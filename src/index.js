@@ -132,21 +132,17 @@ class MainSettlementBus extends ReadyResource {
                 connection.on('data', async (data) => {
                     const msg = Buffer(data).toString('utf8');
                     try {
-                        const item = _this.base._bootstrapWriters[Math.floor(Math.random()*_this.base._bootstrapWriters.length)];
-                        console.log(item.core.key, _this.writerLocalKey);
-                        if(Buffer(item.core.key).toString('hex') === _this.writerLocalKey){
-                            const parsed = JSON.parse(msg);
-                            if(typeof parsed.op !== undefined && parsed.op === 'tx' && typeof parsed.tx !== undefined){
-                                await _this.base.append({ type: 'tx', key: parsed.tx, value : parsed });
-                                await _this.base.update();
-                                await connection.write(JSON.stringify({
-                                    op : 'tx',
-                                    tx : parsed.tx,
-                                    sig : 'abc'
-                                }));
-                                connection.end();
-                                console.log(`Incoming:`, parsed);
-                            }
+                        const parsed = JSON.parse(msg);
+                        if(typeof parsed.op !== undefined && parsed.op === 'tx' && typeof parsed.tx !== undefined){
+                            await _this.base.append({ type: 'tx', key: parsed.tx, value : parsed });
+                            await _this.base.update();
+                            await connection.write(JSON.stringify({
+                                op : 'tx',
+                                tx : parsed.tx,
+                                sig : 'abc'
+                            }));
+                            connection.end();
+                            console.log(`Incoming:`, parsed);
                         }
                     } catch(e) { }
                 });
