@@ -14,9 +14,10 @@ class MainSettlementBus extends ReadyResource {
 
         this.store = store;
         this.swarm = null;
+        this.tx = options.tx || null;;
         this.base = null;
         this.key = null;
-        this.channel = options.channel;
+        this.channel = options.channel || null;;
         this.connectedNodes = 1;
         this.replicate = options.replicate !== false;
         this.writerLocalKey = null;
@@ -86,6 +87,7 @@ class MainSettlementBus extends ReadyResource {
         await this.base.ready();
         this.writerLocalKey = b4a.toString(this.base.local.key, 'hex');
         if (this.replicate) await this._replicate();
+        await this.txChannel();
     }
 
     async close() {
@@ -93,6 +95,49 @@ class MainSettlementBus extends ReadyResource {
             await this.swarm.destroy();
         }
         await this.base.close();
+    }
+
+    async txChannel() {
+        this.tx_swarm = new Hyperswarm();
+        this.tx_swarm.on('connection', async (connection, peerInfo) => {
+            const _this = this;
+            const peerName = b4a.toString(connection.remotePublicKey, 'hex');
+
+            console.log(`TX Remote Public key: ${peerName}`)
+            console.log(`* TX Connected to peer: ${peerName} *`);
+
+            connection.on('close', () => {
+                console.log(`TX Peer disconnected. Remaining nodes: ${this.connectedNodes}`);
+            });
+
+            connection.on('data', async (data) => {
+                const msg = Buffer(data).toString('utf8');
+                try {
+                    const parsed = JSON.parse(msg);
+                    if(typeof parsed.op !== undefined && parsed.op === 'pre-tx' && typeof parsed.tx !== undefined){
+                        const view = await this.base.view.checkout(this.base.view.core.indexedLength);
+                        const batch = view.batch({ update: false });
+                        if(null === await batch.get(parsed.tx)){
+                            const post_tx = JSON.stringify({
+                                op : 'post-tx',
+                                tx : parsed.tx,
+                                sig : 'abc'
+                            });
+                            await _this.base.append({ type: 'tx', key: parsed.tx, value : post_tx });
+                            await _this.base.update();
+                            await connection.write(post_tx);
+                            console.log(`MSB Incoming:`, parsed);
+                        }
+                    }
+                } catch(e) { }
+                connection.end();
+            });
+        });
+
+        const channelBuffer = this.tx;
+        this.tx_swarm.join(channelBuffer, { server: true, client: false });
+        await this.tx_swarm.flush();
+        console.log('Joined channel for peer discovery');
     }
 
     async _replicate() {
@@ -126,24 +171,6 @@ class MainSettlementBus extends ReadyResource {
 
                 connection.on('error', (error) => {
                     console.error(`Connection error: ${error.message}`);
-                });
-
-                connection.on('data', async (data) => {
-                    const msg = Buffer(data).toString('utf8');
-                    try {
-                        const parsed = JSON.parse(msg);
-                        if(typeof parsed.op !== undefined && parsed.op === 'tx' && typeof parsed.tx !== undefined){
-                            await _this.base.append({ type: 'tx', key: parsed.tx, value : parsed });
-                            await _this.base.update();
-                            await connection.write(JSON.stringify({
-                                op : 'tx',
-                                tx : parsed.tx,
-                                sig : 'abc'
-                            }));
-                            connection.end();
-                            console.log(`Incoming:`, parsed);
-                        }
-                    } catch(e) { }
                 });
 
                 if (!this.isStreaming) {
