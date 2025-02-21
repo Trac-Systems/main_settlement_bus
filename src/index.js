@@ -104,7 +104,6 @@ class MainSettlementBus extends ReadyResource {
             });
 
             console.log(`Channel: ${this.channel}`);
-            console.log(`Key from corestore for this node: ${keyPair.publicKey.toString('hex')}`);
             console.log(`Writer key: ${this.writerLocalKey}`)
 
             this.swarm.on('connection', async (connection, peerInfo) => {
@@ -148,20 +147,20 @@ class MainSettlementBus extends ReadyResource {
                 });
 
                 if (!this.isStreaming) {
-                    console.log(`*** Emitting "readyMSB" event. ***`);
-                    this.emit('readyMSB');
+                    console.log(`*** Emitting "readyMsb" event. ***`);
+                    this.emit('readyMsb');
                 }
             });
 
-            const channelBuffer = b4a.from(this.channel, 'hex');
-            this.swarm.join(channelBuffer, { server: true, client: false });
+            const channelBuffer = this.channel;
+            this.swarm.join(channelBuffer, { server: true, client: true });
             await this.swarm.flush();
             console.log('Joined channel for peer discovery');
         }
     }
 
     msbListener() {
-        this.on('readyMSB', async () => {
+        this.on('readyMsb', async () => {
             if (!this.isStreaming) {
                 this.isStreaming = true;
             }
