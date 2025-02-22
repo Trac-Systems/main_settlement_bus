@@ -115,7 +115,7 @@ class MainSettlementBus extends ReadyResource {
                 try {
                     const parsed = JSON.parse(msg);
                     if(typeof parsed.op !== undefined && parsed.op === 'pre-tx' && typeof parsed.tx !== undefined){
-                        const view = await this.base.view.checkout(this.base.view.core.indexedLength);
+                        const view = await this.base.view.checkout(this.base.view.core.length);
                         const batch = view.batch({ update: false });
                         if(null === await batch.get(parsed.tx)){
                             const post_tx = JSON.stringify({
@@ -123,9 +123,9 @@ class MainSettlementBus extends ReadyResource {
                                 tx : parsed.tx,
                                 sig : 'abc'
                             });
+                            await connection.write(post_tx);
                             await _this.base.append({ type: 'tx', key: parsed.tx, value : post_tx });
                             await _this.base.update();
-                            await connection.write(post_tx);
                             console.log(`MSB Incoming:`, parsed);
                         }
                     }
