@@ -128,6 +128,7 @@ class MainSettlementBus extends ReadyResource {
                             await _this.base.update();
                             console.log(`MSB Incoming:`, parsed);
                         }
+                        await batch.flush();
                     }
                 } catch(e) { }
                 connection.end();
