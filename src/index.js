@@ -69,7 +69,7 @@ class MainSettlementBus extends ReadyResource {
                         console.log(`${op.key}: ${op.value}`);
                     } else if (op.type === 'tx'){
                         await batch.put(op.key, op.value);
-                        console.log(`${op.key}:`, op.value);
+                        console.log(`Appended: ${op.key}:`, op.value);
                     }
                 }
 
@@ -123,27 +123,42 @@ class MainSettlementBus extends ReadyResource {
                 const msg = Buffer(data).toString('utf8');
                 try {
                     const parsed = JSON.parse(msg);
-                    if(typeof parsed.op !== undefined && parsed.op === 'pre-tx' && typeof parsed.tx !== undefined){
-                        const view = await this.base.view.checkout(this.base.view.core.indexedLength);
-                        const batch = view.batch({ update: false });
-                        if(null === await batch.get(parsed.tx)){
-                            const post_tx = JSON.stringify({
-                                op : 'post-tx',
-                                tx : parsed.tx,
-                                sig : 'abc'
-                            });
-                            await _this.base.append({ type: 'tx', key: parsed.tx, value : post_tx });
-                            await _this.base.update();
-                            await connection.write(post_tx);
-                            console.log(`MSB Incoming:`, parsed);
-                        }
-                        await batch.flush();
+                    if(typeof parsed.op !== undefined &&
+                        parsed.op === 'pre-tx' &&
+                            typeof parsed.tx !== undefined &&
+                                typeof parsed.w !== undefined &&
+                                    parsed.w === _this.writerLocalKey &&
+                                        _this.base.activeWriters.has(Buffer.from(parsed.w, 'hex'))) {
+                        // TODO: check sender signature
+                        // TODO: sign tx
+                        const append_tx = JSON.stringify({
+                            op : 'post-tx',
+                            tx : parsed.tx,
+                            w : parsed.w,
+                            err : null,
+                            sig : 'abc'
+                        });
+                        await connection.write(append_tx);
+                        await _this.base.append({ type: 'tx', key: parsed.tx, value : append_tx });
+                        await _this.base.update();
+                        console.log(`MSB Incoming:`, parsed);
+                    } else if(typeof parsed.op !== undefined &&
+                                parsed.op === 'pre-tx' &&
+                                    typeof parsed.tx !== undefined) {
+                        const append_tx = JSON.stringify({
+                            op : 'post-tx',
+                            tx : parsed.tx,
+                            w : typeof parsed.w !== undefined ? parsed.w : null,
+                            err : 'Cannot execute transaction',
+                            sig : null
+                        });
+                        await connection.write(append_tx);
                     }
-                } catch(e) { }
+                } catch(e) { console.log(e) }
             });
         });
 
-        const channelBuffer = Buffer.from(this.tx, 'hex');
+        const channelBuffer = this.tx;
         this.tx_swarm.join(channelBuffer, { server: true, client: true });
         await this.tx_swarm.flush();
         console.log('Joined MSB channel for peer discovery');
@@ -188,7 +203,7 @@ class MainSettlementBus extends ReadyResource {
                 }
             });
 
-            const channelBuffer = Buffer.from(this.channel, 'hex');
+            const channelBuffer = this.channel
             this.swarm.join(channelBuffer, { server: true, client: true });
             await this.swarm.flush();
             console.log('Joined channel for peer discovery');
