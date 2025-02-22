@@ -104,10 +104,19 @@ class MainSettlementBus extends ReadyResource {
             const peerName = b4a.toString(connection.remotePublicKey, 'hex');
 
             console.log(`TX Remote Public key: ${peerName}`)
-            console.log(`* TX Connected to peer: ${peerName} *`);
+
+            this.connectedPeers.add(peerName);
+            this.connectedNodes++;
+            console.log(`TX Total connected nodes: ${this.connectedNodes}`);
 
             connection.on('close', () => {
+                this.connectedNodes--;
+                this.connectedPeers.delete(peerName);
                 console.log(`TX Peer disconnected. Remaining nodes: ${this.connectedNodes}`);
+            });
+
+            connection.on('error', (error) => {
+                console.error(`TX Connection error: ${error.message}`);
             });
 
             connection.on('data', async (data) => {
@@ -115,7 +124,7 @@ class MainSettlementBus extends ReadyResource {
                 try {
                     const parsed = JSON.parse(msg);
                     if(typeof parsed.op !== undefined && parsed.op === 'pre-tx' && typeof parsed.tx !== undefined){
-                        const view = await this.base.view.checkout(this.base.view.core.length);
+                        const view = await this.base.view.checkout(this.base.view.core.indexedLength);
                         const batch = view.batch({ update: false });
                         if(null === await batch.get(parsed.tx)){
                             const post_tx = JSON.stringify({
@@ -131,14 +140,13 @@ class MainSettlementBus extends ReadyResource {
                         await batch.flush();
                     }
                 } catch(e) { }
-                connection.end();
             });
         });
 
-        const channelBuffer = this.tx;
-        this.tx_swarm.join(channelBuffer, { server: true, client: false });
+        const channelBuffer = Buffer.from(this.tx, 'hex');
+        this.tx_swarm.join(channelBuffer, { server: true, client: true });
         await this.tx_swarm.flush();
-        console.log('Joined channel for peer discovery');
+        console.log('Joined MSB channel for peer discovery');
     }
 
     async _replicate() {
@@ -180,7 +188,7 @@ class MainSettlementBus extends ReadyResource {
                 }
             });
 
-            const channelBuffer = this.channel;
+            const channelBuffer = Buffer.from(this.channel, 'hex');
             this.swarm.join(channelBuffer, { server: true, client: true });
             await this.swarm.flush();
             console.log('Joined channel for peer discovery');
