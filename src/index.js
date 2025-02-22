@@ -70,8 +70,13 @@ class MainSettlementBus extends ReadyResource {
                     } else if (op.type === 'tx'){
                         // TODO: check signatureS (both, sender and writer)
                         // TODO: check if writer is active writer
-                        await batch.put(op.key, op.value);
-                        console.log(`Appended: ${op.key}:`, op.value);
+                        if(null === await batch.get(op.key)) {
+                            await batch.put(op.key, op.value);
+                            console.log(`TX: ${op.key}:`);
+                            console.log(`TX Fees: 0.0078 $TRAC`);
+                            console.log(`Burned: 0.0026 $TRAC`);
+                            console.log(`Validator Reward: 0.0052 $TRAC.`);
+                        }
                     }
                 }
 
@@ -128,29 +133,35 @@ class MainSettlementBus extends ReadyResource {
                     if(typeof parsed.op !== undefined &&
                         parsed.op === 'pre-tx' &&
                             typeof parsed.tx !== undefined &&
-                                typeof parsed.w !== undefined &&
-                                    parsed.w === _this.writerLocalKey &&
-                                        _this.base.activeWriters.has(Buffer.from(parsed.w, 'hex'))) {
+                                typeof parsed.i !== undefined &&
+                                    typeof parsed.w !== undefined &&
+                                        parsed.w === _this.writerLocalKey &&
+                                            _this.base.activeWriters.has(Buffer.from(parsed.w, 'hex'))) {
+                        // TODO: complete sanitizing above
                         // TODO: check sender signature
                         // TODO: sign tx
                         const append_tx = JSON.stringify({
                             op : 'post-tx',
                             tx : parsed.tx,
                             w : parsed.w,
+                            i : parsed.i,
                             err : null,
-                            sig : 'abc'
+                            sig : 'ad19527946ac4228decedbe125d5b7b52d1422031dbf7aaf96e1210fc6a432b7'
                         });
                         await connection.write(append_tx);
                         await _this.base.append({ type: 'tx', key: parsed.tx, value : append_tx });
                         await _this.base.update();
                         console.log(`MSB Incoming:`, parsed);
+                    // TODO: questionable if this should be used at all because it leads to a lot of "chatter"
                     } else if(typeof parsed.op !== undefined &&
                                 parsed.op === 'pre-tx' &&
-                                    typeof parsed.tx !== undefined) {
+                                    typeof parsed.i !== undefined &&
+                                        typeof parsed.tx !== undefined) {
                         const append_tx = JSON.stringify({
                             op : 'post-tx',
                             tx : parsed.tx,
                             w : typeof parsed.w !== undefined ? parsed.w : null,
+                            i : parsed.i,
                             err : 'Cannot execute transaction',
                             sig : null
                         });
