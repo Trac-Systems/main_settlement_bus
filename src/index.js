@@ -123,9 +123,9 @@ class MainSettlementBus extends ReadyResource {
                                 tx : parsed.tx,
                                 sig : 'abc'
                             });
-                            await connection.write(post_tx);
                             await _this.base.append({ type: 'tx', key: parsed.tx, value : post_tx });
                             await _this.base.update();
+                            await connection.write(post_tx);
                             console.log(`MSB Incoming:`, parsed);
                         }
                         await batch.flush();
