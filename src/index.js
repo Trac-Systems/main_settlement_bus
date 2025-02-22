@@ -68,6 +68,8 @@ class MainSettlementBus extends ReadyResource {
                         await batch.put(op.key, op.value);
                         console.log(`${op.key}: ${op.value}`);
                     } else if (op.type === 'tx'){
+                        // TODO: check signatureS (both, sender and writer)
+                        // TODO: check if writer is active writer
                         await batch.put(op.key, op.value);
                         console.log(`Appended: ${op.key}:`, op.value);
                     }
