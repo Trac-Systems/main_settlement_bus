@@ -85,6 +85,9 @@ export class MainSettlementBus extends ReadyResource {
 
     async _open() {
         await this.base.ready();
+        console.log('View Length:', this.base.view.core.length);
+        console.log('View Signed Length:', this.base.view.core.signedLength);
+        console.log('Channel/topic Key:', Buffer(this.base.view.core.key).toString('hex'));
         this.writerLocalKey = b4a.toString(this.base.local.key, 'hex');
         if (this.replicate) await this._replicate();
         if(this.enable_txchannel){
@@ -100,25 +103,25 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async txChannel() {
-        this.tx_swarm = new Hyperswarm();
+        this.tx_swarm = new Hyperswarm({maxPeers : 1024, maxParallel: 512, maxServerConnections : 256});
         this.tx_swarm.on('connection', async (connection, peerInfo) => {
             const _this = this;
             const peerName = b4a.toString(connection.remotePublicKey, 'hex');
 
-            console.log(`TX Remote Public key: ${peerName}`)
+            //console.log(`TX Remote Public key: ${peerName}`)
 
             this.connectedPeers.add(peerName);
             this.connectedNodes++;
-            console.log(`TX Total connected nodes: ${this.connectedNodes}`);
+            //console.log(`TX Total connected nodes: ${this.connectedNodes}`);
 
             connection.on('close', () => {
                 this.connectedNodes--;
                 this.connectedPeers.delete(peerName);
-                console.log(`TX Peer disconnected. Remaining nodes: ${this.connectedNodes}`);
+                //console.log(`TX Peer disconnected. Remaining nodes: ${this.connectedNodes}`);
             });
 
             connection.on('error', (error) => {
-                console.error(`TX Connection error: ${error.message}`);
+                //console.error(`TX Connection error: ${error.message}`);
             });
 
             connection.on('data', async (data) => {
@@ -161,7 +164,7 @@ export class MainSettlementBus extends ReadyResource {
     async _replicate() {
         if (!this.swarm) {
             const keyPair = await this.store.createKeyPair('hyperswarm');
-            this.swarm = new Hyperswarm({ keyPair });
+            this.swarm = new Hyperswarm({ keyPair, maxPeers : 1024, maxParallel: 512, maxServerConnections : 256 });
             this.invite = new BlindPairing(this.swarm, {
                 poll: 5000
             });
@@ -173,26 +176,26 @@ export class MainSettlementBus extends ReadyResource {
                 const _this = this;
                 const peerName = b4a.toString(connection.remotePublicKey, 'hex');
 
-                console.log(`Remote Public key: ${peerName}`)
+                //console.log(`Remote Public key: ${peerName}`)
 
-                console.log(`* Connected to peer: ${peerName} *`);
+                //console.log(`* Connected to peer: ${peerName} *`);
                 this.connectedPeers.add(peerName);
                 this.store.replicate(connection);
                 this.connectedNodes++;
-                console.log(`Total connected nodes: ${this.connectedNodes}`);
+                //console.log(`Total connected nodes: ${this.connectedNodes}`);
 
                 connection.on('close', () => {
                     this.connectedNodes--;
                     this.connectedPeers.delete(peerName);
-                    console.log(`Peer disconnected. Remaining nodes: ${this.connectedNodes}`);
+                    //console.log(`Peer disconnected. Remaining nodes: ${this.connectedNodes}`);
                 });
 
                 connection.on('error', (error) => {
-                    console.error(`Connection error: ${error.message}`);
+                    //console.error(`Connection error: ${error.message}`);
                 });
 
                 if (!this.isStreaming) {
-                    console.log(`*** Emitting "readyMsb" event. ***`);
+                    //console.log(`*** Emitting "readyMsb" event. ***`);
                     this.emit('readyMsb');
                 }
             });
