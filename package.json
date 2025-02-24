@@ -12,7 +12,7 @@
     "test": "brittle test/*.test.js"
   },
   "dependencies": {
-    "autobase": "^7.0.22",
+    "autobase": "^7.0.24",
     "b4a": "1.6.7",
     "bare-fs": "4.0.1",
     "blind-pairing": "^2.3.1",
