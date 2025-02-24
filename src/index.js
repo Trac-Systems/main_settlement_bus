@@ -143,8 +143,8 @@ export class MainSettlementBus extends ReadyResource {
                             tx : parsed.tx,
                             w : parsed.w,
                             i : parsed.i,
-                            err : null,
-                            sig : 'abcd'
+                            ws : 'abcd',
+                            is : 'wyxz'
                         };
                         await _this.base.append({ type: 'tx', key: parsed.tx, value : append_tx });
                         await _this.base.update();
