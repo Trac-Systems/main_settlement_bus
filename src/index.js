@@ -6,6 +6,7 @@ import b4a from 'b4a';
 import Hyperbee from 'hyperbee';
 import readline from 'readline';
 import BlindPairing from 'blind-pairing';
+import crypto from 'hypercore-crypto';
 
 export class MainSettlementBus extends ReadyResource {
 
@@ -138,18 +139,26 @@ export class MainSettlementBus extends ReadyResource {
                         // TODO: complete sanitizing above
                         // TODO: check sender signature
                         // TODO: sign tx
-                        const append_tx = {
-                            op : 'post-tx',
-                            tx : parsed.tx,
-                            w : parsed.w,
-                            i : parsed.i,
-                            ws : 'abcd',
-                            is : 'wyxz'
-                        };
-                        await _this.base.append({ type: 'tx', key: parsed.tx, value : append_tx });
-                        await _this.base.update();
-                        await connection.write(JSON.stringify(append_tx));
-                        console.log(`MSB Incoming:`, parsed);
+               
+                        if (crypto.verify(Buffer.from(parsed.tx, 'utf-8'), Buffer.from(parsed.isig.data), Buffer.from(parsed.ipk.data))) {
+                            const signature =  crypto.sign (Buffer.from(parsed.tx, 'utf-8'), this.base.localWriter.core.keyPair.secretKey);
+                            const append_tx = {
+                                op : 'post-tx',
+                                tx : parsed.tx,
+                                w : parsed.w,
+                                i : parsed.i,
+                                msbpk: this.base.localWriter.core.keyPair.publicKey,
+                                msbsig: signature,
+                                manifest: this.base.localWriter.core.manifest
+                            };
+                            
+                            await _this.base.append({ type: 'tx', key: parsed.tx, value : append_tx });
+                            await _this.base.update();
+                            await connection.write(JSON.stringify(append_tx));
+                            console.log(`MSB Incoming:`, parsed);
+
+                        }                            
+
                     }
                 } catch(e) { console.log(e) }
             });
