@@ -139,15 +139,18 @@ export class MainSettlementBus extends ReadyResource {
             connection.on('data', async (data) => {
                 const msg = Buffer(data).toString('utf8');
                 try {
+                    console.log("===================> msg:",msg)
                     const parsedPreTx = JSON.parse(msg);
+                    // console.log("======================> parsedPreTx",parsedPreTx)
                     if(sanitizePreTransaction(parsedPreTx) && 
                         crypto.verify(Buffer.from(parsedPreTx.tx, 'utf-8'), Buffer.from(parsedPreTx.isig.data), Buffer.from(parsedPreTx.ipk.data))) {
                             const manifest = this.base.localWriter.core.manifest;
-                            console.log("manifest", this.base.localWriter.core.manifest)
+                            // console.log("manifest", this.base.localWriter.core.manifest)
 
-                            const hashedManifest = manifestHash(createManifest(manifest));
-                            console.log("hashedManifest ",hashedManifest)
-                            console.log("manifest stringify ",JSON.stringify(manifest))
+                            // const hashedManifest = manifestHash(createManifest(manifest));
+                            // console.log("hashedManifest ",hashedManifest)
+                            console.log("=========> manifest ",manifest)
+                            console.log("=========> manifest stringify ",JSON.stringify(manifest))
                             const signature =  crypto.sign(Buffer.from(parsedPreTx.tx, 'utf-8'), this.base.localWriter.core.keyPair.secretKey);
                             const append_tx = {
                                 op : 'post-tx',
@@ -156,13 +159,15 @@ export class MainSettlementBus extends ReadyResource {
                                 i : parsedPreTx.i,
                                 msbsig: signature,
                                 msbpk: this.base.localWriter.core.keyPair.publicKey,
-                                manifest: JSON.stringify(manifest)
+                                manifest: manifest
                             };
-                            console.log("append_tx",append_tx);
+                            const str_append_tx = JSON.stringify(append_tx);
+                            // console.log("=============> append_tx",append_tx);
+                            console.log("============> str_append_tx",str_append_tx);
                             await _this.base.append({ type: 'tx', key: parsedPreTx.tx, value : append_tx });
                             await _this.base.update();
-                            await connection.write(JSON.stringify(append_tx));
-                            console.log("stringifyed parsed post-tx",JSON.stringify(append_tx))
+                            await connection.write(JSON.stringify(str_append_tx));
+                            // console.log("stringifyed parsed post-tx",JSON.stringify(append_tx))
                     
                     }
                 } catch(e) { 
