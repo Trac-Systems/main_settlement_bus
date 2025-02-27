@@ -149,7 +149,7 @@ export class MainSettlementBus extends ReadyResource {
                                 i : parsed.i,
                                 msbpk: this.base.localWriter.core.keyPair.publicKey,
                                 msbsig: signature,
-                                manifest: this.base.localWriter.core.manifest
+                                manifest: JSON.stringify(this.base.localWriter.core.manifest)
                             };
                             
                             await _this.base.append({ type: 'tx', key: parsed.tx, value : append_tx });
