@@ -7,6 +7,10 @@ import Hyperbee from 'hyperbee';
 import readline from 'readline';
 import BlindPairing from 'blind-pairing';
 import crypto from 'hypercore-crypto';
+import {sanitizePreTransaction} from './functions.js';
+
+import pkg from 'hypercore/lib/verifier.js';
+const { manifestHash, createManifest } = pkg;
 
 export class MainSettlementBus extends ReadyResource {
 
@@ -125,42 +129,41 @@ export class MainSettlementBus extends ReadyResource {
                 //console.error(`TX Connection error: ${error.message}`);
             });
 
+
+            // Sanitization time: 0.085 ms
+            // signature verification time: 0.105 ms SUGGESTION: SECOND SERVICE IN RUST WHICH WILL BE SOMETHING LIKE CRYPTOGRAPHIC VALIDATOR WHICH WILL USE SHARED MEMORY WITH THIS PROGRAM?
+            // EVEN IF SODIUM JS LIBRARY IS FAST IT'S STILL SLOW FOR THIS PURPOSE.
+            //todo: add this check  parsed.w === _this.writerLocalKey
+            //todo: add this check _this.base.activeWriters.has(Buffer.from(parsed.w, 'hex'))
             connection.on('data', async (data) => {
                 const msg = Buffer(data).toString('utf8');
                 try {
-                    const parsed = JSON.parse(msg);
-                    if(typeof parsed.op === 'string' &&
-                        parsed.op === 'pre-tx' &&
-                            typeof parsed.tx === 'string' &&
-                                typeof parsed.i === 'string' &&
-                                    typeof parsed.w === 'string' &&
-                                        parsed.w === _this.writerLocalKey &&
-                                            _this.base.activeWriters.has(Buffer.from(parsed.w, 'hex'))) {
-                        // TODO: complete sanitizing above
-                        // TODO: check sender signature
-                        // TODO: sign tx
-               
-                        if (crypto.verify(Buffer.from(parsed.tx, 'utf-8'), Buffer.from(parsed.isig.data), Buffer.from(parsed.ipk.data))) {
-                            const signature =  crypto.sign (Buffer.from(parsed.tx, 'utf-8'), this.base.localWriter.core.keyPair.secretKey);
+                    const parsedTx = JSON.parse(msg);
+                    if(sanitizePreTransaction(parsedTx) && 
+                        crypto.verify(Buffer.from(parsedTx.tx, 'utf-8'), Buffer.from(parsedTx.isig.data), Buffer.from(parsedTx.ipk.data))) {
+                            console.log("manifest", this.base.localWriter.core.manifest)
+                            const hashedManifest = manifestHash(createManifest(this.base.localWriter.core.manifest));
+                            console.log("hashedManifest ",hashedManifest)
+                            const signature =  crypto.sign (Buffer.from(parsedTx.tx, 'utf-8'), this.base.localWriter.core.keyPair.secretKey);
                             const append_tx = {
                                 op : 'post-tx',
-                                tx : parsed.tx,
-                                w : parsed.w,
-                                i : parsed.i,
-                                msbpk: this.base.localWriter.core.keyPair.publicKey,
+                                tx : parsedTx.tx,
+                                w : parsedTx.w,
+                                i : parsedTx.i,
                                 msbsig: signature,
+                                msbpk: this.base.localWriter.core.keyPair.publicKey,
                                 manifest: JSON.stringify(this.base.localWriter.core.manifest)
                             };
                             
-                            await _this.base.append({ type: 'tx', key: parsed.tx, value : append_tx });
+                            await _this.base.append({ type: 'tx', key: parsedTx.tx, value : append_tx });
                             await _this.base.update();
                             await connection.write(JSON.stringify(append_tx));
-                            console.log(`MSB Incoming:`, parsed);
-
-                        }                            
-
+                            console.log(`MSB Incoming:`, parsedTx);
+                    
                     }
-                } catch(e) { console.log(e) }
+                } catch(e) { 
+                    console.log(e) 
+                }
             });
         });
 
