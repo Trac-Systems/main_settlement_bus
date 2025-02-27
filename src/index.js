@@ -10,6 +10,7 @@ import crypto from 'hypercore-crypto';
 import {sanitizePreTransaction} from './functions.js';
 
 import pkg from 'hypercore/lib/verifier.js';
+import { version } from 'os';
 const { manifestHash, createManifest } = pkg;
 
 export class MainSettlementBus extends ReadyResource {
@@ -138,27 +139,30 @@ export class MainSettlementBus extends ReadyResource {
             connection.on('data', async (data) => {
                 const msg = Buffer(data).toString('utf8');
                 try {
-                    const parsedTx = JSON.parse(msg);
-                    if(sanitizePreTransaction(parsedTx) && 
-                        crypto.verify(Buffer.from(parsedTx.tx, 'utf-8'), Buffer.from(parsedTx.isig.data), Buffer.from(parsedTx.ipk.data))) {
+                    const parsedPreTx = JSON.parse(msg);
+                    if(sanitizePreTransaction(parsedPreTx) && 
+                        crypto.verify(Buffer.from(parsedPreTx.tx, 'utf-8'), Buffer.from(parsedPreTx.isig.data), Buffer.from(parsedPreTx.ipk.data))) {
+                            const manifest = this.base.localWriter.core.manifest;
                             console.log("manifest", this.base.localWriter.core.manifest)
-                            const hashedManifest = manifestHash(createManifest(this.base.localWriter.core.manifest));
+
+                            const hashedManifest = manifestHash(createManifest(manifest));
                             console.log("hashedManifest ",hashedManifest)
-                            const signature =  crypto.sign (Buffer.from(parsedTx.tx, 'utf-8'), this.base.localWriter.core.keyPair.secretKey);
+                            console.log("manifest stringify ",JSON.stringify(manifest))
+                            const signature =  crypto.sign(Buffer.from(parsedPreTx.tx, 'utf-8'), this.base.localWriter.core.keyPair.secretKey);
                             const append_tx = {
                                 op : 'post-tx',
-                                tx : parsedTx.tx,
-                                w : parsedTx.w,
-                                i : parsedTx.i,
+                                tx : parsedPreTx.tx,
+                                w : parsedPreTx.w,
+                                i : parsedPreTx.i,
                                 msbsig: signature,
                                 msbpk: this.base.localWriter.core.keyPair.publicKey,
-                                manifest: JSON.stringify(this.base.localWriter.core.manifest)
+                                manifest: JSON.stringify(manifest)
                             };
-                            
-                            await _this.base.append({ type: 'tx', key: parsedTx.tx, value : append_tx });
+                            console.log("append_tx",append_tx);
+                            await _this.base.append({ type: 'tx', key: parsedPreTx.tx, value : append_tx });
                             await _this.base.update();
                             await connection.write(JSON.stringify(append_tx));
-                            console.log(`MSB Incoming:`, parsedTx);
+                            console.log("stringifyed parsed post-tx",JSON.stringify(append_tx))
                     
                     }
                 } catch(e) { 
