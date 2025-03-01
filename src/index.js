@@ -82,11 +82,6 @@ export class MainSettlementBus extends ReadyResource {
                 await batch.flush();
             }
         })
-        // This line propagates the 'update' event emitted by the `Autobase` instance.
-        //The autobase instance emits an update event  whemever its state changes.
-        // By listening to the 'update' event from `this.base` and re-emitting it
-        // (`this.emit('update')`), the `MessageShooter` instance informs its own listeners about these updates.
-        this.base.on('update', () => this.emit('update'));
     }
 
     async _open() {
