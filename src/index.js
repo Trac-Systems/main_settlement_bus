@@ -93,7 +93,7 @@ export class MainSettlementBus extends ReadyResource {
         await this.base.ready();
         console.log('View Length:', this.base.view.core.length);
         console.log('View Signed Length:', this.base.view.core.signedLength);
-        console.log('Channel/topic Key:', Buffer(this.base.view.core.key).toString('hex'));
+        console.log('MSB Key:', Buffer(this.base.view.core.key).toString('hex'));
         this.writerLocalKey = b4a.toString(this.base.local.key, 'hex');
         if (this.replicate) await this._replicate();
         if(this.enable_txchannel){
