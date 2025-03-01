@@ -268,7 +268,6 @@ export class MainSettlementBus extends ReadyResource {
         console.log('- /add_me: enter a node address as argument to get included as writer.');
         console.log('- /dag: check system properties such as writer key, DAG, etc.');
         console.log('- /exit: Exit the program');
-        console.log('- anything else to send a message');
 
         rl.on('line', async (input) => {
             switch (input) {
@@ -324,17 +323,6 @@ export class MainSettlementBus extends ReadyResource {
                             console.log('Paired!');
                         } catch(e) {
                          console.log(e.message);
-                        }
-                    } else {
-                        if(this.isStreaming) {
-                            await this.base.append([{
-                                type : 'msg',
-                                key : this.writerLocalKey,
-                                value : input
-                            }]);
-                            await this.base.update();
-                        } else {
-                            console.log('App is not streaming yet');
                         }
                     }
             }
