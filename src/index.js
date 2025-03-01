@@ -7,11 +7,7 @@ import Hyperbee from 'hyperbee';
 import readline from 'readline';
 import BlindPairing from 'blind-pairing';
 import crypto from 'hypercore-crypto';
-import {sanitizePreTransaction} from './functions.js';
-
-import pkg from 'hypercore/lib/verifier.js';
-import { version } from 'os';
-const { manifestHash, createManifest } = pkg;
+import {sanitizePreTransaction, addWriter} from './functions.js';
 
 export class MainSettlementBus extends ReadyResource {
 
@@ -56,17 +52,10 @@ export class MainSettlementBus extends ReadyResource {
             },
 
             apply: async (nodes, view, base) => {
-
-                //console.log('System core length', this.base.system.core.length);
-                //console.log('System core fork', this.base.system.core.fork);
-
                 const batch = view.batch({ update: false })
 
                 for (const node of nodes) {
-                    //console.log(node);
-                    //console.log('System has node', await this.base.system.has(node.from.key));
                     const op = node.value;
-
                     if (op.type === 'addWriter') {
                         const writerKey = b4a.from(op.key, 'hex');
                         await base.addWriter(writerKey);
@@ -75,7 +64,7 @@ export class MainSettlementBus extends ReadyResource {
                         // TODO: check signatureS (both, sender and writer)
                         // TODO: check if writer is active writer
                         await batch.put(op.key, op.value);
-                        console.log(`TX: ${op.key}:`, op.value);
+                        console.log(`TX: ${op.key} appended`);
                     }
                 }
 
@@ -108,61 +97,46 @@ export class MainSettlementBus extends ReadyResource {
         this.tx_swarm.on('connection', async (connection, peerInfo) => {
             const _this = this;
             const peerName = b4a.toString(connection.remotePublicKey, 'hex');
-
-            //console.log(`TX Remote Public key: ${peerName}`)
-
             this.connectedPeers.add(peerName);
             this.connectedNodes++;
-            //console.log(`TX Total connected nodes: ${this.connectedNodes}`);
 
             connection.on('close', () => {
                 this.connectedNodes--;
                 this.connectedPeers.delete(peerName);
-                //console.log(`TX Peer disconnected. Remaining nodes: ${this.connectedNodes}`);
             });
 
-            connection.on('error', (error) => {
-                //console.error(`TX Connection error: ${error.message}`);
-            });
+            connection.on('error', (error) => { });
 
-
-            // Sanitization time: 0.085 ms
-            // signature verification time: 0.105 ms SUGGESTION: SECOND SERVICE IN RUST WHICH WILL BE SOMETHING LIKE CRYPTOGRAPHIC VALIDATOR WHICH WILL USE SHARED MEMORY WITH THIS PROGRAM?
-            // EVEN IF SODIUM JS LIBRARY IS FAST IT'S STILL SLOW FOR THIS PURPOSE.
-            //todo: add this check  parsed.w === _this.writerLocalKey
-            //todo: add this check _this.base.activeWriters.has(Buffer.from(parsed.w, 'hex'))
-            connection.on('data', async (data) => {
-                const msg = Buffer(data).toString('utf8');
+            connection.on('data', async (msg) => {
                 try {
-                    console.log("===================> msg:",msg)
+                    //console.log("===================> msg:", msg)
                     const parsedPreTx = JSON.parse(msg);
-                    // console.log("======================> parsedPreTx",parsedPreTx)
                     if(sanitizePreTransaction(parsedPreTx) && 
-                        crypto.verify(Buffer.from(parsedPreTx.tx, 'utf-8'), Buffer.from(parsedPreTx.isig.data), Buffer.from(parsedPreTx.ipk.data))) {
+                        crypto.verify(Buffer.from(parsedPreTx.tx, 'utf-8'), Buffer.from(parsedPreTx.is.data), Buffer.from(parsedPreTx.ipk.data)) &&
+                            parsedPreTx.w === _this.writerLocalKey &&
+                                _this.base.activeWriters.has(Buffer.from(parsedPreTx.w, 'hex'))) {
                             const manifest = this.base.localWriter.core.manifest;
-                            // console.log("manifest", this.base.localWriter.core.manifest)
-
-                            // const hashedManifest = manifestHash(createManifest(manifest));
-                            // console.log("hashedManifest ",hashedManifest)
-                            console.log("=========> manifest ",manifest)
-                            console.log("=========> manifest stringify ",JSON.stringify(manifest))
+                            //console.log("=========> manifest ",manifest)
+                            //console.log("=========> manifest stringify ",JSON.stringify(manifest))
                             const signature =  crypto.sign(Buffer.from(parsedPreTx.tx, 'utf-8'), this.base.localWriter.core.keyPair.secretKey);
                             const append_tx = {
                                 op : 'post-tx',
                                 tx : parsedPreTx.tx,
+                                is : parsedPreTx.is,
                                 w : parsedPreTx.w,
                                 i : parsedPreTx.i,
-                                msbsig: signature,
-                                msbpk: this.base.localWriter.core.keyPair.publicKey,
-                                manifest: manifest
+                                ipk : parsedPreTx.ipk,
+                                ch: parsedPreTx.ch,
+                                in : parsedPreTx.in,
+                                ws: JSON.parse(JSON.stringify(signature)),
+                                wpk: JSON.parse(JSON.stringify(this.base.localWriter.core.keyPair.publicKey)),
+                                wm: manifest
                             };
                             const str_append_tx = JSON.stringify(append_tx);
-                            // console.log("=============> append_tx",append_tx);
-                            console.log("============> str_append_tx",str_append_tx);
+                            //console.log("============> str_append_tx", str_append_tx);
                             await _this.base.append({ type: 'tx', key: parsedPreTx.tx, value : append_tx });
                             await _this.base.update();
-                            await connection.write(JSON.stringify(str_append_tx));
-                            // console.log("stringifyed parsed post-tx",JSON.stringify(append_tx))
+                            await connection.write(str_append_tx);
                     
                     }
                 } catch(e) { 
@@ -189,29 +163,19 @@ export class MainSettlementBus extends ReadyResource {
             console.log(`Writer key: ${this.writerLocalKey}`)
 
             this.swarm.on('connection', async (connection, peerInfo) => {
-                const _this = this;
                 const peerName = b4a.toString(connection.remotePublicKey, 'hex');
-
-                //console.log(`Remote Public key: ${peerName}`)
-
-                //console.log(`* Connected to peer: ${peerName} *`);
                 this.connectedPeers.add(peerName);
                 this.store.replicate(connection);
                 this.connectedNodes++;
-                //console.log(`Total connected nodes: ${this.connectedNodes}`);
 
                 connection.on('close', () => {
                     this.connectedNodes--;
                     this.connectedPeers.delete(peerName);
-                    //console.log(`Peer disconnected. Remaining nodes: ${this.connectedNodes}`);
                 });
 
-                connection.on('error', (error) => {
-                    //console.error(`Connection error: ${error.message}`);
-                });
+                connection.on('error', (error) => { });
 
                 if (!this.isStreaming) {
-                    //console.log(`*** Emitting "readyMsb" event. ***`);
                     this.emit('readyMsb');
                 }
             });
@@ -234,8 +198,6 @@ export class MainSettlementBus extends ReadyResource {
     async verifyDag() {
         try {
             console.log('--- DAG Monitoring ---');
-            //const dag = await this.base.system.core.getBackingCore().session.treeHash();
-            //const lengthdag = this.base.system.core.getBackingCore().session.length;
             const dagView = await this.base.view.core.treeHash();
             const lengthdagView = this.base.view.core.length;
             const dagSystem = await this.base.system.core.treeHash();
@@ -260,7 +222,7 @@ export class MainSettlementBus extends ReadyResource {
         });
 
         console.log('MSB started. Available commands:');
-        console.log('- /add_me: enter a node address as argument to get included as writer.');
+        console.log('- /add_writer: enter a peer writer key as argument to get included as writer.');
         console.log('- /dag: check system properties such as writer key, DAG, etc.');
         console.log('- /exit: Exit the program');
 
@@ -276,49 +238,8 @@ export class MainSettlementBus extends ReadyResource {
                     process.exit(0);
                     break;
                 default:
-                    if(input.startsWith('/add_me')) {
-                        try {
-                            let splitted = input.split(' ');
-
-                            const { invite, publicKey, discoveryKey } = BlindPairing.createInvite(Buffer.from(splitted[splitted.length-1], 'hex'));
-                            console.log(invite.toString('hex'), publicKey.toString('hex'), discoveryKey.toString('hex'));
-
-                            const _this = this;
-
-                            const member = this.invite.addMember({
-                                discoveryKey,
-                                async onadd (candidate) {
-                                    console.log('candiate id is', candidate.inviteId.toString('hex'))
-                                    candidate.open(publicKey)
-                                    console.log('add candidate:', candidate.userData.toString('hex'))
-                                    candidate.confirm({ key: Buffer.from(splitted[splitted.length-1], 'hex') })
-                                    await _this.base.append({ type: 'addWriter', key: splitted[splitted.length-1] });
-                                    await _this.base.update();
-                                }
-                            })
-
-                            console.log('Awaiting invite broadcast...');
-
-                            await member.flushed();
-
-                            console.log('Invite id...', invite.toString('hex'));
-
-                            const adding = this.invite.addCandidate({
-                                invite: invite,
-                                userData : Buffer.from(splitted[splitted.length-1], 'hex'),
-                                async onadd (result) {
-                                    console.log('got the result!')
-                                }
-                            })
-
-                            console.log('Awaiting invite pairing...');
-
-                            await adding.pairing;
-
-                            console.log('Paired!');
-                        } catch(e) {
-                         console.log(e.message);
-                        }
+                    if(input.startsWith('/add_writer')) {
+                        await addWriter(input, this);
                     }
             }
             rl.prompt();
