@@ -6,6 +6,7 @@ export function sanitizePreTransaction(parsedTx) {
     return (
         typeof parsedTx === 'object' && parsedTx !== null &&
         typeof parsedTx.op === 'string' &&
+        parsedTx.op === 'pre-tx' &&
         typeof parsedTx.tx === 'string' &&
         typeof parsedTx.w === 'string' &&
         typeof parsedTx.i === 'string' &&

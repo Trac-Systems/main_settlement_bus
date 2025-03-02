@@ -109,8 +109,13 @@ export class MainSettlementBus extends ReadyResource {
 
             connection.on('data', async (msg) => {
                 try {
-                    //console.log("===================> msg:", msg)
                     const parsedPreTx = JSON.parse(msg);
+                    /*
+                    console.log("===================> msg:", parsedPreTx)
+                    console.log(sanitizePreTransaction(parsedPreTx),
+                        crypto.verify(Buffer.from(parsedPreTx.tx, 'utf-8'), Buffer.from(parsedPreTx.is.data), Buffer.from(parsedPreTx.ipk.data)),
+                        parsedPreTx.w +' === ' + _this.writerLocalKey,
+                        _this.base.activeWriters.has(Buffer.from(parsedPreTx.w, 'hex')));*/
                     if(sanitizePreTransaction(parsedPreTx) && 
                         crypto.verify(Buffer.from(parsedPreTx.tx, 'utf-8'), Buffer.from(parsedPreTx.is.data), Buffer.from(parsedPreTx.ipk.data)) &&
                             parsedPreTx.w === _this.writerLocalKey &&
