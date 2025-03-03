@@ -134,7 +134,6 @@ export class MainSettlementBus extends ReadyResource {
                                 ch: parsedPreTx.ch,
                                 in : parsedPreTx.in,
                                 ws: JSON.parse(JSON.stringify(signature)),
-                                wpk: JSON.parse(JSON.stringify(this.base.localWriter.core.keyPair.publicKey)),
                                 wm: manifest
                             };
                             const str_append_tx = JSON.stringify(append_tx);
