@@ -8,6 +8,8 @@ import readline from 'readline';
 import BlindPairing from 'blind-pairing';
 import crypto from 'hypercore-crypto';
 import { sanitizeTransaction, addWriter } from './functions.js';
+import w from 'protomux-wakeup';
+const wakeup = new w();
 
 export class MainSettlementBus extends ReadyResource {
 
@@ -52,31 +54,24 @@ export class MainSettlementBus extends ReadyResource {
             },
 
             apply: async (nodes, view, base) => {
+
                 const batch = view.batch({ update: false })
 
                 for (const node of nodes) {
                     const op = node.value;
                     const postTx = op.value;
                     if (op.type === 'addWriter') {
-                        try {
-                            const writerKey = b4a.from(op.key, 'hex');
-                            await base.addWriter(writerKey);
-                            console.log(`Writer added: ${op.key}`);
-                        } catch (e) {
-                            console.error(`Error adding writer ${op.key}:`, e);
-                        }
+                        const writerKey = b4a.from(op.key, 'hex');
+                        await base.addWriter(writerKey);
+                        console.log(`Writer added: ${op.key}`);
                     } else if (op.type === 'tx') {
-                        try {
-                            if (sanitizeTransaction(postTx) &&
-                                    postTx.op === 'post-tx' &&
-                                        crypto.verify(Buffer.from(postTx.tx, 'utf-8'), Buffer.from(postTx.is.data), Buffer.from(postTx.ipk.data)) &&// sender verification
-                                            crypto.verify(Buffer.from(postTx.tx, 'utf-8'), Buffer.from(postTx.ws.data), Buffer.from(postTx.wm.signers[0].publicKey)) &&// writer verification
-                                                this.base.activeWriters.has(Buffer.from(postTx.w, 'hex'))) {
-                                await batch.put(op.key, op.value);
-                                console.log(`TX: ${op.key} appended`);
-                            }
-                        } catch (e) {
-                            console.error(`Error validating TX ${op.key}:`, e);
+                        if (sanitizeTransaction(postTx) &&
+                            postTx.op === 'post-tx' &&
+                            crypto.verify(Buffer.from(postTx.tx, 'utf-8'), Buffer.from(postTx.is.data), Buffer.from(postTx.ipk.data)) &&// sender verification
+                            crypto.verify(Buffer.from(postTx.tx, 'utf-8'), Buffer.from(postTx.ws.data), Buffer.from(postTx.wm.signers[0].publicKey)) &&// writer verification
+                            this.base.activeWriters.has(Buffer.from(postTx.w, 'hex'))) {
+                            await batch.put(op.key, op.value);
+                            console.log(`TX: ${op.key} appended`);
                         }
 
                     }
@@ -85,6 +80,7 @@ export class MainSettlementBus extends ReadyResource {
                 await batch.flush();
             }
         })
+        this.base.on('warning', (e) => console.log(e))
     }
 
     async _open() {
@@ -133,11 +129,11 @@ export class MainSettlementBus extends ReadyResource {
                         _this.base.activeWriters.has(Buffer.from(parsedPreTx.w, 'hex')));*/
 
                     if (sanitizeTransaction(parsedPreTx) &&
-                            parsedPreTx.op === 'pre-tx' &&
-                                crypto.verify(Buffer.from(parsedPreTx.tx, 'utf-8'), Buffer.from(parsedPreTx.is.data), Buffer.from(parsedPreTx.ipk.data)) &&
-                                    parsedPreTx.w === _this.writerLocalKey &&
-                                        this.base.activeWriters.has(Buffer.from(parsedPreTx.w, 'hex'))) {
-                                            
+                        parsedPreTx.op === 'pre-tx' &&
+                        crypto.verify(Buffer.from(parsedPreTx.tx, 'utf-8'), Buffer.from(parsedPreTx.is.data), Buffer.from(parsedPreTx.ipk.data)) &&
+                        parsedPreTx.w === _this.writerLocalKey &&
+                        this.base.activeWriters.has(Buffer.from(parsedPreTx.w, 'hex'))) {
+
                         const manifest = this.base.localWriter.core.manifest;
                         const signature = crypto.sign(Buffer.from(parsedPreTx.tx, 'utf-8'), this.base.localWriter.core.keyPair.secretKey);
                         const append_tx = {
@@ -168,7 +164,7 @@ export class MainSettlementBus extends ReadyResource {
         const channelBuffer = this.tx;
         this.tx_swarm.join(channelBuffer, { server: true, client: true });
         await this.tx_swarm.flush();
-        console.log('Joined MSB channel for peer discovery');
+        console.log('Joined MSB TX channel');
     }
 
     async _replicate() {
@@ -185,6 +181,7 @@ export class MainSettlementBus extends ReadyResource {
             this.swarm.on('connection', async (connection, peerInfo) => {
                 const peerName = b4a.toString(connection.remotePublicKey, 'hex');
                 this.connectedPeers.add(peerName);
+                wakeup.addStream(connection);
                 this.store.replicate(connection);
                 this.connectedNodes++;
 

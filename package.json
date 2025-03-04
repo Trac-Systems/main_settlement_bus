@@ -12,7 +12,7 @@
     "test": "brittle test/*.test.js"
   },
   "dependencies": {
-    "autobase": "7.0.35",
+    "autobase": "7.0.36",
     "b4a": "1.6.7",
     "bare-fs": "4.0.1",
     "blind-pairing": "2.3.1",
@@ -21,12 +21,13 @@
     "corestore": "7.0.8",
     "debounceify": "1.1.0",
     "hyperbee": "2.20.6",
-    "hypercore": "11.0.31",
+    "hypercore": "11.0.34",
     "hypercore-crypto": "3.4.0",
     "hyperdht": "6.19.0",
     "hyperswarm": "4.8.4",
     "is-options": "1.0.2",
     "pear-interface": "1.0.0",
+    "protomux-wakeup": "^2.2.1",
     "ready-resource": "^1.0.0",
     "safety-catch": "1.0.2",
     "xache": "1.2.0"

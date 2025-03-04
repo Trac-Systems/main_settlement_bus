@@ -4,7 +4,7 @@ import MainSettlementBus from './src/index.js';
 const store = new Corestore('stores/' + process.argv[2])
 
 const opts = {
-    bootstrap: 'eae32401c5b821e6aef397725de0f3e0d5676f858525137337f67014e8ff1255',
+    bootstrap: '73d5b1fa25e495aa4782e4524c10ee60563b447498c071a27516ee282bcbbeba',
     channel: Buffer.alloc(32).fill('0002tracnetworkmainsettlementbus'),
     tx : Buffer.alloc(32).fill('02tracnetworkmainsettlementbustx')
 };
