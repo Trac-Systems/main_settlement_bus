@@ -33,7 +33,6 @@ export class MainSettlementBus extends ReadyResource {
         this.invite = null;
         this.bee = null;
 
-        // Emiters 
         this.msbListener();
         this._boot();
         this.ready().catch(noop);
@@ -71,7 +70,7 @@ export class MainSettlementBus extends ReadyResource {
                             crypto.verify(Buffer.from(postTx.tx, 'utf-8'), Buffer.from(postTx.ws.data), Buffer.from(postTx.wm.signers[0].publicKey)) &&// writer verification
                             this.base.activeWriters.has(Buffer.from(postTx.w, 'hex'))) {
                             await batch.put(op.key, op.value);
-                            console.log(`TX: ${op.key} appended`);
+                            console.log(`TX: ${op.key} appended. Signed length: `, _this.base.view.core.signedLength);
                         }
 
                     }
@@ -120,19 +119,11 @@ export class MainSettlementBus extends ReadyResource {
             connection.on('data', async (msg) => {
                 try {
                     const parsedPreTx = JSON.parse(msg);
-                    /*
-
-                    console.log("===================> msg:", parsedPreTx)
-                    console.log(sanitizePreTransaction(parsedPreTx),
-                        crypto.verify(Buffer.from(parsedPreTx.tx, 'utf-8'), Buffer.from(parsedPreTx.is.data), Buffer.from(parsedPreTx.ipk.data)),
-                        parsedPreTx.w +' === ' + _this.writerLocalKey,
-                        _this.base.activeWriters.has(Buffer.from(parsedPreTx.w, 'hex')));*/
-
                     if (sanitizeTransaction(parsedPreTx) &&
                         parsedPreTx.op === 'pre-tx' &&
                         crypto.verify(Buffer.from(parsedPreTx.tx, 'utf-8'), Buffer.from(parsedPreTx.is.data), Buffer.from(parsedPreTx.ipk.data)) &&
                         parsedPreTx.w === _this.writerLocalKey &&
-                        this.base.activeWriters.has(Buffer.from(parsedPreTx.w, 'hex'))) {
+                        _this.base.activeWriters.has(Buffer.from(parsedPreTx.w, 'hex'))) {
 
                         const manifest = this.base.localWriter.core.manifest;
                         const signature = crypto.sign(Buffer.from(parsedPreTx.tx, 'utf-8'), this.base.localWriter.core.keyPair.secretKey);
@@ -149,7 +140,6 @@ export class MainSettlementBus extends ReadyResource {
                             wm: manifest
                         };
                         const str_append_tx = JSON.stringify(append_tx);
-                        //console.log("============> str_append_tx", str_append_tx);
                         await _this.base.append({ type: 'tx', key: parsedPreTx.tx, value: append_tx });
                         await _this.base.update();
                         await connection.write(str_append_tx);
