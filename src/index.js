@@ -7,7 +7,7 @@ import Hyperbee from 'hyperbee';
 import readline from 'readline';
 import BlindPairing from 'blind-pairing';
 import crypto from 'hypercore-crypto';
-import {sanitizePreTransaction, addWriter} from './functions.js';
+import { sanitizeTransaction, addWriter } from './functions.js';
 
 export class MainSettlementBus extends ReadyResource {
 
@@ -56,15 +56,29 @@ export class MainSettlementBus extends ReadyResource {
 
                 for (const node of nodes) {
                     const op = node.value;
+                    const postTx = op.value;
                     if (op.type === 'addWriter') {
-                        const writerKey = b4a.from(op.key, 'hex');
-                        await base.addWriter(writerKey);
-                        console.log(`Writer added: ${op.key}`);
-                    } else if (op.type === 'tx'){
-                        // TODO: check signatureS (both, sender and writer)
-                        // TODO: check if writer is active writer
-                        await batch.put(op.key, op.value);
-                        console.log(`TX: ${op.key} appended`);
+                        try {
+                            const writerKey = b4a.from(op.key, 'hex');
+                            await base.addWriter(writerKey);
+                            console.log(`Writer added: ${op.key}`);
+                        } catch (e) {
+                            console.error(`Error adding writer ${op.key}:`, e);
+                        }
+                    } else if (op.type === 'tx') {
+                        try {
+                            if (sanitizeTransaction(postTx) &&
+                                    postTx.op === 'post-tx' &&
+                                        crypto.verify(Buffer.from(postTx.tx, 'utf-8'), Buffer.from(postTx.is.data), Buffer.from(postTx.ipk.data)) &&// sender verification
+                                            crypto.verify(Buffer.from(postTx.tx, 'utf-8'), Buffer.from(postTx.ws.data), Buffer.from(postTx.wm.signers[0].publicKey)) &&// writer verification
+                                                this.base.activeWriters.has(Buffer.from(postTx.w, 'hex'))) {
+                                await batch.put(op.key, op.value);
+                                console.log(`TX: ${op.key} appended`);
+                            }
+                        } catch (e) {
+                            console.error(`Error validating TX ${op.key}:`, e);
+                        }
+
                     }
                 }
 
@@ -80,7 +94,7 @@ export class MainSettlementBus extends ReadyResource {
         console.log('MSB Key:', Buffer(this.base.view.core.key).toString('hex'));
         this.writerLocalKey = b4a.toString(this.base.local.key, 'hex');
         if (this.replicate) await this._replicate();
-        if(this.enable_txchannel){
+        if (this.enable_txchannel) {
             await this.txChannel();
         }
     }
@@ -93,7 +107,7 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async txChannel() {
-        this.tx_swarm = new Hyperswarm({maxPeers : 1024, maxParallel: 512, maxServerConnections : 256});
+        this.tx_swarm = new Hyperswarm({ maxPeers: 1024, maxParallel: 512, maxServerConnections: 256 });
         this.tx_swarm.on('connection', async (connection, peerInfo) => {
             const _this = this;
             const peerName = b4a.toString(connection.remotePublicKey, 'hex');
@@ -111,40 +125,42 @@ export class MainSettlementBus extends ReadyResource {
                 try {
                     const parsedPreTx = JSON.parse(msg);
                     /*
+
                     console.log("===================> msg:", parsedPreTx)
                     console.log(sanitizePreTransaction(parsedPreTx),
                         crypto.verify(Buffer.from(parsedPreTx.tx, 'utf-8'), Buffer.from(parsedPreTx.is.data), Buffer.from(parsedPreTx.ipk.data)),
                         parsedPreTx.w +' === ' + _this.writerLocalKey,
                         _this.base.activeWriters.has(Buffer.from(parsedPreTx.w, 'hex')));*/
-                    if(sanitizePreTransaction(parsedPreTx) && 
-                        crypto.verify(Buffer.from(parsedPreTx.tx, 'utf-8'), Buffer.from(parsedPreTx.is.data), Buffer.from(parsedPreTx.ipk.data)) &&
-                            parsedPreTx.w === _this.writerLocalKey &&
-                                _this.base.activeWriters.has(Buffer.from(parsedPreTx.w, 'hex'))) {
-                            const manifest = this.base.localWriter.core.manifest;
-                            //console.log("=========> manifest ",manifest)
-                            //console.log("=========> manifest stringify ",JSON.stringify(manifest))
-                            const signature =  crypto.sign(Buffer.from(parsedPreTx.tx, 'utf-8'), this.base.localWriter.core.keyPair.secretKey);
-                            const append_tx = {
-                                op : 'post-tx',
-                                tx : parsedPreTx.tx,
-                                is : parsedPreTx.is,
-                                w : parsedPreTx.w,
-                                i : parsedPreTx.i,
-                                ipk : parsedPreTx.ipk,
-                                ch: parsedPreTx.ch,
-                                in : parsedPreTx.in,
-                                ws: JSON.parse(JSON.stringify(signature)),
-                                wm: manifest
-                            };
-                            const str_append_tx = JSON.stringify(append_tx);
-                            //console.log("============> str_append_tx", str_append_tx);
-                            await _this.base.append({ type: 'tx', key: parsedPreTx.tx, value : append_tx });
-                            await _this.base.update();
-                            await connection.write(str_append_tx);
-                    
+
+                    if (sanitizeTransaction(parsedPreTx) &&
+                            parsedPreTx.op === 'pre-tx' &&
+                                crypto.verify(Buffer.from(parsedPreTx.tx, 'utf-8'), Buffer.from(parsedPreTx.is.data), Buffer.from(parsedPreTx.ipk.data)) &&
+                                    parsedPreTx.w === _this.writerLocalKey &&
+                                        this.base.activeWriters.has(Buffer.from(parsedPreTx.w, 'hex'))) {
+                                            
+                        const manifest = this.base.localWriter.core.manifest;
+                        const signature = crypto.sign(Buffer.from(parsedPreTx.tx, 'utf-8'), this.base.localWriter.core.keyPair.secretKey);
+                        const append_tx = {
+                            op: 'post-tx',
+                            tx: parsedPreTx.tx,
+                            is: parsedPreTx.is,
+                            w: parsedPreTx.w,
+                            i: parsedPreTx.i,
+                            ipk: parsedPreTx.ipk,
+                            ch: parsedPreTx.ch,
+                            in: parsedPreTx.in,
+                            ws: JSON.parse(JSON.stringify(signature)),
+                            wm: manifest
+                        };
+                        const str_append_tx = JSON.stringify(append_tx);
+                        //console.log("============> str_append_tx", str_append_tx);
+                        await _this.base.append({ type: 'tx', key: parsedPreTx.tx, value: append_tx });
+                        await _this.base.update();
+                        await connection.write(str_append_tx);
+
                     }
-                } catch(e) { 
-                    console.log(e) 
+                } catch (e) {
+                    console.log(e)
                 }
             });
         });
@@ -158,7 +174,7 @@ export class MainSettlementBus extends ReadyResource {
     async _replicate() {
         if (!this.swarm) {
             const keyPair = await this.store.createKeyPair('hyperswarm');
-            this.swarm = new Hyperswarm({ keyPair, maxPeers : 1024, maxParallel: 512, maxServerConnections : 256 });
+            this.swarm = new Hyperswarm({ keyPair, maxPeers: 1024, maxParallel: 512, maxServerConnections: 256 });
             this.invite = new BlindPairing(this.swarm, {
                 poll: 5000
             });
@@ -206,7 +222,7 @@ export class MainSettlementBus extends ReadyResource {
             const lengthdagView = this.base.view.core.length;
             const dagSystem = await this.base.system.core.treeHash();
             const lengthdagSystem = this.base.system.core.length;
-            console.log("this.base.system.core",this.base.system.core);
+            console.log("this.base.system.core", this.base.system.core);
             console.log(`writerLocalKey: ${this.writerLocalKey}`);
             console.log(`base.key: ${this.base.key.toString('hex')}`);
             console.log('discoveryKey:', b4a.toString(this.base.discoveryKey, 'hex'));
@@ -242,7 +258,7 @@ export class MainSettlementBus extends ReadyResource {
                     process.exit(0);
                     break;
                 default:
-                    if(input.startsWith('/add_writer')) {
+                    if (input.startsWith('/add_writer')) {
                         await addWriter(input, this);
                     }
             }
