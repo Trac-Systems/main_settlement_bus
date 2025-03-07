@@ -9,13 +9,21 @@ import BlindPairing from 'blind-pairing';
 import crypto from 'hypercore-crypto';
 import { sanitizeTransaction, addWriter } from './functions.js';
 import w from 'protomux-wakeup';
+import * as edKeyGen from "ed25519-key-generator"
+import fs from 'node:fs';
+import Corestore from 'corestore';
+
 const wakeup = new w();
+
+const STORES_DIRECTORY = 'stores/';
+const KEY_PAIR_PATH = `${STORES_DIRECTORY}${process.argv[2]}/keypair.json`
+export const store = new Corestore(STORES_DIRECTORY + process.argv[2])
 
 export class MainSettlementBus extends ReadyResource {
 
     constructor(store, options = {}) {
         super();
-
+        this.signingKeyPair = null;
         this.store = store;
         this.swarm = null;
         this.tx = options.tx || null;
@@ -84,6 +92,7 @@ export class MainSettlementBus extends ReadyResource {
 
     async _open() {
         await this.base.ready();
+        await this.#initKeyPair();
         console.log('View Length:', this.base.view.core.length);
         console.log('View Signed Length:', this.base.view.core.signedLength);
         console.log('MSB Key:', Buffer(this.base.view.core.key).toString('hex'));
@@ -253,6 +262,76 @@ export class MainSettlementBus extends ReadyResource {
         });
 
         rl.prompt();
+    }
+
+    async #getMnemonicInteractiveMode() {
+        const rl = readline.createInterface({
+            input: process.stdin,
+            output: process.stdout
+        });
+
+        const question = (query) => {
+            return new Promise(resolve => {
+                rl.question(query, resolve);
+            });
+        }
+
+        let mnemonic;
+        let choice = '';
+        while (!choice.trim()) {
+            choice = await question("[1]. Generate new mnemonic phrase\n[2]. Restore keypair from backed up mnemonic phrase\nYour choice (1/2): ");
+            switch (choice) {
+                case '1':
+                    mnemonic = undefined
+                    break;
+                case '2':
+                    const mnemonicInput = await question("Enter your mnemonic phrase: ");
+                    mnemonic = edKeyGen.sanitizeMnemonic(mnemonicInput);
+                    break;
+                default:
+                    console.log("Invalid choice. Please select again");
+                    choice = '';
+                    break;
+            }
+        }
+        rl.close();
+        return mnemonic;
+    }
+
+    async #initKeyPair() {
+        // TODO: User shouldn't be allowed to store it in unencrypted form. ASK for a password to encrypt it. ENCRYPT(HASH(PASSWORD,SALT),FILE)/DECRYPT(HASH(PASSWORD,SALT),ENCRYPTED_FILE)?
+        try {
+            // Check if the key file exists
+            if (fs.existsSync(KEY_PAIR_PATH)) {
+                const keyPair = JSON.parse(fs.readFileSync(KEY_PAIR_PATH));
+                this.signingKeyPair = {
+                    publicKey: Buffer.from(keyPair.publicKey, 'hex'),
+                    secretKey: Buffer.from(keyPair.secretKey, 'hex')
+                }
+            } else {
+                console.log("Key file was not found. How do you wish to proceed?");
+                const mnemonic = await this.#getMnemonicInteractiveMode();
+
+                const generatedSecrets = edKeyGen.generateKeyPair(mnemonic);
+                const keyPair = {
+                    publicKey: Buffer.from(generatedSecrets.publicKey).toString('hex'),
+                    secretKey: Buffer.from(generatedSecrets.secretKey).toString('hex')
+                }
+
+                //TODO: ASK USER TO WRITE FIRST SECOND AND LAST WORD OR SOMETHING SIMILAR TO CONFIRM THEY HAVE WRITTEN IT DOWN
+                if (!mnemonic) console.log("This is your mnemonic:\n", generatedSecrets.mnemonic, "\nPlease back it up in a safe location")
+
+                fs.writeFileSync(KEY_PAIR_PATH, JSON.stringify(keyPair));
+                this.signingKeyPair = {
+                    publicKey: generatedSecrets.publicKey,
+                    secretKey: generatedSecrets.secretKey,
+                }
+
+                console.log("DEBUG: Key pair generated and stored in", KEY_PAIR_PATH);
+            }
+        } catch (err) {
+            console.error(err);
+        }
     }
 }
 
