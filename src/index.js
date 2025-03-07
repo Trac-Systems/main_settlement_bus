@@ -75,8 +75,9 @@ export class MainSettlementBus extends ReadyResource {
                         if (sanitizeTransaction(postTx) &&
                             postTx.op === 'post-tx' &&
                             crypto.verify(Buffer.from(postTx.tx, 'utf-8'), Buffer.from(postTx.is.data), Buffer.from(postTx.ipk.data)) &&// sender verification
-                            crypto.verify(Buffer.from(postTx.tx, 'utf-8'), Buffer.from(postTx.ws.data), Buffer.from(postTx.wm.signers[0].publicKey)) &&// writer verification
-                            this.base.activeWriters.has(Buffer.from(postTx.w, 'hex'))) {
+                            crypto.verify(Buffer.from(postTx.tx, 'utf-8'), Buffer.from(postTx.ws.data), Buffer.from(postTx.wp.data)) &&// writer verification
+                            this.base.activeWriters.has(Buffer.from(postTx.w, 'hex'))
+                        ) {
                             await batch.put(op.key, op.value);
                             console.log(`TX: ${op.key} appended. Signed length: `, _this.base.view.core.signedLength);
                         }
@@ -97,8 +98,8 @@ export class MainSettlementBus extends ReadyResource {
         console.log('View Signed Length:', this.base.view.core.signedLength);
         console.log('MSB Key:', Buffer(this.base.view.core.key).toString('hex'));
         this.writerLocalKey = b4a.toString(this.base.local.key, 'hex');
-        if (this.replicate) await this._replicate();
-        if (this.enable_txchannel) {
+        if (this.replicate && this.signingKeyPair) await this._replicate();
+        if (this.enable_txchannel && this.signingKeyPair) {
             await this.txChannel();
         }
     }
@@ -127,15 +128,15 @@ export class MainSettlementBus extends ReadyResource {
 
             connection.on('data', async (msg) => {
                 try {
+                    
                     const parsedPreTx = JSON.parse(msg);
                     if (sanitizeTransaction(parsedPreTx) &&
                         parsedPreTx.op === 'pre-tx' &&
                         crypto.verify(Buffer.from(parsedPreTx.tx, 'utf-8'), Buffer.from(parsedPreTx.is.data), Buffer.from(parsedPreTx.ipk.data)) &&
                         parsedPreTx.w === _this.writerLocalKey &&
-                        _this.base.activeWriters.has(Buffer.from(parsedPreTx.w, 'hex'))) {
-
-                        const manifest = this.base.localWriter.core.manifest;
-                        const signature = crypto.sign(Buffer.from(parsedPreTx.tx, 'utf-8'), this.base.localWriter.core.keyPair.secretKey);
+                        _this.base.activeWriters.has(Buffer.from(parsedPreTx.w, 'hex'))
+                    ) {
+                        const signature = crypto.sign(Buffer.from(parsedPreTx.tx, 'utf-8'), this.signingKeyPair.secretKey);
                         const append_tx = {
                             op: 'post-tx',
                             tx: parsedPreTx.tx,
@@ -146,7 +147,7 @@ export class MainSettlementBus extends ReadyResource {
                             ch: parsedPreTx.ch,
                             in: parsedPreTx.in,
                             ws: JSON.parse(JSON.stringify(signature)),
-                            wm: manifest
+                            wp: JSON.parse(JSON.stringify(this.signingKeyPair.publicKey)),
                         };
                         const str_append_tx = JSON.stringify(append_tx);
                         await _this.base.append({ type: 'tx', key: parsedPreTx.tx, value: append_tx });
@@ -176,7 +177,7 @@ export class MainSettlementBus extends ReadyResource {
 
             console.log(`Channel: ${this.channel}`);
             console.log(`Writer key: ${this.writerLocalKey}`)
-
+            console.log(`isIndexer: ${this.base.isIndexer}`);
             this.swarm.on('connection', async (connection, peerInfo) => {
                 const peerName = b4a.toString(connection.remotePublicKey, 'hex');
                 this.connectedPeers.add(peerName);
