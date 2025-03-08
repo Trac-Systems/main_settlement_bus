@@ -20,36 +20,10 @@ export function sanitizeTransaction(parsedTx) {
 }
 
 export async function addWriter(input, peer){
-    try {
-        const splitted = input.split(' ');
-        const { invite, publicKey, discoveryKey } = BlindPairing.createInvite(Buffer.from(splitted[splitted.length - 1], 'hex'));
-        console.log(invite.toString('hex'), publicKey.toString('hex'), discoveryKey.toString('hex'));
-        const _this = peer;
-        const member = peer.invite.addMember({
-            discoveryKey,
-            async onadd(candidate) {
-                console.log('Candiate id is', candidate.inviteId.toString('hex'))
-                candidate.open(publicKey)
-                console.log('Add candidate:', candidate.userData.toString('hex'))
-                candidate.confirm({ key: Buffer.from(splitted[splitted.length - 1], 'hex') })
-                await _this.base.append({ type: 'addWriter', key: splitted[splitted.length - 1] });
-                await _this.base.update();
-            }
-        })
-        console.log('Awaiting invite broadcast...');
-        await member.flushed();
-        console.log('Invite id...', invite.toString('hex'));
-        const adding = peer.invite.addCandidate({
-            invite: invite,
-            userData: Buffer.from(splitted[splitted.length - 1], 'hex'),
-            async onadd(result) {
-                console.log('Invited!')
-            }
-        })
-        console.log('Awaiting pairing...');
-        await adding.pairing;
-        console.log('Paired!');
-    } catch (e) {
-        console.log(e.message);
+    const splitted = input.split(' ');
+    if(splitted[0] === '/add_writer'){
+        await peer.base.append({ type: 'addWriter', key: splitted[splitted.length - 1] });
+    } else if(splitted[0] === '/add_writer2') {
+        await peer.base.append({ type: 'addWriter2', key: splitted[splitted.length - 1] });
     }
 }

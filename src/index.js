@@ -19,6 +19,7 @@ export class MainSettlementBus extends ReadyResource {
         this.store = store;
         this.swarm = null;
         this.tx = options.tx || null;
+        this.tx_pool = [];
         this.enable_txchannel = options.enable_txchannel || true;
         this.base = null;
         this.key = null;
@@ -33,6 +34,7 @@ export class MainSettlementBus extends ReadyResource {
         this.invite = null;
         this.bee = null;
 
+        this.pool();
         this.msbListener();
         this._boot();
         this.ready().catch(noop);
@@ -54,7 +56,7 @@ export class MainSettlementBus extends ReadyResource {
 
             apply: async (nodes, view, base) => {
 
-                const batch = view.batch({ update: false })
+                const batch = view;
 
                 for (const node of nodes) {
                     const op = node.value;
@@ -63,6 +65,10 @@ export class MainSettlementBus extends ReadyResource {
                         const writerKey = b4a.from(op.key, 'hex');
                         await base.addWriter(writerKey);
                         console.log(`Writer added: ${op.key}`);
+                    } else if (op.type === 'addWriter2') {
+                        const writerKey = b4a.from(op.key, 'hex');
+                        await base.addWriter(writerKey, { isIndexer : false });
+                        console.log(`Writer added: ${op.key} non-indexer`);
                     } else if (op.type === 'tx') {
                         if (sanitizeTransaction(postTx) &&
                             postTx.op === 'post-tx' &&
@@ -70,13 +76,10 @@ export class MainSettlementBus extends ReadyResource {
                             crypto.verify(Buffer.from(postTx.tx, 'utf-8'), Buffer.from(postTx.ws.data), Buffer.from(postTx.wm.signers[0].publicKey)) &&// writer verification
                             this.base.activeWriters.has(Buffer.from(postTx.w, 'hex'))) {
                             await batch.put(op.key, op.value);
-                            console.log(`TX: ${op.key} appended. Signed length: `, _this.base.view.core.signedLength);
+                            console.log(`TX: ${op.key} appended. Signed length: `,  _this.base.view.core.signedLength);
                         }
-
                     }
                 }
-
-                await batch.flush();
             }
         })
         this.base.on('warning', (e) => console.log(e))
@@ -117,6 +120,13 @@ export class MainSettlementBus extends ReadyResource {
             connection.on('error', (error) => { });
 
             connection.on('data', async (msg) => {
+
+                // TODO: decide if a tx rejection should be responded with
+                if(this.tx_pool.length >= 1000) {
+                    console.log('pool full');
+                    return
+                }
+
                 try {
                     const parsedPreTx = JSON.parse(msg);
                     if (sanitizeTransaction(parsedPreTx) &&
@@ -140,9 +150,8 @@ export class MainSettlementBus extends ReadyResource {
                             wm: manifest
                         };
                         const str_append_tx = JSON.stringify(append_tx);
-                        await _this.base.append({ type: 'tx', key: parsedPreTx.tx, value: append_tx });
-                        await _this.base.update();
                         await connection.write(str_append_tx);
+                        _this.tx_pool.push({ tx: parsedPreTx.tx, append_tx : append_tx });
 
                     }
                 } catch (e) {
@@ -155,6 +164,24 @@ export class MainSettlementBus extends ReadyResource {
         this.tx_swarm.join(channelBuffer, { server: true, client: true });
         await this.tx_swarm.flush();
         console.log('Joined MSB TX channel');
+    }
+
+    async pool(){
+        while(true){
+            if(this.tx_pool.length > 0){
+                const length = this.tx_pool.length;
+                for(let i = 0; i < length; i++){
+                    await this.base.append({ type: 'tx', key: this.tx_pool[i].tx, value: this.tx_pool[i].append_tx });
+                    await this.sleep(5);
+                }
+                this.tx_pool.splice(0, length);
+            }
+            await this.sleep(10);
+        }
+    }
+
+    async sleep(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
     }
 
     async _replicate() {
@@ -209,7 +236,11 @@ export class MainSettlementBus extends ReadyResource {
             const lengthdagView = this.base.view.core.length;
             const dagSystem = await this.base.system.core.treeHash();
             const lengthdagSystem = this.base.system.core.length;
-            console.log("this.base.system.core", this.base.system.core);
+            console.log('this.base.view.core.signedLength:', this.base.view.core.signedLength);
+            console.log("this.base.signedLength", this.base.signedLength);
+            console.log("this.base.linearizer.indexers.length", this.base.linearizer.indexers.length);
+            console.log("this.base.indexedLength", this.base.indexedLength);
+            //console.log("this.base.system.core", this.base.system.core);
             console.log(`writerLocalKey: ${this.writerLocalKey}`);
             console.log(`base.key: ${this.base.key.toString('hex')}`);
             console.log('discoveryKey:', b4a.toString(this.base.discoveryKey, 'hex'));
@@ -230,6 +261,7 @@ export class MainSettlementBus extends ReadyResource {
 
         console.log('MSB started. Available commands:');
         console.log('- /add_writer: enter a peer writer key as argument to get included as writer.');
+        console.log('- /add_writer2: enter a peer writer key as argument to get included as non-indexing writer.');
         console.log('- /dag: check system properties such as writer key, DAG, etc.');
         console.log('- /exit: Exit the program');
 
