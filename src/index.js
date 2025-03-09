@@ -14,23 +14,22 @@ import Corestore from 'corestore';
 
 const wakeup = new w();
 
-const STORES_DIRECTORY = 'stores/';
-const KEY_PAIR_PATH = `${STORES_DIRECTORY}${process.argv[2]}/keypair.json`
-export const store = new Corestore(STORES_DIRECTORY + process.argv[2])
-
 export class MainSettlementBus extends ReadyResource {
 
-    constructor(store, options = {}) {
+    constructor(options = {}) {
         super();
+        this.STORES_DIRECTORY = options.stores_directory;
+        this.KEY_PAIR_PATH = `${this.STORES_DIRECTORY}${options.store_name}/keypair.json`
         this.signingKeyPair = null;
-        this.store = store;
+        this.store = new Corestore(this.STORES_DIRECTORY + options.store_name);
         this.swarm = null;
         this.tx = options.tx || null;
         this.tx_pool = [];
-        this.enable_txchannel = options.enable_txchannel || true;
+        this.enable_txchannel = typeof options.enable_txchannel !== "undefined" && options.enable_txchannel === false ? false : true;
+        this.enable_wallet = typeof options.enable_wallet !== "undefined" && options.enable_wallet === false ? false : true;
         this.base = null;
         this.key = null;
-        this.channel = options.channel || null;;
+        this.channel = options.channel || null;
         this.connectedNodes = 1;
         this.replicate = options.replicate !== false;
         this.writerLocalKey = null;
@@ -62,8 +61,6 @@ export class MainSettlementBus extends ReadyResource {
 
             apply: async (nodes, view, base) => {
 
-                const batch = view;
-
                 for (const node of nodes) {
                     const op = node.value;
                     const postTx = op.value;
@@ -76,13 +73,14 @@ export class MainSettlementBus extends ReadyResource {
                         await base.addWriter(writerKey, { isIndexer : false });
                         console.log(`Writer added: ${op.key} non-indexer`);
                     } else if (op.type === 'tx') {
-                        if (sanitizeTransaction(postTx) &&
+                        if (null === await view.get(op.key) &&
+                            sanitizeTransaction(postTx) &&
                             postTx.op === 'post-tx' &&
                             crypto.verify(Buffer.from(postTx.tx, 'utf-8'), Buffer.from(postTx.is.data), Buffer.from(postTx.ipk.data)) &&// sender verification
                             crypto.verify(Buffer.from(postTx.tx, 'utf-8'), Buffer.from(postTx.ws.data), Buffer.from(postTx.wp.data)) &&// writer verification
                             this.base.activeWriters.has(Buffer.from(postTx.w, 'hex'))
                         ) {
-                            await batch.put(op.key, op.value);
+                            await view.put(op.key, op.value);
                             console.log(`TX: ${op.key} appended. Signed length: `,  _this.base.view.core.signedLength);
                         }
                     }
@@ -94,13 +92,15 @@ export class MainSettlementBus extends ReadyResource {
 
     async _open() {
         await this.base.ready();
-        await this.#initKeyPair();
+        if(this.enable_wallet){
+            await this.#initKeyPair();
+        }
         console.log('View Length:', this.base.view.core.length);
         console.log('View Signed Length:', this.base.view.core.signedLength);
         console.log('MSB Key:', Buffer(this.base.view.core.key).toString('hex'));
         this.writerLocalKey = b4a.toString(this.base.local.key, 'hex');
-        if (this.replicate && this.signingKeyPair) await this._replicate();
-        if (this.enable_txchannel && this.signingKeyPair) {
+        if (this.replicate) await this._replicate();
+        if (this.enable_txchannel) {
             await this.txChannel();
         }
     }
@@ -159,8 +159,6 @@ export class MainSettlementBus extends ReadyResource {
                             ws: JSON.parse(JSON.stringify(signature)),
                             wp: JSON.parse(JSON.stringify(this.signingKeyPair.publicKey)),
                         };
-                        const str_append_tx = JSON.stringify(append_tx);
-                        await connection.write(str_append_tx);
                         _this.tx_pool.push({ tx: parsedPreTx.tx, append_tx : append_tx });
 
                     }
@@ -332,8 +330,8 @@ export class MainSettlementBus extends ReadyResource {
         // TODO: User shouldn't be allowed to store it in unencrypted form. ASK for a password to encrypt it. ENCRYPT(HASH(PASSWORD,SALT),FILE)/DECRYPT(HASH(PASSWORD,SALT),ENCRYPTED_FILE)?
         try {
             // Check if the key file exists
-            if (fs.existsSync(KEY_PAIR_PATH)) {
-                const keyPair = JSON.parse(fs.readFileSync(KEY_PAIR_PATH));
+            if (fs.existsSync(this.KEY_PAIR_PATH)) {
+                const keyPair = JSON.parse(fs.readFileSync(this.KEY_PAIR_PATH));
                 this.signingKeyPair = {
                     publicKey: Buffer.from(keyPair.publicKey, 'hex'),
                     secretKey: Buffer.from(keyPair.secretKey, 'hex')
@@ -351,13 +349,13 @@ export class MainSettlementBus extends ReadyResource {
                 //TODO: ASK USER TO WRITE FIRST SECOND AND LAST WORD OR SOMETHING SIMILAR TO CONFIRM THEY HAVE WRITTEN IT DOWN
                 if (!mnemonic) console.log("This is your mnemonic:\n", generatedSecrets.mnemonic, "\nPlease back it up in a safe location")
 
-                fs.writeFileSync(KEY_PAIR_PATH, JSON.stringify(keyPair));
+                fs.writeFileSync(this.KEY_PAIR_PATH, JSON.stringify(keyPair));
                 this.signingKeyPair = {
                     publicKey: generatedSecrets.publicKey,
                     secretKey: generatedSecrets.secretKey,
                 }
 
-                console.log("DEBUG: Key pair generated and stored in", KEY_PAIR_PATH);
+                console.log("DEBUG: Key pair generated and stored in", this.KEY_PAIR_PATH);
             }
         } catch (err) {
             console.error(err);
