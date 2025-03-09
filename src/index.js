@@ -138,13 +138,13 @@ export class MainSettlementBus extends ReadyResource {
                 }
 
                 try {
-                    
                     const parsedPreTx = JSON.parse(msg);
                     if (sanitizeTransaction(parsedPreTx) &&
                         parsedPreTx.op === 'pre-tx' &&
                         crypto.verify(Buffer.from(parsedPreTx.tx, 'utf-8'), Buffer.from(parsedPreTx.is.data), Buffer.from(parsedPreTx.ipk.data)) &&
                         parsedPreTx.w === _this.writerLocalKey &&
-                        _this.base.activeWriters.has(Buffer.from(parsedPreTx.w, 'hex'))
+                        _this.base.activeWriters.has(Buffer.from(parsedPreTx.w, 'hex') &&
+                        null === await _this.base.view.get(parsedPreTx.tx))
                     ) {
                         const signature = crypto.sign(Buffer.from(parsedPreTx.tx, 'utf-8'), this.signingKeyPair.secretKey);
                         const append_tx = {
@@ -160,7 +160,6 @@ export class MainSettlementBus extends ReadyResource {
                             wp: JSON.parse(JSON.stringify(this.signingKeyPair.publicKey)),
                         };
                         _this.tx_pool.push({ tx: parsedPreTx.tx, append_tx : append_tx });
-
                     }
                 } catch (e) {
                     console.log(e)
