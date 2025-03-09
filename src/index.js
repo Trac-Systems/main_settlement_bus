@@ -5,7 +5,6 @@ import ReadyResource from 'ready-resource';
 import b4a from 'b4a';
 import Hyperbee from 'hyperbee';
 import readline from 'readline';
-import BlindPairing from 'blind-pairing';
 import crypto from 'hypercore-crypto';
 import { sanitizeTransaction, addWriter } from './functions.js';
 import w from 'protomux-wakeup';
@@ -39,7 +38,6 @@ export class MainSettlementBus extends ReadyResource {
         this.bootstrap = options.bootstrap || null;
         this.opts = options;
         this.connectedPeers = new Set();
-        this.invite = null;
         this.bee = null;
 
         this.pool();
@@ -131,6 +129,8 @@ export class MainSettlementBus extends ReadyResource {
 
             connection.on('data', async (msg) => {
 
+                if(_this.base.isIndexer) return;
+
                 // TODO: decide if a tx rejection should be responded with
                 if(this.tx_pool.length >= 1000) {
                     console.log('pool full');
@@ -198,9 +198,6 @@ export class MainSettlementBus extends ReadyResource {
         if (!this.swarm) {
             const keyPair = await this.store.createKeyPair('hyperswarm');
             this.swarm = new Hyperswarm({ keyPair, maxPeers: 1024, maxParallel: 512, maxServerConnections: 256 });
-            this.invite = new BlindPairing(this.swarm, {
-                poll: 5000
-            });
 
             console.log(`Channel: ${this.channel}`);
             console.log(`Writer key: ${this.writerLocalKey}`)
