@@ -64,7 +64,19 @@ export class MainSettlementBus extends ReadyResource {
                 for (const node of nodes) {
                     const op = node.value;
                     const postTx = op.value;
-                    if (op.type === 'addWriter') {
+                    if (op.type === 'tx') {
+                        if (null === await view.get(op.key) &&
+                            sanitizeTransaction(postTx) &&
+                            postTx.op === 'post-tx' &&
+                            crypto.verify(Buffer.from(postTx.tx, 'utf-8'), Buffer.from(postTx.is, 'hex'), Buffer.from(postTx.ipk, 'hex')) &&// sender verification
+                            crypto.verify(Buffer.from(postTx.tx, 'utf-8'), Buffer.from(postTx.ws, 'hex'), Buffer.from(postTx.wp, 'hex')) &&// writer verification
+                            this.base.activeWriters.has(Buffer.from(postTx.w, 'hex')) &&
+                            Buffer.byteLength(JSON.stringify(postTx)) <= 2560
+                        ) {
+                            await view.put(op.key, op.value);
+                            console.log(`TX: ${op.key} appended. Signed length: `,  _this.base.view.core.signedLength);
+                        }
+                    } else if (op.type === 'addWriter') {
                         const writerKey = b4a.from(op.key, 'hex');
                         await base.addWriter(writerKey);
                         console.log(`Writer added: ${op.key}`);
@@ -72,17 +84,6 @@ export class MainSettlementBus extends ReadyResource {
                         const writerKey = b4a.from(op.key, 'hex');
                         await base.addWriter(writerKey, { isIndexer : false });
                         console.log(`Writer added: ${op.key} non-indexer`);
-                    } else if (op.type === 'tx') {
-                        if (null === await view.get(op.key) &&
-                            sanitizeTransaction(postTx) &&
-                            postTx.op === 'post-tx' &&
-                            crypto.verify(Buffer.from(postTx.tx, 'utf-8'), Buffer.from(postTx.is.data), Buffer.from(postTx.ipk.data)) &&// sender verification
-                            crypto.verify(Buffer.from(postTx.tx, 'utf-8'), Buffer.from(postTx.ws.data), Buffer.from(postTx.wp.data)) &&// writer verification
-                            this.base.activeWriters.has(Buffer.from(postTx.w, 'hex'))
-                        ) {
-                            await view.put(op.key, op.value);
-                            console.log(`TX: ${op.key} appended. Signed length: `,  _this.base.view.core.signedLength);
-                        }
                     }
                 }
             }
@@ -137,11 +138,15 @@ export class MainSettlementBus extends ReadyResource {
                     return
                 }
 
+                if(Buffer.byteLength(msg) > 2048) return;
+
                 try {
+
                     const parsedPreTx = JSON.parse(msg);
+
                     if (sanitizeTransaction(parsedPreTx) &&
                         parsedPreTx.op === 'pre-tx' &&
-                        crypto.verify(Buffer.from(parsedPreTx.tx, 'utf-8'), Buffer.from(parsedPreTx.is.data), Buffer.from(parsedPreTx.ipk.data)) &&
+                        crypto.verify(Buffer.from(parsedPreTx.tx, 'utf-8'), Buffer.from(parsedPreTx.is, 'hex'), Buffer.from(parsedPreTx.ipk, 'hex')) &&
                         parsedPreTx.w === _this.writerLocalKey &&
                         _this.base.activeWriters.has(Buffer.from(parsedPreTx.w, 'hex')) &&
                         null === await _this.base.view.get(parsedPreTx.tx)
@@ -156,8 +161,8 @@ export class MainSettlementBus extends ReadyResource {
                             ipk: parsedPreTx.ipk,
                             ch: parsedPreTx.ch,
                             in: parsedPreTx.in,
-                            ws: JSON.parse(JSON.stringify(signature)),
-                            wp: JSON.parse(JSON.stringify(this.signingKeyPair.publicKey)),
+                            ws: signature.toString('hex'),
+                            wp: this.signingKeyPair.publicKey.toString('hex'),
                         };
                         _this.tx_pool.push({ tx: parsedPreTx.tx, append_tx : append_tx });
                     }

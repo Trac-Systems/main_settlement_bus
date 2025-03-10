@@ -10,12 +10,8 @@ export function sanitizeTransaction(parsedTx) {
         typeof parsedTx.tx === 'string' &&
         typeof parsedTx.w === 'string' &&
         typeof parsedTx.i === 'string' &&
-        typeof parsedTx.ipk === 'object' && parsedTx.ipk !== null && Array.isArray(parsedTx.ipk.data) &&
-        parsedTx.ipk.type === 'Buffer' &&
-        typeof parsedTx.is === 'object' && parsedTx.is !== null && Array.isArray(parsedTx.is.data) &&
-        parsedTx.is.type === 'Buffer' &&
-        parsedTx.ipk.data.every(num => typeof num === 'number' && num >= 0 && num <= 255) &&
-        parsedTx.is.data.every(num => typeof num === 'number' && num >= 0 && num <= 255)
+        typeof parsedTx.ipk === 'string' &&
+        typeof parsedTx.is === 'string'
     );
 }
 
