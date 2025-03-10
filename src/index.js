@@ -132,7 +132,7 @@ export class MainSettlementBus extends ReadyResource {
                 if(_this.base.isIndexer) return;
 
                 // TODO: decide if a tx rejection should be responded with
-                if(this.tx_pool.length >= 1000) {
+                if(_this.tx_pool.length >= 1000) {
                     console.log('pool full');
                     return
                 }
@@ -143,8 +143,8 @@ export class MainSettlementBus extends ReadyResource {
                         parsedPreTx.op === 'pre-tx' &&
                         crypto.verify(Buffer.from(parsedPreTx.tx, 'utf-8'), Buffer.from(parsedPreTx.is.data), Buffer.from(parsedPreTx.ipk.data)) &&
                         parsedPreTx.w === _this.writerLocalKey &&
-                        _this.base.activeWriters.has(Buffer.from(parsedPreTx.w, 'hex') &&
-                        null === await _this.base.view.get(parsedPreTx.tx))
+                        _this.base.activeWriters.has(Buffer.from(parsedPreTx.w, 'hex')) &&
+                        null === await _this.base.view.get(parsedPreTx.tx)
                     ) {
                         const signature = crypto.sign(Buffer.from(parsedPreTx.tx, 'utf-8'), this.signingKeyPair.secretKey);
                         const append_tx = {
