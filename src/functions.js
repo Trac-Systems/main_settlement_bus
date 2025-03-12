@@ -24,3 +24,22 @@ export async function addWriter(input, peer){
         await peer.base.append({ type: 'addWriter2', key: splitted[splitted.length - 1] });
     }
 }
+
+export function restoreManifest(parsedManifest) {
+
+    if (Array.isArray(parsedManifest.signers)) {
+        parsedManifest.signers = parsedManifest.signers.map(signer => {
+            if(signer.namespace && signer.namespace.data &&signer.publicKey && signer.publicKey.data){ 
+                return {
+                    ...signer,
+                    namespace: Buffer.from(signer.namespace.data),
+                    publicKey: Buffer.from(signer.publicKey.data),
+                }
+            } else {
+                return signer;
+            }
+        });
+    }
+
+    return parsedManifest;
+}
