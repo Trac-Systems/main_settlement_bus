@@ -12,7 +12,6 @@ import * as edKeyGen from "trac-wallet"
 import fs from 'node:fs';
 import Corestore from 'corestore';
 import verifier from 'hypercore/lib/verifier.js';
-import Hypercore from 'hypercore';
 
 //TODO: MOVE FEATURE LOGIC TO WRITER MANAGER CLASS BECAUSE IT'S TERRIBLE TO READ
 const { manifestHash, createManifest } = verifier;
@@ -42,7 +41,6 @@ export class MainSettlementBus extends ReadyResource {
         this.opts = options;
         this.bee = null;
 
-        this.newWriterListener();
         this.pool();
         this.msbListener();
         this._boot();
@@ -92,12 +90,10 @@ export class MainSettlementBus extends ReadyResource {
                             const pop1Valid = crypto.verify(message, Buffer.from(op.value.pop1, 'hex'), Buffer.from(op.value.hpm.signers[0].publicKey));
                             const pop2Valid = crypto.verify(message, Buffer.from(op.value.pop2, 'hex'), Buffer.from(op.key, 'hex'));
                             const restoredManifest = restoreManifest(op.value.hpm); //temporary workaround
-
                             if (pop1Valid && pop2Valid && manifestHash(createManifest(restoredManifest)).toString('hex') === op.value.wk) {
-                                
                                 await base.addWriter(b4a.from(op.value.wk, 'hex'))
                                 await view.put(op.key, op.value);
-                                console.log(`Writer added: ${op.key} indexer`);
+                                console.log(`Writer added: ${op.value.wk} indexer`);
                             }
                         }
 
@@ -106,29 +102,31 @@ export class MainSettlementBus extends ReadyResource {
                         //TODO: it can be optimalized by adding variables to don't call Buffer.from multiple times. And other operations
                         //TODO: SANITIZE INCOMPING PROPOSAL
                         //WHO CAN PERFORM THIS OPERATION? BOOTSTRAP
-                         if (
+                        if (
                             node.from.key.toString('hex') === this.bootstrap && // only bootstrap can remove writers
                             this.base.activeWriters.has(Buffer.from(node.from.key)) && // only active writer can perform this operation
                             _this.base.view.get(op.key) !== null  // you can't remove anything that doesn't exist (ledger))
-                            
-                         ){
-                            console.log('did i passed the first check?');
+
+                        ) {
+
                             const message = Buffer.concat([
                                 Buffer.from(op.key, 'hex')
                             ]);
+
                             const pop = crypto.verify(message, Buffer.from(op.value.pop, 'hex'), Buffer.from(op.key, 'hex'));
-                            console.log('was I able to verify the message?',pop);
                             if (pop) {
                                 const userData = await _this.base.view.get(op.key)
-                                console.log('userData', userData.value);
                                 if (await base.system.has(Buffer.from(userData.value.wk, 'hex')) === true) {// you can't remove writer that doesn't exist (writers)
                                     await base.removeWriter(Buffer.from(userData.value.wk, 'hex'));
                                     await view.del(op.key);
-                                    console.log(`Writer removed: ${op.key}`);
+
+                                    //WORKAROUND:
+                                    //const selectedWriter = this.base.activeWriters.get(Buffer.from(userData.value.wk, 'hex'));
+                                    //this.base.activeWriters.delete(selectedWriter);
                                 }
 
                             }
-                         }                        
+                        }
                         //await base.removeWriter(writerKey);
 
                     } else if (op.type === 'initBootstrap') {
@@ -136,6 +134,7 @@ export class MainSettlementBus extends ReadyResource {
                         //TODO: ADD MORE SANITIZATION. THIS IS STILL JS.
                         //TODO: HANDLE ERRORS?
                         //TODO: it can be optimalized by adding variables to don't call Buffer.from multiple times.
+
                         if (node.from.key.toString('hex') === this.bootstrap && this.base.activeWriters.has(Buffer.from(op.value.wk, 'hex'))) {
                             const message = Buffer.concat([
                                 Buffer.from(JSON.stringify(op.value.hpm)),
@@ -149,8 +148,6 @@ export class MainSettlementBus extends ReadyResource {
 
                             if (pop1Valid && pop2Valid && manifestHash(createManifest(restoredManifest)).toString('hex') === this.bootstrap) {
                                 await view.put(op.key, op.value);
-                                
-
                             }
                         }
 
@@ -199,8 +196,8 @@ export class MainSettlementBus extends ReadyResource {
 
         //TODO: MOVE IT TO A FUNCTION AND SHOULD IT BE BEFORE OR AFTER THE REPLICATION?
         // if this node is a bootstrap and the first node in the network. Add itself as a writer.
-        if (this.writingKey === this.bootstrap) {
-            //console.log("this.base.view.get(this.signingKeyPair.publicKey.toString('hex')): ", await this.base.view.get('bootstrap'));
+        if (this.writingKey && this.writingKey === this.bootstrap) {
+            console.log("this.base.view.get(this.signingKeyPair.publicKey.toString('hex')): ", await this.base.view.get('bootstrap'));
             const isExistingStrapOfTracManifest = await this.base.view.get('bootstrap');
             if (isExistingStrapOfTracManifest === null) {
 
@@ -218,16 +215,16 @@ export class MainSettlementBus extends ReadyResource {
                         wk: this.writingKey,
                         hpm: this.base.localWriter.core.manifest,
                         skp: this.signingKeyPair.publicKey.toString('hex'),
-                        pop1: crypto.sign(message, this.base.localWriter.core.keyPair.secretKey), //pop - proof of possession
+                        pop1: crypto.sign(message, this.base.localWriter.core.keyPair.secretKey),
                         pop2: crypto.sign(message, this.signingKeyPair.secretKey)
                     }
                 });
-
             }
+            this.WriterEventListener();
         }
-        console.log("this.base.activeWriters", this.base.activeWriters.map);
     }
-    async handleIncomingWritingKey(data) {
+
+    async handleIncomingWriterEvent(data) {
         try {
             const bufferData = data.toString();
             const parsedRequest = JSON.parse(bufferData);
@@ -238,27 +235,41 @@ export class MainSettlementBus extends ReadyResource {
             // for now ignore the error
         }
     }
-    newWriterListener() {
+
+    async WriterEventListener() {
+        if (this.writingKey !== this.bootstrap) return;
         this.on('writerEvent', async (parsedRequest) => {
             await this.base.append(parsedRequest);
         });
     }
 
     async addMe() {
-        //special case. Bootstrap can't run it.
+        //TODO: special case. Bootstrap can't run it.
         try {
             const _this = this;
-            if (
-                await _this.base.view.get(this.signingKeyPair.publicKey.toString("hex")) !== null ||
-                await _this.base.system.has(Buffer.from(_this.writingKey, 'hex')) === true
-            ) {
-                console.log(`Writer ${_this.writingKey} is already added.`);
-            } else {
-                
+
+            const existsInView = await _this.base.view.get(this.signingKeyPair.publicKey.toString("hex"));
+            if (existsInView !== null) {
+                console.log(`Writer ${_this.writingKey} is already associated`);
+                return;
+            }
+            // 2 TYPES OF CHECKING THAT NODE IS ALREADY WRITER IS BASE.SYSTEM.HAS AND ACTIVEWRITERS.HAS
+            const alreadyAdded = await _this.base.system.has(Buffer.from(_this.writingKey, 'hex'));
+            if (alreadyAdded) {
+                console.log(`Writer ${_this.writingKey} is already added in the system`);
+                return;
+            }
+
+            const bootstrapData = await _this.base.view.get('bootstrap');
+            if (!bootstrapData?.value?.hpm?.signers?.[0]?.publicKey?.data) {
+                console.log(`Bootstrap key not found`);
+                return;
+            }
+
             const bootstrapPubKey = Buffer.from(((await _this.base.view.get('bootstrap')).value.hpm.signers[0].publicKey.data)).toString('hex');
             _this.swarm.connections.forEach(async conn => {
                 if (conn.connected && conn.remotePublicKey.toString('hex') === bootstrapPubKey) {
-
+                    
                     const message = Buffer.concat([
                         Buffer.from(JSON.stringify(_this.base.local.core.manifest)),
                         Buffer.from(_this.writingKey, 'hex'),
@@ -276,6 +287,7 @@ export class MainSettlementBus extends ReadyResource {
                             pop2: crypto.sign(message, _this.signingKeyPair.secretKey)
                         }
                     }));
+
                     setTimeout(async () => {
                         const isWriterAdded = _this.base.activeWriters.has(Buffer.from(_this.writingKey, 'hex'));
                         if (isWriterAdded) {
@@ -286,13 +298,12 @@ export class MainSettlementBus extends ReadyResource {
                     }, 5000);
                 }
             })
-            }
         } catch (error) {
             console.error(`err in `, error);
         }
     }
 
-    async removeMe(){
+    async removeMe() {
         //there must be special case for the bootstrap
         try {
             const _this = this;
@@ -339,6 +350,7 @@ export class MainSettlementBus extends ReadyResource {
 
             setTimeout(async () => {
                 const checkKey = await _this.base.view.get(_this.signingKeyPair.publicKey.toString("hex"));
+                //console.log(`checkKey`,checkKey)
                 if (!checkKey) {
                     console.log(`Key successfully removed`);
                 } else {
@@ -453,7 +465,7 @@ export class MainSettlementBus extends ReadyResource {
                 });
 
                 connection.on('data', async data => {
-                    await this.handleIncomingWritingKey(data);
+                    await this.handleIncomingWriterEvent(data);
                 })
 
                 connection.on('error', (error) => { });
@@ -529,12 +541,21 @@ export class MainSettlementBus extends ReadyResource {
                 case '/addMe':
                     await this.addMe();
                     break;
+                case '/aw':
+                    console.log('Active writers:', this.base.activeWriters.map);
+                    break;
                 case '/removeMe':
                     await this.removeMe();
                     break;
                 default:
                     if (input.startsWith('/add_writer')) {
                         await addWriter(input, this);
+                    } else if (input.startsWith('/verify')) {
+                        let splitted = input.split(' ');
+                        const argument = splitted[1];
+                        console.log(`Verifying the ${argument} in activeWriters:`, this.base.activeWriters.has(Buffer.from(argument, 'hex')));
+                        console.log(`Verifying the ${argument} in base.system.has:`, await this.base.system.has(Buffer.from(argument, 'hex')));
+
                     }
             }
             rl.prompt();
