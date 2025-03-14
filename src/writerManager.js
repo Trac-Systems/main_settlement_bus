@@ -9,6 +9,9 @@ import crypto from 'hypercore-crypto';
  * WriterManager manages writer nodes in the TRAC NETWORK, handling events, adding/removing writers, and managing the bootstrap process.
  * It interacts with the MainSettlementBus instance to perform key operations.
  */
+
+const MS_TO_WAIT =  5000;
+
 export class WriterManager extends ReadyResource {
     /**
      * Initializes the WriterManager with the given MainSettlementBus instance.
@@ -17,7 +20,7 @@ export class WriterManager extends ReadyResource {
     constructor(msbInstance) {
         super();
         this.base = msbInstance.base;
-        this.signingKeyPair = msbInstance.signingKeyPair; //TODO: REMOVE BECAUSE WE CANT STORE KEYS LIKE THAT.
+        this.signingKeyPair = msbInstance.signingKeyPair; //TODO: REMOVE BECAUSE WE CANT STORE KEYS LIKE THAT. BUT AFTER WALLET INTEGRATION WE CAN STORE IT IN WALLET
         this.swarm = msbInstance.swarm;
         this.bootstrap = msbInstance.bootstrap;
         this.writingKey = msbInstance.writingKey;
@@ -35,8 +38,8 @@ export class WriterManager extends ReadyResource {
 
             if (this.writingKey && this.writingKey === this.bootstrap) {
 
-                const bootStrapManifest = await this.base.view.get('bootstrap');
-                if (bootStrapManifest === null) {
+                const bootStrapEntry = await this.getBootstrapEntry();
+                if (bootStrapEntry === null) {
 
                     const message = Buffer.concat([
                         Buffer.from(JSON.stringify(this.base.localWriter.core.manifest)),
@@ -95,7 +98,7 @@ export class WriterManager extends ReadyResource {
                 return;
             }
 
-            const bootstrapEntry = await this.base.view.get('bootstrap');
+            const bootstrapEntry = await this.getBootstrapEntry();
             if (!bootstrapEntry?.value?.hpm?.signers?.[0]?.publicKey?.data) {
                 console.log(`Bootstrap key not found`);
                 return;
@@ -133,7 +136,7 @@ export class WriterManager extends ReadyResource {
                         } else {
                             console.warn(`Writer ${this.writingKey} was NOT added.`);
                         }
-                    }, 5000);
+                    }, MS_TO_WAIT);
                 }
             })
         } catch (error) {
@@ -159,7 +162,7 @@ export class WriterManager extends ReadyResource {
                 return;
             }
 
-            const bootstrapEntry = await this.base.view.get('bootstrap');
+            const bootstrapEntry = await this.getBootstrapEntry();
 
             if (bootstrapEntry === null || !bootstrapEntry.value?.hpm?.signers?.[0]?.publicKey?.data) {
                 console.log(`Bootstrap key not found`);
@@ -195,12 +198,22 @@ export class WriterManager extends ReadyResource {
                 } else {
                     console.log(`Failed to remove key`);
                 }
-            }, 5000);
+            }, MS_TO_WAIT);
 
         } catch (error) {
             console.error(`err in `, error);
         }
     }
+
+    /**
+     * Retrieves the bootstrap entry from the base view.
+     * 
+     * @returns {Promise<Object|null>} The bootstrap entry if it exists, otherwise null.
+     */
+    async getBootstrapEntry() {
+        return await this.base.view.get('bootstrap');
+    }
+
     /**
      * Handles incoming writer events by parsing the data and emitting a writerEvent.
      * 

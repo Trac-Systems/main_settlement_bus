@@ -49,7 +49,7 @@ export class MainSettlementBus extends ReadyResource {
         this._boot();
         this.ready().catch(noop);
     }
-
+    
     _boot() {
         const _this = this;
         this.base = new Autobase(this.store, this.bootstrap, {
@@ -116,13 +116,13 @@ export class MainSettlementBus extends ReadyResource {
                         //TODO: it can be optimalized by adding variables to don't call Buffer.from multiple times. And other operations
                         //TODO: SANITIZE INCOMPING PROPOSAL
                         if (node.from.key.toString('hex') === this.bootstrap) {
-
+                            const publicKey = Buffer.from(op.key, 'hex');
                             const message = Buffer.concat([
-                                Buffer.from(op.key, 'hex')
+                                publicKey
                                 //TODO: ADD NONCE ?
                             ]);
 
-                            const popIsValid = crypto.verify(message, Buffer.from(op.value.pop, 'hex'), Buffer.from(op.key, 'hex'));
+                            const popIsValid = crypto.verify(message, Buffer.from(op.value.pop, 'hex'), publicKey);
                             if (popIsValid) {
                                 const writerEntry = await _this.base.view.get(op.key)
                                 if (writerEntry !== null && writerEntry.value.isValid) {
