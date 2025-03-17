@@ -4,7 +4,7 @@ import crypto from 'hypercore-crypto';
 //TODO ADD THROWS
 //TODO FOR NOW IT'S FINE. IT MUST BE INTEGRATED WITH TRAC WALLET
 //TODO: How about nonce if edDSA is deterministic?
-
+//TODO: if enable_wallet is false then user shouldn't be allowd to add or remove writer
 /**
  * WriterManager manages writer nodes in the TRAC NETWORK, handling events, adding/removing writers, and managing the bootstrap process.
  * It interacts with the MainSettlementBus instance to perform key operations.
