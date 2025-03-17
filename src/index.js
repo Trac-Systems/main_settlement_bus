@@ -147,7 +147,6 @@ export class MainSettlementBus extends ReadyResource {
                         parsedPreTx.op === 'pre-tx' &&
                         crypto.verify(Buffer.from(parsedPreTx.tx, 'utf-8'), Buffer.from(parsedPreTx.is, 'hex'), Buffer.from(parsedPreTx.ipk, 'hex')) &&
                         parsedPreTx.w === _this.writerLocalKey &&
-                        _this.base.activeWriters.has(Buffer.from(parsedPreTx.w, 'hex')) &&
                         null === await _this.base.view.get(parsedPreTx.tx)
                     ) {
                         const signature = crypto.sign(Buffer.from(parsedPreTx.tx, 'utf-8'), this.signingKeyPair.secretKey);
