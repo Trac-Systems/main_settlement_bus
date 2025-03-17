@@ -71,7 +71,7 @@ export class MainSettlementBus extends ReadyResource {
                             crypto.verify(Buffer.from(postTx.tx, 'utf-8'), Buffer.from(postTx.is, 'hex'), Buffer.from(postTx.ipk, 'hex')) &&// sender verification
                             crypto.verify(Buffer.from(postTx.tx, 'utf-8'), Buffer.from(postTx.ws, 'hex'), Buffer.from(postTx.wp, 'hex')) &&// writer verification
                             this.base.activeWriters.has(Buffer.from(postTx.w, 'hex')) &&
-                            Buffer.byteLength(JSON.stringify(postTx)) <= 2560
+                            Buffer.byteLength(JSON.stringify(postTx)) <= 4096
                         ) {
                             await view.put(op.key, op.value);
                             console.log(`TX: ${op.key} appended. Signed length: `,  _this.base.view.core.signedLength);
@@ -138,7 +138,7 @@ export class MainSettlementBus extends ReadyResource {
                     return
                 }
 
-                if(Buffer.byteLength(msg) > 2048) return;
+                if(Buffer.byteLength(msg) > 3072) return;
 
                 try {
 

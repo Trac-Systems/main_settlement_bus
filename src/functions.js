@@ -5,7 +5,8 @@ import BlindPairing from "blind-pairing";
 // TODO: Split sanitization on pre and post TX
 export function sanitizeTransaction(parsedTx) {
     return (
-        typeof parsedTx === 'object' && parsedTx !== null &&
+        typeof parsedTx === 'object' &&
+        parsedTx !== null &&
         typeof parsedTx.op === 'string' &&
         typeof parsedTx.tx === 'string' &&
         typeof parsedTx.w === 'string' &&
