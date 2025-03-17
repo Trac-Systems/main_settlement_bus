@@ -70,7 +70,6 @@ export class MainSettlementBus extends ReadyResource {
                             postTx.op === 'post-tx' &&
                             crypto.verify(Buffer.from(postTx.tx, 'utf-8'), Buffer.from(postTx.is, 'hex'), Buffer.from(postTx.ipk, 'hex')) &&// sender verification
                             crypto.verify(Buffer.from(postTx.tx, 'utf-8'), Buffer.from(postTx.ws, 'hex'), Buffer.from(postTx.wp, 'hex')) &&// writer verification
-                            this.base.activeWriters.has(Buffer.from(postTx.w, 'hex')) &&
                             Buffer.byteLength(JSON.stringify(postTx)) <= 4096
                         ) {
                             await view.put(op.key, op.value);
