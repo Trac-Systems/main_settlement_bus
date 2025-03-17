@@ -8,11 +8,10 @@ import readline from 'readline';
 import crypto from 'hypercore-crypto';
 import { sanitizeTransaction, addWriter, restoreManifest, sleep } from './functions.js';
 import w from 'protomux-wakeup';
-import * as edKeyGen from "trac-wallet"
-import fs from 'node:fs';
 import Corestore from 'corestore';
 import verifier from 'hypercore/lib/verifier.js';
 import WriterManager from './writerManager.js';
+import PeerWallet from "ed25519-key-generator"; // TODO: Decide if this should be used here directly or inputed as an option
 
 const { manifestHash, createManifest } = verifier;
 
@@ -43,6 +42,11 @@ export class MainSettlementBus extends ReadyResource {
         this.bootstrap = options.bootstrap || null;
         this.opts = options;
         this.bee = null;
+
+        // TODO: Decide if this is better placed in the _open method instead of here
+        if (this.enable_wallet) {
+            this.wallet = new PeerWallet();
+        }
 
         this.pool();
         this.msbListener();
@@ -189,7 +193,7 @@ export class MainSettlementBus extends ReadyResource {
     async _open() {
         await this.base.ready();
         if (this.enable_wallet) {
-            await this.#initKeyPair();
+            await this.wallet.initKeyPair(this.KEY_PAIR_PATH);
         }
 
         this.writingKey = b4a.toString(this.base.local.key, 'hex');
@@ -393,77 +397,6 @@ export class MainSettlementBus extends ReadyResource {
 
         rl.prompt();
     }
-
-    async #getMnemonicInteractiveMode() {
-        const rl = readline.createInterface({
-            input: process.stdin,
-            output: process.stdout
-        });
-
-        const question = (query) => {
-            return new Promise(resolve => {
-                rl.question(query, resolve);
-            });
-        }
-
-        let mnemonic;
-        let choice = '';
-        while (!choice.trim()) {
-            choice = await question("[1]. Generate new mnemonic phrase\n[2]. Restore keypair from backed up mnemonic phrase\nYour choice (1/2): ");
-            switch (choice) {
-                case '1':
-                    mnemonic = undefined
-                    break;
-                case '2':
-                    const mnemonicInput = await question("Enter your mnemonic phrase: ");
-                    mnemonic = edKeyGen.sanitizeMnemonic(mnemonicInput);
-                    break;
-                default:
-                    console.log("Invalid choice. Please select again");
-                    choice = '';
-                    break;
-            }
-        }
-        rl.close();
-        return mnemonic;
-    }
-
-    async #initKeyPair() {
-        // TODO: User shouldn't be allowed to store it in unencrypted form. ASK for a password to encrypt it. ENCRYPT(HASH(PASSWORD,SALT),FILE)/DECRYPT(HASH(PASSWORD,SALT),ENCRYPTED_FILE)?
-        try {
-            // Check if the key file exists
-            if (fs.existsSync(this.KEY_PAIR_PATH)) {
-                const keyPair = JSON.parse(fs.readFileSync(this.KEY_PAIR_PATH));
-                this.signingKeyPair = {
-                    publicKey: Buffer.from(keyPair.publicKey, 'hex'),
-                    secretKey: Buffer.from(keyPair.secretKey, 'hex')
-                }
-            } else {
-                console.log("Key file was not found. How do you wish to proceed?");
-                const mnemonic = await this.#getMnemonicInteractiveMode();
-
-                const generatedSecrets = edKeyGen.generateKeyPair(mnemonic);
-                const keyPair = {
-                    publicKey: Buffer.from(generatedSecrets.publicKey).toString('hex'),
-                    secretKey: Buffer.from(generatedSecrets.secretKey).toString('hex')
-                }
-
-                //TODO: ASK USER TO WRITE FIRST SECOND AND LAST WORD OR SOMETHING SIMILAR TO CONFIRM THEY HAVE WRITTEN IT DOWN
-                if (!mnemonic) console.log("This is your mnemonic:\n", generatedSecrets.mnemonic, "\nPlease back it up in a safe location")
-
-                fs.writeFileSync(this.KEY_PAIR_PATH, JSON.stringify(keyPair));
-                this.signingKeyPair = {
-                    publicKey: generatedSecrets.publicKey,
-                    secretKey: generatedSecrets.secretKey,
-                }
-
-                console.log("DEBUG: Key pair generated and stored in", this.KEY_PAIR_PATH);
-            }
-        } catch (err) {
-            console.error(err);
-        }
-    }
-
 }
 
 function noop() { }

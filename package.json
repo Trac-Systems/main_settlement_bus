@@ -29,6 +29,7 @@
     "protomux-wakeup": "^2.2.1",
     "ready-resource": "^1.0.0",
     "safety-catch": "1.0.2",
-    "xache": "1.2.0"
+    "xache": "1.2.0",
+    "ed25519-key-generator": "git+ssh://git@github.com:Trac-Systems/ed25519-key-generator.git#convert-to-wallet-class"
   }
 }
