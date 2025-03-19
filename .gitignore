@@ -2,3 +2,4 @@
 /stores/
 /node_modules/
 .idea
+.npmrc

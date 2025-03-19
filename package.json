@@ -1,6 +1,7 @@
 {
   "name": "trac-msb",
   "main": "src/index.js",
+  "version": "0.0.2",
   "pear": {
     "name": "trac-msb",
     "type": "terminal"
@@ -17,7 +18,7 @@
     "brittle": "3.0.0",
     "corestore": "7.0.22",
     "debounceify": "1.1.0",
-    "ed25519-key-generator": "file:../ed25519-key-generator",
+    "trac-wallet": "^0.0.1",
     "hyperbee": "2.23.0",
     "hypercore": "11.0.48",
     "hypercore-crypto": "3.4.0",

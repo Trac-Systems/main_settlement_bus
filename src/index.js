@@ -8,7 +8,7 @@ import readline from 'readline';
 import crypto from 'hypercore-crypto';
 import { sanitizeTransaction, addWriter } from './functions.js';
 import w from 'protomux-wakeup';
-import * as edKeyGen from "ed25519-key-generator"
+import * as edKeyGen from "trac-wallet"
 import fs from 'node:fs';
 import Corestore from 'corestore';
 
