@@ -19,7 +19,7 @@ export class MainSettlementBus extends ReadyResource {
     constructor(options = {}) {
         super();
         this.STORES_DIRECTORY = options.stores_directory;
-        this.KEY_PAIR_PATH = `${this.STORES_DIRECTORY}${options.store_name}/keypair.json`
+        this.KEY_PAIR_PATH = `${this.STORES_DIRECTORY}${options.store_name}/db/keypair.json`
         this.signingKeyPair = null;
         this.store = new Corestore(this.STORES_DIRECTORY + options.store_name);
         this.swarm = null;
