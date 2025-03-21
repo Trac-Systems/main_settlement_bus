@@ -5,7 +5,7 @@ import ReadyResource from 'ready-resource';
 import b4a from 'b4a';
 import Hyperbee from 'hyperbee';
 import readline from 'readline';
-import { sanitizeTransaction, restoreManifest, sleep, restoreHash } from './functions.js';
+import { sanitizeTransaction, restoreManifest, sleep, restoreHash ,verifyDag } from './functions.js';
 import w from 'protomux-wakeup';
 import Corestore from 'corestore';
 import verifier from 'hypercore/lib/verifier.js';
@@ -367,30 +367,6 @@ export class MainSettlementBus extends ReadyResource {
         });
     }
 
-    async verifyDag() {
-        try {
-            console.log('--- DAG Monitoring ---');
-            const dagView = await this.base.view.core.treeHash();
-            const lengthdagView = this.base.view.core.length;
-            const dagSystem = await this.base.system.core.treeHash();
-            const lengthdagSystem = this.base.system.core.length;
-            console.log('this.base.view.core.signedLength:', this.base.view.core.signedLength);
-            console.log("this.base.signedLength", this.base.signedLength);
-            console.log("this.base.linearizer.indexers.length", this.base.linearizer.indexers.length);
-            console.log("this.base.indexedLength", this.base.indexedLength);
-            //console.log("this.base.system.core", this.base.system.core);
-            console.log(`writingKey: ${this.writingKey}`);
-            console.log(`base.key: ${this.base.key.toString('hex')}`);
-            console.log('discoveryKey:', b4a.toString(this.base.discoveryKey, 'hex'));
-
-            console.log(`VIEW Dag: ${dagView.toString('hex')} (length: ${lengthdagView})`);
-            console.log(`SYSTEM Dag: ${dagSystem.toString('hex')} (length: ${lengthdagSystem})`);
-
-        } catch (error) {
-            console.error('Error during DAG monitoring:', error.message);
-        }
-    }
-
     async interactiveMode() {
         const rl = readline.createInterface({
             input: process.stdin,
@@ -408,7 +384,7 @@ export class MainSettlementBus extends ReadyResource {
         rl.on('line', async (input) => {
             switch (input) {
                 case '/dag':
-                    await this.verifyDag();
+                    await verifyDag(this.base);
                     break;
                 case '/exit':
                     console.log('Exiting...');

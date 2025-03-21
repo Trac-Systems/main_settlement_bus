@@ -56,6 +56,27 @@ export function restoreHash(parsedPreTx) {
     return finalReconstructedTxHash;
 }
 
+export async function verifyDag(autoBaseInsance) {
+    try {
+        console.log('--- DAG Monitoring ---');
+        const dagView = await autoBaseInsance.view.core.treeHash();
+        const lengthdagView = autoBaseInsance.view.core.length;
+        const dagSystem = await autoBaseInsance.system.core.treeHash();
+        const lengthdagSystem = autoBaseInsance.system.core.length;
+        console.log('this.base.view.core.signedLength:', autoBaseInsance.view.core.signedLength);
+        console.log("this.base.signedLength", autoBaseInsance.signedLength);
+        console.log("this.base.linearizer.indexers.length", autoBaseInsance.linearizer.indexers.length);
+        console.log("this.base.indexedLength", autoBaseInsance.indexedLength);
+        console.log(`base.key/writingKey: ${autoBaseInsance.key.toString('hex')}`);
+
+        console.log(`VIEW Dag: ${dagView.toString('hex')} (length: ${lengthdagView})`);
+        console.log(`SYSTEM Dag: ${dagSystem.toString('hex')} (length: ${lengthdagSystem})`);
+
+    } catch (error) {
+        console.error('Error during DAG monitoring:', error.message);
+    }
+}
+
 export async function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
