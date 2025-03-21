@@ -5,18 +5,18 @@ import ReadyResource from 'ready-resource';
 import b4a from 'b4a';
 import Hyperbee from 'hyperbee';
 import readline from 'readline';
-import crypto from 'hypercore-crypto';
 import { sanitizeTransaction, addWriter, restoreManifest, sleep } from './functions.js';
 import w from 'protomux-wakeup';
 import Corestore from 'corestore';
 import verifier from 'hypercore/lib/verifier.js';
 import WriterManager from './writerManager.js';
 import PeerWallet from "ed25519-key-generator"; // TODO: Decide if this should be used here directly or inputed as an option
+import { createHash } from "node:crypto";
 
 const { manifestHash, createManifest } = verifier;
 
 const wakeup = new w();
-
+//TODO: change isValid to isIndexer
 //TODO: How about nonce if edDSA is deterministic?
 //TODO: CHECK IF TX HASH IS ALREDY IN BASE BEFORE VALIDATING IT TO DON'T OVERWRITE tx/writerPubKey. Also we need to validate this case where the 2 nodes send the same hash. 
 
@@ -26,13 +26,13 @@ export class MainSettlementBus extends ReadyResource {
         super();
         this.STORES_DIRECTORY = options.stores_directory;
         this.KEY_PAIR_PATH = `${this.STORES_DIRECTORY}${options.store_name}/db/keypair.json`
-        this.signingKeyPair = null;
         this.store = new Corestore(this.STORES_DIRECTORY + options.store_name);
         this.swarm = null;
         this.tx = options.tx || null;
         this.tx_pool = [];
         this.enable_txchannel = typeof options.enable_txchannel !== "undefined" && options.enable_txchannel === false ? false : true;
         this.enable_wallet = typeof options.enable_wallet !== "undefined" && options.enable_wallet === false ? false : true;
+        this.isVerifyOnly = typeof options.isVerifyOnly !== "undefined" && options.isVerifyOnly === true ? true : false;
         this.base = null;
         this.channel = options.channel || null;
         this.connectedNodes = 1;
@@ -45,15 +45,16 @@ export class MainSettlementBus extends ReadyResource {
 
         // TODO: Decide if this is better placed in the _open method instead of here
         if (this.enable_wallet) {
-            this.wallet = new PeerWallet();
+            this.wallet = new PeerWallet({ isVerifyOnly: this.isVerifyOnly });
         }
 
         this.pool();
         this.msbListener();
         this._boot();
         this.ready().catch(noop);
+
     }
-    
+    //TODO: Move apply to the separate file
     _boot() {
         const _this = this;
         this.base = new Autobase(this.store, this.bootstrap, {
@@ -76,15 +77,13 @@ export class MainSettlementBus extends ReadyResource {
                     const op = node.value;
                     const postTx = op.value;
 
-                    if (!op || !op.type || op.key == null || op.value == null) {
+                    if (!op || !op.type || !op.key || !op.value) {
                         continue;
                     }
-
                     // WRITING & INDEXING
                     if (op.type === 'addWriter') {
                         //TODO: it can be optimalized by adding variables to don't call Buffer.from multiple times.
                         //TODO: SANITIZE INCOMPING PROPOSAL
-
                         if (node.from.key.toString('hex') === this.bootstrap) {
                             const message = Buffer.concat([
                                 Buffer.from(JSON.stringify(op.value.hpm)),
@@ -93,24 +92,27 @@ export class MainSettlementBus extends ReadyResource {
                                 //TODO: ADD THE NONCE?
                             ]);
 
-                            const pop1Valid = crypto.verify(message, Buffer.from(op.value.pop1, 'hex'), Buffer.from(op.value.hpm.signers[0].publicKey));
-                            const pop2Valid = crypto.verify(message, Buffer.from(op.value.pop2, 'hex'), Buffer.from(op.key, 'hex'));
+                            const pop1Valid = this.wallet.verify(op.value.pop1, message, Buffer.from(op.value.hpm.signers[0].publicKey));
+                            const pop2Valid = this.wallet.verify(op.value.pop2, message, op.key);
+
+
                             const restoredManifest = restoreManifest(op.value.hpm); //temporary workaround
-                            // await this.base.view.get(op.key) === null
                             if (pop1Valid && pop2Valid && manifestHash(createManifest(restoredManifest)).toString('hex') === op.value.wk) {
 
                                 const writerEntry = this.base.view.get(op.key);
                                 if (writerEntry === null || !writerEntry.isValid) {
-                                    await base.addWriter(b4a.from(op.value.wk, 'hex'))
+                                    await base.addWriter(b4a.from(op.value.wk, 'hex'), { isIndexer: false })
+
                                     await view.put(op.key, {
                                         wk: op.value.wk,
                                         hpm: op.value.hpm,
                                         pop1: op.value.pop1, // TODO: observation this is really necessary to store pops? IF NOT DELETE IT!
                                         pop2: op.value.pop2,
-                                        isValid: true
+                                        isValid: true,
+                                        isIndexer: false
                                         //TODO: ADD NONCE?
                                     });
-                                    console.log(`Writer added: ${op.value.wk} indexer`);
+                                    console.log(`Writer added: ${op.value.wk}`);
 
                                 }
                             }
@@ -126,19 +128,21 @@ export class MainSettlementBus extends ReadyResource {
                                 //TODO: ADD NONCE ?
                             ]);
 
-                            const popIsValid = crypto.verify(message, Buffer.from(op.value.pop, 'hex'), publicKey);
+                            const popIsValid = this.wallet.verify(op.value.pop, message, publicKey);
                             if (popIsValid) {
                                 const writerEntry = await _this.base.view.get(op.key)
-                                if (writerEntry !== null && writerEntry.value.isValid) {
+                                if (writerEntry !== null && writerEntry.value.isValid ) {
                                     await base.removeWriter(Buffer.from(writerEntry.value.wk, 'hex'));
                                     writerEntry.value.isValid = false;
+                                    if (writerEntry.value.isIndexer === true) {
+                                        writerEntry.value.isIndexer = false;
+                                    }
                                     await view.put(op.key, writerEntry.value);
-                                    console.log(`Writer removed: ${writerEntry.value.wk} indexer`);
+                                    console.log(`Writer removed: ${writerEntry.value.wk}`);
                                 }
 
                             }
                         }
-
 
                     } else if (op.type === 'initBootstrap') {
                         // this operation initializes the bootstrap skp to grant this public key the owner status.
@@ -154,8 +158,8 @@ export class MainSettlementBus extends ReadyResource {
                                 //here should be nonce anyway in the future - generated randomly from the huge space. 
                             ]);
 
-                            const pop1Valid = crypto.verify(message, Buffer.from(op.value.pop1, 'hex'), Buffer.from(op.value.hpm.signers[0].publicKey));
-                            const pop2Valid = crypto.verify(message, Buffer.from(op.value.pop2, 'hex'), Buffer.from(op.value.skp, 'hex'));
+                            const pop1Valid = this.wallet.verify(op.value.pop1, message, Buffer.from(op.value.hpm.signers[0].publicKey));
+                            const pop2Valid = this.wallet.verify(op.value.pop2, message, Buffer.from(op.value.skp, 'hex'));
                             const restoredManifest = restoreManifest(op.value.hpm); //temporary workaround
 
                             if (pop1Valid && pop2Valid && manifestHash(createManifest(restoredManifest)).toString('hex') === this.bootstrap) {
@@ -163,26 +167,74 @@ export class MainSettlementBus extends ReadyResource {
                             }
                         }
 
-                    } else if (op.type === 'addWriter2') {
-                        const writerKey = b4a.from(op.key, 'hex');
-                        await base.addWriter(writerKey, { isIndexer: false });
-                        console.log(`Writer added: ${op.key} non-indexer`);
+                    } else if (op.type === 'addIndexer') {
+                        if (node.from.key.toString('hex') === _this.bootstrap) {
+                            //Simplify signature
+                            const message = Buffer.concat([
+                                Buffer.from(op.value.ptpk, 'hex'),
+                                Buffer.from(op.value.pwk, 'hex')]
+                            )
+                            const popValid = _this.wallet.verify(op.value.pop, message, op.key);
+                            const writerEntry = await _this.base.view.get(op.value.ptpk);
+                            if (popValid && writerEntry !== null && writerEntry.value.isValid === true && writerEntry.value.wk === op.value.pwk && writerEntry.value.isIndexer === false) {
+                                await base.removeWriter(Buffer.from(writerEntry.value.wk, 'hex'));
+                                await base.addWriter(b4a.from(writerEntry.value.wk, 'hex'), { indexer: true })
+                                writerEntry.value.isIndexer = true;
+                                await view.put(op.value.ptpk, writerEntry.value);
+                                console.log(`${op.value.ptpk}:${op.value.pwk} writer became indexer`);
+                            }
+                        }
+                    
+                    } else if (op.type === 'removeIndexer') {
+                        if (node.from.key.toString('hex') === _this.bootstrap) {
+                            //Simplify signature
+                            const message = Buffer.concat([
+                                Buffer.from(op.value.ptpk, 'hex'),
+                                Buffer.from(op.value.pwk, 'hex')]
+                            )
+                            const popValid = _this.wallet.verify(op.value.pop, message, op.key);
+                            const writerEntry = await _this.base.view.get(op.value.ptpk);
 
+                            if (popValid && writerEntry !== null && writerEntry.value.isValid === true && writerEntry.value.wk === op.value.pwk && writerEntry.value.isIndexer === true) {
+                                await base.removeWriter(Buffer.from(writerEntry.value.wk, 'hex'));
+                                await base.addWriter(b4a.from(writerEntry.value.wk, 'hex'), { indexer: false })
+                                writerEntry.value.isIndexer = false;
+                                await view.put(op.value.ptpk, writerEntry.value);
+                                console.log(`Writer ${op.value.ptpk}:${op.value.pwk} is not longer indexer`);
+                            }
+                        }
                     } else if (op.type === 'tx') {
-                        //TODO: as a validator I should reconstruct hash and validate it.
+
+                        const reconstructedContentHash = createHash('sha256')
+                            .update(JSON.stringify(postTx.ch))
+                            .digest('hex');
+
+                        const reconstructedTxHash = createHash('sha256')
+                            .update(
+                                postTx.w + '-' +
+                                postTx.i + '-' +
+                                postTx.ipk + '-' +
+                                reconstructedContentHash + '-' +
+                                postTx.in
+                            )
+                            .digest('hex');
+
+                        const finalReconstructedTxHash = createHash('sha256')
+                            .update(reconstructedTxHash)
+                            .digest('hex');
 
                         if (null === await view.get(op.key) &&
+                            finalReconstructedTxHash !== postTx.tx &&
                             sanitizeTransaction(postTx) &&
                             postTx.op === 'post-tx' &&
-                            crypto.verify(Buffer.from(postTx.tx, 'utf-8'), Buffer.from(postTx.is, 'hex'), Buffer.from(postTx.ipk, 'hex')) &&// sender verification
-                            crypto.verify(Buffer.from(postTx.tx, 'utf-8'), Buffer.from(postTx.ws, 'hex'), Buffer.from(postTx.wp, 'hex')) &&// writer verification
+                            this.wallet.verify(Buffer.from(postTx.is, 'hex'), Buffer.from(postTx.tx, 'utf-8'), Buffer.from(postTx.ipk, 'hex')) &&// sender verification
+                            this.wallet.verify(Buffer.from(postTx.ws, 'hex'), Buffer.from(postTx.tx, 'utf-8'), Buffer.from(postTx.wp, 'hex')) &&// writer verification
                             Buffer.byteLength(JSON.stringify(postTx)) <= 4096
-                    ) {
-                        await view.put(op.key, op.value);
-                        console.log(`TX: ${op.key} appended. Signed length: `,  _this.base.view.core.signedLength);
-                    }
-                        
-                        
+                        ) {
+                            await view.put(op.key, op.value);
+                            console.log(`TX: ${op.key} appended. Signed length: `, _this.base.view.core.signedLength);
+                        }
+
                     }
                 }
             }
@@ -192,7 +244,7 @@ export class MainSettlementBus extends ReadyResource {
 
     async _open() {
         await this.base.ready();
-        if (this.enable_wallet) {
+        if (this.enable_wallet && !this.isVerifyOnly) {
             await this.wallet.initKeyPair(this.KEY_PAIR_PATH);
         }
 
@@ -230,7 +282,7 @@ export class MainSettlementBus extends ReadyResource {
 
             connection.on('data', async (msg) => {
 
-                if (_this.base.isIndexer) return;
+                if (!_this.base.isIndexer) return;
 
                 // TODO: decide if a tx rejection should be responded with
                 if (_this.tx_pool.length >= 1000) {
@@ -243,14 +295,33 @@ export class MainSettlementBus extends ReadyResource {
                 try {
                     const parsedPreTx = JSON.parse(msg);
 
+                    const reconstructedContentHash = createHash('sha256')
+                        .update(JSON.stringify(parsedPreTx.ch))
+                        .digest('hex');
+
+                    const reconstructedTxHash = createHash('sha256')
+                        .update(
+                            parsedPreTx.w + '-' +
+                            parsedPreTx.i + '-' +
+                            parsedPreTx.ipk + '-' +
+                            reconstructedContentHash + '-' +
+                            parsedPreTx.in
+                        )
+                        .digest('hex');
+
+                    const finalReconstructedTxHash = createHash('sha256')
+                        .update(reconstructedTxHash)
+                        .digest('hex');
+
                     if (sanitizeTransaction(parsedPreTx) &&
                         parsedPreTx.op === 'pre-tx' &&
-                        crypto.verify(Buffer.from(parsedPreTx.tx, 'utf-8'), Buffer.from(parsedPreTx.is, 'hex'), Buffer.from(parsedPreTx.ipk, 'hex')) &&
+                        finalReconstructedTxHash !== parsedPreTx.tx &&
+                        this.wallet.verify(Buffer.from(parsedPreTx.is, 'hex'), Buffer.from(parsedPreTx.tx, 'utf-8'), Buffer.from(parsedPreTx.ipk, 'hex')) &&
                         parsedPreTx.w === _this.writingKey &&
                         null === await _this.base.view.get(parsedPreTx.tx)
                     ) {
-                        //TODO: as a validator I should reconstruct hash and validate it.
-                        const signature = crypto.sign(Buffer.from(parsedPreTx.tx, 'utf-8'), this.signingKeyPair.secretKey);
+                        const signature = this.wallet.sign(Buffer.from(parsedPreTx.tx, 'utf-8'));
+                       
                         const append_tx = {
                             op: 'post-tx',
                             tx: parsedPreTx.tx,
@@ -260,8 +331,8 @@ export class MainSettlementBus extends ReadyResource {
                             ipk: parsedPreTx.ipk,
                             ch: parsedPreTx.ch,
                             in: parsedPreTx.in,
-                            ws: signature.toString('hex'),
-                            wp: this.signingKeyPair.publicKey.toString('hex'),
+                            ws: JSON.parse(JSON.stringify(signature)),
+                            wp: JSON.parse(JSON.stringify(this.wallet.publicKey)),
                         };
                         _this.tx_pool.push({ tx: parsedPreTx.tx, append_tx: append_tx });
                     }
@@ -345,7 +416,7 @@ export class MainSettlementBus extends ReadyResource {
             console.log("this.base.linearizer.indexers.length", this.base.linearizer.indexers.length);
             console.log("this.base.indexedLength", this.base.indexedLength);
             //console.log("this.base.system.core", this.base.system.core);
-            console.log(`writerLocalKey: ${this.writingKey}`);
+            console.log(`writingKey: ${this.writingKey}`);
             console.log(`base.key: ${this.base.key.toString('hex')}`);
             console.log('discoveryKey:', b4a.toString(this.base.discoveryKey, 'hex'));
 
@@ -364,10 +435,10 @@ export class MainSettlementBus extends ReadyResource {
         });
 
         console.log('MSB started. Available commands:');
-        console.log('- /add_writer: enter a peer writer key as argument to get included as writer.');
-        console.log('- /add_writer2: enter a peer writer key as argument to get included as non-indexing writer.');
-        console.log('- /removeMe:')
-        console.log('- /addMe:')
+        console.log('- /addMe: send request to admin to become a writer node in the TRAC Network');
+        console.log('- /removeMe: send request to admin to remove writer node from the TRAC Network');
+        console.log('- /addIndexer <TracPublicKey> <WritingKey> (Admin only): enter a public key and writing key to make node as Indexer. Node have to be a writer already. ');
+        console.log('- /removeIndexer <TracPublicKey> <WritingKey> (Admin only): enter a public key and writing key to take off Indexer role. Node have to be a writer already');
         console.log('- /dag: check system properties such as writer key, DAG, etc.');
         console.log('- /exit: Exit the program');
 
@@ -388,13 +459,17 @@ export class MainSettlementBus extends ReadyResource {
                     await this.writerManager.removeMe();
                     break;
                 default:
-                    if (input.startsWith('/add_writer')) {
-                        await addWriter(input, this);
+                    if (input.startsWith('/addIndexer')) {
+                        const splitted = input.split(' ');
+                        this.writerManager.addIndexer(splitted[1], splitted[2]);
+
+                    } else if (input.startsWith('/removeIndexer')) {
+                        const splitted = input.split(' ');
+                        this.writerManager.removeIndexer(splitted[1], splitted[2]);
                     }
             }
             rl.prompt();
         });
-
         rl.prompt();
     }
 }

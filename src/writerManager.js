@@ -1,5 +1,4 @@
 import ReadyResource from 'ready-resource';
-import crypto from 'hypercore-crypto';
 
 //TODO ADD THROWS
 //TODO FOR NOW IT'S FINE. IT MUST BE INTEGRATED WITH TRAC WALLET
@@ -10,7 +9,7 @@ import crypto from 'hypercore-crypto';
  * It interacts with the MainSettlementBus instance to perform key operations.
  */
 
-const MS_TO_WAIT =  5000;
+const MS_TO_WAIT = 5000;
 
 export class WriterManager extends ReadyResource {
     /**
@@ -20,7 +19,7 @@ export class WriterManager extends ReadyResource {
     constructor(msbInstance) {
         super();
         this.base = msbInstance.base;
-        this.signingKeyPair = msbInstance.signingKeyPair; //TODO: REMOVE BECAUSE WE CANT STORE KEYS LIKE THAT. BUT AFTER WALLET INTEGRATION WE CAN STORE IT IN WALLET
+        this.wallet = msbInstance.wallet;
         this.swarm = msbInstance.swarm;
         this.bootstrap = msbInstance.bootstrap;
         this.writingKey = msbInstance.writingKey;
@@ -44,7 +43,7 @@ export class WriterManager extends ReadyResource {
                     const message = Buffer.concat([
                         Buffer.from(JSON.stringify(this.base.localWriter.core.manifest)),
                         Buffer.from(this.writingKey, 'hex'),
-                        this.signingKeyPair.publicKey
+                        Buffer.from(this.wallet.publicKey, 'hex')
                     ]);
 
                     //SEND BOOTSTRAP TRAC MANIFEST
@@ -54,9 +53,9 @@ export class WriterManager extends ReadyResource {
                         value: {
                             wk: this.writingKey,
                             hpm: this.base.localWriter.core.manifest,
-                            skp: this.signingKeyPair.publicKey.toString('hex'),
-                            pop1: crypto.sign(message, this.base.localWriter.core.keyPair.secretKey),
-                            pop2: crypto.sign(message, this.signingKeyPair.secretKey)
+                            skp: this.wallet.publicKey,
+                            pop1: this.wallet.sign(message, this.base.localWriter.core.keyPair.secretKey),
+                            pop2: this.wallet.sign(message)
                         }
                     });
                 }
@@ -92,7 +91,7 @@ export class WriterManager extends ReadyResource {
                 return;
             }
 
-            const writerEntry = await this.base.view.get(this.signingKeyPair.publicKey.toString('hex')); //TODO REMOVE LINE TO FUNCTION
+            const writerEntry = await this.base.view.get(this.wallet.publicKey);
             if (writerEntry !== null && writerEntry.value.isValid) {
                 console.log(`Cannot perform operation because node is already writer`);
                 return;
@@ -112,25 +111,26 @@ export class WriterManager extends ReadyResource {
                     const message = Buffer.concat([
                         Buffer.from(JSON.stringify(this.base.local.core.manifest)),
                         Buffer.from(this.writingKey, 'hex'),
-                        this.signingKeyPair.publicKey
+                        Buffer.from(this.wallet.publicKey, 'hex')
                         //TODO: ADD NONCE?
                     ]);
 
                     //SEND TRAC MANIFEST
                     conn.write(JSON.stringify({
                         type: 'addWriter',
-                        key: this.signingKeyPair.publicKey.toString('hex'),
+                        key: this.wallet.publicKey,
                         value: {
                             wk: this.writingKey,
                             hpm: this.base.local.core.manifest,
-                            pop1: crypto.sign(message, this.base.local.core.header.keyPair.secretKey),
-                            pop2: crypto.sign(message, this.signingKeyPair.secretKey)
+                            pop1: this.wallet.sign(message, this.base.local.core.header.keyPair.secretKey),
+                            pop2: this.wallet.sign(message),
                             //TODO: ADD NONCE?
                         }
+
                     }));
 
                     setTimeout(async () => {
-                        const updatedWriterEntry = await this.base.view.get(this.signingKeyPair.publicKey.toString('hex'));
+                        const updatedWriterEntry = await this.base.view.get(this.wallet.publicKey);
                         if (updatedWriterEntry !== null && updatedWriterEntry.value.isValid) {
                             console.log(`Writer ${this.writingKey} was successfully added.`);
                         } else {
@@ -156,7 +156,7 @@ export class WriterManager extends ReadyResource {
                 return;
             }
 
-            const writerEntry = await this.base.view.get(this.signingKeyPair.publicKey.toString("hex"));
+            const writerEntry = await this.base.view.get(this.wallet.publicKey);
             if (writerEntry === null || !writerEntry.value.isValid) {
                 console.log(`Your key does not exist in the database  or you can't remove it`);
                 return;
@@ -175,16 +175,16 @@ export class WriterManager extends ReadyResource {
                 if (conn.connected && conn.remotePublicKey.toString('hex') === bootstrapPubKey) {
 
                     const message = Buffer.concat([
-                        this.signingKeyPair.publicKey // TODO: TO REDUCE THE SIZE OF THE MESSAGE WE CAN SEND SIMPLE STRING SUCHAS  "REMOVE".
+                        Buffer.from(this.wallet.publicKey, 'hex') // TODO: TO REDUCE THE SIZE OF THE MESSAGE WE CAN SEND SIMPLE STRING SUCHAS  "REMOVE". You can just HASH the message and sign the hash.
                         //TODO: ADD NONCE?
                     ]);
 
                     //SEND TRAC MANIFEST
                     conn.write(JSON.stringify({
                         type: 'removeWriter',
-                        key: this.signingKeyPair.publicKey.toString("hex"),
+                        key: this.wallet.publicKey,
                         value: {
-                            pop: crypto.sign(message, this.signingKeyPair.secretKey),
+                            pop: this.wallet.sign(message),
                             //TODO: ADD NONCE?
                         }
                     }));
@@ -192,7 +192,7 @@ export class WriterManager extends ReadyResource {
             })
 
             setTimeout(async () => {
-                const updatedWriterEntry = await this.base.view.get(this.signingKeyPair.publicKey.toString("hex"));
+                const updatedWriterEntry = await this.base.view.get(this.wallet.publicKey);
                 if (updatedWriterEntry !== null && !updatedWriterEntry.value.isValid) {
                     console.log(`Key successfully removed`);
                 } else {
@@ -205,6 +205,68 @@ export class WriterManager extends ReadyResource {
         }
     }
 
+    async addIndexer(peerTracPublicKey, peerWritingKey) {
+        if (this.writingKey !== this.bootstrap) {
+            console.log('Only bootstrap node can add indexer');
+            return;
+        }
+
+        const writerEntry = await this.base.view.get(peerTracPublicKey);
+        if (writerEntry === null || writerEntry.value.isValid === false || writerEntry.value.wk !== peerWritingKey || (writerEntry.value.isValid === true && writerEntry.value.isIndexer === true)) {
+            console.log(`Writer ${peerTracPublicKey}:${this.writingKey} can not become an indxer`);
+            return;
+        } 
+
+        const message = Buffer.concat([
+            Buffer.from(peerTracPublicKey, 'hex'),
+            Buffer.from(peerWritingKey, 'hex')
+        ]);
+
+        const indexerRequest = {
+            type: 'addIndexer',
+            key: this.wallet.publicKey,
+            value: {
+                ptpk: peerTracPublicKey,
+                pwk: peerWritingKey,
+                pop: this.wallet.sign(message)
+            }
+        }
+        await this.base.append(indexerRequest);
+        //TODO: ADD TIMEOUT
+
+    }
+
+    async removeIndexer(peerTracPublicKey, peerWritingKey) {
+        if (this.writingKey !== this.bootstrap) {
+            console.log('Only bootstrap node can add indexer');
+            return;
+        }
+        const writerEntry = await this.base.view.get(peerTracPublicKey);
+
+        if (writerEntry === null || writerEntry.value.isValid === false || writerEntry.value.wk !== peerWritingKey || (writerEntry.value.isValid === true && writerEntry.value.isIndexer === false)) {
+            console.log(`Writer ${peerTracPublicKey}:${this.writingKey} can lose indexer status`);
+            return;
+        } 
+
+        const message = Buffer.concat([
+            Buffer.from(peerTracPublicKey, 'hex'),
+            Buffer.from(peerWritingKey, 'hex')
+        ]);
+
+        const indexerRequest = {
+            type: 'removeIndexer',
+            key: this.wallet.publicKey,
+            value: {
+                ptpk: peerTracPublicKey,
+                pwk: peerWritingKey,
+                pop: this.wallet.sign(message)
+            }
+        }
+        await this.base.append(indexerRequest);
+                //TODO: ADD TIMEOUT
+
+
+    }
     /**
      * Retrieves the bootstrap entry from the base view.
      * 
