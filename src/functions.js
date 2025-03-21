@@ -1,5 +1,4 @@
-import BlindPairing from "blind-pairing";
-
+import { createHash } from "node:crypto";
 //TODO: if something is missing, add additonal sanitization
 // parsed.op === 'pre-tx' -> moved out of the scope this check because we can re-use this function in the apply
 // TODO: Split sanitization on pre and post TX
@@ -14,15 +13,6 @@ export function sanitizeTransaction(parsedTx) {
         typeof parsedTx.ipk === 'string' &&
         typeof parsedTx.is === 'string'
     );
-}
-
-export async function addWriter(input, peer){
-    const splitted = input.split(' ');
-    if(splitted[0] === '/add_writer'){
-        await peer.base.append({ type: 'addWriter', key: splitted[splitted.length - 1] });
-    } else if(splitted[0] === '/add_writer2') {
-        await peer.base.append({ type: 'addWriter2', key: splitted[splitted.length - 1] });
-    }
 }
 
 export function restoreManifest(parsedManifest) {
@@ -42,6 +32,28 @@ export function restoreManifest(parsedManifest) {
     }
 
     return parsedManifest;
+}
+
+// To improve - could be done in better approach (simplify)
+export function restoreHash(parsedPreTx) {
+    const reconstructedContentHash = createHash('sha256')
+        .update(JSON.stringify(parsedPreTx.ch))
+        .digest('hex');
+
+    const reconstructedTxHash = createHash('sha256')
+        .update(
+            parsedPreTx.w + '-' +
+            parsedPreTx.i + '-' +
+            parsedPreTx.ipk + '-' +
+            reconstructedContentHash + '-' +
+            parsedPreTx.in
+        )
+        .digest('hex');
+
+    const finalReconstructedTxHash = createHash('sha256')
+        .update(reconstructedTxHash)
+        .digest('hex');
+    return finalReconstructedTxHash;
 }
 
 export async function sleep(ms) {

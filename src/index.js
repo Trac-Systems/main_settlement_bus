@@ -5,13 +5,13 @@ import ReadyResource from 'ready-resource';
 import b4a from 'b4a';
 import Hyperbee from 'hyperbee';
 import readline from 'readline';
-import { sanitizeTransaction, addWriter, restoreManifest, sleep } from './functions.js';
+import { sanitizeTransaction, restoreManifest, sleep, restoreHash } from './functions.js';
 import w from 'protomux-wakeup';
 import Corestore from 'corestore';
 import verifier from 'hypercore/lib/verifier.js';
 import WriterManager from './writerManager.js';
 import PeerWallet from "ed25519-key-generator"; // TODO: Decide if this should be used here directly or inputed as an option
-import { createHash } from "node:crypto";
+
 
 const { manifestHash, createManifest } = verifier;
 
@@ -203,28 +203,9 @@ export class MainSettlementBus extends ReadyResource {
                                 console.log(`Writer ${op.value.ptpk}:${op.value.pwk} is not longer indexer`);
                             }
                         }
-                    } else if (op.type === 'tx') {
-
-                        const reconstructedContentHash = createHash('sha256')
-                            .update(JSON.stringify(postTx.ch))
-                            .digest('hex');
-
-                        const reconstructedTxHash = createHash('sha256')
-                            .update(
-                                postTx.w + '-' +
-                                postTx.i + '-' +
-                                postTx.ipk + '-' +
-                                reconstructedContentHash + '-' +
-                                postTx.in
-                            )
-                            .digest('hex');
-
-                        const finalReconstructedTxHash = createHash('sha256')
-                            .update(reconstructedTxHash)
-                            .digest('hex');
-
+                    } else if (op.type === 'tx') {                        
                         if (null === await view.get(op.key) &&
-                            finalReconstructedTxHash !== postTx.tx &&
+                            restoreHash(postTx) !== postTx.tx &&
                             sanitizeTransaction(postTx) &&
                             postTx.op === 'post-tx' &&
                             this.wallet.verify(Buffer.from(postTx.is, 'hex'), Buffer.from(postTx.tx, 'utf-8'), Buffer.from(postTx.ipk, 'hex')) &&// sender verification
@@ -295,27 +276,9 @@ export class MainSettlementBus extends ReadyResource {
                 try {
                     const parsedPreTx = JSON.parse(msg);
 
-                    const reconstructedContentHash = createHash('sha256')
-                        .update(JSON.stringify(parsedPreTx.ch))
-                        .digest('hex');
-
-                    const reconstructedTxHash = createHash('sha256')
-                        .update(
-                            parsedPreTx.w + '-' +
-                            parsedPreTx.i + '-' +
-                            parsedPreTx.ipk + '-' +
-                            reconstructedContentHash + '-' +
-                            parsedPreTx.in
-                        )
-                        .digest('hex');
-
-                    const finalReconstructedTxHash = createHash('sha256')
-                        .update(reconstructedTxHash)
-                        .digest('hex');
-
                     if (sanitizeTransaction(parsedPreTx) &&
                         parsedPreTx.op === 'pre-tx' &&
-                        finalReconstructedTxHash !== parsedPreTx.tx &&
+                        restoreHash(parsedPreTx) !== parsedPreTx.tx &&
                         this.wallet.verify(Buffer.from(parsedPreTx.is, 'hex'), Buffer.from(parsedPreTx.tx, 'utf-8'), Buffer.from(parsedPreTx.ipk, 'hex')) &&
                         parsedPreTx.w === _this.writingKey &&
                         null === await _this.base.view.get(parsedPreTx.tx)
