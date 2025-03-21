@@ -205,7 +205,19 @@ export class WriterManager extends ReadyResource {
         }
     }
 
+
+    /**
+     * Adds a writer node as an indexer.
+     * The node must already be a valid writer to become an indexer.
+     * This operation can only be performed by the bootstrap/admin node.
+     * 
+     * @param {string} peerTracPublicKey - The TRAC public key of the writer node to be promoted to indexer.
+     * @param {string} peerWritingKey - The writing key of the writer node to be promoted to indexer.
+     * @returns {Promise<void>} Resolves once the writer has been promoted to indexer or if the operation fails.
+     */
     async addIndexer(peerTracPublicKey, peerWritingKey) {
+        //TODO: ADD TIMEOUT WITH MESSAGE OF SUCCESS OR FAILURE. 
+        //TODO IMPROVE CHECKS
         if (this.writingKey !== this.bootstrap) {
             console.log('Only bootstrap node can add indexer');
             return;
@@ -213,7 +225,7 @@ export class WriterManager extends ReadyResource {
 
         const writerEntry = await this.base.view.get(peerTracPublicKey);
         if (writerEntry === null || writerEntry.value.isValid === false || writerEntry.value.wk !== peerWritingKey || (writerEntry.value.isValid === true && writerEntry.value.isIndexer === true)) {
-            console.log(`Writer ${peerTracPublicKey}:${this.writingKey} can not become an indxer`);
+            console.log(`Writer ${peerTracPublicKey}:${this.writingKey} cannot become an indexer`);
             return;
         } 
 
@@ -232,19 +244,27 @@ export class WriterManager extends ReadyResource {
             }
         }
         await this.base.append(indexerRequest);
-        //TODO: ADD TIMEOUT
-
     }
-
+    /**
+     * Removes the indexer status from a writer node.
+     * The node must already be a valid writer and an indexer to lose its indexer status.
+     * This operation can only be performed by the bootstrap node.
+     * 
+     * @param {string} peerTracPublicKey - The TRAC public key of the writer node to lose indexer status.
+     * @param {string} peerWritingKey - The writing key of the writer node to lose indexer status.
+     * @returns {Promise<void>} Resolves once the writer has lost indexer status or if the operation fails.
+     */
     async removeIndexer(peerTracPublicKey, peerWritingKey) {
+        //TODO: ADD TIMEOUT WITH MESSAGE OF SUCCESS OR FAILURE. 
+        //TODO IMPROVE CHECKS
         if (this.writingKey !== this.bootstrap) {
-            console.log('Only bootstrap node can add indexer');
+            console.log('Only bootstrap node can remove indexer');
             return;
         }
         const writerEntry = await this.base.view.get(peerTracPublicKey);
 
         if (writerEntry === null || writerEntry.value.isValid === false || writerEntry.value.wk !== peerWritingKey || (writerEntry.value.isValid === true && writerEntry.value.isIndexer === false)) {
-            console.log(`Writer ${peerTracPublicKey}:${this.writingKey} can lose indexer status`);
+            console.log(`Writer ${peerTracPublicKey}:${this.writingKey} cannot lose indexer status`);
             return;
         } 
 
@@ -263,10 +283,8 @@ export class WriterManager extends ReadyResource {
             }
         }
         await this.base.append(indexerRequest);
-                //TODO: ADD TIMEOUT
-
-
     }
+
     /**
      * Retrieves the bootstrap entry from the base view.
      * 
