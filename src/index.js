@@ -26,6 +26,7 @@ export class MainSettlementBus extends ReadyResource {
         this.tx_pool = [];
         this.enable_txchannel = typeof options.enable_txchannel !== "undefined" && options.enable_txchannel === false ? false : true;
         this.enable_wallet = typeof options.enable_wallet !== "undefined" && options.enable_wallet === false ? false : true;
+        this.enable_updater = typeof options.enable_updater !== "undefined" && options.enable_updater === false ? false : true;
         this.base = null;
         this.key = null;
         this.channel = options.channel || null;
@@ -49,7 +50,7 @@ export class MainSettlementBus extends ReadyResource {
         const _this = this;
         this.base = new Autobase(this.store, this.bootstrap, {
             valueEncoding: 'json',
-
+            ackInterval: 1000,
             open(store) {
                 _this.bee = new Hyperbee(store.get('view'), {
                     extension: false,
@@ -58,9 +59,7 @@ export class MainSettlementBus extends ReadyResource {
                 })
                 return _this.bee;
             },
-
             apply: async (nodes, view, base) => {
-
                 for (const node of nodes) {
                     const op = node.value;
                     const postTx = op.value;
@@ -103,6 +102,9 @@ export class MainSettlementBus extends ReadyResource {
         if (this.enable_txchannel) {
             await this.txChannel();
         }
+        if (this.enable_updater) {
+            this.updater();
+        }
     }
 
     async close() {
@@ -110,6 +112,13 @@ export class MainSettlementBus extends ReadyResource {
             await this.swarm.destroy();
         }
         await this.base.close();
+    }
+
+    async updater(){
+        while(true){
+            await this.base.append(null);
+            await this.sleep(10_000);
+        }
     }
 
     async txChannel() {

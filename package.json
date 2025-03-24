@@ -1,7 +1,7 @@
 {
   "name": "trac-msb",
   "main": "src/index.js",
-  "version": "0.0.16",
+  "version": "0.0.18",
   "pear": {
     "name": "trac-msb",
     "type": "terminal"
