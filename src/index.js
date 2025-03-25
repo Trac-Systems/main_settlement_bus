@@ -86,13 +86,13 @@ export class MainSettlementBus extends ReadyResource {
                         const adminEntry = await this.getSigned('admin');
                         // first case if admin entry doesn't exist yet and we have to autorize Admin public key only with bootstrap writing key
                         if (!adminEntry && node.from.key.toString('hex') === this.bootstrap) {
-                            const tracPublicKey = Buffer.from(op.value.tpk, 'hex');
+                            const tracPublicKey = Buffer.from(op.value.tracPublicKey, 'hex');
                             const nonce = Buffer.from(op.value.nonce);
                             
                             if (this.#verifyMessage(op.value.pop, tracPublicKey, [tracPublicKey, nonce])) {
                                 view.put('admin', {
-                                    tpk: tracPublicKey,
-                                    wk: this.bootstrap
+                                    tracPublicKey: tracPublicKey,
+                                    writerKey: this.bootstrap // TODO: Maybe we should start to call it "id" as this is used to identiy a node in the network
                                 })
                             }
                         }
@@ -102,20 +102,26 @@ export class MainSettlementBus extends ReadyResource {
                         // - make a decision how will we append pubKeys into hashmap.
                         
                         const adminEntry = await this.getSigned('admin');
-                        const listEntry = await this.getSigned('list');
-                        if (this.#isAdmin(adminEntry, node) && !listEntry) {
+                        if (!this.#isAdmin(adminEntry, node)) {
+                            continue;
+                        }
 
+                        const listEntry = await this.getSigned('list');
+                        if (!listEntry) {
                             //TODO sanitize this string to avoid heavy calculations
-                            const pubKeys = JSON.parse(op.value.pubKeysList);
+                            const pubKeys = JSON.parse(op.value.pubKeysList); // As all pubkeys are 32 bytes, we can check the string.len instead of parsing it first
                             if (pubKeys.length > MAX_PUBKEYS_LENGTH) {
                                 continue;
                             }
 
-                            const adminPublicKey = Buffer.from(adminEntry.tpk.data)
+                            // TODO: This seems unnecessary since we do exactly the same thing inside #verifyMessage
+                            const adminPublicKey = Buffer.from(adminEntry.tracPublicKey.data)
                             const nonce =  Buffer.from(op.value.nonce);
                             const bufferPubKeys = Buffer.from(pubKeys.join(''));
                             
                             if(this.#verifyMessage(op.value.sig, adminPublicKey, [bufferPubKeys, nonce])) {
+                                // TODO: Implement a hashmap structure to store public keys. Storing it as a vector is not efficient.
+                                //       We might need to implement a new class for having a solution more tailored to our needs
                                 view.put('list', pubKeys);
                             }
                         }
