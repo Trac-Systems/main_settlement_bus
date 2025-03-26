@@ -1,6 +1,7 @@
 import ReadyResource from 'ready-resource';
 import { createHash } from 'crypto';
 import fs from 'node:fs';
+import {isHexString} from './functions.js';
 //TODO: GENERATE NONCE WITH CRYPTO LIBRARY WHICH ALLOW US TO GENERATE IT WITH UNIFORM DISTRIBUTION.
 
 const FILEPATH = './whitelist/pubkeys.csv';
@@ -18,7 +19,9 @@ export class WriterManager extends ReadyResource {
     #createMessage(...args) {
         let buf = null;
         if (args.length >= 1) {
-            buf = Buffer.concat(args.map(arg => Buffer.from(arg)));
+            buf = Buffer.concat(
+                args.map(arg => Buffer.from(arg, isHexString(arg) ? 'hex' : undefined))
+            );
         }
         return buf;
     }
@@ -53,7 +56,11 @@ export class WriterManager extends ReadyResource {
             const adminEntry = await this.msbInstance.getSigned('admin');
 
             if (adminEntry && this.msbInstance.wallet.publicKey === Buffer.from(adminEntry.tracPublicKey.data).toString('hex')) {
-                const pubKeys = fs.readFileSync(FILEPATH, 'utf8').split('\n').map(line => line.trim()).filter(line => line.length > 0); // pub keys are 32 bytes long. Take lines which have this length
+                const pubKeys = fs.readFileSync(FILEPATH, 'utf8')
+                    .split('\n')
+                    .map(line => line.trim())
+                    .filter(line => line.length > 0);
+                    
                 const nonce = this.#generateNonce();
                 const msg = this.#createMessage(pubKeys.join(''), nonce);
                 const hash = createHash('sha256').update(msg).digest('hex');

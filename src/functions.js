@@ -23,3 +23,7 @@ export async function addWriter(input, peer){
         await peer.base.append({ type: 'addWriter2', key: splitted[splitted.length - 1] });
     }
 }
+
+export function isHexString(string) {
+    return typeof string === 'string' && /^[0-9a-fA-F]+$/.test(string) && string.length % 2 === 0;
+}

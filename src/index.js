@@ -117,7 +117,7 @@ export class MainSettlementBus extends ReadyResource {
                             // TODO: This seems unnecessary since we do exactly the same thing inside #verifyMessage
                             const adminPublicKey = Buffer.from(adminEntry.tracPublicKey.data)
                             const nonce =  Buffer.from(op.value.nonce);
-                            const bufferPubKeys = Buffer.from(pubKeys.join(''));
+                            const bufferPubKeys = Buffer.from(pubKeys.join(''), 'hex');
                             
                             if(this.#verifyMessage(op.value.sig, adminPublicKey, [bufferPubKeys, nonce])) {
                                 // TODO: Implement a hashmap structure to store public keys. Storing it as a vector is not efficient.
@@ -145,7 +145,7 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     #isAdmin(adminEntry, node) {
-        return adminEntry && adminEntry.wk === node.from.key.toString('hex')
+        return adminEntry && adminEntry.writerKey === Buffer.from(node.from.key).toString('hex');
     }
 
     #verifyMessage(signature, publicKey, messageElements) {
@@ -424,7 +424,9 @@ export class MainSettlementBus extends ReadyResource {
                 case '/add_whitelist':
                     this.writerManager.appendToWhitelist();
                     break;
-                case '/show_list':
+                case '/show':
+                    const admin = await this.getSigned('admin');
+                    console.log('List:', admin);
                     const list = await this.getSigned('list');
                     console.log('List:', list);
                     break;
