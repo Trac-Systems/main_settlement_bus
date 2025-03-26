@@ -87,7 +87,7 @@ export class MainSettlementBus extends ReadyResource {
                         // first case if admin entry doesn't exist yet and we have to autorize Admin public key only with bootstrap writing key
                         if (!adminEntry && node.from.key.toString('hex') === this.bootstrap) {
 
-                            if (this.#verifyMessage(op.value.pop, op.value.tracPublicKey, MsbManager.createMessage(op.value.tracPublicKey, op.value.nonce))) {
+                            if (this.#verifyMessage(op.value.pop, op.value.tracPublicKey, MsbManager.createMessage(op.value.tracPublicKey, op.value.nonce, 'addAdmin'))) {
                                 view.put('admin', {
                                     tracPublicKey: Buffer.from(op.value.tracPublicKey, 'hex'),
                                     writingKey: this.bootstrap // TODO: Maybe we should start to call it "id" as this is used to identiy a node in the network
@@ -185,27 +185,27 @@ export class MainSettlementBus extends ReadyResource {
         if (this.enable_txchannel) {
             await this.txChannel();
         }
-        
+
         const adminEntry = await this.getSigned('admin');
-        const listEntry =  await this.getSigned('list')
+        const listEntry = await this.getSigned('list')
         if (this.#isAdmin(adminEntry)) {
             console.log('I am an admin');
             this.writerEventListener();
             this.isWorkingWriterEventListener = true;
         }
 
-        if (!this.base.writable && this.#amIWhitelisted(listEntry, adminEntry)){
+        if (!this.base.writable && this.#amIWhitelisted(listEntry, adminEntry)) {
             //TODO: Move it to the separate method
             this.swarm.connections.forEach((conn) => {
 
                 if (Buffer.from(conn.remotePublicKey).toString('hex') === Buffer.from(adminEntry.tracPublicKey.data).toString('hex') && conn.connected) {
-                    const assembledAddWriterMessage =  MsbManager.assembleAddWriterMessage(this.wallet, this.writingKey);
+                    const assembledAddWriterMessage = MsbManager.assembleAddWriterMessage(this.wallet, this.writingKey);
                     conn.write(JSON.stringify(assembledAddWriterMessage));
                 }
             }
             );
         }
-        
+
         if (this.enable_updater) {
             this.updater();
         }
@@ -463,7 +463,7 @@ export class MainSettlementBus extends ReadyResource {
                     const adminEntry = await this.getSigned('admin');
                     const addAdminMessage = MsbManager.assembleAdminMessage(adminEntry, this.writingKey, this.wallet, this.bootstrap);
                     await this.base.append(addAdminMessage);
-                    
+
                     setTimeout(async () => {
                         const updatedAdminEntry = await this.getSigned('admin');
                         if (this.#isAdmin(updatedAdminEntry) && !this.isWorkingWriterEventListener) {
@@ -480,12 +480,12 @@ export class MainSettlementBus extends ReadyResource {
                     break;
                 case '/add_whitelist':
                     const adminEntry2 = await this.getSigned('admin');
-                    const addWhitelistMessage =  MsbManager.assembleWhiteListMessage(adminEntry2, this.wallet);
+                    const addWhitelistMessage = MsbManager.assembleWhiteListMessage(adminEntry2, this.wallet);
                     await this.base.append(addWhitelistMessage);
                     break;
                 case '/show':
                     const admin = await this.getSigned('admin');
-                    console.log('List:', admin);
+                    console.log('Admin:', admin);
                     const list = await this.getSigned('list');
                     console.log('List:', list);
                     break;
@@ -526,8 +526,8 @@ export class MainSettlementBus extends ReadyResource {
     }
     async writerEventListener() {
         this.on('writerEvent', async (parsedRequest) => {
-            const listEntry =  await this.getSigned('list')
-            if (Array.from(listEntry).includes(parsedRequest.key) && MsbManager.verifyAddWriterMessage(parsedRequest, this.wallet)){
+            const listEntry = await this.getSigned('list')
+            if (Array.from(listEntry).includes(parsedRequest.key) && MsbManager.verifyAddWriterMessage(parsedRequest, this.wallet)) {
                 await this.base.append(parsedRequest);
             }
         });
