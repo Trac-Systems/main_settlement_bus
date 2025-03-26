@@ -105,18 +105,27 @@ export class MainSettlementBus extends ReadyResource {
                         }
 
                         const listEntry = await this.getSigned('list');
-                        if (!listEntry) {
-                            //TODO sanitize this string to avoid heavy calculations
+                        if (this.#verifyMessage(op.value.sig, adminEntry.tracPublicKey.data, MsbManager.createMessage(pubKeys.join(''), op.value.nonce))) {
                             const pubKeys = JSON.parse(op.value.pubKeysList); // As all pubkeys are 32 bytes, we can check the string.len instead of parsing it first
                             if (pubKeys.length > MAX_PUBKEYS_LENGTH) {
                                 continue;
                             }
-
-                            // TODO: This seems unnecessary since we do exactly the same thing inside #verifyMessage
-                            if (this.#verifyMessage(op.value.sig, adminEntry.tracPublicKey.data, MsbManager.createMessage(pubKeys.join(''), op.value.nonce))) {
+                            if (!listEntry) {
                                 // TODO: Implement a hashmap structure to store public keys. Storing it as a vector is not efficient.
                                 //       We might need to implement a new class for having a solution more tailored to our needs
                                 view.put('list', pubKeys);
+                            }
+                            else {
+                                // TODO: In this case we should include items in the list (in the future it will be a hashmap). Doing this with a vector is VERY inefficient
+                                const list = await view.get('list');
+                                console.log("Typeof list: ", typeof list);
+                                console.log("List: ", list);
+                                pubKeys.forEach((key) => {
+                                    if (!list.value.includes(key)) {
+                                        list.value.push(key);
+                                    }
+                                });
+                                view.put('list', list);                                
                             }
                         }
                     }
