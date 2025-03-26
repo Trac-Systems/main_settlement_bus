@@ -1,7 +1,7 @@
 import ReadyResource from 'ready-resource';
 import { createHash } from 'crypto';
 import fs from 'node:fs';
-import {isHexString} from './functions.js';
+import { isHexString } from './functions.js';
 //TODO: GENERATE NONCE WITH CRYPTO LIBRARY WHICH ALLOW US TO GENERATE IT WITH UNIFORM DISTRIBUTION.
 
 const FILEPATH = './whitelist/pubkeys.csv';
@@ -10,7 +10,7 @@ export class MsbManager extends ReadyResource {
     constructor(msbInstance) {
         super();
         this.msbInstance = msbInstance;
-        
+
     }
 
     static #generateNonce() {
@@ -27,11 +27,11 @@ export class MsbManager extends ReadyResource {
         return buf;
     }
 
-    static assembleAdminMessage(adminEntry, writingKey, wallet,bootstrap) {
+    static assembleAdminMessage(adminEntry, writingKey, wallet, bootstrap) {
         // case where admin entry doesn't exist yet and we have to autorize Admin public key only with bootstrap writing key
-        if (!adminEntry && writingKey && writingKey === bootstrap) {
+        if (!adminEntry && wallet && writingKey && writingKey === bootstrap) {
             const nonce = this.#generateNonce();
-            const msg = this.createMessage(wallet.publicKey, nonce);
+            const msg = this.createMessage(wallet.publicKey, nonce, 'addAdmin');
             const hash = createHash('sha256').update(msg).digest('hex');
             return {
                 type: 'addAdmin',
@@ -58,9 +58,8 @@ export class MsbManager extends ReadyResource {
                     .split('\n')
                     .map(line => line.trim())
                     .filter(line => line.length > 0);
-                    
                 const nonce = this.#generateNonce();
-                const msg = this.createMessage(pubKeys.join(''), nonce);
+                const msg = this.createMessage(pubKeys.join(''), nonce, 'whitelist');
                 const hash = createHash('sha256').update(msg).digest('hex');
                 return {
                     type: 'whitelist',
@@ -78,10 +77,9 @@ export class MsbManager extends ReadyResource {
         }
     }
 
-    //TODO: msg should contain also  type: 'addWriter'. What operation user is signing 
-    static assembleAddWriterMessage(wallet, writingKey){
+    static assembleAddWriterMessage(wallet, writingKey) {
         const nonce = this.#generateNonce();
-        const msg = this.createMessage(wallet.publicKey, writingKey, nonce);
+        const msg = this.createMessage(wallet.publicKey, writingKey, nonce, 'addWriter');
         const hash = createHash('sha256').update(msg).digest('hex');
 
         return {
@@ -94,12 +92,12 @@ export class MsbManager extends ReadyResource {
             }
         };
     }
-    //TODO: msg should contain also  type: 'removeWriter'. What operation user is signing 
-    static assembleRemoveWriterMessage(wallet, writingKey){
+
+    static assembleRemoveWriterMessage(wallet, writingKey) {
         const nonce = this.#generateNonce();
-        const msg = this.createMessage(wallet.publicKey, writingKey, nonce);
+        const msg = this.createMessage(wallet.publicKey, writingKey, nonce, 'removeWriter');
         const hash = createHash('sha256').update(msg).digest('hex');
-        
+
         return {
             type: 'removeWriter',
             key: wallet.publicKey,
@@ -110,7 +108,7 @@ export class MsbManager extends ReadyResource {
             }
         };
     }
-    
+
     static verifyAddWriterMessage(parsedRequest, wallet) {
         const nonce = parsedRequest.value.nonce;
         const msg = this.createMessage(parsedRequest.key, parsedRequest.value.wk, nonce);
