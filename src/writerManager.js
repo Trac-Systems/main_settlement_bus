@@ -53,7 +53,7 @@ export class MsbManager extends ReadyResource {
         try {
             //TODO: IMPORTANT -  IF WE GONNA STORE ~ 2K-10K PUBLIC KEYS IN THE LIST, WE NEED TO SPLIT IT INTO CHUNKS
             // ONE CHUNK WILL BE ~100 PUBLIC KEYS + NONCE + SIG AND ADDITIONAL BYTES < 4096 BYTES. ADMIN WILL NEED TO PERFORM MULTIPLE APPENDS. FOR NOW THIS IS NOT IMPLEMENTED.
-            if (adminEntry && wallet && wallet.publicKey === Buffer.from(adminEntry.tracPublicKey.data).toString('hex')) {
+            if (adminEntry && wallet && wallet.publicKey === adminEntry.tracPublicKey) {
                 const pubKeys = fs.readFileSync(FILEPATH, 'utf8')
                     .split('\n')
                     .map(line => line.trim())
@@ -111,7 +111,7 @@ export class MsbManager extends ReadyResource {
 
     static verifyAddWriterMessage(parsedRequest, wallet) {
         const nonce = parsedRequest.value.nonce;
-        const msg = this.createMessage(parsedRequest.key, parsedRequest.value.wk, nonce);
+        const msg = this.createMessage(parsedRequest.key, parsedRequest.value.wk, nonce, parsedRequest.type);
         const hash = createHash('sha256').update(msg).digest('hex');
         return wallet.verify(parsedRequest.value.sig, hash, parsedRequest.key);
     }
