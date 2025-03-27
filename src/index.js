@@ -6,7 +6,7 @@ import b4a from 'b4a';
 import Hyperbee from 'hyperbee';
 import readline from 'readline';
 import hccrypto from 'hypercore-crypto';
-import { sanitizeTransaction, addWriter } from './functions.js';
+import { sanitizeTransaction, addWriter, verifyDag, sleep } from './functions.js';
 import w from 'protomux-wakeup';
 import PeerWallet from "trac-wallet"
 import Corestore from 'corestore';
@@ -87,9 +87,9 @@ export class MainSettlementBus extends ReadyResource {
                         // first case if admin entry doesn't exist yet and we have to autorize Admin public key only with bootstrap writing key
                         if (!adminEntry && node.from.key.toString('hex') === this.bootstrap) {
 
-                            if (this.#verifyMessage(op.value.pop, op.value.tracPublicKey, MsbManager.createMessage(op.value.tracPublicKey, op.value.nonce, 'addAdmin'))) {
+                            if (this.#verifyMessage(op.value.pop, op.value.tracPublicKey, MsbManager.createMessage(op.value.tracPublicKey, op.value.nonce, op.type))) {
                                 view.put('admin', {
-                                    tracPublicKey: Buffer.from(op.value.tracPublicKey, 'hex'),
+                                    tracPublicKey: op.value.tracPublicKey,
                                     writingKey: this.bootstrap // TODO: Maybe we should start to call it "id" as this is used to identiy a node in the network
                                 })
                             }
@@ -103,10 +103,11 @@ export class MainSettlementBus extends ReadyResource {
                         if (!this.#isAdmin(adminEntry, node)) {
                             continue;
                         }
-
+                        
                         const listEntry = await this.getSigned('list');
-                        if (this.#verifyMessage(op.value.sig, adminEntry.tracPublicKey.data, MsbManager.createMessage(pubKeys.join(''), op.value.nonce))) {
-                            const pubKeys = JSON.parse(op.value.pubKeysList); // As all pubkeys are 32 bytes, we can check the string.len instead of parsing it first
+                        const pubKeys = JSON.parse(op.value.pubKeysList); // As all pubkeys are 32 bytes, we can check the string.len instead of parsing it first
+
+                        if (this.#verifyMessage(op.value.sig, adminEntry.tracPublicKey, MsbManager.createMessage(pubKeys.join(''), op.value.nonce, op.type))) {
                             if (pubKeys.length > MAX_PUBKEYS_LENGTH) {
                                 continue;
                             }
@@ -118,8 +119,6 @@ export class MainSettlementBus extends ReadyResource {
                             else {
                                 // TODO: In this case we should include items in the list (in the future it will be a hashmap). Doing this with a vector is VERY inefficient
                                 const list = await view.get('list');
-                                console.log("Typeof list: ", typeof list);
-                                console.log("List: ", list);
                                 pubKeys.forEach((key) => {
                                     if (!list.value.includes(key)) {
                                         list.value.push(key);
@@ -137,7 +136,7 @@ export class MainSettlementBus extends ReadyResource {
                             continue;
                         }
 
-                        if (this.#verifyMessage(op.value.sig, op.key, MsbManager.createMessage(op.key, op.value.wk, op.value.nonce))) {
+                        if (this.#verifyMessage(op.value.sig, op.key, MsbManager.createMessage(op.key, op.value.wk, op.value.nonce, op.type))) {
                             const writerEntry = await this.getSigned(op.key);
                             if (writerEntry === null || !writerEntry.isWriter){
                                 await base.addWriter(Buffer.from(op.value.wk, 'hex'), { isIndexer: false })
@@ -163,21 +162,21 @@ export class MainSettlementBus extends ReadyResource {
         this.base.on('warning', (e) => console.log(e))
     }
 
-    #isAdmin(adminEntry, node = null) {
-        if (node != null) return adminEntry && adminEntry.writingKey === Buffer.from(node.from.key).toString('hex');
-        else {
-            return adminEntry && this.wallet.publicKey === Buffer.from(adminEntry.tracPublicKey.data).toString('hex') && adminEntry.writingKey === this.writingKey;
-        }
-    }
-
-    #amIWhitelisted(listEntry, adminEntry) {
-        return listEntry !== null && adminEntry !== null && Array.from(listEntry).includes(this.wallet.publicKey) && !this.#isAdmin(adminEntry);
-    }
-
     #verifyMessage(signature, publicKey, bufferMessage) {
         const bufferPublicKey = Buffer.from(publicKey, 'hex');
         const hash = createHash('sha256').update(bufferMessage).digest('hex');
         return this.wallet.verify(signature, hash, bufferPublicKey);
+    }
+
+    #isAdmin(adminEntry, node = null) {
+        if (node != null) return adminEntry && adminEntry.writingKey === Buffer.from(node.from.key).toString('hex');
+        else {
+            return adminEntry && this.wallet.publicKey === adminEntry.tracPublicKey && adminEntry.writingKey === this.writingKey;
+        }
+    }
+
+    #amIWhitelisted(listEntry, adminEntry) {
+        return listEntry !== null && adminEntry !== null && listEntry.includes(this.wallet.publicKey) && !this.#isAdmin(adminEntry);
     }
 
     async _open() {
@@ -207,7 +206,7 @@ export class MainSettlementBus extends ReadyResource {
             //TODO: Move it to the separate method
             this.swarm.connections.forEach((conn) => {
 
-                if (Buffer.from(conn.remotePublicKey).toString('hex') === Buffer.from(adminEntry.tracPublicKey.data).toString('hex') && conn.connected) {
+                if (Buffer.from(conn.remotePublicKey).toString('hex') === adminEntry.tracPublicKey && conn.connected) {
                     const assembledAddWriterMessage = MsbManager.assembleAddWriterMessage(this.wallet, this.writingKey);
                     conn.write(JSON.stringify(assembledAddWriterMessage));
                 }
@@ -236,6 +235,40 @@ export class MainSettlementBus extends ReadyResource {
             }
             await this.sleep(10_000);
         }
+    }
+
+    async getSigned(key) {
+        const view_session = this.base.view.checkout(this.base.view.core.signedLength);
+        const result = await view_session.get(key);
+        if (result === null) return null;
+        return result.value;
+    }
+
+    async get(key) {
+        const result = await this.base.view.get(key);
+        if (result === null) return null;
+        return result.value;
+    }
+
+    async #handleIncomingWriterEvent(data) {
+        try {
+            const bufferData = data.toString();
+            const parsedRequest = JSON.parse(bufferData);
+            if (parsedRequest.type === 'addWriter' || parsedRequest.type === 'removeWriter') {
+                this.emit('writerEvent', parsedRequest);
+            }
+        } catch (error) {
+            // for now ignore the error
+        }
+    }
+    
+    async writerEventListener() {
+        this.on('writerEvent', async (parsedRequest) => {
+            const listEntry = await this.getSigned('list')
+            if (Array.from(listEntry).includes(parsedRequest.key) && MsbManager.verifyAddWriterMessage(parsedRequest, this.wallet)) {
+                await this.base.append(parsedRequest);
+            }
+        });
     }
 
     async txChannel() {
@@ -290,7 +323,7 @@ export class MainSettlementBus extends ReadyResource {
                         _this.tx_pool.push({ tx: parsedPreTx.tx, append_tx: append_tx });
                     }
                 } catch (e) {
-                    //console.log(e)
+                    console.log(e)
                 }
             });
         });
@@ -313,12 +346,8 @@ export class MainSettlementBus extends ReadyResource {
                 await this.base.append(batch);
                 this.tx_pool.splice(0, batch.length);
             }
-            await this.sleep(10);
+            await sleep(10);
         }
-    }
-
-    async sleep(ms) {
-        return new Promise(resolve => setTimeout(resolve, ms));
     }
 
     async _replicate() {
@@ -450,7 +479,7 @@ export class MainSettlementBus extends ReadyResource {
         rl.on('line', async (input) => {
             switch (input) {
                 case '/dag':
-                    await this.verifyDag();
+                    await verifyDag(this.base);
                     break;
                 case '/exit':
                     console.log('Exiting...');
@@ -509,38 +538,6 @@ export class MainSettlementBus extends ReadyResource {
         rl.prompt();
     }
 
-    async getSigned(key) {
-        const view_session = this.base.view.checkout(this.base.view.core.signedLength);
-        const result = await view_session.get(key);
-        if (result === null) return null;
-        return result.value;
-    }
-
-    async get(key) {
-        const result = await this.base.view.get(key);
-        if (result === null) return null;
-        return result.value;
-    }
-
-    async #handleIncomingWriterEvent(data) {
-        try {
-            const bufferData = data.toString();
-            const parsedRequest = JSON.parse(bufferData);
-            if (parsedRequest.type === 'addWriter' || parsedRequest.type === 'removeWriter') {
-                this.emit('writerEvent', parsedRequest);
-            }
-        } catch (error) {
-            // for now ignore the error
-        }
-    }
-    async writerEventListener() {
-        this.on('writerEvent', async (parsedRequest) => {
-            const listEntry = await this.getSigned('list')
-            if (Array.from(listEntry).includes(parsedRequest.key) && MsbManager.verifyAddWriterMessage(parsedRequest, this.wallet)) {
-                await this.base.append(parsedRequest);
-            }
-        });
-    }
 }
 
 function noop() { }
