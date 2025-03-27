@@ -1,7 +1,7 @@
 {
   "name": "trac-msb",
   "main": "src/index.js",
-  "version": "0.0.18",
+  "version": "0.0.28",
   "pear": {
     "name": "trac-msb",
     "type": "terminal"
@@ -12,11 +12,11 @@
     "test": "brittle test/*.test.js"
   },
   "dependencies": {
-    "autobase": "7.0.45",
+    "autobase": "7.1.1",
     "b4a": "1.6.7",
     "bare-fs": "4.0.1",
     "brittle": "3.0.0",
-    "corestore": "7.0.22",
+    "corestore": "7.0.23",
     "debounceify": "1.1.0",
     "trac-wallet": "^0.0.3",
     "hyperbee": "2.23.0",

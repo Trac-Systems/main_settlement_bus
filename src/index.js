@@ -67,8 +67,8 @@ export class MainSettlementBus extends ReadyResource {
                         if (null === await view.get(op.key) &&
                             sanitizeTransaction(postTx) &&
                             postTx.op === 'post-tx' &&
-                            crypto.verify(Buffer.from(postTx.tx, 'utf-8'), Buffer.from(postTx.is, 'hex'), Buffer.from(postTx.ipk, 'hex')) &&// sender verification
-                            crypto.verify(Buffer.from(postTx.tx, 'utf-8'), Buffer.from(postTx.ws, 'hex'), Buffer.from(postTx.wp, 'hex')) &&// writer verification
+                            crypto.verify(Buffer.from(postTx.tx + postTx.in, 'utf-8'), Buffer.from(postTx.is, 'hex'), Buffer.from(postTx.ipk, 'hex')) &&// sender verification
+                            crypto.verify(Buffer.from(postTx.tx + postTx.wn, 'utf-8'), Buffer.from(postTx.ws, 'hex'), Buffer.from(postTx.wp, 'hex')) &&// writer verification
                             Buffer.byteLength(JSON.stringify(postTx)) <= 4096
                         ) {
                             await view.put(op.key, op.value);
@@ -154,11 +154,12 @@ export class MainSettlementBus extends ReadyResource {
 
                     if (sanitizeTransaction(parsedPreTx) &&
                         parsedPreTx.op === 'pre-tx' &&
-                        crypto.verify(Buffer.from(parsedPreTx.tx, 'utf-8'), Buffer.from(parsedPreTx.is, 'hex'), Buffer.from(parsedPreTx.ipk, 'hex')) &&
+                        crypto.verify(Buffer.from(parsedPreTx.tx + parsedPreTx.in, 'utf-8'), Buffer.from(parsedPreTx.is, 'hex'), Buffer.from(parsedPreTx.ipk, 'hex')) &&
                         parsedPreTx.w === _this.writerLocalKey &&
                         null === await _this.base.view.get(parsedPreTx.tx)
                     ) {
-                        const signature = crypto.sign(Buffer.from(parsedPreTx.tx, 'utf-8'), Buffer.from(this.wallet.secretKey, 'hex'));
+                        const nonce = Math.random() + '-' + Date.now();
+                        const signature = crypto.sign(Buffer.from(parsedPreTx.tx + nonce, 'utf-8'), Buffer.from(this.wallet.secretKey, 'hex'));
                         const append_tx = {
                             op: 'post-tx',
                             tx: parsedPreTx.tx,
@@ -170,6 +171,7 @@ export class MainSettlementBus extends ReadyResource {
                             in: parsedPreTx.in,
                             ws: signature.toString('hex'),
                             wp: this.wallet.publicKey,
+                            wn : nonce
                         };
                         _this.tx_pool.push({ tx: parsedPreTx.tx, append_tx : append_tx });
                     }
