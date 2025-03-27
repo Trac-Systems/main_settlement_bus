@@ -1,4 +1,4 @@
-
+import b4a from 'b4a';
 //TODO: if something is missing, add additonal sanitization
 // parsed.op === 'pre-tx' -> moved out of the scope this check because we can re-use this function in the apply
 // TODO: Split sanitization on pre and post TX
@@ -15,14 +15,6 @@ export function sanitizeTransaction(parsedTx) {
     );
 }
 
-export async function addWriter(input, peer){
-    const splitted = input.split(' ');
-    if(splitted[0] === '/add_writer'){
-        await peer.base.append({ type: 'addWriter', key: splitted[splitted.length - 1] });
-    } else if(splitted[0] === '/add_writer2') {
-        await peer.base.append({ type: 'addWriter2', key: splitted[splitted.length - 1] });
-    }
-}
 
 export function isHexString(string) {
     return typeof string === 'string' && /^[0-9a-fA-F]+$/.test(string) && string.length % 2 === 0;
@@ -40,7 +32,6 @@ export async function verifyDag(base) {
             console.log("this.base.linearizer.indexers.length", base.linearizer.indexers.length);
             console.log("this.base.indexedLength", base.indexedLength);
             //console.log("this.base.system.core", this.base.system.core);
-            console.log(`writingKey: ${writingKey}`);
             console.log(`base.key: ${base.key.toString('hex')}`);
             console.log('discoveryKey:', b4a.toString(base.discoveryKey, 'hex'));
 

@@ -6,7 +6,7 @@ import b4a from 'b4a';
 import Hyperbee from 'hyperbee';
 import readline from 'readline';
 import hccrypto from 'hypercore-crypto';
-import { sanitizeTransaction, addWriter, verifyDag, sleep } from './functions.js';
+import { sanitizeTransaction, verifyDag, sleep } from './functions.js';
 import w from 'protomux-wakeup';
 import PeerWallet from "trac-wallet"
 import Corestore from 'corestore';
@@ -14,9 +14,10 @@ import tty from 'tty';
 import sodium from 'sodium-native';
 import MsbManager from './writerManager.js'; //TODO: CHANGE FILE NAME
 import { createHash } from 'crypto';
-// CHANGE NONCE.
-const wakeup = new w();
+//TODO: CHANGE NONCE.
+//TODO FIX PROBLEM WITH REPLICATION.
 
+const wakeup = new w();
 const MAX_PUBKEYS_LENGTH = 100;
 export class MainSettlementBus extends ReadyResource {
 
@@ -88,7 +89,7 @@ export class MainSettlementBus extends ReadyResource {
                         if (!adminEntry && node.from.key.toString('hex') === this.bootstrap) {
 
                             if (this.#verifyMessage(op.value.pop, op.value.tracPublicKey, MsbManager.createMessage(op.value.tracPublicKey, op.value.nonce, op.type))) {
-                                view.put('admin', {
+                                await view.put('admin', {
                                     tracPublicKey: op.value.tracPublicKey,
                                     writingKey: this.bootstrap // TODO: Maybe we should start to call it "id" as this is used to identiy a node in the network
                                 })
@@ -98,33 +99,35 @@ export class MainSettlementBus extends ReadyResource {
                     else if (op.type === 'whitelist') {
                         // TODO: - change list to hashmap (Map() in js)
                         // - make a decision how will we append pubKeys into hashmap.
-                        
+
                         const adminEntry = await this.getSigned('admin');
                         if (!this.#isAdmin(adminEntry, node)) {
                             continue;
                         }
                         
-                        const listEntry = await this.getSigned('list');
                         const pubKeys = JSON.parse(op.value.pubKeysList); // As all pubkeys are 32 bytes, we can check the string.len instead of parsing it first
-
+                        
                         if (this.#verifyMessage(op.value.sig, adminEntry.tracPublicKey, MsbManager.createMessage(pubKeys.join(''), op.value.nonce, op.type))) {
                             if (pubKeys.length > MAX_PUBKEYS_LENGTH) {
                                 continue;
                             }
+
+                            const listEntry = await this.getSigned('list');
+
                             if (!listEntry) {
                                 // TODO: Implement a hashmap structure to store public keys. Storing it as a vector is not efficient.
                                 //       We might need to implement a new class for having a solution more tailored to our needs
-                                view.put('list', pubKeys);
+                                await view.put('list', pubKeys);
                             }
                             else {
                                 // TODO: In this case we should include items in the list (in the future it will be a hashmap). Doing this with a vector is VERY inefficient
-                                const list = await view.get('list');
                                 pubKeys.forEach((key) => {
-                                    if (!list.value.includes(key)) {
-                                        list.value.push(key);
+                                    if (!listEntry.includes(key)) {
+                                        listEntry.push(key);
                                     }
                                 });
-                                view.put('list', list);                                
+
+                                await view.put('list', listEntry);
                             }
                         }
                     }
@@ -137,10 +140,11 @@ export class MainSettlementBus extends ReadyResource {
                         }
 
                         if (this.#verifyMessage(op.value.sig, op.key, MsbManager.createMessage(op.key, op.value.wk, op.value.nonce, op.type))) {
-                            const writerEntry = await this.getSigned(op.key);
-                            if (writerEntry === null || !writerEntry.isWriter){
+                            const nodeEntry = await this.getSigned(op.key);
+                            if (nodeEntry === null || !nodeEntry.isWriter){
                                 await base.addWriter(Buffer.from(op.value.wk, 'hex'), { isIndexer: false })
                                 await view.put(op.key, {
+                                    wk: op.value.wk,
                                     isWriter: true,
                                     isIndexer: false
                                 });
@@ -148,6 +152,26 @@ export class MainSettlementBus extends ReadyResource {
                             }
                         }
                         //todo implement removeWriter https://github.com/Trac-Systems/main_settlement_bus/blob/implement-wallet/src/index.js#L58
+                    } 
+                    else  if (op.type === 'removeWriter') {
+                        const adminEntry = await this.getSigned('admin');
+                        const listEntry = await this.getSigned('list');
+                        if (!this.#isAdmin(adminEntry, node) || !listEntry || !Array.from(listEntry).includes(op.key)){
+                            continue;
+                        }
+                        if (this.#verifyMessage(op.value.sig, op.key, MsbManager.createMessage(op.key, op.value.wk ,op.value.nonce, op.type))) {
+                            const nodeEntry = await this.getSigned(op.key)
+                            if (nodeEntry !== null && nodeEntry.isWriter === true) {
+                                await base.removeWriter(Buffer.from(nodeEntry.wk, 'hex'));
+                                nodeEntry.isWriter = false;
+
+                                if (nodeEntry.isIndexer === true) {
+                                    nodeEntry.isIndexer = false;
+                                }
+                                await view.put(op.key, nodeEntry);
+                                console.log(`Writer removed: ${op.value.wk}`);
+                            }
+                        }
                     } else if (op.type === 'addWriter2') {
                         const writingKey = b4a.from(op.key, 'hex');
                         await base.addWriter(writingKey, { isIndexer: false });
@@ -160,23 +184,6 @@ export class MainSettlementBus extends ReadyResource {
             }
         })
         this.base.on('warning', (e) => console.log(e))
-    }
-
-    #verifyMessage(signature, publicKey, bufferMessage) {
-        const bufferPublicKey = Buffer.from(publicKey, 'hex');
-        const hash = createHash('sha256').update(bufferMessage).digest('hex');
-        return this.wallet.verify(signature, hash, bufferPublicKey);
-    }
-
-    #isAdmin(adminEntry, node = null) {
-        if (node != null) return adminEntry && adminEntry.writingKey === Buffer.from(node.from.key).toString('hex');
-        else {
-            return adminEntry && this.wallet.publicKey === adminEntry.tracPublicKey && adminEntry.writingKey === this.writingKey;
-        }
-    }
-
-    #amIWhitelisted(listEntry, adminEntry) {
-        return listEntry !== null && adminEntry !== null && listEntry.includes(this.wallet.publicKey) && !this.#isAdmin(adminEntry);
     }
 
     async _open() {
@@ -194,31 +201,65 @@ export class MainSettlementBus extends ReadyResource {
             await this.txChannel();
         }
 
-        const adminEntry = await this.getSigned('admin');
-        const listEntry = await this.getSigned('list')
-        if (this.#isAdmin(adminEntry)) {
-            console.log('I am an admin');
-            this.writerEventListener();
-            this.isWorkingWriterEventListener = true;
-        }
-
-        if (!this.base.writable && this.#amIWhitelisted(listEntry, adminEntry)) {
-            //TODO: Move it to the separate method
-            this.swarm.connections.forEach((conn) => {
-
-                if (Buffer.from(conn.remotePublicKey).toString('hex') === adminEntry.tracPublicKey && conn.connected) {
-                    const assembledAddWriterMessage = MsbManager.assembleAddWriterMessage(this.wallet, this.writingKey);
-                    conn.write(JSON.stringify(assembledAddWriterMessage));
-                }
-            }
-            );
-        }
+        await this.setUpRoleAutomatically();
 
         if (this.enable_updater) {
             this.updater();
         }
+
         console.log(`isIndexer: ${this.base.isIndexer}`);
         console.log(`isWriter: ${this.base.writable}`);
+        console.log('View Length:', this.base.view.core.length);
+        console.log('View Signed Length:', this.base.view.core.signedLength);
+    }
+    async setUpRoleAutomatically() {
+
+        const adminEntry = await this.getSigned('admin');
+        if (this.#isAdmin(adminEntry)) {
+            this.writerEventListener();
+            this.isWorkingWriterEventListener = true;
+        }
+        
+        const nodeEntry = await this.getSigned(this.wallet.publicKey);
+        if (!this.base.writable && nodeEntry !== null && nodeEntry.isWriter === true) {
+
+            const assembledRemoveWriterMessage = MsbManager.assembleRemoveWriterMessage(this.wallet, this.writingKey);
+            this.#sendMessageToAdmin(adminEntry, assembledRemoveWriterMessage);
+        }
+
+        const listEntry = await this.getSigned('list');
+        if (!this.base.writable && this.#amIWhitelisted(listEntry, adminEntry)) {
+            const assembledAddWriterMessage = MsbManager.assembleAddWriterMessage(this.wallet, this.writingKey);
+            this.#sendMessageToAdmin(adminEntry, assembledAddWriterMessage);
+        }
+
+    }
+    #sendMessageToAdmin(adminEntry, message) {
+        if (!adminEntry || !message) {
+            return;
+        }
+        this.swarm.connections.forEach((conn) => {
+            if (Buffer.from(conn.remotePublicKey).toString('hex') === adminEntry.tracPublicKey && conn.connected) {
+                conn.write(JSON.stringify(message));
+            }
+        });
+    }
+
+    #verifyMessage(signature, publicKey, bufferMessage) {
+        const bufferPublicKey = Buffer.from(publicKey, 'hex');
+        const hash = createHash('sha256').update(bufferMessage).digest('hex');
+        return this.wallet.verify(signature, hash, bufferPublicKey);
+    }
+
+    #isAdmin(adminEntry, node = null) {
+        if (!adminEntry) return false;
+        if (node) return adminEntry.writingKey === Buffer.from(node.from.key).toString('hex');
+        return this.wallet.publicKey === adminEntry.tracPublicKey && adminEntry.writingKey === this.writingKey;
+
+    }
+
+    #amIWhitelisted(listEntry, adminEntry) {
+        return listEntry !== null  && listEntry.includes(this.wallet.publicKey) && !this.#isAdmin(adminEntry);
     }
 
     async close() {
@@ -265,7 +306,7 @@ export class MainSettlementBus extends ReadyResource {
     async writerEventListener() {
         this.on('writerEvent', async (parsedRequest) => {
             const listEntry = await this.getSigned('list')
-            if (Array.from(listEntry).includes(parsedRequest.key) && MsbManager.verifyAddWriterMessage(parsedRequest, this.wallet)) {
+            if (Array.from(listEntry).includes(parsedRequest.key) && MsbManager.verifyAddOrRemoveWriterMessage(parsedRequest, this.wallet)) {
                 await this.base.append(parsedRequest);
             }
         });
@@ -323,7 +364,7 @@ export class MainSettlementBus extends ReadyResource {
                         _this.tx_pool.push({ tx: parsedPreTx.tx, append_tx: append_tx });
                     }
                 } catch (e) {
-                    console.log(e)
+                    //console.log(e)
                 }
             });
         });
@@ -471,8 +512,8 @@ export class MainSettlementBus extends ReadyResource {
         });
 
         console.log('MSB started. Available commands:');
-        console.log('- /add_writer: enter a peer writing key as argument to get included as writer.');
-        console.log('- /add_writer2: enter a peer writing key as argument to get included as non-indexing writer.');
+        console.log('- /add_admin: register admin entry with bootstrap key.');
+        console.log('- /get_node_info <trac_public_key>: Get information about a node with the given Trac public key');
         console.log('- /dag: check system properties such as writing key, DAG, etc.');
         console.log('- /exit: Exit the program');
 
@@ -527,9 +568,35 @@ export class MainSettlementBus extends ReadyResource {
                     const list = await this.getSigned('list');
                     console.log('List:', list);
                     break;
+                case '/add_writer':
+                    //TODO: Consider the cases when this command can be executed. THIS IS NOT TESTED
+
+                    const adminEntry3 = await this.getSigned('admin');
+                    const nodeEntry = await this.getSigned(this.wallet.publicKey);
+
+                    const listEntry = await this.getSigned('list');
+                    if (!this.base.writable && !nodeEntry.isWriter  && this.#amIWhitelisted(listEntry, adminEntry3)) {
+                        const assembledAddWriterMessage = MsbManager.assembleAddWriterMessage(this.wallet, this.writingKey);
+                        this.#sendMessageToAdmin(adminEntry, assembledAddWriterMessage);
+                    }
+                    break;
+                case '/remove_writer':
+                    //TODO: Consider the cases when this command can be executed. THIS IS NOT TESTED
+                    const nodeEntry2 = await this.getSigned(this.wallet.publicKey);
+                    if (nodeEntry2 === null || !nodeEntry2.isWriter) {
+                        console.log(`Your key does not exist in the database or you can't remove it now`);
+                        return;
+                    }
+                    if (this.base.writable ) {
+                        const assembledRemoveWriterMessage = MsbManager.assembleRemoveWriterMessage(this.wallet, this.writingKey);
+                        this.#sendMessageToAdmin(adminEntry, assembledRemoveWriterMessage);
+                    }
+                    break
                 default:
-                    if (input.startsWith('/add_writer')) {
-                        await addWriter(input, this);
+                    if (input.startsWith('/get_node_info')) {
+                        const splitted = input.split(' ');
+                        await this.getSigned(splitted[1])
+                        console.log(await this.getSigned(splitted[1]))
                     }
             }
             rl.prompt();
