@@ -201,6 +201,12 @@ export class MainSettlementBus extends ReadyResource {
             await this.txChannel();
         }
 
+        const adminEntry = await this.getSigned('admin');
+        if (this.#isAdmin(adminEntry)) {
+            this.writerEventListener();
+            this.isWorkingWriterEventListener = true;
+        }
+        
         await this.setUpRoleAutomatically();
 
         if (this.enable_updater) {
@@ -214,12 +220,7 @@ export class MainSettlementBus extends ReadyResource {
     }
     async setUpRoleAutomatically() {
 
-        const adminEntry = await this.getSigned('admin');
-        if (this.#isAdmin(adminEntry)) {
-            this.writerEventListener();
-            this.isWorkingWriterEventListener = true;
-        }
-        
+        const adminEntry = await this.getSigned('admin');        
         const nodeEntry = await this.getSigned(this.wallet.publicKey);
         if (!this.base.writable && nodeEntry !== null && nodeEntry.isWriter === true) {
 
