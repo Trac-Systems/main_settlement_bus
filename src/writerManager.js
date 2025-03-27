@@ -109,9 +109,9 @@ export class MsbManager extends ReadyResource {
         };
     }
 
-    static verifyAddWriterMessage(parsedRequest, wallet) {
+    static verifyAddOrRemoveWriterMessage(parsedRequest, wallet) {
         const nonce = parsedRequest.value.nonce;
-        const msg = this.createMessage(parsedRequest.key, parsedRequest.value.wk, nonce, parsedRequest.type);
+        const msg = this.createMessage(parsedRequest.key, parsedRequest.value.wk ,nonce, parsedRequest.type);
         const hash = createHash('sha256').update(msg).digest('hex');
         return wallet.verify(parsedRequest.value.sig, hash, parsedRequest.key);
     }
