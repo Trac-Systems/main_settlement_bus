@@ -569,27 +569,27 @@ export class MainSettlementBus extends ReadyResource {
                     console.log('List:', list);
                     break;
                 case '/add_writer':
-                    //TODO: Consider the cases when this command can be executed. THIS IS NOT TESTED
+                    //TODO: Consider the cases when this command can be executed. THIS IS NOT TESTED. Not sure if this is implemented well
 
+                      
                     const adminEntry3 = await this.getSigned('admin');
                     const nodeEntry = await this.getSigned(this.wallet.publicKey);
-
                     const listEntry = await this.getSigned('list');
-                    if (!this.base.writable && !nodeEntry.isWriter  && this.#amIWhitelisted(listEntry, adminEntry3)) {
+
+                    if (!this.base.writable &&  ((nodeEntry === null) || nodeEntry.isWriter === false)  && this.#amIWhitelisted(listEntry, adminEntry3)) {
                         const assembledAddWriterMessage = MsbManager.assembleAddWriterMessage(this.wallet, this.writingKey);
-                        this.#sendMessageToAdmin(adminEntry, assembledAddWriterMessage);
+                        this.#sendMessageToAdmin(adminEntry3, assembledAddWriterMessage);
                     }
                     break;
                 case '/remove_writer':
-                    //TODO: Consider the cases when this command can be executed. THIS IS NOT TESTED
+                    //TODO: Consider the cases when this command can be executed. THIS IS NOT TESTED. Not sure if this is implemented well
                     const nodeEntry2 = await this.getSigned(this.wallet.publicKey);
-                    if (nodeEntry2 === null || !nodeEntry2.isWriter) {
-                        console.log(`Your key does not exist in the database or you can't remove it now`);
-                        return;
-                    }
-                    if (this.base.writable ) {
+                    const listEntry2 = await this.getSigned('list');
+                    const adminEntry4 = await this.getSigned('admin');
+
+                    if (this.base.writable &&(nodeEntry2 && nodeEntry2.isWriter) &&this.#amIWhitelisted(listEntry2, adminEntry4)) {
                         const assembledRemoveWriterMessage = MsbManager.assembleRemoveWriterMessage(this.wallet, this.writingKey);
-                        this.#sendMessageToAdmin(adminEntry, assembledRemoveWriterMessage);
+                        this.#sendMessageToAdmin(adminEntry4, assembledRemoveWriterMessage);
                     }
                     break
                 default:
