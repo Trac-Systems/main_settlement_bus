@@ -20,6 +20,8 @@ import { createHash } from 'crypto';
 const wakeup = new w();
 const MAX_PUBKEYS_LENGTH = 100;
 export class MainSettlementBus extends ReadyResource {
+    #shouldListenToAdminEvents = false;
+    #shouldListenToWriterEvents = false;
 
     constructor(options = {}) {
         super();
@@ -42,8 +44,6 @@ export class MainSettlementBus extends ReadyResource {
         this.opts = options;
         this.bee = null;
         this.wallet = new PeerWallet(options);
-        this.isWorkingWriterEventListener = false; // TODO: DECIDE IF THIS FLAG WILL BE USEFUL IN THE FUTURE;
-
         this.pool();
         this.msbListener();
         this._boot();
@@ -83,15 +83,26 @@ export class MainSettlementBus extends ReadyResource {
                             await batch.put(op.key, op.value);
                             console.log(`TX: ${op.key} appended. Signed length: `,  _this.base.view.core.signedLength);
                         }
-                    } else if (op.type === 'addAdmin') {
+                    } 
+                    else if (op.type === 'addAdmin') {
                         const adminEntry = await this.getSigned('admin');
                         // first case if admin entry doesn't exist yet and we have to autorize Admin public key only with bootstrap writing key
-                        if (!adminEntry && node.from.key.toString('hex') === this.bootstrap) {
+                        if (!adminEntry && node.from.key.toString('hex') === this.bootstrap && op.value.wk === this.bootstrap) {
 
-                            if (this.#verifyMessage(op.value.pop, op.value.tracPublicKey, MsbManager.createMessage(op.value.tracPublicKey, op.value.nonce, op.type))) {
+                            if (this.#verifyMessage(op.value.sig, op.value.tracPublicKey, MsbManager.createMessage(op.value.tracPublicKey, op.value.wk, op.value.nonce, op.type))) {
                                 await view.put('admin', {
                                     tracPublicKey: op.value.tracPublicKey,
-                                    writingKey: this.bootstrap // TODO: Maybe we should start to call it "id" as this is used to identiy a node in the network
+                                    wk: this.bootstrap // TODO: Maybe we should start to call it "id" as this is used to identiy a node in the network
+                                })
+                            }
+                        } else if (adminEntry && adminEntry.tracPublicKey === op.value.tracPublicKey) {
+                            // second case if admin entry exists and we have to autorize Admin public key only with bootstrap writing key
+                            if (this.#verifyMessage(op.value.sig, adminEntry.tracPublicKey, MsbManager.createMessage(adminEntry.tracPublicKey, op.value.wk ,op.value.nonce, op.type))) {
+                                await base.removeWriter(Buffer.from(adminEntry.wk, 'hex'));
+                                await base.addWriter(Buffer.from(op.value.wk, 'hex'), { indexer: true })
+                                await view.put('admin', {
+                                    tracPublicKey: adminEntry.tracPublicKey ,
+                                    wk: op.value.wk
                                 })
                             }
                         }
@@ -104,14 +115,14 @@ export class MainSettlementBus extends ReadyResource {
                         if (!this.#isAdmin(adminEntry, node)) {
                             continue;
                         }
-                        
+
                         const pubKeys = JSON.parse(op.value.pubKeysList); // As all pubkeys are 32 bytes, we can check the string.len instead of parsing it first
                         
                         if (this.#verifyMessage(op.value.sig, adminEntry.tracPublicKey, MsbManager.createMessage(pubKeys.join(''), op.value.nonce, op.type))) {
+
                             if (pubKeys.length > MAX_PUBKEYS_LENGTH) {
                                 continue;
                             }
-
                             const listEntry = await this.getSigned('list');
 
                             if (!listEntry) {
@@ -151,7 +162,6 @@ export class MainSettlementBus extends ReadyResource {
                                 console.log(`Writer added: ${op.key}:${op.value.wk}`);
                             }
                         }
-                        //todo implement removeWriter https://github.com/Trac-Systems/main_settlement_bus/blob/implement-wallet/src/index.js#L58
                     } 
                     else  if (op.type === 'removeWriter') {
                         const adminEntry = await this.getSigned('admin');
@@ -172,7 +182,8 @@ export class MainSettlementBus extends ReadyResource {
                                 console.log(`Writer removed: ${op.value.wk}`);
                             }
                         }
-                    } else if (op.type === 'addWriter2') {
+                    } 
+                    else if (op.type === 'addWriter2') {
                         const writingKey = b4a.from(op.key, 'hex');
                         await base.addWriter(writingKey, { isIndexer: false });
                         console.log(`Writer added: ${op.key} non-indexer`);
@@ -203,11 +214,14 @@ export class MainSettlementBus extends ReadyResource {
 
         const adminEntry = await this.getSigned('admin');
         if (this.#isAdmin(adminEntry)) {
-            this.writerEventListener();
-            this.isWorkingWriterEventListener = true;
+            this.#shouldListenToAdminEvents = true;
+            this.#adminEventListener(); // only for admin
+        } else if (!this.#isAdmin(adminEntry) && this.base.writable && !this.base.isIndexer) {
+            this.#shouldListenToWriterEvents = true;
+            this.#writerEventListener(); // only for writers
         }
-        
-        await this.setUpRoleAutomatically();
+
+        await this.#setUpRoleAutomatically(adminEntry);
 
         if (this.enable_updater) {
             this.updater();
@@ -218,9 +232,12 @@ export class MainSettlementBus extends ReadyResource {
         console.log('View Length:', this.base.view.core.length);
         console.log('View Signed Length:', this.base.view.core.signedLength);
     }
-    async setUpRoleAutomatically() {
 
-        const adminEntry = await this.getSigned('admin');        
+    async #setUpRoleAutomatically(adminEntry = null) {
+        if (adminEntry === null) {
+            adminEntry = await this.getSigned('admin');
+        }
+
         const nodeEntry = await this.getSigned(this.wallet.publicKey);
         if (!this.base.writable && nodeEntry !== null && nodeEntry.isWriter === true) {
 
@@ -235,6 +252,7 @@ export class MainSettlementBus extends ReadyResource {
         }
 
     }
+
     #sendMessageToAdmin(adminEntry, message) {
         if (!adminEntry || !message) {
             return;
@@ -254,8 +272,8 @@ export class MainSettlementBus extends ReadyResource {
 
     #isAdmin(adminEntry, node = null) {
         if (!adminEntry) return false;
-        if (node) return adminEntry.writingKey === Buffer.from(node.from.key).toString('hex');
-        return this.wallet.publicKey === adminEntry.tracPublicKey && adminEntry.writingKey === this.writingKey;
+        if (node) return adminEntry.wk === Buffer.from(node.from.key).toString('hex');
+        return this.wallet.publicKey === adminEntry.tracPublicKey && adminEntry.wk === this.writingKey;
 
     }
 
@@ -279,6 +297,12 @@ export class MainSettlementBus extends ReadyResource {
         }
     }
 
+    async get(key) {
+        const result = await this.base.view.get(key);
+        if (result === null) return null;
+        return result.value;
+    }
+    
     async getSigned(key) {
         const view_session = this.base.view.checkout(this.base.view.core.signedLength);
         const result = await view_session.get(key);
@@ -286,28 +310,35 @@ export class MainSettlementBus extends ReadyResource {
         return result.value;
     }
 
-    async get(key) {
-        const result = await this.base.view.get(key);
-        if (result === null) return null;
-        return result.value;
-    }
-
-    async #handleIncomingWriterEvent(data) {
+    async #handleIncomingEvent(data) {
         try {
             const bufferData = data.toString();
             const parsedRequest = JSON.parse(bufferData);
             if (parsedRequest.type === 'addWriter' || parsedRequest.type === 'removeWriter') {
+                //This request must be hanlded by ADMIN 
+                this.emit('adminEvent', parsedRequest);
+            } else if (parsedRequest.type === 'addAdmin'){
+                //This request must be handled by WRITER
                 this.emit('writerEvent', parsedRequest);
             }
         } catch (error) {
             // for now ignore the error
         }
     }
-    
-    async writerEventListener() {
-        this.on('writerEvent', async (parsedRequest) => {
+
+    async #adminEventListener() {
+        this.on('adminEvent', async (parsedRequest) => {
             const listEntry = await this.getSigned('list')
-            if (Array.from(listEntry).includes(parsedRequest.key) && MsbManager.verifyAddOrRemoveWriterMessage(parsedRequest, this.wallet)) {
+            if (Array.from(listEntry).includes(parsedRequest.key) && MsbManager.verifyEventMessage(parsedRequest, this.wallet)) {
+                await this.base.append(parsedRequest);
+            }
+        });
+    }
+
+    async #writerEventListener() {
+        this.on('writerEvent', async (parsedRequest) => {
+            const adminEntry = await this.getSigned('admin');
+            if (adminEntry && adminEntry.tracPublicKey === parsedRequest.value.tracPublicKey && MsbManager.verifyEventMessage(parsedRequest, this.wallet)) {
                 await this.base.append(parsedRequest);
             }
         });
@@ -421,7 +452,7 @@ export class MainSettlementBus extends ReadyResource {
                 connection.on('error', (error) => { });
 
                 connection.on('data', async data => {
-                    await this.#handleIncomingWriterEvent(data);
+                    await this.#handleIncomingEvent(data);
                 })
 
                 if (!this.isStreaming) {
@@ -542,26 +573,49 @@ export class MainSettlementBus extends ReadyResource {
                     //case if I want to ADD admin entry with bootstrap key to become admin
                     const adminEntry = await this.getSigned('admin');
                     const addAdminMessage = MsbManager.assembleAdminMessage(adminEntry, this.writingKey, this.wallet, this.bootstrap);
-                    await this.base.append(addAdminMessage);
-
-                    setTimeout(async () => {
-                        const updatedAdminEntry = await this.getSigned('admin');
-                        if (this.#isAdmin(updatedAdminEntry) && !this.isWorkingWriterEventListener) {
-                            this.writerEventListener();
-                            this.isWorkingWriterEventListener = true;
-                            console.log(`Admin has been added successfully.`);
-                        } else {
-                            console.warn(`Admin has NOT been added.`);
+                    if(!adminEntry && this.wallet && this.writingKey && this.writingKey === this.bootstrap){
+                        await this.base.append(addAdminMessage);
+                    } else if (adminEntry && adminEntry.tracPublicKey === this.wallet.publicKey && this.writingKey && this.writingKey !== adminEntry.wk) {
+                        const listEntry = await this.getSigned('list');
+                        let connections  = [];
+                        if (listEntry) {
+                            this.swarm.connections.forEach((conn) => {
+                                const remotePublicKeyHex = Buffer.from(conn.remotePublicKey).toString('hex');
+                                if (conn.connected && listEntry.includes(remotePublicKeyHex)) {
+                                    connections.push(conn);
+                                }
+                            });
                         }
+                        if  (connections.length > 0) {
+                            connections[Math.floor(Math.random() * connections.length)].write(JSON.stringify(addAdminMessage));
+                        }
+                        //TODO: Implement an algorithm to search a new writer and connect/send the request for it. 
 
-                    }, 5000);
-
-                    //case if I want to CHANGE admin entry with Trac Public key to become admin (writer + indexer)
+                        setTimeout(async () => {
+                            const updatedAdminEntry = await this.getSigned('admin');
+                            if (this.#isAdmin(updatedAdminEntry) && !this.#shouldListenToAdminEvents) {
+                                this.#shouldListenToAdminEvents = true;
+                                this.#adminEventListener();
+                                console.log(`Admin has been added successfully.`);
+                            } else {
+                                console.warn(`Admin has NOT been added.`);
+                            }
+    
+                        }, 5000);
+                    }
                     break;
                 case '/add_whitelist':
                     const adminEntry2 = await this.getSigned('admin');
-                    const addWhitelistMessage = MsbManager.assembleWhiteListMessage(adminEntry2, this.wallet);
-                    await this.base.append(addWhitelistMessage);
+                    const assembledWhitelistMessages = await MsbManager.assembleWhitelistMessages(adminEntry2, this.wallet);
+                    for(const message of assembledWhitelistMessages) {
+                        await this.base.append({
+                            type: 'whitelist',
+                            key: 'list',
+                            value: message
+                        });
+                        sleep(1000);
+                    }
+
                     break;
                 case '/show':
                     const admin = await this.getSigned('admin');
@@ -570,9 +624,8 @@ export class MainSettlementBus extends ReadyResource {
                     console.log('List:', list);
                     break;
                 case '/add_writer':
+                    //DEBUG
                     //TODO: Consider the cases when this command can be executed. THIS IS NOT TESTED. Not sure if this is implemented well
-
-                      
                     const adminEntry3 = await this.getSigned('admin');
                     const nodeEntry = await this.getSigned(this.wallet.publicKey);
                     const listEntry = await this.getSigned('list');
@@ -583,12 +636,13 @@ export class MainSettlementBus extends ReadyResource {
                     }
                     break;
                 case '/remove_writer':
+                    //DEBUG
                     //TODO: Consider the cases when this command can be executed. THIS IS NOT TESTED. Not sure if this is implemented well
                     const nodeEntry2 = await this.getSigned(this.wallet.publicKey);
                     const listEntry2 = await this.getSigned('list');
                     const adminEntry4 = await this.getSigned('admin');
 
-                    if (this.base.writable &&(nodeEntry2 && nodeEntry2.isWriter) &&this.#amIWhitelisted(listEntry2, adminEntry4)) {
+                    if (this.base.writable &&(nodeEntry2 && nodeEntry2.isWriter) && this.#amIWhitelisted(listEntry2, adminEntry4)) {
                         const assembledRemoveWriterMessage = MsbManager.assembleRemoveWriterMessage(this.wallet, this.writingKey);
                         this.#sendMessageToAdmin(adminEntry4, assembledRemoveWriterMessage);
                     }

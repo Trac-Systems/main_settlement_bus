@@ -5,7 +5,7 @@ import { isHexString } from './functions.js';
 //TODO: GENERATE NONCE WITH CRYPTO LIBRARY WHICH ALLOW US TO GENERATE IT WITH UNIFORM DISTRIBUTION.
 
 const FILEPATH = './whitelist/pubkeys.csv';
-
+const CHUNK_SIZE = 100;
 export class MsbManager extends ReadyResource {
     constructor(msbInstance) {
         super();
@@ -27,19 +27,65 @@ export class MsbManager extends ReadyResource {
         return buf;
     }
 
+    static async readPublicKeysFromFile() {
+        try {
+            const data = await fs.promises.readFile(FILEPATH, 'utf8');
+            const pubKeys = data
+                .split('\n')
+                .map(line => line.trim())
+                .filter(line => line.length > 0);
+
+            if (pubKeys.length === 0) {
+                throw new Error('The file does not contain any public keys');
+            }
+
+            return pubKeys;
+        } catch (err) {
+            if (err.code === 'ENOENT') {
+                throw new Error('File not found');
+            }
+
+            throw new Error(`Failed to read public keys from file: ${err.message}`);
+        }
+    }
+
+    static chunkPublicKeys(pubKeys, chunkSize) {
+        const chunks = [];
+        for (let i = 0; i < pubKeys.length; i += chunkSize) {
+            chunks.push(pubKeys.slice(i, i + chunkSize));
+        }
+        return chunks;
+    }
+
     static assembleAdminMessage(adminEntry, writingKey, wallet, bootstrap) {
         // case where admin entry doesn't exist yet and we have to autorize Admin public key only with bootstrap writing key
         if (!adminEntry && wallet && writingKey && writingKey === bootstrap) {
             const nonce = this.#generateNonce();
-            const msg = this.createMessage(wallet.publicKey, nonce, 'addAdmin');
+            const msg = this.createMessage(wallet.publicKey, writingKey ,nonce, 'addAdmin');
             const hash = createHash('sha256').update(msg).digest('hex');
             return {
                 type: 'addAdmin',
                 key: 'admin',
                 value: {
                     tracPublicKey: wallet.publicKey,
+                    wk: writingKey,
                     nonce: nonce,
-                    pop: wallet.sign(hash)
+                    sig: wallet.sign(hash)
+                }
+            };
+        } else if (adminEntry && adminEntry.tracPublicKey === wallet.publicKey && writingKey && writingKey !== adminEntry.wk) {
+            // case where admin entry exists and we have to authorize Admin public key only with bootstrap writing key
+            const nonce = this.#generateNonce();
+            const msg = this.createMessage(wallet.publicKey, writingKey, nonce, 'addAdmin');
+            const hash = createHash('sha256').update(msg).digest('hex');
+            return {
+                type: 'addAdmin',
+                key: 'admin',
+                value: {
+                    tracPublicKey: wallet.publicKey, // TODO: This value is redundant. Writer and validator in apply will take if from adminEntry. Take a look over the code and remove it.
+                    wk: writingKey,
+                    nonce: nonce,
+                    sig: wallet.sign(hash)
                 }
             };
         }
@@ -48,32 +94,36 @@ export class MsbManager extends ReadyResource {
         // }
     }
 
-    static assembleWhiteListMessage(adminEntry, wallet) {
-        // This method can only be invoked by admin
+    static async assembleWhitelistMessages(adminEntry, wallet) {
         try {
-            //TODO: IMPORTANT -  IF WE GONNA STORE ~ 2K-10K PUBLIC KEYS IN THE LIST, WE NEED TO SPLIT IT INTO CHUNKS
-            // ONE CHUNK WILL BE ~100 PUBLIC KEYS + NONCE + SIG AND ADDITIONAL BYTES < 4096 BYTES. ADMIN WILL NEED TO PERFORM MULTIPLE APPENDS. FOR NOW THIS IS NOT IMPLEMENTED.
-            if (adminEntry && wallet && wallet.publicKey === adminEntry.tracPublicKey) {
-                const pubKeys = fs.readFileSync(FILEPATH, 'utf8')
-                    .split('\n')
-                    .map(line => line.trim())
-                    .filter(line => line.length > 0);
-                const nonce = this.#generateNonce();
-                const msg = this.createMessage(pubKeys.join(''), nonce, 'whitelist');
-                const hash = createHash('sha256').update(msg).digest('hex');
-                return {
-                    type: 'whitelist',
-                    key: 'list',
-                    value: {
-                        nonce: nonce,
-                        pubKeysList: JSON.stringify(pubKeys),
-                        sig: wallet.sign(hash)
-                    }
-                };
+            if (!adminEntry) {
+                throw new Error('Unauthorized: Admin entry is missing');
             }
-        } catch (e) {
-            // TODO: Implement proper error handling
-            console.log('Error reading file', e);
+            if (!wallet) {
+                throw new Error('Unauthorized: Wallet is missing');
+            }
+            if (wallet.publicKey !== adminEntry.tracPublicKey) {
+                throw new Error('Unauthorized: Only the admin can invoke this method');
+            }
+
+            const messages = [];
+            const pubKeys = await this.readPublicKeysFromFile();
+            const chunks = this.chunkPublicKeys(pubKeys, CHUNK_SIZE);
+
+            for (const chunk of chunks) {
+                const nonce = this.#generateNonce();
+                const msg = this.createMessage(chunk.join(''), nonce, 'whitelist');
+                const hash = createHash('sha256').update(msg).digest('hex');
+                messages.push({
+                    nonce: nonce,
+                    pubKeysList: JSON.stringify(chunk),
+                    sig: wallet.sign(hash)
+                });
+
+            }
+            return messages;
+        } catch (err) {
+            throw new Error(`Failed to create whitelist messages: ${err.message}`);
         }
     }
 
@@ -108,12 +158,18 @@ export class MsbManager extends ReadyResource {
             }
         };
     }
-
-    static verifyAddOrRemoveWriterMessage(parsedRequest, wallet) {
-        const nonce = parsedRequest.value.nonce;
-        const msg = this.createMessage(parsedRequest.key, parsedRequest.value.wk ,nonce, parsedRequest.type);
-        const hash = createHash('sha256').update(msg).digest('hex');
-        return wallet.verify(parsedRequest.value.sig, hash, parsedRequest.key);
+    static verifyEventMessage(parsedRequest, wallet) {
+        let msg = null;
+        if (parsedRequest.type === 'addWriter' || parsedRequest.type === 'removeWriter') {
+            msg = this.createMessage(parsedRequest.key, parsedRequest.value.wk, parsedRequest.value.nonce, parsedRequest.type);
+            const hash = createHash('sha256').update(msg).digest('hex');
+            return wallet.verify(parsedRequest.value.sig, hash, parsedRequest.key);
+        } else if (parsedRequest.type === 'addAdmin') {
+            msg = this.createMessage(parsedRequest.value.tracPublicKey, parsedRequest.value.wk, parsedRequest.value.nonce, parsedRequest.type);
+            const hash = createHash('sha256').update(msg).digest('hex');
+            return wallet.verify(parsedRequest.value.sig, hash, parsedRequest.value.tracPublicKey);
+        }
+        return false
     }
 
 }
