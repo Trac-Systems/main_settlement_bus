@@ -72,8 +72,8 @@ export class MainSettlementBus extends ReadyResource {
 
                     const op = node.value;
                     const postTx = op.value;
-                    if (op.type === 'tx') {
-                        if (postTx.op === 'post-tx' &&
+                    if (op.type === OperationType.TX) {
+                        if (postTx.op === OperationType.POST_TX &&
                             null === await batch.get(op.key) &&
                             sanitizeTransaction(postTx) &&
                             hccrypto.verify(b4a.from(postTx.tx + postTx.in, 'utf-8'), b4a.from(postTx.is, 'hex'), b4a.from(postTx.ipk, 'hex')) &&
@@ -85,7 +85,8 @@ export class MainSettlementBus extends ReadyResource {
                             console.log(`TX: ${op.key} appended. Signed length: `,  _this.base.view.core.signedLength);
                         }
                     }
-                    else if (op.type === OperationType.ADMIN) {
+                    else if (op.type === OperationType.ADD_ADMIN) {
+                        console.log('Adding admin entry...');
                         const adminEntry = await this.getSigned(EntryType.ADMIN);
                         // first case if admin entry doesn't exist yet and we have to autorize Admin public key only with bootstrap writing key
                         if (!adminEntry && node.from.key.toString('hex') === this.bootstrap && op.value.wk === this.bootstrap) {
@@ -95,6 +96,7 @@ export class MainSettlementBus extends ReadyResource {
                                     tracPublicKey: op.value.tracPublicKey,
                                     wk: this.bootstrap // TODO: Maybe we should start to call it "id" as this is used to identiy a node in the network
                                 })
+                                console.log(`Admin added: ${op.value.tracPublicKey}:${this.bootstrap}`);
                             }
                         } else if (adminEntry && adminEntry.tracPublicKey === op.value.tracPublicKey) {
                             // second case if admin entry exists and we have to autorize Admin public key only with bootstrap writing key
@@ -105,6 +107,7 @@ export class MainSettlementBus extends ReadyResource {
                                     tracPublicKey: adminEntry.tracPublicKey,
                                     wk: op.value.wk
                                 })
+                                console.log(`Admin updated: ${adminEntry.tracPublicKey}:${op.value.wk}`);
                             }
                         }
                     }
