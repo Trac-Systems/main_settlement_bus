@@ -12,7 +12,7 @@ import PeerWallet from "trac-wallet"
 import Corestore from 'corestore';
 import tty from 'tty';
 import sodium from 'sodium-native';
-import MsbManager from './writerManager.js'; //TODO: CHANGE FILE NAME
+import MsbManager from './msbManager.js';
 import { createHash } from 'crypto';
 import { MAX_PUBKEYS_LENGTH, LISTENER_TIMEOUT, EntryType, OperationType, EventType, TracNamespace } from './constants.js';
 //TODO: CHANGE NONCE.
