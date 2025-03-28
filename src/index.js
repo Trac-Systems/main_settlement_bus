@@ -146,6 +146,29 @@ export class MainSettlementBus extends ReadyResource {
                             }
                         }
                     }
+                    else if (op.type === OperationType.ADD_INDEXER) {
+                        // TODO: This is a placeholder! This part of the code  was not tested yet
+                        const adminEntry = await this.getSigned(EntryType.ADMIN);
+                        const whitelistEntry = await this.getSigned(EntryType.WHITELIST); // TODO: Consider adding a whitelist exclusively for the indexers
+                        if (!this.#isAdmin(adminEntry, node) || !whitelistEntry || !Array.from(whitelistEntry).includes(op.key)) {
+                            continue;
+                        }
+                        if (this.#verifyMessage(op.value.sig, op.key, MsbManager.createMessage(op.key, op.value.wk, op.value.nonce, op.type))) {
+                            const nodeEntry = await this.getSigned(op.key);
+
+                            if (nodeEntry !== null && nodeEntry.isWriter && nodeEntry.isIndexer) {
+                                await base.addWriter(Buffer.from(op.value.wk, 'hex'))
+                                await view.put(op.key, {
+                                    wk: op.value.wk,
+                                    isWriter: true,
+                                    isIndexer: true
+                                });
+                                console.log(`Indexer added: ${op.key}:${op.value.wk}`);
+                                // TODO: Implement a rule for the node to ignore future requests. It should focus only on consensus
+                            }
+                        }
+
+                    }
                     else if (op.type === OperationType.ADD_WRITER) {
                         const adminEntry = await this.getSigned(EntryType.ADMIN);
                         const whitelistEntry = await this.getSigned(EntryType.WHITELIST);
@@ -167,7 +190,8 @@ export class MainSettlementBus extends ReadyResource {
                             }
                         }
                     }
-                    else if (op.type === OperationType.REMOVE_WRITER) {
+                    // TODO: ATTENTION! If we implement a sencond whitelist just for indexers, we will need to separate these 2 cases
+                    else if (op.type === OperationType.REMOVE_WRITER || op.type === OperationType.REMOVE_INDEXER) {
                         const adminEntry = await this.getSigned(EntryType.ADMIN);
                         const whitelistEntry = await this.getSigned(EntryType.WHITELIST);
                         if (!this.#isAdmin(adminEntry, node) || !whitelistEntry || !Array.from(whitelistEntry).includes(op.key)) {
@@ -627,6 +651,11 @@ export class MainSettlementBus extends ReadyResource {
                     const whitelistEntry = await this.getSigned(EntryType.WHITELIST);
                     console.log('List:', whitelistEntry);
                     break;
+                case '/add_indexer':
+                    // TODO: Consider if we need a separate whitelist for the indexers
+                    // TODO: ATTENTION! If we implement a sencond whitelist just for indexers, we will need to separate these 2 cases
+                    console.log("add_indexer still not implemented");
+                    break;
                 case '/add_writer':
                     //DEBUG
                     //TODO: Consider the cases when this command can be executed. THIS IS NOT TESTED. Not sure if this is implemented well
@@ -639,6 +668,8 @@ export class MainSettlementBus extends ReadyResource {
                         this.#sendMessageToAdmin(adminEntry3, assembledAddWriterMessage);
                     }
                     break;
+                case '/remove_indexer':
+                // An indexer is just a 'special' writer. So we can use the same command as for removing a writer
                 case '/remove_writer':
                     //DEBUG
                     //TODO: Consider the cases when this command can be executed. THIS IS NOT TESTED. Not sure if this is implemented well
