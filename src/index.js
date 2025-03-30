@@ -264,7 +264,6 @@ export class MainSettlementBus extends ReadyResource {
         if (adminEntry === null) {
             adminEntry = await this.getSigned(EntryType.ADMIN);
         }
-
         const nodeEntry = await this.getSigned(this.wallet.publicKey);
         if (!this.base.writable && nodeEntry !== null && nodeEntry.isWriter === true) {
 
@@ -276,6 +275,14 @@ export class MainSettlementBus extends ReadyResource {
         if (!this.base.writable && this.#amIWhitelisted(whitelistEntry, adminEntry)) {
             const assembledAddWriterMessage = MsbManager.assembleAddWriterMessage(this.wallet, this.writingKey);
             this.#sendMessageToAdmin(adminEntry, assembledAddWriterMessage);
+            
+            setTimeout(async () => {
+                const nodeEntry = await this.getSigned(this.wallet.publicKey);
+                if (nodeEntry && nodeEntry.wk === this.writingKey && this.base.writable && !this.#shouldListenToWriterEvents) {
+                    this.#shouldListenToWriterEvents = true;
+                    this.#writerEventListener();
+                }
+            }, LISTENER_TIMEOUT);
         }
 
     }
@@ -606,9 +613,10 @@ export class MainSettlementBus extends ReadyResource {
                         const whiteListEntry = await this.getSigned(EntryType.WHITELIST);
                         let connections = [];
                         if (whiteListEntry) {
-                            this.swarm.connections.forEach((conn) => {
+                            this.swarm.connections.forEach(async (conn) => {
                                 const remotePublicKeyHex = Buffer.from(conn.remotePublicKey).toString('hex');
-                                if (conn.connected && whiteListEntry.includes(remotePublicKeyHex)) {
+                                const remotePublicKeyEntry = await this.getSigned(remotePublicKeyHex)
+                                if (conn.connected && whiteListEntry.includes(remotePublicKeyHex) && remotePublicKeyEntry && remotePublicKeyEntry.isWriter === true) {
                                     connections.push(conn);
                                 }
                             });
@@ -617,19 +625,16 @@ export class MainSettlementBus extends ReadyResource {
                             connections[Math.floor(Math.random() * connections.length)].write(JSON.stringify(addAdminMessage));
                         }
                         //TODO: Implement an algorithm to search a new writer and connect/send the request for it. 
-
-                        setTimeout(async () => {
-                            const updatedAdminEntry = await this.getSigned(EntryType.ADMIN);
-                            if (this.#isAdmin(updatedAdminEntry) && !this.#shouldListenToAdminEvents) {
-                                this.#shouldListenToAdminEvents = true;
-                                this.#adminEventListener();
-                                console.log(`Admin has been added successfully.`);
-                            } else {
-                                console.warn(`Admin has NOT been added.`);
-                            }
-
-                        }, LISTENER_TIMEOUT);
                     }
+
+                    setTimeout(async () => {
+                        const updatedAdminEntry = await this.getSigned(EntryType.ADMIN);
+                        if (this.#isAdmin(updatedAdminEntry) && !this.#shouldListenToAdminEvents) {
+                            this.#shouldListenToAdminEvents = true;
+                            this.#adminEventListener();
+                        }
+                    }, LISTENER_TIMEOUT);
+
                     break;
                 case '/add_whitelist':
                     const adminEntry2 = await this.getSigned(EntryType.ADMIN);
@@ -666,6 +671,15 @@ export class MainSettlementBus extends ReadyResource {
                         const assembledAddWriterMessage = MsbManager.assembleAddWriterMessage(this.wallet, this.writingKey);
                         this.#sendMessageToAdmin(adminEntry3, assembledAddWriterMessage);
                     }
+
+                    setTimeout(async () => {
+                        const updatedNodeEntry = await this.getSigned(this.wallet.publicKey);
+                        if (updatedNodeEntry && updatedNodeEntry.wk === this.writingKey && this.base.writable && !this.#shouldListenToWriterEvents) {
+                            this.#shouldListenToWriterEvents = true;
+                            this.#writerEventListener();
+                        }
+                    }, LISTENER_TIMEOUT);
+
                     break;
                 case '/remove_indexer':
                 // An indexer is just a 'special' writer. So we can use the same command as for removing a writer
@@ -680,10 +694,29 @@ export class MainSettlementBus extends ReadyResource {
                         const assembledRemoveWriterMessage = MsbManager.assembleRemoveWriterMessage(this.wallet, this.writingKey);
                         this.#sendMessageToAdmin(adminEntry4, assembledRemoveWriterMessage);
                     }
+
+                    setTimeout(async () => {
+                        const writerEntry = await this.getSigned(this.wallet.publicKey);
+                        if (writerEntry && !writerEntry.isWriter && this.#shouldListenToWriterEvents) {
+                            this.removeAllListeners(EventType.WRITER_EVENT);
+                            this.#shouldListenToWriterEvents = false;
+                        }
+                    }, LISTENER_TIMEOUT);
+                    
                     break
                 case '/flags':
                     console.log("shouldListenToAdminEvents: ", this.#shouldListenToAdminEvents);
                     console.log("shouldListenToWriterEvents: ", this.#shouldListenToWriterEvents);
+                    console.log("isWritable: ", this.base.writable);
+                    console.log("isIndexer: ", this.base.isIndexer);
+                    const logAllListeners = () => {
+                        for (const eventName of this.eventNames()) {
+                            const listeners = this.listeners(eventName);
+                            console.log(`Event: ${String(eventName)}, Listeners: ${listeners.length}`);
+                        }
+                    };
+                    logAllListeners();
+
                     break
                 default:
                     if (input.startsWith('/get_node_info')) {
