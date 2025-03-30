@@ -9,8 +9,9 @@ import crypto from 'hypercore-crypto';
 import { sanitizeTransaction, addWriter } from './functions.js';
 import w from 'protomux-wakeup';
 import PeerWallet from "trac-wallet"
-import fs from 'node:fs';
 import Corestore from 'corestore';
+import tty from 'tty'
+import {Buffer} from 'buffer'
 
 const wakeup = new w();
 
@@ -96,7 +97,7 @@ export class MainSettlementBus extends ReadyResource {
         }
         console.log('View Length:', this.base.view.core.length);
         console.log('View Signed Length:', this.base.view.core.signedLength);
-        console.log('MSB Key:', Buffer(this.base.view.core.key).toString('hex'));
+        console.log('MSB Key:', new Buffer(this.base.view.core.key).toString('hex'));
         this.writerLocalKey = b4a.toString(this.base.local.key, 'hex');
         if (this.replicate) await this._replicate();
         if (this.enable_txchannel) {
@@ -116,7 +117,9 @@ export class MainSettlementBus extends ReadyResource {
 
     async updater(){
         while(true){
-            await this.base.append(null);
+            if(this.base.writable){
+                await this.base.append(null);
+            }
             await this.sleep(10_000);
         }
     }
@@ -273,8 +276,8 @@ export class MainSettlementBus extends ReadyResource {
 
     async interactiveMode() {
         const rl = readline.createInterface({
-            input: process.stdin,
-            output: process.stdout,
+            input: new tty.ReadStream(0),
+            output: new tty.WriteStream(1)
         });
 
         console.log('MSB started. Available commands:');
@@ -292,7 +295,7 @@ export class MainSettlementBus extends ReadyResource {
                     console.log('Exiting...');
                     rl.close();
                     await this.close();
-                    process.exit(0);
+                    typeof process !== "undefined" ? process.exit(0) : Pear.exit(0);
                     break;
                 default:
                     if (input.startsWith('/add_writer')) {
@@ -307,8 +310,8 @@ export class MainSettlementBus extends ReadyResource {
 
     async #getMnemonicInteractiveMode() {
         const rl = readline.createInterface({
-            input: process.stdin,
-            output: process.stdout
+            input: new tty.ReadStream(0),
+            output: new tty.WriteStream(1)
         });
 
         const question = (query) => {

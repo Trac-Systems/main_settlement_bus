@@ -1,8 +1,9 @@
 import MainSettlementBus from './src/index.js';
+
 const opts = {
     stores_directory : 'stores/',
-    store_name : process.argv[2],
-    bootstrap: 'fd4e1b1f08606a6a4f0ccfa064f153aa8ecd11ad82861b56ed5a33ac6b87a489',
+    store_name : typeof process !== "undefined" ? process.argv[2] : Pear.config.args[0],
+    bootstrap: 'e442c6aadc8419c2439552ebecc79ffdc993dd816f9d2d6f562eef56e71ab9ba',
     channel: Buffer.alloc(32).fill('00bptracnetworkmainsettlementbus'),
     tx : Buffer.alloc(32).fill('bptracnetworkmainsettlementbustx')
 };
