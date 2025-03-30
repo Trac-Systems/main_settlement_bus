@@ -86,7 +86,6 @@ export class MainSettlementBus extends ReadyResource {
                         }
                     }
                     else if (op.type === OperationType.ADD_ADMIN) {
-                        console.log('Adding admin entry...');
                         const adminEntry = await this.getSigned(EntryType.ADMIN);
                         // first case if admin entry doesn't exist yet and we have to autorize Admin public key only with bootstrap writing key
                         if (!adminEntry && node.from.key.toString('hex') === this.bootstrap && op.value.wk === this.bootstrap) {

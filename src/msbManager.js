@@ -38,15 +38,23 @@ export class MsbManager extends ReadyResource {
         const hash = createHash('sha256').update(msg).digest('hex');
         const baseKey = entryType ? entryType : wallet.publicKey;
 
+        const value = entryType === EntryType.ADMIN 
+        ? {
+            tracPublicKey: wallet.publicKey,
+            wk: writingKey,
+            nonce: nonce,
+            sig: wallet.sign(hash)
+        }
+        : {
+            wk: writingKey,
+            nonce: nonce,
+            sig: wallet.sign(hash)
+        };
+
         return {
             type: operationType,
             key: baseKey,
-            value: {
-                tracPublicKey: entryType === EntryType.ADMIN ? wallet.publicKey : undefined, // TODO: This value is redundant. Writer and validator in apply will take if from adminEntry. Take a look over the code and remove it
-                wk: writingKey,
-                nonce: nonce,
-                sig: wallet.sign(hash)
-            }
+            value
         };
     }
 
