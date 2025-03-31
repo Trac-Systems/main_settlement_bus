@@ -5,13 +5,13 @@ import ReadyResource from 'ready-resource';
 import b4a from 'b4a';
 import Hyperbee from 'hyperbee';
 import readline from 'readline';
-import crypto from 'hypercore-crypto';
+import hccrypto from 'hypercore-crypto';
 import { sanitizeTransaction, addWriter } from './functions.js';
 import w from 'protomux-wakeup';
 import PeerWallet from "trac-wallet"
 import Corestore from 'corestore';
 import tty from 'tty'
-import {Buffer} from 'buffer'
+import crypto from 'crypto'
 
 const wakeup = new w();
 
@@ -23,14 +23,14 @@ export class MainSettlementBus extends ReadyResource {
         this.KEY_PAIR_PATH = `${this.STORES_DIRECTORY}${options.store_name}/db/keypair.json`
         this.store = new Corestore(this.STORES_DIRECTORY + options.store_name);
         this.swarm = null;
-        this.tx = options.tx || null;
+        this.tx = b4a.alloc(32).fill(options.tx) || null;
         this.tx_pool = [];
         this.enable_txchannel = typeof options.enable_txchannel !== "undefined" && options.enable_txchannel === false ? false : true;
         this.enable_wallet = typeof options.enable_wallet !== "undefined" && options.enable_wallet === false ? false : true;
         this.enable_updater = typeof options.enable_updater !== "undefined" && options.enable_updater === false ? false : true;
         this.base = null;
         this.key = null;
-        this.channel = options.channel || null;
+        this.channel = b4a.alloc(32).fill(options.channel) || null;
         this.connectedNodes = 1;
         this.replicate = options.replicate !== false;
         this.writerLocalKey = null;
@@ -68,9 +68,9 @@ export class MainSettlementBus extends ReadyResource {
                         if (null === await view.get(op.key) &&
                             sanitizeTransaction(postTx) &&
                             postTx.op === 'post-tx' &&
-                            crypto.verify(Buffer.from(postTx.tx + postTx.in, 'utf-8'), Buffer.from(postTx.is, 'hex'), Buffer.from(postTx.ipk, 'hex')) &&// sender verification
-                            crypto.verify(Buffer.from(postTx.tx + postTx.wn, 'utf-8'), Buffer.from(postTx.ws, 'hex'), Buffer.from(postTx.wp, 'hex')) &&// writer verification
-                            Buffer.byteLength(JSON.stringify(postTx)) <= 4096
+                            hccrypto.verify(b4a.from(postTx.tx + postTx.in, 'utf-8'), b4a.from(postTx.is, 'hex'), b4a.from(postTx.ipk, 'hex')) &&// sender verification
+                            hccrypto.verify(b4a.from(postTx.tx + postTx.wn, 'utf-8'), b4a.from(postTx.ws, 'hex'), b4a.from(postTx.wp, 'hex')) &&// writer verification
+                            b4a.byteLength(JSON.stringify(postTx)) <= 4096
                         ) {
                             await view.put(op.key, op.value);
                             console.log(`TX: ${op.key} appended. Signed length: `,  _this.base.view.core.signedLength);
@@ -97,7 +97,7 @@ export class MainSettlementBus extends ReadyResource {
         }
         console.log('View Length:', this.base.view.core.length);
         console.log('View Signed Length:', this.base.view.core.signedLength);
-        console.log('MSB Key:', new Buffer(this.base.view.core.key).toString('hex'));
+        console.log('MSB Key:', b4a.toString(this.base.view.core.key, 'hex'));
         this.writerLocalKey = b4a.toString(this.base.local.key, 'hex');
         if (this.replicate) await this._replicate();
         if (this.enable_txchannel) {
@@ -149,7 +149,7 @@ export class MainSettlementBus extends ReadyResource {
                     return
                 }
 
-                if(Buffer.byteLength(msg) > 3072) return;
+                if(b4a.byteLength(msg) > 3072) return;
 
                 try {
 
@@ -157,12 +157,12 @@ export class MainSettlementBus extends ReadyResource {
 
                     if (sanitizeTransaction(parsedPreTx) &&
                         parsedPreTx.op === 'pre-tx' &&
-                        crypto.verify(Buffer.from(parsedPreTx.tx + parsedPreTx.in, 'utf-8'), Buffer.from(parsedPreTx.is, 'hex'), Buffer.from(parsedPreTx.ipk, 'hex')) &&
+                        hccrypto.verify(b4a.from(parsedPreTx.tx + parsedPreTx.in, 'utf-8'), b4a.from(parsedPreTx.is, 'hex'), b4a.from(parsedPreTx.ipk, 'hex')) &&
                         parsedPreTx.w === _this.writerLocalKey &&
                         null === await _this.base.view.get(parsedPreTx.tx)
                     ) {
                         const nonce = Math.random() + '-' + Date.now();
-                        const signature = crypto.sign(Buffer.from(parsedPreTx.tx + nonce, 'utf-8'), Buffer.from(this.wallet.secretKey, 'hex'));
+                        const signature = hccrypto.sign(b4a.from(parsedPreTx.tx + nonce, 'utf-8'), b4a.from(this.wallet.secretKey, 'hex'));
                         const append_tx = {
                             op: 'post-tx',
                             tx: parsedPreTx.tx,
@@ -248,6 +248,33 @@ export class MainSettlementBus extends ReadyResource {
                 this.isStreaming = true;
             }
         });
+    }
+
+    async createHash(type, message){
+        if(type === 'sha256'){
+            const out = b4a.alloc(sodium.crypto_hash_sha256_BYTES);
+            sodium.crypto_hash_sha256(out, b4a.from(message));
+            return b4a.toString(out, 'hex');
+        }
+        let createHash = null;
+        if(global.Pear !== undefined){
+            let _type = '';
+            switch(type.toLowerCase()){
+                case 'sha1': _type = 'SHA-1'; break;
+                case 'sha384': _type = 'SHA-384'; break;
+                case 'sha512': _type = 'SHA-512'; break;
+                default: throw new Error('Unsupported algorithm.');
+            }
+            const encoder = new TextEncoder();
+            const data = encoder.encode(message);
+            const hash = await crypto.subtle.digest(_type, data);
+            const hashArray = Array.from(new Uint8Array(hash));
+            return hashArray
+                .map((b) => b.toString(16).padStart(2, "0"))
+                .join("");
+        } else {
+            return crypto.createHash(type).update(message).digest('hex')
+        }
     }
 
     async verifyDag() {
