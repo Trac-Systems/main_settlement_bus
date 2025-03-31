@@ -46,3 +46,30 @@ export async function verifyDag(base) {
     export async function sleep(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
+
+    export async function createHash(type, message){
+        if(type === 'sha256'){
+            const out = b4a.alloc(sodium.crypto_hash_sha256_BYTES);
+            sodium.crypto_hash_sha256(out, b4a.from(message));
+            return b4a.toString(out, 'hex');
+        }
+        let createHash = null;
+        if(global.Pear !== undefined){
+            let _type = '';
+            switch(type.toLowerCase()){
+                case 'sha1': _type = 'SHA-1'; break;
+                case 'sha384': _type = 'SHA-384'; break;
+                case 'sha512': _type = 'SHA-512'; break;
+                default: throw new Error('Unsupported algorithm.');
+            }
+            const encoder = new TextEncoder();
+            const data = encoder.encode(message);
+            const hash = await crypto.subtle.digest(_type, data);
+            const hashArray = Array.from(new Uint8Array(hash));
+            return hashArray
+                .map((b) => b.toString(16).padStart(2, "0"))
+                .join("");
+        } else {
+            return crypto.createHash(type).update(message).digest('hex')
+        }
+    }   

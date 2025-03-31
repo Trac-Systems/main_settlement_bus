@@ -1,6 +1,7 @@
 export const EntryType = Object.freeze({
     ADMIN: 'admin',
     WHITELIST: 'whitelist',
+    INDEXERS: 'indexers',
 });
 
 export const OperationType = Object.freeze({
@@ -24,3 +25,4 @@ export const WHITELIST_FILEPATH = './whitelist/pubkeys.csv';
 export const MAX_PUBKEYS_LENGTH = 100;
 export const LISTENER_TIMEOUT = 5000; // 5 seconds
 export const TracNamespace = 'TracNetwork';
+export const MAX_INDEXERS = 5;

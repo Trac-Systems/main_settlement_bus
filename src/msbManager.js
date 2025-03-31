@@ -111,12 +111,34 @@ export class MsbManager extends ReadyResource {
         return this.#assembleMessageBase(wallet, writingKey, OperationType.REMOVE_WRITER);
     }
 
-    static assembleAddIndexerMessage(wallet, writingKey) {
-        return this.#assembleMessageBase(wallet, writingKey, OperationType.ADD_INDEXER);
+    static assembleAddIndexerMessage(wallet, writerTracPublicKey) {
+        //TODO: refactor. For now it is as it is. BEFRE REFACTORING PERFORM TESTS  IT'S MORE IMPORTANT FOR NOW
+        const nonce = this.#generateNonce();
+        const msg = this.createMessage(writerTracPublicKey, nonce, OperationType.ADD_INDEXER);
+        const hash = createHash('sha256').update(msg).digest('hex');
+        return {
+            type: OperationType.ADD_INDEXER,
+            key: writerTracPublicKey,
+            value : {
+                nonce: nonce,
+                sig: wallet.sign(hash)
+            }
+        };
     }
 
-    static assembleRemoveIndexerMessage(wallet, writingKey) {
-        return this.#assembleMessageBase(wallet, writingKey, OperationType.REMOVE_INDEXER);
+    static assembleRemoveIndexerMessage(wallet, writerTracPublicKey) {
+        //TODO: refactor. For now it is as it is. BEFRE REFACTORING PERFORM TESTS  IT'S MORE IMPORTANT FOR NOW
+        const nonce = this.#generateNonce();
+        const msg = this.createMessage(writerTracPublicKey, nonce, OperationType.REMOVE_INDEXER);
+        const hash = createHash('sha256').update(msg).digest('hex');
+        return {
+            type: OperationType.REMOVE_INDEXER,
+            key: writerTracPublicKey,
+            value : {
+                nonce: nonce,
+                sig: wallet.sign(hash)
+            }
+        };
     }
 
     static verifyEventMessage(parsedRequest, wallet) {
