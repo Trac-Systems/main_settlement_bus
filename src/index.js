@@ -86,6 +86,7 @@ export class MainSettlementBus extends ReadyResource {
                         }
                     }
                     else if (op.type === OperationType.ADD_ADMIN) {
+                        //TODO FIX ADMIN RECOVERY ----INVALID_SIGNATURE
                         const adminEntry = await this.getSigned(EntryType.ADMIN);
                         // first case if admin entry doesn't exist yet and we have to autorize Admin public key only with bootstrap writing key
                         if (!adminEntry && node.from.key.toString('hex') === this.bootstrap && op.value.wk === this.bootstrap) {
@@ -93,20 +94,31 @@ export class MainSettlementBus extends ReadyResource {
                             if (this.#verifyMessage(op.value.sig, op.value.tracPublicKey, MsbManager.createMessage(op.value.tracPublicKey, op.value.wk, op.value.nonce, op.type))) {
                                 await view.put(EntryType.ADMIN, {
                                     tracPublicKey: op.value.tracPublicKey,
-                                    wk: this.bootstrap // TODO: Maybe we should start to call it "id" as this is used to identiy a node in the network
+                                    wk: this.bootstrap
                                 })
+                                const initIndexers = [op.value.tracPublicKey];
+                                await view.put(EntryType.INDEXERS, initIndexers);
                                 console.log(`Admin added: ${op.value.tracPublicKey}:${this.bootstrap}`);
                             }
                         } else if (adminEntry && adminEntry.tracPublicKey === op.value.tracPublicKey) {
+                            console.log('1');
                             // second case if admin entry exists and we have to autorize Admin public key only with bootstrap writing key
                             if (this.#verifyMessage(op.value.sig, adminEntry.tracPublicKey, MsbManager.createMessage(adminEntry.tracPublicKey, op.value.wk, op.value.nonce, op.type))) {
-                                await base.removeWriter(Buffer.from(adminEntry.wk, 'hex'));
-                                await base.addWriter(Buffer.from(op.value.wk, 'hex'), { indexer: true })
-                                await view.put(EntryType.ADMIN, {
-                                    tracPublicKey: adminEntry.tracPublicKey,
-                                    wk: op.value.wk
-                                })
-                                console.log(`Admin updated: ${adminEntry.tracPublicKey}:${op.value.wk}`);
+                                const indexersEntry = await this.getSigned(EntryType.INDEXERS);
+                                console.log('2');
+
+                                if (indexersEntry && Array.from(indexersEntry).includes(adminEntry.tracPublicKey) && Array.from(indexersEntry).length > 1) {
+                                    console.log('3');
+
+                                    await base.removeWriter(Buffer.from(adminEntry.wk, 'hex'));
+                                    await base.addWriter(Buffer.from(op.value.wk, 'hex'), { indexer: true })
+                                    await view.put(EntryType.ADMIN, {
+                                        tracPublicKey: adminEntry.tracPublicKey,
+                                        wk: op.value.wk
+                                    })
+
+                                    console.log(`Admin updated: ${adminEntry.tracPublicKey}:${op.value.wk}`);
+                                }
                             }
                         }
                     }
@@ -145,29 +157,6 @@ export class MainSettlementBus extends ReadyResource {
                             }
                         }
                     }
-                    else if (op.type === OperationType.ADD_INDEXER) {
-                        // TODO: This is a placeholder! This part of the code  was not tested yet
-                        const adminEntry = await this.getSigned(EntryType.ADMIN);
-                        const whitelistEntry = await this.getSigned(EntryType.WHITELIST); // TODO: Consider adding a whitelist exclusively for the indexers
-                        if (!this.#isAdmin(adminEntry, node) || !whitelistEntry || !Array.from(whitelistEntry).includes(op.key)) {
-                            continue;
-                        }
-                        if (this.#verifyMessage(op.value.sig, op.key, MsbManager.createMessage(op.key, op.value.wk, op.value.nonce, op.type))) {
-                            const nodeEntry = await this.getSigned(op.key);
-
-                            if (nodeEntry !== null && nodeEntry.isWriter && nodeEntry.isIndexer) {
-                                await base.addWriter(Buffer.from(op.value.wk, 'hex'))
-                                await view.put(op.key, {
-                                    wk: op.value.wk,
-                                    isWriter: true,
-                                    isIndexer: true
-                                });
-                                console.log(`Indexer added: ${op.key}:${op.value.wk}`);
-                                // TODO: Implement a rule for the node to ignore future requests. It should focus only on consensus
-                            }
-                        }
-
-                    }
                     else if (op.type === OperationType.ADD_WRITER) {
                         const adminEntry = await this.getSigned(EntryType.ADMIN);
                         const whitelistEntry = await this.getSigned(EntryType.WHITELIST);
@@ -189,8 +178,7 @@ export class MainSettlementBus extends ReadyResource {
                             }
                         }
                     }
-                    // TODO: ATTENTION! If we implement a sencond whitelist just for indexers, we will need to separate these 2 cases
-                    else if (op.type === OperationType.REMOVE_WRITER || op.type === OperationType.REMOVE_INDEXER) {
+                    else if (op.type === OperationType.REMOVE_WRITER) {
                         const adminEntry = await this.getSigned(EntryType.ADMIN);
                         const whitelistEntry = await this.getSigned(EntryType.WHITELIST);
                         if (!this.#isAdmin(adminEntry, node) || !whitelistEntry || !Array.from(whitelistEntry).includes(op.key)) {
@@ -206,14 +194,74 @@ export class MainSettlementBus extends ReadyResource {
                                     nodeEntry.isIndexer = false;
                                 }
                                 await view.put(op.key, nodeEntry);
-                                console.log(`Writer removed: ${op.value.wk}`);
+                                console.log(`Writer removed: ${op.key}:${op.value.wk}`);
                             }
                         }
                     }
-                    else if (op.type === 'addWriter2') {
-                        const writingKey = b4a.from(op.key, 'hex');
-                        await base.addWriter(writingKey, { isIndexer: false });
-                        console.log(`Writer added: ${op.key} non-indexer`);
+                    else if (op.type === OperationType.ADD_INDEXER) {
+                        const adminEntry = await this.getSigned(EntryType.ADMIN);
+                        const whitelistEntry = await this.getSigned(EntryType.WHITELIST);
+                        const indexersEntry = await this.getSigned(EntryType.INDEXERS);
+
+                        if (!this.#isAdmin(adminEntry, node) ||
+                            !whitelistEntry ||
+                            !Array.from(whitelistEntry).includes(op.key) ||
+                            !indexersEntry || Array.from(indexersEntry).includes(op.key) ||
+                            Array.from(indexersEntry).length >= 5) {
+                            continue;
+                        }
+
+                        if (this.#verifyMessage(op.value.sig, adminEntry.tracPublicKey, MsbManager.createMessage(op.key, op.value.nonce, op.type))) {
+                            const nodeEntry = await this.getSigned(op.key);
+
+                            if (nodeEntry !== null && nodeEntry.isWriter && !nodeEntry.isIndexer) {
+
+                                await base.removeWriter(Buffer.from(nodeEntry.wk, 'hex'));
+                                await base.addWriter(Buffer.from(nodeEntry.wk, 'hex'), { indexer: true })
+                                nodeEntry.isIndexer = true;
+                                await view.put(op.key, nodeEntry);
+                                indexersEntry.push(op.key);
+
+                                await view.put(EntryType.INDEXERS, indexersEntry);
+
+                                // after becoming an indexer, node should stop listening to writer events
+                                // only node which is already writer can become an indexer.
+                                if (nodeEntry.wk === this.writingKey) {
+                                    //workaround? For now it's enough to emit event to ourself with specific value which only we can
+                                    // reproduce. In this case it's null. Listener will be removed for this special case. 
+                                    this.emit(EventType.WRITER_EVENT, null);
+                                }
+
+                            }
+                        }
+
+                    }
+                    else if (op.type === OperationType.REMOVE_INDEXER) {
+                        const adminEntry = await this.getSigned(EntryType.ADMIN);
+                        const indexersEntry = await this.getSigned(EntryType.INDEXERS);
+                        if (!this.#isAdmin(adminEntry, node) || !indexersEntry || !Array.from(indexersEntry).includes(op.key) || Array.from(indexersEntry).length <= 1) {
+                            continue;
+                        }
+                        if (this.#verifyMessage(op.value.sig, adminEntry.tracPublicKey, MsbManager.createMessage(op.key, op.value.nonce, op.type))) {
+                            const nodeEntry = await this.getSigned(op.key);
+                            if (nodeEntry !== null && nodeEntry.isWriter && nodeEntry.isIndexer) {
+                                await base.removeWriter(Buffer.from(nodeEntry.wk, 'hex'));
+
+                                nodeEntry.isWriter = false;
+                                nodeEntry.isIndexer = false;
+                                await view.put(op.key, nodeEntry);
+
+                                const idx = indexersEntry.indexOf(op.key);
+                                if (idx !== -1) {
+                                    indexersEntry.splice(idx, 1);
+                                    await view.put(EntryType.INDEXERS, indexersEntry);
+                                }
+
+                                console.log(`Indexer removed: ${op.key}:${nodeEntry.wk}`);
+                            }
+
+                        }
+
                     }
                 }
 
@@ -275,7 +323,7 @@ export class MainSettlementBus extends ReadyResource {
         if (!this.base.writable && this.#amIWhitelisted(whitelistEntry, adminEntry)) {
             const assembledAddWriterMessage = MsbManager.assembleAddWriterMessage(this.wallet, this.writingKey);
             this.#sendMessageToAdmin(adminEntry, assembledAddWriterMessage);
-            
+
             setTimeout(async () => {
                 const nodeEntry = await this.getSigned(this.wallet.publicKey);
                 if (nodeEntry && nodeEntry.wk === this.writingKey && this.base.writable && !this.#shouldListenToWriterEvents) {
@@ -348,12 +396,16 @@ export class MainSettlementBus extends ReadyResource {
         try {
             const bufferData = data.toString();
             const parsedRequest = JSON.parse(bufferData);
-            if (parsedRequest.type === OperationType.ADD_WRITER || parsedRequest.type === OperationType.REMOVE_WRITER) {
-                //This request must be hanlded by ADMIN 
-                this.emit(EventType.ADMIN_EVENT, parsedRequest);
-            } else if (parsedRequest.type === OperationType.ADMIN) {
-                //This request must be handled by WRITER
-                this.emit(EventType.WRITER_EVENT, parsedRequest);
+            console.log('parsedRequest', parsedRequest);
+            if (parsedRequest && parsedRequest.type && parsedRequest.key && parsedRequest.value) {
+
+                if (parsedRequest.type === OperationType.ADD_WRITER || parsedRequest.type === OperationType.REMOVE_WRITER) {
+                    //This request must be hanlded by ADMIN 
+                    this.emit(EventType.ADMIN_EVENT, parsedRequest);
+                } else if (parsedRequest.type === OperationType.ADD_ADMIN) {
+                    //This request must be handled by WRITER
+                    this.emit(EventType.WRITER_EVENT, parsedRequest);
+                }
             }
         } catch (error) {
             // for now ignore the error
@@ -370,9 +422,23 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async #writerEventListener() {
+        //TODO FIX ADMIN RECOVERY
+
         this.on(EventType.WRITER_EVENT, async (parsedRequest) => {
+            console.log('parsedRequest', parsedRequest);
             const adminEntry = await this.getSigned(EntryType.ADMIN);
-            if (adminEntry && adminEntry.tracPublicKey === parsedRequest.value.tracPublicKey && MsbManager.verifyEventMessage(parsedRequest, this.wallet)) {
+            console.log('000');
+            if (parsedRequest === null) {
+                console.log('111');
+                for (const eventName of this.eventNames()) {
+                    if (eventName === EventType.WRITER_EVENT) {
+                        this.removeAllListeners(EventType.WRITER_EVENT);
+                        this.#shouldListenToWriterEvents = false;
+                    }
+                }
+            }
+            else if (adminEntry && adminEntry.tracPublicKey === parsedRequest.value.tracPublicKey && MsbManager.verifyEventMessage(parsedRequest, this.wallet)) {
+                console.log('222');
                 await this.base.append(parsedRequest);
             }
         });
@@ -508,31 +574,56 @@ export class MainSettlementBus extends ReadyResource {
             }
         });
     }
+    async #handleAdminOperations() {
+        //case if I want to ADD admin entry with bootstrap key to become admin
+        const adminEntry = await this.getSigned(EntryType.ADMIN);
+        const addAdminMessage = MsbManager.assembleAdminMessage(adminEntry, this.writingKey, this.wallet, this.bootstrap);
+        if (!adminEntry && this.wallet && this.writingKey && this.writingKey === this.bootstrap) {
+            await this.base.append(addAdminMessage);
+        } else if (adminEntry && adminEntry.tracPublicKey === this.wallet.publicKey && this.writingKey && this.writingKey !== adminEntry.wk) {
+            const whiteListEntry = await this.getSigned(EntryType.WHITELIST);
+            console.log('whiteListEntry', whiteListEntry);
+            let connections = [];
+            if (whiteListEntry) {
+                for (const conn of this.swarm.connections) {
+                    const remotePublicKeyHex = Buffer.from(conn.remotePublicKey).toString('hex');
+                    const remotePublicKeyEntry = await this.getSigned(remotePublicKeyHex);
 
-    async createHash(type, message){
-        if(type === 'sha256'){
-            const out = b4a.alloc(sodium.crypto_hash_sha256_BYTES);
-            sodium.crypto_hash_sha256(out, b4a.from(message));
-            return b4a.toString(out, 'hex');
-        }
-        let createHash = null;
-        if(global.Pear !== undefined){
-            let _type = '';
-            switch(type.toLowerCase()){
-                case 'sha1': _type = 'SHA-1'; break;
-                case 'sha384': _type = 'SHA-384'; break;
-                case 'sha512': _type = 'SHA-512'; break;
-                default: throw new Error('Unsupported algorithm.');
+                    if (conn.connected &&
+                        whiteListEntry.includes(remotePublicKeyHex) &&
+                        remotePublicKeyEntry &&
+                        remotePublicKeyEntry.isWriter === true &&
+                        remotePublicKeyEntry.isIndexer === false) {
+                        connections.push(conn);
+                    }
+                }
             }
-            const encoder = new TextEncoder();
-            const data = encoder.encode(message);
-            const hash = await crypto.subtle.digest(_type, data);
-            const hashArray = Array.from(new Uint8Array(hash));
-            return hashArray
-                .map((b) => b.toString(16).padStart(2, "0"))
-                .join("");
-        } else {
-            return crypto.createHash(type).update(message).digest('hex')
+            if (connections.length > 0) {
+                connections[Math.floor(Math.random() * connections.length)].write(JSON.stringify(addAdminMessage));
+            }
+            //TODO: Implement an algorithm to search a new writer and connect/send the request for it. 
+        }
+
+        setTimeout(async () => {
+            const updatedAdminEntry = await this.getSigned(EntryType.ADMIN);
+            if (this.#isAdmin(updatedAdminEntry) && !this.#shouldListenToAdminEvents) {
+                this.#shouldListenToAdminEvents = true;
+                this.#adminEventListener();
+            }
+        }, LISTENER_TIMEOUT);
+    }
+    async #handleWhitelistOperations() {
+        const adminEntry = await this.getSigned(EntryType.ADMIN);
+        if (this.#isAdmin(adminEntry)) {
+            const assembledWhitelistMessages = await MsbManager.assembleWhitelistMessages(adminEntry, this.wallet);
+            for (const message of assembledWhitelistMessages) {
+                await this.base.append({
+                    type: OperationType.APPEND_WHITELIST,
+                    key: EntryType.WHITELIST,
+                    value: message
+                });
+                sleep(1000);
+            }
         }
     }
 
@@ -547,30 +638,72 @@ export class MainSettlementBus extends ReadyResource {
         return await this.createHash('sha256', await this.createHash('sha256', tx));
     }
 
-    async verifyDag() {
-        try {
-            console.log('--- DAG Monitoring ---');
-            const dagView = await this.base.view.core.treeHash();
-            const lengthdagView = this.base.view.core.length;
-            const dagSystem = await this.base.system.core.treeHash();
-            const lengthdagSystem = this.base.system.core.length;
-            console.log('this.base.view.core.signedLength:', this.base.view.core.signedLength);
-            console.log("this.base.signedLength", this.base.signedLength);
-            console.log("this.base.linearizer.indexers.length", this.base.linearizer.indexers.length);
-            console.log("this.base.indexedLength", this.base.indexedLength);
-            //console.log("this.base.system.core", this.base.system.core);
-            console.log(`writingKey: ${this.writingKey}`);
-            console.log(`base.key: ${this.base.key.toString('hex')}`);
-            console.log('discoveryKey:', b4a.toString(this.base.discoveryKey, 'hex'));
+    async #handleAddWriterOperation() {
+        //DEBUG only for now
+        //TODO: Consider the cases when this command can be executed. THIS IS NOT TESTED. Not sure if this is implemented well
+        const adminEntry = await this.getSigned(EntryType.ADMIN);
+        const nodeEntry = await this.getSigned(this.wallet.publicKey);
+        const whitelistEntry = await this.getSigned(EntryType.WHITELIST);
 
-            console.log(`VIEW Dag: ${dagView.toString('hex')} (length: ${lengthdagView})`);
-            console.log(`SYSTEM Dag: ${dagSystem.toString('hex')} (length: ${lengthdagSystem})`);
+        if (!this.base.writable && ((nodeEntry === null) || nodeEntry.isWriter === false) && this.#amIWhitelisted(whitelistEntry, adminEntry)) {
+            const assembledAddWriterMessage = MsbManager.assembleAddWriterMessage(this.wallet, this.writingKey);
+            this.#sendMessageToAdmin(adminEntry, assembledAddWriterMessage);
+        }
 
-        } catch (error) {
-            console.error('Error during DAG monitoring:', error.message);
+        setTimeout(async () => {
+            const updatedNodeEntry = await this.getSigned(this.wallet.publicKey);
+            if (updatedNodeEntry && updatedNodeEntry.wk === this.writingKey && this.base.writable && !this.#shouldListenToWriterEvents) {
+                this.#shouldListenToWriterEvents = true;
+                this.#writerEventListener();
+            }
+        }, LISTENER_TIMEOUT);
+    }
+
+    async #handleRemoveWriterOperation() {
+        //DEBUG
+        //TODO: Consider the cases when this command can be executed. THIS IS NOT TESTED. Not sure if this is implemented well
+        const nodeEntry = await this.getSigned(this.wallet.publicKey);
+        const whitelistEntry = await this.getSigned(EntryType.WHITELIST);
+        const adminEntry = await this.getSigned(EntryType.ADMIN);
+
+        if (this.base.writable && (nodeEntry && nodeEntry.isWriter) && this.#amIWhitelisted(whitelistEntry, adminEntry)) {
+            const assembledRemoveWriterMessage = MsbManager.assembleRemoveWriterMessage(this.wallet, this.writingKey);
+            this.#sendMessageToAdmin(adminEntry, assembledRemoveWriterMessage);
+        }
+
+        setTimeout(async () => {
+            const writerEntry = await this.getSigned(this.wallet.publicKey);
+            if (writerEntry && !writerEntry.isWriter && this.#shouldListenToWriterEvents) {
+                this.removeAllListeners(EventType.WRITER_EVENT);
+                this.#shouldListenToWriterEvents = false;
+            }
+        }, LISTENER_TIMEOUT);
+    }
+
+    async #handleAddIndexerOperation(tracPublicKey) {
+        const whitelistEntry = await this.getSigned(EntryType.WHITELIST);
+        const adminEntry = await this.getSigned(EntryType.ADMIN);
+        if (this.#isAdmin(adminEntry) && whitelistEntry && Array.from(whitelistEntry).includes(tracPublicKey) && this.base.writable) {
+            const nodeEntry = await this.getSigned(tracPublicKey);
+            if (nodeEntry !== null && nodeEntry.isWriter === true && nodeEntry.isIndexer === false) {
+                const assembledAddIndexerMessage = MsbManager.assembleAddIndexerMessage(this.wallet, tracPublicKey);
+                await this.base.append(assembledAddIndexerMessage);
+            }
         }
     }
 
+    async #handleRemoveIndexerOperation(tracPublicKey) {
+        const indexerEntry = await this.getSigned(EntryType.INDEXERS);
+        const adminEntry = await this.getSigned(EntryType.ADMIN);
+        if (this.#isAdmin(adminEntry) && indexerEntry && Array.from(indexerEntry).length > 1 && this.base.writable) {
+            const nodeEntry = await this.getSigned(tracPublicKey);
+            if (nodeEntry !== null && nodeEntry.isWriter === true && nodeEntry.isIndexer === true) {
+                const assembledRemoveIndexer = MsbManager.assembleRemoveIndexerMessage(this.wallet, tracPublicKey);
+                console.log(assembledRemoveIndexer)
+                await this.base.append(assembledRemoveIndexer);
+            }
+        }
+    }
     async interactiveMode() {
         const rl = readline.createInterface({
             input: new tty.ReadStream(0),
@@ -585,9 +718,6 @@ export class MainSettlementBus extends ReadyResource {
 
         rl.on('line', async (input) => {
             switch (input) {
-                case '/dag':
-                    await verifyDag(this.base);
-                    break;
                 case '/exit':
                     console.log('Exiting...');
                     rl.close();
@@ -604,107 +734,19 @@ export class MainSettlementBus extends ReadyResource {
                     this.base.append({ type: Math.random().toString(), key: 'test' });
                     break;
                 case '/add_admin':
-                    //case if I want to ADD admin entry with bootstrap key to become admin
-                    const adminEntry = await this.getSigned(EntryType.ADMIN);
-                    const addAdminMessage = MsbManager.assembleAdminMessage(adminEntry, this.writingKey, this.wallet, this.bootstrap);
-                    if (!adminEntry && this.wallet && this.writingKey && this.writingKey === this.bootstrap) {
-                        await this.base.append(addAdminMessage);
-                    } else if (adminEntry && adminEntry.tracPublicKey === this.wallet.publicKey && this.writingKey && this.writingKey !== adminEntry.wk) {
-                        const whiteListEntry = await this.getSigned(EntryType.WHITELIST);
-                        let connections = [];
-                        if (whiteListEntry) {
-                            this.swarm.connections.forEach(async (conn) => {
-                                const remotePublicKeyHex = Buffer.from(conn.remotePublicKey).toString('hex');
-                                const remotePublicKeyEntry = await this.getSigned(remotePublicKeyHex)
-                                if (conn.connected && whiteListEntry.includes(remotePublicKeyHex) && remotePublicKeyEntry && remotePublicKeyEntry.isWriter === true) {
-                                    connections.push(conn);
-                                }
-                            });
-                        }
-                        if (connections.length > 0) {
-                            connections[Math.floor(Math.random() * connections.length)].write(JSON.stringify(addAdminMessage));
-                        }
-                        //TODO: Implement an algorithm to search a new writer and connect/send the request for it. 
-                    }
-
-                    setTimeout(async () => {
-                        const updatedAdminEntry = await this.getSigned(EntryType.ADMIN);
-                        if (this.#isAdmin(updatedAdminEntry) && !this.#shouldListenToAdminEvents) {
-                            this.#shouldListenToAdminEvents = true;
-                            this.#adminEventListener();
-                        }
-                    }, LISTENER_TIMEOUT);
-
+                    await this.#handleAdminOperations();
                     break;
                 case '/add_whitelist':
-                    const adminEntry2 = await this.getSigned(EntryType.ADMIN);
-                    const assembledWhitelistMessages = await MsbManager.assembleWhitelistMessages(adminEntry2, this.wallet);
-                    for (const message of assembledWhitelistMessages) {
-                        await this.base.append({
-                            type: OperationType.APPEND_WHITELIST,
-                            key: EntryType.WHITELIST,
-                            value: message
-                        });
-                        sleep(1000);
-                    }
-
-                    break;
-                case '/show':
-                    const admin = await this.getSigned(EntryType.ADMIN);
-                    console.log('Admin:', admin);
-                    const whitelistEntry = await this.getSigned(EntryType.WHITELIST);
-                    console.log('List:', whitelistEntry);
-                    break;
-                case '/add_indexer':
-                    // TODO: Consider if we need a separate whitelist for the indexers
-                    // TODO: ATTENTION! If we implement a sencond whitelist just for indexers, we will need to separate these 2 cases
-                    console.log("add_indexer still not implemented");
+                    await this.#handleWhitelistOperations();
                     break;
                 case '/add_writer':
-                    //DEBUG
-                    //TODO: Consider the cases when this command can be executed. THIS IS NOT TESTED. Not sure if this is implemented well
-                    const adminEntry3 = await this.getSigned(EntryType.ADMIN);
-                    const nodeEntry = await this.getSigned(this.wallet.publicKey);
-                    const whitelistEntry2 = await this.getSigned(EntryType.WHITELIST);
-
-                    if (!this.base.writable && ((nodeEntry === null) || nodeEntry.isWriter === false) && this.#amIWhitelisted(whitelistEntry2, adminEntry3)) {
-                        const assembledAddWriterMessage = MsbManager.assembleAddWriterMessage(this.wallet, this.writingKey);
-                        this.#sendMessageToAdmin(adminEntry3, assembledAddWriterMessage);
-                    }
-
-                    setTimeout(async () => {
-                        const updatedNodeEntry = await this.getSigned(this.wallet.publicKey);
-                        if (updatedNodeEntry && updatedNodeEntry.wk === this.writingKey && this.base.writable && !this.#shouldListenToWriterEvents) {
-                            this.#shouldListenToWriterEvents = true;
-                            this.#writerEventListener();
-                        }
-                    }, LISTENER_TIMEOUT);
-
+                    await this.#handleAddWriterOperation();
                     break;
-                case '/remove_indexer':
-                // An indexer is just a 'special' writer. So we can use the same command as for removing a writer
                 case '/remove_writer':
-                    //DEBUG
-                    //TODO: Consider the cases when this command can be executed. THIS IS NOT TESTED. Not sure if this is implemented well
-                    const nodeEntry2 = await this.getSigned(this.wallet.publicKey);
-                    const whitelistEntry3 = await this.getSigned(EntryType.WHITELIST);
-                    const adminEntry4 = await this.getSigned(EntryType.ADMIN);
-
-                    if (this.base.writable && (nodeEntry2 && nodeEntry2.isWriter) && this.#amIWhitelisted(whitelistEntry3, adminEntry4)) {
-                        const assembledRemoveWriterMessage = MsbManager.assembleRemoveWriterMessage(this.wallet, this.writingKey);
-                        this.#sendMessageToAdmin(adminEntry4, assembledRemoveWriterMessage);
-                    }
-
-                    setTimeout(async () => {
-                        const writerEntry = await this.getSigned(this.wallet.publicKey);
-                        if (writerEntry && !writerEntry.isWriter && this.#shouldListenToWriterEvents) {
-                            this.removeAllListeners(EventType.WRITER_EVENT);
-                            this.#shouldListenToWriterEvents = false;
-                        }
-                    }, LISTENER_TIMEOUT);
-                    
+                    await this.#handleRemoveWriterOperation();
                     break
                 case '/flags':
+                    // DEBUG. delete if before mergin'
                     console.log("shouldListenToAdminEvents: ", this.#shouldListenToAdminEvents);
                     console.log("shouldListenToWriterEvents: ", this.#shouldListenToWriterEvents);
                     console.log("isWritable: ", this.base.writable);
@@ -713,16 +755,48 @@ export class MainSettlementBus extends ReadyResource {
                         for (const eventName of this.eventNames()) {
                             const listeners = this.listeners(eventName);
                             console.log(`Event: ${String(eventName)}, Listeners: ${listeners.length}`);
+                            // if (eventName === EventType.WRITER_EVENT) {
+                            //     this.removeAllListeners(EventType.WRITER_EVENT);
+                            //     this.#shouldListenToWriterEvents = false;
+                            // }
                         }
                     };
                     logAllListeners();
 
                     break
+                case '/show':
+                    // DEBUG. delete if before mergin'
+
+                    const admin = await this.getSigned(EntryType.ADMIN);
+                    console.log('Admin:', admin);
+                    const whitelistEntry = await this.getSigned(EntryType.WHITELIST);
+                    console.log('List:', whitelistEntry);
+                    const indexers = await this.getSigned(EntryType.INDEXERS);
+                    console.log('indexers:', indexers);
+                    break;
+                case '/dag':
+                    await verifyDag(this.base);
+                    break;
                 default:
                     if (input.startsWith('/get_node_info')) {
                         const splitted = input.split(' ');
                         await this.getSigned(splitted[1])
                         console.log(await this.getSigned(splitted[1]))
+                    } else if (input.startsWith('/add_indexer')) {
+                        // Who can run this command? Admin
+                        // Admin before running it should if whitelist exists and if the node is in the whitelist
+                        // For now max indexers is 5
+                        // the guy who will start being indexer can't listen to writer events
+                        // the first indexer will be admin. So during the first initialization it should create indexers list in the ledger
+                        const splitted = input.split(' ');
+                        const tracPublicKey = splitted[1]
+                        await this.#handleAddIndexerOperation(tracPublicKey);
+                    }
+                    else if (input.startsWith('/remove_indexer')) {
+                        const splitted = input.split(' ');
+                        const tracPublicKey = splitted[1]
+                        await this.#handleRemoveIndexerOperation(tracPublicKey);
+
                     }
             }
             rl.prompt();
