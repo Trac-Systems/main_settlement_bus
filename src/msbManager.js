@@ -3,6 +3,7 @@ import { createHash } from 'crypto';
 import fs from 'node:fs';
 import { isHexString } from './functions.js';
 import { MAX_PUBKEYS_LENGTH, WHITELIST_FILEPATH, OperationType, EntryType } from './constants.js';
+import b4a from 'b4a';
 //TODO: GENERATE NONCE WITH CRYPTO LIBRARY WHICH ALLOW US TO GENERATE IT WITH UNIFORM DISTRIBUTION.
 
 // TODO: This class is trying to solve too many problems at once.
@@ -25,8 +26,8 @@ export class MsbManager extends ReadyResource {
     static createMessage(...args) {
         let buf = null;
         if (args.length >= 1) {
-            buf = Buffer.concat(
-                args.map(arg => Buffer.from(arg, isHexString(arg) ? 'hex' : undefined))
+            buf = b4a.concat(
+                args.map(arg => b4a.from(arg, isHexString(arg) ? 'hex' : undefined))
             );
         }
         return buf;
