@@ -90,7 +90,6 @@ export class MainSettlementBus extends ReadyResource {
                         const adminEntry = await this.getSigned(EntryType.ADMIN);
                         // first case if admin entry doesn't exist yet and we have to autorize Admin public key only with bootstrap writing key
                         if (!adminEntry && node.from.key.toString('hex') === this.bootstrap && op.value.wk === this.bootstrap) {
-
                             if (this.#verifyMessage(op.value.sig, op.value.tracPublicKey, MsbManager.createMessage(op.value.tracPublicKey, op.value.wk, op.value.nonce, op.type))) {
                                 await view.put(EntryType.ADMIN, {
                                     tracPublicKey: op.value.tracPublicKey,
@@ -100,23 +99,18 @@ export class MainSettlementBus extends ReadyResource {
                                 await view.put(EntryType.INDEXERS, initIndexers);
                                 console.log(`Admin added: ${op.value.tracPublicKey}:${this.bootstrap}`);
                             }
-                        } else if (adminEntry && adminEntry.tracPublicKey === op.value.tracPublicKey) {
-                            console.log('1');
+                        }
+                        else if (adminEntry && adminEntry.tracPublicKey === op.value.tracPublicKey) {
                             // second case if admin entry exists and we have to autorize Admin public key only with bootstrap writing key
                             if (this.#verifyMessage(op.value.sig, adminEntry.tracPublicKey, MsbManager.createMessage(adminEntry.tracPublicKey, op.value.wk, op.value.nonce, op.type))) {
                                 const indexersEntry = await this.getSigned(EntryType.INDEXERS);
-                                console.log('2');
-
-                                if (indexersEntry && Array.from(indexersEntry).includes(adminEntry.tracPublicKey) && Array.from(indexersEntry).length > 1) {
-                                    console.log('3');
-
-                                    await base.removeWriter(Buffer.from(adminEntry.wk, 'hex'));
-                                    await base.addWriter(Buffer.from(op.value.wk, 'hex'), { indexer: true })
+                                if (indexersEntry && indexersEntry.includes(adminEntry.tracPublicKey) && indexersEntry.length > 1) {
+                                    await base.removeWriter(b4a.from(adminEntry.wk, 'hex'));
+                                    await base.addWriter(b4a.from(op.value.wk, 'hex'), { isIndexer: true })
                                     await view.put(EntryType.ADMIN, {
                                         tracPublicKey: adminEntry.tracPublicKey,
                                         wk: op.value.wk
                                     })
-
                                     console.log(`Admin updated: ${adminEntry.tracPublicKey}:${op.value.wk}`);
                                 }
                             }
@@ -168,7 +162,7 @@ export class MainSettlementBus extends ReadyResource {
                         if (this.#verifyMessage(op.value.sig, op.key, MsbManager.createMessage(op.key, op.value.wk, op.value.nonce, op.type))) {
                             const nodeEntry = await this.getSigned(op.key);
                             if (nodeEntry === null || !nodeEntry.isWriter) {
-                                await base.addWriter(Buffer.from(op.value.wk, 'hex'), { isIndexer: false })
+                                await base.addWriter(b4a.from(op.value.wk, 'hex'), { isIndexer: false })
                                 await view.put(op.key, {
                                     wk: op.value.wk,
                                     isWriter: true,
@@ -187,7 +181,7 @@ export class MainSettlementBus extends ReadyResource {
                         if (this.#verifyMessage(op.value.sig, op.key, MsbManager.createMessage(op.key, op.value.wk, op.value.nonce, op.type))) {
                             const nodeEntry = await this.getSigned(op.key)
                             if (nodeEntry !== null && nodeEntry.isWriter === true) {
-                                await base.removeWriter(Buffer.from(nodeEntry.wk, 'hex'));
+                                await base.removeWriter(b4a.from(nodeEntry.wk, 'hex'));
                                 nodeEntry.isWriter = false;
 
                                 if (nodeEntry.isIndexer === true) {
@@ -216,8 +210,8 @@ export class MainSettlementBus extends ReadyResource {
 
                             if (nodeEntry !== null && nodeEntry.isWriter && !nodeEntry.isIndexer) {
 
-                                await base.removeWriter(Buffer.from(nodeEntry.wk, 'hex'));
-                                await base.addWriter(Buffer.from(nodeEntry.wk, 'hex'), { indexer: true })
+                                await base.removeWriter(b4a.from(nodeEntry.wk, 'hex'));
+                                await base.addWriter(b4a.from(nodeEntry.wk, 'hex'), { isIndexer: true })
                                 nodeEntry.isIndexer = true;
                                 await view.put(op.key, nodeEntry);
                                 indexersEntry.push(op.key);
@@ -245,7 +239,7 @@ export class MainSettlementBus extends ReadyResource {
                         if (this.#verifyMessage(op.value.sig, adminEntry.tracPublicKey, MsbManager.createMessage(op.key, op.value.nonce, op.type))) {
                             const nodeEntry = await this.getSigned(op.key);
                             if (nodeEntry !== null && nodeEntry.isWriter && nodeEntry.isIndexer) {
-                                await base.removeWriter(Buffer.from(nodeEntry.wk, 'hex'));
+                                await base.removeWriter(b4a.from(nodeEntry.wk, 'hex'));
 
                                 nodeEntry.isWriter = false;
                                 nodeEntry.isIndexer = false;
@@ -279,7 +273,7 @@ export class MainSettlementBus extends ReadyResource {
         }
         console.log('View Length:', this.base.view.core.length);
         console.log('View Signed Length:', this.base.view.core.signedLength);
-        console.log('MSB Key:', Buffer(this.base.view.core.key).toString('hex'));
+        console.log('MSB Key:', b4a.from(this.base.view.core.key).toString('hex'));
 
         this.writingKey = b4a.toString(this.base.local.key, 'hex');
         if (this.replicate) await this._replicate();
@@ -340,21 +334,21 @@ export class MainSettlementBus extends ReadyResource {
             return;
         }
         this.swarm.connections.forEach((conn) => {
-            if (Buffer.from(conn.remotePublicKey).toString('hex') === adminEntry.tracPublicKey && conn.connected) {
+            if (b4a.from(conn.remotePublicKey).toString('hex') === adminEntry.tracPublicKey && conn.connected) {
                 conn.write(JSON.stringify(message));
             }
         });
     }
 
     #verifyMessage(signature, publicKey, bufferMessage) {
-        const bufferPublicKey = Buffer.from(publicKey, 'hex');
+        const bufferPublicKey = b4a.from(publicKey, 'hex');
         const hash = createHash('sha256').update(bufferMessage).digest('hex');
         return this.wallet.verify(signature, hash, bufferPublicKey);
     }
 
     #isAdmin(adminEntry, node = null) {
         if (!adminEntry) return false;
-        if (node) return adminEntry.wk === Buffer.from(node.from.key).toString('hex');
+        if (node) return adminEntry.wk === b4a.from(node.from.key).toString('hex');
         return this.wallet.publicKey === adminEntry.tracPublicKey && adminEntry.wk === this.writingKey;
 
     }
@@ -464,7 +458,7 @@ export class MainSettlementBus extends ReadyResource {
                     return
                 }
 
-                if(b4a.byteLength(msg) > 3072) return;
+                if (b4a.byteLength(msg) > 3072) return;
 
                 try {
 
@@ -531,8 +525,8 @@ export class MainSettlementBus extends ReadyResource {
             }
 
             keyPair = {
-                publicKey: Buffer.from(this.wallet.publicKey, 'hex'),
-                secretKey: Buffer.from(this.wallet.secretKey, 'hex')
+                publicKey: b4a.from(this.wallet.publicKey, 'hex'),
+                secretKey: b4a.from(this.wallet.secretKey, 'hex')
             };
 
             this.swarm = new Hyperswarm({ keyPair, maxPeers: 1024, maxParallel: 512, maxServerConnections: 256 });
@@ -586,7 +580,7 @@ export class MainSettlementBus extends ReadyResource {
             let connections = [];
             if (whiteListEntry) {
                 for (const conn of this.swarm.connections) {
-                    const remotePublicKeyHex = Buffer.from(conn.remotePublicKey).toString('hex');
+                    const remotePublicKeyHex = b4a.from(conn.remotePublicKey).toString('hex');
                     const remotePublicKeyEntry = await this.getSigned(remotePublicKeyHex);
 
                     if (conn.connected &&
