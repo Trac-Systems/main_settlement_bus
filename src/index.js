@@ -11,7 +11,6 @@ import w from 'protomux-wakeup';
 import PeerWallet from "trac-wallet"
 import Corestore from 'corestore';
 import tty from 'tty'
-import crypto from 'crypto'
 
 const wakeup = new w();
 
