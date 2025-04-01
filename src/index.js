@@ -605,18 +605,23 @@ export class MainSettlementBus extends ReadyResource {
                 this.#adminEventListener();
             }
         }, LISTENER_TIMEOUT);
+
     }
     async #handleWhitelistOperations() {
         const adminEntry = await this.getSigned(EntryType.ADMIN);
         if (this.#isAdmin(adminEntry)) {
             const assembledWhitelistMessages = await MsbManager.assembleWhitelistMessages(adminEntry, this.wallet);
-            for (const message of assembledWhitelistMessages) {
+            const totalChunks = assembledWhitelistMessages.length;
+
+            for (let i = 0; i < totalChunks; i++) {
+                const message = assembledWhitelistMessages[i];
                 await this.base.append({
                     type: OperationType.APPEND_WHITELIST,
                     key: EntryType.WHITELIST,
                     value: message
                 });
-                sleep(1000);
+                console.log(`Whitelist message sent (chunk ${(i + 1)}/${totalChunks})`);
+                await sleep(10000);
             }
         }
     }
