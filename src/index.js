@@ -14,7 +14,7 @@ import tty from 'tty';
 import sodium from 'sodium-native';
 import MsbManager from './msbManager.js';
 import { createHash } from 'crypto';
-import { MAX_PUBKEYS_LENGTH, LISTENER_TIMEOUT, EntryType, OperationType, EventType, TracNamespace } from './constants.js';
+import { MAX_PUBKEYS_LENGTH, LISTENER_TIMEOUT, EntryType, OperationType, EventType, TRAC_NAMESPACE, ACK_INTERVAL } from './constants.js';
 //TODO: CHANGE NONCE.
 //TODO FIX PROBLEM WITH REPLICATION.
 
@@ -55,7 +55,7 @@ export class MainSettlementBus extends ReadyResource {
         const _this = this;
         this.base = new Autobase(this.store, this.bootstrap, {
             valueEncoding: 'json',
-            ackInterval: 1000,
+            ackInterval: ACK_INTERVAL,
             open(store) {
                 _this.bee = new Hyperbee(store.get('view'), {
                     extension: false,
@@ -521,7 +521,7 @@ export class MainSettlementBus extends ReadyResource {
         if (!this.swarm) {
             let keyPair;
             if (!this.enable_wallet) {
-                keyPair = await this.store.createKeyPair(TracNamespace);
+                keyPair = await this.store.createKeyPair(TRAC_NAMESPACE);
             }
 
             keyPair = {

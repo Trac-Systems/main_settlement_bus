@@ -19,10 +19,13 @@ export const OperationType = Object.freeze({
 export const EventType = Object.freeze({
     ADMIN_EVENT: 'adminEvent',
     WRITER_EVENT: 'writerEvent',
+    IS_INDEXER: 'is-indexer',
+    IS_NON_INDEXER: 'is-non-indexer',
 });
 
 export const WHITELIST_FILEPATH = './whitelist/pubkeys.csv';
-export const MAX_PUBKEYS_LENGTH = 100;
+export const MAX_PUBKEYS_LENGTH = 50;
 export const LISTENER_TIMEOUT = 5000; // 5 seconds
-export const TracNamespace = 'TracNetwork';
+export const TRAC_NAMESPACE = 'TracNetwork';
 export const MAX_INDEXERS = 5;
+export const ACK_INTERVAL = 1000;
