@@ -39,19 +39,23 @@ export class MsbManager extends ReadyResource {
         const hash = createHash('sha256').update(msg).digest('hex');
         const baseKey = entryType ? entryType : wallet.publicKey;
 
-        const value = entryType === EntryType.ADMIN 
-        ? {
-            tracPublicKey: wallet.publicKey,
-            wk: writingKey,
-            nonce: nonce,
-            sig: wallet.sign(hash)
-        }
-        : {
-            wk: writingKey,
-            nonce: nonce,
-            sig: wallet.sign(hash)
-        };
+        let value = null;
 
+        if (entryType === EntryType.ADMIN) {
+            value = {
+                tracPublicKey: wallet.publicKey,
+                wk: writingKey,
+                nonce: nonce,
+                sig: wallet.sign(hash)
+            }
+        } else {
+            value =  {
+                wk: writingKey,
+                nonce: nonce,
+                sig: wallet.sign(hash)
+            };
+        }
+        
         return {
             type: operationType,
             key: baseKey,
