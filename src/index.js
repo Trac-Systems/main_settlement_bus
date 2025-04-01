@@ -49,7 +49,23 @@ export class MainSettlementBus extends ReadyResource {
         this.msbListener();
         this._boot();
         this.ready().catch(noop);
+
+        this.base.on(EventType.IS_INDEXER, () => {
+            for (const eventName of this.eventNames()) {
+                if (eventName === EventType.WRITER_EVENT) {
+                    this.removeAllListeners(EventType.WRITER_EVENT);
+                    this.#shouldListenToWriterEvents = false;
+                    break;
+                }
+            }
+            console.log('Current node is an indexer');
+        });
+
+        this.base.on(EventType.IS_NON_INDEXER, () => {
+            console.log('Current node is not an indexer anymore');
+        });
     }
+
 
     _boot() {
         const _this = this;
@@ -215,17 +231,7 @@ export class MainSettlementBus extends ReadyResource {
                                 nodeEntry.isIndexer = true;
                                 await view.put(op.key, nodeEntry);
                                 indexersEntry.push(op.key);
-
                                 await view.put(EntryType.INDEXERS, indexersEntry);
-
-                                // after becoming an indexer, node should stop listening to writer events
-                                // only node which is already writer can become an indexer.
-                                if (nodeEntry.wk === this.writingKey) {
-                                    //workaround? For now it's enough to emit event to ourself with specific value which only we can
-                                    // reproduce. In this case it's null. Listener will be removed for this special case. 
-                                    this.emit(EventType.WRITER_EVENT, null);
-                                }
-
                             }
                         }
 
@@ -253,9 +259,7 @@ export class MainSettlementBus extends ReadyResource {
 
                                 console.log(`Indexer removed: ${op.key}:${nodeEntry.wk}`);
                             }
-
                         }
-
                     }
                 }
 
@@ -417,22 +421,9 @@ export class MainSettlementBus extends ReadyResource {
 
     async #writerEventListener() {
         //TODO FIX ADMIN RECOVERY
-
         this.on(EventType.WRITER_EVENT, async (parsedRequest) => {
-            console.log('parsedRequest', parsedRequest);
             const adminEntry = await this.getSigned(EntryType.ADMIN);
-            console.log('000');
-            if (parsedRequest === null) {
-                console.log('111');
-                for (const eventName of this.eventNames()) {
-                    if (eventName === EventType.WRITER_EVENT) {
-                        this.removeAllListeners(EventType.WRITER_EVENT);
-                        this.#shouldListenToWriterEvents = false;
-                    }
-                }
-            }
-            else if (adminEntry && adminEntry.tracPublicKey === parsedRequest.value.tracPublicKey && MsbManager.verifyEventMessage(parsedRequest, this.wallet)) {
-                console.log('222');
+            if (adminEntry && adminEntry.tracPublicKey === parsedRequest.value.tracPublicKey && MsbManager.verifyEventMessage(parsedRequest, this.wallet)) {
                 await this.base.append(parsedRequest);
             }
         });
@@ -703,6 +694,7 @@ export class MainSettlementBus extends ReadyResource {
             }
         }
     }
+
     async interactiveMode() {
         const rl = readline.createInterface({
             input: new tty.ReadStream(0),
@@ -782,11 +774,6 @@ export class MainSettlementBus extends ReadyResource {
                         await this.getSigned(splitted[1])
                         console.log(await this.getSigned(splitted[1]))
                     } else if (input.startsWith('/add_indexer')) {
-                        // Who can run this command? Admin
-                        // Admin before running it should if whitelist exists and if the node is in the whitelist
-                        // For now max indexers is 5
-                        // the guy who will start being indexer can't listen to writer events
-                        // the first indexer will be admin. So during the first initialization it should create indexers list in the ledger
                         const splitted = input.split(' ');
                         const tracPublicKey = splitted[1]
                         await this.#handleAddIndexerOperation(tracPublicKey);
@@ -795,7 +782,6 @@ export class MainSettlementBus extends ReadyResource {
                         const splitted = input.split(' ');
                         const tracPublicKey = splitted[1]
                         await this.#handleRemoveIndexerOperation(tracPublicKey);
-
                     }
             }
             rl.prompt();
