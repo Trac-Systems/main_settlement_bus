@@ -32,9 +32,9 @@ export class MainSettlementBus extends ReadyResource {
         this.swarm = null;
         this.tx = b4a.alloc(32).fill(options.tx) || null;
         this.tx_pool = [];
-        this.enable_txchannel = typeof options.enable_txchannel !== "undefined" && options.enable_txchannel === false ? false : true;
-        this.enable_wallet = typeof options.enable_wallet !== "undefined" && options.enable_wallet === false ? false : true;
-        this.enable_updater = typeof options.enable_updater !== "undefined" && options.enable_updater === false ? false : true;
+        this.enable_txchannel = options.enable_txchannel !== false;
+        this.enable_wallet = options.enable_wallet !== false;
+        this.enable_updater = options.enable_updater !== false;
         this.base = null;
         this.key = null;
         this.channel = b4a.alloc(32).fill(options.channel) || null;
@@ -296,7 +296,7 @@ export class MainSettlementBus extends ReadyResource {
 
         await this.#setUpRoleAutomatically(adminEntry);
 
-        if (this.enable_updater) {
+        if (this.enable_updater && this.base.writable) {
             this.updater();
         }
 
