@@ -24,8 +24,8 @@ export const EventType = Object.freeze({
 });
 
 export const WHITELIST_FILEPATH = './whitelist/pubkeys.csv';
-export const MAX_PUBKEYS_LENGTH = 50;
-export const LISTENER_TIMEOUT = 5000; // 5 seconds
+export const MAX_PUBKEYS_LENGTH = 5;
+export const LISTENER_TIMEOUT = 5000;
 export const TRAC_NAMESPACE = 'TracNetwork';
 export const MAX_INDEXERS = 5;
 export const ACK_INTERVAL = 1000;

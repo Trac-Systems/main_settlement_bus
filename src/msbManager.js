@@ -33,29 +33,43 @@ export class MsbManager extends ReadyResource {
         return buf;
     }
 
-    static #assembleMessageBase(wallet, writingKey, operationType, entryType = null) {
-        const nonce = this.#generateNonce();
-        const msg = this.createMessage(wallet.publicKey, writingKey, nonce, operationType);
-        const hash = createHash('sha256').update(msg).digest('hex');
-        const baseKey = entryType ? entryType : wallet.publicKey;
-
+    static #assembleMessageBase(wallet, keyParam, operationType) {
+        let nonce = null;
+        let msg = null;
+        let hash = null;
+        let baseKey = wallet.publicKey;
         let value = null;
-
-        if (entryType === EntryType.ADMIN) {
-            value = {
-                tracPublicKey: wallet.publicKey,
-                wk: writingKey,
-                nonce: nonce,
-                sig: wallet.sign(hash)
-            }
-        } else {
-            value =  {
-                wk: writingKey,
-                nonce: nonce,
-                sig: wallet.sign(hash)
-            };
+    
+        switch (operationType) {
+            case OperationType.ADD_ADMIN:
+            case OperationType.ADD_WRITER:
+            case OperationType.REMOVE_WRITER:
+                nonce = this.#generateNonce();
+                msg = this.createMessage(wallet.publicKey, keyParam, nonce, operationType);
+                hash = createHash('sha256').update(msg).digest('hex');
+                value = {
+                    wk: keyParam,
+                    nonce: nonce,
+                    sig: wallet.sign(hash)
+                };
+                break;
+    
+            case OperationType.ADD_INDEXER:
+            case OperationType.REMOVE_INDEXER:
+                nonce = this.#generateNonce();
+                msg = this.createMessage(keyParam, nonce, operationType);
+                hash = createHash('sha256').update(msg).digest('hex');
+                baseKey = keyParam;
+                value = {
+                    nonce: nonce,
+                    sig: wallet.sign(hash)
+                };
+                break;
+    
+            default:
+                return undefined;
         }
-        
+    
         return {
             type: operationType,
             key: baseKey,
@@ -67,25 +81,17 @@ export class MsbManager extends ReadyResource {
         if ((!adminEntry && wallet && writingKey && writingKey === bootstrap) || // Admin entry doesn't exist yet, thus admin public key can only be associated with bootstrap writing key
             (adminEntry && adminEntry.tracPublicKey === wallet.publicKey && writingKey && writingKey !== adminEntry.wk)) { // Admin entry exists and we have to update its writing key in base, so it can recover admin access
 
-            return this.#assembleMessageBase(wallet, writingKey, OperationType.ADD_ADMIN, EntryType.ADMIN);
+            return this.#assembleMessageBase(wallet, writingKey, OperationType.ADD_ADMIN);
         }
     }
 
-    // TODO: The other 'assemble message' methods in this class are just ignoring invalid requests. 
-    //       This one, however, is throwing errors. 
-    //       Decide which standard we are going to follow
+
     static async assembleWhitelistMessages(adminEntry, wallet) {
         try {
-            if (!adminEntry) {
-                throw new Error('Unauthorized: Admin entry is missing');
+            if (!adminEntry || !wallet || wallet.publicKey !== adminEntry.tracPublicKey) {
+                return null;
             }
-            if (!wallet) {
-                throw new Error('Unauthorized: Wallet is missing');
-            }
-            if (wallet.publicKey !== adminEntry.tracPublicKey) {
-                throw new Error('Unauthorized: Only the admin can invoke this method');
-            }
-
+            
             const messages = [];
             const pubKeys = await this.readPublicKeysFromFile();
             const chunks = this.chunkPublicKeys(pubKeys, MAX_PUBKEYS_LENGTH);
@@ -94,6 +100,7 @@ export class MsbManager extends ReadyResource {
                 const nonce = this.#generateNonce();
                 const msg = this.createMessage(chunk.join(''), nonce, OperationType.APPEND_WHITELIST);
                 const hash = createHash('sha256').update(msg).digest('hex');
+
                 messages.push({
                     nonce: nonce,
                     pubKeysList: JSON.stringify(chunk),
@@ -101,13 +108,13 @@ export class MsbManager extends ReadyResource {
                 });
 
             }
+
             return messages;
         } catch (err) {
-            throw new Error(`Failed to create whitelist messages: ${err.message}`);
+            console.log(`Failed to create whitelist messages: ${err.message}`);
         }
     }
 
-    // TODO: Decide if we really want to keep these methods or if we should just call the base method directly
     static assembleAddWriterMessage(wallet, writingKey) {
         return this.#assembleMessageBase(wallet, writingKey, OperationType.ADD_WRITER);
     }
@@ -117,51 +124,19 @@ export class MsbManager extends ReadyResource {
     }
 
     static assembleAddIndexerMessage(wallet, writerTracPublicKey) {
-        //TODO: refactor. For now it is as it is. BEFRE REFACTORING PERFORM TESTS  IT'S MORE IMPORTANT FOR NOW
-        const nonce = this.#generateNonce();
-        const msg = this.createMessage(writerTracPublicKey, nonce, OperationType.ADD_INDEXER);
-        const hash = createHash('sha256').update(msg).digest('hex');
-        return {
-            type: OperationType.ADD_INDEXER,
-            key: writerTracPublicKey,
-            value : {
-                nonce: nonce,
-                sig: wallet.sign(hash)
-            }
-        };
+        return this.#assembleMessageBase(wallet, writerTracPublicKey, OperationType.ADD_INDEXER);
     }
 
     static assembleRemoveIndexerMessage(wallet, writerTracPublicKey) {
-        //TODO: refactor. For now it is as it is. BEFRE REFACTORING PERFORM TESTS  IT'S MORE IMPORTANT FOR NOW
-        const nonce = this.#generateNonce();
-        const msg = this.createMessage(writerTracPublicKey, nonce, OperationType.REMOVE_INDEXER);
-        const hash = createHash('sha256').update(msg).digest('hex');
-        return {
-            type: OperationType.REMOVE_INDEXER,
-            key: writerTracPublicKey,
-            value : {
-                nonce: nonce,
-                sig: wallet.sign(hash)
-            }
-        };
+        return this.#assembleMessageBase(wallet, writerTracPublicKey, OperationType.REMOVE_INDEXER);
     }
 
     static verifyEventMessage(parsedRequest, wallet) {
-        let key = null;
-
-        if (parsedRequest.type === OperationType.ADD_WRITER || parsedRequest.type === OperationType.REMOVE_WRITER) {
-            key = parsedRequest.key
-        } else if (parsedRequest.type === OperationType.ADD_ADMIN) {
-            key = parsedRequest.value.tracPublicKey
-        }
-
-        if (key) {
-            const msg = this.createMessage(key, parsedRequest.value.wk, parsedRequest.value.nonce, parsedRequest.type);
-            const hash = createHash('sha256').update(msg).digest('hex');
-            return wallet.verify(parsedRequest.value.sig, hash, key);
-        }
-
-        return false
+        //TODO: Here we can add some sanitization
+        console.log('parsedRequest:', parsedRequest);
+        const msg = this.createMessage(parsedRequest.key, parsedRequest.value.wk, parsedRequest.value.nonce, parsedRequest.type);
+        const hash = createHash('sha256').update(msg).digest('hex');
+        return wallet.verify(parsedRequest.value.sig, hash, parsedRequest.key);
     }
 
     static async readPublicKeysFromFile() {
@@ -179,10 +154,9 @@ export class MsbManager extends ReadyResource {
             return pubKeys;
         } catch (err) {
             if (err.code === 'ENOENT') {
-                throw new Error('File not found');
+                console.log('Whitelist file not found');
             }
-
-            throw new Error(`Failed to read public keys from file: ${err.message}`);
+            console.log(`Failed to read public keys from the whitelist file: ${err.message}`);
         }
     }
 
