@@ -21,6 +21,7 @@ export const EventType = Object.freeze({
     WRITER_EVENT: 'writerEvent',
     IS_INDEXER: 'is-indexer',
     IS_NON_INDEXER: 'is-non-indexer',
+    READY_MSB: 'ready-msb',
 });
 
 export const WHITELIST_FILEPATH = './whitelist/pubkeys.csv';
@@ -29,3 +30,7 @@ export const LISTENER_TIMEOUT = 5000;
 export const TRAC_NAMESPACE = 'TracNetwork';
 export const MAX_INDEXERS = 5;
 export const ACK_INTERVAL = 1000;
+export const WHITELIST_SLEEP_INTERVAL = 10_000;
+export const MAX_PEERS = 1024;
+export const MAX_PARALLEL = 512;
+export const MAX_SERVER_CONNECTIONS = 256;
