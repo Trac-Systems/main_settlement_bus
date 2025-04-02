@@ -17,7 +17,7 @@ export class MsbManager extends ReadyResource {
 
     }
 
-    static #generateNonce() {
+    static generateNonce() {
         return Math.random() + '-' + Date.now(); // TODO: Change it to crypto.randomBytes. Math.random might not be secure enough. It's even better to use nonce generator from sodium. GENERATE NONCE WITH CRYPTO LIBRARY WHICH ALLOW US TO GENERATE IT WITH UNIFORM DISTRIBUTION.
     }
 
@@ -42,7 +42,7 @@ export class MsbManager extends ReadyResource {
             case OperationType.ADD_ADMIN:
             case OperationType.ADD_WRITER:
             case OperationType.REMOVE_WRITER:
-                nonce = this.#generateNonce();
+                nonce = this.generateNonce();
                 msg = this.createMessage(wallet.publicKey, keyParam, nonce, operationType);
                 hash = createHash('sha256').update(msg).digest('hex');
                 value = {
@@ -54,7 +54,7 @@ export class MsbManager extends ReadyResource {
     
             case OperationType.ADD_INDEXER:
             case OperationType.REMOVE_INDEXER:
-                nonce = this.#generateNonce();
+                nonce = this.generateNonce();
                 msg = this.createMessage(keyParam, nonce, operationType);
                 hash = createHash('sha256').update(msg).digest('hex');
                 baseKey = keyParam;
@@ -95,7 +95,7 @@ export class MsbManager extends ReadyResource {
             const chunks = this.chunkPublicKeys(pubKeys, MAX_PUBKEYS_LENGTH);
 
             for (const chunk of chunks) {
-                const nonce = this.#generateNonce();
+                const nonce = this.generateNonce();
                 const msg = this.createMessage(chunk.join(''), nonce, OperationType.APPEND_WHITELIST);
                 const hash = createHash('sha256').update(msg).digest('hex');
 
