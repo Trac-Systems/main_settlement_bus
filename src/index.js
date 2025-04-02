@@ -94,8 +94,8 @@ export class MainSettlementBus extends ReadyResource {
                         if (postTx.op === OperationType.POST_TX &&
                             null === await batch.get(op.key) &&
                             sanitizeTransaction(postTx) &&
-                            hccrypto.verify(b4a.from(postTx.tx + postTx.in, 'utf-8'), b4a.from(postTx.is, 'hex'), b4a.from(postTx.ipk, 'hex')) &&
-                            hccrypto.verify(b4a.from(postTx.tx + postTx.wn, 'utf-8'), b4a.from(postTx.ws, 'hex'), b4a.from(postTx.wp, 'hex')) &&
+                            this.wallet.verify(b4a.from(postTx.is, 'hex'), b4a.from(postTx.tx + postTx.in), b4a.from(postTx.ipk, 'hex')) &&// sender verification
+                            this.wallet.verify(b4a.from(postTx.ws, 'hex'), b4a.from(postTx.tx + postTx.wn),  b4a.from(postTx.wp, 'hex')) &&// writer verification
                             postTx.tx === await _this.generateTx(postTx.bs, this.bootstrap, postTx.w, postTx.i, postTx.ipk, postTx.ch, postTx.in) &&
                             b4a.byteLength(JSON.stringify(postTx)) <= 4096
                         ) {
@@ -459,12 +459,12 @@ export class MainSettlementBus extends ReadyResource {
 
                     if (sanitizeTransaction(parsedPreTx) &&
                         parsedPreTx.op === 'pre-tx' &&
-                        hccrypto.verify(b4a.from(parsedPreTx.tx + parsedPreTx.in, 'utf-8'), b4a.from(parsedPreTx.is, 'hex'), b4a.from(parsedPreTx.ipk, 'hex')) &&
-                        parsedPreTx.w === _this.writerLocalKey &&
+                        this.wallet.verify(b4a.from(parsedPreTx.is, 'hex'), b4a.from(parsedPreTx.tx + parsedPreTx.in), b4a.from(parsedPreTx.ipk, 'hex')) &&
+                        parsedPreTx.w === _this.writingKey &&
                         null === await _this.base.view.get(parsedPreTx.tx)
                     ) {
-                        const nonce = Math.random() + '-' + Date.now();
-                        const signature = hccrypto.sign(b4a.from(parsedPreTx.tx + nonce, 'utf-8'), b4a.from(this.wallet.secretKey, 'hex'));
+                        const nonce = MsbManager.generateNonce();
+                        const signature = this.wallet.sign(b4a.from(parsedPreTx.tx + nonce), b4a.from(this.wallet.secretKey, 'hex'));
                         const append_tx = {
                             op: 'post-tx',
                             tx: parsedPreTx.tx,
@@ -610,7 +610,7 @@ export class MainSettlementBus extends ReadyResource {
                 return;
             }
 
-            const totalChunks = assembledWhitelistMessages.length;  
+            const totalChunks = assembledWhitelistMessages.length;
 
             for (let i = 0; i < totalChunks; i++) {
                 const message = assembledWhitelistMessages[i];
