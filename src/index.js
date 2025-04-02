@@ -14,7 +14,9 @@ import tty from 'tty';
 import sodium from 'sodium-native';
 import MsbManager from './msbManager.js';
 import { createHash } from 'crypto';
-import { MAX_PUBKEYS_LENGTH, LISTENER_TIMEOUT, EntryType, OperationType, EventType, TRAC_NAMESPACE, ACK_INTERVAL } from './constants.js';
+import { MAX_PUBKEYS_LENGTH, LISTENER_TIMEOUT, EntryType, OperationType, EventType, TRAC_NAMESPACE, ACK_INTERVAL, WHITELIST_SLEEP_INTERVAL, MAX_PEERS, MAX_PARALLEL, MAX_SERVER_CONNECTIONS
+} from './constants.js';
+
 //TODO: CHANGE NONCE.
 //TODO FIX PROBLEM WITH REPLICATION.
 
@@ -520,7 +522,7 @@ export class MainSettlementBus extends ReadyResource {
                 secretKey: b4a.from(this.wallet.secretKey, 'hex')
             };
 
-            this.swarm = new Hyperswarm({ keyPair, maxPeers: 1024, maxParallel: 512, maxServerConnections: 256 });
+            this.swarm = new Hyperswarm({ keyPair, maxPeers: MAX_PEERS, maxParallel: MAX_PARALLEL, maxServerConnections: MAX_SERVER_CONNECTIONS });
 
             console.log(`Channel: ${this.channel}`);
             console.log(`Writing key: ${this.writingKey}`)
@@ -541,7 +543,7 @@ export class MainSettlementBus extends ReadyResource {
                 })
 
                 if (!this.isStreaming) {
-                    this.emit('readyMsb');
+                    this.emit(EventType.READY_MSB);
                 }
             });
 
@@ -553,7 +555,7 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     msbListener() {
-        this.on('readyMsb', async () => {
+        this.on(EventType.READY_MSB, async () => {
             if (!this.isStreaming) {
                 this.isStreaming = true;
             }
@@ -618,7 +620,7 @@ export class MainSettlementBus extends ReadyResource {
                     value: message
                 });
                 console.log(`Whitelist message sent (chunk ${(i + 1)}/${totalChunks})`);
-                await sleep(10000);
+                await sleep(WHITELIST_SLEEP_INTERVAL);
             }
         }
     }

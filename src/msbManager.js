@@ -4,8 +4,6 @@ import fs from 'node:fs';
 import { isHexString } from './functions.js';
 import { MAX_PUBKEYS_LENGTH, WHITELIST_FILEPATH, OperationType, EntryType } from './constants.js';
 import b4a from 'b4a';
-//TODO: GENERATE NONCE WITH CRYPTO LIBRARY WHICH ALLOW US TO GENERATE IT WITH UNIFORM DISTRIBUTION.
-
 // TODO: This class is trying to solve too many problems at once.
 //       It is responsible for creating messages, verifying them, reading public keys from a file, etc.
 //       It would be better to separate these concerns into different classes or modules.
@@ -20,7 +18,7 @@ export class MsbManager extends ReadyResource {
     }
 
     static #generateNonce() {
-        return Math.random() + '-' + Date.now(); // TODO: Change it to crypto.randomBytes. Math.random might not be secure enough. It's even better to use nonce generator from sodium.
+        return Math.random() + '-' + Date.now(); // TODO: Change it to crypto.randomBytes. Math.random might not be secure enough. It's even better to use nonce generator from sodium. GENERATE NONCE WITH CRYPTO LIBRARY WHICH ALLOW US TO GENERATE IT WITH UNIFORM DISTRIBUTION.
     }
 
     static createMessage(...args) {
