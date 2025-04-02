@@ -710,8 +710,10 @@ export class MainSettlementBus extends ReadyResource {
 
         console.log('MSB started. Available commands:');
         console.log('- /add_admin: register admin entry with bootstrap key.');
-        console.log('- /add_whitelist: Add a list of Trac public keys. Nodes that own these public keys can become writers.');
-        console.log('- /get_node_info <trac_public_key>: Get information about a node with the given Trac public key');
+        console.log('- /add_whitelist: add a list of Trac public keys. Nodes that own these public keys can become writers.');
+        console.log('- /add_indexer <trac_public_key>: change a role of the selected writer node to indexer role');
+        console.log('- /remove_indexer <trac_public_key>: change a role of the selected indexer node to default role');
+        console.log('- /get_node_info <trac_public_key>: get information about a node with the given Trac public key');
         console.log('- /dag: check system properties such as writing key, DAG, etc.');
         console.log('- /exit: Exit the program');
 
@@ -745,14 +747,14 @@ export class MainSettlementBus extends ReadyResource {
                     await this.#handleRemoveWriterOperation();
                     break
                 case '/flags':
-                    // DEBUG. delete if before mergin'
+                    // Only for DEBUG
                     console.log("shouldListenToAdminEvents: ", this.#shouldListenToAdminEvents);
                     console.log("shouldListenToWriterEvents: ", this.#shouldListenToWriterEvents);
                     console.log("isWritable: ", this.base.writable);
                     console.log("isIndexer: ", this.base.isIndexer);
                     break
                 case '/show':
-                    // DEBUG. delete if before mergin'
+                    // Only for DEBUG
                     const admin = await this.getSigned(EntryType.ADMIN);
                     console.log('Admin:', admin);
                     const whitelistEntry = await this.getSigned(EntryType.WHITELIST);
