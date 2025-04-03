@@ -14,46 +14,79 @@ import tty from 'tty';
 import sodium from 'sodium-native';
 import MsgUtils from './utils/msgUtils.js';
 import { createHash } from 'crypto';
-import { MAX_PUBKEYS_LENGTH, LISTENER_TIMEOUT, EntryType, OperationType, EventType, TRAC_NAMESPACE, ACK_INTERVAL, WHITELIST_SLEEP_INTERVAL, MAX_PEERS, MAX_PARALLEL, MAX_SERVER_CONNECTIONS
-} from './utils/constants.js';
+import { MAX_PUBKEYS_LENGTH, LISTENER_TIMEOUT, EntryType, OperationType, EventType, TRAC_NAMESPACE, ACK_INTERVAL, WHITELIST_SLEEP_INTERVAL, MAX_PEERS, MAX_PARALLEL, MAX_SERVER_CONNECTIONS } from './utils/constants.js';
 
 //TODO: CHANGE NONCE.
 
 const wakeup = new w();
 
 export class MainSettlementBus extends ReadyResource {
+    // Internal flags
     #shouldListenToAdminEvents = false;
     #shouldListenToWriterEvents = false;
+    #isStreaming = false;
+
+    // internal attributes
+    #STORES_DIRECTORY;
+    #KEY_PAIR_PATH;
+    #bootstrap;
+    #channel;
+    #tx;
+    #tx_pool;
+    #store;
+    #bee;
+    #swarm;
+    #base;
+    #key;
+    #writingKey;
+    #enable_txchannel;
+    #enable_updater;
+    #enable_wallet;
+    #wallet;
+    #replicate;
+    #opts;
 
     constructor(options = {}) {
-        //TODO: change visibility of the attributes to private. Most of them should be internal.
         super();
-        this.STORES_DIRECTORY = options.stores_directory;
-        this.KEY_PAIR_PATH = `${this.STORES_DIRECTORY}${options.store_name}/db/keypair.json`
-        this.store = new Corestore(this.STORES_DIRECTORY + options.store_name);
-        this.swarm = null;
-        this.tx = b4a.alloc(32).fill(options.tx) || null;
-        this.tx_pool = [];
-        this.enable_txchannel = options.enable_txchannel !== false;
-        this.enable_wallet = options.enable_wallet !== false;
-        this.enable_updater = options.enable_updater !== false;
-        this.base = null;
-        this.key = null;
-        this.channel = b4a.alloc(32).fill(options.channel) || null;
-        this.replicate = options.replicate !== false;
-        this.writingKey = null;
-        this.isStreaming = false;
-        this.bootstrap = options.bootstrap || null;
-        this.opts = options;
-        this.bee = null;
-        this.wallet = new PeerWallet(options);
+        this.#initInternalAttributes(options);
         this.pool();
         this.msbListener();
         this._boot();
         this.ready().catch(noop);
         this.#setupInternalListeners();
     }
-    
+
+    #initInternalAttributes(options) {
+        //TODO: change visibility of the attributes to private. Most of them should be internal.
+        this.#STORES_DIRECTORY = options.stores_directory;
+        this.#KEY_PAIR_PATH = `${this.STORES_DIRECTORY}${options.store_name}/db/keypair.json`
+        this.#bootstrap = options.bootstrap || null;
+        this.#channel = b4a.alloc(32).fill(options.channel) || null;
+        this.#tx = b4a.alloc(32).fill(options.tx) || null;
+        this.#tx_pool = [];
+        this.#store = new Corestore(this.STORES_DIRECTORY + options.store_name);
+        this.#bee = null;
+        this.#swarm = null;
+        this.#base = null;
+        this.#key = null;
+        this.#writingKey = null;
+        this.#enable_txchannel = options.enable_txchannel !== false;
+        this.#enable_updater = options.enable_updater !== false;
+        this.#enable_wallet = options.enable_wallet !== false;
+        this.#wallet = this.#enable_wallet ? new PeerWallet(options) : null;
+        this.#replicate = options.replicate !== false;
+        this.#opts = options;
+    }
+
+    // TODO: Implement other getters as necessary
+    // TODO: Separate those getters in the code
+    get STORES_DIRECTORY() {
+        return this.#STORES_DIRECTORY;
+    }
+
+    get KEY_PAIR_PATH() {
+        return this.#KEY_PAIR_PATH;
+    }
 
     _boot() {
         const _this = this;
@@ -260,17 +293,17 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async _open() {
-        await this.base.ready();
-        if (this.enable_wallet) {
-            await this.wallet.initKeyPair(this.KEY_PAIR_PATH);
+        await this.#base.ready();
+        if (this.#enable_wallet) {
+            await this.#wallet.initKeyPair(this.KEY_PAIR_PATH);
         }
-        console.log('View Length:', this.base.view.core.length);
-        console.log('View Signed Length:', this.base.view.core.signedLength);
-        console.log('MSB Key:', b4a.from(this.base.view.core.key).toString('hex'));
+        console.log('View Length:', this.#base.view.core.length);
+        console.log('View Signed Length:', this.#base.view.core.signedLength);
+        console.log('MSB Key:', b4a.from(this.#base.view.core.key).toString('hex'));
 
-        this.writingKey = b4a.toString(this.base.local.key, 'hex');
-        if (this.replicate) await this._replicate();
-        if (this.enable_txchannel) {
+        this.#writingKey = b4a.toString(this.#base.local.key, 'hex');
+        if (this.#replicate) await this._replicate();
+        if (this.#enable_txchannel) {
             await this.txChannel();
         }
 
@@ -278,25 +311,25 @@ export class MainSettlementBus extends ReadyResource {
         if (this.#isAdmin(adminEntry)) {
             this.#shouldListenToAdminEvents = true;
             this.#adminEventListener(); // only for admin
-        } else if (!this.#isAdmin(adminEntry) && this.base.writable && !this.base.isIndexer) {
+        } else if (!this.#isAdmin(adminEntry) && this.#base.writable && !this.#base.isIndexer) {
             this.#shouldListenToWriterEvents = true;
             this.#writerEventListener(); // only for writers
         }
 
         await this.#setUpRoleAutomatically(adminEntry);
 
-        if (this.enable_updater && this.base.writable) {
+        if (this.#enable_updater && this.#base.writable) {
             this.updater();
         }
 
-        console.log(`isIndexer: ${this.base.isIndexer}`);
-        console.log(`isWriter: ${this.base.writable}`);
-        console.log('View Length:', this.base.view.core.length);
-        console.log('View Signed Length:', this.base.view.core.signedLength);
+        console.log(`isIndexer: ${this.#base.isIndexer}`);
+        console.log(`isWriter: ${this.#base.writable}`);
+        console.log('View Length:', this.#base.view.core.length);
+        console.log('View Signed Length:', this.#base.view.core.signedLength);
     }
 
     async #setUpRoleAutomatically() {
-        if (!this.base.writable) {
+        if (!this.#base.writable) {
             await this.#requestWriterRole(false)
             setTimeout(async () => {
                 await this.#requestWriterRole(true)
@@ -308,7 +341,7 @@ export class MainSettlementBus extends ReadyResource {
         if (!adminEntry || !message) {
             return;
         }
-        this.swarm.connections.forEach((conn) => {
+        this.#swarm.connections.forEach((conn) => {
             if (b4a.from(conn.remotePublicKey).toString('hex') === adminEntry.tracPublicKey && conn.connected) {
                 conn.write(JSON.stringify(message));
             }
@@ -318,44 +351,44 @@ export class MainSettlementBus extends ReadyResource {
     #verifyMessage(signature, publicKey, bufferMessage) {
         const bufferPublicKey = b4a.from(publicKey, 'hex');
         const hash = createHash('sha256').update(bufferMessage).digest('hex');
-        return this.wallet.verify(signature, hash, bufferPublicKey);
+        return this.#wallet.verify(signature, hash, bufferPublicKey);
     }
 
     #isAdmin(adminEntry, node = null) {
         if (!adminEntry) return false;
         if (node) return adminEntry.wk === b4a.from(node.from.key).toString('hex');
-        return this.wallet.publicKey === adminEntry.tracPublicKey && adminEntry.wk === this.writingKey;
+        return this.#wallet.publicKey === adminEntry.tracPublicKey && adminEntry.wk === this.#writingKey;
 
     }
 
     #amIWhitelisted(whitelistEntry, adminEntry) {
-        return whitelistEntry && Array.isArray(whitelistEntry) && whitelistEntry.includes(this.wallet.publicKey) && !this.#isAdmin(adminEntry);
+        return whitelistEntry && Array.isArray(whitelistEntry) && whitelistEntry.includes(this.#wallet.publicKey) && !this.#isAdmin(adminEntry);
     }
 
     async close() {
-        if (this.swarm) {
-            await this.swarm.destroy();
+        if (this.#swarm) {
+            await this.#swarm.destroy();
         }
-        await this.base.close();
+        await this.#base.close();
     }
 
-    async updater(){
-        while(true){
-            if(this.base.writable){
-                await this.base.append(null);
+    async updater() {
+        while (true) {
+            if (this.#base.writable) {
+                await this.#base.append(null);
             }
             await sleep(10_000);
         }
     }
 
     async get(key) {
-        const result = await this.base.view.get(key);
+        const result = await this.#base.view.get(key);
         if (result === null) return null;
         return result.value;
     }
 
     async getSigned(key) {
-        const view_session = this.base.view.checkout(this.base.view.core.signedLength);
+        const view_session = this.#base.view.checkout(this.#base.view.core.signedLength);
         const result = await view_session.get(key);
         if (result === null) return null;
         return result.value;
@@ -380,7 +413,7 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     #setupInternalListeners() {
-        this.base.on(EventType.IS_INDEXER, () => {
+        this.#base.on(EventType.IS_INDEXER, () => {
             for (const eventName of this.eventNames()) {
                 if (eventName === EventType.WRITER_EVENT) {
                     this.removeAllListeners(EventType.WRITER_EVENT);
@@ -391,14 +424,14 @@ export class MainSettlementBus extends ReadyResource {
             console.log('Current node is an indexer');
         });
 
-        this.base.on(EventType.IS_NON_INDEXER, () => {
+        this.#base.on(EventType.IS_NON_INDEXER, () => {
             console.log('Current node is not an indexer anymore');
         });
 
-        this.base.on(EventType.WRITABLE, async () => {
-            const updatedNodeEntry = await this.getSigned(this.wallet.publicKey);
+        this.#base.on(EventType.WRITABLE, async () => {
+            const updatedNodeEntry = await this.getSigned(this.#wallet.publicKey);
             const canEnableWriterEvents = updatedNodeEntry &&
-                updatedNodeEntry.wk === this.writingKey &&
+                updatedNodeEntry.wk === this.#writingKey &&
                 !this.#shouldListenToWriterEvents;
 
             if (canEnableWriterEvents) {
@@ -408,8 +441,8 @@ export class MainSettlementBus extends ReadyResource {
             }
         });
 
-        this.base.on(EventType.UNWRITABLE, async () => {
-            const updatedNodeEntry = await this.getSigned(this.wallet.publicKey);
+        this.#base.on(EventType.UNWRITABLE, async () => {
+            const updatedNodeEntry = await this.getSigned(this.#wallet.publicKey);
             const canDisableWriterEvents = updatedNodeEntry &&
                 !updatedNodeEntry.isWriter &&
                 this.#shouldListenToWriterEvents;
@@ -425,8 +458,8 @@ export class MainSettlementBus extends ReadyResource {
     async #adminEventListener() {
         this.on(EventType.ADMIN_EVENT, async (parsedRequest) => {
             const whitelistEntry = await this.getSigned(EntryType.WHITELIST)
-            if (Array.from(whitelistEntry).includes(parsedRequest.key) && MsgUtils.verifyEventMessage(parsedRequest, this.wallet)) {
-                await this.base.append(parsedRequest);
+            if (Array.from(whitelistEntry).includes(parsedRequest.key) && MsgUtils.verifyEventMessage(parsedRequest, this.#wallet)) {
+                await this.#base.append(parsedRequest);
             }
         });
     }
@@ -434,8 +467,8 @@ export class MainSettlementBus extends ReadyResource {
     async #writerEventListener() {
         this.on(EventType.WRITER_EVENT, async (parsedRequest) => {
             const adminEntry = await this.getSigned(EntryType.ADMIN);
-            if (adminEntry && adminEntry.tracPublicKey === parsedRequest.value.tracPublicKey && MsgUtils.verifyEventMessage(parsedRequest, this.wallet)) {
-                await this.base.append(parsedRequest);
+            if (adminEntry && adminEntry.tracPublicKey === parsedRequest.value.tracPublicKey && MsgUtils.verifyEventMessage(parsedRequest, this.#wallet)) {
+                await this.#base.append(parsedRequest);
             }
         });
     }
@@ -452,10 +485,10 @@ export class MainSettlementBus extends ReadyResource {
 
             connection.on('data', async (msg) => {
 
-                if (_this.base.isIndexer) return;
+                if (_this.#base.isIndexer) return;
 
                 // TODO: decide if a tx rejection should be responded with
-                if (_this.tx_pool.length >= 1000) {
+                if (_this.#tx_pool.length >= 1000) {
                     console.log('pool full');
                     return
                 }
@@ -468,12 +501,12 @@ export class MainSettlementBus extends ReadyResource {
 
                     if (sanitizeTransaction(parsedPreTx) &&
                         parsedPreTx.op === 'pre-tx' &&
-                        this.wallet.verify(b4a.from(parsedPreTx.is, 'hex'), b4a.from(parsedPreTx.tx + parsedPreTx.in), b4a.from(parsedPreTx.ipk, 'hex')) &&
-                        parsedPreTx.w === _this.writingKey &&
-                        null === await _this.base.view.get(parsedPreTx.tx)
+                        this.#wallet.verify(b4a.from(parsedPreTx.is, 'hex'), b4a.from(parsedPreTx.tx + parsedPreTx.in), b4a.from(parsedPreTx.ipk, 'hex')) &&
+                        parsedPreTx.w === _this.#writingKey &&
+                        null === await _this.#base.view.get(parsedPreTx.tx)
                     ) {
                         const nonce = MsgUtils.generateNonce();
-                        const signature = this.wallet.sign(b4a.from(parsedPreTx.tx + nonce), b4a.from(this.wallet.secretKey, 'hex'));
+                        const signature = this.#wallet.sign(b4a.from(parsedPreTx.tx + nonce), b4a.from(this.#wallet.secretKey, 'hex'));
                         const append_tx = {
                             op: 'post-tx',
                             tx: parsedPreTx.tx,
@@ -486,10 +519,10 @@ export class MainSettlementBus extends ReadyResource {
                             bs: parsedPreTx.bs,
                             mbs: parsedPreTx.mbs,
                             ws: signature.toString('hex'),
-                            wp: this.wallet.publicKey,
-                            wn : nonce
+                            wp: this.#wallet.publicKey,
+                            wn: nonce
                         };
-                        _this.tx_pool.push({ tx: parsedPreTx.tx, append_tx: append_tx });
+                        _this.#tx_pool.push({ tx: parsedPreTx.tx, append_tx: append_tx });
                     }
                 } catch (e) {
                     //console.log(e)
@@ -497,7 +530,7 @@ export class MainSettlementBus extends ReadyResource {
             });
         });
 
-        const channelBuffer = this.tx;
+        const channelBuffer = this.#tx;
         this.tx_swarm.join(channelBuffer, { server: true, client: true });
         await this.tx_swarm.flush();
         console.log('Joined MSB TX channel');
@@ -505,41 +538,41 @@ export class MainSettlementBus extends ReadyResource {
 
     async pool() {
         while (true) {
-            if (this.tx_pool.length > 0) {
-                const length = this.tx_pool.length;
+            if (this.#tx_pool.length > 0) {
+                const length = this.#tx_pool.length;
                 const batch = [];
                 for(let i = 0; i < length; i++){
                     if(i >= 100) break;
-                    batch.push({ type: 'tx', key: this.tx_pool[i].tx, value: this.tx_pool[i].append_tx });
+                    batch.push({ type: 'tx', key: this.#tx_pool[i].tx, value: this.#tx_pool[i].append_tx });
                 }
                 await this.base.append(batch);
-                this.tx_pool.splice(0, batch.length);
+                this.#tx_pool.splice(0, batch.length);
             }
             await sleep(10);
         }
     }
 
     async _replicate() {
-        if (!this.swarm) {
+        if (!this.#swarm) {
             let keyPair;
-            if (!this.enable_wallet) {
-                keyPair = await this.store.createKeyPair(TRAC_NAMESPACE);
+            if (!this.#enable_wallet) {
+                keyPair = await this.#store.createKeyPair(TRAC_NAMESPACE);
             }
 
             keyPair = {
-                publicKey: b4a.from(this.wallet.publicKey, 'hex'),
-                secretKey: b4a.from(this.wallet.secretKey, 'hex')
+                publicKey: b4a.from(this.#wallet.publicKey, 'hex'),
+                secretKey: b4a.from(this.#wallet.secretKey, 'hex')
             };
 
-            this.swarm = new Hyperswarm({ keyPair, maxPeers: MAX_PEERS, maxParallel: MAX_PARALLEL, maxServerConnections: MAX_SERVER_CONNECTIONS });
+            this.#swarm = new Hyperswarm({ keyPair, maxPeers: MAX_PEERS, maxParallel: MAX_PARALLEL, maxServerConnections: MAX_SERVER_CONNECTIONS });
 
-            console.log(`Channel: ${this.channel}`);
-            console.log(`Writing key: ${this.writingKey}`)
-            console.log(`isIndexer: ${this.base.isIndexer}`);
-            console.log(`isWriter: ${this.base.writable}`);
-            this.swarm.on('connection', async (connection) => {
+            console.log(`Channel: ${this.#channel}`);
+            console.log(`Writing key: ${this.#writingKey}`)
+            console.log(`isIndexer: ${this.#base.isIndexer}`);
+            console.log(`isWriter: ${this.#base.writable}`);
+            this.#swarm.on('connection', async (connection) => {
                 wakeup.addStream(connection);
-                this.store.replicate(connection);
+                this.#store.replicate(connection);
 
                 connection.on('close', () => {
 
@@ -551,22 +584,22 @@ export class MainSettlementBus extends ReadyResource {
                     await this.#handleIncomingEvent(data);
                 })
 
-                if (!this.isStreaming) {
+                if (!this.#isStreaming) {
                     this.emit(EventType.READY_MSB);
                 }
             });
 
-            const channelBuffer = this.channel
-            this.swarm.join(channelBuffer, { server: true, client: true });
-            await this.swarm.flush();
+            const channelBuffer = this.#channel
+            this.#swarm.join(channelBuffer, { server: true, client: true });
+            await this.#swarm.flush();
             console.log('Joined channel for peer discovery');
         }
     }
 
     msbListener() {
         this.on(EventType.READY_MSB, async () => {
-            if (!this.isStreaming) {
-                this.isStreaming = true;
+            if (!this.#isStreaming) {
+                this.#isStreaming = true;
             }
         });
     }
@@ -574,14 +607,14 @@ export class MainSettlementBus extends ReadyResource {
     async #handleAdminOperations() {
         //case if I want to ADD admin entry with bootstrap key to become admin
         const adminEntry = await this.getSigned(EntryType.ADMIN);
-        const addAdminMessage = MsgUtils.assembleAdminMessage(adminEntry, this.writingKey, this.wallet, this.bootstrap);
-        if (!adminEntry && this.wallet && this.writingKey && this.writingKey === this.bootstrap) {
-            await this.base.append(addAdminMessage);
-        } else if (adminEntry && adminEntry.tracPublicKey === this.wallet.publicKey && this.writingKey && this.writingKey !== adminEntry.wk) {
+        const addAdminMessage = MsgUtils.assembleAdminMessage(adminEntry, this.#writingKey, this.#wallet, this.#bootstrap);
+        if (!adminEntry && this.#wallet && this.#writingKey && this.#writingKey === this.#bootstrap) {
+            await this.#base.append(addAdminMessage);
+        } else if (adminEntry && adminEntry.tracPublicKey === this.#wallet.publicKey && this.#writingKey && this.#writingKey !== adminEntry.wk) {
             const whiteListEntry = await this.getSigned(EntryType.WHITELIST);
             let connections = [];
             if (whiteListEntry) {
-                for (const conn of this.swarm.connections) {
+                for (const conn of this.#swarm.connections) {
                     const remotePublicKeyHex = b4a.from(conn.remotePublicKey).toString('hex');
                     const remotePublicKeyEntry = await this.getSigned(remotePublicKeyHex);
 
@@ -590,7 +623,7 @@ export class MainSettlementBus extends ReadyResource {
                         remotePublicKeyEntry &&
                         remotePublicKeyEntry.isWriter === true &&
                         remotePublicKeyEntry.isIndexer === false &&
-                        remotePublicKeyHex !== this.wallet.publicKey) {
+                        remotePublicKeyHex !== this.#wallet.publicKey) {
                         connections.push(conn);
                     }
                 }
@@ -615,7 +648,7 @@ export class MainSettlementBus extends ReadyResource {
         const adminEntry = await this.getSigned(EntryType.ADMIN);
         if (!this.#isAdmin(adminEntry)) return;
 
-        const assembledWhitelistMessages = await MsgUtils.assembleWhitelistMessages(adminEntry, this.wallet);
+        const assembledWhitelistMessages = await MsgUtils.assembleWhitelistMessages(adminEntry, this.#wallet);
 
         if (!assembledWhitelistMessages) {
             console.log('Whitelist message not sent.');
@@ -626,7 +659,7 @@ export class MainSettlementBus extends ReadyResource {
 
         for (let i = 0; i < totalChunks; i++) {
             const message = assembledWhitelistMessages[i];
-            await this.base.append({
+            await this.#base.append({
                 type: OperationType.APPEND_WHITELIST,
                 key: EntryType.WHITELIST,
                 value: message
@@ -650,20 +683,20 @@ export class MainSettlementBus extends ReadyResource {
     
     async #requestWriterRole(toAdd) {
         const adminEntry = await this.getSigned(EntryType.ADMIN);
-        const nodeEntry = await this.getSigned(this.wallet.publicKey);
+        const nodeEntry = await this.getSigned(this.#wallet.publicKey);
         const whitelistEntry = await this.getSigned(EntryType.WHITELIST);
         if (toAdd) {
-            const canAddWriter = !this.base.writable && (!nodeEntry || !nodeEntry.isWriter) && this.#amIWhitelisted(whitelistEntry, adminEntry);
+            const canAddWriter = !this.#base.writable && (!nodeEntry || !nodeEntry.isWriter) && this.#amIWhitelisted(whitelistEntry, adminEntry);
 
             if (canAddWriter) {
-                const assembledAddWriterMessage = MsgUtils.assembleAddWriterMessage(this.wallet, this.writingKey);
+                const assembledAddWriterMessage = MsgUtils.assembleAddWriterMessage(this.#wallet, this.#writingKey);
                 this.#sendMessageToAdmin(adminEntry, assembledAddWriterMessage);
             }
-        } 
+        }
         else {
             const canRemoveWriter = nodeEntry && nodeEntry.isWriter
             if (canRemoveWriter) {
-                const assembledRemoveWriterMessage = MsgUtils.assembleRemoveWriterMessage(this.wallet, this.writingKey);
+                const assembledRemoveWriterMessage = MsgUtils.assembleRemoveWriterMessage(this.#wallet, this.#writingKey);
                 this.#sendMessageToAdmin(adminEntry, assembledRemoveWriterMessage);
             }
         }
@@ -671,7 +704,7 @@ export class MainSettlementBus extends ReadyResource {
 
     async #updateIndexerRole(tracPublicKey, toAdd) {
         const adminEntry = await this.getSigned(EntryType.ADMIN);
-        if (!this.#isAdmin(adminEntry) && !this.base.writable) return;
+        if (!this.#isAdmin(adminEntry) && !this.#base.writable) return;
 
         const whitelistEntry = await this.getSigned(EntryType.WHITELIST);
         if (!whitelistEntry && !Array.isArray(whitelistEntry) && !whitelistEntry.includes(tracPublicKey)) return;
@@ -682,14 +715,14 @@ export class MainSettlementBus extends ReadyResource {
         if (toAdd) {
             const canAddIndexer = toAdd && !nodeEntry.isIndexer && whitelistEntry.length < 5;
             if (canAddIndexer) {
-                const assembledAddIndexerMessage = MsgUtils.assembleAddIndexerMessage(this.wallet, tracPublicKey);
-                await this.base.append(assembledAddIndexerMessage);
+                const assembledAddIndexerMessage = MsgUtils.assembleAddIndexerMessage(this.#wallet, tracPublicKey);
+                await this.#base.append(assembledAddIndexerMessage);
             }
         } else {
             const canRemoveIndexer = !toAdd && nodeEntry.isIndexer && whitelistEntry.length > 1;
             if (canRemoveIndexer) {
-                const assembledRemoveIndexer = MsgUtils.assembleRemoveIndexerMessage(this.wallet, tracPublicKey);
-                await this.base.append(assembledRemoveIndexer);
+                const assembledRemoveIndexer = MsgUtils.assembleRemoveIndexerMessage(this.#wallet, tracPublicKey);
+                await this.#base.append(assembledRemoveIndexer);
             }
 
         }
@@ -734,13 +767,13 @@ export class MainSettlementBus extends ReadyResource {
                     typeof process !== "undefined" ? process.exit(0) : Pear.exit(0);
                     break;
                 case '/con':
-                    console.log("MY PUB KEY IS: ", this.wallet.publicKey);
-                    this.swarm.connections.forEach((conn) => {
+                    console.log("MY PUB KEY IS: ", this.#wallet.publicKey);
+                    this.#swarm.connections.forEach((conn) => {
                         console.log(`connection = ${JSON.stringify(conn)}`)
                     });
                     break;
                 case '/test':
-                    this.base.append({ type: Math.random().toString(), key: 'test' });
+                    this.#base.append({ type: Math.random().toString(), key: 'test' });
                     break;
                 case '/add_admin':
                     await this.#handleAdminOperations();
@@ -758,8 +791,8 @@ export class MainSettlementBus extends ReadyResource {
                     // Only for DEBUG
                     console.log("shouldListenToAdminEvents: ", this.#shouldListenToAdminEvents);
                     console.log("shouldListenToWriterEvents: ", this.#shouldListenToWriterEvents);
-                    console.log("isWritable: ", this.base.writable);
-                    console.log("isIndexer: ", this.base.isIndexer);
+                    console.log("isWritable: ", this.#base.writable);
+                    console.log("isIndexer: ", this.#base.isIndexer);
                     break
                 case '/show':
                     // Only for DEBUG
@@ -771,7 +804,7 @@ export class MainSettlementBus extends ReadyResource {
                     console.log('Indexers:', indexers);
                     break;
                 case '/dag':
-                    await verifyDag(this.base);
+                    await verifyDag(this.#base);
                     break;
                 default:
                     if (input.startsWith('/get_node_info')) {
