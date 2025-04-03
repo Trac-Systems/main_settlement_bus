@@ -90,206 +90,232 @@ export class MainSettlementBus extends ReadyResource {
 
     _boot() {
         const _this = this;
-        this.base = new Autobase(this.store, this.bootstrap, {
+        this.#base = new Autobase(this.#store, this.#bootstrap, {
             valueEncoding: 'json',
             ackInterval: ACK_INTERVAL,
-            open(store) {
-                _this.bee = new Hyperbee(store.get('view'), {
-                    extension: false,
-                    keyEncoding: 'utf-8',
-                    valueEncoding: 'json'
+            open: this.#setupHyperbee.bind(this),
+            apply: this.#apply.bind(this),
+        })
+        this.#base.on(EventType.WARNING, (e) => console.log(e))
+    }
+
+    #setupHyperbee(store) {
+        this.#bee = new Hyperbee(store.get('view'), {
+            extension: false,
+            keyEncoding: 'utf-8',
+            valueEncoding: 'json'
+        })
+        return this.#bee;
+    }
+
+    async #apply(nodes, view, base) {
+        for (const node of nodes) {
+            const op = node.value;
+            const handler = this.#getApplyOperationHandler(op.type);
+    
+            if (handler) {
+                await handler(op, view, base, node);
+            } else {
+                console.warn(`Unknown operation type: ${op.type}`);
+            }
+        }
+        await view.batch.flush();
+        await view.batch.close();
+    }
+
+    #getApplyOperationHandler(type) {
+        const handlers = {
+            [OperationType.TX]: this.#handleApplyTxOperation.bind(this),
+            [OperationType.ADD_ADMIN]: this.#handleApplyAddAdminOperation.bind(this),
+            [OperationType.APPEND_WHITELIST]: this.#handleApplyAppendWhitelistOperation.bind(this),
+            [OperationType.ADD_WRITER]: this.#handleApplyAddWriterOperation.bind(this),
+            [OperationType.REMOVE_WRITER]: this.#handleApplyRemoveWriterOperation.bind(this),
+            [OperationType.ADD_INDEXER]: this.#handleApplyAddIndexerOperation.bind(this),
+            [OperationType.REMOVE_INDEXER]: this.#handleApplyRemoveIndexerOperation.bind(this),
+        };
+        return handlers[type] || null;
+    }
+
+    async #handleApplyTxOperation(op, view, base, node) {
+        const batch = view.batch(); 
+        const postTx = op.value;
+
+        if (postTx.op === OperationType.POST_TX &&
+            null === await batch.get(op.key) &&
+            sanitizeTransaction(postTx) &&
+            this.wallet.verify(b4a.from(postTx.is, 'hex'), b4a.from(postTx.tx + postTx.in), b4a.from(postTx.ipk, 'hex')) &&// sender verification
+            this.wallet.verify(b4a.from(postTx.ws, 'hex'), b4a.from(postTx.tx + postTx.wn),  b4a.from(postTx.wp, 'hex')) &&// writer verification
+            postTx.tx === await this.generateTx(postTx.bs, this.bootstrap, postTx.w, postTx.i, postTx.ipk, postTx.ch, postTx.in) &&
+            b4a.byteLength(JSON.stringify(postTx)) <= 4096
+        ) {
+            await batch.put(op.key, op.value);
+            console.log(`TX: ${op.key} appended. Signed length: `,  this.base.view.core.signedLength);
+        }
+    }
+
+    async #handleApplyAddAdminOperation(op, view, base, node) {
+        const adminEntry = await this.getSigned(EntryType.ADMIN);
+        if (!adminEntry && node.from.key.toString('hex') === this.bootstrap && op.value.wk === this.bootstrap) {
+            // If admin isn't set yet...
+            if (this.#verifyMessage(op.value.sig, op.key, MsgUtils.createMessage(op.key, op.value.wk, op.value.nonce, op.type))) {
+                await view.put(EntryType.ADMIN, {
+                    tracPublicKey: op.key,
+                    wk: this.bootstrap
                 })
-                return _this.bee;
-            },
-            apply: async (nodes, view, base) => {
+                const initIndexers = [op.key];
+                await view.put(EntryType.INDEXERS, initIndexers);
+                console.log(`Admin added: ${op.key}:${this.bootstrap}`);
+            }
+        }
+        else if (adminEntry && adminEntry.tracPublicKey === op.key) {
+            // If admin is already set...
+            if (this.#verifyMessage(op.value.sig, adminEntry.tracPublicKey, MsgUtils.createMessage(adminEntry.tracPublicKey, op.value.wk, op.value.nonce, op.type))) {
 
-                const batch = view.batch();
+                const indexersEntry = await this.getSigned(EntryType.INDEXERS);
+                if (indexersEntry && indexersEntry.includes(adminEntry.tracPublicKey) && indexersEntry.length > 1) {
 
-                for (const node of nodes) {
+                    await base.removeWriter(b4a.from(adminEntry.wk, 'hex'));
+                    await base.addWriter(b4a.from(op.value.wk, 'hex'), { isIndexer: true })
+                    await view.put(EntryType.ADMIN, {
+                        tracPublicKey: adminEntry.tracPublicKey,
+                        wk: op.value.wk
+                    })
+                    console.log(`Admin updated: ${adminEntry.tracPublicKey}:${op.value.wk}`);
+                }
+            }
+        }
+    }
 
-                    const op = node.value;
-                    const postTx = op.value;
-                    if (op.type === OperationType.TX) {
-                        if (postTx.op === OperationType.POST_TX &&
-                            null === await batch.get(op.key) &&
-                            sanitizeTransaction(postTx) &&
-                            this.wallet.verify(b4a.from(postTx.is, 'hex'), b4a.from(postTx.tx + postTx.in), b4a.from(postTx.ipk, 'hex')) &&// sender verification
-                            this.wallet.verify(b4a.from(postTx.ws, 'hex'), b4a.from(postTx.tx + postTx.wn),  b4a.from(postTx.wp, 'hex')) &&// writer verification
-                            postTx.tx === await _this.generateTx(postTx.bs, this.bootstrap, postTx.w, postTx.i, postTx.ipk, postTx.ch, postTx.in) &&
-                            b4a.byteLength(JSON.stringify(postTx)) <= 4096
-                        ) {
-                            await batch.put(op.key, op.value);
-                            console.log(`TX: ${op.key} appended. Signed length: `,  _this.base.view.core.signedLength);
-                        }
+    async #handleApplyAppendWhitelistOperation(op, view, base, node) {
+        // TODO: - change list to hashmap (Map() in js)
+        // - make a decision how will we append pubKeys into hashmap.
+        const adminEntry = await this.getSigned(EntryType.ADMIN);
+        if (!this.#isAdmin(adminEntry, node)) {
+            return;
+        }
+
+        const pubKeys = JSON.parse(op.value.pubKeysList); // As all pubkeys are 32 bytes, we can check the string.len instead of parsing it first
+
+        if (this.#verifyMessage(op.value.sig, adminEntry.tracPublicKey, MsgUtils.createMessage(pubKeys.join(''), op.value.nonce, op.type))) {
+
+            if (pubKeys.length > MAX_PUBKEYS_LENGTH) {
+                return;
+            }
+            const whitelistEntry = await this.getSigned(EntryType.WHITELIST);
+
+            if (!whitelistEntry) {
+                // TODO: Implement a hashmap structure to store public keys. Storing it as a vector is not efficient.
+                //       We might need to implement a new class for having a solution more tailored to our needs
+                await view.put(EntryType.WHITELIST, pubKeys);
+            }
+            else {
+                // TODO: In this case we should include items in the list (in the future it will be a hashmap). Doing this with a vector is VERY inefficient
+                pubKeys.forEach((key) => {
+                    if (!whitelistEntry.includes(key)) {
+                        whitelistEntry.push(key);
                     }
-                    else if (op.type === OperationType.ADD_ADMIN) {
-                        const adminEntry = await this.getSigned(EntryType.ADMIN);
-                        // first case if admin entry doesn't exist yet and we have to autorize Admin public key only with bootstrap writing key
-                        if (!adminEntry && node.from.key.toString('hex') === this.bootstrap && op.value.wk === this.bootstrap) {
-                            if (this.#verifyMessage(op.value.sig, op.key, MsgUtils.createMessage(op.key, op.value.wk, op.value.nonce, op.type))) {
-                                await view.put(EntryType.ADMIN, {
-                                    tracPublicKey: op.key,
-                                    wk: this.bootstrap
-                                })
-                                const initIndexers = [op.key];
-                                await view.put(EntryType.INDEXERS, initIndexers);
-                                console.log(`Admin added: ${op.key}:${this.bootstrap}`);
-                            }
-                        }
-                        else if (adminEntry && adminEntry.tracPublicKey === op.key) {
-                            // second case if admin entry exists and we have to autorize Admin public key only with bootstrap writing key
-                            if (this.#verifyMessage(op.value.sig, adminEntry.tracPublicKey, MsgUtils.createMessage(adminEntry.tracPublicKey, op.value.wk, op.value.nonce, op.type))) {
+                });
 
-                                const indexersEntry = await this.getSigned(EntryType.INDEXERS);
-                                if (indexersEntry && indexersEntry.includes(adminEntry.tracPublicKey) && indexersEntry.length > 1) {
+                await view.put(EntryType.WHITELIST, whitelistEntry);
+            }
+        }
+    }
 
-                                    await base.removeWriter(b4a.from(adminEntry.wk, 'hex'));
-                                    await base.addWriter(b4a.from(op.value.wk, 'hex'), { isIndexer: true })
-                                    await view.put(EntryType.ADMIN, {
-                                        tracPublicKey: adminEntry.tracPublicKey,
-                                        wk: op.value.wk
-                                    })
-                                    console.log(`Admin updated: ${adminEntry.tracPublicKey}:${op.value.wk}`);
-                                }
-                            }
-                        }
-                    }
-                    else if (op.type === OperationType.APPEND_WHITELIST) {
-                        // TODO: - change list to hashmap (Map() in js)
-                        // - make a decision how will we append pubKeys into hashmap.
+    async #handleApplyAddWriterOperation(op, view, base, node) {
+        const adminEntry = await this.getSigned(EntryType.ADMIN);
+        const whitelistEntry = await this.getSigned(EntryType.WHITELIST);
 
-                        const adminEntry = await this.getSigned(EntryType.ADMIN);
-                        if (!this.#isAdmin(adminEntry, node)) {
-                            continue;
-                        }
+        if (!this.#isAdmin(adminEntry, node) || !whitelistEntry || !Array.from(whitelistEntry).includes(op.key)) {
+            return;
+        }
 
-                        const pubKeys = JSON.parse(op.value.pubKeysList); // As all pubkeys are 32 bytes, we can check the string.len instead of parsing it first
+        if (this.#verifyMessage(op.value.sig, op.key, MsgUtils.createMessage(op.key, op.value.wk, op.value.nonce, op.type))) {
+            const nodeEntry = await this.getSigned(op.key);
+            if (nodeEntry === null || !nodeEntry.isWriter) {
+                await base.addWriter(b4a.from(op.value.wk, 'hex'), { isIndexer: false })
+                await view.put(op.key, {
+                    wk: op.value.wk,
+                    isWriter: true,
+                    isIndexer: false
+                });
+                console.log(`Writer added: ${op.key}:${op.value.wk}`);
+            }
+        }
+    }
 
-                        if (this.#verifyMessage(op.value.sig, adminEntry.tracPublicKey, MsgUtils.createMessage(pubKeys.join(''), op.value.nonce, op.type))) {
+    async #handleApplyRemoveWriterOperation(op, view, base, node) {
+        const adminEntry = await this.getSigned(EntryType.ADMIN);
+        if (!this.#isAdmin(adminEntry, node)) {
+            return;
+        }
+        if (this.#verifyMessage(op.value.sig, op.key, MsgUtils.createMessage(op.key, op.value.wk, op.value.nonce, op.type))) {
+            const nodeEntry = await this.getSigned(op.key)
+            if (nodeEntry !== null && nodeEntry.isWriter === true) {
+                await base.removeWriter(b4a.from(nodeEntry.wk, 'hex'));
+                nodeEntry.isWriter = false;
 
-                            if (pubKeys.length > MAX_PUBKEYS_LENGTH) {
-                                continue;
-                            }
-                            const whitelistEntry = await this.getSigned(EntryType.WHITELIST);
+                if (nodeEntry.isIndexer === true) {
+                    nodeEntry.isIndexer = false;
+                }
+                await view.put(op.key, nodeEntry);
+                console.log(`Writer removed: ${op.key}:${op.value.wk}`);
+            }
+        }
+    }
 
-                            if (!whitelistEntry) {
-                                // TODO: Implement a hashmap structure to store public keys. Storing it as a vector is not efficient.
-                                //       We might need to implement a new class for having a solution more tailored to our needs
-                                await view.put(EntryType.WHITELIST, pubKeys);
-                            }
-                            else {
-                                // TODO: In this case we should include items in the list (in the future it will be a hashmap). Doing this with a vector is VERY inefficient
-                                pubKeys.forEach((key) => {
-                                    if (!whitelistEntry.includes(key)) {
-                                        whitelistEntry.push(key);
-                                    }
-                                });
+    async #handleApplyAddIndexerOperation(op, view, base, node) {
+        const adminEntry = await this.getSigned(EntryType.ADMIN);
+        const whitelistEntry = await this.getSigned(EntryType.WHITELIST);
+        const indexersEntry = await this.getSigned(EntryType.INDEXERS);
 
-                                await view.put(EntryType.WHITELIST, whitelistEntry);
-                            }
-                        }
-                    }
-                    else if (op.type === OperationType.ADD_WRITER) {
-                        const adminEntry = await this.getSigned(EntryType.ADMIN);
-                        const whitelistEntry = await this.getSigned(EntryType.WHITELIST);
+        if (!this.#isAdmin(adminEntry, node) ||
+            !whitelistEntry ||
+            !Array.from(whitelistEntry).includes(op.key) ||
+            !indexersEntry || Array.from(indexersEntry).includes(op.key) ||
+            Array.from(indexersEntry).length >= 5) {
+            return;
+        }
 
-                        if (!this.#isAdmin(adminEntry, node) || !whitelistEntry || !Array.from(whitelistEntry).includes(op.key)) {
-                            continue;
-                        }
+        if (this.#verifyMessage(op.value.sig, adminEntry.tracPublicKey, MsgUtils.createMessage(op.key, op.value.nonce, op.type))) {
+            const nodeEntry = await this.getSigned(op.key);
 
-                        if (this.#verifyMessage(op.value.sig, op.key, MsgUtils.createMessage(op.key, op.value.wk, op.value.nonce, op.type))) {
-                            const nodeEntry = await this.getSigned(op.key);
-                            if (nodeEntry === null || !nodeEntry.isWriter) {
-                                await base.addWriter(b4a.from(op.value.wk, 'hex'), { isIndexer: false })
-                                await view.put(op.key, {
-                                    wk: op.value.wk,
-                                    isWriter: true,
-                                    isIndexer: false
-                                });
-                                console.log(`Writer added: ${op.key}:${op.value.wk}`);
-                            }
-                        }
-                    }
-                    else if (op.type === OperationType.REMOVE_WRITER) {
-                        const adminEntry = await this.getSigned(EntryType.ADMIN);
-                        if (!this.#isAdmin(adminEntry, node)) {
-                            continue;
-                        }
-                        if (this.#verifyMessage(op.value.sig, op.key, MsgUtils.createMessage(op.key, op.value.wk, op.value.nonce, op.type))) {
-                            const nodeEntry = await this.getSigned(op.key)
-                            if (nodeEntry !== null && nodeEntry.isWriter === true) {
-                                await base.removeWriter(b4a.from(nodeEntry.wk, 'hex'));
-                                nodeEntry.isWriter = false;
+            if (nodeEntry !== null && nodeEntry.isWriter && !nodeEntry.isIndexer) {
 
-                                if (nodeEntry.isIndexer === true) {
-                                    nodeEntry.isIndexer = false;
-                                }
-                                await view.put(op.key, nodeEntry);
-                                console.log(`Writer removed: ${op.key}:${op.value.wk}`);
-                            }
-                        }
-                    }
-                    else if (op.type === OperationType.ADD_INDEXER) {
-                        const adminEntry = await this.getSigned(EntryType.ADMIN);
-                        const whitelistEntry = await this.getSigned(EntryType.WHITELIST);
-                        const indexersEntry = await this.getSigned(EntryType.INDEXERS);
+                await base.removeWriter(b4a.from(nodeEntry.wk, 'hex'));
+                await base.addWriter(b4a.from(nodeEntry.wk, 'hex'), { isIndexer: true })
+                nodeEntry.isIndexer = true;
+                await view.put(op.key, nodeEntry);
+                indexersEntry.push(op.key);
+                await view.put(EntryType.INDEXERS, indexersEntry);
+                console.log(`Indexer added: ${op.key}:${nodeEntry.wk}`);
+            }
+        }
+    }
 
-                        if (!this.#isAdmin(adminEntry, node) ||
-                            !whitelistEntry ||
-                            !Array.from(whitelistEntry).includes(op.key) ||
-                            !indexersEntry || Array.from(indexersEntry).includes(op.key) ||
-                            Array.from(indexersEntry).length >= 5) {
-                            continue;
-                        }
+    async #handleApplyRemoveIndexerOperation(op, view, base, node) {
+        const adminEntry = await this.getSigned(EntryType.ADMIN);
+        const indexersEntry = await this.getSigned(EntryType.INDEXERS);
+        if (!this.#isAdmin(adminEntry, node) || !indexersEntry || !Array.from(indexersEntry).includes(op.key) || Array.from(indexersEntry).length <= 1) {
+            return;
+        }
+        if (this.#verifyMessage(op.value.sig, adminEntry.tracPublicKey, MsgUtils.createMessage(op.key, op.value.nonce, op.type))) {
+            const nodeEntry = await this.getSigned(op.key);
+            if (nodeEntry !== null && nodeEntry.isWriter && nodeEntry.isIndexer) {
+                await base.removeWriter(b4a.from(nodeEntry.wk, 'hex'));
 
-                        if (this.#verifyMessage(op.value.sig, adminEntry.tracPublicKey, MsgUtils.createMessage(op.key, op.value.nonce, op.type))) {
-                            const nodeEntry = await this.getSigned(op.key);
+                nodeEntry.isWriter = false;
+                nodeEntry.isIndexer = false;
+                await view.put(op.key, nodeEntry);
 
-                            if (nodeEntry !== null && nodeEntry.isWriter && !nodeEntry.isIndexer) {
-
-                                await base.removeWriter(b4a.from(nodeEntry.wk, 'hex'));
-                                await base.addWriter(b4a.from(nodeEntry.wk, 'hex'), { isIndexer: true })
-                                nodeEntry.isIndexer = true;
-                                await view.put(op.key, nodeEntry);
-                                indexersEntry.push(op.key);
-                                await view.put(EntryType.INDEXERS, indexersEntry);
-                                console.log(`Indexer added: ${op.key}:${nodeEntry.wk}`);
-                            }
-                        }
-
-                    }
-                    else if (op.type === OperationType.REMOVE_INDEXER) {
-                        const adminEntry = await this.getSigned(EntryType.ADMIN);
-                        const indexersEntry = await this.getSigned(EntryType.INDEXERS);
-                        if (!this.#isAdmin(adminEntry, node) || !indexersEntry || !Array.from(indexersEntry).includes(op.key) || Array.from(indexersEntry).length <= 1) {
-                            continue;
-                        }
-                        if (this.#verifyMessage(op.value.sig, adminEntry.tracPublicKey, MsgUtils.createMessage(op.key, op.value.nonce, op.type))) {
-                            const nodeEntry = await this.getSigned(op.key);
-                            if (nodeEntry !== null && nodeEntry.isWriter && nodeEntry.isIndexer) {
-                                await base.removeWriter(b4a.from(nodeEntry.wk, 'hex'));
-
-                                nodeEntry.isWriter = false;
-                                nodeEntry.isIndexer = false;
-                                await view.put(op.key, nodeEntry);
-
-                                const idx = indexersEntry.indexOf(op.key);
-                                if (idx !== -1) {
-                                    indexersEntry.splice(idx, 1);
-                                    await view.put(EntryType.INDEXERS, indexersEntry);
-                                }
-
-                                console.log(`Indexer removed: ${op.key}:${nodeEntry.wk}`);
-                            }
-                        }
-                    }
+                const idx = indexersEntry.indexOf(op.key);
+                if (idx !== -1) {
+                    indexersEntry.splice(idx, 1);
+                    await view.put(EntryType.INDEXERS, indexersEntry);
                 }
 
-                await batch.flush();
-                await batch.close();
+                console.log(`Indexer removed: ${op.key}:${nodeEntry.wk}`);
             }
-        })
-        this.base.on('warning', (e) => console.log(e))
+        }
     }
 
     async _open() {
