@@ -22,6 +22,8 @@ export const EventType = Object.freeze({
     IS_INDEXER: 'is-indexer',
     IS_NON_INDEXER: 'is-non-indexer',
     READY_MSB: 'ready-msb',
+    WRITABLE: 'writable',
+    UNWRITABLE: 'unwritable',
 });
 
 export const WHITELIST_FILEPATH = './whitelist/pubkeys.csv';
