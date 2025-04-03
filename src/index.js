@@ -5,17 +5,16 @@ import ReadyResource from 'ready-resource';
 import b4a from 'b4a';
 import Hyperbee from 'hyperbee';
 import readline from 'readline';
-import hccrypto from 'hypercore-crypto';
-import { sanitizeTransaction, verifyDag, sleep } from './functions.js';
+import { sanitizeTransaction, verifyDag, sleep } from './utils/functions.js';
 import w from 'protomux-wakeup';
 import PeerWallet from "trac-wallet"
 import Corestore from 'corestore';
 import tty from 'tty';
 import sodium from 'sodium-native';
-import MsbManager from './msbManager.js';
+import MsgUtils from './utils/msgUtils.js';
 import { createHash } from 'crypto';
 import { MAX_PUBKEYS_LENGTH, LISTENER_TIMEOUT, EntryType, OperationType, EventType, TRAC_NAMESPACE, ACK_INTERVAL, WHITELIST_SLEEP_INTERVAL, MAX_PEERS, MAX_PARALLEL, MAX_SERVER_CONNECTIONS
-} from './constants.js';
+} from './utils/constants.js';
 
 //TODO: CHANGE NONCE.
 
@@ -93,7 +92,7 @@ export class MainSettlementBus extends ReadyResource {
                         const adminEntry = await this.getSigned(EntryType.ADMIN);
                         // first case if admin entry doesn't exist yet and we have to autorize Admin public key only with bootstrap writing key
                         if (!adminEntry && node.from.key.toString('hex') === this.bootstrap && op.value.wk === this.bootstrap) {
-                            if (this.#verifyMessage(op.value.sig, op.key, MsbManager.createMessage(op.key, op.value.wk, op.value.nonce, op.type))) {
+                            if (this.#verifyMessage(op.value.sig, op.key, MsgUtils.createMessage(op.key, op.value.wk, op.value.nonce, op.type))) {
                                 await view.put(EntryType.ADMIN, {
                                     tracPublicKey: op.key,
                                     wk: this.bootstrap
@@ -105,7 +104,7 @@ export class MainSettlementBus extends ReadyResource {
                         }
                         else if (adminEntry && adminEntry.tracPublicKey === op.key) {
                             // second case if admin entry exists and we have to autorize Admin public key only with bootstrap writing key
-                            if (this.#verifyMessage(op.value.sig, adminEntry.tracPublicKey, MsbManager.createMessage(adminEntry.tracPublicKey, op.value.wk, op.value.nonce, op.type))) {
+                            if (this.#verifyMessage(op.value.sig, adminEntry.tracPublicKey, MsgUtils.createMessage(adminEntry.tracPublicKey, op.value.wk, op.value.nonce, op.type))) {
 
                                 const indexersEntry = await this.getSigned(EntryType.INDEXERS);
                                 if (indexersEntry && indexersEntry.includes(adminEntry.tracPublicKey) && indexersEntry.length > 1) {
@@ -132,7 +131,7 @@ export class MainSettlementBus extends ReadyResource {
 
                         const pubKeys = JSON.parse(op.value.pubKeysList); // As all pubkeys are 32 bytes, we can check the string.len instead of parsing it first
 
-                        if (this.#verifyMessage(op.value.sig, adminEntry.tracPublicKey, MsbManager.createMessage(pubKeys.join(''), op.value.nonce, op.type))) {
+                        if (this.#verifyMessage(op.value.sig, adminEntry.tracPublicKey, MsgUtils.createMessage(pubKeys.join(''), op.value.nonce, op.type))) {
 
                             if (pubKeys.length > MAX_PUBKEYS_LENGTH) {
                                 continue;
@@ -164,7 +163,7 @@ export class MainSettlementBus extends ReadyResource {
                             continue;
                         }
 
-                        if (this.#verifyMessage(op.value.sig, op.key, MsbManager.createMessage(op.key, op.value.wk, op.value.nonce, op.type))) {
+                        if (this.#verifyMessage(op.value.sig, op.key, MsgUtils.createMessage(op.key, op.value.wk, op.value.nonce, op.type))) {
                             const nodeEntry = await this.getSigned(op.key);
                             if (nodeEntry === null || !nodeEntry.isWriter) {
                                 await base.addWriter(b4a.from(op.value.wk, 'hex'), { isIndexer: false })
@@ -182,7 +181,7 @@ export class MainSettlementBus extends ReadyResource {
                         if (!this.#isAdmin(adminEntry, node)) {
                             continue;
                         }
-                        if (this.#verifyMessage(op.value.sig, op.key, MsbManager.createMessage(op.key, op.value.wk, op.value.nonce, op.type))) {
+                        if (this.#verifyMessage(op.value.sig, op.key, MsgUtils.createMessage(op.key, op.value.wk, op.value.nonce, op.type))) {
                             const nodeEntry = await this.getSigned(op.key)
                             if (nodeEntry !== null && nodeEntry.isWriter === true) {
                                 await base.removeWriter(b4a.from(nodeEntry.wk, 'hex'));
@@ -209,7 +208,7 @@ export class MainSettlementBus extends ReadyResource {
                             continue;
                         }
 
-                        if (this.#verifyMessage(op.value.sig, adminEntry.tracPublicKey, MsbManager.createMessage(op.key, op.value.nonce, op.type))) {
+                        if (this.#verifyMessage(op.value.sig, adminEntry.tracPublicKey, MsgUtils.createMessage(op.key, op.value.nonce, op.type))) {
                             const nodeEntry = await this.getSigned(op.key);
 
                             if (nodeEntry !== null && nodeEntry.isWriter && !nodeEntry.isIndexer) {
@@ -231,7 +230,7 @@ export class MainSettlementBus extends ReadyResource {
                         if (!this.#isAdmin(adminEntry, node) || !indexersEntry || !Array.from(indexersEntry).includes(op.key) || Array.from(indexersEntry).length <= 1) {
                             continue;
                         }
-                        if (this.#verifyMessage(op.value.sig, adminEntry.tracPublicKey, MsbManager.createMessage(op.key, op.value.nonce, op.type))) {
+                        if (this.#verifyMessage(op.value.sig, adminEntry.tracPublicKey, MsgUtils.createMessage(op.key, op.value.nonce, op.type))) {
                             const nodeEntry = await this.getSigned(op.key);
                             if (nodeEntry !== null && nodeEntry.isWriter && nodeEntry.isIndexer) {
                                 await base.removeWriter(b4a.from(nodeEntry.wk, 'hex'));
@@ -425,7 +424,7 @@ export class MainSettlementBus extends ReadyResource {
     async #adminEventListener() {
         this.on(EventType.ADMIN_EVENT, async (parsedRequest) => {
             const whitelistEntry = await this.getSigned(EntryType.WHITELIST)
-            if (Array.from(whitelistEntry).includes(parsedRequest.key) && MsbManager.verifyEventMessage(parsedRequest, this.wallet)) {
+            if (Array.from(whitelistEntry).includes(parsedRequest.key) && MsgUtils.verifyEventMessage(parsedRequest, this.wallet)) {
                 await this.base.append(parsedRequest);
             }
         });
@@ -434,7 +433,7 @@ export class MainSettlementBus extends ReadyResource {
     async #writerEventListener() {
         this.on(EventType.WRITER_EVENT, async (parsedRequest) => {
             const adminEntry = await this.getSigned(EntryType.ADMIN);
-            if (adminEntry && adminEntry.tracPublicKey === parsedRequest.value.tracPublicKey && MsbManager.verifyEventMessage(parsedRequest, this.wallet)) {
+            if (adminEntry && adminEntry.tracPublicKey === parsedRequest.value.tracPublicKey && MsgUtils.verifyEventMessage(parsedRequest, this.wallet)) {
                 await this.base.append(parsedRequest);
             }
         });
@@ -472,7 +471,7 @@ export class MainSettlementBus extends ReadyResource {
                         parsedPreTx.w === _this.writingKey &&
                         null === await _this.base.view.get(parsedPreTx.tx)
                     ) {
-                        const nonce = MsbManager.generateNonce();
+                        const nonce = MsgUtils.generateNonce();
                         const signature = this.wallet.sign(b4a.from(parsedPreTx.tx + nonce), b4a.from(this.wallet.secretKey, 'hex'));
                         const append_tx = {
                             op: 'post-tx',
@@ -574,7 +573,7 @@ export class MainSettlementBus extends ReadyResource {
     async #handleAdminOperations() {
         //case if I want to ADD admin entry with bootstrap key to become admin
         const adminEntry = await this.getSigned(EntryType.ADMIN);
-        const addAdminMessage = MsbManager.assembleAdminMessage(adminEntry, this.writingKey, this.wallet, this.bootstrap);
+        const addAdminMessage = MsgUtils.assembleAdminMessage(adminEntry, this.writingKey, this.wallet, this.bootstrap);
         if (!adminEntry && this.wallet && this.writingKey && this.writingKey === this.bootstrap) {
             await this.base.append(addAdminMessage);
         } else if (adminEntry && adminEntry.tracPublicKey === this.wallet.publicKey && this.writingKey && this.writingKey !== adminEntry.wk) {
@@ -615,7 +614,7 @@ export class MainSettlementBus extends ReadyResource {
         const adminEntry = await this.getSigned(EntryType.ADMIN);
         if (!this.#isAdmin(adminEntry)) return;
 
-        const assembledWhitelistMessages = await MsbManager.assembleWhitelistMessages(adminEntry, this.wallet);
+        const assembledWhitelistMessages = await MsgUtils.assembleWhitelistMessages(adminEntry, this.wallet);
 
         if (!assembledWhitelistMessages) {
             console.log('Whitelist message not sent.');
@@ -656,14 +655,14 @@ export class MainSettlementBus extends ReadyResource {
             const canAddWriter = !this.base.writable && (!nodeEntry || !nodeEntry.isWriter) && this.#amIWhitelisted(whitelistEntry, adminEntry);
 
             if (canAddWriter) {
-                const assembledAddWriterMessage = MsbManager.assembleAddWriterMessage(this.wallet, this.writingKey);
+                const assembledAddWriterMessage = MsgUtils.assembleAddWriterMessage(this.wallet, this.writingKey);
                 this.#sendMessageToAdmin(adminEntry, assembledAddWriterMessage);
             }
         } 
         else {
             const canRemoveWriter = nodeEntry && nodeEntry.isWriter
             if (canRemoveWriter) {
-                const assembledRemoveWriterMessage = MsbManager.assembleRemoveWriterMessage(this.wallet, this.writingKey);
+                const assembledRemoveWriterMessage = MsgUtils.assembleRemoveWriterMessage(this.wallet, this.writingKey);
                 this.#sendMessageToAdmin(adminEntry, assembledRemoveWriterMessage);
             }
         }
@@ -682,13 +681,13 @@ export class MainSettlementBus extends ReadyResource {
         if (toAdd) {
             const canAddIndexer = toAdd && !nodeEntry.isIndexer && whitelistEntry.length < 5;
             if (canAddIndexer) {
-                const assembledAddIndexerMessage = MsbManager.assembleAddIndexerMessage(this.wallet, tracPublicKey);
+                const assembledAddIndexerMessage = MsgUtils.assembleAddIndexerMessage(this.wallet, tracPublicKey);
                 await this.base.append(assembledAddIndexerMessage);
             }
         } else {
             const canRemoveIndexer = !toAdd && nodeEntry.isIndexer && whitelistEntry.length > 1;
             if (canRemoveIndexer) {
-                const assembledRemoveIndexer = MsbManager.assembleRemoveIndexerMessage(this.wallet, tracPublicKey);
+                const assembledRemoveIndexer = MsgUtils.assembleRemoveIndexerMessage(this.wallet, tracPublicKey);
                 await this.base.append(assembledRemoveIndexer);
             }
 
