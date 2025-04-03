@@ -607,28 +607,29 @@ export class MainSettlementBus extends ReadyResource {
         }, LISTENER_TIMEOUT);
 
     }
+
     async #handleWhitelistOperations() {
         const adminEntry = await this.getSigned(EntryType.ADMIN);
-        if (this.#isAdmin(adminEntry)) {
-            const assembledWhitelistMessages = await MsbManager.assembleWhitelistMessages(adminEntry, this.wallet);
+        if (!this.#isAdmin(adminEntry)) return;
 
-            if (!assembledWhitelistMessages) {
-                console.log('Whitelist message not sent.');
-                return;
-            }
+        const assembledWhitelistMessages = await MsbManager.assembleWhitelistMessages(adminEntry, this.wallet);
 
-            const totalChunks = assembledWhitelistMessages.length;
+        if (!assembledWhitelistMessages) {
+            console.log('Whitelist message not sent.');
+            return;
+        }
 
-            for (let i = 0; i < totalChunks; i++) {
-                const message = assembledWhitelistMessages[i];
-                await this.base.append({
-                    type: OperationType.APPEND_WHITELIST,
-                    key: EntryType.WHITELIST,
-                    value: message
-                });
-                console.log(`Whitelist message sent (chunk ${(i + 1)}/${totalChunks})`);
-                await sleep(WHITELIST_SLEEP_INTERVAL);
-            }
+        const totalChunks = assembledWhitelistMessages.length;
+
+        for (let i = 0; i < totalChunks; i++) {
+            const message = assembledWhitelistMessages[i];
+            await this.base.append({
+                type: OperationType.APPEND_WHITELIST,
+                key: EntryType.WHITELIST,
+                value: message
+            });
+            console.log(`Whitelist message sent (chunk ${(i + 1)}/${totalChunks})`);
+            await sleep(WHITELIST_SLEEP_INTERVAL);
         }
     }
 
