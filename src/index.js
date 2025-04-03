@@ -51,47 +51,7 @@ export class MainSettlementBus extends ReadyResource {
         this.msbListener();
         this._boot();
         this.ready().catch(noop);
-
-        this.base.on(EventType.IS_INDEXER, () => {
-            for (const eventName of this.eventNames()) {
-                if (eventName === EventType.WRITER_EVENT) {
-                    this.removeAllListeners(EventType.WRITER_EVENT);
-                    this.#shouldListenToWriterEvents = false;
-                    break;
-                }
-            }
-            console.log('Current node is an indexer');
-        });
-
-        this.base.on(EventType.IS_NON_INDEXER, () => {
-            console.log('Current node is not an indexer anymore');
-        });
-
-        this.base.on(EventType.WRITABLE, async () => {
-            const updatedNodeEntry = await this.getSigned(this.wallet.publicKey);
-            const canEnableWriterEvents = updatedNodeEntry &&
-                updatedNodeEntry.wk === this.writingKey &&
-                !this.#shouldListenToWriterEvents;
-
-            if (canEnableWriterEvents) {
-                this.#shouldListenToWriterEvents = true;
-                this.#writerEventListener();
-                console.log('Current node is writable');
-            }
-        });
-
-        this.base.on(EventType.UNWRITABLE, async () => {
-            const updatedNodeEntry = await this.getSigned(this.wallet.publicKey);
-            const canDisableWriterEvents = updatedNodeEntry &&
-                !updatedNodeEntry.isWriter &&
-                this.#shouldListenToWriterEvents;
-
-            if (canDisableWriterEvents) {
-                this.removeAllListeners(EventType.WRITER_EVENT);
-                this.#shouldListenToWriterEvents = false;
-                console.log('Current node is unwritable');
-            }
-        });
+        this.#setupInternalListeners();
     }
     
 
@@ -417,6 +377,49 @@ export class MainSettlementBus extends ReadyResource {
         } catch (error) {
             // for now ignore the error
         }
+    }
+
+    async #setupInternalListeners() {
+        this.base.on(EventType.IS_INDEXER, () => {
+            for (const eventName of this.eventNames()) {
+                if (eventName === EventType.WRITER_EVENT) {
+                    this.removeAllListeners(EventType.WRITER_EVENT);
+                    this.#shouldListenToWriterEvents = false;
+                    break;
+                }
+            }
+            console.log('Current node is an indexer');
+        });
+
+        this.base.on(EventType.IS_NON_INDEXER, () => {
+            console.log('Current node is not an indexer anymore');
+        });
+
+        this.base.on(EventType.WRITABLE, async () => {
+            const updatedNodeEntry = await this.getSigned(this.wallet.publicKey);
+            const canEnableWriterEvents = updatedNodeEntry &&
+                updatedNodeEntry.wk === this.writingKey &&
+                !this.#shouldListenToWriterEvents;
+
+            if (canEnableWriterEvents) {
+                this.#shouldListenToWriterEvents = true;
+                this.#writerEventListener();
+                console.log('Current node is writable');
+            }
+        });
+
+        this.base.on(EventType.UNWRITABLE, async () => {
+            const updatedNodeEntry = await this.getSigned(this.wallet.publicKey);
+            const canDisableWriterEvents = updatedNodeEntry &&
+                !updatedNodeEntry.isWriter &&
+                this.#shouldListenToWriterEvents;
+
+            if (canDisableWriterEvents) {
+                this.removeAllListeners(EventType.WRITER_EVENT);
+                this.#shouldListenToWriterEvents = false;
+                console.log('Current node is unwritable');
+            }
+        });
     }
 
     async #adminEventListener() {
