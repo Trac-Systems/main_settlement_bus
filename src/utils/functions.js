@@ -15,7 +15,6 @@ export function sanitizeTransaction(parsedTx) {
     );
 }
 
-
 export function isHexString(string) {
     return typeof string === 'string' && /^[0-9a-fA-F]+$/.test(string) && string.length % 2 === 0;
 }

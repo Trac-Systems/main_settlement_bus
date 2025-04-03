@@ -1,16 +1,17 @@
 import ReadyResource from 'ready-resource';
 import { createHash } from 'crypto';
-import fs from 'node:fs';
 import { isHexString } from './functions.js';
-import { MAX_PUBKEYS_LENGTH, WHITELIST_FILEPATH, OperationType, EntryType } from './constants.js';
+import { MAX_PUBKEYS_LENGTH, OperationType } from './constants.js';
+import fileUtils from './fileUtils.js';
 import b4a from 'b4a';
+
 // TODO: This class is trying to solve too many problems at once.
 //       It is responsible for creating messages, verifying them, reading public keys from a file, etc.
 //       It would be better to separate these concerns into different classes or modules.
 //       For example, we could have a separate class for file operations, another for message creation, etc.
 //       This would make the code more modular and easier to maintain.
 //       It would also make it easier to create tests and mocks in the future.
-export class MsbManager extends ReadyResource {
+export class MsgUtils extends ReadyResource {
     constructor(msbInstance) {
         super();
         this.msbInstance = msbInstance;
@@ -83,17 +84,24 @@ export class MsbManager extends ReadyResource {
         }
     }
 
-
     static async assembleWhitelistMessages(adminEntry, wallet) {
         try {
             if (!adminEntry || !wallet || wallet.publicKey !== adminEntry.tracPublicKey) {
                 return null;
             }
-            
-            const messages = [];
-            const pubKeys = await this.readPublicKeysFromFile();
-            const chunks = this.chunkPublicKeys(pubKeys, MAX_PUBKEYS_LENGTH);
 
+            const chunkPublicKeys = (pubKeys, chunkSize) =>{
+                const chunks = [];
+                for (let i = 0; i < pubKeys.length; i += chunkSize) {
+                    chunks.push(pubKeys.slice(i, i + chunkSize));
+                }
+                return chunks;
+            }
+
+            const messages = [];
+            const pubKeys = await fileUtils.readPublicKeysFromFile();
+            const chunks = chunkPublicKeys(pubKeys, MAX_PUBKEYS_LENGTH);
+            
             for (const chunk of chunks) {
                 const nonce = this.generateNonce();
                 const msg = this.createMessage(chunk.join(''), nonce, OperationType.APPEND_WHITELIST);
@@ -131,41 +139,11 @@ export class MsbManager extends ReadyResource {
 
     static verifyEventMessage(parsedRequest, wallet) {
         //TODO: Here we can add some sanitization
-        console.log('parsedRequest:', parsedRequest);
         const msg = this.createMessage(parsedRequest.key, parsedRequest.value.wk, parsedRequest.value.nonce, parsedRequest.type);
         const hash = createHash('sha256').update(msg).digest('hex');
         return wallet.verify(parsedRequest.value.sig, hash, parsedRequest.key);
     }
 
-    static async readPublicKeysFromFile() {
-        try {
-            const data = await fs.promises.readFile(WHITELIST_FILEPATH, 'utf8');
-            const pubKeys = data
-                .split('\n')
-                .map(line => line.trim())
-                .filter(line => line.length > 0);
-
-            if (pubKeys.length === 0) {
-                throw new Error('The file does not contain any public keys');
-            }
-
-            return pubKeys;
-        } catch (err) {
-            if (err.code === 'ENOENT') {
-                console.log('Whitelist file not found');
-            }
-            console.log(`Failed to read public keys from the whitelist file: ${err.message}`);
-        }
-    }
-
-    static chunkPublicKeys(pubKeys, chunkSize) {
-        const chunks = [];
-        for (let i = 0; i < pubKeys.length; i += chunkSize) {
-            chunks.push(pubKeys.slice(i, i + chunkSize));
-        }
-        return chunks;
-    }
-
 }
 
-export default MsbManager;
+export default MsgUtils;
