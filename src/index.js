@@ -666,30 +666,39 @@ export class MainSettlementBus extends ReadyResource {
         }
     }
 
-    async #handleAddIndexerOperation(tracPublicKey) {
-        const whitelistEntry = await this.getSigned(EntryType.WHITELIST);
+    async #updateIndexerRole(tracPublicKey, toAdd) {
         const adminEntry = await this.getSigned(EntryType.ADMIN);
-        if (this.#isAdmin(adminEntry) && whitelistEntry && Array.from(whitelistEntry).includes(tracPublicKey) && this.base.writable) {
-            const nodeEntry = await this.getSigned(tracPublicKey);
-            if (nodeEntry !== null && nodeEntry.isWriter === true && nodeEntry.isIndexer === false) {
+        if (!this.#isAdmin(adminEntry) && !this.base.writable) return;
+
+        const whitelistEntry = await this.getSigned(EntryType.WHITELIST);
+        if (!whitelistEntry && !Array.isArray(whitelistEntry) && !whitelistEntry.includes(tracPublicKey)) return;
+
+        const nodeEntry = await this.getSigned(tracPublicKey);
+        if (!nodeEntry || !nodeEntry.isWriter) return;
+
+        if (toAdd) {
+            const canAddIndexer = toAdd && !nodeEntry.isIndexer && whitelistEntry.length < 5;
+            if (canAddIndexer) {
                 const assembledAddIndexerMessage = MsbManager.assembleAddIndexerMessage(this.wallet, tracPublicKey);
                 await this.base.append(assembledAddIndexerMessage);
             }
-        }
-    }
-
-    async #handleRemoveIndexerOperation(tracPublicKey) {
-        const indexerEntry = await this.getSigned(EntryType.INDEXERS);
-        const adminEntry = await this.getSigned(EntryType.ADMIN);
-        if (this.#isAdmin(adminEntry) && indexerEntry && Array.from(indexerEntry).length > 1 && this.base.writable) {
-            const nodeEntry = await this.getSigned(tracPublicKey);
-            if (nodeEntry !== null && nodeEntry.isWriter === true && nodeEntry.isIndexer === true) {
+        } else {
+            const canRemoveIndexer = !toAdd && nodeEntry.isIndexer && whitelistEntry.length > 1;
+            if (canRemoveIndexer) {
                 const assembledRemoveIndexer = MsbManager.assembleRemoveIndexerMessage(this.wallet, tracPublicKey);
                 await this.base.append(assembledRemoveIndexer);
             }
+
         }
     }
-    
+    async #handleAddIndexerOperation(tracPublicKey) {
+        this.#updateIndexerRole(tracPublicKey, true);
+    }
+
+    async #handleRemoveIndexerOperation(tracPublicKey) {
+        this.#updateIndexerRole(tracPublicKey, false);
+    }
+
     async #handleAddWriterOperation() {
         await this.#requestWriterRole(true);
     }
