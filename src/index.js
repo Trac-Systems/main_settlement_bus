@@ -379,7 +379,7 @@ export class MainSettlementBus extends ReadyResource {
         }
     }
 
-    async #setupInternalListeners() {
+    #setupInternalListeners() {
         this.base.on(EventType.IS_INDEXER, () => {
             for (const eventName of this.eventNames()) {
                 if (eventName === EventType.WRITER_EVENT) {
