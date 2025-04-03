@@ -8,6 +8,7 @@ import readline from 'readline';
 import { sanitizeTransaction, verifyDag, sleep } from './utils/functions.js';
 import w from 'protomux-wakeup';
 import PeerWallet from "trac-wallet"
+import tty from 'tty';
 import Corestore from 'corestore';
 import tty from 'tty';
 import sodium from 'sodium-native';
@@ -343,7 +344,7 @@ export class MainSettlementBus extends ReadyResource {
             if(this.base.writable){
                 await this.base.append(null);
             }
-            await this.sleep(10_000);
+            await sleep(10_000);
         }
     }
 
