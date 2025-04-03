@@ -18,7 +18,6 @@ import { MAX_PUBKEYS_LENGTH, LISTENER_TIMEOUT, EntryType, OperationType, EventTy
 } from './constants.js';
 
 //TODO: CHANGE NONCE.
-//TODO FIX PROBLEM WITH REPLICATION.
 
 const wakeup = new w();
 
@@ -27,6 +26,7 @@ export class MainSettlementBus extends ReadyResource {
     #shouldListenToWriterEvents = false;
 
     constructor(options = {}) {
+        //TODO: change visibility of the attributes to private. Most of them should be internal.
         super();
         this.STORES_DIRECTORY = options.stores_directory;
         this.KEY_PAIR_PATH = `${this.STORES_DIRECTORY}${options.store_name}/db/keypair.json`
@@ -66,8 +66,34 @@ export class MainSettlementBus extends ReadyResource {
         this.base.on(EventType.IS_NON_INDEXER, () => {
             console.log('Current node is not an indexer anymore');
         });
-    }
 
+        this.base.on(EventType.WRITABLE, async () => {
+            const updatedNodeEntry = await this.getSigned(this.wallet.publicKey);
+            const canEnableWriterEvents = updatedNodeEntry &&
+                updatedNodeEntry.wk === this.writingKey &&
+                !this.#shouldListenToWriterEvents;
+
+            if (canEnableWriterEvents) {
+                this.#shouldListenToWriterEvents = true;
+                this.#writerEventListener();
+                console.log('Current node is writable');
+            }
+        });
+
+        this.base.on(EventType.UNWRITABLE, async () => {
+            const updatedNodeEntry = await this.getSigned(this.wallet.publicKey);
+            const canDisableWriterEvents = updatedNodeEntry &&
+                !updatedNodeEntry.isWriter &&
+                this.#shouldListenToWriterEvents;
+
+            if (canDisableWriterEvents) {
+                this.removeAllListeners(EventType.WRITER_EVENT);
+                this.#shouldListenToWriterEvents = false;
+                console.log('Current node is unwritable');
+            }
+        });
+    }
+    
 
     _boot() {
         const _this = this;
@@ -104,7 +130,6 @@ export class MainSettlementBus extends ReadyResource {
                         }
                     }
                     else if (op.type === OperationType.ADD_ADMIN) {
-                        //TODO FIX ADMIN RECOVERY ----INVALID_SIGNATURE
                         const adminEntry = await this.getSigned(EntryType.ADMIN);
                         // first case if admin entry doesn't exist yet and we have to autorize Admin public key only with bootstrap writing key
                         if (!adminEntry && node.from.key.toString('hex') === this.bootstrap && op.value.wk === this.bootstrap) {
@@ -194,8 +219,7 @@ export class MainSettlementBus extends ReadyResource {
                     }
                     else if (op.type === OperationType.REMOVE_WRITER) {
                         const adminEntry = await this.getSigned(EntryType.ADMIN);
-                        const whitelistEntry = await this.getSigned(EntryType.WHITELIST);
-                        if (!this.#isAdmin(adminEntry, node) || !whitelistEntry || !Array.from(whitelistEntry).includes(op.key)) {
+                        if (!this.#isAdmin(adminEntry, node)) {
                             continue;
                         }
                         if (this.#verifyMessage(op.value.sig, op.key, MsbManager.createMessage(op.key, op.value.wk, op.value.nonce, op.type))) {
@@ -311,31 +335,13 @@ export class MainSettlementBus extends ReadyResource {
         console.log('View Signed Length:', this.base.view.core.signedLength);
     }
 
-    async #setUpRoleAutomatically(adminEntry = null) {
-        if (adminEntry === null) {
-            adminEntry = await this.getSigned(EntryType.ADMIN);
-        }
-        const nodeEntry = await this.getSigned(this.wallet.publicKey);
-        if (!this.base.writable && nodeEntry !== null && nodeEntry.isWriter === true) {
-
-            const assembledRemoveWriterMessage = MsbManager.assembleRemoveWriterMessage(this.wallet, this.writingKey);
-            this.#sendMessageToAdmin(adminEntry, assembledRemoveWriterMessage);
-        }
-
-        const whitelistEntry = await this.getSigned(EntryType.WHITELIST);
-        if (!this.base.writable && this.#amIWhitelisted(whitelistEntry, adminEntry)) {
-            const assembledAddWriterMessage = MsbManager.assembleAddWriterMessage(this.wallet, this.writingKey);
-            this.#sendMessageToAdmin(adminEntry, assembledAddWriterMessage);
-
+    async #setUpRoleAutomatically() {
+        if (!this.base.writable) {
+            await this.#requestWriterRole(false)
             setTimeout(async () => {
-                const nodeEntry = await this.getSigned(this.wallet.publicKey);
-                if (nodeEntry && nodeEntry.wk === this.writingKey && this.base.writable && !this.#shouldListenToWriterEvents) {
-                    this.#shouldListenToWriterEvents = true;
-                    this.#writerEventListener();
-                }
-            }, LISTENER_TIMEOUT);
+                await this.#requestWriterRole(true)
+            }, 10_000);
         }
-
     }
 
     #sendMessageToAdmin(adminEntry, message) {
@@ -363,7 +369,7 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     #amIWhitelisted(whitelistEntry, adminEntry) {
-        return whitelistEntry !== null && whitelistEntry.includes(this.wallet.publicKey) && !this.#isAdmin(adminEntry);
+        return whitelistEntry && Array.isArray(whitelistEntry) && whitelistEntry.includes(this.wallet.publicKey) && !this.#isAdmin(adminEntry);
     }
 
     async close() {
@@ -561,6 +567,7 @@ export class MainSettlementBus extends ReadyResource {
             }
         });
     }
+
     async #handleAdminOperations() {
         //case if I want to ADD admin entry with bootstrap key to become admin
         const adminEntry = await this.getSigned(EntryType.ADMIN);
@@ -636,46 +643,26 @@ export class MainSettlementBus extends ReadyResource {
         return await this.createHash('sha256', await this.createHash('sha256', tx));
     }
 
-    async #handleAddWriterOperation() {
-        //DEBUG only for now
-        //TODO: Consider the cases when this command can be executed. THIS IS NOT TESTED. Not sure if this is implemented well
+    
+    async #requestWriterRole(toAdd) {
         const adminEntry = await this.getSigned(EntryType.ADMIN);
         const nodeEntry = await this.getSigned(this.wallet.publicKey);
         const whitelistEntry = await this.getSigned(EntryType.WHITELIST);
+        if (toAdd) {
+            const canAddWriter = !this.base.writable && (!nodeEntry || !nodeEntry.isWriter) && this.#amIWhitelisted(whitelistEntry, adminEntry);
 
-        if (!this.base.writable && ((nodeEntry === null) || nodeEntry.isWriter === false) && this.#amIWhitelisted(whitelistEntry, adminEntry)) {
-            const assembledAddWriterMessage = MsbManager.assembleAddWriterMessage(this.wallet, this.writingKey);
-            this.#sendMessageToAdmin(adminEntry, assembledAddWriterMessage);
-        }
-
-        setTimeout(async () => {
-            const updatedNodeEntry = await this.getSigned(this.wallet.publicKey);
-            if (updatedNodeEntry && updatedNodeEntry.wk === this.writingKey && this.base.writable && !this.#shouldListenToWriterEvents) {
-                this.#shouldListenToWriterEvents = true;
-                this.#writerEventListener();
+            if (canAddWriter) {
+                const assembledAddWriterMessage = MsbManager.assembleAddWriterMessage(this.wallet, this.writingKey);
+                this.#sendMessageToAdmin(adminEntry, assembledAddWriterMessage);
             }
-        }, LISTENER_TIMEOUT);
-    }
-
-    async #handleRemoveWriterOperation() {
-        //DEBUG
-        //TODO: Consider the cases when this command can be executed. THIS IS NOT TESTED. Not sure if this is implemented well
-        const nodeEntry = await this.getSigned(this.wallet.publicKey);
-        const whitelistEntry = await this.getSigned(EntryType.WHITELIST);
-        const adminEntry = await this.getSigned(EntryType.ADMIN);
-
-        if (this.base.writable && (nodeEntry && nodeEntry.isWriter) && this.#amIWhitelisted(whitelistEntry, adminEntry)) {
-            const assembledRemoveWriterMessage = MsbManager.assembleRemoveWriterMessage(this.wallet, this.writingKey);
-            this.#sendMessageToAdmin(adminEntry, assembledRemoveWriterMessage);
-        }
-
-        setTimeout(async () => {
-            const writerEntry = await this.getSigned(this.wallet.publicKey);
-            if (writerEntry && !writerEntry.isWriter && this.#shouldListenToWriterEvents) {
-                this.removeAllListeners(EventType.WRITER_EVENT);
-                this.#shouldListenToWriterEvents = false;
+        } 
+        else {
+            const canRemoveWriter = nodeEntry && nodeEntry.isWriter
+            if (canRemoveWriter) {
+                const assembledRemoveWriterMessage = MsbManager.assembleRemoveWriterMessage(this.wallet, this.writingKey);
+                this.#sendMessageToAdmin(adminEntry, assembledRemoveWriterMessage);
             }
-        }, LISTENER_TIMEOUT);
+        }
     }
 
     async #handleAddIndexerOperation(tracPublicKey) {
@@ -700,6 +687,14 @@ export class MainSettlementBus extends ReadyResource {
                 await this.base.append(assembledRemoveIndexer);
             }
         }
+    }
+    
+    async #handleAddWriterOperation() {
+        await this.#requestWriterRole(true);
+    }
+
+    async #handleRemoveWriterOperation() {
+        await this.#requestWriterRole(false);
     }
 
     async interactiveMode() {
