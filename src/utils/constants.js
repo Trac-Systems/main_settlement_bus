@@ -24,6 +24,7 @@ export const EventType = Object.freeze({
     READY_MSB: 'ready-msb',
     WRITABLE: 'writable',
     UNWRITABLE: 'unwritable',
+    WARNING: 'warning',
 });
 
 export const WHITELIST_FILEPATH = './whitelist/pubkeys.csv';
@@ -36,4 +37,22 @@ export const WHITELIST_SLEEP_INTERVAL = 10_000;
 export const MAX_PEERS = 1024;
 export const MAX_PARALLEL = 512;
 export const MAX_SERVER_CONNECTIONS = 256;
+
+const constants = {
+    EntryType,
+    OperationType,
+    EventType,
+    WHITELIST_FILEPATH,
+    MAX_PUBKEYS_LENGTH,
+    LISTENER_TIMEOUT,
+    TRAC_NAMESPACE,
+    MAX_INDEXERS,
+    ACK_INTERVAL,
+    WHITELIST_SLEEP_INTERVAL,
+    MAX_PEERS,
+    MAX_PARALLEL,
+    MAX_SERVER_CONNECTIONS,
+};
+
+export default constants;
 
