@@ -14,8 +14,8 @@ import tty from 'tty';
 import sodium from 'sodium-native';
 import MsgUtils from './utils/msgUtils.js';
 import { createHash } from 'crypto';
-import { MAX_PUBKEYS_LENGTH, LISTENER_TIMEOUT, EntryType, OperationType, EventType, TRAC_NAMESPACE, ACK_INTERVAL, WHITELIST_SLEEP_INTERVAL, MAX_PEERS, MAX_PARALLEL, MAX_SERVER_CONNECTIONS } from './utils/constants.js';
-
+import { MAX_PUBKEYS_LENGTH, LISTENER_TIMEOUT, EntryType, OperationType, EventType, TRAC_NAMESPACE, ACK_INTERVAL, WHITELIST_SLEEP_INTERVAL, UPDATER_INTERVAL} from './utils/constants.js';
+import Network from './network.js';
 //TODO: CHANGE NONCE.
 
 const wakeup = new w();
@@ -32,29 +32,28 @@ export class MainSettlementBus extends ReadyResource {
     #bootstrap;
     #channel;
     #tx;
-    #tx_pool;
     #store;
     #bee;
     #swarm;
     #tx_swarm;
     #base;
-    #key;
     #writingKey;
     #enable_txchannel;
     #enable_updater;
     #enable_wallet;
     #wallet;
     #replicate;
+    #network;
     #opts;
 
     constructor(options = {}) {
         super();
         this.#initInternalAttributes(options);
-        this.pool();
         this.msbListener();
-        this._boot();
+        this.#boot();
         this.ready().catch(noop);
         this.#setupInternalListeners();
+        this.#network = new Network(this.#base);
     }
 
     #initInternalAttributes(options) {
@@ -64,13 +63,11 @@ export class MainSettlementBus extends ReadyResource {
         this.#bootstrap = options.bootstrap || null;
         this.#channel = b4a.alloc(32).fill(options.channel) || null;
         this.#tx = b4a.alloc(32).fill(options.tx) || null;
-        this.#tx_pool = [];
         this.#store = new Corestore(this.STORES_DIRECTORY + options.store_name);
         this.#bee = null;
         this.#swarm = null;
         this.#tx_swarm = null;
         this.#base = null;
-        this.#key = null;
         this.#writingKey = null;
         this.#enable_txchannel = options.enable_txchannel !== false;
         this.#enable_updater = options.enable_updater !== false;
@@ -90,7 +87,11 @@ export class MainSettlementBus extends ReadyResource {
         return this.#KEY_PAIR_PATH;
     }
 
-    _boot() {
+    get base() {
+        return this.#base;
+    }
+
+    #boot() {
         const _this = this;
         this.#base = new Autobase(this.#store, this.#bootstrap, {
             valueEncoding: 'json',
@@ -325,17 +326,23 @@ export class MainSettlementBus extends ReadyResource {
         if (this.#enable_wallet) {
             await this.#wallet.initKeyPair(this.KEY_PAIR_PATH);
         }
+        
         console.log('View Length:', this.#base.view.core.length);
         console.log('View Signed Length:', this.#base.view.core.signedLength);
         console.log('MSB Key:', b4a.from(this.#base.view.core.key).toString('hex'));
 
         this.#writingKey = b4a.toString(this.#base.local.key, 'hex');
-        if (this.#replicate) await this._replicate();
+
+        if (this.#replicate){
+            this.#swarm = await Network.replicate(this.#swarm, this.#enable_wallet, this.#store, this.#wallet, this.#channel, this.#isStreaming, this.#handleIncomingEvent.bind(this), this.emit.bind(this));
+        } 
+
         if (this.#enable_txchannel) {
-            await this.txChannel();
+            this.#tx_swarm = await Network.txChannel(this.#tx_swarm, this.#tx ,this.#base, this.#wallet, this.#writingKey, this.#network);
         }
 
         const adminEntry = await this.getSigned(EntryType.ADMIN);
+
         if (this.#isAdmin(adminEntry)) {
             this.#shouldListenToAdminEvents = true;
             this.#adminEventListener(); // only for admin
@@ -408,7 +415,7 @@ export class MainSettlementBus extends ReadyResource {
             if (this.#base.writable) {
                 await this.#base.append(null);
             }
-            await sleep(10_000);
+            await sleep(UPDATER_INTERVAL);
         }
     }
 
@@ -504,130 +511,10 @@ export class MainSettlementBus extends ReadyResource {
         });
     }
 
-    async txChannel() {
-        this.tx_swarm = new Hyperswarm();
-        this.tx_swarm.on('connection', async (connection, peerInfo) => {
-            const _this = this;
-
-            connection.on('close', () => {});
-            connection.on('error', (error) => {});
-            connection.on('data', async (msg) => {
-
-                if (_this.#base.isIndexer) return;
-
-                // TODO: decide if a tx rejection should be responded with
-                if (_this.#tx_pool.length >= 1000) {
-                    console.log('pool full');
-                    return
-                }
-
-                if (b4a.byteLength(msg) > 3072) return;
-
-                try {
-
-                    const parsedPreTx = JSON.parse(msg);
-
-                    if (sanitizeTransaction(parsedPreTx) &&
-                        parsedPreTx.op === 'pre-tx' &&
-                        this.#wallet.verify(b4a.from(parsedPreTx.is, 'hex'), b4a.from(parsedPreTx.tx + parsedPreTx.in), b4a.from(parsedPreTx.ipk, 'hex')) &&
-                        parsedPreTx.w === _this.#writingKey &&
-                        null === await _this.#base.view.get(parsedPreTx.tx)
-                    ) {
-                        const nonce = MsgUtils.generateNonce();
-                        const signature = this.#wallet.sign(b4a.from(parsedPreTx.tx + nonce), b4a.from(this.#wallet.secretKey, 'hex'));
-                        const append_tx = {
-                            op: 'post-tx',
-                            tx: parsedPreTx.tx,
-                            is: parsedPreTx.is,
-                            w: parsedPreTx.w,
-                            i: parsedPreTx.i,
-                            ipk: parsedPreTx.ipk,
-                            ch: parsedPreTx.ch,
-                            in: parsedPreTx.in,
-                            bs: parsedPreTx.bs,
-                            mbs: parsedPreTx.mbs,
-                            ws: signature.toString('hex'),
-                            wp: this.#wallet.publicKey,
-                            wn: nonce
-                        };
-                        _this.#tx_pool.push({ tx: parsedPreTx.tx, append_tx: append_tx });
-                    }
-                } catch (e) {
-                    //console.log(e)
-                }
-            });
-        });
-
-        const channelBuffer = this.#tx;
-        this.tx_swarm.join(channelBuffer, { server: true, client: true });
-        await this.tx_swarm.flush();
-        console.log('Joined MSB TX channel');
-    }
-
-    async pool() {
-        while (true) {
-            if (this.#tx_pool.length > 0) {
-                const length = this.#tx_pool.length;
-                const batch = [];
-                for(let i = 0; i < length; i++){
-                    if(i >= 100) break;
-                    batch.push({ type: 'tx', key: this.#tx_pool[i].tx, value: this.#tx_pool[i].append_tx });
-                }
-                await this.base.append(batch);
-                this.#tx_pool.splice(0, batch.length);
-            }
-            await sleep(10);
-        }
-    }
-
-    async _replicate() {
-        if (!this.#swarm) {
-            let keyPair;
-            if (!this.#enable_wallet) {
-                keyPair = await this.#store.createKeyPair(TRAC_NAMESPACE);
-            }
-
-            keyPair = {
-                publicKey: b4a.from(this.#wallet.publicKey, 'hex'),
-                secretKey: b4a.from(this.#wallet.secretKey, 'hex')
-            };
-
-            this.#swarm = new Hyperswarm({ keyPair, maxPeers: MAX_PEERS, maxParallel: MAX_PARALLEL, maxServerConnections: MAX_SERVER_CONNECTIONS });
-
-            console.log(`Channel: ${this.#channel}`);
-            console.log(`Writing key: ${this.#writingKey}`)
-            console.log(`isIndexer: ${this.#base.isIndexer}`);
-            console.log(`isWriter: ${this.#base.writable}`);
-            this.#swarm.on('connection', async (connection) => {
-                wakeup.addStream(connection);
-                this.#store.replicate(connection);
-
-                connection.on('close', () => {
-
-                });
-
-                connection.on('error', (error) => { });
-
-                connection.on('data', async data => {
-                    await this.#handleIncomingEvent(data);
-                })
-
-                if (!this.#isStreaming) {
-                    this.emit(EventType.READY_MSB);
-                }
-            });
-
-            const channelBuffer = this.#channel
-            this.#swarm.join(channelBuffer, { server: true, client: true });
-            await this.#swarm.flush();
-            console.log('Joined channel for peer discovery');
-        }
-    }
-
     msbListener() {
         this.on(EventType.READY_MSB, async () => {
             if (!this.#isStreaming) {
-                this.#isStreaming = true;
+                this.#isStreaming = true;W
             }
         });
     }
@@ -755,6 +642,7 @@ export class MainSettlementBus extends ReadyResource {
 
         }
     }
+
     async #handleAddIndexerOperation(tracPublicKey) {
         this.#updateIndexerRole(tracPublicKey, true);
     }
@@ -793,15 +681,6 @@ export class MainSettlementBus extends ReadyResource {
                     rl.close();
                     await this.close();
                     typeof process !== "undefined" ? process.exit(0) : Pear.exit(0);
-                    break;
-                case '/con':
-                    console.log("MY PUB KEY IS: ", this.#wallet.publicKey);
-                    this.#swarm.connections.forEach((conn) => {
-                        console.log(`connection = ${JSON.stringify(conn)}`)
-                    });
-                    break;
-                case '/test':
-                    this.#base.append({ type: Math.random().toString(), key: 'test' });
                     break;
                 case '/add_admin':
                     await this.#handleAdminOperations();
