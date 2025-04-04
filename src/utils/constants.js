@@ -37,6 +37,7 @@ export const WHITELIST_SLEEP_INTERVAL = 10_000;
 export const MAX_PEERS = 1024;
 export const MAX_PARALLEL = 512;
 export const MAX_SERVER_CONNECTIONS = 256;
+export const UPDATER_INTERVAL = 10_000;
 
 const constants = {
     EntryType,
@@ -52,6 +53,7 @@ const constants = {
     MAX_PEERS,
     MAX_PARALLEL,
     MAX_SERVER_CONNECTIONS,
+    UPDATER_INTERVAL
 };
 
 export default constants;
