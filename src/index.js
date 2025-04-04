@@ -36,6 +36,7 @@ export class MainSettlementBus extends ReadyResource {
     #store;
     #bee;
     #swarm;
+    #tx_swarm;
     #base;
     #key;
     #writingKey;
@@ -67,6 +68,7 @@ export class MainSettlementBus extends ReadyResource {
         this.#store = new Corestore(this.STORES_DIRECTORY + options.store_name);
         this.#bee = null;
         this.#swarm = null;
+        this.#tx_swarm = null;
         this.#base = null;
         this.#key = null;
         this.#writingKey = null;
@@ -155,16 +157,16 @@ export class MainSettlementBus extends ReadyResource {
 
     async #handleApplyAddAdminOperation(op, view, base, node) {
         const adminEntry = await this.getSigned(EntryType.ADMIN);
-        if (!adminEntry && node.from.key.toString('hex') === this.bootstrap && op.value.wk === this.bootstrap) {
+        if (!adminEntry && node.from.key.toString('hex') === this.#bootstrap && op.value.wk === this.#bootstrap) {
             // If admin isn't set yet...
             if (this.#verifyMessage(op.value.sig, op.key, MsgUtils.createMessage(op.key, op.value.wk, op.value.nonce, op.type))) {
                 await view.put(EntryType.ADMIN, {
                     tracPublicKey: op.key,
-                    wk: this.bootstrap
+                    wk: this.#bootstrap
                 })
                 const initIndexers = [op.key];
                 await view.put(EntryType.INDEXERS, initIndexers);
-                console.log(`Admin added: ${op.key}:${this.bootstrap}`);
+                console.log(`Admin added: ${op.key}:${this.#bootstrap}`);
             }
         }
         else if (adminEntry && adminEntry.tracPublicKey === op.key) {
@@ -354,6 +356,16 @@ export class MainSettlementBus extends ReadyResource {
         console.log('View Signed Length:', this.#base.view.core.signedLength);
     }
 
+    async close() {
+        if (this.#swarm) {
+            await this.#swarm.destroy();
+        }
+        if (this.#tx_swarm) {
+            await this.#tx_swarm.destroy();
+        }
+        await this.#base.close();
+    }
+
     async #setUpRoleAutomatically() {
         if (!this.#base.writable) {
             await this.#requestWriterRole(false)
@@ -389,13 +401,6 @@ export class MainSettlementBus extends ReadyResource {
 
     #amIWhitelisted(whitelistEntry, adminEntry) {
         return whitelistEntry && Array.isArray(whitelistEntry) && whitelistEntry.includes(this.#wallet.publicKey) && !this.#isAdmin(adminEntry);
-    }
-
-    async close() {
-        if (this.#swarm) {
-            await this.#swarm.destroy();
-        }
-        await this.#base.close();
     }
 
     async updater() {
@@ -504,11 +509,8 @@ export class MainSettlementBus extends ReadyResource {
         this.tx_swarm.on('connection', async (connection, peerInfo) => {
             const _this = this;
 
-            connection.on('close', () => {
-            });
-
-            connection.on('error', (error) => { });
-
+            connection.on('close', () => {});
+            connection.on('error', (error) => {});
             connection.on('data', async (msg) => {
 
                 if (_this.#base.isIndexer) return;
