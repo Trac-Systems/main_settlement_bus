@@ -1,12 +1,10 @@
 /** @typedef {import('pear-interface')} */ /* global Pear */
 import Autobase from 'autobase';
-import Hyperswarm from 'hyperswarm';
 import ReadyResource from 'ready-resource';
 import b4a from 'b4a';
 import Hyperbee from 'hyperbee';
 import readline from 'readline';
 import { sanitizeTransaction, verifyDag, sleep } from './utils/functions.js';
-import w from 'protomux-wakeup';
 import PeerWallet from "trac-wallet"
 import tty from 'tty';
 import Corestore from 'corestore';
@@ -14,13 +12,12 @@ import tty from 'tty';
 import sodium from 'sodium-native';
 import MsgUtils from './utils/msgUtils.js';
 import { createHash } from 'crypto';
-import { MAX_PUBKEYS_LENGTH, LISTENER_TIMEOUT, EntryType, OperationType, EventType, TRAC_NAMESPACE, ACK_INTERVAL, WHITELIST_SLEEP_INTERVAL, UPDATER_INTERVAL} from './utils/constants.js';
+import { MAX_PUBKEYS_LENGTH, LISTENER_TIMEOUT, EntryType, OperationType, EventType, ACK_INTERVAL, WHITELIST_SLEEP_INTERVAL, UPDATER_INTERVAL} from './utils/constants.js';
 import Network from './network.js';
 //TODO: CHANGE NONCE.
 
-const wakeup = new w();
 
-export class MainSettlementBus extends ReadyResource {
+class MainSettlementBus extends ReadyResource {
     // Internal flags
     #shouldListenToAdminEvents = false;
     #shouldListenToWriterEvents = false;
