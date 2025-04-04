@@ -145,13 +145,13 @@ export class MainSettlementBus extends ReadyResource {
         if (postTx.op === OperationType.POST_TX &&
             null === await batch.get(op.key) &&
             sanitizeTransaction(postTx) &&
-            this.wallet.verify(b4a.from(postTx.is, 'hex'), b4a.from(postTx.tx + postTx.in), b4a.from(postTx.ipk, 'hex')) &&// sender verification
-            this.wallet.verify(b4a.from(postTx.ws, 'hex'), b4a.from(postTx.tx + postTx.wn),  b4a.from(postTx.wp, 'hex')) &&// writer verification
+            this.#wallet.verify(b4a.from(postTx.is, 'hex'), b4a.from(postTx.tx + postTx.in), b4a.from(postTx.ipk, 'hex')) && // sender verification
+            this.#wallet.verify(b4a.from(postTx.ws, 'hex'), b4a.from(postTx.tx + postTx.wn), b4a.from(postTx.wp, 'hex')) && // writer verification
             postTx.tx === await this.generateTx(postTx.bs, this.bootstrap, postTx.w, postTx.i, postTx.ipk, postTx.ch, postTx.in) &&
             b4a.byteLength(JSON.stringify(postTx)) <= 4096
         ) {
             await batch.put(op.key, op.value);
-            console.log(`TX: ${op.key} appended. Signed length: `,  this.base.view.core.signedLength);
+            console.log(`TX: ${op.key} appended. Signed length: `, this.#base.view.core.signedLength);
         }
     }
 
