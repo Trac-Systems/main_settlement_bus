@@ -10,7 +10,8 @@ import { sanitizeTransaction, addWriter } from './functions.js';
 import w from 'protomux-wakeup';
 import PeerWallet from "trac-wallet"
 import Corestore from 'corestore';
-import tty from 'tty'
+import tty from 'tty';
+import sodium from 'sodium-native';
 
 const wakeup = new w();
 
@@ -60,18 +61,22 @@ export class MainSettlementBus extends ReadyResource {
                 return _this.bee;
             },
             apply: async (nodes, view, base) => {
+
+                const batch = view.batch();
+
                 for (const node of nodes) {
                     const op = node.value;
                     const postTx = op.value;
                     if (op.type === 'tx') {
-                        if (null === await view.get(op.key) &&
+                        if (postTx.op === 'post-tx' &&
+                            null === await batch.get(op.key) &&
                             sanitizeTransaction(postTx) &&
-                            postTx.op === 'post-tx' &&
-                            hccrypto.verify(b4a.from(postTx.tx + postTx.in, 'utf-8'), b4a.from(postTx.is, 'hex'), b4a.from(postTx.ipk, 'hex')) &&// sender verification
-                            hccrypto.verify(b4a.from(postTx.tx + postTx.wn, 'utf-8'), b4a.from(postTx.ws, 'hex'), b4a.from(postTx.wp, 'hex')) &&// writer verification
+                            hccrypto.verify(b4a.from(postTx.tx + postTx.in, 'utf-8'), b4a.from(postTx.is, 'hex'), b4a.from(postTx.ipk, 'hex')) &&
+                            hccrypto.verify(b4a.from(postTx.tx + postTx.wn, 'utf-8'), b4a.from(postTx.ws, 'hex'), b4a.from(postTx.wp, 'hex')) &&
+                            postTx.tx === await _this.generateTx(postTx.bs, this.bootstrap, postTx.w, postTx.i, postTx.ipk, postTx.ch, postTx.in) &&
                             b4a.byteLength(JSON.stringify(postTx)) <= 4096
                         ) {
-                            await view.put(op.key, op.value);
+                            await batch.put(op.key, op.value);
                             console.log(`TX: ${op.key} appended. Signed length: `,  _this.base.view.core.signedLength);
                         }
                     } else if (op.type === 'addWriter') {
@@ -84,6 +89,9 @@ export class MainSettlementBus extends ReadyResource {
                         console.log(`Writer added: ${op.key} non-indexer`);
                     }
                 }
+
+                await batch.flush();
+                await batch.close();
             }
         })
         this.base.on('warning', (e) => console.log(e))
@@ -171,6 +179,8 @@ export class MainSettlementBus extends ReadyResource {
                             ipk: parsedPreTx.ipk,
                             ch: parsedPreTx.ch,
                             in: parsedPreTx.in,
+                            bs: parsedPreTx.bs,
+                            mbs: parsedPreTx.mbs,
                             ws: signature.toString('hex'),
                             wp: this.wallet.publicKey,
                             wn : nonce
@@ -193,11 +203,13 @@ export class MainSettlementBus extends ReadyResource {
         while(true){
             if(this.tx_pool.length > 0){
                 const length = this.tx_pool.length;
+                const batch = [];
                 for(let i = 0; i < length; i++){
-                    await this.base.append({ type: 'tx', key: this.tx_pool[i].tx, value: this.tx_pool[i].append_tx });
-                    await this.sleep(5);
+                    if(i >= 100) break;
+                    batch.push({ type: 'tx', key: this.tx_pool[i].tx, value: this.tx_pool[i].append_tx });
                 }
-                this.tx_pool.splice(0, length);
+                await this.base.append(batch);
+                this.tx_pool.splice(0, batch.length);
             }
             await this.sleep(10);
         }
@@ -274,6 +286,17 @@ export class MainSettlementBus extends ReadyResource {
         } else {
             return crypto.createHash(type).update(message).digest('hex')
         }
+    }
+
+    async generateTx(bootstrap, msb_bootstrap, validator_writer_key, local_writer_key, local_public_key, content_hash, nonce){
+        let tx = bootstrap + '-' +
+            msb_bootstrap + '-' +
+            validator_writer_key + '-' +
+            local_writer_key + '-' +
+            local_public_key + '-' +
+            content_hash + '-' +
+            nonce;
+        return await this.createHash('sha256', await this.createHash('sha256', tx));
     }
 
     async verifyDag() {
