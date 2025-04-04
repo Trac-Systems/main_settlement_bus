@@ -4,6 +4,9 @@ class Check {
     #_validator;
     #_addRemoveAdminOrWriter;
     #_appendWhitelist;
+    #_addRemoveIndexer;
+    #_preTx;
+    #_postTx;
 
     constructor() {
         this.#_validator = new Validator({
@@ -55,6 +58,9 @@ class Check {
 
         this.#_addRemoveAdminOrWriter = this.#compileAdminWriterRoleSchema();
         this.#_appendWhitelist = this.#compileAppendWhitelist();
+        this.#_addRemoveIndexer = this.#compileIndexerSchema();
+        this.#_preTx = this.#compilePreTx();
+        this.#_postTx = this.#compilePostTx();
     }
 
     #compileAdminWriterRoleSchema() {
@@ -64,8 +70,8 @@ class Check {
             value: {
                 $$type: "object",
                 wk: { type: 'is_hex_string', length: 64, required: true },
-                nonce: { type: 'string', min: 1, required: true },
-                sig: { type: 'is_hex_string', required: true }, // TODO: check what is eddsa signature length. Probably 64 bytes but check and test it
+                nonce: { type: 'string', min: 1, required: true }, // TODO: this nonce is temporary as string
+                sig: { type: 'is_hex_string', required: true }, // TODO: check what is eddsa signature length. Probably 64 which mean length: 128 but check and test it
 
             }
         }
@@ -77,30 +83,31 @@ class Check {
     }
 
     #compileIndexerSchema() {
-        // addWriter and removeWriter are the same. 
-        //TODO: FINISH
         const schema = {
             type: { type: 'string', enum: ['addIndexer', 'removeIndexer'], required: true },
             key: { type: "is_hex_string", length: 64, required: true },
             value: {
                 $$type: "object",
-                nonce: { type: 'string', min: 1, required: true },
-                sig: { type: 'is_hex_string', required: true }, // TODO: check what is eddsa signature length. Probably 64 bytes but check and test it
+                nonce: { type: 'string', min: 1, required: true }, // TODO: this nonce is temporary as string
+                sig: { type: 'is_hex_string', required: true }, // TODO: check what is eddsa signature length. Probably 64 which mean length: 128 but check and test it
 
             }
         }
         return this.#_validator.compile(schema);
     }
-    //TODO ADD INTERFACE FOR ADD REMOVE INDEXER
-    
+
+    addRemoveIndexer(op) {
+        return this.#_addRemoveIndexer(op) === true;
+    }
+
     #compileAppendWhitelist() {
         const schema = {
-            type: { type: 'string', enum: ['AppendWhitelist'],empty: false, required: true },
+            type: { type: 'string', enum: ['AppendWhitelist'], empty: false, required: true },
             value: {
                 $$type: 'object',
-                nonce: { type: 'string', min: 1, required: true },
+                nonce: { type: 'string', min: 1, required: true }, // TODO: this nonce is temporary as string
                 pubKeysList: { type: 'array', min: 1, items: { type: "is_hex_string", length: 64 }, required: true },
-                sig: { type: 'string', min: 1, required: true },
+                sig: { type: 'is_hex_string', required: true }, // TODO: check what is eddsa signature length. Probably 64 which mean length: 128 but check and test it
             }
         };
         return this.#_validator.compile(schema);
@@ -109,7 +116,50 @@ class Check {
     appendWhitelist(op) {
         return this.#_appendWhitelist(op) === true;
     }
-    //TX, PRE_TX, POST_TX
+    
+    #compilePreTx() {
+        const schema = {
+            op: { type: 'string', enum: ['pre-tx'], required: true },
+            tx: { type: 'is_hex_string', required: true }, // TODO: if we will use only 256 bit hash then change to length: 64
+            is: { type: 'is_hex_string', required: true },  // TODO: check what is eddsa signature length. Probably 64 which mean length: 128 but check and test it
+            w: { type: 'is_hex_string', length: 64, required: true },
+            i: { type: 'is_hex_string', length: 64, required: true },
+            ipk: { type: 'is_hex_string', length: 64, required: true },
+            ch: { type: 'is_hex_string', required: true }, // TODO: if we will use only 256 bit hash then change to length: 64
+            in: { type: 'string', min: 1, required: true } // TODO: this nonce is temporary as string
+        };
+        return this.#_validator.compile(schema);
+    }
+
+    preTx(op) {
+        return this.#_preTx(op) === true;
+    }
+
+    #compilePostTx() {
+        const schema = {
+            type: { type: 'string', enum: ['tx'], required: true },
+            key: { type: 'is_hex_string', required: true }, // TODO: if we will use only 256 bit hash then change to length: 64
+            value: {
+                $$type: "object",
+                op: { type: 'string', enum: ['post-tx'], required: true },
+                tx: { type: 'is_hex_string', required: true }, // TODO: if we will use only 256 bit hash then change to length: 64
+                is: { type: 'is_hex_string', required: true },  // TODO: check what is eddsa signature length. Probably 64 which mean length: 128 but check and test it
+                w: { type: 'is_hex_string', length: 64, required: true },
+                i: { type: 'is_hex_string', length: 64, required: true },
+                ipk: { type: 'is_hex_string', length: 64, required: true },
+                ch: { type: 'is_hex_string', required: true }, // TODO: if we will use only 256 bit hash then change to length: 64
+                in: { type: 'string', min: 1, required: true }, // TODO: this nonce is temporary as string
+                ws: { type: 'is_hex_string', required: true }, // TODO: check what is eddsa signature length. Probably 64 which mean length: 128 but check and test it
+                wp: { type: 'is_hex_string', length: 64, required: true },
+                wn: { type: 'string', min: 1, required: true }
+            }
+        };
+        return this.#_validator.compile(schema);
+    }
+
+    postTx(op) {
+        return this.#_postTx(op) === true;
+    }
 }
 
 export default Check;
