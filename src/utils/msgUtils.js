@@ -11,13 +11,7 @@ import b4a from 'b4a';
 //       For example, we could have a separate class for file operations, another for message creation, etc.
 //       This would make the code more modular and easier to maintain.
 //       It would also make it easier to create tests and mocks in the future.
-export class MsgUtils extends ReadyResource {
-    constructor(msbInstance) {
-        super();
-        this.msbInstance = msbInstance;
-
-    }
-
+export class MsgUtils {
     static generateNonce() {
         return Math.random() + '-' + Date.now(); // TODO: Change it to crypto.randomBytes. Math.random might not be secure enough. It's even better to use nonce generator from sodium. GENERATE NONCE WITH CRYPTO LIBRARY WHICH ALLOW US TO GENERATE IT WITH UNIFORM DISTRIBUTION.
     }
