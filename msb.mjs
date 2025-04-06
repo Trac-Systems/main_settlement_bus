@@ -12,5 +12,5 @@ const msb = new MainSettlementBus(opts);
 
 msb.ready().then(() => {
     console.log('MSB is ready.');
-    msb.interactiveMode();
+    try { msb.interactiveMode(); } catch(e) { console.log('Interactive mode not running. Not necessarily an error.') }
 });
