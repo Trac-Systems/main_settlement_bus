@@ -8,7 +8,6 @@ import {verifyDag, sleep } from './utils/functions.js';
 import PeerWallet from "trac-wallet"
 import tty from 'tty';
 import Corestore from 'corestore';
-import tty from 'tty';
 import sodium from 'sodium-native';
 import MsgUtils from './utils/msgUtils.js';
 import { createHash } from 'crypto';
@@ -90,6 +89,10 @@ class MainSettlementBus extends ReadyResource {
         return this.#base;
     }
 
+    get bootstrap() {
+        return this.#bootstrap;
+    }
+
     #boot() {
         const _this = this;
         this.#base = new Autobase(this.#store, this.#bootstrap, {
@@ -111,18 +114,19 @@ class MainSettlementBus extends ReadyResource {
     }
 
     async #apply(nodes, view, base) {
+        const batch = view.batch(); 
         for (const node of nodes) {
             const op = node.value;
             const handler = this.#getApplyOperationHandler(op.type);
 
             if (handler) {
-                await handler(op, view, base, node);
+                await handler(op, view, base, node, batch);
             } else {
                 console.warn(`Unknown operation type: ${op.type}`);
             }
         }
-        await view.batch.flush();
-        await view.batch.close();
+        await batch.flush();
+        await batch.close();
     }
 
     #getApplyOperationHandler(type) {
@@ -138,8 +142,7 @@ class MainSettlementBus extends ReadyResource {
         return handlers[type] || null;
     }
 
-    async #handleApplyTxOperation(op, view, base, node) {
-        const batch = view.batch(); 
+    async #handleApplyTxOperation(op, view, base, node, batch) {
         const postTx = op.value;
 
         if (postTx.op === OperationType.POST_TX &&
@@ -156,7 +159,7 @@ class MainSettlementBus extends ReadyResource {
         }
     }
 
-    async #handleApplyAddAdminOperation(op, view, base, node) {
+    async #handleApplyAddAdminOperation(op, view, base, node, batch ) {
         if(!this.check.sanitizeAdminAndWritersOperations(op)) return;
 
         const adminEntry = await this.getSigned(EntryType.ADMIN);
@@ -199,7 +202,7 @@ class MainSettlementBus extends ReadyResource {
         }
     }
 
-    async #handleApplyAppendWhitelistOperation(op, view, base, node) {
+    async #handleApplyAppendWhitelistOperation(op, view, base, node, batch) {
 
         const adminEntry = await this.getSigned(EntryType.ADMIN);
         if (!this.check.appendWhitelist(op) || !this.#isAdmin(adminEntry, node)) return;
@@ -229,7 +232,7 @@ class MainSettlementBus extends ReadyResource {
         }
     }
 
-    async #handleApplyAddWriterOperation(op, view, base, node) {
+    async #handleApplyAddWriterOperation(op, view, base, node, batch) {
         const adminEntry = await this.getSigned(EntryType.ADMIN);
         if (!this.check.sanitizeAdminAndWritersOperations(op) || !this.#isAdmin(adminEntry, node)) return;
 
@@ -253,7 +256,7 @@ class MainSettlementBus extends ReadyResource {
         }
     }
 
-    async #handleApplyRemoveWriterOperation(op, view, base, node) {
+    async #handleApplyRemoveWriterOperation(op, view, base, node, batch) {
         const adminEntry = await this.getSigned(EntryType.ADMIN);
         if (!this.check.sanitizeAdminAndWritersOperations(op) || !this.#isAdmin(adminEntry, node)) return;
 
@@ -273,7 +276,7 @@ class MainSettlementBus extends ReadyResource {
         }
     }
 
-    async #handleApplyAddIndexerOperation(op, view, base, node) {
+    async #handleApplyAddIndexerOperation(op, view, base, node, batch) {
         if (!this.check.sanitizeIndexerOperations(op)) {
             return;
         }
@@ -309,7 +312,7 @@ class MainSettlementBus extends ReadyResource {
         }
     }
 
-    async #handleApplyRemoveIndexerOperation(op, view, base, node) {
+    async #handleApplyRemoveIndexerOperation(op, view, base, node, batch) {
         if (!this.check.sanitizeIndexerOperations(op)) return;
         const adminEntry = await this.getSigned(EntryType.ADMIN);
         const indexersEntry = await this.getSigned(EntryType.INDEXERS);
@@ -367,7 +370,7 @@ class MainSettlementBus extends ReadyResource {
         await this.#setUpRoleAutomatically(adminEntry);
 
         if (this.#enable_updater && this.#base.writable) {
-            this.updater();
+            this.updater();// TODO: NODE AFTER BECOMING A writer should start the updater
         }
 
         console.log(`isIndexer: ${this.#base.isIndexer}`);
@@ -534,6 +537,33 @@ class MainSettlementBus extends ReadyResource {
                 this.#isStreaming = true;
             }
         });
+    }
+
+    async createHash(type, message){
+        if(type === 'sha256'){
+            const out = b4a.alloc(sodium.crypto_hash_sha256_BYTES);
+            sodium.crypto_hash_sha256(out, b4a.from(message));
+            return b4a.toString(out, 'hex');
+        }
+        let createHash = null;
+        if(global.Pear !== undefined){
+            let _type = '';
+            switch(type.toLowerCase()){
+                case 'sha1': _type = 'SHA-1'; break;
+                case 'sha384': _type = 'SHA-384'; break;
+                case 'sha512': _type = 'SHA-512'; break;
+                default: throw new Error('Unsupported algorithm.');
+            }
+            const encoder = new TextEncoder();
+            const data = encoder.encode(message);
+            const hash = await crypto.subtle.digest(_type, data);
+            const hashArray = Array.from(new Uint8Array(hash));
+            return hashArray
+                .map((b) => b.toString(16).padStart(2, "0"))
+                .join("");
+        } else {
+            return crypto.createHash(type).update(message).digest('hex')
+        }
     }
 
     async #handleAdminOperations() {
