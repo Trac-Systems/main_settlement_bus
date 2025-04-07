@@ -65,9 +65,11 @@ class Check {
 
     #compileSanitizationAdminAndWriterOperationsSchema() {
         const schema = {
+            $$strict: true,
             type: { type: 'string', enum: ['addAdmin', 'addWriter', 'removeWriter'], required: true },
             key: { type: "is_hex_string", length: 64, required: true },
             value: {
+                $$strict: true,
                 $$type: "object",
                 wk: { type: 'is_hex_string', length: 64, required: true },
                 nonce: { type: 'string', min: 1, required: true }, // TODO: this nonce is temporary as string
@@ -84,9 +86,11 @@ class Check {
 
     #compileIndexerSchema() {
         const schema = {
+            $$strict: true,
             type: { type: 'string', enum: ['addIndexer', 'removeIndexer'], required: true },
             key: { type: "is_hex_string", length: 64, required: true },
             value: {
+                $$strict: true,
                 $$type: "object",
                 nonce: { type: 'string', min: 1, required: true }, // TODO: this nonce is temporary as string
                 sig: { type: 'is_hex_string', required: true }, // TODO: check what is eddsa signature length. Probably 64 which mean length: 128 but check and test it
@@ -102,8 +106,10 @@ class Check {
 
     #compileAppendWhitelistSchema() {
         const schema = {
+            $$strict: true,
             type: { type: 'string', enum: ['AppendWhitelist'], empty: false, required: true },
             value: {
+                $$strict: true,
                 $$type: 'object',
                 nonce: { type: 'string', min: 1, required: true }, // TODO: this nonce is temporary as string
                 pubKeysList: { type: 'array', min: 1, items: { type: "is_hex_string", length: 64 }, required: true },
@@ -119,6 +125,7 @@ class Check {
     
     #compilePreTxSchema() {
         const schema = {
+            $$strict: true,
             op: { type: 'string', enum: ['pre-tx'], required: true },
             tx: { type: 'is_hex_string', required: true }, // TODO: if we will use only 256 bit hash then change to length: 64
             is: { type: 'is_hex_string', required: true },  // TODO: check what is eddsa signature length. Probably 64 which mean length: 128 but check and test it
@@ -139,9 +146,11 @@ class Check {
 
     #compilePostTxSchema() {
         const schema = {
+            $$strict: true,
             type: { type: 'string', enum: ['tx'], required: true },
             key: { type: 'is_hex_string', required: true }, // TODO: if we will use only 256 bit hash then change to length: 64
             value: {
+                $$strict: true,
                 $$type: "object",
                 op: { type: 'string', enum: ['post-tx'], required: true },
                 tx: { type: 'is_hex_string', required: true }, // TODO: if we will use only 256 bit hash then change to length: 64
