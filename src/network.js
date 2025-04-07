@@ -2,15 +2,16 @@ import w from 'protomux-wakeup';
 import b4a from 'b4a';
 import Hyperswarm from 'hyperswarm';
 import { EventType, TRAC_NAMESPACE, MAX_PEERS, MAX_PARALLEL, MAX_SERVER_CONNECTIONS } from './utils/constants.js';
-import { sanitizeTransaction, sleep } from './utils/functions.js';
+import {sleep } from './utils/functions.js';
 import MsgUtils from './utils/msgUtils.js';
-
+import Check from './utils/check.js';
 const wakeup = new w();
 
 class Network {
     constructor(base) {
         this.tx_pool = [];
         this.pool(base);
+        this.check = new Check();
     }
 
 
@@ -74,8 +75,8 @@ class Network {
                     try {
 
                         const parsedPreTx = JSON.parse(msg);
-                        if (sanitizeTransaction(parsedPreTx) &&
-                            parsedPreTx.op === 'pre-tx' &&
+                        
+                        if (networkInstance.check.preTx(parsedPreTx) &&
                             wallet.verify(b4a.from(parsedPreTx.is, 'hex'), b4a.from(parsedPreTx.tx + parsedPreTx.in), b4a.from(parsedPreTx.ipk, 'hex')) &&
                             parsedPreTx.w === writingKey &&
                             null === await base.view.get(parsedPreTx.tx)
