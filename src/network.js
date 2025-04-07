@@ -83,7 +83,6 @@ class Network {
                         ) {
                             const nonce = MsgUtils.generateNonce();
                             const signature = wallet.sign(b4a.from(parsedPreTx.tx + nonce), b4a.from(wallet.secretKey, 'hex'));
-                            //console.log(parsedPreTx.tx)
                             const append_tx = {
                                 op: 'post-tx',
                                 tx: parsedPreTx.tx,
