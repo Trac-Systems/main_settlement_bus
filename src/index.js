@@ -4,7 +4,7 @@ import ReadyResource from 'ready-resource';
 import b4a from 'b4a';
 import Hyperbee from 'hyperbee';
 import readline from 'readline';
-import { sanitizeTransaction, verifyDag, sleep } from './utils/functions.js';
+import {verifyDag, sleep } from './utils/functions.js';
 import PeerWallet from "trac-wallet"
 import tty from 'tty';
 import Corestore from 'corestore';
@@ -14,6 +14,7 @@ import MsgUtils from './utils/msgUtils.js';
 import { createHash } from 'crypto';
 import { MAX_PUBKEYS_LENGTH, LISTENER_TIMEOUT, EntryType, OperationType, EventType, ACK_INTERVAL, WHITELIST_SLEEP_INTERVAL, UPDATER_INTERVAL, MAX_INDEXERS } from './utils/constants.js';
 import Network from './network.js';
+import Check from './utils/check.js';
 //TODO: CHANGE NONCE.
 
 
@@ -45,6 +46,7 @@ class MainSettlementBus extends ReadyResource {
 
     constructor(options = {}) {
         super();
+        this.check = new Check();
         this.#initInternalAttributes(options);
         this.msbListener();
         this.#boot();
@@ -142,7 +144,8 @@ class MainSettlementBus extends ReadyResource {
 
         if (postTx.op === OperationType.POST_TX &&
             null === await batch.get(op.key) &&
-            sanitizeTransaction(postTx) &&
+            this.check.postTx(op) &&
+            op.key === postTx.tx &&
             this.#wallet.verify(b4a.from(postTx.is, 'hex'), b4a.from(postTx.tx + postTx.in), b4a.from(postTx.ipk, 'hex')) && // sender verification
             this.#wallet.verify(b4a.from(postTx.ws, 'hex'), b4a.from(postTx.tx + postTx.wn), b4a.from(postTx.wp, 'hex')) && // writer verification
             postTx.tx === await this.generateTx(postTx.bs, this.bootstrap, postTx.w, postTx.i, postTx.ipk, postTx.ch, postTx.in) &&
@@ -154,6 +157,8 @@ class MainSettlementBus extends ReadyResource {
     }
 
     async #handleApplyAddAdminOperation(op, view, base, node) {
+        if(!this.check.sanitizeAdminAndWritersOperations(op)) return;
+
         const adminEntry = await this.getSigned(EntryType.ADMIN);
         if (!adminEntry) {
             this.#addAdminIfNotSet(op, view, node);
@@ -195,12 +200,11 @@ class MainSettlementBus extends ReadyResource {
     }
 
     async #handleApplyAppendWhitelistOperation(op, view, base, node) {
-        // TODO: - change list to hashmap (Map() in js)
-        // - make a decision how will we append pubKeys into hashmap.
-        const adminEntry = await this.getSigned(EntryType.ADMIN);
-        if (!this.#isAdmin(adminEntry, node)) return;
 
-        const pubKeys = JSON.parse(op.value.pubKeysList); // As all pubkeys are 32 bytes, we can check the string.len instead of parsing it first
+        const adminEntry = await this.getSigned(EntryType.ADMIN);
+        if (!this.check.appendWhitelist(op) || !this.#isAdmin(adminEntry, node)) return;
+   
+        const pubKeys = op.value.pubKeysList 
         if (pubKeys.length > MAX_PUBKEYS_LENGTH) return;
         if (!this.#verifyMessage(op.value.sig, adminEntry.tracPublicKey, MsgUtils.createMessage(pubKeys.join(''), op.value.nonce, op.type))) return;
 
@@ -227,13 +231,10 @@ class MainSettlementBus extends ReadyResource {
 
     async #handleApplyAddWriterOperation(op, view, base, node) {
         const adminEntry = await this.getSigned(EntryType.ADMIN);
-        if (!this.#isAdmin(adminEntry, node)) return;
+        if (!this.check.sanitizeAdminAndWritersOperations(op) || !this.#isAdmin(adminEntry, node)) return;
 
         const whitelistEntry = await this.getSigned(EntryType.WHITELIST);
-        if (!this.#isWhitelisted(whitelistEntry, op.key)) { // TODO: Whe should store the whitelist in a hashmap
-            return;
-        }
-
+        if (!this.#isWhitelisted(whitelistEntry, op.key)) return;
         if (this.#verifyMessage(op.value.sig, op.key, MsgUtils.createMessage(op.key, op.value.wk, op.value.nonce, op.type))) {
             await this.#addWriter(op, view, base);
         }
@@ -254,7 +255,7 @@ class MainSettlementBus extends ReadyResource {
 
     async #handleApplyRemoveWriterOperation(op, view, base, node) {
         const adminEntry = await this.getSigned(EntryType.ADMIN);
-        if (!this.#isAdmin(adminEntry, node)) return;
+        if (!this.check.sanitizeAdminAndWritersOperations(op) || !this.#isAdmin(adminEntry, node)) return;
 
         if (this.#verifyMessage(op.value.sig, op.key, MsgUtils.createMessage(op.key, op.value.wk, op.value.nonce, op.type))) {
             await this.#removeWriter(op, view, base);
@@ -273,6 +274,9 @@ class MainSettlementBus extends ReadyResource {
     }
 
     async #handleApplyAddIndexerOperation(op, view, base, node) {
+        if (!this.check.sanitizeIndexerOperations(op)) {
+            return;
+        }
         const adminEntry = await this.getSigned(EntryType.ADMIN);
         if (!this.#isAdmin(adminEntry, node)) return;
 
@@ -306,11 +310,10 @@ class MainSettlementBus extends ReadyResource {
     }
 
     async #handleApplyRemoveIndexerOperation(op, view, base, node) {
+        if (!this.check.sanitizeIndexerOperations(op)) return;
         const adminEntry = await this.getSigned(EntryType.ADMIN);
         const indexersEntry = await this.getSigned(EntryType.INDEXERS);
-        if (!this.#isAdmin(adminEntry, node) || !indexersEntry || !Array.from(indexersEntry).includes(op.key) || Array.from(indexersEntry).length <= 1) {
-            return;
-        }
+        if (!this.#isAdmin(adminEntry, node) || !indexersEntry || !Array.from(indexersEntry).includes(op.key) || Array.from(indexersEntry).length <= 1) return;
         if (this.#verifyMessage(op.value.sig, adminEntry.tracPublicKey, MsgUtils.createMessage(op.key, op.value.nonce, op.type))) {
             const nodeEntry = await this.getSigned(op.key);
             if (nodeEntry !== null && nodeEntry.isWriter && nodeEntry.isIndexer) {
@@ -336,7 +339,6 @@ class MainSettlementBus extends ReadyResource {
         if (this.#enable_wallet) {
             await this.#wallet.initKeyPair(this.KEY_PAIR_PATH);
         }
-
         console.log('View Length:', this.#base.view.core.length);
         console.log('View Signed Length:', this.#base.view.core.signedLength);
         console.log('MSB Key:', b4a.from(this.#base.view.core.key).toString('hex'));
@@ -591,7 +593,6 @@ class MainSettlementBus extends ReadyResource {
             const message = assembledWhitelistMessages[i];
             await this.#base.append({
                 type: OperationType.APPEND_WHITELIST,
-                key: EntryType.WHITELIST,
                 value: message
             });
             console.log(`Whitelist message sent (chunk ${(i + 1)}/${totalChunks})`);

@@ -2,9 +2,9 @@ import Validator from 'fastest-validator';
 import { isHexString } from './functions.js';
 class Check {
     #_validator;
-    #_addRemoveAdminOrWriter;
+    #_sanitizeAdminAndWritersOperations;
     #_appendWhitelist;
-    #_addRemoveIndexer;
+    #_sanitizeIndexerOperations;
     #_preTx;
     #_postTx;
 
@@ -56,14 +56,14 @@ class Check {
             };
         });
 
-        this.#_addRemoveAdminOrWriter = this.#compileAdminWriterRoleSchema();
-        this.#_appendWhitelist = this.#compileAppendWhitelist();
-        this.#_addRemoveIndexer = this.#compileIndexerSchema();
-        this.#_preTx = this.#compilePreTx();
-        this.#_postTx = this.#compilePostTx();
+        this.#_sanitizeAdminAndWritersOperations = this.#compileSanitizationAdminAndWriterOperationsSchema();
+        this.#_appendWhitelist = this.#compileAppendWhitelistSchema();
+        this.#_sanitizeIndexerOperations = this.#compileIndexerSchema();
+        this.#_preTx = this.#compilePreTxSchema();
+        this.#_postTx = this.#compilePostTxSchema();
     }
 
-    #compileAdminWriterRoleSchema() {
+    #compileSanitizationAdminAndWriterOperationsSchema() {
         const schema = {
             type: { type: 'string', enum: ['addAdmin', 'addWriter', 'removeWriter'], required: true },
             key: { type: "is_hex_string", length: 64, required: true },
@@ -78,8 +78,8 @@ class Check {
         return this.#_validator.compile(schema);
     }
 
-    addRemoveAdminOrWriter(op) {
-        return this.#_addRemoveAdminOrWriter(op) === true;
+    sanitizeAdminAndWritersOperations(op) {
+        return this.#_sanitizeAdminAndWritersOperations(op) === true;
     }
 
     #compileIndexerSchema() {
@@ -96,11 +96,11 @@ class Check {
         return this.#_validator.compile(schema);
     }
 
-    addRemoveIndexer(op) {
-        return this.#_addRemoveIndexer(op) === true;
+    sanitizeIndexerOperations(op) {
+        return this.#_sanitizeIndexerOperations(op) === true;
     }
 
-    #compileAppendWhitelist() {
+    #compileAppendWhitelistSchema() {
         const schema = {
             type: { type: 'string', enum: ['AppendWhitelist'], empty: false, required: true },
             value: {
@@ -117,7 +117,7 @@ class Check {
         return this.#_appendWhitelist(op) === true;
     }
     
-    #compilePreTx() {
+    #compilePreTxSchema() {
         const schema = {
             op: { type: 'string', enum: ['pre-tx'], required: true },
             tx: { type: 'is_hex_string', required: true }, // TODO: if we will use only 256 bit hash then change to length: 64
@@ -135,7 +135,7 @@ class Check {
         return this.#_preTx(op) === true;
     }
 
-    #compilePostTx() {
+    #compilePostTxSchema() {
         const schema = {
             type: { type: 'string', enum: ['tx'], required: true },
             key: { type: 'is_hex_string', required: true }, // TODO: if we will use only 256 bit hash then change to length: 64

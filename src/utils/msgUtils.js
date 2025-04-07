@@ -103,7 +103,7 @@ class MsgUtils {
 
                 messages.push({
                     nonce: nonce,
-                    pubKeysList: JSON.stringify(chunk),
+                    pubKeysList: chunk,
                     sig: wallet.sign(hash)
                 });
 
