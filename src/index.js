@@ -164,18 +164,17 @@ class MainSettlementBus extends ReadyResource {
 
         const adminEntry = await this.getSigned(EntryType.ADMIN);
         if (!adminEntry) {
-            this.#addAdminIfNotSet(op, view, node);
+            await this.#addAdminIfNotSet(op, view, node);
         }
         else if (adminEntry.tracPublicKey === op.key) {
-            this.#addAdminIfSet(adminEntry, op, view, base);
+            await this.#addAdminIfSet(adminEntry, op, view, base);
         }
     }
 
     async #addAdminIfSet(adminEntry, op, view, base) {
         if (this.#verifyMessage(op.value.sig, adminEntry.tracPublicKey, MsgUtils.createMessage(adminEntry.tracPublicKey, op.value.wk, op.value.nonce, op.type))) {
             const indexersEntry = await this.getSigned(EntryType.INDEXERS);
-            if (indexersEntry && indexersEntry.includes(adminEntry.tracPublicKey)) { // TODO: Store the indexers in a hashmap instead of a vector
-                //TODO: It would be better to use the functions #removeWriter and #addWriter instead of directly calling base methods
+            if (indexersEntry && indexersEntry.includes(adminEntry.tracPublicKey)) {
                 await base.removeWriter(b4a.from(adminEntry.wk, 'hex'));
                 await base.addWriter(b4a.from(op.value.wk, 'hex'), { isIndexer: true })
                 await view.put(EntryType.ADMIN, {
@@ -525,7 +524,7 @@ class MainSettlementBus extends ReadyResource {
     async #writerEventListener() {
         this.on(EventType.WRITER_EVENT, async (parsedRequest) => {
             const adminEntry = await this.getSigned(EntryType.ADMIN);
-            if (adminEntry && adminEntry.tracPublicKey === parsedRequest.value.tracPublicKey && MsgUtils.verifyEventMessage(parsedRequest, this.#wallet)) {
+            if (adminEntry && adminEntry.tracPublicKey === parsedRequest.key && MsgUtils.verifyEventMessage(parsedRequest, this.#wallet)) {
                 await this.#base.append(parsedRequest);
             }
         });
@@ -755,6 +754,7 @@ class MainSettlementBus extends ReadyResource {
                     console.log('Admin:', admin);
                     const whitelistEntry = await this.getSigned(EntryType.WHITELIST);
                     console.log('Whitelist:', whitelistEntry);
+                    console.log('WL length:', whitelistEntry.length);
                     const indexers = await this.getSigned(EntryType.INDEXERS);
                     console.log('Indexers:', indexers);
                     break;
