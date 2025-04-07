@@ -1,7 +1,7 @@
 import w from 'protomux-wakeup';
 import b4a from 'b4a';
 import Hyperswarm from 'hyperswarm';
-import { EventType, TRAC_NAMESPACE, MAX_PEERS, MAX_PARALLEL, MAX_SERVER_CONNECTIONS } from './utils/constants.js';
+import { EventType, TRAC_NAMESPACE, MAX_PEERS, MAX_PARALLEL, MAX_SERVER_CONNECTIONS, OperationType } from './utils/constants.js';
 import {sleep } from './utils/functions.js';
 import MsgUtils from './utils/msgUtils.js';
 import Check from './utils/check.js';
@@ -84,7 +84,7 @@ class Network {
                             const nonce = MsgUtils.generateNonce();
                             const signature = wallet.sign(b4a.from(parsedPreTx.tx + nonce), b4a.from(wallet.secretKey, 'hex'));
                             const append_tx = {
-                                op: 'post-tx',
+                                op: OperationType.POST_TX,
                                 tx: parsedPreTx.tx,
                                 is: parsedPreTx.is,
                                 w: parsedPreTx.w,
@@ -122,7 +122,7 @@ class Network {
                 const batch = [];
                 for (let i = 0; i < length; i++) {
                     if(i >= 100) break;
-                    batch.push({ type: 'tx', key: this.tx_pool[i].tx, value: this.tx_pool[i].append_tx });
+                    batch.push({ type: OperationType.TX, key: this.tx_pool[i].tx, value: this.tx_pool[i].append_tx });
                 }
                 await base.append(batch);
                 this.tx_pool.splice(0, batch.length);
