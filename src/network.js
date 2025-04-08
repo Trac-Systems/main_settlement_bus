@@ -62,7 +62,7 @@ class Network {
                 connection.on('error', (error) => { });
                 connection.on('data', async (msg) => {
 
-                    if (base.isIndexer) return;
+                    if (base.isIndexer || !base.writable) return;
 
                     // TODO: decide if a tx rejection should be responded with
                     if (networkInstance.tx_pool.length >= 1000) {
