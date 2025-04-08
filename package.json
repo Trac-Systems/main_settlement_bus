@@ -1,7 +1,7 @@
 {
   "name": "trac-msb",
   "main": "msb.mjs",
-  "version": "0.0.61",
+  "version": "0.0.63",
   "pear": {
     "name": "trac-msb",
     "type": "terminal"
@@ -12,7 +12,7 @@
     "test": "brittle test/*.test.js"
   },
   "dependencies": {
-    "trac-wallet": "^0.0.35",
+    "trac-wallet": "^0.0.36",
     "autobase": "7.2.2",
     "b4a": "1.6.7",
     "hyperbee": "2.24.1",
@@ -32,6 +32,9 @@
     "protomux-wakeup": "^2.2.1",
 
 
+    "sodium-native": "^5.0.1",
+    "ready-resource": "^1.0.0",
+    "bare-fetch": "^2.2.1",
     "bare-assert": "^1.0.2",
     "bare-buffer": "^3.1.2",
     "bare-console": "^6.0.1",
@@ -51,23 +54,23 @@
     "bare-subprocess": "^5.0.3",
     "bare-timers": "^3.0.1",
     "bare-tls": "^2.0.2",
-    "bare-tty": "^3.2.0",
+    "bare-tty": "^5.0.2",
     "bare-url": "^2.1.4",
     "bare-utils": "^1.2.0",
     "bare-worker": "^3.0.0",
     "bare-zlib": "^1.2.5",
-    "worker_threads": "npm:bare-node-worker-threads",
-    "crypto": "npm:bare-node-crypto",
+    "fetch": "npm:bare-node-fetch",
     "assert": "npm:bare-node-assert",
     "buffer": "npm:bare-node-buffer",
     "child_process": "npm:bare-node-child-process",
     "console": "npm:bare-node-console",
+    "crypto": "npm:bare-node-crypto",
     "events": "npm:bare-node-events",
     "fs": "npm:bare-node-fs",
     "http": "npm:bare-node-http",
     "https": "npm:bare-node-https",
-    "module": "npm:bare-node-module",
     "inspector": "npm:bare-node-inspector",
+    "module": "npm:bare-node-module",
     "os": "npm:bare-node-os",
     "path": "npm:bare-node-path",
     "process": "npm:bare-node-process",
@@ -79,6 +82,7 @@
     "tty": "npm:bare-node-tty",
     "url": "npm:bare-node-url",
     "util": "npm:bare-node-util",
+    "worker_threads": "npm:bare-node-worker-threads",
     "zlib": "npm:bare-node-zlib"
   },
   "publishConfig": {
