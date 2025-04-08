@@ -269,7 +269,18 @@ class MainSettlementBus extends ReadyResource {
         if (nodeEntry !== null) {
             await base.removeWriter(b4a.from(nodeEntry.wk, 'hex'));
             nodeEntry.isWriter = false;
-            nodeEntry.isIndexer = false;
+            if (nodeEntry.isIndexer) {
+                nodeEntry.isIndexer = false;
+                const indexersEntry = await this.getSigned(EntryType.INDEXERS);
+                if( indexersEntry && indexersEntry.includes(op.key)) {
+                    const idx = indexersEntry.indexOf(op.key);
+                    if (idx !== -1) {
+                        indexersEntry.splice(idx, 1);
+                        await view.put(EntryType.INDEXERS, indexersEntry);
+                    }
+                }
+            }
+
             await view.put(op.key, nodeEntry);
             console.log(`Writer removed: ${op.key}:${op.value.wk}`);
         }
@@ -669,7 +680,6 @@ class MainSettlementBus extends ReadyResource {
         if (!this.#isWhitelisted(whitelistEntry, tracPublicKey)) return;
 
         const nodeEntry = await this.getSigned(tracPublicKey);
-        console.log("nodeEntry= ", nodeEntry)
         if (!nodeEntry || !nodeEntry.isWriter) return;
 
         const indexersEntry = await this.getSigned(EntryType.INDEXERS);
