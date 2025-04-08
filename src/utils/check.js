@@ -72,8 +72,8 @@ class Check {
                 $$strict: true,
                 $$type: "object",
                 wk: { type: 'is_hex_string', length: 64, required: true },
-                nonce: { type: 'string', min: 1, required: true }, // TODO: this nonce is temporary as string
-                sig: { type: 'is_hex_string', required: true }, // TODO: check what is eddsa signature length. Probably 64 which mean length: 128 but check and test it
+                nonce: { type: 'string', min: 1, max: 256, required: true },
+                sig: { type: 'is_hex_string', length: 128, required: true },
 
             }
         }
@@ -92,8 +92,8 @@ class Check {
             value: {
                 $$strict: true,
                 $$type: "object",
-                nonce: { type: 'string', min: 1, required: true }, // TODO: this nonce is temporary as string
-                sig: { type: 'is_hex_string', required: true }, // TODO: check what is eddsa signature length. Probably 64 which mean length: 128 but check and test it
+                nonce: { type: 'string', min: 1, max: 256, required: true },
+                sig: { type: 'is_hex_string', length: 128, required: true },
 
             }
         }
@@ -111,9 +111,9 @@ class Check {
             value: {
                 $$strict: true,
                 $$type: 'object',
-                nonce: { type: 'string', min: 1, required: true }, // TODO: this nonce is temporary as string
+                nonce: { type: 'string', min: 1, max: 256, required: true },
                 pubKeysList: { type: 'array', min: 1, items: { type: "is_hex_string", length: 64 }, required: true },
-                sig: { type: 'is_hex_string', required: true }, // TODO: check what is eddsa signature length. Probably 64 which mean length: 128 but check and test it
+                sig: { type: 'is_hex_string', length: 128, required: true },
             }
         };
         return this.#_validator.compile(schema);
@@ -122,18 +122,18 @@ class Check {
     appendWhitelist(op) {
         return this.#_appendWhitelist(op) === true;
     }
-    
+
     #compilePreTxSchema() {
         const schema = {
             $$strict: true,
             op: { type: 'string', enum: ['pre-tx'], required: true },
             tx: { type: 'is_hex_string', required: true }, // TODO: if we will use only 256 bit hash then change to length: 64
-            is: { type: 'is_hex_string', required: true },  // TODO: check what is eddsa signature length. Probably 64 which mean length: 128 but check and test it
+            is: { type: 'is_hex_string', length: 128, required: true },
             w: { type: 'is_hex_string', length: 64, required: true },
             i: { type: 'is_hex_string', length: 64, required: true },
             ipk: { type: 'is_hex_string', length: 64, required: true },
             ch: { type: 'is_hex_string', required: true }, // TODO: if we will use only 256 bit hash then change to length: 64
-            in: { type: 'string', min: 1, required: true }, // TODO: this nonce is temporary as string
+            in: { type: 'string', min: 1, max: 256, required: true },
             bs: { type: 'is_hex_string', length: 64, required: true },
             mbs: { type: 'is_hex_string', length: 64, required: true },
         };
@@ -154,15 +154,15 @@ class Check {
                 $$type: "object",
                 op: { type: 'string', enum: ['post-tx'], required: true },
                 tx: { type: 'is_hex_string', required: true }, // TODO: if we will use only 256 bit hash then change to length: 64
-                is: { type: 'is_hex_string', required: true },  // TODO: check what is eddsa signature length. Probably 64 which mean length: 128 but check and test it
+                is: { type: 'is_hex_string', length: 128, required: true },
                 w: { type: 'is_hex_string', length: 64, required: true },
                 i: { type: 'is_hex_string', length: 64, required: true },
                 ipk: { type: 'is_hex_string', length: 64, required: true },
                 ch: { type: 'is_hex_string', required: true }, // TODO: if we will use only 256 bit hash then change to length: 64
-                in: { type: 'string', min: 1, required: true }, // TODO: this nonce is temporary as string
+                in: { type: 'string', min: 1, max: 256, required: true },
                 bs: { type: 'is_hex_string', length: 64, required: true },
                 mbs: { type: 'is_hex_string', length: 64, required: true },
-                ws: { type: 'is_hex_string', required: true }, // TODO: check what is eddsa signature length. Probably 64 which mean length: 128 but check and test it
+                ws: { type: 'is_hex_string', length: 128, required: true },
                 wp: { type: 'is_hex_string', length: 64, required: true },
                 wn: { type: 'string', min: 1, required: true }
             }
