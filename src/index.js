@@ -11,7 +11,7 @@ import Corestore from 'corestore';
 import sodium from 'sodium-native';
 import MsgUtils from './utils/msgUtils.js';
 import { createHash } from 'crypto';
-import { MAX_PUBKEYS_LENGTH, LISTENER_TIMEOUT, EntryType, OperationType, EventType, ACK_INTERVAL, WHITELIST_SLEEP_INTERVAL, UPDATER_INTERVAL, MAX_INDEXERS } from './utils/constants.js';
+import { MAX_PUBKEYS_LENGTH, LISTENER_TIMEOUT, EntryType, OperationType, EventType, ACK_INTERVAL, WHITELIST_SLEEP_INTERVAL, UPDATER_INTERVAL, MAX_INDEXERS, MIN_INDEXERS } from './utils/constants.js';
 import Network from './network.js';
 import Check from './utils/check.js';
 //TODO: CHANGE NONCE.
@@ -691,7 +691,7 @@ class MainSettlementBus extends ReadyResource {
                 await this.#base.append(assembledAddIndexerMessage);
             }
         } else {
-            const canRemoveIndexer = !toAdd && nodeEntry.isIndexer && indexersEntry.length > 1;
+            const canRemoveIndexer = !toAdd && nodeEntry.isIndexer && indexersEntry.length > MIN_INDEXERS;
             if (canRemoveIndexer) {
                 const assembledRemoveIndexer = MsgUtils.assembleRemoveIndexerMessage(this.#wallet, tracPublicKey);
                 await this.#base.append(assembledRemoveIndexer);
