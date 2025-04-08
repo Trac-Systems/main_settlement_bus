@@ -764,7 +764,9 @@ class MainSettlementBus extends ReadyResource {
                     console.log('Admin:', admin);
                     const whitelistEntry = await this.getSigned(EntryType.WHITELIST);
                     console.log('Whitelist:', whitelistEntry);
-                    console.log('WL length:', whitelistEntry.length);
+                    if (whitelistEntry) {
+                        console.log('WL length:', whitelistEntry.length);
+                    }
                     const indexers = await this.getSigned(EntryType.INDEXERS);
                     console.log('Indexers:', indexers);
                     break;
