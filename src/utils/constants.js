@@ -31,7 +31,8 @@ export const WHITELIST_FILEPATH = './Whitelist/pubkeys.csv';
 export const MAX_PUBKEYS_LENGTH = 20;
 export const LISTENER_TIMEOUT = 5000;
 export const TRAC_NAMESPACE = 'TracNetwork';
-export const MAX_INDEXERS = 5;
+export const MAX_INDEXERS = 3;
+export const MIN_INDEXERS = 1;
 export const ACK_INTERVAL = 1000;
 export const WHITELIST_SLEEP_INTERVAL = 10_000;
 export const MAX_PEERS = 1024;
@@ -48,6 +49,7 @@ const constants = {
     LISTENER_TIMEOUT,
     TRAC_NAMESPACE,
     MAX_INDEXERS,
+    MIN_INDEXERS,
     ACK_INTERVAL,
     WHITELIST_SLEEP_INTERVAL,
     MAX_PEERS,
