@@ -27,7 +27,7 @@ export const EventType = Object.freeze({
     WARNING: 'warning',
 });
 
-export const WHITELIST_FILEPATH = './whitelist/pubkeys.csv';
+export const WHITELIST_FILEPATH = './Whitelist/pubkeys.csv';
 export const MAX_PUBKEYS_LENGTH = 20;
 export const LISTENER_TIMEOUT = 5000;
 export const TRAC_NAMESPACE = 'TracNetwork';
