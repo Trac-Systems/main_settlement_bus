@@ -55,7 +55,7 @@ class Network {
 
     static async txChannel(tx_swarm, tx_channel, base, wallet, writingKey, networkInstance) {
         if (!tx_swarm) {
-            tx_swarm = new Hyperswarm({ maxPeers: 1024, maxParallel: 512, maxServerConnections: 256 });
+            tx_swarm = new Hyperswarm({ maxPeers: MAX_PEERS, maxParallel: MAX_PARALLEL, maxServerConnections: MAX_SERVER_CONNECTIONS });
             tx_swarm.on('connection', async (connection, peerInfo) => {
 
                 connection.on('close', () => { });
