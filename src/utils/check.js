@@ -3,10 +3,9 @@ import { isHexString } from './functions.js';
 class Check {
     #_validator;
     #_sanitizeAdminAndWritersOperations;
-    #_appendWhitelist;
-    #_sanitizeIndexerOperations;
-    #_preTx;
-    #_postTx;
+    #_sanitizeIndexerOrWhitelistOperations;
+    #_sanitizePreTx;
+    #_sanitizePostTx;
 
     constructor() {
         this.#_validator = new Validator({
@@ -57,10 +56,9 @@ class Check {
         });
 
         this.#_sanitizeAdminAndWritersOperations = this.#compileSanitizationAdminAndWriterOperationsSchema();
-        this.#_appendWhitelist = this.#compileAppendWhitelistSchema();
-        this.#_sanitizeIndexerOperations = this.#compileIndexerSchema();
-        this.#_preTx = this.#compilePreTxSchema();
-        this.#_postTx = this.#compilePostTxSchema();
+        this.#_sanitizeIndexerOrWhitelistOperations = this.#compileIndexerOrWhitelistOperationSchema();
+        this.#_sanitizePreTx = this.#compilePreTxSchema();
+        this.#_sanitizePostTx = this.#compilePostTxSchema();
     }
 
     #compileSanitizationAdminAndWriterOperationsSchema() {
@@ -84,10 +82,10 @@ class Check {
         return this.#_sanitizeAdminAndWritersOperations(op) === true;
     }
 
-    #compileIndexerSchema() {
+    #compileIndexerOrWhitelistOperationSchema() {
         const schema = {
             $$strict: true,
-            type: { type: 'string', enum: ['addIndexer', 'removeIndexer'], required: true },
+            type: { type: 'string', enum: ['addIndexer', 'removeIndexer', 'AppendWhitelist'], required: true },
             key: { type: "is_hex_string", length: 64, required: true },
             value: {
                 $$strict: true,
@@ -100,27 +98,8 @@ class Check {
         return this.#_validator.compile(schema);
     }
 
-    sanitizeIndexerOperations(op) {
-        return this.#_sanitizeIndexerOperations(op) === true;
-    }
-
-    #compileAppendWhitelistSchema() {
-        const schema = {
-            $$strict: true,
-            type: { type: 'string', enum: ['AppendWhitelist'], empty: false, required: true },
-            value: {
-                $$strict: true,
-                $$type: 'object',
-                nonce: { type: 'string', min: 1, max: 256, required: true },
-                pubKeysList: { type: 'array', min: 1, items: { type: "is_hex_string", length: 64 }, required: true },
-                sig: { type: 'is_hex_string', length: 128, required: true },
-            }
-        };
-        return this.#_validator.compile(schema);
-    }
-
-    appendWhitelist(op) {
-        return this.#_appendWhitelist(op) === true;
+    sanitizeIndexerOrWhitelistOperations(op) {
+        return this.#_sanitizeIndexerOrWhitelistOperations(op) === true;
     }
 
     #compilePreTxSchema() {
@@ -140,8 +119,8 @@ class Check {
         return this.#_validator.compile(schema);
     }
 
-    preTx(op) {
-        return this.#_preTx(op) === true;
+    sanitizePreTx(op) {
+        return this.#_sanitizePreTx(op) === true;
     }
 
     #compilePostTxSchema() {
@@ -170,8 +149,8 @@ class Check {
         return this.#_validator.compile(schema);
     }
 
-    postTx(op) {
-        return this.#_postTx(op) === true;
+    sanitizePostTx(op) {
+        return this.#_sanitizePostTx(op) === true;
     }
 }
 

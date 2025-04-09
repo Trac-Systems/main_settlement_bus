@@ -76,7 +76,7 @@ class Network {
 
                         const parsedPreTx = JSON.parse(msg);
                         
-                        if (networkInstance.check.preTx(parsedPreTx) &&
+                        if (networkInstance.check.sanitizePreTx(parsedPreTx) &&
                             wallet.verify(b4a.from(parsedPreTx.is, 'hex'), b4a.from(parsedPreTx.tx + parsedPreTx.in), b4a.from(parsedPreTx.ipk, 'hex')) &&
                             parsedPreTx.w === writingKey &&
                             null === await base.view.get(parsedPreTx.tx)
