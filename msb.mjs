@@ -3,9 +3,9 @@ import MainSettlementBus from './src/index.js';
 const opts = {
     stores_directory : 'stores/',
     store_name : typeof process !== "undefined" ? process.argv[2] : Pear.config.args[0],
-    bootstrap: 'db83156cbf7d227ad08fc4117fc247f387c15311e3597d65c2a09a768e97d70a',
-    channel: '00bptracnetworkmainsettlementbus',
-    tx : 'bptracnetworkmainsettlementbustx'
+    bootstrap: '07814eb54b2a3ebf61506f056fa1235d11431fcfb6505dccfa880146938093a6',
+    channel: '00ogtracnetworkmainsettlementbus',
+    tx : 'ogtracnetworkmainsettlementbustx'
 };
 
 const msb = new MainSettlementBus(opts);

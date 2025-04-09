@@ -32,8 +32,6 @@
     "protomux-wakeup": "^2.2.1",
 
 
-    "sodium-native": "^5.0.1",
-    "ready-resource": "^1.0.0",
     "bare-fetch": "^2.2.1",
     "bare-assert": "^1.0.2",
     "bare-buffer": "^3.1.2",

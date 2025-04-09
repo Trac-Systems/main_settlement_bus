@@ -132,7 +132,7 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async txChannel() {
-        this.tx_swarm = new Hyperswarm({ maxPeers: 1024, maxParallel: 512, maxServerConnections: 256 });
+        this.tx_swarm = new Hyperswarm();
         this.tx_swarm.on('connection', async (connection, peerInfo) => {
             const _this = this;
             const peerName = b4a.toString(connection.remotePublicKey, 'hex');
