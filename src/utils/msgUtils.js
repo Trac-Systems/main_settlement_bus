@@ -1,7 +1,7 @@
 import ReadyResource from 'ready-resource';
 import { createHash } from 'crypto';
 import { isHexString } from './functions.js';
-import { MAX_PUBKEYS_LENGTH, OperationType } from './constants.js';
+import { OperationType } from './constants.js';
 import fileUtils from './fileUtils.js';
 import b4a from 'b4a';
 
@@ -46,7 +46,7 @@ class MsgUtils {
                     sig: wallet.sign(hash)
                 };
                 break;
-    
+            case OperationType.APPEND_WHITELIST:
             case OperationType.ADD_INDEXER:
             case OperationType.REMOVE_INDEXER:
                 nonce = this.generateNonce();
@@ -84,29 +84,12 @@ class MsgUtils {
                 return null;
             }
 
-            const chunkPublicKeys = (pubKeys, chunkSize) =>{
-                const chunks = [];
-                for (let i = 0; i < pubKeys.length; i += chunkSize) {
-                    chunks.push(pubKeys.slice(i, i + chunkSize));
-                }
-                return chunks;
-            }
-
             const messages = [];
             const pubKeys = await fileUtils.readPublicKeysFromFile();
-            const chunks = chunkPublicKeys(pubKeys, MAX_PUBKEYS_LENGTH);
             
-            for (const chunk of chunks) {
-                const nonce = this.generateNonce();
-                const msg = this.createMessage(chunk.join(''), nonce, OperationType.APPEND_WHITELIST);
-                const hash = createHash('sha256').update(msg).digest('hex');
-
-                messages.push({
-                    nonce: nonce,
-                    pubKeysList: chunk,
-                    sig: wallet.sign(hash)
-                });
-
+            for (const pubKey of pubKeys) {
+                const assembledMessage = this.#assembleMessageBase(wallet, pubKey, OperationType.APPEND_WHITELIST);
+                messages.push(assembledMessage);
             }
 
             return messages;

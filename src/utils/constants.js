@@ -28,13 +28,13 @@ export const EventType = Object.freeze({
 });
 
 export const WHITELIST_FILEPATH = './Whitelist/pubkeys.csv';
-export const MAX_PUBKEYS_LENGTH = 20;
-export const LISTENER_TIMEOUT = 5000;
+export const LISTENER_TIMEOUT = 10000;
 export const TRAC_NAMESPACE = 'TracNetwork';
+export const WHITELIST_PREFIX = 'whitelist/';
 export const MAX_INDEXERS = 3;
 export const MIN_INDEXERS = 1;
 export const ACK_INTERVAL = 1000;
-export const WHITELIST_SLEEP_INTERVAL = 10_000;
+export const WHITELIST_SLEEP_INTERVAL = 100;
 export const MAX_PEERS = 1024;
 export const MAX_PARALLEL = 512;
 export const MAX_SERVER_CONNECTIONS = 256;
@@ -45,7 +45,6 @@ const constants = {
     OperationType,
     EventType,
     WHITELIST_FILEPATH,
-    MAX_PUBKEYS_LENGTH,
     LISTENER_TIMEOUT,
     TRAC_NAMESPACE,
     MAX_INDEXERS,
@@ -55,7 +54,8 @@ const constants = {
     MAX_PEERS,
     MAX_PARALLEL,
     MAX_SERVER_CONNECTIONS,
-    UPDATER_INTERVAL
+    UPDATER_INTERVAL,
+    WHITELIST_PREFIX
 };
 
 export default constants;
