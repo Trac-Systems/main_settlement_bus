@@ -4,11 +4,10 @@ import ReadyResource from 'ready-resource';
 import b4a from 'b4a';
 import Hyperbee from 'hyperbee';
 import readline from 'readline';
-import { verifyDag, sleep } from './utils/functions.js';
+import { verifyDag, sleep, createHash } from './utils/functions.js';
 import PeerWallet from "trac-wallet"
 import tty from 'tty';
 import Corestore from 'corestore';
-import sodium from 'sodium-native';
 import MsgUtils from './utils/msgUtils.js';
 import { LISTENER_TIMEOUT, EntryType, OperationType, EventType, ACK_INTERVAL, WHITELIST_SLEEP_INTERVAL, UPDATER_INTERVAL, MAX_INDEXERS, MIN_INDEXERS, WHITELIST_PREFIX } from './utils/constants.js';
 import Network from './network.js';
@@ -171,7 +170,8 @@ class MainSettlementBus extends ReadyResource {
     }
 
     async #addAdminIfSet(adminEntry, op, view, base) {
-        if (this.#verifyMessage(op.value.sig, adminEntry.tracPublicKey, MsgUtils.createMessage(adminEntry.tracPublicKey, op.value.wk, op.value.nonce, op.type))) {
+        const isMessageVerifed = await this.#verifyMessage(op.value.sig, adminEntry.tracPublicKey, MsgUtils.createMessage(adminEntry.tracPublicKey, op.value.wk, op.value.nonce, op.type));
+        if (isMessageVerifed) {
             const indexersEntry = await this.getSigned(EntryType.INDEXERS);
             if (indexersEntry && indexersEntry.includes(adminEntry.tracPublicKey)) {
                 await base.removeWriter(b4a.from(adminEntry.wk, 'hex'));
@@ -186,9 +186,11 @@ class MainSettlementBus extends ReadyResource {
     }
 
     async #addAdminIfNotSet(op, view, node) {
+        const isMessageVerifed = await this.#verifyMessage(op.value.sig, op.key, MsgUtils.createMessage(op.key, op.value.wk, op.value.nonce, op.type));
+
         if (node.from.key.toString('hex') === this.#bootstrap &&
             op.value.wk === this.#bootstrap &&
-            this.#verifyMessage(op.value.sig, op.key, MsgUtils.createMessage(op.key, op.value.wk, op.value.nonce, op.type))
+            isMessageVerifed
         ) {
             await view.put(EntryType.ADMIN, {
                 tracPublicKey: op.key,
@@ -204,7 +206,8 @@ class MainSettlementBus extends ReadyResource {
 
         const adminEntry = await this.getSigned(EntryType.ADMIN);
         if (!this.check.sanitizeIndexerOrWhitelistOperations(op) || !this.#isAdmin(adminEntry, node)) return;
-        if (!this.#verifyMessage(op.value.sig, adminEntry.tracPublicKey, MsgUtils.createMessage(op.key, op.value.nonce, op.type))) return;
+        const isMessageVerifed = await this.#verifyMessage(op.value.sig, adminEntry.tracPublicKey, MsgUtils.createMessage(op.key, op.value.nonce, op.type));
+        if (!isMessageVerifed) return;
         const isWhitelisted = await this.#isWhitelisted(op.key);
         if (isWhitelisted) return;
         await this.#createWhitelistEntry(view, op.key);
@@ -218,10 +221,11 @@ class MainSettlementBus extends ReadyResource {
     async #handleApplyAddWriterOperation(op, view, base, node, batch) {
         const adminEntry = await this.getSigned(EntryType.ADMIN);
         if (!this.check.sanitizeAdminAndWritersOperations(op) || !this.#isAdmin(adminEntry, node)) return;
-        
+
         const isWhitelisted = await this.#isWhitelisted(op.key);
         if (!isWhitelisted) return;
-        if (this.#verifyMessage(op.value.sig, op.key, MsgUtils.createMessage(op.key, op.value.wk, op.value.nonce, op.type))) {
+        const isMessageVerifed = await this.#verifyMessage(op.value.sig, op.key, MsgUtils.createMessage(op.key, op.value.wk, op.value.nonce, op.type));
+        if (isMessageVerifed) {
             await this.#addWriter(op, view, base);
         }
     }
@@ -242,8 +246,8 @@ class MainSettlementBus extends ReadyResource {
     async #handleApplyRemoveWriterOperation(op, view, base, node, batch) {
         const adminEntry = await this.getSigned(EntryType.ADMIN);
         if (!this.check.sanitizeAdminAndWritersOperations(op) || !this.#isAdmin(adminEntry, node)) return;
-
-        if (this.#verifyMessage(op.value.sig, op.key, MsgUtils.createMessage(op.key, op.value.wk, op.value.nonce, op.type))) {
+        const isMessageVerifed = await this.#verifyMessage(op.value.sig, op.key, MsgUtils.createMessage(op.key, op.value.wk, op.value.nonce, op.type));
+        if (isMessageVerifed) {
             await this.#removeWriter(op, view, base);
         }
     }
@@ -285,8 +289,8 @@ class MainSettlementBus extends ReadyResource {
             Array.from(indexersEntry).length >= MAX_INDEXERS) {
             return;
         }
-
-        if (this.#verifyMessage(op.value.sig, adminEntry.tracPublicKey, MsgUtils.createMessage(op.key, op.value.nonce, op.type))) {
+        const isMessageVerifed = await this.#verifyMessage(op.value.sig, adminEntry.tracPublicKey, MsgUtils.createMessage(op.key, op.value.nonce, op.type))
+        if (isMessageVerifed) {
             await this.#addIndexer(indexersEntry, op, view, base);
         }
     }
@@ -311,7 +315,8 @@ class MainSettlementBus extends ReadyResource {
         const adminEntry = await this.getSigned(EntryType.ADMIN);
         const indexersEntry = await this.getSigned(EntryType.INDEXERS);
         if (!this.#isAdmin(adminEntry, node) || !indexersEntry || !Array.from(indexersEntry).includes(op.key) || Array.from(indexersEntry).length <= 1) return;
-        if (this.#verifyMessage(op.value.sig, adminEntry.tracPublicKey, MsgUtils.createMessage(op.key, op.value.nonce, op.type))) {
+        const isMessageVerifed = await this.#verifyMessage(op.value.sig, adminEntry.tracPublicKey, MsgUtils.createMessage(op.key, op.value.nonce, op.type))
+        if (isMessageVerifed) {
             const nodeEntry = await this.getSigned(op.key);
             if (nodeEntry !== null && nodeEntry.isWriter && nodeEntry.isIndexer) {
                 await base.removeWriter(b4a.from(nodeEntry.wk, 'hex'));
@@ -403,9 +408,9 @@ class MainSettlementBus extends ReadyResource {
         });
     }
 
-    #verifyMessage(signature, publicKey, bufferMessage) {
+    async #verifyMessage(signature, publicKey, bufferMessage) {
         const bufferPublicKey = b4a.from(publicKey, 'hex');
-        const hash = createHash('sha256').update(bufferMessage).digest('hex');
+        const hash = await createHash('sha256', bufferMessage);
         return this.#wallet.verify(signature, hash, bufferPublicKey);
     }
 
@@ -451,7 +456,7 @@ class MainSettlementBus extends ReadyResource {
     async getWhitelistEntry(key) {
         const entry = await this.getSigned(WHITELIST_PREFIX + key);
         return entry
-     }
+    }
 
     async #handleIncomingEvent(data) {
         try {
@@ -514,7 +519,8 @@ class MainSettlementBus extends ReadyResource {
     async #adminEventListener() {
         this.on(EventType.ADMIN_EVENT, async (parsedRequest) => {
             const isWhitelisted = await this.#isWhitelisted(parsedRequest.key);
-            if (isWhitelisted && MsgUtils.verifyEventMessage(parsedRequest, this.#wallet)) {
+            const isEventMessageVerifed = await MsgUtils.verifyEventMessage(parsedRequest, this.#wallet)
+            if (isWhitelisted && isEventMessageVerifed) {
                 await this.#base.append(parsedRequest);
             }
         });
@@ -523,7 +529,8 @@ class MainSettlementBus extends ReadyResource {
     async #writerEventListener() {
         this.on(EventType.WRITER_EVENT, async (parsedRequest) => {
             const adminEntry = await this.getSigned(EntryType.ADMIN);
-            if (adminEntry && adminEntry.tracPublicKey === parsedRequest.key && MsgUtils.verifyEventMessage(parsedRequest, this.#wallet)) {
+            const isEventMessageVerifed = await MsgUtils.verifyEventMessage(parsedRequest, this.#wallet)
+            if (adminEntry && adminEntry.tracPublicKey === parsedRequest.key && isEventMessageVerifed) {
                 await this.#base.append(parsedRequest);
             }
         });
@@ -537,37 +544,10 @@ class MainSettlementBus extends ReadyResource {
         });
     }
 
-    async createHash(type, message) {
-        if (type === 'sha256') {
-            const out = b4a.alloc(sodium.crypto_hash_sha256_BYTES);
-            sodium.crypto_hash_sha256(out, b4a.from(message));
-            return b4a.toString(out, 'hex');
-        }
-        let createHash = null;
-        if (global.Pear !== undefined) {
-            let _type = '';
-            switch (type.toLowerCase()) {
-                case 'sha1': _type = 'SHA-1'; break;
-                case 'sha384': _type = 'SHA-384'; break;
-                case 'sha512': _type = 'SHA-512'; break;
-                default: throw new Error('Unsupported algorithm.');
-            }
-            const encoder = new TextEncoder();
-            const data = encoder.encode(message);
-            const hash = await crypto.subtle.digest(_type, data);
-            const hashArray = Array.from(new Uint8Array(hash));
-            return hashArray
-                .map((b) => b.toString(16).padStart(2, "0"))
-                .join("");
-        } else {
-            return crypto.createHash(type).update(message).digest('hex')
-        }
-    }
-
     async #handleAdminOperations() {
         //TODO: ADJUST FOR WHITELIST STRUCTURE
         const adminEntry = await this.getSigned(EntryType.ADMIN);
-        const addAdminMessage = MsgUtils.assembleAdminMessage(adminEntry, this.#writingKey, this.#wallet, this.#bootstrap);
+        const addAdminMessage = await MsgUtils.assembleAdminMessage(adminEntry, this.#writingKey, this.#wallet, this.#bootstrap);
         if (!adminEntry && this.#wallet && this.#writingKey && this.#writingKey === this.#bootstrap) {
             await this.#base.append(addAdminMessage);
         } else if (adminEntry && adminEntry.tracPublicKey === this.#wallet.publicKey && this.#writingKey && this.#writingKey !== adminEntry.wk) {
@@ -631,7 +611,7 @@ class MainSettlementBus extends ReadyResource {
             local_public_key + '-' +
             content_hash + '-' +
             nonce;
-        return await this.createHash('sha256', await this.createHash('sha256', tx));
+        return await createHash('sha256', await createHash('sha256', tx));
     }
 
     async #requestWriterRole(toAdd) {
@@ -643,12 +623,12 @@ class MainSettlementBus extends ReadyResource {
             const isAllowedToRequestRole = await this.#isAllowedToRequestRole(this.#wallet.publicKey, adminEntry);
             const canAddWriter = !!(!this.#base.writable && !isAlreadyWriter && isAllowedToRequestRole);
             if (canAddWriter) {
-                assembledMessage = MsgUtils.assembleAddWriterMessage(this.#wallet, this.#writingKey);
+                assembledMessage = await MsgUtils.assembleAddWriterMessage(this.#wallet, this.#writingKey);
             }
         }
         else {
             if (isAlreadyWriter) {
-                assembledMessage = MsgUtils.assembleRemoveWriterMessage(this.#wallet, this.#writingKey);
+                assembledMessage = await MsgUtils.assembleRemoveWriterMessage(this.#wallet, this.#writingKey);
             }
         }
 
@@ -673,13 +653,13 @@ class MainSettlementBus extends ReadyResource {
         if (toAdd) {
             const canAddIndexer = !nodeEntry.isIndexer && indexersEntry.length <= MAX_INDEXERS;
             if (canAddIndexer) {
-                const assembledAddIndexerMessage = MsgUtils.assembleAddIndexerMessage(this.#wallet, tracPublicKey);
+                const assembledAddIndexerMessage = await MsgUtils.assembleAddIndexerMessage(this.#wallet, tracPublicKey);
                 await this.#base.append(assembledAddIndexerMessage);
             }
         } else {
             const canRemoveIndexer = !toAdd && nodeEntry.isIndexer && indexersEntry.length > MIN_INDEXERS;
             if (canRemoveIndexer) {
-                const assembledRemoveIndexer = MsgUtils.assembleRemoveIndexerMessage(this.#wallet, tracPublicKey);
+                const assembledRemoveIndexer = await MsgUtils.assembleRemoveIndexerMessage(this.#wallet, tracPublicKey);
                 await this.#base.append(assembledRemoveIndexer);
             }
 

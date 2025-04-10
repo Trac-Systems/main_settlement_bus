@@ -1,6 +1,5 @@
 import ReadyResource from 'ready-resource';
-import { createHash } from 'crypto';
-import { isHexString } from './functions.js';
+import { isHexString, createHash } from './functions.js';
 import { OperationType } from './constants.js';
 import fileUtils from './fileUtils.js';
 import b4a from 'b4a';
@@ -26,20 +25,20 @@ class MsgUtils {
         return buf;
     }
 
-    static #assembleMessageBase(wallet, keyParam, operationType) {
+    static async #assembleMessageBase(wallet, keyParam, operationType) {
         let nonce = null;
         let msg = null;
         let hash = null;
         let baseKey = wallet.publicKey;
         let value = null;
-    
+
         switch (operationType) {
             case OperationType.ADD_ADMIN:
             case OperationType.ADD_WRITER:
             case OperationType.REMOVE_WRITER:
                 nonce = this.generateNonce();
                 msg = this.createMessage(wallet.publicKey, keyParam, nonce, operationType);
-                hash = createHash('sha256').update(msg).digest('hex');
+                hash = await createHash('sha256', msg);
                 value = {
                     wk: keyParam,
                     nonce: nonce,
@@ -51,18 +50,18 @@ class MsgUtils {
             case OperationType.REMOVE_INDEXER:
                 nonce = this.generateNonce();
                 msg = this.createMessage(keyParam, nonce, operationType);
-                hash = createHash('sha256').update(msg).digest('hex');
+                hash = await createHash('sha256', msg);
                 baseKey = keyParam;
                 value = {
                     nonce: nonce,
                     sig: wallet.sign(hash)
                 };
                 break;
-    
+
             default:
                 return undefined;
         }
-    
+
         return {
             type: operationType,
             key: baseKey,
@@ -70,11 +69,11 @@ class MsgUtils {
         };
     }
 
-    static assembleAdminMessage(adminEntry, writingKey, wallet, bootstrap) {
+    static async assembleAdminMessage(adminEntry, writingKey, wallet, bootstrap) {
         if ((!adminEntry && wallet && writingKey && writingKey === bootstrap) || // Admin entry doesn't exist yet, thus admin public key can only be associated with bootstrap writing key
             (adminEntry && adminEntry.tracPublicKey === wallet.publicKey && writingKey && writingKey !== adminEntry.wk)) { // Admin entry exists and we have to update its writing key in base, so it can recover admin access
 
-            return this.#assembleMessageBase(wallet, writingKey, OperationType.ADD_ADMIN);
+            return await this.#assembleMessageBase(wallet, writingKey, OperationType.ADD_ADMIN);
         }
     }
 
@@ -86,9 +85,9 @@ class MsgUtils {
 
             const messages = [];
             const pubKeys = await fileUtils.readPublicKeysFromFile();
-            
+
             for (const pubKey of pubKeys) {
-                const assembledMessage = this.#assembleMessageBase(wallet, pubKey, OperationType.APPEND_WHITELIST);
+                const assembledMessage = await this.#assembleMessageBase(wallet, pubKey, OperationType.APPEND_WHITELIST);
                 messages.push(assembledMessage);
             }
 
@@ -98,26 +97,26 @@ class MsgUtils {
         }
     }
 
-    static assembleAddWriterMessage(wallet, writingKey) {
-        return this.#assembleMessageBase(wallet, writingKey, OperationType.ADD_WRITER);
+    static async assembleAddWriterMessage(wallet, writingKey) {
+        return await this.#assembleMessageBase(wallet, writingKey, OperationType.ADD_WRITER);
     }
 
-    static assembleRemoveWriterMessage(wallet, writingKey) {
-        return this.#assembleMessageBase(wallet, writingKey, OperationType.REMOVE_WRITER);
+    static async assembleRemoveWriterMessage(wallet, writingKey) {
+        return await this.#assembleMessageBase(wallet, writingKey, OperationType.REMOVE_WRITER);
     }
 
-    static assembleAddIndexerMessage(wallet, writerTracPublicKey) {
-        return this.#assembleMessageBase(wallet, writerTracPublicKey, OperationType.ADD_INDEXER);
+    static async assembleAddIndexerMessage(wallet, writerTracPublicKey) {
+        return await this.#assembleMessageBase(wallet, writerTracPublicKey, OperationType.ADD_INDEXER);
     }
 
-    static assembleRemoveIndexerMessage(wallet, writerTracPublicKey) {
-        return this.#assembleMessageBase(wallet, writerTracPublicKey, OperationType.REMOVE_INDEXER);
+    static async assembleRemoveIndexerMessage(wallet, writerTracPublicKey) {
+        return await this.#assembleMessageBase(wallet, writerTracPublicKey, OperationType.REMOVE_INDEXER);
     }
 
-    static verifyEventMessage(parsedRequest, wallet) {
+    static async verifyEventMessage(parsedRequest, wallet) {
         //TODO: Here we can add some sanitization
         const msg = this.createMessage(parsedRequest.key, parsedRequest.value.wk, parsedRequest.value.nonce, parsedRequest.type);
-        const hash = createHash('sha256').update(msg).digest('hex');
+        const hash = await createHash('sha256', msg);
         return wallet.verify(parsedRequest.value.sig, hash, parsedRequest.key);
     }
 
