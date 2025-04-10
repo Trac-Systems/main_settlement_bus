@@ -10,7 +10,6 @@ import tty from 'tty';
 import Corestore from 'corestore';
 import sodium from 'sodium-native';
 import MsgUtils from './utils/msgUtils.js';
-import { createHash } from 'crypto';
 import { LISTENER_TIMEOUT, EntryType, OperationType, EventType, ACK_INTERVAL, WHITELIST_SLEEP_INTERVAL, UPDATER_INTERVAL, MAX_INDEXERS, MIN_INDEXERS, WHITELIST_PREFIX } from './utils/constants.js';
 import Network from './network.js';
 import Check from './utils/check.js';
@@ -474,12 +473,9 @@ class MainSettlementBus extends ReadyResource {
 
     #setupInternalListeners() {
         this.#base.on(EventType.IS_INDEXER, () => {
-            for (const eventName of this.eventNames()) {
-                if (eventName === EventType.WRITER_EVENT) {
-                    this.removeAllListeners(EventType.WRITER_EVENT);
-                    this.#shouldListenToWriterEvents = false;
-                    break;
-                }
+            if (this.listenerCount(EventType.WRITER_EVENT) > 0) {
+                this.removeAllListeners(EventType.WRITER_EVENT);
+                this.#shouldListenToWriterEvents = false;
             }
             console.log('Current node is an indexer');
         });
@@ -536,7 +532,7 @@ class MainSettlementBus extends ReadyResource {
     msbListener() {
         this.on(EventType.READY_MSB, async () => {
             if (!this.#isStreaming) {
-                this.#isStreaming = true;W
+                this.#isStreaming = true;
             }
         });
     }
