@@ -14,7 +14,6 @@ import Network from './network.js';
 import Check from './utils/check.js';
 //TODO: CHANGE NONCE.
 
-
 class MainSettlementBus extends ReadyResource {
     // Internal flags
     #shouldListenToAdminEvents = false;
@@ -397,15 +396,17 @@ class MainSettlementBus extends ReadyResource {
         }
     }
 
-    #sendMessageToAdmin(adminEntry, message) {
+    async #sendMessageToAdmin(adminEntry, message) {
         if (!adminEntry || !message) {
             return;
         }
-        this.#swarm.connections.forEach((conn) => {
-            if (b4a.from(conn.remotePublicKey).toString('hex') === adminEntry.tracPublicKey && conn.connected) {
-                conn.write(JSON.stringify(message));
-            }
-        });
+
+        const conn = await Network.tryConnect(adminEntry.tracPublicKey, this.#swarm);
+        if (!conn) {
+            return;
+        }
+        conn.write(JSON.stringify(message));
+        conn.end();
     }
 
     async #verifyMessage(signature, publicKey, bufferMessage) {
@@ -503,11 +504,11 @@ class MainSettlementBus extends ReadyResource {
         });
 
         this.#base.on(EventType.UNWRITABLE, async () => {
-            const updatedNodeEntry = await this.getSigned(this.#wallet.publicKey);
+            const updatedNodeEntry = await this.get(this.#wallet.publicKey);
             const canDisableWriterEvents = updatedNodeEntry &&
                 !updatedNodeEntry.isWriter &&
                 this.#shouldListenToWriterEvents;
-
+                
             if (canDisableWriterEvents) {
                 this.removeAllListeners(EventType.WRITER_EVENT);
                 this.#shouldListenToWriterEvents = false;
@@ -633,7 +634,7 @@ class MainSettlementBus extends ReadyResource {
         }
 
         if (assembledMessage) {
-            this.#sendMessageToAdmin(adminEntry, assembledMessage);
+            await this.#sendMessageToAdmin(adminEntry, assembledMessage);
         }
 
     }

@@ -25,7 +25,13 @@ export const EventType = Object.freeze({
     WRITABLE: 'writable',
     UNWRITABLE: 'unwritable',
     WARNING: 'warning',
+    OPEN: 'open',
+    ERROR: 'error',
 });
+
+export const NetworkError  = Object.freeze({
+    PEER_NOT_FOUND: 'PEER_NOT_FOUND',
+})
 
 export const WHITELIST_FILEPATH = './Whitelist/pubkeys.csv';
 export const LISTENER_TIMEOUT = 10000;
@@ -39,6 +45,7 @@ export const MAX_PEERS = 1024;
 export const MAX_PARALLEL = 512;
 export const MAX_SERVER_CONNECTIONS = 256;
 export const UPDATER_INTERVAL = 10_000;
+export const TRY_CONNECT_TIMEOUT = 5000;
 
 const constants = {
     EntryType,
@@ -55,7 +62,9 @@ const constants = {
     MAX_PARALLEL,
     MAX_SERVER_CONNECTIONS,
     UPDATER_INTERVAL,
-    WHITELIST_PREFIX
+    WHITELIST_PREFIX,
+    NetworkError,
+    TRY_CONNECT_TIMEOUT
 };
 
 export default constants;

@@ -1,7 +1,7 @@
 import w from 'protomux-wakeup';
 import b4a from 'b4a';
 import Hyperswarm from 'hyperswarm';
-import { EventType, TRAC_NAMESPACE, MAX_PEERS, MAX_PARALLEL, MAX_SERVER_CONNECTIONS, OperationType } from './utils/constants.js';
+import { EventType, TRAC_NAMESPACE, MAX_PEERS, MAX_PARALLEL, MAX_SERVER_CONNECTIONS, OperationType, NetworkError, TRY_CONNECT_TIMEOUT } from './utils/constants.js';
 import {sleep } from './utils/functions.js';
 import MsgUtils from './utils/msgUtils.js';
 import Check from './utils/check.js';
@@ -129,6 +129,30 @@ class Network {
             }
             await sleep(10);
         }
+    }
+
+    static async tryConnect(remotePublicKey, swarm) {
+        return new Promise((resolve) => {
+            const conn = swarm.dht.connect(remotePublicKey);
+    
+            conn.once(EventType.ERROR, (err) => {
+                if (err.code === NetworkError.PEER_NOT_FOUND) {
+                    console.log('Peer not found. The peer may be offline or unreachable.');
+                } else {
+                    console.log('Connection error:', err);
+                }
+    
+                resolve(false);
+            });
+    
+            conn.once(EventType.OPEN, () => {
+                resolve(conn);
+            });
+    
+            setTimeout(() => {
+                resolve(false);
+            }, TRY_CONNECT_TIMEOUT);
+        });
     }
 }
 
