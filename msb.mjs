@@ -1,4 +1,4 @@
-import MainSettlementBus from './src/index.js';
+import {MainSettlementBus} from './src/index.js';
 
 const opts = {
     stores_directory : 'stores/',

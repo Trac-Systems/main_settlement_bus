@@ -14,8 +14,7 @@ import Network from './network.js';
 import Check from './utils/check.js';
 //TODO: CHANGE NONCE.
 
-
-class MainSettlementBus extends ReadyResource {
+export class MainSettlementBus extends ReadyResource {
     // Internal flags
     #shouldListenToAdminEvents = false;
     #shouldListenToWriterEvents = false;
@@ -68,7 +67,7 @@ class MainSettlementBus extends ReadyResource {
         this.#enable_txchannel = options.enable_txchannel !== false;
         this.#enable_updater = options.enable_updater !== false;
         this.#enable_wallet = options.enable_wallet !== false;
-        this.#wallet = this.#enable_wallet ? new PeerWallet(options) : null;
+        this.#wallet = new PeerWallet(options);
         this.#replicate = options.replicate !== false;
         this.#opts = options;
     }
@@ -153,7 +152,7 @@ class MainSettlementBus extends ReadyResource {
             b4a.byteLength(JSON.stringify(postTx)) <= 4096
         ) {
             await batch.put(op.key, op.value);
-            //console.log(`TX: ${op.key} appended. Signed length: `, this.#base.view.core.signedLength);
+            console.log(`TX: ${op.key} appended. Signed length: `, this.#base.view.core.signedLength);
         }
     }
 
@@ -415,10 +414,10 @@ class MainSettlementBus extends ReadyResource {
     }
 
     #isAdmin(adminEntry, node = null) {
+        if(this.#enable_wallet === false) return false;
         if (!adminEntry) return false;
         if (node) return adminEntry.wk === b4a.from(node.from.key).toString('hex');
         return !!(this.#wallet.publicKey === adminEntry.tracPublicKey && adminEntry.wk === this.#writingKey);
-
     }
 
     async #isAllowedToRequestRole(key, adminEntry) {
@@ -464,7 +463,7 @@ class MainSettlementBus extends ReadyResource {
             const parsedRequest = JSON.parse(bufferData);
             if (parsedRequest && parsedRequest.type && parsedRequest.key && parsedRequest.value) {
                 if (parsedRequest.type === OperationType.ADD_WRITER || parsedRequest.type === OperationType.REMOVE_WRITER) {
-                    //This request must be hanlded by ADMIN 
+                    //This request must be hanlded by ADMIN
                     this.emit(EventType.ADMIN_EVENT, parsedRequest);
                 } else if (parsedRequest.type === OperationType.ADD_ADMIN) {
                     //This request must be handled by WRITER
@@ -503,6 +502,10 @@ class MainSettlementBus extends ReadyResource {
         });
 
         this.#base.on(EventType.UNWRITABLE, async () => {
+            if(this.#enable_wallet === false) {
+                console.log('Current node is unwritable');
+                return;
+            }
             const updatedNodeEntry = await this.getSigned(this.#wallet.publicKey);
             const canDisableWriterEvents = updatedNodeEntry &&
                 !updatedNodeEntry.isWriter &&
@@ -518,6 +521,7 @@ class MainSettlementBus extends ReadyResource {
 
     async #adminEventListener() {
         this.on(EventType.ADMIN_EVENT, async (parsedRequest) => {
+            if(this.#enable_wallet === false) return;
             const isWhitelisted = await this.#isWhitelisted(parsedRequest.key);
             const isEventMessageVerifed = await MsgUtils.verifyEventMessage(parsedRequest, this.#wallet)
             if (isWhitelisted && isEventMessageVerifed) {
@@ -528,6 +532,7 @@ class MainSettlementBus extends ReadyResource {
 
     async #writerEventListener() {
         this.on(EventType.WRITER_EVENT, async (parsedRequest) => {
+            if(this.#enable_wallet === false) return;
             const adminEntry = await this.getSigned(EntryType.ADMIN);
             const isEventMessageVerifed = await MsgUtils.verifyEventMessage(parsedRequest, this.#wallet)
             if (adminEntry && adminEntry.tracPublicKey === parsedRequest.key && isEventMessageVerifed) {
@@ -550,7 +555,7 @@ class MainSettlementBus extends ReadyResource {
         const addAdminMessage = await MsgUtils.assembleAdminMessage(adminEntry, this.#writingKey, this.#wallet, this.#bootstrap);
         if (!adminEntry && this.#wallet && this.#writingKey && this.#writingKey === this.#bootstrap) {
             await this.#base.append(addAdminMessage);
-        } else if (adminEntry && adminEntry.tracPublicKey === this.#wallet.publicKey && this.#writingKey && this.#writingKey !== adminEntry.wk) {
+        } else if (adminEntry && this.#wallet && adminEntry.tracPublicKey === this.#wallet.publicKey && this.#writingKey && this.#writingKey !== adminEntry.wk) {
             let connections = [];
             for (const conn of this.#swarm.connections) {
 
@@ -570,7 +575,7 @@ class MainSettlementBus extends ReadyResource {
             if (connections.length > 0) {
                 connections[Math.floor(Math.random() * connections.length)].write(JSON.stringify(addAdminMessage));
             }
-            //TODO: Implement an algorithm to search a new writer and connect/send the request for it. 
+            //TODO: Implement an algorithm to search a new writer and connect/send the request for it.
         }
 
         setTimeout(async () => {
@@ -584,6 +589,7 @@ class MainSettlementBus extends ReadyResource {
     }
 
     async #handleWhitelistOperations() {
+        if(this.#enable_wallet === false) return;
         const adminEntry = await this.getSigned(EntryType.ADMIN);
         if (!this.#isAdmin(adminEntry)) return;
 
@@ -615,6 +621,7 @@ class MainSettlementBus extends ReadyResource {
     }
 
     async #requestWriterRole(toAdd) {
+        if(this.#enable_wallet === false) return;
         const adminEntry = await this.getSigned(EntryType.ADMIN);
         const nodeEntry = await this.getSigned(this.#wallet.publicKey);
         const isAlreadyWriter = !!(nodeEntry && nodeEntry.isWriter)
@@ -639,6 +646,7 @@ class MainSettlementBus extends ReadyResource {
     }
 
     async #updateIndexerRole(tracPublicKey, toAdd) {
+        if(this.#enable_wallet === false) return;
         const adminEntry = await this.getSigned(EntryType.ADMIN);
         if (!this.#isAdmin(adminEntry) && !this.#base.writable) return;
 
@@ -738,7 +746,6 @@ class MainSettlementBus extends ReadyResource {
                 default:
                     if (input.startsWith('/get_node_info')) {
                         const splitted = input.split(' ');
-                        console.log("address:", await this.getSigned(splitted[1]))
                         console.log("whitelist entry:", await this.#isWhitelisted(splitted[1]))
                     } else if (input.startsWith('/add_indexer')) {
                         const splitted = input.split(' ');

@@ -20,18 +20,17 @@ class Network {
             let keyPair;
             if (!walletEnabled) {
                 keyPair = await store.createKeyPair(TRAC_NAMESPACE);
+            } else {
+                keyPair = {
+                    publicKey: b4a.from(wallet.publicKey, 'hex'),
+                    secretKey: b4a.from(wallet.secretKey, 'hex')
+                };
             }
-
-            keyPair = {
-                publicKey: b4a.from(wallet.publicKey, 'hex'),
-                secretKey: b4a.from(wallet.secretKey, 'hex')
-            };
 
             swarm = new Hyperswarm({ keyPair, maxPeers: MAX_PEERS, maxParallel: MAX_PARALLEL, maxServerConnections: MAX_SERVER_CONNECTIONS });
 
             console.log(`Channel: ${b4a.toString(channel)}`);
             swarm.on('connection', async (connection) => {
-
                 wakeup.addStream(connection);
                 store.replicate(connection);
                 connection.on('close', () => { });
@@ -75,7 +74,7 @@ class Network {
                     try {
 
                         const parsedPreTx = JSON.parse(msg);
-                        
+
                         if (networkInstance.check.sanitizePreTx(parsedPreTx) &&
                             wallet.verify(b4a.from(parsedPreTx.is, 'hex'), b4a.from(parsedPreTx.tx + parsedPreTx.in), b4a.from(parsedPreTx.ipk, 'hex')) &&
                             parsedPreTx.w === writingKey &&
