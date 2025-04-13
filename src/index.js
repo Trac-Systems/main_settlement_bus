@@ -35,6 +35,7 @@ export class MainSettlementBus extends ReadyResource {
     #swarm;
     #dht_server;
     #dht_node;
+    #dht_bootstrap;
     #base;
     #writingKey;
     #enable_txchannel;
@@ -66,7 +67,8 @@ export class MainSettlementBus extends ReadyResource {
         this.#store = new Corestore(this.STORES_DIRECTORY + options.store_name);
         this.#bee = null;
         this.#swarm = null;
-        this.#dht_node = new DHT();
+        this.#dht_bootstrap = ['116.202.214.143:10001','116.202.214.149:10001', 'node1.hyperdht.org:49737', 'node2.hyperdht.org:49737', 'node3.hyperdht.org:49737'];
+        this.#dht_node = new DHT({ bootstrap: this.#dht_bootstrap });
         this.#dht_server = null;
         this.#base = null;
         this.#writingKey = null;
@@ -353,7 +355,7 @@ export class MainSettlementBus extends ReadyResource {
         console.log('Writer Key:', this.#writingKey);
 
         if (this.#replicate) {
-            this.#swarm = await Network.replicate(this.#swarm, this.#enable_wallet, this.#store, this.#wallet, this.#channel, this.#isStreaming, this.#handleIncomingEvent.bind(this), this.emit.bind(this));
+            this.#swarm = await Network.replicate(this.#dht_bootstrap, this.#swarm, this.#enable_wallet, this.#store, this.#wallet, this.#channel, this.#isStreaming, this.#handleIncomingEvent.bind(this), this.emit.bind(this));
         }
 
         if (this.#enable_txchannel) {
@@ -722,6 +724,7 @@ export class MainSettlementBus extends ReadyResource {
         console.log('- /add_admin: register admin entry with bootstrap key.');
         console.log('- /add_whitelist: add a list of Trac public keys. Nodes that own these public keys can become writers.');
         console.log('- /add_indexer <trac_public_key>: change a role of the selected writer node to indexer role');
+        console.log('- /push_writer_add: try to enforce adding this peer as writer after whitelisting.');
         console.log('- /remove_indexer <trac_public_key>: change a role of the selected indexer node to default role');
         console.log('- /get_node_info <trac_public_key>: get information about a node with the given Trac public key');
         console.log('- /dag: check system properties such as writing key, DAG, etc.');
@@ -734,6 +737,9 @@ export class MainSettlementBus extends ReadyResource {
                     rl.close();
                     await this.close();
                     typeof process !== "undefined" ? process.exit(0) : Pear.exit(0);
+                    break;
+                case '/push_writer_add':
+                    await this.#requestWriterRole(true)
                     break;
                 case '/add_admin':
                     await this.#handleAdminOperations();
