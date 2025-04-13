@@ -35,10 +35,9 @@ export async function sleep(ms) {
 export async function createHash(type, message) {
     if (type === 'sha256') {
         const out = b4a.alloc(sodium.crypto_hash_sha256_BYTES);
-        sodium.crypto_hash_sha256(out, b4a.from(message));
+        sodium.crypto_hash_sha256(out,!b4a.isBuffer(message) ? b4a.from(message) : message);
         return b4a.toString(out, 'hex');
     }
-    let createHash = null;
     if (global.Pear !== undefined) {
         let _type = '';
         switch (type.toLowerCase()) {
@@ -48,13 +47,15 @@ export async function createHash(type, message) {
             default: throw new Error('Unsupported algorithm.');
         }
         const encoder = new TextEncoder();
-        const data = encoder.encode(message);
+        const data = encoder.encode(b4a.isBuffer(message) ? b4a.toString(message, 'utf-8') : message);
         const hash = await crypto.subtle.digest(_type, data);
         const hashArray = Array.from(new Uint8Array(hash));
         return hashArray
             .map((b) => b.toString(16).padStart(2, "0"))
             .join("");
     } else {
-        return nodeCreateHash(type).update(message).digest('hex');
+        // this is only available here for completeness and in fact will never be used in the MSB.
+        // just keep it as it is.
+        return crypto.createHash(type).update(!b4a.isBuffer(message) ? b4a.from(message) : message).digest('hex')
     }
 }   

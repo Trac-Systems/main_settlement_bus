@@ -1,5 +1,5 @@
 import ReadyResource from 'ready-resource';
-import { createHash } from 'crypto';
+import { createHash } from 'utils/functions.js';
 import fs from 'fs';
 //TODO: GENERATE NONCE WITH CRYPTO LIBRARY WHICH ALLOW US TO GENERATE IT WITH UNIFORM DISTRIBUTION.
 
@@ -16,7 +16,6 @@ export class WriterManager extends ReadyResource {
         const adminEntry = await this.msbInstance.getSigned('admin');
         if (!adminEntry && this.msbInstance.writingKey && this.msbInstance.writingKey === this.msbInstance.bootstrap) {
 
-            
             const nonce = Math.random() + '-' + Date.now();
             const msg = Buffer.concat(
                 [
@@ -25,7 +24,7 @@ export class WriterManager extends ReadyResource {
                 ]
             )
 
-            const hash = createHash('sha256').update(msg).digest('hex');
+            const hash = await createHash('sha256', msg);
             await this.msbInstance.base.append({
                 type: 'addAdmin',
                 key: 'admin',
@@ -57,7 +56,7 @@ export class WriterManager extends ReadyResource {
                     Buffer.from(nonce),
                 ]
             )
-            const hash = createHash('sha256').update(msg).digest('hex');
+            const hash = await createHash('sha256', msg);
             await this.msbInstance.base.append({
                 type: 'whitelist',
                 key: 'list',
@@ -68,8 +67,6 @@ export class WriterManager extends ReadyResource {
                 }
             });
             }
-
-            
         }catch(e) {
             console.log('Error reading file', e);
         }
