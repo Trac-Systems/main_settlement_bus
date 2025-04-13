@@ -164,8 +164,8 @@ export class MainSettlementBus extends ReadyResource {
     async #handleApplyAddAdminOperation(op, view, base, node, batch) {
         if (!this.check.sanitizeAdminAndWritersOperations(op)) return;
         const adminEntry = await batch.get(EntryType.ADMIN);
-        if (null === adminEntry) {
-            await this.#addAdminIfNotSet(op, view, node);
+        if (null === adminEntry || !this.#isAdmin(adminEntry.value, node)) {
+            await this.#addAdminIfNotSet(op, view, node, batch);
         }
         else if (adminEntry.value.tracPublicKey === op.key) {
             await this.#addAdminIfSet(adminEntry.value, op, view, base, batch);
@@ -188,7 +188,7 @@ export class MainSettlementBus extends ReadyResource {
         }
     }
 
-    async #addAdminIfNotSet(op, view, node) {
+    async #addAdminIfNotSet(op, view, node, batch) {
         const isMessageVerifed = await this.#verifyMessage(op.value.sig, op.key, MsgUtils.createMessage(op.key, op.value.wk, op.value.nonce, op.type));
 
         if (node.from.key.toString('hex') === this.#bootstrap &&
@@ -233,8 +233,8 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async #addWriter(op, batch, base) {
-        const nodeEntry = await this.getSigned(op.key);
-        if (nodeEntry === null || !nodeEntry.isWriter) {
+        const nodeEntry = await batch.get(op.key);
+        if (nodeEntry === null || !nodeEntry.value.isWriter) {
             await base.addWriter(b4a.from(op.value.wk, 'hex'), { isIndexer: false })
             await batch.put(op.key, {
                 wk: op.value.wk,
@@ -246,8 +246,8 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async #handleApplyRemoveWriterOperation(op, view, base, node, batch) {
-        const adminEntry = await this.getSigned(EntryType.ADMIN);
-        if (!this.check.sanitizeAdminAndWritersOperations(op) || !this.#isAdmin(adminEntry, node)) return;
+        const adminEntry = await batch.get(EntryType.ADMIN);
+        if (null === adminEntry || !this.check.sanitizeAdminAndWritersOperations(op) || !this.#isAdmin(adminEntry.value, node)) return;
         const isMessageVerifed = await this.#verifyMessage(op.value.sig, op.key, MsgUtils.createMessage(op.key, op.value.wk, op.value.nonce, op.type));
         if (isMessageVerifed) {
             await this.#removeWriter(op, batch, base);
@@ -255,18 +255,19 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async #removeWriter(op, batch, base) {
-        const nodeEntry = await this.getSigned(op.key)
+        let nodeEntry = await batch.get(op.key)
         if (nodeEntry !== null) {
+            nodeEntry = nodeEntry.value;
             await base.removeWriter(b4a.from(nodeEntry.wk, 'hex'));
             nodeEntry.isWriter = false;
             if (nodeEntry.isIndexer) {
                 nodeEntry.isIndexer = false;
-                const indexersEntry = await this.getSigned(EntryType.INDEXERS);
-                if (indexersEntry && indexersEntry.includes(op.key)) {
-                    const idx = indexersEntry.indexOf(op.key);
+                const indexersEntry = await batch.get(EntryType.INDEXERS);
+                if (null !== indexersEntry && indexersEntry.value.includes(op.key)) {
+                    const idx = indexersEntry.value.indexOf(op.key);
                     if (idx !== -1) {
-                        indexersEntry.splice(idx, 1);
-                        await batch.put(EntryType.INDEXERS, indexersEntry);
+                        indexersEntry.value.splice(idx, 1);
+                        await batch.put(EntryType.INDEXERS, indexersEntry.value);
                     }
                 }
             }
@@ -281,27 +282,27 @@ export class MainSettlementBus extends ReadyResource {
             return;
         }
 
-        const adminEntry = await this.getSigned(EntryType.ADMIN);
-        if (!this.#isAdmin(adminEntry, node)) return;
+        const adminEntry = await batch.get(EntryType.ADMIN);
+        if (null === adminEntry || !this.#isAdmin(adminEntry.value, node)) return;
 
         if (!this.#isWhitelisted(op.key)) return;
 
-        const indexersEntry = await this.getSigned(EntryType.INDEXERS);
-        if (!indexersEntry || Array.from(indexersEntry).includes(op.key) ||
-            Array.from(indexersEntry).length >= MAX_INDEXERS) {
+        const indexersEntry = await batch.get(EntryType.INDEXERS);
+        if (null === indexersEntry || Array.from(indexersEntry.value).includes(op.key) ||
+            Array.from(indexersEntry.value).length >= MAX_INDEXERS) {
             return;
         }
-        const isMessageVerifed = await this.#verifyMessage(op.value.sig, adminEntry.tracPublicKey, MsgUtils.createMessage(op.key, op.value.nonce, op.type))
+        const isMessageVerifed = await this.#verifyMessage(op.value.sig, adminEntry.value.tracPublicKey, MsgUtils.createMessage(op.key, op.value.nonce, op.type))
         if (isMessageVerifed) {
-            await this.#addIndexer(indexersEntry, op, batch, base);
+            await this.#addIndexer(indexersEntry.value, op, batch, base);
         }
     }
 
     async #addIndexer(indexersEntry, op, batch, base) {
-        const nodeEntry = await this.getSigned(op.key);
+        let nodeEntry = await batch.get(op.key);
 
-        if (nodeEntry !== null && nodeEntry.isWriter && !nodeEntry.isIndexer) {
-
+        if (nodeEntry !== null && nodeEntry.value.isWriter && !nodeEntry.value.isIndexer) {
+            nodeEntry = nodeEntry.value;
             await base.removeWriter(b4a.from(nodeEntry.wk, 'hex'));
             await base.addWriter(b4a.from(nodeEntry.wk, 'hex'), { isIndexer: true })
             nodeEntry.isIndexer = true;
@@ -314,13 +315,15 @@ export class MainSettlementBus extends ReadyResource {
 
     async #handleApplyRemoveIndexerOperation(op, view, base, node, batch) {
         if (!this.check.sanitizeIndexerOrWhitelistOperations(op)) return;
-        const adminEntry = await this.getSigned(EntryType.ADMIN);
-        const indexersEntry = await this.getSigned(EntryType.INDEXERS);
-        if (!this.#isAdmin(adminEntry, node) || !indexersEntry || !Array.from(indexersEntry).includes(op.key) || Array.from(indexersEntry).length <= 1) return;
-        const isMessageVerifed = await this.#verifyMessage(op.value.sig, adminEntry.tracPublicKey, MsgUtils.createMessage(op.key, op.value.nonce, op.type))
+        const adminEntry = await batch.get(EntryType.ADMIN);
+        let indexersEntry = await batch.get(EntryType.INDEXERS);
+        if (null === adminEntry || !this.#isAdmin(adminEntry.value, node) || null === indexersEntry || !Array.from(indexersEntry.value).includes(op.key) || Array.from(indexersEntry.value).length <= 1) return;
+        const isMessageVerifed = await this.#verifyMessage(op.value.sig, adminEntry.value.tracPublicKey, MsgUtils.createMessage(op.key, op.value.nonce, op.type))
         if (isMessageVerifed) {
-            const nodeEntry = await this.getSigned(op.key);
-            if (nodeEntry !== null && nodeEntry.isWriter && nodeEntry.isIndexer) {
+            let nodeEntry = await batch.get(op.key);
+            if (nodeEntry !== null && nodeEntry.value.isWriter && nodeEntry.value.isIndexer) {
+                indexersEntry = indexersEntry.value;
+                nodeEntry = nodeEntry.value;
                 await base.removeWriter(b4a.from(nodeEntry.wk, 'hex'));
 
                 nodeEntry.isWriter = false;
