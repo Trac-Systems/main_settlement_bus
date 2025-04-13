@@ -69,7 +69,9 @@ class Network {
                         msg = JSON.parse(msg);
                         if(msg === 'get_writer_key'){
                             await connection.send(b4a.from(JSON.stringify({op:'writer_key', key : writingKey})));
+                            await connection.destroy();
                         } else if(msg.op !== undefined && msg.message !== undefined && msg.op === 'add_writer'){
+                            await connection.destroy();
                             msg = msg.message;
                             const adminEntry = await msb.getSigned(EntryType.ADMIN);
                             if(null === adminEntry || (adminEntry.tracPublicKey !== wallet.publicKey)) return;
@@ -118,7 +120,6 @@ class Network {
                                 networkInstance.tx_pool.push({ tx: parsedPreTx.tx, append_tx: append_tx });
                             }
                         }
-                        //await connection.destroy();
                     }catch(e){
                         console.log(e);
                     }

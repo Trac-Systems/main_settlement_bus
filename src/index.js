@@ -418,6 +418,7 @@ export class MainSettlementBus extends ReadyResource {
         const stream = this.#dht_node.connect(b4a.from(adminEntry.tracPublicKey, 'hex'))
         stream.on('connect', async function () {
             await stream.send(b4a.from(JSON.stringify({ op : 'add_writer', message : message })));
+            await stream.destroy();
         });
         stream.on('open', function () { });
         stream.on('close', () => { });
