@@ -39,6 +39,7 @@ class MsgUtils {
                 msg = this.createMessage(wallet.publicKey, keyParam, nonce, operationType);
                 hash = await createHash('sha256', msg);
                 value = {
+                    pub : wallet.publicKey,
                     wk: keyParam,
                     nonce: nonce,
                     sig: wallet.sign(hash)

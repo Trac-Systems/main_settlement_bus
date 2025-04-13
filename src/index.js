@@ -67,7 +67,7 @@ export class MainSettlementBus extends ReadyResource {
         this.#bee = null;
         this.#swarm = null;
         this.#dht_node = new DHT();
-        this.#dht_server = this.#dht_node.createServer();
+        this.#dht_server = null;
         this.#base = null;
         this.#writingKey = null;
         this.#enable_txchannel = options.enable_txchannel !== false;
@@ -121,7 +121,6 @@ export class MainSettlementBus extends ReadyResource {
         for (const node of nodes) {
             const op = node.value;
             const handler = this.#getApplyOperationHandler(op.type);
-
             if (handler) {
                 await handler(op, view, base, node, batch);
             } else {
@@ -164,7 +163,7 @@ export class MainSettlementBus extends ReadyResource {
     async #handleApplyAddAdminOperation(op, view, base, node, batch) {
         if (!this.check.sanitizeAdminAndWritersOperations(op)) return;
         const adminEntry = await batch.get(EntryType.ADMIN);
-        if (null === adminEntry || !this.#isAdmin(adminEntry.value, node)) {
+        if (null === adminEntry) {
             await this.#addAdminIfNotSet(op, view, node, batch);
         }
         else if (adminEntry.value.tracPublicKey === op.key) {
@@ -358,7 +357,8 @@ export class MainSettlementBus extends ReadyResource {
         }
 
         if (this.#enable_txchannel) {
-            await Network.dhtServer(this.#dht_server, this.#base, this.#wallet, this.#writingKey, this.#network);
+            this.#dht_server = this.#dht_node.createServer();
+            await Network.dhtServer(this, this.#dht_server, this.#base, this.#wallet, this.#writingKey, this.#network);
         }
 
         const adminEntry = await this.getSigned(EntryType.ADMIN);
@@ -415,11 +415,13 @@ export class MainSettlementBus extends ReadyResource {
         if (!adminEntry || !message) {
             return;
         }
-        this.#swarm.connections.forEach((conn) => {
-            if (b4a.from(conn.remotePublicKey).toString('hex') === adminEntry.tracPublicKey && conn.connected) {
-                conn.write(JSON.stringify(message));
-            }
+        const stream = this.#dht_node.connect(b4a.from(adminEntry.tracPublicKey, 'hex'))
+        stream.on('connect', async function () {
+            await stream.send(b4a.from(JSON.stringify({ op : 'add_writer', message : message })));
         });
+        stream.on('open', function () { });
+        stream.on('close', () => { });
+        stream.on('error', (error) => { });
     }
 
     async #verifyMessage(signature, publicKey, bufferMessage) {
@@ -438,6 +440,11 @@ export class MainSettlementBus extends ReadyResource {
     async #isAllowedToRequestRole(key, adminEntry) {
         const isWhitelisted = await this.#isWhitelisted(key);
         return !!(isWhitelisted && !this.#isAdmin(adminEntry));
+    }
+
+    async _isAllowedToRequestRole(key, adminEntry) {
+        const isWhitelisted = await this.#isWhitelisted(key);
+        return isWhitelisted && this.#isAdmin(adminEntry);
     }
 
     async #isWhitelisted(key) {
@@ -657,7 +664,6 @@ export class MainSettlementBus extends ReadyResource {
         if (assembledMessage) {
             this.#sendMessageToAdmin(adminEntry, assembledMessage);
         }
-
     }
 
     async #updateIndexerRole(tracPublicKey, toAdd) {

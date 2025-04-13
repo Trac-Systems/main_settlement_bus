@@ -69,6 +69,7 @@ class Check {
             value: {
                 $$strict: true,
                 $$type: "object",
+                pub: { type: 'is_hex_string', length: 64, required: true },
                 wk: { type: 'is_hex_string', length: 64, required: true },
                 nonce: { type: 'string', min: 1, max: 256, required: true },
                 sig: { type: 'is_hex_string', length: 128, required: true },

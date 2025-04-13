@@ -1,7 +1,15 @@
 import w from 'protomux-wakeup';
 import b4a from 'b4a';
 import Hyperswarm from 'hyperswarm';
-import { EventType, TRAC_NAMESPACE, MAX_PEERS, MAX_PARALLEL, MAX_SERVER_CONNECTIONS, OperationType } from './utils/constants.js';
+import {
+    EventType,
+    TRAC_NAMESPACE,
+    MAX_PEERS,
+    MAX_PARALLEL,
+    MAX_SERVER_CONNECTIONS,
+    OperationType,
+    EntryType
+} from './utils/constants.js';
 import {sleep } from './utils/functions.js';
 import MsgUtils from './utils/msgUtils.js';
 import Check from './utils/check.js';
@@ -52,27 +60,38 @@ class Network {
         return swarm;
     }
 
-    static async dhtServer(dhtServer, base, wallet, writingKey, networkInstance){
+    static async dhtServer(msb, dhtServer, base, wallet, writingKey, networkInstance){
         try{
             dhtServer.on('connection', function (connection) {
                 connection.on('message', async (msg) =>  {
-                    msg = b4a.toString(msg, 'utf-8');
-                    if(msg === 'get_writer_key'){
-                        await connection.send(b4a.from(JSON.stringify({op:'writer_key', key : writingKey})));
-                    } else {
+                    try{
+                        msg = b4a.toString(msg, 'utf-8');
+                        msg = JSON.parse(msg);
+                        if(msg === 'get_writer_key'){
+                            await connection.send(b4a.from(JSON.stringify({op:'writer_key', key : writingKey})));
+                        } else if(msg.op !== undefined && msg.message !== undefined && msg.op === 'add_writer'){
+                            msg = msg.message;
+                            const adminEntry = await msb.getSigned(EntryType.ADMIN);
+                            if(null === adminEntry || (adminEntry.tracPublicKey !== wallet.publicKey)) return;
+                            const nodeEntry = await msb.getSigned(msg.value.pub);
+                            const isAlreadyWriter = null !== nodeEntry && nodeEntry.isWriter;
+                            const isAllowedToRequestRole = await msb._isAllowedToRequestRole(msg.value.pub, adminEntry);
+                            const canAddWriter = base.writable && !isAlreadyWriter && isAllowedToRequestRole;
+                            if(msg.value.pub !== wallet.publicKey && canAddWriter){
+                                await base.append(msg);
+                            }
+                        } else {
+                            if (base.isIndexer || !base.writable) return;
 
-                        if (base.isIndexer || !base.writable) return;
+                            // TODO: decide if a tx rejection should be responded with
+                            if (networkInstance.tx_pool.length >= 1000) {
+                                console.log('pool full');
+                                return
+                            }
 
-                        // TODO: decide if a tx rejection should be responded with
-                        if (networkInstance.tx_pool.length >= 1000) {
-                            console.log('pool full');
-                            return
-                        }
+                            if (b4a.byteLength(msg) > 3072) return;
 
-                        if (b4a.byteLength(msg) > 3072) return;
-
-                        try {
-                            const parsedPreTx = JSON.parse(msg);
+                            const parsedPreTx = msg;
 
                             if (networkInstance.check.sanitizePreTx(parsedPreTx) &&
                                 wallet.verify(b4a.from(parsedPreTx.is, 'hex'), b4a.from(parsedPreTx.tx + parsedPreTx.in), b4a.from(parsedPreTx.ipk, 'hex')) &&
@@ -98,11 +117,11 @@ class Network {
                                 };
                                 networkInstance.tx_pool.push({ tx: parsedPreTx.tx, append_tx: append_tx });
                             }
-                        } catch (e) {
-                            console.log(e)
                         }
+                        //await connection.destroy();
+                    }catch(e){
+                        console.log(e);
                     }
-                    //await connection.destroy();
                 });
                 connection.on('close', () => { });
                 connection.on('error', (error) => { });
@@ -113,7 +132,7 @@ class Network {
             };
             await dhtServer.listen(keyPair)
             console.log('DHT node is listening on public key', wallet.publicKey);
-        } catch(e) { }
+        } catch(e) { console.log(e) }
     }
 
     async pool(base) {
