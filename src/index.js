@@ -12,6 +12,10 @@ import MsgUtils from './utils/msgUtils.js';
 import { LISTENER_TIMEOUT, EntryType, OperationType, EventType, ACK_INTERVAL, WHITELIST_SLEEP_INTERVAL, UPDATER_INTERVAL, MAX_INDEXERS, MIN_INDEXERS, WHITELIST_PREFIX } from './utils/constants.js';
 import Network from './network.js';
 import Check from './utils/check.js';
+
+import DHT from 'hyperdht'
+import process from 'process'
+
 //TODO: CHANGE NONCE.
 
 export class MainSettlementBus extends ReadyResource {
@@ -29,7 +33,8 @@ export class MainSettlementBus extends ReadyResource {
     #store;
     #bee;
     #swarm;
-    #tx_swarm;
+    #dht_server;
+    #dht_node;
     #base;
     #writingKey;
     #enable_txchannel;
@@ -61,7 +66,8 @@ export class MainSettlementBus extends ReadyResource {
         this.#store = new Corestore(this.STORES_DIRECTORY + options.store_name);
         this.#bee = null;
         this.#swarm = null;
-        this.#tx_swarm = null;
+        this.#dht_node = new DHT();
+        this.#dht_server = this.#dht_node.createServer();
         this.#base = null;
         this.#writingKey = null;
         this.#enable_txchannel = options.enable_txchannel !== false;
@@ -148,7 +154,7 @@ export class MainSettlementBus extends ReadyResource {
             op.key === postTx.tx &&
             this.#wallet.verify(b4a.from(postTx.is, 'hex'), b4a.from(postTx.tx + postTx.in), b4a.from(postTx.ipk, 'hex')) && // sender verification
             this.#wallet.verify(b4a.from(postTx.ws, 'hex'), b4a.from(postTx.tx + postTx.wn), b4a.from(postTx.wp, 'hex')) && // writer verification
-            postTx.tx === await this.generateTx(postTx.bs, this.bootstrap, postTx.w, postTx.i, postTx.ipk, postTx.ch, postTx.in) &&
+            postTx.tx === await this.generateTx(postTx.bs, this.bootstrap, postTx.wp, postTx.i, postTx.ipk, postTx.ch, postTx.in) &&
             b4a.byteLength(JSON.stringify(postTx)) <= 4096
         ) {
             await batch.put(op.key, op.value);
@@ -345,14 +351,14 @@ export class MainSettlementBus extends ReadyResource {
         console.log('MSB Key:', b4a.from(this.#base.view.core.key).toString('hex'));
 
         this.#writingKey = b4a.toString(this.#base.local.key, 'hex');
-        console.log('Writing Key:', this.#writingKey);
+        console.log('Writer Key:', this.#writingKey);
 
         if (this.#replicate) {
             this.#swarm = await Network.replicate(this.#swarm, this.#enable_wallet, this.#store, this.#wallet, this.#channel, this.#isStreaming, this.#handleIncomingEvent.bind(this), this.emit.bind(this));
         }
 
         if (this.#enable_txchannel) {
-            this.#tx_swarm = await Network.txChannel(this.#tx_swarm, this.#tx, this.#base, this.#wallet, this.#writingKey, this.#network);
+            await Network.dhtServer(this.#dht_server, this.#base, this.#wallet, this.#writingKey, this.#network);
         }
 
         const adminEntry = await this.getSigned(EntryType.ADMIN);
@@ -381,8 +387,17 @@ export class MainSettlementBus extends ReadyResource {
         if (this.#swarm) {
             await this.#swarm.destroy();
         }
-        if (this.#tx_swarm) {
-            await this.#tx_swarm.destroy();
+        if (this.#dht_server) {
+            try{
+                await this.#dht_server.close();
+            } catch(e){
+                console.log(e.message);
+            }
+        }
+        try{
+            this.#dht_node.destroy();
+        } catch(e){
+            console.log(e.message);
         }
         await this.#base.close();
     }
