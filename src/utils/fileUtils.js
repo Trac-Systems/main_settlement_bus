@@ -1,4 +1,4 @@
-import fs from 'node:fs';
+import fs from 'fs';
 import {WHITELIST_FILEPATH} from '../utils/constants.js';
 
 async function readPublicKeysFromFile() {

@@ -1,4 +1,3 @@
-import ReadyResource from 'ready-resource';
 import { isHexString, createHash } from './functions.js';
 import { OperationType } from './constants.js';
 import fileUtils from './fileUtils.js';
