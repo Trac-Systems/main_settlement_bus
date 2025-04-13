@@ -108,7 +108,7 @@ class Check {
             op: { type: 'string', enum: ['pre-tx'], required: true },
             tx: { type: 'is_hex_string', required: true }, // TODO: if we will use only 256 bit hash then change to length: 64
             is: { type: 'is_hex_string', length: 128, required: true },
-            w: { type: 'is_hex_string', length: 64, required: true },
+            wp: { type: 'is_hex_string', length: 64, required: true },
             i: { type: 'is_hex_string', length: 64, required: true },
             ipk: { type: 'is_hex_string', length: 64, required: true },
             ch: { type: 'is_hex_string', required: true }, // TODO: if we will use only 256 bit hash then change to length: 64
