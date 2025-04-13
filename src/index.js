@@ -147,7 +147,6 @@ export class MainSettlementBus extends ReadyResource {
 
     async #handleApplyTxOperation(op, view, base, node, batch) {
         const postTx = op.value;
-
         if (postTx.op === OperationType.POST_TX &&
             null === await batch.get(op.key) &&
             this.check.sanitizePostTx(op) &&
@@ -164,24 +163,23 @@ export class MainSettlementBus extends ReadyResource {
 
     async #handleApplyAddAdminOperation(op, view, base, node, batch) {
         if (!this.check.sanitizeAdminAndWritersOperations(op)) return;
-
-        const adminEntry = await this.getSigned(EntryType.ADMIN);
-        if (!adminEntry) {
+        const adminEntry = await batch.get(EntryType.ADMIN);
+        if (null === adminEntry) {
             await this.#addAdminIfNotSet(op, view, node);
         }
-        else if (adminEntry.tracPublicKey === op.key) {
-            await this.#addAdminIfSet(adminEntry, op, view, base);
+        else if (adminEntry.value.tracPublicKey === op.key) {
+            await this.#addAdminIfSet(adminEntry.value, op, view, base, batch);
         }
     }
 
-    async #addAdminIfSet(adminEntry, op, view, base) {
+    async #addAdminIfSet(adminEntry, op, view, base, batch) {
         const isMessageVerifed = await this.#verifyMessage(op.value.sig, adminEntry.tracPublicKey, MsgUtils.createMessage(adminEntry.tracPublicKey, op.value.wk, op.value.nonce, op.type));
         if (isMessageVerifed) {
-            const indexersEntry = await this.getSigned(EntryType.INDEXERS);
-            if (indexersEntry && indexersEntry.includes(adminEntry.tracPublicKey)) {
+            const indexersEntry = await batch.get(EntryType.INDEXERS);
+            if (null !== indexersEntry && indexersEntry.value.includes(adminEntry.tracPublicKey)) {
                 await base.removeWriter(b4a.from(adminEntry.wk, 'hex'));
                 await base.addWriter(b4a.from(op.value.wk, 'hex'), { isIndexer: true })
-                await view.put(EntryType.ADMIN, {
+                await batch.put(EntryType.ADMIN, {
                     tracPublicKey: adminEntry.tracPublicKey,
                     wk: op.value.wk
                 })
@@ -197,49 +195,48 @@ export class MainSettlementBus extends ReadyResource {
             op.value.wk === this.#bootstrap &&
             isMessageVerifed
         ) {
-            await view.put(EntryType.ADMIN, {
+            await batch.put(EntryType.ADMIN, {
                 tracPublicKey: op.key,
                 wk: this.#bootstrap
             })
             const initIndexers = [op.key];
-            await view.put(EntryType.INDEXERS, initIndexers);
+            await batch.put(EntryType.INDEXERS, initIndexers);
             console.log(`Admin added: ${op.key}:${this.#bootstrap}`);
         }
     }
 
     async #handleApplyAppendWhitelistOperation(op, view, base, node, batch) {
-
-        const adminEntry = await this.getSigned(EntryType.ADMIN);
-        if (!this.check.sanitizeIndexerOrWhitelistOperations(op) || !this.#isAdmin(adminEntry, node)) return;
-        const isMessageVerifed = await this.#verifyMessage(op.value.sig, adminEntry.tracPublicKey, MsgUtils.createMessage(op.key, op.value.nonce, op.type));
+        const adminEntry = await batch.get(EntryType.ADMIN);
+        if (null === adminEntry || !this.check.sanitizeIndexerOrWhitelistOperations(op) || !this.#isAdmin(adminEntry.value, node)) return;
+        const isMessageVerifed = await this.#verifyMessage(op.value.sig, adminEntry.value.tracPublicKey, MsgUtils.createMessage(op.key, op.value.nonce, op.type));
         if (!isMessageVerifed) return;
         const isWhitelisted = await this.#isWhitelisted(op.key);
         if (isWhitelisted) return;
-        await this.#createWhitelistEntry(view, op.key);
+        await this.#createWhitelistEntry(batch, op.key);
     }
 
-    async #createWhitelistEntry(view, pubKey) {
+    async #createWhitelistEntry(batch, pubKey) {
         const whitelistKey = WHITELIST_PREFIX + pubKey;
-        await view.put(whitelistKey, true);
+        await batch.put(whitelistKey, true);
     }
 
     async #handleApplyAddWriterOperation(op, view, base, node, batch) {
-        const adminEntry = await this.getSigned(EntryType.ADMIN);
-        if (!this.check.sanitizeAdminAndWritersOperations(op) || !this.#isAdmin(adminEntry, node)) return;
+        const adminEntry = await batch.get(EntryType.ADMIN);
+        if (null === adminEntry || !this.check.sanitizeAdminAndWritersOperations(op) || !this.#isAdmin(adminEntry.value, node)) return;
 
         const isWhitelisted = await this.#isWhitelisted(op.key);
         if (!isWhitelisted) return;
         const isMessageVerifed = await this.#verifyMessage(op.value.sig, op.key, MsgUtils.createMessage(op.key, op.value.wk, op.value.nonce, op.type));
         if (isMessageVerifed) {
-            await this.#addWriter(op, view, base);
+            await this.#addWriter(op, batch, base);
         }
     }
 
-    async #addWriter(op, view, base) {
+    async #addWriter(op, batch, base) {
         const nodeEntry = await this.getSigned(op.key);
         if (nodeEntry === null || !nodeEntry.isWriter) {
             await base.addWriter(b4a.from(op.value.wk, 'hex'), { isIndexer: false })
-            await view.put(op.key, {
+            await batch.put(op.key, {
                 wk: op.value.wk,
                 isWriter: true,
                 isIndexer: false
@@ -253,11 +250,11 @@ export class MainSettlementBus extends ReadyResource {
         if (!this.check.sanitizeAdminAndWritersOperations(op) || !this.#isAdmin(adminEntry, node)) return;
         const isMessageVerifed = await this.#verifyMessage(op.value.sig, op.key, MsgUtils.createMessage(op.key, op.value.wk, op.value.nonce, op.type));
         if (isMessageVerifed) {
-            await this.#removeWriter(op, view, base);
+            await this.#removeWriter(op, batch, base);
         }
     }
 
-    async #removeWriter(op, view, base) {
+    async #removeWriter(op, batch, base) {
         const nodeEntry = await this.getSigned(op.key)
         if (nodeEntry !== null) {
             await base.removeWriter(b4a.from(nodeEntry.wk, 'hex'));
@@ -269,12 +266,12 @@ export class MainSettlementBus extends ReadyResource {
                     const idx = indexersEntry.indexOf(op.key);
                     if (idx !== -1) {
                         indexersEntry.splice(idx, 1);
-                        await view.put(EntryType.INDEXERS, indexersEntry);
+                        await batch.put(EntryType.INDEXERS, indexersEntry);
                     }
                 }
             }
 
-            await view.put(op.key, nodeEntry);
+            await batch.put(op.key, nodeEntry);
             console.log(`Writer removed: ${op.key}:${op.value.wk}`);
         }
     }
@@ -296,11 +293,11 @@ export class MainSettlementBus extends ReadyResource {
         }
         const isMessageVerifed = await this.#verifyMessage(op.value.sig, adminEntry.tracPublicKey, MsgUtils.createMessage(op.key, op.value.nonce, op.type))
         if (isMessageVerifed) {
-            await this.#addIndexer(indexersEntry, op, view, base);
+            await this.#addIndexer(indexersEntry, op, batch, base);
         }
     }
 
-    async #addIndexer(indexersEntry, op, view, base) {
+    async #addIndexer(indexersEntry, op, batch, base) {
         const nodeEntry = await this.getSigned(op.key);
 
         if (nodeEntry !== null && nodeEntry.isWriter && !nodeEntry.isIndexer) {
@@ -308,9 +305,9 @@ export class MainSettlementBus extends ReadyResource {
             await base.removeWriter(b4a.from(nodeEntry.wk, 'hex'));
             await base.addWriter(b4a.from(nodeEntry.wk, 'hex'), { isIndexer: true })
             nodeEntry.isIndexer = true;
-            await view.put(op.key, nodeEntry);
+            await batch.put(op.key, nodeEntry);
             indexersEntry.push(op.key);
-            await view.put(EntryType.INDEXERS, indexersEntry);
+            await batch.put(EntryType.INDEXERS, indexersEntry);
             console.log(`Indexer added: ${op.key}:${nodeEntry.wk}`);
         }
     }
@@ -328,12 +325,12 @@ export class MainSettlementBus extends ReadyResource {
 
                 nodeEntry.isWriter = false;
                 nodeEntry.isIndexer = false;
-                await view.put(op.key, nodeEntry);
+                await batch.put(op.key, nodeEntry);
 
                 const idx = indexersEntry.indexOf(op.key);
                 if (idx !== -1) {
                     indexersEntry.splice(idx, 1);
-                    await view.put(EntryType.INDEXERS, indexersEntry);
+                    await batch.put(EntryType.INDEXERS, indexersEntry);
                 }
 
                 console.log(`Indexer removed: ${op.key}:${nodeEntry.wk}`);
