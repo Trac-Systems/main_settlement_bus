@@ -1,6 +1,6 @@
 import ReadyResource from 'ready-resource';
 import { createHash } from 'crypto';
-import fs from 'node:fs';
+import fs from 'fs';
 //TODO: GENERATE NONCE WITH CRYPTO LIBRARY WHICH ALLOW US TO GENERATE IT WITH UNIFORM DISTRIBUTION.
 
 const FILEPATH = './whitelist/pubkeys.csv';

@@ -1,5 +1,4 @@
 import b4a from 'b4a';
-import { createHash as nodeCreateHash } from 'crypto';
 import sodium from 'sodium-native';
 
 export function isHexString(string) {
