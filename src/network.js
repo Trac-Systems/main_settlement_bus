@@ -16,7 +16,7 @@ class Network {
     }
 
 
-    static async replicate(swarm, walletEnabled, store, wallet, channel, isStreaming, handleIncomingEvent, emit) {
+    static async replicate(bootstrap, swarm, walletEnabled, store, wallet, channel, isStreaming, handleIncomingEvent, emit) {
         if (!swarm) {
             let keyPair;
             if (!walletEnabled) {
@@ -28,7 +28,7 @@ class Network {
                 };
             }
 
-            swarm = new Hyperswarm({ keyPair, maxPeers: MAX_PEERS, maxParallel: MAX_PARALLEL, maxServerConnections: MAX_SERVER_CONNECTIONS });
+            swarm = new Hyperswarm({ keyPair, bootstrap, maxPeers: MAX_PEERS, maxParallel: MAX_PARALLEL, maxServerConnections: MAX_SERVER_CONNECTIONS });
 
             console.log(`Channel: ${b4a.toString(channel)}`);
             swarm.on('connection', async (connection) => {
@@ -75,6 +75,7 @@ class Network {
                                 await base.append(msg);
                             }
                         } else {
+                            await connection.destroy();
                             if (base.isIndexer || !base.writable) return;
 
                             // TODO: decide if a tx rejection should be responded with
