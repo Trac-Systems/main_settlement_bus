@@ -12,9 +12,7 @@ import MsgUtils from './utils/msgUtils.js';
 import { LISTENER_TIMEOUT, EntryType, OperationType, EventType, ACK_INTERVAL, WHITELIST_SLEEP_INTERVAL, UPDATER_INTERVAL, MAX_INDEXERS, MIN_INDEXERS, WHITELIST_PREFIX } from './utils/constants.js';
 import Network from './network.js';
 import Check from './utils/check.js';
-
 import DHT from 'hyperdht'
-import process from 'process'
 
 //TODO: CHANGE NONCE.
 
@@ -52,9 +50,9 @@ export class MainSettlementBus extends ReadyResource {
         this.#initInternalAttributes(options);
         this.msbListener();
         this.#boot();
-        this.ready().catch(noop);
         this.#setupInternalListeners();
         this.#network = new Network(this.#base);
+        this.ready().catch(noop);
     }
 
     #initInternalAttributes(options) {
