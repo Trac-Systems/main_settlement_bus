@@ -148,6 +148,7 @@ class Network {
                         }
                     }catch(e){
                         console.log(e);
+                        try{ await connection.destroy(); }catch (e){}
                     }
                 });
                 connection.on('close', () => { });
