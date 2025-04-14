@@ -83,9 +83,9 @@ class Network {
                         } else if(msg.op !== undefined && msg.message !== undefined && msg.op === 'add_writer'){
                             await connection.destroy();
                             msg = msg.message;
-                            const adminEntry = await msb.getSigned(EntryType.ADMIN);
+                            const adminEntry = await msb.get(EntryType.ADMIN);
                             if(null === adminEntry || (adminEntry.tracPublicKey !== wallet.publicKey)) return;
-                            const nodeEntry = await msb.getSigned(msg.value.pub);
+                            const nodeEntry = await msb.get(msg.value.pub);
                             const isAlreadyWriter = null !== nodeEntry && nodeEntry.isWriter;
                             const isAllowedToRequestRole = await msb._isAllowedToRequestRole(msg.value.pub, adminEntry);
                             const canAddWriter = base.writable && !isAlreadyWriter && isAllowedToRequestRole;

@@ -67,7 +67,7 @@ export class MainSettlementBus extends ReadyResource {
         this.#store = new Corestore(this.STORES_DIRECTORY + options.store_name);
         this.#bee = null;
         this.#swarm = null;
-        this.#dht_bootstrap = ['116.202.214.143:10001','116.202.214.149:10001', 'node1.hyperdht.org:49737', 'node2.hyperdht.org:49737', 'node3.hyperdht.org:49737'];
+        this.#dht_bootstrap = [/*'116.202.214.143:10001','116.202.214.149:10001', */'node1.hyperdht.org:49737', 'node2.hyperdht.org:49737', 'node3.hyperdht.org:49737'];
         this.#dht_node = new DHT({ bootstrap: this.#dht_bootstrap });
         this.#dht_server = null;
         this.#base = null;
@@ -379,7 +379,7 @@ export class MainSettlementBus extends ReadyResource {
             await Network.dhtServer(this, this.#dht_server, this.#base, this.#wallet, this.#writingKey, this.#network);
         }
 
-        const adminEntry = await this.getSigned(EntryType.ADMIN);
+        const adminEntry = await this.get(EntryType.ADMIN);
 
         if (this.#isAdmin(adminEntry)) {
             this.#shouldListenToAdminEvents = true;
@@ -391,7 +391,7 @@ export class MainSettlementBus extends ReadyResource {
 
         //await this.#setUpRoleAutomatically(adminEntry);
 
-        if (this.#enable_updater) {
+        if (this.#enable_updater && this.#base.writable) {
             this.updater();// TODO: NODE AFTER BECOMING A writer should start the updater
         }
 
@@ -501,7 +501,7 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async getWhitelistEntry(key) {
-        const entry = await this.getSigned(WHITELIST_PREFIX + key);
+        const entry = await this.get(WHITELIST_PREFIX + key);
         return entry
     }
 
@@ -542,7 +542,7 @@ export class MainSettlementBus extends ReadyResource {
         });
 
         this.#base.on(EventType.WRITABLE, async () => {
-            const updatedNodeEntry = await this.getSigned(this.#wallet.publicKey);
+            const updatedNodeEntry = await this.get(this.#wallet.publicKey);
             const canEnableWriterEvents = updatedNodeEntry &&
                 updatedNodeEntry.wk === this.#writingKey &&
                 !this.#shouldListenToWriterEvents;
@@ -559,7 +559,7 @@ export class MainSettlementBus extends ReadyResource {
                 console.log('Current node is unwritable');
                 return;
             }
-            const updatedNodeEntry = await this.getSigned(this.#wallet.publicKey);
+            const updatedNodeEntry = await this.get(this.#wallet.publicKey);
             const canDisableWriterEvents = updatedNodeEntry &&
                 !updatedNodeEntry.isWriter &&
                 this.#shouldListenToWriterEvents;
@@ -586,7 +586,7 @@ export class MainSettlementBus extends ReadyResource {
     async #writerEventListener() {
         this.on(EventType.WRITER_EVENT, async (parsedRequest) => {
             if(this.#enable_wallet === false) return;
-            const adminEntry = await this.getSigned(EntryType.ADMIN);
+            const adminEntry = await this.get(EntryType.ADMIN);
             const isEventMessageVerifed = await MsgUtils.verifyEventMessage(parsedRequest, this.#wallet)
             if (adminEntry && adminEntry.tracPublicKey === parsedRequest.key && isEventMessageVerifed) {
                 await this.#base.append(parsedRequest);
@@ -604,7 +604,7 @@ export class MainSettlementBus extends ReadyResource {
 
     async #handleAdminOperations() {
         //TODO: ADJUST FOR WHITELIST STRUCTURE
-        const adminEntry = await this.getSigned(EntryType.ADMIN);
+        const adminEntry = await this.get(EntryType.ADMIN);
         const addAdminMessage = await MsgUtils.assembleAdminMessage(adminEntry, this.#writingKey, this.#wallet, this.#bootstrap);
         if (!adminEntry && this.#wallet && this.#writingKey && this.#writingKey === this.#bootstrap) {
             await this.#base.append(addAdminMessage);
@@ -613,7 +613,7 @@ export class MainSettlementBus extends ReadyResource {
             for (const conn of this.#swarm.connections) {
 
                 const remotePublicKeyHex = b4a.from(conn.remotePublicKey).toString('hex');
-                const remotePublicKeyEntry = await this.getSigned(remotePublicKeyHex);
+                const remotePublicKeyEntry = await this.get(remotePublicKeyHex);
                 const isWhitelisted = await this.#isWhitelisted(remotePublicKeyHex);
 
                 if (conn.connected &&
@@ -632,7 +632,7 @@ export class MainSettlementBus extends ReadyResource {
         }
 
         setTimeout(async () => {
-            const updatedAdminEntry = await this.getSigned(EntryType.ADMIN);
+            const updatedAdminEntry = await this.get(EntryType.ADMIN);
             if (this.#isAdmin(updatedAdminEntry) && !this.#shouldListenToAdminEvents) {
                 this.#shouldListenToAdminEvents = true;
                 this.#adminEventListener();
@@ -643,7 +643,7 @@ export class MainSettlementBus extends ReadyResource {
 
     async #handleWhitelistOperations() {
         if(this.#enable_wallet === false) return;
-        const adminEntry = await this.getSigned(EntryType.ADMIN);
+        const adminEntry = await this.get(EntryType.ADMIN);
         if (!this.#isAdmin(adminEntry)) return;
 
         const assembledWhitelistMessages = await MsgUtils.assembleWhitelistMessages(adminEntry, this.#wallet);
@@ -675,8 +675,8 @@ export class MainSettlementBus extends ReadyResource {
 
     async #requestWriterRole(toAdd) {
         if(this.#enable_wallet === false) return;
-        const adminEntry = await this.getSigned(EntryType.ADMIN);
-        const nodeEntry = await this.getSigned(this.#wallet.publicKey);
+        const adminEntry = await this.get(EntryType.ADMIN);
+        const nodeEntry = await this.get(this.#wallet.publicKey);
         const isAlreadyWriter = !!(nodeEntry && nodeEntry.isWriter)
         let assembledMessage = null;
         if (toAdd) {
@@ -699,16 +699,16 @@ export class MainSettlementBus extends ReadyResource {
 
     async #updateIndexerRole(tracPublicKey, toAdd) {
         if(this.#enable_wallet === false) return;
-        const adminEntry = await this.getSigned(EntryType.ADMIN);
+        const adminEntry = await this.get(EntryType.ADMIN);
         if (!this.#isAdmin(adminEntry) && !this.#base.writable) return;
 
         const isWhitelisted = await this.#isWhitelisted(tracPublicKey);
         if (!isWhitelisted) return;
 
-        const nodeEntry = await this.getSigned(tracPublicKey);
+        const nodeEntry = await this.get(tracPublicKey);
         if (!nodeEntry || !nodeEntry.isWriter) return;
 
-        const indexersEntry = await this.getSigned(EntryType.INDEXERS);
+        const indexersEntry = await this.get(EntryType.INDEXERS);
 
         if (toAdd) {
             const canAddIndexer = !nodeEntry.isIndexer && indexersEntry.length <= MAX_INDEXERS;
@@ -791,9 +791,9 @@ export class MainSettlementBus extends ReadyResource {
                 case '/show':
                     // /get_node_info 9da99d98f02f24bdb13d46ba5d346c9a3eda03c18ab6e1441b7bac9743cf0bcc1
                     // Only for DEBUG
-                    const admin = await this.getSigned(EntryType.ADMIN);
+                    const admin = await this.get(EntryType.ADMIN);
                     console.log('Admin:', admin);
-                    const indexers = await this.getSigned(EntryType.INDEXERS);
+                    const indexers = await this.get(EntryType.INDEXERS);
                     console.log('Indexers:', indexers);
                     break;
                 case '/dag':
