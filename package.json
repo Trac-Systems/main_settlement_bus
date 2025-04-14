@@ -1,7 +1,7 @@
 {
   "name": "trac-msb",
   "main": "msb.mjs",
-  "version": "0.0.87",
+  "version": "0.0.92",
   "pear": {
     "name": "trac-msb",
     "type": "terminal"
@@ -57,7 +57,7 @@
     "hypercore": "11.1.2",
     "hypercore-crypto": "3.4.0",
     "hyperdht": "^6.20.1",
-    "hyperswarm": "4.11.1",
+    "hyperswarm": "4.11.4",
     "inspector": "npm:bare-node-inspector",
     "is-options": "1.0.2",
     "module": "npm:bare-node-module",

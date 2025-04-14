@@ -1,7 +1,18 @@
 import w from 'protomux-wakeup';
 import b4a from 'b4a';
 import Hyperswarm from 'hyperswarm';
-import { EventType, TRAC_NAMESPACE, MAX_PEERS, MAX_PARALLEL, MAX_SERVER_CONNECTIONS, OperationType, NetworkError, TRY_CONNECT_TIMEOUT } from './utils/constants.js';
+import {
+    EventType,
+    TRAC_NAMESPACE,
+    MAX_PEERS,
+    MAX_PARALLEL,
+    MAX_SERVER_CONNECTIONS,
+    MAX_CLIENT_CONNECTIONS,
+    OperationType,
+    EntryType,
+    NetworkError,
+    TRY_CONNECT_TIMEOUT
+} from './utils/constants.js';
 import {sleep } from './utils/functions.js';
 import MsgUtils from './utils/msgUtils.js';
 import Check from './utils/check.js';
@@ -28,7 +39,7 @@ class Network {
                 };
             }
 
-            swarm = new Hyperswarm({ keyPair, bootstrap, maxPeers: MAX_PEERS, maxParallel: MAX_PARALLEL, maxServerConnections: MAX_SERVER_CONNECTIONS });
+            swarm = new Hyperswarm({ keyPair, bootstrap : bootstrap, maxPeers: MAX_PEERS, maxParallel: MAX_PARALLEL, maxServerConnections: MAX_SERVER_CONNECTIONS, maxClientConnections :  MAX_CLIENT_CONNECTIONS});
 
             console.log(`Channel: ${b4a.toString(channel)}`);
             swarm.on('connection', async (connection) => {
@@ -45,9 +56,16 @@ class Network {
                 }
             });
 
-            swarm.join(channel, { server: true, client: true });
+            const discovery = swarm.join(channel, { server: true, client: true });
             await swarm.flush();
-            console.log('Joined channel for peer discovery');
+            console.log('Joined channel');
+            async function refresh(){
+                await discovery.refresh();
+                setTimeout(function(){
+                    refresh();
+                }, 30_000);
+            }
+            await refresh();
         }
         return swarm;
     }
@@ -58,7 +76,9 @@ class Network {
                 connection.on('message', async (msg) =>  {
                     try{
                         msg = b4a.toString(msg, 'utf-8');
+                        //console.log(msg);
                         msg = JSON.parse(msg);
+                        if(null === msg) return;
                         if(msg === 'get_writer_key'){
                             await connection.send(b4a.from(JSON.stringify({op:'writer_key', key : writingKey})));
                             await connection.destroy();
@@ -75,7 +95,7 @@ class Network {
                                 await base.append(msg);
                             }
                         } else {
-                            await connection.destroy();
+                            //await connection.destroy();
                             if (base.isIndexer || !base.writable) return;
 
                             // TODO: decide if a tx rejection should be responded with
