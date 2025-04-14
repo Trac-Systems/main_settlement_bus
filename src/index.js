@@ -58,7 +58,6 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     #initInternalAttributes(options) {
-        //TODO: change visibility of the attributes to private. Most of them should be internal.
         this.#STORES_DIRECTORY = options.stores_directory;
         this.#KEY_PAIR_PATH = `${this.STORES_DIRECTORY}${options.store_name}/db/keypair.json`
         this.#bootstrap = options.bootstrap || null;
@@ -208,13 +207,11 @@ export class MainSettlementBus extends ReadyResource {
 
     async #handleApplyAppendWhitelistOperation(op, view, base, node, batch) {
         const adminEntry = await batch.get(EntryType.ADMIN);
-        if (null === adminEntry || !this.check.sanitizeIndexerOrWhitelistOperations(op) /* TODO: This cannot work, needs to be signed, not checked against wallet!!! || !this.#isAdmin(adminEntry.value, node)*/) return;
-        // TODO: is the below an admin signature?
+        if (null === adminEntry || !this.check.sanitizeIndexerOrWhitelistOperations(op) || !this.#isAdmin(adminEntry.value, node)) return;
+        // TODO: is the below an admin signature? - yes
         const isMessageVerifed = await this.#verifyMessage(op.value.sig, adminEntry.value.tracPublicKey, MsgUtils.createMessage(op.key, op.value.nonce, op.type));
-        console.log('isMessageVerifed', isMessageVerifed);
         if (!isMessageVerifed) return;
         const isWhitelisted = await this.#isWhitelisted2(op.key, batch);
-        console.log('iswhitelisted', isWhitelisted);
         if (isWhitelisted) return;
         await this.#createWhitelistEntry(batch, op.key);
     }
@@ -226,12 +223,12 @@ export class MainSettlementBus extends ReadyResource {
 
     async #handleApplyAddWriterOperation(op, view, base, node, batch) {
         const adminEntry = await batch.get(EntryType.ADMIN);
-        if (null === adminEntry || !this.check.sanitizeAdminAndWritersOperations(op) /*TODO: this cannot work, needs to be signed, not checked against wallet!!! || !this.#isAdmin(adminEntry.value, node)*/) return;
+        if (null === adminEntry || !this.check.sanitizeAdminAndWritersOperations(op) || !this.#isAdmin(adminEntry.value, node)) return;
 
         const isWhitelisted = await this.#isWhitelisted2(op.key, batch);
         if (!isWhitelisted || op.key !== op.value.pub) return;
         // TODO: if the below is not a message signed by admin BUT this handler is supposed to be executed by the admin, then use admin signatures in apply!
-        const isMessageVerifed = await this.#verifyMessage(op.value.sig, op.key, MsgUtils.createMessage(op.key, op.value.wk, op.value.nonce, op.type));
+        const isMessageVerifed = await this.#verifyMessage(op.value.sig, op.key, MsgUtils.createMessage(op.key, op.value.pub, op.value.wk, op.value.nonce, op.type));
         if (isMessageVerifed) {
             await this.#addWriter(op, batch, base);
         }
@@ -261,9 +258,9 @@ export class MainSettlementBus extends ReadyResource {
 
     async #handleApplyRemoveWriterOperation(op, view, base, node, batch) {
         const adminEntry = await batch.get(EntryType.ADMIN);
-        if (null === adminEntry || !this.check.sanitizeAdminAndWritersOperations(op) /*TODO: this cannot work, needs to be signed, not checked against wallet!!! || !this.#isAdmin(adminEntry.value, node)*/) return;
+        if (null === adminEntry || !this.check.sanitizeAdminAndWritersOperations(op) || !this.#isAdmin(adminEntry.value, node)) return;
         // TODO: if the below is not a message signed by admin BUT this handler is supposed to be executed by the admin, then use admin signatures in apply!
-        const isMessageVerifed = await this.#verifyMessage(op.value.sig, op.key, MsgUtils.createMessage(op.key, op.value.wk, op.value.nonce, op.type));
+        const isMessageVerifed = await this.#verifyMessage(op.value.sig, op.key, MsgUtils.createMessage(op.key,op.value.pub, op.value.wk, op.value.nonce, op.type));
         if (isMessageVerifed) {
             await this.#removeWriter(op, batch, base);
         }
@@ -298,7 +295,7 @@ export class MainSettlementBus extends ReadyResource {
         }
 
         const adminEntry = await batch.get(EntryType.ADMIN);
-        if (null === adminEntry /* TODO: this cannot work!!!! || !this.#isAdmin(adminEntry.value, node)*/) return;
+        if (null === adminEntry || !this.#isAdmin(adminEntry.value, node)) return;
 
         if (!this.#isWhitelisted2(op.key, batch)) return;
 
@@ -307,7 +304,7 @@ export class MainSettlementBus extends ReadyResource {
             Array.from(indexersEntry.value).length >= MAX_INDEXERS) {
             return;
         }
-        // TODO: is the below an admin signature?
+        // TODO: is the below an admin signature? -yes
         const isMessageVerifed = await this.#verifyMessage(op.value.sig, adminEntry.value.tracPublicKey, MsgUtils.createMessage(op.key, op.value.nonce, op.type))
         if (isMessageVerifed) {
             await this.#addIndexer(indexersEntry.value, op, batch, base);
@@ -333,8 +330,8 @@ export class MainSettlementBus extends ReadyResource {
         if (!this.check.sanitizeIndexerOrWhitelistOperations(op)) return;
         const adminEntry = await batch.get(EntryType.ADMIN);
         let indexersEntry = await batch.get(EntryType.INDEXERS);
-        if (null === adminEntry /* TODO: this cannot work!!! || !this.#isAdmin(adminEntry.value, node) */ || null === indexersEntry || !Array.from(indexersEntry.value).includes(op.key) || Array.from(indexersEntry.value).length <= 1) return;
-        // TODO: is the below an admin signature?
+        if (null === adminEntry  || !this.#isAdmin(adminEntry.value, node) || null === indexersEntry || !Array.from(indexersEntry.value).includes(op.key) || Array.from(indexersEntry.value).length <= 1) return;
+        // TODO: is the below an admin signature? -yes
         const isMessageVerifed = await this.#verifyMessage(op.value.sig, adminEntry.value.tracPublicKey, MsgUtils.createMessage(op.key, op.value.nonce, op.type))
         if (isMessageVerifed) {
             let nodeEntry = await batch.get(op.key);
@@ -452,9 +449,11 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     #isAdmin(adminEntry, node = null) {
-        if(this.#enable_wallet === false) return false;
+        //on-chain
         if (!adminEntry) return false;
         if (node) return adminEntry.wk === b4a.from(node.from.key).toString('hex');
+        //off-chain
+        if (this.#enable_wallet === false) return false;
         return !!(this.#wallet.publicKey === adminEntry.tracPublicKey && adminEntry.wk === this.#writingKey);
     }
 
