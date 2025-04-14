@@ -208,10 +208,13 @@ export class MainSettlementBus extends ReadyResource {
 
     async #handleApplyAppendWhitelistOperation(op, view, base, node, batch) {
         const adminEntry = await batch.get(EntryType.ADMIN);
-        if (null === adminEntry || !this.check.sanitizeIndexerOrWhitelistOperations(op) || !this.#isAdmin(adminEntry.value, node)) return;
+        if (null === adminEntry || !this.check.sanitizeIndexerOrWhitelistOperations(op) /* TODO: This cannot work, needs to be signed, not checked against wallet!!! || !this.#isAdmin(adminEntry.value, node)*/) return;
+        // TODO: is the below an admin signature?
         const isMessageVerifed = await this.#verifyMessage(op.value.sig, adminEntry.value.tracPublicKey, MsgUtils.createMessage(op.key, op.value.nonce, op.type));
+        console.log('isMessageVerifed', isMessageVerifed);
         if (!isMessageVerifed) return;
-        const isWhitelisted = await this.#isWhitelisted(op.key);
+        const isWhitelisted = await this.#isWhitelisted2(op.key, batch);
+        console.log('iswhitelisted', isWhitelisted);
         if (isWhitelisted) return;
         await this.#createWhitelistEntry(batch, op.key);
     }
@@ -223,10 +226,11 @@ export class MainSettlementBus extends ReadyResource {
 
     async #handleApplyAddWriterOperation(op, view, base, node, batch) {
         const adminEntry = await batch.get(EntryType.ADMIN);
-        if (null === adminEntry || !this.check.sanitizeAdminAndWritersOperations(op) || !this.#isAdmin(adminEntry.value, node)) return;
+        if (null === adminEntry || !this.check.sanitizeAdminAndWritersOperations(op) /*TODO: this cannot work, needs to be signed, not checked against wallet!!! || !this.#isAdmin(adminEntry.value, node)*/) return;
 
-        const isWhitelisted = await this.#isWhitelisted(op.key);
-        if (!isWhitelisted) return;
+        const isWhitelisted = await this.#isWhitelisted2(op.key, batch);
+        if (!isWhitelisted || op.key !== op.value.pub) return;
+        // TODO: if the below is not a message signed by admin BUT this handler is supposed to be executed by the admin, then use admin signatures in apply!
         const isMessageVerifed = await this.#verifyMessage(op.value.sig, op.key, MsgUtils.createMessage(op.key, op.value.wk, op.value.nonce, op.type));
         if (isMessageVerifed) {
             await this.#addWriter(op, batch, base);
@@ -238,17 +242,27 @@ export class MainSettlementBus extends ReadyResource {
         if (nodeEntry === null || !nodeEntry.value.isWriter) {
             await base.addWriter(b4a.from(op.value.wk, 'hex'), { isIndexer: false })
             await batch.put(op.key, {
+                pub : op.value.pub,
                 wk: op.value.wk,
                 isWriter: true,
                 isIndexer: false
             });
+            let length = await batch.get('wrl');
+            if(null === length){
+                length = 0;
+            } else {
+                length = length.value;
+            }
+            await batch.put('wri/'+length, op.value.pub);
+            await batch.put('wrl', length + 1);
             console.log(`Writer added: ${op.key}:${op.value.wk}`);
         }
     }
 
     async #handleApplyRemoveWriterOperation(op, view, base, node, batch) {
         const adminEntry = await batch.get(EntryType.ADMIN);
-        if (null === adminEntry || !this.check.sanitizeAdminAndWritersOperations(op) || !this.#isAdmin(adminEntry.value, node)) return;
+        if (null === adminEntry || !this.check.sanitizeAdminAndWritersOperations(op) /*TODO: this cannot work, needs to be signed, not checked against wallet!!! || !this.#isAdmin(adminEntry.value, node)*/) return;
+        // TODO: if the below is not a message signed by admin BUT this handler is supposed to be executed by the admin, then use admin signatures in apply!
         const isMessageVerifed = await this.#verifyMessage(op.value.sig, op.key, MsgUtils.createMessage(op.key, op.value.wk, op.value.nonce, op.type));
         if (isMessageVerifed) {
             await this.#removeWriter(op, batch, base);
@@ -284,15 +298,16 @@ export class MainSettlementBus extends ReadyResource {
         }
 
         const adminEntry = await batch.get(EntryType.ADMIN);
-        if (null === adminEntry || !this.#isAdmin(adminEntry.value, node)) return;
+        if (null === adminEntry /* TODO: this cannot work!!!! || !this.#isAdmin(adminEntry.value, node)*/) return;
 
-        if (!this.#isWhitelisted(op.key)) return;
+        if (!this.#isWhitelisted2(op.key, batch)) return;
 
         const indexersEntry = await batch.get(EntryType.INDEXERS);
         if (null === indexersEntry || Array.from(indexersEntry.value).includes(op.key) ||
             Array.from(indexersEntry.value).length >= MAX_INDEXERS) {
             return;
         }
+        // TODO: is the below an admin signature?
         const isMessageVerifed = await this.#verifyMessage(op.value.sig, adminEntry.value.tracPublicKey, MsgUtils.createMessage(op.key, op.value.nonce, op.type))
         if (isMessageVerifed) {
             await this.#addIndexer(indexersEntry.value, op, batch, base);
@@ -318,7 +333,8 @@ export class MainSettlementBus extends ReadyResource {
         if (!this.check.sanitizeIndexerOrWhitelistOperations(op)) return;
         const adminEntry = await batch.get(EntryType.ADMIN);
         let indexersEntry = await batch.get(EntryType.INDEXERS);
-        if (null === adminEntry || !this.#isAdmin(adminEntry.value, node) || null === indexersEntry || !Array.from(indexersEntry.value).includes(op.key) || Array.from(indexersEntry.value).length <= 1) return;
+        if (null === adminEntry /* TODO: this cannot work!!! || !this.#isAdmin(adminEntry.value, node) */ || null === indexersEntry || !Array.from(indexersEntry.value).includes(op.key) || Array.from(indexersEntry.value).length <= 1) return;
+        // TODO: is the below an admin signature?
         const isMessageVerifed = await this.#verifyMessage(op.value.sig, adminEntry.value.tracPublicKey, MsgUtils.createMessage(op.key, op.value.nonce, op.type))
         if (isMessageVerifed) {
             let nodeEntry = await batch.get(op.key);
@@ -373,7 +389,7 @@ export class MainSettlementBus extends ReadyResource {
             this.#writerEventListener(); // only for writers
         }
 
-        await this.#setUpRoleAutomatically(adminEntry);
+        //await this.#setUpRoleAutomatically(adminEntry);
 
         if (this.#enable_updater) {
             this.updater();// TODO: NODE AFTER BECOMING A writer should start the updater
@@ -386,6 +402,7 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async close() {
+        console.log('Closing everything...');
         if (this.#swarm) {
             await this.#swarm.destroy();
         }
@@ -417,7 +434,8 @@ export class MainSettlementBus extends ReadyResource {
         if (!adminEntry || !message) {
             return;
         }
-        const stream = this.#dht_node.connect(b4a.from(adminEntry.tracPublicKey, 'hex'))
+        const node = new DHT({bootstrap:this.#dht_bootstrap})
+        const stream = node.connect(b4a.from(adminEntry.tracPublicKey, 'hex'))
         stream.on('connect', async function () {
             await stream.send(b4a.from(JSON.stringify({ op : 'add_writer', message : message })));
             await stream.destroy();
@@ -455,6 +473,11 @@ export class MainSettlementBus extends ReadyResource {
         return !!whitelistEntry;
     }
 
+    async #isWhitelisted2(key, batch) {
+        const whitelistEntry = await this.getWhitelistEntry2(key, batch)
+        return !!whitelistEntry;
+    }
+
     async updater() {
         while (true) {
             if (this.#base.writable) {
@@ -480,6 +503,11 @@ export class MainSettlementBus extends ReadyResource {
     async getWhitelistEntry(key) {
         const entry = await this.getSigned(WHITELIST_PREFIX + key);
         return entry
+    }
+
+    async getWhitelistEntry2(key, batch) {
+        const entry = await batch.get(WHITELIST_PREFIX + key);
+        return entry !== null ? entry.value : null
     }
 
     async #handleIncomingEvent(data) {
