@@ -388,7 +388,7 @@ export class MainSettlementBus extends ReadyResource {
 
         await this.#setUpRoleAutomatically(adminEntry);
 
-        if (this.#enable_updater && this.#base.writable) {
+        if (this.#enable_updater) {
             this.updater();// TODO: NODE AFTER BECOMING A writer should start the updater
         }
 

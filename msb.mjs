@@ -4,7 +4,6 @@ const opts = {
     stores_directory : 'stores/',
     store_name : typeof process !== "undefined" ? process.argv[2] : Pear.config.args[0],
     bootstrap: '4577ebf1e84c06d48b2caa33fe54ae58be3a79cb30810129d58b725fae412e37',
-    enable_updater : true,
     channel: '00axtracnetworkmainsettlementbus',
     tx : 'axtracnetworkmainsettlementbustx'
 };
