@@ -81,7 +81,6 @@ class Network {
                             await connection.send(b4a.from(JSON.stringify({op:'writer_key', key : writingKey})));
                             await connection.destroy();
                         } else if(msg.op !== undefined && msg.message !== undefined && msg.op === 'add_writer'){
-                            await connection.destroy();
                             msg = msg.message;
                             const adminEntry = await msb.get(EntryType.ADMIN);
                             if(null === adminEntry || (adminEntry.tracPublicKey !== wallet.publicKey)) return;
@@ -92,6 +91,7 @@ class Network {
                             if(msg.value.pub !== wallet.publicKey && canAddWriter){
                                 await base.append(msg);
                             }
+                            await connection.destroy();
                         } else {
                             //await connection.destroy();
                             if (base.isIndexer || !base.writable) return;
@@ -133,6 +133,7 @@ class Network {
                         }
                     }catch(e){
                         console.log(e);
+                        try{ await connection.destroy(); }catch (e){}
                     }
                 });
                 connection.on('close', () => { });
