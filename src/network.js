@@ -14,7 +14,6 @@ import {
 import {sleep } from './utils/functions.js';
 import MsgUtils from './utils/msgUtils.js';
 import Check from './utils/check.js';
-import DHT from "hyperdht";
 const wakeup = new w();
 
 class Network {
@@ -81,15 +80,15 @@ class Network {
                             await connection.send(b4a.from(JSON.stringify({op:'writer_key', key : writingKey})));
                             await connection.destroy();
                         } else if(msg.type !== undefined && msg.key !== undefined && msg.value !== undefined && msg.type === 'addWriter'){
+                            console.log(1);
                             await connection.destroy();
-  
+                            console.log(2);
                             const adminEntry = await msb.get(EntryType.ADMIN);
                             if(null === adminEntry || (adminEntry.tracPublicKey !== wallet.publicKey)) return;
                             const nodeEntry = await msb.get(msg.value.pub);
                             const isAlreadyWriter = null !== nodeEntry && nodeEntry.isWriter;
                             const isAllowedToRequestRole = await msb._isAllowedToRequestRole(msg.key, adminEntry);
                             const canAddWriter = base.writable && !isAlreadyWriter && isAllowedToRequestRole;
-
                             if(msg.key !== wallet.publicKey && canAddWriter){
                                 await base.append(msg);
                             }
@@ -101,7 +100,6 @@ class Network {
                             const isAlreadyWriter = null !== nodeEntry && nodeEntry.isWriter;
                             const canRemoveWriter = base.writable && isAlreadyWriter 
                             if (msg.key !== wallet.publicKey && canRemoveWriter) {
-                                console.log(msg)
                                 await base.append(msg);
                             }
                         }
