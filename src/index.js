@@ -228,7 +228,7 @@ export class MainSettlementBus extends ReadyResource {
         const isWhitelisted = await this.#isWhitelisted2(op.key, batch);
         if (!isWhitelisted || op.key !== op.value.pub) return;
         // TODO: if the below is not a message signed by admin BUT this handler is supposed to be executed by the admin, then use admin signatures in apply!
-        const isMessageVerifed = await this.#verifyMessage(op.value.sig, op.key, MsgUtils.createMessage(op.key, op.value.pub, op.value.wk, op.value.nonce, op.type));
+        const isMessageVerifed = await this.#verifyMessage(op.value.sig, op.key, MsgUtils.createMessage(op.key, op.value.wk, op.value.nonce, op.type));
         if (isMessageVerifed) {
             await this.#addWriter(op, batch, base);
         }
@@ -260,7 +260,7 @@ export class MainSettlementBus extends ReadyResource {
         const adminEntry = await batch.get(EntryType.ADMIN);
         if (null === adminEntry || !this.check.sanitizeAdminAndWritersOperations(op) || !this.#isAdmin(adminEntry.value, node)) return;
         // TODO: if the below is not a message signed by admin BUT this handler is supposed to be executed by the admin, then use admin signatures in apply!
-        const isMessageVerifed = await this.#verifyMessage(op.value.sig, op.key, MsgUtils.createMessage(op.key,op.value.pub, op.value.wk, op.value.nonce, op.type));
+        const isMessageVerifed = await this.#verifyMessage(op.value.sig, op.key, MsgUtils.createMessage(op.key, op.value.wk, op.value.nonce, op.type));
         if (isMessageVerifed) {
             await this.#removeWriter(op, batch, base);
         }
@@ -386,7 +386,7 @@ export class MainSettlementBus extends ReadyResource {
             this.#writerEventListener(); // only for writers
         }
 
-        //await this.#setUpRoleAutomatically(adminEntry);
+        await this.#setUpRoleAutomatically(adminEntry);
 
         if (this.#enable_updater) {
             this.updater();// TODO: NODE AFTER BECOMING A writer should start the updater
@@ -421,9 +421,10 @@ export class MainSettlementBus extends ReadyResource {
     async #setUpRoleAutomatically() {
         if (!this.#base.writable) {
             await this.#requestWriterRole(false)
+            console.log('Wait please...');
             setTimeout(async () => {
                 await this.#requestWriterRole(true)
-            }, 10_000);
+            }, 5_000);
         }
     }
 
@@ -434,7 +435,7 @@ export class MainSettlementBus extends ReadyResource {
         const node = new DHT({bootstrap:this.#dht_bootstrap})
         const stream = node.connect(b4a.from(adminEntry.tracPublicKey, 'hex'))
         stream.on('connect', async function () {
-            await stream.send(b4a.from(JSON.stringify({ op : 'add_writer', message : message })));
+            await stream.send(b4a.from(JSON.stringify(message)));
             await stream.destroy();
         });
         stream.on('open', function () { });

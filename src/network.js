@@ -80,19 +80,32 @@ class Network {
                         if(msg === 'get_writer_key'){
                             await connection.send(b4a.from(JSON.stringify({op:'writer_key', key : writingKey})));
                             await connection.destroy();
-                        } else if(msg.op !== undefined && msg.message !== undefined && msg.op === 'add_writer'){
+                        } else if(msg.type !== undefined && msg.key !== undefined && msg.value !== undefined && msg.type === 'addWriter'){
                             await connection.destroy();
-                            msg = msg.message;
+  
                             const adminEntry = await msb.get(EntryType.ADMIN);
                             if(null === adminEntry || (adminEntry.tracPublicKey !== wallet.publicKey)) return;
                             const nodeEntry = await msb.get(msg.value.pub);
                             const isAlreadyWriter = null !== nodeEntry && nodeEntry.isWriter;
-                            const isAllowedToRequestRole = await msb._isAllowedToRequestRole(msg.value.pub, adminEntry);
+                            const isAllowedToRequestRole = await msb._isAllowedToRequestRole(msg.key, adminEntry);
                             const canAddWriter = base.writable && !isAlreadyWriter && isAllowedToRequestRole;
-                            if(msg.value.pub !== wallet.publicKey && canAddWriter){
+
+                            if(msg.key !== wallet.publicKey && canAddWriter){
                                 await base.append(msg);
                             }
-                        } else {
+                        } else if (msg.type !== undefined && msg.key !== undefined && msg.value !== undefined && msg.type === 'removeWriter') {
+                            await connection.destroy();
+                            const adminEntry = await msb.get(EntryType.ADMIN);
+                            if(null === adminEntry || (adminEntry.tracPublicKey !== wallet.publicKey)) return;
+                            const nodeEntry = await msb.get(msg.value.pub);
+                            const isAlreadyWriter = null !== nodeEntry && nodeEntry.isWriter;
+                            const canRemoveWriter = base.writable && isAlreadyWriter 
+                            if (msg.key !== wallet.publicKey && canRemoveWriter) {
+                                console.log(msg)
+                                await base.append(msg);
+                            }
+                        }
+                        else {
                             //await connection.destroy();
                             if (base.isIndexer || !base.writable) return;
 
