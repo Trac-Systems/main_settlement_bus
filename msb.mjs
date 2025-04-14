@@ -1,17 +1,17 @@
-import Corestore from 'corestore';
-import MainSettlementBus from './src/index.js';
-
-const store = new Corestore('stores/' + process.argv[2])
+import {MainSettlementBus} from './src/index.js';
 
 const opts = {
-    bootstrap: '5bab30f8d1839aece31f55d4ead3de108f86ba6b756bebea30e284eeb7d23f58',
-    channel: Buffer.alloc(32).fill('0000tracnetworkmainsettlementbus'),
-    tx : Buffer.alloc(32).fill('00tracnetworkmainsettlementbustx')
+    stores_directory : 'stores/',
+    store_name : typeof process !== "undefined" ? process.argv[2] : Pear.config.args[0],
+    bootstrap: '4577ebf1e84c06d48b2caa33fe54ae58be3a79cb30810129d58b725fae412e37',
+    enable_updater : true,
+    channel: '00axtracnetworkmainsettlementbus',
+    tx : 'axtracnetworkmainsettlementbustx'
 };
 
-const msb = new MainSettlementBus(store, opts);
+const msb = new MainSettlementBus(opts);
 
 msb.ready().then(() => {
     console.log('MSB is ready.');
-    msb.interactiveMode();
+    try { msb.interactiveMode(); } catch(e) { console.log('Interactive mode not running. Not necessarily an error.') }
 });
