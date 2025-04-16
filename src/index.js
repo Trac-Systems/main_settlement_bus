@@ -9,7 +9,19 @@ import PeerWallet from "trac-wallet"
 import tty from 'tty';
 import Corestore from 'corestore';
 import MsgUtils from './utils/msgUtils.js';
-import { LISTENER_TIMEOUT, EntryType, OperationType, EventType, ACK_INTERVAL, WHITELIST_SLEEP_INTERVAL, UPDATER_INTERVAL, MAX_INDEXERS, MIN_INDEXERS, WHITELIST_PREFIX } from './utils/constants.js';
+import {
+    LISTENER_TIMEOUT,
+    EntryType,
+    OperationType,
+    EventType,
+    ACK_INTERVAL,
+    WHITELIST_SLEEP_INTERVAL,
+    UPDATER_INTERVAL,
+    MAX_INDEXERS,
+    MIN_INDEXERS,
+    WHITELIST_PREFIX,
+    TRAC_NAMESPACE
+} from './utils/constants.js';
 import Network from './network.js';
 import Check from './utils/check.js';
 import DHT from 'hyperdht'
@@ -31,7 +43,6 @@ export class MainSettlementBus extends ReadyResource {
     #store;
     #bee;
     #swarm;
-    #dht_server;
     #dht_node;
     #dht_bootstrap;
     #base;
@@ -65,8 +76,7 @@ export class MainSettlementBus extends ReadyResource {
         this.#bee = null;
         this.#swarm = null;
         this.#dht_bootstrap = [/*'116.202.214.143:10001','116.202.214.149:10001', */'node1.hyperdht.org:49737', 'node2.hyperdht.org:49737', 'node3.hyperdht.org:49737'];
-        this.#dht_node = new DHT({ bootstrap: this.#dht_bootstrap });
-        this.#dht_server = null;
+        this.#dht_node = null;
         this.#base = null;
         this.#writingKey = null;
         this.#enable_txchannel = options.enable_txchannel !== false;
@@ -366,12 +376,8 @@ export class MainSettlementBus extends ReadyResource {
         console.log('Writer Key:', this.#writingKey);
 
         if (this.#replicate) {
-            this.#swarm = await Network.replicate(this.#dht_bootstrap, this.#swarm, this.#enable_wallet, this.#store, this.#wallet, this.#channel, this.#isStreaming, this.#handleIncomingEvent.bind(this), this.emit.bind(this));
-        }
-
-        if (this.#enable_txchannel) {
-            this.#dht_server = this.#dht_node.createServer();
-            await Network.dhtServer(this, this.#dht_server, this.#base, this.#wallet, this.#writingKey, this.#network);
+            this.#swarm = await Network.replicate(this, this.#network, this.#enable_txchannel, this.#base, this.#writingKey, this.#dht_bootstrap, this.#swarm, this.#enable_wallet, this.#store, this.#wallet, this.#channel, this.#isStreaming, this.#handleIncomingEvent.bind(this), this.emit.bind(this));
+            this.#dht_node = this.#swarm.dht;
         }
 
         const adminEntry = await this.get(EntryType.ADMIN);
@@ -401,18 +407,6 @@ export class MainSettlementBus extends ReadyResource {
         if (this.#swarm) {
             await this.#swarm.destroy();
         }
-        if (this.#dht_server) {
-            try{
-                await this.#dht_server.close();
-            } catch(e){
-                console.log(e.message);
-            }
-        }
-        try{
-            this.#dht_node.destroy();
-        } catch(e){
-            console.log(e.message);
-        }
         await this.#base.close();
     }
 
@@ -430,15 +424,15 @@ export class MainSettlementBus extends ReadyResource {
         if (!adminEntry || !message) {
             return;
         }
-        const node = new DHT({bootstrap:this.#dht_bootstrap})
-        const stream = node.connect(b4a.from(adminEntry.tracPublicKey, 'hex'))
+        const stream = this.#dht_node.connect(b4a.from(adminEntry.tracPublicKey, 'hex'))
         stream.on('connect', async function () {
+            console.log('Trying to send message to admin.');
             await stream.send(b4a.from(JSON.stringify(message)));
-            await stream.destroy();
+            await stream.end();
         });
-        stream.on('open', function () { });
-        stream.on('close', () => { });
-        stream.on('error', (error) => { });
+        stream.on('open', function () { console.log('Message channel opened') });
+        stream.on('close', () => { console.log('Message channel closed') });
+        stream.on('error', (error) => { console.log('Message send error', error) });
     }
 
     async #verifyMessage(signature, publicKey, bufferMessage) {
