@@ -131,16 +131,8 @@ class Network {
                 }
             });
 
-            const discovery = swarm.join(channel, { server: true, client: true });
+            swarm.join(channel, { server: true, client: true });
             await swarm.flush();
-            console.log('Joined channel');
-            async function refresh(){
-                await discovery.refresh();
-                setTimeout(function(){
-                    refresh();
-                }, 30_000);
-            }
-            await refresh();
         }
         return swarm;
     }
