@@ -54,6 +54,7 @@ export class MainSettlementBus extends ReadyResource {
     #replicate;
     #network;
     #opts;
+    #signature_whitelist;
 
     constructor(options = {}) {
         super();
@@ -83,6 +84,7 @@ export class MainSettlementBus extends ReadyResource {
         this.#enable_wallet = options.enable_wallet !== false;
         this.#wallet = new PeerWallet(options);
         this.#replicate = options.replicate !== false;
+        this.#signature_whitelist = options.signature_whitelist !== undefined && Array.isArray(options.signature_whitelist) ? options.signature_whitelist : [];
         this.#opts = options;
     }
 
@@ -155,6 +157,7 @@ export class MainSettlementBus extends ReadyResource {
     async #handleApplyTxOperation(op, view, base, node, batch) {
         const postTx = op.value;
         if (postTx.op === OperationType.POST_TX &&
+            (this.#signature_whitelist.length === 0 || this.#signature_whitelist.includes(postTx.bs)) &&
             null === await batch.get(op.key) &&
             this.check.sanitizePostTx(op) &&
             op.key === postTx.tx &&
