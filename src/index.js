@@ -71,7 +71,6 @@ export class MainSettlementBus extends ReadyResource {
         this.#KEY_PAIR_PATH = `${this.STORES_DIRECTORY}${options.store_name}/db/keypair.json`
         this.#bootstrap = options.bootstrap || null;
         this.#channel = b4a.alloc(32).fill(options.channel) || null;
-        this.#tx = b4a.alloc(32).fill(options.tx) || null;
         this.#store = new Corestore(this.STORES_DIRECTORY + options.store_name);
         this.#bee = null;
         this.#swarm = null;
