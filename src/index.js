@@ -55,6 +55,7 @@ export class MainSettlementBus extends ReadyResource {
     #network;
     #opts;
     #signature_whitelist;
+    #readline_instance;
 
     constructor(options = {}) {
         super();
@@ -86,6 +87,16 @@ export class MainSettlementBus extends ReadyResource {
         this.#replicate = options.replicate !== false;
         this.#signature_whitelist = options.signature_whitelist !== undefined && Array.isArray(options.signature_whitelist) ? options.signature_whitelist : [];
         this.#opts = options;
+        this.#readline_instance = null;
+        this.enable_interactive_mode = options.enable_interactive_mode !== false;
+        if(this.enable_interactive_mode !== false){
+            try{
+                this.#readline_instance = readline.createInterface({
+                    input: new tty.ReadStream(0),
+                    output: new tty.WriteStream(1)
+                });
+            }catch(e){ }
+        }
     }
 
     // TODO: Implement other getters as necessary
@@ -368,7 +379,7 @@ export class MainSettlementBus extends ReadyResource {
     async _open() {
         await this.#base.ready();
         if (this.#enable_wallet) {
-            await this.#wallet.initKeyPair(this.KEY_PAIR_PATH);
+            await this.#wallet.initKeyPair(this.KEY_PAIR_PATH, this.#readline_instance);
         }
         console.log('View Length:', this.#base.view.core.length);
         console.log('View Signed Length:', this.#base.view.core.signedLength);
@@ -737,10 +748,8 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async interactiveMode() {
-        const rl = readline.createInterface({
-            input: new tty.ReadStream(0),
-            output: new tty.WriteStream(1)
-        });
+        if(this.#readline_instance === null) return;
+        const rl = this.#readline_instance;
 
         console.log('MSB started. Available commands:');
         console.log('- /add_admin: register admin entry with bootstrap key.');
