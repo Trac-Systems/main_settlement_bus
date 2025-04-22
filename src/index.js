@@ -380,12 +380,15 @@ export class MainSettlementBus extends ReadyResource {
             await this.#wallet.initKeyPair(this.KEY_PAIR_PATH, this.#readline_instance);
         }
 
-        console.log('');
-        console.log('#####################################################################################');
-        console.log('# MSB Address:    ', this.#wallet.publicKey, '#');
-        this.#writingKey = b4a.toString(this.#base.local.key, 'hex');
-        console.log('# MSB Writer:     ', this.#writingKey, '#');
-        console.log('#####################################################################################');
+        if(this.#enable_wallet){
+            console.log('');
+            console.log('#####################################################################################');
+            console.log('# MSB Address:    ', this.#wallet.publicKey, '#');
+            this.#writingKey = b4a.toString(this.#base.local.key, 'hex');
+            console.log('# MSB Writer:     ', this.#writingKey, '#');
+            console.log('#####################################################################################');
+        }
+
         console.log('');
         if (this.#replicate) {
             this.#swarm = await Network.replicate(this, this.#network, this.#enable_txchannel, this.#base, this.#writingKey, this.#dht_bootstrap, this.#swarm, this.#enable_wallet, this.#store, this.#wallet, this.#channel, this.#isStreaming, this.#handleIncomingEvent.bind(this), this.emit.bind(this));
