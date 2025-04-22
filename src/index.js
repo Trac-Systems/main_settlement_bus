@@ -26,8 +26,6 @@ import Network from './network.js';
 import Check from './utils/check.js';
 import DHT from 'hyperdht'
 
-//TODO: CHANGE NONCE.
-
 export class MainSettlementBus extends ReadyResource {
     // Internal flags
     #shouldListenToAdminEvents = false;

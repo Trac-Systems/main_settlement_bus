@@ -12,8 +12,9 @@ import {
     EntryType
 } from './utils/constants.js';
 import {sleep } from './utils/functions.js';
-import MsgUtils from './utils/msgUtils.js';
 import Check from './utils/check.js';
+import Wallet from 'trac-wallet';
+
 const wakeup = new w();
 
 class Network {
@@ -99,7 +100,7 @@ class Network {
                                     parsedPreTx.wp === wallet.publicKey &&
                                     null === await base.view.get(parsedPreTx.tx)
                                 ) {
-                                    const nonce = MsgUtils.generateNonce();
+                                    const nonce = Wallet.generateNonce().toString('hex');
                                     const signature = wallet.sign(b4a.from(parsedPreTx.tx + nonce), b4a.from(wallet.secretKey, 'hex'));
                                     const append_tx = {
                                         op: OperationType.POST_TX,

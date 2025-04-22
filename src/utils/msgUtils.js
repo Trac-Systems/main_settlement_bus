@@ -2,7 +2,7 @@ import { isHexString, createHash } from './functions.js';
 import { OperationType } from './constants.js';
 import fileUtils from './fileUtils.js';
 import b4a from 'b4a';
-
+import Wallet from 'trac-wallet';
 // TODO: This class is trying to solve too many problems at once.
 //       It is responsible for creating messages, verifying them, reading public keys from a file, etc.
 //       It would be better to separate these concerns into different classes or modules.
@@ -10,9 +10,6 @@ import b4a from 'b4a';
 //       This would make the code more modular and easier to maintain.
 //       It would also make it easier to create tests and mocks in the future.
 class MsgUtils {
-    static generateNonce() {
-        return Math.random() + '-' + Date.now(); // TODO: Change it to crypto.randomBytes. Math.random might not be secure enough. It's even better to use nonce generator from sodium. GENERATE NONCE WITH CRYPTO LIBRARY WHICH ALLOW US TO GENERATE IT WITH UNIFORM DISTRIBUTION.
-    }
 
     static createMessage(...args) {
         let buf = null;
@@ -35,7 +32,7 @@ class MsgUtils {
             case OperationType.ADD_ADMIN:
             case OperationType.ADD_WRITER:
             case OperationType.REMOVE_WRITER:
-                nonce = this.generateNonce();
+                nonce = Wallet.generateNonce().toString('hex');
                 msg = this.createMessage(wallet.publicKey, keyParam, nonce, operationType);
                 hash = await createHash('sha256', msg);
                 value = {
@@ -48,7 +45,7 @@ class MsgUtils {
             case OperationType.APPEND_WHITELIST:
             case OperationType.ADD_INDEXER:
             case OperationType.REMOVE_INDEXER:
-                nonce = this.generateNonce();
+                nonce = Wallet.generateNonce().toString('hex');
                 msg = this.createMessage(keyParam, nonce, operationType);
                 hash = await createHash('sha256', msg);
                 baseKey = keyParam;

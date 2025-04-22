@@ -71,7 +71,7 @@ class Check {
                 $$type: "object",
                 pub: { type: 'is_hex_string', length: 64, required: true },
                 wk: { type: 'is_hex_string', length: 64, required: true },
-                nonce: { type: 'string', min: 1, max: 256, required: true },
+                nonce: { type: 'is_hex_string', length: 64, required: true },
                 sig: { type: 'is_hex_string', length: 128, required: true },
 
             }
@@ -91,7 +91,7 @@ class Check {
             value: {
                 $$strict: true,
                 $$type: "object",
-                nonce: { type: 'string', min: 1, max: 256, required: true },
+                nonce: { type: 'is_hex_string', length: 64, required: true },
                 sig: { type: 'is_hex_string', length: 128, required: true },
 
             }
@@ -113,7 +113,7 @@ class Check {
             i: { type: 'is_hex_string', length: 64, required: true },
             ipk: { type: 'is_hex_string', length: 64, required: true },
             ch: { type: 'is_hex_string', required: true }, // TODO: if we will use only 256 bit hash then change to length: 64
-            in: { type: 'string', min: 1, max: 256, required: true },
+            in: { type: 'is_hex_string', length: 64,  required: true },
             bs: { type: 'is_hex_string', length: 64, required: true },
             mbs: { type: 'is_hex_string', length: 64, required: true },
         };
@@ -139,12 +139,12 @@ class Check {
                 i: { type: 'is_hex_string', length: 64, required: true },
                 ipk: { type: 'is_hex_string', length: 64, required: true },
                 ch: { type: 'is_hex_string', required: true }, // TODO: if we will use only 256 bit hash then change to length: 64
-                in: { type: 'string', min: 1, max: 256, required: true },
+                in: { type: 'is_hex_string', length: 64, required: true },
                 bs: { type: 'is_hex_string', length: 64, required: true },
                 mbs: { type: 'is_hex_string', length: 64, required: true },
                 ws: { type: 'is_hex_string', length: 128, required: true },
                 wp: { type: 'is_hex_string', length: 64, required: true },
-                wn: { type: 'string', min: 1, required: true }
+                wn: { type: 'is_hex_string', length: 64, required: true }
             }
         };
         return this.#_validator.compile(schema);
