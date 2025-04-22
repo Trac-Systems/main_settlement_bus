@@ -379,13 +379,14 @@ export class MainSettlementBus extends ReadyResource {
         if (this.#enable_wallet) {
             await this.#wallet.initKeyPair(this.KEY_PAIR_PATH, this.#readline_instance);
         }
-        console.log('View Length:', this.#base.view.core.length);
-        console.log('View Signed Length:', this.#base.view.core.signedLength);
-        console.log('MSB Key:', b4a.from(this.#base.view.core.key).toString('hex'));
 
+        console.log('');
+        console.log('#####################################################################################');
+        console.log('# MSB Address:    ', this.#wallet.publicKey, '#');
         this.#writingKey = b4a.toString(this.#base.local.key, 'hex');
-        console.log('Writer Key:', this.#writingKey);
-
+        console.log('# MSB Writer:     ', this.#writingKey, '#');
+        console.log('#####################################################################################');
+        console.log('');
         if (this.#replicate) {
             this.#swarm = await Network.replicate(this, this.#network, this.#enable_txchannel, this.#base, this.#writingKey, this.#dht_bootstrap, this.#swarm, this.#enable_wallet, this.#store, this.#wallet, this.#channel, this.#isStreaming, this.#handleIncomingEvent.bind(this), this.emit.bind(this));
             this.#dht_node = this.#swarm.dht;
@@ -409,8 +410,9 @@ export class MainSettlementBus extends ReadyResource {
 
         console.log(`isIndexer: ${this.#base.isIndexer}`);
         console.log(`isWriter: ${this.#base.writable}`);
-        console.log('View Length:', this.#base.view.core.length);
-        console.log('View Signed Length:', this.#base.view.core.signedLength);
+        console.log('MSB Unsigned Length:', this.#base.view.core.length);
+        console.log('MSB Signed Length:', this.#base.view.core.signedLength);
+        console.log('');
     }
 
     async close() {
@@ -424,7 +426,6 @@ export class MainSettlementBus extends ReadyResource {
     async #setUpRoleAutomatically() {
         if (!this.#base.writable) {
             await this.#requestWriterRole(false)
-            console.log('Wait please...');
             setTimeout(async () => {
                 await this.#requestWriterRole(true)
             }, 5_000);
@@ -745,22 +746,31 @@ export class MainSettlementBus extends ReadyResource {
         await this.#requestWriterRole(false);
     }
 
+    printHelp(){
+        console.log('Available commands:');
+        console.log('- /add_writer: add yourself as validator to this MSB once whitelisted.');
+        console.log('- /remove_writer: remove yourself from this MSB.');
+        console.log('- /add_admin: register admin entry with bootstrap key. (initial setup)');
+        console.log('- /add_whitelist: add all specified whitelist addresses. (admin only)');
+        console.log('- /add_indexer <address>: change a role of the selected writer node to indexer role. (admin only)');
+        console.log('- /remove_indexer <address>: change a role of the selected indexer node to default role. (admin only)');
+        console.log('- /get_node_info <address>: get information about a node with the given address.');
+        console.log('- /dag: check system properties such as writing key, DAG, etc.');
+        console.log('- /exit: Exit the program.');
+        console.log('- /help: display this help.');
+    }
+
     async interactiveMode() {
         if(this.#readline_instance === null) return;
         const rl = this.#readline_instance;
 
-        console.log('MSB started. Available commands:');
-        console.log('- /add_admin: register admin entry with bootstrap key.');
-        console.log('- /add_whitelist: add a list of Trac public keys. Nodes that own these public keys can become writers.');
-        console.log('- /add_indexer <trac_public_key>: change a role of the selected writer node to indexer role');
-        console.log('- /push_writer_add: try to enforce adding this peer as writer after whitelisting.');
-        console.log('- /remove_indexer <trac_public_key>: change a role of the selected indexer node to default role');
-        console.log('- /get_node_info <trac_public_key>: get information about a node with the given Trac public key');
-        console.log('- /dag: check system properties such as writing key, DAG, etc.');
-        console.log('- /exit: Exit the program');
+        this.printHelp();
 
         rl.on('line', async (input) => {
             switch (input) {
+                case '/help':
+                    this.printHelp();
+                    break;
                 case '/exit':
                     console.log('Exiting...');
                     rl.close();
@@ -783,15 +793,12 @@ export class MainSettlementBus extends ReadyResource {
                     await this.#handleRemoveWriterOperation();
                     break
                 case '/flags':
-                    // Only for DEBUG
                     console.log("shouldListenToAdminEvents: ", this.#shouldListenToAdminEvents);
                     console.log("shouldListenToWriterEvents: ", this.#shouldListenToWriterEvents);
                     console.log("isWritable: ", this.#base.writable);
                     console.log("isIndexer: ", this.#base.isIndexer);
                     break
                 case '/show':
-                    // /get_node_info 9da99d98f02f24bdb13d46ba5d346c9a3eda03c18ab6e1441b7bac9743cf0bcc1
-                    // Only for DEBUG
                     const admin = await this.get(EntryType.ADMIN);
                     console.log('Admin:', admin);
                     const indexers = await this.get(EntryType.INDEXERS);

@@ -10,6 +10,5 @@ const opts = {
 const msb = new MainSettlementBus(opts);
 
 msb.ready().then(() => {
-    console.log('MSB is ready.');
     msb.interactiveMode();
 });

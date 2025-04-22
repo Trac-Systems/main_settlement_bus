@@ -19,7 +19,6 @@ export async function verifyDag(base) {
         //console.log("this.base.system.core", this.base.system.core);
         console.log(`base.key: ${base.key.toString('hex')}`);
         console.log('discoveryKey:', b4a.toString(base.discoveryKey, 'hex'));
-
         console.log(`VIEW Dag: ${dagView.toString('hex')} (length: ${lengthdagView})`);
         console.log(`SYSTEM Dag: ${dagSystem.toString('hex')} (length: ${lengthdagSystem})`);
 
