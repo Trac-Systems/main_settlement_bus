@@ -37,11 +37,12 @@ export class MainSettlementBus extends ReadyResource {
     #KEY_PAIR_PATH;
     #bootstrap;
     #channel;
-    #tx;
     #store;
     #bee;
     #swarm;
     #dht_node;
+    #validator_stream;
+    #validator;
     #dht_bootstrap;
     #base;
     #writingKey;
@@ -76,6 +77,8 @@ export class MainSettlementBus extends ReadyResource {
         this.#swarm = null;
         this.#dht_bootstrap = ['116.202.214.143:10001', '116.202.214.149:10001', 'node1.hyperdht.org:49737', 'node2.hyperdht.org:49737', 'node3.hyperdht.org:49737'];
         this.#dht_node = null;
+        this.#validator_stream = null
+        this.validator = null;
         this.#base = null;
         this.#writingKey = null;
         this.#enable_txchannel = options.enable_txchannel !== false;
@@ -416,6 +419,12 @@ export class MainSettlementBus extends ReadyResource {
         console.log('MSB Unsigned Length:', this.#base.view.core.length);
         console.log('MSB Signed Length:', this.#base.view.core.signedLength);
         console.log('');
+
+
+        //TODO: WHEN WE WANT TO OBSERVER VALIDATORS? ALWAYS? OR IN DISTINGUISHED CASES?
+        if (!this.#base.writable || !this.#base.isIndexer) {
+            this.validatorObserver();
+        }
     }
 
     async close() {
@@ -732,6 +741,72 @@ export class MainSettlementBus extends ReadyResource {
 
         }
     }
+    async validatorObserver() {
+        while (true) {
+            if (this.#dht_node === null || this.#validator_stream !== null) {
+                await sleep(1000);
+                continue;
+            }
+        
+            const lengthEntry = await this.#base.view.get('wrl');
+            const length = lengthEntry?.value ?? 0;
+    
+            async function findValidator(_this) {
+                if (_this.#validator_stream !== null) return;
+    
+                const rndIndex = Math.floor(Math.random() * length);
+                const wriEntry = await _this.#base.view.get('wri/' + rndIndex);
+                if (_this.#validator_stream !== null || wriEntry === null) return;
+    
+                
+                const validatorEntry = await _this.#base.view.get(wriEntry.value);
+                if (
+                    _this.#validator_stream !== null ||
+                    validatorEntry === null ||
+                    !validatorEntry.value.isWriter ||
+                    validatorEntry.value.isIndexer
+                ) return;
+    
+                const pubKey = validatorEntry.value.pub;
+                _this.#validator = pubKey;
+                await sleep(100);
+                if (_this.#validator_stream !== null) return;
+    
+                const stream = _this.#dht_node.connect(b4a.from(pubKey, 'hex'));
+                _this.#validator_stream = stream;
+    
+                stream.on('open', () => {
+                    _this.#validator = pubKey;
+                    console.log('Validator stream established', pubKey);
+                });
+    
+                stream.on('close', () => {
+                    try { stream.destroy(); } catch {}
+                    _this.#validator_stream = null;
+                    _this.#validator = null;
+                    console.log('Stream closed', pubKey);
+                });
+    
+                stream.on('error', (err) => {
+                    try { stream.destroy(); } catch {}
+                    _this.#validator_stream = null;
+                    _this.#validator = null;
+                    console.log(err);
+                });
+            }
+    
+            const promises = [];
+            for (let i = 0; i < 10; i++) {
+                promises.push(findValidator(this));
+                await sleep(250);
+            }
+            await Promise.all(promises);
+    
+            await sleep(1000);
+            console.log('Current validator:', this.#validator);
+        }
+    }
+    
 
     async #handleAddIndexerOperation(tracPublicKey) {
         this.#updateIndexerRole(tracPublicKey, true);
