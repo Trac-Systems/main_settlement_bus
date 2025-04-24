@@ -38,7 +38,7 @@ class Network {
                 };
             }
 
-            swarm = new Hyperswarm({ keyPair, randomPunchInterval: 500, bootstrap : bootstrap, maxPeers: MAX_PEERS, maxParallel: MAX_PARALLEL, maxServerConnections: MAX_SERVER_CONNECTIONS, maxClientConnections :  MAX_CLIENT_CONNECTIONS});
+            swarm = new Hyperswarm({ keyPair, randomPunchInterval: 5_000, bootstrap : bootstrap, maxPeers: MAX_PEERS, maxParallel: MAX_PARALLEL, maxServerConnections: MAX_SERVER_CONNECTIONS, maxClientConnections :  MAX_CLIENT_CONNECTIONS});
 
             console.log(`Channel: ${b4a.toString(channel)}`);
             swarm.on('connection', async (connection) => {
