@@ -115,11 +115,21 @@ class MsgUtils {
         return await this.#assembleMessageBase(wallet, validatorTracPublicKey, OperationType.BAN_VALIDATOR);
     }
 
-    static async verifyEventMessage(parsedRequest, wallet) {
-        //TODO: Here we can add some sanitization
-        const msg = this.createMessage(parsedRequest.key, parsedRequest.value.wk, parsedRequest.value.nonce, parsedRequest.type);
+    static async verifyEventMessage(parsedRequest, wallet, check) {
+        const { type, key, value } = parsedRequest;
+        if (
+            type !== OperationType.ADD_ADMIN &&
+            type !== OperationType.ADD_WRITER &&
+            type !== OperationType.REMOVE_WRITER
+        ) {
+            return false;
+        }
+        const sanitizationResult = check.sanitizeAdminAndWritersOperations(parsedRequest);
+        if (!sanitizationResult) return false;
+
+        const msg = this.createMessage(key, value.wk, value.nonce, type);
         const hash = await createHash('sha256', msg);
-        return wallet.verify(parsedRequest.value.sig, hash, parsedRequest.key);
+        return wallet.verify(value.sig, hash, key);
     }
 
 }
