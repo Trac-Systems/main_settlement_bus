@@ -869,7 +869,7 @@ export class MainSettlementBus extends ReadyResource {
         console.log('- /add_whitelist: add all specified whitelist addresses. (admin only)');
         console.log('- /add_indexer <address>: change a role of the selected writer node to indexer role. (admin only)');
         console.log('- /remove_indexer <address>: change a role of the selected indexer node to default role. (admin only)');
-        console.log('- /ban_validator <address>: demote a whitelisted validator to default role and remove it from the whitelist. (admin only)');
+        console.log('- /ban_writer <address>: demote a whitelisted writer to default role and remove it from the whitelist. (admin only)');
         console.log('- /get_node_info <address>: get information about a node with the given address.');
         console.log('- /dag: check system properties such as writing key, DAG, etc.');
         console.log('- /exit: Exit the program.');
@@ -937,7 +937,7 @@ export class MainSettlementBus extends ReadyResource {
                         const tracPublicKey = splitted[1]
                         await this.#handleRemoveIndexerOperation(tracPublicKey);
                     }
-                    else if (input.startsWith('/ban_validator')) {
+                    else if (input.startsWith('/ban_writer')) {
                         const splitted = input.split(' ');
                         const tracPublicKey = splitted[1]
                         await this.#handleBanValidatorOperation(tracPublicKey);
