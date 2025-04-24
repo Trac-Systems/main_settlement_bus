@@ -11,6 +11,7 @@ export const OperationType = Object.freeze({
     REMOVE_WRITER: 'removeWriter',
     ADD_INDEXER: 'addIndexer',
     REMOVE_INDEXER: 'removeIndexer',
+    BAN_VALIDATOR: 'banValidator',
     TX: 'tx',
     PRE_TX: 'pre-tx',
     POST_TX: 'post-tx',

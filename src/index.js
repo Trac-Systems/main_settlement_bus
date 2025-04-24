@@ -24,7 +24,6 @@ import {
 } from './utils/constants.js';
 import Network from './network.js';
 import Check from './utils/check.js';
-import DHT from 'hyperdht'
 
 export class MainSettlementBus extends ReadyResource {
     // Internal flags
@@ -90,13 +89,13 @@ export class MainSettlementBus extends ReadyResource {
         this.#opts = options;
         this.#readline_instance = null;
         this.enable_interactive_mode = options.enable_interactive_mode !== false;
-        if(this.enable_interactive_mode !== false){
-            try{
+        if (this.enable_interactive_mode !== false) {
+            try {
                 this.#readline_instance = readline.createInterface({
                     input: new tty.ReadStream(0),
                     output: new tty.WriteStream(1)
                 });
-            }catch(e){ }
+            } catch (e) { }
         }
     }
 
@@ -162,6 +161,7 @@ export class MainSettlementBus extends ReadyResource {
             [OperationType.REMOVE_WRITER]: this.#handleApplyRemoveWriterOperation.bind(this),
             [OperationType.ADD_INDEXER]: this.#handleApplyAddIndexerOperation.bind(this),
             [OperationType.REMOVE_INDEXER]: this.#handleApplyRemoveIndexerOperation.bind(this),
+            [OperationType.BAN_VALIDATOR]: this.#handleApplyBanValidatorOperation.bind(this),
         };
         return handlers[type] || null;
     }
@@ -243,6 +243,11 @@ export class MainSettlementBus extends ReadyResource {
         await batch.put(whitelistKey, true);
     }
 
+    async #deleteWhitelistEntry(batch, pubKey) {
+        const whitelistKey = WHITELIST_PREFIX + pubKey;
+        await batch.del(whitelistKey);
+    }
+
     async #handleApplyAddWriterOperation(op, view, base, node, batch) {
         const adminEntry = await batch.get(EntryType.ADMIN);
         if (null === adminEntry || !this.check.sanitizeAdminAndWritersOperations(op) || !this.#isAdmin(adminEntry.value, node)) return;
@@ -261,18 +266,18 @@ export class MainSettlementBus extends ReadyResource {
         if (nodeEntry === null || !nodeEntry.value.isWriter) {
             await base.addWriter(b4a.from(op.value.wk, 'hex'), { isIndexer: false })
             await batch.put(op.key, {
-                pub : op.value.pub,
+                pub: op.value.pub,
                 wk: op.value.wk,
                 isWriter: true,
                 isIndexer: false
             });
             let length = await batch.get('wrl');
-            if(null === length){
+            if (null === length) {
                 length = 0;
             } else {
                 length = length.value;
             }
-            await batch.put('wri/'+length, op.value.pub);
+            await batch.put('wri/' + length, op.value.pub);
             await batch.put('wrl', length + 1);
             console.log(`Writer added: ${op.key}:${op.value.wk}`);
         }
@@ -307,7 +312,8 @@ export class MainSettlementBus extends ReadyResource {
             }
 
             await batch.put(op.key, nodeEntry);
-            console.log(`Writer removed: ${op.key}:${op.value.wk}`);
+            console.log(`Writer removed: ${op.key}${op.value.wk ? `:${op.value.wk}` : ''}`);
+
         }
     }
 
@@ -352,8 +358,7 @@ export class MainSettlementBus extends ReadyResource {
         if (!this.check.sanitizeIndexerOrWhitelistOperations(op)) return;
         const adminEntry = await batch.get(EntryType.ADMIN);
         let indexersEntry = await batch.get(EntryType.INDEXERS);
-        if (null === adminEntry  || !this.#isAdmin(adminEntry.value, node) || null === indexersEntry || !Array.from(indexersEntry.value).includes(op.key) || Array.from(indexersEntry.value).length <= 1) return;
-        // TODO: is the below an admin signature? -yes
+        if (null === adminEntry || !this.#isAdmin(adminEntry.value, node) || null === indexersEntry || !Array.from(indexersEntry.value).includes(op.key) || Array.from(indexersEntry.value).length <= 1) return;
         const isMessageVerifed = await this.#verifyMessage(op.value.sig, adminEntry.value.tracPublicKey, MsgUtils.createMessage(op.key, op.value.nonce, op.type))
         if (isMessageVerifed) {
             let nodeEntry = await batch.get(op.key);
@@ -377,13 +382,29 @@ export class MainSettlementBus extends ReadyResource {
         }
     }
 
+    async #handleApplyBanValidatorOperation(op, view, base, node, batch) {
+        const adminEntry = await batch.get(EntryType.ADMIN);
+        if (null === adminEntry || !this.#isAdmin(adminEntry.value, node)) return;
+        if (!this.check.sanitizeIndexerOrWhitelistOperations(op)) return;
+        const isWhitelisted = await this.#isWhitelisted2(op.key, batch);
+        if (!isWhitelisted) return;
+
+        const nodeEntry = await batch.get(op.key)
+        if (null === nodeEntry || nodeEntry.value.isIndexer === true) return; // even if node is not writable atm it should be possible to ban it.
+        const isMessageVerifed = await this.#verifyMessage(op.value.sig, adminEntry.value.tracPublicKey, MsgUtils.createMessage(op.key, op.value.nonce, op.type))
+        if (!isMessageVerifed) return;
+        await this.#deleteWhitelistEntry(batch, op.key);
+        await this.#removeWriter(op, batch, base);
+
+    }
+    
     async _open() {
         await this.#base.ready();
         if (this.#enable_wallet) {
             await this.#wallet.initKeyPair(this.KEY_PAIR_PATH, this.#readline_instance);
         }
 
-        if(this.#enable_wallet){
+        if (this.#enable_wallet) {
             console.log('');
             console.log('#####################################################################################');
             console.log('# MSB Address:    ', this.#wallet.publicKey, '#');
@@ -571,7 +592,7 @@ export class MainSettlementBus extends ReadyResource {
         });
 
         this.#base.on(EventType.UNWRITABLE, async () => {
-            if(this.#enable_wallet === false) {
+            if (this.#enable_wallet === false) {
                 console.log('Current node is unwritable');
                 return;
             }
@@ -590,7 +611,7 @@ export class MainSettlementBus extends ReadyResource {
 
     async #adminEventListener() {
         this.on(EventType.ADMIN_EVENT, async (parsedRequest) => {
-            if(this.#enable_wallet === false) return;
+            if (this.#enable_wallet === false) return;
             const isWhitelisted = await this.#isWhitelisted(parsedRequest.key);
             const isEventMessageVerifed = await MsgUtils.verifyEventMessage(parsedRequest, this.#wallet)
             if (isWhitelisted && isEventMessageVerifed) {
@@ -601,7 +622,7 @@ export class MainSettlementBus extends ReadyResource {
 
     async #writerEventListener() {
         this.on(EventType.WRITER_EVENT, async (parsedRequest) => {
-            if(this.#enable_wallet === false) return;
+            if (this.#enable_wallet === false) return;
             const adminEntry = await this.get(EntryType.ADMIN);
             const isEventMessageVerifed = await MsgUtils.verifyEventMessage(parsedRequest, this.#wallet)
             if (adminEntry && adminEntry.tracPublicKey === parsedRequest.key && isEventMessageVerifed) {
@@ -658,7 +679,7 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async #handleWhitelistOperations() {
-        if(this.#enable_wallet === false) return;
+        if (this.#enable_wallet === false) return;
         const adminEntry = await this.get(EntryType.ADMIN);
         if (!this.#isAdmin(adminEntry)) return;
 
@@ -690,7 +711,7 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async #requestWriterRole(toAdd) {
-        if(this.#enable_wallet === false) return;
+        if (this.#enable_wallet === false) return;
         const adminEntry = await this.get(EntryType.ADMIN);
         const nodeEntry = await this.get(this.#wallet.publicKey);
         const isAlreadyWriter = !!(nodeEntry && nodeEntry.isWriter)
@@ -714,7 +735,7 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async #updateIndexerRole(tracPublicKey, toAdd) {
-        if(this.#enable_wallet === false) return;
+        if (this.#enable_wallet === false) return;
         const adminEntry = await this.get(EntryType.ADMIN);
         if (!this.#isAdmin(adminEntry) && !this.#base.writable) return;
 
@@ -808,6 +829,18 @@ export class MainSettlementBus extends ReadyResource {
     }
     
 
+    async #banValidator(tracPublicKey) {
+        const adminEntry = await this.get(EntryType.ADMIN);
+        if (!this.#isAdmin(adminEntry)) return;
+        const isWhitelisted = await this.#isWhitelisted(tracPublicKey);
+        const nodeEntry = await this.get(tracPublicKey);
+        if (!isWhitelisted || null === nodeEntry || nodeEntry.isIndexer === true) return;
+
+        const assembledBanValidatorMessage = await MsgUtils.assembleBanValidatorMessage(this.#wallet, tracPublicKey);
+        this.#base.append(assembledBanValidatorMessage);
+
+    }
+
     async #handleAddIndexerOperation(tracPublicKey) {
         this.#updateIndexerRole(tracPublicKey, true);
     }
@@ -824,7 +857,11 @@ export class MainSettlementBus extends ReadyResource {
         await this.#requestWriterRole(false);
     }
 
-    printHelp(){
+    async #handleBanValidatorOperation(tracPublicKey) {
+        await this.#banValidator(tracPublicKey);
+    }
+
+    printHelp() {
         console.log('Available commands:');
         console.log('- /add_writer: add yourself as validator to this MSB once whitelisted.');
         console.log('- /remove_writer: remove yourself from this MSB.');
@@ -832,6 +869,7 @@ export class MainSettlementBus extends ReadyResource {
         console.log('- /add_whitelist: add all specified whitelist addresses. (admin only)');
         console.log('- /add_indexer <address>: change a role of the selected writer node to indexer role. (admin only)');
         console.log('- /remove_indexer <address>: change a role of the selected indexer node to default role. (admin only)');
+        console.log('- /ban_validator <address>: demote a whitelisted validator to default role and remove it from the whitelist. (admin only)');
         console.log('- /get_node_info <address>: get information about a node with the given address.');
         console.log('- /dag: check system properties such as writing key, DAG, etc.');
         console.log('- /exit: Exit the program.');
@@ -839,7 +877,7 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async interactiveMode() {
-        if(this.#readline_instance === null) return;
+        if (this.#readline_instance === null) return;
         const rl = this.#readline_instance;
 
         this.printHelp();
@@ -898,6 +936,11 @@ export class MainSettlementBus extends ReadyResource {
                         const splitted = input.split(' ');
                         const tracPublicKey = splitted[1]
                         await this.#handleRemoveIndexerOperation(tracPublicKey);
+                    }
+                    else if (input.startsWith('/ban_validator')) {
+                        const splitted = input.split(' ');
+                        const tracPublicKey = splitted[1]
+                        await this.#handleBanValidatorOperation(tracPublicKey);
                     }
             }
             rl.prompt();

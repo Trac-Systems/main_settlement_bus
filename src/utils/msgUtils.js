@@ -43,6 +43,7 @@ class MsgUtils {
                 };
                 break;
             case OperationType.APPEND_WHITELIST:
+            case OperationType.BAN_VALIDATOR:
             case OperationType.ADD_INDEXER:
             case OperationType.REMOVE_INDEXER:
                 nonce = Wallet.generateNonce().toString('hex');
@@ -108,6 +109,10 @@ class MsgUtils {
 
     static async assembleRemoveIndexerMessage(wallet, writerTracPublicKey) {
         return await this.#assembleMessageBase(wallet, writerTracPublicKey, OperationType.REMOVE_INDEXER);
+    }
+
+    static async assembleBanValidatorMessage(wallet, validatorTracPublicKey) {
+        return await this.#assembleMessageBase(wallet, validatorTracPublicKey, OperationType.BAN_VALIDATOR);
     }
 
     static async verifyEventMessage(parsedRequest, wallet) {
