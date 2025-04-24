@@ -1,26 +1,31 @@
 import b4a from 'b4a';
 import sodium from 'sodium-native';
+import {peer} from "hyperdht/lib/messages.js";
 
 export function isHexString(string) {
     return typeof string === 'string' && /^[0-9a-fA-F]+$/.test(string) && string.length % 2 === 0;
 }
 
-export async function verifyDag(base) {
+export async function verifyDag(base, swarm, wallet, writerKey) {
     try {
-        console.log('--- DAG Monitoring ---');
+        console.log('--- Stats ---');
         const dagView = await base.view.core.treeHash();
         const lengthdagView = base.view.core.length;
         const dagSystem = await base.system.core.treeHash();
         const lengthdagSystem = base.system.core.length;
-        console.log('this.base.view.core.signedLength:', base.view.core.signedLength);
-        console.log("this.base.signedLength", base.signedLength);
-        console.log("this.base.linearizer.indexers.length", base.linearizer.indexers.length);
-        console.log("this.base.indexedLength", base.indexedLength);
-        //console.log("this.base.system.core", this.base.system.core);
+        console.log('wallet.publicKey:', wallet !== null ? wallet.publicKey : 'unset');
+        console.log('msb.writerKey:', writerKey);
+        console.log('swarm.connections.size:', swarm.connections.size);
+        console.log('base.view.core.signedLength:', base.view.core.signedLength);
+        console.log("base.signedLength", base.signedLength);
+        console.log("base.indexedLength", base.indexedLength);
+        console.log("base.linearizer.indexers.length", base.linearizer.indexers.length);
         console.log(`base.key: ${base.key.toString('hex')}`);
         console.log('discoveryKey:', b4a.toString(base.discoveryKey, 'hex'));
         console.log(`VIEW Dag: ${dagView.toString('hex')} (length: ${lengthdagView})`);
         console.log(`SYSTEM Dag: ${dagSystem.toString('hex')} (length: ${lengthdagSystem})`);
+        const wl = await base.view.get('wrl');
+        console.log('Total Registered Writers:', wl !== null ? wl.value : 0);
 
     } catch (error) {
         console.error('Error during DAG monitoring:', error.message);

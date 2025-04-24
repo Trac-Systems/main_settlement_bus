@@ -170,8 +170,8 @@ export class MainSettlementBus extends ReadyResource {
             null === await batch.get(op.key) &&
             this.check.sanitizePostTx(op) &&
             op.key === postTx.tx &&
-            this.#wallet.verify(b4a.from(postTx.is, 'hex'), b4a.from(postTx.tx + postTx.in), b4a.from(postTx.ipk, 'hex')) && // sender verification
-            this.#wallet.verify(b4a.from(postTx.ws, 'hex'), b4a.from(postTx.tx + postTx.wn), b4a.from(postTx.wp, 'hex')) && // writer verification
+            this.#wallet.verify(b4a.from(postTx.is, 'hex'), b4a.from(postTx.tx + postTx.in), b4a.from(postTx.ipk, 'hex')) &&
+            this.#wallet.verify(b4a.from(postTx.ws, 'hex'), b4a.from(postTx.tx + postTx.wn), b4a.from(postTx.wp, 'hex')) &&
             postTx.tx === await this.generateTx(postTx.bs, this.bootstrap, postTx.wp, postTx.i, postTx.ipk, postTx.ch, postTx.in) &&
             b4a.byteLength(JSON.stringify(postTx)) <= 4096
         ) {
@@ -796,7 +796,7 @@ export class MainSettlementBus extends ReadyResource {
         console.log('- /remove_indexer <address>: change a role of the selected indexer node to default role. (admin only)');
         console.log('- /ban_writer <address>: demote a whitelisted writer to default role and remove it from the whitelist. (admin only)');
         console.log('- /get_node_info <address>: get information about a node with the given address.');
-        console.log('- /dag: check system properties such as writing key, DAG, etc.');
+        console.log('- /stats: check system stats such as writing key, DAG, etc.');
         console.log('- /exit: Exit the program.');
         console.log('- /help: display this help.');
     }
@@ -845,8 +845,8 @@ export class MainSettlementBus extends ReadyResource {
                     const indexers = await this.get(EntryType.INDEXERS);
                     console.log('Indexers:', indexers);
                     break;
-                case '/dag':
-                    await verifyDag(this.#base);
+                case '/stats':
+                    await verifyDag(this.#base, this.#swarm, this.#wallet, this.#writingKey);
                     break;
                 default:
                     if (input.startsWith('/get_node_info')) {
