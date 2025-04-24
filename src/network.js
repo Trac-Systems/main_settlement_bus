@@ -85,7 +85,6 @@ class Network {
                                 //await connection.destroy();
                                 if (base.isIndexer || !base.writable) return;
 
-                                // TODO: decide if a tx rejection should be responded with
                                 if (network.tx_pool.length >= 1000) {
                                     console.log('pool full');
                                     return
