@@ -398,7 +398,6 @@ export class MainSettlementBus extends ReadyResource {
         await this.#removeWriter(op, batch, base);
 
     }
-
     async _open() {
         await this.#base.ready();
         if (this.#enable_wallet) {
