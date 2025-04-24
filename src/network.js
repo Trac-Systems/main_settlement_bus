@@ -38,7 +38,7 @@ class Network {
                 };
             }
 
-            swarm = new Hyperswarm({ keyPair, bootstrap : bootstrap, maxPeers: MAX_PEERS, maxParallel: MAX_PARALLEL, maxServerConnections: MAX_SERVER_CONNECTIONS, maxClientConnections :  MAX_CLIENT_CONNECTIONS});
+            swarm = new Hyperswarm({ keyPair, randomPunchInterval: 500, bootstrap : bootstrap, maxPeers: MAX_PEERS, maxParallel: MAX_PARALLEL, maxServerConnections: MAX_SERVER_CONNECTIONS, maxClientConnections :  MAX_CLIENT_CONNECTIONS});
 
             console.log(`Channel: ${b4a.toString(channel)}`);
             swarm.on('connection', async (connection) => {
@@ -60,7 +60,6 @@ class Network {
                                 await connection.send(b4a.from(JSON.stringify({op:'writer_key', key : writingKey})));
                                 await connection.end();
                             } else if(msg.type !== undefined && msg.key !== undefined && msg.value !== undefined && msg.type === 'addWriter'){
-                                await connection.end();
                                 const adminEntry = await msb.get(EntryType.ADMIN);
                                 if(null === adminEntry || (adminEntry.tracPublicKey !== wallet.publicKey)) return;
                                 const nodeEntry = await msb.get(msg.value.pub);
@@ -70,8 +69,8 @@ class Network {
                                 if(msg.key !== wallet.publicKey && canAddWriter){
                                     await base.append(msg);
                                 }
-                            } else if (msg.type !== undefined && msg.key !== undefined && msg.value !== undefined && msg.type === 'removeWriter') {
                                 await connection.end();
+                            } else if (msg.type !== undefined && msg.key !== undefined && msg.value !== undefined && msg.type === 'removeWriter') {
                                 const adminEntry = await msb.get(EntryType.ADMIN);
                                 if(null === adminEntry || (adminEntry.tracPublicKey !== wallet.publicKey)) return;
                                 const nodeEntry = await msb.get(msg.value.pub);
@@ -80,6 +79,7 @@ class Network {
                                 if (msg.key !== wallet.publicKey && canRemoveWriter) {
                                     await base.append(msg);
                                 }
+                                await connection.end();
                             }
                             else {
                                 //await connection.destroy();
@@ -122,7 +122,7 @@ class Network {
                             }
                         }catch(e){
                             console.log(e);
-                            try{ await connection.end(); } catch (e){ }
+                            try{ await connection.end(); } catch (e){ console.log(e) }
                         }
                     });
                 }
