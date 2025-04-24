@@ -1,7 +1,7 @@
 {
   "name": "trac-msb",
   "main": "msb.mjs",
-  "version": "0.1.10",
+  "version": "0.1.14",
   "pear": {
     "name": "trac-msb",
     "type": "terminal"
@@ -15,12 +15,12 @@
     "trac-wallet": "^0.0.42",
     "hyperbee": "2.24.2",
     "hypercore": "11.6.2",
-    "corestore": "7.4.0",
+    "corestore": "7.4.1",
+    "autobase": "7.6.2",
     "hypercore-crypto": "3.4.0",
     "hyperdht": "^6.20.1",
     "hyperswarm": "4.11.5",
     "b4a": "1.6.7",
-    "autobase": "7.6.2",
     "ready-resource": "^1.0.0",
     "bare-readline": "^1.0.7",
     "readline": "npm:bare-node-readline",
