@@ -86,7 +86,7 @@ class Check {
     #compileIndexerOrWhitelistOperationSchema() {
         const schema = {
             $$strict: true,
-            type: { type: 'string', enum: ['addIndexer', 'removeIndexer', 'AppendWhitelist'], required: true },
+            type: { type: 'string', enum: ['addIndexer', 'removeIndexer', 'AppendWhitelist', 'banValidator'], required: true },
             key: { type: "is_hex_string", length: 64, required: true },
             value: {
                 $$strict: true,
