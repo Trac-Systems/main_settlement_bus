@@ -1,5 +1,6 @@
 import Validator from 'fastest-validator';
 import { isHexString } from './functions.js';
+import {OperationType} from './constants.js';
 class Check {
     #_validator;
     #_sanitizeAdminAndWritersOperations;
@@ -60,11 +61,12 @@ class Check {
         this.#_sanitizePreTx = this.#compilePreTxSchema();
         this.#_sanitizePostTx = this.#compilePostTxSchema();
     }
-
+    //TODO: rename this function
     #compileSanitizationAdminAndWriterOperationsSchema() {
+        // TODO: Create constants for int values below
         const schema = {
             $$strict: true,
-            type: { type: 'string', enum: ['addAdmin', 'addWriter', 'removeWriter'], required: true },
+            type: { type: 'string', enum: [OperationType.ADD_ADMIN, OperationType.ADD_WRITER, OperationType.REMOVE_WRITER], required: true },
             key: { type: "is_hex_string", length: 64, required: true },
             value: {
                 $$strict: true,
@@ -82,11 +84,12 @@ class Check {
     sanitizeAdminAndWritersOperations(op) {
         return this.#_sanitizeAdminAndWritersOperations(op) === true;
     }
-
+    //TODO: rename this function
     #compileIndexerOrWhitelistOperationSchema() {
+        // TODO: Create constants for int values below
         const schema = {
             $$strict: true,
-            type: { type: 'string', enum: ['addIndexer', 'removeIndexer', 'AppendWhitelist'], required: true },
+            type: { type: 'string', enum: [OperationType.ADD_INDEXER, OperationType.REMOVE_INDEXER, OperationType.APPEND_WHITELIST, OperationType.BAN_VALIDATOR], required: true },
             key: { type: "is_hex_string", length: 64, required: true },
             value: {
                 $$strict: true,
@@ -104,6 +107,7 @@ class Check {
     }
 
     #compilePreTxSchema() {
+        // TODO: Create constants for int values below
         const schema = {
             $$strict: true,
             op: { type: 'string', enum: ['pre-tx'], required: true },
@@ -125,6 +129,7 @@ class Check {
     }
 
     #compilePostTxSchema() {
+        // TODO: Create constants for int values below
         const schema = {
             $$strict: true,
             type: { type: 'string', enum: ['tx'], required: true },
