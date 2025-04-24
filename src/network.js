@@ -46,9 +46,6 @@ class Network {
                 store.replicate(connection);
                 connection.on('close', () => { });
                 connection.on('error', (error) => { });
-                connection.on('data', async (data) => {
-                    await handleIncomingEvent(data);
-                });
 
                 if(enable_txchannel){
                     connection.on('message', async (msg) =>  {
@@ -67,7 +64,7 @@ class Network {
                                 const isAllowedToRequestRole = await msb._isAllowedToRequestRole(msg.key, adminEntry);
                                 const canAddWriter = base.writable && !isAlreadyWriter && isAllowedToRequestRole;
                                 if(msg.key !== wallet.publicKey && canAddWriter){
-                                    await base.append(msg);
+                                    await handleIncomingEvent(msg);
                                 }
                                 await connection.end();
                             } else if (msg.type !== undefined && msg.key !== undefined && msg.value !== undefined && msg.type === 'removeWriter') {
@@ -77,7 +74,7 @@ class Network {
                                 const isAlreadyWriter = null !== nodeEntry && nodeEntry.isWriter;
                                 const canRemoveWriter = base.writable && isAlreadyWriter
                                 if (msg.key !== wallet.publicKey && canRemoveWriter) {
-                                    await base.append(msg);
+                                    await handleIncomingEvent(msg);
                                 }
                                 await connection.end();
                             }

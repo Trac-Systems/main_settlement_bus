@@ -538,10 +538,8 @@ export class MainSettlementBus extends ReadyResource {
         return entry !== null ? entry.value : null
     }
 
-    async #handleIncomingEvent(data) {
+    async #handleIncomingEvent(parsedRequest) {
         try {
-            const bufferData = data.toString();
-            const parsedRequest = JSON.parse(bufferData);
             if (parsedRequest && parsedRequest.type && parsedRequest.key && parsedRequest.value) {
                 if (parsedRequest.type === OperationType.ADD_WRITER || parsedRequest.type === OperationType.REMOVE_WRITER) {
                     //This request must be hanlded by ADMIN
@@ -604,7 +602,7 @@ export class MainSettlementBus extends ReadyResource {
         this.on(EventType.ADMIN_EVENT, async (parsedRequest) => {
             if (this.#enable_wallet === false) return;
             const isWhitelisted = await this.#isWhitelisted(parsedRequest.key);
-            const isEventMessageVerifed = await MsgUtils.verifyEventMessage(parsedRequest, this.#wallet)
+            const isEventMessageVerifed = await MsgUtils.verifyEventMessage(parsedRequest, this.#wallet, this.check)
             if (isWhitelisted && isEventMessageVerifed) {
                 await this.#base.append(parsedRequest);
             }
@@ -615,7 +613,7 @@ export class MainSettlementBus extends ReadyResource {
         this.on(EventType.WRITER_EVENT, async (parsedRequest) => {
             if (this.#enable_wallet === false) return;
             const adminEntry = await this.get(EntryType.ADMIN);
-            const isEventMessageVerifed = await MsgUtils.verifyEventMessage(parsedRequest, this.#wallet)
+            const isEventMessageVerifed = await MsgUtils.verifyEventMessage(parsedRequest, this.#wallet, this.check)
             if (adminEntry && adminEntry.tracPublicKey === parsedRequest.key && isEventMessageVerifed) {
                 await this.#base.append(parsedRequest);
             }
