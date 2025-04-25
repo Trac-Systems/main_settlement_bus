@@ -29,6 +29,7 @@ export class MainSettlementBus extends ReadyResource {
     // Internal flags
     #shouldListenToAdminEvents = false;
     #shouldListenToWriterEvents = false;
+    #shouldValidatorObserverWorks = true;
     #isStreaming = false;
 
     // internal attributes
@@ -397,7 +398,7 @@ export class MainSettlementBus extends ReadyResource {
         await this.#removeWriter(op, batch, base);
 
     }
-    
+
     async _open() {
         await this.#base.ready();
         if (this.#enable_wallet) {
@@ -441,11 +442,7 @@ export class MainSettlementBus extends ReadyResource {
         console.log('MSB Signed Length:', this.#base.view.core.signedLength);
         console.log('');
 
-
-        //TODO: WHEN WE WANT TO OBSERVER VALIDATORS? ALWAYS? OR IN DISTINGUISHED CASES?
-        if (!this.#base.writable || !this.#base.isIndexer) {
-            this.validatorObserver();
-        }
+        this.validatorObserver();
     }
 
     async close() {
@@ -638,42 +635,28 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async #handleAdminOperations() {
-        //TODO: ADJUST FOR WHITELIST STRUCTURE
-        const adminEntry = await this.get(EntryType.ADMIN);
-        const addAdminMessage = await MsgUtils.assembleAdminMessage(adminEntry, this.#writingKey, this.#wallet, this.#bootstrap);
-        if (!adminEntry && this.#wallet && this.#writingKey && this.#writingKey === this.#bootstrap) {
-            await this.#base.append(addAdminMessage);
-        } else if (adminEntry && this.#wallet && adminEntry.tracPublicKey === this.#wallet.publicKey && this.#writingKey && this.#writingKey !== adminEntry.wk) {
-            let connections = [];
-            for (const conn of this.#swarm.connections) {
+        try {
+            const adminEntry = await this.get(EntryType.ADMIN);
+            const addAdminMessage = await MsgUtils.assembleAdminMessage(adminEntry, this.#writingKey, this.#wallet, this.#bootstrap);
+            if (!adminEntry && this.#wallet && this.#writingKey && this.#writingKey === this.#bootstrap) {
+                await this.#base.append(addAdminMessage);
+            } else if (adminEntry && this.#wallet && adminEntry.tracPublicKey === this.#wallet.publicKey && this.#writingKey && this.#writingKey !== adminEntry.wk) {
+                
+                if (null === this.#validator_stream) return;
+                await this.#validator_stream.send(b4a.from(JSON.stringify(addAdminMessage)));
+            }
 
-                const remotePublicKeyHex = b4a.from(conn.remotePublicKey).toString('hex');
-                const remotePublicKeyEntry = await this.get(remotePublicKeyHex);
-                const isWhitelisted = await this.#isWhitelisted(remotePublicKeyHex);
-
-                if (conn.connected &&
-                    isWhitelisted &&
-                    remotePublicKeyEntry &&
-                    remotePublicKeyEntry.isWriter === true &&
-                    remotePublicKeyEntry.isIndexer === false &&
-                    remotePublicKeyHex !== this.#wallet.publicKey) {
-                    connections.push(conn);
+            setTimeout(async () => {
+                const updatedAdminEntry = await this.get(EntryType.ADMIN);
+                if (this.#isAdmin(updatedAdminEntry) && !this.#shouldListenToAdminEvents) {
+                    this.#shouldListenToAdminEvents = true;
+                    this.#adminEventListener();
                 }
-            }
-            if (connections.length > 0) {
-                connections[Math.floor(Math.random() * connections.length)].write(JSON.stringify(addAdminMessage));
-            }
-            //TODO: Implement an algorithm to search a new writer and connect/send the request for it.
+            }, LISTENER_TIMEOUT);
+
+        } catch (e) {
+            console.log(e);
         }
-
-        setTimeout(async () => {
-            const updatedAdminEntry = await this.get(EntryType.ADMIN);
-            if (this.#isAdmin(updatedAdminEntry) && !this.#shouldListenToAdminEvents) {
-                this.#shouldListenToAdminEvents = true;
-                this.#adminEventListener();
-            }
-        }, LISTENER_TIMEOUT);
-
     }
 
     async #handleWhitelistOperations() {
@@ -760,24 +743,26 @@ export class MainSettlementBus extends ReadyResource {
 
         }
     }
+
     async validatorObserver() {
-        while (true) {
-            if (this.#dht_node === null || this.#validator_stream !== null) {
+        // Finding writers for admin recovery case
+        while (this.#shouldValidatorObserverWorks) {
+
+            if (this.#dht_node === null || this.#validator_stream !== null || this.#base.writable) {
                 await sleep(1000);
                 continue;
             }
-        
             const lengthEntry = await this.#base.view.get('wrl');
             const length = lengthEntry?.value ?? 0;
-    
+
             async function findValidator(_this) {
                 if (_this.#validator_stream !== null) return;
-    
+
                 const rndIndex = Math.floor(Math.random() * length);
                 const wriEntry = await _this.#base.view.get('wri/' + rndIndex);
                 if (_this.#validator_stream !== null || wriEntry === null) return;
-    
-                
+
+
                 const validatorEntry = await _this.#base.view.get(wriEntry.value);
                 if (
                     _this.#validator_stream !== null ||
@@ -785,47 +770,46 @@ export class MainSettlementBus extends ReadyResource {
                     !validatorEntry.value.isWriter ||
                     validatorEntry.value.isIndexer
                 ) return;
-    
+
                 const pubKey = validatorEntry.value.pub;
+                if (pubKey === _this.#wallet.publicKey) return; // avoid establishing connection to itself
                 _this.#validator = pubKey;
-                await sleep(100);
                 if (_this.#validator_stream !== null) return;
-    
+
                 const stream = _this.#dht_node.connect(b4a.from(pubKey, 'hex'));
                 _this.#validator_stream = stream;
-    
-                stream.on('open', () => {
+
+                _this.#validator_stream.on('open', () => {
                     _this.#validator = pubKey;
                     console.log('Validator stream established', pubKey);
                 });
-    
-                stream.on('close', () => {
-                    try { stream.destroy(); } catch {}
+
+                _this.#validator_stream.on('close', () => {
+                    try { stream.destroy(); } catch { }
                     _this.#validator_stream = null;
                     _this.#validator = null;
                     console.log('Stream closed', pubKey);
                 });
-    
-                stream.on('error', (err) => {
-                    try { stream.destroy(); } catch {}
+
+                _this.#validator_stream.on('error', (err) => {
+                    try { stream.destroy(); } catch { }
                     _this.#validator_stream = null;
                     _this.#validator = null;
                     console.log(err);
                 });
             }
-    
+
             const promises = [];
             for (let i = 0; i < 10; i++) {
                 promises.push(findValidator(this));
                 await sleep(250);
             }
             await Promise.all(promises);
-    
+
             await sleep(1000);
-            console.log('Current validator:', this.#validator);
         }
     }
-    
+
 
     async #banValidator(tracPublicKey) {
         const adminEntry = await this.get(EntryType.ADMIN);
