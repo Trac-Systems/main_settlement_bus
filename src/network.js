@@ -38,7 +38,7 @@ class Network {
                 };
             }
 
-            swarm = new Hyperswarm({ keyPair, randomPunchInterval: 5_000, bootstrap : bootstrap, maxPeers: MAX_PEERS, maxParallel: MAX_PARALLEL, maxServerConnections: MAX_SERVER_CONNECTIONS, maxClientConnections :  MAX_CLIENT_CONNECTIONS});
+            swarm = new Hyperswarm({ keyPair, bootstrap : bootstrap, maxPeers: MAX_PEERS, maxParallel: MAX_PARALLEL, maxServerConnections: MAX_SERVER_CONNECTIONS, maxClientConnections :  MAX_CLIENT_CONNECTIONS});
 
             console.log(`Channel: ${b4a.toString(channel)}`);
             swarm.on('connection', async (connection) => {
@@ -50,6 +50,7 @@ class Network {
                 if(enable_txchannel){
                     connection.on('message', async (msg) =>  {
                         try{
+                            const tmp_message = msg;
                             msg = b4a.toString(msg, 'utf-8');
                             msg = JSON.parse(msg);
                             if(null === msg) return;
@@ -87,7 +88,7 @@ class Network {
                                     return
                                 }
 
-                                if (b4a.byteLength(msg) > 3072) return;
+                                if (b4a.byteLength(tmp_message) > 3072) return;
 
                                 const parsedPreTx = msg;
 
