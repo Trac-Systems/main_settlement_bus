@@ -500,23 +500,7 @@ export class MainSettlementBus extends ReadyResource {
             }
             let stream = undefined;
 
-            if(this.#validator_stream !== null){
-                this.#swarm.joinPeer(b4a.from(adminEntry.tracPublicKey, 'hex'));
-                let cnt = 0;
-                while(false === this.#swarm.peers.has(adminEntry.tracPublicKey)){
-                    if(cnt >= 10) break;
-                    await sleep(1_000);
-                    cnt += 1;
-                }
-                if(this.#swarm.peers.has(adminEntry.tracPublicKey)){
-                    const peerInfo = this.#swarm.peers.get(adminEntry.tracPublicKey)
-                    stream = this.#swarm._allConnections.get(peerInfo.publicKey)
-                }
-            }
-
-            if(stream === undefined){
-                stream = this.#dht_node.connect(b4a.from(adminEntry.tracPublicKey, 'hex'))
-            }
+            stream = this.#dht_node.connect(b4a.from(adminEntry.tracPublicKey, 'hex'))
 
             stream.on('connect', async function () {
                 console.log('Trying to send message to admin.');
