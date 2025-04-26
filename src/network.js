@@ -11,7 +11,7 @@ import {
     OperationType,
     EntryType
 } from './utils/constants.js';
-import {sleep } from './utils/functions.js';
+import { sleep } from './utils/functions.js';
 import Check from './utils/check.js';
 import Wallet from 'trac-wallet';
 
@@ -53,28 +53,35 @@ class Network {
                             const tmp_message = msg;
                             msg = b4a.toString(msg, 'utf-8');
                             msg = JSON.parse(msg);
+
                             if(null === msg) return;
                             if(msg === 'get_writer_key'){
                                 await connection.send(b4a.from(JSON.stringify({op:'writer_key', key : writingKey})));
                             } else if(msg.type !== undefined && msg.key !== undefined && msg.value !== undefined && msg.type === 'addWriter'){
                                 const adminEntry = await msb.get(EntryType.ADMIN);
-                                if(null === adminEntry || (adminEntry.tracPublicKey !== wallet.publicKey)) return;
+                                if (null === adminEntry || (adminEntry.tracPublicKey !== wallet.publicKey)) return;
                                 const nodeEntry = await msb.get(msg.value.pub);
                                 const isAlreadyWriter = null !== nodeEntry && nodeEntry.isWriter;
                                 const isAllowedToRequestRole = await msb._isAllowedToRequestRole(msg.key, adminEntry);
                                 const canAddWriter = base.writable && !isAlreadyWriter && isAllowedToRequestRole;
-                                if(msg.key !== wallet.publicKey && canAddWriter){
+                                if (msg.key !== wallet.publicKey && canAddWriter) {
                                     await handleIncomingEvent(msg);
                                 }
                             } else if (msg.type !== undefined && msg.key !== undefined && msg.value !== undefined && msg.type === 'removeWriter') {
                                 const adminEntry = await msb.get(EntryType.ADMIN);
-                                if(null === adminEntry || (adminEntry.tracPublicKey !== wallet.publicKey)) return;
+                                if (null === adminEntry || (adminEntry.tracPublicKey !== wallet.publicKey)) return;
                                 const nodeEntry = await msb.get(msg.value.pub);
                                 const isAlreadyWriter = null !== nodeEntry && nodeEntry.isWriter;
                                 const canRemoveWriter = base.writable && isAlreadyWriter
                                 if (msg.key !== wallet.publicKey && canRemoveWriter) {
                                     await handleIncomingEvent(msg);
                                 }
+                            }
+                            else if (msg.type !== undefined && msg.key !== undefined && msg.value !== undefined && msg.type === 'addAdmin') {
+                                const adminEntry = await msb.get(EntryType.ADMIN);
+                                if (null === adminEntry || (adminEntry.tracPublicKey !== msg.key)) return;
+                                await handleIncomingEvent(msg);
+
                             }
                             else {
                                 //await connection.destroy();
@@ -114,7 +121,7 @@ class Network {
                                     network.tx_pool.push({ tx: parsedPreTx.tx, append_tx: append_tx });
                                 }
                             }
-                        }catch(e){
+                        } catch (e) {
                             console.log(e);
                         }
                     });
@@ -137,7 +144,7 @@ class Network {
                 const length = this.tx_pool.length;
                 const batch = [];
                 for (let i = 0; i < length; i++) {
-                    if(i >= 100) break;
+                    if (i >= 100) break;
                     batch.push({ type: OperationType.TX, key: this.tx_pool[i].tx, value: this.tx_pool[i].append_tx });
                 }
                 await base.append(batch);
