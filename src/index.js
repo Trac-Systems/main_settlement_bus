@@ -402,7 +402,7 @@ export class MainSettlementBus extends ReadyResource {
         await this.#removeWriter(op, batch, base);
 
     }
-    
+
     async _open() {
         await this.#base.ready();
         if (this.#enable_wallet) {
@@ -646,7 +646,7 @@ export class MainSettlementBus extends ReadyResource {
             if (!adminEntry && this.#wallet && this.#writingKey && this.#writingKey === this.#bootstrap) {
                 await this.#base.append(addAdminMessage);
             } else if (adminEntry && this.#wallet && adminEntry.tracPublicKey === this.#wallet.publicKey && this.#writingKey && this.#writingKey !== adminEntry.wk) {
-                
+
                 if (null === this.#validator_stream) return;
                 await this.#validator_stream.send(b4a.from(JSON.stringify(addAdminMessage)));
             }
@@ -751,7 +751,7 @@ export class MainSettlementBus extends ReadyResource {
 
     async validatorObserver() {
         // Finding writers for admin recovery case
-        while (this.#shouldValidatorObserverWorks) {
+        while (this.#enable_wallet && this.#shouldValidatorObserverWorks) {
 
             if (this.#dht_node === null || this.#validator_stream !== null || this.#base.writable) {
                 await sleep(1000);
@@ -767,7 +767,6 @@ export class MainSettlementBus extends ReadyResource {
                 const wriEntry = await _this.#base.view.get('wri/' + rndIndex);
                 if (_this.#validator_stream !== null || wriEntry === null) return;
 
-
                 const validatorEntry = await _this.#base.view.get(wriEntry.value);
                 if (
                     _this.#validator_stream !== null ||
@@ -777,31 +776,47 @@ export class MainSettlementBus extends ReadyResource {
                 ) return;
 
                 const pubKey = validatorEntry.value.pub;
-                if (pubKey === _this.#wallet.publicKey) return; // avoid establishing connection to itself
-                _this.#validator = pubKey;
-                if (_this.#validator_stream !== null) return;
+                if (pubKey === _this.#wallet.publicKey) return;
 
-                const stream = _this.#dht_node.connect(b4a.from(pubKey, 'hex'));
-                _this.#validator_stream = stream;
+                _this.#swarm.joinPeer(b4a.from(pubKey, 'hex'))
 
-                _this.#validator_stream.on('open', () => {
+                let existing_stream = undefined;
+                if(_this.#swarm.peers.has(pubKey)){
+                    const peerInfo = _this.#swarm.peers.get(pubKey)
+                    existing_stream = _this.#swarm._allConnections.get(peerInfo.publicKey)
+                }
+                if(existing_stream !== undefined){
+                    _this.validator_stream = existing_stream;
+                    _this.validator = pubKey;
+                    _this.validator_stream.on('close', () => {
+                        _this.validator_stream = null;
+                        _this.validator = null;
+                        console.log('Existing Validator stream closed', pubKey);
+                    });
+                    console.log('Existing Stream established', pubKey);
+                } else {
                     _this.#validator = pubKey;
-                    console.log('Validator stream established', pubKey);
-                });
+                    if (_this.#validator_stream !== null) return;
 
-                _this.#validator_stream.on('close', () => {
-                    try { stream.destroy(); } catch { }
-                    _this.#validator_stream = null;
-                    _this.#validator = null;
-                    console.log('Stream closed', pubKey);
-                });
+                    const stream = _this.#dht_node.connect(b4a.from(pubKey, 'hex'));
+                    _this.#validator_stream = stream;
 
-                _this.#validator_stream.on('error', (err) => {
-                    try { stream.destroy(); } catch { }
-                    _this.#validator_stream = null;
-                    _this.#validator = null;
-                    console.log(err);
-                });
+                    _this.#validator_stream.on('open', () => {
+                        _this.#validator = pubKey;
+                        console.log('Stream established', pubKey);
+                    });
+
+                    _this.#validator_stream.on('close', () => {
+                        _this.#validator_stream = null;
+                        _this.#validator = null;
+                        console.log('Stream closed', pubKey);
+                    });
+
+                    _this.#validator_stream.on('error', (err) => {
+                        _this.#validator_stream = null;
+                        _this.#validator = null;
+                    });
+                }
             }
 
             const promises = [];
