@@ -480,7 +480,10 @@ export class MainSettlementBus extends ReadyResource {
                     await sleep(1_000);
                     cnt += 1;
                 }
-                stream = this.#validator_stream;
+                if(this.#swarm.peers.has(adminEntry.tracPublicKey)){
+                    const peerInfo = this.#swarm.peers.get(adminEntry.tracPublicKey)
+                    stream = this.#swarm._allConnections.get(peerInfo.publicKey)
+                }
             }
 
             if(stream === undefined){
