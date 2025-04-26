@@ -176,6 +176,7 @@ export class MainSettlementBus extends ReadyResource {
         if (postTx.op === OperationType.POST_TX &&
             (this.#signature_whitelist.length === 0 || this.#signature_whitelist.includes(postTx.bs)) &&
             null === await batch.get(op.key) &&
+            null === await batch.get(postTx.tx) &&
             this.check.sanitizePostTx(op) &&
             op.key === postTx.tx &&
             this.#wallet.verify(b4a.from(postTx.is, 'hex'), b4a.from(postTx.tx + postTx.in), b4a.from(postTx.ipk, 'hex')) &&
