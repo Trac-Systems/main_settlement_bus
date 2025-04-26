@@ -213,7 +213,7 @@ export class MainSettlementBus extends ReadyResource {
                     tracPublicKey: adminEntry.tracPublicKey,
                     wk: op.value.wk
                 })
-                await batch.put(hash, op.value);
+                await batch.put(hash, op);
                 console.log(`Admin updated: ${adminEntry.tracPublicKey}:${op.value.wk}`);
             }
         }
@@ -234,7 +234,7 @@ export class MainSettlementBus extends ReadyResource {
             })
             const initIndexers = [op.key];
             await batch.put(EntryType.INDEXERS, initIndexers);
-            await batch.put(hash,op.value);
+            await batch.put(hash, op);
             console.log(`Admin added: ${op.key}:${this.#bootstrap}`);
         }
     }
@@ -251,7 +251,7 @@ export class MainSettlementBus extends ReadyResource {
         const isWhitelisted = await this.#isWhitelisted2(op.key, batch);
         if (isWhitelisted) return;
         await this.#createWhitelistEntry(batch, op.key);
-        await batch.put(hash, op.value);
+        await batch.put(hash, op);
     }
 
     async #createWhitelistEntry(batch, pubKey) {
@@ -298,7 +298,7 @@ export class MainSettlementBus extends ReadyResource {
             }
             await batch.put('wri/' + length, op.value.pub);
             await batch.put('wrl', length + 1);
-            await batch.put(hash, op.value);
+            await batch.put(hash, op);
             console.log(`Writer added: ${op.key}:${op.value.wk}`);
         }
     }
@@ -335,7 +335,7 @@ export class MainSettlementBus extends ReadyResource {
             }
 
             await batch.put(op.key, nodeEntry);
-            await batch.put(hash, op.value);
+            await batch.put(hash, op);
             console.log(`Writer removed: ${op.key}${op.value.wk ? `:${op.value.wk}` : ''}`);
 
         }
@@ -376,7 +376,7 @@ export class MainSettlementBus extends ReadyResource {
             await batch.put(op.key, nodeEntry);
             indexersEntry.push(op.key);
             await batch.put(EntryType.INDEXERS, indexersEntry);
-            await batch.put(hash, op.value);
+            await batch.put(hash, op);
             console.log(`Indexer added: ${op.key}:${nodeEntry.wk}`);
         }
     }
@@ -406,7 +406,7 @@ export class MainSettlementBus extends ReadyResource {
                     indexersEntry.splice(idx, 1);
                     await batch.put(EntryType.INDEXERS, indexersEntry);
                 }
-                await batch.put(hash, op.value);
+                await batch.put(hash, op);
                 console.log(`Indexer removed: ${op.key}:${nodeEntry.wk}`);
             }
         }
