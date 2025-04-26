@@ -6,7 +6,7 @@ export const EntryType = Object.freeze({
 
 export const OperationType = Object.freeze({
     ADD_ADMIN: 'addAdmin',
-    APPEND_WHITELIST: 'AppendWhitelist',
+    APPEND_WHITELIST: 'appendWhitelist',
     ADD_WRITER: 'addWriter',
     REMOVE_WRITER: 'removeWriter',
     ADD_INDEXER: 'addIndexer',
