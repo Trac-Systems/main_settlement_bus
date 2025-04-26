@@ -53,11 +53,11 @@ class Network {
                             const tmp_message = msg;
                             msg = b4a.toString(msg, 'utf-8');
                             msg = JSON.parse(msg);
-                            if (null === msg) return;
-                            if (msg === 'get_writer_key') {
-                                await connection.send(b4a.from(JSON.stringify({ op: 'writer_key', key: writingKey })));
-                                await connection.end();
-                            } else if (msg.type !== undefined && msg.key !== undefined && msg.value !== undefined && msg.type === 'addWriter') {
+
+                            if(null === msg) return;
+                            if(msg === 'get_writer_key'){
+                                await connection.send(b4a.from(JSON.stringify({op:'writer_key', key : writingKey})));
+                            } else if(msg.type !== undefined && msg.key !== undefined && msg.value !== undefined && msg.type === 'addWriter'){
                                 const adminEntry = await msb.get(EntryType.ADMIN);
                                 if (null === adminEntry || (adminEntry.tracPublicKey !== wallet.publicKey)) return;
                                 const nodeEntry = await msb.get(msg.value.pub);
@@ -67,7 +67,6 @@ class Network {
                                 if (msg.key !== wallet.publicKey && canAddWriter) {
                                     await handleIncomingEvent(msg);
                                 }
-                                await connection.end();
                             } else if (msg.type !== undefined && msg.key !== undefined && msg.value !== undefined && msg.type === 'removeWriter') {
                                 const adminEntry = await msb.get(EntryType.ADMIN);
                                 if (null === adminEntry || (adminEntry.tracPublicKey !== wallet.publicKey)) return;
@@ -77,7 +76,6 @@ class Network {
                                 if (msg.key !== wallet.publicKey && canRemoveWriter) {
                                     await handleIncomingEvent(msg);
                                 }
-                                await connection.end();
                             }
                             else if (msg.type !== undefined && msg.key !== undefined && msg.value !== undefined && msg.type === 'addAdmin') {
                                 const adminEntry = await msb.get(EntryType.ADMIN);
@@ -125,7 +123,6 @@ class Network {
                             }
                         } catch (e) {
                             console.log(e);
-                            try { await connection.end(); } catch (e) { console.log(e) }
                         }
                     });
                 }

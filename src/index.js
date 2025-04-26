@@ -118,6 +118,10 @@ export class MainSettlementBus extends ReadyResource {
         return this.#bootstrap;
     }
 
+    getSwarm(){
+        return this.#swarm;
+    }
+
     #boot() {
         const _this = this;
         this.#base = new Autobase(this.#store, this.#bootstrap, {
@@ -466,11 +470,12 @@ export class MainSettlementBus extends ReadyResource {
         if (!adminEntry || !message) {
             return;
         }
+
         const stream = this.#dht_node.connect(b4a.from(adminEntry.tracPublicKey, 'hex'))
+
         stream.on('connect', async function () {
             console.log('Trying to send message to admin.');
             await stream.send(b4a.from(JSON.stringify(message)));
-            await stream.end();
         });
         stream.on('open', function () { console.log('Message channel opened') });
         stream.on('close', () => { console.log('Message channel closed') });
