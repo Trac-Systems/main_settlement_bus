@@ -56,7 +56,6 @@ class Network {
                             if(null === msg) return;
                             if(msg === 'get_writer_key'){
                                 await connection.send(b4a.from(JSON.stringify({op:'writer_key', key : writingKey})));
-                                await connection.end();
                             } else if(msg.type !== undefined && msg.key !== undefined && msg.value !== undefined && msg.type === 'addWriter'){
                                 const adminEntry = await msb.get(EntryType.ADMIN);
                                 if(null === adminEntry || (adminEntry.tracPublicKey !== wallet.publicKey)) return;
@@ -67,7 +66,6 @@ class Network {
                                 if(msg.key !== wallet.publicKey && canAddWriter){
                                     await handleIncomingEvent(msg);
                                 }
-                                await connection.end();
                             } else if (msg.type !== undefined && msg.key !== undefined && msg.value !== undefined && msg.type === 'removeWriter') {
                                 const adminEntry = await msb.get(EntryType.ADMIN);
                                 if(null === adminEntry || (adminEntry.tracPublicKey !== wallet.publicKey)) return;
@@ -77,7 +75,6 @@ class Network {
                                 if (msg.key !== wallet.publicKey && canRemoveWriter) {
                                     await handleIncomingEvent(msg);
                                 }
-                                await connection.end();
                             }
                             else {
                                 //await connection.destroy();
@@ -119,7 +116,6 @@ class Network {
                             }
                         }catch(e){
                             console.log(e);
-                            try{ await connection.end(); } catch (e){ console.log(e) }
                         }
                     });
                 }
