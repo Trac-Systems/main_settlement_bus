@@ -465,26 +465,38 @@ export class MainSettlementBus extends ReadyResource {
         }
     }
 
-    #sendMessageToAdmin(adminEntry, message) {
-        if (!adminEntry || !message) {
-            return;
-        }
-        let stream;
+    async #sendMessageToAdmin(adminEntry, message) {
+        try{
+            if (!adminEntry || !message) {
+                return;
+            }
+            let stream = undefined;
 
-        if(this.#validator_stream !== null){
-            stream = this.#validator_stream;
-        } else {
-            stream = this.#dht_node.connect(b4a.from(adminEntry.tracPublicKey, 'hex'))
-        }
+            if(this.#validator_stream !== null){
+                this.#swarm.joinPeer(b4a.from(adminEntry.tracPublicKey, 'hex'));
+                let cnt = 0;
+                while(false === this.#swarm.peers.has(adminEntry.tracPublicKey)){
+                    if(cnt >= 10) break;
+                    await sleep(1_000);
+                    cnt += 1;
+                }
+                stream = this.#validator_stream;
+            }
 
-        stream.on('connect', async function () {
-            console.log('Trying to send message to admin.');
-            await stream.send(b4a.from(JSON.stringify(message)));
-            await stream.end();
-        });
-        stream.on('open', function () { console.log('Message channel opened') });
-        stream.on('close', () => { console.log('Message channel closed') });
-        stream.on('error', (error) => { console.log('Message send error', error) });
+            if(stream === undefined){
+                stream = this.#dht_node.connect(b4a.from(adminEntry.tracPublicKey, 'hex'))
+            }
+
+            stream.on('connect', async function () {
+                console.log('Trying to send message to admin.');
+                await stream.send(b4a.from(JSON.stringify(message)));
+            });
+            stream.on('open', function () { console.log('Message channel opened') });
+            stream.on('close', () => { console.log('Message channel closed') });
+            stream.on('error', (error) => { console.log('Message send error', error) });
+        }catch(e){
+            console.log(e)
+        }
     }
 
     async #sendMessageToAdmin2(adminEntry, message) {
