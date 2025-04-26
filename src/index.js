@@ -29,7 +29,6 @@ export class MainSettlementBus extends ReadyResource {
     // Internal flags
     #shouldListenToAdminEvents = false;
     #shouldListenToWriterEvents = false;
-    #shouldValidatorObserverWorks = true;
     #isStreaming = false;
 
     // internal attributes
@@ -466,7 +465,29 @@ export class MainSettlementBus extends ReadyResource {
         }
     }
 
-    async #sendMessageToAdmin(adminEntry, message) {
+    #sendMessageToAdmin(adminEntry, message) {
+        if (!adminEntry || !message) {
+            return;
+        }
+        let stream;
+
+        if(this.#validator_stream !== null){
+            stream = this.#validator_stream;
+        } else {
+            stream = this.#dht_node.connect(b4a.from(adminEntry.tracPublicKey, 'hex'))
+        }
+
+        stream.on('connect', async function () {
+            console.log('Trying to send message to admin.');
+            await stream.send(b4a.from(JSON.stringify(message)));
+            await stream.end();
+        });
+        stream.on('open', function () { console.log('Message channel opened') });
+        stream.on('close', () => { console.log('Message channel closed') });
+        stream.on('error', (error) => { console.log('Message send error', error) });
+    }
+
+    async #sendMessageToAdmin2(adminEntry, message) {
         if (!adminEntry || !message) {
             return;
         }
@@ -475,17 +496,7 @@ export class MainSettlementBus extends ReadyResource {
 
         let stream = undefined;
 
-        while(true){
-            if(this.#swarm.peers.has(adminEntry.tracPublicKey)){
-                const peerInfo = this.#swarm.peers.get(adminEntry.tracPublicKey)
-                stream = this.#swarm._allConnections.get(peerInfo.publicKey)
-            }
-            await sleep(1_000)
-        }
-
-        if(stream === undefined){
-            stream = this.#dht_node.connect(b4a.from(adminEntry.tracPublicKey, 'hex'))
-        }
+        stream = this.#dht_node.connect(b4a.from(adminEntry.tracPublicKey, 'hex'))
 
         if(stream !== undefined && stream.op !== undefined){
             stream.on('connect', async function () {
@@ -825,9 +836,9 @@ export class MainSettlementBus extends ReadyResource {
 
     async validatorObserver() {
         // Finding writers for admin recovery case
-        while (this.#enable_wallet && this.#shouldValidatorObserverWorks) {
+        while (this.#enable_wallet) {
 
-            if (this.#dht_node === null || this.#validator_stream !== null || this.#validator !== null || this.#base.writable) {
+            if (this.#dht_node === null || this.#validator_stream !== null || this.#validator !== null) {
                 await sleep(1000);
                 continue;
             }
@@ -863,6 +874,7 @@ export class MainSettlementBus extends ReadyResource {
                     const peerInfo = _this.#swarm.peers.get(pubKey)
                     existing_stream = _this.#swarm._allConnections.get(peerInfo.publicKey)
                 }
+                if (_this.#validator_stream !== null) return;
 
                 if(existing_stream !== undefined){
                     _this.validator_stream = existing_stream;
