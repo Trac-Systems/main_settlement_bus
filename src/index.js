@@ -246,8 +246,7 @@ export class MainSettlementBus extends ReadyResource {
         const message =  MsgUtils.createMessage(op.key, op.value.nonce, op.type)
         const isMessageVerifed = await this.#verifyMessage(op.value.sig, adminEntry.value.tracPublicKey, message);
         const hash = await createHash('sha256', message);
-        if (!isMessageVerifed) return;
-        if (null !== await batch.get(hash)) return;
+        if (!isMessageVerifed || null !== await batch.get(hash)) return;
         const isWhitelisted = await this.#isWhitelisted2(op.key, batch);
         if (isWhitelisted) return;
         await this.#createWhitelistEntry(batch, op.key);
@@ -424,7 +423,7 @@ export class MainSettlementBus extends ReadyResource {
         const message =  MsgUtils.createMessage(op.key, op.value.nonce, op.type);
         const isMessageVerifed = await this.#verifyMessage(op.value.sig, adminEntry.value.tracPublicKey,message );
         const hash = await createHash('sha256', message);
-        if (!isMessageVerifed && null !== await batch.get(hash)) return;
+        if (!isMessageVerifed || null !== await batch.get(hash)) return;
         await this.#deleteWhitelistEntry(batch, op.key);
         await this.#removeWriter(op, batch, base, hash);
 
