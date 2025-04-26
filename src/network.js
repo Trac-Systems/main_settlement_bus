@@ -44,7 +44,7 @@ class Network {
             swarm.on('connection', async (connection) => {
                 wakeup.addStream(connection);
                 store.replicate(connection);
-                connection.on('close', () => { });
+                connection.on('close', () => {});
                 connection.on('error', (error) => { });
 
                 if(enable_txchannel){
@@ -84,7 +84,6 @@ class Network {
 
                             }
                             else {
-                                //await connection.destroy();
                                 if (base.isIndexer || !base.writable) return;
 
                                 if (network.tx_pool.length >= 1000) {

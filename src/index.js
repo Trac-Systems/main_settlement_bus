@@ -78,7 +78,7 @@ export class MainSettlementBus extends ReadyResource {
         this.#dht_bootstrap = ['116.202.214.143:10001', '116.202.214.149:10001', 'node1.hyperdht.org:49737', 'node2.hyperdht.org:49737', 'node3.hyperdht.org:49737'];
         this.#dht_node = null;
         this.#validator_stream = null
-        this.validator = null;
+        this.#validator = null;
         this.#base = null;
         this.#writingKey = null;
         this.#enable_txchannel = options.enable_txchannel !== false;
@@ -466,20 +466,36 @@ export class MainSettlementBus extends ReadyResource {
         }
     }
 
-    #sendMessageToAdmin(adminEntry, message) {
+    async #sendMessageToAdmin(adminEntry, message) {
         if (!adminEntry || !message) {
             return;
         }
 
-        const stream = this.#dht_node.connect(b4a.from(adminEntry.tracPublicKey, 'hex'))
+        this.#swarm.joinPeer(b4a.from(adminEntry.tracPublicKey, 'hex'))
 
-        stream.on('connect', async function () {
-            console.log('Trying to send message to admin.');
-            await stream.send(b4a.from(JSON.stringify(message)));
-        });
-        stream.on('open', function () { console.log('Message channel opened') });
-        stream.on('close', () => { console.log('Message channel closed') });
-        stream.on('error', (error) => { console.log('Message send error', error) });
+        let stream = undefined;
+
+        while(true){
+            if(this.#swarm.peers.has(adminEntry.tracPublicKey)){
+                const peerInfo = this.#swarm.peers.get(adminEntry.tracPublicKey)
+                stream = this.#swarm._allConnections.get(peerInfo.publicKey)
+            }
+            await sleep(1_000)
+        }
+
+        if(stream === undefined){
+            stream = this.#dht_node.connect(b4a.from(adminEntry.tracPublicKey, 'hex'))
+        }
+
+        if(stream !== undefined && stream.op !== undefined){
+            stream.on('connect', async function () {
+                console.log('Trying to send message to admin.');
+                await stream.send(b4a.from(JSON.stringify(message)));
+            });
+            stream.on('open', function () { console.log('Message channel opened') });
+            stream.on('close', () => { console.log('Message channel closed') });
+            stream.on('error', (error) => { console.log('Message send error', error) });
+        }
     }
 
     async #verifyMessage(signature, publicKey, bufferMessage) {
@@ -646,7 +662,6 @@ export class MainSettlementBus extends ReadyResource {
             if (!adminEntry && this.#wallet && this.#writingKey && this.#writingKey === this.#bootstrap) {
                 await this.#base.append(addAdminMessage);
             } else if (adminEntry && this.#wallet && adminEntry.tracPublicKey === this.#wallet.publicKey && this.#writingKey && this.#writingKey !== adminEntry.wk) {
-
                 if (null === this.#validator_stream) return;
                 await this.#validator_stream.send(b4a.from(JSON.stringify(addAdminMessage)));
             }
@@ -716,7 +731,7 @@ export class MainSettlementBus extends ReadyResource {
         }
 
         if (assembledMessage) {
-            this.#sendMessageToAdmin(adminEntry, assembledMessage);
+            await this.#sendMessageToAdmin(adminEntry, assembledMessage);
         }
     }
 
@@ -749,11 +764,70 @@ export class MainSettlementBus extends ReadyResource {
         }
     }
 
+    async isValidatorAvailable(address){
+        if(null === this.#swarm) return null;
+        let writer_key = null;
+
+        this.#swarm.joinPeer(b4a.from(address, 'hex'))
+
+        let existing_stream = undefined;
+
+        if(this.#swarm.peers.has(address)){
+            const peerInfo = this.#swarm.peers.get(address)
+            existing_stream = this.#swarm._allConnections.get(peerInfo.publicKey)
+        }
+
+        if(existing_stream !== undefined){
+            existing_stream.on('message', (msg) => {
+                try{
+                    const response = JSON.parse(b4a.toString(msg, 'utf-8'));
+                    if(response.op === 'writer_key' && response.key !== undefined){
+                        writer_key = response.key;
+                    }
+                }catch(e){}
+            });
+            existing_stream.on('open', function () { });
+            existing_stream.on('close', () => { });
+            existing_stream.on('error', (error) => { });
+            await existing_stream.send(b4a.from(JSON.stringify('get_writer_key')));
+            let i = 0;
+            while(null === writer_key){
+                if(i >= 1_000) break;
+                await sleep(10);
+                i += 10;
+            }
+            return writer_key;
+        } else {
+            const stream = this.#swarm.dht.connect(b4a.from(address, 'hex'))
+            stream.on('connect', async function () {
+                await stream.send(b4a.from(JSON.stringify('get_writer_key')));
+            });
+            stream.on('message', (msg) => {
+                try{
+                    const response = jsonParse(b4a.toString(msg, 'utf-8'));
+                    if(response.op === 'writer_key' && response.key !== undefined){
+                        writer_key = response.key;
+                    }
+                }catch(e){}
+            });
+            stream.on('open', function () { });
+            stream.on('close', () => { });
+            stream.on('error', (error) => { });
+            let i = 0;
+            while(null === writer_key){
+                if(i >= 5_000) break;
+                await sleep(10);
+                i += 10;
+            }
+            return writer_key;
+        }
+    }
+
     async validatorObserver() {
         // Finding writers for admin recovery case
         while (this.#enable_wallet && this.#shouldValidatorObserverWorks) {
 
-            if (this.#dht_node === null || this.#validator_stream !== null || this.#base.writable) {
+            if (this.#dht_node === null || this.#validator_stream !== null || this.#validator !== null || this.#base.writable) {
                 await sleep(1000);
                 continue;
             }
@@ -770,6 +844,7 @@ export class MainSettlementBus extends ReadyResource {
                 const validatorEntry = await _this.#base.view.get(wriEntry.value);
                 if (
                     _this.#validator_stream !== null ||
+                    _this.#validator !== null ||
                     validatorEntry === null ||
                     !validatorEntry.value.isWriter ||
                     validatorEntry.value.isIndexer
@@ -778,43 +853,44 @@ export class MainSettlementBus extends ReadyResource {
                 const pubKey = validatorEntry.value.pub;
                 if (pubKey === _this.#wallet.publicKey) return;
 
-                _this.#swarm.joinPeer(b4a.from(pubKey, 'hex'))
+                const available = await _this.isValidatorAvailable(pubKey);
+                if (_this.#validator_stream !== null) return;
+                if(available === null) return;
 
                 let existing_stream = undefined;
+
                 if(_this.#swarm.peers.has(pubKey)){
                     const peerInfo = _this.#swarm.peers.get(pubKey)
                     existing_stream = _this.#swarm._allConnections.get(peerInfo.publicKey)
                 }
+
                 if(existing_stream !== undefined){
                     _this.validator_stream = existing_stream;
                     _this.validator = pubKey;
                     _this.validator_stream.on('close', () => {
-                        _this.validator_stream = null;
-                        _this.validator = null;
-                        console.log('Existing Validator stream closed', pubKey);
+                        if(_this.validator_stream !== null && b4a.toString(_this.validator_stream.publicKey, 'hex') === pubKey){
+                            _this.#validator_stream = null;
+                            _this.#validator = null;
+                            console.log('Exissting Stream closed', pubKey);
+                        }
                     });
                     console.log('Existing Stream established', pubKey);
                 } else {
+                    _this.#validator_stream = _this.#dht_node.connect(b4a.from(pubKey, 'hex'));
                     _this.#validator = pubKey;
-                    if (_this.#validator_stream !== null) return;
-
-                    const stream = _this.#dht_node.connect(b4a.from(pubKey, 'hex'));
-                    _this.#validator_stream = stream;
-
-                    _this.#validator_stream.on('open', () => {
-                        _this.#validator = pubKey;
-                        console.log('Stream established', pubKey);
-                    });
-
                     _this.#validator_stream.on('close', () => {
-                        _this.#validator_stream = null;
-                        _this.#validator = null;
-                        console.log('Stream closed', pubKey);
+                        if(_this.validator_stream !== null && b4a.toString(_this.validator_stream.publicKey, 'hex') === pubKey){
+                            _this.#validator_stream = null;
+                            _this.#validator = null;
+                            console.log('Stream closed', pubKey);
+                        }
                     });
 
                     _this.#validator_stream.on('error', (err) => {
-                        _this.#validator_stream = null;
-                        _this.#validator = null;
+                        if(_this.validator_stream !== null && b4a.toString(_this.validator_stream.publicKey, 'hex') === pubKey) {
+                            _this.#validator_stream = null;
+                            _this.#validator = null;
+                        }
                     });
                 }
             }
