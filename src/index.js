@@ -877,10 +877,10 @@ export class MainSettlementBus extends ReadyResource {
                 if (_this.#validator_stream !== null) return;
 
                 if(existing_stream !== undefined){
-                    _this.validator_stream = existing_stream;
-                    _this.validator = pubKey;
-                    _this.validator_stream.on('close', () => {
-                        if(_this.validator_stream !== null && b4a.toString(_this.validator_stream.publicKey, 'hex') === pubKey){
+                    _this.#validator_stream = existing_stream;
+                    _this.#validator = pubKey;
+                    _this.#validator_stream.on('close', () => {
+                        if(_this.#validator_stream !== null && b4a.toString(_this.#validator_stream.publicKey, 'hex') === pubKey){
                             _this.#validator_stream = null;
                             _this.#validator = null;
                             console.log('Exissting Stream closed', pubKey);
@@ -891,7 +891,7 @@ export class MainSettlementBus extends ReadyResource {
                     _this.#validator_stream = _this.#dht_node.connect(b4a.from(pubKey, 'hex'));
                     _this.#validator = pubKey;
                     _this.#validator_stream.on('close', () => {
-                        if(_this.validator_stream !== null && b4a.toString(_this.validator_stream.publicKey, 'hex') === pubKey){
+                        if(_this.#validator_stream !== null && b4a.toString(_this.#validator_stream.publicKey, 'hex') === pubKey){
                             _this.#validator_stream = null;
                             _this.#validator = null;
                             console.log('Stream closed', pubKey);
@@ -899,7 +899,7 @@ export class MainSettlementBus extends ReadyResource {
                     });
 
                     _this.#validator_stream.on('error', (err) => {
-                        if(_this.validator_stream !== null && b4a.toString(_this.validator_stream.publicKey, 'hex') === pubKey) {
+                        if(_this.#validator_stream !== null && b4a.toString(_this.#validator_stream.publicKey, 'hex') === pubKey) {
                             _this.#validator_stream = null;
                             _this.#validator = null;
                         }
