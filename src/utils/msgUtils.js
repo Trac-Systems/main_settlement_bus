@@ -3,12 +3,7 @@ import { OperationType } from './constants.js';
 import fileUtils from './fileUtils.js';
 import b4a from 'b4a';
 import Wallet from 'trac-wallet';
-// TODO: This class is trying to solve too many problems at once.
-//       It is responsible for creating messages, verifying them, reading public keys from a file, etc.
-//       It would be better to separate these concerns into different classes or modules.
-//       For example, we could have a separate class for file operations, another for message creation, etc.
-//       This would make the code more modular and easier to maintain.
-//       It would also make it easier to create tests and mocks in the future.
+
 class MsgUtils {
 
     static createMessage(...args) {
