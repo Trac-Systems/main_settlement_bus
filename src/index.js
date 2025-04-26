@@ -426,7 +426,7 @@ export class MainSettlementBus extends ReadyResource {
         const hash = await createHash('sha256', message);
         if (!isMessageVerifed && null !== await batch.get(hash)) return;
         await this.#deleteWhitelistEntry(batch, op.key);
-        await this.#removeWriter(op, batch, base);
+        await this.#removeWriter(op, batch, base, hash);
 
     }
 
