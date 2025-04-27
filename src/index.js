@@ -68,10 +68,10 @@ export class MainSettlementBus extends ReadyResource {
 
     #initInternalAttributes(options) {
         this.#STORES_DIRECTORY = options.stores_directory;
-        this.#KEY_PAIR_PATH = `${this.#STORES_DIRECTORY}${options.store_name}/db/keypair.json`
+        this.#KEY_PAIR_PATH = `${this.STORES_DIRECTORY}${options.store_name}/db/keypair.json`
         this.#bootstrap = options.bootstrap || null;
         this.#channel = b4a.alloc(32).fill(options.channel) || null;
-        this.#store = new Corestore(this.#STORES_DIRECTORY + options.store_name);
+        this.#store = new Corestore(this.STORES_DIRECTORY + options.store_name);
         this.#bee = null;
         this.#swarm = null;
         this.#dht_bootstrap = ['116.202.214.143:10001', '116.202.214.149:10001', 'node1.hyperdht.org:49737', 'node2.hyperdht.org:49737', 'node3.hyperdht.org:49737'];
@@ -199,12 +199,8 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async #addAdminIfSet(adminEntry, op, view, base, batch) {
-        const message = MsgUtils.createMessage(adminEntry.tracPublicKey, op.value.wk, op.value.nonce, op.type)
-        const isMessageVerifed = await this.#verifyMessage(op.value.sig, adminEntry.tracPublicKey, message);
-        const hash = await createHash('sha256', message);
-        if (isMessageVerifed &&
-            null === await batch.get(hash)
-        ) {
+        const isMessageVerifed = await this.#verifyMessage(op.value.sig, adminEntry.tracPublicKey, MsgUtils.createMessage(adminEntry.tracPublicKey, op.value.wk, op.value.nonce, op.type));
+        if (isMessageVerifed) {
             const indexersEntry = await batch.get(EntryType.INDEXERS);
             if (null !== indexersEntry && indexersEntry.value.includes(adminEntry.tracPublicKey)) {
                 await base.removeWriter(b4a.from(adminEntry.wk, 'hex'));
@@ -213,20 +209,17 @@ export class MainSettlementBus extends ReadyResource {
                     tracPublicKey: adminEntry.tracPublicKey,
                     wk: op.value.wk
                 })
-                await batch.put(hash, op);
                 console.log(`Admin updated: ${adminEntry.tracPublicKey}:${op.value.wk}`);
             }
         }
     }
 
     async #addAdminIfNotSet(op, view, node, batch) {
-        const message = MsgUtils.createMessage(op.key, op.value.wk, op.value.nonce, op.type)
-        const isMessageVerifed = await this.#verifyMessage(op.value.sig, op.key, message);
-        const hash = await createHash('sha256', message);
+        const isMessageVerifed = await this.#verifyMessage(op.value.sig, op.key, MsgUtils.createMessage(op.key, op.value.wk, op.value.nonce, op.type));
+
         if (node.from.key.toString('hex') === this.#bootstrap &&
             op.value.wk === this.#bootstrap &&
-            isMessageVerifed &&
-            null === await batch.get(hash)
+            isMessageVerifed
         ) {
             await batch.put(EntryType.ADMIN, {
                 tracPublicKey: op.key,
@@ -234,7 +227,6 @@ export class MainSettlementBus extends ReadyResource {
             })
             const initIndexers = [op.key];
             await batch.put(EntryType.INDEXERS, initIndexers);
-            await batch.put(hash, op);
             console.log(`Admin added: ${op.key}:${this.#bootstrap}`);
         }
     }
@@ -242,15 +234,12 @@ export class MainSettlementBus extends ReadyResource {
     async #handleApplyAppendWhitelistOperation(op, view, base, node, batch) {
         const adminEntry = await batch.get(EntryType.ADMIN);
         if (null === adminEntry || !this.check.sanitizeIndexerOrWhitelistOperations(op) || !this.#isAdmin(adminEntry.value, node)) return;
-        
-        const message =  MsgUtils.createMessage(op.key, op.value.nonce, op.type)
-        const isMessageVerifed = await this.#verifyMessage(op.value.sig, adminEntry.value.tracPublicKey, message);
-        const hash = await createHash('sha256', message);
-        if (!isMessageVerifed || null !== await batch.get(hash)) return;
+        // TODO: is the below an admin signature? - yes
+        const isMessageVerifed = await this.#verifyMessage(op.value.sig, adminEntry.value.tracPublicKey, MsgUtils.createMessage(op.key, op.value.nonce, op.type));
+        if (!isMessageVerifed) return;
         const isWhitelisted = await this.#isWhitelisted2(op.key, batch);
         if (isWhitelisted) return;
         await this.#createWhitelistEntry(batch, op.key);
-        await batch.put(hash, op);
     }
 
     async #createWhitelistEntry(batch, pubKey) {
@@ -269,17 +258,14 @@ export class MainSettlementBus extends ReadyResource {
 
         const isWhitelisted = await this.#isWhitelisted2(op.key, batch);
         if (!isWhitelisted || op.key !== op.value.pub) return;
-        const message = MsgUtils.createMessage(op.key, op.value.wk, op.value.nonce, op.type)
-        const isMessageVerifed = await this.#verifyMessage(op.value.sig, op.key, message);
-        const hash = await createHash('sha256', message);
-        if (isMessageVerifed &&
-            null === await batch.get(hash)
-        ) {
-            await this.#addWriter(op, batch, base, hash);
+        // TODO: if the below is not a message signed by admin BUT this handler is supposed to be executed by the admin, then use admin signatures in apply!
+        const isMessageVerifed = await this.#verifyMessage(op.value.sig, op.key, MsgUtils.createMessage(op.key, op.value.wk, op.value.nonce, op.type));
+        if (isMessageVerifed) {
+            await this.#addWriter(op, batch, base);
         }
     }
 
-    async #addWriter(op, batch, base, hash) {
+    async #addWriter(op, batch, base) {
         const nodeEntry = await batch.get(op.key);
         if (nodeEntry === null || !nodeEntry.value.isWriter) {
             await base.addWriter(b4a.from(op.value.wk, 'hex'), { isIndexer: false })
@@ -297,7 +283,6 @@ export class MainSettlementBus extends ReadyResource {
             }
             await batch.put('wri/' + length, op.value.pub);
             await batch.put('wrl', length + 1);
-            await batch.put(hash, op);
             console.log(`Writer added: ${op.key}:${op.value.wk}`);
         }
     }
@@ -305,17 +290,14 @@ export class MainSettlementBus extends ReadyResource {
     async #handleApplyRemoveWriterOperation(op, view, base, node, batch) {
         const adminEntry = await batch.get(EntryType.ADMIN);
         if (null === adminEntry || !this.check.sanitizeAdminAndWritersOperations(op) || !this.#isAdmin(adminEntry.value, node)) return;
-        const message =  MsgUtils.createMessage(op.key, op.value.wk, op.value.nonce, op.type);
-        const isMessageVerifed = await this.#verifyMessage(op.value.sig, op.key, message);
-        const hash = await createHash('sha256', message);
-        if (isMessageVerifed &&
-            null === await batch.get(hash)
-        ) {
-            await this.#removeWriter(op, batch, base, hash);
+        // TODO: if the below is not a message signed by admin BUT this handler is supposed to be executed by the admin, then use admin signatures in apply!
+        const isMessageVerifed = await this.#verifyMessage(op.value.sig, op.key, MsgUtils.createMessage(op.key, op.value.wk, op.value.nonce, op.type));
+        if (isMessageVerifed) {
+            await this.#removeWriter(op, batch, base);
         }
     }
 
-    async #removeWriter(op, batch, base, hash) {
+    async #removeWriter(op, batch, base) {
         let nodeEntry = await batch.get(op.key)
         if (nodeEntry !== null) {
             nodeEntry = nodeEntry.value;
@@ -334,7 +316,6 @@ export class MainSettlementBus extends ReadyResource {
             }
 
             await batch.put(op.key, nodeEntry);
-            await batch.put(hash, op);
             console.log(`Writer removed: ${op.key}${op.value.wk ? `:${op.value.wk}` : ''}`);
 
         }
@@ -355,16 +336,14 @@ export class MainSettlementBus extends ReadyResource {
             Array.from(indexersEntry.value).length >= MAX_INDEXERS) {
             return;
         }
-        const message =  MsgUtils.createMessage(op.key, op.value.nonce, op.type);
-        const isMessageVerifed = await this.#verifyMessage(op.value.sig, adminEntry.value.tracPublicKey, message)
-        const hash = await createHash('sha256', message);
-        if (isMessageVerifed &&
-            null === await batch.get(hash)) {
-            await this.#addIndexer(indexersEntry.value, op, batch, base, hash);
+        // TODO: is the below an admin signature? -yes
+        const isMessageVerifed = await this.#verifyMessage(op.value.sig, adminEntry.value.tracPublicKey, MsgUtils.createMessage(op.key, op.value.nonce, op.type))
+        if (isMessageVerifed) {
+            await this.#addIndexer(indexersEntry.value, op, batch, base);
         }
     }
 
-    async #addIndexer(indexersEntry, op, batch, base, hash) {
+    async #addIndexer(indexersEntry, op, batch, base) {
         let nodeEntry = await batch.get(op.key);
 
         if (nodeEntry !== null && nodeEntry.value.isWriter && !nodeEntry.value.isIndexer) {
@@ -375,7 +354,6 @@ export class MainSettlementBus extends ReadyResource {
             await batch.put(op.key, nodeEntry);
             indexersEntry.push(op.key);
             await batch.put(EntryType.INDEXERS, indexersEntry);
-            await batch.put(hash, op);
             console.log(`Indexer added: ${op.key}:${nodeEntry.wk}`);
         }
     }
@@ -385,11 +363,8 @@ export class MainSettlementBus extends ReadyResource {
         const adminEntry = await batch.get(EntryType.ADMIN);
         let indexersEntry = await batch.get(EntryType.INDEXERS);
         if (null === adminEntry || !this.#isAdmin(adminEntry.value, node) || null === indexersEntry || !Array.from(indexersEntry.value).includes(op.key) || Array.from(indexersEntry.value).length <= 1) return;
-        const message = MsgUtils.createMessage(op.key, op.value.nonce, op.type);
-        const isMessageVerifed = await this.#verifyMessage(op.value.sig, adminEntry.value.tracPublicKey, message)
-        const hash = await createHash('sha256', message);
-        if (isMessageVerifed &&
-            null === await batch.get(hash)) {
+        const isMessageVerifed = await this.#verifyMessage(op.value.sig, adminEntry.value.tracPublicKey, MsgUtils.createMessage(op.key, op.value.nonce, op.type))
+        if (isMessageVerifed) {
             let nodeEntry = await batch.get(op.key);
             if (nodeEntry !== null && nodeEntry.value.isWriter && nodeEntry.value.isIndexer) {
                 indexersEntry = indexersEntry.value;
@@ -405,7 +380,7 @@ export class MainSettlementBus extends ReadyResource {
                     indexersEntry.splice(idx, 1);
                     await batch.put(EntryType.INDEXERS, indexersEntry);
                 }
-                await batch.put(hash, op);
+
                 console.log(`Indexer removed: ${op.key}:${nodeEntry.wk}`);
             }
         }
@@ -420,12 +395,10 @@ export class MainSettlementBus extends ReadyResource {
 
         const nodeEntry = await batch.get(op.key)
         if (null === nodeEntry || nodeEntry.value.isIndexer === true) return; // even if node is not writable atm it should be possible to ban it.
-        const message =  MsgUtils.createMessage(op.key, op.value.nonce, op.type);
-        const isMessageVerifed = await this.#verifyMessage(op.value.sig, adminEntry.value.tracPublicKey,message );
-        const hash = await createHash('sha256', message);
-        if (!isMessageVerifed || null !== await batch.get(hash)) return;
+        const isMessageVerifed = await this.#verifyMessage(op.value.sig, adminEntry.value.tracPublicKey, MsgUtils.createMessage(op.key, op.value.nonce, op.type))
+        if (!isMessageVerifed) return;
         await this.#deleteWhitelistEntry(batch, op.key);
-        await this.#removeWriter(op, batch, base, hash);
+        await this.#removeWriter(op, batch, base);
 
     }
 
@@ -883,6 +856,8 @@ export class MainSettlementBus extends ReadyResource {
             const lengthEntry = await this.#base.view.get('wrl');
             const length = lengthEntry?.value ?? 0;
 
+            console.log('Looking for available writers, please wait...');
+
             async function findValidator(_this) {
                 if (_this.#validator_stream !== null) return;
 
@@ -918,29 +893,28 @@ export class MainSettlementBus extends ReadyResource {
                     _this.#validator_stream = existing_stream;
                     _this.#validator = pubKey;
                     _this.#validator_stream.on('close', () => {
-                        if(_this.#validator_stream !== null && b4a.toString(_this.#validator_stream.publicKey, 'hex') === pubKey){
-                            _this.#validator_stream = null;
-                            _this.#validator = null;
-                            console.log('Exissting Stream closed', pubKey);
-                        }
+                        _this.#validator_stream = null;
+                        _this.#validator = null;
+                        console.log('Existing Stream closed', pubKey);
                     });
                     console.log('Existing Stream established', pubKey);
                 } else {
                     _this.#validator_stream = _this.#dht_node.connect(b4a.from(pubKey, 'hex'));
-                    _this.#validator = pubKey;
+
+                    _this.#validator_stream.on('open', () => {
+                        _this.#validator = pubKey;
+                        console.log('Stream established', pubKey);
+                    });
+
                     _this.#validator_stream.on('close', () => {
-                        if(_this.#validator_stream !== null && b4a.toString(_this.#validator_stream.publicKey, 'hex') === pubKey){
-                            _this.#validator_stream = null;
-                            _this.#validator = null;
-                            console.log('Stream closed', pubKey);
-                        }
+                        _this.#validator_stream = null;
+                        _this.#validator = null;
+                        console.log('Stream closed', pubKey);
                     });
 
                     _this.#validator_stream.on('error', (err) => {
-                        if(_this.#validator_stream !== null && b4a.toString(_this.#validator_stream.publicKey, 'hex') === pubKey) {
-                            _this.#validator_stream = null;
-                            _this.#validator = null;
-                        }
+                        _this.#validator_stream = null;
+                        _this.#validator = null;
                     });
                 }
             }
