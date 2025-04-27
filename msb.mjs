@@ -3,8 +3,8 @@ import {MainSettlementBus} from './src/index.js';
 const opts = {
     stores_directory : 'stores/',
     store_name : typeof process !== "undefined" ? process.argv[2] : Pear.config.args[0],
-    bootstrap: '0f4fa31072e9b9d55eae87981ee657cbf9c18c70207f80d7c917540938f8b59d',
-    channel: '00axtracnetworkmainsettlementbus'
+    bootstrap: '64bd0a01c03f46432dd15a60a2d7150c787042b13e3c42c97da5fe02d0295b7f',
+    channel: '0000tracnetworkmainsettlementbus'
 };
 
 const msb = new MainSettlementBus(opts);
