@@ -856,8 +856,6 @@ export class MainSettlementBus extends ReadyResource {
             const lengthEntry = await this.#base.view.get('wrl');
             const length = lengthEntry?.value ?? 0;
 
-            console.log('Looking for available writers, please wait...');
-
             async function findValidator(_this) {
                 if (_this.#validator_stream !== null) return;
 
