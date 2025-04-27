@@ -54,6 +54,7 @@ export class MainSettlementBus extends ReadyResource {
     #opts;
     #signature_whitelist;
     #readline_instance;
+    #enable_txlogs;
 
     constructor(options = {}) {
         super();
@@ -74,13 +75,14 @@ export class MainSettlementBus extends ReadyResource {
         this.#store = new Corestore(this.STORES_DIRECTORY + options.store_name);
         this.#bee = null;
         this.#swarm = null;
-        this.#dht_bootstrap = ['116.202.214.143:10001', '116.202.214.149:10001', 'node1.hyperdht.org:49737', 'node2.hyperdht.org:49737', 'node3.hyperdht.org:49737'];
+        this.#dht_bootstrap = ['116.202.214.149:10001', '157.180.12.214:10001', 'node1.hyperdht.org:49737', 'node2.hyperdht.org:49737', 'node3.hyperdht.org:49737'];
         this.#dht_node = null;
         this.#validator_stream = null
         this.#validator = null;
         this.#base = null;
         this.#writingKey = null;
         this.#enable_txchannel = options.enable_txchannel !== false;
+        this.#enable_txlogs = options.enable_txlogs === true;
         this.#enable_updater = options.enable_updater !== false;
         this.#enable_wallet = options.enable_wallet !== false;
         this.#wallet = new PeerWallet(options);
@@ -183,7 +185,9 @@ export class MainSettlementBus extends ReadyResource {
             b4a.byteLength(JSON.stringify(postTx)) <= 4096
         ) {
             await batch.put(op.key, op.value);
-            console.log(`TX: ${op.key} appended. Signed length: `, this.#base.view.core.signedLength);
+            if(this.#enable_txlogs === true){
+                console.log(`TX: ${op.key} appended. Signed length: `, this.#base.view.core.signedLength);
+            }
         }
     }
 
