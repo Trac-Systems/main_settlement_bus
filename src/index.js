@@ -55,6 +55,7 @@ export class MainSettlementBus extends ReadyResource {
     #signature_whitelist;
     #readline_instance;
     #enable_txlogs;
+    #disable_rate_limit;
 
     constructor(options = {}) {
         super();
@@ -85,6 +86,7 @@ export class MainSettlementBus extends ReadyResource {
         this.#enable_txlogs = options.enable_txlogs === true;
         this.#enable_updater = options.enable_updater !== false;
         this.#enable_wallet = options.enable_wallet !== false;
+        this.#disable_rate_limit = options.disable_rate_limit === true;
         this.#wallet = new PeerWallet(options);
         this.#replicate = options.replicate !== false;
         this.#signature_whitelist = options.signature_whitelist !== undefined && Array.isArray(options.signature_whitelist) ? options.signature_whitelist : [];
@@ -423,7 +425,7 @@ export class MainSettlementBus extends ReadyResource {
 
         console.log('');
         if (this.#replicate) {
-            this.#swarm = await Network.replicate(this, this.#network, this.#enable_txchannel, this.#base, this.#writingKey, this.#dht_bootstrap, this.#swarm, this.#enable_wallet, this.#store, this.#wallet, this.#channel, this.#isStreaming, this.#handleIncomingEvent.bind(this), this.emit.bind(this));
+            this.#swarm = await Network.replicate(this.#disable_rate_limit, this, this.#network, this.#enable_txchannel, this.#base, this.#writingKey, this.#dht_bootstrap, this.#swarm, this.#enable_wallet, this.#store, this.#wallet, this.#channel, this.#isStreaming, this.#handleIncomingEvent.bind(this), this.emit.bind(this));
             this.#dht_node = this.#swarm.dht;
         }
 

@@ -25,7 +25,7 @@ class Network {
     }
 
 
-    static async replicate(msb, network, enable_txchannel, base, writingKey, bootstrap, swarm, walletEnabled, store, wallet, channel, isStreaming, handleIncomingEvent, emit) {
+    static async replicate(disable_rate_limit, msb, network, enable_txchannel, base, writingKey, bootstrap, swarm, walletEnabled, store, wallet, channel, isStreaming, handleIncomingEvent, emit) {
         if (!swarm) {
 
             let keyPair;
@@ -37,6 +37,9 @@ class Network {
                     secretKey: b4a.from(wallet.secretKey, 'hex')
                 };
             }
+
+            let clean = Date.now();
+            let conns = {};
 
             swarm = new Hyperswarm({ keyPair, bootstrap : bootstrap, maxPeers: MAX_PEERS, maxParallel: MAX_PARALLEL, maxServerConnections: MAX_SERVER_CONNECTIONS, maxClientConnections :  MAX_CLIENT_CONNECTIONS});
 
@@ -85,6 +88,33 @@ class Network {
                             }
                             else {
                                 if (base.isIndexer || !base.writable) return;
+
+                                if(true !== disable_rate_limit)
+                                {
+                                    const peer = b4a.toString(connection.remotePublicKey, 'hex');
+                                    const _now = Date.now();
+
+                                    if(_now - clean >= 120_000) {
+                                        clean = _now;
+                                        conns = {};
+                                    }
+
+                                    if(conns[peer] === undefined){
+                                        conns[peer] = { prev : _now, now: 0, tx_cnt : 0 }
+                                    }
+
+                                    conns[peer].now = _now;
+                                    conns[peer].tx_cnt += 1;
+
+                                    if(conns[peer].now - conns[peer].prev >= 60_000){
+                                        delete conns[peer];
+                                    }
+
+                                    if(conns[peer] !== undefined && conns[peer].now - conns[peer].prev >= 1000 && conns[peer].tx_cnt >= 50){
+                                        swarm.leavePeer(connection.remotePublicKey);
+                                        connection.end()
+                                    }
+                                }
 
                                 if (network.tx_pool.length >= 1000) {
                                     console.log('pool full');
@@ -143,13 +173,13 @@ class Network {
                 const length = this.tx_pool.length;
                 const batch = [];
                 for (let i = 0; i < length; i++) {
-                    if (i >= 100) break;
+                    if (i >= 10) break;
                     batch.push({ type: OperationType.TX, key: this.tx_pool[i].tx, value: this.tx_pool[i].append_tx });
                 }
                 await base.append(batch);
                 this.tx_pool.splice(0, batch.length);
             }
-            await sleep(10);
+            await sleep(5);
         }
     }
 }
