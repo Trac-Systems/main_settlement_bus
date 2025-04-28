@@ -178,10 +178,10 @@ export class MainSettlementBus extends ReadyResource {
 
     async #handleApplyTxOperation(op, view, base, node, batch) {
         const postTx = op.value;
-        if (postTx.op === OperationType.POST_TX &&
+        if (this.check.sanitizePostTx(op) && // ATTENTION: The sanitization should be done before ANY other check, otherwise we risk crashing
+            postTx.op === OperationType.POST_TX &&
             (this.#signature_whitelist.length === 0 || this.#signature_whitelist.includes(postTx.bs)) &&
             null === await batch.get(op.key) &&
-            this.check.sanitizePostTx(op) &&
             op.key === postTx.tx &&
             this.#wallet.verify(b4a.from(postTx.is, 'hex'), b4a.from(postTx.tx + postTx.in), b4a.from(postTx.ipk, 'hex')) &&
             this.#wallet.verify(b4a.from(postTx.ws, 'hex'), b4a.from(postTx.tx + postTx.wn), b4a.from(postTx.wp, 'hex')) &&
