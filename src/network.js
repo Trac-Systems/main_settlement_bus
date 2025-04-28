@@ -85,12 +85,10 @@ class Network {
                                 if (null === adminEntry || (adminEntry.tracPublicKey !== msg.key)) return;
                                 await handleIncomingEvent(msg);
 
-                            }
-                            else {
+                            } else {
                                 if (base.isIndexer || !base.writable) return;
 
-                                if(true !== disable_rate_limit)
-                                {
+                                if(true !== disable_rate_limit) {
                                     const peer = b4a.toString(connection.remotePublicKey, 'hex');
                                     const _now = Date.now();
 

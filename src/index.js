@@ -504,28 +504,6 @@ export class MainSettlementBus extends ReadyResource {
         }
     }
 
-    async #sendMessageToAdmin2(adminEntry, message) {
-        if (!adminEntry || !message) {
-            return;
-        }
-
-        this.#swarm.joinPeer(b4a.from(adminEntry.tracPublicKey, 'hex'))
-
-        let stream = undefined;
-
-        stream = this.#dht_node.connect(b4a.from(adminEntry.tracPublicKey, 'hex'))
-
-        if(stream !== undefined && stream.op !== undefined){
-            stream.on('connect', async function () {
-                console.log('Trying to send message to admin.');
-                await stream.send(b4a.from(JSON.stringify(message)));
-            });
-            stream.on('open', function () { console.log('Message channel opened') });
-            stream.on('close', () => { console.log('Message channel closed') });
-            stream.on('error', (error) => { console.log('Message send error', error) });
-        }
-    }
-
     async #verifyMessage(signature, publicKey, bufferMessage) {
         const bufferPublicKey = b4a.from(publicKey, 'hex');
         const hash = await createHash('sha256', bufferMessage);
