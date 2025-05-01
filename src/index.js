@@ -760,7 +760,11 @@ export class MainSettlementBus extends ReadyResource {
 
     async tryConnection(address, type = 'validator'){
         if(null === this.#swarm) return null;
-
+        if(this.#network.validator_stream !== null && address !== b4a.toString(this.#network.validator_stream.remotePublicKey, 'hex')){
+            this.#swarm.leavePeer(this.#network.validator_stream.remotePublicKey);
+            this.#network.validator_stream = null;
+            this.#network.validator = null;
+        }
         // trying to join a peer from the global swarm
         if(false === this.#swarm.peers.has(address)){
             this.#swarm.joinPeer(b4a.from(address, 'hex'));
