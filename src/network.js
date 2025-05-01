@@ -94,7 +94,7 @@ class Network {
                                 const res = await msb.get(msg.response.address);
                                 if (res === null) return;
                                 const verified = wallet.verify(msg.sig, JSON.stringify(msg.response) + msg.nonce, msg.response.address)
-                                if (verified && msg.response.channel === b4a.toString(channel, 'utf8')) {
+                                if (verified && msg.response.channel === b4a.toString(channel, 'utf8') && network.validator_stream === null) {
                                     console.log('Validator stream established', msg.response.address)
                                     network.validator_stream = connection;
                                     network.validator = msg.response.address;
