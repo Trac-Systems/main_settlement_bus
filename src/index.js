@@ -128,6 +128,10 @@ export class MainSettlementBus extends ReadyResource {
         return this.#swarm;
     }
 
+    getNetwork(){
+        return this.#network;
+    }
+
     #boot() {
         const _this = this;
         this.#base = new Autobase(this.#store, this.#bootstrap, {
@@ -762,8 +766,8 @@ export class MainSettlementBus extends ReadyResource {
             this.#swarm.joinPeer(b4a.from(address, 'hex'));
             let cnt = 0;
             while(false === this.#swarm.peers.has(address)){
-                if(cnt >= 15) break;
-                await sleep(1_000);
+                if(cnt >= 1500) break;
+                await sleep(10);
                 cnt += 1;
             }
         }
