@@ -14,6 +14,8 @@ import {
 import { sleep } from './utils/functions.js';
 import Check from './utils/check.js';
 import Wallet from 'trac-wallet';
+import Protomux from 'protomux'
+import c from 'compact-encoding'
 
 const wakeup = new w();
 
@@ -22,8 +24,11 @@ class Network {
         this.tx_pool = [];
         this.pool(base);
         this.check = new Check();
+        this.admin_stream = null
+        this.admin = null
+        this.validator_stream = null
+        this.validator = null;
     }
-
 
     static async replicate(disable_rate_limit, msb, network, enable_txchannel, base, writingKey, bootstrap, swarm, walletEnabled, store, wallet, channel, isStreaming, handleIncomingEvent, emit) {
         if (!swarm) {
@@ -45,114 +50,161 @@ class Network {
 
             console.log(`Channel: ${b4a.toString(channel)}`);
             swarm.on('connection', async (connection) => {
-                wakeup.addStream(connection);
-                store.replicate(connection);
-                connection.on('close', () => {});
-                connection.on('error', (error) => { });
+                if(enable_txchannel) {
+                    const mux = Protomux.from(connection)
+                    connection.userData = mux
 
-                if(enable_txchannel){
-                    connection.on('message', async (msg) =>  {
-                        try{
-                            const tmp_message = msg;
-                            msg = b4a.toString(msg, 'utf-8');
-                            msg = JSON.parse(msg);
-
-                            if(null === msg) return;
-                            if(msg === 'get_writer_key'){
-                                await connection.send(b4a.from(JSON.stringify({op:'writer_key', key : writingKey})));
-                            } else if(msg.type !== undefined && msg.key !== undefined && msg.value !== undefined && msg.type === 'addWriter'){
-                                const adminEntry = await msb.get(EntryType.ADMIN);
-                                if (null === adminEntry || (adminEntry.tracPublicKey !== wallet.publicKey)) return;
-                                const nodeEntry = await msb.get(msg.value.pub);
-                                const isAlreadyWriter = null !== nodeEntry && nodeEntry.isWriter;
-                                const isAllowedToRequestRole = await msb._isAllowedToRequestRole(msg.key, adminEntry);
-                                const canAddWriter = base.writable && !isAlreadyWriter && isAllowedToRequestRole;
-                                if (msg.key !== wallet.publicKey && canAddWriter) {
-                                    await handleIncomingEvent(msg);
-                                }
-                            } else if (msg.type !== undefined && msg.key !== undefined && msg.value !== undefined && msg.type === 'removeWriter') {
-                                const adminEntry = await msb.get(EntryType.ADMIN);
-                                if (null === adminEntry || (adminEntry.tracPublicKey !== wallet.publicKey)) return;
-                                const nodeEntry = await msb.get(msg.value.pub);
-                                const isAlreadyWriter = null !== nodeEntry && nodeEntry.isWriter;
-                                const canRemoveWriter = base.writable && isAlreadyWriter
-                                if (msg.key !== wallet.publicKey && canRemoveWriter) {
-                                    await handleIncomingEvent(msg);
-                                }
-                            }
-                            else if (msg.type !== undefined && msg.key !== undefined && msg.value !== undefined && msg.type === 'addAdmin') {
-                                const adminEntry = await msb.get(EntryType.ADMIN);
-                                if (null === adminEntry || (adminEntry.tracPublicKey !== msg.key)) return;
-                                await handleIncomingEvent(msg);
-
-                            } else {
-                                if (base.isIndexer || !base.writable) return;
-
-                                if(true !== disable_rate_limit) {
-                                    const peer = b4a.toString(connection.remotePublicKey, 'hex');
-                                    const _now = Date.now();
-
-                                    if(_now - clean >= 120_000) {
-                                        clean = _now;
-                                        conns = {};
-                                    }
-
-                                    if(conns[peer] === undefined){
-                                        conns[peer] = { prev : _now, now: 0, tx_cnt : 0 }
-                                    }
-
-                                    conns[peer].now = _now;
-                                    conns[peer].tx_cnt += 1;
-
-                                    if(conns[peer].now - conns[peer].prev >= 60_000){
-                                        delete conns[peer];
-                                    }
-
-                                    if(conns[peer] !== undefined && conns[peer].now - conns[peer].prev >= 1000 && conns[peer].tx_cnt >= 50){
-                                        swarm.leavePeer(connection.remotePublicKey);
-                                        connection.end()
-                                    }
-                                }
-
-                                if (network.tx_pool.length >= 1000) {
-                                    console.log('pool full');
-                                    return
-                                }
-
-                                if (b4a.byteLength(tmp_message) > 3072) return;
-
-                                const parsedPreTx = msg;
-
-                                if (network.check.sanitizePreTx(parsedPreTx) &&
-                                    wallet.verify(b4a.from(parsedPreTx.is, 'hex'), b4a.from(parsedPreTx.tx + parsedPreTx.in), b4a.from(parsedPreTx.ipk, 'hex')) &&
-                                    parsedPreTx.wp === wallet.publicKey &&
-                                    null === await base.view.get(parsedPreTx.tx)
-                                ) {
+                    const message_channel = mux.createChannel({
+                        protocol: b4a.toString(channel, 'utf8'),
+                        onopen() { },
+                        onclose() { }
+                    })
+                    message_channel.open()
+                    const message = message_channel.addMessage({
+                        encoding: c.json,
+                        async onmessage(msg) {
+                            try{
+                                if(msg === 'get_validator'){
                                     const nonce = Wallet.generateNonce().toString('hex');
-                                    const signature = wallet.sign(b4a.from(parsedPreTx.tx + nonce), b4a.from(wallet.secretKey, 'hex'));
-                                    const append_tx = {
-                                        op: OperationType.POST_TX,
-                                        tx: parsedPreTx.tx,
-                                        is: parsedPreTx.is,
-                                        w: writingKey,
-                                        i: parsedPreTx.i,
-                                        ipk: parsedPreTx.ipk,
-                                        ch: parsedPreTx.ch,
-                                        in: parsedPreTx.in,
-                                        bs: parsedPreTx.bs,
-                                        mbs: parsedPreTx.mbs,
-                                        ws: signature.toString('hex'),
-                                        wp: wallet.publicKey,
-                                        wn: nonce
-                                    };
-                                    network.tx_pool.push({ tx: parsedPreTx.tx, append_tx: append_tx });
+                                    const _msg = {op:'validator', key : writingKey, address : wallet.publicKey, channel : b4a.toString(channel, 'utf8')};
+                                    const sig = wallet.sign( JSON.stringify(_msg) + nonce );
+                                    message.send({response : _msg, sig, nonce})
+                                } else if(msg === 'get_admin'){
+                                    const nonce = Wallet.generateNonce().toString('hex');
+                                    const _msg = {op:'admin', key : writingKey, address : wallet.publicKey, channel : b4a.toString(channel, 'utf8')};
+                                    const sig = wallet.sign( JSON.stringify(_msg) + nonce );
+                                    message.send({response : _msg, sig, nonce})
+                                } else if(msg.response !== undefined && msg.response.op !== undefined && msg.response.op === 'validator'){
+                                    const res = await msb.get(msg.response.address);
+                                    if(res === null) return;
+                                    const verified = wallet.verify(msg.sig, JSON.stringify(msg.response) + msg.nonce, msg.response.address)
+                                    if(verified && msg.response.channel === b4a.toString(channel, 'utf8')){
+                                        console.log('Validator stream established', msg.response.address)
+                                        network.validator_stream = connection;
+                                        network.validator = msg.response.address;
+                                    }
+                                } else if(msg.response !== undefined && msg.response.op !== undefined && msg.response.op === 'admin'){
+                                    const res = await msb.get(EntryType.ADMIN);
+                                    if(res === null || res.tracPublicKey !== msg.response.address) return;
+                                    const verified = wallet.verify(msg.sig, JSON.stringify(msg.response) + msg.nonce, res.tracPublicKey)
+                                    if(verified && msg.response.channel === b4a.toString(channel, 'utf8')){
+                                        console.log('Admin stream established', res.tracPublicKey)
+                                        network.admin_stream = connection;
+                                        network.admin = res.tracPublicKey;
+                                    }
+                                }else if(msg.type !== undefined && msg.key !== undefined && msg.value !== undefined && msg.type === 'addWriter'){
+                                    const adminEntry = await msb.get(EntryType.ADMIN);
+                                    if (null === adminEntry || (adminEntry.tracPublicKey !== wallet.publicKey)) return;
+                                    const nodeEntry = await msb.get(msg.value.pub);
+                                    const isAlreadyWriter = null !== nodeEntry && nodeEntry.isWriter;
+                                    const isAllowedToRequestRole = await msb._isAllowedToRequestRole(msg.key, adminEntry);
+                                    const canAddWriter = base.writable && !isAlreadyWriter && isAllowedToRequestRole;
+                                    if (msg.key !== wallet.publicKey && canAddWriter) {
+                                        await handleIncomingEvent(msg);
+                                    }
+                                } else if (msg.type !== undefined && msg.key !== undefined && msg.value !== undefined && msg.type === 'removeWriter') {
+                                    const adminEntry = await msb.get(EntryType.ADMIN);
+                                    if (null === adminEntry || (adminEntry.tracPublicKey !== wallet.publicKey)) return;
+                                    const nodeEntry = await msb.get(msg.value.pub);
+                                    const isAlreadyWriter = null !== nodeEntry && nodeEntry.isWriter;
+                                    const canRemoveWriter = base.writable && isAlreadyWriter
+                                    if (msg.key !== wallet.publicKey && canRemoveWriter) {
+                                        await handleIncomingEvent(msg);
+                                    }
                                 }
+                                else if (msg.type !== undefined && msg.key !== undefined && msg.value !== undefined && msg.type === 'addAdmin') {
+                                    const adminEntry = await msb.get(EntryType.ADMIN);
+                                    if (null === adminEntry || (adminEntry.tracPublicKey !== msg.key)) return;
+                                    await handleIncomingEvent(msg);
+                                } else {
+                                    if (base.isIndexer || !base.writable) return;
+
+                                    if(true !== disable_rate_limit) {
+                                        const peer = b4a.toString(connection.remotePublicKey, 'hex');
+                                        const _now = Date.now();
+
+                                        if(_now - clean >= 120_000) {
+                                            clean = _now;
+                                            conns = {};
+                                        }
+
+                                        if(conns[peer] === undefined){
+                                            conns[peer] = { prev : _now, now: 0, tx_cnt : 0 }
+                                        }
+
+                                        conns[peer].now = _now;
+                                        conns[peer].tx_cnt += 1;
+
+                                        if(conns[peer].now - conns[peer].prev >= 60_000){
+                                            delete conns[peer];
+                                        }
+
+                                        if(conns[peer] !== undefined && conns[peer].now - conns[peer].prev >= 1000 && conns[peer].tx_cnt >= 50){
+                                            swarm.leavePeer(connection.remotePublicKey);
+                                            connection.end()
+                                        }
+                                    }
+
+                                    if (network.tx_pool.length >= 1000) {
+                                        console.log('pool full');
+                                        return
+                                    }
+
+                                    if (b4a.byteLength(JSON.stringify(msg)) > 3072) return;
+
+                                    const parsedPreTx = msg;
+
+                                    if (network.check.sanitizePreTx(parsedPreTx) &&
+                                        wallet.verify(b4a.from(parsedPreTx.is, 'hex'), b4a.from(parsedPreTx.tx + parsedPreTx.in), b4a.from(parsedPreTx.ipk, 'hex')) &&
+                                        parsedPreTx.wp === wallet.publicKey &&
+                                        null === await base.view.get(parsedPreTx.tx)
+                                    ) {
+                                        const nonce = Wallet.generateNonce().toString('hex');
+                                        const signature = wallet.sign(b4a.from(parsedPreTx.tx + nonce), b4a.from(wallet.secretKey, 'hex'));
+                                        const append_tx = {
+                                            op: OperationType.POST_TX,
+                                            tx: parsedPreTx.tx,
+                                            is: parsedPreTx.is,
+                                            w: writingKey,
+                                            i: parsedPreTx.i,
+                                            ipk: parsedPreTx.ipk,
+                                            ch: parsedPreTx.ch,
+                                            in: parsedPreTx.in,
+                                            bs: parsedPreTx.bs,
+                                            mbs: parsedPreTx.mbs,
+                                            ws: signature.toString('hex'),
+                                            wp: wallet.publicKey,
+                                            wn: nonce
+                                        };
+                                        network.tx_pool.push({ tx: parsedPreTx.tx, append_tx: append_tx });
+                                    }
+                                }
+                            } catch (e) {
+                                console.log(e);
                             }
-                        } catch (e) {
-                            console.log(e);
                         }
+                    })
+
+                    connection.messenger = message;
+
+                    connection.on('close', () => {
+                        if(network.validator_stream === connection){
+                            network.validator_stream = null;
+                            network.validator = null;
+                        }
+                        if(network.admin_stream === connection){
+                            network.admin_stream = null;
+                            network.admin = null;
+                        }
+                        message_channel.close()
                     });
                 }
+
+                // must be called AFTER the protomux init above
+                wakeup.addStream(connection);
+                store.replicate(connection);
+
+                connection.on('error', (error) => { });
 
                 if (!isStreaming) {
                     emit(EventType.READY_MSB);
