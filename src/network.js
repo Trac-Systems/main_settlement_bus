@@ -70,10 +70,13 @@ class Network {
                                     const sig = wallet.sign( JSON.stringify(_msg) + nonce );
                                     message.send({response : _msg, sig, nonce})
                                 } else if(msg === 'get_admin'){
+                                    const res = await msb.get(EntryType.ADMIN);
+                                    if(wallet.publicKey !== res.tracPublicKey) return;
                                     const nonce = Wallet.generateNonce().toString('hex');
                                     const _msg = {op:'admin', key : writingKey, address : wallet.publicKey, channel : b4a.toString(channel, 'utf8')};
                                     const sig = wallet.sign( JSON.stringify(_msg) + nonce );
                                     message.send({response : _msg, sig, nonce})
+                                    swarm.leavePeer(connection.remotePublicKey)
                                 } else if(msg.response !== undefined && msg.response.op !== undefined && msg.response.op === 'validator'){
                                     const res = await msb.get(msg.response.address);
                                     if(res === null) return;
@@ -92,6 +95,7 @@ class Network {
                                         network.admin_stream = connection;
                                         network.admin = res.tracPublicKey;
                                     }
+                                    swarm.leavePeer(connection.remotePublicKey)
                                 }else if(msg.type !== undefined && msg.key !== undefined && msg.value !== undefined && msg.type === 'addWriter'){
                                     const adminEntry = await msb.get(EntryType.ADMIN);
                                     if (null === adminEntry || (adminEntry.tracPublicKey !== wallet.publicKey)) return;
