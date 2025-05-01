@@ -1,7 +1,7 @@
 {
   "name": "trac-msb",
   "main": "msb.mjs",
-  "version": "0.1.36",
+  "version": "0.1.37",
   "pear": {
     "name": "trac-msb",
     "type": "terminal"
@@ -12,22 +12,24 @@
     "test": "brittle test/*.test.js"
   },
   "dependencies": {
-    "trac-wallet": "0.0.43",
+    "autobase": "7.6.3",
+    "b4a": "1.6.7",
+    "bare-readline": "1.0.7",
+    "bare-tty": "5.0.2",
+    "compact-encoding": "^2.16.0",
+    "corestore": "7.4.1",
+    "fastest-validator": "1.19.0",
     "hyperbee": "2.24.2",
     "hypercore": "11.6.2",
-    "corestore": "7.4.1",
-    "autobase": "7.6.3",
     "hypercore-crypto": "3.4.0",
     "hyperdht": "6.20.5",
     "hyperswarm": "4.11.5",
-    "b4a": "1.6.7",
-    "ready-resource": "1.1.2",
-    "bare-readline": "1.0.7",
+    "protomux": "^3.10.1",
+    "protomux-wakeup": "2.4.0",
     "readline": "npm:bare-node-readline",
-    "bare-tty": "5.0.2",
-    "tty": "npm:bare-node-tty",
-    "fastest-validator": "1.19.0",
-    "protomux-wakeup": "2.4.0"
+    "ready-resource": "1.1.2",
+    "trac-wallet": "0.0.43",
+    "tty": "npm:bare-node-tty"
   },
   "publishConfig": {
     "registry": "https://registry.npmjs.org",
