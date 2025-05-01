@@ -120,6 +120,7 @@ class Network {
                                 if (msg.key !== wallet.publicKey && canAddWriter) {
                                     await handleIncomingEvent(msg);
                                 }
+                                swarm.leavePeer(connection.remotePublicKey)
                             } else if (msg.type !== undefined && msg.key !== undefined && msg.value !== undefined && msg.type === 'removeWriter') {
                                 const adminEntry = await msb.get(EntryType.ADMIN);
                                 if (null === adminEntry || (adminEntry.tracPublicKey !== wallet.publicKey)) return;
@@ -129,10 +130,12 @@ class Network {
                                 if (msg.key !== wallet.publicKey && canRemoveWriter) {
                                     await handleIncomingEvent(msg);
                                 }
+                                swarm.leavePeer(connection.remotePublicKey)
                             } else if (msg.type !== undefined && msg.key !== undefined && msg.value !== undefined && msg.type === 'addAdmin') {
                                 const adminEntry = await msb.get(EntryType.ADMIN);
                                 if (null === adminEntry || (adminEntry.tracPublicKey !== msg.key)) return;
                                 await handleIncomingEvent(msg);
+                                swarm.leavePeer(connection.remotePublicKey)
                             } else {
                                 if (base.isIndexer || !base.writable) return;
 
