@@ -28,6 +28,8 @@ class Network {
         this.admin = null
         this.validator_stream = null
         this.validator = null;
+        this.custom_stream =  null;
+        this.custom_node = null
     }
 
     static async replicate(disable_rate_limit, msb, network, enable_txchannel, base, writingKey, bootstrap, swarm, walletEnabled, store, wallet, channel, isStreaming, handleIncomingEvent, emit) {
@@ -90,6 +92,19 @@ class Network {
                                 const sig = wallet.sign(JSON.stringify(_msg) + nonce);
                                 message.send({response: _msg, sig, nonce})
                                 swarm.leavePeer(connection.remotePublicKey)
+                            } else  if (msg === 'get_node') {
+                     
+                                const nonce = Wallet.generateNonce().toString('hex');
+                                const _msg = {
+                                    op: 'node',
+                                    key: writingKey,
+                                    address: wallet.publicKey,
+                                    channel: b4a.toString(channel, 'utf8')
+                                };
+                                const sig = wallet.sign(JSON.stringify(_msg) + nonce);
+                                message.send({response: _msg, sig, nonce})
+                                swarm.leavePeer(connection.remotePublicKey)
+                            
                             } else if (msg.response !== undefined && msg.response.op !== undefined && msg.response.op === 'validator') {
                                 const res = await msb.get(msg.response.address);
                                 if (res === null) return;
@@ -108,6 +123,16 @@ class Network {
                                     console.log('Admin stream established', res.tracPublicKey)
                                     network.admin_stream = connection;
                                     network.admin = res.tracPublicKey;
+                                }
+                                swarm.leavePeer(connection.remotePublicKey)
+                            }
+                            else if (msg.response !== undefined && msg.response.op !== undefined && msg.response.op === 'node'){
+
+                                const verified = wallet.verify(msg.sig, JSON.stringify(msg.response) + msg.nonce, msg.response.address)
+                                if (verified && msg.response.channel === b4a.toString(channel, 'utf8')) {
+                                    console.log('Node stream established', msg.response.address)
+                                    network.custom_stream = connection;
+                                    network.custom_node = msg.response.address;
                                 }
                                 swarm.leavePeer(connection.remotePublicKey)
                             } else if (msg.type !== undefined && msg.key !== undefined && msg.value !== undefined && msg.type === 'addWriter') {
@@ -134,6 +159,10 @@ class Network {
                             } else if (msg.type !== undefined && msg.key !== undefined && msg.value !== undefined && msg.type === 'addAdmin') {
                                 const adminEntry = await msb.get(EntryType.ADMIN);
                                 if (null === adminEntry || (adminEntry.tracPublicKey !== msg.key)) return;
+                                await handleIncomingEvent(msg);
+                                swarm.leavePeer(connection.remotePublicKey)
+                            }
+                            else if (msg.type !== undefined && msg.key !== undefined && msg.value !== undefined && msg.type === 'whitelisted') {
                                 await handleIncomingEvent(msg);
                                 swarm.leavePeer(connection.remotePublicKey)
                             } else {
@@ -218,6 +247,12 @@ class Network {
                         network.admin_stream = null;
                         network.admin = null;
                     }
+
+                    if (network.custom_stream === connection) {
+                        network.custom_stream = null;
+                        network.custom_node = null;
+                    }
+
                     message_channel.close()
                 });
 

@@ -12,6 +12,7 @@ export const OperationType = Object.freeze({
     ADD_INDEXER: 'addIndexer',
     REMOVE_INDEXER: 'removeIndexer',
     BAN_VALIDATOR: 'banValidator',
+    WHITELISTED: 'whitelisted',
     TX: 'tx',
     PRE_TX: 'pre-tx',
     POST_TX: 'post-tx',
@@ -35,8 +36,8 @@ export const WHITELIST_PREFIX = 'whitelist/';
 export const MAX_INDEXERS = 3;
 export const MIN_INDEXERS = 1;
 export const ACK_INTERVAL = 1000;
-export const WHITELIST_SLEEP_INTERVAL = 100;
-export const MAX_PEERS = 128;
+export const WHITELIST_SLEEP_INTERVAL = 1000;
+export const MAX_PEERS = 2;
 export const MAX_PARALLEL = 128;
 export const MAX_SERVER_CONNECTIONS = 64;
 export const MAX_CLIENT_CONNECTIONS = 64;
