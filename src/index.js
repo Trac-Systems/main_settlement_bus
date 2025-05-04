@@ -528,11 +528,16 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async updater() {
-        while (true) {
-            if (this.#base.writable) {
-                await this.#base.append(null);
+        const adminEntry = await this.get(EntryType.ADMIN);
+        if(this.#base.writable && this.#wallet !== null){
+            const nodeEntry = await this.get(this.#wallet.publicKey);
+            while (true) {
+                if (this.#wallet.publicKey === adminEntry.tracPublicKey ||
+                    nodeEntry.isIndexer === true) {
+                    await this.#base.append(null);
+                }
+                await sleep(UPDATER_INTERVAL);
             }
-            await sleep(UPDATER_INTERVAL);
         }
     }
 
