@@ -3,7 +3,7 @@ import {MainSettlementBus} from './src/index.js';
 const opts = {
     stores_directory : 'stores/',
     store_name : typeof process !== "undefined" ? process.argv[2] : Pear.config.args[0],
-    bootstrap: '0b40fd2365b4e4f0b67d1dc2724108bddb7ea8f7be322202986fb7097e17f529',
+    bootstrap: '0768953b234c79eccc6306fdcba2d7c1f0b05b9af6815a3502e96a83a8878ff7',
     channel: '00axtracnetworkmainsettlementbus',
     disable_rate_limit : true,
     enable_txlogs : true
