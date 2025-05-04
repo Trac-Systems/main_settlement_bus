@@ -83,7 +83,7 @@ export class MainSettlementBus extends ReadyResource {
         this.#writingKey = null;
         this.#enable_txchannel = options.enable_txchannel !== false;
         this.#enable_txlogs = options.enable_txlogs === true;
-        this.#enable_updater = options.enable_updater !== false;
+        this.#enable_updater = options.enable_updater !== true;
         this.#enable_wallet = options.enable_wallet !== false;
         this.#disable_rate_limit = options.disable_rate_limit === true;
         this.#wallet = new PeerWallet(options);
