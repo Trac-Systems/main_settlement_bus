@@ -34,7 +34,6 @@ export const TRAC_NAMESPACE = 'TracNetwork';
 export const WHITELIST_PREFIX = 'whitelist/';
 export const MAX_INDEXERS = 3;
 export const MIN_INDEXERS = 1;
-export const ACK_INTERVAL = 1000;
 export const WHITELIST_SLEEP_INTERVAL = 100;
 export const MAX_PEERS = 128;
 export const MAX_PARALLEL = 128;
@@ -51,7 +50,6 @@ const constants = {
     TRAC_NAMESPACE,
     MAX_INDEXERS,
     MIN_INDEXERS,
-    ACK_INTERVAL,
     WHITELIST_SLEEP_INTERVAL,
     MAX_PEERS,
     MAX_PARALLEL,

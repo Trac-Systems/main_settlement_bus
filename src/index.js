@@ -14,7 +14,6 @@ import {
     EntryType,
     OperationType,
     EventType,
-    ACK_INTERVAL,
     WHITELIST_SLEEP_INTERVAL,
     UPDATER_INTERVAL,
     MAX_INDEXERS,
@@ -134,7 +133,6 @@ export class MainSettlementBus extends ReadyResource {
         const _this = this;
         this.#base = new Autobase(this.#store, this.#bootstrap, {
             valueEncoding: 'json',
-            ackInterval: ACK_INTERVAL,
             open: this.#setupHyperbee.bind(this),
             apply: this.#apply.bind(this),
         })
