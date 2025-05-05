@@ -47,7 +47,7 @@ export class MainSettlementBus extends ReadyResource {
     #base;
     #writingKey;
     #enable_txchannel;
-    #enable_updater;
+    #is_indexer;
     #enable_wallet;
     #wallet;
     #replicate;
@@ -83,7 +83,7 @@ export class MainSettlementBus extends ReadyResource {
         this.#writingKey = null;
         this.#enable_txchannel = options.enable_txchannel !== false;
         this.#enable_txlogs = options.enable_txlogs === true;
-        this.#enable_updater = options.enable_updater !== true;
+        this.#is_indexer = false;
         this.#enable_wallet = options.enable_wallet !== false;
         this.#disable_rate_limit = options.disable_rate_limit === true;
         this.#wallet = new PeerWallet(options);
@@ -102,8 +102,6 @@ export class MainSettlementBus extends ReadyResource {
         }
     }
 
-    // TODO: Implement other getters as necessary
-    // TODO: Separate those getters in the code
     get STORES_DIRECTORY() {
         return this.#STORES_DIRECTORY;
     }
@@ -448,9 +446,7 @@ export class MainSettlementBus extends ReadyResource {
 
         await this.#setUpRoleAutomatically(adminEntry);
 
-        if (this.#enable_updater) {
-            this.updater();// TODO: NODE AFTER BECOMING A writer should start the updater
-        }
+        this.updater();
 
         console.log(`isIndexer: ${this.#base.isIndexer}`);
         console.log(`isWriter: ${this.#base.writable}`);
@@ -529,7 +525,7 @@ export class MainSettlementBus extends ReadyResource {
 
     async updater() {
         while (true) {
-            if (this.#base.writable) {
+            if (this.#is_indexer) {
                 await this.#base.append(null);
             }
             await sleep(UPDATER_INTERVAL);
@@ -581,10 +577,12 @@ export class MainSettlementBus extends ReadyResource {
                 this.removeAllListeners(EventType.WRITER_EVENT);
                 this.#shouldListenToWriterEvents = false;
             }
+            this.#is_indexer = true;
             console.log('Current node is an indexer');
         });
 
         this.#base.on(EventType.IS_NON_INDEXER, () => {
+            this.#is_indexer = false;
             console.log('Current node is not an indexer anymore');
         });
 
