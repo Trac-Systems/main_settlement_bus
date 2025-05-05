@@ -655,7 +655,7 @@ export class MainSettlementBus extends ReadyResource {
                 await this.#base.append(addAdminMessage);
             } else if (adminEntry && this.#wallet && adminEntry.tracPublicKey === this.#wallet.publicKey && this.#writingKey && this.#writingKey !== adminEntry.wk) {
                 if (null === this.#network.validator_stream) return;
-                await this.#network.validator_stream.messenger.send(b4a.from(JSON.stringify(addAdminMessage)));
+                await this.#network.validator_stream.messenger.send(addAdminMessage);
             }
 
             setTimeout(async () => {
