@@ -120,15 +120,15 @@ export class MainSettlementBus extends ReadyResource {
         return this.#bootstrap;
     }
 
-    getChannel(){
+    getChannel() {
         return this.#channel;
     }
 
-    getSwarm(){
+    getSwarm() {
         return this.#swarm;
     }
 
-    getNetwork(){
+    getNetwork() {
         return this.#network;
     }
 
@@ -194,7 +194,7 @@ export class MainSettlementBus extends ReadyResource {
             b4a.byteLength(JSON.stringify(postTx)) <= 4096
         ) {
             await batch.put(op.key, op.value);
-            if(this.#enable_txlogs === true){
+            if (this.#enable_txlogs === true) {
                 console.log(`TX: ${op.key} appended. Signed length: `, this.#base.view.core.signedLength);
             }
         }
@@ -485,13 +485,33 @@ export class MainSettlementBus extends ReadyResource {
             }
             await this.tryConnection(adminEntry.tracPublicKey, 'admin');
             await this.spinLock(() => this.#network.admin_stream === null);
-
             if (this.#network.admin_stream !== null) {
                 await this.#network.admin_stream.messenger.send(message);
             }
         } catch (e) {
             console.log(e)
         }
+    }
+    async #sendDirectMessage(address, message) {
+        try {
+            if (!address || !message) {
+             return;
+            }
+            await this.tryConnection(address, 'node');
+
+            await this.spinLock(() => 
+                this.#network.custom_stream === null || this.#network.custom_node !== address
+            );
+
+            if (this.#network.custom_stream !== null) {
+                await this.#network.custom_stream.messenger.send(message);
+                this.#swarm.leavePeer(b4a.from(address, 'hex'));
+            }
+
+        } catch (e) {
+            console.log(e)
+        }
+
     }
 
     async #verifyMessage(signature, publicKey, bufferMessage) {
@@ -570,6 +590,14 @@ export class MainSettlementBus extends ReadyResource {
                 } else if (parsedRequest.type === OperationType.ADD_ADMIN) {
                     //This request must be handled by WRITER
                     this.emit(EventType.WRITER_EVENT, parsedRequest);
+                }
+                else if (parsedRequest.type === OperationType.WHITELISTED) {
+                    const adminEntry = await this.get(EntryType.ADMIN);
+                    const reconstructedMessage = MsgUtils.createMessage(parsedRequest.key, parsedRequest.value.nonce, OperationType.WHITELISTED);
+                    const hash = await createHash('sha256', reconstructedMessage);
+                    if (this.#wallet.verify(b4a.from(parsedRequest.value.sig, 'hex'), b4a.from(hash), b4a.from(adminEntry.tracPublicKey, 'hex')) && !this.#base.writable &&parsedRequest.key === this.#wallet.publicKey) {
+                        await this.#handleAddWriterOperation(true)
+                    }
                 }
             }
         } catch (error) {
@@ -691,8 +719,10 @@ export class MainSettlementBus extends ReadyResource {
 
         for (let i = 0; i < totelElements; i++) {
             await this.#base.append(assembledWhitelistMessages[i]);
-            console.log(`Whitelist message sent (public key ${(i + 1)}/${totelElements})`);
+            const whitelistedMessage = await MsgUtils.assembleWhitelistedMessage(this.#wallet, assembledWhitelistMessages[i].key);
+            this.#sendDirectMessage(assembledWhitelistMessages[i].key, whitelistedMessage);
             await sleep(WHITELIST_SLEEP_INTERVAL);
+            console.log(`Whitelist message sent (public key ${(i + 1)}/${totelElements})`);
         }
     }
 
@@ -783,10 +813,6 @@ export class MainSettlementBus extends ReadyResource {
             // split it into 2 cases as before 1. existing connection and 
             const peerInfo = this.#swarm.peers.get(address)
             stream = this.#swarm._allConnections.get(peerInfo.publicKey)
-            
-            if (!stream && type === 'node'){
-                console.log("stream: ",stream)
-            }
 
             if (stream !== undefined && stream.messenger !== undefined) {   
                 await this.#sendRequestByType(stream, type);
