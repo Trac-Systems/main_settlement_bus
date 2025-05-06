@@ -132,6 +132,7 @@ export class MainSettlementBus extends ReadyResource {
     #boot() {
         const _this = this;
         this.#base = new Autobase(this.#store, this.#bootstrap, {
+            ackInterval : 1000,
             valueEncoding: 'json',
             open: this.#setupHyperbee.bind(this),
             apply: this.#apply.bind(this),
@@ -523,7 +524,9 @@ export class MainSettlementBus extends ReadyResource {
 
     async updater() {
         while (true) {
-            if (this.#is_indexer) {
+            if (this.#is_indexer &&
+                this.#base.view.core.length >
+                this.#base.view.core.signedLength) {
                 await this.#base.append(null);
             }
             await sleep(UPDATER_INTERVAL);
