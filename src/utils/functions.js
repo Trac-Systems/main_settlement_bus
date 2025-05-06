@@ -13,10 +13,13 @@ export async function verifyDag(base, swarm, wallet, writerKey) {
         const lengthdagView = base.view.core.length;
         const dagSystem = await base.system.core.treeHash();
         const lengthdagSystem = base.system.core.length;
+        console.log(`isIndexer: ${base.isIndexer}`);
+        console.log(`isWriter: ${base.writable}`);
         console.log('wallet.publicKey:', wallet !== null ? wallet.publicKey : 'unset');
         console.log('msb.writerKey:', writerKey);
         console.log('swarm.connections.size:', swarm.connections.size);
         console.log('base.view.core.signedLength:', base.view.core.signedLength);
+        console.log('base.view.core.length:', base.view.core.length);
         console.log("base.signedLength", base.signedLength);
         console.log("base.indexedLength", base.indexedLength);
         console.log("base.linearizer.indexers.length", base.linearizer.indexers.length);

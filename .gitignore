@@ -3,3 +3,5 @@
 /node_modules/
 .idea
 .npmrc
+/stores_/
+/package-lock.json
