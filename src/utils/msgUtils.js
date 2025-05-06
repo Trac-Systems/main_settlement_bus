@@ -38,6 +38,7 @@ class MsgUtils {
                 };
                 break;
             case OperationType.APPEND_WHITELIST:
+            case OperationType.WHITELISTED:
             case OperationType.BAN_VALIDATOR:
             case OperationType.ADD_INDEXER:
             case OperationType.REMOVE_INDEXER:
@@ -106,8 +107,12 @@ class MsgUtils {
         return await this.#assembleMessageBase(wallet, writerTracPublicKey, OperationType.REMOVE_INDEXER);
     }
 
-    static async assembleBanValidatorMessage(wallet, validatorTracPublicKey) {
-        return await this.#assembleMessageBase(wallet, validatorTracPublicKey, OperationType.BAN_VALIDATOR);
+    static async assembleBanValidatorMessage(wallet, writerTracPublicKey) {
+        return await this.#assembleMessageBase(wallet, writerTracPublicKey, OperationType.BAN_VALIDATOR);
+    }
+
+    static async assembleWhitelistedMessage(wallet, writerTracPublicKey) {
+        return await this.#assembleMessageBase(wallet, writerTracPublicKey, OperationType.WHITELISTED);
     }
 
     static async verifyEventMessage(parsedRequest, wallet, check) {
