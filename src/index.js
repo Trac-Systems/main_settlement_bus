@@ -479,15 +479,17 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async #sendMessageToAdmin(adminEntry, message) {
-        try{
+        try {
             if (!adminEntry || !message) {
                 return;
             }
             await this.tryConnection(adminEntry.tracPublicKey, 'admin');
-            if(this.#network.admin_stream !== null){
+            await this.spinLock(() => this.#network.admin_stream === null);
+
+            if (this.#network.admin_stream !== null) {
                 await this.#network.admin_stream.messenger.send(message);
             }
-        }catch(e){
+        } catch (e) {
             console.log(e)
         }
     }
@@ -758,50 +760,67 @@ export class MainSettlementBus extends ReadyResource {
         }
     }
 
-    async tryConnection(address, type = 'validator'){
-        if(null === this.#swarm) return null;
-        if(this.#network.validator_stream !== null && address !== b4a.toString(this.#network.validator_stream.remotePublicKey, 'hex')){
+    async tryConnection(address, type = null) {
+        if (null === this.#swarm) return null;
+        if (this.#network.validator_stream !== null && address !== b4a.toString(this.#network.validator_stream.remotePublicKey, 'hex')) {
             this.#swarm.leavePeer(this.#network.validator_stream.remotePublicKey);
             this.#network.validator_stream = null;
             this.#network.validator = null;
         }
         // trying to join a peer from the global swarm
-        if(false === this.#swarm.peers.has(address)){
+        if (false === this.#swarm.peers.has(address)) {
             this.#swarm.joinPeer(b4a.from(address, 'hex'));
             let cnt = 0;
-            while(false === this.#swarm.peers.has(address)){
-                if(cnt >= 1500) break;
+            while (false === this.#swarm.peers.has(address)) {
+                if (cnt >= 1500) break;
                 await sleep(10);
                 cnt += 1;
             }
         }
 
-        if(this.#swarm.peers.has(address)){
+        if (this.#swarm.peers.has(address)) {
             let stream;
+            // split it into 2 cases as before 1. existing connection and 
             const peerInfo = this.#swarm.peers.get(address)
             stream = this.#swarm._allConnections.get(peerInfo.publicKey)
-            if(stream !== undefined && stream.messenger !== undefined){
-                if(type === 'validator'){
-                    stream.messenger.send('get_validator');
-                    let cnt = 0;
-                    while(this.#network.validator_stream === null){
-                        if(cnt >= 1500) break;
-                        await sleep(10);
-                        cnt += 1;
-                    }
-                } else if(type === 'admin'){
-                    stream.messenger.send('get_admin');
-                    let cnt = 0;
-                    while(this.#network.admin_stream === null){
-                        if(cnt >= 1500) break;
-                        await sleep(10);
-                        cnt += 1;
-                    }
-                }
+            
+            if (!stream && type === 'node'){
+                console.log("stream: ",stream)
+            }
+
+            if (stream !== undefined && stream.messenger !== undefined) {   
+                await this.#sendRequestByType(stream, type);
             }
         }
     }
 
+    async #sendRequestByType(stream, type) {
+        const waitFor = {
+            validator: () => this.#network.validator_stream,
+            admin: () => this.#network.admin_stream,
+            node: () => this.#network.custom_stream
+        }[type];
+        
+        if (type === 'validator') {
+            await stream.messenger.send('get_validator');
+        } else if (type === 'admin') {
+            await stream.messenger.send('get_admin');
+        } else if (type === 'node') {
+            await stream.messenger.send('get_node');
+        } else {
+            return;
+        }
+        await this.spinLock( () => !waitFor)
+    };
+    
+   async spinLock(conditionFn, maxIterations = 1500, intervalMs = 10) {
+        let counter = 0;
+        while (conditionFn() && counter < maxIterations) {
+            await sleep(intervalMs);
+            counter++;
+        }
+    }
+    
     async validatorObserver() {
         // Finding writers for admin recovery case
         while (this.#enable_wallet) {
