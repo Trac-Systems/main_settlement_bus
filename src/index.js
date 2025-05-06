@@ -492,7 +492,7 @@ export class MainSettlementBus extends ReadyResource {
             console.log(e)
         }
     }
-    async #sendDirectMessage(address, message) {
+    async #sendMessageToNode(address, message) {
         try {
             if (!address || !message) {
              return;
@@ -505,7 +505,6 @@ export class MainSettlementBus extends ReadyResource {
 
             if (this.#network.custom_stream !== null) {
                 await this.#network.custom_stream.messenger.send(message);
-                this.#swarm.leavePeer(b4a.from(address, 'hex'));
             }
 
         } catch (e) {
@@ -720,7 +719,7 @@ export class MainSettlementBus extends ReadyResource {
         for (let i = 0; i < totelElements; i++) {
             await this.#base.append(assembledWhitelistMessages[i]);
             const whitelistedMessage = await MsgUtils.assembleWhitelistedMessage(this.#wallet, assembledWhitelistMessages[i].key);
-            this.#sendDirectMessage(assembledWhitelistMessages[i].key, whitelistedMessage);
+            this.#sendMessageToNode(assembledWhitelistMessages[i].key, whitelistedMessage);
             await sleep(WHITELIST_SLEEP_INTERVAL);
             console.log(`Whitelist message sent (public key ${(i + 1)}/${totelElements})`);
         }
