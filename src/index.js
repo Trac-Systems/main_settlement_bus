@@ -132,7 +132,6 @@ export class MainSettlementBus extends ReadyResource {
     #boot() {
         const _this = this;
         this.#base = new Autobase(this.#store, this.#bootstrap, {
-            ackInterval : 1000,
             valueEncoding: 'json',
             open: this.#setupHyperbee.bind(this),
             apply: this.#apply.bind(this),
