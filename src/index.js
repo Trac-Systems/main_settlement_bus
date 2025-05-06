@@ -715,11 +715,14 @@ export class MainSettlementBus extends ReadyResource {
         const totelElements = assembledWhitelistMessages.length;
 
         for (let i = 0; i < totelElements; i++) {
-            await this.#base.append(assembledWhitelistMessages[i]);
-            const whitelistedMessage = await MsgUtils.assembleWhitelistedMessage(this.#wallet, assembledWhitelistMessages[i].key);
-            this.#sendMessageToNode(assembledWhitelistMessages[i].key, whitelistedMessage);
-            await sleep(WHITELIST_SLEEP_INTERVAL);
-            console.log(`Whitelist message sent (public key ${(i + 1)}/${totelElements})`);
+            const isWhitelisted = await this.#isWhitelisted(assembledWhitelistMessages[i].key);
+            if (!isWhitelisted) {
+                await this.#base.append(assembledWhitelistMessages[i]);
+                const whitelistedMessage = await MsgUtils.assembleWhitelistedMessage(this.#wallet, assembledWhitelistMessages[i].key);
+                this.#sendMessageToNode(assembledWhitelistMessages[i].key, whitelistedMessage);
+                await sleep(WHITELIST_SLEEP_INTERVAL);
+                console.log(`Whitelist message sent (public key ${(i + 1)}/${totelElements})`);
+            }
         }
     }
 
