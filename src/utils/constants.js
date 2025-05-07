@@ -42,6 +42,14 @@ export const MAX_SERVER_CONNECTIONS = 64;
 export const MAX_CLIENT_CONNECTIONS = 64;
 export const UPDATER_INTERVAL = 10_000;
 
+// checkjs
+export const ADDRESS_CHAR_HEX_LENGTH = 64;
+export const WRITER_KEY_CHAR_HEX_LENGTH = 64;
+export const NONCE_CHAR_HEX_LENGTH = 64;
+export const HASH_CHAR_HEX_LENGTH = 64;
+export const SIGNATURE_CHAR_HEX_LENGTH = 128;
+
+
 const constants = {
     EntryType,
     OperationType,
