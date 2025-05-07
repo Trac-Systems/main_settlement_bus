@@ -3,8 +3,8 @@ import { isHexString } from './functions.js';
 import { OperationType, ADDRESS_CHAR_HEX_LENGTH, WRITER_KEY_CHAR_HEX_LENGTH, NONCE_CHAR_HEX_LENGTH, SIGNATURE_CHAR_HEX_LENGTH, HASH_CHAR_HEX_LENGTH } from './constants.js';
 class Check {
     #_validator;
-    #_sanitizeAdminAndWritersOperations;
-    #_sanitizeIndexerOrWhitelistOperations;
+    #_sanitizeExtendedKeyOp;
+    #_sanitizeBasicKeyOp;
     #_sanitizePreTx;
     #_sanitizePostTx;
 
@@ -56,13 +56,13 @@ class Check {
             };
         });
 
-        this.#_sanitizeAdminAndWritersOperations = this.#compileSanitizationAdminAndWriterOperationsSchema();
-        this.#_sanitizeIndexerOrWhitelistOperations = this.#compileIndexerOrWhitelistOperationSchema();
+        this.#_sanitizeExtendedKeyOp = this.#compileExtendedKeyOpSchema();
+        this.#_sanitizeBasicKeyOp = this.#compileBasicKeyOpSchema();
         this.#_sanitizePreTx = this.#compilePreTxSchema();
         this.#_sanitizePostTx = this.#compilePostTxSchema();
     }
-    //TODO: rename this function
-    #compileSanitizationAdminAndWriterOperationsSchema() {
+    
+    #compileExtendedKeyOpSchema() {
         const schema = {
             $$strict: true,
             type: { type: 'string', enum: [OperationType.ADD_ADMIN, OperationType.ADD_WRITER, OperationType.REMOVE_WRITER], required: true },
@@ -80,11 +80,11 @@ class Check {
         return this.#_validator.compile(schema);
     }
 
-    sanitizeAdminAndWritersOperations(op) {
-        return this.#_sanitizeAdminAndWritersOperations(op) === true;
+    sanitizeExtendedKeyOpSchema(op) {
+        return this.#_sanitizeExtendedKeyOp(op) === true;
     }
-    //TODO: rename this function
-    #compileIndexerOrWhitelistOperationSchema() {
+
+    #compileBasicKeyOpSchema() {
         const schema = {
             $$strict: true,
             type: { type: 'string', enum: [OperationType.ADD_INDEXER, OperationType.REMOVE_INDEXER, OperationType.APPEND_WHITELIST, OperationType.BAN_VALIDATOR], required: true },
@@ -100,8 +100,8 @@ class Check {
         return this.#_validator.compile(schema);
     }
 
-    sanitizeIndexerOrWhitelistOperations(op) {
-        return this.#_sanitizeIndexerOrWhitelistOperations(op) === true;
+    sanitizeBasicKeyOp(op) {
+        return this.#_sanitizeBasicKeyOp(op) === true;
     }
 
     #compilePreTxSchema() {
