@@ -117,15 +117,15 @@ export class MainSettlementBus extends ReadyResource {
         return this.#bootstrap;
     }
 
-    getChannel(){
+    getChannel() {
         return this.#channel;
     }
 
-    getSwarm(){
+    getSwarm() {
         return this.#swarm;
     }
 
-    getNetwork(){
+    getNetwork() {
         return this.#network;
     }
 
@@ -191,7 +191,7 @@ export class MainSettlementBus extends ReadyResource {
             b4a.byteLength(JSON.stringify(postTx)) <= 4096
         ) {
             await batch.put(op.key, op.value);
-            if(this.#enable_txlogs === true){
+            if (this.#enable_txlogs === true) {
                 console.log(`TX: ${op.key} appended. Signed length: `, this.#base.view.core.signedLength);
             }
         }
@@ -474,17 +474,38 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async #sendMessageToAdmin(adminEntry, message) {
-        try{
+        try {
             if (!adminEntry || !message) {
                 return;
             }
             await this.tryConnection(adminEntry.tracPublicKey, 'admin');
-            if(this.#network.admin_stream !== null){
+            await this.spinLock(() => this.#network.admin_stream === null);
+            if (this.#network.admin_stream !== null) {
                 await this.#network.admin_stream.messenger.send(message);
             }
-        }catch(e){
+        } catch (e) {
             console.log(e)
         }
+    }
+    async #sendMessageToNode(address, message) {
+        try {
+            if (!address || !message) {
+             return;
+            }
+            await this.tryConnection(address, 'node');
+
+            await this.spinLock(() => 
+                this.#network.custom_stream === null || this.#network.custom_node !== address
+            );
+
+            if (this.#network.custom_stream !== null) {
+                await this.#network.custom_stream.messenger.send(message);
+            }
+
+        } catch (e) {
+            console.log(e)
+        }
+
     }
 
     async #verifyMessage(signature, publicKey, bufferMessage) {
@@ -565,6 +586,14 @@ export class MainSettlementBus extends ReadyResource {
                 } else if (parsedRequest.type === OperationType.ADD_ADMIN) {
                     //This request must be handled by WRITER
                     this.emit(EventType.WRITER_EVENT, parsedRequest);
+                }
+                else if (parsedRequest.type === OperationType.WHITELISTED) {
+                    const adminEntry = await this.get(EntryType.ADMIN);
+                    const reconstructedMessage = MsgUtils.createMessage(parsedRequest.key, parsedRequest.value.nonce, OperationType.WHITELISTED);
+                    const hash = await createHash('sha256', reconstructedMessage);
+                    if (this.#wallet.verify(b4a.from(parsedRequest.value.sig, 'hex'), b4a.from(hash), b4a.from(adminEntry.tracPublicKey, 'hex')) && !this.#base.writable &&parsedRequest.key === this.#wallet.publicKey) {
+                        await this.#handleAddWriterOperation(true)
+                    }
                 }
             }
         } catch (error) {
@@ -687,9 +716,14 @@ export class MainSettlementBus extends ReadyResource {
         const totelElements = assembledWhitelistMessages.length;
 
         for (let i = 0; i < totelElements; i++) {
-            await this.#base.append(assembledWhitelistMessages[i]);
-            console.log(`Whitelist message sent (public key ${(i + 1)}/${totelElements})`);
-            await sleep(WHITELIST_SLEEP_INTERVAL);
+            const isWhitelisted = await this.#isWhitelisted(assembledWhitelistMessages[i].key);
+            if (!isWhitelisted) {
+                await this.#base.append(assembledWhitelistMessages[i]);
+                const whitelistedMessage = await MsgUtils.assembleWhitelistedMessage(this.#wallet, assembledWhitelistMessages[i].key);
+                this.#sendMessageToNode(assembledWhitelistMessages[i].key, whitelistedMessage);
+                await sleep(WHITELIST_SLEEP_INTERVAL);
+                console.log(`Whitelist message sent (public key ${(i + 1)}/${totelElements})`);
+            }
         }
     }
 
@@ -757,50 +791,63 @@ export class MainSettlementBus extends ReadyResource {
         }
     }
 
-    async tryConnection(address, type = 'validator'){
-        if(null === this.#swarm) return null;
-        if(this.#network.validator_stream !== null && address !== b4a.toString(this.#network.validator_stream.remotePublicKey, 'hex')){
+    async tryConnection(address, type = null) {
+        if (null === this.#swarm) return null;
+        if (this.#network.validator_stream !== null && address !== b4a.toString(this.#network.validator_stream.remotePublicKey, 'hex')) {
             this.#swarm.leavePeer(this.#network.validator_stream.remotePublicKey);
             this.#network.validator_stream = null;
             this.#network.validator = null;
         }
         // trying to join a peer from the global swarm
-        if(false === this.#swarm.peers.has(address)){
+        if (false === this.#swarm.peers.has(address)) {
             this.#swarm.joinPeer(b4a.from(address, 'hex'));
             let cnt = 0;
-            while(false === this.#swarm.peers.has(address)){
-                if(cnt >= 1500) break;
+            while (false === this.#swarm.peers.has(address)) {
+                if (cnt >= 1500) break;
                 await sleep(10);
                 cnt += 1;
             }
         }
 
-        if(this.#swarm.peers.has(address)){
+        if (this.#swarm.peers.has(address)) {
             let stream;
+            // split it into 2 cases as before 1. existing connection and 
             const peerInfo = this.#swarm.peers.get(address)
             stream = this.#swarm._allConnections.get(peerInfo.publicKey)
-            if(stream !== undefined && stream.messenger !== undefined){
-                if(type === 'validator'){
-                    stream.messenger.send('get_validator');
-                    let cnt = 0;
-                    while(this.#network.validator_stream === null){
-                        if(cnt >= 1500) break;
-                        await sleep(10);
-                        cnt += 1;
-                    }
-                } else if(type === 'admin'){
-                    stream.messenger.send('get_admin');
-                    let cnt = 0;
-                    while(this.#network.admin_stream === null){
-                        if(cnt >= 1500) break;
-                        await sleep(10);
-                        cnt += 1;
-                    }
-                }
+
+            if (stream !== undefined && stream.messenger !== undefined) {   
+                await this.#sendRequestByType(stream, type);
             }
         }
     }
 
+    async #sendRequestByType(stream, type) {
+        const waitFor = {
+            validator: () => this.#network.validator_stream,
+            admin: () => this.#network.admin_stream,
+            node: () => this.#network.custom_stream
+        }[type];
+        
+        if (type === 'validator') {
+            await stream.messenger.send('get_validator');
+        } else if (type === 'admin') {
+            await stream.messenger.send('get_admin');
+        } else if (type === 'node') {
+            await stream.messenger.send('get_node');
+        } else {
+            return;
+        }
+        await this.spinLock( () => !waitFor)
+    };
+    
+   async spinLock(conditionFn, maxIterations = 1500, intervalMs = 10) {
+        let counter = 0;
+        while (conditionFn() && counter < maxIterations) {
+            await sleep(intervalMs);
+            counter++;
+        }
+    }
+    
     async validatorObserver() {
         // Finding writers for admin recovery case
         while (this.#enable_wallet) {
