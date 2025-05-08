@@ -30,7 +30,7 @@ export const EventType = Object.freeze({
 });
 
 export const WHITELIST_FILEPATH = './Whitelist/pubkeys.csv';
-export const LISTENER_TIMEOUT = 10000;
+export const LISTENER_TIMEOUT = 10_000;
 export const TRAC_NAMESPACE = 'TracNetwork';
 export const WHITELIST_PREFIX = 'whitelist/';
 export const MAX_INDEXERS = 3;
@@ -41,6 +41,14 @@ export const MAX_PARALLEL = 128;
 export const MAX_SERVER_CONNECTIONS = 64;
 export const MAX_CLIENT_CONNECTIONS = 64;
 export const UPDATER_INTERVAL = 10_000;
+
+// checkjs
+export const ADDRESS_CHAR_HEX_LENGTH = 64;
+export const WRITER_KEY_CHAR_HEX_LENGTH = 64;
+export const NONCE_CHAR_HEX_LENGTH = 64;
+export const HASH_CHAR_HEX_LENGTH = 64;
+export const SIGNATURE_CHAR_HEX_LENGTH = 128;
+
 
 const constants = {
     EntryType,
