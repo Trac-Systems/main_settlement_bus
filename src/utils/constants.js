@@ -40,7 +40,7 @@ export const MAX_PEERS = 128;
 export const MAX_PARALLEL = 128;
 export const MAX_SERVER_CONNECTIONS = 64;
 export const MAX_CLIENT_CONNECTIONS = 64;
-export const UPDATER_INTERVAL = 1_000;
+export const UPDATER_INTERVAL = 10_000;
 
 const constants = {
     EntryType,
