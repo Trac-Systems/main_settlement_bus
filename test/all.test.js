@@ -6,10 +6,10 @@ async function runTests() {
   test.pause();
 
   await import('./check.test.js');
+  await import('./fileUtils.test.js');
+  await import('./functions.test.js');
 
   //TODO add test MsgUtils
-  //TODO add test Functions
-  //TODO add test FileUtils
   //TODO add test Apply function
 
   test.resume();
