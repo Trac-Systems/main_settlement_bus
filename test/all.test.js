@@ -12,6 +12,11 @@ async function runTests() {
   //TODO add test MsgUtils
   //TODO add test Apply function
 
+  //TODO add test MsgUtils
+  //TODO add test Functions
+  //TODO add test FileUtils
+  //TODO add test Apply function
+
   test.resume();
 }
 
