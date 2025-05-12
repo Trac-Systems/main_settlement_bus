@@ -1,6 +1,9 @@
 import fs from 'fs';
 import {WHITELIST_FILEPATH} from '../utils/constants.js';
 
+// TODO: The methods in fileUtils need to be refactoed and generalized to improve code reusability
+// -- For example, the readPublicKeysFromFile method is specific to reading a whitelist file set in constants.
+// -- In the future, we might want to generalize this method to read any file and return its content.
 async function readPublicKeysFromFile() {
     try {
         const data = await fs.promises.readFile(WHITELIST_FILEPATH, 'utf8');

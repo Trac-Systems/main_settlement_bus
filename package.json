@@ -9,7 +9,8 @@
   "type": "module",
   "scripts": {
     "dev": "pear run -d .",
-    "test": "brittle test/*.test.js"
+    "test:node": "brittle test/all.test.js",
+    "test:bare": "bare test/all.test.js"
   },
   "dependencies": {
     "autobase": "7.6.3",
@@ -18,6 +19,7 @@
     "b4a": "1.6.7",
     "bare-readline": "1.0.7",
     "bare-tty": "5.0.2",
+    "brittle": "^3.16.2",
     "compact-encoding": "^2.16.0",
     "fastest-validator": "1.19.0",
     "hyperbee": "2.24.2",

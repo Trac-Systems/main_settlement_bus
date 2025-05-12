@@ -2,6 +2,8 @@ import b4a from 'b4a';
 import sodium from 'sodium-native';
 import {peer} from "hyperdht/lib/messages.js";
 
+// TODO: (?) Should we allow 0x prefix?
+// TODO: (?) Should an mepty string be considered valid?
 export function isHexString(string) {
     return typeof string === 'string' && /^[0-9a-fA-F]+$/.test(string) && string.length % 2 === 0;
 }
