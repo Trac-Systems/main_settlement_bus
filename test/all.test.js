@@ -6,8 +6,9 @@ async function runTests() {
   test.pause();
 
   await import('./check/check.test.js');
+  await import('./functions/isHexString.test.js');
+  await import('./functions/createHash.test.js');
   await import('./fileUtils.test.js');
-  await import('./functions.test.js');
 
   //TODO add test MsgUtils
   //TODO add test Apply function
