@@ -67,14 +67,14 @@ class Check {
         const schema = {
             $$strict: true,
             type: { type: 'string', enum: [OperationType.ADD_ADMIN, OperationType.ADD_WRITER, OperationType.REMOVE_WRITER], required: true },
-            key: { type: "string", length: 64, required: true, custom: 'hexStringCheck' },
+            key: { type: "string", length: 64, required: true, hex: true },
             value: {
                 $$strict: true,
                 $$type: "object",
-                pub: { type: 'string', length: 64, required: true, custom: 'hexStringCheck' },
-                wk: { type: 'string', length: 64, required: true, custom: 'hexStringCheck' },
-                nonce: { type: 'string', length: 64, required: true, custom: 'hexStringCheck' },
-                sig: { type: 'string', length: 128, required: true, custom: 'hexStringCheck' },
+                pub: { type: 'string', length: 64, required: true, hex: true },
+                wk: { type: 'string', length: 64, required: true, hex: true },
+                nonce: { type: 'string', length: 64, required: true, hex: true },
+                sig: { type: 'string', length: 128, required: true, hex: true },
 
             }
         }
@@ -90,12 +90,12 @@ class Check {
         const schema = {
             $$strict: true,
             type: { type: 'string', enum: [OperationType.ADD_INDEXER, OperationType.REMOVE_INDEXER, OperationType.APPEND_WHITELIST, OperationType.BAN_VALIDATOR], required: true },
-            key: { type: "string", length: 64, required: true, custom: 'hexStringCheck' },
+            key: { type: "string", length: 64, required: true, hex: true },
             value: {
                 $$strict: true,
                 $$type: "object",
-                nonce: { type: 'string', length: 64, required: true, custom: 'hexStringCheck' },
-                sig: { type: 'string', length: 128, required: true, custom: 'hexStringCheck' },
+                nonce: { type: 'string', length: 64, required: true, hex: true },
+                sig: { type: 'string', length: 128, required: true, hex: true },
 
             }
         }
@@ -111,15 +111,15 @@ class Check {
         const schema = {
             $$strict: true,
             op: { type: 'string', enum: ['pre-tx'], required: true },
-            tx: { type: 'string', length: 64, required: true, custom: 'hexStringCheck' },
-            is: { type: 'string', length: 128, required: true, custom: 'hexStringCheck' },
-            wp: { type: 'string', length: 64, required: true, custom: 'hexStringCheck' },
-            i: { type: 'string', length: 64, required: true, custom: 'hexStringCheck' },
-            ipk: { type: 'string', length: 64, required: true, custom: 'hexStringCheck' },
-            ch: { type: 'string', length: 64, required: true, custom: 'hexStringCheck' },
-            in: { type: 'string', length: 64, required: true, custom: 'hexStringCheck' },
-            bs: { type: 'string', length: 64, required: true, custom: 'hexStringCheck' },
-            mbs: { type: 'string', length: 64, required: true, custom: 'hexStringCheck' },
+            tx: { type: 'string', length: 64, required: true, hex: true },
+            is: { type: 'string', length: 128, required: true, hex: true },
+            wp: { type: 'string', length: 64, required: true, hex: true },
+            i: { type: 'string', length: 64, required: true, hex: true },
+            ipk: { type: 'string', length: 64, required: true, hex: true },
+            ch: { type: 'string', length: 64, required: true, hex: true },
+            in: { type: 'string', length: 64, required: true, hex: true },
+            bs: { type: 'string', length: 64, required: true, hex: true },
+            mbs: { type: 'string', length: 64, required: true, hex: true },
         };
         return this.#_validator.compile(schema);
     }
@@ -133,23 +133,23 @@ class Check {
         const schema = {
             $$strict: true,
             type: { type: 'string', enum: ['tx'], required: true },
-            key: { type: 'string', length: 64, required: true, custom: 'hexStringCheck' },
+            key: { type: 'string', length: 64, required: true, hex: true },
             value: {
                 $$strict: true,
                 $$type: "object",
                 op: { type: 'string', enum: ['post-tx'], required: true },
-                tx: { type: 'string', length: 64, required: true, custom: 'hexStringCheck' },
-                is: { type: 'string', length: 128, required: true, custom: 'hexStringCheck' },
-                w: { type: 'string', length: 64, required: true, custom: 'hexStringCheck' },
-                i: { type: 'string', length: 64, required: true, custom: 'hexStringCheck' },
-                ipk: { type: 'string', length: 64, required: true, custom: 'hexStringCheck' },
-                ch: { type: 'string', length: 64, required: true, custom: 'hexStringCheck' },
-                in: { type: 'string', length: 64, required: true, custom: 'hexStringCheck' },
-                bs: { type: 'string', length: 64, required: true, custom: 'hexStringCheck' },
-                mbs: { type: 'string', length: 64, required: true, custom: 'hexStringCheck' },
-                ws: { type: 'string', length: 128, required: true, custom: 'hexStringCheck' },
-                wp: { type: 'string', length: 64, required: true, custom: 'hexStringCheck' },
-                wn: { type: 'string', length: 64, required: true, custom: 'hexStringCheck' }
+                tx: { type: 'string', length: 64, required: true, hex: true },
+                is: { type: 'string', length: 128, required: true, hex: true },
+                w: { type: 'string', length: 64, required: true, hex: true },
+                i: { type: 'string', length: 64, required: true, hex: true },
+                ipk: { type: 'string', length: 64, required: true, hex: true },
+                ch: { type: 'string', length: 64, required: true, hex: true },
+                in: { type: 'string', length: 64, required: true, hex: true },
+                bs: { type: 'string', length: 64, required: true, hex: true },
+                mbs: { type: 'string', length: 64, required: true, hex: true },
+                ws: { type: 'string', length: 128, required: true, hex: true },
+                wp: { type: 'string', length: 64, required: true, hex: true },
+                wn: { type: 'string', length: 64, required: true, hex: true }
             }
         };
         return this.#_validator.compile(schema);
