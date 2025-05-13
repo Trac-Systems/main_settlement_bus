@@ -32,7 +32,9 @@ test('sanitizePreTx - data type validation', t => {
         //Symbol('sym'), test will throw but protocol won't accept it TODO: fix in the future
         BigInt(997),
         new Date(),
-        NaN
+        NaN,
+        new Map(),
+        new Set()
     ]
 
     for (const field of preTxfields) {
@@ -65,12 +67,12 @@ test('sanitizePreTx - data type validation', t => {
 
 test('sanitizePreTx - hexString length validation', t => {
     const requiredLengthOfFields = {
-        tx: 64,     // (uncomment when you enforce tx length)
+        tx: 64,
         is: 128,
         wp: 64,
         i: 64,
         ipk: 64,
-        ch: 64,     // (uncomment when you enforce ch length)
+        ch: 64,
         in: 64,
         bs: 64,
         mbs: 64
@@ -99,4 +101,28 @@ test('sanitizePreTx - hexString length validation', t => {
             `${field} is ok (length ${exact.length}) should pass`
           )
       }
-}); 
+});
+
+test('sanitizePreTx - reject non-hex characters in any field', t => {
+    const requiredLengthOfFields = {
+        tx: 64,
+        is: 128,
+        wp: 64,
+        i: 64,
+        ipk: 64,
+        ch: 64,
+        in: 64,
+        bs: 64,
+        mbs: 64
+    };
+  
+    for (const [field, expectedLen] of Object.entries(requiredLengthOfFields)) {
+      const characterOutOfTheHex = fixtures.validPreTx[field].slice(0, expectedLen - 1) + 'z';
+      const input = { ...fixtures.validPreTx, [field]: characterOutOfTheHex };
+  
+      t.absent(
+        check.sanitizePreTx(input),
+        `${field} with non-hex char should fail (last char replaced with 'z') where expected length is ${expectedLen}`
+      );
+    }
+  });
