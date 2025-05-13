@@ -1,18 +1,19 @@
 import test from 'brittle'
-import fixtures from '../fixtures/check.fixtures.js'
+import checkFixtures from '../fixtures/check.fixtures.js'
 import Check from '../../src/utils/check.js';
+import { string } from 'compact-encoding';
+import { data } from 'hypercore-crypto';
 
 const check = new Check();
 
-test('preTx', t => {
-    const result = check.sanitizePreTx(fixtures.validPreTx)
+test('sanitizePreTx - happy-path case', t => {
+    const result = check.sanitizePreTx(checkFixtures.validPreTx)
     t.ok(result, 'Valid data should pass the sanitization')
-
 })
 
 test('sanitizePreTx - data type validation', t => {
     const invalidInput = {
-        ...fixtures.validPreTx,
+        ...checkFixtures.validPreTx,
         extra: 'redundant field'
     }
 
@@ -21,7 +22,7 @@ test('sanitizePreTx - data type validation', t => {
 
     const preTxfields = ['op', 'tx', 'is', 'wp', 'i', 'ipk', 'ch', 'in', 'bs', 'mbs']
 
-    const dataTypes = [
+    const notAllowedDataTypes = [
         997,
         true,
         null,
@@ -38,28 +39,28 @@ test('sanitizePreTx - data type validation', t => {
     ]
 
     for (const field of preTxfields) {
-        const missingFieldInvalidInput = { ...fixtures.validPreTx }
+        const missingFieldInvalidInput = { ...checkFixtures.validPreTx }
         delete missingFieldInvalidInput[field]
         t.absent(check.sanitizePreTx(missingFieldInvalidInput), `Missing ${field} should fail`);
     }
 
     for (const field of preTxfields) {
-        for (const dataType of dataTypes) {
-            const input = { ...fixtures.validPreTx, [field]: dataType }
-            t.absent(check.sanitizePreTx(input), `${field} as ${typeof dataType} should fail`)
+        for (const dataType of notAllowedDataTypes) {
+            const input = { ...checkFixtures.validPreTx, [field]: dataType }
+            t.absent(check.sanitizePreTx(input), `${field} as ${typeof dataType}(${String(dataType)}) should fail`)
         }
     }
 
-    const invalidOperationType = { ...fixtures.validPreTx, op: 'invalid-op' }
+    const invalidOperationType = { ...checkFixtures.validPreTx, op: 'invalid-op' }
     t.absent(check.sanitizePreTx(invalidOperationType), 'Invalid operation type should fail');
-    
-    const invalidOperationTypeDiffType = { ...fixtures.validPreTx, op: 123 }
+
+    const invalidOperationTypeDiffType = { ...checkFixtures.validPreTx, op: 123 }
     t.absent(check.sanitizePreTx(invalidOperationTypeDiffType), 'Wrong type for op should fail')
 
-    const neastedInvalidInput = { ...fixtures.validPreTx, nested: { foo: 'bar' } }
+    const neastedInvalidInput = { ...checkFixtures.validPreTx, nested: { foo: 'bar' } }
     t.absent(check.sanitizePreTx(neastedInvalidInput), 'Nested object should fail under strict mode')
 
-    for (const dataType of dataTypes) {
+    for (const dataType of notAllowedDataTypes) {
         t.absent(check.sanitizePreTx(dataType), `${typeof dataType} should fail`)
     }
 });
@@ -76,32 +77,29 @@ test('sanitizePreTx - hexString length validation', t => {
         in: 64,
         bs: 64,
         mbs: 64
-      }
-    
-      for (const [field, expectedLen] of Object.entries(requiredLengthOfFields)) {
+    }
+
+    for (const [field, expectedLen] of Object.entries(requiredLengthOfFields)) {
         const tooShort = 'a'.repeat(expectedLen - 2)
-        const tooLong  = 'a'.repeat(expectedLen + 2)
-        const exact    = 'a'.repeat(expectedLen);
-        const shortInput = { ...fixtures.validPreTx, [field]: tooShort }
-        const longInput  = { ...fixtures.validPreTx, [field]: tooLong }
-        const exactInput = { ...fixtures.validPreTx, [field]: exact }
+        const oneTooShort = 'a'.repeat(expectedLen - 1)
+        const exact = 'a'.repeat(expectedLen)
+        const oneTooLong = 'a'.repeat(expectedLen + 1)
+        const tooLong = 'a'.repeat(expectedLen + 2)
 
-        t.absent(
-          check.sanitizePreTx(shortInput),
-          `${field} too short (length ${tooShort.length}) should fail`
-        )
-    
-        t.absent(
-          check.sanitizePreTx(longInput),
-          `${field} too long (length ${tooLong.length}) should fail`
-        )
+        const shortInput = { ...checkFixtures.validPreTx, [field]: tooShort }
+        const oneTooShortInput = { ...checkFixtures.validPreTx, [field]: oneTooShort }
+        const exactInput = { ...checkFixtures.validPreTx, [field]: exact }
+        const oneTooLongInput = { ...checkFixtures.validPreTx, [field]: oneTooLong }
+        const longInput = { ...checkFixtures.validPreTx, [field]: tooLong }
 
-        t.ok(
-            check.sanitizePreTx(exactInput),
-            `${field} is ok (length ${exact.length}) should pass`
-          )
-      }
+        t.absent(check.sanitizePreTx(shortInput),`${field} too short (length ${tooShort.length}) should fail`)
+        t.absent(check.sanitizePreTx(oneTooShortInput),`${field} one too short (length ${oneTooShort.length}) should fail`)
+        t.ok(check.sanitizePreTx(exactInput),`${field} is ok (length ${exact.length}) should pass`)
+        t.absent(check.sanitizePreTx(oneTooLongInput),`${field} one too long (length ${oneTooLong.length}) should fail`)
+        t.absent(check.sanitizePreTx(longInput),`${field} too long (length ${tooLong.length}) should fail`)
+    }
 });
+
 
 test('sanitizePreTx - reject non-hex characters in any field', t => {
     const requiredLengthOfFields = {
@@ -115,14 +113,12 @@ test('sanitizePreTx - reject non-hex characters in any field', t => {
         bs: 64,
         mbs: 64
     };
-  
+
     for (const [field, expectedLen] of Object.entries(requiredLengthOfFields)) {
-      const characterOutOfTheHex = fixtures.validPreTx[field].slice(0, expectedLen - 1) + 'z';
-      const input = { ...fixtures.validPreTx, [field]: characterOutOfTheHex };
-  
-      t.absent(
-        check.sanitizePreTx(input),
-        `${field} with non-hex char should fail (last char replaced with 'z') where expected length is ${expectedLen}`
-      );
+        const characterOutOfTheHex = checkFixtures.validPreTx[field].slice(0, expectedLen - 1) + 'z';
+        const input = { ...checkFixtures.validPreTx, [field]: characterOutOfTheHex };
+        
+        t.absent(check.sanitizePreTx(input),`${field} with non-hex char should fail (last char replaced with 'z') where expected length is ${expectedLen}`);
     }
-  });
+
+});
