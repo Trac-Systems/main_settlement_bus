@@ -10,6 +10,7 @@ async function runTests() {
   await import('./functions/createHash.test.js');
   await import('./fileUtils/readPublicKeysFromFile.test.js');
   await import('./msgUtils/createMessage.test.js');
+  await import('./msgUtils/assembleAdminMessage.test.js');
 
   //TODO add test Apply function
 
