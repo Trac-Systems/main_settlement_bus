@@ -7,8 +7,8 @@ class Check {
     #_sanitizeIndexerOrWhitelistOperations;
     #_sanitizePreTx;
     #_sanitizePostTx;
-
     constructor() {
+
         this.#_validator = new Validator({
             useNewCustomCheckerFunction: true,
             messages: {
@@ -45,7 +45,6 @@ class Check {
                 `
             };
         });
-
         this.#_validator.add("is_hex_string", function ({ schema, messages }, path, context) {
             return {
                 source: `
@@ -55,7 +54,6 @@ class Check {
                 `
             };
         });
-
         this.#_sanitizeAdminAndWritersOperations = this.#compileSanitizationAdminAndWriterOperationsSchema();
         this.#_sanitizeIndexerOrWhitelistOperations = this.#compileIndexerOrWhitelistOperationSchema();
         this.#_sanitizePreTx = this.#compilePreTxSchema();
@@ -69,21 +67,24 @@ class Check {
             type: { type: 'string', enum: [OperationType.ADD_ADMIN, OperationType.ADD_WRITER, OperationType.REMOVE_WRITER], required: true },
             key: { type: "string", length: 64, required: true, hex: true },
             value: {
-                $$strict: true,
-                $$type: "object",
-                pub: { type: 'string', length: 64, required: true, hex: true },
-                wk: { type: 'string', length: 64, required: true, hex: true },
-                nonce: { type: 'string', length: 64, required: true, hex: true },
-                sig: { type: 'string', length: 128, required: true, hex: true },
-
+                strict: true,
+                type: "object",
+                props: {
+                    pub: { type: 'string', length: 64, required: true, hex: true },
+                    wk: { type: 'string', length: 64, required: true, hex: true },
+                    nonce: { type: 'string', length: 64, required: true, hex: true },
+                    sig: { type: 'string', length: 128, required: true, hex: true },
+                }
             }
         }
+
         return this.#_validator.compile(schema);
     }
 
     sanitizeAdminAndWritersOperations(op) {
         return this.#_sanitizeAdminAndWritersOperations(op) === true;
     }
+
     //TODO: rename this function
     #compileIndexerOrWhitelistOperationSchema() {
         // TODO: Create constants for int values below
@@ -92,20 +93,20 @@ class Check {
             type: { type: 'string', enum: [OperationType.ADD_INDEXER, OperationType.REMOVE_INDEXER, OperationType.APPEND_WHITELIST, OperationType.BAN_VALIDATOR], required: true },
             key: { type: "string", length: 64, required: true, hex: true },
             value: {
-                $$strict: true,
-                $$type: "object",
-                nonce: { type: 'string', length: 64, required: true, hex: true },
-                sig: { type: 'string', length: 128, required: true, hex: true },
-
+                strict: true,
+                type: "object",
+                props: {
+                    nonce: { type: 'string', length: 64, required: true, hex: true },
+                    sig: { type: 'string', length: 128, required: true, hex: true },
+                }
+                
             }
         }
         return this.#_validator.compile(schema);
     }
-
     sanitizeIndexerOrWhitelistOperations(op) {
         return this.#_sanitizeIndexerOrWhitelistOperations(op) === true;
     }
-
     #compilePreTxSchema() {
         // TODO: Create constants for int values below
         const schema = {
@@ -123,7 +124,6 @@ class Check {
         };
         return this.#_validator.compile(schema);
     }
-
     sanitizePreTx(op) {
         return this.#_sanitizePreTx(op) === true;
     }
@@ -135,21 +135,23 @@ class Check {
             type: { type: 'string', enum: ['tx'], required: true },
             key: { type: 'string', length: 64, required: true, hex: true },
             value: {
-                $$strict: true,
-                $$type: "object",
-                op: { type: 'string', enum: ['post-tx'], required: true },
-                tx: { type: 'string', length: 64, required: true, hex: true },
-                is: { type: 'string', length: 128, required: true, hex: true },
-                w: { type: 'string', length: 64, required: true, hex: true },
-                i: { type: 'string', length: 64, required: true, hex: true },
-                ipk: { type: 'string', length: 64, required: true, hex: true },
-                ch: { type: 'string', length: 64, required: true, hex: true },
-                in: { type: 'string', length: 64, required: true, hex: true },
-                bs: { type: 'string', length: 64, required: true, hex: true },
-                mbs: { type: 'string', length: 64, required: true, hex: true },
-                ws: { type: 'string', length: 128, required: true, hex: true },
-                wp: { type: 'string', length: 64, required: true, hex: true },
-                wn: { type: 'string', length: 64, required: true, hex: true }
+                strict: true,
+                type: "object",
+                props: {
+                    op: { type: 'string', enum: ['post-tx'], required: true },
+                    tx: { type: 'string', length: 64, required: true, hex: true },
+                    is: { type: 'string', length: 128, required: true, hex: true },
+                    w: { type: 'string', length: 64, required: true, hex: true },
+                    i: { type: 'string', length: 64, required: true, hex: true },
+                    ipk: { type: 'string', length: 64, required: true, hex: true },
+                    ch: { type: 'string', length: 64, required: true, hex: true },
+                    in: { type: 'string', length: 64, required: true, hex: true },
+                    bs: { type: 'string', length: 64, required: true, hex: true },
+                    mbs: { type: 'string', length: 64, required: true, hex: true },
+                    ws: { type: 'string', length: 128, required: true, hex: true },
+                    wp: { type: 'string', length: 64, required: true, hex: true },
+                    wn: { type: 'string', length: 64, required: true, hex: true }
+                }
             }
         };
         return this.#_validator.compile(schema);
@@ -159,5 +161,4 @@ class Check {
         return this.#_sanitizePostTx(op) === true;
     }
 }
-
 export default Check;
