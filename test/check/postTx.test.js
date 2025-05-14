@@ -32,14 +32,14 @@ test('sanitizePostTx - data type validation TOP LEVEL', t => {
         }
     };
 
-    t.absent(check.sanitizePostTx(neastedObjectInsideValue), 'Unexpected nested field inside value should fail due to $$strict');
+    t.absent(check.sanitizePostTx(neastedObjectInsideValue), 'Unexpected nested field inside `value` should fail due to strict');
 
     const neastedObjectInsideValue2 = {
         ...checkFixtures.validPostTx,
         nested: { foo: 'bar' }
     };
 
-    t.absent(check.sanitizePostTx(neastedObjectInsideValue2), 'Unexpected nested field inside object should fail due to $$strict');
+    t.absent(check.sanitizePostTx(neastedObjectInsideValue2), 'Unexpected nested field inside object should fail due to strict');
     const neastedObjectInsideValue3 = {
         ...checkFixtures.validPostTx,
         type: {
@@ -47,7 +47,7 @@ test('sanitizePostTx - data type validation TOP LEVEL', t => {
             nested: { foo: 'bar' }
         }
     };
-    t.absent(check.sanitizePostTx(neastedObjectInsideValue3), 'Unexpected nested field inside `type` field should fail due to $$strict');
+    t.absent(check.sanitizePostTx(neastedObjectInsideValue3), 'Unexpected nested field inside `type` field should fail due to strict');
 
     const neastedObjectInsideValue4 = {
         ...checkFixtures.validPostTx,
@@ -56,38 +56,21 @@ test('sanitizePostTx - data type validation TOP LEVEL', t => {
             nested: { foo: 'bar' }
         }
     };
-    t.absent(check.sanitizePostTx(neastedObjectInsideValue4), 'Unexpected nested field inside `key` field should fail due to $$strict');
+    t.absent(check.sanitizePostTx(neastedObjectInsideValue4), 'Unexpected nested field inside `key` field should fail due to strict');
 
     //testing for invalid data types
-    const postTxMainfields = ['type', 'key', 'value'];
-    const notAllowedDataTypes = [
-        997,
-        true,
-        null,
-        undefined,
-        {},
-        [],
-        () => { },
-        //Symbol('sym'), test will throw but protocol won't accept it TODO: fix in the future
-        BigInt(997),
-        new Date(),
-        NaN,
-        new Map(),
-        new Set()
-    ]
 
-    for (const invalidType of notAllowedDataTypes) {
+    for (const invalidType of checkFixtures.notAllowedDataTypes) {
         const invalidTypForTypeKey = { ...checkFixtures.validPostTx, type: invalidType };
         t.absent(check.sanitizePostTx(invalidTypForTypeKey), `Invalid data type for 'type' key ${String(invalidType)} (${typeof invalidType}) should fail`);
-
     }
 
-    for (const invalidType of notAllowedDataTypes) {
+    for (const invalidType of checkFixtures.notAllowedDataTypes) {
         const invalidTypForTypeKey = { ...checkFixtures.validPostTx, key: invalidType };
         t.absent(check.sanitizePostTx(invalidTypForTypeKey), `Invalid data type for 'key' key ${String(invalidType)} (${typeof invalidType}) should fail`);
     }
 
-    for (const invalidType of notAllowedDataTypes) {
+    for (const invalidType of checkFixtures.notAllowedDataTypes) {
         if (String(invalidType) === '[object Object]') {
             continue;
         }
@@ -98,7 +81,7 @@ test('sanitizePostTx - data type validation TOP LEVEL', t => {
     const invalidOperationTypeDiffType = { ...checkFixtures.validPostTx, type: 123 }
     t.absent(check.sanitizePostTx(invalidOperationTypeDiffType), 'Wrong type for `type` should fail')
 
-    for (const mainField of postTxMainfields) {
+    for (const mainField of checkFixtures.topFields) {
         const missingFieldInvalidInput = { ...checkFixtures.validPostTx }
         delete missingFieldInvalidInput[mainField]
         t.absent(check.sanitizePostTx(missingFieldInvalidInput), `Missing ${mainField} should fail`);
@@ -107,24 +90,8 @@ test('sanitizePostTx - data type validation TOP LEVEL', t => {
 });
 
 test('sanitizePostTx - data type validation VALUE LEVEL', t => {
-    const postTxValueFields = ['op', 'tx', 'is', 'w', 'i', 'ipk', 'ch', 'in', 'bs', 'mbs', 'ws', 'wp', 'wn'];
-    const notAllowedDataTypes = [
-        997,
-        true,
-        null,
-        undefined,
-        {},
-        [],
-        () => { },
-        //Symbol('sym'), test will throw but protocol won't accept it TODO: fix in the future
-        BigInt(997),
-        new Date(),
-        NaN,
-        new Map(),
-        new Set()
-    ]
     // missing value fields
-    for (const field of postTxValueFields) {
+    for (const field of checkFixtures.postTxValueFields) {
         const missing = {
             ...checkFixtures.validPostTx,
             value: { ...checkFixtures.validPostTx.value }
@@ -133,8 +100,8 @@ test('sanitizePostTx - data type validation VALUE LEVEL', t => {
         t.absent(check.sanitizePostTx(missing), `Missing value.${field} should fail`);
     }
     // Incorrect types for each field in value
-    for (const field of postTxValueFields) {
-        for (const invalidType of notAllowedDataTypes) {
+    for (const field of checkFixtures.postTxValueFields) {
+        for (const invalidType of checkFixtures.notAllowedDataTypes) {
             const withInvalidDataType = {
                 ...checkFixtures.validPostTx,
                 value: {
@@ -146,7 +113,7 @@ test('sanitizePostTx - data type validation VALUE LEVEL', t => {
         }
     }
     // Empty string for each field in value
-    for (const field of postTxValueFields) {
+    for (const field of checkFixtures.postTxValueFields) {
         const emptyStr = {
             ...checkFixtures.validPostTx,
             value: {
@@ -157,7 +124,7 @@ test('sanitizePostTx - data type validation VALUE LEVEL', t => {
         t.absent(check.sanitizePostTx(emptyStr), `Empty string for value.${field} should fail`);
     }
 
-    for (const field of postTxValueFields) {
+    for (const field of checkFixtures.postTxValueFields) {
         const nestedObj = {
             ...checkFixtures.validPostTx,
             value: {
@@ -166,10 +133,7 @@ test('sanitizePostTx - data type validation VALUE LEVEL', t => {
             }
         };
 
-        t.absent(
-            check.sanitizePostTx(nestedObj),
-            `Nested object for value.${field} should fail under strict mode`
-        );
+        t.absent(check.sanitizePostTx(nestedObj), `Nested object for value.${field} should fail under strict mode`);
     }
 
     const incorrectOpAsString = {
@@ -191,7 +155,7 @@ test('sanitizePostTx - data type validation VALUE LEVEL', t => {
     t.absent(check.sanitizePostTx(extraInValue), 'Extra field should fail due to $$strict')
 
 
-    for (const field of postTxValueFields) {
+    for (const field of checkFixtures.postTxValueFields) {
         const emptyObjForField = {
             ...checkFixtures.validPostTx,
             value: {
@@ -203,8 +167,6 @@ test('sanitizePostTx - data type validation VALUE LEVEL', t => {
     }
 
 });
-
-
 
 test('sanitizePostTx - hexString length validation - TOP LEVEL', t => {
     const expectedLen = 64;
@@ -234,25 +196,8 @@ test('sanitizePostTx - hexString length validation - TOP LEVEL', t => {
     t.absent(check.sanitizePostTx(inputs.longInput), `'key' too long (length ${tooLong.length}) should fail`);
 });
 
-
-
 test('sanitizePostTx - hexString length validation - VALUE LEVEL', t => {
-    const requiredLengthOfFields = {
-        tx: 64,
-        is: 128,
-        w: 64,
-        i: 64,
-        ipk: 64,
-        ch: 64,
-        in: 64,
-        bs: 64,
-        mbs: 64,
-        ws: 128,
-        wp: 64,
-        wn: 64,
-    };
-
-    for (const [field, expectedLen] of Object.entries(requiredLengthOfFields)) {
+    for (const [field, expectedLen] of Object.entries(checkFixtures.requiredLengthOfFieldsForPostTx)) {
         const oneTooShort = 'a'.repeat(expectedLen - 1);
         const tooShort = 'a'.repeat(expectedLen - 2);
         const exact = 'a'.repeat(expectedLen);
@@ -283,7 +228,6 @@ test('sanitizePostTx - hexString length validation - VALUE LEVEL', t => {
     }
 });
 
-
 test('sanitizePostTx - reject non-hex characters TOP LEVEL', t => {
     const expectedLen = 64;
     const invalidKey = checkFixtures.validPostTx.key.slice(0, expectedLen - 1) + 'z';
@@ -296,33 +240,19 @@ test('sanitizePostTx - reject non-hex characters TOP LEVEL', t => {
 });
 
 test('sanitizePostTx - reject non-hex characters VALUE LEVEL', t => {
-    const requiredLengthOfFields = {
-        tx: 64,
-        is: 128,
-        w: 64,
-        i: 64,
-        ipk: 64,
-        ch: 64,
-        in: 64,
-        bs: 64,
-        mbs: 64,
-        ws: 128,
-        wp: 64,
-        wn: 64,
-    };
     const buildValueLevel = (field, val) => ({
         ...checkFixtures.validPostTx,
         value: {
-          ...checkFixtures.validPostTx.value,
-          [field]: val
+            ...checkFixtures.validPostTx.value,
+            [field]: val
         }
-      });
-    
-    for (const [field, expectedLen] of Object.entries(requiredLengthOfFields)) {
+    });
+
+    for (const [field, expectedLen] of Object.entries(checkFixtures.requiredLengthOfFieldsForPostTx)) {
         const characterOutOfTheHex = checkFixtures.validPostTx.value[field].slice(0, expectedLen - 1) + 'z';
         const invalidInput = buildValueLevel(field, characterOutOfTheHex);
 
-        t.absent(check.sanitizePostTx(invalidInput),`value.${field} with non-hex char should fail (last char replaced with 'z') where expected length is ${expectedLen}`);
+        t.absent(check.sanitizePostTx(invalidInput), `value.${field} with non-hex char should fail (last char replaced with 'z') where expected length is ${expectedLen}`);
     }
 
 });
