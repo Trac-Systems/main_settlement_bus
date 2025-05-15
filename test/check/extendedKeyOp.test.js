@@ -27,7 +27,7 @@ test('sanitizeExtendedKeyOpSchema - data type validation TOP LEVEL', t => {
     t.absent(check.sanitizeExtendedKeyOpSchema(invalidOperationType), 'Invalid operation type should fail');
 
     // testing for nested objects
-    const neastedObjectInsideValue = {
+    const nestedObjectInsideValue = {
         ...checkFixtures.validAddWriter,
         value: {
             ...checkFixtures.validAddWriter.value,
@@ -35,31 +35,31 @@ test('sanitizeExtendedKeyOpSchema - data type validation TOP LEVEL', t => {
         }
     };
 
-    t.absent(check.sanitizeExtendedKeyOpSchema(neastedObjectInsideValue), 'Unexpected nested field inside value should fail');
+    t.absent(check.sanitizeExtendedKeyOpSchema(nestedObjectInsideValue), 'Unexpected nested field inside value should fail');
 
-    const neastedObjectInsideValue2 = {
+    const nestedObjectInsideValue2 = {
         ...checkFixtures.validAddWriter,
         nested: { foo: 'bar' }
     };
-    t.absent(check.sanitizeExtendedKeyOpSchema(neastedObjectInsideValue2), 'Unexpected nested field inside object should fail due to strict');
+    t.absent(check.sanitizeExtendedKeyOpSchema(nestedObjectInsideValue2), 'Unexpected nested field inside object should fail due to strict');
 
-    const neastedObjectInsideValue3 = {
+    const nestedObjectInsideValue3 = {
         ...checkFixtures.validAddWriter,
         type: {
             foo: 'bar',
             nested: { foo: 'bar' }
         }
     };
-    t.absent(check.sanitizeExtendedKeyOpSchema(neastedObjectInsideValue3), 'Unexpected nested field inside `type` field should fail due to strict');
+    t.absent(check.sanitizeExtendedKeyOpSchema(nestedObjectInsideValue3), 'Unexpected nested field inside `type` field should fail due to strict');
 
-    const neastedObjectInsideValue4 = {
+    const nestedObjectInsideValue4 = {
         ...checkFixtures.validAddWriter,
         key: {
             foo: 'bar',
             nested: { foo: 'bar' }
         }
     };
-    t.absent(check.sanitizeExtendedKeyOpSchema(neastedObjectInsideValue4), 'Unexpected nested field inside `key` field should fail due to strict');
+    t.absent(check.sanitizeExtendedKeyOpSchema(nestedObjectInsideValue4), 'Unexpected nested field inside `key` field should fail due to strict');
 
     //testing for invalid data types
     const topFields = ['type', 'key', 'value'];
