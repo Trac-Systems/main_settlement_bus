@@ -5,7 +5,7 @@ import { default as test } from 'brittle';
 async function runTests() {
   test.pause();
 
-  await import('./check.test.js');
+  await import('./check/check.test.js');
   await import('./fileUtils.test.js');
   await import('./functions.test.js');
 
