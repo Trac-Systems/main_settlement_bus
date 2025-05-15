@@ -9,8 +9,7 @@ async function runTests() {
   await import('./functions/isHexString.test.js');
   await import('./functions/createHash.test.js');
   await import('./fileUtils/readPublicKeysFromFile.test.js');
-  await import('./msgUtils/createMessage.test.js');
-  await import('./msgUtils/assembleAdminMessage.test.js');
+  await import('./msgUtils/msgUtils.test.js');
 
   //TODO add test Apply function
 
