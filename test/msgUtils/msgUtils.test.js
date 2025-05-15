@@ -13,6 +13,8 @@ async function runMsgUtilsTests() {
     await import('./assembleBanValidatorMessage.test.js');
     await import('./assembleWhitelistedMessage.test.js');
 
+    // TODO: Implement mocked tests for MsgUtils.verifyEventMessage
+
     test.resume();
 }
 

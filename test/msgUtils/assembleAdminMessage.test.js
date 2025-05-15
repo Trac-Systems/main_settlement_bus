@@ -1,7 +1,7 @@
 import test from 'brittle';
 import MsgUtils from '../../src/utils/msgUtils.js';
 import { OperationType } from '../../src/utils/constants.js';
-import {default as fixtures} from '../fixtures/assembleMessage.fixtures.js';
+import { default as fixtures } from '../fixtures/assembleMessage.fixtures.js';
 
 test('assembleAdminMessage', async (t) => {
     await fixtures.initAll();
@@ -15,9 +15,11 @@ test('assembleAdminMessage', async (t) => {
     t.test('assembleAdminMessage - setup admin entry', async (k) => {
         const msg = await MsgUtils.assembleAdminMessage(null, writingKeyAdmin, walletAdmin, bootstrapAdmin);
         k.ok(msg, 'Message should be created');
+        k.is(Object.keys(msg).length, 3, 'Message should have 3 keys');
+        k.is(Object.keys(msg.value).length, 4, 'Message value have 4 keys');
         k.is(msg.type, OperationType.ADD_ADMIN, 'Message type should be ADD_ADMIN');
-        k.is(msg.key, fixtures.walletAdmin.publicKey, 'Message key should be the public key of the wallet');
-        k.is(msg.value.wk, fixtures.writingKeyAdmin, 'Message wk should be the writing key');
+        k.is(msg.key, walletAdmin.publicKey, 'Message key should be the public key of the wallet');
+        k.is(msg.value.wk, writingKeyAdmin, 'Message wk should be the writing key');
         k.is(msg.value.nonce.length, 64, 'Message nonce should be 64 characters long');
         k.ok(msg.value.nonce.match(/^[a-f0-9]+$/), 'Message nonce should be a hex string');
         k.is(msg.value.sig.length, 128, 'Message signature should be 128 characters long');
@@ -27,6 +29,8 @@ test('assembleAdminMessage', async (t) => {
     t.test('assembleAdminMessage - admin recovery message', async (k) => {
         const msg = await MsgUtils.assembleAdminMessage(adminEntry, writingKeyNonAdmin, walletAdmin, bootstrapAdmin);
         k.ok(msg, 'Message should be created');
+        k.is(Object.keys(msg).length, 3, 'Message should have 3 keys');
+        k.is(Object.keys(msg.value).length, 4, 'Message value have 4 keys');
         k.is(msg.type, OperationType.ADD_ADMIN, 'Message type should be ADD_ADMIN');
         k.is(msg.key, walletAdmin.publicKey, 'Message key should be the public key of the wallet');
         k.is(msg.value.wk, writingKeyNonAdmin, 'Message wk should be the writing key');

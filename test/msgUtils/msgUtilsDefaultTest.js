@@ -1,7 +1,6 @@
 export async function msgUtilsDefaultTest(t, fnName, fn, wallet, writingKey, opType, msgValueLength, expectedMsgKey) {
     t.test(`${fnName} - Happy Path`, async (k) => {
         const msg = await fn(wallet, writingKey);
-        console.log(">>>>>>>>>>>>>>>>>>>> MSG: ", msg)
         k.ok(msg, 'Message should be created');
         k.is(Object.keys(msg).length, 3, 'Message should have 3 keys');
         k.is(Object.keys(msg.value).length, msgValueLength, `Message should value have ${msgValueLength} keys`);

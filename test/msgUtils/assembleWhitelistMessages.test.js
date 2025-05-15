@@ -1,7 +1,7 @@
 import test from 'brittle';
 import MsgUtils from '../../src/utils/msgUtils.js';
 import { OperationType } from '../../src/utils/constants.js';
-import {default as fixtures} from '../fixtures/assembleMessage.fixtures.js';
+import { default as fixtures } from '../fixtures/assembleMessage.fixtures.js';
 
 test('assembleWhitelistMessages', async (t) => {
     await fixtures.initAll();
@@ -15,6 +15,8 @@ test('assembleWhitelistMessages', async (t) => {
         const msg = await MsgUtils.assembleWhitelistMessages(adminEntry, walletAdmin);
         k.ok(msg, 'Message should be created');
         k.ok(msg.length > 0, 'Message should be an array with at least one element'); // TODO: Assuming whitelist file contains at least one entry. Create mock
+        k.is(Object.keys(msg[0]).length, 3, 'Message should have 3 keys');
+        k.is(Object.keys(msg[0].value).length, 2, 'Message value should have 2 keys');
         k.is(msg[0].type, OperationType.APPEND_WHITELIST, 'Message type should be APPEND_WHITELIST');
         // k.is(msg[0].key, mockedWhitelistPubKey, 'Message key should be the public key in the file'); // TODO: Activate after whitelist file is mocked
         k.is(msg[0].value.nonce.length, 64, 'Message nonce should be 64 characters long');
