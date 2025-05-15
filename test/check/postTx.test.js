@@ -4,7 +4,7 @@ import Check from '../../src/utils/check.js';
 
 const check = new Check();
 
-test('sanitzatePostTx - happy-path case', t => {
+test('sanitizePostTx - happy-path case', t => {
     const result = check.sanitizePostTx(checkFixtures.validPostTx)
     t.ok(result, 'Valid data should pass the sanitization')
 })
