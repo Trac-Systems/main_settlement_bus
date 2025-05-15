@@ -4,7 +4,6 @@ import Check from '../../src/utils/check.js'
 
 const check = new Check()
 
-
 test('sanitizeAdminAndWritersOperations – happy paths for all operation types', t => {
     const validInputs = [
         checkFixtures.validAddAdmin,
@@ -131,7 +130,6 @@ test('sanitizeAdminAndWritersOperations - data type validation VALUE LEVEL', t =
         t.absent(check.sanitizeAdminAndWritersOperations(emptyStr), `Empty string for value.${field} should fail`);
     }
 
-
     for (const field of checkFixtures.extendedKeyOpValueFields) {
         const nestedObj = {
             ...checkFixtures.validAddWriter,
@@ -152,7 +150,6 @@ test('sanitizeAdminAndWritersOperations - data type validation VALUE LEVEL', t =
         }
     }
     t.absent(check.sanitizeAdminAndWritersOperations(extraInValue), 'Extra field should fail due to $$strict')
-
 
     for (const field of checkFixtures.extendedKeyOpValueFields) {
         const emptyObjForField = {

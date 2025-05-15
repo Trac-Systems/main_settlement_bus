@@ -9,7 +9,6 @@ test('sanitizePostTx - happy-path case', t => {
     t.ok(result, 'Valid data should pass the sanitization')
 })
 
-
 test('sanitizePostTx - data type validation TOP LEVEL', t => {
     //testing strict
     const invalidInput = {
@@ -90,6 +89,7 @@ test('sanitizePostTx - data type validation TOP LEVEL', t => {
 });
 
 test('sanitizePostTx - data type validation VALUE LEVEL', t => {
+
     // missing value fields
     for (const field of checkFixtures.postTxValueFields) {
         const missing = {
@@ -99,6 +99,7 @@ test('sanitizePostTx - data type validation VALUE LEVEL', t => {
         delete missing.value[field];
         t.absent(check.sanitizePostTx(missing), `Missing value.${field} should fail`);
     }
+
     // Incorrect types for each field in value
     for (const field of checkFixtures.postTxValueFields) {
         for (const invalidType of checkFixtures.notAllowedDataTypes) {
@@ -112,6 +113,7 @@ test('sanitizePostTx - data type validation VALUE LEVEL', t => {
             t.absent(check.sanitizePostTx(withInvalidDataType), `Invalid data type for value.${field}: ${String(invalidType)} (${typeof invalidType}) should fail`);
         }
     }
+    
     // Empty string for each field in value
     for (const field of checkFixtures.postTxValueFields) {
         const emptyStr = {
@@ -153,7 +155,6 @@ test('sanitizePostTx - data type validation VALUE LEVEL', t => {
         }
     }
     t.absent(check.sanitizePostTx(extraInValue), 'Extra field should fail due to $$strict')
-
 
     for (const field of checkFixtures.postTxValueFields) {
         const emptyObjForField = {

@@ -4,9 +4,6 @@ import Check from '../../src/utils/check.js';
 
 const check = new Check();
 
-///OperationType.ADD_ADMIN, OperationType.ADD_WRITER, OperationType.REMOVE_WRITER
-
-
 test('sanitizeIndexerOrWhitelistOperations – happy paths for all operation types', t => {
     const validInputs = [
         checkFixtures.validAddIndexer,
@@ -66,7 +63,6 @@ test('sanitizeIndexerOrWhitelistOperations - data type validation TOP LEVEL', t 
     t.absent(check.sanitizeIndexerOrWhitelistOperations(neastedObjectInsideValue4), 'Unexpected nested field inside `key` field should fail due to strict');
 
     //testing for invalid data types
-
     for (const invalidType of checkFixtures.notAllowedDataTypes) {
         const invalidTypForTypeKey = { ...checkFixtures.validAddIndexer, type: invalidType };
         t.absent(check.sanitizeIndexerOrWhitelistOperations(invalidTypForTypeKey), `Invalid data type for 'type' key ${String(invalidType)} (${typeof invalidType}) should fail`);
@@ -96,6 +92,7 @@ test('sanitizeIndexerOrWhitelistOperations - data type validation TOP LEVEL', t 
 });
 
 test('sanitizeIndexerOrWhitelistOperations - data type validation VALUE LEVEL', t => {
+
     // missing value fields
     for (const field of checkFixtures.basicKeyOpValueFields) {
         const missing = {
@@ -131,7 +128,6 @@ test('sanitizeIndexerOrWhitelistOperations - data type validation VALUE LEVEL', 
         };
         t.absent(check.sanitizeIndexerOrWhitelistOperations(emptyStr), `Empty string for value.${field} should fail`);
     }
-
 
     for (const field of checkFixtures.basicKeyOpValueFields) {
         const nestedObj = {

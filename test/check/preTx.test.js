@@ -45,7 +45,6 @@ test('sanitizePreTx - data type validation', t => {
     }
 });
 
-
 test('sanitizePreTx - hexString length validation', t => {
 
     for (const [field, expectedLen] of Object.entries(checkFixtures.requiredLengthOfFieldsForPreTx)) {
@@ -68,7 +67,6 @@ test('sanitizePreTx - hexString length validation', t => {
         t.absent(check.sanitizePreTx(longInput), `${field} too long (length ${tooLong.length}) should fail`)
     }
 });
-
 
 test('sanitizePreTx - reject non-hex characters in any field', t => {
 
