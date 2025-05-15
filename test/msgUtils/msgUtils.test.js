@@ -10,6 +10,7 @@ async function runMsgUtilsTests() {
     await import('./assembleRemoveWriterMessage.test.js');
     await import('./assembleAddIndexerMessage.test.js');
     await import('./assembleRemoveIndexerMessage.test.js');
+    await import('./assembleBanValidatorMessage.test.js');
 
     test.resume();
 }
