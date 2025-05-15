@@ -16,10 +16,12 @@ export const adminEntry = {
 }
 
 export const initAll = async () => {
-    await walletAdmin.generateKeyPair(mnemonicAdmin);
-    await walletNonAdmin.generateKeyPair(walletNonAdmin.generateMnemonic());
-    adminEntry.tracPublicKey = walletAdmin.publicKey;
-    adminEntry.wk = writingKeyAdmin;
+    if (!walletAdmin.publicKey) await walletAdmin.generateKeyPair(mnemonicAdmin);
+    if (!walletNonAdmin.publicKey) await walletNonAdmin.generateKeyPair(walletNonAdmin.generateMnemonic());
+    if (!adminEntry.tracPublicKey && !adminEntry.wk) {
+        adminEntry.tracPublicKey = walletAdmin.publicKey;
+        adminEntry.wk = writingKeyAdmin;
+    }
 }
 
 export default {
