@@ -11,6 +11,7 @@ async function runMsgUtilsTests() {
     await import('./assembleAddIndexerMessage.test.js');
     await import('./assembleRemoveIndexerMessage.test.js');
     await import('./assembleBanValidatorMessage.test.js');
+    await import('./assembleWhitelistedMessage.test.js');
 
     test.resume();
 }
