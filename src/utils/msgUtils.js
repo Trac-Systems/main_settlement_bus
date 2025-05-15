@@ -73,7 +73,7 @@ class MsgUtils {
 
     static async assembleWhitelistMessages(adminEntry, wallet) {
         try {
-            if (!adminEntry || !wallet || wallet.publicKey !== adminEntry.tracPublicKey) {
+            if (!adminEntry || !wallet || !adminEntry.tracPublicKey || !wallet.publicKey || wallet.publicKey !== adminEntry.tracPublicKey) {
                 return null;
             }
 
