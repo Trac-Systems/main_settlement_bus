@@ -1,7 +1,6 @@
 import test from 'brittle'
 import checkFixtures from '../fixtures/check.fixtures.js'
 import Check from '../../src/utils/check.js'
-import { OperationType } from '../../src/utils/constants.js'
 
 const check = new Check()
 
@@ -105,7 +104,7 @@ test('sanitizeAdminAndWritersOperations - data type validation VALUE LEVEL', t =
         delete missing.value[field];
         t.absent(check.sanitizeAdminAndWritersOperations(missing), `Missing value.${field} should fail`);
     }
-    
+
     // Incorrect types for each field in value
     for (const field of checkFixtures.extendedKeyOpValueFields) {
         for (const invalidType of checkFixtures.notAllowedDataTypes) {
@@ -119,7 +118,7 @@ test('sanitizeAdminAndWritersOperations - data type validation VALUE LEVEL', t =
             t.absent(check.sanitizeAdminAndWritersOperations(withInvalidDataType), `Invalid data type for value.${field}: ${String(invalidType)} (${typeof invalidType}) should fail`);
         }
     }
-    
+
     // Empty string for each field in value
     for (const field of checkFixtures.extendedKeyOpValueFields) {
         const emptyStr = {
@@ -131,8 +130,8 @@ test('sanitizeAdminAndWritersOperations - data type validation VALUE LEVEL', t =
         };
         t.absent(check.sanitizeAdminAndWritersOperations(emptyStr), `Empty string for value.${field} should fail`);
     }
-    
-    
+
+
     for (const field of checkFixtures.extendedKeyOpValueFields) {
         const nestedObj = {
             ...checkFixtures.validAddWriter,
@@ -165,7 +164,7 @@ test('sanitizeAdminAndWritersOperations - data type validation VALUE LEVEL', t =
         }
         t.absent(check.sanitizeAdminAndWritersOperations(emptyObjForField), `Empty object for value.${field} should fail`)
     }
-    
+
 });
 
 test('sanitizeAdminAndWritersOperations - hexString length validation - TOP LEVEL', t => {
@@ -244,16 +243,16 @@ test('sanitizeAdminAndWritersOperations - reject non-hex characters VALUE LEVEL'
     const buildValueLevel = (field, val) => ({
         ...checkFixtures.validAddWriter,
         value: {
-          ...checkFixtures.validAddWriter.value,
-          [field]: val
+            ...checkFixtures.validAddWriter.value,
+            [field]: val
         }
-      });
-    
+    });
+
     for (const [field, expectedLen] of Object.entries(checkFixtures.requiredLengthOfFieldsForExtendedValue)) {
         const characterOutOfTheHex = checkFixtures.validAddWriter.value[field].slice(0, expectedLen - 1) + 'z';
         const invalidInput = buildValueLevel(field, characterOutOfTheHex);
 
-        t.absent(check.sanitizeAdminAndWritersOperations(invalidInput),`value.${field} with non-hex char should fail (last char replaced with 'z') where expected length is ${expectedLen}`);
+        t.absent(check.sanitizeAdminAndWritersOperations(invalidInput), `value.${field} with non-hex char should fail (last char replaced with 'z') where expected length is ${expectedLen}`);
     }
 
 });

@@ -1,8 +1,6 @@
 import test from 'brittle'
 import checkFixtures from '../fixtures/check.fixtures.js'
 import Check from '../../src/utils/check.js';
-import { string } from 'compact-encoding';
-import { data } from 'hypercore-crypto';
 
 const check = new Check();
 
@@ -63,11 +61,11 @@ test('sanitizePreTx - hexString length validation', t => {
         const oneTooLongInput = { ...checkFixtures.validPreTx, [field]: oneTooLong }
         const longInput = { ...checkFixtures.validPreTx, [field]: tooLong }
 
-        t.absent(check.sanitizePreTx(shortInput),`${field} too short (length ${tooShort.length}) should fail`)
-        t.absent(check.sanitizePreTx(oneTooShortInput),`${field} one too short (length ${oneTooShort.length}) should fail`)
-        t.ok(check.sanitizePreTx(exactInput),`${field} is ok (length ${exact.length}) should pass`)
-        t.absent(check.sanitizePreTx(oneTooLongInput),`${field} one too long (length ${oneTooLong.length}) should fail`)
-        t.absent(check.sanitizePreTx(longInput),`${field} too long (length ${tooLong.length}) should fail`)
+        t.absent(check.sanitizePreTx(shortInput), `${field} too short (length ${tooShort.length}) should fail`)
+        t.absent(check.sanitizePreTx(oneTooShortInput), `${field} one too short (length ${oneTooShort.length}) should fail`)
+        t.ok(check.sanitizePreTx(exactInput), `${field} is ok (length ${exact.length}) should pass`)
+        t.absent(check.sanitizePreTx(oneTooLongInput), `${field} one too long (length ${oneTooLong.length}) should fail`)
+        t.absent(check.sanitizePreTx(longInput), `${field} too long (length ${tooLong.length}) should fail`)
     }
 });
 
@@ -78,7 +76,7 @@ test('sanitizePreTx - reject non-hex characters in any field', t => {
         const characterOutOfTheHex = checkFixtures.validPreTx[field].slice(0, expectedLen - 1) + 'z';
         const input = { ...checkFixtures.validPreTx, [field]: characterOutOfTheHex };
 
-        t.absent(check.sanitizePreTx(input),`${field} with non-hex char should fail (last char replaced with 'z') where expected length is ${expectedLen}`);
+        t.absent(check.sanitizePreTx(input), `${field} with non-hex char should fail (last char replaced with 'z') where expected length is ${expectedLen}`);
     }
 
 });
