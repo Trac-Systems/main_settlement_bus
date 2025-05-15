@@ -72,5 +72,5 @@ const constants = {
     SIGNATURE_CHAR_HEX_LENGTH
 };
 
-export default {constants};
+export default constants;
 
