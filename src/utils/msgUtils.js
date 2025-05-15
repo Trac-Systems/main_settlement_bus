@@ -16,14 +16,15 @@ class MsgUtils {
         return buf;
     }
 
+    // TODO: Move part of this logic into check.js after we reach consensus on how to manage addresses
     static #checkAssembleMessageBaseParams(wallet, keyParam) {
-        return !((!wallet || !keyParam) || 
-            (typeof wallet !== 'object') || 
-            (typeof keyParam !== 'string') || 
-            (keyParam.length !== 64) || 
-            (!isHexString(keyParam)) || 
-            (!wallet.publicKey) || 
-            (wallet.publicKey.length !== 64) || 
+        return !((!wallet || !keyParam) ||
+            (typeof wallet !== 'object') ||
+            (typeof keyParam !== 'string') ||
+            (keyParam.length !== 64) ||
+            (!isHexString(keyParam)) ||
+            (!wallet.publicKey) ||
+            (wallet.publicKey.length !== 64) ||
             (!isHexString(wallet.publicKey)));
     }
 
@@ -32,11 +33,11 @@ class MsgUtils {
         if (!this.#checkAssembleMessageBaseParams(wallet, keyParam)) {
             return undefined; // TODO: (?) Should we return null instead?
         }
-        
+
         let nonce = null;
         let msg = null;
         let hash = null;
-        let baseKey = wallet.publicKey;
+        let baseKey = null;
         let value = null;
 
         switch (operationType) {
@@ -46,8 +47,9 @@ class MsgUtils {
                 nonce = Wallet.generateNonce().toString('hex');
                 msg = this.createMessage(wallet.publicKey, keyParam, nonce, operationType);
                 hash = await createHash('sha256', msg);
+                baseKey = wallet.publicKey;
                 value = {
-                    pub : wallet.publicKey,
+                    pub: wallet.publicKey,
                     wk: keyParam,
                     nonce: nonce,
                     sig: wallet.sign(hash)

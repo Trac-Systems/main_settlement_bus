@@ -7,7 +7,6 @@ import { msgUtilsDefaultTest } from './msgUtilsDefaultTest.js';
 const testName = 'assembleWhitelistedMessage';
 test(testName, async (t) => {
     await initAll();
-
     const fn = async (x, y) => {
         const ret = await MsgUtils.assembleWhitelistedMessage(x, y);
         return ret;
