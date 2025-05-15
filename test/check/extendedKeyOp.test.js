@@ -4,7 +4,7 @@ import Check from '../../src/utils/check.js'
 
 const check = new Check()
 
-test('sanitizeAdminAndWritersOperations – happy paths for all operation types', t => {
+test('sanitizeExtendedKeyOpSchema – happy paths for all operation types', t => {
     const validInputs = [
         checkFixtures.validAddAdmin,
         checkFixtures.validAddWriter,
@@ -12,19 +12,19 @@ test('sanitizeAdminAndWritersOperations – happy paths for all operation types'
     ]
 
     for (const validInput of validInputs) {
-        t.ok(check.sanitizeAdminAndWritersOperations(validInput), `Valid payload for ${validInput.type} should pass`)
+        t.ok(check.sanitizeExtendedKeyOpSchema(validInput), `Valid payload for ${validInput.type} should pass`)
     }
 })
 
-test('sanitizeAdminAndWritersOperations - data type validation TOP LEVEL', t => {
+test('sanitizeExtendedKeyOpSchema - data type validation TOP LEVEL', t => {
     const invalid = {
         ...checkFixtures.validAddWriter,
         extra: 'redundant field'
     };
-    t.absent(check.sanitizeAdminAndWritersOperations(invalid), 'Extra field should fail due to $$strict');
-    t.absent(check.sanitizeAdminAndWritersOperations({}), 'Empty object should fail');
+    t.absent(check.sanitizeExtendedKeyOpSchema(invalid), 'Extra field should fail due to $$strict');
+    t.absent(check.sanitizeExtendedKeyOpSchema({}), 'Empty object should fail');
     const invalidOperationType = { ...checkFixtures.validAddWriter, type: 'invalid-op' }
-    t.absent(check.sanitizeAdminAndWritersOperations(invalidOperationType), 'Invalid operation type should fail');
+    t.absent(check.sanitizeExtendedKeyOpSchema(invalidOperationType), 'Invalid operation type should fail');
 
     // testing for nested objects
     const neastedObjectInsideValue = {
@@ -35,13 +35,13 @@ test('sanitizeAdminAndWritersOperations - data type validation TOP LEVEL', t => 
         }
     };
 
-    t.absent(check.sanitizeAdminAndWritersOperations(neastedObjectInsideValue), 'Unexpected nested field inside value should fail');
+    t.absent(check.sanitizeExtendedKeyOpSchema(neastedObjectInsideValue), 'Unexpected nested field inside value should fail');
 
     const neastedObjectInsideValue2 = {
         ...checkFixtures.validAddWriter,
         nested: { foo: 'bar' }
     };
-    t.absent(check.sanitizeAdminAndWritersOperations(neastedObjectInsideValue2), 'Unexpected nested field inside object should fail due to strict');
+    t.absent(check.sanitizeExtendedKeyOpSchema(neastedObjectInsideValue2), 'Unexpected nested field inside object should fail due to strict');
 
     const neastedObjectInsideValue3 = {
         ...checkFixtures.validAddWriter,
@@ -50,7 +50,7 @@ test('sanitizeAdminAndWritersOperations - data type validation TOP LEVEL', t => 
             nested: { foo: 'bar' }
         }
     };
-    t.absent(check.sanitizeAdminAndWritersOperations(neastedObjectInsideValue3), 'Unexpected nested field inside `type` field should fail due to strict');
+    t.absent(check.sanitizeExtendedKeyOpSchema(neastedObjectInsideValue3), 'Unexpected nested field inside `type` field should fail due to strict');
 
     const neastedObjectInsideValue4 = {
         ...checkFixtures.validAddWriter,
@@ -59,19 +59,19 @@ test('sanitizeAdminAndWritersOperations - data type validation TOP LEVEL', t => 
             nested: { foo: 'bar' }
         }
     };
-    t.absent(check.sanitizeAdminAndWritersOperations(neastedObjectInsideValue4), 'Unexpected nested field inside `key` field should fail due to strict');
+    t.absent(check.sanitizeExtendedKeyOpSchema(neastedObjectInsideValue4), 'Unexpected nested field inside `key` field should fail due to strict');
 
     //testing for invalid data types
     const topFields = ['type', 'key', 'value'];
 
     for (const invalidType of checkFixtures.notAllowedDataTypes) {
         const invalidTypForTypeKey = { ...checkFixtures.validAddWriter, type: invalidType };
-        t.absent(check.sanitizeAdminAndWritersOperations(invalidTypForTypeKey), `Invalid data type for 'type' key ${String(invalidType)} (${typeof invalidType}) should fail`);
+        t.absent(check.sanitizeExtendedKeyOpSchema(invalidTypForTypeKey), `Invalid data type for 'type' key ${String(invalidType)} (${typeof invalidType}) should fail`);
     }
 
     for (const invalidType of checkFixtures.notAllowedDataTypes) {
         const invalidTypForTypeKey = { ...checkFixtures.validAddWriter, key: invalidType };
-        t.absent(check.sanitizeAdminAndWritersOperations(invalidTypForTypeKey), `Invalid data type for 'key' key ${String(invalidType)} (${typeof invalidType}) should fail`);
+        t.absent(check.sanitizeExtendedKeyOpSchema(invalidTypForTypeKey), `Invalid data type for 'key' key ${String(invalidType)} (${typeof invalidType}) should fail`);
     }
 
     for (const invalidType of checkFixtures.notAllowedDataTypes) {
@@ -79,20 +79,20 @@ test('sanitizeAdminAndWritersOperations - data type validation TOP LEVEL', t => 
             continue;
         }
         const invalidTypForTypeKey = { ...checkFixtures.validAddWriter, value: invalidType };
-        t.absent(check.sanitizeAdminAndWritersOperations(invalidTypForTypeKey), `Invalid data type for 'value' key ${String(invalidType)} (${typeof invalidType}) should fail`);
+        t.absent(check.sanitizeExtendedKeyOpSchema(invalidTypForTypeKey), `Invalid data type for 'value' key ${String(invalidType)} (${typeof invalidType}) should fail`);
     }
 
     const invalidOperationTypeDiffType = { ...checkFixtures.validAddWriter, type: 123 }
-    t.absent(check.sanitizeAdminAndWritersOperations(invalidOperationTypeDiffType), 'Wrong type for `type` should fail')
+    t.absent(check.sanitizeExtendedKeyOpSchema(invalidOperationTypeDiffType), 'Wrong type for `type` should fail')
 
     for (const mainField of checkFixtures.topFields) {
         const missingFieldInvalidInput = { ...checkFixtures.validAddWriter }
         delete missingFieldInvalidInput[mainField]
-        t.absent(check.sanitizeAdminAndWritersOperations(missingFieldInvalidInput), `Missing ${mainField} should fail`);
+        t.absent(check.sanitizeExtendedKeyOpSchema(missingFieldInvalidInput), `Missing ${mainField} should fail`);
     }
 });
 
-test('sanitizeAdminAndWritersOperations - data type validation VALUE LEVEL', t => {
+test('sanitizeExtendedKeyOpSchema - data type validation VALUE LEVEL', t => {
 
     // missing value fields
     for (const field of checkFixtures.extendedKeyOpValueFields) {
@@ -101,7 +101,7 @@ test('sanitizeAdminAndWritersOperations - data type validation VALUE LEVEL', t =
             value: { ...checkFixtures.validAddWriter.value }
         };
         delete missing.value[field];
-        t.absent(check.sanitizeAdminAndWritersOperations(missing), `Missing value.${field} should fail`);
+        t.absent(check.sanitizeExtendedKeyOpSchema(missing), `Missing value.${field} should fail`);
     }
 
     // Incorrect types for each field in value
@@ -114,7 +114,7 @@ test('sanitizeAdminAndWritersOperations - data type validation VALUE LEVEL', t =
                     [field]: invalidType
                 }
             };
-            t.absent(check.sanitizeAdminAndWritersOperations(withInvalidDataType), `Invalid data type for value.${field}: ${String(invalidType)} (${typeof invalidType}) should fail`);
+            t.absent(check.sanitizeExtendedKeyOpSchema(withInvalidDataType), `Invalid data type for value.${field}: ${String(invalidType)} (${typeof invalidType}) should fail`);
         }
     }
 
@@ -127,7 +127,7 @@ test('sanitizeAdminAndWritersOperations - data type validation VALUE LEVEL', t =
                 [field]: ''
             }
         };
-        t.absent(check.sanitizeAdminAndWritersOperations(emptyStr), `Empty string for value.${field} should fail`);
+        t.absent(check.sanitizeExtendedKeyOpSchema(emptyStr), `Empty string for value.${field} should fail`);
     }
 
     for (const field of checkFixtures.extendedKeyOpValueFields) {
@@ -139,7 +139,7 @@ test('sanitizeAdminAndWritersOperations - data type validation VALUE LEVEL', t =
             }
         };
 
-        t.absent(check.sanitizeAdminAndWritersOperations(nestedObj), `Nested object for value.${field} should fail under strict mode`);
+        t.absent(check.sanitizeExtendedKeyOpSchema(nestedObj), `Nested object for value.${field} should fail under strict mode`);
     }
 
     const extraInValue = {
@@ -149,7 +149,7 @@ test('sanitizeAdminAndWritersOperations - data type validation VALUE LEVEL', t =
             extraField: 'redundant'
         }
     }
-    t.absent(check.sanitizeAdminAndWritersOperations(extraInValue), 'Extra field should fail due to $$strict')
+    t.absent(check.sanitizeExtendedKeyOpSchema(extraInValue), 'Extra field should fail due to $$strict')
 
     for (const field of checkFixtures.extendedKeyOpValueFields) {
         const emptyObjForField = {
@@ -159,12 +159,12 @@ test('sanitizeAdminAndWritersOperations - data type validation VALUE LEVEL', t =
                 [field]: {}
             }
         }
-        t.absent(check.sanitizeAdminAndWritersOperations(emptyObjForField), `Empty object for value.${field} should fail`)
+        t.absent(check.sanitizeExtendedKeyOpSchema(emptyObjForField), `Empty object for value.${field} should fail`)
     }
 
 });
 
-test('sanitizeAdminAndWritersOperations - hexString length validation - TOP LEVEL', t => {
+test('sanitizeExtendedKeyOpSchema - hexString length validation - TOP LEVEL', t => {
     const expectedLen = 64;
 
     const oneTooShort = 'a'.repeat(expectedLen - 1);
@@ -181,18 +181,18 @@ test('sanitizeAdminAndWritersOperations - hexString length validation - TOP LEVE
         longInput: { ...checkFixtures.validAddWriter, key: tooLong },
     };
 
-    t.absent(check.sanitizeAdminAndWritersOperations(inputs.shortInput), `'key' too short (length ${tooShort.length}) should fail`);
+    t.absent(check.sanitizeExtendedKeyOpSchema(inputs.shortInput), `'key' too short (length ${tooShort.length}) should fail`);
 
-    t.absent(check.sanitizeAdminAndWritersOperations(inputs.oneTooShortInput), `'key' one too short (length ${oneTooShort.length}) should fail`);
+    t.absent(check.sanitizeExtendedKeyOpSchema(inputs.oneTooShortInput), `'key' one too short (length ${oneTooShort.length}) should fail`);
 
-    t.ok(check.sanitizeAdminAndWritersOperations(inputs.exactInput), `'key' exact length (length ${exact.length}) should pass`);
+    t.ok(check.sanitizeExtendedKeyOpSchema(inputs.exactInput), `'key' exact length (length ${exact.length}) should pass`);
 
-    t.absent(check.sanitizeAdminAndWritersOperations(inputs.oneTooLongInput), `'key' one too long (length ${oneTooLong.length}) should fail`);
+    t.absent(check.sanitizeExtendedKeyOpSchema(inputs.oneTooLongInput), `'key' one too long (length ${oneTooLong.length}) should fail`);
 
-    t.absent(check.sanitizeAdminAndWritersOperations(inputs.longInput), `'key' too long (length ${tooLong.length}) should fail`);
+    t.absent(check.sanitizeExtendedKeyOpSchema(inputs.longInput), `'key' too long (length ${tooLong.length}) should fail`);
 });
 
-test('sanitizeAdminAndWritersOperations - hexString length validation - VALUE LEVEL', t => {
+test('sanitizeExtendedKeyOpSchema - hexString length validation - VALUE LEVEL', t => {
 
     for (const [field, expectedLen] of Object.entries(checkFixtures.requiredLengthOfFieldsForExtendedValue)) {
         const oneTooShort = 'a'.repeat(expectedLen - 1);
@@ -217,15 +217,15 @@ test('sanitizeAdminAndWritersOperations - hexString length validation - VALUE LE
             longInput: buildValueLevel(tooLong),
         };
 
-        t.absent(check.sanitizeAdminAndWritersOperations(inputs.shortInput), `value.${field} too short (length ${tooShort.length}) should fail`);
-        t.absent(check.sanitizeAdminAndWritersOperations(inputs.oneTooShortInput), `value.${field} one too short (length ${oneTooShort.length}) should fail`);
-        t.ok(check.sanitizeAdminAndWritersOperations(inputs.exactInput), `value.${field} exact length (length ${exact.length}) should pass`);
-        t.absent(check.sanitizeAdminAndWritersOperations(inputs.oneTooLongInput), `value.${field} one too long (length ${oneTooLong.length}) should fail`);
-        t.absent(check.sanitizeAdminAndWritersOperations(inputs.longInput), `value.${field} too long (length ${tooLong.length}) should fail`);
+        t.absent(check.sanitizeExtendedKeyOpSchema(inputs.shortInput), `value.${field} too short (length ${tooShort.length}) should fail`);
+        t.absent(check.sanitizeExtendedKeyOpSchema(inputs.oneTooShortInput), `value.${field} one too short (length ${oneTooShort.length}) should fail`);
+        t.ok(check.sanitizeExtendedKeyOpSchema(inputs.exactInput), `value.${field} exact length (length ${exact.length}) should pass`);
+        t.absent(check.sanitizeExtendedKeyOpSchema(inputs.oneTooLongInput), `value.${field} one too long (length ${oneTooLong.length}) should fail`);
+        t.absent(check.sanitizeExtendedKeyOpSchema(inputs.longInput), `value.${field} too long (length ${tooLong.length}) should fail`);
     }
 });
 
-test('sanitizeAdminAndWritersOperations - reject non-hex characters TOP LEVEL', t => {
+test('sanitizeExtendedKeyOpSchema - reject non-hex characters TOP LEVEL', t => {
     const expectedLen = 64;
     const invalidKey = checkFixtures.validAddWriter.key.slice(0, expectedLen - 1) + 'z';
 
@@ -233,10 +233,10 @@ test('sanitizeAdminAndWritersOperations - reject non-hex characters TOP LEVEL', 
         ...checkFixtures.validAddWriter,
         key: invalidKey
     };
-    t.absent(check.sanitizeAdminAndWritersOperations(invalidInput), `'key' with non-hex char should fail (last char replaced with 'z') where expected length is ${expectedLen}`);
+    t.absent(check.sanitizeExtendedKeyOpSchema(invalidInput), `'key' with non-hex char should fail (last char replaced with 'z') where expected length is ${expectedLen}`);
 });
 
-test('sanitizeAdminAndWritersOperations - reject non-hex characters VALUE LEVEL', t => {
+test('sanitizeExtendedKeyOpSchema - reject non-hex characters VALUE LEVEL', t => {
     const buildValueLevel = (field, val) => ({
         ...checkFixtures.validAddWriter,
         value: {
@@ -249,7 +249,7 @@ test('sanitizeAdminAndWritersOperations - reject non-hex characters VALUE LEVEL'
         const characterOutOfTheHex = checkFixtures.validAddWriter.value[field].slice(0, expectedLen - 1) + 'z';
         const invalidInput = buildValueLevel(field, characterOutOfTheHex);
 
-        t.absent(check.sanitizeAdminAndWritersOperations(invalidInput), `value.${field} with non-hex char should fail (last char replaced with 'z') where expected length is ${expectedLen}`);
+        t.absent(check.sanitizeExtendedKeyOpSchema(invalidInput), `value.${field} with non-hex char should fail (last char replaced with 'z') where expected length is ${expectedLen}`);
     }
 
 });
