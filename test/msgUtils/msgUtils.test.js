@@ -1,13 +1,15 @@
 import { default as test } from 'brittle';
 
 async function runMsgUtilsTests() {
-  test.pause();
+    test.pause();
 
-  await import('./createMessage.test.js');
-  await import('./assembleAdminMessage.test.js');
-  await import('./assembleWhitelistMessages.test.js');
+    await import('./createMessage.test.js');
+    await import('./assembleAdminMessage.test.js');
+    await import('./assembleWhitelistMessages.test.js');
+    await import('./assembleAddWriterMessage.test.js');
+    await import('./assembleRemoveWriterMessage.test.js');
 
-  test.resume();
+    test.resume();
 }
 
 runMsgUtilsTests();
