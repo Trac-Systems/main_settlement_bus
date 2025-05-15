@@ -1,3 +1,10 @@
+import {
+	ADDRESS_CHAR_HEX_LENGTH,
+	WRITER_KEY_CHAR_HEX_LENGTH,
+	NONCE_CHAR_HEX_LENGTH,
+	SIGNATURE_CHAR_HEX_LENGTH,
+	HASH_CHAR_HEX_LENGTH
+} from '../../src/utils/constants.js';
 
 const validPreTx = {
 	op: 'pre-tx',
@@ -120,15 +127,15 @@ const notAllowedDataTypes = [
 const preTxfields = ['op', 'tx', 'is', 'wp', 'i', 'ipk', 'ch', 'in', 'bs', 'mbs'];
 
 const requiredLengthOfFieldsForPreTx = {
-	tx: 64,
-	is: 128,
-	wp: 64,
-	i: 64,
-	ipk: 64,
-	ch: 64,
-	in: 64,
-	bs: 64,
-	mbs: 64
+	tx: HASH_CHAR_HEX_LENGTH,
+	is: SIGNATURE_CHAR_HEX_LENGTH,
+	wp: ADDRESS_CHAR_HEX_LENGTH,
+	i: WRITER_KEY_CHAR_HEX_LENGTH,
+	ipk: ADDRESS_CHAR_HEX_LENGTH,
+	ch: HASH_CHAR_HEX_LENGTH,
+	in: NONCE_CHAR_HEX_LENGTH,
+	bs: WRITER_KEY_CHAR_HEX_LENGTH,
+	mbs: WRITER_KEY_CHAR_HEX_LENGTH
 };
 
 const topFields = ['type', 'key', 'value'];
@@ -136,31 +143,31 @@ const topFields = ['type', 'key', 'value'];
 const postTxValueFields = ['op', 'tx', 'is', 'w', 'i', 'ipk', 'ch', 'in', 'bs', 'mbs', 'ws', 'wp', 'wn'];
 
 const requiredLengthOfFieldsForPostTx = {
-	tx: 64,
-	is: 128,
-	w: 64,
-	i: 64,
-	ipk: 64,
-	ch: 64,
-	in: 64,
-	bs: 64,
-	mbs: 64,
-	ws: 128,
-	wp: 64,
-	wn: 64,
+	tx: HASH_CHAR_HEX_LENGTH,
+	is: SIGNATURE_CHAR_HEX_LENGTH,
+	w: WRITER_KEY_CHAR_HEX_LENGTH,
+	i: WRITER_KEY_CHAR_HEX_LENGTH,
+	ipk: ADDRESS_CHAR_HEX_LENGTH,
+	ch: HASH_CHAR_HEX_LENGTH,
+	in: NONCE_CHAR_HEX_LENGTH,
+	bs: WRITER_KEY_CHAR_HEX_LENGTH,
+	mbs: WRITER_KEY_CHAR_HEX_LENGTH,
+	ws: SIGNATURE_CHAR_HEX_LENGTH,
+	wp: ADDRESS_CHAR_HEX_LENGTH,
+	wn: NONCE_CHAR_HEX_LENGTH
 };
 const basicKeyOpValueFields = ['nonce', 'sig'];
 const requiredLengthOfFieldsForBasicKeyOp = {
-	nonce: 64,
-	sig: 128,
+	nonce: NONCE_CHAR_HEX_LENGTH,
+	sig: SIGNATURE_CHAR_HEX_LENGTH,
 };
 const extendedKeyOpValueFields = ['pub', 'wk', 'nonce', 'sig'];
 
 const requiredLengthOfFieldsForExtendedValue = {
-	pub: 64,
-	wk: 64,
-	nonce: 64,
-	sig: 128,
+	pub: ADDRESS_CHAR_HEX_LENGTH,
+	wk: WRITER_KEY_CHAR_HEX_LENGTH,
+	nonce: NONCE_CHAR_HEX_LENGTH,
+	sig: SIGNATURE_CHAR_HEX_LENGTH,
 };
 
 export default {

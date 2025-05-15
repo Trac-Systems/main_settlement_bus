@@ -23,7 +23,7 @@ test('sanitizePostTx - data type validation TOP LEVEL', t => {
     t.absent(check.sanitizePostTx(invalidOperationType), 'Invalid operation type should fail');
 
     // testing for nested objects
-    const neastedObjectInsideValue = {
+    const nestedObjectInsideValue = {
         ...checkFixtures.validPostTx,
         value: {
             ...checkFixtures.validPostTx.value,
@@ -31,31 +31,31 @@ test('sanitizePostTx - data type validation TOP LEVEL', t => {
         }
     };
 
-    t.absent(check.sanitizePostTx(neastedObjectInsideValue), 'Unexpected nested field inside `value` should fail due to strict');
+    t.absent(check.sanitizePostTx(nestedObjectInsideValue), 'Unexpected nested field inside `value` should fail due to strict');
 
-    const neastedObjectInsideValue2 = {
+    const nestedObjectInsideValue2 = {
         ...checkFixtures.validPostTx,
         nested: { foo: 'bar' }
     };
 
-    t.absent(check.sanitizePostTx(neastedObjectInsideValue2), 'Unexpected nested field inside object should fail due to strict');
-    const neastedObjectInsideValue3 = {
+    t.absent(check.sanitizePostTx(nestedObjectInsideValue2), 'Unexpected nested field inside object should fail due to strict');
+    const nestedObjectInsideValue3 = {
         ...checkFixtures.validPostTx,
         type: {
             foo: 'bar',
             nested: { foo: 'bar' }
         }
     };
-    t.absent(check.sanitizePostTx(neastedObjectInsideValue3), 'Unexpected nested field inside `type` field should fail due to strict');
+    t.absent(check.sanitizePostTx(nestedObjectInsideValue3), 'Unexpected nested field inside `type` field should fail due to strict');
 
-    const neastedObjectInsideValue4 = {
+    const nestedObjectInsideValue4 = {
         ...checkFixtures.validPostTx,
         key: {
             foo: 'bar',
             nested: { foo: 'bar' }
         }
     };
-    t.absent(check.sanitizePostTx(neastedObjectInsideValue4), 'Unexpected nested field inside `key` field should fail due to strict');
+    t.absent(check.sanitizePostTx(nestedObjectInsideValue4), 'Unexpected nested field inside `key` field should fail due to strict');
 
     //testing for invalid data types
 
