@@ -16,7 +16,23 @@ class MsgUtils {
         return buf;
     }
 
+    static #checkAssembleMessageBaseParams(wallet, keyParam) {
+        return !((!wallet || !keyParam) || 
+            (typeof wallet !== 'object') || 
+            (typeof keyParam !== 'string') || 
+            (keyParam.length !== 64) || 
+            (!isHexString(keyParam)) || 
+            (!wallet.publicKey) || 
+            (wallet.publicKey.length !== 64) || 
+            (!isHexString(wallet.publicKey)));
+    }
+
+
     static async #assembleMessageBase(wallet, keyParam, operationType) {
+        if (!this.#checkAssembleMessageBaseParams(wallet, keyParam)) {
+            return undefined; // TODO: (?) Should we return null instead?
+        }
+        
         let nonce = null;
         let msg = null;
         let hash = null;
@@ -53,7 +69,7 @@ class MsgUtils {
                 break;
 
             default:
-                return undefined;
+                return undefined; // TODO: (?) Should we return null instead?
         }
 
         return {
