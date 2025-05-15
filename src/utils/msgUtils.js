@@ -124,7 +124,7 @@ class MsgUtils {
         ) {
             return false;
         }
-        const sanitizationResult = check.sanitizeAdminAndWritersOperations(parsedRequest);
+        const sanitizationResult = check.sanitizeExtendedKeyOpSchema(parsedRequest);
         if (!sanitizationResult) return false;
 
         const msg = this.createMessage(key, value.wk, value.nonce, type);

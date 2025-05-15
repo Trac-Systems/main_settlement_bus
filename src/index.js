@@ -199,7 +199,7 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async #handleApplyAddAdminOperation(op, view, base, node, batch) {
-        if (!this.check.sanitizeAdminAndWritersOperations(op)) return;
+        if (!this.check.sanitizeExtendedKeyOpSchema(op)) return;
         const adminEntry = await batch.get(EntryType.ADMIN);
         if (null === adminEntry) {
             await this.#addAdminIfNotSet(op, view, node, batch);
@@ -244,8 +244,7 @@ export class MainSettlementBus extends ReadyResource {
 
     async #handleApplyAppendWhitelistOperation(op, view, base, node, batch) {
         const adminEntry = await batch.get(EntryType.ADMIN);
-        if (null === adminEntry || !this.check.sanitizeIndexerOrWhitelistOperations(op) || !this.#isAdmin(adminEntry.value, node)) return;
-        // TODO: is the below an admin signature? - yes
+        if (null === adminEntry || !this.check.sanitizeBasicKeyOp(op) || !this.#isAdmin(adminEntry.value, node)) return;
         const isMessageVerifed = await this.#verifyMessage(op.value.sig, adminEntry.value.tracPublicKey, MsgUtils.createMessage(op.key, op.value.nonce, op.type));
         if (!isMessageVerifed) return;
         const isWhitelisted = await this.#isWhitelisted2(op.key, batch);
@@ -265,11 +264,10 @@ export class MainSettlementBus extends ReadyResource {
 
     async #handleApplyAddWriterOperation(op, view, base, node, batch) {
         const adminEntry = await batch.get(EntryType.ADMIN);
-        if (null === adminEntry || !this.check.sanitizeAdminAndWritersOperations(op) || !this.#isAdmin(adminEntry.value, node)) return;
+        if (null === adminEntry || !this.check.sanitizeExtendedKeyOpSchema(op) || !this.#isAdmin(adminEntry.value, node)) return;
 
         const isWhitelisted = await this.#isWhitelisted2(op.key, batch);
         if (!isWhitelisted || op.key !== op.value.pub) return;
-        // TODO: if the below is not a message signed by admin BUT this handler is supposed to be executed by the admin, then use admin signatures in apply!
         const isMessageVerifed = await this.#verifyMessage(op.value.sig, op.key, MsgUtils.createMessage(op.key, op.value.wk, op.value.nonce, op.type));
         if (isMessageVerifed) {
             await this.#addWriter(op, batch, base);
@@ -300,8 +298,7 @@ export class MainSettlementBus extends ReadyResource {
 
     async #handleApplyRemoveWriterOperation(op, view, base, node, batch) {
         const adminEntry = await batch.get(EntryType.ADMIN);
-        if (null === adminEntry || !this.check.sanitizeAdminAndWritersOperations(op) || !this.#isAdmin(adminEntry.value, node)) return;
-        // TODO: if the below is not a message signed by admin BUT this handler is supposed to be executed by the admin, then use admin signatures in apply!
+        if (null === adminEntry || !this.check.sanitizeExtendedKeyOpSchema(op) || !this.#isAdmin(adminEntry.value, node)) return;
         const isMessageVerifed = await this.#verifyMessage(op.value.sig, op.key, MsgUtils.createMessage(op.key, op.value.wk, op.value.nonce, op.type));
         if (isMessageVerifed) {
             await this.#removeWriter(op, batch, base);
@@ -333,7 +330,7 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async #handleApplyAddIndexerOperation(op, view, base, node, batch) {
-        if (!this.check.sanitizeIndexerOrWhitelistOperations(op)) {
+        if (!this.check.sanitizeBasicKeyOp(op)) {
             return;
         }
 
@@ -347,7 +344,6 @@ export class MainSettlementBus extends ReadyResource {
             Array.from(indexersEntry.value).length >= MAX_INDEXERS) {
             return;
         }
-        // TODO: is the below an admin signature? -yes
         const isMessageVerifed = await this.#verifyMessage(op.value.sig, adminEntry.value.tracPublicKey, MsgUtils.createMessage(op.key, op.value.nonce, op.type))
         if (isMessageVerifed) {
             await this.#addIndexer(indexersEntry.value, op, batch, base);
@@ -370,7 +366,7 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async #handleApplyRemoveIndexerOperation(op, view, base, node, batch) {
-        if (!this.check.sanitizeIndexerOrWhitelistOperations(op)) return;
+        if (!this.check.sanitizeBasicKeyOp(op)) return;
         const adminEntry = await batch.get(EntryType.ADMIN);
         let indexersEntry = await batch.get(EntryType.INDEXERS);
         if (null === adminEntry || !this.#isAdmin(adminEntry.value, node) || null === indexersEntry || !Array.from(indexersEntry.value).includes(op.key) || Array.from(indexersEntry.value).length <= 1) return;
@@ -400,7 +396,7 @@ export class MainSettlementBus extends ReadyResource {
     async #handleApplyBanValidatorOperation(op, view, base, node, batch) {
         const adminEntry = await batch.get(EntryType.ADMIN);
         if (null === adminEntry || !this.#isAdmin(adminEntry.value, node)) return;
-        if (!this.check.sanitizeIndexerOrWhitelistOperations(op)) return;
+        if (!this.check.sanitizeBasicKeyOp(op)) return;
         const isWhitelisted = await this.#isWhitelisted2(op.key, batch);
         if (!isWhitelisted) return;
 
