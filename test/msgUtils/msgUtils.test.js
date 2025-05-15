@@ -8,6 +8,8 @@ async function runMsgUtilsTests() {
     await import('./assembleWhitelistMessages.test.js');
     await import('./assembleAddWriterMessage.test.js');
     await import('./assembleRemoveWriterMessage.test.js');
+    await import('./assembleAddIndexerMessage.test.js');
+    await import('./assembleRemoveIndexerMessage.test.js');
 
     test.resume();
 }
