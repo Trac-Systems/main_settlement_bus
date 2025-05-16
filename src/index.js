@@ -428,7 +428,7 @@ export class MainSettlementBus extends ReadyResource {
         const nodeEntry = await batch.get(op.key)
         if (null === nodeEntry || nodeEntry.value.isIndexer === true) return; // even if node is not writable atm it should be possible to ban it.
         const message =  MsgUtils.createMessage(op.key, op.value.nonce, op.type);
-        const isMessageVerifed = await this.#verifyMessage(op.value.sig, adminEntry.value.tracPublicKey,message );
+        const isMessageVerifed = await this.#verifyMessage(op.value.sig, adminEntry.value.tracPublicKey, message );
         const hash = await createHash('sha256', message);
         if (!isMessageVerifed || null !== await batch.get(hash)) return;
         await this.#deleteWhitelistEntry(batch, op.key);
