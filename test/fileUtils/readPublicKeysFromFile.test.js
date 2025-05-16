@@ -1,5 +1,5 @@
 import test from 'brittle';
-import fileUtils from '../src/utils/fileUtils.js';
+import fileUtils from '../../src/utils/fileUtils.js';
 
 test('readPublicKeysFromFile', async (t) => {
     // TODO: This is reading the real whitelist file (which is not a good practice)

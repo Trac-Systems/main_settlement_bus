@@ -57,6 +57,7 @@ export async function createHash(type, message) {
         }
         const encoder = new TextEncoder();
         const data = encoder.encode(b4a.isBuffer(message) ? b4a.toString(message, 'utf-8') : message);
+        // TODO: This will only work in Nodejs, because crypto is not defined in Bare environment. Fix this in future releases 
         const hash = await crypto.subtle.digest(_type, data);
         const hashArray = Array.from(new Uint8Array(hash));
         return hashArray
