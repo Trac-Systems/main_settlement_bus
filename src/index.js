@@ -70,7 +70,7 @@ export class MainSettlementBus extends ReadyResource {
 
     #initInternalAttributes(options) {
         this.#STORES_DIRECTORY = options.stores_directory;
-        this.#KEY_PAIR_PATH = `${this.STORES_DIRECTORY}${options.store_name}2/db/keypair.json`
+        this.#KEY_PAIR_PATH = `${this.STORES_DIRECTORY}${options.store_name}/db/keypair.json`
         this.#bootstrap = options.bootstrap || null;
         this.#channel = b4a.alloc(32).fill(options.channel) || null;
         this.#store = new Corestore(this.STORES_DIRECTORY + options.store_name);
