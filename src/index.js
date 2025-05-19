@@ -445,8 +445,6 @@ export class MainSettlementBus extends ReadyResource {
 
         await this.#setUpRoleAutomatically(adminEntry);
 
-        this.updater();
-
         console.log(`isIndexer: ${this.#base.isIndexer}`);
         console.log(`isWriter: ${this.#base.writable}`);
         console.log('MSB Unsigned Length:', this.#base.view.core.length);
@@ -541,17 +539,6 @@ export class MainSettlementBus extends ReadyResource {
     async #isWhitelisted2(key, batch) {
         const whitelistEntry = await this.getWhitelistEntry2(key, batch)
         return !!whitelistEntry;
-    }
-
-    async updater() {
-        while (true) {
-            if (this.#is_indexer &&
-                this.#base.view.core.length >
-                this.#base.view.core.signedLength) {
-                await this.#base.append(null);
-            }
-            await sleep(UPDATER_INTERVAL);
-        }
     }
 
     async get(key) {
