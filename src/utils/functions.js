@@ -2,10 +2,8 @@ import b4a from 'b4a';
 import sodium from 'sodium-native';
 import {peer} from "hyperdht/lib/messages.js";
 
-// TODO: (?) Should we allow 0x prefix?
-// TODO: (?) Should an mepty string be considered valid?
 export function isHexString(string) {
-    return typeof string === 'string' && /^[0-9a-fA-F]+$/.test(string) && string.length % 2 === 0;
+    return typeof string === 'string' && string.length > 1 && /^[0-9a-fA-F]+$/.test(string) && string.length % 2 === 0;
 }
 
 export async function verifyDag(base, swarm, wallet, writerKey) {
@@ -57,6 +55,7 @@ export async function createHash(type, message) {
         }
         const encoder = new TextEncoder();
         const data = encoder.encode(b4a.isBuffer(message) ? b4a.toString(message, 'utf-8') : message);
+        // TODO: This will only work in Nodejs, because crypto is not defined in Bare environment. Fix this in future releases 
         const hash = await crypto.subtle.digest(_type, data);
         const hashArray = Array.from(new Uint8Array(hash));
         return hashArray
