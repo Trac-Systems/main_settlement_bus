@@ -119,7 +119,10 @@ export class MainSettlementBus extends ReadyResource {
             this.#writerEventListener(); // only for writers
         }
 
-        await this.#setUpRoleAutomatically(adminEntry);
+        if (this.enableRoleRequester) {
+            await this.#setUpRoleAutomatically(adminEntry);
+
+        }
 
         console.log(`isIndexer: ${this.#state.isIndexer()}`);
         console.log(`isWriter: ${this.#state.isWritable()}`);

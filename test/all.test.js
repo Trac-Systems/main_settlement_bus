@@ -11,6 +11,7 @@ async function runTests() {
   await import('./fileUtils/readPublicKeysFromFile.test.js');
   await import('./msgUtils/msgUtils.test.js');
   await import('./apply/apply.test.js');
+  //TODO add test Apply function
 
   test.resume();
 }
