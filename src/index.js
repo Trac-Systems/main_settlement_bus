@@ -116,12 +116,20 @@ export class MainSettlementBus extends ReadyResource {
         return this.#channel;
     }
 
+    get writingKey() {
+        return this.#writingKey;
+    }
+
     getSwarm() {
         return this.#swarm;
     }
 
     getNetwork() {
         return this.#network;
+    }
+
+    getTracPublicKey() {
+        return this.#wallet.publicKey;
     }
 
     #boot() {
@@ -497,7 +505,10 @@ export class MainSettlementBus extends ReadyResource {
             this.#writerEventListener(); // only for writers
         }
 
-        await this.#setUpRoleAutomatically(adminEntry);
+        if (this.enableRoleRequester) {
+            await this.#setUpRoleAutomatically(adminEntry);
+
+        }
 
         console.log(`isIndexer: ${this.#base.isIndexer}`);
         console.log(`isWriter: ${this.#base.writable}`);
@@ -505,7 +516,9 @@ export class MainSettlementBus extends ReadyResource {
         console.log('MSB Signed Length:', this.#base.view.core.signedLength);
         console.log('');
 
-        this.validatorObserver();
+        if (this.enableValidatorObserver) {
+            this.validatorObserver();
+        }
     }
 
     async _close() {
