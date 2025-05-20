@@ -119,6 +119,10 @@ export class MainSettlementBus extends ReadyResource {
         return this.#channel;
     }
 
+    get writingKey() {
+        return this.#writingKey;
+    }
+
     getSwarm() {
         return this.#swarm;
     }
@@ -127,10 +131,14 @@ export class MainSettlementBus extends ReadyResource {
         return this.#network;
     }
 
+    getTracPublicKey() {
+        return this.#wallet.publicKey;
+    }
+
     #boot() {
         const _this = this;
         this.#base = new Autobase(this.#store, this.#bootstrap, {
-            ackInterval : 1000,
+            ackInterval: 1000,
             valueEncoding: 'json',
             open: this.#setupHyperbee.bind(this),
             apply: this.#apply.bind(this),
@@ -250,8 +258,8 @@ export class MainSettlementBus extends ReadyResource {
     async #handleApplyAppendWhitelistOperation(op, view, base, node, batch) {
         const adminEntry = await batch.get(EntryType.ADMIN);
         if (null === adminEntry || !this.check.sanitizeBasicKeyOp(op) || !this.#isAdmin(adminEntry.value, node)) return;
-        
-        const message =  MsgUtils.createMessage(op.key, op.value.nonce, op.type)
+
+        const message = MsgUtils.createMessage(op.key, op.value.nonce, op.type)
         const isMessageVerifed = await this.#verifyMessage(op.value.sig, adminEntry.value.tracPublicKey, message);
         const hash = await createHash('sha256', message);
         if (!isMessageVerifed || null !== await batch.get(hash)) return;
@@ -313,7 +321,7 @@ export class MainSettlementBus extends ReadyResource {
     async #handleApplyRemoveWriterOperation(op, view, base, node, batch) {
         const adminEntry = await batch.get(EntryType.ADMIN);
         if (null === adminEntry || !this.check.sanitizeExtendedKeyOpSchema(op) || !this.#isAdmin(adminEntry.value, node)) return;
-        const message =  MsgUtils.createMessage(op.key, op.value.wk, op.value.nonce, op.type);
+        const message = MsgUtils.createMessage(op.key, op.value.wk, op.value.nonce, op.type);
         const isMessageVerifed = await this.#verifyMessage(op.value.sig, op.key, message);
         const hash = await createHash('sha256', message);
         if (isMessageVerifed &&
@@ -363,7 +371,7 @@ export class MainSettlementBus extends ReadyResource {
             Array.from(indexersEntry.value).length >= MAX_INDEXERS) {
             return;
         }
-        const message =  MsgUtils.createMessage(op.key, op.value.nonce, op.type);
+        const message = MsgUtils.createMessage(op.key, op.value.nonce, op.type);
         const isMessageVerifed = await this.#verifyMessage(op.value.sig, adminEntry.value.tracPublicKey, message)
         const hash = await createHash('sha256', message);
         if (isMessageVerifed &&
@@ -428,8 +436,8 @@ export class MainSettlementBus extends ReadyResource {
 
         const nodeEntry = await batch.get(op.key)
         if (null === nodeEntry || nodeEntry.value.isIndexer === true) return; // even if node is not writable atm it should be possible to ban it.
-        const message =  MsgUtils.createMessage(op.key, op.value.nonce, op.type);
-        const isMessageVerifed = await this.#verifyMessage(op.value.sig, adminEntry.value.tracPublicKey, message );
+        const message = MsgUtils.createMessage(op.key, op.value.nonce, op.type);
+        const isMessageVerifed = await this.#verifyMessage(op.value.sig, adminEntry.value.tracPublicKey, message);
         const hash = await createHash('sha256', message);
         if (!isMessageVerifed || null !== await batch.get(hash)) return;
         await this.#deleteWhitelistEntry(batch, op.key);
@@ -468,7 +476,10 @@ export class MainSettlementBus extends ReadyResource {
             this.#writerEventListener(); // only for writers
         }
 
-        await this.#setUpRoleAutomatically(adminEntry);
+        if (this.enableRoleRequester) {
+            await this.#setUpRoleAutomatically(adminEntry);
+
+        }
 
         console.log(`isIndexer: ${this.#base.isIndexer}`);
         console.log(`isWriter: ${this.#base.writable}`);
@@ -476,7 +487,9 @@ export class MainSettlementBus extends ReadyResource {
         console.log('MSB Signed Length:', this.#base.view.core.signedLength);
         console.log('');
 
-        this.validatorObserver();
+        if (this.enableValidatorObserver) {
+            this.validatorObserver();
+        }
     }
 
     async _close() {
@@ -553,11 +566,11 @@ export class MainSettlementBus extends ReadyResource {
     async #sendMessageToNode(address, message) {
         try {
             if (!address || !message) {
-             return;
+                return;
             }
             await this.tryConnection(address, 'node');
 
-            await this.spinLock(() => 
+            await this.spinLock(() =>
                 this.#network.custom_stream === null || this.#network.custom_node !== address
             );
 
@@ -643,7 +656,7 @@ export class MainSettlementBus extends ReadyResource {
                     const adminEntry = await this.get(EntryType.ADMIN);
                     const reconstructedMessage = MsgUtils.createMessage(parsedRequest.key, parsedRequest.value.nonce, OperationType.WHITELISTED);
                     const hash = await createHash('sha256', reconstructedMessage);
-                    if (this.#wallet.verify(b4a.from(parsedRequest.value.sig, 'hex'), b4a.from(hash), b4a.from(adminEntry.tracPublicKey, 'hex')) && !this.#base.writable &&parsedRequest.key === this.#wallet.publicKey) {
+                    if (this.#wallet.verify(b4a.from(parsedRequest.value.sig, 'hex'), b4a.from(hash), b4a.from(adminEntry.tracPublicKey, 'hex')) && !this.#base.writable && parsedRequest.key === this.#wallet.publicKey) {
                         await this.#handleAddWriterOperation(true)
                     }
                 }
@@ -867,7 +880,7 @@ export class MainSettlementBus extends ReadyResource {
             const peerInfo = this.#swarm.peers.get(address)
             stream = this.#swarm._allConnections.get(peerInfo.publicKey)
 
-            if (stream !== undefined && stream.messenger !== undefined) {   
+            if (stream !== undefined && stream.messenger !== undefined) {
                 await this.#sendRequestByType(stream, type);
             }
         }
@@ -879,7 +892,7 @@ export class MainSettlementBus extends ReadyResource {
             admin: () => this.#network.admin_stream,
             node: () => this.#network.custom_stream
         }[type];
-        
+
         if (type === 'validator') {
             await stream.messenger.send('get_validator');
         } else if (type === 'admin') {
@@ -889,10 +902,10 @@ export class MainSettlementBus extends ReadyResource {
         } else {
             return;
         }
-        await this.spinLock( () => !waitFor)
+        await this.spinLock(() => !waitFor)
     };
-    
-   async spinLock(conditionFn, maxIterations = 1500, intervalMs = 10) {
+
+    async spinLock(conditionFn, maxIterations = 1500, intervalMs = 10) {
         let counter = 0;
         while (conditionFn() && counter < maxIterations) {
             await sleep(intervalMs);
