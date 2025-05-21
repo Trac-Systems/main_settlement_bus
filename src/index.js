@@ -53,6 +53,8 @@ export class MainSettlementBus extends ReadyResource {
     #readline_instance;
     #enable_txlogs;
     #disable_rate_limit;
+    #enableValidatorObserver;
+    #enableRoleRequester;
 
     constructor(options = {}) {
         super();
@@ -62,7 +64,8 @@ export class MainSettlementBus extends ReadyResource {
         this.#boot();
         this.#setupInternalListeners();
         this.#network = new Network(this.#base);
-        this.ready().catch(noop);
+        this.#enableValidatorObserver = options.enableValidatorObserver !== undefined ? options.enableValidatorObserver : true;
+        this.#enableRoleRequester = options.enableRoleRequester !== undefined ? options.enableRoleRequester : true;
     }
 
     #initInternalAttributes(options) {
@@ -478,20 +481,60 @@ export class MainSettlementBus extends ReadyResource {
         this.validatorObserver();
     }
 
-    async close() {
-        console.log('Closing everything...');
-        if (this.#swarm) {
+    async _close() {
+        console.log('Closing everything gracefully... This may take a moment.');
+
+        if (this.#network !== null) {
+            this.#network.stopPool();
+        }
+        await sleep(100);
+
+        if (this.#enableValidatorObserver) {
+            this.stopValidatorObserver();
+        }
+
+        await sleep(1_000); // stopValidatorObserver is using findValidator which is reading from the base, so we need to wait fot it to finish.. Temporary workaround?
+        if (this.#swarm !== null) {
             await this.#swarm.destroy();
         }
-        await this.#base.close();
+        await sleep(100);
+
+        if (this.#base !== null) {
+            await this.#base.close();
+        }
+        await sleep(100);
+        if (this.#bee !== null) {
+            await this.#bee.close();
+        }
+        await sleep(100);
+        if (this.#readline_instance) {
+            
+            const inputClosed = new Promise(resolve => this.#readline_instance.input.once('close', resolve));
+            const outputClosed = new Promise(resolve => this.#readline_instance.output.once('close', resolve));
+
+            this.#readline_instance.close();
+            this.#readline_instance.input.destroy();
+            this.#readline_instance.output.destroy();
+
+            // Do not remove this. Without it, readline may close too quickly and still hang.
+            await Promise.all([inputClosed, outputClosed]).catch(e => console.log("Error during closing readline stream:", e));
+        }
+        await sleep(100);
+
+        if (this.#store !== null) {
+            await this.#store.close();
+        }
+        await sleep(100);
     }
 
     async #setUpRoleAutomatically() {
-        if (!this.#base.writable) {
+        if (!this.#base.writable && this.#enableRoleRequester) {
+            console.log('Requesting writer role... This may take a moment.');
             await this.#requestWriterRole(false)
             setTimeout(async () => {
                 await this.#requestWriterRole(true)
             }, 5_000);
+            await sleep(5_000);
         }
     }
 
@@ -861,7 +904,7 @@ export class MainSettlementBus extends ReadyResource {
     
     async validatorObserver() {
         // Finding writers for admin recovery case
-        while (this.#enable_wallet) {
+        while (this.#enableValidatorObserver) {
 
             if (this.#dht_node === null || this.#network.validator_stream !== null) {
                 await sleep(1000);
@@ -935,6 +978,10 @@ export class MainSettlementBus extends ReadyResource {
         await this.#banValidator(tracPublicKey);
     }
 
+    stopValidatorObserver() {
+        this.#enableValidatorObserver = false;
+    }
+
     printHelp() {
         console.log('Available commands:');
         console.log('- /add_writer: add yourself as validator to this MSB once whitelisted.');
@@ -962,10 +1009,8 @@ export class MainSettlementBus extends ReadyResource {
                     this.printHelp();
                     break;
                 case '/exit':
-                    console.log('Exiting...');
                     rl.close();
                     await this.close();
-                    typeof process !== "undefined" ? process.exit(0) : Pear.exit(0);
                     break;
                 case '/push_writer_add':
                     await this.#requestWriterRole(true)
