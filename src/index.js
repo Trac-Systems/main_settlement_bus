@@ -1072,5 +1072,4 @@ export class MainSettlementBus extends ReadyResource {
 
 }
 
-function noop() { }
 export default MainSettlementBus;
