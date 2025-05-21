@@ -906,7 +906,7 @@ export class MainSettlementBus extends ReadyResource {
     // OS CALLS, ACCUMULATORS, MAYBE THIS IS POSSIBLE TO CHECK I/O QUEUE IF IT COINTAIN IT. FOR NOW WE ARE USING SLEEP.
     async validatorObserver() {
         // Finding writers for admin recovery case
-        while (this.#enableValidatorObserver) {
+        while (this.#enableValidatorObserver && this.#enable_wallet) {
 
             if (this.#dht_node === null || this.#network.validator_stream !== null) {
                 await sleep(1000);
