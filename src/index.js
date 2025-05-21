@@ -493,7 +493,7 @@ export class MainSettlementBus extends ReadyResource {
             this.stopValidatorObserver();
         }
 
-        await sleep(1_000); // stopValidatorObserver is using findValidator which is reading from the base, so we need to wait fot it to finish.. Temporary workaround?
+        await sleep(5_000); // stopValidatorObserver is using findValidator which is reading from the base, so we need to wait fot it to finish.. Temporary workaround?
         if (this.#swarm !== null) {
             await this.#swarm.destroy();
         }
@@ -902,6 +902,8 @@ export class MainSettlementBus extends ReadyResource {
         }
     }
     
+    // TODO: AFTER WHILE LOOP SIGNAL TO THE PROCESS THAT VALIDATOR OBSERVER STOPPED OPERATING. 
+    // OS CALLS, ACCUMULATORS, MAYBE THIS IS POSSIBLE TO CHECK I/O QUEUE IF IT COINTAIN IT. FOR NOW WE ARE USING SLEEP.
     async validatorObserver() {
         // Finding writers for admin recovery case
         while (this.#enableValidatorObserver) {
