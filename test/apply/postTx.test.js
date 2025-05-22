@@ -10,7 +10,8 @@ import { randomBytes } from 'crypto'
 import PeerWallet from "trac-wallet"
 
 const tick = () => new Promise(resolve => setImmediate(resolve))
-
+// add test with invalid data - should not pass. Many cases 
+// should not be possible to perform replay attack
 const testKeyPair = {
     publicKey: '82f6c1f684f4e251dfe092155b8861a0625b596991810b2b80b9c65ccbec5ad3',
     secretKey: '734aa8a4ff1506a502054f537c235d3fbe70452926bad869c3ab57e90d06df7382f6c1f684f4e251dfe092155b8861a0625b596991810b2b80b9c65ccbec5ad3',
@@ -154,3 +155,4 @@ test('Apply function POST_TX operation - Append transaction into the base ', asy
     await fs.rm(tmp, { recursive: true, force: true });
 
 })
+
