@@ -46,15 +46,13 @@ test('Apply function POST_TX operation - Append transaction into the base ', asy
         bootstrap: randomBytes(32).toString('hex'),
         enable_txlogs: false,
         enableValidatorObserver: false,
+        enableRoleRequester: false,
         replicate: false,
-        enableRoleRequester: false
     });
 
-    await msbInit.ready()
-    const bootstrap = msbInit.writingKey
-    await msbInit.close()
-
-    //t.ok(true, 'temp')
+    await msbInit.ready();
+    const bootstrap = msbInit.writingKey;
+    await msbInit.close();
 
     const msb = new MainSettlementBus({
         stores_directory: storesDirectory,
@@ -65,21 +63,21 @@ test('Apply function POST_TX operation - Append transaction into the base ', asy
         enableValidatorObserver: false,
         enableRoleRequester: false,
         replicate: false,
-        signature_whitelist: []
-    })
+    });
 
-    await msb.ready()
+    await msb.ready();
 
     // Initialization peerWallet1 (validator) and peerWallet2 (subnetwork writer) wallets for testing purposes
-    const peerWallet1 = new PeerWallet()
-    await peerWallet1.initKeyPair(keyPath)
-    const peerWallet2 = new PeerWallet()
-    await peerWallet2.initKeyPair(keyPath2)
+    const peerWallet1 = new PeerWallet();
+    await peerWallet1.initKeyPair(keyPath);
 
-    const peerBootstrap = randomBytes(32).toString('hex')
-    const validatorPubKey = msb.getTracPublicKey()
-    const peerWriterLocalKey = randomBytes(32).toString('hex')
-    const peerPublicKey = peerWallet2.publicKey
+    const peerWallet2 = new PeerWallet();
+    await peerWallet2.initKeyPair(keyPath2);
+
+    const peerBootstrap = randomBytes(32).toString('hex');
+    const validatorPubKey = msb.getTracPublicKey();
+    const peerWriterLocalKey = randomBytes(32).toString('hex');
+    const peerPublicKey = peerWallet2.publicKey;
 
     const testObj = {
         type: 'deployTest',
@@ -90,10 +88,11 @@ test('Apply function POST_TX operation - Append transaction into the base ', asy
             lim: '1000',
             dec: 18
         }
-    }
-    const contentHash = await createHash('sha256', JSON.stringify(testObj))
+    };
 
-    const nonce = PeerWallet.generateNonce().toString('hex')
+    const contentHash = await createHash('sha256', JSON.stringify(testObj));
+
+    const nonce = PeerWallet.generateNonce().toString('hex');
 
     const preTxHash = await msb.generateTx(
         peerBootstrap,
@@ -103,7 +102,7 @@ test('Apply function POST_TX operation - Append transaction into the base ', asy
         peerPublicKey,
         contentHash,
         nonce
-    )
+    );
 
     const parsedPreTx = {
         op: 'pre-tx',
@@ -116,12 +115,12 @@ test('Apply function POST_TX operation - Append transaction into the base ', asy
         in: nonce,
         bs: peerBootstrap,
         mbs: msb.bootstrap
-    }
+    };
 
     const postTxSig = peerWallet1.sign(
         b4a.from(parsedPreTx.tx + nonce),
         b4a.from(peerWallet1.secretKey, 'hex')
-    )
+    );
 
     const postTx = {
         type: OperationType.TX,
@@ -141,17 +140,17 @@ test('Apply function POST_TX operation - Append transaction into the base ', asy
             wp: peerWallet1.publicKey,
             wn: nonce
         }
-    }
+    };
 
-    await msb.base.append(postTx)
-    await tick()
-    await tick()
+    await msb.base.append(postTx);
+    await tick();
+    await tick();
 
-    const result = await msb.base.view.get(preTxHash)
-    t.ok(result, 'post tx added to corestore')
+    const result = await msb.base.view.get(preTxHash);
+    t.ok(result, 'post tx added to the base');
 
     // close msb and remove temp directory
-    await msb.close()
-    await fs.rm(tmp, { recursive: true, force: true })
+    await msb.close();
+    await fs.rm(tmp, { recursive: true, force: true });
 
 })
