@@ -20,6 +20,7 @@ import c from 'compact-encoding'
 const wakeup = new w();
 
 class Network {
+    #shouldStopPool = false;
     constructor(base) {
         this.tx_pool = [];
         this.pool(base);
@@ -28,7 +29,7 @@ class Network {
         this.admin = null
         this.validator_stream = null
         this.validator = null;
-        this.custom_stream =  null;
+        this.custom_stream = null;
         this.custom_node = null
     }
 
@@ -48,7 +49,7 @@ class Network {
             let clean = Date.now();
             let conns = {};
 
-            swarm = new Hyperswarm({ keyPair, bootstrap : bootstrap, maxPeers: MAX_PEERS, maxParallel: MAX_PARALLEL, maxServerConnections: MAX_SERVER_CONNECTIONS, maxClientConnections :  MAX_CLIENT_CONNECTIONS});
+            swarm = new Hyperswarm({ keyPair, bootstrap: bootstrap, maxPeers: MAX_PEERS, maxParallel: MAX_PARALLEL, maxServerConnections: MAX_SERVER_CONNECTIONS, maxClientConnections: MAX_CLIENT_CONNECTIONS });
 
             console.log(`Channel: ${b4a.toString(channel)}`);
             swarm.on('connection', async (connection) => {
@@ -68,7 +69,7 @@ class Network {
                     encoding: c.json,
                     async onmessage(msg) {
                         try {
-                            
+
                             if (msg === 'get_validator') {
                                 const nonce = Wallet.generateNonce().toString('hex');
                                 const _msg = {
@@ -78,7 +79,7 @@ class Network {
                                     channel: b4a.toString(channel, 'utf8')
                                 };
                                 const sig = wallet.sign(JSON.stringify(_msg) + nonce);
-                                message.send({response: _msg, sig, nonce})
+                                message.send({ response: _msg, sig, nonce })
                                 swarm.leavePeer(connection.remotePublicKey)
                             } else if (msg === 'get_admin') {
                                 const res = await msb.get(EntryType.ADMIN);
@@ -91,10 +92,10 @@ class Network {
                                     channel: b4a.toString(channel, 'utf8')
                                 };
                                 const sig = wallet.sign(JSON.stringify(_msg) + nonce);
-                                message.send({response: _msg, sig, nonce})
+                                message.send({ response: _msg, sig, nonce })
                                 swarm.leavePeer(connection.remotePublicKey)
-                            } else  if (msg === 'get_node') {
-                     
+                            } else if (msg === 'get_node') {
+
                                 const nonce = Wallet.generateNonce().toString('hex');
                                 const _msg = {
                                     op: 'node',
@@ -103,9 +104,9 @@ class Network {
                                     channel: b4a.toString(channel, 'utf8')
                                 };
                                 const sig = wallet.sign(JSON.stringify(_msg) + nonce);
-                                message.send({response: _msg, sig, nonce})
+                                message.send({ response: _msg, sig, nonce })
                                 swarm.leavePeer(connection.remotePublicKey)
-                            
+
                             } else if (msg.response !== undefined && msg.response.op !== undefined && msg.response.op === 'validator') {
                                 const res = await msb.get(msg.response.address);
                                 if (res === null) return;
@@ -127,7 +128,7 @@ class Network {
                                 }
                                 swarm.leavePeer(connection.remotePublicKey)
                             }
-                            else if (msg.response !== undefined && msg.response.op !== undefined && msg.response.op === 'node'){
+                            else if (msg.response !== undefined && msg.response.op !== undefined && msg.response.op === 'node') {
 
                                 const verified = wallet.verify(msg.sig, JSON.stringify(msg.response) + msg.nonce, msg.response.address)
                                 if (verified && msg.response.channel === b4a.toString(channel, 'utf8')) {
@@ -180,7 +181,7 @@ class Network {
                                     }
 
                                     if (conns[peer] === undefined) {
-                                        conns[peer] = {prev: _now, now: 0, tx_cnt: 0}
+                                        conns[peer] = { prev: _now, now: 0, tx_cnt: 0 }
                                     }
 
                                     conns[peer].now = _now;
@@ -227,7 +228,7 @@ class Network {
                                         wp: wallet.publicKey,
                                         wn: nonce
                                     };
-                                    network.tx_pool.push({tx: parsedPreTx.tx, append_tx: append_tx});
+                                    network.tx_pool.push({ tx: parsedPreTx.tx, append_tx: append_tx });
                                 }
 
                                 swarm.leavePeer(connection.remotePublicKey)
@@ -276,7 +277,7 @@ class Network {
     }
 
     async pool(base) {
-        while (true) {
+        while (!this.#shouldStopPool) {
             if (this.tx_pool.length > 0) {
                 const length = this.tx_pool.length;
                 const batch = [];
@@ -290,6 +291,9 @@ class Network {
             await sleep(5);
         }
     }
-}
 
+    stopPool() {
+        this.#shouldStopPool = true;
+    }
+}
 export default Network;

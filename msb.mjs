@@ -9,6 +9,6 @@ const opts = {
 
 const msb = new MainSettlementBus(opts);
 
-msb.ready().then(() => {
-    msb.interactiveMode();
-});
+msb.ready()
+    .then(() => { msb.interactiveMode(); })
+    .catch(function () { });
