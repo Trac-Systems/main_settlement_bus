@@ -240,3 +240,4 @@ hook('Clean up postTx setup', async t => {
     if (msbBootstrap) await msbBootstrap.close();
     if (tmpDirectory) await fs.rm(tmpDirectory, { recursive: true, force: true })
 })
+
