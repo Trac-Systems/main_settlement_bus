@@ -15,11 +15,9 @@ import {
     OperationType,
     EventType,
     WHITELIST_SLEEP_INTERVAL,
-    UPDATER_INTERVAL,
     MAX_INDEXERS,
     MIN_INDEXERS,
     WHITELIST_PREFIX,
-    TRAC_NAMESPACE
 } from './utils/constants.js';
 import Network from './network.js';
 import Check from './utils/check.js';
