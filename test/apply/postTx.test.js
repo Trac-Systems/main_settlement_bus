@@ -241,3 +241,20 @@ hook('Clean up postTx setup', async t => {
     if (tmpDirectory) await fs.rm(tmpDirectory, { recursive: true, force: true })
 })
 
+test('Apply function POST_TX operation - Append transaction into the base', async t => {
+    t.plan(1)
+
+    const {postTx, preTxHash} = await generatePostTx(msbBoostrap, booostrapPeerWallet1, peerWallet2)
+    await msbBoostrap.base.append(postTx);
+    await tick();
+    await tick();
+
+    const result = await msbBoostrap.base.view.get(preTxHash);
+    t.ok(result, 'post tx added to the base');
+})
+
+hook('Clean up postTx setup', async t => {
+    // close msbBoostrap and remove temp directory
+    if (msbBoostrap) await msbBoostrap.close()
+    if (tmp) await fs.rm(tmp, { recursive: true, force: true })
+})
