@@ -28,7 +28,7 @@ let tmp, keyPath, keyPath2, msbBootstrap, boostrapPeerWallet1, peerWallet2
 const tick = () => new Promise(resolve => setImmediate(resolve))
 
 const generatePostTx = async (msbBootstrap, boostrapPeerWallet1, peerWallet2) => {
-    
+
     const peerBootstrap = randomBytes(32).toString('hex');
     const validatorPubKey = msbBootstrap.getTracPublicKey();
     const peerWriterLocalKey = randomBytes(32).toString('hex');
@@ -192,7 +192,8 @@ test('Apply function POST_TX operation - negative)', async t => {
             ...postTx,
             value: {
                 ...postTx.value,
-                op: 'invalidOp',}
+                op: 'invalidOp',
+            }
         }
         await msbBootstrap.base.append(postTx);
         await tick();
@@ -205,16 +206,29 @@ test('Apply function POST_TX operation - negative)', async t => {
         await msbBootstrap.base.append(postTx);
         await tick();
         const firstRes = await msbBootstrap.base.view.get(preTxHash);
-        
+
         await msbBootstrap.base.append(postTx);
         await tick();
-    
+
         const secondRes = await msbBootstrap.base.view.get(preTxHash);
-        
+
 
         t.is(firstRes.seq, secondRes.seq, 'post tx should not be added to the base twice');
     })
-    
+
+    t.test('invalid key hash and tx hash does not match - placeholder name', async t => {
+        let { postTx, preTxHash } = await generatePostTx(msbBootstrap, boostrapPeerWallet1, peerWallet2);
+        postTx = {
+            ...postTx,
+            key: randomBytes(32).toString('hex'),
+        }
+        await msbBootstrap.base.append(postTx);
+        await tick();
+        const result = await msbBootstrap.base.view.get(preTxHash);
+        t.absent(result, 'post tx with invalid key hash should not be added to the base');
+
+    })
+
 })
 
 hook('Clean up postTx setup', async t => {
