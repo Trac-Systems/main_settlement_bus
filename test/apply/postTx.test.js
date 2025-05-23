@@ -23,13 +23,14 @@ const testKeyPair2 = {
     secretKey: "21b7f3c56eaa4d8114530258c79b8086bcca3e61d6c9edee589e8ca2f48688e98f17ec2862c7b3e4dbbedaf88a68a9b74d76e9d6acca6ca4a5fafb1b6c474616",
     mnemonic: "century category maze cover student upset trip cup purchase area turtle keen minimum flee diagram romance stool absorb umbrella phone valve avocado fade window"
 }
-let tmp, keyPath, keyPath2, msbBoostrap, booostrapPeerWallet1, peerWallet2
+let tmp, keyPath, keyPath2, msbBootstrap, boostrapPeerWallet1, peerWallet2
 
 const tick = () => new Promise(resolve => setImmediate(resolve))
-const generatePostTx = async (msbBootstrap, booostrapPeerWallet1, peerWallet2) => {
+
+const generatePostTx = async (msbBootstrap, boostrapPeerWallet1, peerWallet2) => {
     
     const peerBootstrap = randomBytes(32).toString('hex');
-    const validatorPubKey = msbBoostrap.getTracPublicKey();
+    const validatorPubKey = msbBootstrap.getTracPublicKey();
     const peerWriterLocalKey = randomBytes(32).toString('hex');
     const peerPublicKey = peerWallet2.publicKey;
 
@@ -47,9 +48,9 @@ const generatePostTx = async (msbBootstrap, booostrapPeerWallet1, peerWallet2) =
     const contentHash = await createHash('sha256', JSON.stringify(testObj));
     const nonce = PeerWallet.generateNonce().toString('hex');
 
-    const preTxHash = await msbBoostrap.generateTx(
+    const preTxHash = await msbBootstrap.generateTx(
         peerBootstrap,
-        msbBoostrap.bootstrap,
+        msbBootstrap.bootstrap,
         validatorPubKey,
         peerWriterLocalKey,
         peerPublicKey,
@@ -67,12 +68,12 @@ const generatePostTx = async (msbBootstrap, booostrapPeerWallet1, peerWallet2) =
         ch: contentHash,
         in: nonce,
         bs: peerBootstrap,
-        mbs: msbBoostrap.bootstrap
+        mbs: msbBootstrap.bootstrap
     };
 
-    const postTxSig = booostrapPeerWallet1.sign(
+    const postTxSig = boostrapPeerWallet1.sign(
         b4a.from(parsedPreTx.tx + nonce),
-        b4a.from(booostrapPeerWallet1.secretKey, 'hex')
+        b4a.from(boostrapPeerWallet1.secretKey, 'hex')
     );
 
     const postTx = {
@@ -82,7 +83,7 @@ const generatePostTx = async (msbBootstrap, booostrapPeerWallet1, peerWallet2) =
             op: OperationType.POST_TX,
             tx: preTxHash,
             is: parsedPreTx.is,
-            w: msbBoostrap.bootstrap,
+            w: msbBootstrap.bootstrap,
             i: parsedPreTx.i,
             ipk: parsedPreTx.ipk,
             ch: parsedPreTx.ch,
@@ -90,12 +91,12 @@ const generatePostTx = async (msbBootstrap, booostrapPeerWallet1, peerWallet2) =
             bs: parsedPreTx.bs,
             mbs: parsedPreTx.mbs,
             ws: postTxSig.toString('hex'),
-            wp: booostrapPeerWallet1.publicKey,
+            wp: boostrapPeerWallet1.publicKey,
             wn: nonce
         }
     };
 
-    return {postTx, preTxHash};
+    return { postTx, preTxHash };
 
 }
 
@@ -127,7 +128,7 @@ hook('Initialize nodes', async t => {
     const bootstrap = msbInit.writingKey;
     await msbInit.close();
 
-    msbBoostrap = new MainSettlementBus({
+    msbBootstrap = new MainSettlementBus({
         stores_directory: storesDirectory,
         store_name: storeName,
         channel: randomBytes(32).toString('hex'),
@@ -138,11 +139,11 @@ hook('Initialize nodes', async t => {
         replicate: false,
     });
 
-    await msbBoostrap.ready();
+    await msbBootstrap.ready();
 
     // Initialization peerWallet1 (validator) and peerWallet2 (subnetwork writer) wallets for testing purposes
-    booostrapPeerWallet1 = new PeerWallet();
-    await booostrapPeerWallet1.initKeyPair(keyPath);
+    boostrapPeerWallet1 = new PeerWallet();
+    await boostrapPeerWallet1.initKeyPair(keyPath);
 
     peerWallet2 = new PeerWallet();
     await peerWallet2.initKeyPair(keyPath2);
@@ -151,17 +152,59 @@ hook('Initialize nodes', async t => {
 test('Apply function POST_TX operation - Append transaction into the base', async t => {
     t.plan(1)
 
-    const {postTx, preTxHash} = await generatePostTx(msbBoostrap, booostrapPeerWallet1, peerWallet2)
-    await msbBoostrap.base.append(postTx);
+    const { postTx, preTxHash } = await generatePostTx(msbBootstrap, boostrapPeerWallet1, peerWallet2)
+    await msbBootstrap.base.append(postTx);
     await tick();
     await tick();
 
-    const result = await msbBoostrap.base.view.get(preTxHash);
+    const result = await msbBootstrap.base.view.get(preTxHash);
     t.ok(result, 'post tx added to the base');
+})
+
+test('Apply function POST_TX operation - negative)', async t => {
+    t.test('sanitizePostTx - placeholder name', async t => {
+        //sanitizePostTx is already tested in /test/check/postTx.test.js
+        let { postTx, preTxHash } = await generatePostTx(msbBootstrap, boostrapPeerWallet1, peerWallet2)
+        postTx = {
+            ...postTx,
+            foo: 'bar',
+        }
+        await msbBootstrap.base.append(postTx);
+        await tick();
+
+        t.absent(await msbBootstrap.base.view.get(preTxHash), 'post tx with neasted object should not be added to the base');
+        postTx = {
+            ...postTx,
+            value: {
+                ...postTx.value,
+                foo: 'bar',
+            }
+        }
+        await msbBootstrap.base.append(postTx);
+        await tick();
+        t.absent(await msbBootstrap.base.view.get(preTxHash), 'post tx with neasted object in value property should not be added to the base');
+
+    })
+
+    t.test('different operation type - placeholder name', async t => {
+        let { postTx, preTxHash } = await generatePostTx(msbBootstrap, boostrapPeerWallet1, peerWallet2)
+        postTx = {
+            ...postTx,
+            value: {
+                ...postTx.value,
+                op: 'invalidOp',}
+        }
+        await msbBootstrap.base.append(postTx);
+        await tick();
+
+        t.absent(await msbBootstrap.base.view.get(preTxHash), 'post tx with incorrect operation type should not be added to the base');
+    })
+
+    
 })
 
 hook('Clean up postTx setup', async t => {
     // close msbBoostrap and remove temp directory
-    if (msbBoostrap) await msbBoostrap.close()
+    if (msbBootstrap) await msbBootstrap.close()
     if (tmp) await fs.rm(tmp, { recursive: true, force: true })
 })
