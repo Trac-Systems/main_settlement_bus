@@ -244,17 +244,59 @@ hook('Clean up postTx setup', async t => {
 test('Apply function POST_TX operation - Append transaction into the base', async t => {
     t.plan(1)
 
-    const {postTx, preTxHash} = await generatePostTx(msbBoostrap, booostrapPeerWallet1, peerWallet2)
-    await msbBoostrap.base.append(postTx);
+    const { postTx, preTxHash } = await generatePostTx(msbBootstrap, boostrapPeerWallet1, peerWallet2)
+    await msbBootstrap.base.append(postTx);
     await tick();
     await tick();
 
-    const result = await msbBoostrap.base.view.get(preTxHash);
+    const result = await msbBootstrap.base.view.get(preTxHash);
     t.ok(result, 'post tx added to the base');
+})
+
+test('Apply function POST_TX operation - negative)', async t => {
+    t.test('sanitizePostTx - placeholder name', async t => {
+        //sanitizePostTx is already tested in /test/check/postTx.test.js
+        let { postTx, preTxHash } = await generatePostTx(msbBootstrap, boostrapPeerWallet1, peerWallet2)
+        postTx = {
+            ...postTx,
+            foo: 'bar',
+        }
+        await msbBootstrap.base.append(postTx);
+        await tick();
+
+        t.absent(await msbBootstrap.base.view.get(preTxHash), 'post tx with neasted object should not be added to the base');
+        postTx = {
+            ...postTx,
+            value: {
+                ...postTx.value,
+                foo: 'bar',
+            }
+        }
+        await msbBootstrap.base.append(postTx);
+        await tick();
+        t.absent(await msbBootstrap.base.view.get(preTxHash), 'post tx with neasted object in value property should not be added to the base');
+
+    })
+
+    t.test('different operation type - placeholder name', async t => {
+        let { postTx, preTxHash } = await generatePostTx(msbBootstrap, boostrapPeerWallet1, peerWallet2)
+        postTx = {
+            ...postTx,
+            value: {
+                ...postTx.value,
+                op: 'invalidOp',}
+        }
+        await msbBootstrap.base.append(postTx);
+        await tick();
+
+        t.absent(await msbBootstrap.base.view.get(preTxHash), 'post tx with incorrect operation type should not be added to the base');
+    })
+
+    
 })
 
 hook('Clean up postTx setup', async t => {
     // close msbBoostrap and remove temp directory
-    if (msbBoostrap) await msbBoostrap.close()
+    if (msbBootstrap) await msbBootstrap.close()
     if (tmp) await fs.rm(tmp, { recursive: true, force: true })
 })
