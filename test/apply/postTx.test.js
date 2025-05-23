@@ -292,6 +292,20 @@ test('Apply function POST_TX operation - negative)', async t => {
         t.absent(await msbBootstrap.base.view.get(preTxHash), 'post tx with incorrect operation type should not be added to the base');
     })
 
+    t.test('replay attack - placeholder name', async t => {
+        const { postTx, preTxHash } = await generatePostTx(msbBootstrap, boostrapPeerWallet1, peerWallet2);
+        await msbBootstrap.base.append(postTx);
+        await tick();
+        const firstRes = await msbBootstrap.base.view.get(preTxHash);
+        
+        await msbBootstrap.base.append(postTx);
+        await tick();
+    
+        const secondRes = await msbBootstrap.base.view.get(preTxHash);
+        
+
+        t.is(firstRes.seq, secondRes.seq, 'post tx should not be added to the base twice');
+    })
     
 })
 
