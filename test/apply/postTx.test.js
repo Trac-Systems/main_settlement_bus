@@ -244,7 +244,7 @@ hook('Clean up postTx setup', async t => {
 test('Apply function POST_TX operation - Append transaction into the base', async t => {
     t.plan(1)
 
-    const { postTx, preTxHash } = await generatePostTx(msbBootstrap, boostrapPeerWallet1, peerWallet2)
+    const { postTx, preTxHash } = await generatePostTx(msbBootstrap, boostrapPeerWallet, peerWallet)
     await msbBootstrap.base.append(postTx);
     await tick();
     await tick();
@@ -256,7 +256,7 @@ test('Apply function POST_TX operation - Append transaction into the base', asyn
 test('Apply function POST_TX operation - negative)', async t => {
     t.test('sanitizePostTx - placeholder name', async t => {
         //sanitizePostTx is already tested in /test/check/postTx.test.js
-        let { postTx, preTxHash } = await generatePostTx(msbBootstrap, boostrapPeerWallet1, peerWallet2)
+        let { postTx, preTxHash } = await generatePostTx(msbBootstrap, boostrapPeerWallet, peerWallet)
         postTx = {
             ...postTx,
             foo: 'bar',
@@ -279,7 +279,7 @@ test('Apply function POST_TX operation - negative)', async t => {
     })
 
     t.test('different operation type - placeholder name', async t => {
-        let { postTx, preTxHash } = await generatePostTx(msbBootstrap, boostrapPeerWallet1, peerWallet2)
+        let { postTx, preTxHash } = await generatePostTx(msbBootstrap, boostrapPeerWallet, peerWallet)
         postTx = {
             ...postTx,
             value: {
@@ -294,7 +294,7 @@ test('Apply function POST_TX operation - negative)', async t => {
     })
 
     t.test('replay attack - placeholder name', async t => {
-        const { postTx, preTxHash } = await generatePostTx(msbBootstrap, boostrapPeerWallet1, peerWallet2);
+        const { postTx, preTxHash } = await generatePostTx(msbBootstrap, boostrapPeerWallet, peerWallet);
         await msbBootstrap.base.append(postTx);
         await tick();
         const firstRes = await msbBootstrap.base.view.get(preTxHash);
@@ -309,7 +309,7 @@ test('Apply function POST_TX operation - negative)', async t => {
     })
 
     t.test('invalid key hash and tx hash does not match - placeholder name', async t => {
-        let { postTx, preTxHash } = await generatePostTx(msbBootstrap, boostrapPeerWallet1, peerWallet2);
+        let { postTx, preTxHash } = await generatePostTx(msbBootstrap, boostrapPeerWallet, peerWallet);
         postTx = {
             ...postTx,
             key: randomBytes(32).toString('hex'),
@@ -321,6 +321,41 @@ test('Apply function POST_TX operation - negative)', async t => {
 
     })
 
+    t.test('adversary prepared fake preTx signature (peer signature) - placeholder name', async t => {
+        let { postTx, preTxHash } = await generatePostTx(msbBootstrap, boostrapPeerWallet, peerWallet);
+
+        const adversarySignature = adversaryWallet.sign(
+            Buffer.from(postTx.value.tx + postTx.value.in)
+        );
+
+        postTx.value.is = adversarySignature.toString('hex');
+
+        await msbBootstrap.base.append(postTx);
+        await tick();
+
+        const result = await msbBootstrap.base.view.get(preTxHash);
+        t.absent(result, 'adversary prepared fake preTx signature (third key pair) should be rejected');
+    });
+
+    t.test('adversary prepared fake postTx signature (writer signature) - placeholder name', async t => {
+        let { postTx, preTxHash } = await generatePostTx(msbBootstrap, boostrapPeerWallet, peerWallet);
+ 
+
+        const adversarySignature = adversaryWallet.sign(
+            Buffer.from(postTx.value.tx + postTx.value.in)
+        );
+
+        postTx.ws = adversarySignature.toString('hex');
+
+        await msbBootstrap.base.append(postTx);
+        await tick();
+
+        const result = await msbBootstrap.base.view.get(preTxHash);
+        t.absent(result, 'adversary prepared fake postTx signature (third key pair) should be rejected');
+    });
+
+    //todo add cases with nonces, try to fake generateTx and try to send huge sized tx
+    // fake contentHash or maybe it should be empty?
 })
 
 hook('Clean up postTx setup', async t => {
