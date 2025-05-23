@@ -12,27 +12,33 @@ import PeerWallet from "trac-wallet"
 // add test with invalid data - should not pass. Many cases 
 // should not be possible to perform replay attack
 
-const testKeyPair = {
+const bootstrapKeyPair = {
     publicKey: '82f6c1f684f4e251dfe092155b8861a0625b596991810b2b80b9c65ccbec5ad3',
     secretKey: '734aa8a4ff1506a502054f537c235d3fbe70452926bad869c3ab57e90d06df7382f6c1f684f4e251dfe092155b8861a0625b596991810b2b80b9c65ccbec5ad3',
     mnemonic: 'slight wedding permit mention subject mask hawk awkward sniff leopard spider scatter close neutral deny apple wide category sick love sorry pupil then legal'
 }
 
-const testKeyPair2 = {
+const peerKeyPair = {
     publicKey: "8f17ec2862c7b3e4dbbedaf88a68a9b74d76e9d6acca6ca4a5fafb1b6c474616",
     secretKey: "21b7f3c56eaa4d8114530258c79b8086bcca3e61d6c9edee589e8ca2f48688e98f17ec2862c7b3e4dbbedaf88a68a9b74d76e9d6acca6ca4a5fafb1b6c474616",
     mnemonic: "century category maze cover student upset trip cup purchase area turtle keen minimum flee diagram romance stool absorb umbrella phone valve avocado fade window"
 }
-let tmp, keyPath, keyPath2, msbBootstrap, boostrapPeerWallet1, peerWallet2
+
+const adversaryKeyPair = {
+    publicKey: "3341b586cad305908b4ac0cf9176851d90c64a7b7d3ff74100262e383d63c6b8",
+    secretKey: "25178b87c194c3e84358323a2ec43069610a5b48fdd4ca88689155bbc5c180b13341b586cad305908b4ac0cf9176851d90c64a7b7d3ff74100262e383d63c6b8",
+    mnemonic: "inner pond duty corn danger board tragic penalty mad lounge excite lottery great current high exercise spin noble true curtain airport trend when decade"
+}
+let tmp, bootstrapKeyPairPath, peerKeyPath,advKeyPath, msbBootstrap, boostrapPeerWallet, peerWallet, adversaryWallet
 
 const tick = () => new Promise(resolve => setImmediate(resolve))
 
-const generatePostTx = async (msbBootstrap, boostrapPeerWallet1, peerWallet2) => {
+const generatePostTx = async (msbBootstrap, boostrapPeerWallet, peerWallet) => {
 
     const peerBootstrap = randomBytes(32).toString('hex');
     const validatorPubKey = msbBootstrap.getTracPublicKey();
     const peerWriterLocalKey = randomBytes(32).toString('hex');
-    const peerPublicKey = peerWallet2.publicKey;
+    const peerPublicKey = peerWallet.publicKey;
 
     const testObj = {
         type: 'deployTest',
@@ -61,7 +67,7 @@ const generatePostTx = async (msbBootstrap, boostrapPeerWallet1, peerWallet2) =>
     const parsedPreTx = {
         op: 'pre-tx',
         tx: preTxHash,
-        is: peerWallet2.sign(Buffer.from(preTxHash + nonce)),
+        is: peerWallet.sign(Buffer.from(preTxHash + nonce)),
         wp: validatorPubKey,
         i: peerWriterLocalKey,
         ipk: peerPublicKey,
@@ -71,9 +77,9 @@ const generatePostTx = async (msbBootstrap, boostrapPeerWallet1, peerWallet2) =>
         mbs: msbBootstrap.bootstrap
     };
 
-    const postTxSig = boostrapPeerWallet1.sign(
+    const postTxSig = boostrapPeerWallet.sign(
         b4a.from(parsedPreTx.tx + nonce),
-        b4a.from(boostrapPeerWallet1.secretKey, 'hex')
+        b4a.from(boostrapPeerWallet.secretKey, 'hex')
     );
 
     const postTx = {
@@ -91,7 +97,7 @@ const generatePostTx = async (msbBootstrap, boostrapPeerWallet1, peerWallet2) =>
             bs: parsedPreTx.bs,
             mbs: parsedPreTx.mbs,
             ws: postTxSig.toString('hex'),
-            wp: boostrapPeerWallet1.publicKey,
+            wp: boostrapPeerWallet.publicKey,
             wn: nonce
         }
     };
@@ -107,11 +113,15 @@ hook('Initialize nodes', async t => {
     const storeName = 'testStore/';
     const corestoreDbDirectory = path.join(storesDirectory, storeName, 'db');
     await fs.mkdir(corestoreDbDirectory, { recursive: true });
-    keyPath = path.join(corestoreDbDirectory, 'keypair.json');
-    await fs.writeFile(keyPath, JSON.stringify(testKeyPair, null, 2));
 
-    keyPath2 = path.join(corestoreDbDirectory, 'keypair2.json');
-    await fs.writeFile(keyPath2, JSON.stringify(testKeyPair2, null, 2));
+    bootstrapKeyPairPath = path.join(corestoreDbDirectory, 'keypair.json');
+    await fs.writeFile(bootstrapKeyPairPath, JSON.stringify(bootstrapKeyPair, null, 2));
+
+    peerKeyPath = path.join(corestoreDbDirectory, 'keypair2.json');
+    await fs.writeFile(peerKeyPath, JSON.stringify(peerKeyPair, null, 2));
+
+    advKeyPath = path.join(corestoreDbDirectory, 'keypair3.json');
+    await fs.writeFile(advKeyPath, JSON.stringify(adversaryKeyPair, null, 2));
 
     const msbInit = new MainSettlementBus({
         stores_directory: storesDirectory,
@@ -142,17 +152,20 @@ hook('Initialize nodes', async t => {
     await msbBootstrap.ready();
 
     // Initialization peerWallet1 (validator) and peerWallet2 (subnetwork writer) wallets for testing purposes
-    boostrapPeerWallet1 = new PeerWallet();
-    await boostrapPeerWallet1.initKeyPair(keyPath);
+    boostrapPeerWallet = new PeerWallet();
+    await boostrapPeerWallet.initKeyPair(bootstrapKeyPairPath);
 
-    peerWallet2 = new PeerWallet();
-    await peerWallet2.initKeyPair(keyPath2);
+    peerWallet = new PeerWallet();
+    await peerWallet.initKeyPair(peerKeyPath);
+
+    adversaryWallet = new PeerWallet();
+    await adversaryWallet.initKeyPair(advKeyPath);
 })
 
 test('Apply function POST_TX operation - Append transaction into the base', async t => {
     t.plan(1)
 
-    const { postTx, preTxHash } = await generatePostTx(msbBootstrap, boostrapPeerWallet1, peerWallet2)
+    const { postTx, preTxHash } = await generatePostTx(msbBootstrap, boostrapPeerWallet, peerWallet)
     await msbBootstrap.base.append(postTx);
     await tick();
     await tick();
@@ -164,7 +177,7 @@ test('Apply function POST_TX operation - Append transaction into the base', asyn
 test('Apply function POST_TX operation - negative)', async t => {
     t.test('sanitizePostTx - placeholder name', async t => {
         //sanitizePostTx is already tested in /test/check/postTx.test.js
-        let { postTx, preTxHash } = await generatePostTx(msbBootstrap, boostrapPeerWallet1, peerWallet2)
+        let { postTx, preTxHash } = await generatePostTx(msbBootstrap, boostrapPeerWallet, peerWallet)
         postTx = {
             ...postTx,
             foo: 'bar',
@@ -187,7 +200,7 @@ test('Apply function POST_TX operation - negative)', async t => {
     })
 
     t.test('different operation type - placeholder name', async t => {
-        let { postTx, preTxHash } = await generatePostTx(msbBootstrap, boostrapPeerWallet1, peerWallet2)
+        let { postTx, preTxHash } = await generatePostTx(msbBootstrap, boostrapPeerWallet, peerWallet)
         postTx = {
             ...postTx,
             value: {
@@ -202,7 +215,7 @@ test('Apply function POST_TX operation - negative)', async t => {
     })
 
     t.test('replay attack - placeholder name', async t => {
-        const { postTx, preTxHash } = await generatePostTx(msbBootstrap, boostrapPeerWallet1, peerWallet2);
+        const { postTx, preTxHash } = await generatePostTx(msbBootstrap, boostrapPeerWallet, peerWallet);
         await msbBootstrap.base.append(postTx);
         await tick();
         const firstRes = await msbBootstrap.base.view.get(preTxHash);
@@ -217,7 +230,7 @@ test('Apply function POST_TX operation - negative)', async t => {
     })
 
     t.test('invalid key hash and tx hash does not match - placeholder name', async t => {
-        let { postTx, preTxHash } = await generatePostTx(msbBootstrap, boostrapPeerWallet1, peerWallet2);
+        let { postTx, preTxHash } = await generatePostTx(msbBootstrap, boostrapPeerWallet, peerWallet);
         postTx = {
             ...postTx,
             key: randomBytes(32).toString('hex'),
@@ -229,6 +242,41 @@ test('Apply function POST_TX operation - negative)', async t => {
 
     })
 
+    t.test('adversary prepared fake preTx signature (peer signature) - placeholder name', async t => {
+        let { postTx, preTxHash } = await generatePostTx(msbBootstrap, boostrapPeerWallet, peerWallet);
+
+        const adversarySignature = adversaryWallet.sign(
+            Buffer.from(postTx.value.tx + postTx.value.in)
+        );
+
+        postTx.value.is = adversarySignature.toString('hex');
+
+        await msbBootstrap.base.append(postTx);
+        await tick();
+
+        const result = await msbBootstrap.base.view.get(preTxHash);
+        t.absent(result, 'adversary prepared fake preTx signature (third key pair) should be rejected');
+    });
+
+    t.test('adversary prepared fake postTx signature (writer signature) - placeholder name', async t => {
+        let { postTx, preTxHash } = await generatePostTx(msbBootstrap, boostrapPeerWallet, peerWallet);
+ 
+
+        const adversarySignature = adversaryWallet.sign(
+            Buffer.from(postTx.value.tx + postTx.value.in)
+        );
+
+        postTx.ws = adversarySignature.toString('hex');
+
+        await msbBootstrap.base.append(postTx);
+        await tick();
+
+        const result = await msbBootstrap.base.view.get(preTxHash);
+        t.absent(result, 'adversary prepared fake postTx signature (third key pair) should be rejected');
+    });
+
+    //todo add cases with nonces, try to fake generateTx and try to send huge sized tx
+    // fake contentHash or maybe it should be empty?
 })
 
 hook('Clean up postTx setup', async t => {
