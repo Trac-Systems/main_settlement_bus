@@ -10,7 +10,7 @@ async function runTests() {
   await import('./functions/createHash.test.js');
   await import('./fileUtils/readPublicKeysFromFile.test.js');
   await import('./msgUtils/msgUtils.test.js');
-
+  await import('./apply/apply.test.js');
   //TODO add test Apply function
 
   test.resume();
