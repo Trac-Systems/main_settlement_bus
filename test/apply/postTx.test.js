@@ -9,9 +9,7 @@ import b4a from 'b4a'
 import { randomBytes } from 'crypto'
 import PeerWallet from "trac-wallet"
 
-// add test with invalid data - should not pass. Many cases 
-// should not be possible to perform replay attack
-
+//TODO change placeholder name to something more meaningful
 const bootstrapKeyPair = {
     publicKey: '82f6c1f684f4e251dfe092155b8861a0625b596991810b2b80b9c65ccbec5ad3',
     secretKey: '734aa8a4ff1506a502054f537c235d3fbe70452926bad869c3ab57e90d06df7382f6c1f684f4e251dfe092155b8861a0625b596991810b2b80b9c65ccbec5ad3',
@@ -29,7 +27,7 @@ const adversaryKeyPair = {
     secretKey: "25178b87c194c3e84358323a2ec43069610a5b48fdd4ca88689155bbc5c180b13341b586cad305908b4ac0cf9176851d90c64a7b7d3ff74100262e383d63c6b8",
     mnemonic: "inner pond duty corn danger board tragic penalty mad lounge excite lottery great current high exercise spin noble true curtain airport trend when decade"
 }
-let tmp, bootstrapKeyPairPath, peerKeyPath,advKeyPath, msbBootstrap, boostrapPeerWallet, peerWallet, adversaryWallet
+let tmp, bootstrapKeyPairPath, peerKeyPath, advKeyPath, msbBootstrap, boostrapPeerWallet, peerWallet, adversaryWallet
 
 const tick = () => new Promise(resolve => setImmediate(resolve))
 
@@ -255,12 +253,12 @@ test('Apply function POST_TX operation - negative)', async t => {
         await tick();
 
         const result = await msbBootstrap.base.view.get(preTxHash);
-        t.absent(result, 'adversary prepared fake preTx signature (third key pair) should be rejected');
+        t.absent(result, 'adversary prepared fake preTx signature (third key pair) should not be added to the base');
     });
 
     t.test('adversary prepared fake postTx signature (writer signature) - placeholder name', async t => {
         let { postTx, preTxHash } = await generatePostTx(msbBootstrap, boostrapPeerWallet, peerWallet);
- 
+
 
         const adversarySignature = adversaryWallet.sign(
             Buffer.from(postTx.value.tx + postTx.value.in)
@@ -272,11 +270,71 @@ test('Apply function POST_TX operation - negative)', async t => {
         await tick();
 
         const result = await msbBootstrap.base.view.get(preTxHash);
-        t.absent(result, 'adversary prepared fake postTx signature (third key pair) should be rejected');
+        t.absent(result, 'adversary prepared fake postTx signature (third key pair) should not be added to the base');
     });
 
-    //todo add cases with nonces, try to fake generateTx and try to send huge sized tx
-    // fake contentHash or maybe it should be empty?
+    // generateTx generates hash, so one small changes in the input should generate different hash, however, let's add some test cases.
+    t.test('adversary modified validator key in generateTx - placeholder name', async t => {
+        let { postTx, preTxHash } = await generatePostTx(msbBootstrap, boostrapPeerWallet, peerWallet);
+        const maliciousValidatorWriterKey = randomBytes(32).toString('hex');
+
+        const maliciousTx = await msbBootstrap.generateTx(postTx.value.bs, postTx.value.mbs, maliciousValidatorWriterKey, postTx.value.i, postTx.value.ipk, postTx.value.ch, postTx.value.in);
+        postTx.value.tx = maliciousTx;
+        postTx.key = maliciousTx;
+        await msbBootstrap.base.append(postTx);
+        await tick();
+        
+        const result = await msbBootstrap.base.view.get(maliciousTx);
+        t.absent(result, 'post tx with malicious generateTx hash should not be added to the base');
+    });
+
+    t.test('adversary modified peer bootstrap - placeholder name', async t => {
+        let { postTx, preTxHash } = await generatePostTx(msbBootstrap, boostrapPeerWallet, peerWallet);
+        const maliciousPeerBootstrap = randomBytes(32).toString('hex');
+        const maliciousTx = await msbBootstrap.generateTx(maliciousPeerBootstrap, postTx.value.mbs, postTx.value.wp, postTx.value.i, postTx.value.ipk, postTx.value.ch, postTx.value.in);
+        postTx.value.bs = maliciousPeerBootstrap;
+        postTx.value.tx = maliciousTx;
+        postTx.key = maliciousTx;
+        await msbBootstrap.base.append(postTx);
+        await tick();
+        const result = await msbBootstrap.base.view.get(maliciousTx);
+        t.absent(result, 'post tx with modified peer bootstrap should not be added to the base');
+    });
+
+    t.test('adversary modified msb bootstrap - placeholder name', async t => {
+        let { postTx, preTxHash } = await generatePostTx(msbBootstrap, boostrapPeerWallet, peerWallet);
+        const maliciousMsbBootstrap = randomBytes(32).toString('hex');
+        const maliciousTx = await msbBootstrap.generateTx(postTx.value.bs, maliciousMsbBootstrap, postTx.value.wp, postTx.value.i, postTx.value.ipk, postTx.value.ch, postTx.value.in);
+        postTx.value.mbs = maliciousMsbBootstrap;
+        postTx.value.tx = maliciousTx;
+        postTx.key = maliciousTx;
+        await msbBootstrap.base.append(postTx);
+        await tick();
+        const result = await msbBootstrap.base.view.get(maliciousTx);
+        t.absent(result, 'post tx with modified msb bootstrap should not be added to the base');
+    });
+
+    t.test('adversary modified content hash - placeholder name', async t => {
+        let { postTx, preTxHash } = await generatePostTx(msbBootstrap, boostrapPeerWallet, peerWallet);
+        const maliciousContentHash = randomBytes(32).toString('hex');
+        const maliciousTx = await msbBootstrap.generateTx(postTx.value.bs, postTx.value.mbs, postTx.value.wp, postTx.value.i, postTx.value.ipk, maliciousContentHash, postTx.value.in);
+        postTx.value.ch = maliciousContentHash;
+        postTx.value.tx = maliciousTx;
+        postTx.key = maliciousTx;
+        await msbBootstrap.base.append(postTx);
+        await tick();
+        const result = await msbBootstrap.base.view.get(maliciousTx);
+        t.absent(result, 'post tx with modified content hash should not be added to the base');
+    });
+
+    t.test('oversized transaction - placeholder name', async t => {
+        let { postTx, preTxHash } = await generatePostTx(msbBootstrap, boostrapPeerWallet, peerWallet);
+        postTx.value.extraData = randomBytes(4500).toString('hex'); // fastest validator have good schemas and it will be protected by this validator but this case should be considered
+        await msbBootstrap.base.append(postTx);
+        await tick();
+        const result = await await msbBootstrap.base.view.get(preTxHash);
+        t.absent(result, 'oversized post tx should not be added to the base');
+    });
 })
 
 hook('Clean up postTx setup', async t => {
