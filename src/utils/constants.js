@@ -36,11 +36,11 @@ export const WHITELIST_PREFIX = 'whitelist/';
 export const MAX_INDEXERS = 3;
 export const MIN_INDEXERS = 1;
 export const WHITELIST_SLEEP_INTERVAL = 1000;
-export const MAX_PEERS = 128;
-export const MAX_PARALLEL = 128;
+export const MAX_PEERS = 64;
+export const MAX_PARALLEL = 64;
 export const MAX_SERVER_CONNECTIONS = Infinity;
 export const MAX_CLIENT_CONNECTIONS = Infinity;
-export const UPDATER_INTERVAL = 10_000;
+export const UPDATER_INTERVAL = 1_000;
 
 const constants = {
     EntryType,
