@@ -15,11 +15,9 @@ import {
     OperationType,
     EventType,
     WHITELIST_SLEEP_INTERVAL,
-    UPDATER_INTERVAL,
     MAX_INDEXERS,
     MIN_INDEXERS,
     WHITELIST_PREFIX,
-    TRAC_NAMESPACE
 } from './utils/constants.js';
 import Network from './network.js';
 import Check from './utils/check.js';
@@ -56,6 +54,8 @@ export class MainSettlementBus extends ReadyResource {
     #readline_instance;
     #enable_txlogs;
     #disable_rate_limit;
+    #enableValidatorObserver;
+    #enableRoleRequester;
 
     constructor(options = {}) {
         super();
@@ -65,7 +65,8 @@ export class MainSettlementBus extends ReadyResource {
         this.#boot();
         this.#setupInternalListeners();
         this.#network = new Network(this.#base);
-        this.ready().catch(noop);
+        this.#enableValidatorObserver = options.enableValidatorObserver !== undefined ? options.enableValidatorObserver : true;
+        this.#enableRoleRequester = options.enableRoleRequester !== undefined ? options.enableRoleRequester : true;
     }
 
     #initInternalAttributes(options) {
@@ -445,8 +446,6 @@ export class MainSettlementBus extends ReadyResource {
 
         await this.#setUpRoleAutomatically(adminEntry);
 
-        this.updater();
-
         console.log(`isIndexer: ${this.#base.isIndexer}`);
         console.log(`isWriter: ${this.#base.writable}`);
         console.log('MSB Unsigned Length:', this.#base.view.core.length);
@@ -456,20 +455,60 @@ export class MainSettlementBus extends ReadyResource {
         this.validatorObserver();
     }
 
-    async close() {
-        console.log('Closing everything...');
-        if (this.#swarm) {
+    async _close() {
+        console.log('Closing everything gracefully... This may take a moment.');
+
+        if (this.#network !== null) {
+            this.#network.stopPool();
+        }
+        await sleep(100);
+
+        if (this.#enableValidatorObserver) {
+            this.stopValidatorObserver();
+        }
+
+        await sleep(5_000); // stopValidatorObserver is using findValidator which is reading from the base, so we need to wait fot it to finish.. Temporary workaround?
+        if (this.#swarm !== null) {
             await this.#swarm.destroy();
         }
-        await this.#base.close();
+        await sleep(100);
+
+        if (this.#base !== null) {
+            await this.#base.close();
+        }
+        await sleep(100);
+        if (this.#bee !== null) {
+            await this.#bee.close();
+        }
+        await sleep(100);
+        if (this.#readline_instance) {
+            
+            const inputClosed = new Promise(resolve => this.#readline_instance.input.once('close', resolve));
+            const outputClosed = new Promise(resolve => this.#readline_instance.output.once('close', resolve));
+
+            this.#readline_instance.close();
+            this.#readline_instance.input.destroy();
+            this.#readline_instance.output.destroy();
+
+            // Do not remove this. Without it, readline may close too quickly and still hang.
+            await Promise.all([inputClosed, outputClosed]).catch(e => console.log("Error during closing readline stream:", e));
+        }
+        await sleep(100);
+
+        if (this.#store !== null) {
+            await this.#store.close();
+        }
+        await sleep(100);
     }
 
     async #setUpRoleAutomatically() {
-        if (!this.#base.writable) {
+        if (!this.#base.writable && this.#enableRoleRequester) {
+            console.log('Requesting writer role... This may take a moment.');
             await this.#requestWriterRole(false)
             setTimeout(async () => {
                 await this.#requestWriterRole(true)
             }, 5_000);
+            await sleep(5_000);
         }
     }
 
@@ -541,17 +580,6 @@ export class MainSettlementBus extends ReadyResource {
     async #isWhitelisted2(key, batch) {
         const whitelistEntry = await this.getWhitelistEntry2(key, batch)
         return !!whitelistEntry;
-    }
-
-    async updater() {
-        while (true) {
-            if (this.#is_indexer &&
-                this.#base.view.core.length >
-                this.#base.view.core.signedLength) {
-                await this.#base.append(null);
-            }
-            await sleep(UPDATER_INTERVAL);
-        }
     }
 
     async get(key) {
@@ -848,9 +876,11 @@ export class MainSettlementBus extends ReadyResource {
         }
     }
     
+    // TODO: AFTER WHILE LOOP SIGNAL TO THE PROCESS THAT VALIDATOR OBSERVER STOPPED OPERATING. 
+    // OS CALLS, ACCUMULATORS, MAYBE THIS IS POSSIBLE TO CHECK I/O QUEUE IF IT COINTAIN IT. FOR NOW WE ARE USING SLEEP.
     async validatorObserver() {
         // Finding writers for admin recovery case
-        while (this.#enable_wallet) {
+        while (this.#enableValidatorObserver && this.#enable_wallet) {
 
             if (this.#dht_node === null || this.#network.validator_stream !== null) {
                 await sleep(1000);
@@ -924,6 +954,10 @@ export class MainSettlementBus extends ReadyResource {
         await this.#banValidator(tracPublicKey);
     }
 
+    stopValidatorObserver() {
+        this.#enableValidatorObserver = false;
+    }
+
     printHelp() {
         console.log('Available commands:');
         console.log('- /add_writer: add yourself as validator to this MSB once whitelisted.');
@@ -951,10 +985,8 @@ export class MainSettlementBus extends ReadyResource {
                     this.printHelp();
                     break;
                 case '/exit':
-                    console.log('Exiting...');
                     rl.close();
                     await this.close();
-                    typeof process !== "undefined" ? process.exit(0) : Pear.exit(0);
                     break;
                 case '/push_writer_add':
                     await this.#requestWriterRole(true)
@@ -1014,5 +1046,4 @@ export class MainSettlementBus extends ReadyResource {
 
 }
 
-function noop() { }
 export default MainSettlementBus;
