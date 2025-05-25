@@ -17,7 +17,7 @@
     "hypercore": "^11.6.3",
     "corestore": "^7.4.2",
     "b4a": "1.6.7",
-    "bare-readline": "1.0.7",
+    "bare-readline": "^1.0.9",
     "bare-tty": "5.0.2",
     "compact-encoding": "^2.16.0",
     "fastest-validator": "1.19.0",
