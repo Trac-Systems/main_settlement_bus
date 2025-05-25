@@ -260,6 +260,7 @@ class Network {
 
                 // must be called AFTER the protomux init above
                 const stream = store.replicate(connection);
+                stream.on('error', (error) => { });
                 wakeup.addStream(stream);
 
                 connection.on('error', (error) => { });
