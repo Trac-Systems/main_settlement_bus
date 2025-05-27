@@ -50,6 +50,12 @@ const setUpWriter = async (msbBootstrap, peerWritingKey, peerWallet) => {
     await tick();
 }
 
+const setUpIndexer = async (boostrapPeerWallet, msbBootstrap, peerTracPublicKey) => {
+    const assembledAddIndexerMessage = await MsgUtils.assembleAddIndexerMessage(boostrapPeerWallet, peerTracPublicKey);
+    await msbBootstrap.base.append(assembledAddIndexerMessage);
+    await tick();
+}
+
 
 hook('Initialize nodes', async t => {
     //init mocked directory structure
@@ -135,22 +141,25 @@ hook('Initialize nodes', async t => {
     // peerMsb should become a writer (setUpWriter)
     await setUpWriter(msbBootstrap, msbPeer.writingKey, peerWallet);
 
+    // set up indexer
+    await setUpIndexer(boostrapPeerWallet, msbBootstrap, peerWallet.publicKey);
+
 })
 
 //TODO write more tests
-test('handleApplyAddWriterOperation (apply) - Append transaction into the base', async t => {
+test('handleApplyRemoveWriterOperation (apply) - Append transaction into the base', async t => {
     t.plan(2)
 
     const indexerCandidate = peerWallet.publicKey;
-    const assembledAddIndexerMessage = await MsgUtils.assembleAddIndexerMessage(boostrapPeerWallet, indexerCandidate);
+    const assembledAddIndexerMessage = await MsgUtils.assembleRemoveIndexerMessage(boostrapPeerWallet, indexerCandidate);
     await msbBootstrap.base.append(assembledAddIndexerMessage);
     await tick();
     const indexers = await msbBootstrap.get(EntryType.INDEXERS);
     const nodeInfo = await msbBootstrap.get(indexerCandidate);
 
 
-    t.is(Array.from(indexers).includes(indexerCandidate), true, 'Indexer candidate should be included in the indexers list');
-    t.is(nodeInfo.isIndexer, true, 'Node info should indicate that the node is an indexer');
+    t.is(Array.from(indexers).includes(indexerCandidate), false, 'Indexer candidate should be included in the indexers list');
+    t.is(nodeInfo.isIndexer, false, 'Node info should indicate that the node is an indexer');
 })
 
 hook('Clean up addIndexer setup', async t => {
