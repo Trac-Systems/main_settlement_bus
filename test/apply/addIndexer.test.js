@@ -3,10 +3,9 @@ import os from 'os'
 import path from 'path'
 import fs from 'fs/promises'
 import { MainSettlementBus } from '../../src/index.js'
-
 import { randomBytes } from 'crypto'
 import PeerWallet from "trac-wallet"
-import {EntryType} from "../../src/utils/constants.js"
+import { EntryType } from "../../src/utils/constants.js"
 import MsgUtils from '../../src/utils/msgUtils.js'
 import fileUtils from '../../src/utils/fileUtils.js'
 
@@ -22,19 +21,14 @@ const peerKeyPair = {
     mnemonic: "century category maze cover student upset trip cup purchase area turtle keen minimum flee diagram romance stool absorb umbrella phone valve avocado fade window"
 }
 
-const adversaryKeyPair = {
-    publicKey: "3341b586cad305908b4ac0cf9176851d90c64a7b7d3ff74100262e383d63c6b8",
-    secretKey: "25178b87c194c3e84358323a2ec43069610a5b48fdd4ca88689155bbc5c180b13341b586cad305908b4ac0cf9176851d90c64a7b7d3ff74100262e383d63c6b8",
-    mnemonic: "inner pond duty corn danger board tragic penalty mad lounge excite lottery great current high exercise spin noble true curtain airport trend when decade"
-}
 let tmp, bootstrapKeyPairPath, peerKeyPath, advKeyPath, msbBootstrap, msbPeer, boostrapPeerWallet, peerWallet, adversaryWallet
 
 const tick = () => new Promise(resolve => setImmediate(resolve))
 
-const setUpAdmin = async (bootstrap) => {
+const setUpAdmin = async (msbBootstrap, bootstrap) => {
     const adminEntry = await msbBootstrap.get(EntryType.ADMIN)
     const addAdminMessage = await MsgUtils.assembleAdminMessage(adminEntry, msbBootstrap.writingKey, boostrapPeerWallet, bootstrap);
-    
+
     await msbBootstrap.base.append(addAdminMessage);
     await tick();
 };
@@ -43,19 +37,26 @@ const getMockWhitelistKeys = async () => {
     return [peerWallet.publicKey];
 };
 
-const setUpWhitelist = async (wallet) => {
+const setUpWhitelist = async (msbBootstrap, wallet) => {
     const adminEntry = await msbBootstrap.get(EntryType.ADMIN)
     const assembledWhitelistMessages = await MsgUtils.assembleWhitelistMessages(adminEntry, wallet);
     await msbBootstrap.base.append(assembledWhitelistMessages);
-    
 };
+
+const setUpWriter = async (msbBootstrap, peerWritingKey, peerWallet) => {
+    const assembledAddWriterMessage = await MsgUtils.assembleAddWriterMessage(peerWallet, peerWritingKey);
+    await msbBootstrap.base.append(assembledAddWriterMessage);
+    await tick();
+}
+
 
 hook('Initialize nodes', async t => {
     //init mocked directory structure
     tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'tempTestStore-'))
-    console.log('Temporary directory created:', tmp);
+
     const storesDirectory = tmp + '/stores/';
     const storeName = 'testBootstrapStore/';
+
     // Bootstrap store
     const corestoreDbDirectory = path.join(storesDirectory, storeName, 'db');
     await fs.mkdir(corestoreDbDirectory, { recursive: true });
@@ -67,11 +68,9 @@ hook('Initialize nodes', async t => {
     const writeStoreName = 'testWriterStore';
     const writerCorestoreDbDirectory = path.join(storesDirectory, writeStoreName, 'db');
     await fs.mkdir(writerCorestoreDbDirectory, { recursive: true });
+    // Writer keypair files
     peerKeyPath = path.join(writerCorestoreDbDirectory, 'keypair.json');
     await fs.writeFile(peerKeyPath, JSON.stringify(peerKeyPair, null, 2));
-
-    // advKeyPath = path.join(corestoreDbDirectory, 'keypair3.json');
-    // await fs.writeFile(advKeyPath, JSON.stringify(adversaryKeyPair, null, 2));
 
     const msbInit = new MainSettlementBus({
         stores_directory: storesDirectory,
@@ -113,32 +112,44 @@ hook('Initialize nodes', async t => {
 
     await msbPeer.ready();
 
-    // what admin should do? add_admin, add_whitelist and add
-    // Initialization peerWallet1 (validator) and peerWallet2 (subnetwork writer) wallets for testing purposes
+    // Initialization admin  and validator with writing role (Trac network) wallets for testing purposes
     boostrapPeerWallet = new PeerWallet();
     await boostrapPeerWallet.initKeyPair(bootstrapKeyPairPath);
 
     peerWallet = new PeerWallet();
     await peerWallet.initKeyPair(peerKeyPath);
 
-    // adversaryWallet = new PeerWallet();
-    // await adversaryWallet.initKeyPair(advKeyPath);
-
     //set up admin entry
-    await setUpAdmin(bootstrap);
+    await setUpAdmin(msbBootstrap, bootstrap);
 
     // set up whitelist
     const whitelistKeys = await getMockWhitelistKeys();
     const originalReadPublicKeysFromFile = fileUtils.readPublicKeysFromFile;
     fileUtils.readPublicKeysFromFile = async () => whitelistKeys;
 
-    await setUpWhitelist(boostrapPeerWallet);
+    await setUpWhitelist(msbBootstrap, boostrapPeerWallet);
     //brittle does not support mock so we need to revert original function after initialization:
     fileUtils.readPublicKeysFromFile = originalReadPublicKeysFromFile;
 
-    // peerMsb should become a writer
+    // peerMsb should become a writer (setUpWriter)
+    await setUpWriter(msbBootstrap, msbPeer.writingKey, peerWallet);
+
 })
 
+test('Apply function handleApplyAddWriterOperation - Append transaction into the base', async t => {
+    t.plan(2)
+
+    const indexerCandidate = peerWallet.publicKey;
+    const assembledAddIndexerMessage = await MsgUtils.assembleAddIndexerMessage(boostrapPeerWallet, indexerCandidate);
+    await msbBootstrap.base.append(assembledAddIndexerMessage);
+    await tick();
+    const indexers = await msbBootstrap.get(EntryType.INDEXERS);
+    const nodeInfo = await msbBootstrap.get(indexerCandidate);
+
+
+    t.is(Array.from(indexers).includes(indexerCandidate), true, 'Indexer candidate should be included in the indexers list');
+    t.is(nodeInfo.isIndexer, true, 'Node info should indicate that the node is an indexer');
+})
 
 hook('Clean up addIndexer setup', async t => {
     // close msbBoostrap and remove temp directory
