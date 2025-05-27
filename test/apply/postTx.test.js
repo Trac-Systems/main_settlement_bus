@@ -253,7 +253,7 @@ test('Apply function POST_TX operation - Append transaction into the base', asyn
     t.ok(result, 'post tx added to the base');
 })
 
-test('Apply function POST_TX operation - negative', async t => {
+test('handleApplyTxOperation (apply) - negative', async t => {
     t.test('sanitizePostTx - nested object in postTx', async t => {
         //sanitizePostTx is already tested in /test/check/postTx.test.js
         let { postTx, preTxHash } = await generatePostTx(msbBootstrap, boostrapPeerWallet, peerWallet)
