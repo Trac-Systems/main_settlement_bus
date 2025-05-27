@@ -89,7 +89,6 @@ hook('Initialize nodes', async t => {
     await msbInit.ready();
     const bootstrap = msbInit.state.writingKey;
     await msbInit.close();
-
     const channel = randomBytes(32).toString('hex');
     msbBootstrap = new MainSettlementBus({
         stores_directory: storesDirectory,
