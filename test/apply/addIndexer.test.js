@@ -8,6 +8,7 @@ import PeerWallet from "trac-wallet"
 import { EntryType } from "../../src/utils/constants.js"
 import MsgUtils from '../../src/utils/msgUtils.js'
 import fileUtils from '../../src/utils/fileUtils.js'
+import { sleep } from '../../src/utils/functions.js'
 
 //TODO move keys to fixtures, create utils for tests, include Leo's tests approach for initializaion
 const bootstrapKeyPair = {
@@ -88,10 +89,11 @@ hook('Initialize nodes', async t => {
     const bootstrap = msbInit.writingKey;
     await msbInit.close();
 
+    const channel = randomBytes(32).toString('hex');
     msbBootstrap = new MainSettlementBus({
         stores_directory: storesDirectory,
         store_name: storeName,
-        channel: randomBytes(32).toString('hex'),
+        channel:channel,
         bootstrap: bootstrap,
         enable_txlogs: true,
         enableValidatorObserver: false,
@@ -103,7 +105,7 @@ hook('Initialize nodes', async t => {
     msbPeer = new MainSettlementBus({
         stores_directory: storesDirectory,
         store_name: writeStoreName,
-        channel: randomBytes(32).toString('hex'),
+        channel: channel,
         bootstrap: bootstrap,
         enable_txlogs: true,
         enableValidatorObserver: false,
@@ -145,9 +147,10 @@ test('handleApplyAddWriterOperation (apply) - Append transaction into the base',
     const assembledAddIndexerMessage = await MsgUtils.assembleAddIndexerMessage(boostrapPeerWallet, indexerCandidate);
     await msbBootstrap.base.append(assembledAddIndexerMessage);
     await tick();
-    const indexers = await msbBootstrap.get(EntryType.INDEXERS);
-    const nodeInfo = await msbBootstrap.get(indexerCandidate);
-
+    await sleep(5000);
+    
+    const indexers = await msbPeer.get(EntryType.INDEXERS);
+    const nodeInfo = await msbPeer.get(indexerCandidate);
 
     t.is(Array.from(indexers).includes(indexerCandidate), true, 'Indexer candidate should be included in the indexers list');
     t.is(nodeInfo.isIndexer, true, 'Node info should indicate that the node is an indexer');
