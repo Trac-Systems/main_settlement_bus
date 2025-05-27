@@ -327,6 +327,6 @@ test('Apply function POST_TX operation - negative', async t => {
 
 hook('Clean up postTx setup', async t => {
     // close msbBoostrap and remove temp directory
-    if (msbBootstrap) await msbBootstrap.close()
+    if (msbBootstrap) await msbBootstrap.close();
     if (tmp) await fs.rm(tmp, { recursive: true, force: true })
 })
