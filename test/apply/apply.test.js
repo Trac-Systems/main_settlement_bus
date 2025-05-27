@@ -4,6 +4,7 @@ async function runCheckTests() {
   test.pause();
   await import('./postTx.test.js');
   await import('./addIndexer.test.js');
+  await import('./removeIndexer.test.js');
   test.resume();
 }
 
