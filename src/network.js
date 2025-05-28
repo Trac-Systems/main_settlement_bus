@@ -87,6 +87,9 @@ class Network {
                 message_channel.open()
                 const message = message_channel.addMessage({
                     encoding: c.json,
+                    //TODO:split this into many functions. This function should only contain switch statement
+                    //TODO: instad of doing return; in cases which does not fit for us, we should perform - swarm.leavePeer(connection.remotePublicKey)
+
                     async onmessage(msg) {
                         try {
 
@@ -252,6 +255,9 @@ class Network {
                             }
                         } catch (e) {
                             console.log(e);
+                        }
+                        finally {
+                            swarm.leavePeer(connection.remotePublicKey);
                         }
                     }
                 })
