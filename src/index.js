@@ -445,11 +445,11 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async #isWhitelistedApply(key, batch) {
-        const whitelistEntry = await this.getWhitelistEntryApply(key, batch)
+        const whitelistEntry = await this.#getWhitelistEntryApply(key, batch)
         return !!whitelistEntry;
     }
 
-    async getWhitelistEntryApply(key, batch) {
+    async #getWhitelistEntryApply(key, batch) {
         const entry = await batch.get(WHITELIST_PREFIX + key);
         return entry !== null ? entry.value : null
     }
