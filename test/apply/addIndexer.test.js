@@ -19,8 +19,6 @@ let tmpDirectory, bootstrapKeyPairPath, peerKeyPath, advKeyPath;
 let msbBootstrap, msbPeer;
 let boostrapPeerWallet, peerWallet, adversaryWallet;
 
-
-
 const setUpAdmin = async (msbBootstrap, bootstrap) => {
     const adminEntry = await msbBootstrap.state.get(EntryType.ADMIN);
     const addAdminMessage = await MsgUtils.assembleAdminMessage(adminEntry, msbBootstrap.state.writingKey, boostrapPeerWallet, bootstrap);
