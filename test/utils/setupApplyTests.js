@@ -64,7 +64,6 @@ export async function setupAdmin(keyPair, temporaryDirectory, options = {}) {
     const admin = await initMsbAdmin(keyPair, temporaryDirectory, options);
 
     await admin.msb.ready();
-    //await admin.msb.handleCommand('/add_admin');
     const adminEntry = await admin.msb.get(EntryType.ADMIN)
     const addAdminMessage = await MsgUtils.assembleAdminMessage(adminEntry, admin.msb.writingKey, admin.wallet, admin.options.bootstrap);
     await admin.msb.base.append(addAdminMessage);

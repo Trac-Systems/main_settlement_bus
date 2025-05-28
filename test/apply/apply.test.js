@@ -7,6 +7,7 @@ async function runCheckTests() {
   await import('./removeIndexer.test.js');
   await import('./addWriter.test.js');
   await import('./removeWriter.test.js');
+  await import('./addAdmin.test.js');
   test.resume();
 }
 
