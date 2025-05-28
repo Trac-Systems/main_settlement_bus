@@ -18,6 +18,7 @@ import {
     MAX_INDEXERS,
     MIN_INDEXERS,
     WHITELIST_PREFIX,
+    ACK_INTERVAL
 } from './utils/constants.js';
 import Network from './network.js';
 import Check from './utils/check.js';
@@ -130,7 +131,7 @@ export class MainSettlementBus extends ReadyResource {
     #boot() {
         const _this = this;
         this.#base = new Autobase(this.#store, this.#bootstrap, {
-            ackInterval : 1000,
+            ackInterval: ACK_INTERVAL,
             valueEncoding: 'json',
             open: this.#setupHyperbee.bind(this),
             apply: this.#apply.bind(this),
