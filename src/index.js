@@ -41,8 +41,6 @@ export class MainSettlementBus extends ReadyResource {
     #dht_bootstrap;
     #base;
     #writingKey;
-    #enable_txchannel;
-    #is_indexer;
     #enable_wallet;
     #wallet;
     #replicate;
@@ -79,9 +77,7 @@ export class MainSettlementBus extends ReadyResource {
         this.#dht_node = null;
         this.#base = null;
         this.#writingKey = null;
-        this.#enable_txchannel = options.enable_txchannel !== false;
         this.#enable_txlogs = options.enable_txlogs === true;
-        this.#is_indexer = false;
         this.#enable_wallet = options.enable_wallet !== false;
         this.#disable_rate_limit = options.disable_rate_limit === true;
         this.#wallet = new PeerWallet(options);
@@ -476,7 +472,6 @@ export class MainSettlementBus extends ReadyResource {
                 this.#disable_rate_limit,
                 this,
                 this.#network,
-                this.#enable_txchannel,
                 this.#base,
                 this.#writingKey,
                 this.#dht_bootstrap,
@@ -677,12 +672,10 @@ export class MainSettlementBus extends ReadyResource {
                 this.removeAllListeners(EventType.WRITER_EVENT);
                 this.#shouldListenToWriterEvents = false;
             }
-            this.#is_indexer = true;
             console.log('Current node is an indexer');
         });
 
         this.#base.on(EventType.IS_NON_INDEXER, () => {
-            this.#is_indexer = false;
             console.log('Current node is not an indexer anymore');
         });
 

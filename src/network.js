@@ -37,7 +37,6 @@ class Network {
         disable_rate_limit,
         msb,
         network,
-        enable_txchannel,
         base, writingKey,
         bootstrap, swarm,
         walletEnabled,
