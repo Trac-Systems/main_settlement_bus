@@ -33,7 +33,21 @@ class Network {
         this.custom_node = null
     }
 
-    static async replicate(disable_rate_limit, msb, network, enable_txchannel, base, writingKey, bootstrap, swarm, walletEnabled, store, wallet, channel, isStreaming, handleIncomingEvent, emit) {
+    static async replicate(
+        disable_rate_limit,
+        msb,
+        network,
+        enable_txchannel,
+        base, writingKey,
+        bootstrap, swarm,
+        walletEnabled,
+        store,
+        wallet,
+        channel,
+        isStreaming,
+        handleIncomingEvent,
+        emit,
+    ) {
         if (!swarm) {
 
             let keyPair;
@@ -49,7 +63,14 @@ class Network {
             let clean = Date.now();
             let conns = {};
 
-            swarm = new Hyperswarm({ keyPair, bootstrap: bootstrap, maxPeers: MAX_PEERS, maxParallel: MAX_PARALLEL, maxServerConnections: MAX_SERVER_CONNECTIONS, maxClientConnections: MAX_CLIENT_CONNECTIONS });
+            swarm = new Hyperswarm({
+                keyPair,
+                bootstrap: bootstrap,
+                maxPeers: MAX_PEERS,
+                maxParallel: MAX_PARALLEL,
+                maxServerConnections: MAX_SERVER_CONNECTIONS,
+                maxClientConnections: MAX_CLIENT_CONNECTIONS
+            });
 
             console.log(`Channel: ${b4a.toString(channel)}`);
             swarm.on('connection', async (connection) => {
@@ -143,11 +164,9 @@ class Network {
                                 if (null === adminEntry || (adminEntry.tracPublicKey !== wallet.publicKey)) return;
                                 const nodeEntry = await msb.get(msg.value.pub);
                                 const isAlreadyWriter = null !== nodeEntry && nodeEntry.isWriter;
-                                const isAllowedToRequestRole = await msb._isAllowedToRequestRole(msg.key, adminEntry);
-                                const canAddWriter = base.writable && !isAlreadyWriter && isAllowedToRequestRole;
-                                if (msg.key !== wallet.publicKey && canAddWriter) {
-                                    await handleIncomingEvent(msg);
-                                }
+                                const canAddWriter = base.writable && !isAlreadyWriter;
+                                if (msg.key === wallet.publicKey || !canAddWriter) return;
+                                await handleIncomingEvent(msg);
                                 swarm.leavePeer(connection.remotePublicKey)
                             } else if (msg.type !== undefined && msg.key !== undefined && msg.value !== undefined && msg.type === 'removeWriter') {
                                 const adminEntry = await msb.get(EntryType.ADMIN);
@@ -155,9 +174,8 @@ class Network {
                                 const nodeEntry = await msb.get(msg.value.pub);
                                 const isAlreadyWriter = null !== nodeEntry && nodeEntry.isWriter;
                                 const canRemoveWriter = base.writable && isAlreadyWriter
-                                if (msg.key !== wallet.publicKey && canRemoveWriter) {
-                                    await handleIncomingEvent(msg);
-                                }
+                                if (msg.key === wallet.publicKey || !canRemoveWriter) return;
+                                await handleIncomingEvent(msg);
                                 swarm.leavePeer(connection.remotePublicKey)
                             } else if (msg.type !== undefined && msg.key !== undefined && msg.value !== undefined && msg.type === 'addAdmin') {
                                 const adminEntry = await msb.get(EntryType.ADMIN);

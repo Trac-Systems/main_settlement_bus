@@ -13,7 +13,7 @@
     "test:bare": "bare test/all.test.js"
   },
   "dependencies": {
-    "autobase": "7.6.3",
+    "autobase": "7.6.2",
     "hypercore": "^11.6.3",
     "corestore": "^7.4.2",
     "b4a": "1.6.7",
