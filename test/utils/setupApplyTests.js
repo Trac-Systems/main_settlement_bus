@@ -1,11 +1,15 @@
-import os from 'os'
-import path from 'path'
-import fs from 'fs/promises'
 import { MainSettlementBus } from '../../src/index.js'
-import PeerWallet from "trac-wallet"
 import fileUtils from '../../src/utils/fileUtils.js'
 import MsgUtils from '../../src/utils/msgUtils.js'
 import { EntryType } from '../../src/utils/constants.js';
+import { OperationType } from '../../src/utils/constants.js'
+import { createHash } from '../../src/utils/functions.js'
+import b4a from 'b4a'
+import os from 'os'
+import path from 'path'
+import fs from 'fs/promises'
+import PeerWallet from "trac-wallet"
+import { randomBytes } from 'crypto'
 
 export const tick = () => new Promise(resolve => setImmediate(resolve));
 
@@ -144,4 +148,77 @@ export async function restoreWhitelistFromBackup(filepath) {
     } catch (e) {
         // Backup does not exist, nothing to restore
     }
+}
+
+export const generatePostTx = async (msbBootstrap, boostrapPeerWallet, peerWallet) => {
+
+    const peerBootstrap = randomBytes(32).toString('hex');
+    const validatorPubKey = msbBootstrap.getTracPublicKey();
+    const peerWriterKey = randomBytes(32).toString('hex');
+    const peerPublicKey = peerWallet.publicKey;
+
+    const testObj = {
+        type: 'deployTest',
+        value: {
+            op: 'deploy',
+            tick: Math.random().toString(),
+            max: '21000000',
+            lim: '1000',
+            dec: 18
+        }
+    };
+
+    const contentHash = await createHash('sha256', JSON.stringify(testObj));
+    const nonce = PeerWallet.generateNonce().toString('hex');
+
+    const preTxHash = await msbBootstrap.generateTx(
+        peerBootstrap,
+        msbBootstrap.bootstrap,
+        validatorPubKey,
+        peerWriterKey,
+        peerPublicKey,
+        contentHash,
+        nonce
+    );
+
+    const parsedPreTx = {
+        op: 'pre-tx',
+        tx: preTxHash,
+        is: peerWallet.sign(Buffer.from(preTxHash + nonce)),
+        wp: validatorPubKey,
+        i: peerWriterKey,
+        ipk: peerPublicKey,
+        ch: contentHash,
+        in: nonce,
+        bs: peerBootstrap,
+        mbs: msbBootstrap.bootstrap
+    };
+
+    const postTxSig = boostrapPeerWallet.sign(
+        b4a.from(parsedPreTx.tx + nonce),
+        b4a.from(boostrapPeerWallet.secretKey, 'hex')
+    );
+
+    const postTx = {
+        type: OperationType.TX,
+        key: preTxHash,
+        value: {
+            op: OperationType.POST_TX,
+            tx: preTxHash,
+            is: parsedPreTx.is,
+            w: msbBootstrap.bootstrap,
+            i: parsedPreTx.i,
+            ipk: parsedPreTx.ipk,
+            ch: parsedPreTx.ch,
+            in: parsedPreTx.in,
+            bs: parsedPreTx.bs,
+            mbs: parsedPreTx.mbs,
+            ws: postTxSig.toString('hex'),
+            wp: boostrapPeerWallet.publicKey,
+            wn: nonce
+        }
+    };
+
+    return { postTx, preTxHash };
+
 }

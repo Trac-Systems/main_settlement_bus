@@ -3,88 +3,12 @@ import os from 'os'
 import path from 'path'
 import fs from 'fs/promises'
 import { MainSettlementBus } from '../../src/index.js'
-import { OperationType } from '../../src/utils/constants.js'
-import { createHash } from '../../src/utils/functions.js'
-import b4a from 'b4a'
 import { randomBytes } from 'crypto'
 import PeerWallet from "trac-wallet"
-import { tick } from '../utils/setupApplyTests.js';
+import { tick, generatePostTx } from '../utils/setupApplyTests.js';
 import {testKeyPair1, testKeyPair2, testKeyPair3} from '../fixtures/apply.fixtures.js'
 
 let tmp, bootstrapKeyPairPath, peerKeyPath, advKeyPath, msbBootstrap, boostrapPeerWallet, peerWallet, adversaryWallet
-
-const generatePostTx = async (msbBootstrap, boostrapPeerWallet, peerWallet) => {
-
-    const peerBootstrap = randomBytes(32).toString('hex');
-    const validatorPubKey = msbBootstrap.getTracPublicKey();
-    const peerWriterKey = randomBytes(32).toString('hex');
-    const peerPublicKey = peerWallet.publicKey;
-
-    const testObj = {
-        type: 'deployTest',
-        value: {
-            op: 'deploy',
-            tick: Math.random().toString(),
-            max: '21000000',
-            lim: '1000',
-            dec: 18
-        }
-    };
-
-    const contentHash = await createHash('sha256', JSON.stringify(testObj));
-    const nonce = PeerWallet.generateNonce().toString('hex');
-
-    const preTxHash = await msbBootstrap.generateTx(
-        peerBootstrap,
-        msbBootstrap.bootstrap,
-        validatorPubKey,
-        peerWriterKey,
-        peerPublicKey,
-        contentHash,
-        nonce
-    );
-
-    const parsedPreTx = {
-        op: 'pre-tx',
-        tx: preTxHash,
-        is: peerWallet.sign(Buffer.from(preTxHash + nonce)),
-        wp: validatorPubKey,
-        i: peerWriterKey,
-        ipk: peerPublicKey,
-        ch: contentHash,
-        in: nonce,
-        bs: peerBootstrap,
-        mbs: msbBootstrap.bootstrap
-    };
-
-    const postTxSig = boostrapPeerWallet.sign(
-        b4a.from(parsedPreTx.tx + nonce),
-        b4a.from(boostrapPeerWallet.secretKey, 'hex')
-    );
-
-    const postTx = {
-        type: OperationType.TX,
-        key: preTxHash,
-        value: {
-            op: OperationType.POST_TX,
-            tx: preTxHash,
-            is: parsedPreTx.is,
-            w: msbBootstrap.bootstrap,
-            i: parsedPreTx.i,
-            ipk: parsedPreTx.ipk,
-            ch: parsedPreTx.ch,
-            in: parsedPreTx.in,
-            bs: parsedPreTx.bs,
-            mbs: parsedPreTx.mbs,
-            ws: postTxSig.toString('hex'),
-            wp: boostrapPeerWallet.publicKey,
-            wn: nonce
-        }
-    };
-
-    return { postTx, preTxHash };
-
-}
 
 hook('Initialize nodes', async t => {
     //init mocked directory structure
