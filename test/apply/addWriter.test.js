@@ -46,8 +46,8 @@ test('Apply function addWriter - happy path', async (t) => {
 
 });
 
-hook('Clean up addIndexer setup', async t => {
-    // close msbBoostrap and remove temp directory
+hook('Clean up addWriter setup', async t => {
+    // close msb instances and remove temp directory
     if (admin.msb) await admin.msb.close();
     if (writer.msb) await writer.msb.close();
     if (tmpDirectory) await removeTemporaryDirectory(tmpDirectory);
