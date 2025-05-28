@@ -1,5 +1,5 @@
 import test from 'brittle';
-import { tick, setupAdmin, setupMsbPeer, setupWhitelist } from './setupApplyTests.js';
+import { tick, setupAdmin, setupMsbPeer, setupWhitelist } from '../utils/setupApplyTests.js';
 import { testKeyPair1, testKeyPair2 } from '../fixtures/apply.fixtures.js';
 import MsgUtils from '../../src/utils/msgUtils.js';
 import { sleep } from '../../src/utils/functions.js';
