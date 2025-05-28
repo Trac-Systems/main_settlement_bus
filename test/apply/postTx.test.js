@@ -8,27 +8,10 @@ import { createHash } from '../../src/utils/functions.js'
 import b4a from 'b4a'
 import { randomBytes } from 'crypto'
 import PeerWallet from "trac-wallet"
+import { tick } from '../utils/setupApplyTests.js';
+import {testKeyPair1, testKeyPair2, testKeyPair3} from '../fixtures/apply.fixtures.js'
 
-const bootstrapKeyPair = {
-    publicKey: '82f6c1f684f4e251dfe092155b8861a0625b596991810b2b80b9c65ccbec5ad3',
-    secretKey: '734aa8a4ff1506a502054f537c235d3fbe70452926bad869c3ab57e90d06df7382f6c1f684f4e251dfe092155b8861a0625b596991810b2b80b9c65ccbec5ad3',
-    mnemonic: 'slight wedding permit mention subject mask hawk awkward sniff leopard spider scatter close neutral deny apple wide category sick love sorry pupil then legal'
-}
-
-const peerKeyPair = {
-    publicKey: "8f17ec2862c7b3e4dbbedaf88a68a9b74d76e9d6acca6ca4a5fafb1b6c474616",
-    secretKey: "21b7f3c56eaa4d8114530258c79b8086bcca3e61d6c9edee589e8ca2f48688e98f17ec2862c7b3e4dbbedaf88a68a9b74d76e9d6acca6ca4a5fafb1b6c474616",
-    mnemonic: "century category maze cover student upset trip cup purchase area turtle keen minimum flee diagram romance stool absorb umbrella phone valve avocado fade window"
-}
-
-const adversaryKeyPair = {
-    publicKey: "3341b586cad305908b4ac0cf9176851d90c64a7b7d3ff74100262e383d63c6b8",
-    secretKey: "25178b87c194c3e84358323a2ec43069610a5b48fdd4ca88689155bbc5c180b13341b586cad305908b4ac0cf9176851d90c64a7b7d3ff74100262e383d63c6b8",
-    mnemonic: "inner pond duty corn danger board tragic penalty mad lounge excite lottery great current high exercise spin noble true curtain airport trend when decade"
-}
 let tmp, bootstrapKeyPairPath, peerKeyPath, advKeyPath, msbBootstrap, boostrapPeerWallet, peerWallet, adversaryWallet
-
-const tick = () => new Promise(resolve => setImmediate(resolve))
 
 const generatePostTx = async (msbBootstrap, boostrapPeerWallet, peerWallet) => {
 
@@ -112,13 +95,13 @@ hook('Initialize nodes', async t => {
     await fs.mkdir(corestoreDbDirectory, { recursive: true });
 
     bootstrapKeyPairPath = path.join(corestoreDbDirectory, 'keypair.json');
-    await fs.writeFile(bootstrapKeyPairPath, JSON.stringify(bootstrapKeyPair, null, 2));
+    await fs.writeFile(bootstrapKeyPairPath, JSON.stringify(testKeyPair1, null, 2));
 
     peerKeyPath = path.join(corestoreDbDirectory, 'keypair2.json');
-    await fs.writeFile(peerKeyPath, JSON.stringify(peerKeyPair, null, 2));
+    await fs.writeFile(peerKeyPath, JSON.stringify(testKeyPair2, null, 2));
 
     advKeyPath = path.join(corestoreDbDirectory, 'keypair3.json');
-    await fs.writeFile(advKeyPath, JSON.stringify(adversaryKeyPair, null, 2));
+    await fs.writeFile(advKeyPath, JSON.stringify(testKeyPair3, null, 2));
 
     const msbInit = new MainSettlementBus({
         stores_directory: storesDirectory,
