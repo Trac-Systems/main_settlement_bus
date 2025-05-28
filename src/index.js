@@ -797,6 +797,7 @@ export class MainSettlementBus extends ReadyResource {
         }
     }
 
+    // TODO: MOVE TO UTILS
     async generateTx(bootstrap, msb_bootstrap, validator_writer_key, local_writer_key, local_public_key, content_hash, nonce) {
         let tx = bootstrap + '-' +
             msb_bootstrap + '-' +
@@ -862,6 +863,7 @@ export class MainSettlementBus extends ReadyResource {
         }
     }
 
+    //TODO: MOVE TO NETWORK MODULE
     async tryConnection(address, type = null) {
         if (null === this.#swarm) return null;
         if (this.#network.validator_stream !== null && address !== b4a.toString(this.#network.validator_stream.remotePublicKey, 'hex')) {
@@ -891,7 +893,7 @@ export class MainSettlementBus extends ReadyResource {
             }
         }
     }
-
+    //TODO: MOVE TO NETWORK MODULE
     async #sendRequestByType(stream, type) {
         const waitFor = {
             validator: () => this.#network.validator_stream,
@@ -910,7 +912,7 @@ export class MainSettlementBus extends ReadyResource {
         }
         await this.spinLock(() => !waitFor)
     };
-
+    //TODO: MOVE TO NETWORK MODULE
     async spinLock(conditionFn, maxIterations = 1500, intervalMs = 10) {
         let counter = 0;
         while (conditionFn() && counter < maxIterations) {
@@ -964,7 +966,7 @@ export class MainSettlementBus extends ReadyResource {
         }
     }
 
-
+    //TODO create a MODULE which will separate logic responsible for role managment
     async #banValidator(tracPublicKey) {
         const adminEntry = await this.get(EntryType.ADMIN);
         if (!this.#isAdmin(adminEntry)) return;
