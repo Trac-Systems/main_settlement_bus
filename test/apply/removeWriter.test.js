@@ -1,18 +1,23 @@
-import test from 'brittle';
-import { tick, setupAdmin, setupMsbPeer, setupWhitelist } from '../utils/setupApplyTests.js';
+import { test, hook } from 'brittle';
+import { tick, setupAdmin, setupMsbPeer, setupWhitelist, initTemporaryDirectory, removeTemporaryDirectory } from '../utils/setupApplyTests.js';
 import { testKeyPair1, testKeyPair2 } from '../fixtures/apply.fixtures.js';
 import MsgUtils from '../../src/utils/msgUtils.js';
 import { sleep } from '../../src/utils/functions.js';
 
+let admin, writer, tmpDirectory;
+
+hook('Initialize nodes for addWriter tests', async t => {
+    tmpDirectory = await initTemporaryDirectory()
+    admin = await setupAdmin(testKeyPair1, tmpDirectory, {});
+    writer = await setupMsbPeer('writer', testKeyPair2, tmpDirectory, admin.options);
+
+    // set up whitelist
+    const whitelistKeys = [writer.wallet.publicKey];
+    await setupWhitelist(admin, whitelistKeys);
+})
+
 test('Apply function removeWriter - happy path', async (t) => {
     try {
-        const admin = await setupAdmin(testKeyPair1, {});
-        const writer = await setupMsbPeer('writer', testKeyPair2, admin.options);
-
-        // set up whitelist
-        const whitelistKeys = [writer.wallet.publicKey]
-        await setupWhitelist(admin, whitelistKeys);
-
         const reqAddWriter = await MsgUtils.assembleAddWriterMessage(
             writer.wallet,
             writer.msb.writingKey,
@@ -49,3 +54,11 @@ test('Apply function removeWriter - happy path', async (t) => {
     }
 
 });
+
+hook('Clean up addIndexer setup', async t => {
+    // close msbBoostrap and remove temp directory
+    if (admin.msb) await admin.msb.close();
+    if (writer.msb) await writer.msb.close();
+    console.log('Removing temporary directory:', tmpDirectory);
+    if (tmpDirectory) await removeTemporaryDirectory(tmpDirectory);
+})

@@ -1,16 +1,16 @@
-import { test, hook } from 'brittle'
-import os from 'os'
-import path from 'path'
-import fs from 'fs/promises'
-import { MainSettlementBus } from '../../src/index.js'
-import { randomBytes } from 'crypto'
-import PeerWallet from "trac-wallet"
-import { EntryType } from "../../src/utils/constants.js"
-import MsgUtils from '../../src/utils/msgUtils.js'
-import fileUtils from '../../src/utils/fileUtils.js'
-import { sleep } from '../../src/utils/functions.js'
+import { test, hook } from 'brittle';
+import os from 'os';
+import path from 'path';
+import fs from 'fs/promises';
+import { MainSettlementBus } from '../../src/index.js';
+import { randomBytes } from 'crypto';
+import PeerWallet from "trac-wallet";
+import { EntryType } from "../../src/utils/constants.js";
+import MsgUtils from '../../src/utils/msgUtils.js';
+import fileUtils from '../../src/utils/fileUtils.js';
+import { sleep } from '../../src/utils/functions.js';
 import { tick } from '../utils/setupApplyTests.js';
-import {testKeyPair1, testKeyPair2} from '../fixtures/apply.fixtures.js'
+import {testKeyPair1, testKeyPair2} from '../fixtures/apply.fixtures.js';
 
 //TODO: create utils for tests, include Leo's tests approach for initializaion
 

@@ -25,8 +25,8 @@ export async function baseSetup(test) {
     }
 }
 
-export async function initMsbPeer(peerName, peerKeyPair, options = {}) {
-    const peer = await initDirectoryStructure(peerName, peerKeyPair);
+export async function initMsbPeer(peerName, peerKeyPair, temporaryDirectory, options = {}) {
+    const peer = await initDirectoryStructure(peerName, peerKeyPair, temporaryDirectory);
     peer.options = options
     peer.options.stores_directory = peer.storesDirectory;
     peer.options.store_name = peer.storeName;
@@ -42,14 +42,15 @@ export async function initMsbPeer(peerName, peerKeyPair, options = {}) {
     return peer;
 }
 
-export async function setupMsbPeer(peerName, peerKeyPair, options = {}) {
-    const peer = await initMsbPeer(peerName, peerKeyPair, options);
+export async function setupMsbPeer(peerName, peerKeyPair, temporaryDirectory, options = {}) {
+    const peer = await initMsbPeer(peerName, peerKeyPair, temporaryDirectory, options);
     await peer.msb.ready();
     return peer;
 }
 
-export async function initMsbAdmin(keyPair, options = {}) {
-    const admin = await initMsbPeer('admin', keyPair, options);
+export async function initMsbAdmin(keyPair, temporaryDirectory, options = {}) {
+    const peerName = 'admin';
+    const admin = await initMsbPeer(peerName, keyPair, temporaryDirectory, options);
 
     await admin.msb.ready();
     admin.options.bootstrap = admin.msb.writingKey;
@@ -59,10 +60,15 @@ export async function initMsbAdmin(keyPair, options = {}) {
     return admin;
 }
 
-export async function setupAdmin(keyPair, options = {}) {
-    const admin = await initMsbAdmin(keyPair, options);
+export async function setupAdmin(keyPair, temporaryDirectory, options = {}) {
+    const admin = await initMsbAdmin(keyPair, temporaryDirectory, options);
+
     await admin.msb.ready();
-    await admin.msb.handleCommand('/add_admin');
+    //await admin.msb.handleCommand('/add_admin');
+    const adminEntry = await admin.msb.get(EntryType.ADMIN)
+    const addAdminMessage = await MsgUtils.assembleAdminMessage(adminEntry, admin.msb.writingKey, admin.wallet, admin.options.bootstrap);
+    await admin.msb.base.append(addAdminMessage);
+    await tick();
     return admin;
 }
 
@@ -88,12 +94,19 @@ export async function setupWhitelist(admin, whitelistKeys) {
     fileUtils.readPublicKeysFromFile = originalReadPublicKeysFromFile;
 }
 
-async function initDirectoryStructure(peerName, keyPair) {
-    try {
-        const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'tempTestStore-'));
-        console.log('tmp dir', tmp);
+export async function initTemporaryDirectory() {
+    const temporaryDirectory = await fs.mkdtemp(path.join(os.tmpdir(), 'tempTestStore-'));
+    console.log('temporary directory: ', temporaryDirectory);
+    return temporaryDirectory;
+}
 
-        const storesDirectory = tmp + '/stores/';
+export async function removeTemporaryDirectory(temporaryDirectory) {
+    await fs.rm(temporaryDirectory, { recursive: true, force: true })
+}
+
+async function initDirectoryStructure(peerName, keyPair, temporaryDirectory) {
+    try {
+        const storesDirectory = temporaryDirectory + '/stores/';
         const storeName = peerName + '/';
         const corestoreDbDirectory = path.join(storesDirectory, storeName, 'db');
         await fs.mkdir(corestoreDbDirectory, { recursive: true });
