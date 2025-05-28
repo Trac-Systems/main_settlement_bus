@@ -1,12 +1,12 @@
-import { test, hook } from 'brittle'
-import os from 'os'
-import path from 'path'
-import fs from 'fs/promises'
-import { MainSettlementBus } from '../../src/index.js'
-import { randomBytes } from 'crypto'
-import PeerWallet from "trac-wallet"
+import { test, hook } from 'brittle';
+import os from 'os';
+import path from 'path';
+import fs from 'fs/promises';
+import { MainSettlementBus } from '../../src/index.js';
+import { randomBytes } from 'crypto';
+import PeerWallet from "trac-wallet";
 import { tick, generatePostTx } from '../utils/setupApplyTests.js';
-import {testKeyPair1, testKeyPair2, testKeyPair3} from '../fixtures/apply.fixtures.js'
+import {testKeyPair1, testKeyPair2, testKeyPair3} from '../fixtures/apply.fixtures.js';
 
 let tmp, bootstrapKeyPairPath, peerKeyPath, advKeyPath, msbBootstrap, boostrapPeerWallet, peerWallet, adversaryWallet
 
