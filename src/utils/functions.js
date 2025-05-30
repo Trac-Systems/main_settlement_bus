@@ -77,3 +77,18 @@ export async function generateTx(bootstrap, msb_bootstrap, validator_writer_key,
         nonce;
     return await createHash('sha256', await createHash('sha256', tx));
 }
+
+export function printHelp() {
+    console.log('Available commands:');
+    console.log('- /add_writer: add yourself as validator to this MSB once whitelisted.');
+    console.log('- /remove_writer: remove yourself from this MSB.');
+    console.log('- /add_admin: register admin entry with bootstrap key. (initial setup)');
+    console.log('- /add_whitelist: add all specified whitelist addresses. (admin only)');
+    console.log('- /add_indexer <address>: change a role of the selected writer node to indexer role. (admin only)');
+    console.log('- /remove_indexer <address>: change a role of the selected indexer node to default role. (admin only)');
+    console.log('- /ban_writer <address>: demote a whitelisted writer to default role and remove it from the whitelist. (admin only)');
+    console.log('- /get_node_info <address>: get information about a node with the given address.');
+    console.log('- /stats: check system stats such as writing key, DAG, etc.');
+    console.log('- /exit: Exit the program.');
+    console.log('- /help: display this help.');
+}
