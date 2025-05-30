@@ -16,12 +16,19 @@ import Check from './utils/check.js';
 import Wallet from 'trac-wallet';
 import Protomux from 'protomux'
 import c from 'compact-encoding'
+import ReadyResource from 'ready-resource';
 
 const wakeup = new w();
 
-class Network {
+class Network extends ReadyResource {
     #shouldStopPool = false;
-    constructor(base) {
+    #swarm = null;
+    #enableValidatorObserver;
+    #enable_wallet
+    constructor(base, options = {}) {
+        super();
+        this.#enableValidatorObserver = options.enableValidatorObserver !== undefined ? options.enableValidatorObserver : true;
+        this.#enable_wallet = options.enable_wallet !== false;
         this.tx_pool = [];
         this.pool(base);
         this.check = new Check();
@@ -31,14 +38,18 @@ class Network {
         this.validator = null;
         this.custom_stream = null;
         this.custom_node = null
+        this.ready();
     }
 
-    static async replicate(
+    get swarm() {
+        return this.#swarm;
+    }
+
+    async replicate(
         disable_rate_limit,
         msb,
-        network,
         base, writingKey,
-        bootstrap, swarm,
+        bootstrap,
         walletEnabled,
         store,
         wallet,
@@ -47,7 +58,7 @@ class Network {
         handleIncomingEvent,
         emit,
     ) {
-        if (!swarm) {
+        if (!this.#swarm) {
 
             let keyPair;
             if (!walletEnabled) {
@@ -62,7 +73,7 @@ class Network {
             let clean = Date.now();
             let conns = {};
 
-            swarm = new Hyperswarm({
+            this.#swarm = new Hyperswarm({
                 keyPair,
                 bootstrap: bootstrap,
                 maxPeers: MAX_PEERS,
@@ -72,7 +83,8 @@ class Network {
             });
 
             console.log(`Channel: ${b4a.toString(channel)}`);
-            swarm.on('connection', async (connection) => {
+            const network = this;
+            this.#swarm.on('connection', async (connection) => {
 
                 const mux = Protomux.from(connection)
                 connection.userData = mux
@@ -92,7 +104,6 @@ class Network {
 
                     async onmessage(msg) {
                         try {
-
                             if (msg === 'get_validator') {
                                 const nonce = Wallet.generateNonce().toString('hex');
                                 const _msg = {
@@ -103,7 +114,7 @@ class Network {
                                 };
                                 const sig = wallet.sign(JSON.stringify(_msg) + nonce);
                                 message.send({ response: _msg, sig, nonce })
-                                swarm.leavePeer(connection.remotePublicKey)
+                                network.#swarm.leavePeer(connection.remotePublicKey)
                             } else if (msg === 'get_admin') {
                                 const res = await msb.get(EntryType.ADMIN);
                                 if (wallet.publicKey !== res.tracPublicKey) return;
@@ -116,7 +127,7 @@ class Network {
                                 };
                                 const sig = wallet.sign(JSON.stringify(_msg) + nonce);
                                 message.send({ response: _msg, sig, nonce })
-                                swarm.leavePeer(connection.remotePublicKey)
+                                network.#swarm.leavePeer(connection.remotePublicKey)
                             } else if (msg === 'get_node') {
 
                                 const nonce = Wallet.generateNonce().toString('hex');
@@ -128,7 +139,7 @@ class Network {
                                 };
                                 const sig = wallet.sign(JSON.stringify(_msg) + nonce);
                                 message.send({ response: _msg, sig, nonce })
-                                swarm.leavePeer(connection.remotePublicKey)
+                                network.#swarm.leavePeer(connection.remotePublicKey)
 
                             } else if (msg.response !== undefined && msg.response.op !== undefined && msg.response.op === 'validator') {
                                 const res = await msb.get(msg.response.address);
@@ -139,7 +150,7 @@ class Network {
                                     network.validator_stream = connection;
                                     network.validator = msg.response.address;
                                 }
-                                swarm.leavePeer(connection.remotePublicKey)
+                                network.#swarm.leavePeer(connection.remotePublicKey)
                             } else if (msg.response !== undefined && msg.response.op !== undefined && msg.response.op === 'admin') {
                                 const res = await msb.get(EntryType.ADMIN);
                                 if (res === null || res.tracPublicKey !== msg.response.address) return;
@@ -149,7 +160,7 @@ class Network {
                                     network.admin_stream = connection;
                                     network.admin = res.tracPublicKey;
                                 }
-                                swarm.leavePeer(connection.remotePublicKey)
+                                network.#swarm.leavePeer(connection.remotePublicKey)
                             }
                             else if (msg.response !== undefined && msg.response.op !== undefined && msg.response.op === 'node') {
 
@@ -160,7 +171,7 @@ class Network {
                                     network.custom_stream = connection;
                                     network.custom_node = msg.response.address;
                                 }
-                                swarm.leavePeer(connection.remotePublicKey)
+                                network.#swarm.leavePeer(connection.remotePublicKey)
                             } else if (msg.type !== undefined && msg.key !== undefined && msg.value !== undefined && msg.type === 'addWriter') {
                                 const adminEntry = await msb.get(EntryType.ADMIN);
                                 if (null === adminEntry || (adminEntry.tracPublicKey !== wallet.publicKey)) return;
@@ -169,7 +180,7 @@ class Network {
                                 const canAddWriter = base.writable && !isAlreadyWriter;
                                 if (msg.key === wallet.publicKey || !canAddWriter) return;
                                 await handleIncomingEvent(msg);
-                                swarm.leavePeer(connection.remotePublicKey)
+                                network.#swarm.leavePeer(connection.remotePublicKey)
                             } else if (msg.type !== undefined && msg.key !== undefined && msg.value !== undefined && msg.type === 'removeWriter') {
                                 const adminEntry = await msb.get(EntryType.ADMIN);
                                 if (null === adminEntry || (adminEntry.tracPublicKey !== wallet.publicKey)) return;
@@ -178,16 +189,16 @@ class Network {
                                 const canRemoveWriter = base.writable && isAlreadyWriter
                                 if (msg.key === wallet.publicKey || !canRemoveWriter) return;
                                 await handleIncomingEvent(msg);
-                                swarm.leavePeer(connection.remotePublicKey)
+                                network.#swarm.leavePeer(connection.remotePublicKey)
                             } else if (msg.type !== undefined && msg.key !== undefined && msg.value !== undefined && msg.type === 'addAdmin') {
                                 const adminEntry = await msb.get(EntryType.ADMIN);
                                 if (null === adminEntry || (adminEntry.tracPublicKey !== msg.key)) return;
                                 await handleIncomingEvent(msg);
-                                swarm.leavePeer(connection.remotePublicKey)
+                                network.#swarm.leavePeer(connection.remotePublicKey)
                             }
                             else if (msg.type !== undefined && msg.key !== undefined && msg.value !== undefined && msg.type === 'whitelisted') {
                                 await handleIncomingEvent(msg);
-                                swarm.leavePeer(connection.remotePublicKey)
+                                network.#swarm.leavePeer(connection.remotePublicKey)
                             } else {
                                 if (base.isIndexer || !base.writable) return;
 
@@ -212,7 +223,7 @@ class Network {
                                     }
 
                                     if (conns[peer] !== undefined && conns[peer].now - conns[peer].prev >= 1000 && conns[peer].tx_cnt >= 50) {
-                                        swarm.leavePeer(connection.remotePublicKey);
+                                        network.#swarm.leavePeer(connection.remotePublicKey);
                                         connection.end()
                                     }
                                 }
@@ -251,13 +262,13 @@ class Network {
                                     network.tx_pool.push({ tx: parsedPreTx.tx, append_tx: append_tx });
                                 }
 
-                                swarm.leavePeer(connection.remotePublicKey)
+                                network.#swarm.leavePeer(connection.remotePublicKey)
                             }
                         } catch (e) {
                             console.log(e);
                         }
                         finally {
-                            swarm.leavePeer(connection.remotePublicKey);
+                            network.#swarm.leavePeer(connection.remotePublicKey);
                         }
                     }
                 })
@@ -265,18 +276,18 @@ class Network {
                 connection.messenger = message;
 
                 connection.on('close', () => {
-                    if (network.validator_stream === connection) {
-                        network.validator_stream = null;
-                        network.validator = null;
+                    if (this.validator_stream === connection) {
+                        this.validator_stream = null;
+                        this.validator = null;
                     }
-                    if (network.admin_stream === connection) {
-                        network.admin_stream = null;
-                        network.admin = null;
+                    if (this.admin_stream === connection) {
+                        this.admin_stream = null;
+                        this.admin = null;
                     }
 
-                    if (network.custom_stream === connection) {
-                        network.custom_stream = null;
-                        network.custom_node = null;
+                    if (this.custom_stream === connection) {
+                        this.custom_stream = null;
+                        this.custom_node = null;
                     }
 
                     message_channel.close()
@@ -293,10 +304,31 @@ class Network {
                 }
             });
 
-            swarm.join(channel, { server: true, client: true });
-            await swarm.flush();
+            this.#swarm.join(channel, { server: true, client: true });
+            await this.#swarm.flush();
         }
-        return swarm;
+    }
+
+    async _open() {
+        console.log('Network: opening...');
+
+    }
+
+    async _close() {
+        console.log('Network: closing gracefully...');
+        this.stopPool();
+        await sleep(100);
+
+        if (this.#enableValidatorObserver) {
+            this.stopValidatorObserver();
+        }
+
+        await sleep(5_000);
+
+        if (this.#swarm !== null) {
+            this.#swarm.destroy();
+        }
+        this.stopPool();
     }
 
     async pool(base) {
@@ -317,6 +349,147 @@ class Network {
 
     stopPool() {
         this.#shouldStopPool = true;
+    }
+    // TODO: AFTER WHILE LOOP SIGNAL TO THE PROCESS THAT VALIDATOR OBSERVER STOPPED OPERATING. 
+    // OS CALLS, ACCUMULATORS, MAYBE THIS IS POSSIBLE TO CHECK I/O QUEUE IF IT COINTAIN IT. FOR NOW WE ARE USING SLEEP.
+    async validatorObserver(base, publicKey) {
+        while (this.#enableValidatorObserver && this.#enable_wallet) {
+            if (this.validator_stream !== null) {
+                await sleep(1000);
+                continue;
+            }
+            const lengthEntry = await base.view.get('wrl');
+            const length = lengthEntry?.value ?? 0;
+
+            const findValidator = async () => {
+                if (this.validator_stream !== null) return;
+
+                const rndIndex = Math.floor(Math.random() * length);
+                const wriEntry = await base.view.get('wri/' + rndIndex);
+                if (this.validator_stream !== null || wriEntry === null) return;
+
+                const validatorEntry = await base.view.get(wriEntry.value);
+                if (
+                    this.validator_stream !== null ||
+                    this.validator !== null ||
+                    validatorEntry === null ||
+                    !validatorEntry.value.isWriter ||
+                    validatorEntry.value.isIndexer
+                ) return;
+
+                const pubKey = validatorEntry.value.pub;
+                if (pubKey === publicKey) return;
+                await this.tryConnection(pubKey, 'validator');
+            };
+
+            const promises = [];
+            for (let i = 0; i < 10; i++) {
+                promises.push(findValidator());
+                await sleep(250);
+            }
+            await Promise.all(promises);
+
+            await sleep(1000);
+        }
+    }
+
+    stopValidatorObserver() {
+        this.#enableValidatorObserver = false;
+    }
+
+    //TODO: MOVE TO NETWORK MODULE
+    async tryConnection(address, type = null) {
+        if (null === this.#swarm) return null;
+        if (this.validator_stream !== null && address !== b4a.toString(this.validator_stream.remotePublicKey, 'hex')) {
+            this.#swarm.leavePeer(this.validator_stream.remotePublicKey);
+            this.validator_stream = null;
+            this.validator = null;
+        }
+        // trying to join a peer from the global swarm
+        if (false === this.#swarm.peers.has(address)) {
+            this.#swarm.joinPeer(b4a.from(address, 'hex'));
+            let cnt = 0;
+            while (false === this.#swarm.peers.has(address)) {
+                if (cnt >= 1500) break;
+                await sleep(10);
+                cnt += 1;
+            }
+        }
+
+        if (this.#swarm.peers.has(address)) {
+            let stream;
+            // split it into 2 cases as before 1. existing connection and 
+            const peerInfo = this.#swarm.peers.get(address)
+            stream = this.#swarm._allConnections.get(peerInfo.publicKey)
+
+            if (stream !== undefined && stream.messenger !== undefined) {
+                await this.#sendRequestByType(stream, type);
+            }
+        }
+    }
+
+    //TODO: MOVE TO NETWORK MODULE
+    async #sendRequestByType(stream, type) {
+        const waitFor = {
+            validator: () => this.validator_stream,
+            admin: () => this.admin_stream,
+            node: () => this.custom_stream
+        }[type];
+
+        if (type === 'validator') {
+            await stream.messenger.send('get_validator');
+        } else if (type === 'admin') {
+            await stream.messenger.send('get_admin');
+        } else if (type === 'node') {
+            await stream.messenger.send('get_node');
+        } else {
+            return;
+        }
+        await this.spinLock(() => !waitFor)
+    };
+    //TODO: MOVE TO NETWORK MODULE
+    async spinLock(conditionFn, maxIterations = 1500, intervalMs = 10) {
+        let counter = 0;
+        while (conditionFn() && counter < maxIterations) {
+            await sleep(intervalMs);
+            counter++;
+        }
+    }
+
+    async sendMessageToAdmin(adminEntry, message) {
+        try {
+            if (!adminEntry || !message) {
+                return;
+            }
+            await this.tryConnection(adminEntry.tracPublicKey, 'admin');
+            await this.spinLock(() => this.admin_stream === null);
+            if (this.admin_stream !== null) {
+                await this.admin_stream.messenger.send(message);
+            }
+        } catch (e) {
+            console.log(e)
+        }
+    }
+
+    async sendMessageToNode(address, message) {
+        try {
+            if (!address || !message) {
+                return;
+            }
+            await this.tryConnection(address, 'node');
+
+            await this.spinLock(() =>
+                this.custom_stream === null || this.custom_node !== address
+            );
+
+            if (this.custom_stream !== null) {
+                await this.custom_stream.messenger.send(message);
+            }
+
+        } catch (e) {
+            console.log(e)
+        }
+
     }
 }
 export default Network;

@@ -36,7 +36,6 @@ export class MainSettlementBus extends ReadyResource {
     #channel;
     #store;
     #bee;
-    #swarm;
     #dht_node;
     #dht_bootstrap;
     #base;
@@ -50,7 +49,6 @@ export class MainSettlementBus extends ReadyResource {
     #readline_instance;
     #enable_txlogs;
     #disable_rate_limit;
-    #enableValidatorObserver;
     #enableRoleRequester;
 
     constructor(options = {}) {
@@ -60,8 +58,7 @@ export class MainSettlementBus extends ReadyResource {
         this.msbListener();
         this.#boot();
         this.#setupInternalListeners();
-        this.#network = new Network(this.#base);
-        this.#enableValidatorObserver = options.enableValidatorObserver !== undefined ? options.enableValidatorObserver : true;
+        this.#network = new Network(this.#base, options);
         this.#enableRoleRequester = options.enableRoleRequester !== undefined ? options.enableRoleRequester : true;
     }
 
@@ -72,9 +69,7 @@ export class MainSettlementBus extends ReadyResource {
         this.#channel = b4a.alloc(32).fill(options.channel) || null;
         this.#store = new Corestore(this.#STORES_DIRECTORY + options.store_name);
         this.#bee = null;
-        this.#swarm = null;
         this.#dht_bootstrap = ['116.202.214.149:10001', '157.180.12.214:10001', 'node1.hyperdht.org:49737', 'node2.hyperdht.org:49737', 'node3.hyperdht.org:49737'];
-        this.#dht_node = null;
         this.#base = null;
         this.#writingKey = null;
         this.#enable_txlogs = options.enable_txlogs === true;
@@ -112,16 +107,12 @@ export class MainSettlementBus extends ReadyResource {
         return this.#bootstrap;
     }
 
-    getChannel() {
-        return this.#channel;
-    }
-
     get writingKey() {
         return this.#writingKey;
     }
 
-    getSwarm() {
-        return this.#swarm;
+    getChannel() {
+        return this.#channel;
     }
 
     getNetwork() {
@@ -213,7 +204,7 @@ export class MainSettlementBus extends ReadyResource {
 
     async #addAdminIfSet(adminEntry, op, view, base, batch) {
         const message = MsgUtils.createMessage(adminEntry.tracPublicKey, op.value.wk, op.value.nonce, op.type)
-        const isMessageVerifed = await this.#verifyMessage(op.value.sig, adminEntry.tracPublicKey, message);
+        const isMessageVerifed = await this.#verifyMessageApply(op.value.sig, adminEntry.tracPublicKey, message);
         const hash = await createHash('sha256', message);
         if (isMessageVerifed &&
             null === await batch.get(hash)
@@ -234,7 +225,7 @@ export class MainSettlementBus extends ReadyResource {
 
     async #addAdminIfNotSet(op, view, node, batch) {
         const message = MsgUtils.createMessage(op.key, op.value.wk, op.value.nonce, op.type)
-        const isMessageVerifed = await this.#verifyMessage(op.value.sig, op.key, message);
+        const isMessageVerifed = await this.#verifyMessageApply(op.value.sig, op.key, message);
         const hash = await createHash('sha256', message);
         if (node.from.key.toString('hex') === this.#bootstrap &&
             op.value.wk === this.#bootstrap &&
@@ -257,7 +248,7 @@ export class MainSettlementBus extends ReadyResource {
         if (null === adminEntry || !this.check.sanitizeBasicKeyOp(op) || !this.#isAdminApply(adminEntry.value, node)) return;
 
         const message = MsgUtils.createMessage(op.key, op.value.nonce, op.type)
-        const isMessageVerifed = await this.#verifyMessage(op.value.sig, adminEntry.value.tracPublicKey, message);
+        const isMessageVerifed = await this.#verifyMessageApply(op.value.sig, adminEntry.value.tracPublicKey, message);
         const hash = await createHash('sha256', message);
 
         if (!isMessageVerifed || null !== await batch.get(hash)) return;
@@ -284,7 +275,7 @@ export class MainSettlementBus extends ReadyResource {
         const isWhitelisted = await this.#isWhitelistedApply(op.key, batch);
         if (!isWhitelisted || op.key !== op.value.pub) return;
         const message = MsgUtils.createMessage(op.key, op.value.wk, op.value.nonce, op.type)
-        const isMessageVerifed = await this.#verifyMessage(op.value.sig, op.key, message);
+        const isMessageVerifed = await this.#verifyMessageApply(op.value.sig, op.key, message);
         const hash = await createHash('sha256', message);
         if (isMessageVerifed &&
             null === await batch.get(hash)
@@ -320,7 +311,7 @@ export class MainSettlementBus extends ReadyResource {
         const adminEntry = await batch.get(EntryType.ADMIN);
         if (null === adminEntry || !this.check.sanitizeExtendedKeyOpSchema(op) || !this.#isAdminApply(adminEntry.value, node)) return;
         const message = MsgUtils.createMessage(op.key, op.value.wk, op.value.nonce, op.type);
-        const isMessageVerifed = await this.#verifyMessage(op.value.sig, op.key, message);
+        const isMessageVerifed = await this.#verifyMessageApply(op.value.sig, op.key, message);
         const hash = await createHash('sha256', message);
         if (isMessageVerifed &&
             null === await batch.get(hash)
@@ -370,7 +361,7 @@ export class MainSettlementBus extends ReadyResource {
             return;
         }
         const message = MsgUtils.createMessage(op.key, op.value.nonce, op.type);
-        const isMessageVerifed = await this.#verifyMessage(op.value.sig, adminEntry.value.tracPublicKey, message)
+        const isMessageVerifed = await this.#verifyMessageApply(op.value.sig, adminEntry.value.tracPublicKey, message)
         const hash = await createHash('sha256', message);
         if (isMessageVerifed &&
             null === await batch.get(hash)) {
@@ -400,7 +391,7 @@ export class MainSettlementBus extends ReadyResource {
         let indexersEntry = await batch.get(EntryType.INDEXERS);
         if (null === adminEntry || !this.#isAdminApply(adminEntry.value, node) || null === indexersEntry || !Array.from(indexersEntry.value).includes(op.key) || Array.from(indexersEntry.value).length <= 1) return;
         const message = MsgUtils.createMessage(op.key, op.value.nonce, op.type);
-        const isMessageVerifed = await this.#verifyMessage(op.value.sig, adminEntry.value.tracPublicKey, message)
+        const isMessageVerifed = await this.#verifyMessageApply(op.value.sig, adminEntry.value.tracPublicKey, message)
         const hash = await createHash('sha256', message);
         if (isMessageVerifed &&
             null === await batch.get(hash)) {
@@ -435,12 +426,18 @@ export class MainSettlementBus extends ReadyResource {
         const nodeEntry = await batch.get(op.key)
         if (null === nodeEntry || nodeEntry.value.isIndexer === true) return; // even if node is not writable atm it should be possible to ban it.
         const message = MsgUtils.createMessage(op.key, op.value.nonce, op.type);
-        const isMessageVerifed = await this.#verifyMessage(op.value.sig, adminEntry.value.tracPublicKey, message);
+        const isMessageVerifed = await this.#verifyMessageApply(op.value.sig, adminEntry.value.tracPublicKey, message);
         const hash = await createHash('sha256', message);
         if (!isMessageVerifed || null !== await batch.get(hash)) return;
         await this.#deleteWhitelistEntry(batch, op.key);
         await this.#removeWriter(op, batch, base, hash);
 
+    }
+
+    async #verifyMessageApply(signature, publicKey, bufferMessage) {
+        const bufferPublicKey = b4a.from(publicKey, 'hex');
+        const hash = await createHash('sha256', bufferMessage);
+        return this.#wallet.verify(signature, hash, bufferPublicKey);
     }
 
     #isAdminApply(adminEntry, node) {
@@ -476,14 +473,12 @@ export class MainSettlementBus extends ReadyResource {
 
         console.log('');
         if (this.#replicate) {
-            this.#swarm = await Network.replicate(
+            await this.#network.replicate(
                 this.#disable_rate_limit,
                 this,
-                this.#network,
                 this.#base,
                 this.#writingKey,
                 this.#dht_bootstrap,
-                this.#swarm,
                 this.#enable_wallet,
                 this.#store,
                 this.#wallet,
@@ -492,7 +487,6 @@ export class MainSettlementBus extends ReadyResource {
                 this.#handleIncomingEvent.bind(this),
                 this.emit.bind(this),
             );
-            this.#dht_node = this.#swarm.dht;
         }
 
         const adminEntry = await this.get(EntryType.ADMIN);
@@ -513,26 +507,11 @@ export class MainSettlementBus extends ReadyResource {
         console.log('MSB Signed Length:', this.#base.view.core.signedLength);
         console.log('');
 
-        this.validatorObserver();
+        this.#network.validatorObserver(this.#base, this.#wallet.publicKey);
     }
 
     async _close() {
         console.log('Closing everything gracefully... This may take a moment.');
-
-        if (this.#network !== null) {
-            this.#network.stopPool();
-        }
-        await sleep(100);
-
-        if (this.#enableValidatorObserver) {
-            this.stopValidatorObserver();
-        }
-
-        await sleep(5_000); // stopValidatorObserver is using findValidator which is reading from the base, so we need to wait fot it to finish.. Temporary workaround?
-        if (this.#swarm !== null) {
-            await this.#swarm.destroy();
-        }
-        await sleep(100);
 
         if (this.#base !== null) {
             await this.#base.close();
@@ -571,47 +550,6 @@ export class MainSettlementBus extends ReadyResource {
             }, 5_000);
             await sleep(5_000);
         }
-    }
-
-    async #sendMessageToAdmin(adminEntry, message) {
-        try {
-            if (!adminEntry || !message) {
-                return;
-            }
-            await this.tryConnection(adminEntry.tracPublicKey, 'admin');
-            await this.spinLock(() => this.#network.admin_stream === null);
-            if (this.#network.admin_stream !== null) {
-                await this.#network.admin_stream.messenger.send(message);
-            }
-        } catch (e) {
-            console.log(e)
-        }
-    }
-    async #sendMessageToNode(address, message) {
-        try {
-            if (!address || !message) {
-                return;
-            }
-            await this.tryConnection(address, 'node');
-
-            await this.spinLock(() =>
-                this.#network.custom_stream === null || this.#network.custom_node !== address
-            );
-
-            if (this.#network.custom_stream !== null) {
-                await this.#network.custom_stream.messenger.send(message);
-            }
-
-        } catch (e) {
-            console.log(e)
-        }
-
-    }
-
-    async #verifyMessage(signature, publicKey, bufferMessage) {
-        const bufferPublicKey = b4a.from(publicKey, 'hex');
-        const hash = await createHash('sha256', bufferMessage);
-        return this.#wallet.verify(signature, hash, bufferPublicKey);
     }
 
     #isAdmin(adminEntry) {
@@ -791,7 +729,7 @@ export class MainSettlementBus extends ReadyResource {
             if (!isWhitelisted) {
                 await this.#base.append(assembledWhitelistMessages[i]);
                 const whitelistedMessage = await MsgUtils.assembleWhitelistedMessage(this.#wallet, assembledWhitelistMessages[i].key);
-                this.#sendMessageToNode(assembledWhitelistMessages[i].key, whitelistedMessage);
+                await this.#network.sendMessageToNode(assembledWhitelistMessages[i].key, whitelistedMessage);
                 await sleep(WHITELIST_SLEEP_INTERVAL);
                 console.log(`Whitelist message sent (public key ${(i + 1)}/${totelElements})`);
             }
@@ -831,7 +769,7 @@ export class MainSettlementBus extends ReadyResource {
         }
 
         if (assembledMessage) {
-            await this.#sendMessageToAdmin(adminEntry, assembledMessage);
+            await this.#network.sendMessageToAdmin(adminEntry, assembledMessage);
         }
     }
 
@@ -861,109 +799,6 @@ export class MainSettlementBus extends ReadyResource {
                 await this.#base.append(assembledRemoveIndexer);
             }
 
-        }
-    }
-
-    //TODO: MOVE TO NETWORK MODULE
-    async tryConnection(address, type = null) {
-        if (null === this.#swarm) return null;
-        if (this.#network.validator_stream !== null && address !== b4a.toString(this.#network.validator_stream.remotePublicKey, 'hex')) {
-            this.#swarm.leavePeer(this.#network.validator_stream.remotePublicKey);
-            this.#network.validator_stream = null;
-            this.#network.validator = null;
-        }
-        // trying to join a peer from the global swarm
-        if (false === this.#swarm.peers.has(address)) {
-            this.#swarm.joinPeer(b4a.from(address, 'hex'));
-            let cnt = 0;
-            while (false === this.#swarm.peers.has(address)) {
-                if (cnt >= 1500) break;
-                await sleep(10);
-                cnt += 1;
-            }
-        }
-
-        if (this.#swarm.peers.has(address)) {
-            let stream;
-            // split it into 2 cases as before 1. existing connection and 
-            const peerInfo = this.#swarm.peers.get(address)
-            stream = this.#swarm._allConnections.get(peerInfo.publicKey)
-
-            if (stream !== undefined && stream.messenger !== undefined) {
-                await this.#sendRequestByType(stream, type);
-            }
-        }
-    }
-    //TODO: MOVE TO NETWORK MODULE
-    async #sendRequestByType(stream, type) {
-        const waitFor = {
-            validator: () => this.#network.validator_stream,
-            admin: () => this.#network.admin_stream,
-            node: () => this.#network.custom_stream
-        }[type];
-
-        if (type === 'validator') {
-            await stream.messenger.send('get_validator');
-        } else if (type === 'admin') {
-            await stream.messenger.send('get_admin');
-        } else if (type === 'node') {
-            await stream.messenger.send('get_node');
-        } else {
-            return;
-        }
-        await this.spinLock(() => !waitFor)
-    };
-    //TODO: MOVE TO NETWORK MODULE
-    async spinLock(conditionFn, maxIterations = 1500, intervalMs = 10) {
-        let counter = 0;
-        while (conditionFn() && counter < maxIterations) {
-            await sleep(intervalMs);
-            counter++;
-        }
-    }
-
-    // TODO: AFTER WHILE LOOP SIGNAL TO THE PROCESS THAT VALIDATOR OBSERVER STOPPED OPERATING. 
-    // OS CALLS, ACCUMULATORS, MAYBE THIS IS POSSIBLE TO CHECK I/O QUEUE IF IT COINTAIN IT. FOR NOW WE ARE USING SLEEP.
-    async validatorObserver() {
-        // Finding writers for admin recovery case
-        while (this.#enableValidatorObserver && this.#enable_wallet) {
-
-            if (this.#dht_node === null || this.#network.validator_stream !== null) {
-                await sleep(1000);
-                continue;
-            }
-            const lengthEntry = await this.#base.view.get('wrl');
-            const length = lengthEntry?.value ?? 0;
-
-            async function findValidator(_this) {
-                if (_this.#network.validator_stream !== null) return;
-
-                const rndIndex = Math.floor(Math.random() * length);
-                const wriEntry = await _this.#base.view.get('wri/' + rndIndex);
-                if (_this.#network.validator_stream !== null || wriEntry === null) return;
-
-                const validatorEntry = await _this.#base.view.get(wriEntry.value);
-                if (
-                    _this.#network.validator_stream !== null ||
-                    _this.#network.validator !== null ||
-                    validatorEntry === null ||
-                    !validatorEntry.value.isWriter ||
-                    validatorEntry.value.isIndexer
-                ) return;
-
-                const pubKey = validatorEntry.value.pub;
-                if (pubKey === _this.#wallet.publicKey) return;
-                await _this.tryConnection(pubKey, 'validator');
-            }
-
-            const promises = [];
-            for (let i = 0; i < 10; i++) {
-                promises.push(findValidator(this));
-                await sleep(250);
-            }
-            await Promise.all(promises);
-
-            await sleep(1000);
         }
     }
 
@@ -998,10 +833,6 @@ export class MainSettlementBus extends ReadyResource {
 
     async #handleBanValidatorOperation(tracPublicKey) {
         await this.#banValidator(tracPublicKey);
-    }
-
-    stopValidatorObserver() {
-        this.#enableValidatorObserver = false;
     }
 
     printHelp() {
@@ -1070,7 +901,7 @@ export class MainSettlementBus extends ReadyResource {
                 console.log('Indexers:', indexers);
                 break;
             case '/stats':
-                await verifyDag(this.#base, this.#swarm, this.#wallet, this.#writingKey);
+                await verifyDag(this.#base, this.#network.swarm, this.#wallet, this.#writingKey);
                 break;
             default:
                 if (input.startsWith('/get_node_info')) {
