@@ -130,16 +130,17 @@ class Network extends ReadyResource {
                     encoding: c.json,
                     //TODO:split this into many functions. This function should only contain switch statement
                     //TODO: instad of doing return; in cases which does not fit for us, we should perform - swarm.leavePeer(connection.remotePublicKey)
-
                     async onmessage(msg) {
                         try {
+                            const channelString = b4a.toString(network.channel, 'utf8');
+
                             if (msg === 'get_validator') {
                                 const nonce = Wallet.generateNonce().toString('hex');
                                 const _msg = {
                                     op: 'validator',
                                     key: writingKey,
                                     address: wallet.publicKey,
-                                    channel: b4a.toString(network.channel, 'utf8')
+                                    channel: channelString
                                 };
                                 const sig = wallet.sign(JSON.stringify(_msg) + nonce);
                                 message.send({ response: _msg, sig, nonce })
@@ -152,7 +153,7 @@ class Network extends ReadyResource {
                                     op: 'admin',
                                     key: writingKey,
                                     address: wallet.publicKey,
-                                    channel: b4a.toString(network.channel, 'utf8')
+                                    channel: channelString
                                 };
                                 const sig = wallet.sign(JSON.stringify(_msg) + nonce);
                                 message.send({ response: _msg, sig, nonce })
@@ -164,7 +165,7 @@ class Network extends ReadyResource {
                                     op: 'node',
                                     key: writingKey,
                                     address: wallet.publicKey,
-                                    channel: b4a.toString(network.channel, 'utf8')
+                                    channel: channelString
                                 };
                                 const sig = wallet.sign(JSON.stringify(_msg) + nonce);
                                 message.send({ response: _msg, sig, nonce })
@@ -174,7 +175,7 @@ class Network extends ReadyResource {
                                 const res = await msb.get(msg.response.address);
                                 if (res === null) return;
                                 const verified = wallet.verify(msg.sig, JSON.stringify(msg.response) + msg.nonce, msg.response.address)
-                                if (verified && msg.response.channel === b4a.toString(network.channel, 'utf8') && network.validator_stream === null) {
+                                if (verified && msg.response.channel === channelString && network.validator_stream === null) {
                                     console.log('Validator stream established', msg.response.address)
                                     network.validator_stream = connection;
                                     network.validator = msg.response.address;
@@ -184,7 +185,7 @@ class Network extends ReadyResource {
                                 const res = await msb.get(EntryType.ADMIN);
                                 if (res === null || res.tracPublicKey !== msg.response.address) return;
                                 const verified = wallet.verify(msg.sig, JSON.stringify(msg.response) + msg.nonce, res.tracPublicKey)
-                                if (verified && msg.response.channel === b4a.toString(network.channel, 'utf8')) {
+                                if (verified && msg.response.channel === channelString) {
                                     console.log('Admin stream established', res.tracPublicKey)
                                     network.admin_stream = connection;
                                     network.admin = res.tracPublicKey;
@@ -194,7 +195,7 @@ class Network extends ReadyResource {
                             else if (msg.response !== undefined && msg.response.op !== undefined && msg.response.op === 'node') {
 
                                 const verified = wallet.verify(msg.sig, JSON.stringify(msg.response) + msg.nonce, msg.response.address)
-                                if (verified && msg.response.channel === b4a.toString(network.channel, 'utf8')) {
+                                if (verified && msg.response.channel === channelString) {
 
                                     console.log('Node stream established', msg.response.address)
                                     network.custom_stream = connection;
