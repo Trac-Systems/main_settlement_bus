@@ -27,7 +27,6 @@ export class MainSettlementBus extends ReadyResource {
     // Internal flags
     #shouldListenToAdminEvents = false;
     #shouldListenToWriterEvents = false;
-    #isStreaming = false;
 
     // internal attributes
     #STORES_DIRECTORY;
@@ -36,7 +35,6 @@ export class MainSettlementBus extends ReadyResource {
     #channel;
     #store;
     #bee;
-    #dht_node;
     #dht_bootstrap;
     #base;
     #writingKey;
@@ -55,7 +53,6 @@ export class MainSettlementBus extends ReadyResource {
         super();
         this.check = new Check();
         this.#initInternalAttributes(options);
-        this.msbListener();
         this.#boot();
         this.#setupInternalListeners();
         this.#network = new Network(this.#base, options);
@@ -471,7 +468,6 @@ export class MainSettlementBus extends ReadyResource {
             console.log('#####################################################################################');
         }
 
-        console.log('');
         if (this.#replicate) {
             await this.#network.replicate(
                 this.#disable_rate_limit,
@@ -483,7 +479,6 @@ export class MainSettlementBus extends ReadyResource {
                 this.#store,
                 this.#wallet,
                 this.#channel,
-                this.#isStreaming,
                 this.#handleIncomingEvent.bind(this),
                 this.emit.bind(this),
             );
@@ -674,14 +669,6 @@ export class MainSettlementBus extends ReadyResource {
             const isEventMessageVerifed = await MsgUtils.verifyEventMessage(parsedRequest, this.#wallet, this.check)
             if (adminEntry && adminEntry.tracPublicKey === parsedRequest.key && isEventMessageVerifed) {
                 await this.#base.append(parsedRequest);
-            }
-        });
-    }
-
-    msbListener() {
-        this.on(EventType.READY_MSB, async () => {
-            if (!this.#isStreaming) {
-                this.#isStreaming = true;
             }
         });
     }
