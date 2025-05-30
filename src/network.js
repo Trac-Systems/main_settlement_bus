@@ -54,7 +54,6 @@ class Network extends ReadyResource {
         store,
         wallet,
         channel,
-        isStreaming,
         handleIncomingEvent,
         emit,
     ) {
@@ -299,9 +298,6 @@ class Network extends ReadyResource {
 
                 connection.on('error', (error) => { });
 
-                if (!isStreaming) {
-                    emit(EventType.READY_MSB);
-                }
             });
 
             this.#swarm.join(channel, { server: true, client: true });
