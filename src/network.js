@@ -24,20 +24,26 @@ class Network extends ReadyResource {
     #shouldStopPool = false;
     #swarm = null;
     #enableValidatorObserver;
-    #enable_wallet
-    constructor(base, options = {}) {
+    #enable_wallet;
+    #disable_rate_limit;
+    #channel;
+    #dht_bootstrap = ['116.202.214.149:10001', '157.180.12.214:10001', 'node1.hyperdht.org:49737', 'node2.hyperdht.org:49737', 'node3.hyperdht.org:49737'];
+
+    constructor(base, channel, options = {}) {
         super();
         this.#enableValidatorObserver = options.enableValidatorObserver !== undefined ? options.enableValidatorObserver : true;
         this.#enable_wallet = options.enable_wallet !== false;
+        this.#disable_rate_limit = options.disable_rate_limit === true;
+        this.#channel = channel;
         this.tx_pool = [];
         this.pool(base);
         this.check = new Check();
-        this.admin_stream = null
-        this.admin = null
-        this.validator_stream = null
+        this.admin_stream = null;
+        this.admin = null;
+        this.validator_stream = null;
         this.validator = null;
         this.custom_stream = null;
-        this.custom_node = null
+        this.custom_node = null;
         this.ready();
     }
 
@@ -45,22 +51,46 @@ class Network extends ReadyResource {
         return this.#swarm;
     }
 
+    get disable_rate_limit() {
+        return this.#disable_rate_limit;
+    }
+
+    get channel() {
+        return this.#channel;
+    }
+
+    async _open() {
+        console.log('Network: opening...');
+    }
+
+    async _close() {
+        console.log('Network: closing gracefully...');
+        this.stopPool();
+        await sleep(100);
+
+        if (this.#enableValidatorObserver) {
+            this.stopValidatorObserver();
+        }
+
+        await sleep(5_000);
+
+        if (this.#swarm !== null) {
+            this.#swarm.destroy();
+        }
+    }
+
     async replicate(
-        disable_rate_limit,
+        //TODO: we should delete an access to msb and base. We should create a new methods in index.js which will allows access to needed properties and bind them here.
         msb,
-        base, writingKey,
-        bootstrap,
-        walletEnabled,
+        base,
+        writingKey,
         store,
         wallet,
-        channel,
         handleIncomingEvent,
-        emit,
     ) {
         if (!this.#swarm) {
-
             let keyPair;
-            if (!walletEnabled) {
+            if (!this.#enable_wallet) {
                 keyPair = await store.createKeyPair(TRAC_NAMESPACE);
             } else {
                 keyPair = {
@@ -74,14 +104,14 @@ class Network extends ReadyResource {
 
             this.#swarm = new Hyperswarm({
                 keyPair,
-                bootstrap: bootstrap,
+                bootstrap: this.#dht_bootstrap,
                 maxPeers: MAX_PEERS,
                 maxParallel: MAX_PARALLEL,
                 maxServerConnections: MAX_SERVER_CONNECTIONS,
                 maxClientConnections: MAX_CLIENT_CONNECTIONS
             });
 
-            console.log(`Channel: ${b4a.toString(channel)}`);
+            console.log(`Channel: ${b4a.toString(this.#channel)}`);
             const network = this;
             this.#swarm.on('connection', async (connection) => {
 
@@ -89,7 +119,7 @@ class Network extends ReadyResource {
                 connection.userData = mux
 
                 const message_channel = mux.createChannel({
-                    protocol: b4a.toString(channel, 'utf8'),
+                    protocol: b4a.toString(this.#channel, 'utf8'),
                     onopen() {
                     },
                     onclose() {
@@ -109,7 +139,7 @@ class Network extends ReadyResource {
                                     op: 'validator',
                                     key: writingKey,
                                     address: wallet.publicKey,
-                                    channel: b4a.toString(channel, 'utf8')
+                                    channel: b4a.toString(network.channel, 'utf8')
                                 };
                                 const sig = wallet.sign(JSON.stringify(_msg) + nonce);
                                 message.send({ response: _msg, sig, nonce })
@@ -122,7 +152,7 @@ class Network extends ReadyResource {
                                     op: 'admin',
                                     key: writingKey,
                                     address: wallet.publicKey,
-                                    channel: b4a.toString(channel, 'utf8')
+                                    channel: b4a.toString(network.channel, 'utf8')
                                 };
                                 const sig = wallet.sign(JSON.stringify(_msg) + nonce);
                                 message.send({ response: _msg, sig, nonce })
@@ -134,7 +164,7 @@ class Network extends ReadyResource {
                                     op: 'node',
                                     key: writingKey,
                                     address: wallet.publicKey,
-                                    channel: b4a.toString(channel, 'utf8')
+                                    channel: b4a.toString(network.channel, 'utf8')
                                 };
                                 const sig = wallet.sign(JSON.stringify(_msg) + nonce);
                                 message.send({ response: _msg, sig, nonce })
@@ -144,7 +174,7 @@ class Network extends ReadyResource {
                                 const res = await msb.get(msg.response.address);
                                 if (res === null) return;
                                 const verified = wallet.verify(msg.sig, JSON.stringify(msg.response) + msg.nonce, msg.response.address)
-                                if (verified && msg.response.channel === b4a.toString(channel, 'utf8') && network.validator_stream === null) {
+                                if (verified && msg.response.channel === b4a.toString(network.channel, 'utf8') && network.validator_stream === null) {
                                     console.log('Validator stream established', msg.response.address)
                                     network.validator_stream = connection;
                                     network.validator = msg.response.address;
@@ -154,7 +184,7 @@ class Network extends ReadyResource {
                                 const res = await msb.get(EntryType.ADMIN);
                                 if (res === null || res.tracPublicKey !== msg.response.address) return;
                                 const verified = wallet.verify(msg.sig, JSON.stringify(msg.response) + msg.nonce, res.tracPublicKey)
-                                if (verified && msg.response.channel === b4a.toString(channel, 'utf8')) {
+                                if (verified && msg.response.channel === b4a.toString(network.channel, 'utf8')) {
                                     console.log('Admin stream established', res.tracPublicKey)
                                     network.admin_stream = connection;
                                     network.admin = res.tracPublicKey;
@@ -164,13 +194,15 @@ class Network extends ReadyResource {
                             else if (msg.response !== undefined && msg.response.op !== undefined && msg.response.op === 'node') {
 
                                 const verified = wallet.verify(msg.sig, JSON.stringify(msg.response) + msg.nonce, msg.response.address)
-                                if (verified && msg.response.channel === b4a.toString(channel, 'utf8')) {
+                                if (verified && msg.response.channel === b4a.toString(network.channel, 'utf8')) {
 
                                     console.log('Node stream established', msg.response.address)
                                     network.custom_stream = connection;
                                     network.custom_node = msg.response.address;
                                 }
                                 network.#swarm.leavePeer(connection.remotePublicKey)
+
+                                //TODO: Most of this logic below should be moved into the handleIncomingEvent function. Code below can be reduced to call only handleIncomingEvent(msg) with some basic checks.
                             } else if (msg.type !== undefined && msg.key !== undefined && msg.value !== undefined && msg.type === 'addWriter') {
                                 const adminEntry = await msb.get(EntryType.ADMIN);
                                 if (null === adminEntry || (adminEntry.tracPublicKey !== wallet.publicKey)) return;
@@ -201,7 +233,7 @@ class Network extends ReadyResource {
                             } else {
                                 if (base.isIndexer || !base.writable) return;
 
-                                if (true !== disable_rate_limit) {
+                                if (true !== network.disable_rate_limit) {
                                     const peer = b4a.toString(connection.remotePublicKey, 'hex');
                                     const _now = Date.now();
 
@@ -300,31 +332,9 @@ class Network extends ReadyResource {
 
             });
 
-            this.#swarm.join(channel, { server: true, client: true });
+            this.#swarm.join(this.#channel, { server: true, client: true });
             await this.#swarm.flush();
         }
-    }
-
-    async _open() {
-        console.log('Network: opening...');
-
-    }
-
-    async _close() {
-        console.log('Network: closing gracefully...');
-        this.stopPool();
-        await sleep(100);
-
-        if (this.#enableValidatorObserver) {
-            this.stopValidatorObserver();
-        }
-
-        await sleep(5_000);
-
-        if (this.#swarm !== null) {
-            this.#swarm.destroy();
-        }
-        this.stopPool();
     }
 
     async pool(base) {
@@ -346,36 +356,40 @@ class Network extends ReadyResource {
     stopPool() {
         this.#shouldStopPool = true;
     }
+
     // TODO: AFTER WHILE LOOP SIGNAL TO THE PROCESS THAT VALIDATOR OBSERVER STOPPED OPERATING. 
     // OS CALLS, ACCUMULATORS, MAYBE THIS IS POSSIBLE TO CHECK I/O QUEUE IF IT COINTAIN IT. FOR NOW WE ARE USING SLEEP.
-    async validatorObserver(base, publicKey) {
+    async validatorObserver(get, publicKey) {
+        console.log('Validator observer started');
         while (this.#enableValidatorObserver && this.#enable_wallet) {
             if (this.validator_stream !== null) {
                 await sleep(1000);
                 continue;
             }
-            const lengthEntry = await base.view.get('wrl');
-            const length = lengthEntry?.value ?? 0;
+            const lengthEntry = await get('wrl');
+            const length = lengthEntry ?? 0;
 
             const findValidator = async () => {
                 if (this.validator_stream !== null) return;
 
                 const rndIndex = Math.floor(Math.random() * length);
-                const wriEntry = await base.view.get('wri/' + rndIndex);
+                const wriEntry = await get('wri/' + rndIndex);
                 if (this.validator_stream !== null || wriEntry === null) return;
 
-                const validatorEntry = await base.view.get(wriEntry.value);
+                const validatorEntry = await get(wriEntry);
                 if (
                     this.validator_stream !== null ||
                     this.validator !== null ||
                     validatorEntry === null ||
-                    !validatorEntry.value.isWriter ||
-                    validatorEntry.value.isIndexer
+                    !validatorEntry.isWriter ||
+                    validatorEntry.isIndexer
                 ) return;
 
-                const pubKey = validatorEntry.value.pub;
-                if (pubKey === publicKey) return;
-                await this.tryConnection(pubKey, 'validator');
+                const validatorPubKey = validatorEntry.pub;
+                if (validatorPubKey === publicKey) return;
+
+                console.log('Trying to connect to validator:', validatorPubKey);
+                await this.tryConnection(validatorPubKey, 'validator');
             };
 
             const promises = [];
@@ -393,7 +407,6 @@ class Network extends ReadyResource {
         this.#enableValidatorObserver = false;
     }
 
-    //TODO: MOVE TO NETWORK MODULE
     async tryConnection(address, type = null) {
         if (null === this.#swarm) return null;
         if (this.validator_stream !== null && address !== b4a.toString(this.validator_stream.remotePublicKey, 'hex')) {
@@ -414,7 +427,6 @@ class Network extends ReadyResource {
 
         if (this.#swarm.peers.has(address)) {
             let stream;
-            // split it into 2 cases as before 1. existing connection and 
             const peerInfo = this.#swarm.peers.get(address)
             stream = this.#swarm._allConnections.get(peerInfo.publicKey)
 
@@ -424,7 +436,6 @@ class Network extends ReadyResource {
         }
     }
 
-    //TODO: MOVE TO NETWORK MODULE
     async #sendRequestByType(stream, type) {
         const waitFor = {
             validator: () => this.validator_stream,
@@ -443,7 +454,7 @@ class Network extends ReadyResource {
         }
         await this.spinLock(() => !waitFor)
     };
-    //TODO: MOVE TO NETWORK MODULE
+
     async spinLock(conditionFn, maxIterations = 1500, intervalMs = 10) {
         let counter = 0;
         while (conditionFn() && counter < maxIterations) {
