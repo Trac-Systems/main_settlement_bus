@@ -2,7 +2,6 @@ import w from 'protomux-wakeup';
 import b4a from 'b4a';
 import Hyperswarm from 'hyperswarm';
 import {
-    EventType,
     TRAC_NAMESPACE,
     MAX_PEERS,
     MAX_PARALLEL,
