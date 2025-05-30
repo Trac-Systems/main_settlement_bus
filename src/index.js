@@ -4,7 +4,7 @@ import ReadyResource from 'ready-resource';
 import b4a from 'b4a';
 import Hyperbee from 'hyperbee';
 import readline from 'readline';
-import { verifyDag, sleep, createHash } from './utils/functions.js';
+import { verifyDag, sleep, createHash, generateTx } from './utils/functions.js';
 import PeerWallet from "trac-wallet"
 import tty from 'tty';
 import Corestore from 'corestore';
@@ -172,7 +172,7 @@ export class MainSettlementBus extends ReadyResource {
             op.key === postTx.tx &&
             this.#wallet.verify(b4a.from(postTx.is, 'hex'), b4a.from(postTx.tx + postTx.in), b4a.from(postTx.ipk, 'hex')) &&
             this.#wallet.verify(b4a.from(postTx.ws, 'hex'), b4a.from(postTx.tx + postTx.wn), b4a.from(postTx.wp, 'hex')) &&
-            postTx.tx === await this.generateTx(postTx.bs, this.bootstrap, postTx.wp, postTx.i, postTx.ipk, postTx.ch, postTx.in) &&
+            postTx.tx === await generateTx(postTx.bs, this.bootstrap, postTx.wp, postTx.i, postTx.ipk, postTx.ch, postTx.in) &&
             b4a.byteLength(JSON.stringify(postTx)) <= 4096
         ) {
             await batch.put(op.key, op.value);
@@ -714,18 +714,6 @@ export class MainSettlementBus extends ReadyResource {
                 console.log(`Whitelist message sent (public key ${(i + 1)}/${totelElements})`);
             }
         }
-    }
-
-    // TODO: MOVE TO UTILS
-    async generateTx(bootstrap, msb_bootstrap, validator_writer_key, local_writer_key, local_public_key, content_hash, nonce) {
-        let tx = bootstrap + '-' +
-            msb_bootstrap + '-' +
-            validator_writer_key + '-' +
-            local_writer_key + '-' +
-            local_public_key + '-' +
-            content_hash + '-' +
-            nonce;
-        return await createHash('sha256', await createHash('sha256', tx));
     }
 
     async #requestWriterRole(toAdd) {

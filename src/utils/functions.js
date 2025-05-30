@@ -1,6 +1,5 @@
 import b4a from 'b4a';
 import sodium from 'sodium-native';
-import {peer} from "hyperdht/lib/messages.js";
 
 export function isHexString(string) {
     return typeof string === 'string' && string.length > 1 && /^[0-9a-fA-F]+$/.test(string) && string.length % 2 === 0;
@@ -42,7 +41,7 @@ export async function sleep(ms) {
 export async function createHash(type, message) {
     if (type === 'sha256') {
         const out = b4a.alloc(sodium.crypto_hash_sha256_BYTES);
-        sodium.crypto_hash_sha256(out,!b4a.isBuffer(message) ? b4a.from(message) : message);
+        sodium.crypto_hash_sha256(out, !b4a.isBuffer(message) ? b4a.from(message) : message);
         return b4a.toString(out, 'hex');
     }
     if (global.Pear !== undefined) {
@@ -66,4 +65,15 @@ export async function createHash(type, message) {
         // just keep it as it is.
         return crypto.createHash(type).update(!b4a.isBuffer(message) ? b4a.from(message) : message).digest('hex')
     }
-}   
+}
+
+export async function generateTx(bootstrap, msb_bootstrap, validator_writer_key, local_writer_key, local_public_key, content_hash, nonce) {
+    let tx = bootstrap + '-' +
+        msb_bootstrap + '-' +
+        validator_writer_key + '-' +
+        local_writer_key + '-' +
+        local_public_key + '-' +
+        content_hash + '-' +
+        nonce;
+    return await createHash('sha256', await createHash('sha256', tx));
+}
