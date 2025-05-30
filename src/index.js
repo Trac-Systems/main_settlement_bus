@@ -35,18 +35,15 @@ export class MainSettlementBus extends ReadyResource {
     #channel;
     #store;
     #bee;
-    #dht_bootstrap;
     #base;
     #writingKey;
     #enable_wallet;
     #wallet;
     #replicate;
     #network;
-    #opts;
     #signature_whitelist;
     #readline_instance;
     #enable_txlogs;
-    #disable_rate_limit;
     #enableRoleRequester;
 
     constructor(options = {}) {
@@ -55,7 +52,7 @@ export class MainSettlementBus extends ReadyResource {
         this.#initInternalAttributes(options);
         this.#boot();
         this.#setupInternalListeners();
-        this.#network = new Network(this.#base, options);
+        this.#network = new Network(this.#base, this.#channel ,options);
         this.#enableRoleRequester = options.enableRoleRequester !== undefined ? options.enableRoleRequester : true;
     }
 
@@ -66,16 +63,13 @@ export class MainSettlementBus extends ReadyResource {
         this.#channel = b4a.alloc(32).fill(options.channel) || null;
         this.#store = new Corestore(this.#STORES_DIRECTORY + options.store_name);
         this.#bee = null;
-        this.#dht_bootstrap = ['116.202.214.149:10001', '157.180.12.214:10001', 'node1.hyperdht.org:49737', 'node2.hyperdht.org:49737', 'node3.hyperdht.org:49737'];
         this.#base = null;
         this.#writingKey = null;
         this.#enable_txlogs = options.enable_txlogs === true;
         this.#enable_wallet = options.enable_wallet !== false;
-        this.#disable_rate_limit = options.disable_rate_limit === true;
         this.#wallet = new PeerWallet(options);
         this.#replicate = options.replicate !== false;
         this.#signature_whitelist = options.signature_whitelist !== undefined && Array.isArray(options.signature_whitelist) ? options.signature_whitelist : [];
-        this.#opts = options;
         this.#readline_instance = null;
         this.enable_interactive_mode = options.enable_interactive_mode !== false;
         if (this.enable_interactive_mode !== false) {
@@ -470,17 +464,12 @@ export class MainSettlementBus extends ReadyResource {
 
         if (this.#replicate) {
             await this.#network.replicate(
-                this.#disable_rate_limit,
                 this,
                 this.#base,
                 this.#writingKey,
-                this.#dht_bootstrap,
-                this.#enable_wallet,
                 this.#store,
                 this.#wallet,
-                this.#channel,
                 this.#handleIncomingEvent.bind(this),
-                this.emit.bind(this),
             );
         }
 
@@ -502,11 +491,14 @@ export class MainSettlementBus extends ReadyResource {
         console.log('MSB Signed Length:', this.#base.view.core.signedLength);
         console.log('');
 
-        this.#network.validatorObserver(this.#base, this.#wallet.publicKey);
+        this.#network.validatorObserver(this.get.bind(this), this.#wallet.publicKey); // can't be await
     }
 
     async _close() {
         console.log('Closing everything gracefully... This may take a moment.');
+
+        await this.#network.close();
+        await sleep(100);
 
         if (this.#base !== null) {
             await this.#base.close();
@@ -680,6 +672,7 @@ export class MainSettlementBus extends ReadyResource {
             if (!adminEntry && this.#wallet && this.#writingKey && this.#writingKey === this.#bootstrap) {
                 await this.#base.append(addAdminMessage);
             } else if (adminEntry && this.#wallet && adminEntry.tracPublicKey === this.#wallet.publicKey && this.#writingKey && this.#writingKey !== adminEntry.wk) {
+
                 if (null === this.#network.validator_stream) return;
                 await this.#network.validator_stream.messenger.send(addAdminMessage);
             }
