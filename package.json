@@ -1,7 +1,7 @@
 {
   "name": "trac-msb",
   "main": "msb.mjs",
-  "version": "0.1.79",
+  "version": "0.1.80",
   "pear": {
     "name": "trac-msb",
     "type": "terminal"
@@ -14,8 +14,8 @@
   },
   "dependencies": {
     "autobase": "7.6.3",
-    "hypercore": "11.6.2",
-    "corestore": "7.4.2",
+    "hypercore": "11.8.3",
+    "corestore": "7.4.4",
     "b4a": "1.6.7",
     "bare-readline": "1.0.7",
     "bare-tty": "5.0.2",
