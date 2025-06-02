@@ -4,6 +4,7 @@ import MsgUtils from '../../src/utils/msgUtils.js'
 import { EntryType } from '../../src/utils/constants.js';
 import { OperationType } from '../../src/utils/constants.js'
 import { createHash, sleep } from '../../src/utils/functions.js'
+import { generateTx } from '../../src/utils/functions.js';
 import sodium from 'sodium-native';
 import { generateMnemonic, validateMnemonic, mnemonicToSeed } from 'bip39-mnemonic';
 import b4a from 'b4a'
@@ -12,7 +13,6 @@ import path from 'path'
 import fs from 'fs/promises'
 import PeerWallet from "trac-wallet"
 import { randomBytes } from 'crypto'
-import { request } from 'http';
 
 async function randomKeypair() {
     const keypair = {};
@@ -260,7 +260,7 @@ export const generatePostTx = async (msbBootstrap, boostrapPeerWallet, peerWalle
     const contentHash = await createHash('sha256', JSON.stringify(testObj));
     const nonce = PeerWallet.generateNonce().toString('hex');
 
-    const preTxHash = await msbBootstrap.generateTx(
+    const preTxHash = await generateTx(
         peerBootstrap,
         msbBootstrap.bootstrap,
         validatorPubKey,
