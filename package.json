@@ -9,7 +9,7 @@
   "type": "module",
   "scripts": {
     "dev": "pear run -d .",
-    "test:node": "brittle test/all.test.js",
+    "test:node": "brittle -c -t 60000 test/all.test.js",
     "test:bare": "bare test/all.test.js"
   },
   "dependencies": {
@@ -30,11 +30,11 @@
     "readline": "npm:bare-node-readline",
     "ready-resource": "1.1.2",
     "trac-wallet": "0.0.43",
-    "tty": "npm:bare-node-tty"
+    "tty": "npm:bare-node-tty",
+    "brittle": "^3.16.2"
   },
   "publishConfig": {
     "registry": "https://registry.npmjs.org",
-    "access": "public",
-    "brittle": "^3.16.2"
+    "access": "public"
   }
 }

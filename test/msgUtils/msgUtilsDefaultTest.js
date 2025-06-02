@@ -20,51 +20,51 @@ export async function msgUtilsDefaultTest(t, fnName, fn, wallet, writingKey, opT
 
     t.test(`${fnName} - Invalid wallet 1`, async (k) => {
         const msg = await fn({ publicKey: "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdeg" }, writingKey);
-        k.is(msg, undefined, 'Message should be undefined');
+        k.is(msg, null, 'Message should be null');
     });
 
     t.test(`${fnName} - Invalid wallet 2`, async (k) => {
         const msg = await fn({ publicKey: "1234567890abcdef" }, writingKey);
-        k.is(msg, undefined, 'Message should be undefined');
+        k.is(msg, null, 'Message should be null');
     });
 
     t.test(`${fnName} - Invalid wallet 3`, async (k) => {
         const msg = await fn({ publicKey: "" }, writingKey);
-        k.is(msg, undefined, 'Message should be undefined');
+        k.is(msg, null, 'Message should be null');
     });
 
     t.test(`${fnName} - Null Wallet`, async (k) => {
         const msg = await fn(null, writingKey);
-        k.is(msg, undefined, 'Message should be undefined');
+        k.is(msg, null, 'Message should be null');
     });
 
     t.test(`${fnName} - undefined Wallet`, async (k) => {
         const msg = await fn(undefined, writingKey);
-        k.is(msg, undefined, 'Message should be undefined');
+        k.is(msg, null, 'Message should be null');
     });
 
     t.test(`${fnName} - Invalid writing key 1`, async (k) => {
         const msg = await fn(wallet, "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdeg");
-        k.is(msg, undefined, 'Message should be undefined');
+        k.is(msg, null, 'Message should be null');
     });
 
     t.test(`${fnName} - Invalid writing key 2`, async (k) => {
         const msg = await fn(wallet, "1234567890abcdef");
-        k.is(msg, undefined, 'Message should be undefined');
+        k.is(msg, null, 'Message should be null');
     });
 
     t.test(`${fnName} - Invalid writing key 3`, async (k) => {
         const msg = await fn(wallet, "");
-        k.is(msg, undefined, 'Message should be undefined');
+        k.is(msg, null, 'Message should be null');
     });
 
     t.test(`${fnName} - Null writing key`, async (k) => {
         const msg = await fn(wallet, null);
-        k.is(msg, undefined, 'Message should be undefined');
+        k.is(msg, null, 'Message should be null');
     });
 
     t.test(`${fnName} - undefined writing key`, async (k) => {
         const msg = await fn(wallet, undefined);
-        k.is(msg, undefined, 'Message should be undefined');
+        k.is(msg, null, 'Message should be null');
     });
 }

@@ -1,8 +1,16 @@
+# IDE configuration files
 .idea
-/stores/
-/node_modules/
-.idea
+
+# Node modules (dependencies)
+node_modules/
+
+# Local store directories (application-specific)
+stores/
+stores_/
+
+# NPM configuration and lock file
 .npmrc
-/stores_/
-/package-lock.json
-/stores2/
+package-lock.json
+
+# Coverage reports
+coverage/
