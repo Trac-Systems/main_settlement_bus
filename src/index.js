@@ -505,10 +505,7 @@ export class MainSettlementBus extends ReadyResource {
             this.#writerEventListener(); // only for writers
         }
 
-        if (this.enableRoleRequester) {
-            await this.#setUpRoleAutomatically(adminEntry);
-
-        }
+        await this.#setUpRoleAutomatically(adminEntry);
 
         console.log(`isIndexer: ${this.#base.isIndexer}`);
         console.log(`isWriter: ${this.#base.writable}`);
@@ -516,9 +513,7 @@ export class MainSettlementBus extends ReadyResource {
         console.log('MSB Signed Length:', this.#base.view.core.signedLength);
         console.log('');
 
-        if (this.enableValidatorObserver) {
-            this.validatorObserver();
-        }
+        this.validatorObserver();
     }
 
     async _close() {
