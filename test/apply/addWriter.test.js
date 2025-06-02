@@ -34,6 +34,7 @@ test('Apply function addWriter - happy path', async (t) => {
         await admin.msb.close();
 
         // check the result
+        t.ok(writer.msb.base.writable, 'peer should be writable');
         t.ok(result, 'Result should not be null');
         t.is(result.pub, writer.wallet.publicKey, 'Result pub should match writer public key');
         t.is(result.wk, writer.msb.writingKey, 'Result writing key should match writer writing key');

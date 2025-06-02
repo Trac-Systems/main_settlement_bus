@@ -31,7 +31,7 @@ class MsgUtils {
 
     static async #assembleMessageBase(wallet, keyParam, operationType) {
         if (!this.#checkAssembleMessageBaseParams(wallet, keyParam)) {
-            return undefined; // TODO: (?) Should we return null instead?
+            return null;
         }
 
         let nonce = null;
@@ -71,7 +71,7 @@ class MsgUtils {
                 break;
 
             default:
-                return undefined; // TODO: (?) Should we return null instead?
+                return null;
         }
 
         return {
