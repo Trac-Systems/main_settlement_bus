@@ -116,12 +116,20 @@ export class MainSettlementBus extends ReadyResource {
         return this.#channel;
     }
 
+    get writingKey() {
+        return this.#writingKey;
+    }
+
     getSwarm() {
         return this.#swarm;
     }
 
     getNetwork() {
         return this.#network;
+    }
+
+    getTracPublicKey() {
+        return this.#wallet.publicKey;
     }
 
     #boot() {
@@ -1018,68 +1026,72 @@ export class MainSettlementBus extends ReadyResource {
         this.printHelp();
 
         rl.on('line', async (input) => {
-            switch (input) {
-                case '/help':
-                    this.printHelp();
-                    break;
-                case '/exit':
-                    rl.close();
-                    await this.close();
-                    break;
-                case '/push_writer_add':
-                    await this.#requestWriterRole(true)
-                    break;
-                case '/add_admin':
-                    await this.#handleAdminOperations();
-                    break;
-                case '/add_whitelist':
-                    await this.#handleWhitelistOperations();
-                    break;
-                case '/add_writer':
-                    await this.#handleAddWriterOperation(true);
-                    break;
-                case '/remove_writer':
-                    await this.#handleRemoveWriterOperation();
-                    break
-                case '/flags':
-                    console.log("shouldListenToAdminEvents: ", this.#shouldListenToAdminEvents);
-                    console.log("shouldListenToWriterEvents: ", this.#shouldListenToWriterEvents);
-                    console.log("isWritable: ", this.#base.writable);
-                    console.log("isIndexer: ", this.#base.isIndexer);
-                    break
-                case '/show':
-                    const admin = await this.get(EntryType.ADMIN);
-                    console.log('Admin:', admin);
-                    const indexers = await this.get(EntryType.INDEXERS);
-                    console.log('Indexers:', indexers);
-                    break;
-                case '/stats':
-                    await verifyDag(this.#base, this.#swarm, this.#wallet, this.#writingKey);
-                    break;
-                default:
-                    if (input.startsWith('/get_node_info')) {
-                        const splitted = input.split(' ');
-                        console.log("whitelist entry:", await this.#isWhitelisted(splitted[1]))
-                    } else if (input.startsWith('/add_indexer')) {
-                        const splitted = input.split(' ');
-                        const tracPublicKey = splitted[1]
-                        await this.#handleAddIndexerOperation(tracPublicKey);
-                    }
-                    else if (input.startsWith('/remove_indexer')) {
-                        const splitted = input.split(' ');
-                        const tracPublicKey = splitted[1]
-                        await this.#handleRemoveIndexerOperation(tracPublicKey);
-                    }
-                    else if (input.startsWith('/ban_writer')) {
-                        const splitted = input.split(' ');
-                        const tracPublicKey = splitted[1]
-                        await this.#handleBanValidatorOperation(tracPublicKey);
-                    }
-            }
+            this.handleCommand(input.trim(), rl);
             rl.prompt();
         });
 
         rl.prompt();
+    }
+
+    async handleCommand(input, rl = null) {
+        switch (input) {
+            case '/help':
+                this.printHelp();
+                break;
+            case '/exit':
+                if (rl) rl.close();
+                await this.close();
+                break;
+            case '/push_writer_add':
+                await this.#requestWriterRole(true)
+                break;
+            case '/add_admin':
+                await this.#handleAdminOperations();
+                break;
+            case '/add_whitelist':
+                await this.#handleWhitelistOperations();
+                break;
+            case '/add_writer':
+                await this.#handleAddWriterOperation(true);
+                break;
+            case '/remove_writer':
+                await this.#handleRemoveWriterOperation();
+                break
+            case '/flags':
+                console.log("shouldListenToAdminEvents: ", this.#shouldListenToAdminEvents);
+                console.log("shouldListenToWriterEvents: ", this.#shouldListenToWriterEvents);
+                console.log("isWritable: ", this.#base.writable);
+                console.log("isIndexer: ", this.#base.isIndexer);
+                break
+            case '/show':
+                const admin = await this.get(EntryType.ADMIN);
+                console.log('Admin:', admin);
+                const indexers = await this.get(EntryType.INDEXERS);
+                console.log('Indexers:', indexers);
+                break;
+            case '/stats':
+                await verifyDag(this.#base, this.#swarm, this.#wallet, this.#writingKey);
+                break;
+            default:
+                if (input.startsWith('/get_node_info')) {
+                    const splitted = input.split(' ');
+                    console.log("whitelist entry:", await this.#isWhitelisted(splitted[1]))
+                } else if (input.startsWith('/add_indexer')) {
+                    const splitted = input.split(' ');
+                    const tracPublicKey = splitted[1]
+                    await this.#handleAddIndexerOperation(tracPublicKey);
+                }
+                else if (input.startsWith('/remove_indexer')) {
+                    const splitted = input.split(' ');
+                    const tracPublicKey = splitted[1]
+                    await this.#handleRemoveIndexerOperation(tracPublicKey);
+                }
+                else if (input.startsWith('/ban_writer')) {
+                    const splitted = input.split(' ');
+                    const tracPublicKey = splitted[1]
+                    await this.#handleBanValidatorOperation(tracPublicKey);
+                }
+        }
     }
 
 }
