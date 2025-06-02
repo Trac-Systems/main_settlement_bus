@@ -7,6 +7,7 @@ import { randomBytes } from 'crypto';
 import PeerWallet from "trac-wallet";
 import { tick, generatePostTx } from '../utils/setupApplyTests.js';
 import {testKeyPair1, testKeyPair2, testKeyPair3} from '../fixtures/apply.fixtures.js';
+import { generateTx } from '../../src/utils/functions.js';
 
 let tmp, bootstrapKeyPairPath, peerKeyPath, advKeyPath, msbBootstrap, boostrapPeerWallet, peerWallet, adversaryWallet
 
@@ -195,7 +196,7 @@ test('handleApplyTxOperation (apply) - negative', async t => {
         for (const testCase of testCases) {
             const maliciousValue = randomBytes(32).toString('hex');
             const modifiedValue = testCase.mod(postTx, maliciousValue);
-            const maliciousTxHash = await msbBootstrap.generateTx(
+            const maliciousTxHash = await generateTx(
                 modifiedValue.bs ?? postTx.value.bs,
                 modifiedValue.mbs ?? postTx.value.mbs,
                 modifiedValue.wp ?? postTx.value.wp,
