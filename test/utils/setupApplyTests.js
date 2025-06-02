@@ -13,6 +13,27 @@ import path from 'path'
 import fs from 'fs/promises'
 import PeerWallet from "trac-wallet"
 import { randomBytes } from 'crypto'
+import { request } from 'http';
+
+async function randomKeypair() {
+    const keypair = {};
+    const mnemonic = generateMnemonic();
+    const seed = await mnemonicToSeed(mnemonic);
+
+    const publicKey = b4a.alloc(sodium.crypto_sign_PUBLICKEYBYTES);
+    const secretKey = b4a.alloc(sodium.crypto_sign_SECRETKEYBYTES);
+
+    const hash = b4a.alloc(sodium.crypto_hash_sha256_BYTES);
+    sodium.crypto_hash_sha256(hash, b4a.from(seed));
+
+    const seed32 = b4a.from(hash, 'hex');
+
+    sodium.crypto_sign_seed_keypair(publicKey, secretKey, seed32);
+
+    keypair.publicKey = publicKey;
+    keypair.secretKey = secretKey;
+    return keypair;
+}
 
 async function randomKeypair() {
     const keypair = {};
