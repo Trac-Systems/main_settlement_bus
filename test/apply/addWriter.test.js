@@ -29,10 +29,6 @@ test('Apply function addWriter - happy path', async (t) => {
         await sleep(5000); // wait for both peers to sync state
         const result = await writer.msb.get(req.key); // check if the writer entry was added successfully in the base
 
-        // release resources
-        await writer.msb.close();
-        await admin.msb.close();
-
         // check the result
         t.ok(writer.msb.base.writable, 'peer should be writable');
         t.ok(result, 'Result should not be null');
