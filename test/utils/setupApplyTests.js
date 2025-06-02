@@ -3,27 +3,38 @@ import fileUtils from '../../src/utils/fileUtils.js'
 import MsgUtils from '../../src/utils/msgUtils.js'
 import { EntryType } from '../../src/utils/constants.js';
 import { OperationType } from '../../src/utils/constants.js'
-import { createHash } from '../../src/utils/functions.js'
+import { createHash, sleep } from '../../src/utils/functions.js'
+import sodium from 'sodium-native';
+import { generateMnemonic, validateMnemonic, mnemonicToSeed } from 'bip39-mnemonic';
 import b4a from 'b4a'
 import os from 'os'
 import path from 'path'
 import fs from 'fs/promises'
 import PeerWallet from "trac-wallet"
 import { randomBytes } from 'crypto'
+import { request } from 'http';
+
+async function randomKeypair() {
+    const keypair = {};
+    const mnemonic = generateMnemonic();
+    const seed = await mnemonicToSeed(mnemonic);
+
+    const publicKey = b4a.alloc(sodium.crypto_sign_PUBLICKEYBYTES);
+    const secretKey = b4a.alloc(sodium.crypto_sign_SECRETKEYBYTES);
+
+    const hash = b4a.alloc(sodium.crypto_hash_sha256_BYTES);
+    sodium.crypto_hash_sha256(hash, b4a.from(seed));
+
+    const seed32 = b4a.from(hash, 'hex');
+
+    sodium.crypto_sign_seed_keypair(publicKey, secretKey, seed32);
+
+    keypair.publicKey = publicKey;
+    keypair.secretKey = secretKey;
+    return keypair;
+}
 
 export const tick = () => new Promise(resolve => setImmediate(resolve));
-
-export async function baseSetup(test) {
-    try {
-        // TODO: Make this function more complete.
-        // It should set the standard environment for MSB apply tests.
-        const admin = await initMsbAdmin();
-        return admin;
-    }
-    catch (error) {
-        test.fail('Base setup error: ' + error)
-    }
-}
 
 export async function initMsbPeer(peerName, peerKeyPair, temporaryDirectory, options = {}) {
     const peer = await initDirectoryStructure(peerName, peerKeyPair, temporaryDirectory);
@@ -71,6 +82,69 @@ export async function setupAdmin(keyPair, temporaryDirectory, options = {}) {
     return admin;
 }
 
+export async function setupMsbWriter(admin, peerName, peerKeyPair, temporaryDirectory, options = {}) {
+    try {
+        const writerCandidate = await setupMsbPeer(peerName, peerKeyPair, temporaryDirectory, options);
+        await setupWhitelist(admin, [writerCandidate.wallet.publicKey]);
+
+        const isWriter = async (key) => {
+            const result = await admin.msb.get(key);
+            return result && result.isWriter && !result.isIndexer;
+        }
+
+        const req = await MsgUtils.assembleAddWriterMessage(writerCandidate.wallet, writerCandidate.msb.writingKey);
+        await admin.msb.base.append(req);
+        await tick(); // wait for the request to be processed
+
+        let counter;
+        const limit = 10; // maximum number of attempts to verify the role
+        for (counter = 0; counter < limit; counter++) {
+            const res = await isWriter(req.key);
+            if (res) {
+                break;
+            }
+            await sleep(1000); // wait for the peer to sync state
+        }
+
+        return writerCandidate;
+    }
+    catch (error) {
+        throw new Error('Error setting up MSB writer: ', error.message);
+    }
+}
+
+export async function setupMsbIndexer(indexerCandidate, admin, peerName, peerKeyPair, temporaryDirectory, options = {}) {
+    try {
+        const req = await MsgUtils.assembleAddIndexerMessage(admin.wallet, indexerCandidate.wallet.publicKey);
+        await admin.msb.base.append(req);
+        await tick(); // wait for the request to be processed
+
+        const isIndexer = async () => {
+            const indexers = await admin.msb.get(EntryType.INDEXERS)
+            if (!indexers) {
+                return false;
+            }
+            // Check if the peer's public key is in the indexers list
+            return Array.from(indexers).includes(indexerCandidate.wallet.publicKey);
+        }
+
+        let counter;
+        const limit = 10; // maximum number of attempts to verify the role
+        for (counter = 0; counter < limit; counter++) {
+            const res = await isIndexer(req.key);
+            if (res) {
+                break;
+            }
+            await sleep(1000); // wait for the peer to sync state
+        }
+
+        return indexerCandidate;
+    }
+    catch (error) {
+        throw new Error('Error setting up MSB indexer:', error.message);
+    }
+}
+
 export async function setupWhitelist(admin, whitelistKeys) {
     if (!admin || !admin.msb || !admin.wallet) {
         throw new Error('Admin is not properly initialized');
@@ -111,6 +185,9 @@ async function initDirectoryStructure(peerName, keyPair, temporaryDirectory) {
         await fs.mkdir(corestoreDbDirectory, { recursive: true });
 
         const keypath = path.join(corestoreDbDirectory, 'keypair.json');
+        if (!keyPair || !keyPair.publicKey || !keyPair.secretKey) {
+            keyPair = await randomKeypair();
+        }
         await fs.writeFile(keypath, JSON.stringify(keyPair, null, 2));
         return {
             storesDirectory,
