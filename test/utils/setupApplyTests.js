@@ -92,7 +92,7 @@ export async function initMsbAdmin(keyPair, temporaryDirectory, options = {}) {
     return admin;
 }
 
-export async function setupAdmin(keyPair, temporaryDirectory, options = {}) {
+export async function setupMsbAdmin(keyPair, temporaryDirectory, options = {}) {
     const admin = await initMsbAdmin(keyPair, temporaryDirectory, options);
 
     await admin.msb.ready();
@@ -224,17 +224,6 @@ async function initDirectoryStructure(peerName, keyPair, temporaryDirectory) {
 
 export async function addKeyToWhitelist(filepath, key) {
     try {
-        // Ensure the directory exists
-        await fs.mkdir(path.dirname(filepath), { recursive: true });
-
-        // If the file exists, rename it to <filename>.bak
-        try {
-            await fs.access(filepath);
-            await fs.rename(filepath, filepath + '.bak');
-        } catch (e) {
-            // File does not exist, no need to rename
-        }
-
         // Append the key to the file, followed by a newline
         await fs.appendFile(filepath, key + '\n', { encoding: 'utf8' });
     } catch (error) {

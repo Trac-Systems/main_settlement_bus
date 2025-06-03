@@ -1,5 +1,5 @@
 import { test, hook } from 'brittle';
-import { tick, initMsbAdmin, initTemporaryDirectory, removeTemporaryDirectory, setupMsbPeer, initMsbPeer } from '../utils/setupApplyTests.js';
+import { tick, initMsbAdmin, initTemporaryDirectory, removeTemporaryDirectory, setupMsbPeer } from '../utils/setupApplyTests.js';
 import { testKeyPair1 } from '../fixtures/apply.fixtures.js';
 import MsgUtils from '../../src/utils/msgUtils.js';
 import { EntryType } from '../../src/utils/constants.js';
@@ -13,7 +13,6 @@ hook('Initialize nodes for addWriter tests', async () => {
     const baseOptions = {
         enable_txchannels: false,
         enable_txlogs: false,
-        // replicate: false,
         enable_interactive_mode: false,
     }
     tmpDirectory = await initTemporaryDirectory();
