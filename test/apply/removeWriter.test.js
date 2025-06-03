@@ -1,5 +1,5 @@
 import { test, hook } from 'brittle';
-import { tick, setupAdmin, setupMsbPeer, setupWhitelist, initTemporaryDirectory, removeTemporaryDirectory } from '../utils/setupApplyTests.js';
+import { tick, setupMsbAdmin as setupMsbAdmin, setupMsbPeer, setupWhitelist, initTemporaryDirectory, removeTemporaryDirectory } from '../utils/setupApplyTests.js';
 import { testKeyPair1, testKeyPair2 } from '../fixtures/apply.fixtures.js';
 import MsgUtils from '../../src/utils/msgUtils.js';
 import { sleep } from '../../src/utils/functions.js';
@@ -8,7 +8,7 @@ let admin, writer, tmpDirectory;
 
 hook('Initialize nodes for addWriter tests', async t => {
     tmpDirectory = await initTemporaryDirectory()
-    admin = await setupAdmin(testKeyPair1, tmpDirectory, {});
+    admin = await setupMsbAdmin(testKeyPair1, tmpDirectory, {});
     writer = await setupMsbPeer('writer', testKeyPair2, tmpDirectory, admin.options);
 
     // set up whitelist
