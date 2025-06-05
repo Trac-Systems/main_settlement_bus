@@ -77,17 +77,20 @@ export class MainSettlementBus extends ReadyResource {
 
     get state() { return this.#state; }
 
-    getChannel() { return this.#channel; }
+    get channel() { return this.#channel; }
 
-    getNetwork() { return this.#network; }
+    get network() { return this.#network; }
 
-    getTracPublicKey() { return this.#wallet.publicKey; }
+    get tracPublicKey() {
+        if (!this.#wallet) return null;
+        return this.#wallet.publicKey;
+    }
 
     async _open() {
-        
+
         await this.#state.ready();
         this.#stateEventsListener();
-        
+
         if (this.#enable_wallet) {
             await this.#wallet.initKeyPair(this.KEY_PAIR_PATH, this.#readline_instance);
             printWalletInfo(this.#wallet.publicKey, this.#state.writingKey);

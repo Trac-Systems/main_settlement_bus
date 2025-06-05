@@ -242,7 +242,7 @@ export async function restoreWhitelistFromBackup(filepath) {
 export const generatePostTx = async (msbBootstrap, boostrapPeerWallet, peerWallet) => {
 
     const peerBootstrap = randomBytes(32).toString('hex');
-    const validatorPubKey = msbBootstrap.getTracPublicKey();
+    const validatorPubKey = msbBootstrap.tracPublicKey;
     const peerWriterKey = randomBytes(32).toString('hex');
     const peerPublicKey = peerWallet.publicKey;
 
