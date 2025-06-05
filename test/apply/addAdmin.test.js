@@ -5,8 +5,10 @@ import MsgUtils from '../../src/utils/msgUtils.js';
 import { EntryType } from '../../src/utils/constants.js';
 import { setupMsbIndexer, setupMsbWriter } from '../utils/setupApplyTests.js';
 import { sleep } from '../../src/utils/functions.js';
-
-let admin, newAdmin, indexer1, indexer2, writer, tmpDirectory;
+//TODO THIS TEST WORKS TO LONG!!!! TIMEOUT OF 1 MINUTE IS NOT ENOUGH, IT TAKES ABOUT 2 MINUTES TO EXECUTE
+let admin, newAdmin;
+let indexer1, indexer2, writer;
+let tmpDirectory;
 hook('Initialize nodes for addWriter tests', async () => {
     const baseOptions = {
         enable_txchannels: false,
@@ -22,28 +24,28 @@ hook('Initialize nodes for addWriter tests', async () => {
 test('Apply function addAdmin - happy path', async (t) => {
     t.test('Apply function addAdmin for the first time - happy path', async (k) => {
         try {
-            const adminEntryBefore = await admin.msb.get(EntryType.ADMIN);
+            const adminEntryBefore = await admin.msb.state.get(EntryType.ADMIN);
             k.is(adminEntryBefore, null, 'Admin entry should be null before adding a new admin');
 
             const addAdminMessage = await MsgUtils.assembleAdminMessage(
                 adminEntryBefore,
-                admin.msb.writingKey,
+                admin.msb.state.writingKey,
                 admin.wallet,
                 admin.options.bootstrap
             );
 
             // add admin to base
-            await admin.msb.base.append(addAdminMessage); // Send `add admin` request to apply function
+            await admin.msb.state.append(addAdminMessage); // Send `add admin` request to apply function
             await tick();
-            const adminEntryAfter = await admin.msb.get(EntryType.ADMIN); // check if the admin entry was added successfully in the base
+            const adminEntryAfter = await admin.msb.state.get(EntryType.ADMIN); // check if the admin entry was added successfully in the base
 
             // check the result
             k.ok(adminEntryAfter, 'Result should not be null');
             k.is(adminEntryAfter.tracPublicKey, admin.wallet.publicKey, 'Admin pubkey in base should match admin wallet public key');
-            k.is(adminEntryAfter.wk, admin.msb.writingKey, 'Admin writing key in base should match admin MSB writing key');
+            k.is(adminEntryAfter.wk, admin.msb.state.writingKey, 'Admin writing key in base should match admin MSB writing key');
             k.is(adminEntryAfter.wk, admin.options.bootstrap, 'Admin writing key in base should match bootstrap key');
-            k.ok(admin.msb.base.writable, 'Admin should be a writer');
-            k.ok(admin.msb.base.isIndexer, 'Admin should be an indexer');
+            k.ok(admin.msb.state.isWritable(), 'Admin should be a writer');
+            k.ok(admin.msb.state.isIndexer(), 'Admin should be an indexer');
 
         } catch (error) {
             k.fail(error.message);
@@ -73,10 +75,10 @@ test('Apply function addAdmin - happy path', async (t) => {
 
     t.test('Apply function addAdmin for recovery - happy path', async (k) => {
         try {
-            const adminEntryBefore = await admin.msb.get(EntryType.ADMIN);
-            const admI1 = await indexer1.msb.get(EntryType.ADMIN);
-            const admI2 = await indexer2.msb.get(EntryType.ADMIN);
-            const admW = await writer.msb.get(EntryType.ADMIN);
+            const adminEntryBefore = await admin.msb.state.get(EntryType.ADMIN);
+            const admI1 = await indexer1.msb.state.get(EntryType.ADMIN);
+            const admI2 = await indexer2.msb.state.get(EntryType.ADMIN);
+            const admW = await writer.msb.state.get(EntryType.ADMIN);
 
             k.ok(adminEntryBefore !== null, 'Admin entry should not be null before recovery');
             k.is(adminEntryBefore.wk, admin.options.bootstrap, 'Admin writing key in base should match bootstrap key');
@@ -95,25 +97,25 @@ test('Apply function addAdmin - happy path', async (t) => {
 
             const addAdminMessage = await MsgUtils.assembleAdminMessage(
                 adminEntryBefore,
-                newAdmin.msb.writingKey,
+                newAdmin.msb.state.writingKey,
                 newAdmin.wallet,
                 newAdmin.options.bootstrap
             );
 
             // add admin to base
-            await writer.msb.base.append(addAdminMessage); // Send `add admin` request to apply function
+            await writer.msb.state.append(addAdminMessage); // Send `add admin` request to apply function
             await sleep(5000); // wait for the new admin to sync with indexers
-            const adminEntryAfter = await newAdmin.msb.get(EntryType.ADMIN); // check if the admin entry was added successfully in the base
+            const adminEntryAfter = await newAdmin.msb.state.get(EntryType.ADMIN); // check if the admin entry was added successfully in the base
 
             // check the result
             k.ok(adminEntryAfter, 'Result should not be null');
             k.is(adminEntryAfter.tracPublicKey, newAdmin.wallet.publicKey, 'New Admin pubkey in base should match new admin wallet public key');
             k.is(admin.wallet.publicKey, newAdmin.wallet.publicKey, 'New Admin wallet pubkey should be the same as old admin wallet public key');
-            k.is(adminEntryAfter.wk, newAdmin.msb.writingKey, 'New Admin writing key in base should match new admin MSB writing key');
+            k.is(adminEntryAfter.wk, newAdmin.msb.state.writingKey, 'New Admin writing key in base should match new admin MSB writing key');
             k.ok(adminEntryBefore.wk !== adminEntryAfter.wk, 'New Admin writing key in base should have changed');
             k.ok(adminEntryAfter.wk !== newAdmin.options.bootstrap, 'New Admin should not be bootstrap anymore');
-            k.ok(newAdmin.msb.base.writable, 'New Admin should be a writer');
-            // t.ok(newAdmin.msb.base.isIndexer, 'New Admin should be an indexer'); // TODO: Fix admin not being an indexer after recovery. THen, uncomment this test
+            k.ok(newAdmin.msb.state.isWritable(), 'New Admin should be a writer');
+            // t.ok(newAdmin.msb.state.isIndexer(), 'New Admin should be an indexer'); // TODO: Fix admin not being an indexer after recovery. THen, uncomment this test
         } catch (error) {
             k.fail(error.message);
         }

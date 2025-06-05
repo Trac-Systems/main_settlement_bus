@@ -15,13 +15,17 @@ import {testKeyPair1, testKeyPair2} from '../fixtures/apply.fixtures.js';
 //TODO: create utils for tests, include Leo's tests approach for initializaion
 
 
-let tmp, bootstrapKeyPairPath, peerKeyPath, advKeyPath, msbBootstrap, msbPeer, boostrapPeerWallet, peerWallet, adversaryWallet
+let tmpDirectory, bootstrapKeyPairPath, peerKeyPath, advKeyPath;
+let msbBootstrap, msbPeer;
+let boostrapPeerWallet, peerWallet, adversaryWallet;
+
+
 
 const setUpAdmin = async (msbBootstrap, bootstrap) => {
-    const adminEntry = await msbBootstrap.get(EntryType.ADMIN)
-    const addAdminMessage = await MsgUtils.assembleAdminMessage(adminEntry, msbBootstrap.writingKey, boostrapPeerWallet, bootstrap);
+    const adminEntry = await msbBootstrap.state.get(EntryType.ADMIN);
+    const addAdminMessage = await MsgUtils.assembleAdminMessage(adminEntry, msbBootstrap.state.writingKey, boostrapPeerWallet, bootstrap);
 
-    await msbBootstrap.base.append(addAdminMessage);
+    await msbBootstrap.state.base.append(addAdminMessage);
     await tick();
 };
 
@@ -30,23 +34,23 @@ const getMockWhitelistKeys = async () => {
 };
 
 const setUpWhitelist = async (msbBootstrap, wallet) => {
-    const adminEntry = await msbBootstrap.get(EntryType.ADMIN)
+    const adminEntry = await msbBootstrap.state.get(EntryType.ADMIN);
     const assembledWhitelistMessages = await MsgUtils.assembleWhitelistMessages(adminEntry, wallet);
-    await msbBootstrap.base.append(assembledWhitelistMessages);
+    await msbBootstrap.state.base.append(assembledWhitelistMessages);
 };
 
 const setUpWriter = async (msbBootstrap, peerWritingKey, peerWallet) => {
     const assembledAddWriterMessage = await MsgUtils.assembleAddWriterMessage(peerWallet, peerWritingKey);
-    await msbBootstrap.base.append(assembledAddWriterMessage);
+    await msbBootstrap.state.base.append(assembledAddWriterMessage);
     await tick();
-}
+};
 
 
 hook('Initialize nodes', async t => {
     //init mocked directory structure
-    tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'tempTestStore-'))
+    tmpDirectory = await fs.mkdtemp(path.join(os.tmpdir(), 'tempTestStore-'))
 
-    const storesDirectory = tmp + '/stores/';
+    const storesDirectory = tmpDirectory + '/stores/';
     const storeName = 'testBootstrapStore/';
 
     // Bootstrap store
@@ -76,7 +80,7 @@ hook('Initialize nodes', async t => {
     });
 
     await msbInit.ready();
-    const bootstrap = msbInit.writingKey;
+    const bootstrap = msbInit.state.writingKey;
     await msbInit.close();
 
     const channel = randomBytes(32).toString('hex');
@@ -125,7 +129,7 @@ hook('Initialize nodes', async t => {
     fileUtils.readPublicKeysFromFile = originalReadPublicKeysFromFile;
 
     // peerMsb should become a writer (setUpWriter)
-    await setUpWriter(msbBootstrap, msbPeer.writingKey, peerWallet);
+    await setUpWriter(msbBootstrap, msbPeer.state.writingKey, peerWallet);
 
 })
 
@@ -135,12 +139,12 @@ test('handleApplyAddWriterOperation (apply) - Append transaction into the base',
 
     const indexerCandidate = peerWallet.publicKey;
     const assembledAddIndexerMessage = await MsgUtils.assembleAddIndexerMessage(boostrapPeerWallet, indexerCandidate);
-    await msbBootstrap.base.append(assembledAddIndexerMessage);
+    await msbBootstrap.state.append(assembledAddIndexerMessage);
     await tick();
     await sleep(5000);
     
-    const indexers = await msbPeer.get(EntryType.INDEXERS);
-    const nodeInfo = await msbPeer.get(indexerCandidate);
+    const indexers = await msbPeer.state.get(EntryType.INDEXERS);
+    const nodeInfo = await msbPeer.state.get(indexerCandidate);
 
     t.is(Array.from(indexers).includes(indexerCandidate), true, 'Indexer candidate should be included in the indexers list');
     t.is(nodeInfo.isIndexer, true, 'Node info should indicate that the node is an indexer');
@@ -150,5 +154,5 @@ hook('Clean up addIndexer setup', async t => {
     // close msbBoostrap and remove temp directory
     if (msbBootstrap) await msbBootstrap.close();
     if (msbPeer) await msbPeer.close();
-    if (tmp) await fs.rm(tmp, { recursive: true, force: true })
+    if (tmpDirectory) await fs.rm(tmpDirectory, { recursive: true, force: true })
 })

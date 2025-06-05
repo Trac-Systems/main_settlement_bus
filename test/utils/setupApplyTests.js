@@ -64,7 +64,7 @@ export async function initMsbAdmin(keyPair, temporaryDirectory, options = {}) {
     const admin = await initMsbPeer(peerName, keyPair, temporaryDirectory, options);
 
     await admin.msb.ready();
-    admin.options.bootstrap = admin.msb.writingKey;
+    admin.options.bootstrap = admin.msb.state.writingKey;
     await admin.msb.close();
 
     admin.msb = new MainSettlementBus(admin.options);
@@ -75,9 +75,9 @@ export async function setupAdmin(keyPair, temporaryDirectory, options = {}) {
     const admin = await initMsbAdmin(keyPair, temporaryDirectory, options);
 
     await admin.msb.ready();
-    const adminEntry = await admin.msb.get(EntryType.ADMIN)
-    const addAdminMessage = await MsgUtils.assembleAdminMessage(adminEntry, admin.msb.writingKey, admin.wallet, admin.options.bootstrap);
-    await admin.msb.base.append(addAdminMessage);
+    const adminEntry = await admin.msb.state.get(EntryType.ADMIN)
+    const addAdminMessage = await MsgUtils.assembleAdminMessage(adminEntry, admin.msb.state.writingKey, admin.wallet, admin.options.bootstrap);
+    await admin.msb.state.append(addAdminMessage);
     await tick();
     return admin;
 }
@@ -88,12 +88,12 @@ export async function setupMsbWriter(admin, peerName, peerKeyPair, temporaryDire
         await setupWhitelist(admin, [writerCandidate.wallet.publicKey]);
 
         const isWriter = async (key) => {
-            const result = await admin.msb.get(key);
+            const result = await admin.msb.state.get(key);
             return result && result.isWriter && !result.isIndexer;
         }
 
-        const req = await MsgUtils.assembleAddWriterMessage(writerCandidate.wallet, writerCandidate.msb.writingKey);
-        await admin.msb.base.append(req);
+        const req = await MsgUtils.assembleAddWriterMessage(writerCandidate.wallet, writerCandidate.msb.state.writingKey);
+        await admin.msb.state.append(req);
         await tick(); // wait for the request to be processed
 
         let counter;
@@ -116,11 +116,11 @@ export async function setupMsbWriter(admin, peerName, peerKeyPair, temporaryDire
 export async function setupMsbIndexer(indexerCandidate, admin, peerName, peerKeyPair, temporaryDirectory, options = {}) {
     try {
         const req = await MsgUtils.assembleAddIndexerMessage(admin.wallet, indexerCandidate.wallet.publicKey);
-        await admin.msb.base.append(req);
+        await admin.msb.state.append(req);
         await tick(); // wait for the request to be processed
 
         const isIndexer = async () => {
-            const indexers = await admin.msb.get(EntryType.INDEXERS)
+            const indexers = await admin.msb.state.get(EntryType.INDEXERS)
             if (!indexers) {
                 return false;
             }
@@ -154,7 +154,7 @@ export async function setupWhitelist(admin, whitelistKeys) {
         throw new Error('Whitelist keys must be a non-empty array');
     }
 
-    const adminEntry = await admin.msb.get(EntryType.ADMIN);
+    const adminEntry = await admin.msb.state.get(EntryType.ADMIN);
     if (!adminEntry) {
         throw new Error('Admin is not initialized. Execute /add_admin command first.');
     }
@@ -163,7 +163,7 @@ export async function setupWhitelist(admin, whitelistKeys) {
     const originalReadPublicKeysFromFile = fileUtils.readPublicKeysFromFile;
     fileUtils.readPublicKeysFromFile = async () => whitelistKeys;
     const assembledWhitelistMessages = await MsgUtils.assembleWhitelistMessages(adminEntry, admin.wallet);
-    await admin.msb.base.append(assembledWhitelistMessages);
+    await admin.msb.state.append(assembledWhitelistMessages);
     fileUtils.readPublicKeysFromFile = originalReadPublicKeysFromFile;
 }
 
@@ -303,7 +303,7 @@ export const generatePostTx = async (msbBootstrap, boostrapPeerWallet, peerWalle
             bs: parsedPreTx.bs,
             mbs: parsedPreTx.mbs,
             ws: postTxSig.toString('hex'),
-            wp: boostrapPeerWallet.publicKey,
+            wp: parsedPreTx.wp,
             wn: nonce
         }
     };

@@ -92,3 +92,11 @@ export function printHelp() {
     console.log('- /exit: Exit the program.');
     console.log('- /help: display this help.');
 }
+
+export const printWalletInfo = (tracPublicKey, writingKey) => {
+    console.log('');
+    console.log('#####################################################################################');
+    console.log('# MSB Address:    ', tracPublicKey, '#');
+    console.log('# MSB Writer:     ', writingKey, '#');
+    console.log('#####################################################################################');
+}

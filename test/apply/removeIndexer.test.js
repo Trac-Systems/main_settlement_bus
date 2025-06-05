@@ -14,13 +14,20 @@ import {testKeyPair1, testKeyPair2} from '../fixtures/apply.fixtures.js';
 
 //TODO: create utils for tests, include Leo's tests approach for initializaion
 
-let tmp, bootstrapKeyPairPath, peerKeyPath, advKeyPath, msbBootstrap, msbPeer, boostrapPeerWallet, peerWallet, adversaryWallet
+let tmpDirectory, bootstrapKeyPairPath, peerKeyPath;
+let msbBootstrap, msbPeer;
+let boostrapPeerWallet, peerWallet;
 
 const setUpAdmin = async (msbBootstrap, bootstrap) => {
-    const adminEntry = await msbBootstrap.get(EntryType.ADMIN)
-    const addAdminMessage = await MsgUtils.assembleAdminMessage(adminEntry, msbBootstrap.writingKey, boostrapPeerWallet, bootstrap);
+    const adminEntry = await msbBootstrap.state.get(EntryType.ADMIN);
+    const addAdminMessage = await MsgUtils.assembleAdminMessage(
+        adminEntry,
+        msbBootstrap.state.writingKey,
+        boostrapPeerWallet,
+        bootstrap
+    );
 
-    await msbBootstrap.base.append(addAdminMessage);
+    await msbBootstrap.state.append(addAdminMessage);
     await tick();
 };
 
@@ -29,29 +36,29 @@ const getMockWhitelistKeys = async () => {
 };
 
 const setUpWhitelist = async (msbBootstrap, wallet) => {
-    const adminEntry = await msbBootstrap.get(EntryType.ADMIN)
+    const adminEntry = await msbBootstrap.state.get(EntryType.ADMIN);
     const assembledWhitelistMessages = await MsgUtils.assembleWhitelistMessages(adminEntry, wallet);
-    await msbBootstrap.base.append(assembledWhitelistMessages);
+    await msbBootstrap.state.append(assembledWhitelistMessages);
+    await tick();
 };
 
 const setUpWriter = async (msbBootstrap, peerWritingKey, peerWallet) => {
     const assembledAddWriterMessage = await MsgUtils.assembleAddWriterMessage(peerWallet, peerWritingKey);
-    await msbBootstrap.base.append(assembledAddWriterMessage);
+    await msbBootstrap.state.append(assembledAddWriterMessage);
     await tick();
-}
+};
 
-const setUpIndexer = async (boostrapPeerWallet, msbBootstrap, peerTracPublicKey) => {
-    const assembledAddIndexerMessage = await MsgUtils.assembleAddIndexerMessage(boostrapPeerWallet, peerTracPublicKey);
-    await msbBootstrap.base.append(assembledAddIndexerMessage);
+const setUpIndexer = async (bootstrapWallet, msbBootstrap, peerTracPublicKey) => {
+    const assembledAddIndexerMessage = await MsgUtils.assembleAddIndexerMessage(bootstrapWallet, peerTracPublicKey);
+    await msbBootstrap.state.append(assembledAddIndexerMessage);
     await tick();
-}
-
+};
 
 hook('Initialize nodes', async t => {
     //init mocked directory structure
-    tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'tempTestStore-'))
+    tmpDirectory = await fs.mkdtemp(path.join(os.tmpdir(), 'tempTestStore-'))
 
-    const storesDirectory = tmp + '/stores/';
+    const storesDirectory = tmpDirectory + '/stores/';
     const storeName = 'testBootstrapStore/';
 
     // Bootstrap store
@@ -79,10 +86,10 @@ hook('Initialize nodes', async t => {
         enableRoleRequester: false,
         replicate: false,
     });
-
     await msbInit.ready();
-    const bootstrap = msbInit.writingKey;
+    const bootstrap = msbInit.state.writingKey;
     await msbInit.close();
+
     const channel = randomBytes(32).toString('hex');
     msbBootstrap = new MainSettlementBus({
         stores_directory: storesDirectory,
@@ -94,8 +101,8 @@ hook('Initialize nodes', async t => {
         enableRoleRequester: false,
         replicate: true,
     });
-
     await msbBootstrap.ready();
+
     msbPeer = new MainSettlementBus({
         stores_directory: storesDirectory,
         store_name: writeStoreName,
@@ -106,7 +113,6 @@ hook('Initialize nodes', async t => {
         enableRoleRequester: false,
         replicate: true,
     });
-
     await msbPeer.ready();
 
     // Initialization admin  and validator with writing role (Trac network) wallets for testing purposes
@@ -128,34 +134,31 @@ hook('Initialize nodes', async t => {
     //brittle does not support mock so we need to revert original function after initialization:
     fileUtils.readPublicKeysFromFile = originalReadPublicKeysFromFile;
 
-    // peerMsb should become a writer (setUpWriter)
-    await setUpWriter(msbBootstrap, msbPeer.writingKey, peerWallet);
+    await setUpWriter(msbBootstrap, msbPeer.state.writingKey, peerWallet);
 
-    // set up indexer
     await setUpIndexer(boostrapPeerWallet, msbBootstrap, peerWallet.publicKey);
 
-})
+});
 
-//TODO write more tests
 test('handleApplyRemoveWriterOperation (apply) - Append transaction into the base', async t => {
-    t.plan(2)
+    t.plan(2);
 
     const indexerCandidate = peerWallet.publicKey;
-    const assembledAddIndexerMessage = await MsgUtils.assembleRemoveIndexerMessage(boostrapPeerWallet, indexerCandidate);
-    await msbBootstrap.base.append(assembledAddIndexerMessage);
-    await tick();
-    await sleep(5000);
-    
-    const indexers = await msbPeer.get(EntryType.INDEXERS);
-    const nodeInfo = await msbPeer.get(indexerCandidate);
 
-    t.is(Array.from(indexers).includes(indexerCandidate), false, 'Indexer candidate should be not included in the indexers list');
-    t.is(nodeInfo.isIndexer, false, 'Node info should indicate that the node is not an indexer');
-})
+    const removeIndexerMsg = await MsgUtils.assembleRemoveIndexerMessage(boostrapPeerWallet, indexerCandidate);
+    await msbBootstrap.state.append(removeIndexerMsg);
+    await tick();
+    await sleep(2000);
+
+    const indexersAfter = await msbPeer.state.get(EntryType.INDEXERS);
+    const nodeInfoAfter = await msbPeer.state.get(indexerCandidate);
+
+    t.is(Array.from(indexersAfter).includes(indexerCandidate), false, 'Indexer candidate should be not included in the indexers list');
+    t.is(nodeInfoAfter.isIndexer, false, 'Node info should indicate that the node is not an indexer');
+});
 
 hook('Clean up addIndexer setup', async t => {
-    // close msbBoostrap and remove temp directory
     if (msbBootstrap) await msbBootstrap.close();
     if (msbPeer) await msbPeer.close();
-    if (tmp) await fs.rm(tmp, { recursive: true, force: true })
-})
+    if (tmpDirectory) await fs.rm(tmpDirectory, { recursive: true, force: true });
+});
