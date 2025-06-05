@@ -189,7 +189,7 @@ class State extends ReadyResource {
             const indexersEntry = await batch.get(EntryType.INDEXERS);
             if (null !== indexersEntry && indexersEntry.value.includes(adminEntry.tracPublicKey)) {
                 await base.removeWriter(b4a.from(adminEntry.wk, 'hex'));
-                await base.addWriter(b4a.from(op.value.wk, 'hex'), { isIndexer: true })
+                await base.addWriter(b4a.from(op.value.wk, 'hex'), { isIndexer: true });
                 await batch.put(EntryType.ADMIN, {
                     tracPublicKey: adminEntry.tracPublicKey,
                     wk: op.value.wk
