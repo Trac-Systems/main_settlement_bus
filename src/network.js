@@ -28,14 +28,14 @@ class Network extends ReadyResource {
     #channel;
     #dht_bootstrap = ['116.202.214.149:10001', '157.180.12.214:10001', 'node1.hyperdht.org:49737', 'node2.hyperdht.org:49737', 'node3.hyperdht.org:49737'];
 
-    constructor(base, channel, options = {}) {
+    constructor(state, channel, options = {}) {
         super();
         this.#enableValidatorObserver = options.enableValidatorObserver !== undefined ? options.enableValidatorObserver : true;
         this.#enable_wallet = options.enable_wallet !== false;
         this.#disable_rate_limit = options.disable_rate_limit === true;
         this.#channel = channel;
         this.tx_pool = [];
-        this.pool(base);
+        this.pool(state.append.bind(state));
         this.check = new Check();
         this.admin_stream = null;
         this.admin = null;
@@ -43,7 +43,7 @@ class Network extends ReadyResource {
         this.validator = null;
         this.custom_stream = null;
         this.custom_node = null;
-        this.ready();
+        
     }
 
     get swarm() {
@@ -58,9 +58,7 @@ class Network extends ReadyResource {
         return this.#channel;
     }
 
-    async _open() {
-        console.log('Network: opening...');
-    }
+    async _open() { console.log('Network initialization...'); }
 
     async _close() {
         console.log('Network: closing gracefully...');
@@ -79,9 +77,8 @@ class Network extends ReadyResource {
     }
 
     async replicate(
-        //TODO: we should delete an access to msb and base. We should create a new methods in index.js which will allows access to needed properties and bind them here.
-        msb,
-        base,
+        //TODO: we should delete an access to state. We should create a new methods in index.js which will allows access to needed properties and bind them here.
+        state,
         writingKey,
         store,
         wallet,
@@ -145,7 +142,7 @@ class Network extends ReadyResource {
                                 message.send({ response: _msg, sig, nonce })
                                 network.#swarm.leavePeer(connection.remotePublicKey)
                             } else if (msg === 'get_admin') {
-                                const res = await msb.get(EntryType.ADMIN);
+                                const res = await state.get(EntryType.ADMIN);
                                 if (wallet.publicKey !== res.tracPublicKey) return;
                                 const nonce = Wallet.generateNonce().toString('hex');
                                 const _msg = {
@@ -171,7 +168,7 @@ class Network extends ReadyResource {
                                 network.#swarm.leavePeer(connection.remotePublicKey)
 
                             } else if (msg.response !== undefined && msg.response.op !== undefined && msg.response.op === 'validator') {
-                                const res = await msb.get(msg.response.address);
+                                const res = await state.get(msg.response.address);
                                 if (res === null) return;
                                 const verified = wallet.verify(msg.sig, JSON.stringify(msg.response) + msg.nonce, msg.response.address)
                                 if (verified && msg.response.channel === channelString && network.validator_stream === null) {
@@ -181,7 +178,7 @@ class Network extends ReadyResource {
                                 }
                                 network.#swarm.leavePeer(connection.remotePublicKey)
                             } else if (msg.response !== undefined && msg.response.op !== undefined && msg.response.op === 'admin') {
-                                const res = await msb.get(EntryType.ADMIN);
+                                const res = await state.get(EntryType.ADMIN);
                                 if (res === null || res.tracPublicKey !== msg.response.address) return;
                                 const verified = wallet.verify(msg.sig, JSON.stringify(msg.response) + msg.nonce, res.tracPublicKey)
                                 if (verified && msg.response.channel === channelString) {
@@ -204,25 +201,25 @@ class Network extends ReadyResource {
 
                                 //TODO: Most of this logic below should be moved into the handleIncomingEvent function. Code below can be reduced to call only handleIncomingEvent(msg) with some basic checks.
                             } else if (msg.type !== undefined && msg.key !== undefined && msg.value !== undefined && msg.type === 'addWriter') {
-                                const adminEntry = await msb.get(EntryType.ADMIN);
+                                const adminEntry = await state.get(EntryType.ADMIN);
                                 if (null === adminEntry || (adminEntry.tracPublicKey !== wallet.publicKey)) return;
-                                const nodeEntry = await msb.get(msg.value.pub);
+                                const nodeEntry = await state.get(msg.value.pub);
                                 const isAlreadyWriter = null !== nodeEntry && nodeEntry.isWriter;
-                                const canAddWriter = base.writable && !isAlreadyWriter;
+                                const canAddWriter = state.isWritable() && !isAlreadyWriter;
                                 if (msg.key === wallet.publicKey || !canAddWriter) return;
                                 await handleIncomingEvent(msg);
                                 network.#swarm.leavePeer(connection.remotePublicKey)
                             } else if (msg.type !== undefined && msg.key !== undefined && msg.value !== undefined && msg.type === 'removeWriter') {
-                                const adminEntry = await msb.get(EntryType.ADMIN);
+                                const adminEntry = await state.get(EntryType.ADMIN);
                                 if (null === adminEntry || (adminEntry.tracPublicKey !== wallet.publicKey)) return;
-                                const nodeEntry = await msb.get(msg.value.pub);
+                                const nodeEntry = await state.get(msg.value.pub);
                                 const isAlreadyWriter = null !== nodeEntry && nodeEntry.isWriter;
-                                const canRemoveWriter = base.writable && isAlreadyWriter
+                                const canRemoveWriter = state.isWritable() && isAlreadyWriter
                                 if (msg.key === wallet.publicKey || !canRemoveWriter) return;
                                 await handleIncomingEvent(msg);
                                 network.#swarm.leavePeer(connection.remotePublicKey)
                             } else if (msg.type !== undefined && msg.key !== undefined && msg.value !== undefined && msg.type === 'addAdmin') {
-                                const adminEntry = await msb.get(EntryType.ADMIN);
+                                const adminEntry = await state.get(EntryType.ADMIN);
                                 if (null === adminEntry || (adminEntry.tracPublicKey !== msg.key)) return;
                                 await handleIncomingEvent(msg);
                                 network.#swarm.leavePeer(connection.remotePublicKey)
@@ -231,7 +228,7 @@ class Network extends ReadyResource {
                                 await handleIncomingEvent(msg);
                                 network.#swarm.leavePeer(connection.remotePublicKey)
                             } else {
-                                if (base.isIndexer || !base.writable) return;
+                                if (state.isIndexer() || !state.isWritable()) return;
 
                                 if (true !== network.disable_rate_limit) {
                                     const peer = b4a.toString(connection.remotePublicKey, 'hex');
@@ -271,7 +268,7 @@ class Network extends ReadyResource {
                                 if (network.check.sanitizePreTx(parsedPreTx) &&
                                     wallet.verify(b4a.from(parsedPreTx.is, 'hex'), b4a.from(parsedPreTx.tx + parsedPreTx.in), b4a.from(parsedPreTx.ipk, 'hex')) &&
                                     parsedPreTx.wp === wallet.publicKey &&
-                                    null === await base.view.get(parsedPreTx.tx)
+                                    null === await state.get(parsedPreTx.tx)
                                 ) {
                                     const nonce = Wallet.generateNonce().toString('hex');
                                     const signature = wallet.sign(b4a.from(parsedPreTx.tx + nonce), b4a.from(wallet.secretKey, 'hex'));
@@ -338,7 +335,7 @@ class Network extends ReadyResource {
         }
     }
 
-    async pool(base) {
+    async pool(appendState) {
         while (!this.#shouldStopPool) {
             if (this.tx_pool.length > 0) {
                 const length = this.tx_pool.length;
@@ -347,7 +344,7 @@ class Network extends ReadyResource {
                     if (i >= 10) break;
                     batch.push({ type: OperationType.TX, key: this.tx_pool[i].tx, value: this.tx_pool[i].append_tx });
                 }
-                await base.append(batch);
+                await appendState(batch);
                 this.tx_pool.splice(0, batch.length);
             }
             await sleep(5);

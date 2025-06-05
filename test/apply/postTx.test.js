@@ -9,12 +9,14 @@ import { tick, generatePostTx } from '../utils/setupApplyTests.js';
 import {testKeyPair1, testKeyPair2, testKeyPair3} from '../fixtures/apply.fixtures.js';
 import { generateTx } from '../../src/utils/functions.js';
 
-let tmp, bootstrapKeyPairPath, peerKeyPath, advKeyPath, msbBootstrap, boostrapPeerWallet, peerWallet, adversaryWallet
+let tmpDirectory, bootstrapKeyPairPath, peerKeyPath;
+let advKeyPath, msbBootstrap;
+let boostrapPeerWallet, peerWallet, adversaryWallet;
 
 hook('Initialize nodes', async t => {
     //init mocked directory structure
-    tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'tempTestStore-'))
-    const storesDirectory = tmp + '/stores/';
+    tmpDirectory = await fs.mkdtemp(path.join(os.tmpdir(), 'tempTestStore-'))
+    const storesDirectory = tmpDirectory + '/stores/';
     const storeName = 'testStore/';
     const corestoreDbDirectory = path.join(storesDirectory, storeName, 'db');
     await fs.mkdir(corestoreDbDirectory, { recursive: true });
@@ -40,7 +42,7 @@ hook('Initialize nodes', async t => {
     });
 
     await msbInit.ready();
-    const bootstrap = msbInit.writingKey;
+    const bootstrap = msbInit.state.writingKey;
     await msbInit.close();
 
     msbBootstrap = new MainSettlementBus({
@@ -71,11 +73,12 @@ test('handleApplyTxOperation (apply) - Append transaction into the base', async 
     t.plan(1)
 
     const { postTx, preTxHash } = await generatePostTx(msbBootstrap, boostrapPeerWallet, peerWallet)
-    await msbBootstrap.base.append(postTx);
+    await msbBootstrap.state.append(postTx);
     await tick();
     await tick();
 
-    const result = await msbBootstrap.base.view.get(preTxHash);
+    const result = await msbBootstrap.state.get(preTxHash);
+
     t.ok(result, 'post tx added to the base');
 })
 
@@ -87,10 +90,10 @@ test('handleApplyTxOperation (apply) - negative', async t => {
             ...postTx,
             foo: 'bar',
         }
-        await msbBootstrap.base.append(postTx);
+        await msbBootstrap.state.append(postTx);
         await tick();
 
-        t.absent(await msbBootstrap.base.view.get(preTxHash), 'post tx with neasted object should not be added to the base');
+        t.absent(await msbBootstrap.state.get(preTxHash), 'post tx with neasted object should not be added to the base');
         postTx = {
             ...postTx,
             value: {
@@ -98,9 +101,9 @@ test('handleApplyTxOperation (apply) - negative', async t => {
                 foo: 'bar',
             }
         }
-        await msbBootstrap.base.append(postTx);
+        await msbBootstrap.state.append(postTx);
         await tick();
-        t.absent(await msbBootstrap.base.view.get(preTxHash), 'post tx with neasted object in value property should not be added to the base');
+        t.absent(await msbBootstrap.state.get(preTxHash), 'post tx with neasted object in value property should not be added to the base');
 
     })
 
@@ -113,22 +116,21 @@ test('handleApplyTxOperation (apply) - negative', async t => {
                 op: 'invalidOp',
             }
         }
-        await msbBootstrap.base.append(postTx);
+        await msbBootstrap.state.append(postTx);
         await tick();
 
-        t.absent(await msbBootstrap.base.view.get(preTxHash), 'post tx with incorrect operation type should not be added to the base');
+        t.absent(await msbBootstrap.state.get(preTxHash), 'post tx with incorrect operation type should not be added to the base');
     })
 
     t.test('replay attack', async t => {
         const { postTx, preTxHash } = await generatePostTx(msbBootstrap, boostrapPeerWallet, peerWallet);
-        await msbBootstrap.base.append(postTx);
+        await msbBootstrap.state.append(postTx);
         await tick();
-        const firstRes = await msbBootstrap.base.view.get(preTxHash);
-
-        await msbBootstrap.base.append(postTx);
+        const firstRes = await msbBootstrap.state.get(preTxHash);
+        await msbBootstrap.state.append(postTx);
         await tick();
 
-        const secondRes = await msbBootstrap.base.view.get(preTxHash);
+        const secondRes = await msbBootstrap.state.get(preTxHash);
 
 
         t.is(firstRes.seq, secondRes.seq, 'post tx should not be added to the base twice');
@@ -140,9 +142,9 @@ test('handleApplyTxOperation (apply) - negative', async t => {
             ...postTx,
             key: randomBytes(32).toString('hex'),
         }
-        await msbBootstrap.base.append(postTx);
+        await msbBootstrap.state.append(postTx);
         await tick();
-        const result = await msbBootstrap.base.view.get(preTxHash);
+        const result = await msbBootstrap.state.get(preTxHash);
         t.absent(result, 'post tx with invalid key hash should not be added to the base');
 
     })
@@ -156,10 +158,10 @@ test('handleApplyTxOperation (apply) - negative', async t => {
 
         postTx.value.is = adversarySignature.toString('hex');
 
-        await msbBootstrap.base.append(postTx);
+        await msbBootstrap.state.append(postTx);
         await tick();
 
-        const result = await msbBootstrap.base.view.get(preTxHash);
+        const result = await msbBootstrap.state.get(preTxHash);
         t.absent(result, 'adversary prepared fake preTx signature (third key pair) should not be added to the base');
     });
 
@@ -173,10 +175,10 @@ test('handleApplyTxOperation (apply) - negative', async t => {
 
         postTx.ws = adversarySignature.toString('hex');
 
-        await msbBootstrap.base.append(postTx);
+        await msbBootstrap.state.append(postTx);
         await tick();
 
-        const result = await msbBootstrap.base.view.get(preTxHash);
+        const result = await msbBootstrap.state.get(preTxHash);
         t.absent(result, 'adversary prepared fake postTx signature (third key pair) should not be added to the base');
     });
 
@@ -216,9 +218,9 @@ test('handleApplyTxOperation (apply) - negative', async t => {
                 },
             };
 
-            await msbBootstrap.base.append(maliciousPostTx);
+            await msbBootstrap.state.append(maliciousPostTx);
             await tick();
-            const result = await msbBootstrap.base.view.get(maliciousTxHash);
+            const result = await msbBootstrap.state.base.view.get(maliciousTxHash);
             t.absent(result, `post tx with ${testCase.name} should not be added to the base`);
         }
     });
@@ -226,9 +228,9 @@ test('handleApplyTxOperation (apply) - negative', async t => {
     t.test('oversized transaction', async t => {
         let { postTx, preTxHash } = await generatePostTx(msbBootstrap, boostrapPeerWallet, peerWallet);
         postTx.value.extraData = randomBytes(4500).toString('hex'); // fastest validator have good schemas and it will be protected by this validator but this case should be considered
-        await msbBootstrap.base.append(postTx);
+        await msbBootstrap.state.append(postTx);
         await tick();
-        const result = await await msbBootstrap.base.view.get(preTxHash);
+        const result = await await msbBootstrap.state.base.view.get(preTxHash);
         t.absent(result, 'oversized post tx should not be added to the base');
     });
 })
@@ -236,5 +238,5 @@ test('handleApplyTxOperation (apply) - negative', async t => {
 hook('Clean up postTx setup', async t => {
     // close msbBoostrap and remove temp directory
     if (msbBootstrap) await msbBootstrap.close();
-    if (tmp) await fs.rm(tmp, { recursive: true, force: true })
+    if (tmpDirectory) await fs.rm(tmpDirectory, { recursive: true, force: true })
 })

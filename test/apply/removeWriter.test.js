@@ -14,38 +14,35 @@ hook('Initialize nodes for addWriter tests', async t => {
     // set up whitelist
     const whitelistKeys = [writer.wallet.publicKey];
     await setupWhitelist(admin, whitelistKeys);
+    await tick();
 })
 
 test('Apply function removeWriter - happy path', async (t) => {
     try {
         const reqAddWriter = await MsgUtils.assembleAddWriterMessage(
             writer.wallet,
-            writer.msb.writingKey,
+            writer.msb.state.writingKey,
         );
 
         // add writer to base
-        await admin.msb.base.append(reqAddWriter); // Send `add writer` request to admin apply function
+        await admin.msb.state.append(reqAddWriter); // Send `add writer` request to admin apply function
         await tick();
 
         // request writer removal
         const reqRemoveWriter = await MsgUtils.assembleRemoveWriterMessage(
             writer.wallet,
-            writer.msb.writingKey,
+            writer.msb.state.writingKey,
         );
 
-        await admin.msb.base.append(reqRemoveWriter);
+        await admin.msb.state.append(reqRemoveWriter);
         await tick();
         await sleep(5000); // wait for both peers to sync state
-        const resultRemoveWriter = await writer.msb.get(reqRemoveWriter.key); // check if the writer entry was removed successfully in the base
-
-        // release resources
-        await writer.msb.close();
-        await admin.msb.close();
+        const resultRemoveWriter = await writer.msb.state.get(reqRemoveWriter.key); // check if the writer entry was removed successfully in the base
 
         // check the result
         t.ok(resultRemoveWriter, 'Result should not be null');
         t.is(resultRemoveWriter.pub, writer.wallet.publicKey, 'Result value.pub should match writer public key');
-        t.is(resultRemoveWriter.wk, writer.msb.writingKey, 'Result writing key should match writer writing key');
+        t.is(resultRemoveWriter.wk, writer.msb.state.writingKey, 'Result writing key should match writer writing key');
         t.is(resultRemoveWriter.isWriter, false, 'Node should not be a writer anymore');
         t.is(resultRemoveWriter.isIndexer, false, 'Result should not indicate that the peer is an indexer');
     }

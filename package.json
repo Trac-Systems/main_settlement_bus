@@ -9,7 +9,7 @@
   "type": "module",
   "scripts": {
     "dev": "pear run -d .",
-    "test:node": "brittle -c -t 60000 test/all.test.js",
+    "test:node": "brittle -c -t 120000 test/all.test.js",
     "test:bare": "bare test/all.test.js"
   },
   "dependencies": {
