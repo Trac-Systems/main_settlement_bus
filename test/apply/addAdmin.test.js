@@ -5,7 +5,7 @@ import MsgUtils from '../../src/utils/msgUtils.js';
 import { EntryType } from '../../src/utils/constants.js';
 import { setupMsbIndexer, setupMsbWriter } from '../utils/setupApplyTests.js';
 import { sleep } from '../../src/utils/functions.js';
-//TODO THIS TEST WORKS TO LONG!!!! TIMEOUT OF 1 MINUTE IS NOT ENOUGH, IT TAKES ABOUT 2 MINUTES TO EXECUTE
+
 let admin, newAdmin;
 let indexer1, indexer2, writer;
 let tmpDirectory;
