@@ -20,20 +20,20 @@ test('Apply function addWriter - happy path', async (t) => {
     try {
         const req = await MsgUtils.assembleAddWriterMessage(
             writer.wallet,
-            writer.msb.writingKey,
+            writer.msb.state.writingKey,
         );
 
         // add writer to base
-        await admin.msb.base.append(req); // Send `add writer` request to apply function
+        await admin.msb.state.append(req); // Send `add writer` request to apply function
         await tick();
         await sleep(5000); // wait for both peers to sync state
-        const result = await writer.msb.get(req.key); // check if the writer entry was added successfully in the base
+        const result = await writer.msb.state.get(req.key); // check if the writer entry was added successfully in the base
 
         // check the result
-        t.ok(writer.msb.base.writable, 'peer should be writable');
+        t.ok(writer.msb.state.isWritable(), 'peer should be writable');
         t.ok(result, 'Result should not be null');
         t.is(result.pub, writer.wallet.publicKey, 'Result pub should match writer public key');
-        t.is(result.wk, writer.msb.writingKey, 'Result writing key should match writer writing key');
+        t.is(result.wk, writer.msb.state.writingKey, 'Result writing key should match writer writing key');
         t.ok(result.isWriter, 'Result should indicate that the peer is a valid writer');
         t.is(result.isIndexer, false, 'Result should not indicate that the peer is an indexer');
     }
