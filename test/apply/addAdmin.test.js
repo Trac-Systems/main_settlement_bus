@@ -63,8 +63,8 @@ test('Apply function addAdmin - happy path', async (t) => {
         await sleep(5000); // wait for the peers to sync with admin
 
         // Initialize indexers
-        indexer1 = await setupMsbIndexer(indexer1, admin, 'indexer1', null, tmpDirectory, admin.options);
-        indexer2 = await setupMsbIndexer(indexer2, admin, 'indexer2', null, tmpDirectory, admin.options)
+        indexer1 = await setupMsbIndexer(indexer1, admin);
+        indexer2 = await setupMsbIndexer(indexer2, admin);
         await sleep(5000); // wait for the indexers and writer to sync with admin
     }
     catch (error) {

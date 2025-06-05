@@ -25,10 +25,10 @@ hook('Initialize admin node for addWhitelist tests', async () => {
 });
 
 test('Apply function addWhitelist - happy path', async (t) => {
-    const adminEntry = await admin.msb.get(EntryType.ADMIN);
+    const adminEntry = await admin.msb.state.get(EntryType.ADMIN);
     const assembledWhitelistMessages = await MsgUtils.assembleWhitelistMessages(adminEntry, admin.wallet);
-    await admin.msb.base.append(assembledWhitelistMessages);
-    const whitelist = await admin.msb.get(WHITELIST_PREFIX + testKeyPair2.publicKey);
+    await admin.msb.state.append(assembledWhitelistMessages);
+    const whitelist = await admin.msb.state.get(WHITELIST_PREFIX + testKeyPair2.publicKey);
     t.is(whitelist, true, 'Whitelist entry should be created and true');
 });
 

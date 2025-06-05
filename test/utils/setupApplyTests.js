@@ -6,34 +6,13 @@ import { OperationType } from '../../src/utils/constants.js'
 import { createHash, sleep } from '../../src/utils/functions.js'
 import { generateTx } from '../../src/utils/functions.js';
 import sodium from 'sodium-native';
-import { generateMnemonic, validateMnemonic, mnemonicToSeed } from 'bip39-mnemonic';
+import { generateMnemonic, mnemonicToSeed } from 'bip39-mnemonic';
 import b4a from 'b4a'
 import os from 'os'
 import path from 'path'
 import fs from 'fs/promises'
 import PeerWallet from "trac-wallet"
 import { randomBytes } from 'crypto'
-import { request } from 'http';
-
-async function randomKeypair() {
-    const keypair = {};
-    const mnemonic = generateMnemonic();
-    const seed = await mnemonicToSeed(mnemonic);
-
-    const publicKey = b4a.alloc(sodium.crypto_sign_PUBLICKEYBYTES);
-    const secretKey = b4a.alloc(sodium.crypto_sign_SECRETKEYBYTES);
-
-    const hash = b4a.alloc(sodium.crypto_hash_sha256_BYTES);
-    sodium.crypto_hash_sha256(hash, b4a.from(seed));
-
-    const seed32 = b4a.from(hash, 'hex');
-
-    sodium.crypto_sign_seed_keypair(publicKey, secretKey, seed32);
-
-    keypair.publicKey = publicKey;
-    keypair.secretKey = secretKey;
-    return keypair;
-}
 
 async function randomKeypair() {
     const keypair = {};
@@ -134,7 +113,7 @@ export async function setupMsbWriter(admin, peerName, peerKeyPair, temporaryDire
     }
 }
 
-export async function setupMsbIndexer(indexerCandidate, admin, peerName, peerKeyPair, temporaryDirectory, options = {}) {
+export async function setupMsbIndexer(indexerCandidate, admin) {
     try {
         const req = await MsgUtils.assembleAddIndexerMessage(admin.wallet, indexerCandidate.wallet.publicKey);
         await admin.msb.state.append(req);
