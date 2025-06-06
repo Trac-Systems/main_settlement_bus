@@ -1,5 +1,5 @@
 import { test, hook } from 'brittle';
-import { tick, setupAdmin, setupMsbPeer, setupWhitelist, initTemporaryDirectory, removeTemporaryDirectory } from '../utils/setupApplyTests.js';
+import { tick, setupMsbAdmin, setupMsbPeer, setupWhitelist, initTemporaryDirectory, removeTemporaryDirectory } from '../utils/setupApplyTests.js';
 import { testKeyPair1, testKeyPair2 } from '../fixtures/apply.fixtures.js';
 import MsgUtils from '../../src/utils/msgUtils.js';
 import { sleep } from '../../src/utils/functions.js';
@@ -8,15 +8,15 @@ let admin, writer, tmpDirectory;
 
 hook('Initialize nodes for addWriter tests', async t => {
     tmpDirectory = await initTemporaryDirectory()
-    admin = await setupAdmin(testKeyPair1, tmpDirectory, {});
+    admin = await setupMsbAdmin(testKeyPair1, tmpDirectory, {});
     writer = await setupMsbPeer('writer', testKeyPair2, tmpDirectory, admin.options);
 
     // set up whitelist
     const whitelistKeys = [writer.wallet.publicKey];
     await setupWhitelist(admin, whitelistKeys);
-})
+});
 
-test('Apply function addWriter - happy path', async (t) => {
+test('handleApplyAddWriterOperation (apply) - Append transaction into the base', async (t) => {
     try {
         const req = await MsgUtils.assembleAddWriterMessage(
             writer.wallet,
@@ -38,14 +38,16 @@ test('Apply function addWriter - happy path', async (t) => {
         t.is(result.isIndexer, false, 'Result should not indicate that the peer is an indexer');
     }
     catch (error) {
-        t.fail(error.message);
+        t.fail('Failed to add writer: ' + error.message);
     }
 
 });
 
+// TODO: Include a test that shows a non-whitelisted peer cannot become writer
+
 hook('Clean up addWriter setup', async t => {
     // close msb instances and remove temp directory
-    if (admin.msb) await admin.msb.close();
-    if (writer.msb) await writer.msb.close();
+    if (admin && admin.msb) await admin.msb.close();
+    if (writer && writer.msb) await writer.msb.close();
     if (tmpDirectory) await removeTemporaryDirectory(tmpDirectory);
 })

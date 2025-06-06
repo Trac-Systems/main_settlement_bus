@@ -6,7 +6,7 @@ import { OperationType } from '../../src/utils/constants.js'
 import { createHash, sleep } from '../../src/utils/functions.js'
 import { generateTx } from '../../src/utils/functions.js';
 import sodium from 'sodium-native';
-import { generateMnemonic, validateMnemonic, mnemonicToSeed } from 'bip39-mnemonic';
+import { generateMnemonic, mnemonicToSeed } from 'bip39-mnemonic';
 import b4a from 'b4a'
 import os from 'os'
 import path from 'path'
@@ -71,7 +71,7 @@ export async function initMsbAdmin(keyPair, temporaryDirectory, options = {}) {
     return admin;
 }
 
-export async function setupAdmin(keyPair, temporaryDirectory, options = {}) {
+export async function setupMsbAdmin(keyPair, temporaryDirectory, options = {}) {
     const admin = await initMsbAdmin(keyPair, temporaryDirectory, options);
 
     await admin.msb.ready();
@@ -113,7 +113,7 @@ export async function setupMsbWriter(admin, peerName, peerKeyPair, temporaryDire
     }
 }
 
-export async function setupMsbIndexer(indexerCandidate, admin, peerName, peerKeyPair, temporaryDirectory, options = {}) {
+export async function setupMsbIndexer(indexerCandidate, admin) {
     try {
         const req = await MsgUtils.assembleAddIndexerMessage(admin.wallet, indexerCandidate.wallet.publicKey);
         await admin.msb.state.append(req);
@@ -141,7 +141,7 @@ export async function setupMsbIndexer(indexerCandidate, admin, peerName, peerKey
         return indexerCandidate;
     }
     catch (error) {
-        throw new Error('Error setting up MSB indexer:', error.message);
+        throw new Error('Error setting up MSB indexer: ', error.message);
     }
 }
 
@@ -203,17 +203,9 @@ async function initDirectoryStructure(peerName, keyPair, temporaryDirectory) {
 
 export async function addKeyToWhitelist(filepath, key) {
     try {
-        // Ensure the directory exists
-        await fs.mkdir(path.dirname(filepath), { recursive: true });
-
-        // If the file exists, rename it to <filename>.bak
-        try {
-            await fs.access(filepath);
-            await fs.rename(filepath, filepath + '.bak');
-        } catch (e) {
-            // File does not exist, no need to rename
-        }
-
+        // Check if the file exists, if not create it
+        await fs.mkdir(path.dirname(filepath), { recursive: true })
+        
         // Append the key to the file, followed by a newline
         await fs.appendFile(filepath, key + '\n', { encoding: 'utf8' });
     } catch (error) {
