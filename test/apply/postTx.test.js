@@ -49,7 +49,7 @@ test('handleApplyTxOperation (apply) - negative', async t => {
         await admin.msb.state.append(postTx);
         await tick();
 
-        t.absent(await admin.msb.state.get(preTxHash), 'post tx with neasted object should not be added to the base');
+        t.absent(await admin.msb.state.get(preTxHash), 'post tx with nested object should not be added to the base');
         postTx = {
             ...postTx,
             value: {
@@ -59,7 +59,7 @@ test('handleApplyTxOperation (apply) - negative', async t => {
         }
         await admin.msb.state.append(postTx);
         await tick();
-        t.absent(await admin.msb.state.get(preTxHash), 'post tx with neasted object in value property should not be added to the base');
+        t.absent(await admin.msb.state.get(preTxHash), 'post tx with nested object in value property should not be added to the base');
 
     })
 
@@ -187,7 +187,7 @@ test('handleApplyTxOperation (apply) - negative', async t => {
         postTx.value.extraData = randomBytes(4500).toString('hex'); // fastest validator have good schemas and it will be protected by this validator but this case should be considered
         await admin.msb.state.append(postTx);
         await tick();
-        const result = await await admin.msb.state.get(preTxHash);
+        const result = await admin.msb.state.get(preTxHash);
         t.absent(result, 'oversized post tx should not be added to the base');
     });
 })

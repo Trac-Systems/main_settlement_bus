@@ -38,7 +38,7 @@ test('handleApplyAddWriterOperation (apply) - Append transaction into the base',
         t.is(result.isIndexer, false, 'Result should not indicate that the peer is an indexer');
     }
     catch (error) {
-        t.fail('Failed to add writer' + error.message);
+        t.fail('Failed to add writer: ' + error.message);
     }
 
 });

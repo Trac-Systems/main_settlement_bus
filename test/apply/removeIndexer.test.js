@@ -14,7 +14,7 @@ hook('Initialize nodes for addIndexer tests', async t => {
     indexer = await setupMsbIndexer(indexer, admin);
 });
 
-test('handleApplyRemoveWriterOperation (apply) - Append transaction into the base', async t => {
+test('handleApplyRemoveIndexerOperation (apply) - Append transaction into the base', async t => {
     t.plan(2);
 
     try {
@@ -33,7 +33,7 @@ test('handleApplyRemoveWriterOperation (apply) - Append transaction into the bas
     }
 });
 
-hook('Clean up addIndexer setup', async t => {
+hook('Clean up removeIndexer setup', async t => {
     // close msbBoostrap and remove temp directory
     if (admin && admin.msb) await admin.msb.close();
     if (indexer && indexer.msb) await indexer.msb.close();

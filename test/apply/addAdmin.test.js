@@ -1,15 +1,14 @@
 import { test, hook } from 'brittle';
-import { tick, initMsbAdmin, initTemporaryDirectory, removeTemporaryDirectory, setupMsbPeer } from '../utils/setupApplyTests.js';
+import { tick, initMsbAdmin, initTemporaryDirectory, removeTemporaryDirectory, setupMsbPeer, setupMsbWriter, setupMsbIndexer } from '../utils/setupApplyTests.js';
 import { testKeyPair1 } from '../fixtures/apply.fixtures.js';
 import MsgUtils from '../../src/utils/msgUtils.js';
 import { EntryType } from '../../src/utils/constants.js';
-import { setupMsbIndexer, setupMsbWriter } from '../utils/setupApplyTests.js';
 import { sleep } from '../../src/utils/functions.js';
 
 let admin, newAdmin;
 let indexer1, indexer2, writer;
 let tmpDirectory;
-hook('Initialize nodes for addWriter tests', async () => {
+hook('Initialize nodes for addAdmin tests', async () => {
     const baseOptions = {
         enable_txchannels: false,
         enable_txlogs: false,

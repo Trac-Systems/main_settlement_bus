@@ -141,7 +141,7 @@ export async function setupMsbIndexer(indexerCandidate, admin) {
         return indexerCandidate;
     }
     catch (error) {
-        throw new Error('Error setting up MSB indexer:', error.message);
+        throw new Error('Error setting up MSB indexer: ', error.message);
     }
 }
 
@@ -203,6 +203,9 @@ async function initDirectoryStructure(peerName, keyPair, temporaryDirectory) {
 
 export async function addKeyToWhitelist(filepath, key) {
     try {
+        // Check if the file exists, if not create it
+        await fs.mkdir(path.dirname(filepath), { recursive: true })
+        
         // Append the key to the file, followed by a newline
         await fs.appendFile(filepath, key + '\n', { encoding: 'utf8' });
     } catch (error) {
