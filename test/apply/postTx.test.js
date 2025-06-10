@@ -1,99 +1,55 @@
 import { test, hook } from 'brittle';
-import os from 'os';
 import path from 'path';
 import fs from 'fs/promises';
-import { MainSettlementBus } from '../../src/index.js';
 import { randomBytes } from 'crypto';
 import PeerWallet from "trac-wallet";
-import { tick, generatePostTx } from '../utils/setupApplyTests.js';
-import {testKeyPair1, testKeyPair2, testKeyPair3} from '../fixtures/apply.fixtures.js';
+import { tick, generatePostTx, setupMsbAdmin, initTemporaryDirectory, removeTemporaryDirectory } from '../utils/setupApplyTests.js';
+import { testKeyPair1, testKeyPair2, testKeyPair3 } from '../fixtures/apply.fixtures.js';
 import { generateTx } from '../../src/utils/functions.js';
 
-let tmpDirectory, bootstrapKeyPairPath, peerKeyPath;
-let advKeyPath, msbBootstrap;
-let boostrapPeerWallet, peerWallet, adversaryWallet;
+let tmpDirectory, admin, legitWallet, maliciousWallet;
 
 hook('Initialize nodes', async t => {
-    //init mocked directory structure
-    tmpDirectory = await fs.mkdtemp(path.join(os.tmpdir(), 'tempTestStore-'))
-    const storesDirectory = tmpDirectory + '/stores/';
-    const storeName = 'testStore/';
-    const corestoreDbDirectory = path.join(storesDirectory, storeName, 'db');
-    await fs.mkdir(corestoreDbDirectory, { recursive: true });
+    tmpDirectory = await initTemporaryDirectory()
+    admin = await setupMsbAdmin(testKeyPair1, tmpDirectory, {});
 
-    bootstrapKeyPairPath = path.join(corestoreDbDirectory, 'keypair.json');
-    await fs.writeFile(bootstrapKeyPairPath, JSON.stringify(testKeyPair1, null, 2));
+    const legitPeerKeyPath = path.join(admin.corestoreDbDirectory, 'keypair2.json');
+    const maliciousPeerKeyPath = path.join(admin.corestoreDbDirectory, 'keypair3.json');
 
-    peerKeyPath = path.join(corestoreDbDirectory, 'keypair2.json');
-    await fs.writeFile(peerKeyPath, JSON.stringify(testKeyPair2, null, 2));
+    await fs.writeFile(legitPeerKeyPath, JSON.stringify(testKeyPair2, null, 2));
+    await fs.writeFile(maliciousPeerKeyPath, JSON.stringify(testKeyPair3, null, 2));
 
-    advKeyPath = path.join(corestoreDbDirectory, 'keypair3.json');
-    await fs.writeFile(advKeyPath, JSON.stringify(testKeyPair3, null, 2));
+    legitWallet = new PeerWallet();
+    maliciousWallet = new PeerWallet();
 
-    const msbInit = new MainSettlementBus({
-        stores_directory: storesDirectory,
-        store_name: storeName,
-        channel: randomBytes(32).toString('hex'),
-        bootstrap: randomBytes(32).toString('hex'),
-        enable_txlogs: false,
-        enableValidatorObserver: false,
-        enableRoleRequester: false,
-        replicate: false,
-    });
-
-    await msbInit.ready();
-    const bootstrap = msbInit.state.writingKey;
-    await msbInit.close();
-
-    msbBootstrap = new MainSettlementBus({
-        stores_directory: storesDirectory,
-        store_name: storeName,
-        channel: randomBytes(32).toString('hex'),
-        bootstrap: bootstrap,
-        enable_txlogs: false,
-        enableValidatorObserver: false,
-        enableRoleRequester: false,
-        replicate: false,
-    });
-
-    await msbBootstrap.ready();
-
-    // Initialization peerWallet1 (validator) and peerWallet2 (subnetwork writer) wallets for testing purposes
-    boostrapPeerWallet = new PeerWallet();
-    await boostrapPeerWallet.initKeyPair(bootstrapKeyPairPath);
-
-    peerWallet = new PeerWallet();
-    await peerWallet.initKeyPair(peerKeyPath);
-
-    adversaryWallet = new PeerWallet();
-    await adversaryWallet.initKeyPair(advKeyPath);
-})
+    await legitWallet.initKeyPair(legitPeerKeyPath);
+    await maliciousWallet.initKeyPair(maliciousPeerKeyPath);
+});
 
 test('handleApplyTxOperation (apply) - Append transaction into the base', async t => {
     t.plan(1)
 
-    const { postTx, preTxHash } = await generatePostTx(msbBootstrap, boostrapPeerWallet, peerWallet)
-    await msbBootstrap.state.append(postTx);
+    const { postTx, preTxHash } = await generatePostTx(admin.msb, admin.wallet, legitWallet)
+    await admin.msb.state.append(postTx);
     await tick();
     await tick();
 
-    const result = await msbBootstrap.state.get(preTxHash);
-
+    const result = await admin.msb.state.get(preTxHash);
     t.ok(result, 'post tx added to the base');
 })
 
 test('handleApplyTxOperation (apply) - negative', async t => {
     t.test('sanitizePostTx - nested object in postTx', async t => {
         //sanitizePostTx is already tested in /test/check/postTx.test.js
-        let { postTx, preTxHash } = await generatePostTx(msbBootstrap, boostrapPeerWallet, peerWallet)
+        let { postTx, preTxHash } = await generatePostTx(admin.msb, admin.wallet, legitWallet)
         postTx = {
             ...postTx,
             foo: 'bar',
         }
-        await msbBootstrap.state.append(postTx);
+        await admin.msb.state.append(postTx);
         await tick();
 
-        t.absent(await msbBootstrap.state.get(preTxHash), 'post tx with neasted object should not be added to the base');
+        t.absent(await admin.msb.state.get(preTxHash), 'post tx with nested object should not be added to the base');
         postTx = {
             ...postTx,
             value: {
@@ -101,14 +57,14 @@ test('handleApplyTxOperation (apply) - negative', async t => {
                 foo: 'bar',
             }
         }
-        await msbBootstrap.state.append(postTx);
+        await admin.msb.state.append(postTx);
         await tick();
-        t.absent(await msbBootstrap.state.get(preTxHash), 'post tx with neasted object in value property should not be added to the base');
+        t.absent(await admin.msb.state.get(preTxHash), 'post tx with nested object in value property should not be added to the base');
 
     })
 
     t.test('different operation type in value', async t => {
-        let { postTx, preTxHash } = await generatePostTx(msbBootstrap, boostrapPeerWallet, peerWallet)
+        let { postTx, preTxHash } = await generatePostTx(admin.msb, admin.wallet, legitWallet)
         postTx = {
             ...postTx,
             value: {
@@ -116,74 +72,75 @@ test('handleApplyTxOperation (apply) - negative', async t => {
                 op: 'invalidOp',
             }
         }
-        await msbBootstrap.state.append(postTx);
+        await admin.msb.state.append(postTx);
         await tick();
 
-        t.absent(await msbBootstrap.state.get(preTxHash), 'post tx with incorrect operation type should not be added to the base');
+        t.absent(await admin.msb.state.get(preTxHash), 'post tx with incorrect operation type should not be added to the base');
     })
 
     t.test('replay attack', async t => {
-        const { postTx, preTxHash } = await generatePostTx(msbBootstrap, boostrapPeerWallet, peerWallet);
-        await msbBootstrap.state.append(postTx);
+        const { postTx, preTxHash } = await generatePostTx(admin.msb, admin.wallet, legitWallet);
+        await admin.msb.state.append(postTx);
         await tick();
-        const firstRes = await msbBootstrap.state.get(preTxHash);
-        await msbBootstrap.state.append(postTx);
+        const firstRes = await admin.msb.state.get(preTxHash);
+
+        await admin.msb.state.append(postTx);
         await tick();
 
-        const secondRes = await msbBootstrap.state.get(preTxHash);
+        const secondRes = await admin.msb.state.get(preTxHash);
 
 
         t.is(firstRes.seq, secondRes.seq, 'post tx should not be added to the base twice');
     })
 
     t.test('invalid key - key hash does not match tx hash', async t => {
-        let { postTx, preTxHash } = await generatePostTx(msbBootstrap, boostrapPeerWallet, peerWallet);
+        let { postTx, preTxHash } = await generatePostTx(admin.msb, admin.wallet, legitWallet);
         postTx = {
             ...postTx,
             key: randomBytes(32).toString('hex'),
         }
-        await msbBootstrap.state.append(postTx);
+        await admin.msb.state.append(postTx);
         await tick();
-        const result = await msbBootstrap.state.get(preTxHash);
+        const result = await admin.msb.state.get(preTxHash);
         t.absent(result, 'post tx with invalid key hash should not be added to the base');
 
     })
 
     t.test('invalid postTx signature - adversary signature (peer signature)', async t => {
-        let { postTx, preTxHash } = await generatePostTx(msbBootstrap, boostrapPeerWallet, peerWallet);
+        let { postTx, preTxHash } = await generatePostTx(admin.msb, admin.wallet, legitWallet);
 
-        const adversarySignature = adversaryWallet.sign(
+        const adversarySignature = maliciousWallet.sign(
             Buffer.from(postTx.value.tx + postTx.value.in)
         );
 
         postTx.value.is = adversarySignature.toString('hex');
 
-        await msbBootstrap.state.append(postTx);
+        await admin.msb.state.append(postTx);
         await tick();
 
-        const result = await msbBootstrap.state.get(preTxHash);
+        const result = await admin.msb.state.get(preTxHash);
         t.absent(result, 'adversary prepared fake preTx signature (third key pair) should not be added to the base');
     });
 
     t.test('invalid postTx signature - adversary signature (writer signature)', async t => {
-        let { postTx, preTxHash } = await generatePostTx(msbBootstrap, boostrapPeerWallet, peerWallet);
+        let { postTx, preTxHash } = await generatePostTx(admin.msb, admin.wallet, legitWallet);
 
 
-        const adversarySignature = adversaryWallet.sign(
+        const adversarySignature = maliciousWallet.sign(
             Buffer.from(postTx.value.tx + postTx.value.in)
         );
 
         postTx.ws = adversarySignature.toString('hex');
 
-        await msbBootstrap.state.append(postTx);
+        await admin.msb.state.append(postTx);
         await tick();
 
-        const result = await msbBootstrap.state.get(preTxHash);
+        const result = await admin.msb.state.get(preTxHash);
         t.absent(result, 'adversary prepared fake postTx signature (third key pair) should not be added to the base');
     });
 
     t.test('invalid generateTx (all inputs)', async t => {
-        const { postTx } = await generatePostTx(msbBootstrap, boostrapPeerWallet, peerWallet);
+        const { postTx } = await generatePostTx(admin.msb, admin.wallet, legitWallet);
 
         const testCases = [
             { name: 'modified peer bootstrap', mod: (tx, maliciousValue) => { return { ...tx.value, bs: maliciousValue }; } },
@@ -218,25 +175,25 @@ test('handleApplyTxOperation (apply) - negative', async t => {
                 },
             };
 
-            await msbBootstrap.state.append(maliciousPostTx);
+            await admin.msb.state.append(maliciousPostTx);
             await tick();
-            const result = await msbBootstrap.state.base.view.get(maliciousTxHash);
+            const result = await admin.msb.state.get(maliciousTxHash);
             t.absent(result, `post tx with ${testCase.name} should not be added to the base`);
         }
     });
 
     t.test('oversized transaction', async t => {
-        let { postTx, preTxHash } = await generatePostTx(msbBootstrap, boostrapPeerWallet, peerWallet);
+        let { postTx, preTxHash } = await generatePostTx(admin.msb, admin.wallet, legitWallet);
         postTx.value.extraData = randomBytes(4500).toString('hex'); // fastest validator have good schemas and it will be protected by this validator but this case should be considered
-        await msbBootstrap.state.append(postTx);
+        await admin.msb.state.append(postTx);
         await tick();
-        const result = await await msbBootstrap.state.base.view.get(preTxHash);
+        const result = await admin.msb.state.get(preTxHash);
         t.absent(result, 'oversized post tx should not be added to the base');
     });
 })
 
 hook('Clean up postTx setup', async t => {
     // close msbBoostrap and remove temp directory
-    if (msbBootstrap) await msbBootstrap.close();
-    if (tmpDirectory) await fs.rm(tmpDirectory, { recursive: true, force: true })
-})
+    if (admin && admin.msb) await admin.msb.close();
+    if (tmpDirectory) await removeTemporaryDirectory(tmpDirectory);
+});
