@@ -10,9 +10,9 @@ import {
     MAX_CLIENT_CONNECTIONS,
     OperationType,
     EntryType
-} from './utils/constants.js';
-import { sleep } from './utils/functions.js';
-import Check from './utils/check.js';
+} from '../utils/constants.js';
+import { sleep } from '../utils/functions.js';
+import Check from '../utils/check.js';
 import Wallet from 'trac-wallet';
 import Protomux from 'protomux'
 import c from 'compact-encoding'
@@ -33,7 +33,35 @@ class Network {
         this.custom_node = null
     }
 
-    static async replicate(disable_rate_limit, msb, network, enable_txchannel, base, writingKey, bootstrap, swarm, walletEnabled, store, wallet, channel, isStreaming, handleIncomingEvent, emit) {
+    createMsg = (op, writingKey, address, channel) => {
+        return { op, key: writingKey, address, channel: b4a.toString(channel, 'utf8') };
+    }
+
+    completeHandling = (wallet, msg, sig, connection, message, swarm) => {
+        const nonce = Wallet.generateNonce().toString('hex');
+        const sig = wallet.sign(JSON.stringify(msg) + nonce);
+        message.send({ response: msg, sig, nonce })
+        swarm.leavePeer(connection.remotePublicKey)
+    }
+
+    handleGetValidator = (wallet, message, swarm, writingKey, connection, channel) => {
+        const _msg = createMsg('validator', writingKey, wallet.publicKey, channel);
+        completeHandling(wallet, _msg, sig, connection, message, swarm);
+    }
+
+    handleGetAdmin = async (wallet, message, swarm, writingKey, connection, msb, channel) => {
+        const res = await msb.get(EntryType.ADMIN);
+        if (wallet.publicKey !== res.tracPublicKey) return;
+        const _msg = createMsg('admin', writingKey, wallet.publicKey, channel);
+        completeHandling(wallet, _msg, sig, connection, message, swarm);
+    }
+
+    handleGetNode = (wallet, message, swarm, writingKey, connection, channel) => {
+        const _msg = createMsg('node', writingKey, wallet.publicKey, channel);
+        completeHandling(wallet, _msg, sig, connection, message, swarm);
+    }
+
+    static async replicate(disable_rate_limit, msb, network, base, writingKey, bootstrap, swarm, walletEnabled, store, wallet, channel, isStreaming, handleIncomingEvent, emit) {
         if (!swarm) {
 
             let keyPair;
@@ -71,42 +99,11 @@ class Network {
                         try {
 
                             if (msg === 'get_validator') {
-                                const nonce = Wallet.generateNonce().toString('hex');
-                                const _msg = {
-                                    op: 'validator',
-                                    key: writingKey,
-                                    address: wallet.publicKey,
-                                    channel: b4a.toString(channel, 'utf8')
-                                };
-                                const sig = wallet.sign(JSON.stringify(_msg) + nonce);
-                                message.send({ response: _msg, sig, nonce })
-                                swarm.leavePeer(connection.remotePublicKey)
+                                this.handleGetValidator(wallet, message, swarm, writingKey, connection, channel);
                             } else if (msg === 'get_admin') {
-                                const res = await msb.get(EntryType.ADMIN);
-                                if (wallet.publicKey !== res.tracPublicKey) return;
-                                const nonce = Wallet.generateNonce().toString('hex');
-                                const _msg = {
-                                    op: 'admin',
-                                    key: writingKey,
-                                    address: wallet.publicKey,
-                                    channel: b4a.toString(channel, 'utf8')
-                                };
-                                const sig = wallet.sign(JSON.stringify(_msg) + nonce);
-                                message.send({ response: _msg, sig, nonce })
-                                swarm.leavePeer(connection.remotePublicKey)
+                                this.handleGetAdmin(wallet, message, swarm, writingKey, connection, msb, channel)
                             } else if (msg === 'get_node') {
-
-                                const nonce = Wallet.generateNonce().toString('hex');
-                                const _msg = {
-                                    op: 'node',
-                                    key: writingKey,
-                                    address: wallet.publicKey,
-                                    channel: b4a.toString(channel, 'utf8')
-                                };
-                                const sig = wallet.sign(JSON.stringify(_msg) + nonce);
-                                message.send({ response: _msg, sig, nonce })
-                                swarm.leavePeer(connection.remotePublicKey)
-
+                                this.handleGetNode(wallet, message, swarm, writingKey, connection, channel)
                             } else if (msg.response !== undefined && msg.response.op !== undefined && msg.response.op === 'validator') {
                                 const res = await msb.get(msg.response.address);
                                 if (res === null) return;

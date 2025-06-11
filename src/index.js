@@ -2,32 +2,26 @@
 import Autobase from 'autobase';
 import ReadyResource from 'ready-resource';
 import b4a from 'b4a';
-import Hyperbee from 'hyperbee';
 import readline from 'readline';
-import { verifyDag, sleep, createHash } from './utils/functions.js';
+import { sleep, createHash } from './utils/functions.js';
 import PeerWallet from "trac-wallet"
 import tty from 'tty';
 import Corestore from 'corestore';
 import MsgUtils from './utils/msgUtils.js';
 import {
-    LISTENER_TIMEOUT,
     EntryType,
     OperationType,
     EventType,
-    WHITELIST_SLEEP_INTERVAL,
     MAX_INDEXERS,
-    MIN_INDEXERS,
     WHITELIST_PREFIX,
 } from './utils/constants.js';
-import Network from './network.js';
+import Network from './network/network.js';
 import Check from './utils/check.js';
-import Protomux from 'protomux'
-import c from 'compact-encoding'
-import Hypercore from 'hypercore'
+import Bee from './utils/Bee.js'
+import { addWriter, removeWriter } from './utils/writer.js';
 
 export class MainSettlementBus extends ReadyResource {
     // Internal flags
-    #shouldListenToAdminEvents = false;
     #shouldListenToWriterEvents = false;
     #isStreaming = false;
 
@@ -43,13 +37,10 @@ export class MainSettlementBus extends ReadyResource {
     #dht_bootstrap;
     #base;
     #writingKey;
-    #enable_txchannel;
-    #is_indexer;
     #enable_wallet;
     #wallet;
     #replicate;
     #network;
-    #opts;
     #signature_whitelist;
     #readline_instance;
     #enable_txlogs;
@@ -71,25 +62,23 @@ export class MainSettlementBus extends ReadyResource {
 
     #initInternalAttributes(options) {
         this.#STORES_DIRECTORY = options.stores_directory;
-        this.#KEY_PAIR_PATH = `${this.STORES_DIRECTORY}${options.store_name}/db/keypair.json`
+        this.#KEY_PAIR_PATH = `${this.#STORES_DIRECTORY}${options.store_name}/db/keypair.json`
         this.#bootstrap = options.bootstrap || null;
         this.#channel = b4a.alloc(32).fill(options.channel) || null;
-        this.#store = new Corestore(this.STORES_DIRECTORY + options.store_name);
+        this.#store = new Corestore(this.#STORES_DIRECTORY + options.store_name);
         this.#bee = null;
         this.#swarm = null;
+        // should be set in .env
         this.#dht_bootstrap = ['116.202.214.149:10001', '157.180.12.214:10001', 'node1.hyperdht.org:49737', 'node2.hyperdht.org:49737', 'node3.hyperdht.org:49737'];
         this.#dht_node = null;
         this.#base = null;
         this.#writingKey = null;
-        this.#enable_txchannel = options.enable_txchannel !== false;
         this.#enable_txlogs = options.enable_txlogs === true;
-        this.#is_indexer = false;
         this.#enable_wallet = options.enable_wallet !== false;
         this.#disable_rate_limit = options.disable_rate_limit === true;
         this.#wallet = new PeerWallet(options);
         this.#replicate = options.replicate !== false;
         this.#signature_whitelist = options.signature_whitelist !== undefined && Array.isArray(options.signature_whitelist) ? options.signature_whitelist : [];
-        this.#opts = options;
         this.#readline_instance = null;
         this.enable_interactive_mode = options.enable_interactive_mode !== false;
         if (this.enable_interactive_mode !== false) {
@@ -101,37 +90,11 @@ export class MainSettlementBus extends ReadyResource {
             } catch (e) { }
         }
     }
-
-    get STORES_DIRECTORY() {
-        return this.#STORES_DIRECTORY;
-    }
-
-    get KEY_PAIR_PATH() {
-        return this.#KEY_PAIR_PATH;
-    }
-
+    
     get base() {
         return this.#base;
     }
-
-    get bootstrap() {
-        return this.#bootstrap;
-    }
-
-    getChannel() {
-        return this.#channel;
-    }
-
-    getSwarm() {
-        return this.#swarm;
-    }
-
-    getNetwork() {
-        return this.#network;
-    }
-
     #boot() {
-        const _this = this;
         this.#base = new Autobase(this.#store, this.#bootstrap, {
             ackInterval : 1000,
             valueEncoding: 'json',
@@ -142,12 +105,7 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     #setupHyperbee(store) {
-        this.#bee = new Hyperbee(store.get('view'), {
-            extension: false,
-            keyEncoding: 'utf-8',
-            valueEncoding: 'json'
-        })
-        return this.#bee;
+        this.#bee = new Bee(store);
     }
 
     async #apply(nodes, view, base) {
@@ -188,7 +146,7 @@ export class MainSettlementBus extends ReadyResource {
             op.key === postTx.tx &&
             this.#wallet.verify(b4a.from(postTx.is, 'hex'), b4a.from(postTx.tx + postTx.in), b4a.from(postTx.ipk, 'hex')) &&
             this.#wallet.verify(b4a.from(postTx.ws, 'hex'), b4a.from(postTx.tx + postTx.wn), b4a.from(postTx.wp, 'hex')) &&
-            postTx.tx === await this.generateTx(postTx.bs, this.bootstrap, postTx.wp, postTx.i, postTx.ipk, postTx.ch, postTx.in) &&
+            postTx.tx === await this.generateTx([postTx.bs, this.#bootstrap, postTx.wp, postTx.i, postTx.ipk, postTx.ch, postTx.in]) &&
             b4a.byteLength(JSON.stringify(postTx)) <= 4096
         ) {
             await batch.put(op.key, op.value);
@@ -248,7 +206,7 @@ export class MainSettlementBus extends ReadyResource {
         // TODO: is the below an admin signature? - yes
         const isMessageVerifed = await this.#verifyMessage(op.value.sig, adminEntry.value.tracPublicKey, MsgUtils.createMessage(op.key, op.value.nonce, op.type));
         if (!isMessageVerifed) return;
-        const isWhitelisted = await this.#isWhitelisted2(op.key, batch);
+        const isWhitelisted = await this.#isWhitelisted(op.key, batch);
         if (isWhitelisted) return;
         await this.#createWhitelistEntry(batch, op.key);
     }
@@ -267,34 +225,12 @@ export class MainSettlementBus extends ReadyResource {
         const adminEntry = await batch.get(EntryType.ADMIN);
         if (null === adminEntry || !this.check.sanitizeAdminAndWritersOperations(op) || !this.#isAdmin(adminEntry.value, node)) return;
 
-        const isWhitelisted = await this.#isWhitelisted2(op.key, batch);
+        const isWhitelisted = await this.#isWhitelisted(op.key, batch);
         if (!isWhitelisted || op.key !== op.value.pub) return;
         // TODO: if the below is not a message signed by admin BUT this handler is supposed to be executed by the admin, then use admin signatures in apply!
         const isMessageVerifed = await this.#verifyMessage(op.value.sig, op.key, MsgUtils.createMessage(op.key, op.value.wk, op.value.nonce, op.type));
         if (isMessageVerifed) {
-            await this.#addWriter(op, batch, base);
-        }
-    }
-
-    async #addWriter(op, batch, base) {
-        const nodeEntry = await batch.get(op.key);
-        if (nodeEntry === null || !nodeEntry.value.isWriter) {
-            await base.addWriter(b4a.from(op.value.wk, 'hex'), { isIndexer: false })
-            await batch.put(op.key, {
-                pub: op.value.pub,
-                wk: op.value.wk,
-                isWriter: true,
-                isIndexer: false
-            });
-            let length = await batch.get('wrl');
-            if (null === length) {
-                length = 0;
-            } else {
-                length = length.value;
-            }
-            await batch.put('wri/' + length, op.value.pub);
-            await batch.put('wrl', length + 1);
-            console.log(`Writer added: ${op.key}:${op.value.wk}`);
+            await addWriter(op, batch, base);
         }
     }
 
@@ -304,31 +240,7 @@ export class MainSettlementBus extends ReadyResource {
         // TODO: if the below is not a message signed by admin BUT this handler is supposed to be executed by the admin, then use admin signatures in apply!
         const isMessageVerifed = await this.#verifyMessage(op.value.sig, op.key, MsgUtils.createMessage(op.key, op.value.wk, op.value.nonce, op.type));
         if (isMessageVerifed) {
-            await this.#removeWriter(op, batch, base);
-        }
-    }
-
-    async #removeWriter(op, batch, base) {
-        let nodeEntry = await batch.get(op.key)
-        if (nodeEntry !== null) {
-            nodeEntry = nodeEntry.value;
-            await base.removeWriter(b4a.from(nodeEntry.wk, 'hex'));
-            nodeEntry.isWriter = false;
-            if (nodeEntry.isIndexer) {
-                nodeEntry.isIndexer = false;
-                const indexersEntry = await batch.get(EntryType.INDEXERS);
-                if (null !== indexersEntry && indexersEntry.value.includes(op.key)) {
-                    const idx = indexersEntry.value.indexOf(op.key);
-                    if (idx !== -1) {
-                        indexersEntry.value.splice(idx, 1);
-                        await batch.put(EntryType.INDEXERS, indexersEntry.value);
-                    }
-                }
-            }
-
-            await batch.put(op.key, nodeEntry);
-            console.log(`Writer removed: ${op.key}${op.value.wk ? `:${op.value.wk}` : ''}`);
-
+            await removeWriter(op, batch, base);
         }
     }
 
@@ -340,7 +252,7 @@ export class MainSettlementBus extends ReadyResource {
         const adminEntry = await batch.get(EntryType.ADMIN);
         if (null === adminEntry || !this.#isAdmin(adminEntry.value, node)) return;
 
-        if (!this.#isWhitelisted2(op.key, batch)) return;
+        if (!this.#isWhitelisted(op.key, batch)) return;
 
         const indexersEntry = await batch.get(EntryType.INDEXERS);
         if (null === indexersEntry || Array.from(indexersEntry.value).includes(op.key) ||
@@ -377,7 +289,7 @@ export class MainSettlementBus extends ReadyResource {
         const isMessageVerifed = await this.#verifyMessage(op.value.sig, adminEntry.value.tracPublicKey, MsgUtils.createMessage(op.key, op.value.nonce, op.type))
         if (isMessageVerifed) {
             let nodeEntry = await batch.get(op.key);
-            if (nodeEntry !== null && nodeEntry.value.isWriter && nodeEntry.value.isIndexer) {
+            if (nodeEntry?.value?.isWriter && nodeEntry?.value?.isIndexer) {
                 indexersEntry = indexersEntry.value;
                 nodeEntry = nodeEntry.value;
                 await base.removeWriter(b4a.from(nodeEntry.wk, 'hex'));
@@ -401,7 +313,7 @@ export class MainSettlementBus extends ReadyResource {
         const adminEntry = await batch.get(EntryType.ADMIN);
         if (null === adminEntry || !this.#isAdmin(adminEntry.value, node)) return;
         if (!this.check.sanitizeIndexerOrWhitelistOperations(op)) return;
-        const isWhitelisted = await this.#isWhitelisted2(op.key, batch);
+        const isWhitelisted = await this.#isWhitelisted(op.key, batch);
         if (!isWhitelisted) return;
 
         const nodeEntry = await batch.get(op.key)
@@ -409,17 +321,15 @@ export class MainSettlementBus extends ReadyResource {
         const isMessageVerifed = await this.#verifyMessage(op.value.sig, adminEntry.value.tracPublicKey, MsgUtils.createMessage(op.key, op.value.nonce, op.type))
         if (!isMessageVerifed) return;
         await this.#deleteWhitelistEntry(batch, op.key);
-        await this.#removeWriter(op, batch, base);
+        await removeWriter(op, batch, base);
 
     }
 
     async _open() {
         await this.#base.ready();
         if (this.#enable_wallet) {
-            await this.#wallet.initKeyPair(this.KEY_PAIR_PATH, this.#readline_instance);
-        }
-
-        if (this.#enable_wallet) {
+            await this.#wallet.initKeyPair(this.#KEY_PAIR_PATH, this.#readline_instance);
+       
             console.log('');
             console.log('#####################################################################################');
             console.log('# MSB Address:    ', this.#wallet.publicKey, '#');
@@ -430,14 +340,13 @@ export class MainSettlementBus extends ReadyResource {
 
         console.log('');
         if (this.#replicate) {
-            this.#swarm = await Network.replicate(this.#disable_rate_limit, this, this.#network, this.#enable_txchannel, this.#base, this.#writingKey, this.#dht_bootstrap, this.#swarm, this.#enable_wallet, this.#store, this.#wallet, this.#channel, this.#isStreaming, this.#handleIncomingEvent.bind(this), this.emit.bind(this));
+            this.#swarm = await Network.replicate(this.#disable_rate_limit, this, this.#network, this.#base, this.#writingKey, this.#dht_bootstrap, this.#swarm, this.#enable_wallet, this.#store, this.#wallet, this.#channel, this.#isStreaming, this.#handleIncomingEvent.bind(this), this.emit.bind(this));
             this.#dht_node = this.#swarm.dht;
         }
 
         const adminEntry = await this.get(EntryType.ADMIN);
 
         if (this.#isAdmin(adminEntry)) {
-            this.#shouldListenToAdminEvents = true;
             this.#adminEventListener(); // only for admin
         } else if (!this.#isAdmin(adminEntry) && this.#base.writable && !this.#base.isIndexer) {
             this.#shouldListenToWriterEvents = true;
@@ -477,9 +386,7 @@ export class MainSettlementBus extends ReadyResource {
             await this.#base.close();
         }
         await sleep(100);
-        if (this.#bee !== null) {
-            await this.#bee.close();
-        }
+        await this.#bee?.close();
         await sleep(100);
         if (this.#readline_instance) {
             
@@ -526,26 +433,6 @@ export class MainSettlementBus extends ReadyResource {
             console.log(e)
         }
     }
-    async #sendMessageToNode(address, message) {
-        try {
-            if (!address || !message) {
-             return;
-            }
-            await this.tryConnection(address, 'node');
-
-            await this.spinLock(() => 
-                this.#network.custom_stream === null || this.#network.custom_node !== address
-            );
-
-            if (this.#network.custom_stream !== null) {
-                await this.#network.custom_stream.messenger.send(message);
-            }
-
-        } catch (e) {
-            console.log(e)
-        }
-
-    }
 
     async #verifyMessage(signature, publicKey, bufferMessage) {
         const bufferPublicKey = b4a.from(publicKey, 'hex');
@@ -572,32 +459,24 @@ export class MainSettlementBus extends ReadyResource {
         return isWhitelisted && this.#isAdmin(adminEntry);
     }
 
-    async #isWhitelisted(key) {
-        const whitelistEntry = await this.getWhitelistEntry(key)
-        return !!whitelistEntry;
-    }
-
-    async #isWhitelisted2(key, batch) {
-        const whitelistEntry = await this.getWhitelistEntry2(key, batch)
+    async #isWhitelisted(key, batch) {
+        const whitelistEntry = !batch ? await this.getWhitelistEntry(key) : await this.getWhitelistEntry2(key, batch)
         return !!whitelistEntry;
     }
 
     async get(key) {
         const result = await this.#base.view.get(key);
-        if (result === null) return null;
-        return result.value;
+        return result?.value || null;
     }
 
     async getSigned(key) {
         const view_session = this.#base.view.checkout(this.#base.view.core.signedLength);
         const result = await view_session.get(key);
-        if (result === null) return null;
-        return result.value;
+        return result?.value || null;
     }
 
     async getWhitelistEntry(key) {
-        const entry = await this.get(WHITELIST_PREFIX + key);
-        return entry
+        return this.get(WHITELIST_PREFIX + key);
     }
 
     async getWhitelistEntry2(key, batch) {
@@ -635,12 +514,10 @@ export class MainSettlementBus extends ReadyResource {
                 this.removeAllListeners(EventType.WRITER_EVENT);
                 this.#shouldListenToWriterEvents = false;
             }
-            this.#is_indexer = true;
             console.log('Current node is an indexer');
         });
 
         this.#base.on(EventType.IS_NON_INDEXER, () => {
-            this.#is_indexer = false;
             console.log('Current node is not an indexer anymore');
         });
 
@@ -705,65 +582,8 @@ export class MainSettlementBus extends ReadyResource {
         });
     }
 
-    async #handleAdminOperations() {
-        try {
-            const adminEntry = await this.get(EntryType.ADMIN);
-            const addAdminMessage = await MsgUtils.assembleAdminMessage(adminEntry, this.#writingKey, this.#wallet, this.#bootstrap);
-            if (!adminEntry && this.#wallet && this.#writingKey && this.#writingKey === this.#bootstrap) {
-                await this.#base.append(addAdminMessage);
-            } else if (adminEntry && this.#wallet && adminEntry.tracPublicKey === this.#wallet.publicKey && this.#writingKey && this.#writingKey !== adminEntry.wk) {
-                if (null === this.#network.validator_stream) return;
-                await this.#network.validator_stream.messenger.send(addAdminMessage);
-            }
-
-            setTimeout(async () => {
-                const updatedAdminEntry = await this.get(EntryType.ADMIN);
-                if (this.#isAdmin(updatedAdminEntry) && !this.#shouldListenToAdminEvents) {
-                    this.#shouldListenToAdminEvents = true;
-                    this.#adminEventListener();
-                }
-            }, LISTENER_TIMEOUT);
-
-        } catch (e) {
-            console.log(e);
-        }
-    }
-
-    async #handleWhitelistOperations() {
-        if (this.#enable_wallet === false) return;
-        const adminEntry = await this.get(EntryType.ADMIN);
-        if (!this.#isAdmin(adminEntry)) return;
-
-        const assembledWhitelistMessages = await MsgUtils.assembleWhitelistMessages(adminEntry, this.#wallet);
-
-        if (!assembledWhitelistMessages) {
-            console.log('Whitelist message not sent.');
-            return;
-        }
-
-        const totelElements = assembledWhitelistMessages.length;
-
-        for (let i = 0; i < totelElements; i++) {
-            const isWhitelisted = await this.#isWhitelisted(assembledWhitelistMessages[i].key);
-            if (!isWhitelisted) {
-                await this.#base.append(assembledWhitelistMessages[i]);
-                const whitelistedMessage = await MsgUtils.assembleWhitelistedMessage(this.#wallet, assembledWhitelistMessages[i].key);
-                this.#sendMessageToNode(assembledWhitelistMessages[i].key, whitelistedMessage);
-                await sleep(WHITELIST_SLEEP_INTERVAL);
-                console.log(`Whitelist message sent (public key ${(i + 1)}/${totelElements})`);
-            }
-        }
-    }
-
-    async generateTx(bootstrap, msb_bootstrap, validator_writer_key, local_writer_key, local_public_key, content_hash, nonce) {
-        let tx = bootstrap + '-' +
-            msb_bootstrap + '-' +
-            validator_writer_key + '-' +
-            local_writer_key + '-' +
-            local_public_key + '-' +
-            content_hash + '-' +
-            nonce;
-        return await createHash('sha256', await createHash('sha256', tx));
+    async generateTx(params) {
+        return createHash('sha256', await createHash('sha256', params.join('-')));
     }
 
     async #requestWriterRole(toAdd) {
@@ -787,35 +607,6 @@ export class MainSettlementBus extends ReadyResource {
 
         if (assembledMessage) {
             await this.#sendMessageToAdmin(adminEntry, assembledMessage);
-        }
-    }
-
-    async #updateIndexerRole(tracPublicKey, toAdd) {
-        if (this.#enable_wallet === false) return;
-        const adminEntry = await this.get(EntryType.ADMIN);
-        if (!this.#isAdmin(adminEntry) && !this.#base.writable) return;
-
-        const isWhitelisted = await this.#isWhitelisted(tracPublicKey);
-        if (!isWhitelisted) return;
-
-        const nodeEntry = await this.get(tracPublicKey);
-        if (!nodeEntry || !nodeEntry.isWriter) return;
-
-        const indexersEntry = await this.get(EntryType.INDEXERS);
-
-        if (toAdd) {
-            const canAddIndexer = !nodeEntry.isIndexer && indexersEntry.length <= MAX_INDEXERS;
-            if (canAddIndexer) {
-                const assembledAddIndexerMessage = await MsgUtils.assembleAddIndexerMessage(this.#wallet, tracPublicKey);
-                await this.#base.append(assembledAddIndexerMessage);
-            }
-        } else {
-            const canRemoveIndexer = !toAdd && nodeEntry.isIndexer && indexersEntry.length > MIN_INDEXERS;
-            if (canRemoveIndexer) {
-                const assembledRemoveIndexer = await MsgUtils.assembleRemoveIndexerMessage(this.#wallet, tracPublicKey);
-                await this.#base.append(assembledRemoveIndexer);
-            }
-
         }
     }
 
@@ -856,12 +647,8 @@ export class MainSettlementBus extends ReadyResource {
             node: () => this.#network.custom_stream
         }[type];
         
-        if (type === 'validator') {
-            await stream.messenger.send('get_validator');
-        } else if (type === 'admin') {
-            await stream.messenger.send('get_admin');
-        } else if (type === 'node') {
-            await stream.messenger.send('get_node');
+        if (['validator', 'admin', 'node'].includes(type)) {
+            await stream.messenger.send(`get_${type}`);
         } else {
             return;
         }
@@ -921,127 +708,12 @@ export class MainSettlementBus extends ReadyResource {
         }
     }
 
-
-    async #banValidator(tracPublicKey) {
-        const adminEntry = await this.get(EntryType.ADMIN);
-        if (!this.#isAdmin(adminEntry)) return;
-        const isWhitelisted = await this.#isWhitelisted(tracPublicKey);
-        const nodeEntry = await this.get(tracPublicKey);
-        if (!isWhitelisted || null === nodeEntry || nodeEntry.isIndexer === true) return;
-
-        const assembledBanValidatorMessage = await MsgUtils.assembleBanValidatorMessage(this.#wallet, tracPublicKey);
-        this.#base.append(assembledBanValidatorMessage);
-
-    }
-
-    async #handleAddIndexerOperation(tracPublicKey) {
-        this.#updateIndexerRole(tracPublicKey, true);
-    }
-
-    async #handleRemoveIndexerOperation(tracPublicKey) {
-        this.#updateIndexerRole(tracPublicKey, false);
-    }
-
     async #handleAddWriterOperation() {
         await this.#requestWriterRole(true);
     }
 
-    async #handleRemoveWriterOperation() {
-        await this.#requestWriterRole(false);
-    }
-
-    async #handleBanValidatorOperation(tracPublicKey) {
-        await this.#banValidator(tracPublicKey);
-    }
-
     stopValidatorObserver() {
         this.#enableValidatorObserver = false;
-    }
-
-    printHelp() {
-        console.log('Available commands:');
-        console.log('- /add_writer: add yourself as validator to this MSB once whitelisted.');
-        console.log('- /remove_writer: remove yourself from this MSB.');
-        console.log('- /add_admin: register admin entry with bootstrap key. (initial setup)');
-        console.log('- /add_whitelist: add all specified whitelist addresses. (admin only)');
-        console.log('- /add_indexer <address>: change a role of the selected writer node to indexer role. (admin only)');
-        console.log('- /remove_indexer <address>: change a role of the selected indexer node to default role. (admin only)');
-        console.log('- /ban_writer <address>: demote a whitelisted writer to default role and remove it from the whitelist. (admin only)');
-        console.log('- /get_node_info <address>: get information about a node with the given address.');
-        console.log('- /stats: check system stats such as writing key, DAG, etc.');
-        console.log('- /exit: Exit the program.');
-        console.log('- /help: display this help.');
-    }
-
-    async interactiveMode() {
-        if (this.#readline_instance === null) return;
-        const rl = this.#readline_instance;
-
-        this.printHelp();
-
-        rl.on('line', async (input) => {
-            switch (input) {
-                case '/help':
-                    this.printHelp();
-                    break;
-                case '/exit':
-                    rl.close();
-                    await this.close();
-                    break;
-                case '/push_writer_add':
-                    await this.#requestWriterRole(true)
-                    break;
-                case '/add_admin':
-                    await this.#handleAdminOperations();
-                    break;
-                case '/add_whitelist':
-                    await this.#handleWhitelistOperations();
-                    break;
-                case '/add_writer':
-                    await this.#handleAddWriterOperation(true);
-                    break;
-                case '/remove_writer':
-                    await this.#handleRemoveWriterOperation();
-                    break
-                case '/flags':
-                    console.log("shouldListenToAdminEvents: ", this.#shouldListenToAdminEvents);
-                    console.log("shouldListenToWriterEvents: ", this.#shouldListenToWriterEvents);
-                    console.log("isWritable: ", this.#base.writable);
-                    console.log("isIndexer: ", this.#base.isIndexer);
-                    break
-                case '/show':
-                    const admin = await this.get(EntryType.ADMIN);
-                    console.log('Admin:', admin);
-                    const indexers = await this.get(EntryType.INDEXERS);
-                    console.log('Indexers:', indexers);
-                    break;
-                case '/stats':
-                    await verifyDag(this.#base, this.#swarm, this.#wallet, this.#writingKey);
-                    break;
-                default:
-                    if (input.startsWith('/get_node_info')) {
-                        const splitted = input.split(' ');
-                        console.log("whitelist entry:", await this.#isWhitelisted(splitted[1]))
-                    } else if (input.startsWith('/add_indexer')) {
-                        const splitted = input.split(' ');
-                        const tracPublicKey = splitted[1]
-                        await this.#handleAddIndexerOperation(tracPublicKey);
-                    }
-                    else if (input.startsWith('/remove_indexer')) {
-                        const splitted = input.split(' ');
-                        const tracPublicKey = splitted[1]
-                        await this.#handleRemoveIndexerOperation(tracPublicKey);
-                    }
-                    else if (input.startsWith('/ban_writer')) {
-                        const splitted = input.split(' ');
-                        const tracPublicKey = splitted[1]
-                        await this.#handleBanValidatorOperation(tracPublicKey);
-                    }
-            }
-            rl.prompt();
-        });
-
-        rl.prompt();
     }
 
 }
