@@ -287,7 +287,6 @@ export class MainSettlementBus extends ReadyResource {
             const adminEntry = await this.#state.get(EntryType.ADMIN);
             const addAdminMessage = await MsgUtils.assembleAdminMessage(adminEntry, this.#state.writingKey, this.#wallet, this.#bootstrap);
             // if (!adminEntry && this.#wallet && this.#state.writingKey && this.#state.writingKey === this.#bootstrap) {
-                console.log(">>>>>>>>>>>>>>>>>>> AddAdminMessage: ", addAdminMessage);
                 const obj = {
                     type: OperationType.ADD_ADMIN,
                     key: b4a.from(this.#wallet.publicKey, 'hex'),
@@ -298,9 +297,16 @@ export class MainSettlementBus extends ReadyResource {
                         sig: b4a.from(addAdminMessage.value.sig, 'hex'),
                     }
                 };
+                console.log(">>>>>>>>>>>>>>>>>>> SENT OBJ: ", obj);
 
-                const enc = messages.AddAdmin.encode(obj);                
-                console.log(">>>>>>>>>>>>>>>>>>> AddAdminMessage encoded: ", enc);
+                const typeMod = Uint8Array.from([0x1]);
+                console.log(">>>>>>>>>>>>>>>>>>> NONCE LEN: ", obj.value.nonce.length);
+                console.log(">>>>>>>>>>>>>>>>>>> PUB LEN: ", obj.value.pub.length);
+                console.log(">>>>>>>>>>>>>>>>>>> WK LEN: ", obj.value.wk.length);
+                console.log(">>>>>>>>>>>>>>>>>>> SIG LEN: ", obj.value.sig.length);
+
+                const enc = MsgUtils.createMessage(typeMod, obj.value.nonce, obj.value.pub, obj.value.wk, obj.value.sig);       
+                console.log(">>>>>>>>>>>>>>>>>>> OBJ encoded: ", enc);
 
                 await this.#state.append(enc);
                 // await this.#state.append(addAdminMessage);

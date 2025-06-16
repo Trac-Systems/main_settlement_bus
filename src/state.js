@@ -121,21 +121,46 @@ class State extends ReadyResource {
     }
 
     ///////////////////////////////APPLY////////////////////////////////////
+    #decodeAdminMessage(op) {
+        // Message is a buffer of bytes:
+        // [TYPE][NONCE][PUB_KEY][WRITER_KEY][SIGNATURE]
+        const TYPE_LEN = 1;
+        const NONCE_LEN = 32;
+        const PUB_KEY_LEN = 32;
+        const WRITER_KEY_LEN = 32;
+        const SIGNATURE_LEN = 64;
+
+        const TYPE_INDEX = 0;
+        const NONCE_INDEX = TYPE_INDEX + TYPE_LEN;
+        const PUB_KEY_INDEX = NONCE_INDEX + NONCE_LEN;
+        const WRITER_KEY_INDEX = PUB_KEY_INDEX + PUB_KEY_LEN;
+        const SIGNATURE_INDEX = WRITER_KEY_INDEX + WRITER_KEY_LEN;
+
+
+        const dec = {
+            type: op[TYPE_INDEX] === 0x1 ? OperationType.ADD_ADMIN : null, // OperationType
+            key: b4a.from(op.slice(PUB_KEY_INDEX, PUB_KEY_INDEX + PUB_KEY_LEN)), // Public key of the admin
+            value: {
+                pub: b4a.from(op.slice(PUB_KEY_INDEX, PUB_KEY_INDEX + PUB_KEY_LEN)),
+                wk: b4a.from(op.slice(WRITER_KEY_INDEX, WRITER_KEY_INDEX + WRITER_KEY_LEN)), // Writing key of the admin
+                nonce: op.slice(NONCE_INDEX, NONCE_INDEX + NONCE_LEN), // Nonce
+                sig: b4a.from(op.slice(SIGNATURE_INDEX, SIGNATURE_INDEX + SIGNATURE_LEN)), // Signature
+            }
+        };
+        return dec;
+    }
 
     async #apply(nodes, view, base) {
         const batch = view.batch();
         for (const node of nodes) {
-            const op = node.value;
-            const dec = messages.AddAdmin.decode(op);
-            console.log(">>>>>>>>>>>>>>>> Decoded message = ", dec);
-            const handler = this.#getApplyOperationHandler(dec.type);
-            // const handler = this.#getApplyOperationHandler(op.type);
+            const op = this.#decodeAdminMessage(node.value);
+            // const dec = messages.AddAdmin.decode(op);
+            console.log(">>>>>>>>>>>>>>>> Decoded message = ", op);
+            const handler = this.#getApplyOperationHandler(op.type);
             if (handler) {
-                // await handler(op, view, base, node, batch);
-                await handler(dec, view, base, node, batch);
+                await handler(op, view, base, node, batch);
             } else {
-                // console.warn(`Unknown operation type: ${op.type}`);
-                console.warn(`Unknown operation type: ${dec.type}`);
+                console.warn(`Unknown operation type: ${op.type}`);
             }
         }
         await batch.flush();
