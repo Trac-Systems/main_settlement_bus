@@ -12,6 +12,8 @@ import {
 import { sleep, createHash, generateTx } from './utils/functions.js';
 import MsgUtils from './utils/msgUtils.js';
 import Check from './utils/check.js';
+import { performance } from 'perf_hooks';
+import messages from '../lib/messages.cjs';
 
 class State extends ReadyResource {
 
@@ -28,15 +30,15 @@ class State extends ReadyResource {
         super();
 
         this.#store = store;
-        this.#bootstrap = bootstrap;
+        this.#bootstrap = b4a.from(bootstrap, 'hex');
         this.#wallet = wallet;
         this.#signature_whitelist = options.signature_whitelist !== undefined && Array.isArray(options.signature_whitelist) ? options.signature_whitelist : [];
         this.#enable_txlogs = options.enable_txlogs === true;
 
         this.check = new Check();
-        this.#base = new Autobase(this.#store, this.#bootstrap, {
+        this.#base = new Autobase(this.#store, bootstrap, {
             ackInterval: ACK_INTERVAL,
-            valueEncoding: 'json',
+            valueEncoding: 'binary',
             open: this.#setupHyperbee.bind(this),
             apply: this.#apply.bind(this),
         })
@@ -112,8 +114,8 @@ class State extends ReadyResource {
     #setupHyperbee(store) {
         this.#bee = new Hyperbee(store.get('view'), {
             extension: false,
-            keyEncoding: 'utf-8',
-            valueEncoding: 'json'
+            keyEncoding: 'ascii',
+            valueEncoding: 'binary'
         })
         return this.#bee;
     }
@@ -124,11 +126,16 @@ class State extends ReadyResource {
         const batch = view.batch();
         for (const node of nodes) {
             const op = node.value;
-            const handler = this.#getApplyOperationHandler(op.type);
+            const dec = messages.AddAdmin.decode(op);
+            console.log(">>>>>>>>>>>>>>>> Decoded message = ", dec);
+            const handler = this.#getApplyOperationHandler(dec.type);
+            // const handler = this.#getApplyOperationHandler(op.type);
             if (handler) {
-                await handler(op, view, base, node, batch);
+                // await handler(op, view, base, node, batch);
+                await handler(dec, view, base, node, batch);
             } else {
-                console.warn(`Unknown operation type: ${op.type}`);
+                // console.warn(`Unknown operation type: ${op.type}`);
+                console.warn(`Unknown operation type: ${dec.type}`);
             }
         }
         await batch.flush();
@@ -169,14 +176,14 @@ class State extends ReadyResource {
     }
 
     async #handleApplyAddAdminOperation(op, view, base, node, batch) {
-        if (!this.check.sanitizeExtendedKeyOpSchema(op)) return;
-        const adminEntry = await batch.get(EntryType.ADMIN);
-        if (null === adminEntry) {
+        // if (!this.check.sanitizeExtendedKeyOpSchema(op)) return;
+        // const adminEntry = await batch.get(EntryType.ADMIN);
+        // if (null === adminEntry) {
             await this.#addAdminIfNotSet(op, view, node, batch);
-        }
-        else if (adminEntry.value.tracPublicKey === op.key) {
-            await this.#addAdminIfSet(adminEntry.value, op, view, base, batch);
-        }
+        // }
+        // else if (adminEntry.value.tracPublicKey === op.key) {
+        //     await this.#addAdminIfSet(adminEntry.value, op, view, base, batch);
+        // }
     }
 
     async #addAdminIfSet(adminEntry, op, view, base, batch) {
@@ -201,23 +208,29 @@ class State extends ReadyResource {
     }
 
     async #addAdminIfNotSet(op, view, node, batch) {
-        const message = MsgUtils.createMessage(op.key, op.value.wk, op.value.nonce, op.type)
-        const isMessageVerifed = await this.#verifyMessageApply(op.value.sig, op.key, message);
-        const hash = await createHash('sha256', message);
-        if (node.from.key.toString('hex') === this.#bootstrap &&
-            op.value.wk === this.#bootstrap &&
-            isMessageVerifed &&
-            null === await batch.get(hash)
-        ) {
-            await batch.put(EntryType.ADMIN, {
-                tracPublicKey: op.key,
-                wk: this.#bootstrap
-            })
-            const initIndexers = [op.key];
-            await batch.put(EntryType.INDEXERS, initIndexers);
-            await batch.put(hash, op);
-            console.log(`Admin added: ${op.key}:${this.#bootstrap}`);
+        console.log("Adding admin if not set called with OP = ", op);
+        const t0 = performance.now(); // Start performance measurement
+
+        for (let i = 0; i < 1000; i++) {
+            const message = MsgUtils.createMessage(op.key, op.value.wk, op.value.nonce, op.type)
+            const isMessageVerifed = await this.#verifyMessageApply(op.value.sig, op.key, message);
+            const hash = await createHash('sha256', message);
+            if (0 === b4a.compare(node.from.key, this.#bootstrap) &&
+                0 === b4a.compare(op.value.wk, this.#bootstrap) &&
+                isMessageVerifed //&&
+                // null === await batch.get(hash)
+            ) {
+                const conc = b4a.concat([op.key, this.#bootstrap])
+                await batch.put(EntryType.ADMIN, conc)
+                const initIndexers = op.key;
+                await batch.put(EntryType.INDEXERS, initIndexers);
+                await batch.put(hash, node.value);
+                // console.log(`Admin added: ${op.key}:${this.#bootstrap}`);
+            }
         }
+
+        const t1 = performance.now(); // End performance measurement
+        console.log(`Add Admin operation took ${t1 - t0} milliseconds`); // Log the time taken for the operation
     }
 
     async #handleApplyAppendWhitelistOperation(op, view, base, node, batch) {
@@ -412,9 +425,9 @@ class State extends ReadyResource {
     }
 
     async #verifyMessageApply(signature, publicKey, bufferMessage) {
-        const bufferPublicKey = b4a.from(publicKey, 'hex');
+        // const bufferPublicKey = b4a.from(publicKey, 'hex');
         const hash = await createHash('sha256', bufferMessage);
-        return this.#wallet.verify(signature, hash, bufferPublicKey);
+        return this.#wallet.verify(signature, hash, publicKey);
     }
 
     #isAdminApply(adminEntry, node) {

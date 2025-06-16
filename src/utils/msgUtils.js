@@ -6,6 +6,16 @@ import Wallet from 'trac-wallet';
 
 class MsgUtils {
 
+    static createMessage2(...args) {
+        let buf = null;
+        if (args.length >= 1) {
+            buf = b4a.concat(
+                args.map(arg => arg)
+            );
+        }
+        return buf;
+    }
+
     static createMessage(...args) {
         let buf = null;
         if (args.length >= 1) {
@@ -30,9 +40,9 @@ class MsgUtils {
 
 
     static async #assembleMessageBase(wallet, keyParam, operationType) {
-        if (!this.#checkAssembleMessageBaseParams(wallet, keyParam)) {
-            return null;
-        }
+        // if (!this.#checkAssembleMessageBaseParams(wallet, keyParam)) {
+        //     return null;
+        // }
 
         let nonce = null;
         let msg = null;
@@ -82,11 +92,11 @@ class MsgUtils {
     }
 
     static async assembleAdminMessage(adminEntry, writingKey, wallet, bootstrap) {
-        if ((!adminEntry && wallet && writingKey && writingKey === bootstrap) || // Admin entry doesn't exist yet, thus admin public key can only be associated with bootstrap writing key
-            (adminEntry && adminEntry.tracPublicKey === wallet.publicKey && writingKey && writingKey !== adminEntry.wk)) { // Admin entry exists and we have to update its writing key in base, so it can recover admin access
+        // if ((!adminEntry && wallet && writingKey && writingKey === bootstrap) || // Admin entry doesn't exist yet, thus admin public key can only be associated with bootstrap writing key
+            // (adminEntry && adminEntry.tracPublicKey === wallet.publicKey && writingKey && writingKey !== adminEntry.wk)) { // Admin entry exists and we have to update its writing key in base, so it can recover admin access
 
             return await this.#assembleMessageBase(wallet, writingKey, OperationType.ADD_ADMIN);
-        }
+        // }
     }
 
     static async assembleWhitelistMessages(adminEntry, wallet) {

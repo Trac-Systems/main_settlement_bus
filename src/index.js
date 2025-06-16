@@ -19,6 +19,7 @@ import {
 import Network from './network.js';
 import Check from './utils/check.js';
 import State from './state.js';
+import messages from '../lib/messages.cjs';
 
 export class MainSettlementBus extends ReadyResource {
     // Internal flags
@@ -285,21 +286,37 @@ export class MainSettlementBus extends ReadyResource {
         try {
             const adminEntry = await this.#state.get(EntryType.ADMIN);
             const addAdminMessage = await MsgUtils.assembleAdminMessage(adminEntry, this.#state.writingKey, this.#wallet, this.#bootstrap);
-            if (!adminEntry && this.#wallet && this.#state.writingKey && this.#state.writingKey === this.#bootstrap) {
-                await this.#state.append(addAdminMessage);
-            } else if (adminEntry && this.#wallet && adminEntry.tracPublicKey === this.#wallet.publicKey && this.#state.writingKey && this.#state.writingKey !== adminEntry.wk) {
+            // if (!adminEntry && this.#wallet && this.#state.writingKey && this.#state.writingKey === this.#bootstrap) {
+                console.log(">>>>>>>>>>>>>>>>>>> AddAdminMessage: ", addAdminMessage);
+                const obj = {
+                    type: OperationType.ADD_ADMIN,
+                    key: b4a.from(this.#wallet.publicKey, 'hex'),
+                    value: {
+                        pub: b4a.from(addAdminMessage.value.pub, 'hex'),
+                        wk: b4a.from(addAdminMessage.value.wk, 'hex'),
+                        nonce: b4a.from(addAdminMessage.value.nonce, 'hex'),
+                        sig: b4a.from(addAdminMessage.value.sig, 'hex'),
+                    }
+                };
 
-                if (null === this.#network.validator_stream) return;
-                await this.#network.validator_stream.messenger.send(addAdminMessage);
-            }
+                const enc = messages.AddAdmin.encode(obj);                
+                console.log(">>>>>>>>>>>>>>>>>>> AddAdminMessage encoded: ", enc);
 
-            setTimeout(async () => {
-                const updatedAdminEntry = await this.#state.get(EntryType.ADMIN);
-                if (this.#isAdmin(updatedAdminEntry) && !this.#shouldListenToAdminEvents) {
-                    this.#shouldListenToAdminEvents = true;
-                    this.#adminEventListener();
-                }
-            }, LISTENER_TIMEOUT);
+                await this.#state.append(enc);
+                // await this.#state.append(addAdminMessage);
+            // } else if (adminEntry && this.#wallet && adminEntry.tracPublicKey === this.#wallet.publicKey && this.#state.writingKey && this.#state.writingKey !== adminEntry.wk) {
+
+            //     if (null === this.#network.validator_stream) return;
+            //     await this.#network.validator_stream.messenger.send(addAdminMessage);
+            // }
+
+            // setTimeout(async () => {
+            //     const updatedAdminEntry = await this.#state.get(EntryType.ADMIN);
+            //     if (this.#isAdmin(updatedAdminEntry) && !this.#shouldListenToAdminEvents) {
+            //         this.#shouldListenToAdminEvents = true;
+            //         this.#adminEventListener();
+            //     }
+            // }, LISTENER_TIMEOUT);
 
         } catch (e) {
             console.log(e);
