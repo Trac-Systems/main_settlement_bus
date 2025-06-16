@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+message AddAdmin {
+  string type = 1;
+  bytes key = 2;
+
+  message Value {
+    bytes pub = 1;
+    bytes wk = 2;
+    bytes nonce = 3;
+    bytes sig = 4;
+  }
+
+  Value value = 3;
+}
