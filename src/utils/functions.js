@@ -97,7 +97,7 @@ export function printHelp() {
 export const printWalletInfo = (tracPublicKey, writingKey) => {
     console.log('');
     console.log('#####################################################################################');
-    console.log('# MSB Address:    ', tracPublicKey, '#');
-    console.log('# MSB Writer:     ', writingKey, '#');
+    console.log('# MSB Address:    ', tracPublicKey.toString('hex'), '#');
+    console.log('# MSB Writer:     ', writingKey.toString('hex'), '#');
     console.log('#####################################################################################');
 }

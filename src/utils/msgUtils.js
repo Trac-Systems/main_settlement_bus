@@ -30,19 +30,23 @@ class MsgUtils {
     static #checkAssembleMessageBaseParams(wallet, keyParam) {
         return !((!wallet || !keyParam) ||
             (typeof wallet !== 'object') ||
-            (typeof keyParam !== 'string') ||
-            (keyParam.length !== 64) ||
-            (!isHexString(keyParam)) ||
+            // (typeof keyParam !== 'string') ||
+            // (keyParam.length !== 64) ||
+            // (!isHexString(keyParam)) ||
+            (!b4a.isBuffer(keyParam)) ||
+            (keyParam.length !== 32) ||
             (!wallet.publicKey) ||
-            (wallet.publicKey.length !== 64) ||
-            (!isHexString(wallet.publicKey)));
+            // (wallet.publicKey.length !== 64) ||
+            // (!isHexString(wallet.publicKey)));
+            (wallet.publicKey.length !== 32) ||
+            (!b4a.isBuffer(wallet.publicKey)));
     }
 
 
     static async #assembleMessageBase(wallet, keyParam, operationType) {
-        // if (!this.#checkAssembleMessageBaseParams(wallet, keyParam)) {
-        //     return null;
-        // }
+        if (!this.#checkAssembleMessageBaseParams(wallet, keyParam)) {
+            return null;
+        }
 
         let nonce = null;
         let msg = null;

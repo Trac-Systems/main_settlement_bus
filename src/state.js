@@ -56,7 +56,7 @@ class State extends ReadyResource {
     async _open() {
         console.log("State initialization...")
         await this.#base.ready();
-        this.#writingKey = b4a.toString(this.#base.local.key, 'hex');
+        this.#writingKey = this.#base.local.key; //b4a.toString(this.#base.local.key, 'hex');
     }
 
     async _close() {
@@ -234,6 +234,8 @@ class State extends ReadyResource {
 
     async #addAdminIfNotSet(op, view, node, batch) {
         console.log("Adding admin if not set called with OP = ", op);
+        const s0 = this.#base.core.byteLength;
+        console.log(`>>>>>>>>>>>>>> Bytes before: ${s0}`);
         const t0 = performance.now(); // Start performance measurement
 
         for (let i = 0; i < 1000; i++) {
@@ -255,7 +257,9 @@ class State extends ReadyResource {
         }
 
         const t1 = performance.now(); // End performance measurement
-        console.log(`Add Admin operation took ${t1 - t0} milliseconds`); // Log the time taken for the operation
+        const s1 = this.#base.core.byteLength;
+        console.log(`>>>>>>>>>>>>>> Bytes before: ${s0}, after: ${s1}, difference: ${s1 - s0}`);
+        console.log(`>>>>>>>>>>>>>> Add Admin operation took ${t1 - t0} milliseconds`); // Log the time taken for the operation
     }
 
     async #handleApplyAppendWhitelistOperation(op, view, base, node, batch) {

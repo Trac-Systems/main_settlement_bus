@@ -297,17 +297,14 @@ export class MainSettlementBus extends ReadyResource {
                         sig: b4a.from(addAdminMessage.value.sig, 'hex'),
                     }
                 };
-                console.log(">>>>>>>>>>>>>>>>>>> SENT OBJ: ", obj);
+                // console.log(">>>>>>>>>>>>>>>>>>> SENT OBJ: ", obj);
 
                 const typeMod = Uint8Array.from([0x1]);
-                console.log(">>>>>>>>>>>>>>>>>>> NONCE LEN: ", obj.value.nonce.length);
-                console.log(">>>>>>>>>>>>>>>>>>> PUB LEN: ", obj.value.pub.length);
-                console.log(">>>>>>>>>>>>>>>>>>> WK LEN: ", obj.value.wk.length);
-                console.log(">>>>>>>>>>>>>>>>>>> SIG LEN: ", obj.value.sig.length);
-
                 const enc = MsgUtils.createMessage(typeMod, obj.value.nonce, obj.value.pub, obj.value.wk, obj.value.sig);       
-                console.log(">>>>>>>>>>>>>>>>>>> OBJ encoded: ", enc);
+                // console.log(">>>>>>>>>>>>>>>>>>> OBJ encoded: ", enc);
 
+                const s0 = this.#state.base.core.byteLength;
+                console.log(">>>>>>>>>>>>>>>>>>> Size before appending: ", s0);
                 await this.#state.append(enc);
                 // await this.#state.append(addAdminMessage);
             // } else if (adminEntry && this.#wallet && adminEntry.tracPublicKey === this.#wallet.publicKey && this.#state.writingKey && this.#state.writingKey !== adminEntry.wk) {
@@ -491,6 +488,10 @@ export class MainSettlementBus extends ReadyResource {
                 console.log('Admin:', admin);
                 const indexers = await this.#state.get(EntryType.INDEXERS);
                 console.log('Indexers:', indexers);
+                break;
+            case '/size':
+                const len = this.#state.base.core.byteLength;
+                console.log('MSB byte Length:', len);
                 break;
             case '/stats':
                 await verifyDag(this.#state.base, this.#network.swarm, this.#wallet, this.#state.writingKey);
