@@ -21,6 +21,13 @@ import Check from './utils/check.js';
 import State from './state.js';
 import messages from '../lib/messages.cjs';
 
+import { execSync } from 'child_process';
+import path from 'path';
+
+let initialSize = null;
+let previousSize = null;
+let totalGrowth = 0;
+
 export class MainSettlementBus extends ReadyResource {
     // Internal flags
     #shouldListenToAdminEvents = false;
@@ -283,12 +290,56 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async #handleAdminOperations() {
-        try {
+    try {
+        //gpt
+        function getFolderSizeInBytes(folderPath) {
+            const output = execSync(`du -bs "${folderPath}"`).toString(); // bytes
+            const bytes = parseInt(output.split('\t')[0], 10);
+            return bytes// * 1024;
+        }
+        //gpt
+        function printAndTrackStoreSize() {
+            const storePath = path.resolve('./stores/admin');
+            const currentSize = getFolderSizeInBytes(storePath);
+
+            if (initialSize === null) {
+                initialSize = currentSize;
+                previousSize = currentSize;
+                console.log(`[Storage Size] Initial: ${formatBytes(currentSize)}`);
+                return;
+            }
+
+            const delta = currentSize - previousSize;
+            totalGrowth += delta;
+            previousSize = currentSize;
+
+            console.log(`[Storage Size] Current: ${formatBytes(currentSize)} | Single: +${formatBytes(delta)} | Total Growth: +${formatBytes(totalGrowth)}`);
+        }
+        //gpt
+        function formatBytes(bytes) {
+            const units = ['B', 'KB', 'MB', 'GB'];
+            let i = 0;
+            while (bytes >= 1024 && i < units.length - 1) {
+                bytes /= 1024;
+                i++;
+            }
+            return `${bytes.toFixed(2)} ${units[i]}`;
+        }
+
+        let initialSize = null;
+        let previousSize = 0;
+        let totalGrowth = 0;
+
+        const totalRuns = 1000;
+        const delayMs = 50;
+
+        for (let i = 0; i < totalRuns; i++) {
+            console.log(`\n[Run ${i + 1}/${totalRuns}]`);
+
             const adminEntry = await this.#state.get(EntryType.ADMIN);
             const addAdminMessage = await MsgUtils.assembleAdminMessage(adminEntry, this.#state.writingKey, this.#wallet, this.#bootstrap);
-            // if (!adminEntry && this.#wallet && this.#state.writingKey && this.#state.writingKey === this.#bootstrap) {
-                console.log(">>>>>>>>>>>>>>>>>>> AddAdminMessage: ", addAdminMessage);
-                const obj = {
+
+            const obj = {
                     type: OperationType.ADD_ADMIN,
                     key: b4a.from(this.#wallet.publicKey, 'hex'),
                     value: {
@@ -299,29 +350,65 @@ export class MainSettlementBus extends ReadyResource {
                     }
                 };
 
-                const enc = messages.AddAdmin.encode(obj);                
-                console.log(">>>>>>>>>>>>>>>>>>> AddAdminMessage encoded: ", enc);
+                const enc = messages.AddAdmin.encode(obj);  
 
-                await this.#state.append(enc);
-                // await this.#state.append(addAdminMessage);
-            // } else if (adminEntry && this.#wallet && adminEntry.tracPublicKey === this.#wallet.publicKey && this.#state.writingKey && this.#state.writingKey !== adminEntry.wk) {
+            const s0 = this.#state.base.core.byteLength;
+            console.log(">>>>>>>>>>>>>>>>>>> Size before appending: ", s0);
+            console.log('core.length:', this.#state.base.core.length);
 
-            //     if (null === this.#network.validator_stream) return;
-            //     await this.#network.validator_stream.messenger.send(addAdminMessage);
-            // }
+            await this.#state.append(enc);
+            printAndTrackStoreSize();
 
-            // setTimeout(async () => {
-            //     const updatedAdminEntry = await this.#state.get(EntryType.ADMIN);
-            //     if (this.#isAdmin(updatedAdminEntry) && !this.#shouldListenToAdminEvents) {
-            //         this.#shouldListenToAdminEvents = true;
-            //         this.#adminEventListener();
-            //     }
-            // }, LISTENER_TIMEOUT);
-
-        } catch (e) {
-            console.log(e);
+            await new Promise(resolve => setTimeout(resolve, delayMs));
         }
+
+        console.log("\n✅ Done: All operations completed.");
+
+    } catch (e) {
+        console.log(e);
     }
+}
+
+    // async #handleAdminOperations() {
+    //     try {
+    //         const adminEntry = await this.#state.get(EntryType.ADMIN);
+    //         const addAdminMessage = await MsgUtils.assembleAdminMessage(adminEntry, this.#state.writingKey, this.#wallet, this.#bootstrap);
+    //         // if (!adminEntry && this.#wallet && this.#state.writingKey && this.#state.writingKey === this.#bootstrap) {
+    //             console.log(">>>>>>>>>>>>>>>>>>> AddAdminMessage: ", addAdminMessage);
+    //             const obj = {
+    //                 type: OperationType.ADD_ADMIN,
+    //                 key: b4a.from(this.#wallet.publicKey, 'hex'),
+    //                 value: {
+    //                     pub: b4a.from(addAdminMessage.value.pub, 'hex'),
+    //                     wk: b4a.from(addAdminMessage.value.wk, 'hex'),
+    //                     nonce: b4a.from(addAdminMessage.value.nonce, 'hex'),
+    //                     sig: b4a.from(addAdminMessage.value.sig, 'hex'),
+    //                 }
+    //             };
+
+    //             const enc = messages.AddAdmin.encode(obj);                
+    //             console.log(">>>>>>>>>>>>>>>>>>> AddAdminMessage encoded: ", enc);
+
+    //             await this.#state.append(enc);
+    //             // await this.#state.append(addAdminMessage);
+    //         // } else if (adminEntry && this.#wallet && adminEntry.tracPublicKey === this.#wallet.publicKey && this.#state.writingKey && this.#state.writingKey !== adminEntry.wk) {
+
+    //         //     if (null === this.#network.validator_stream) return;
+    //         //     await this.#network.validator_stream.messenger.send(addAdminMessage);
+    //         // }
+
+    //         // setTimeout(async () => {
+    //         //     const updatedAdminEntry = await this.#state.get(EntryType.ADMIN);
+    //         //     if (this.#isAdmin(updatedAdminEntry) && !this.#shouldListenToAdminEvents) {
+    //         //         this.#shouldListenToAdminEvents = true;
+    //         //         this.#adminEventListener();
+    //         //     }
+    //         // }, LISTENER_TIMEOUT);
+
+    //     } catch (e) {
+    //         console.log(e);
+    //     }
+    // }
 
     async #handleWhitelistOperations() {
         if (this.#enable_wallet === false) return;

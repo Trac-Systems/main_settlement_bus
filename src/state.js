@@ -127,7 +127,7 @@ class State extends ReadyResource {
         for (const node of nodes) {
             const op = node.value;
             const dec = messages.AddAdmin.decode(op);
-            console.log(">>>>>>>>>>>>>>>> Decoded message = ", dec);
+            // console.log(">>>>>>>>>>>>>>>> Decoded message = ", dec);
             const handler = this.#getApplyOperationHandler(dec.type);
             // const handler = this.#getApplyOperationHandler(op.type);
             if (handler) {
@@ -208,10 +208,10 @@ class State extends ReadyResource {
     }
 
     async #addAdminIfNotSet(op, view, node, batch) {
-        console.log("Adding admin if not set called with OP = ", op);
-        const t0 = performance.now(); // Start performance measurement
+        // console.log("Adding admin if not set called with OP = ", op);
+        // const t0 = performance.now(); // Start performance measurement
 
-        for (let i = 0; i < 1000; i++) {
+        // for (let i = 0; i < 1000; i++) {
             const message = MsgUtils.createMessage(op.key, op.value.wk, op.value.nonce, op.type)
             const isMessageVerifed = await this.#verifyMessageApply(op.value.sig, op.key, message);
             const hash = await createHash('sha256', message);
@@ -224,13 +224,16 @@ class State extends ReadyResource {
                 await batch.put(EntryType.ADMIN, conc)
                 const initIndexers = op.key;
                 await batch.put(EntryType.INDEXERS, initIndexers);
-                await batch.put(hash, node.value);
+                const test = b4a.concat([node.value, node.value, node.value, node.value, node.value, node.value, node.value, node.value]);
+                await batch.put(hash, test);
                 // console.log(`Admin added: ${op.key}:${this.#bootstrap}`);
+                console.log('>>>>>>>>>>>> OP SIZE: ', test.length);
             }
-        }
 
-        const t1 = performance.now(); // End performance measurement
-        console.log(`Add Admin operation took ${t1 - t0} milliseconds`); // Log the time taken for the operation
+        // }
+
+        // const t1 = performance.now(); // End performance measurement
+        // console.log(`Add Admin operation took ${t1 - t0} milliseconds`); // Log the time taken for the operation
     }
 
     async #handleApplyAppendWhitelistOperation(op, view, base, node, batch) {
