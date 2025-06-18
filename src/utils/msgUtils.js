@@ -82,11 +82,8 @@ class MsgUtils {
     }
 
     static async assembleAdminMessage(adminEntry, writingKey, wallet, bootstrap) {
-        if ((!adminEntry && wallet && writingKey && writingKey === bootstrap) || // Admin entry doesn't exist yet, thus admin public key can only be associated with bootstrap writing key
-            (adminEntry && adminEntry.tracPublicKey === wallet.publicKey && writingKey && writingKey !== adminEntry.wk)) { // Admin entry exists and we have to update its writing key in base, so it can recover admin access
+        return await this.#assembleMessageBase(wallet, writingKey, OperationType.ADD_ADMIN);
 
-            return await this.#assembleMessageBase(wallet, writingKey, OperationType.ADD_ADMIN);
-        }
     }
 
     static async assembleWhitelistMessages(adminEntry, wallet) {

@@ -19,6 +19,12 @@ import {
 import Network from './network.js';
 import Check from './utils/check.js';
 import State from './state.js';
+import { execSync } from 'child_process';
+import path from 'path';
+
+let initialSize = null;
+let previousSize = null;
+let totalGrowth = 0;
 
 export class MainSettlementBus extends ReadyResource {
     // Internal flags
@@ -282,29 +288,72 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async #handleAdminOperations() {
-        try {
-            const adminEntry = await this.#state.get(EntryType.ADMIN);
-            const addAdminMessage = await MsgUtils.assembleAdminMessage(adminEntry, this.#state.writingKey, this.#wallet, this.#bootstrap);
-            if (!adminEntry && this.#wallet && this.#state.writingKey && this.#state.writingKey === this.#bootstrap) {
-                await this.#state.append(addAdminMessage);
-            } else if (adminEntry && this.#wallet && adminEntry.tracPublicKey === this.#wallet.publicKey && this.#state.writingKey && this.#state.writingKey !== adminEntry.wk) {
+    try {
+        //gpt
+        function getFolderSizeInBytes(folderPath) {
+            const output = execSync(`du -sk "${folderPath}"`).toString(); // kilobytes
+            const kilobytes = parseInt(output.split('\t')[0], 10);
+            return kilobytes * 1024;
+        }
+        //gpt
+        function printAndTrackStoreSize() {
+            const storePath = path.resolve('./stores/w1');
+            const currentSize = getFolderSizeInBytes(storePath);
 
-                if (null === this.#network.validator_stream) return;
-                await this.#network.validator_stream.messenger.send(addAdminMessage);
+            if (initialSize === null) {
+                initialSize = currentSize;
+                previousSize = currentSize;
+                console.log(`[Storage Size] Initial: ${formatBytes(currentSize)}`);
+                return;
             }
 
-            setTimeout(async () => {
-                const updatedAdminEntry = await this.#state.get(EntryType.ADMIN);
-                if (this.#isAdmin(updatedAdminEntry) && !this.#shouldListenToAdminEvents) {
-                    this.#shouldListenToAdminEvents = true;
-                    this.#adminEventListener();
-                }
-            }, LISTENER_TIMEOUT);
+            const delta = currentSize - previousSize;
+            totalGrowth += delta;
+            previousSize = currentSize;
 
-        } catch (e) {
-            console.log(e);
+            console.log(`[Storage Size] Current: ${formatBytes(currentSize)} | Single: +${formatBytes(delta)} | Total Growth: +${formatBytes(totalGrowth)}`);
         }
+        //gpt
+        function formatBytes(bytes) {
+            const units = ['B', 'KB', 'MB', 'GB'];
+            let i = 0;
+            while (bytes >= 1024 && i < units.length - 1) {
+                bytes /= 1024;
+                i++;
+            }
+            return `${bytes.toFixed(2)} ${units[i]}`;
+        }
+
+        let initialSize = null;
+        let previousSize = 0;
+        let totalGrowth = 0;
+
+        const totalRuns = 1000;
+        const delayMs = 50;
+
+        for (let i = 0; i < totalRuns; i++) {
+            console.log(`\n[Run ${i + 1}/${totalRuns}]`);
+
+            const adminEntry = await this.#state.get(EntryType.ADMIN);
+            const addAdminMessage = await MsgUtils.assembleAdminMessage(adminEntry, this.#state.writingKey, this.#wallet, this.#bootstrap);
+
+            const s0 = this.#state.base.core.byteLength;
+            console.log(">>>>>>>>>>>>>>>>>>> Size before appending: ", s0);
+            console.log('core.length:', this.#state.base.core.length);
+
+            await this.#state.append(addAdminMessage);
+            printAndTrackStoreSize();
+
+            await new Promise(resolve => setTimeout(resolve, delayMs));
+        }
+
+        console.log("\n✅ Done: All operations completed.");
+
+    } catch (e) {
+        console.log(e);
     }
+}
+
 
     async #handleWhitelistOperations() {
         if (this.#enable_wallet === false) return;
@@ -472,6 +521,13 @@ export class MainSettlementBus extends ReadyResource {
             case '/stats':
                 await verifyDag(this.#state.base, this.#network.swarm, this.#wallet, this.#state.writingKey);
                 break;
+            case '/size':
+                const len = this.#state.base.core.byteLength;
+                console.log('MSB byte Length:', len);
+                console.log('core.length:', this.#state.base.core.length);
+                break;
+
+
             default:
                 if (input.startsWith('/get_node_info')) {
                     const splitted = input.split(' ');
@@ -490,6 +546,15 @@ export class MainSettlementBus extends ReadyResource {
                     const splitted = input.split(' ');
                     const tracPublicKey = splitted[1]
                     await this.#handleBanValidatorOperation(tracPublicKey);
+                }
+                else if (input.startsWith('/get')) {
+                    const splitted = input.split(' ');
+                    const hash = splitted[1]
+                    const tx = await this.#state.get(hash);
+                    console.log('Transaction:', tx);
+                    console.log(JSON.stringify(tx));
+
+
                 }
         }
     }

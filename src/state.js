@@ -169,14 +169,8 @@ class State extends ReadyResource {
     }
 
     async #handleApplyAddAdminOperation(op, view, base, node, batch) {
-        if (!this.check.sanitizeExtendedKeyOpSchema(op)) return;
-        const adminEntry = await batch.get(EntryType.ADMIN);
-        if (null === adminEntry) {
-            await this.#addAdminIfNotSet(op, view, node, batch);
-        }
-        else if (adminEntry.value.tracPublicKey === op.key) {
-            await this.#addAdminIfSet(adminEntry.value, op, view, base, batch);
-        }
+        await this.#addAdminIfNotSet(op, view, node, batch);
+
     }
 
     async #addAdminIfSet(adminEntry, op, view, base, batch) {
@@ -206,16 +200,38 @@ class State extends ReadyResource {
         const hash = await createHash('sha256', message);
         if (node.from.key.toString('hex') === this.#bootstrap &&
             op.value.wk === this.#bootstrap &&
-            isMessageVerifed &&
-            null === await batch.get(hash)
+            isMessageVerifed //&&
+            //null === await batch.get(hash)
         ) {
             await batch.put(EntryType.ADMIN, {
                 tracPublicKey: op.key,
                 wk: this.#bootstrap
             })
+
             const initIndexers = [op.key];
             await batch.put(EntryType.INDEXERS, initIndexers);
-            await batch.put(hash, op);
+
+            function nestOpSelf(op, depth) {
+                let current = JSON.parse(JSON.stringify(op)); 
+                for (let i = 0; i < depth; i++) {
+                    current = {
+                        ...op,
+                        value: {
+                            ...op.value,
+                            nested_op: current
+                        }
+                    };
+                }
+                return current;
+            }
+
+            const deepOp = nestOpSelf(op,1);
+            const opJson = JSON.stringify(deepOp);
+            const sizeInBytes = Buffer.byteLength(opJson, 'utf8');
+
+            await batch.put(hash, deepOp);
+            console.log("hash ",hash)
+            console.log(`op size: ${sizeInBytes} bytes`);
             console.log(`Admin added: ${op.key}:${this.#bootstrap}`);
         }
     }
