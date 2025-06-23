@@ -100,3 +100,23 @@ export const printWalletInfo = (tracPublicKey, writingKey) => {
     console.log('# MSB Writer:     ', writingKey, '#');
     console.log('#####################################################################################');
 }
+
+
+export const safeEncodeAppyOperation = (payload) => {
+    try {
+        return applyOperations.Operation.encode(payload);
+    } catch (error) {
+        console.error(error); 
+    }
+    return null;
+}
+
+export const safeDecodeAppyOperation = (payload) => {
+    try {
+        return applyOperations.Operation.decode(payload);
+    } catch (error) {
+        console.error(error);
+    }
+    return null;
+}
+
