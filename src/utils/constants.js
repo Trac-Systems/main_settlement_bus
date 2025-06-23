@@ -21,7 +21,7 @@ export const OperationType = Object.freeze({
 
 // TODO: Confirm with team whether 'tx' field should be deprecated or retained.
 // Finalize this object structure during applyFunction refactor alignment.
-// and replace OperationType in this time with applyOperations.OperationType. Just port it.
+// and replace OperationType in this enum with applyOperations.OperationType. Just port it.
 
 export const EventType = Object.freeze({
     ADMIN_EVENT: 'adminEvent',
