@@ -21,20 +21,7 @@ export const OperationType = Object.freeze({
 
 // TODO: Confirm with team whether 'tx' field should be deprecated or retained.
 // Finalize this object structure during applyFunction refactor alignment.
-
-// export const OperationType = Object.freeze({
-//     ADD_ADMIN: applyOperations.OperationType.ADD_ADMIN,
-//     APPEND_WHITELIST: applyOperations.OperationType.APPEND_WHITELIST,
-//     ADD_WRITER: applyOperations.OperationType.ADD_WRITER,
-//     REMOVE_WRITER: applyOperations.OperationType.REMOVE_WRITER,
-//     ADD_INDEXER: applyOperations.OperationType.ADD_INDEXER,
-//     REMOVE_INDEXER: applyOperations.OperationType.REMOVE_INDEXER,
-//     BAN_VALIDATOR: applyOperations.OperationType.BAN_WRITER,
-//     WHITELISTED: 'whitelisted',
-//     TX: 'tx',
-//     PRE_TX: 'pre-tx',
-//     POST_TX: applyOperations.OperationType.POST_TX,
-// });
+// and replace OperationType in this time with applyOperations.OperationType. Just port it.
 
 export const EventType = Object.freeze({
     ADMIN_EVENT: 'adminEvent',
