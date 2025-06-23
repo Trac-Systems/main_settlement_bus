@@ -1,0 +1,59 @@
+/**
+ * This is the initial builder-based schema (v0.1). In future iterations, we’ll need to extend the postTx message 
+ * to support surrogate tx forwarding and daisy-chained execution semantics.
+ * PS. current schema got rid off the `op` field from the PostTxOperation message, because it was doubled.
+ *
+ */
+
+syntax = "proto3";
+
+package apply.operations;
+
+enum OperationType {
+    UNKNOWN          = 0;
+    ADD_ADMIN        = 1;
+    APPEND_WHITELIST = 2;
+    ADD_WRITER       = 3;
+    REMOVE_WRITER    = 4;
+    POST_TX          = 5;
+    ADD_INDEXER      = 6;
+    REMOVE_INDEXER   = 7;
+    BAN_WRITER       = 8;
+}
+
+message PostTxOperation {
+    bytes tx   = 1;
+    bytes is   = 2;
+    bytes w    = 3;
+    bytes i    = 4;
+    bytes ipk  = 5;
+    bytes ch   = 6;
+    bytes in   = 7;
+    bytes bs   = 8;
+    bytes mbs  = 9;
+    bytes ws   = 10;
+    bytes wp   = 11;
+    bytes wn   = 12;
+}
+
+message BasicKeyOperation {
+    bytes nonce = 1;
+    bytes sig   = 2;
+}
+
+message ExtendedKeyOperation {
+    bytes wk    = 1;
+    bytes nonce = 2;
+    bytes sig   = 3;
+}
+
+message Operation {
+    OperationType type = 1;
+    bytes key          = 2;
+
+    oneof value {
+        BasicKeyOperation      bko  = 3;
+        ExtendedKeyOperation   eko  = 4;
+        PostTxOperation        txo  = 5;
+    }
+}

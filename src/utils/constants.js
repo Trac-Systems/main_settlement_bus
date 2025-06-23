@@ -1,3 +1,4 @@
+import applyOperations from './protobuf/applyOperations.cjs';
 export const EntryType = Object.freeze({
     ADMIN: 'admin',
     WHITELIST: 'whitelist',
@@ -17,6 +18,23 @@ export const OperationType = Object.freeze({
     PRE_TX: 'pre-tx',
     POST_TX: 'post-tx',
 });
+
+// TODO: Confirm with team whether 'tx' field should be deprecated or retained.
+// Finalize this object structure during applyFunction refactor alignment.
+
+// export const OperationType = Object.freeze({
+//     ADD_ADMIN: applyOperations.OperationType.ADD_ADMIN,
+//     APPEND_WHITELIST: applyOperations.OperationType.APPEND_WHITELIST,
+//     ADD_WRITER: applyOperations.OperationType.ADD_WRITER,
+//     REMOVE_WRITER: applyOperations.OperationType.REMOVE_WRITER,
+//     ADD_INDEXER: applyOperations.OperationType.ADD_INDEXER,
+//     REMOVE_INDEXER: applyOperations.OperationType.REMOVE_INDEXER,
+//     BAN_VALIDATOR: applyOperations.OperationType.BAN_WRITER,
+//     WHITELISTED: 'whitelisted',
+//     TX: 'tx',
+//     PRE_TX: 'pre-tx',
+//     POST_TX: applyOperations.OperationType.POST_TX,
+// });
 
 export const EventType = Object.freeze({
     ADMIN_EVENT: 'adminEvent',
