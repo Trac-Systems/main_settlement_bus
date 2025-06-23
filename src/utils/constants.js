@@ -1,3 +1,4 @@
+import applyOperations from './protobuf/applyOperations.cjs';
 export const EntryType = Object.freeze({
     ADMIN: 'admin',
     WHITELIST: 'whitelist',
@@ -17,6 +18,10 @@ export const OperationType = Object.freeze({
     PRE_TX: 'pre-tx',
     POST_TX: 'post-tx',
 });
+
+// TODO: Confirm with team whether 'tx' field should be deprecated or retained.
+// Finalize this object structure during applyFunction refactor alignment.
+// and replace OperationType in this enum with applyOperations.OperationType. Just port it.
 
 export const EventType = Object.freeze({
     ADMIN_EVENT: 'adminEvent',
