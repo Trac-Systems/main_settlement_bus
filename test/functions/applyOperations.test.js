@@ -65,7 +65,7 @@ test('safeDecodeAppyOperation – handles invalid offset/end parameters graceful
 });
 
 test('safeDecodeAppyOperation – decode calls skip() on unknown wire type, safely returns null or object', t => {
-    const bufWithUnknownWire = b4a.from([0xAA, 0x02]);
+    const bufWithUnknownWire = b4a.from([0x0F]);
     const decoded = safeDecodeAppyOperation(bufWithUnknownWire);
     t.ok(decoded === null || typeof decoded === 'object', 'Should return null or object on unknown wire type');
 });
