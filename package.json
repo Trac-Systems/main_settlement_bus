@@ -36,6 +36,7 @@
     "tty": "npm:bare-node-tty"
   },
   "devDependencies": {
+    "bip39-mnemonic": "^2.4.0",
     "protocol-buffers": "^4.2.0"
   },
   "publishConfig": {
