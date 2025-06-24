@@ -1,9 +1,6 @@
 import b4a from 'b4a';
 import sodium from 'sodium-native';
-
-export function isHexString(string) {
-    return typeof string === 'string' && string.length > 1 && /^[0-9a-fA-F]+$/.test(string) && string.length % 2 === 0;
-}
+import applyOperations from '../utils/protobuf/applyOperations.cjs';
 
 export async function verifyDag(base, swarm, wallet, writerKey) {
     try {
@@ -32,6 +29,45 @@ export async function verifyDag(base, swarm, wallet, writerKey) {
     } catch (error) {
         console.error('Error during DAG monitoring:', error.message);
     }
+}
+
+export function printHelp() {
+    console.log('Available commands:');
+    console.log('- /add_writer: add yourself as validator to this MSB once whitelisted.');
+    console.log('- /remove_writer: remove yourself from this MSB.');
+    console.log('- /add_admin: register admin entry with bootstrap key. (initial setup)');
+    console.log('- /add_whitelist: add all specified whitelist addresses. (admin only)');
+    console.log('- /add_indexer <address>: change a role of the selected writer node to indexer role. (admin only)');
+    console.log('- /remove_indexer <address>: change a role of the selected indexer node to default role. (admin only)');
+    console.log('- /ban_writer <address>: demote a whitelisted writer to default role and remove it from the whitelist. (admin only)');
+    console.log('- /get_node_info <address>: get information about a node with the given address.');
+    console.log('- /stats: check system stats such as writing key, DAG, etc.');
+    console.log('- /exit: Exit the program.');
+    console.log('- /help: display this help.');
+}
+
+export const printWalletInfo = (tracPublicKey, writingKey) => {
+    console.log('');
+    console.log('#####################################################################################');
+    console.log('# MSB Address:    ', tracPublicKey, '#');
+    console.log('# MSB Writer:     ', writingKey, '#');
+    console.log('#####################################################################################');
+}
+
+/**
+ * Checks whether a given value is a valid hexadecimal string.
+ *
+ * A valid hex string must:
+ * - Be of type string
+ * - Have at least 2 characters
+ * - Contain only hexadecimal characters (0-9, a-f, A-F)
+ * - Have an even length (since hex bytes are two characters long)
+ *
+ * @param {*} string - The value to check.
+ * @returns {boolean} - True if the input is a valid hex string, false otherwise.
+ */
+export function isHexString(string) {
+    return typeof string === 'string' && string.length > 1 && /^[0-9a-fA-F]+$/.test(string) && string.length % 2 === 0;
 }
 
 export async function sleep(ms) {
@@ -78,45 +114,53 @@ export async function generateTx(bootstrap, msb_bootstrap, validator_writer_key,
     return await createHash('sha256', await createHash('sha256', tx));
 }
 
-export function printHelp() {
-    console.log('Available commands:');
-    console.log('- /add_writer: add yourself as validator to this MSB once whitelisted.');
-    console.log('- /remove_writer: remove yourself from this MSB.');
-    console.log('- /add_admin: register admin entry with bootstrap key. (initial setup)');
-    console.log('- /add_whitelist: add all specified whitelist addresses. (admin only)');
-    console.log('- /add_indexer <address>: change a role of the selected writer node to indexer role. (admin only)');
-    console.log('- /remove_indexer <address>: change a role of the selected indexer node to default role. (admin only)');
-    console.log('- /ban_writer <address>: demote a whitelisted writer to default role and remove it from the whitelist. (admin only)');
-    console.log('- /get_node_info <address>: get information about a node with the given address.');
-    console.log('- /stats: check system stats such as writing key, DAG, etc.');
-    console.log('- /exit: Exit the program.');
-    console.log('- /help: display this help.');
-}
-
-export const printWalletInfo = (tracPublicKey, writingKey) => {
-    console.log('');
-    console.log('#####################################################################################');
-    console.log('# MSB Address:    ', tracPublicKey, '#');
-    console.log('# MSB Writer:     ', writingKey, '#');
-    console.log('#####################################################################################');
-}
-
-
+/**
+ * Safely encodes an operation using `applyOperations.Operation.encode`.
+ * If the encoding fails (e.g., due to an invalid payload), returns an empty Buffer.
+ *
+ * @param {*} payload - Any input that should conform to the `applyOperation` schema.
+ * @returns {Buffer} - Encoded Buffer if successful, otherwise an empty Buffer (`b4a.alloc(0)`).
+ */
 export const safeEncodeAppyOperation = (payload) => {
     try {
-        return applyOperations.Operation.encode(payload);
+        const result = applyOperations.Operation.encode(payload);
+        if (b4a.isBuffer(result)) return result
     } catch (error) {
-        console.error(error); 
+        console.log("safeEncodeAppyOperation error:", error.message);
+    }
+    return b4a.alloc(0);
+}
+
+/**
+ * Safely decodes a Buffer into an `Operation` object using `applyOperations.Operation.decode`.
+ * Returns `null` if decoding fails or the input is invalid.
+ *
+ * @param {Buffer} payload - A buffer containing encoded data.
+ * @returns {Object|null} - Decoded `applyOperation` object on success, or `null` on failure.
+ */
+export const safeDecodeAppyOperation = (payload) => {
+    try {
+        return applyOperations.Operation.decode(payload);
+    } catch (error) {
+        console.log(error);
     }
     return null;
 }
 
-export const safeDecodeAppyOperation = (payload) => {
+export const safeJsonStringify = (value) => {
     try {
-        return applyOperations.Operation.decode(payload);
+        return JSON.stringify(value);
     } catch (error) {
         console.error(error);
     }
     return null;
 }
 
+export const safeJsonParse = (str) => {
+    try {
+        return JSON.parse(str);
+    } catch (error) {
+        console.error(error);
+    }
+    return undefined;
+}
