@@ -7,6 +7,7 @@ import PeerWallet from "trac-wallet"
 import tty from 'tty';
 import Corestore from 'corestore';
 import MsgUtils from './utils/msgUtils.js';
+import MsgUtils2 from './utils/msgUtils/msgUtils.js'
 import {
     LISTENER_TIMEOUT,
     EntryType,
@@ -471,6 +472,13 @@ export class MainSettlementBus extends ReadyResource {
                 break;
             case '/stats':
                 await verifyDag(this.#state.base, this.#network.swarm, this.#wallet, this.#state.writingKey);
+                break;
+            case '/test':
+                const adminEntry = await this.#state.get(EntryType.ADMIN);
+                const writingKey = b4a.from(this.#state.writingKey, 'hex');
+                const bootstrap = b4a.from(this.#bootstrap, 'hex');
+                console.log(adminEntry, writingKey, bootstrap);
+                MsgUtils2.assembleAddAdminMessage(adminEntry, writingKey, this.#wallet, bootstrap);
                 break;
             default:
                 if (input.startsWith('/get_node_info')) {

@@ -78,7 +78,7 @@ export async function createHash(type, message) {
     if (type === 'sha256') {
         const out = b4a.alloc(sodium.crypto_hash_sha256_BYTES);
         sodium.crypto_hash_sha256(out, !b4a.isBuffer(message) ? b4a.from(message) : message);
-        return b4a.toString(out, 'hex');
+        return out;
     }
     if (global.Pear !== undefined) {
         let _type = '';
