@@ -8,11 +8,10 @@ class MsgUtils {
             const builder = new MessageBuilder(wallet);
             const director = new MessageDirector();
             director.builder = builder;
-            const payload = await director.buildAddAdminMessage(adminEntry, writingKey, bootstrap, wallet.publicKey);
-            console.log("assembleAddAdminMessage payload:", payload);
 
+            const payload = await director.buildAddAdminMessage(adminEntry, writingKey, bootstrap, wallet.publicKey);
             const encodedPayload = safeEncodeAppyOperation(payload);
-            console.log("Encoded payload:", encodedPayload);
+            return encodedPayload;
 
         } catch (error) {
             console.error(`Failed to assemble admin message via MsgUtils: ${error.message}`);
@@ -26,10 +25,8 @@ class MsgUtils {
             director.builder = builder;
 
             const payload = await director.buildAddWriterMessage(writingKey, wallet.publicKey);
-            console.log("assembleAddWriterMessage payload:", payload);
-
             const encodedPayload = safeEncodeAppyOperation(payload);
-            console.log("Encoded payload:", encodedPayload);
+            return encodedPayload;
 
         } catch (error) {
             console.error(`Failed to assemble add writer message via MsgUtils: ${error.message}`);
@@ -44,10 +41,8 @@ class MsgUtils {
             director.builder = builder;
 
             const payload = await director.buildRemoveWriterMessage(writingKey, wallet.publicKey);
-            console.log("assembleRemoveWriterMessage payload:", payload);
-
             const encodedPayload = safeEncodeAppyOperation(payload);
-            console.log("Encoded payload:", encodedPayload);
+            return encodedPayload;
 
         } catch (error) {
             console.error(`Failed to assemble add writer message via MsgUtils: ${error.message}`);
@@ -62,10 +57,8 @@ class MsgUtils {
             director.builder = builder;
 
             const payload = await director.buildAddIndexerMessage(wallet.publicKey);
-            console.log("assembleAddIndexerMessage payload:", payload);
-
             const encodedPayload = safeEncodeAppyOperation(payload);
-            console.log("Encoded payload:", encodedPayload);
+            return encodedPayload;
 
         } catch (error) {
             console.error(`Failed to assemble add indexer message via MsgUtils: ${error.message}`);
@@ -80,10 +73,8 @@ class MsgUtils {
             director.builder = builder;
 
             const payload = await director.buildRemoveIndexerMessage(wallet.publicKey);
-            console.log("assembleRemoveIndexerMessage payload:", payload);
-
             const encodedPayload = safeEncodeAppyOperation(payload);
-            console.log("Encoded payload:", encodedPayload);
+            return encodedPayload;
 
         } catch (error) {
             console.error(`Failed to assemble add indexer message via MsgUtils: ${error.message}`);
@@ -98,10 +89,8 @@ class MsgUtils {
             director.builder = builder;
 
             const payload = await director.buildAppendWhitelistMessage(wallet.publicKey);
-            console.log("assembleAppendWhitelistMessage payload:", payload);
-
             const encodedPayload = safeEncodeAppyOperation(payload);
-            console.log("Encoded payload:", encodedPayload);
+            return encodedPayload;
 
         } catch (error) {
             console.error(`Failed to assemble add indexer message via MsgUtils: ${error.message}`);
@@ -116,10 +105,8 @@ class MsgUtils {
             director.builder = builder;
 
             const payload = await director.buildBanWriterMessage(wallet.publicKey);
-            console.log("assembleAppendWhitelistMessage payload:", payload);
-
             const encodedPayload = safeEncodeAppyOperation(payload);
-            console.log("Encoded payload:", encodedPayload);
+            return encodedPayload;
 
         } catch (error) {
             console.error(`Failed to assemble add indexer message via MsgUtils: ${error.message}`);
