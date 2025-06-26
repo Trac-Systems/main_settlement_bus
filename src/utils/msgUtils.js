@@ -110,7 +110,6 @@ class MsgUtils {
     }
 
 
-    /// director whouls use a builder to create messages below
     static async assembleAddWriterMessage(wallet, writingKey) {
         return await this.#assembleMessageBase(wallet, writingKey, OperationType.ADD_WRITER);
     }

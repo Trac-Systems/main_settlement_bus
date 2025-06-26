@@ -48,7 +48,7 @@ class MessageOperations {
             return encodedPayload;
 
         } catch (error) {
-            console.error(`Failed to assemble add writer message via MsgUtils: ${error.message}`);
+            console.error(`Failed to assemble remove writer message via MsgUtils: ${error.message}`);
             return null;
         }
     }
@@ -80,7 +80,7 @@ class MessageOperations {
             return encodedPayload;
 
         } catch (error) {
-            console.error(`Failed to assemble add indexer message via MsgUtils: ${error.message}`);
+            console.error(`Failed to assemble remove indexer message via MsgUtils: ${error.message}`);
             return null;
         }
     }
@@ -96,7 +96,7 @@ class MessageOperations {
             return encodedPayload;
 
         } catch (error) {
-            console.error(`Failed to assemble add indexer message via MsgUtils: ${error.message}`);
+            console.error(`Failed to assemble append whitelist message via MsgUtils: ${error.message}`);
             return null;
         }
     }
@@ -112,10 +112,11 @@ class MessageOperations {
             return encodedPayload;
 
         } catch (error) {
-            console.error(`Failed to assemble add indexer message via MsgUtils: ${error.message}`);
+            console.error(`Failed to assemble ban writer message via MsgUtils: ${error.message}`);
             return null;
         }
     }
+    //TODO: verifyEventMessage
 }
 
 export default MessageOperations;

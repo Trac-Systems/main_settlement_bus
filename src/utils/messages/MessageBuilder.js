@@ -120,7 +120,7 @@ class MessageBuilder extends Builder {
             case OperationType.ADD_WRITER:
             case OperationType.REMOVE_WRITER:
                 if (!writingKey) {
-                    throw new Error('Writer key must be set for ADD_ADMIN operation.');
+                    throw new Error('Writer key must be set for writer operations (ADD_WRITER or REMOVE_WRITER).');
                 }
                 msg = createMessage(tracPublicKey, writingKey, nonce, operationType);
                 break;
@@ -177,9 +177,9 @@ class MessageBuilder extends Builder {
     };
 
     #canAssembleAdminMessage(adminEntry, writingKey, bootstrap, tracPublicKey) {
-        const fistCondition = Boolean(!adminEntry && b4a.equals(writingKey, bootstrap)) // Admin entry doesn't exist yet, thus admin public key can only be associated with bootstrap writing key
+        const firstCondition = Boolean(!adminEntry && b4a.equals(writingKey, bootstrap)) // Admin entry doesn't exist yet, thus admin public key can only be associated with bootstrap writing key
         const secondCondition = Boolean(adminEntry && b4a.equals(adminEntry.tracPublicKey, tracPublicKey) && writingKey && b4a.equals(writingKey, adminEntry.wk)); // Admin entry exists and we have to update its writing key in base, so it can recover admin access
-        return (fistCondition || secondCondition)
+        return (firstCondition || secondCondition)
     }
 
     getPayload() {
