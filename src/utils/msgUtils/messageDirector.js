@@ -20,9 +20,74 @@ class MessageDirector {
             .withWriterKey(writingKey)
             .withBootstrap(bootstrap)
             .buildValueAndSign();
-            
+
         return this.#builder.getPayload();
     }
+
+    async buildAddWriterMessage(writingKey, tracPublicKey) {
+        if (!this.#builder) throw new Error('Builder has not been set.');
+
+        await this.#builder.withOperationType(OperationType.ADD_WRITER)
+            .withTracPubKey(tracPublicKey)
+            .withWriterKey(writingKey)
+            .buildValueAndSign();
+
+        return this.#builder.getPayload();
+    }
+
+    async buildRemoveWriterMessage(writingKey, tracPublicKey) {
+        if (!this.#builder) throw new Error('Builder has not been set.');
+
+        await this.#builder.withOperationType(OperationType.REMOVE_WRITER)
+            .withTracPubKey(tracPublicKey)
+            .withWriterKey(writingKey)
+            .buildValueAndSign();
+
+        return this.#builder.getPayload();
+    }
+
+    async buildAddIndexerMessage(tracPublicKey) {
+        if (!this.#builder) throw new Error('Builder has not been set.');
+
+        await this.#builder.withOperationType(OperationType.ADD_INDEXER)
+            .withTracPubKey(tracPublicKey)
+            .buildValueAndSign();
+
+        return this.#builder.getPayload();
+    }
+
+    async buildRemoveIndexerMessage(tracPublicKey) {
+        if (!this.#builder) throw new Error('Builder has not been set.');
+
+        await this.#builder.withOperationType(OperationType.REMOVE_INDEXER)
+            .withTracPubKey(tracPublicKey)
+            .buildValueAndSign();
+
+        return this.#builder.getPayload();
+    }
+
+    async buildAppendWhitelistMessage(tracPublicKey) {
+        if (!this.#builder) throw new Error('Builder has not been set.');
+
+        await this.#builder.withOperationType(OperationType.APPEND_WHITELIST)
+            .withTracPubKey(tracPublicKey)
+            .buildValueAndSign();
+
+        return this.#builder.getPayload();
+    }
+
+    async buildBanWriterMessage(tracPublicKey) {
+        if (!this.#builder) throw new Error('Builder has not been set.');
+
+        await this.#builder.withOperationType(OperationType.BAN_WRITER)
+            .withTracPubKey(tracPublicKey)
+            .buildValueAndSign();
+
+        return this.#builder.getPayload();
+    }
+
+
+
 }
 
 export default MessageDirector;

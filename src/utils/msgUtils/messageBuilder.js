@@ -185,14 +185,14 @@ class MessageBuilder extends Builder {
     };
 
     static createMessage(...args) {
-        const isValidUInt32 = (n) => { return Number.isInteger(n) && n >= 1 && n <= 0xFFFFFFFF; }
+        const isUInt32 = (n) => { return Number.isInteger(n) && n >= 1 && n <= 0xFFFFFFFF; }
 
         if (args.length === 0) return b4a.alloc(0);
 
         const buffers = args.map(arg => {
             if (b4a.isBuffer(arg)) {
                 return arg;
-            } else if (typeof arg === 'number' && isValidUInt32(arg)) {
+            } else if (typeof arg === 'number' && isUInt32(arg)) {
                 const buf = b4a.alloc(4);
                 buf.writeUInt32BE(arg, 0);
                 return buf;
@@ -200,7 +200,6 @@ class MessageBuilder extends Builder {
         });
 
         return b4a.concat(buffers);
-
     }
 
     getPayload() {
