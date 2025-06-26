@@ -7,7 +7,6 @@ import PeerWallet from "trac-wallet"
 import tty from 'tty';
 import Corestore from 'corestore';
 import MsgUtils from './utils/msgUtils.js';
-import MsgUtils2 from './utils/msgUtils/msgUtils.js'
 import {
     LISTENER_TIMEOUT,
     EntryType,

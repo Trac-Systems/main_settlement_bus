@@ -14,7 +14,7 @@ class MessageDirector {
     async buildAddAdminMessage(adminEntry, writingKey, bootstrap, tracPublicKey) {
         if (!this.#builder) throw new Error('Builder has not been set.');
 
-        await this.#builder.withOperationType(OperationType.ADD_ADMIN)
+        await this.#builder.forOperationType(OperationType.ADD_ADMIN)
             .withTracPubKey(tracPublicKey)
             .withAdminEntry(adminEntry)
             .withWriterKey(writingKey)
@@ -27,7 +27,7 @@ class MessageDirector {
     async buildAddWriterMessage(writingKey, tracPublicKey) {
         if (!this.#builder) throw new Error('Builder has not been set.');
 
-        await this.#builder.withOperationType(OperationType.ADD_WRITER)
+        await this.#builder.forOperationType(OperationType.ADD_WRITER)
             .withTracPubKey(tracPublicKey)
             .withWriterKey(writingKey)
             .buildValueAndSign();
@@ -38,7 +38,7 @@ class MessageDirector {
     async buildRemoveWriterMessage(writingKey, tracPublicKey) {
         if (!this.#builder) throw new Error('Builder has not been set.');
 
-        await this.#builder.withOperationType(OperationType.REMOVE_WRITER)
+        await this.#builder.forOperationType(OperationType.REMOVE_WRITER)
             .withTracPubKey(tracPublicKey)
             .withWriterKey(writingKey)
             .buildValueAndSign();
@@ -49,7 +49,7 @@ class MessageDirector {
     async buildAddIndexerMessage(tracPublicKey) {
         if (!this.#builder) throw new Error('Builder has not been set.');
 
-        await this.#builder.withOperationType(OperationType.ADD_INDEXER)
+        await this.#builder.forOperationType(OperationType.ADD_INDEXER)
             .withTracPubKey(tracPublicKey)
             .buildValueAndSign();
 
@@ -59,7 +59,7 @@ class MessageDirector {
     async buildRemoveIndexerMessage(tracPublicKey) {
         if (!this.#builder) throw new Error('Builder has not been set.');
 
-        await this.#builder.withOperationType(OperationType.REMOVE_INDEXER)
+        await this.#builder.forOperationType(OperationType.REMOVE_INDEXER)
             .withTracPubKey(tracPublicKey)
             .buildValueAndSign();
 
@@ -69,7 +69,7 @@ class MessageDirector {
     async buildAppendWhitelistMessage(tracPublicKey) {
         if (!this.#builder) throw new Error('Builder has not been set.');
 
-        await this.#builder.withOperationType(OperationType.APPEND_WHITELIST)
+        await this.#builder.forOperationType(OperationType.APPEND_WHITELIST)
             .withTracPubKey(tracPublicKey)
             .buildValueAndSign();
 
@@ -79,7 +79,7 @@ class MessageDirector {
     async buildBanWriterMessage(tracPublicKey) {
         if (!this.#builder) throw new Error('Builder has not been set.');
 
-        await this.#builder.withOperationType(OperationType.BAN_WRITER)
+        await this.#builder.forOperationType(OperationType.BAN_WRITER)
             .withTracPubKey(tracPublicKey)
             .buildValueAndSign();
 

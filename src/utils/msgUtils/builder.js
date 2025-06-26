@@ -7,7 +7,7 @@ class Builder {
     }
 
     reset() { throw new Error("Method 'reset()' must be implemented.");}
-    withOperationType(operationType) {throw new Error("Method 'withOperationType()' must be implemented.");}
+    forOperationType(operationType) {throw new Error("Method 'forOperationType()' must be implemented.");}
     withTracPubKey(publicKey) { throw new Error("Method 'withKey()' must be implemented.");}
     withWriterKey(writerKey) { throw new Error("Method 'withWriterKey()' must be implemented.");}
     withBootstrap(bootstrap) { throw new Error("Method 'withBootstrap()' must be implemented.");}

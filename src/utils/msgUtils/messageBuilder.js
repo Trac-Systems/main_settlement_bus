@@ -33,7 +33,7 @@ class MessageBuilder extends Builder {
         this.#payload = {}
     }
 
-    withOperationType(operationType) {
+    forOperationType(operationType) {
         if (!Object.values(OperationType).includes(operationType) || OperationType === OperationType.UNKNOWN) {
             throw new Error(`Invalid operation type: ${operationType}`);
         }
