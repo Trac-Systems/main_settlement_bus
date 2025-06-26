@@ -10,7 +10,7 @@ async function runMsgUtilsTests() {
     await import('./assembleRemoveIndexerMessage.test.js');
     await import('./assembleBanWriterMessage.test.js');
     await import('./assembleWhitelistMessages.test.js');
-
+    await import('./createMessage.test.js');
     // TODO: Implement mocked tests for MessageOperations.verifyEventMessage
 
     test.resume();
