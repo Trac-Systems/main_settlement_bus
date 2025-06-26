@@ -1,4 +1,4 @@
-import Builder from './builder.js';
+import Builder from './Builder.js';
 import { OperationType } from '../protobuf/applyOperations.cjs'
 
 class MessageDirector {
@@ -85,8 +85,6 @@ class MessageDirector {
 
         return this.#builder.getPayload();
     }
-
-
 
 }
 

@@ -1,8 +1,9 @@
+import Builder from './Builder.js';
+import { createHash, createMessage } from '../functions.js';
 import { OperationType } from '../protobuf/applyOperations.cjs'
 import b4a from 'b4a';
-import { createHash, createMessage } from '../functions.js';
 import Wallet from 'trac-wallet';
-import Builder from './builder.js';
+
 
 class MessageBuilder extends Builder {
     #wallet;

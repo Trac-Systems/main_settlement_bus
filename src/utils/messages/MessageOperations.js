@@ -1,8 +1,11 @@
-import MessageDirector from './messageDirector.js';
-import MessageBuilder from './messageBuilder.js';
+import MessageDirector from './MessageDirector.js';
+import MessageBuilder from './MessageBuilder.js';
 import { safeEncodeAppyOperation } from '../functions.js';
-//facade
-class MsgUtils {
+
+/*
+    This module won't work properly as long as createHash returns string. 
+*/
+class MessageOperations {
     static async assembleAddAdminMessage(adminEntry, writingKey, wallet, bootstrap) {
         try {
             const builder = new MessageBuilder(wallet);
@@ -115,4 +118,4 @@ class MsgUtils {
     }
 }
 
-export default MsgUtils;
+export default MessageOperations;
