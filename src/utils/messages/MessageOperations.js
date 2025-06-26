@@ -116,7 +116,7 @@ class MessageOperations {
             return null;
         }
     }
-    //TODO: verifyEventMessage
+    //TODO: verifyEventMessage. This task will require to refactor check.js to support data in bytes.
 }
 
 export default MessageOperations;
