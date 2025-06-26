@@ -4,8 +4,6 @@ import { createHash } from '../functions.js';
 import Wallet from 'trac-wallet';
 import Builder from './builder.js';
 
-// https://refactoring.guru/design-patterns/builder/typescript/example
-
 class MessageBuilder extends Builder {
     #wallet;
     #operationType;
@@ -71,10 +69,6 @@ class MessageBuilder extends Builder {
     }
 
     withAdminEntry(adminEntry) {
-        // if (typeof adminEntry !== 'object' || !adminEntry.tracPublicKey || !b4a.isBuffer(adminEntry.tracPublicKey) || adminEntry.tracPublicKey.length !== 64 ||
-        //     !adminEntry.wk || !b4a.isBuffer(adminEntry.wk) || adminEntry.wk.length !== 64) {
-        //     throw new Error('Admin entry must be an object with valid tracPublicKey and wk buffers.');
-        // }
         this.#adminEntry = adminEntry;
         return this;
     }
@@ -98,7 +92,7 @@ class MessageBuilder extends Builder {
         }
 
         if (operationType === OperationType.UNKNOWN) {
-            throw new Error('UNKNOWNis not allowed to construct');
+            throw new Error('UNKNOWN is not allowed to construct');
         }
 
         const nonce = Wallet.generateNonce();
@@ -114,10 +108,7 @@ class MessageBuilder extends Builder {
                     throw new Error('Writer key must be set for ADD_ADMIN operation.');
                 }
 
-                const fistCondition = Boolean(!adminEntry && b4a.equals(writingKey, bootstrap)) // Admin entry doesn't exist yet, thus admin public key can only be associated with bootstrap writing key
-                const secondCondition = Boolean(adminEntry && b4a.equals(adminEntry.tracPublicKey, wallet.publicKey) && writingKey && b4a.equals(writingKey, adminEntry.wk)); // Admin entry exists and we have to update its writing key in base, so it can recover admin access
-
-                const shouldAssembleAdmin = fistCondition || secondCondition;
+                const shouldAssembleAdmin = this.#canAssembleAdminMessage(adminEntry, writingKey, bootstrap, tracPublicKey);
 
                 if (!shouldAssembleAdmin) {
                     throw new Error('Conditions for assembling ADD_ADMIN message are not met.');
@@ -183,6 +174,12 @@ class MessageBuilder extends Builder {
             OperationType.BAN_WRITER
         ].includes(type);
     };
+
+    #canAssembleAdminMessage(adminEntry, writingKey, bootstrap, tracPublicKey) {
+        const fistCondition = Boolean(!adminEntry && b4a.equals(writingKey, bootstrap)) // Admin entry doesn't exist yet, thus admin public key can only be associated with bootstrap writing key
+        const secondCondition = Boolean(adminEntry && b4a.equals(adminEntry.tracPublicKey, tracPublicKey) && writingKey && b4a.equals(writingKey, adminEntry.wk)); // Admin entry exists and we have to update its writing key in base, so it can recover admin access
+        return (fistCondition || secondCondition)
+    }
 
     static createMessage(...args) {
         const isUInt32 = (n) => { return Number.isInteger(n) && n >= 1 && n <= 0xFFFFFFFF; }
