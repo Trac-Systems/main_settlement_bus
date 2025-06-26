@@ -23,7 +23,7 @@ class MessageOperations {
         }
     }
 
-    static async assembleAddWriterMessage(writingKey, wallet) {
+    static async assembleAddWriterMessage(wallet, writingKey) {
         try {
             const builder = new MessageBuilder(wallet);
             const director = new MessageDirector();
@@ -39,7 +39,7 @@ class MessageOperations {
         }
     }
 
-    static async assembleRemoveWriterMessage(writingKey, wallet) {
+    static async assembleRemoveWriterMessage(wallet, writingKey) {
         try {
             const builder = new MessageBuilder(wallet);
             const director = new MessageDirector();
@@ -55,13 +55,13 @@ class MessageOperations {
         }
     }
 
-    static async assembleAddIndexerMessage(wallet) {
+    static async assembleAddIndexerMessage(wallet, tracPublicKey) {
         try {
             const builder = new MessageBuilder(wallet);
             const director = new MessageDirector();
             director.builder = builder;
 
-            const payload = await director.buildAddIndexerMessage(wallet.publicKey);
+            const payload = await director.buildAddIndexerMessage(tracPublicKey);
             const encodedPayload = safeEncodeAppyOperation(payload);
             return encodedPayload;
 
@@ -71,13 +71,13 @@ class MessageOperations {
         }
     }
 
-    static async assembleRemoveIndexerMessage(wallet) {
+    static async assembleRemoveIndexerMessage(wallet, tracPublicKey) {
         try {
             const builder = new MessageBuilder(wallet);
             const director = new MessageDirector();
             director.builder = builder;
 
-            const payload = await director.buildRemoveIndexerMessage(wallet.publicKey);
+            const payload = await director.buildRemoveIndexerMessage(tracPublicKey);
             const encodedPayload = safeEncodeAppyOperation(payload);
             return encodedPayload;
 
@@ -112,13 +112,13 @@ class MessageOperations {
         }
     }
 
-    static async assembleBanWriterMessage(wallet) {
+    static async assembleBanWriterMessage(wallet, tracPublicKey) {
         try {
             const builder = new MessageBuilder(wallet);
             const director = new MessageDirector();
             director.builder = builder;
 
-            const payload = await director.buildBanWriterMessage(wallet.publicKey);
+            const payload = await director.buildBanWriterMessage(tracPublicKey);
             const encodedPayload = safeEncodeAppyOperation(payload);
             return encodedPayload;
 

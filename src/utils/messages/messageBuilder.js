@@ -179,7 +179,6 @@ class MessageBuilder extends Builder {
     #canAssembleAdminMessage(adminEntry, writingKey, bootstrap, tracPublicKey) {
         const firstCondition = Boolean(!adminEntry && b4a.equals(writingKey, bootstrap)) // Admin entry doesn't exist yet, thus admin public key can only be associated with bootstrap writing key
         const secondCondition = Boolean(adminEntry && b4a.equals(adminEntry.tracPublicKey, tracPublicKey) && writingKey && !b4a.equals(writingKey, adminEntry.wk)); // Admin entry exists and we have to update its writing key in base, so it can recover admin access
-
         return (firstCondition || secondCondition)
     }
 
