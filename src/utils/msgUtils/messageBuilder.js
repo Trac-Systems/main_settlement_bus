@@ -1,6 +1,6 @@
 import { OperationType } from '../protobuf/applyOperations.cjs'
 import b4a from 'b4a';
-import { createHash } from '../functions.js';
+import { createHash, createMessage } from '../functions.js';
 import Wallet from 'trac-wallet';
 import Builder from './builder.js';
 
@@ -113,7 +113,7 @@ class MessageBuilder extends Builder {
                 if (!shouldAssembleAdmin) {
                     throw new Error('Conditions for assembling ADD_ADMIN message are not met.');
                 }
-                msg = MessageBuilder.createMessage(tracPublicKey, writingKey, nonce, operationType);
+                msg = createMessage(tracPublicKey, writingKey, nonce, operationType);
                 break;
 
             case OperationType.ADD_WRITER:
@@ -121,7 +121,7 @@ class MessageBuilder extends Builder {
                 if (!writingKey) {
                     throw new Error('Writer key must be set for ADD_ADMIN operation.');
                 }
-                msg = MessageBuilder.createMessage(tracPublicKey, writingKey, nonce, operationType);
+                msg = createMessage(tracPublicKey, writingKey, nonce, operationType);
                 break;
 
 
@@ -129,7 +129,7 @@ class MessageBuilder extends Builder {
             case OperationType.ADD_INDEXER:
             case OperationType.REMOVE_INDEXER:
             case OperationType.BAN_WRITER:
-                msg = MessageBuilder.createMessage(tracPublicKey, nonce, operationType);
+                msg = createMessage(tracPublicKey, nonce, operationType);
                 break;
             default:
                 throw new Error(`Unsupported operation type for building value: ${OperationType[operationType]}.`);
@@ -179,24 +179,6 @@ class MessageBuilder extends Builder {
         const fistCondition = Boolean(!adminEntry && b4a.equals(writingKey, bootstrap)) // Admin entry doesn't exist yet, thus admin public key can only be associated with bootstrap writing key
         const secondCondition = Boolean(adminEntry && b4a.equals(adminEntry.tracPublicKey, tracPublicKey) && writingKey && b4a.equals(writingKey, adminEntry.wk)); // Admin entry exists and we have to update its writing key in base, so it can recover admin access
         return (fistCondition || secondCondition)
-    }
-
-    static createMessage(...args) {
-        const isUInt32 = (n) => { return Number.isInteger(n) && n >= 1 && n <= 0xFFFFFFFF; }
-
-        if (args.length === 0) return b4a.alloc(0);
-
-        const buffers = args.map(arg => {
-            if (b4a.isBuffer(arg)) {
-                return arg;
-            } else if (typeof arg === 'number' && isUInt32(arg)) {
-                const buf = b4a.alloc(4);
-                buf.writeUInt32BE(arg, 0);
-                return buf;
-            }
-        });
-
-        return b4a.concat(buffers);
     }
 
     getPayload() {
