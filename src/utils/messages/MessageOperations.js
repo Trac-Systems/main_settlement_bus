@@ -1,7 +1,8 @@
 import MessageDirector from './MessageDirector.js';
 import MessageBuilder from './MessageBuilder.js';
 import { safeEncodeAppyOperation } from '../functions.js';
-
+import fileUtils from '../fileUtils.js';
+import b4a from 'b4a';
 /*
     This module won't work properly as long as createHash returns string. 
 */
@@ -17,10 +18,11 @@ class MessageOperations {
             return encodedPayload;
 
         } catch (error) {
-            console.error(`Failed to assemble admin message via MsgUtils: ${error.message}`);
+            console.error(`Failed to assemble admin message via MessageOperations: ${error.message}`);
             return null;
         }
     }
+
     static async assembleAddWriterMessage(writingKey, wallet) {
         try {
             const builder = new MessageBuilder(wallet);
@@ -32,7 +34,7 @@ class MessageOperations {
             return encodedPayload;
 
         } catch (error) {
-            console.error(`Failed to assemble add writer message via MsgUtils: ${error.message}`);
+            console.error(`Failed to assemble add writer message via MessageOperations: ${error.message}`);
             return null;
         }
     }
@@ -48,7 +50,7 @@ class MessageOperations {
             return encodedPayload;
 
         } catch (error) {
-            console.error(`Failed to assemble remove writer message via MsgUtils: ${error.message}`);
+            console.error(`Failed to assemble remove writer message via MessageOperations: ${error.message}`);
             return null;
         }
     }
@@ -64,7 +66,7 @@ class MessageOperations {
             return encodedPayload;
 
         } catch (error) {
-            console.error(`Failed to assemble add indexer message via MsgUtils: ${error.message}`);
+            console.error(`Failed to assemble add indexer message via MessageOperations: ${error.message}`);
             return null;
         }
     }
@@ -80,23 +82,32 @@ class MessageOperations {
             return encodedPayload;
 
         } catch (error) {
-            console.error(`Failed to assemble remove indexer message via MsgUtils: ${error.message}`);
+            console.error(`Failed to assemble remove indexer message via MessageOperations: ${error.message}`);
             return null;
         }
     }
-    
-    static async assembleAppendWhitelistMessage(wallet) {
+
+    static async assembleAppendWhitelistMessages(wallet) {
         try {
+
             const builder = new MessageBuilder(wallet);
             const director = new MessageDirector();
             director.builder = builder;
 
-            const payload = await director.buildAppendWhitelistMessage(wallet.publicKey);
-            const encodedPayload = safeEncodeAppyOperation(payload);
-            return encodedPayload;
+            const messages = [];
+            const pubKeys = await fileUtils.readPublicKeysFromFile(); // TODO: This method should return public keys in Buffer, not string format
+
+            for (const pubKey of pubKeys) {
+                const payload = await director.buildAppendWhitelistMessage(b4a.from(pubKey, 'hex'));
+                console.log(`payload ${payload}`);
+                const encodedPayload = safeEncodeAppyOperation(payload);
+                messages.push(encodedPayload);
+            }
+
+            return messages;
 
         } catch (error) {
-            console.error(`Failed to assemble append whitelist message via MsgUtils: ${error.message}`);
+            console.error(`Failed to assemble append whitelist message via MessageOperations: ${error.message}`);
             return null;
         }
     }
@@ -112,11 +123,15 @@ class MessageOperations {
             return encodedPayload;
 
         } catch (error) {
-            console.error(`Failed to assemble ban writer message via MsgUtils: ${error.message}`);
+            console.error(`Failed to assemble ban writer message via MessageOperations: ${error.message}`);
             return null;
         }
     }
+    
     //TODO: verifyEventMessage. This task will require to refactor check.js to support data in bytes.
+    static async verifyEventMessage() {
+        //TODO!
+    }
 }
 
 export default MessageOperations;
