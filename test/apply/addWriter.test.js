@@ -2,7 +2,7 @@ import { test, hook } from 'brittle';
 import { tick, setupMsbAdmin, setupMsbPeer, setupWhitelist, initTemporaryDirectory, removeTemporaryDirectory } from '../utils/setupApplyTests.js';
 import { testKeyPair1, testKeyPair2 } from '../fixtures/apply.fixtures.js';
 import MsgUtils from '../../src/utils/msgUtils.js';
-import { sleep } from '../../src/utils/functions.js';
+import { sleep } from '../../src/utils/helpers.js';
 
 let admin, writer, tmpDirectory;
 

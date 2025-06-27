@@ -2,7 +2,7 @@ import test from 'brittle';
 import MessageOperations from '../../src/utils/messages/MessageOperations.js';
 import { default as fixtures } from '../fixtures/assembleMessage2.fixtures.js';
 import b4a from 'b4a';
-import { safeDecodeAppyOperation } from '../../src/utils/functions.js';
+import { safeDecodeApplyOperation } from '../../src/utils/protobuf/operationHelpers.js';
 
 test('assembleAdminMessage', async (t) => {
     await fixtures.initAll();
@@ -16,7 +16,7 @@ test('assembleAdminMessage', async (t) => {
 
     t.test('assembleAdminMessage - setup admin entry', async (k) => {
 
-        const msg = safeDecodeAppyOperation(await MessageOperations.assembleAddAdminMessage(null, writingKeyAdmin, walletAdmin, bootstrapAdmin));
+        const msg = safeDecodeApplyOperation(await MessageOperations.assembleAddAdminMessage(null, writingKeyAdmin, walletAdmin, bootstrapAdmin));
 
         k.ok(msg, 'Message should be created');
         k.is(Object.keys(msg).length, 3, 'Message should have 3 keys');
@@ -32,7 +32,7 @@ test('assembleAdminMessage', async (t) => {
     });
 
     t.test('assembleAdminMessage - admin recovery message', async (k) => {
-        const msg = safeDecodeAppyOperation(await MessageOperations.assembleAddAdminMessage(adminEntry, writingKeyNonAdmin, walletAdmin, bootstrapAdmin));
+        const msg = safeDecodeApplyOperation(await MessageOperations.assembleAddAdminMessage(adminEntry, writingKeyNonAdmin, walletAdmin, bootstrapAdmin));
         console.log('msg', msg);
         console.log('Object.keys(msg).length', Object.keys(msg).length);
 

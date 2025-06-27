@@ -2,7 +2,9 @@
 import ReadyResource from 'ready-resource';
 import b4a from 'b4a';
 import readline from 'readline';
-import { verifyDag, sleep, createHash, printHelp, printWalletInfo } from './utils/functions.js';
+import { sleep } from './utils/helpers.js';
+import { createHash } from './utils/crypto.js';
+import { verifyDag, printHelp, printWalletInfo } from './utils/cli.js';
 import PeerWallet from "trac-wallet"
 import tty from 'tty';
 import Corestore from 'corestore';
@@ -16,9 +18,9 @@ import {
     MAX_INDEXERS,
     MIN_INDEXERS,
 } from './utils/constants.js';
-import Network from './network.js';
+import Network from './core/network/Network.js';
 import Check from './utils/check.js';
-import State from './state.js';
+import State from './core/state/State.js';
 
 export class MainSettlementBus extends ReadyResource {
     // Internal flags
@@ -284,7 +286,9 @@ export class MainSettlementBus extends ReadyResource {
     async #handleAdminOperations() {
         try {
             const adminEntry = await this.#state.get(EntryType.ADMIN);
+            console.log('Admin entry:1');
             const addAdminMessage = await MsgUtils.assembleAdminMessage(adminEntry, this.#state.writingKey, this.#wallet, this.#bootstrap);
+            
             if (!adminEntry && this.#wallet && this.#state.writingKey && this.#state.writingKey === this.#bootstrap) {
                 await this.#state.append(addAdminMessage);
             } else if (adminEntry && this.#wallet && adminEntry.tracPublicKey === this.#wallet.publicKey && this.#state.writingKey && this.#state.writingKey !== adminEntry.wk) {

@@ -1,6 +1,6 @@
 import test from 'brittle';
 import b4a from 'b4a';
-import { createMessage } from '../../src/utils/functions.js';
+import { createMessage } from '../../src/utils/buffer.js';
 
 test('createMessage', async (t) => {
     const expected = b4a.alloc(32);

@@ -5,7 +5,7 @@ import { randomBytes } from 'crypto';
 import PeerWallet from "trac-wallet";
 import { tick, generatePostTx, setupMsbAdmin, initTemporaryDirectory, removeTemporaryDirectory } from '../utils/setupApplyTests.js';
 import { testKeyPair1, testKeyPair2, testKeyPair3 } from '../fixtures/apply.fixtures.js';
-import { generateTx } from '../../src/utils/functions.js';
+import { generateTx } from '../../src/utils/crypto.js';
 
 let tmpDirectory, admin, legitWallet, maliciousWallet;
 

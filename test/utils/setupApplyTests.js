@@ -3,8 +3,10 @@ import fileUtils from '../../src/utils/fileUtils.js'
 import MsgUtils from '../../src/utils/msgUtils.js'
 import { EntryType } from '../../src/utils/constants.js';
 import { OperationType } from '../../src/utils/constants.js'
-import { createHash, sleep } from '../../src/utils/functions.js'
-import { generateTx } from '../../src/utils/functions.js';
+import { sleep } from '../../src/utils/helpers.js'
+import { createHash  } from '../../src/utils/crypto.js'
+
+import { generateTx } from '../../src/utils/crypto.js';
 import sodium from 'sodium-native';
 import { generateMnemonic, mnemonicToSeed } from 'bip39-mnemonic';
 import b4a from 'b4a'
