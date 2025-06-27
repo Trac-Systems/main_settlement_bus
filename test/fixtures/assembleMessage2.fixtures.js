@@ -1,4 +1,4 @@
-// TODO: CHANGE NAME OF THIS FILLE.
+// TODO: CHANGE NAME OF THIS FILE.
 
 import PeerWallet from 'trac-wallet';
 import b4a from 'b4a';

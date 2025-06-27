@@ -59,7 +59,7 @@ test('assembleAdminMessage', async (t) => {
 
     t.test("assembleAdminMessage - admin entry is set. writingKey is the same as admin", async (k) => {
         const msg = await MessageOperations.assembleAddAdminMessage(adminEntry, writingKeyAdmin, walletNonAdmin, bootstrapAdmin);
-        k.is(msg, null, 'Message should be undefined');
+        k.is(msg, null, 'Message should be null');
     });
 
 });

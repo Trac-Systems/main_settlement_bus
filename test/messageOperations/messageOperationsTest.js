@@ -8,7 +8,7 @@ export async function messageOperationsEkoTest(t, fnName, fn, wallet, writingKey
         console.log('msg', msg);
         k.ok(msg, 'Message should be created');
         k.is(Object.keys(msg).length, 3, 'Message should have 3 keys');
-        k.is(Object.keys(msg.eko).length, msgValueLength, `Message should value have ${msgValueLength} keys`);
+        k.is(Object.keys(msg.eko).length, msgValueLength, `Message value should have ${msgValueLength} keys`);
 
         if (msgValueLength > 2) {
             //k.is(msg.eko.pub, wallet.publicKey, 'Message pub should be the public key of the wallet'); // pub does not exist
@@ -81,7 +81,7 @@ export async function messageOperationsBkoTest(t, fnName, fn, wallet, writingKey
         const msg = await fn(wallet, expectedMsgKey);
         k.ok(msg, 'Message should be created');
         k.is(Object.keys(msg).length, 3, 'Message should have 3 keys');
-        k.is(Object.keys(msg.bko).length, msgValueLength, `Message should value have ${msgValueLength} keys`);
+        k.is(Object.keys(msg.bko).length, msgValueLength, `Message value should have ${msgValueLength} keys`);
 
         if (msgValueLength > 2) {
             //k.is(msg.bko.pub, wallet.publicKey, 'Message pub should be the public key of the wallet'); // pub does not exist

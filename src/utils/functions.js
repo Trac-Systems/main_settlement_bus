@@ -128,7 +128,8 @@ export const createMessage = (...args) => {
             buf.writeUInt32BE(arg, 0);
             return buf;
         }
-    });
+    }).filter(buf => b4a.isBuffer(buf));
+    if (buffers.length === 0) return b4a.alloc(0);
 
     return b4a.concat(buffers);
 }

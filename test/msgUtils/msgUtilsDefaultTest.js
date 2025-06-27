@@ -3,7 +3,7 @@ export async function msgUtilsDefaultTest(t, fnName, fn, wallet, writingKey, opT
         const msg = await fn(wallet, writingKey);
         k.ok(msg, 'Message should be created');
         k.is(Object.keys(msg).length, 3, 'Message should have 3 keys');
-        k.is(Object.keys(msg.value).length, msgValueLength, `Message should value have ${msgValueLength} keys`);
+        k.is(Object.keys(msg.value).length, msgValueLength, `Message value should have ${msgValueLength} keys`);
 
         if (msgValueLength > 2) {
             k.is(msg.value.pub, wallet.publicKey, 'Message pub should be the public key of the wallet');
