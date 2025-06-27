@@ -4,7 +4,8 @@ import { OperationType } from './constants.js';
 import fileUtils from './fileUtils.js';
 import b4a from 'b4a';
 import Wallet from 'trac-wallet';
-//todo: DELETE
+
+// TODO: Legacy class kept for backward compatibility – to be deleted after full protobuf migration.
 class MsgUtils {
 
     static createMessage(...args) {
