@@ -4,7 +4,7 @@ import Check from '../../src/utils/check.js'
 
 const check = new Check()
 
-test('sanitizeExtendedKeyOpSchema – happy paths for all operation types', t => {
+test('sanitizeExtendedKeyOpSchema - happy paths for all operation types', t => {
     const validInputs = [
         checkFixtures.validAddAdmin,
         checkFixtures.validAddWriter,

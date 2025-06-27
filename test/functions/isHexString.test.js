@@ -1,5 +1,5 @@
 import test from 'brittle';
-import { isHexString } from '../../src/utils/functions.js';
+import { isHexString } from '../../src/utils/helpers.js';
 
 test('isHexString', (t) => {
     t.ok(isHexString('1234567890abcdef'), 'Valid hex string should return true with all lowercase characters');

@@ -2,7 +2,7 @@ import test from 'brittle';
 import MessageOperations from '../../src/utils/messages/MessageOperations.js';
 import { OperationType } from '../../src/utils/protobuf/applyOperations.cjs';
 import { default as fixtures } from '../fixtures/assembleMessage2.fixtures.js';
-import { safeDecodeAppyOperation } from '../../src/utils/functions.js';
+import { safeDecodeApplyOperation } from '../../src/utils/protobuf/operationHelpers.js';
 import b4a from 'b4a';
 
 test('assembleWhitelistMessages', async (t) => {
@@ -17,7 +17,7 @@ test('assembleWhitelistMessages', async (t) => {
         const msg = await MessageOperations.assembleAppendWhitelistMessages(walletAdmin);
         k.ok(msg, 'Message should be created');
         k.ok(msg.length > 0, 'Message should be an array with at least one element'); // TODO: Assuming whitelist file contains at least one entry. Create mock
-        const decodedMsg = safeDecodeAppyOperation(msg[0]);
+        const decodedMsg = safeDecodeApplyOperation(msg[0]);
         console.log(decodedMsg);
         k.is(Object.keys(decodedMsg).length, 3, 'Message should have 3 keys');
         k.is(Object.keys(decodedMsg.bko).length, 2, 'Message value should have 2 keys');

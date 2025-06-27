@@ -3,7 +3,7 @@ import { tick, initMsbAdmin, initTemporaryDirectory, removeTemporaryDirectory, s
 import { testKeyPair1 } from '../fixtures/apply.fixtures.js';
 import MsgUtils from '../../src/utils/msgUtils.js';
 import { EntryType } from '../../src/utils/constants.js';
-import { sleep } from '../../src/utils/functions.js';
+import { sleep } from '../../src/utils/helpers.js';
 
 let admin, newAdmin;
 let indexer1, indexer2, writer;

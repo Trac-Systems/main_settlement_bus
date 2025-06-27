@@ -8,10 +8,11 @@ import {
     EntryType,
     OperationType,
     MAX_INDEXERS,
-} from './utils/constants.js';
-import { sleep, createHash, generateTx } from './utils/functions.js';
-import MsgUtils from './utils/msgUtils.js';
-import Check from './utils/check.js';
+} from '../../utils/constants.js';
+import { sleep } from '../../utils/helpers.js';
+import { createHash, generateTx } from '../../utils/crypto.js';
+import MsgUtils from '../../utils/msgUtils.js';
+import Check from '../../utils/check.js';
 
 class State extends ReadyResource {
 

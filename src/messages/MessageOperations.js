@@ -1,6 +1,6 @@
 import MessageDirector from './MessageDirector.js';
 import MessageBuilder from './MessageBuilder.js';
-import { safeEncodeAppyOperation } from '../functions.js';
+import { safeEncodeApplyOperation } from '../utils/protobuf/operationHelpers.js';
 import fileUtils from '../fileUtils.js';
 import b4a from 'b4a';
 /*
@@ -14,7 +14,7 @@ class MessageOperations {
             director.builder = builder;
 
             const payload = await director.buildAddAdminMessage(adminEntry, writingKey, bootstrap, wallet.publicKey);
-            const encodedPayload = safeEncodeAppyOperation(payload);
+            const encodedPayload = safeEncodeApplyOperation(payload);
             return encodedPayload;
 
         } catch (error) {
@@ -30,7 +30,7 @@ class MessageOperations {
             director.builder = builder;
 
             const payload = await director.buildAddWriterMessage(writingKey, wallet.publicKey);
-            const encodedPayload = safeEncodeAppyOperation(payload);
+            const encodedPayload = safeEncodeApplyOperation(payload);
             return encodedPayload;
 
         } catch (error) {
@@ -46,7 +46,7 @@ class MessageOperations {
             director.builder = builder;
 
             const payload = await director.buildRemoveWriterMessage(writingKey, wallet.publicKey);
-            const encodedPayload = safeEncodeAppyOperation(payload);
+            const encodedPayload = safeEncodeApplyOperation(payload);
             return encodedPayload;
 
         } catch (error) {
@@ -62,7 +62,7 @@ class MessageOperations {
             director.builder = builder;
 
             const payload = await director.buildAddIndexerMessage(tracPublicKey);
-            const encodedPayload = safeEncodeAppyOperation(payload);
+            const encodedPayload = safeEncodeApplyOperation(payload);
             return encodedPayload;
 
         } catch (error) {
@@ -78,7 +78,7 @@ class MessageOperations {
             director.builder = builder;
 
             const payload = await director.buildRemoveIndexerMessage(tracPublicKey);
-            const encodedPayload = safeEncodeAppyOperation(payload);
+            const encodedPayload = safeEncodeApplyOperation(payload);
             return encodedPayload;
 
         } catch (error) {
@@ -100,7 +100,7 @@ class MessageOperations {
             for (const pubKey of pubKeys) {
                 const payload = await director.buildAppendWhitelistMessage(b4a.from(pubKey, 'hex'));
                 console.log(`payload ${payload}`);
-                const encodedPayload = safeEncodeAppyOperation(payload);
+                const encodedPayload = safeEncodeApplyOperation(payload);
                 messages.push(encodedPayload);
             }
 
@@ -119,7 +119,7 @@ class MessageOperations {
             director.builder = builder;
 
             const payload = await director.buildBanWriterMessage(tracPublicKey);
-            const encodedPayload = safeEncodeAppyOperation(payload);
+            const encodedPayload = safeEncodeApplyOperation(payload);
             return encodedPayload;
 
         } catch (error) {

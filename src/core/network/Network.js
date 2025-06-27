@@ -1,6 +1,10 @@
 import w from 'protomux-wakeup';
 import b4a from 'b4a';
 import Hyperswarm from 'hyperswarm';
+import Wallet from 'trac-wallet';
+import Protomux from 'protomux'
+import c from 'compact-encoding'
+import ReadyResource from 'ready-resource';
 import {
     TRAC_NAMESPACE,
     MAX_PEERS,
@@ -9,13 +13,9 @@ import {
     MAX_CLIENT_CONNECTIONS,
     OperationType,
     EntryType
-} from './utils/constants.js';
-import { sleep } from './utils/functions.js';
-import Check from './utils/check.js';
-import Wallet from 'trac-wallet';
-import Protomux from 'protomux'
-import c from 'compact-encoding'
-import ReadyResource from 'ready-resource';
+} from '../../utils/constants.js';
+import { sleep } from '../../utils/helpers.js';
+import Check from '../../utils/check.js';
 
 const wakeup = new w();
 
