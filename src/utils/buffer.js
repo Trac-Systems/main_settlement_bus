@@ -1,4 +1,5 @@
 import b4a from 'b4a';
+
 const isUInt32 = (n) => { return Number.isInteger(n) && n >= 1 && n <= 0xFFFFFFFF; }
 
 export const safeWriteUInt32BE = (value, offset) => {
