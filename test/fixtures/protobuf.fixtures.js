@@ -87,7 +87,6 @@ const validRemoveWriter = {
   }
 };
 
-
 const invalidPayloads = [
   null,
   undefined,

@@ -109,6 +109,7 @@ class MsgUtils {
         }
     }
 
+
     static async assembleAddWriterMessage(wallet, writingKey) {
         return await this.#assembleMessageBase(wallet, writingKey, OperationType.ADD_WRITER);
     }
