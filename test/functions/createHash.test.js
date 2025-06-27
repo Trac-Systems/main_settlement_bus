@@ -1,5 +1,5 @@
 import test from 'brittle';
-import { createHash } from '../../src/utils/functions.js';
+import { createHash } from '../../src/utils/crypto.js';
 
 test('createHash', async (t) => {
     t.test('sha256', async (k) => {

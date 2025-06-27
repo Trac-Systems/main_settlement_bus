@@ -1,9 +1,11 @@
-import { isHexString, createHash } from './functions.js';
+import { isHexString } from './helpers.js';
+import { createHash } from './crypto.js';
 import { OperationType } from './constants.js';
 import fileUtils from './fileUtils.js';
 import b4a from 'b4a';
 import Wallet from 'trac-wallet';
 
+// TODO: Legacy class kept for backward compatibility – to be deleted after full protobuf migration.
 class MsgUtils {
 
     static createMessage(...args) {

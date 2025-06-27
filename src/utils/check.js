@@ -1,5 +1,5 @@
 import Validator from 'fastest-validator';
-import { isHexString } from './functions.js';
+import { isHexString } from './helpers.js';
 import { OperationType, ADDRESS_CHAR_HEX_LENGTH, WRITER_KEY_CHAR_HEX_LENGTH, NONCE_CHAR_HEX_LENGTH, SIGNATURE_CHAR_HEX_LENGTH, HASH_CHAR_HEX_LENGTH } from './constants.js';
 class Check {
     #_validator;
