@@ -8,7 +8,7 @@ async function runTests() {
   // await import('./check/check.test.js');
   // await import('./functions/functions.test.js');
   // await import('./fileUtils/readPublicKeysFromFile.test.js');
-  //await import('./messageOperations/messageOperations.test.js'); 
+  // await import('./messageOperations/messageOperations.test.js'); 
   // await import('./msgUtils/msgUtils.test.js');
   // await import('./protobuf/protobuf.test.js');
   // await import('./apply/apply.test.js');

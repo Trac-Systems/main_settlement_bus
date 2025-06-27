@@ -127,22 +127,17 @@ export const createMessage = (...args) => {
     const isUInt32 = (n) => { return Number.isInteger(n) && n >= 1 && n <= 0xFFFFFFFF; }
     if (args.length === 0) return b4a.alloc(0);
 
-    try {
-        const buffers = args.map(arg => {
-            if (b4a.isBuffer(arg)) {
-                return arg;
-            } else if (typeof arg === 'number' && isUInt32(arg)) {
-                const buf = safeWriteUInt32BE(arg, 0);
-                return buf;
-            }
-        }).filter(buf => b4a.isBuffer(buf));
+    const buffers = args.map(arg => {
+        if (b4a.isBuffer(arg)) {
+            return arg;
+        } else if (typeof arg === 'number' && isUInt32(arg)) {
+            const buf = safeWriteUInt32BE(arg, 0);
+            return buf;
+        }
+    }).filter(buf => b4a.isBuffer(buf));
 
-        if (buffers.length === 0) return b4a.alloc(0);
-        return b4a.concat(buffers);
-
-    } catch (error) {
-        return b4a.alloc(0);
-    }
+    if (buffers.length === 0) return b4a.alloc(0);
+    return b4a.concat(buffers);
 }
 
 /**
