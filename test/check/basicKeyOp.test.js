@@ -36,7 +36,7 @@ test('sanitizeBasicKeyOp - data type validation TOP LEVEL', t => {
         }
     };
 
-    t.absent(check.sanitizeBasicKeyOp(nestedObjectInsideValue), 'Unexpected nested field inside value should fail');
+    t.absent(check.sanitizeBasicKeyOp(nestedObjectInsideValue), 'Unexpected nested field inside bko should fail');
 
     const nestedObjectInsideValue2 = {
         ...checkFixtures.validAddIndexer,
@@ -81,7 +81,7 @@ test('sanitizeBasicKeyOp - data type validation TOP LEVEL', t => {
             continue;
         }
         const invalidDataTypeForTypeValue = { ...checkFixtures.validAddIndexer, bko: invalidDataType };
-        t.absent(check.sanitizeBasicKeyOp(invalidDataTypeForTypeValue), `Invalid data type for 'value' key ${String(invalidDataType)} (${typeof invalidDataType}) should fail`);
+        t.absent(check.sanitizeBasicKeyOp(invalidDataTypeForTypeValue), `Invalid data type for 'bko' key ${String(invalidDataType)} (${typeof invalidDataType}) should fail`);
     }
 
     const invalidOperationTypeDiffType = { ...checkFixtures.validAddIndexer, type: "string" }
@@ -94,7 +94,7 @@ test('sanitizeBasicKeyOp - data type validation TOP LEVEL', t => {
     }
 });
 
-test('sanitizeBasicKeyOp - data type validation VALUE LEVEL', t => {
+test('sanitizeBasicKeyOp - data type validation VALUE LEVEL (bko)', t => {
 
     // missing bko fields
     for (const field of checkFixtures.basicKeyOpValueFields) {
@@ -103,7 +103,7 @@ test('sanitizeBasicKeyOp - data type validation VALUE LEVEL', t => {
             bko: { ...checkFixtures.validAddIndexer.bko }
         };
         delete missing.bko[field];
-        t.absent(check.sanitizeBasicKeyOp(missing), `Missing value.${field} should fail`);
+        t.absent(check.sanitizeBasicKeyOp(missing), `Missing bko.${field} should fail`);
     }
 
     // Incorrect types for each field in bko
@@ -116,7 +116,7 @@ test('sanitizeBasicKeyOp - data type validation VALUE LEVEL', t => {
                     [field]: invalidType
                 }
             };
-            t.absent(check.sanitizeBasicKeyOp(withInvalidDataType), `Invalid data type for value.${field}: ${String(invalidType)} (${typeof invalidType}) should fail`);
+            t.absent(check.sanitizeBasicKeyOp(withInvalidDataType), `Invalid data type for bko.${field}: ${String(invalidType)} (${typeof invalidType}) should fail`);
         }
     }
 
@@ -129,7 +129,7 @@ test('sanitizeBasicKeyOp - data type validation VALUE LEVEL', t => {
                 [field]: ''
             }
         };
-        t.absent(check.sanitizeBasicKeyOp(emptyStr), `Empty string for value.${field} should fail`);
+        t.absent(check.sanitizeBasicKeyOp(emptyStr), `Empty string for bko.${field} should fail`);
     }
 
     for (const field of checkFixtures.basicKeyOpValueFields) {
@@ -141,7 +141,7 @@ test('sanitizeBasicKeyOp - data type validation VALUE LEVEL', t => {
             }
         };
 
-        t.absent(check.sanitizeBasicKeyOp(nestedObj), `Nested object for value.${field} should fail under strict mode`);
+        t.absent(check.sanitizeBasicKeyOp(nestedObj), `Nested object for bko.${field} should fail under strict mode`);
     }
 
     const extraInValue = {
@@ -162,7 +162,7 @@ test('sanitizeBasicKeyOp - data type validation VALUE LEVEL', t => {
                 [field]: {}
             }
         }
-        t.absent(check.sanitizeBasicKeyOp(emptyObjForField), `Empty object for value.${field} should fail`)
+        t.absent(check.sanitizeBasicKeyOp(emptyObjForField), `Empty object for bko.${field} should fail`)
     }
 
 });
@@ -199,7 +199,7 @@ test('sanitizeBasicKeyOp - buffer length validation - TOP LEVEL', t => {
     t.absent(check.sanitizeBasicKeyOp(inputs.longInput), `'key' too long (length ${tooLong.length}) should fail`);
 });
 
-test('sanitizeBasicKeyOp - hexString length validation - VALUE LEVEL', t => {
+test('sanitizeBasicKeyOp - hexString length validation - VALUE LEVEL (bko)', t => {
 
     for (const [field, expectedLen] of Object.entries(checkFixtures.requiredLengthOfFieldsForBasicKeyOp)) {
         const emptyBuffer = b4a.alloc(0);
@@ -225,11 +225,11 @@ test('sanitizeBasicKeyOp - hexString length validation - VALUE LEVEL', t => {
             oneTooLongInput: buildValueLevel(oneTooLong),
             longInput: buildValueLevel(tooLong),
         };
-        t.absent(check.sanitizeBasicKeyOp(inputs.emptyBufferInput), `value.${field} empty buffer (length ${emptyBuffer.length}) should fail`);
-        t.absent(check.sanitizeBasicKeyOp(inputs.shortInput), `value.${field} too short (length ${tooShort.length}) should fail`);
-        t.absent(check.sanitizeBasicKeyOp(inputs.oneTooShortInput), `value.${field} one too short (length ${oneTooShort.length}) should fail`);
-        t.ok(check.sanitizeBasicKeyOp(inputs.exactInput), `value.${field} exact length (length ${exact.length}) should pass`);
-        t.absent(check.sanitizeBasicKeyOp(inputs.oneTooLongInput), `value.${field} one too long (length ${oneTooLong.length}) should fail`);
-        t.absent(check.sanitizeBasicKeyOp(inputs.longInput), `value.${field} too long (length ${tooLong.length}) should fail`);
+        t.absent(check.sanitizeBasicKeyOp(inputs.emptyBufferInput), `bko.${field} empty buffer (length ${emptyBuffer.length}) should fail`);
+        t.absent(check.sanitizeBasicKeyOp(inputs.shortInput), `bko.${field} too short (length ${tooShort.length}) should fail`);
+        t.absent(check.sanitizeBasicKeyOp(inputs.oneTooShortInput), `bko.${field} one too short (length ${oneTooShort.length}) should fail`);
+        t.ok(check.sanitizeBasicKeyOp(inputs.exactInput), `bko.${field} exact length (length ${exact.length}) should pass`);
+        t.absent(check.sanitizeBasicKeyOp(inputs.oneTooLongInput), `bko.${field} one too long (length ${oneTooLong.length}) should fail`);
+        t.absent(check.sanitizeBasicKeyOp(inputs.longInput), `bko.${field} too long (length ${tooLong.length}) should fail`);
     }
 });

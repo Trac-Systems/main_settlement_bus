@@ -33,7 +33,7 @@ test('sanitizePostTx - data type validation TOP LEVEL', t => {
         }
     };
 
-    t.absent(check.sanitizePostTx(nestedObjectInsideValue), 'Unexpected nested field inside `value` should fail due to strict');
+    t.absent(check.sanitizePostTx(nestedObjectInsideValue), 'Unexpected nested field inside `txo` should fail due to strict');
 
     const nestedObjectInsideValue2 = {
         ...checkFixtures.validPostTx,
@@ -79,7 +79,7 @@ test('sanitizePostTx - data type validation TOP LEVEL', t => {
             continue;
         }
         const invalidTypeForTypeValue = { ...checkFixtures.validPostTx, txo: invalidDataType };
-        t.absent(check.sanitizePostTx(invalidTypeForTypeValue), `Invalid data type for 'value' key ${String(invalidDataType)} (${typeof invalidDataType}) should fail`);
+        t.absent(check.sanitizePostTx(invalidTypeForTypeValue), `Invalid data type for 'txo' key ${String(invalidDataType)} (${typeof invalidDataType}) should fail`);
     }
 
     const invalidOperationTypeDiffType = { ...checkFixtures.validPostTx, type: "string" }
@@ -93,7 +93,7 @@ test('sanitizePostTx - data type validation TOP LEVEL', t => {
 
 });
 
-test('sanitizePostTx - data type validation VALUE LEVEL', t => {
+test('sanitizePostTx - data type validation VALUE LEVEL (txo)', t => {
 
     // missing value fields
     for (const field of checkFixtures.postTxValueFields) {
@@ -102,7 +102,7 @@ test('sanitizePostTx - data type validation VALUE LEVEL', t => {
             txo: { ...checkFixtures.validPostTx.txo }
         };
         delete missing.txo[field];
-        t.absent(check.sanitizePostTx(missing), `Missing value.${field} should fail`);
+        t.absent(check.sanitizePostTx(missing), `Missing txo.${field} should fail`);
     }
 
     // Incorrect types for each field in value
@@ -115,7 +115,7 @@ test('sanitizePostTx - data type validation VALUE LEVEL', t => {
                     [field]: invalidType
                 }
             };
-            t.absent(check.sanitizePostTx(withInvalidDataType), `Invalid data type for value.${field}: ${String(invalidType)} (${typeof invalidType}) should fail`);
+            t.absent(check.sanitizePostTx(withInvalidDataType), `Invalid data type for txo.${field}: ${String(invalidType)} (${typeof invalidType}) should fail`);
         }
     }
 
@@ -128,19 +128,19 @@ test('sanitizePostTx - data type validation VALUE LEVEL', t => {
                 [field]: ''
             }
         };
-        t.absent(check.sanitizePostTx(emptyStr), `Empty string for value.${field} should fail`);
+        t.absent(check.sanitizePostTx(emptyStr), `Empty string for txo.${field} should fail`);
     }
 
     for (const field of checkFixtures.postTxValueFields) {
         const nestedObj = {
             ...checkFixtures.validPostTx,
-            value: {
-                ...checkFixtures.validPostTx.value,
+            txo: {
+                ...checkFixtures.validPostTx.txo,
                 [field]: { foo: 'bar' }
             }
         };
 
-        t.absent(check.sanitizePostTx(nestedObj), `Nested object for value.${field} should fail under strict mode`);
+        t.absent(check.sanitizePostTx(nestedObj), `Nested object for txo.${field} should fail under strict mode`);
     }
 
     const incorrectOpAsString = {
@@ -150,7 +150,7 @@ test('sanitizePostTx - data type validation VALUE LEVEL', t => {
             op: 'test'
         }
     };
-    t.absent(check.sanitizePostTx(incorrectOpAsString), `Invalid enum for value.op ('foo') should fail`);
+    t.absent(check.sanitizePostTx(incorrectOpAsString), `Invalid enum for txo.op ('foo') should fail`);
 
     const extraInValue = {
         ...checkFixtures.validPostTx,
@@ -169,7 +169,7 @@ test('sanitizePostTx - data type validation VALUE LEVEL', t => {
                 [field]: {}
             }
         }
-        t.absent(check.sanitizePostTx(emptyObjForField), `Empty object for value.${field} should fail`)
+        t.absent(check.sanitizePostTx(emptyObjForField), `Empty object for txo.${field} should fail`)
     }
 
 });
@@ -201,7 +201,7 @@ test('sanitizePostTx - Buffer length validation - TOP LEVEL', t => {
     t.absent(check.sanitizePostTx(inputs.longInput), `'key' too long (length ${tooLong.length}) should fail`);
 });
 
-test('sanitizePostTx - Buffer length validation - VALUE LEVEL', t => {
+test('sanitizePostTx - Buffer length validation - VALUE LEVEL (txo)', t => {
 
     for (const [field, expectedLen] of Object.entries(checkFixtures.requiredLengthOfFieldsForPostTx)) {
         const emptyBuffer = b4a.alloc(0);
@@ -210,7 +210,7 @@ test('sanitizePostTx - Buffer length validation - VALUE LEVEL', t => {
         const exact = b4a.alloc(expectedLen, 0x01);
         const oneTooLong = b4a.alloc(expectedLen + 1, 0x01);
         const tooLong = b4a.alloc(expectedLen + 2, 0x01);
-        
+
         const buildValueLevel = (val) => ({
             ...checkFixtures.validPostTx,
             txo: {
@@ -228,12 +228,12 @@ test('sanitizePostTx - Buffer length validation - VALUE LEVEL', t => {
             longInput: buildValueLevel(tooLong),
         };
 
-        t.absent(check.sanitizePostTx(inputs.emptyBufferInput), `value.${field} empty buffer (length ${emptyBuffer.length}) should fail`);
-        t.absent(check.sanitizePostTx(inputs.shortInput), `value.${field} too short (length ${tooShort.length}) should fail`);
-        t.absent(check.sanitizePostTx(inputs.oneTooShortInput), `value.${field} one too short (length ${oneTooShort.length}) should fail`);
-        t.ok(check.sanitizePostTx(inputs.exactInput), `value.${field} exact length (length ${exact.length}) should pass`);
-        t.absent(check.sanitizePostTx(inputs.oneTooLongInput), `value.${field} one too long (length ${oneTooLong.length}) should fail`);
-        t.absent(check.sanitizePostTx(inputs.longInput), `value.${field} too long (length ${tooLong.length}) should fail`);
+        t.absent(check.sanitizePostTx(inputs.emptyBufferInput), `txo.${field} empty buffer (length ${emptyBuffer.length}) should fail`);
+        t.absent(check.sanitizePostTx(inputs.shortInput), `txo.${field} too short (length ${tooShort.length}) should fail`);
+        t.absent(check.sanitizePostTx(inputs.oneTooShortInput), `txo.${field} one too short (length ${oneTooShort.length}) should fail`);
+        t.ok(check.sanitizePostTx(inputs.exactInput), `txo.${field} exact length (length ${exact.length}) should pass`);
+        t.absent(check.sanitizePostTx(inputs.oneTooLongInput), `txo.${field} one too long (length ${oneTooLong.length}) should fail`);
+        t.absent(check.sanitizePostTx(inputs.longInput), `txo.${field} too long (length ${tooLong.length}) should fail`);
     }
 });
 
