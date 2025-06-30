@@ -1,10 +1,12 @@
 import {
-	ADDRESS_CHAR_HEX_LENGTH,
-	WRITER_KEY_CHAR_HEX_LENGTH,
-	NONCE_CHAR_HEX_LENGTH,
-	SIGNATURE_CHAR_HEX_LENGTH,
-	HASH_CHAR_HEX_LENGTH
+	ADDRESS_BYTE_LENGTH,
+	WRITER_BYTE_HEX_LENGTH,
+	NONCE_BYTE_LENGTH,
+	SIGNATURE_BYTE_LENGTH,
+	HASH_BYTE_LENGTH
 } from '../../src/utils/constants.js';
+import { OperationType } from '../../src/utils/constants.js';
+import b4a from 'b4a';
 
 const validPreTx = {
 	op: 'pre-tx',
@@ -76,35 +78,32 @@ const validBanValidator = {
 };
 
 const validAddAdmin = {
-	type: 'addAdmin',
-	key: '9418310c60fe01bd3788bb1f2fa5be8a2ea7eaa638ce712ca2af835f8eaabe2d',
-	value: {
-		pub: '9418310c60fe01bd3788bb1f2fa5be8a2ea7eaa638ce712ca2af835f8eaabe2d',
-		wk: 'cb8ddff835b6837422bfe0a8e50ba3b4dca08d4f35667a75681128e2bf4d8ee8',
-		nonce: '4ba7252577a07316b4b8dad6a7a91b65e9e6c7fce81a3641120febdc7c455600',
-		sig: '2c2fcec55305653421ca3e68097b62615ab8c0ecf2a3eec487e6fe9db2bb662b94b40e6ed39f8e321f88ec550114dd6706aa36b13eda0d3fca06af8234a7980d'
+	type: OperationType.ADD_ADMIN,
+	key: b4a.from('9418310c60fe01bd3788bb1f2fa5be8a2ea7eaa638ce712ca2af835f8eaabe2d', 'hex'),
+	eko: {
+		wk: b4a.from('cb8ddff835b6837422bfe0a8e50ba3b4dca08d4f35667a75681128e2bf4d8ee8', 'hex'),
+		nonce: b4a.from('4ba7252577a07316b4b8dad6a7a91b65e9e6c7fce81a3641120febdc7c455600', 'hex'),
+		sig: b4a.from('2c2fcec55305653421ca3e68097b62615ab8c0ecf2a3eec487e6fe9db2bb662b94b40e6ed39f8e321f88ec550114dd6706aa36b13eda0d3fca06af8234a7980d', 'hex')
 	}
 };
 
 const validAddWriter = {
-	type: 'addWriter',
-	key: '675cf7ed2813155d92335335dbdb19e9cea3278330185dbb4f441a7fa2207479',
-	value: {
-		pub: '675cf7ed2813155d92335335dbdb19e9cea3278330185dbb4f441a7fa2207479',
-		wk: 'b1210f884cd7c7cd2895a7345388d6ede24e21990e69eb34ae7a60a47c30fdfa',
-		nonce: '9387127793640a09af6c11c4e29dc4108fa729230a7c3e587072a09fdf4a555d',
-		sig: '82cc5dff1ec55c3eb3ff448a888286b3c97e17279909882a015f8249e8573c8fa64ec57cf9b525a4fca28cca6c56f09376c891e48192a39d8b9a618c69c1ce0c'
+	type: OperationType.ADD_WRITER,
+	key: b4a.from('675cf7ed2813155d92335335dbdb19e9cea3278330185dbb4f441a7fa2207479', 'hex'),
+	eko: {
+		wk: b4a.from('b1210f884cd7c7cd2895a7345388d6ede24e21990e69eb34ae7a60a47c30fdfa', 'hex'),
+		nonce: b4a.from('9387127793640a09af6c11c4e29dc4108fa729230a7c3e587072a09fdf4a555d', 'hex'),
+		sig: b4a.from('82cc5dff1ec55c3eb3ff448a888286b3c97e17279909882a015f8249e8573c8fa64ec57cf9b525a4fca28cca6c56f09376c891e48192a39d8b9a618c69c1ce0c', 'hex')
 	}
 };
 
 const validRemoveWriter = {
-	type: 'removeWriter',
-	key: '675cf7ed2813155d92335335dbdb19e9cea3278330185dbb4f441a7fa2207479',
-	value: {
-		pub: '675cf7ed2813155d92335335dbdb19e9cea3278330185dbb4f441a7fa2207479',
-		wk: 'b1210f884cd7c7cd2895a7345388d6ede24e21990e69eb34ae7a60a47c30fdfa',
-		nonce: '6c7501bf624767e960bc6a3668a65df3388817f7512d105ef8961b01139509f3',
-		sig: 'cc0e4e9bc5faf3b54521501d5c69a98edaa244e24df4a847b5dcd1b8167316f674d538812dfa3e296a13eebbc5941a1d717856a298c95b9eee533b141d8f4f07'
+	type: OperationType.REMOVE_WRITER,
+	key: b4a.from('675cf7ed2813155d92335335dbdb19e9cea3278330185dbb4f441a7fa2207479', 'hex'),
+	eko: {
+		wk: b4a.from('b1210f884cd7c7cd2895a7345388d6ede24e21990e69eb34ae7a60a47c30fdfa', 'hex'),
+		nonce: b4a.from('6c7501bf624767e960bc6a3668a65df3388817f7512d105ef8961b01139509f3', 'hex'),
+		sig: b4a.from('cc0e4e9bc5faf3b54521501d5c69a98edaa244e24df4a847b5dcd1b8167316f674d538812dfa3e296a13eebbc5941a1d717856a298c95b9eee533b141d8f4f07', 'hex')
 	}
 };
 
@@ -116,7 +115,8 @@ const notAllowedDataTypes = [
 	{},
 	[],
 	() => { },
-	//Symbol('sym'), test will throw but protocol won't accept it TODO: fix in the future
+	"string",
+	//Symbol('sym'), test will throw but protocol won't accept it TODO: cover it somehow in the future if possible
 	BigInt(997),
 	new Date(),
 	NaN,
@@ -127,47 +127,46 @@ const notAllowedDataTypes = [
 const preTxfields = ['op', 'tx', 'is', 'wp', 'i', 'ipk', 'ch', 'in', 'bs', 'mbs'];
 
 const requiredLengthOfFieldsForPreTx = {
-	tx: HASH_CHAR_HEX_LENGTH,
-	is: SIGNATURE_CHAR_HEX_LENGTH,
-	wp: ADDRESS_CHAR_HEX_LENGTH,
-	i: WRITER_KEY_CHAR_HEX_LENGTH,
-	ipk: ADDRESS_CHAR_HEX_LENGTH,
-	ch: HASH_CHAR_HEX_LENGTH,
-	in: NONCE_CHAR_HEX_LENGTH,
-	bs: WRITER_KEY_CHAR_HEX_LENGTH,
-	mbs: WRITER_KEY_CHAR_HEX_LENGTH
+	tx: HASH_BYTE_LENGTH,
+	is: SIGNATURE_BYTE_LENGTH,
+	wp: ADDRESS_BYTE_LENGTH,
+	i: WRITER_BYTE_HEX_LENGTH,
+	ipk: ADDRESS_BYTE_LENGTH,
+	ch: HASH_BYTE_LENGTH,
+	in: NONCE_BYTE_LENGTH,
+	bs: WRITER_BYTE_HEX_LENGTH,
+	mbs: WRITER_BYTE_HEX_LENGTH
 };
 
-const topFields = ['type', 'key', 'value'];
+const topFields = ['type', 'key', 'eko'];
 
 const postTxValueFields = ['op', 'tx', 'is', 'w', 'i', 'ipk', 'ch', 'in', 'bs', 'mbs', 'ws', 'wp', 'wn'];
 
 const requiredLengthOfFieldsForPostTx = {
-	tx: HASH_CHAR_HEX_LENGTH,
-	is: SIGNATURE_CHAR_HEX_LENGTH,
-	w: WRITER_KEY_CHAR_HEX_LENGTH,
-	i: WRITER_KEY_CHAR_HEX_LENGTH,
-	ipk: ADDRESS_CHAR_HEX_LENGTH,
-	ch: HASH_CHAR_HEX_LENGTH,
-	in: NONCE_CHAR_HEX_LENGTH,
-	bs: WRITER_KEY_CHAR_HEX_LENGTH,
-	mbs: WRITER_KEY_CHAR_HEX_LENGTH,
-	ws: SIGNATURE_CHAR_HEX_LENGTH,
-	wp: ADDRESS_CHAR_HEX_LENGTH,
-	wn: NONCE_CHAR_HEX_LENGTH
+	tx: HASH_BYTE_LENGTH,
+	is: SIGNATURE_BYTE_LENGTH,
+	w: WRITER_BYTE_HEX_LENGTH,
+	i: WRITER_BYTE_HEX_LENGTH,
+	ipk: ADDRESS_BYTE_LENGTH,
+	ch: HASH_BYTE_LENGTH,
+	in: NONCE_BYTE_LENGTH,
+	bs: WRITER_BYTE_HEX_LENGTH,
+	mbs: WRITER_BYTE_HEX_LENGTH,
+	ws: SIGNATURE_BYTE_LENGTH,
+	wp: ADDRESS_BYTE_LENGTH,
+	wn: NONCE_BYTE_LENGTH
 };
 const basicKeyOpValueFields = ['nonce', 'sig'];
 const requiredLengthOfFieldsForBasicKeyOp = {
-	nonce: NONCE_CHAR_HEX_LENGTH,
-	sig: SIGNATURE_CHAR_HEX_LENGTH,
+	nonce: NONCE_BYTE_LENGTH,
+	sig: SIGNATURE_BYTE_LENGTH,
 };
-const extendedKeyOpValueFields = ['pub', 'wk', 'nonce', 'sig'];
+const extendedKeyOpValueFields = ['wk', 'nonce', 'sig'];
 
 const requiredLengthOfFieldsForExtendedValue = {
-	pub: ADDRESS_CHAR_HEX_LENGTH,
-	wk: WRITER_KEY_CHAR_HEX_LENGTH,
-	nonce: NONCE_CHAR_HEX_LENGTH,
-	sig: SIGNATURE_CHAR_HEX_LENGTH,
+	wk: WRITER_BYTE_HEX_LENGTH,
+	nonce: NONCE_BYTE_LENGTH,
+	sig: SIGNATURE_BYTE_LENGTH,
 };
 
 export default {

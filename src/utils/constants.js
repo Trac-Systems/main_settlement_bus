@@ -1,4 +1,4 @@
-import applyOperations from './protobuf/applyOperations.cjs';
+import {OperationType as OP} from './protobuf/applyOperations.cjs';
 export const EntryType = Object.freeze({
     ADMIN: 'admin',
     WHITELIST: 'whitelist',
@@ -6,17 +6,17 @@ export const EntryType = Object.freeze({
 });
 
 export const OperationType = Object.freeze({
-    ADD_ADMIN: 'addAdmin',
-    APPEND_WHITELIST: 'appendWhitelist',
-    ADD_WRITER: 'addWriter',
-    REMOVE_WRITER: 'removeWriter',
-    ADD_INDEXER: 'addIndexer',
-    REMOVE_INDEXER: 'removeIndexer',
-    BAN_VALIDATOR: 'banValidator',
-    WHITELISTED: 'whitelisted',
+    ADD_ADMIN: OP.ADD_ADMIN,
+    APPEND_WHITELIST: OP.APPEND_WHITELIST,
+    ADD_WRITER: OP.ADD_WRITER,
+    REMOVE_WRITER: OP.REMOVE_WRITER,
+    ADD_INDEXER: OP.ADD_INDEXER,
+    REMOVE_INDEXER: OP.REMOVE_INDEXER,
+    BAN_VALIDATOR: OP.BAN_WRITER,
+    WHITELISTED: OP.APPEND_WHITELIST,
     TX: 'tx',
     PRE_TX: 'pre-tx',
-    POST_TX: 'post-tx',
+    POST_TX: OP.POST_TX,
 });
 
 // TODO: Confirm with team whether 'tx' field should be deprecated or retained.
@@ -47,8 +47,8 @@ export const MAX_CLIENT_CONNECTIONS = Infinity;
 export const ACK_INTERVAL = 1_000;
 
 // checkjs
-export const ADDRESS_CHAR_HEX_LENGTH = 64;
-export const WRITER_KEY_CHAR_HEX_LENGTH = 64;
-export const NONCE_CHAR_HEX_LENGTH = 64;
-export const HASH_CHAR_HEX_LENGTH = 64;
-export const SIGNATURE_CHAR_HEX_LENGTH = 128;
+export const ADDRESS_BYTE_LENGTH = 32;
+export const WRITER_BYTE_HEX_LENGTH = 32;
+export const NONCE_BYTE_LENGTH = 32;
+export const HASH_BYTE_LENGTH = 32;
+export const SIGNATURE_BYTE_LENGTH = 64;
