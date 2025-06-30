@@ -96,15 +96,15 @@ class Check {
         const schema = {
             $$strict: true,
             op: { type: 'string', enum: ['pre-tx'], required: true },
-            tx: { type: 'string', length: HASH_BYTE_LENGTH, required: true, hex: true }, // tx hash
-            is: { type: 'string', length: SIGNATURE_BYTE_LENGTH, required: true, hex: true }, // signature
-            wp: { type: 'string', length: ADDRESS_BYTE_LENGTH, required: true, hex: true }, // validator public key
-            i: { type: 'string', length: WRITER_BYTE_LENGTH, required: true, hex: true }, // incoming peer writer key
-            ipk: { type: 'string', length: ADDRESS_BYTE_LENGTH, required: true, hex: true }, // incoming peer public key
-            ch: { type: 'string', length: HASH_BYTE_LENGTH, required: true, hex: true }, // content hash
-            in: { type: 'string', length: NONCE_BYTE_LENGTH, required: true, hex: true }, // nonce
-            bs: { type: 'string', length: WRITER_BYTE_LENGTH, required: true, hex: true }, // peer contract bootstrap
-            mbs: { type: 'string', length: WRITER_BYTE_LENGTH, required: true, hex: true }, // msb bootstrap
+            tx: { type: 'string', length: HASH_BYTE_LENGTH * 2, required: true, hex: true }, // tx hash
+            is: { type: 'string', length: SIGNATURE_BYTE_LENGTH * 2, required: true, hex: true }, // signature
+            wp: { type: 'string', length: ADDRESS_BYTE_LENGTH * 2, required: true, hex: true }, // validator public key
+            i: { type: 'string', length: WRITER_BYTE_LENGTH * 2, required: true, hex: true }, // incoming peer writer key
+            ipk: { type: 'string', length: ADDRESS_BYTE_LENGTH * 2, required: true, hex: true }, // incoming peer public key
+            ch: { type: 'string', length: HASH_BYTE_LENGTH * 2, required: true, hex: true }, // content hash
+            in: { type: 'string', length: NONCE_BYTE_LENGTH * 2, required: true, hex: true }, // nonce
+            bs: { type: 'string', length: WRITER_BYTE_LENGTH * 2, required: true, hex: true }, // peer contract bootstrap
+            mbs: { type: 'string', length: WRITER_BYTE_LENGTH * 2, required: true, hex: true }, // msb bootstrap
         };
         return this.#_validator.compile(schema);
     }
