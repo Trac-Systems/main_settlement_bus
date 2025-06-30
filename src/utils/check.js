@@ -1,5 +1,5 @@
 import Validator from 'fastest-validator';
-import { OperationType, ADDRESS_BYTE_LENGTH, WRITER_BYTE_LENGTH, NONCE_BYTE_LENGTH, SIGNATURE_BYTE_LENGTH, HASH_BYTE_LENGTH, MIN_SAFE_INTEGER, MAX_SAFE_INTEGER } from './constants.js';
+import { OperationType, ADDRESS_BYTE_LENGTH, WRITER_BYTE_LENGTH, NONCE_BYTE_LENGTH, SIGNATURE_BYTE_LENGTH, HASH_BYTE_LENGTH, MIN_SAFE_VALIDATION_INTEGER, MAX_SAFE_VALIDATION_INTEGER } from './constants.js';
 import b4a from 'b4a';
 class Check {
     #_validator;
@@ -52,7 +52,7 @@ class Check {
     #compileExtendedKeyOpSchema() {
         const schema = {
             $$strict: true,
-            type: { type: 'number', enum: [OperationType.ADD_ADMIN, OperationType.ADD_WRITER, OperationType.REMOVE_WRITER], positive: true, integer: true, min: MIN_SAFE_INTEGER, max: MAX_SAFE_INTEGER, required: true },
+            type: { type: 'number', enum: [OperationType.ADD_ADMIN, OperationType.ADD_WRITER, OperationType.REMOVE_WRITER], positive: true, integer: true, min: MIN_SAFE_VALIDATION_INTEGER, max: MAX_SAFE_VALIDATION_INTEGER, required: true },
             key: { type: 'buffer', length: ADDRESS_BYTE_LENGTH, required: true },
             eko: {
                 strict: true,
@@ -74,7 +74,7 @@ class Check {
     #compileBasicKeyOpSchema() {
         const schema = {
             $$strict: true,
-            type: { type: 'number', enum: [OperationType.ADD_INDEXER, OperationType.REMOVE_INDEXER, OperationType.APPEND_WHITELIST, OperationType.BAN_VALIDATOR], positive: true, integer: true, min: MIN_SAFE_INTEGER, max: MAX_SAFE_INTEGER, required: true },
+            type: { type: 'number', enum: [OperationType.ADD_INDEXER, OperationType.REMOVE_INDEXER, OperationType.APPEND_WHITELIST, OperationType.BAN_VALIDATOR], positive: true, integer: true, min: MIN_SAFE_VALIDATION_INTEGER, max: MAX_SAFE_VALIDATION_INTEGER, required: true },
             key: { type: 'buffer', length: ADDRESS_BYTE_LENGTH, required: true },
             bko: {
                 strict: true,
@@ -115,7 +115,7 @@ class Check {
     #compilePostTxSchema() {
         const schema = {
             $$strict: true,
-            type: { type: 'number', enum: [OperationType.POST_TX], positive: true, integer: true, min: MIN_SAFE_INTEGER, max: MAX_SAFE_INTEGER, required: true },
+            type: { type: 'number', enum: [OperationType.POST_TX], positive: true, integer: true, min: MIN_SAFE_VALIDATION_INTEGER, max: MAX_SAFE_VALIDATION_INTEGER, required: true },
             key: { type: 'buffer', length: HASH_BYTE_LENGTH, required: true }, // tx hash
             txo: {
                 strict: true,
