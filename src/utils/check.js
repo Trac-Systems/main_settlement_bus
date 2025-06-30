@@ -17,12 +17,12 @@ class Check {
                 nonZeroBuffer: "The '{field}' field must not be an empty or zero-filled Buffer!",
             },
         });
-        const isBufferReference = b4a.isBuffer;
+        const isBuffer = b4a.isBuffer;
         this.#_validator.add("buffer", function ({ schema, messages }, path, context) {
             return {
                 source:
                     `   
-                    if (!${isBufferReference}(value)) {
+                    if (!${isBuffer}(value)) {
                         ${this.makeError({ type: "buffer", actual: "value", messages })}
                     }
                     if (value.length !== ${schema.length}) {
