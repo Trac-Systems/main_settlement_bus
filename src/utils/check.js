@@ -1,5 +1,5 @@
 import Validator from 'fastest-validator';
-import { OperationType, ADDRESS_BYTE_LENGTH, WRITER_BYTE_LENGTH, NONCE_BYTE_LENGTH, SIGNATURE_BYTE_LENGTH, HASH_BYTE_LENGTH } from './constants.js';
+import { OperationType, ADDRESS_BYTE_LENGTH, WRITER_BYTE_LENGTH, NONCE_BYTE_LENGTH, SIGNATURE_BYTE_LENGTH, HASH_BYTE_LENGTH, MIN_SAFE_INTEGER, MAX_SAFE_INTEGER } from './constants.js';
 import b4a from 'b4a';
 class Check {
     #_validator;
@@ -52,7 +52,7 @@ class Check {
     #compileExtendedKeyOpSchema() {
         const schema = {
             $$strict: true,
-            type: { type: 'number', enum: [OperationType.ADD_ADMIN, OperationType.ADD_WRITER, OperationType.REMOVE_WRITER], positive: true, integer: true, min: 1, max: 4294967295, required: true },
+            type: { type: 'number', enum: [OperationType.ADD_ADMIN, OperationType.ADD_WRITER, OperationType.REMOVE_WRITER], positive: true, integer: true, min: MIN_SAFE_INTEGER, max: MAX_SAFE_INTEGER, required: true },
             key: { type: 'buffer', length: ADDRESS_BYTE_LENGTH, required: true },
             eko: {
                 strict: true,
@@ -74,14 +74,14 @@ class Check {
     #compileBasicKeyOpSchema() {
         const schema = {
             $$strict: true,
-            type: { type: 'number', enum: [OperationType.ADD_INDEXER, OperationType.REMOVE_INDEXER, OperationType.APPEND_WHITELIST, OperationType.BAN_VALIDATOR], positive: true, integer: true, min: 1, max: 4294967295, required: true },
-            key: { type: 'buffer', length: ADDRESS_BYTE_LENGTH, required: true},
+            type: { type: 'number', enum: [OperationType.ADD_INDEXER, OperationType.REMOVE_INDEXER, OperationType.APPEND_WHITELIST, OperationType.BAN_VALIDATOR], positive: true, integer: true, min: MIN_SAFE_INTEGER, max: MAX_SAFE_INTEGER, required: true },
+            key: { type: 'buffer', length: ADDRESS_BYTE_LENGTH, required: true },
             bko: {
                 strict: true,
                 type: 'object',
                 props: {
-                    nonce: { type: 'buffer', length: NONCE_BYTE_LENGTH, required: true,},
-                    sig: { type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true},
+                    nonce: { type: 'buffer', length: NONCE_BYTE_LENGTH, required: true, },
+                    sig: { type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true },
                 }
             }
         }
@@ -115,24 +115,24 @@ class Check {
     #compilePostTxSchema() {
         const schema = {
             $$strict: true,
-            type: { type: 'number', enum: [OperationType.POST_TX], positive: true, integer: true, min: 1, max: 4294967295, required: true},
-            key: { type: 'buffer', length: HASH_BYTE_LENGTH, required: true}, // tx hash
+            type: { type: 'number', enum: [OperationType.POST_TX], positive: true, integer: true, min: MIN_SAFE_INTEGER, max: MAX_SAFE_INTEGER, required: true },
+            key: { type: 'buffer', length: HASH_BYTE_LENGTH, required: true }, // tx hash
             txo: {
                 strict: true,
                 type: "object",
                 props: {
-                    tx: { type: 'buffer', length: HASH_BYTE_LENGTH, required: true}, // tx hash
-                    is: { type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true}, // signature
-                    w: { type: 'buffer', length: WRITER_BYTE_LENGTH, required: true}, // msb writer key
-                    i: { type: 'buffer', length: WRITER_BYTE_LENGTH, required: true}, // incoming peer writer key
-                    ipk: { type: 'buffer', length: ADDRESS_BYTE_LENGTH, required: true}, // incoming peer public key
-                    ch: { type: 'buffer', length: HASH_BYTE_LENGTH, required: true}, // content hash
-                    in: { type: 'buffer', length: NONCE_BYTE_LENGTH, required: true}, // nonce
-                    bs: { type: 'buffer', length: WRITER_BYTE_LENGTH, required: true}, // peer contract bootstrap
-                    mbs: { type: 'buffer', length: WRITER_BYTE_LENGTH, required: true}, // msb bootstrap
-                    ws: { type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true}, // validator/writer signature
-                    wp: { type: 'buffer', length: ADDRESS_BYTE_LENGTH, required: true}, // validator/writer public key
-                    wn: { type: 'buffer', length: NONCE_BYTE_LENGTH, required: true} // validator/writer nonce
+                    tx: { type: 'buffer', length: HASH_BYTE_LENGTH, required: true }, // tx hash
+                    is: { type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true }, // signature
+                    w: { type: 'buffer', length: WRITER_BYTE_LENGTH, required: true }, // msb writer key
+                    i: { type: 'buffer', length: WRITER_BYTE_LENGTH, required: true }, // incoming peer writer key
+                    ipk: { type: 'buffer', length: ADDRESS_BYTE_LENGTH, required: true }, // incoming peer public key
+                    ch: { type: 'buffer', length: HASH_BYTE_LENGTH, required: true }, // content hash
+                    in: { type: 'buffer', length: NONCE_BYTE_LENGTH, required: true }, // nonce
+                    bs: { type: 'buffer', length: WRITER_BYTE_LENGTH, required: true }, // peer contract bootstrap
+                    mbs: { type: 'buffer', length: WRITER_BYTE_LENGTH, required: true }, // msb bootstrap
+                    ws: { type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true }, // validator/writer signature
+                    wp: { type: 'buffer', length: ADDRESS_BYTE_LENGTH, required: true }, // validator/writer public key
+                    wn: { type: 'buffer', length: NONCE_BYTE_LENGTH, required: true } // validator/writer nonce
                 }
             }
         };
