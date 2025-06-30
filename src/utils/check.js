@@ -74,18 +74,15 @@ class Check {
     #compileBasicKeyOpSchema() {
         const schema = {
             $$strict: true,
-            type: { type: 'string', enum: [OperationType.ADD_INDEXER, OperationType.REMOVE_INDEXER, OperationType.APPEND_WHITELIST, OperationType.BAN_VALIDATOR], required: true },
-            key: { type: "string", length: ADDRESS_BYTE_LENGTH, required: true, hex: true },
-
-            value: {
+            type: { type: 'number', enum: [OperationType.ADD_INDEXER, OperationType.REMOVE_INDEXER, OperationType.APPEND_WHITELIST, OperationType.BAN_VALIDATOR], positive: true, integer: true, min: 1, max: 4294967295, required: true },
+            key: { type: 'buffer', length: ADDRESS_BYTE_LENGTH, required: true},
+            bko: {
                 strict: true,
                 type: 'object',
                 props: {
-                    nonce: { type: 'string', length: NONCE_BYTE_LENGTH, required: true, hex: true },
-                    sig: { type: 'string', length: SIGNATURE_BYTE_LENGTH, required: true, hex: true },
-
+                    nonce: { type: 'buffer', length: NONCE_BYTE_LENGTH, required: true,},
+                    sig: { type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true},
                 }
-
             }
         }
         return this.#_validator.compile(schema);

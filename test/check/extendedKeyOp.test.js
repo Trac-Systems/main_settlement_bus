@@ -85,7 +85,7 @@ test('sanitizeExtendedKeyOpSchema - data type validation TOP LEVEL', t => {
     const invalidOperationTypeDiffType = { ...checkFixtures.validAddWriter, type: 'string' }
     t.absent(check.sanitizeExtendedKeyOpSchema(invalidOperationTypeDiffType), 'Incorrect data type for `type` should fail')
 
-    for (const mainField of checkFixtures.topFields) {
+    for (const mainField of checkFixtures.topFieldsEko) {
         const missingFieldInvalidInput = { ...checkFixtures.validAddWriter }
         delete missingFieldInvalidInput[mainField]
         t.absent(check.sanitizeExtendedKeyOpSchema(missingFieldInvalidInput), `Missing ${mainField} should fail`);
@@ -166,7 +166,6 @@ test('sanitizeExtendedKeyOpSchema - data type validation VALUE LEVEL', t => {
 
 test('sanitizeExtendedKeyOpSchema - buffer length validation - TOP LEVEL', t => {
     const expectedLen = 32;
-
 
     const emptyBuffer = b4a.alloc(0);
     const oneTooShort = b4a.alloc(expectedLen - 1, 0x01);

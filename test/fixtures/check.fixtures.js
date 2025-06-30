@@ -41,40 +41,40 @@ const validPostTx = {
 	}
 };
 
-const validAddIndexer = {
-	type: 'addIndexer',
-	key: '6f0e38b8de086e65c1de22418d8ca54ad00aafe072159e2b05a9305f2611db80',
-	value: {
-		nonce: '59b638b60a07d8ae06aa3e2879bbf5ec7d09cfe566fabc6e866bf853f3458d15',
-		sig: '8fb6f2b1a6f0b6aef7c897b7525c2dbd25b41135aa1493f3a517befc932302a2074d19232192d34cca51c380f5ff0b1c5b23464c915e6dce547326db9795610e'
-	}
+export const validAddIndexer = {
+  type: OperationType.ADD_INDEXER,
+  key: b4a.from('6f0e38b8de086e65c1de22418d8ca54ad00aafe072159e2b05a9305f2611db80', 'hex'),
+  bko: {
+    nonce: b4a.from('59b638b60a07d8ae06aa3e2879bbf5ec7d09cfe566fabc6e866bf853f3458d15', 'hex'),
+    sig:   b4a.from('8fb6f2b1a6f0b6aef7c897b7525c2dbd25b41135aa1493f3a517befc932302a2074d19232192d34cca51c380f5ff0b1c5b23464c915e6dce547326db9795610e', 'hex'),
+  }
 };
 
-const validRemoveIndexr = {
-	type: 'removeIndexer',
-	key: '6f0e38b8de086e65c1de22418d8ca54ad00aafe072159e2b05a9305f2611db80',
-	value: {
-		nonce: 'ee4bf87667a39a058beadd3a34d5f58f9fa9f2dfef378023a53856bd72bb0225',
-		sig: '36fa96d940ea6ac15a8e26af40c160a9fe66cb810fd9837b76b7edac9f0a86d5c928d11f765a0a610b1fe7edcfa965a7f16da3bc2efb63896b7b0810a7dd0e00'
-	}
+export const validRemoveIndexer = {
+  type: OperationType.REMOVE_INDEXER,
+  key: b4a.from('6f0e38b8de086e65c1de22418d8ca54ad00aafe072159e2b05a9305f2611db80', 'hex'),
+  bko: {
+    nonce: b4a.from('ee4bf87667a39a058beadd3a34d5f58f9fa9f2dfef378023a53856bd72bb0225', 'hex'),
+    sig:   b4a.from('36fa96d940ea6ac15a8e26af40c160a9fe66cb810fd9837b76b7edac9f0a86d5c928d11f765a0a610b1fe7edcfa965a7f16da3bc2efb63896b7b0810a7dd0e00', 'hex'),
+  }
 };
 
-const validAppendWhitelist = {
-	type: 'appendWhitelist',
-	key: '8ddd9cdea5dda7792529fd2b84736bae41e735fd0466c2f7871ee36f2ede8cac',
-	value: {
-		nonce: 'aaa649f39261af0b6513a4af4309dc02d6409e01e690dcffb9d2be10986b97ce',
-		sig: 'ea34436732dabf611eb1eeb9f15b86fd6dce502c256063eee0022a0287fbbb635ed6229ea8bc0ec38fd921ceb6bc7bcf843ed824f59f4d51efbe8861d50adc05'
-	}
+export const validAppendWhitelist = {
+  type: OperationType.APPEND_WHITELIST,
+  key: b4a.from('8ddd9cdea5dda7792529fd2b84736bae41e735fd0466c2f7871ee36f2ede8cac', 'hex'),
+  bko: {
+    nonce: b4a.from('aaa649f39261af0b6513a4af4309dc02d6409e01e690dcffb9d2be10986b97ce', 'hex'),
+    sig:   b4a.from('ea34436732dabf611eb1eeb9f15b86fd6dce502c256063eee0022a0287fbbb635ed6229ea8bc0ec38fd921ceb6bc7bcf843ed824f59f4d51efbe8861d50adc05', 'hex'),
+  }
 };
 
-const validBanValidator = {
-	type: 'banValidator',
-	key: '6f0e38b8de086e65c1de22418d8ca54ad00aafe072159e2b05a9305f2611db80',
-	value: {
-		nonce: '7fb5b38fd0ee409045f249ffb11205649c3c65c9e77db6ed658411095d7db1b1',
-		sig: 'b41bf967106134c5b748b41ab8607c0a4eb512a0f5127b12ae2d8304d6ee32b0da4ef1a93b6e602a32327f209b3ddc8ef015329f06e171b885b4b65ee69ee307'
-	}
+export const validBanValidator = {
+  type: OperationType.BAN_VALIDATOR,
+  key: b4a.from('6f0e38b8de086e65c1de22418d8ca54ad00aafe072159e2b05a9305f2611db80', 'hex'),
+  bko: {
+    nonce: b4a.from('7fb5b38fd0ee409045f249ffb11205649c3c65c9e77db6ed658411095d7db1b1', 'hex'),
+    sig:   b4a.from('b41bf967106134c5b748b41ab8607c0a4eb512a0f5127b12ae2d8304d6ee32b0da4ef1a93b6e602a32327f209b3ddc8ef015329f06e171b885b4b65ee69ee307', 'hex'),
+  }
 };
 
 const validAddAdmin = {
@@ -138,7 +138,8 @@ const requiredLengthOfFieldsForPreTx = {
 	mbs: WRITER_BYTE_HEX_LENGTH
 };
 
-const topFields = ['type', 'key', 'eko'];
+const topFieldsEko = ['type', 'key', 'eko'];
+const topFieldsBko = ['type', 'key', 'bko'];
 
 const postTxValueFields = ['op', 'tx', 'is', 'w', 'i', 'ipk', 'ch', 'in', 'bs', 'mbs', 'ws', 'wp', 'wn'];
 
@@ -157,6 +158,7 @@ const requiredLengthOfFieldsForPostTx = {
 	wn: NONCE_BYTE_LENGTH
 };
 const basicKeyOpValueFields = ['nonce', 'sig'];
+
 const requiredLengthOfFieldsForBasicKeyOp = {
 	nonce: NONCE_BYTE_LENGTH,
 	sig: SIGNATURE_BYTE_LENGTH,
@@ -173,7 +175,7 @@ export default {
 	validPreTx,
 	validPostTx,
 	validAddIndexer,
-	validRemoveIndexr,
+	validRemoveIndexer,
 	validAppendWhitelist,
 	validBanValidator,
 	validAddAdmin,
@@ -182,7 +184,8 @@ export default {
 	notAllowedDataTypes,
 	preTxfields,
 	requiredLengthOfFieldsForPreTx,
-	topFields,
+	topFieldsEko,
+	topFieldsBko,
 	postTxValueFields,
 	requiredLengthOfFieldsForPostTx,
 	basicKeyOpValueFields,
