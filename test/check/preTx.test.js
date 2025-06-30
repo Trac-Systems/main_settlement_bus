@@ -6,7 +6,7 @@ const check = new Check();
 
 test('sanitizePreTx - happy-path case', t => {
     const result = check.sanitizePreTx(checkFixtures.validPreTx)
-    t.ok(result, 'Valid data should pass the sanitization')
+    t.ok(result, 'Valid data should pass the validation')
 })
 
 test('sanitizePreTx - data type validation', t => {
