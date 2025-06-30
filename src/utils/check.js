@@ -1,5 +1,5 @@
 import Validator from 'fastest-validator';
-import { OperationType, ADDRESS_BYTE_LENGTH, WRITER_BYTE_HEX_LENGTH, NONCE_BYTE_LENGTH, SIGNATURE_BYTE_LENGTH, HASH_BYTE_LENGTH } from './constants.js';
+import { OperationType, ADDRESS_BYTE_LENGTH, WRITER_BYTE_LENGTH, NONCE_BYTE_LENGTH, SIGNATURE_BYTE_LENGTH, HASH_BYTE_LENGTH } from './constants.js';
 import b4a from 'b4a';
 class Check {
     #_validator;
@@ -58,7 +58,7 @@ class Check {
                 strict: true,
                 type: 'object',
                 props: {
-                    wk: { type: 'buffer', length: WRITER_BYTE_HEX_LENGTH, required: true },
+                    wk: { type: 'buffer', length: WRITER_BYTE_LENGTH, required: true },
                     nonce: { type: 'buffer', length: NONCE_BYTE_LENGTH, required: true },
                     sig: { type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true },
                 }
@@ -91,6 +91,7 @@ class Check {
     sanitizeBasicKeyOp(op) {
         return this.#_sanitizeBasicKeyOp(op) === true;
     }
+
     #compilePreTxSchema() {
         const schema = {
             $$strict: true,
@@ -98,12 +99,12 @@ class Check {
             tx: { type: 'string', length: HASH_BYTE_LENGTH, required: true, hex: true }, // tx hash
             is: { type: 'string', length: SIGNATURE_BYTE_LENGTH, required: true, hex: true }, // signature
             wp: { type: 'string', length: ADDRESS_BYTE_LENGTH, required: true, hex: true }, // validator public key
-            i: { type: 'string', length: WRITER_BYTE_HEX_LENGTH, required: true, hex: true }, // incoming peer writer key
+            i: { type: 'string', length: WRITER_BYTE_LENGTH, required: true, hex: true }, // incoming peer writer key
             ipk: { type: 'string', length: ADDRESS_BYTE_LENGTH, required: true, hex: true }, // incoming peer public key
             ch: { type: 'string', length: HASH_BYTE_LENGTH, required: true, hex: true }, // content hash
             in: { type: 'string', length: NONCE_BYTE_LENGTH, required: true, hex: true }, // nonce
-            bs: { type: 'string', length: WRITER_BYTE_HEX_LENGTH, required: true, hex: true }, // peer contract bootstrap
-            mbs: { type: 'string', length: WRITER_BYTE_HEX_LENGTH, required: true, hex: true }, // msb bootstrap
+            bs: { type: 'string', length: WRITER_BYTE_LENGTH, required: true, hex: true }, // peer contract bootstrap
+            mbs: { type: 'string', length: WRITER_BYTE_LENGTH, required: true, hex: true }, // msb bootstrap
         };
         return this.#_validator.compile(schema);
     }
@@ -114,25 +115,24 @@ class Check {
     #compilePostTxSchema() {
         const schema = {
             $$strict: true,
-            type: { type: 'string', enum: ['tx'], required: true },
-            key: { type: 'string', length: HASH_BYTE_LENGTH, required: true, hex: true }, // tx hash
-            value: {
+            type: { type: 'number', enum: [OperationType.POST_TX], positive: true, integer: true, min: 1, max: 4294967295, required: true},
+            key: { type: 'buffer', length: HASH_BYTE_LENGTH, required: true}, // tx hash
+            txo: {
                 strict: true,
                 type: "object",
                 props: {
-                    op: { type: 'string', enum: ['post-tx'], required: true }, // operation type
-                    tx: { type: 'string', length: HASH_BYTE_LENGTH, required: true, hex: true }, // tx hash
-                    is: { type: 'string', length: SIGNATURE_BYTE_LENGTH, required: true, hex: true }, // signature
-                    w: { type: 'string', length: WRITER_BYTE_HEX_LENGTH, required: true, hex: true }, // msb writer key
-                    i: { type: 'string', length: WRITER_BYTE_HEX_LENGTH, required: true, hex: true }, // incoming peer writer key
-                    ipk: { type: 'string', length: ADDRESS_BYTE_LENGTH, required: true, hex: true }, // incoming peer public key
-                    ch: { type: 'string', length: HASH_BYTE_LENGTH, required: true, hex: true }, // content hash
-                    in: { type: 'string', length: NONCE_BYTE_LENGTH, required: true, hex: true }, // nonce
-                    bs: { type: 'string', length: WRITER_BYTE_HEX_LENGTH, required: true, hex: true }, // peer contract bootstrap
-                    mbs: { type: 'string', length: WRITER_BYTE_HEX_LENGTH, required: true, hex: true }, // msb bootstrap
-                    ws: { type: 'string', length: SIGNATURE_BYTE_LENGTH, required: true, hex: true }, // validator/writer signature
-                    wp: { type: 'string', length: ADDRESS_BYTE_LENGTH, required: true, hex: true }, // validator/writer public key
-                    wn: { type: 'string', length: NONCE_BYTE_LENGTH, required: true, hex: true } // validator/writer nonce
+                    tx: { type: 'buffer', length: HASH_BYTE_LENGTH, required: true}, // tx hash
+                    is: { type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true}, // signature
+                    w: { type: 'buffer', length: WRITER_BYTE_LENGTH, required: true}, // msb writer key
+                    i: { type: 'buffer', length: WRITER_BYTE_LENGTH, required: true}, // incoming peer writer key
+                    ipk: { type: 'buffer', length: ADDRESS_BYTE_LENGTH, required: true}, // incoming peer public key
+                    ch: { type: 'buffer', length: HASH_BYTE_LENGTH, required: true}, // content hash
+                    in: { type: 'buffer', length: NONCE_BYTE_LENGTH, required: true}, // nonce
+                    bs: { type: 'buffer', length: WRITER_BYTE_LENGTH, required: true}, // peer contract bootstrap
+                    mbs: { type: 'buffer', length: WRITER_BYTE_LENGTH, required: true}, // msb bootstrap
+                    ws: { type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true}, // validator/writer signature
+                    wp: { type: 'buffer', length: ADDRESS_BYTE_LENGTH, required: true}, // validator/writer public key
+                    wn: { type: 'buffer', length: NONCE_BYTE_LENGTH, required: true} // validator/writer nonce
                 }
             }
         };

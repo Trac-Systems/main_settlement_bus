@@ -1,6 +1,6 @@
 import {
 	ADDRESS_BYTE_LENGTH,
-	WRITER_BYTE_HEX_LENGTH,
+	WRITER_BYTE_LENGTH,
 	NONCE_BYTE_LENGTH,
 	SIGNATURE_BYTE_LENGTH,
 	HASH_BYTE_LENGTH
@@ -21,24 +21,23 @@ const validPreTx = {
 	mbs: '70bddc71374515d60a7fbe5abd47227658c4274b2832741404e78601d1d19b6e'
 };
 
-const validPostTx = {
-	type: 'tx',
-	key: '2f0f434b77ac0c85c1c3511ac01e24136d9e5e2425cceca14ef9199f73af5d07',
-	value: {
-		op: 'post-tx',
-		tx: '2f0f434b77ac0c85c1c3511ac01e24136d9e5e2425cceca14ef9199f73af5d07',
-		is: '4dbe14b0ef8cc08a9b513d40f541b3d56194debd03b09e5e571565b0c4196cc6f2b5feb5f763b8599c66bb41e0776bfdd5992657d6547afefecf044899d0b607',
-		w: 'd9edc49157caa7b0d7508591b1dfba84c3e1a7c1039bf66238f9014c3dd00636',
-		i: '3ad0a49ecc5996d72a3ea9a1a57c4fed5bf71ecd0f965ec6225e4deed4fd4d95',
-		ipk: '332a5394d68e282f084d6c627febb40d1a5217c8f499a95510f2ba942bc52572',
-		ch: '7ceba2e9e4caa40e93b718d689ac543efb095b4d596d36d0abb13bb29c789f94',
-		in: '86e08c2a24854e3407b6a85912c088f97556cb0e381afa7912176ad7a2e8346b',
-		bs: 'df2d5eab173b93fb585ce69463dee7288969869e9a025474aa638f42fab200c5',
-		mbs: '70bddc71374515d60a7fbe5abd47227658c4274b2832741404e78601d1d19b6e',
-		ws: 'a24be863c6498e8b4473f6bb8e702a6d2dcbaaa0c789ba485b3fac0064888fbc7bbaf966e760b03e570c9ce606b1d2961413dec9a54b3f5438c1333d3ec69c0b',
-		wp: '3075ff1ab92036d45bf803f1fb0860a73eca2ca1f0c7b3abe4283684b7fcdfd2',
-		wn: '50d27298b975f92b605f6bb80c8c0eeb76d2a81bf494470a2b1ef68ffff6d0bc'
-	}
+export const validPostTx = {
+  type: OperationType.POST_TX,
+  key: b4a.from('2f0f434b77ac0c85c1c3511ac01e24136d9e5e2425cceca14ef9199f73af5d07', 'hex'),
+  txo: {
+    tx:  b4a.from('2f0f434b77ac0c85c1c3511ac01e24136d9e5e2425cceca14ef9199f73af5d07', 'hex'),
+    is:  b4a.from('4dbe14b0ef8cc08a9b513d40f541b3d56194debd03b09e5e571565b0c4196cc6f2b5feb5f763b8599c66bb41e0776bfdd5992657d6547afefecf044899d0b607', 'hex'),
+    w:   b4a.from('d9edc49157caa7b0d7508591b1dfba84c3e1a7c1039bf66238f9014c3dd00636', 'hex'),
+    i:   b4a.from('3ad0a49ecc5996d72a3ea9a1a57c4fed5bf71ecd0f965ec6225e4deed4fd4d95', 'hex'),
+    ipk: b4a.from('332a5394d68e282f084d6c627febb40d1a5217c8f499a95510f2ba942bc52572', 'hex'),
+    ch:  b4a.from('7ceba2e9e4caa40e93b718d689ac543efb095b4d596d36d0abb13bb29c789f94', 'hex'),
+    in:  b4a.from('86e08c2a24854e3407b6a85912c088f97556cb0e381afa7912176ad7a2e8346b', 'hex'),
+    bs:  b4a.from('df2d5eab173b93fb585ce69463dee7288969869e9a025474aa638f42fab200c5', 'hex'),
+    mbs: b4a.from('70bddc71374515d60a7fbe5abd47227658c4274b2832741404e78601d1d19b6e', 'hex'),
+    ws:  b4a.from('a24be863c6498e8b4473f6bb8e702a6d2dcbaaa0c789ba485b3fac0064888fbc7bbaf966e760b03e570c9ce606b1d2961413dec9a54b3f5438c1333d3ec69c0b', 'hex'),
+    wp:  b4a.from('3075ff1ab92036d45bf803f1fb0860a73eca2ca1f0c7b3abe4283684b7fcdfd2', 'hex'),
+    wn:  b4a.from('50d27298b975f92b605f6bb80c8c0eeb76d2a81bf494470a2b1ef68ffff6d0bc', 'hex'),
+  }
 };
 
 export const validAddIndexer = {
@@ -130,29 +129,30 @@ const requiredLengthOfFieldsForPreTx = {
 	tx: HASH_BYTE_LENGTH,
 	is: SIGNATURE_BYTE_LENGTH,
 	wp: ADDRESS_BYTE_LENGTH,
-	i: WRITER_BYTE_HEX_LENGTH,
+	i: WRITER_BYTE_LENGTH,
 	ipk: ADDRESS_BYTE_LENGTH,
 	ch: HASH_BYTE_LENGTH,
 	in: NONCE_BYTE_LENGTH,
-	bs: WRITER_BYTE_HEX_LENGTH,
-	mbs: WRITER_BYTE_HEX_LENGTH
+	bs: WRITER_BYTE_LENGTH,
+	mbs: WRITER_BYTE_LENGTH
 };
 
 const topFieldsEko = ['type', 'key', 'eko'];
 const topFieldsBko = ['type', 'key', 'bko'];
+const topFieldsTx = ['type', 'key', 'txo'];
 
-const postTxValueFields = ['op', 'tx', 'is', 'w', 'i', 'ipk', 'ch', 'in', 'bs', 'mbs', 'ws', 'wp', 'wn'];
+const postTxValueFields = ['tx', 'is', 'w', 'i', 'ipk', 'ch', 'in', 'bs', 'mbs', 'ws', 'wp', 'wn'];
 
 const requiredLengthOfFieldsForPostTx = {
 	tx: HASH_BYTE_LENGTH,
 	is: SIGNATURE_BYTE_LENGTH,
-	w: WRITER_BYTE_HEX_LENGTH,
-	i: WRITER_BYTE_HEX_LENGTH,
+	w: WRITER_BYTE_LENGTH,
+	i: WRITER_BYTE_LENGTH,
 	ipk: ADDRESS_BYTE_LENGTH,
 	ch: HASH_BYTE_LENGTH,
 	in: NONCE_BYTE_LENGTH,
-	bs: WRITER_BYTE_HEX_LENGTH,
-	mbs: WRITER_BYTE_HEX_LENGTH,
+	bs: WRITER_BYTE_LENGTH,
+	mbs: WRITER_BYTE_LENGTH,
 	ws: SIGNATURE_BYTE_LENGTH,
 	wp: ADDRESS_BYTE_LENGTH,
 	wn: NONCE_BYTE_LENGTH
@@ -166,7 +166,7 @@ const requiredLengthOfFieldsForBasicKeyOp = {
 const extendedKeyOpValueFields = ['wk', 'nonce', 'sig'];
 
 const requiredLengthOfFieldsForExtendedValue = {
-	wk: WRITER_BYTE_HEX_LENGTH,
+	wk: WRITER_BYTE_LENGTH,
 	nonce: NONCE_BYTE_LENGTH,
 	sig: SIGNATURE_BYTE_LENGTH,
 };
@@ -186,6 +186,7 @@ export default {
 	requiredLengthOfFieldsForPreTx,
 	topFieldsEko,
 	topFieldsBko,
+	topFieldsTx,
 	postTxValueFields,
 	requiredLengthOfFieldsForPostTx,
 	basicKeyOpValueFields,

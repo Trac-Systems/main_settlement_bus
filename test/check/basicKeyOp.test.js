@@ -13,7 +13,7 @@ test('sanitizeBasicKeyOp – happy paths for all operation types', t => {
     ]
 
     for (const validInput of validInputs) {
-        t.ok(check.sanitizeBasicKeyOp(validInput), `Valid data for ${validInput.type} should pass the sanitization`)
+        t.ok(check.sanitizeBasicKeyOp(validInput), `Valid data for ${validInput.type} should pass the validation`)
     }
 })
 
@@ -186,6 +186,8 @@ test('sanitizeBasicKeyOp - buffer length validation - TOP LEVEL', t => {
         longInput: { ...checkFixtures.validAddIndexer, key: tooLong },
     };
 
+    t.absent(check.sanitizeBasicKeyOp(inputs.emptyBufferInput), `'key' empty buffer (length ${emptyBuffer.length}) should fail`);
+
     t.absent(check.sanitizeBasicKeyOp(inputs.shortInput), `'key' too short (length ${tooShort.length}) should fail`);
 
     t.absent(check.sanitizeBasicKeyOp(inputs.oneTooShortInput), `'key' one too short (length ${oneTooShort.length}) should fail`);
@@ -223,7 +225,7 @@ test('sanitizeBasicKeyOp - hexString length validation - VALUE LEVEL', t => {
             oneTooLongInput: buildValueLevel(oneTooLong),
             longInput: buildValueLevel(tooLong),
         };
-
+        t.absent(check.sanitizeBasicKeyOp(inputs.emptyBufferInput), `value.${field} empty buffer (length ${emptyBuffer.length}) should fail`);
         t.absent(check.sanitizeBasicKeyOp(inputs.shortInput), `value.${field} too short (length ${tooShort.length}) should fail`);
         t.absent(check.sanitizeBasicKeyOp(inputs.oneTooShortInput), `value.${field} one too short (length ${oneTooShort.length}) should fail`);
         t.ok(check.sanitizeBasicKeyOp(inputs.exactInput), `value.${field} exact length (length ${exact.length}) should pass`);

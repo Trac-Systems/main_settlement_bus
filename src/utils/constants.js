@@ -48,7 +48,7 @@ export const ACK_INTERVAL = 1_000;
 
 // checkjs
 export const ADDRESS_BYTE_LENGTH = 32;
-export const WRITER_BYTE_HEX_LENGTH = 32;
+export const WRITER_BYTE_LENGTH = 32;
 export const NONCE_BYTE_LENGTH = 32;
 export const HASH_BYTE_LENGTH = 32;
 export const SIGNATURE_BYTE_LENGTH = 64;
