@@ -50,13 +50,14 @@ class MessageBuilder extends Builder {
             throw new Error('Key parameter must be a 32 length buffer.');
 
         }
-        this.#tracPublicKey = b4a.from([this.#networkPrefix, publicKey]);
+        this.#tracPublicKey = b4a.from([this.#networkPrefix, ...publicKey]);
         this.#payload.key = this.#tracPublicKey;
 
         return this;
     }
 
     withWriterKey(writingKey) {
+        console.log('withWriterKey', writingKey);
         if (!b4a.isBuffer(writingKey) || writingKey.length !== 32) {
             throw new Error('Writer key must be a 32 length buffer.');
         }
@@ -85,7 +86,7 @@ class MessageBuilder extends Builder {
         const writingKey = this.#writingKey;
         const bootstrap = this.#bootstrap;
         const adminEntry = this.#adminEntry;
-
+        
         // writer key is not required for all operations, but it is required for some...
         if (!operationType || !tracPublicKey) {
             throw new Error('Operation type, trac public key must be set before building the message.');
@@ -139,7 +140,7 @@ class MessageBuilder extends Builder {
             default:
                 throw new Error(`Unsupported operation type for building value: ${OperationType[operationType]}.`);
         }
-
+        console.log("msg in buildValueAndSign", msg.toString('hex'));
         hash = await createHash('sha256', msg);
         signature = wallet.sign(hash);
 
