@@ -37,7 +37,7 @@ class State extends ReadyResource {
         this.check = new Check();
         this.#base = new Autobase(this.#store, this.#bootstrap, {
             ackInterval: ACK_INTERVAL,
-            valueEncoding: 'json',
+            valueEncoding: 'binary',
             open: this.#setupHyperbee.bind(this),
             apply: this.#apply.bind(this),
         })
@@ -113,8 +113,8 @@ class State extends ReadyResource {
     #setupHyperbee(store) {
         this.#bee = new Hyperbee(store.get('view'), {
             extension: false,
-            keyEncoding: 'utf-8',
-            valueEncoding: 'json'
+            keyEncoding: 'ascii',
+            valueEncoding: 'binary'
         })
         return this.#bee;
     }
