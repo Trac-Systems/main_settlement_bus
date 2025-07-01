@@ -4,7 +4,7 @@ import { createMessage } from '../utils/buffer.js';
 import { OperationType } from '../utils/protobuf/applyOperations.cjs'
 import b4a from 'b4a';
 import Wallet from 'trac-wallet';
-
+import {TRAC_NETWORK_PREFIX} from '../utils/constants.js';
 
 class MessageBuilder extends Builder {
     #wallet;
@@ -14,13 +14,15 @@ class MessageBuilder extends Builder {
     #bootstrap;
     #adminEntry;
     #payload;
+    #networkPrefix;
 
-    constructor(wallet) {
+    constructor(wallet, networkPrefix = TRAC_NETWORK_PREFIX) {
         super();
         if (!wallet || typeof wallet !== 'object' || !b4a.isBuffer(wallet.publicKey)) {
             throw new Error('MessageBuilder requires a valid Wallet instance with a 32-byte public key Buffer.');
         }
         this.#wallet = wallet;
+        this.#networkPrefix = networkPrefix;
         this.reset();
     }
 
@@ -31,6 +33,7 @@ class MessageBuilder extends Builder {
         this.#bootstrap = null;
         this.#adminEntry = null;
         this.#payload = {}
+        this.#networkPrefix = TRAC_NETWORK_PREFIX;
     }
 
     forOperationType(operationType) {
@@ -47,8 +50,8 @@ class MessageBuilder extends Builder {
             throw new Error('Key parameter must be a 32 length buffer.');
 
         }
-        this.#tracPublicKey = publicKey;
-        this.#payload.key = publicKey;
+        this.#tracPublicKey = b4a.from([this.#networkPrefix, publicKey]);
+        this.#payload.key = this.#tracPublicKey;
 
         return this;
     }
@@ -182,7 +185,6 @@ class MessageBuilder extends Builder {
         const secondCondition = Boolean(adminEntry && b4a.equals(adminEntry.tracPublicKey, tracPublicKey) && writingKey && !b4a.equals(writingKey, adminEntry.wk)); // Admin entry exists and we have to update its writing key in base, so it can recover admin access
         return (firstCondition || secondCondition)
     }
-asdasd
     getPayload() {
         if (!this.#payload.type || !this.#payload.key || (!this.#payload.bko && !this.#payload.eko)) {
             throw new Error('Product is not fully assembled. Missing type, key, or value (bko/eko).');

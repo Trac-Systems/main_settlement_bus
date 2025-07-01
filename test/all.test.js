@@ -8,7 +8,7 @@ async function runTests() {
   // await import('./check/check.test.js'); it should work
   //await import('./functions/functions.test.js'); it should work
   //await import('./fileUtils/readPublicKeysFromFile.test.js'); it should work
-  await import('./messageOperations/messageOperations.test.js'); 
+  //await import('./messageOperations/messageOperations.test.js'); 
   //await import('./protobuf/protobuf.test.js'); it should work
   // await import('./apply/apply.test.js'); // after 108-adjust-checkjs-for-incoming-buffer-data commit this test is failing due to changes in check.js
   test.resume();

@@ -1,4 +1,7 @@
 import {OperationType as OP} from './protobuf/applyOperations.cjs';
+
+export const TRAC_NETWORK_PREFIX = 0x01; // 1 byte prefix for TRAC network
+
 export const EntryType = Object.freeze({
     ADMIN: 'admin',
     WHITELIST: 'whitelist',
@@ -47,7 +50,7 @@ export const MAX_CLIENT_CONNECTIONS = Infinity;
 export const ACK_INTERVAL = 1_000;
 
 // checkjs
-export const ADDRESS_BYTE_LENGTH = 32;
+export const ADDRESS_BYTE_LENGTH = 33;
 export const WRITER_BYTE_LENGTH = 32;
 export const NONCE_BYTE_LENGTH = 32;
 export const HASH_BYTE_LENGTH = 32;

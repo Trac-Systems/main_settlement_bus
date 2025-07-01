@@ -9,6 +9,7 @@ import PeerWallet from "trac-wallet"
 import tty from 'tty';
 import Corestore from 'corestore';
 import MsgUtils from './utils/msgUtils.js';
+import MsgUtils2 from "./messages/MessageOperations.js"
 import {
     LISTENER_TIMEOUT,
     EntryType,
@@ -53,7 +54,7 @@ export class MainSettlementBus extends ReadyResource {
     #initInternalAttributes(options) {
         this.#STORES_DIRECTORY = options.stores_directory;
         this.#KEY_PAIR_PATH = `${this.#STORES_DIRECTORY}${options.store_name}/db/keypair.json`
-        this.#bootstrap = options.bootstrap || null;
+        this.#bootstrap = this.#bootstrap = options.bootstrap ? b4a.from(options.bootstrap, 'hex') : null;;
         this.#channel = b4a.alloc(32).fill(options.channel) || null;
         this.#store = new Corestore(this.#STORES_DIRECTORY + options.store_name);
         this.#enable_wallet = options.enable_wallet !== false;
@@ -286,13 +287,12 @@ export class MainSettlementBus extends ReadyResource {
     async #handleAdminOperations() {
         try {
             const adminEntry = await this.#state.get(EntryType.ADMIN);
-            console.log('Admin entry:1');
-            const addAdminMessage = await MsgUtils.assembleAdminMessage(adminEntry, this.#state.writingKey, this.#wallet, this.#bootstrap);
-            
+            const addAdminMessage = await MsgUtils2.assembleAddAdminMessage(adminEntry, this.#state.writingKey, this.#wallet, this.#bootstrap);
+
             if (!adminEntry && this.#wallet && this.#state.writingKey && this.#state.writingKey === this.#bootstrap) {
+                console.log(addAdminMessage);
                 await this.#state.append(addAdminMessage);
             } else if (adminEntry && this.#wallet && adminEntry.tracPublicKey === this.#wallet.publicKey && this.#state.writingKey && this.#state.writingKey !== adminEntry.wk) {
-
                 if (null === this.#network.validator_stream) return;
                 await this.#network.validator_stream.messenger.send(addAdminMessage);
             }
