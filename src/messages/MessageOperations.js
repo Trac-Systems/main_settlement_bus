@@ -1,7 +1,7 @@
 import MessageDirector from './MessageDirector.js';
 import MessageBuilder from './MessageBuilder.js';
 import { safeEncodeApplyOperation } from '../utils/protobuf/operationHelpers.js';
-import fileUtils from '../fileUtils.js';
+import fileUtils from '../../src/utils/fileUtils.js';
 import b4a from 'b4a';
 /*
     This module won't work properly as long as createHash returns string. 

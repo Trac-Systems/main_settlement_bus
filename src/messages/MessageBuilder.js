@@ -1,7 +1,7 @@
 import Builder from './Builder.js';
 import { createHash } from '../utils/crypto.js';
 import { createMessage } from '../utils/buffer.js';
-import { OperationType } from '../protobuf/applyOperations.cjs'
+import { OperationType } from '../utils/protobuf/applyOperations.cjs'
 import b4a from 'b4a';
 import Wallet from 'trac-wallet';
 
