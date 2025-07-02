@@ -57,7 +57,6 @@ class MessageBuilder extends Builder {
     }
 
     withWriterKey(writingKey) {
-        console.log('withWriterKey', writingKey);
         if (!b4a.isBuffer(writingKey) || writingKey.length !== 32) {
             throw new Error('Writer key must be a 32 length buffer.');
         }
@@ -140,7 +139,7 @@ class MessageBuilder extends Builder {
             default:
                 throw new Error(`Unsupported operation type for building value: ${OperationType[operationType]}.`);
         }
-        console.log("msg in buildValueAndSign", msg.toString('hex'));
+
         hash = await createHash('sha256', msg);
         signature = wallet.sign(hash);
 
