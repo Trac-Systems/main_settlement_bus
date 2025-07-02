@@ -36,11 +36,16 @@ export function encodeAdminEntry(tracAddr, wKey) {
         return b4a.alloc(0);
     }
 
-    const adminEntry = b4a.alloc(1 + tracAddr.length + wKey.length);
-    adminEntry[0] = tracAddr.length;
-    b4a.copy(tracAddr, adminEntry, 1);
-    b4a.copy(wKey, adminEntry, 1 + tracAddr.length);
-    return adminEntry;
+    try {
+        const adminEntry = b4a.alloc(1 + tracAddr.length + wKey.length);
+        adminEntry[0] = tracAddr.length;
+        b4a.copy(tracAddr, adminEntry, 1);
+        b4a.copy(wKey, adminEntry, 1 + tracAddr.length);
+        return adminEntry;
+    } catch (error) {
+        console.error('Error encoding admin entry:', error);
+        return b4a.alloc(0);
+    }
 }
 
 /**
@@ -59,10 +64,17 @@ export function decodeAdminEntry(adminEntry) {
     if (!isBufferValid(adminEntry, ADMIN_ENTRY_SIZE)) {
         return null;
     }
-    const tracAddrLen = adminEntry[0];
-    const tracAddr = adminEntry.subarray(1, 1 + tracAddrLen);
-    const wKey = adminEntry.subarray(1 + tracAddrLen);
-    return { tracAddr, wKey };
+
+    try {
+        const tracAddrLen = adminEntry[0];
+        const tracAddr = adminEntry.subarray(1, 1 + tracAddrLen);
+        const wKey = adminEntry.subarray(1 + tracAddrLen);
+        return { tracAddr, wKey };
+    }
+    catch (error) {
+        console.error('Error decoding admin entry:', error);
+        return null;
+    }
 }
 
 
@@ -88,10 +100,16 @@ export function encodeNodeEntry(wKey, isWriter, isIndexer) {
         return b4a.alloc(0); // Return an empty buffer if keys are invalid
     }
 
+    try {
     const entry = b4a.alloc(1 + wKey.length);
     entry[0] = (isWriter ? WRITER_MASK : 0x0) | (isIndexer ? INDEXER_MASK : 0x0);
     b4a.copy(wKey, entry, 1);
     return entry;
+    }
+    catch (error) {
+        console.error('Error encoding node entry:', error);
+        return b4a.alloc(0); // Return an empty buffer on error
+    }
 }
 
 /**
@@ -109,10 +127,16 @@ export function decodeNodeEntry(nodeEntry) {
     if (!isBufferValid(nodeEntry, NODE_ENTRY_SIZE)) {
         return null;
     }
-    const isWriter = Boolean(nodeEntry[0] & WRITER_MASK);
-    const isIndexer = Boolean(nodeEntry[0] & INDEXER_MASK);
-    const wk = nodeEntry.subarray(1);
-    return { wk, isWriter, isIndexer };
+    try {
+        const isWriter = Boolean(nodeEntry[0] & WRITER_MASK);
+        const isIndexer = Boolean(nodeEntry[0] & INDEXER_MASK);
+        const wk = nodeEntry.subarray(1);
+        return { wk, isWriter, isIndexer };
+    }
+    catch (error) {
+        console.error('Error decoding node entry:', error);
+        return null; // Return null on error
+    }
 }
 
 /**
@@ -130,14 +154,4 @@ export function setNodeEntryRole(nodeEntry, isWriter, isIndexer) {
         nodeEntry[0] = (isWriter ? WRITER_MASK : 0x0) | (isIndexer ? INDEXER_MASK : 0x0);
     }
     return nodeEntry;
-}
-
-// ------------ TRANSACTIONS ------------ //
-export function encodeTransaction(tx) {
-    // TODO
-    // [OP(1)][TX_HASH(??)][IS(??)][W(32)][I(??)][IPK(??)][CH(??)][IN(??)][BS(32)][MBS(32)][WS(??)][WP(??)][WN(32)]
-}
-
-export function decodeTransaction(encTx) {
-    // TODO
 }

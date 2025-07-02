@@ -5,7 +5,7 @@ import { default as test } from 'brittle';
 async function runTests() {
   test.pause();
 
-  // await import('./encodings/encodings.test.js'); // it should work
+  // await import('./encodings/ApplyOperationEncodings.test.js'); // it should work
   // await import('./check/check.test.js'); it should work
   //await import('./functions/functions.test.js'); it should work
   //await import('./fileUtils/readPublicKeysFromFile.test.js'); it should work

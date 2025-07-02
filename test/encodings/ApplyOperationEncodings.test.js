@@ -6,12 +6,11 @@ import {
     encodeNodeEntry,
     decodeNodeEntry,
     setNodeEntryRole
-} from '../../src/core/state/encodings.js';
+} from '../../src/core/state/ApplyOperationEncodings.js';
 
 const WRITING_KEY_SIZE = 32;
 const TRAC_PUB_KEY_SIZE = 32;
 const TRAC_ADDRESS_SIZE = 1 + TRAC_PUB_KEY_SIZE;
-const ADMIN_ENTRY_SIZE = TRAC_ADDRESS_SIZE + WRITING_KEY_SIZE;
 const NODE_ENTRY_SIZE = WRITING_KEY_SIZE + 1;
 
 function randomBuffer(size) {
@@ -21,7 +20,7 @@ function randomBuffer(size) {
 test('Encode and Decode Admin Entry - Happy Path', t => {
     const tracAddr = randomBuffer(TRAC_ADDRESS_SIZE);
     const wKey = randomBuffer(WRITING_KEY_SIZE);
-    
+
     const encoded = encodeAdminEntry(tracAddr, wKey);
     t.is(encoded.length, 1 + tracAddr.length + wKey.length, "encoding has valid length");
 
