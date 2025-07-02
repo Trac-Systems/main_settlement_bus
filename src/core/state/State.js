@@ -262,6 +262,8 @@ class State extends ReadyResource {
     }
 
     async #handleApplyAppendWhitelistOperation(op, view, base, node, batch) {
+
+        // TODO - somehow we need to figure out how to store whitelisted entries. Maybe we should move it to nodeEntry???
         const adminEntry = await batch.get(EntryType.ADMIN);
         if (null === adminEntry || !this.check.sanitizeBasicKeyOp(op) || !this.#isAdminApply(adminEntry.value, node)) return;
 
