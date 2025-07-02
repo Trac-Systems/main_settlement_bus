@@ -202,7 +202,14 @@ export function appendIndexer(indexerAddr, indexersEntry = null) {
  * @param {Buffer} indexerAddr - The indexer address to search for (must be TRAC_ADDRESS_SIZE bytes).
  * @returns {number} The index of the address if found, or -1 if not found.
  */
-function getIndexerIndex(indexersEntry, indexerAddr) {
+export function getIndexerIndex(indexersEntry, indexerAddr) {
+    if (
+        !b4a.isBuffer(indexersEntry) ||
+        !isBufferValid(indexerAddr, TRAC_ADDRESS_SIZE) ||
+        indexersEntry.length < TRAC_ADDRESS_SIZE + 1 // it should ensure minimal length of the indexersEntry
+    ) {
+        return -1;
+    }
     // step through the indexersEntry until we find indexerAddr
     for (let i = 0; i < indexersEntry[0]; i++) {
         if (b4a.equals(indexersEntry.subarray(1 + i * TRAC_ADDRESS_SIZE, 1 + (i + 1) * TRAC_ADDRESS_SIZE), indexerAddr)) {
