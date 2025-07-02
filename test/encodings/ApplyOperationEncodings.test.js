@@ -111,10 +111,10 @@ test('appendIndexer appends to existing entry', t => {
     t.ok(b4a.equals(entry.subarray(1 + TRAC_ADDRESS_SIZE), addr2), 'second address matches');
 });
 
-test('appendIndexer ignores invalid address', t => {
+test('appendIndexer returns empty buffer if address is invalid', t => {
     const addr = b4a.alloc(5); // invalid size
     const entry = appendIndexer(addr, null);
-    t.is(entry, null, 'should return null if address is invalid');
+    t.ok(b4a.equals(entry, b4a.alloc(0)), 'should return empty buffer if address is invalid');
 });
 
 test('removeIndexer removes address from entry', t => {
@@ -128,7 +128,7 @@ test('removeIndexer removes address from entry', t => {
     t.ok(b4a.equals(updated.subarray(1), addr2), 'remaining address should be addr2');
 });
 
-test('removeIndexer does nothing if address not found', t => {
+test('removeIndexer returns empty buffer if address not found', t => {
     const addr1 = randomBuffer(TRAC_ADDRESS_SIZE);
     const addr2 = randomBuffer(TRAC_ADDRESS_SIZE);
     const addr3 = randomBuffer(TRAC_ADDRESS_SIZE);
@@ -136,22 +136,22 @@ test('removeIndexer does nothing if address not found', t => {
     entry = appendIndexer(addr2, entry);
 
     const updated = removeIndexer(addr3, entry);
-    t.ok(b4a.equals(updated, entry), 'entry should be unchanged if address not found');
+    t.ok(b4a.equals(updated, b4a.alloc(0)), 'entry should be empty if address not found');
 });
 
-test('removeIndexer does nothing on invalid entry', t => {
+test('removeIndexer returns empty buffer on invalid entry', t => {
     const addr = randomBuffer(TRAC_ADDRESS_SIZE);
     const invalidEntry = b4a.alloc(5); // too short
     const updated = removeIndexer(addr, invalidEntry);
-    t.ok(b4a.equals(updated, invalidEntry), 'should return original entry if invalid');
+    t.ok(b4a.equals(updated, b4a.alloc(0)), 'should return empty buffer if invalid');
 });
 
-test('removeIndexer does nothing on invalid address', t => {
+test('removeIndexer returns emoty buffer on invalid address', t => {
     const addr1 = randomBuffer(TRAC_ADDRESS_SIZE);
     let entry = appendIndexer(addr1, null);
     const invalidAddr = b4a.alloc(5);
     const updated = removeIndexer(invalidAddr, entry);
-    t.ok(b4a.equals(updated, entry), 'should return original entry if address invalid');
+    t.ok(b4a.equals(updated, b4a.alloc(0)), 'should return empty buffer if address invalid');
 });
 
 test('removeIndexer doesn\'t throw an error when count is bigger than the number of indexers', t => {
@@ -164,5 +164,5 @@ test('removeIndexer doesn\'t throw an error when count is bigger than the number
     // Remove an indexer and set the count to a higher value
     entry[0] = 3;
     const updated = removeIndexer(addr3, entry);
-    t.ok(b4a.equals(updated, entry), 'entry should be unchanged if count is too high');
+    t.ok(b4a.equals(updated, b4a.alloc(0)), 'entry should be unchanged if count is too high');
 });
