@@ -8,12 +8,14 @@ import {
     EntryType,
     OperationType,
     MAX_INDEXERS,
+    TRAC_NETWORK_PREFIX,
 } from '../../utils/constants.js';
 import { sleep } from '../../utils/helpers.js';
 import { createHash, generateTx } from '../../utils/crypto.js';
 import MsgUtils from '../../utils/msgUtils.js';
 import Check from '../../utils/check.js';
-
+import {safeDecodeApplyOperation} from '../../utils/protobuf/operationHelpers.js';
+import {createMessage} from '../../utils/buffer.js';
 class State extends ReadyResource {
 
     #base;
@@ -55,7 +57,7 @@ class State extends ReadyResource {
     async _open() {
         console.log("State initialization...")
         await this.#base.ready();
-        this.#writingKey = b4a.toString(this.#base.local.key, 'hex');
+        this.#writingKey = this.#base.local.key;
     }
 
     async _close() {
@@ -124,7 +126,7 @@ class State extends ReadyResource {
     async #apply(nodes, view, base) {
         const batch = view.batch();
         for (const node of nodes) {
-            const op = node.value;
+            const op = safeDecodeApplyOperation(node.value);
             const handler = this.#getApplyOperationHandler(op.type);
             if (handler) {
                 await handler(op, view, base, node, batch);
@@ -175,9 +177,9 @@ class State extends ReadyResource {
         if (null === adminEntry) {
             await this.#addAdminIfNotSet(op, view, node, batch);
         }
-        else if (adminEntry.value.tracPublicKey === op.key) {
-            await this.#addAdminIfSet(adminEntry.value, op, view, base, batch);
-        }
+        // else if (adminEntry.value.tracPublicKey === op.key) {
+        //     await this.#addAdminIfSet(adminEntry.value, op, view, base, batch);
+        // }
     }
 
     async #addAdminIfSet(adminEntry, op, view, base, batch) {
@@ -202,22 +204,30 @@ class State extends ReadyResource {
     }
 
     async #addAdminIfNotSet(op, view, node, batch) {
-        const message = MsgUtils.createMessage(op.key, op.value.wk, op.value.nonce, op.type)
-        const isMessageVerifed = await this.#verifyMessageApply(op.value.sig, op.key, message);
+        const address = op.key;
+        const networkPrefix = address.slice(0, 1);
+        if (networkPrefix.readUInt8(0) !== TRAC_NETWORK_PREFIX ) return;
+
+        const tracPublicKey = address.slice(1, 33);
+        const message = createMessage(op.key, op.eko.wk, op.eko.nonce, op.type)
+        const isMessageVerifed = await this.#verifyMessageApply(op.eko.sig, tracPublicKey, message);
         const hash = await createHash('sha256', message);
-        if (node.from.key.toString('hex') === this.#bootstrap &&
-            op.value.wk === this.#bootstrap &&
+
+        if (
+            b4a.equals(node.from.key, this.#bootstrap) &&
+            b4a.equals(op.eko.wk, this.#bootstrap) &&
             isMessageVerifed &&
             null === await batch.get(hash)
         ) {
-            await batch.put(EntryType.ADMIN, {
-                tracPublicKey: op.key,
-                wk: this.#bootstrap
-            })
-            const initIndexers = [op.key];
-            await batch.put(EntryType.INDEXERS, initIndexers);
-            await batch.put(hash, op);
-            console.log(`Admin added: ${op.key}:${this.#bootstrap}`);
+            console.log("ok2");
+            // await batch.put(EntryType.ADMIN, {
+            //     tracPublicKey: op.key,
+            //     wk: this.#bootstrap
+            // })
+            // const initIndexers = [op.key];
+            // await batch.put(EntryType.INDEXERS, initIndexers);
+            // await batch.put(hash, op);
+            // console.log(`Admin added: ${op.key}:${this.#bootstrap}`);
         }
     }
 
