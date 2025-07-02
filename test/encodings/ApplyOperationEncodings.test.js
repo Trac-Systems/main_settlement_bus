@@ -21,26 +21,26 @@ function randomBuffer(size) {
 
 test('Encode and Decode Admin Entry - Happy Path', t => {
     const tracAddr = randomBuffer(TRAC_ADDRESS_SIZE);
-    const wKey = randomBuffer(WRITING_KEY_SIZE);
+    const wk = randomBuffer(WRITING_KEY_SIZE);
 
-    const encoded = encodeAdminEntry(tracAddr, wKey);
-    t.is(encoded.length, 1 + tracAddr.length + wKey.length, "encoding has valid length");
+    const encoded = encodeAdminEntry(tracAddr, wk);
+    t.is(encoded.length, 1 + tracAddr.length + wk.length, "encoding has valid length");
 
     const decoded = decodeAdminEntry(encoded);
     t.ok(decoded, 'decoded should not be null');
     t.is(b4a.compare(decoded.tracAddr, tracAddr), 0, 'tracAddr matches');
-    t.is(b4a.compare(decoded.wKey, wKey), 0, 'wKey matches');
+    t.is(b4a.compare(decoded.wk, wk), 0, 'wk matches');
 });
 
 test('encodeAdminEntry returns empty buffer on invalid input', t => {
     const validTracAddr = randomBuffer(TRAC_ADDRESS_SIZE);
     const invalidTracAddr = randomBuffer(10);
 
-    const validWKey = randomBuffer(WRITING_KEY_SIZE);
-    const invalidWKey = randomBuffer(10);
+    const validWk = randomBuffer(WRITING_KEY_SIZE);
+    const invalidWk = randomBuffer(10);
 
-    const encoded1 = encodeAdminEntry(validTracAddr, invalidWKey);
-    const encoded2 = encodeAdminEntry(invalidTracAddr, validWKey);
+    const encoded1 = encodeAdminEntry(validTracAddr, invalidWk);
+    const encoded2 = encodeAdminEntry(invalidTracAddr, validWk);
 
     t.is(encoded1.length, 0);
     t.is(encoded2.length, 0);
@@ -53,23 +53,23 @@ test('decodeAdminEntry returns null on invalid input', t => {
 });
 
 test('Encode and Decode Node Entry - Happy Path', t => {
-    const wKey = randomBuffer(WRITING_KEY_SIZE);
+    const wk = randomBuffer(WRITING_KEY_SIZE);
     const isWriter = true;
     const isIndexer = false;
 
-    const encoded = encodeNodeEntry(wKey, isWriter, isIndexer);
+    const encoded = encodeNodeEntry(wk, isWriter, isIndexer);
     t.is(encoded.length, NODE_ENTRY_SIZE, "encoding has valid length");
 
     const decoded = decodeNodeEntry(encoded);
     t.ok(decoded, 'decoded should not be null');
-    t.is(b4a.compare(decoded.wk, wKey), 0, 'wKey matches');
+    t.is(b4a.compare(decoded.wk, wk), 0, 'wk matches');
     t.is(decoded.isWriter, isWriter, 'isWriter matches');
     t.is(decoded.isIndexer, isIndexer, 'isIndexer matches');
 });
 
 test('encodeNodeEntry returns empty buffer on invalid input', t => {
-    const wKey = randomBuffer(10); // invalid size
-    const encoded = encodeNodeEntry(wKey, true, true);
+    const wk = randomBuffer(10); // invalid size
+    const encoded = encodeNodeEntry(wk, true, true);
     t.is(encoded.length, 0);
 });
 
@@ -80,8 +80,8 @@ test('decodeNodeEntry returns null on invalid input', t => {
 });
 
 test('setNodeEntryRole updates role flags', t => {
-    const wKey = randomBuffer(WRITING_KEY_SIZE);
-    let entry = encodeNodeEntry(wKey, false, false);
+    const wk = randomBuffer(WRITING_KEY_SIZE);
+    let entry = encodeNodeEntry(wk, false, false);
 
     entry = setNodeEntryRole(entry, true, true);
     const decoded = decodeNodeEntry(entry);

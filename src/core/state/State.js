@@ -221,7 +221,7 @@ class State extends ReadyResource {
             const newAdminEntry = encodeAdminEntry(adminEntry.tracAddr, op.eko.wk);
             if (indexersEntry === null || indexerIndex === -1 || adminEntry.length === 0) return;
 
-            await base.removeWriter(newAdminEntry.wKey);
+            await base.removeWriter(newAdminEntry.wk);
             await base.addWriter(op.eko.wk, { isIndexer: true });
             await batch.put(EntryType.ADMIN, newAdminEntry);
             await batch.put(hash, op);

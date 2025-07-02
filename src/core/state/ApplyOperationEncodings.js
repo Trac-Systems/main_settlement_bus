@@ -1,5 +1,8 @@
 import b4a from 'b4a';
 
+// TODO: b-garbacz: I think we will use some of these functions also in index js so it should be moved to utils (maybe buffer.js?)
+
+
 // Buffer standard sizes in bytes
 const WRITING_KEY_SIZE = 32;
 const TRAC_PUB_KEY_SIZE = 32;
@@ -28,19 +31,19 @@ function isBufferValid(key, size) {
  * Note: The address length is included for future compatibility with variable-length addresses.
  *
  * @param {Buffer} tracAddr - The TRAC address buffer.
- * @param {Buffer} wKey - The admin's writing key buffer (must be 32 bytes).
+ * @param {Buffer} wk - The admin's writing key buffer (must be 32 bytes).
  * @returns {Buffer} The encoded admin entry buffer, or an empty buffer if input is invalid.
  */
-export function encodeAdminEntry(tracAddr, wKey) {
-    if (!isBufferValid(tracAddr, 33) || !isBufferValid(wKey, 32)) {
+export function encodeAdminEntry(tracAddr, wk) {
+    if (!isBufferValid(tracAddr, 33) || !isBufferValid(wk, 32)) {
         return b4a.alloc(0);
     }
 
     try {
-        const adminEntry = b4a.alloc(1 + tracAddr.length + wKey.length);
+        const adminEntry = b4a.alloc(1 + tracAddr.length + wk.length);
         adminEntry[0] = tracAddr.length;
         b4a.copy(tracAddr, adminEntry, 1);
-        b4a.copy(wKey, adminEntry, 1 + tracAddr.length);
+        b4a.copy(wk, adminEntry, 1 + tracAddr.length);
         return adminEntry;
     } catch (error) {
         console.error('Error encoding admin entry:', error);
@@ -58,7 +61,7 @@ export function encodeAdminEntry(tracAddr, wKey) {
  * @param {Buffer} adminEntry - The encoded admin entry buffer.
  * @returns {Object} An object with:
  *   - tracAddr: Buffer containing the TRAC address.
- *   - wKey: Buffer containing the writing key.
+ *   - wk: Buffer containing the writing key.
  */
 export function decodeAdminEntry(adminEntry) {
     if (!isBufferValid(adminEntry, ADMIN_ENTRY_SIZE)) {
@@ -67,9 +70,12 @@ export function decodeAdminEntry(adminEntry) {
 
     try {
         const tracAddrLen = adminEntry[0];
+        console.log("tracAddrLen:", tracAddrLen);
         const tracAddr = adminEntry.subarray(1, 1 + tracAddrLen);
-        const wKey = adminEntry.subarray(1 + tracAddrLen);
-        return { tracAddr, wKey };
+        console.log("tracAddr:", tracAddr);
+        const wk = adminEntry.subarray(1 + tracAddrLen);
+        console.log("wk:", wk);
+        return { tracAddr, wk };
     }
     catch (error) {
         console.error('Error decoding admin entry:', error);
@@ -90,20 +96,20 @@ export function decodeAdminEntry(adminEntry) {
  *   - WRITER = 0x1 (bit 0)
  *   - INDEXER = 0x2 (bit 1)
  *
- * @param {Buffer} wKey - The node's writing key (must be 32 bytes).
+ * @param {Buffer} wk - The node's writing key (must be 32 bytes).
  * @param {boolean} isWriter - Whether the node is a writer.
  * @param {boolean} isIndexer - Whether the node is an indexer.
  * @returns {Buffer} The encoded node entry buffer, or an empty buffer if input is invalid.
  */
-export function encodeNodeEntry(wKey, isWriter, isIndexer) {
-    if (!isBufferValid(wKey, 32)) {
+export function encodeNodeEntry(wk, isWriter, isIndexer) {
+    if (!isBufferValid(wk, 32)) {
         return b4a.alloc(0); // Return an empty buffer if keys are invalid
     }
 
     try {
-    const entry = b4a.alloc(1 + wKey.length);
+    const entry = b4a.alloc(1 + wk.length);
     entry[0] = (isWriter ? WRITER_MASK : 0x0) | (isIndexer ? INDEXER_MASK : 0x0);
-    b4a.copy(wKey, entry, 1);
+    b4a.copy(wk, entry, 1);
     return entry;
     }
     catch (error) {

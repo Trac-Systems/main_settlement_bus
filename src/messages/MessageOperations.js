@@ -99,7 +99,6 @@ class MessageOperations {
 
             for (const pubKey of pubKeys) {
                 const payload = await director.buildAppendWhitelistMessage(b4a.from(pubKey, 'hex'));
-                console.log(`payload ${payload}`);
                 const encodedPayload = safeEncodeApplyOperation(payload);
                 messages.push(encodedPayload);
             }
