@@ -10,6 +10,8 @@ import tty from 'tty';
 import Corestore from 'corestore';
 import MsgUtils from './utils/msgUtils.js';
 import MsgUtils2 from "./messages/MessageOperations.js"
+import { extractPublickeyFromAddress } from './utils/helpers.js';
+import { decodeAdminEntry } from './core/state/ApplyOperationEncodings.js';
 import {
     LISTENER_TIMEOUT,
     EntryType,
@@ -176,8 +178,11 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     #isAdmin(adminEntry) {
-        if (!adminEntry || this.#enable_wallet === false) return false;
-        return !!(this.#wallet.publicKey === adminEntry.tracPublicKey && adminEntry.wk === this.#state.writingKey);
+        const decodedAdminEntry = decodeAdminEntry(adminEntry);
+        if (!decodedAdminEntry || this.#enable_wallet === false) return false;
+        const adminTracPublicKey = extractPublickeyFromAddress(decodedAdminEntry.tracAddr);
+        return !!(b4a.equals(this.#wallet.publicKey, adminTracPublicKey) && b4a.equals(decodedAdminEntry.wk, this.#state.writingKey));
+
     }
 
     async #isAllowedToRequestRole(key, adminEntry) {
@@ -290,11 +295,11 @@ export class MainSettlementBus extends ReadyResource {
             const addAdminMessage = await MsgUtils2.assembleAddAdminMessage(adminEntry, this.#state.writingKey, this.#wallet, this.#bootstrap);
 
             if (!adminEntry && this.#wallet && this.#state.writingKey && this.#state.writingKey === this.#bootstrap) {
-                console.log(addAdminMessage);
                 await this.#state.append(addAdminMessage);
             } else if (adminEntry && this.#wallet && adminEntry.tracPublicKey === this.#wallet.publicKey && this.#state.writingKey && this.#state.writingKey !== adminEntry.wk) {
                 if (null === this.#network.validator_stream) return;
-                await this.#network.validator_stream.messenger.send(addAdminMessage);
+                //TODO: it should be refactored at the end
+                //await this.#network.validator_stream.messenger.send(addAdminMessage);
             }
 
             setTimeout(async () => {
@@ -313,10 +318,10 @@ export class MainSettlementBus extends ReadyResource {
     async #handleWhitelistOperations() {
         if (this.#enable_wallet === false) return;
         const adminEntry = await this.#state.get(EntryType.ADMIN);
+
         if (!this.#isAdmin(adminEntry)) return;
-
-        const assembledWhitelistMessages = await MsgUtils.assembleWhitelistMessages(adminEntry, this.#wallet);
-
+        const assembledWhitelistMessages = await MsgUtils2.assembleAppendWhitelistMessages(this.#wallet);
+        console.log(assembledWhitelistMessages)
         if (!assembledWhitelistMessages) {
             console.log('Whitelist message not sent.');
             return;
@@ -327,11 +332,11 @@ export class MainSettlementBus extends ReadyResource {
         for (let i = 0; i < totelElements; i++) {
             const isWhitelisted = await this.#isWhitelisted(assembledWhitelistMessages[i].key);
             if (!isWhitelisted) {
-                await this.#state.append(assembledWhitelistMessages[i]);
-                const whitelistedMessage = await MsgUtils.assembleWhitelistedMessage(this.#wallet, assembledWhitelistMessages[i].key);
-                await this.#network.sendMessageToNode(assembledWhitelistMessages[i].key, whitelistedMessage);
-                await sleep(WHITELIST_SLEEP_INTERVAL);
-                console.log(`Whitelist message sent (public key ${(i + 1)}/${totelElements})`);
+                // await this.#state.append(assembledWhitelistMessages[i]);
+                // const whitelistedMessage = await MsgUtils.assembleWhitelistedMessage(this.#wallet, assembledWhitelistMessages[i].key);
+                // await this.#network.sendMessageToNode(assembledWhitelistMessages[i].key, whitelistedMessage);
+                // await sleep(WHITELIST_SLEEP_INTERVAL);
+                // console.log(`Whitelist message sent (public key ${(i + 1)}/${totelElements})`);
             }
         }
     }

@@ -70,11 +70,8 @@ export function decodeAdminEntry(adminEntry) {
 
     try {
         const tracAddrLen = adminEntry[0];
-        console.log("tracAddrLen:", tracAddrLen);
         const tracAddr = adminEntry.subarray(1, 1 + tracAddrLen);
-        console.log("tracAddr:", tracAddr);
         const wk = adminEntry.subarray(1 + tracAddrLen);
-        console.log("wk:", wk);
         return { tracAddr, wk };
     }
     catch (error) {
