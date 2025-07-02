@@ -14,8 +14,9 @@ import { sleep } from '../../utils/helpers.js';
 import { createHash, generateTx } from '../../utils/crypto.js';
 import MsgUtils from '../../utils/msgUtils.js';
 import Check from '../../utils/check.js';
-import {safeDecodeApplyOperation} from '../../utils/protobuf/operationHelpers.js';
-import {createMessage} from '../../utils/buffer.js';
+import { safeDecodeApplyOperation } from '../../utils/protobuf/operationHelpers.js';
+import { createMessage } from '../../utils/buffer.js';
+import { encodeAdminEntry, decodeAdminEntry, appendIndexer, getIndexerIndex } from './ApplyOperationEncodings.js';
 class State extends ReadyResource {
 
     #base;
@@ -104,9 +105,25 @@ class State extends ReadyResource {
     }
 
     async getWhitelistEntry(key) {
-        const entry = await this.get(WHITELIST_PREFIX + key);
+        const entry = await this.get(WHITELIST_PREFIX + key);// todo! should use decoder
         return entry
     }
+    async getAdminEntry() {
+        return; //todo!
+    }
+    async getNodeEntry() {
+        return; //todo!
+    }
+
+    async getNodeEntry() {
+        return; //todo!
+    }
+
+    async getIndexersEntry() {
+        return; //todo!
+    }
+
+
 
     async append(payload) {
         await this.#base.append(payload);
@@ -140,7 +157,7 @@ class State extends ReadyResource {
 
     #getApplyOperationHandler(type) {
         const handlers = {
-            [OperationType.TX]: this.#handleApplyTxOperation.bind(this),
+            [OperationType.POST_TX]: this.#handleApplyTxOperation.bind(this),
             [OperationType.ADD_ADMIN]: this.#handleApplyAddAdminOperation.bind(this),
             [OperationType.APPEND_WHITELIST]: this.#handleApplyAppendWhitelistOperation.bind(this),
             [OperationType.ADD_WRITER]: this.#handleApplyAddWriterOperation.bind(this),
@@ -173,62 +190,75 @@ class State extends ReadyResource {
 
     async #handleApplyAddAdminOperation(op, view, base, node, batch) {
         if (!this.check.sanitizeExtendedKeyOpSchema(op)) return;
+
         const adminEntry = await batch.get(EntryType.ADMIN);
-        if (null === adminEntry) {
+        const decodedAdminEntry = decodeAdminEntry(adminEntry);
+        if (null === decodedAdminEntry) {
             await this.#addAdminIfNotSet(op, view, node, batch);
         }
-        // else if (adminEntry.value.tracPublicKey === op.key) {
-        //     await this.#addAdminIfSet(adminEntry.value, op, view, base, batch);
-        // }
+        else if (decodedAdminEntry.tracAddr === op.key) {
+            await this.#addAdminIfSet(decodedAdminEntry, op, view, base, batch);
+        }
     }
 
     async #addAdminIfSet(adminEntry, op, view, base, batch) {
-        const message = MsgUtils.createMessage(adminEntry.tracPublicKey, op.value.wk, op.value.nonce, op.type)
-        const isMessageVerifed = await this.#verifyMessageApply(op.value.sig, adminEntry.tracPublicKey, message);
+
+        //TODO wrap in sub function 
+        const tracAddr = adminEntry.tracAddr
+        const networkPrefix = tracAddr.slice(0, 1);
+        if (networkPrefix.readUInt8(0) !== TRAC_NETWORK_PREFIX) return;
+        const tracPublicKey = tracAddr.slice(1, 33);
+
+        const message = createMessage(tracPublicKey, op.eko.wk, op.eko.nonce, op.type)
         const hash = await createHash('sha256', message);
+        const isMessageVerifed = this.#wallet.verify(op.eko.sig, hash, tracPublicKey)
+
         if (isMessageVerifed &&
             null === await batch.get(hash)
         ) {
             const indexersEntry = await batch.get(EntryType.INDEXERS);
-            if (null !== indexersEntry && indexersEntry.value.includes(adminEntry.tracPublicKey)) {
-                await base.removeWriter(b4a.from(adminEntry.wk, 'hex'));
-                await base.addWriter(b4a.from(op.value.wk, 'hex'), { isIndexer: true });
-                await batch.put(EntryType.ADMIN, {
-                    tracPublicKey: adminEntry.tracPublicKey,
-                    wk: op.value.wk
-                })
-                await batch.put(hash, op);
-                console.log(`Admin updated: ${adminEntry.tracPublicKey}:${op.value.wk}`);
-            }
+            const indexerIndex = getIndexerIndex(indexersEntry, adminEntry.tracAddr);
+            const newAdminEntry = encodeAdminEntry(adminEntry.tracAddr, op.eko.wk);
+            if (indexersEntry === null || indexerIndex === -1 || adminEntry.length === 0) return;
+
+            await base.removeWriter(newAdminEntry.wKey);
+            await base.addWriter(op.eko.wk, { isIndexer: true });
+            await batch.put(EntryType.ADMIN, newAdminEntry);
+            await batch.put(hash, op);
+            console.log(`Admin updated: ${adminEntry.tracAddr}:${op.value.wk}`);
+
         }
     }
 
     async #addAdminIfNotSet(op, view, node, batch) {
-        const address = op.key;
-        const networkPrefix = address.slice(0, 1);
-        if (networkPrefix.readUInt8(0) !== TRAC_NETWORK_PREFIX ) return;
+        //TODO wrap in sub function 
+        const tracAddr = op.key;
+        const networkPrefix = tracAddr.slice(0, 1);
+        if (networkPrefix.readUInt8(0) !== TRAC_NETWORK_PREFIX) return;
+        const tracPublicKey = tracAddr.slice(1, 33);
 
-        const tracPublicKey = address.slice(1, 33);
+
         const message = createMessage(op.key, op.eko.wk, op.eko.nonce, op.type)
-        const isMessageVerifed = await this.#verifyMessageApply(op.eko.sig, tracPublicKey, message);
         const hash = await createHash('sha256', message);
+        const isMessageVerifed = this.#wallet.verify(op.eko.sig, hash, tracPublicKey)
 
         if (
-            b4a.equals(node.from.key, this.#bootstrap) &&
-            b4a.equals(op.eko.wk, this.#bootstrap) &&
-            isMessageVerifed &&
-            null === await batch.get(hash)
-        ) {
-            console.log("ok2");
-            // await batch.put(EntryType.ADMIN, {
-            //     tracPublicKey: op.key,
-            //     wk: this.#bootstrap
-            // })
-            // const initIndexers = [op.key];
-            // await batch.put(EntryType.INDEXERS, initIndexers);
-            // await batch.put(hash, op);
-            // console.log(`Admin added: ${op.key}:${this.#bootstrap}`);
-        }
+            !b4a.equals(node.from.key, this.#bootstrap) ||
+            !b4a.equals(op.eko.wk, this.#bootstrap) ||
+            !isMessageVerifed ||
+            !null === await batch.get(hash)
+        ) return;
+
+        const adminEntry = encodeAdminEntry(tracAddr, op.eko.wk);
+        const initIndexers = appendIndexer(tracAddr);
+
+        if (initIndexers.length === 0 || adminEntry.length === 0) return;
+
+        await batch.put(EntryType.ADMIN, adminEntry);
+        await batch.put(EntryType.INDEXERS, initIndexers);
+        await batch.put(hash, node.value);
+
+        console.log(`Admin added: ${tracPublicKey.toString('hex')}:${this.#bootstrap.toString('hex')}`);
     }
 
     async #handleApplyAppendWhitelistOperation(op, view, base, node, batch) {
@@ -422,6 +452,7 @@ class State extends ReadyResource {
 
     }
 
+    //todo: delete. No longer necessary we dont need to calculate hash twice...
     async #verifyMessageApply(signature, publicKey, bufferMessage) {
         const bufferPublicKey = b4a.from(publicKey, 'hex');
         const hash = await createHash('sha256', bufferMessage);
