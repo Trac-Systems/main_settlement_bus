@@ -284,6 +284,8 @@ class State extends ReadyResource {
         const nodeEntry = await this.#getEntryApply(op.key.toString('hex'), batch);
         if (isWhitelisted(nodeEntry)) return;
         if (!nodeEntry) {
+            //TODO RESEARCH ABOUT 00000000000000000000000000000000 ON ED25519. IS IT SECURE? What if this is torsion point, if yes we must be 100000000000%
+            //sure that holepunch do not allow to generate torsian points.
             const createdNodeEntry = encodeNodeEntry(b4a.alloc(32, 0), true, false, false);
             await batch.put(op.key.toString('hex'), createdNodeEntry);
 
