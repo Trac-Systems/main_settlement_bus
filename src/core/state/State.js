@@ -16,7 +16,7 @@ import MsgUtils from '../../utils/msgUtils.js';
 import Check from '../../utils/check.js';
 import { safeDecodeApplyOperation } from '../../utils/protobuf/operationHelpers.js';
 import { createMessage } from '../../utils/buffer.js';
-import { encodeAdminEntry, decodeAdminEntry, appendIndexer, getIndexerIndex, encodeNodeEntry, isWhitelisted, setNodeEntryRole } from './ApplyOperationEncodings.js';
+import { encodeAdminEntry, decodeAdminEntry, appendIndexer, getIndexerIndex, encodeNodeEntry, isWhitelisted, setNodeEntryRole, isWriter, NodeRole } from './ApplyOperationEncodings.js';
 class State extends ReadyResource {
 
     #base;
@@ -191,7 +191,7 @@ class State extends ReadyResource {
 
         const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
         const decodedAdminEntry = decodeAdminEntry(adminEntry);
-        
+
         if (null === decodedAdminEntry) {
             await this.#addAdminIfNotSet(op, view, node, batch);
         }
@@ -263,8 +263,8 @@ class State extends ReadyResource {
     async #handleApplyAppendWhitelistOperation(op, view, base, node, batch) {
         if (!this.check.sanitizeBasicKeyOp(op)) return;// TODO change name to validateBasicKeyOp
 
-        const adminEntry = await batch.get(EntryType.ADMIN);
-        const decodedAdminEntry = decodeAdminEntry(adminEntry.value);
+        const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
+        const decodedAdminEntry = decodeAdminEntry(adminEntry);
         if (null === decodedAdminEntry || !this.#isAdminApply(decodedAdminEntry, node)) return;
 
         const adminTracAddr = decodedAdminEntry.tracAddr
@@ -286,11 +286,11 @@ class State extends ReadyResource {
         if (!nodeEntry) {
             //TODO RESEARCH ABOUT 00000000000000000000000000000000 ON ED25519. IS IT SECURE? What if this is torsion point, if yes we must be 100000000000%
             //sure that holepunch do not allow to generate torsian points.
-            const createdNodeEntry = encodeNodeEntry(b4a.alloc(32, 0), true, false, false);
+            const createdNodeEntry = encodeNodeEntry(b4a.alloc(32, 0), NodeRole.WHITELISTED);
             await batch.put(op.key.toString('hex'), createdNodeEntry);
 
         } else {
-            const editedNodeEntry = setNodeEntryRole(nodeEntry, true, false, false);
+            const editedNodeEntry = setNodeEntryRole(nodeEntry, NodeRole.WHITELISTED);
             await batch.put(op.key.toString('hex'), editedNodeEntry);
 
         }

@@ -16,13 +16,21 @@ const WHITELISTED_MASK = 0x1;
 const WRITER_MASK = 0x2;
 const INDEXER_MASK = 0x4;
 
-
+export const NodeRole = {
+    READER: 0x0,
+    WHITELISTED: 0x1,
+    WRITER: 0x3,
+    INDEXER: 0x7,
+}
 
 // Helper functions
 function isBufferValid(key, size) {
     return b4a.isBuffer(key) && key.length === size;
 }
 
+function isNodeRoleValid(role) {
+    return Object.values(NodeRole).includes(role);
+}
 
 // ------------ ADMIN ENTRY ------------ //
 
@@ -92,9 +100,6 @@ export function decodeAdminEntry(adminEntry) {
  * The remaining bytes are the node's writing key.
  *
  * NODE_ENTRY = [NODE_ROLE_MASK(1)][WRITING_KEY(32)]
- * NODE_ROLE_MASK:
- *   - WRITER = 0x1 (bit 0)
- *   - INDEXER = 0x2 (bit 1)
  *
  * @param {Buffer} wk - The node's writing key (must be 32 bytes).
  * @param {boolean} isWhitelisted - Whether the node is whitelisted.
@@ -102,17 +107,15 @@ export function decodeAdminEntry(adminEntry) {
  * @param {boolean} isIndexer - Whether the node is an indexer.
  * @returns {Buffer} The encoded node entry buffer, or an empty buffer if input is invalid.
  */
-export function encodeNodeEntry(wk, isWhitelisted, isWriter, isIndexer) {
+export function encodeNodeEntry(wk, nodeRole) {
     if (!isBufferValid(wk, 32)) {
         return b4a.alloc(0); // Return an empty buffer if keys are invalid
     }
+    if (!isNodeRoleValid(nodeRole)) return b4a.alloc(0); // Return an empty buffer if node role is invalid
 
     try {
         const entry = b4a.alloc(1 + wk.length);
-        entry[0] =
-            (isWhitelisted ? WHITELISTED_MASK : 0x0) |
-            (isWriter ? WRITER_MASK : 0x0) |
-            (isIndexer ? INDEXER_MASK : 0x0);
+        entry[0] = nodeRole;
         b4a.copy(wk, entry, 1);
         return entry;
     }
@@ -188,12 +191,10 @@ export function isIndexer(nodeEntry) {
  * @param {boolean} isIndexer - Whether the node should be marked as an indexer.
  * @returns {Buffer} The updated node entry buffer (same instance as input).
  */
-export function setNodeEntryRole(nodeEntry, isWhitelisted, isWriter, isIndexer) {
+export function setNodeEntryRole(nodeEntry, nodeRole) {
+    if (!isNodeRoleValid(nodeRole)) nodeEntry;
     if (isBufferValid(nodeEntry, NODE_ENTRY_SIZE)) {
-        nodeEntry[0] =
-            (isWhitelisted ? WHITELISTED_MASK : 0x0) |
-            (isWriter ? WRITER_MASK : 0x0) |
-            (isIndexer ? INDEXER_MASK : 0x0);
+        nodeEntry[0] = nodeRole;
     }
     return nodeEntry;
 }
