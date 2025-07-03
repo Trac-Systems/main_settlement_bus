@@ -284,15 +284,37 @@ class State extends ReadyResource {
         const nodeEntry = await this.#getEntryApply(op.key.toString('hex'), batch);
         if (isWhitelisted(nodeEntry)) return;
         if (!nodeEntry) {
-            //TODO RESEARCH ABOUT 00000000000000000000000000000000 ON ED25519. IS IT SECURE? What if this is torsion point, if yes we must be 100000000000%
-            //sure that holepunch do not allow to generate torsian points.
+            /*
+                Dear reader,
+                wk = 00000000000000000000000000000000 on ed25519 is P.
+                P = (19681161376707505956807079304988542015446066515923890162744021073123829784752,0)
+                This point lies on the curve but is not a valid public key.
+                Point P belongs to the torsion subgroup E(Fp)_TOR of the curve.
+
+                Yes, you could theoretically (easly) forge a signature on this point.
+                No, you don’t need to worry about it.
+
+                Why? Because `wk` is only used as an identifier in our network:
+                1. Trac pair of keys is higher in hierarchy.
+                2. Our network leverages Libsodium, a robust cryptographic library that enforces stringent checks:
+                    - Anyone attempting to create a node with such a key won't be able to participate in our network.
+                    - If an attacker tries to use a small order key, signature
+                    verification fails due to checks that reject such keys;
+                    - The cofactor is always cleared when generating keys,
+                    thanks to a process called clamping, which forces private keys
+                    to lie in the prime-order subgroup by fixing certain bits.
+                    This protects against attacks involving small-order points;
+                3. Even if you are assigned this specific wk (the all-zero identifier), you can rest assured
+                that you won't be able to perform any network actions with it. You can only directly participate
+                in the network if you possess a valid wk. As an indirect user, this characteristic doesn't affect you.             
+
+            */
             const createdNodeEntry = encodeNodeEntry(b4a.alloc(32, 0), NodeRole.WHITELISTED);
             await batch.put(op.key.toString('hex'), createdNodeEntry);
 
         } else {
             const editedNodeEntry = setNodeEntryRole(nodeEntry, NodeRole.WHITELISTED);
             await batch.put(op.key.toString('hex'), editedNodeEntry);
-
         }
 
     }
