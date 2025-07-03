@@ -16,7 +16,7 @@ import MsgUtils from '../../utils/msgUtils.js';
 import Check from '../../utils/check.js';
 import { safeDecodeApplyOperation } from '../../utils/protobuf/operationHelpers.js';
 import { createMessage } from '../../utils/buffer.js';
-import { encodeAdminEntry, decodeAdminEntry, appendIndexer, getIndexerIndex } from './ApplyOperationEncodings.js';
+import { encodeAdminEntry, decodeAdminEntry, appendIndexer, getIndexerIndex, encodeNodeEntry, isWhitelisted, setNodeEntryRole } from './ApplyOperationEncodings.js';
 class State extends ReadyResource {
 
     #base;
@@ -104,10 +104,10 @@ class State extends ReadyResource {
         return result.value;
     }
 
-    async getWhitelistEntry(key) {
-        const entry = await this.get(WHITELIST_PREFIX + key);// todo! should use decoder
-        return entry
+    async getWhitelistEntry(address) {
+        const entry = await this.get(address);
     }
+
     async getAdminEntry() {
         return; //todo!
     }
@@ -122,8 +122,6 @@ class State extends ReadyResource {
     async getIndexersEntry() {
         return; //todo!
     }
-
-
 
     async append(payload) {
         await this.#base.append(payload);
@@ -191,8 +189,9 @@ class State extends ReadyResource {
     async #handleApplyAddAdminOperation(op, view, base, node, batch) {
         if (!this.check.sanitizeExtendedKeyOpSchema(op)) return;
 
-        const adminEntry = await batch.get(EntryType.ADMIN);
+        const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
         const decodedAdminEntry = decodeAdminEntry(adminEntry);
+        
         if (null === decodedAdminEntry) {
             await this.#addAdminIfNotSet(op, view, node, batch);
         }
@@ -262,30 +261,38 @@ class State extends ReadyResource {
     }
 
     async #handleApplyAppendWhitelistOperation(op, view, base, node, batch) {
+        if (!this.check.sanitizeBasicKeyOp(op)) return;// TODO change name to validateBasicKeyOp
 
-        // TODO - somehow we need to figure out how to store whitelisted entries. Maybe we should move it to nodeEntry???
         const adminEntry = await batch.get(EntryType.ADMIN);
-        if (null === adminEntry || !this.check.sanitizeBasicKeyOp(op) || !this.#isAdminApply(adminEntry.value, node)) return;
+        const decodedAdminEntry = decodeAdminEntry(adminEntry.value);
+        if (null === decodedAdminEntry || !this.#isAdminApply(decodedAdminEntry, node)) return;
 
-        const message = MsgUtils.createMessage(op.key, op.value.nonce, op.type)
-        const isMessageVerifed = await this.#verifyMessageApply(op.value.sig, adminEntry.value.tracPublicKey, message);
+        const adminTracAddr = decodedAdminEntry.tracAddr
+        const networkPrefix = adminTracAddr.slice(0, 1);
+        if (networkPrefix.readUInt8(0) !== TRAC_NETWORK_PREFIX) return;
+        const adminTracPublicKey = adminTracAddr.slice(1, 33);
+
+        const nodeTracAddr = op.key;
+        const nodeNetworkPrefix = nodeTracAddr.slice(0, 1);
+        if (nodeNetworkPrefix.readUInt8(0) !== TRAC_NETWORK_PREFIX) return;
+
+        const message = createMessage(op.key, op.bko.nonce, op.type);
         const hash = await createHash('sha256', message);
-
+        const isMessageVerifed = this.#wallet.verify(op.bko.sig, hash, adminTracPublicKey)
         if (!isMessageVerifed || null !== await batch.get(hash)) return;
-        const isWhitelisted = await this.#isWhitelistedApply(op.key, batch);
-        if (isWhitelisted) return;
-        await this.#createWhitelistEntry(batch, op.key);
-        await batch.put(hash, op);
-    }
 
-    async #createWhitelistEntry(batch, pubKey) {
-        const whitelistKey = WHITELIST_PREFIX + pubKey;
-        await batch.put(whitelistKey, true);
-    }
+        const nodeEntry = await this.#getEntryApply(op.key.toString('hex'), batch);
+        if (isWhitelisted(nodeEntry)) return;
+        if (!nodeEntry) {
+            const createdNodeEntry = encodeNodeEntry(b4a.alloc(32, 0), true, false, false);
+            await batch.put(op.key.toString('hex'), createdNodeEntry);
 
-    async #deleteWhitelistEntry(batch, pubKey) {
-        const whitelistKey = WHITELIST_PREFIX + pubKey;
-        await batch.del(whitelistKey);
+        } else {
+            const editedNodeEntry = setNodeEntryRole(nodeEntry, true, false, false);
+            await batch.put(op.key.toString('hex'), editedNodeEntry);
+
+        }
+
     }
 
     async #handleApplyAddWriterOperation(op, view, base, node, batch) {
@@ -454,6 +461,12 @@ class State extends ReadyResource {
 
     }
 
+    //todo: delete
+    async #deleteWhitelistEntry(batch, pubKey) {
+        const whitelistKey = WHITELIST_PREFIX + pubKey;
+        await batch.del(whitelistKey);
+    }
+
     //todo: delete. No longer necessary we dont need to calculate hash twice...
     async #verifyMessageApply(signature, publicKey, bufferMessage) {
         const bufferPublicKey = b4a.from(publicKey, 'hex');
@@ -461,21 +474,21 @@ class State extends ReadyResource {
         return this.#wallet.verify(signature, hash, bufferPublicKey);
     }
 
-    #isAdminApply(adminEntry, node) {
-        if (!adminEntry || !node) return false;
-        return adminEntry.wk === b4a.from(node.from.key).toString('hex');
-    }
-
-    async #isWhitelistedApply(key, batch) {
-        const whitelistEntry = await this.#getWhitelistEntryApply(key, batch)
+    //todo: delete
+    async #isWhitelistedApply(address, batch) {
+        const whitelistEntry = await this.#getEntryApply(address, batch)
         return !!whitelistEntry;
     }
 
-    async #getWhitelistEntryApply(key, batch) {
-        const entry = await batch.get(WHITELIST_PREFIX + key);
-        return entry !== null ? entry.value : null
+    #isAdminApply(adminEntry, node) {
+        if (!adminEntry || !node) return false;
+        return b4a.equals(adminEntry.wk, node.from.key);
     }
 
+    async #getEntryApply(key, batch) {
+        const entry = await batch.get(key);
+        return entry !== null ? entry.value : null
+    }
 }
 
 export default State;

@@ -193,8 +193,9 @@ export class MainSettlementBus extends ReadyResource {
         return isWhitelisted && !this.#isAdmin(adminEntry);
     }
 
-    async #isWhitelisted(key) {
-        const whitelistEntry = await this.#state.getWhitelistEntry(key)
+    async #isWhitelisted(address) {
+        //TODO rewrite with new binary logic
+        const whitelistEntry = await this.#state.getWhitelistEntry(address)
         return !!whitelistEntry;
     }
 
@@ -330,14 +331,13 @@ export class MainSettlementBus extends ReadyResource {
         const totelElements = assembledWhitelistMessages.length;
 
         for (let i = 0; i < totelElements; i++) {
-            const isWhitelisted = await this.#isWhitelisted(assembledWhitelistMessages[i].key);
-            if (!isWhitelisted) {
-                // await this.#state.append(assembledWhitelistMessages[i]);
-                // const whitelistedMessage = await MsgUtils.assembleWhitelistedMessage(this.#wallet, assembledWhitelistMessages[i].key);
+            // const isWhitelisted = await this.#isWhitelisted(assembledWhitelistMessages[i].key);
+            // if (!isWhitelisted) {
+                await this.#state.append(assembledWhitelistMessages[i]);
                 // await this.#network.sendMessageToNode(assembledWhitelistMessages[i].key, whitelistedMessage);
                 // await sleep(WHITELIST_SLEEP_INTERVAL);
                 // console.log(`Whitelist message sent (public key ${(i + 1)}/${totelElements})`);
-            }
+            //}
         }
     }
 
