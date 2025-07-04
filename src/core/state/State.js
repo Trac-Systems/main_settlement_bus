@@ -8,11 +8,15 @@ import {
     EntryType,
     OperationType,
     MAX_INDEXERS,
+    TRAC_NETWORK_PREFIX,
 } from '../../utils/constants.js';
 import { sleep } from '../../utils/helpers.js';
 import { createHash, generateTx } from '../../utils/crypto.js';
 import MsgUtils from '../../utils/msgUtils.js';
 import Check from '../../utils/check.js';
+import { safeDecodeApplyOperation } from '../../utils/protobuf/operationHelpers.js';
+import { createMessage } from '../../utils/buffer.js';
+import { encodeAdminEntry, decodeAdminEntry, appendIndexer, getIndexerIndex, encodeNodeEntry, isWhitelisted, setNodeEntryRole, isWriter, NodeRole, decodeNodeEntry } from './ApplyOperationEncodings.js';
 
 class State extends ReadyResource {
 
@@ -37,7 +41,7 @@ class State extends ReadyResource {
         this.check = new Check();
         this.#base = new Autobase(this.#store, this.#bootstrap, {
             ackInterval: ACK_INTERVAL,
-            valueEncoding: 'json',
+            valueEncoding: 'binary',
             open: this.#setupHyperbee.bind(this),
             apply: this.#apply.bind(this),
         })
@@ -55,7 +59,7 @@ class State extends ReadyResource {
     async _open() {
         console.log("State initialization...")
         await this.#base.ready();
-        this.#writingKey = b4a.toString(this.#base.local.key, 'hex');
+        this.#writingKey = this.#base.local.key;
     }
 
     async _close() {
@@ -101,9 +105,24 @@ class State extends ReadyResource {
         return result.value;
     }
 
-    async getWhitelistEntry(key) {
-        const entry = await this.get(WHITELIST_PREFIX + key);
-        return entry
+    async getAdminEntry() {
+        const adminEntry = await this.get(EntryType.ADMIN);
+        return adminEntry ? decodeAdminEntry(adminEntry) : null;
+    }
+
+    async getNodeEntry(address) {
+        const nodeEntry = await this.get(address);
+        return nodeEntry ? decodeNodeEntry(nodeEntry) : null;
+    }
+
+    async isAddressWhitelisted(address) {
+        const nodeEntry = await this.getNodeEntry(address);
+        if (nodeEntry === null) return false;
+        return !!nodeEntry.isWhitelisted;   
+    }
+
+    async getIndexersEntry() {
+        return; //todo!
     }
 
     async append(payload) {
@@ -113,8 +132,8 @@ class State extends ReadyResource {
     #setupHyperbee(store) {
         this.#bee = new Hyperbee(store.get('view'), {
             extension: false,
-            keyEncoding: 'utf-8',
-            valueEncoding: 'json'
+            keyEncoding: 'ascii',
+            valueEncoding: 'binary'
         })
         return this.#bee;
     }
@@ -124,7 +143,9 @@ class State extends ReadyResource {
     async #apply(nodes, view, base) {
         const batch = view.batch();
         for (const node of nodes) {
-            const op = node.value;
+            const op = safeDecodeApplyOperation(node.value);
+            if (op === null) return;
+
             const handler = this.#getApplyOperationHandler(op.type);
             if (handler) {
                 await handler(op, view, base, node, batch);
@@ -138,7 +159,7 @@ class State extends ReadyResource {
 
     #getApplyOperationHandler(type) {
         const handlers = {
-            [OperationType.TX]: this.#handleApplyTxOperation.bind(this),
+            [OperationType.POST_TX]: this.#handleApplyTxOperation.bind(this),
             [OperationType.ADD_ADMIN]: this.#handleApplyAddAdminOperation.bind(this),
             [OperationType.APPEND_WHITELIST]: this.#handleApplyAppendWhitelistOperation.bind(this),
             [OperationType.ADD_WRITER]: this.#handleApplyAddWriterOperation.bind(this),
@@ -171,79 +192,135 @@ class State extends ReadyResource {
 
     async #handleApplyAddAdminOperation(op, view, base, node, batch) {
         if (!this.check.sanitizeExtendedKeyOpSchema(op)) return;
-        const adminEntry = await batch.get(EntryType.ADMIN);
-        if (null === adminEntry) {
+
+        const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
+        const decodedAdminEntry = decodeAdminEntry(adminEntry);
+
+        if (null === decodedAdminEntry) {
             await this.#addAdminIfNotSet(op, view, node, batch);
         }
-        else if (adminEntry.value.tracPublicKey === op.key) {
-            await this.#addAdminIfSet(adminEntry.value, op, view, base, batch);
+        else if (decodedAdminEntry.tracAddr === op.key) {
+            await this.#addAdminIfSet(decodedAdminEntry, op, view, base, batch);
         }
     }
 
     async #addAdminIfSet(adminEntry, op, view, base, batch) {
-        const message = MsgUtils.createMessage(adminEntry.tracPublicKey, op.value.wk, op.value.nonce, op.type)
-        const isMessageVerifed = await this.#verifyMessageApply(op.value.sig, adminEntry.tracPublicKey, message);
+
+        //TODO wrap in sub function 
+        const tracAddr = adminEntry.tracAddr
+        const networkPrefix = tracAddr.slice(0, 1);
+        if (networkPrefix.readUInt8(0) !== TRAC_NETWORK_PREFIX) return;
+        const tracPublicKey = tracAddr.slice(1, 33);
+
+        const message = createMessage(tracPublicKey, op.eko.wk, op.eko.nonce, op.type)
         const hash = await createHash('sha256', message);
+        const isMessageVerifed = this.#wallet.verify(op.eko.sig, hash, tracPublicKey)
+
         if (isMessageVerifed &&
             null === await batch.get(hash)
         ) {
             const indexersEntry = await batch.get(EntryType.INDEXERS);
-            if (null !== indexersEntry && indexersEntry.value.includes(adminEntry.tracPublicKey)) {
-                await base.removeWriter(b4a.from(adminEntry.wk, 'hex'));
-                await base.addWriter(b4a.from(op.value.wk, 'hex'), { isIndexer: true });
-                await batch.put(EntryType.ADMIN, {
-                    tracPublicKey: adminEntry.tracPublicKey,
-                    wk: op.value.wk
-                })
-                await batch.put(hash, op);
-                console.log(`Admin updated: ${adminEntry.tracPublicKey}:${op.value.wk}`);
-            }
+            const indexerIndex = getIndexerIndex(indexersEntry, adminEntry.tracAddr);
+            const newAdminEntry = encodeAdminEntry(adminEntry.tracAddr, op.eko.wk);
+            if (indexersEntry === null || indexerIndex === -1 || adminEntry.length === 0) return;
+
+            await base.removeWriter(newAdminEntry.wk);
+            await base.addWriter(op.eko.wk, { isIndexer: true });
+            await batch.put(EntryType.ADMIN, newAdminEntry);
+            await batch.put(hash, op);
+            console.log(`Admin updated: ${adminEntry.tracAddr}:${op.value.wk}`);
+
         }
     }
 
     async #addAdminIfNotSet(op, view, node, batch) {
-        const message = MsgUtils.createMessage(op.key, op.value.wk, op.value.nonce, op.type)
-        const isMessageVerifed = await this.#verifyMessageApply(op.value.sig, op.key, message);
+        //TODO wrap in sub function 
+        const tracAddr = op.key;
+        const networkPrefix = tracAddr.slice(0, 1);
+        if (networkPrefix.readUInt8(0) !== TRAC_NETWORK_PREFIX) return;
+        const tracPublicKey = tracAddr.slice(1, 33);
+
+
+        const message = createMessage(op.key, op.eko.wk, op.eko.nonce, op.type)
         const hash = await createHash('sha256', message);
-        if (node.from.key.toString('hex') === this.#bootstrap &&
-            op.value.wk === this.#bootstrap &&
-            isMessageVerifed &&
-            null === await batch.get(hash)
-        ) {
-            await batch.put(EntryType.ADMIN, {
-                tracPublicKey: op.key,
-                wk: this.#bootstrap
-            })
-            const initIndexers = [op.key];
-            await batch.put(EntryType.INDEXERS, initIndexers);
-            await batch.put(hash, op);
-            console.log(`Admin added: ${op.key}:${this.#bootstrap}`);
-        }
+        const isMessageVerifed = this.#wallet.verify(op.eko.sig, hash, tracPublicKey)
+
+        if (
+            !b4a.equals(node.from.key, this.#bootstrap) ||
+            !b4a.equals(op.eko.wk, this.#bootstrap) ||
+            !isMessageVerifed ||
+            !null === await batch.get(hash)
+        ) return;
+
+        const adminEntry = encodeAdminEntry(tracAddr, op.eko.wk);
+        const initIndexers = appendIndexer(tracAddr);
+
+        if (initIndexers.length === 0 || adminEntry.length === 0) return;
+
+        await batch.put(EntryType.ADMIN, adminEntry);
+        await batch.put(EntryType.INDEXERS, initIndexers);
+        await batch.put(hash, node.value);
+
+        console.log(`Admin added: ${tracPublicKey.toString('hex')}:${this.#bootstrap.toString('hex')}`);
     }
 
     async #handleApplyAppendWhitelistOperation(op, view, base, node, batch) {
-        const adminEntry = await batch.get(EntryType.ADMIN);
-        if (null === adminEntry || !this.check.sanitizeBasicKeyOp(op) || !this.#isAdminApply(adminEntry.value, node)) return;
+        if (!this.check.sanitizeBasicKeyOp(op)) return;// TODO change name to validateBasicKeyOp
 
-        const message = MsgUtils.createMessage(op.key, op.value.nonce, op.type)
-        const isMessageVerifed = await this.#verifyMessageApply(op.value.sig, adminEntry.value.tracPublicKey, message);
+        const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
+        const decodedAdminEntry = decodeAdminEntry(adminEntry);
+        if (null === decodedAdminEntry || !this.#isAdminApply(decodedAdminEntry, node)) return;
+
+        const adminTracAddr = decodedAdminEntry.tracAddr
+        const networkPrefix = adminTracAddr.slice(0, 1);
+        if (networkPrefix.readUInt8(0) !== TRAC_NETWORK_PREFIX) return;
+        const adminTracPublicKey = adminTracAddr.slice(1, 33);
+
+        const nodeTracAddr = op.key;
+        const nodeNetworkPrefix = nodeTracAddr.slice(0, 1);
+        if (nodeNetworkPrefix.readUInt8(0) !== TRAC_NETWORK_PREFIX) return;
+
+        const message = createMessage(op.key, op.bko.nonce, op.type);
         const hash = await createHash('sha256', message);
-
+        const isMessageVerifed = this.#wallet.verify(op.bko.sig, hash, adminTracPublicKey)
         if (!isMessageVerifed || null !== await batch.get(hash)) return;
-        const isWhitelisted = await this.#isWhitelistedApply(op.key, batch);
-        if (isWhitelisted) return;
-        await this.#createWhitelistEntry(batch, op.key);
-        await batch.put(hash, op);
-    }
 
-    async #createWhitelistEntry(batch, pubKey) {
-        const whitelistKey = WHITELIST_PREFIX + pubKey;
-        await batch.put(whitelistKey, true);
-    }
+        const nodeEntry = await this.#getEntryApply(op.key.toString('hex'), batch);
+        if (isWhitelisted(nodeEntry)) return;
+        if (!nodeEntry) {
+            /*
+                Dear reader,
+                wk = 00000000000000000000000000000000 on ed25519 is point P.
+                P = (19681161376707505956807079304988542015446066515923890162744021073123829784752,0).
+                This point lies on the curve but is not a valid point.
+                Point P belongs to the torsion subgroup E(Fp)_TOR of the curve.
 
-    async #deleteWhitelistEntry(batch, pubKey) {
-        const whitelistKey = WHITELIST_PREFIX + pubKey;
-        await batch.del(whitelistKey);
+                Yes, you could theoretically (easly) forge a signature on this point.
+                No, you don’t need to worry about it.
+
+                Why? Because `wk` is only used as an identifier in our network:
+                1. Trac pair of keys is higher in hierarchy.
+                2. Our network leverages Libsodium, a robust cryptographic library that enforces stringent checks:
+                    - Anyone attempting to create a node with such a key won't be able to participate in our network.
+                    - If an attacker tries to use a small order key, signature
+                    verification fails due to checks that reject such keys;
+                    - The cofactor is always cleared when generating keys,
+                    thanks to a process called clamping, which forces private keys
+                    to lie in the prime-order subgroup by fixing certain bits.
+                    This protects against attacks involving small-order points;
+                3. Even if you are assigned this specific wk (the all-zero identifier), you can rest assured
+                that you won't be able to perform any network actions with it. You can only directly participate
+                in the network if you possess a valid wk. As an indirect user, this characteristic doesn't affect you.             
+
+            */
+            const createdNodeEntry = encodeNodeEntry(b4a.alloc(32, 0), NodeRole.WHITELISTED);
+            await batch.put(op.key.toString('hex'), createdNodeEntry);
+
+        } else {
+            const editedNodeEntry = setNodeEntryRole(nodeEntry, NodeRole.WHITELISTED);
+            await batch.put(op.key.toString('hex'), editedNodeEntry);
+        }
+
     }
 
     async #handleApplyAddWriterOperation(op, view, base, node, batch) {
@@ -412,27 +489,34 @@ class State extends ReadyResource {
 
     }
 
+    //todo: delete
+    async #deleteWhitelistEntry(batch, pubKey) {
+        const whitelistKey = WHITELIST_PREFIX + pubKey;
+        await batch.del(whitelistKey);
+    }
+
+    //todo: delete. No longer necessary we dont need to calculate hash twice...
     async #verifyMessageApply(signature, publicKey, bufferMessage) {
         const bufferPublicKey = b4a.from(publicKey, 'hex');
         const hash = await createHash('sha256', bufferMessage);
         return this.#wallet.verify(signature, hash, bufferPublicKey);
     }
 
-    #isAdminApply(adminEntry, node) {
-        if (!adminEntry || !node) return false;
-        return adminEntry.wk === b4a.from(node.from.key).toString('hex');
-    }
-
-    async #isWhitelistedApply(key, batch) {
-        const whitelistEntry = await this.#getWhitelistEntryApply(key, batch)
+    //todo: delete
+    async #isWhitelistedApply(address, batch) {
+        const whitelistEntry = await this.#getEntryApply(address, batch)
         return !!whitelistEntry;
     }
 
-    async #getWhitelistEntryApply(key, batch) {
-        const entry = await batch.get(WHITELIST_PREFIX + key);
-        return entry !== null ? entry.value : null
+    #isAdminApply(adminEntry, node) {
+        if (!adminEntry || !node) return false;
+        return b4a.equals(adminEntry.wk, node.from.key);
     }
 
+    async #getEntryApply(key, batch) {
+        const entry = await batch.get(key);
+        return entry !== null ? entry.value : null
+    }
 }
 
 export default State;

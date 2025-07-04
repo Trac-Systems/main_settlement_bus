@@ -136,23 +136,6 @@ class MsgUtils {
         return await this.#assembleMessageBase(wallet, writerTracPublicKey, OperationType.WHITELISTED);
     }
 
-    static async verifyEventMessage(parsedRequest, wallet, check) {
-        const { type, key, value } = parsedRequest;
-        if (
-            type !== OperationType.ADD_ADMIN &&
-            type !== OperationType.ADD_WRITER &&
-            type !== OperationType.REMOVE_WRITER
-        ) {
-            return false;
-        }
-        const sanitizationResult = check.sanitizeExtendedKeyOpSchema(parsedRequest);
-        if (!sanitizationResult) return false;
-
-        const msg = this.createMessage(key, value.wk, value.nonce, type);
-        const hash = await createHash('sha256', msg);
-        return wallet.verify(value.sig, hash, key);
-    }
-
 }
 
 export default MsgUtils;

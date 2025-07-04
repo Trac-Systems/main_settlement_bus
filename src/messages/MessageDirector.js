@@ -1,5 +1,5 @@
 import Builder from './Builder.js';
-import { OperationType } from '../protobuf/applyOperations.cjs'
+import { OperationType } from '../../src/utils/protobuf/applyOperations.cjs'
 
 class MessageDirector {
     #builder;

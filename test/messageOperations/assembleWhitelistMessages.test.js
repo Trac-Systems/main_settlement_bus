@@ -1,5 +1,5 @@
 import test from 'brittle';
-import MessageOperations from '../../src/utils/messages/MessageOperations.js';
+import MessageOperations from '../../src/messages/MessageOperations.js';
 import { OperationType } from '../../src/utils/protobuf/applyOperations.cjs';
 import { default as fixtures } from '../fixtures/assembleMessage2.fixtures.js';
 import { safeDecodeApplyOperation } from '../../src/utils/protobuf/operationHelpers.js';

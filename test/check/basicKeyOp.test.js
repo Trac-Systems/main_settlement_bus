@@ -4,7 +4,7 @@ import Check from '../../src/utils/check.js';
 import b4a from 'b4a';
 const check = new Check();
 
-test('sanitizeBasicKeyOp – happy paths for all operation types', t => {
+test('sanitizeBasicKeyOp - happy paths for all operation types', t => {
     const validInputs = [
         checkFixtures.validAddIndexer,
         checkFixtures.validRemoveIndexer,
