@@ -16,7 +16,8 @@ import MsgUtils from '../../utils/msgUtils.js';
 import Check from '../../utils/check.js';
 import { safeDecodeApplyOperation } from '../../utils/protobuf/operationHelpers.js';
 import { createMessage } from '../../utils/buffer.js';
-import { encodeAdminEntry, decodeAdminEntry, appendIndexer, getIndexerIndex, encodeNodeEntry, isWhitelisted, setNodeEntryRole, isWriter, NodeRole } from './ApplyOperationEncodings.js';
+import { encodeAdminEntry, decodeAdminEntry, appendIndexer, getIndexerIndex, encodeNodeEntry, isWhitelisted, setNodeEntryRole, isWriter, NodeRole, decodeNodeEntry } from './ApplyOperationEncodings.js';
+
 class State extends ReadyResource {
 
     #base;
@@ -104,19 +105,20 @@ class State extends ReadyResource {
         return result.value;
     }
 
-    async getWhitelistEntry(address) {
-        const entry = await this.get(address);
-    }
-
     async getAdminEntry() {
-        return; //todo!
-    }
-    async getNodeEntry() {
-        return; //todo!
+        const adminEntry = await this.get(EntryType.ADMIN);
+        return adminEntry ? decodeAdminEntry(adminEntry) : null;
     }
 
-    async getNodeEntry() {
-        return; //todo!
+    async getNodeEntry(address) {
+        const nodeEntry = await this.get(address);
+        return nodeEntry ? decodeNodeEntry(nodeEntry) : null;
+    }
+
+    async isAddressWhitelisted(address) {
+        const nodeEntry = await this.getNodeEntry(address);
+        if (nodeEntry === null) return false;
+        return !!nodeEntry.isWhitelisted;   
     }
 
     async getIndexersEntry() {
@@ -142,6 +144,8 @@ class State extends ReadyResource {
         const batch = view.batch();
         for (const node of nodes) {
             const op = safeDecodeApplyOperation(node.value);
+            if (op === null) return;
+
             const handler = this.#getApplyOperationHandler(op.type);
             if (handler) {
                 await handler(op, view, base, node, batch);
@@ -286,9 +290,9 @@ class State extends ReadyResource {
         if (!nodeEntry) {
             /*
                 Dear reader,
-                wk = 00000000000000000000000000000000 on ed25519 is P.
-                P = (19681161376707505956807079304988542015446066515923890162744021073123829784752,0)
-                This point lies on the curve but is not a valid public key.
+                wk = 00000000000000000000000000000000 on ed25519 is point P.
+                P = (19681161376707505956807079304988542015446066515923890162744021073123829784752,0).
+                This point lies on the curve but is not a valid point.
                 Point P belongs to the torsion subgroup E(Fp)_TOR of the curve.
 
                 Yes, you could theoretically (easly) forge a signature on this point.

@@ -11,7 +11,8 @@ import Corestore from 'corestore';
 import MsgUtils from './utils/msgUtils.js';
 import MsgUtils2 from "./messages/MessageOperations.js"
 import { extractPublickeyFromAddress } from './utils/helpers.js';
-import { decodeAdminEntry } from './core/state/ApplyOperationEncodings.js';
+import {safeDecodeApplyOperation} from '../src/utils/protobuf/operationHelpers.js';
+
 import {
     LISTENER_TIMEOUT,
     EntryType,
@@ -20,6 +21,7 @@ import {
     WHITELIST_SLEEP_INTERVAL,
     MAX_INDEXERS,
     MIN_INDEXERS,
+    TRAC_NETWORK_PREFIX,
 } from './utils/constants.js';
 import Network from './core/network/Network.js';
 import Check from './utils/check.js';
@@ -113,7 +115,7 @@ export class MainSettlementBus extends ReadyResource {
 
         this.#network.validatorObserver(this.#state.get.bind(this.#state), this.#wallet.publicKey); // can't be await
 
-        const adminEntry = await this.#state.get(EntryType.ADMIN);
+        const adminEntry = await this.#state.getAdminEntry();
 
 
         if (this.#isAdmin(adminEntry)) {
@@ -124,7 +126,8 @@ export class MainSettlementBus extends ReadyResource {
             this.#writerEventListener(); // only for writers
         }
 
-        await this.#setUpRoleAutomatically(adminEntry);
+        // temporary turned off
+        //await this.#setUpRoleAutomatically(adminEntry);
 
         console.log(`isIndexer: ${this.#state.isIndexer()}`);
         console.log(`isWriter: ${this.#state.isWritable()}`);
@@ -178,37 +181,36 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     #isAdmin(adminEntry) {
-        const decodedAdminEntry = decodeAdminEntry(adminEntry);
-        if (!decodedAdminEntry || this.#enable_wallet === false) return false;
-        const adminTracPublicKey = extractPublickeyFromAddress(decodedAdminEntry.tracAddr);
-        return !!(b4a.equals(this.#wallet.publicKey, adminTracPublicKey) && b4a.equals(decodedAdminEntry.wk, this.#state.writingKey));
+        if (!adminEntry || this.#enable_wallet === false) return false;
+        const adminTracPublicKey = extractPublickeyFromAddress(adminEntry.tracAddr);
+        return !!(b4a.equals(this.#wallet.publicKey, adminTracPublicKey) && b4a.equals(adminEntry.wk, this.#state.writingKey));
 
     }
 
-    async #isAllowedToRequestRole(key, adminEntry) {
-        /*
-            This function blocks an admin to build quote to request writer role.
-         */
-        const isWhitelisted = await this.#isWhitelisted(key);
-        return isWhitelisted && !this.#isAdmin(adminEntry);
+    async #isAllowedToRequestRole(adminEntry, nodeEntry) {
+        return nodeEntry.isWhitelisted && !this.#isAdmin(adminEntry);
     }
 
+    //todo: delete state.js method have it
     async #isWhitelisted(address) {
         //TODO rewrite with new binary logic
-        const whitelistEntry = await this.#state.getWhitelistEntry(address)
+        const whitelistEntry = await this.#state.isAddressWhitelisted(address)
         return !!whitelistEntry;
     }
 
 
-    async #handleIncomingEvent(parsedRequest) {
+    async #handleIncomingEvent(bufferedRequest) {
         try {
-            if (parsedRequest && parsedRequest.type && parsedRequest.key && parsedRequest.value) {
-                if (parsedRequest.type === OperationType.ADD_WRITER || parsedRequest.type === OperationType.REMOVE_WRITER) {
+
+            const decodedRequest = safeDecodeApplyOperation(bufferedRequest);
+            if (decodedRequest.type) {
+
+                if (decodedRequest.type === OperationType.ADD_WRITER || decodedRequest.type === OperationType.REMOVE_WRITER) {
                     //This request must be hanlded by ADMIN
-                    this.emit(EventType.ADMIN_EVENT, parsedRequest);
+                    this.emit(EventType.ADMIN_EVENT, decodedRequest, bufferedRequest);
                 } else if (parsedRequest.type === OperationType.ADD_ADMIN) {
                     //This request must be handled by WRITER
-                    this.emit(EventType.WRITER_EVENT, parsedRequest);
+                    this.emit(EventType.WRITER_EVENT, parsedRequest, bufferedRequest);
                 }
                 else if (parsedRequest.type === OperationType.WHITELISTED) {
                     const adminEntry = await this.#state.get(EntryType.ADMIN);
@@ -225,18 +227,17 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async #adminEventListener() {
-        this.on(EventType.ADMIN_EVENT, async (parsedRequest) => {
+        this.on(EventType.ADMIN_EVENT, async (parsedRequest, bufferedRequest) => {
             if (this.#enable_wallet === false) return;
-            const isWhitelisted = await this.#isWhitelisted(parsedRequest.key);
-            const isEventMessageVerifed = await MsgUtils.verifyEventMessage(parsedRequest, this.#wallet, this.check)
-            if (isWhitelisted && isEventMessageVerifed) {
-                await this.#state.append(parsedRequest);
+            const isEventMessageValid = await MsgUtils2.verifyEventMessage(parsedRequest, this.#wallet, this.check, this.#state)
+            if (isEventMessageValid) {
+                await this.#state.append(bufferedRequest);
             }
         });
     }
 
     async #writerEventListener() {
-        this.on(EventType.WRITER_EVENT, async (parsedRequest) => {
+        this.on(EventType.WRITER_EVENT, async (parsedRequest, bufferedRequest) => {
             if (this.#enable_wallet === false) return;
             const adminEntry = await this.#state.get(EntryType.ADMIN);
             const isEventMessageVerifed = await MsgUtils.verifyEventMessage(parsedRequest, this.#wallet, this.check)
@@ -304,7 +305,7 @@ export class MainSettlementBus extends ReadyResource {
             }
 
             setTimeout(async () => {
-                const updatedAdminEntry = await this.#state.get(EntryType.ADMIN);
+                const updatedAdminEntry = await this.#state.getAdminEntry();
                 if (this.#isAdmin(updatedAdminEntry) && !this.#shouldListenToAdminEvents) {
                     this.#shouldListenToAdminEvents = true;
                     this.#adminEventListener();
@@ -318,7 +319,7 @@ export class MainSettlementBus extends ReadyResource {
 
     async #handleWhitelistOperations() {
         if (this.#enable_wallet === false) return;
-        const adminEntry = await this.#state.get(EntryType.ADMIN);
+        const adminEntry = await this.#state.getAdminEntry();
 
         if (!this.#isAdmin(adminEntry)) return;
         const assembledWhitelistMessages = await MsgUtils2.assembleAppendWhitelistMessages(this.#wallet);
@@ -333,31 +334,40 @@ export class MainSettlementBus extends ReadyResource {
         for (let i = 0; i < totelElements; i++) {
             // const isWhitelisted = await this.#isWhitelisted(assembledWhitelistMessages[i].key);
             // if (!isWhitelisted) {
-                await this.#state.append(assembledWhitelistMessages[i]);
-                // await this.#network.sendMessageToNode(assembledWhitelistMessages[i].key, whitelistedMessage);
-                // await sleep(WHITELIST_SLEEP_INTERVAL);
-                // console.log(`Whitelist message sent (public key ${(i + 1)}/${totelElements})`);
+            await this.#state.append(assembledWhitelistMessages[i]);
+            // await this.#network.sendMessageToNode(assembledWhitelistMessages[i].key, whitelistedMessage);
+            // await sleep(WHITELIST_SLEEP_INTERVAL);
+            // console.log(`Whitelist message sent (public key ${(i + 1)}/${totelElements})`);
             //}
         }
     }
 
     async #requestWriterRole(toAdd) {
         if (this.#enable_wallet === false) return;
-        const adminEntry = await this.#state.get(EntryType.ADMIN);
-        const nodeEntry = await this.#state.get(this.#wallet.publicKey);
-        const isAlreadyWriter = !!(nodeEntry && nodeEntry.isWriter)
+        const adminEntry = await this.#state.getAdminEntry();
+        const nodeEntry = await this.#state.getNodeEntry(this.#wallet.address.toString('hex'));
+        const isAlreadyWriter = !!(nodeEntry && nodeEntry.isWriter === true)
         let assembledMessage = null;
-        if (toAdd) {
-            const isAllowedToRequestRole = await this.#isAllowedToRequestRole(this.#wallet.publicKey, adminEntry);
 
+        if (toAdd) {
+            const isAllowedToRequestRole = await this.#isAllowedToRequestRole(adminEntry, nodeEntry);
+            console.log("isAllowedToRequestRole", isAllowedToRequestRole)
             const canAddWriter = !!(!this.#state.isWritable() && !isAlreadyWriter && isAllowedToRequestRole);
+            console.log("canAddWriter", canAddWriter)
             if (canAddWriter) {
-                assembledMessage = await MsgUtils.assembleAddWriterMessage(this.#wallet, this.#state.writingKey);
+                assembledMessage = {
+                    op: 'addWriter',
+                    message: await MsgUtils2.assembleAddWriterMessage(this.#wallet, this.#state.writingKey),
+                }
             }
         }
         else {
             if (isAlreadyWriter) {
-                assembledMessage = await MsgUtils.assembleRemoveWriterMessage(this.#wallet, this.#state.writingKey);
+                assembledMessage = {
+                    op: 'removeWriter',
+                    message: await MsgUtils2.assembleRemoveWriterMessage(this.#wallet, this.#state.writingKey),
+
+                }
             }
         }
 

@@ -14,7 +14,7 @@ import {
     OperationType,
     EntryType
 } from '../../utils/constants.js';
-import { sleep } from '../../utils/helpers.js';
+import { sleep, extractPublickeyFromAddress } from '../../utils/helpers.js';
 import Check from '../../utils/check.js';
 
 const wakeup = new w();
@@ -43,7 +43,7 @@ class Network extends ReadyResource {
         this.validator = null;
         this.custom_stream = null;
         this.custom_node = null;
-        
+
     }
 
     get swarm() {
@@ -109,6 +109,7 @@ class Network extends ReadyResource {
 
             console.log(`Channel: ${b4a.toString(this.#channel)}`);
             const network = this;
+
             this.#swarm.on('connection', async (connection) => {
 
                 const mux = Protomux.from(connection)
@@ -127,9 +128,9 @@ class Network extends ReadyResource {
                     //TODO:split this into many functions. This function should only contain switch statement
                     //TODO: instad of doing return; in cases which does not fit for us, we should perform - swarm.leavePeer(connection.remotePublicKey)
                     async onmessage(msg) {
+                        //TODO write validators in fastest validator + define protoschemas 
                         try {
                             const channelString = b4a.toString(network.channel, 'utf8');
-
                             if (msg === 'get_validator') {
                                 const nonce = Wallet.generateNonce().toString('hex');
                                 const _msg = {
@@ -142,18 +143,10 @@ class Network extends ReadyResource {
                                 message.send({ response: _msg, sig, nonce })
                                 network.#swarm.leavePeer(connection.remotePublicKey)
                             } else if (msg === 'get_admin') {
-                                const res = await state.get(EntryType.ADMIN);
-                                if (wallet.publicKey !== res.tracPublicKey) return;
-                                const nonce = Wallet.generateNonce().toString('hex');
-                                const _msg = {
-                                    op: 'admin',
-                                    key: writingKey,
-                                    address: wallet.publicKey,
-                                    channel: channelString
-                                };
-                                const sig = wallet.sign(JSON.stringify(_msg) + nonce);
-                                message.send({ response: _msg, sig, nonce })
+
+                                network.handleGetAdminRequest(message, connection, channelString, state, wallet, writingKey);
                                 network.#swarm.leavePeer(connection.remotePublicKey)
+
                             } else if (msg === 'get_node') {
 
                                 const nonce = Wallet.generateNonce().toString('hex');
@@ -167,7 +160,9 @@ class Network extends ReadyResource {
                                 message.send({ response: _msg, sig, nonce })
                                 network.#swarm.leavePeer(connection.remotePublicKey)
 
-                            } else if (msg.response !== undefined && msg.response.op !== undefined && msg.response.op === 'validator') {
+                            }
+                            // ---------- HANDLING RECEIVED MESSAGES ----------
+                            else if (msg.response !== undefined && msg.response.op !== undefined && msg.response.op === 'validator') {
                                 const res = await state.get(msg.response.address);
                                 if (res === null) return;
                                 const verified = wallet.verify(msg.sig, JSON.stringify(msg.response) + msg.nonce, msg.response.address)
@@ -177,16 +172,11 @@ class Network extends ReadyResource {
                                     network.validator = msg.response.address;
                                 }
                                 network.#swarm.leavePeer(connection.remotePublicKey)
-                            } else if (msg.response !== undefined && msg.response.op !== undefined && msg.response.op === 'admin') {
-                                const res = await state.get(EntryType.ADMIN);
-                                if (res === null || res.tracPublicKey !== msg.response.address) return;
-                                const verified = wallet.verify(msg.sig, JSON.stringify(msg.response) + msg.nonce, res.tracPublicKey)
-                                if (verified && msg.response.channel === channelString) {
-                                    console.log('Admin stream established', res.tracPublicKey)
-                                    network.admin_stream = connection;
-                                    network.admin = res.tracPublicKey;
-                                }
+                            } else if (msg.response !== undefined && msg.response.op !== undefined && msg.response.op === 'adminResponse') {
+
+                                await network.handleAdminResponse(msg, connection, channelString, state, wallet);
                                 network.#swarm.leavePeer(connection.remotePublicKey)
+
                             }
                             else if (msg.response !== undefined && msg.response.op !== undefined && msg.response.op === 'node') {
 
@@ -200,14 +190,8 @@ class Network extends ReadyResource {
                                 network.#swarm.leavePeer(connection.remotePublicKey)
 
                                 //TODO: Most of this logic below should be moved into the handleIncomingEvent function. Code below can be reduced to call only handleIncomingEvent(msg) with some basic checks.
-                            } else if (msg.type !== undefined && msg.key !== undefined && msg.value !== undefined && msg.type === 'addWriter') {
-                                const adminEntry = await state.get(EntryType.ADMIN);
-                                if (null === adminEntry || (adminEntry.tracPublicKey !== wallet.publicKey)) return;
-                                const nodeEntry = await state.get(msg.value.pub);
-                                const isAlreadyWriter = null !== nodeEntry && nodeEntry.isWriter;
-                                const canAddWriter = state.isWritable() && !isAlreadyWriter;
-                                if (msg.key === wallet.publicKey || !canAddWriter) return;
-                                await handleIncomingEvent(msg);
+                            } else if (msg.message !== undefined && msg.op === 'addWriter') {
+                                await handleIncomingEvent(b4a.from(msg.message));                               
                                 network.#swarm.leavePeer(connection.remotePublicKey)
                             } else if (msg.type !== undefined && msg.key !== undefined && msg.value !== undefined && msg.type === 'removeWriter') {
                                 const adminEntry = await state.get(EntryType.ADMIN);
@@ -219,6 +203,7 @@ class Network extends ReadyResource {
                                 await handleIncomingEvent(msg);
                                 network.#swarm.leavePeer(connection.remotePublicKey)
                             } else if (msg.type !== undefined && msg.key !== undefined && msg.value !== undefined && msg.type === 'addAdmin') {
+                                
                                 const adminEntry = await state.get(EntryType.ADMIN);
                                 if (null === adminEntry || (adminEntry.tracPublicKey !== msg.key)) return;
                                 await handleIncomingEvent(msg);
@@ -404,27 +389,30 @@ class Network extends ReadyResource {
         this.#enableValidatorObserver = false;
     }
 
-    async tryConnection(address, type = null) {
+    async tryConnection(publicKey, type = null) {
+        console.log('in tryConnection', publicKey, type);
         if (null === this.#swarm) return null;
-        if (this.validator_stream !== null && address !== b4a.toString(this.validator_stream.remotePublicKey, 'hex')) {
+        console.log("this.validator_stream ", this.validator_stream);
+        if (this.validator_stream !== null && publicKey !== b4a.toString(this.validator_stream.remotePublicKey, 'hex')) {
             this.#swarm.leavePeer(this.validator_stream.remotePublicKey);
             this.validator_stream = null;
             this.validator = null;
         }
         // trying to join a peer from the global swarm
-        if (false === this.#swarm.peers.has(address)) {
-            this.#swarm.joinPeer(b4a.from(address, 'hex'));
+
+        if (false === this.#swarm.peers.has(publicKey)) {
+            this.#swarm.joinPeer(b4a.from(publicKey, 'hex'));
             let cnt = 0;
-            while (false === this.#swarm.peers.has(address)) {
+            while (false === this.#swarm.peers.has(publicKey)) {
                 if (cnt >= 1500) break;
                 await sleep(10);
                 cnt += 1;
             }
         }
 
-        if (this.#swarm.peers.has(address)) {
+        if (this.#swarm.peers.has(publicKey)) {
             let stream;
-            const peerInfo = this.#swarm.peers.get(address)
+            const peerInfo = this.#swarm.peers.get(publicKey)
             stream = this.#swarm._allConnections.get(peerInfo.publicKey)
 
             if (stream !== undefined && stream.messenger !== undefined) {
@@ -463,9 +451,10 @@ class Network extends ReadyResource {
     async sendMessageToAdmin(adminEntry, message) {
         try {
             if (!adminEntry || !message) {
-                return;
+                return; //change to throw error because we are not in apply 
             }
-            await this.tryConnection(adminEntry.tracPublicKey, 'admin');
+            const adminPublicKey = extractPublickeyFromAddress(adminEntry.tracAddr).toString('hex');
+            await this.tryConnection(adminPublicKey, 'admin');
             await this.spinLock(() => this.admin_stream === null);
             if (this.admin_stream !== null) {
                 await this.admin_stream.messenger.send(message);
@@ -493,7 +482,77 @@ class Network extends ReadyResource {
         } catch (e) {
             console.log(e)
         }
-
     }
+
+    //TODO: In the future we will move it to another class to reduce size of this file. 
+    async handleGetAdminRequest(message, connection, channelString, state, wallet, writingKey) {
+        const adminEntry = await state.getAdminEntry();
+        const adminPublicKey = extractPublickeyFromAddress(adminEntry.tracAddr);
+
+        if (!b4a.equals(wallet.publicKey, adminPublicKey)) {
+            console.log("You are not an admin, cannot get admin stream.");
+            return;
+        }
+
+        const nonce = Wallet.generateNonce().toString('hex');
+        const payload = {
+            op: 'adminResponse',
+            wk: writingKey.toString('hex'),
+            address: wallet.address.toString('hex'),
+            nonce: nonce,
+            channel: channelString,
+            issuer: connection.remotePublicKey.toString('hex'),
+            timestamp: Date.now(),
+        };
+        const hash = await wallet.createHash('sha256', JSON.stringify(payload));
+        const sig = wallet.sign(hash);
+
+        message.send({ response: payload, sig });
+    }
+
+    //TODO: In the future we will move it to another class to reduce size of this file. 
+    async handleAdminResponse(msg, connection, channelString, state, wallet) {
+        if (!msg.response || !msg.response.wk || !msg.response.address || !msg.response.nonce || !msg.response.channel || !msg.response.issuer || !msg.response.timestamp) {
+            console.log("Admin response is missing required fields.");
+            this.#swarm.leavePeer(connection.remotePublicKey);
+            return;
+        }
+
+        const issuerPublicKey = b4a.from(msg.response.issuer, 'hex');
+        if (!b4a.equals(issuerPublicKey, wallet.publicKey)) {
+            console.log("Issuer public key does not match wallet public key.");
+            this.#swarm.leavePeer(connection.remotePublicKey);
+            return;
+        }
+
+        const timestamp = msg.response.timestamp;
+        const now = Date.now();
+        const fiveSeconds = 5000;
+
+        if (now - timestamp > fiveSeconds) {
+            console.log("Admin response is too old, ignoring.");
+            this.#swarm.leavePeer(connection.remotePublicKey);
+            return;
+        }
+
+        const adminEntry = await state.getAdminEntry();
+        const adminPublicKey = extractPublickeyFromAddress(adminEntry.tracAddr);
+        const receivedAdminPublicKey = extractPublickeyFromAddress(b4a.from(msg.response.address, 'hex'));
+
+        if (adminEntry === null || !b4a.equals(adminPublicKey, receivedAdminPublicKey)) {
+            console.log("Admin entry is null or admin public key mismatch in response.");
+            this.#swarm.leavePeer(connection.remotePublicKey);
+            return;
+        }
+
+        const hash = await wallet.createHash('sha256', JSON.stringify(msg.response));
+        const verified = wallet.verify(msg.sig, hash, adminPublicKey);
+        if (verified && msg.response.channel === channelString) {
+            console.log('Admin stream established', adminPublicKey);
+            this.admin_stream = connection;
+            this.admin = adminPublicKey;
+        }
+    }
+
 }
 export default Network;

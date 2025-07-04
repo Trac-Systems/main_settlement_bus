@@ -141,15 +141,17 @@ export function decodeNodeEntry(nodeEntry) {
     if (!isBufferValid(nodeEntry, NODE_ENTRY_SIZE)) {
         return null;
     }
+
     try {
-        const mask = nodeEntry[0];
-        const isWhitelisted = !!(mask & WHITELISTED_MASK);
-        const isWriter = !!(mask & WRITER_MASK);
-        const isIndexer = !!(mask & INDEXER_MASK);
+        const role = nodeEntry[0];
+
+        const isWhitelisted = !!(role & WHITELISTED_MASK);
+        const isWriter = !!(role & WRITER_MASK);
+        const isIndexer = !!(role & INDEXER_MASK);
 
 
         const wk = nodeEntry.subarray(1);
-        return { wk, isWriter, isIndexer, isWhitelisted };
+        return { wk, isWhitelisted, isWriter, isIndexer };
 
     }
     catch (error) {

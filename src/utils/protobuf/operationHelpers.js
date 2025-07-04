@@ -27,6 +27,7 @@ export const safeEncodeApplyOperation = (payload) => {
  */
 export const safeDecodeApplyOperation = (payload) => {
     try {
+        if (!b4a.isBuffer(payload)) return null;
         return applyOperations.Operation.decode(payload);
     } catch (error) {
         console.log(error);
