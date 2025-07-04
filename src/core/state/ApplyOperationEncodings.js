@@ -160,6 +160,7 @@ export function decodeNodeEntry(nodeEntry) {
     }
 }
 
+//FUNCTIONS BELOW ARE USED IN APPLY. CONSIDER IF WE DON'T NEED THEM IN UNDER APPLAY SECTION IN STATE.JS
 export function isWhitelisted(nodeEntry) {
     if (!isBufferValid(nodeEntry, NODE_ENTRY_SIZE)) {
         return false;

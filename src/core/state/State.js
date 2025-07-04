@@ -118,7 +118,7 @@ class State extends ReadyResource {
     async isAddressWhitelisted(address) {
         const nodeEntry = await this.getNodeEntry(address);
         if (nodeEntry === null) return false;
-        return !!nodeEntry.isWhitelisted;   
+        return !!nodeEntry.isWhitelisted;
     }
 
     async getIndexersEntry() {
@@ -144,6 +144,7 @@ class State extends ReadyResource {
         const batch = view.batch();
         for (const node of nodes) {
             const op = safeDecodeApplyOperation(node.value);
+            console.log(op)
             if (op === null) return;
 
             const handler = this.#getApplyOperationHandler(op.type);
@@ -324,38 +325,58 @@ class State extends ReadyResource {
     }
 
     async #handleApplyAddWriterOperation(op, view, base, node, batch) {
-        const adminEntry = await batch.get(EntryType.ADMIN);
-        if (null === adminEntry || !this.check.sanitizeExtendedKeyOpSchema(op) || !this.#isAdminApply(adminEntry.value, node)) return;
+        if (!this.check.sanitizeExtendedKeyOpSchema(op)) return;
 
-        const isWhitelisted = await this.#isWhitelistedApply(op.key, batch);
-        if (!isWhitelisted || op.key !== op.value.pub) return;
-        const message = MsgUtils.createMessage(op.key, op.value.wk, op.value.nonce, op.type)
-        const isMessageVerifed = await this.#verifyMessageApply(op.value.sig, op.key, message);
+        const nodeTracAddr = op.key;
+        const nodeNetworkPrefix = nodeTracAddr.slice(0, 1);
+        if (nodeNetworkPrefix.readUInt8(0) !== TRAC_NETWORK_PREFIX) return;
+
+        const tracPublicKey = nodeTracAddr.slice(1, 33);
+        const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
+        const decodedAdminEntry = decodeAdminEntry(adminEntry);
+        if (null === decodedAdminEntry || !this.#isAdminApply(decodedAdminEntry, node)) return;
+        const nodeEntry = await this.#getEntryApply(op.key.toString('hex'), batch);
+        const isNodeWhitelisted = isWhitelisted(nodeEntry);
+
+        if (!isNodeWhitelisted) return;
+        const message = createMessage(op.key, op.eko.wk, op.eko.nonce, op.type)
         const hash = await createHash('sha256', message);
+        const isMessageVerifed = this.#wallet.verify(op.eko.sig, hash, tracPublicKey);
+        const opEntry = await batch.get(hash)
+
         if (isMessageVerifed &&
-            null === await batch.get(hash)
+            null === opEntry
         ) {
             await this.#addWriter(op, batch, base, hash);
         }
     }
 
     async #addWriter(op, batch, base, hash) {
-        const nodeEntry = await batch.get(op.key);
-        if (nodeEntry === null || !nodeEntry.value.isWriter) {
-            await base.addWriter(b4a.from(op.value.wk, 'hex'), { isIndexer: false })
-            await batch.put(op.key, {
-                pub: op.value.pub,
-                wk: op.value.wk,
-                isWriter: true,
-                isIndexer: false
-            });
+        const nodeEntry = await this.#getEntryApply(op.key.toString('hex'), batch);
+        if (nodeEntry === null) return;
+
+        if (!isWriter(nodeEntry)) {
+            const editedNodeEntry = encodeNodeEntry(op.eko.wk, NodeRole.WRITER);
+            if (editedNodeEntry.length === 0) return;
+            await base.addWriter(op.eko.wk, { isIndexer: false })
+            await batch.put(op.key, editedNodeEntry);
+
             let length = await batch.get('wrl');
+            console.log("length", length)
             if (null === length) {
                 length = 0;
             } else {
                 length = length.value;
             }
-            await batch.put('wri/' + length, op.value.pub);
+            //TODO: NOW WE ARE OPERATING ON BYTES. Wri is a string so we can write it like this
+            //b-garbacz:
+            // however wrl and length +1 should be a byte number. Question is what size should it be?
+            // UInt32 (4bytes) 4,294,967,295?
+            // UInt64 (8bytes) 18,446,744,073,709,551,615?
+            // Implement encodeLength,decode and setLength???? 
+            // I think this entry Uint32 is enough for now. 4Billion operations is a lot...
+            console.log("length after", length)
+            await batch.put('wri/' + length, op.key);
             await batch.put('wrl', length + 1);
             await batch.put(hash, op);
             console.log(`Writer added: ${op.key}:${op.value.wk}`);
@@ -363,41 +384,46 @@ class State extends ReadyResource {
     }
 
     async #handleApplyRemoveWriterOperation(op, view, base, node, batch) {
-        const adminEntry = await batch.get(EntryType.ADMIN);
-        if (null === adminEntry || !this.check.sanitizeExtendedKeyOpSchema(op) || !this.#isAdminApply(adminEntry.value, node)) return;
-        const message = MsgUtils.createMessage(op.key, op.value.wk, op.value.nonce, op.type);
-        const isMessageVerifed = await this.#verifyMessageApply(op.value.sig, op.key, message);
+        if (!this.check.sanitizeExtendedKeyOpSchema(op)) return;
+        const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
+        if (null === adminEntry || !this.#isAdminApply(adminEntry, node)) return;
+
+        const tracAddr = op.key;
+        const networkPrefix = tracAddr.slice(0, 1);
+        if (networkPrefix.readUInt8(0) !== TRAC_NETWORK_PREFIX) return;
+        const tracPublicKey = tracAddr.slice(1, 33);
+
+        const message = createMessage(op.key, op.eko.wk, op.eko.nonce, op.type);
         const hash = await createHash('sha256', message);
-        if (isMessageVerifed &&
-            null === await batch.get(hash)
-        ) {
-            await this.#removeWriter(op, batch, base, hash);
-        }
+        const isMessageVerifed = this.#wallet.verify(op.eko.sig, hash, tracPublicKey);
+
+        if (!isMessageVerifed || null !== await batch.get(hash)) return;
+        await this.#removeWriter(op, batch, base, hash);
+
     }
 
     async #removeWriter(op, batch, base, hash) {
-        let nodeEntry = await batch.get(op.key)
-        if (nodeEntry !== null) {
-            nodeEntry = nodeEntry.value;
-            await base.removeWriter(b4a.from(nodeEntry.wk, 'hex'));
-            nodeEntry.isWriter = false;
-            if (nodeEntry.isIndexer) {
-                nodeEntry.isIndexer = false;
-                const indexersEntry = await batch.get(EntryType.INDEXERS);
-                if (null !== indexersEntry && indexersEntry.value.includes(op.key)) {
-                    const idx = indexersEntry.value.indexOf(op.key);
-                    if (idx !== -1) {
-                        indexersEntry.value.splice(idx, 1);
-                        await batch.put(EntryType.INDEXERS, indexersEntry.value);
-                    }
+        let nodeEntry = await this.#getEntryApply(op.key.toString('hex'), batch);
+        if (null === nodeEntry) return;
+
+
+        await base.removeWriter(b4a.from(nodeEntry.wk, 'hex'));
+        nodeEntry.isWriter = false;
+        if (nodeEntry.isIndexer) {
+            nodeEntry.isIndexer = false;
+            const indexersEntry = await batch.get(EntryType.INDEXERS);
+            if (null !== indexersEntry && indexersEntry.value.includes(op.key)) {
+                const idx = indexersEntry.value.indexOf(op.key);
+                if (idx !== -1) {
+                    indexersEntry.value.splice(idx, 1);
+                    await batch.put(EntryType.INDEXERS, indexersEntry.value);
                 }
             }
-
-            await batch.put(op.key, nodeEntry);
-            await batch.put(hash, op);
-            console.log(`Writer removed: ${op.key}${op.value.wk ? `:${op.value.wk}` : ''}`);
-
         }
+
+        await batch.put(op.key, nodeEntry);
+        await batch.put(hash, op);
+        console.log(`Writer removed: ${op.key}${op.value.wk ? `:${op.value.wk}` : ''}`);
     }
 
     async #handleApplyAddIndexerOperation(op, view, base, node, batch) {
