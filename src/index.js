@@ -323,30 +323,29 @@ export class MainSettlementBus extends ReadyResource {
 
         if (!this.#isAdmin(adminEntry)) return;
         const assembledWhitelistMessages = await MsgUtils2.assembleAppendWhitelistMessages(this.#wallet);
-        console.log(assembledWhitelistMessages)
         if (!assembledWhitelistMessages) {
             console.log('Whitelist message not sent.');
             return;
         }
 
-        const totelElements = assembledWhitelistMessages.length;
+        const totalElements = assembledWhitelistMessages.length;
 
-        for (let i = 0; i < totelElements; i++) {
-            // const isWhitelisted = await this.#isWhitelisted(assembledWhitelistMessages[i].key);
+        for (let i = 0; i < totalElements; i++) {
             // if (!isWhitelisted) {
             await this.#state.append(assembledWhitelistMessages[i]);
-            // await this.#network.sendMessageToNode(assembledWhitelistMessages[i].key, whitelistedMessage);
+                // await this.#network.sendMessageToNode(assembledWhitelistMessages[i].key, whitelistedMessage);
             // await sleep(WHITELIST_SLEEP_INTERVAL);
             // console.log(`Whitelist message sent (public key ${(i + 1)}/${totelElements})`);
-            //}
+            // }
         }
     }
 
     async #requestWriterRole(toAdd) {
         if (this.#enable_wallet === false) return;
         const adminEntry = await this.#state.getAdminEntry();
-        const nodeEntry = await this.#state.getNodeEntry(this.#wallet.address.toString('hex'));
-        const isAlreadyWriter = !!(nodeEntry && nodeEntry.isWriter === true)
+        const addr = this.#wallet.address.toString('hex');
+        const nodeEntry = await this.#state.getNodeEntry(addr);
+        const isAlreadyWriter = !!(nodeEntry && nodeEntry.isWriter)
         let assembledMessage = null;
 
         if (toAdd) {

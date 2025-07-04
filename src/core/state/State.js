@@ -324,38 +324,50 @@ class State extends ReadyResource {
     }
 
     async #handleApplyAddWriterOperation(op, view, base, node, batch) {
-        const adminEntry = await batch.get(EntryType.ADMIN);
-        if (null === adminEntry || !this.check.sanitizeExtendedKeyOpSchema(op) || !this.#isAdminApply(adminEntry.value, node)) return;
+        if (!this.check.sanitizeExtendedKeyOpSchema(op)) return; // TODO: change name to validateExtendedKeyOpSchema
 
-        const isWhitelisted = await this.#isWhitelistedApply(op.key, batch);
-        if (!isWhitelisted || op.key !== op.value.pub) return;
-        const message = MsgUtils.createMessage(op.key, op.value.wk, op.value.nonce, op.type)
-        const isMessageVerifed = await this.#verifyMessageApply(op.value.sig, op.key, message);
+        const nodeTracAddr = op.key;
+        const nodeNetworkPrefix = nodeTracAddr.slice(0, 1);
+        if (nodeNetworkPrefix.readUInt8(0) !== TRAC_NETWORK_PREFIX) return;
+
+        const tracPublicKey = nodeTracAddr.slice(1, 33);
+
+        const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
+        const decodedAdminEntry = decodeAdminEntry(adminEntry.value);
+        if (null === decodedAdminEntry || !this.#isAdminApply(decodedAdminEntry.value, node)) return;
+
+        const nodeEntry = await this.#getEntryApply(op.key.toString('hex'), batch);
+        const isWhitelisted = isWhitelisted(nodeEntry);
+
+        if (!isWhitelisted) return;
+        const message = createMessage(op.key, op.eko.wk, op.eko.nonce, op.type)
         const hash = await createHash('sha256', message);
+
+        const isMessageVerifed = this.#wallet.verify(op.eko.sig, hash, tracPublicKey);
+        const opEntry = await batch.get(hash)
         if (isMessageVerifed &&
-            null === await batch.get(hash)
+            null === opEntry
         ) {
             await this.#addWriter(op, batch, base, hash);
         }
     }
 
     async #addWriter(op, batch, base, hash) {
-        const nodeEntry = await batch.get(op.key);
-        if (nodeEntry === null || !nodeEntry.value.isWriter) {
-            await base.addWriter(b4a.from(op.value.wk, 'hex'), { isIndexer: false })
-            await batch.put(op.key, {
-                pub: op.value.pub,
-                wk: op.value.wk,
-                isWriter: true,
-                isIndexer: false
-            });
+        const nodeEntry = await this.#getEntryApply(op.key.toString('hex'), batch);
+        if (nodeEntry === null) return;
+
+        if (!isWriter(nodeEntry)) {
+            const editedNodeEntry = encodeNodeEntry(op.eko.wk, NodeRole.WRITER);
+            if (editedNodeEntry.length === 0) return;
+            await base.addWriter(op.eko.wk, { isIndexer: false })
+            await batch.put(op.key, editedNodeEntry);
             let length = await batch.get('wrl');
             if (null === length) {
                 length = 0;
             } else {
                 length = length.value;
             }
-            await batch.put('wri/' + length, op.value.pub);
+            await batch.put('wri/' + length, op.key);
             await batch.put('wrl', length + 1);
             await batch.put(hash, op);
             console.log(`Writer added: ${op.key}:${op.value.wk}`);
