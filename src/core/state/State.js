@@ -389,7 +389,7 @@ class State extends ReadyResource {
             const editedNodeEntry = encodeNodeEntry(op.eko.wk, NodeRole.WRITER);
             if (editedNodeEntry.length === 0) return;
             await base.addWriter(op.eko.wk, { isIndexer: false })
-            await batch.put(op.key, editedNodeEntry);
+            await batch.put(op.key.toString('hex'), editedNodeEntry);
 
             await batch.put('wri/' + length, op.key);
             await batch.put('wrl', incrementedLength);
