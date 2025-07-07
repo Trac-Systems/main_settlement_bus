@@ -173,10 +173,9 @@ class Network extends ReadyResource {
                                 }
                                 network.#swarm.leavePeer(connection.remotePublicKey)
                             } else if (msg.response !== undefined && msg.response.op !== undefined && msg.response.op === 'adminResponse') {
-
+                                
                                 await network.handleAdminResponse(msg, connection, channelString, state, wallet);
                                 network.#swarm.leavePeer(connection.remotePublicKey)
-
                             }
                             else if (msg.response !== undefined && msg.response.op !== undefined && msg.response.op === 'node') {
 
@@ -193,8 +192,9 @@ class Network extends ReadyResource {
                             } else if (msg.message !== undefined && msg.op === 'addWriter') {
                                 await handleIncomingEvent(b4a.from(msg.message));                               
                                 network.#swarm.leavePeer(connection.remotePublicKey)
-                            } else if (msg.type !== undefined && msg.key !== undefined && msg.value !== undefined && msg.type === 'removeWriter') {
-                                await handleIncomingEvent(msg);
+                            } else if (msg.message !== undefined && msg.op === 'removeWriter') {
+                                
+                                await handleIncomingEvent(b4a.from(msg.message));
                                 network.#swarm.leavePeer(connection.remotePublicKey)
                             } else if (msg.type !== undefined && msg.key !== undefined && msg.value !== undefined && msg.type === 'addAdmin') {
                                 

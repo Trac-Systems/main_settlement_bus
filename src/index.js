@@ -27,6 +27,8 @@ import Network from './core/network/Network.js';
 import Check from './utils/check.js';
 import State from './core/state/State.js';
 
+//TODO create a MODULE which will separate logic responsible for role managment
+
 export class MainSettlementBus extends ReadyResource {
     // Internal flags
     #shouldListenToAdminEvents = false;
@@ -403,7 +405,6 @@ export class MainSettlementBus extends ReadyResource {
         }
     }
 
-    //TODO create a MODULE which will separate logic responsible for role managment
     async #banValidator(tracPublicKey) {
         const adminEntry = await this.#state.get(EntryType.ADMIN);
         if (!this.#isAdmin(adminEntry)) return;
