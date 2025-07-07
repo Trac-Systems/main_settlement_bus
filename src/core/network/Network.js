@@ -194,12 +194,6 @@ class Network extends ReadyResource {
                                 await handleIncomingEvent(b4a.from(msg.message));                               
                                 network.#swarm.leavePeer(connection.remotePublicKey)
                             } else if (msg.type !== undefined && msg.key !== undefined && msg.value !== undefined && msg.type === 'removeWriter') {
-                                const adminEntry = await state.get(EntryType.ADMIN);
-                                if (null === adminEntry || (adminEntry.tracPublicKey !== wallet.publicKey)) return;
-                                const nodeEntry = await state.get(msg.value.pub);
-                                const isAlreadyWriter = null !== nodeEntry && nodeEntry.isWriter;
-                                const canRemoveWriter = state.isWritable() && isAlreadyWriter
-                                if (msg.key === wallet.publicKey || !canRemoveWriter) return;
                                 await handleIncomingEvent(msg);
                                 network.#swarm.leavePeer(connection.remotePublicKey)
                             } else if (msg.type !== undefined && msg.key !== undefined && msg.value !== undefined && msg.type === 'addAdmin') {
@@ -538,8 +532,9 @@ class Network extends ReadyResource {
         const adminEntry = await state.getAdminEntry();
         const adminPublicKey = extractPublickeyFromAddress(adminEntry.tracAddr);
         const receivedAdminPublicKey = extractPublickeyFromAddress(b4a.from(msg.response.address, 'hex'));
+        const adminWritingKey = b4a.from(msg.response.wk, 'hex');
 
-        if (adminEntry === null || !b4a.equals(adminPublicKey, receivedAdminPublicKey)) {
+        if (adminEntry === null || !b4a.equals(adminPublicKey, receivedAdminPublicKey) || !b4a.equals(adminEntry.wk, adminWritingKey)) {
             console.log("Admin entry is null or admin public key mismatch in response.");
             this.#swarm.leavePeer(connection.remotePublicKey);
             return;

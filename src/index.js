@@ -188,7 +188,7 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async #isAllowedToRequestRole(adminEntry, nodeEntry) {
-        return nodeEntry.isWhitelisted && !this.#isAdmin(adminEntry);
+        return nodeEntry && nodeEntry.isWhitelisted && !this.#isAdmin(adminEntry);
     }
 
     //todo: delete state.js method have it
@@ -351,9 +351,7 @@ export class MainSettlementBus extends ReadyResource {
 
         if (toAdd) {
             const isAllowedToRequestRole = await this.#isAllowedToRequestRole(adminEntry, nodeEntry);
-            console.log("isAllowedToRequestRole", isAllowedToRequestRole)
             const canAddWriter = !!(!this.#state.isWritable() && !isAlreadyWriter && isAllowedToRequestRole);
-            console.log("canAddWriter", canAddWriter)
             if (canAddWriter) {
                 assembledMessage = {
                     op: 'addWriter',

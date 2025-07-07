@@ -131,6 +131,7 @@ class MessageOperations {
         }
     }
 
+    //todo refactor when all cases are implemented. Missing addAdmin
     static async verifyEventMessage(parsedRequest, wallet, check, state) {
         const { type } = parsedRequest;
         if (
@@ -158,6 +159,25 @@ class MessageOperations {
             const networkPrefix = nodeTracAddress.slice(0, 1);
             if (networkPrefix.readUInt8(0) !== TRAC_NETWORK_PREFIX) return false;
             const nodePublicKey = nodeTracAddress.slice(1, 33);
+
+            const msg = createMessage(parsedRequest.key, parsedRequest.eko.wk, parsedRequest.eko.nonce, parsedRequest.type);
+            const hash = await createHash('sha256', msg);
+
+            return wallet.verify(parsedRequest.eko.sig, hash, nodePublicKey);
+        } else if (type === OperationType.REMOVE_WRITER) {
+
+            const nodeEntry = await state.getNodeEntry(parsedRequest.key.toString('hex'));
+            if (!nodeEntry) return false;
+
+            const isAlreadyWriter = nodeEntry.isWriter;
+            const canRemoveWriter = state.isWritable() && isAlreadyWriter;
+            if (parsedRequest.key === wallet.address || !canRemoveWriter) return false;
+
+            const nodeTracAddress = parsedRequest.key
+            const networkPrefix = nodeTracAddress.slice(0, 1);
+            if (networkPrefix.readUInt8(0) !== TRAC_NETWORK_PREFIX) return false;
+            const nodePublicKey = nodeTracAddress.slice(1, 33);
+
             const msg = createMessage(parsedRequest.key, parsedRequest.eko.wk, parsedRequest.eko.nonce, parsedRequest.type);
             const hash = await createHash('sha256', msg);
 

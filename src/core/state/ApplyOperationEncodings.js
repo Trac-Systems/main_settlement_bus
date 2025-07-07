@@ -160,6 +160,7 @@ export function decodeNodeEntry(nodeEntry) {
     }
 }
 
+//FUNCTIONS BELOW ARE USED IN APPLY. CONSIDER IF WE DON'T NEED THEM IN UNDER APPLAY SECTION IN STATE.JS
 export function isWhitelisted(nodeEntry) {
     if (!isBufferValid(nodeEntry, NODE_ENTRY_SIZE)) {
         return false;
@@ -302,4 +303,30 @@ export function removeIndexer(indexerAddr, indexersEntry) {
         console.error("Error removing indexer:", error);
         return b4a.alloc(0); // If some error occurs, do nothing
     }
+}
+
+
+// ------------ LENGTH MANAGEMENT ------------ //
+
+// Probably we will use it only once for length initialization so I do not expect any throw
+// in this case incoming data is always from state which should be always valid 
+
+export function setUpLengthEntry() {
+    const buf = b4a.alloc(4, 0x00); // rid off magic numbers
+    return buf;
+}
+
+export function decodeLengthEntry(bufferData) {
+    return bufferData.readUInt32LE();
+}
+
+export function encodeLengthEntry(length) {
+    const buf = b4a.alloc(4);
+    buf.writeUInt32LE(length); // little endian or big endian? For example for cryptographic purposes we should use little endian to avoid dobule conversions - we forget about it.
+    return buf;
+}
+
+export function incrementLengthEntry(length) {
+    const nextValue = length + 1
+    return encodeLengthEntry(nextValue);
 }
