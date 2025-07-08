@@ -7,9 +7,7 @@ import { createMessage } from '../utils/buffer.js';
 import { createHash } from '../utils/crypto.js';
 import { TRAC_NETWORK_PREFIX } from '../utils/constants.js';
 import b4a from 'b4a';
-/*
-    This module won't work properly as long as createHash returns string. 
-*/
+
 class MessageOperations {
     static async assembleAddAdminMessage(adminEntry, writingKey, wallet, bootstrap) {
         try {

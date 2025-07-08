@@ -12,15 +12,12 @@ import MsgUtils from './utils/msgUtils.js';
 import MsgUtils2 from "./messages/MessageOperations.js"
 import { extractPublickeyFromAddress } from './utils/helpers.js';
 import {safeDecodeApplyOperation} from '../src/utils/protobuf/operationHelpers.js';
-
 import {
     LISTENER_TIMEOUT,
     EntryType,
     OperationType,
     EventType,
     WHITELIST_SLEEP_INTERVAL,
-    MAX_INDEXERS,
-    MIN_INDEXERS,
     TRAC_NETWORK_PREFIX,
 } from './utils/constants.js';
 import Network from './core/network/Network.js';
@@ -376,33 +373,31 @@ export class MainSettlementBus extends ReadyResource {
         }
     }
 
-    async #updateIndexerRole(tracPublicKey, toAdd) {
+    async #updateIndexerRole(tracPubKey, toAdd) {
+        const tempAddressApproach = "01" + tracPubKey;
         if (this.#enable_wallet === false) return;
-        const adminEntry = await this.#state.get(EntryType.ADMIN);
+        const adminEntry = await this.#state.getAdminEntry();
         if (!this.#isAdmin(adminEntry) && !this.#state.isWritable()) return;
-
-        const isWhitelisted = await this.#isWhitelisted(tracPublicKey);
-        if (!isWhitelisted) return;
-
-        const nodeEntry = await this.#state.get(tracPublicKey);
+        const nodeEntry = await this.#state.getNodeEntry(tempAddressApproach);
         if (!nodeEntry || !nodeEntry.isWriter) return;
 
-        const indexersEntry = await this.#state.get(EntryType.INDEXERS);
-
+        const indexersEntry = await this.#state.getIndexersEntry();
+        const indexerListHasAddress = await this.#state.isAddressInIndexersEntry(tempAddressApproach, indexersEntry);
+        if (indexerListHasAddress) return;
         if (toAdd) {
-            const canAddIndexer = !nodeEntry.isIndexer && indexersEntry.length <= MAX_INDEXERS;
+            const canAddIndexer = nodeEntry.isWhitelisted && nodeEntry.isWriter && !nodeEntry.isIndexer;
             if (canAddIndexer) {
-                const assembledAddIndexerMessage = await MsgUtils.assembleAddIndexerMessage(this.#wallet, tracPublicKey);
+                const assembledAddIndexerMessage = await MsgUtils2.assembleAddIndexerMessage(this.#wallet, b4a.from(tracPubKey, 'hex'));
                 await this.#state.append(assembledAddIndexerMessage);
             }
-        } else {
-            const canRemoveIndexer = !toAdd && nodeEntry.isIndexer && indexersEntry.length > MIN_INDEXERS;
-            if (canRemoveIndexer) {
-                const assembledRemoveIndexer = await MsgUtils.assembleRemoveIndexerMessage(this.#wallet, tracPublicKey);
-                await this.#state.append(assembledRemoveIndexer);
-            }
+        } //else {
+        //     const canRemoveIndexer = !toAdd && nodeEntry.isIndexer && indexersEntry.length > MIN_INDEXERS;
+        //     if (canRemoveIndexer) {
+        //         const assembledRemoveIndexer = await MsgUtils2.assembleRemoveIndexerMessage(this.#wallet, tempAddress);
+        //         await this.#state.append(assembledRemoveIndexer);
+        //     }
 
-        }
+        // }
     }
 
     async #banValidator(tracPublicKey) {
@@ -412,13 +407,13 @@ export class MainSettlementBus extends ReadyResource {
         const nodeEntry = await this.#state.get(tracPublicKey);
         if (!isWhitelisted || null === nodeEntry || nodeEntry.isIndexer === true) return;
 
-        const assembledBanValidatorMessage = await MsgUtils.assembleBanValidatorMessage(this.#wallet, tracPublicKey);
+        //const assembledBanValidatorMessage = await MsgUtils.assembleBanValidatorMessage(this.#wallet, tracPublicKey);
         await this.#state.append(assembledBanValidatorMessage);
 
     }
 
-    async #handleAddIndexerOperation(tracPublicKey) {
-        this.#updateIndexerRole(tracPublicKey, true);
+    async #handleAddIndexerOperation(tracAddress) {
+        this.#updateIndexerRole(tracAddress, true);
     }
 
     async #handleRemoveIndexerOperation(tracPublicKey) {
@@ -494,7 +489,9 @@ export class MainSettlementBus extends ReadyResource {
                 if (input.startsWith('/get_node_info')) {
                     const splitted = input.split(' ');
                     const address = splitted[1];
-                    const nodeEntry = await this.#state.getNodeEntry("0" + TRAC_NETWORK_PREFIX.toString() + address);
+                    const tempAddress = "0" + TRAC_NETWORK_PREFIX.toString() + address;
+                    console.log("Temporary Address:", tempAddress);
+                    const nodeEntry = await this.#state.getNodeEntry(tempAddress);
                     if (nodeEntry) {
                         console.log("Node Entry:", {
                             WritingKey: nodeEntry.wk.toString('hex'),
