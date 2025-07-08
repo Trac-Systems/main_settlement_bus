@@ -130,6 +130,7 @@ class MessageOperations {
     }
 
     //todo refactor when all cases are implemented. Missing addAdmin
+    //TODO: This method can be simplified.
     static async verifyEventMessage(parsedRequest, wallet, check, state) {
         const { type } = parsedRequest;
         if (

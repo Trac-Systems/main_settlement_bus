@@ -131,6 +131,7 @@ class Network extends ReadyResource {
                         //TODO write validators in fastest validator + define protoschemas 
                         try {
                             const channelString = b4a.toString(network.channel, 'utf8');
+                            //TODO fix finding validators and specific node
                             if (msg === 'get_validator') {
                                 const nonce = Wallet.generateNonce().toString('hex');
                                 const _msg = {
@@ -173,7 +174,7 @@ class Network extends ReadyResource {
                                 }
                                 network.#swarm.leavePeer(connection.remotePublicKey)
                             } else if (msg.response !== undefined && msg.response.op !== undefined && msg.response.op === 'adminResponse') {
-                                
+
                                 await network.handleAdminResponse(msg, connection, channelString, state, wallet);
                                 network.#swarm.leavePeer(connection.remotePublicKey)
                             }
@@ -190,14 +191,14 @@ class Network extends ReadyResource {
 
                                 //TODO: Most of this logic below should be moved into the handleIncomingEvent function. Code below can be reduced to call only handleIncomingEvent(msg) with some basic checks.
                             } else if (msg.message !== undefined && msg.op === 'addWriter') {
-                                await handleIncomingEvent(b4a.from(msg.message));                               
+                                await handleIncomingEvent(b4a.from(msg.message));
                                 network.#swarm.leavePeer(connection.remotePublicKey)
                             } else if (msg.message !== undefined && msg.op === 'removeWriter') {
-                                
+
                                 await handleIncomingEvent(b4a.from(msg.message));
                                 network.#swarm.leavePeer(connection.remotePublicKey)
                             } else if (msg.type !== undefined && msg.key !== undefined && msg.value !== undefined && msg.type === 'addAdmin') {
-                                
+
                                 const adminEntry = await state.get(EntryType.ADMIN);
                                 if (null === adminEntry || (adminEntry.tracPublicKey !== msg.key)) return;
                                 await handleIncomingEvent(msg);
@@ -243,7 +244,7 @@ class Network extends ReadyResource {
                                 if (b4a.byteLength(JSON.stringify(msg)) > 3072) return;
 
                                 const parsedPreTx = msg;
-
+                                //TODO implement separated function for this. 
                                 if (network.check.sanitizePreTx(parsedPreTx) &&
                                     wallet.verify(b4a.from(parsedPreTx.is, 'hex'), b4a.from(parsedPreTx.tx + parsedPreTx.in), b4a.from(parsedPreTx.ipk, 'hex')) &&
                                     parsedPreTx.wp === wallet.publicKey &&
@@ -335,6 +336,7 @@ class Network extends ReadyResource {
 
     // TODO: AFTER WHILE LOOP SIGNAL TO THE PROCESS THAT VALIDATOR OBSERVER STOPPED OPERATING. 
     // OS CALLS, ACCUMULATORS, MAYBE THIS IS POSSIBLE TO CHECK I/O QUEUE IF IT COINTAIN IT. FOR NOW WE ARE USING SLEEP.
+    //TODO fix finding validators and specific node
     async validatorObserver(get, publicKey) {
         console.log('Validator observer started');
         while (this.#enableValidatorObserver && this.#enable_wallet) {

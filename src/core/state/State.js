@@ -16,7 +16,8 @@ import Check from '../../utils/check.js';
 import { safeDecodeApplyOperation } from '../../utils/protobuf/operationHelpers.js';
 import { createMessage } from '../../utils/buffer.js';
 import ApplyOperationEncodings from './ApplyOperationEncodings.js';
-
+//TODO: describe apply operation +- what is going on to increase readability.
+//TODO; Integrate with bench32m
 class State extends ReadyResource {
 
     #base;
@@ -515,7 +516,7 @@ class State extends ReadyResource {
 
         console.log(`Indexer added: ${op.key.toString('hex')}:${decodedNodeEntry.wk.toString('hex')}`);
     }
-
+    //TODO: Adjust for binary data
     async #handleApplyRemoveIndexerOperation(op, view, base, node, batch) {
         if (!this.check.sanitizeBasicKeyOp(op)) return;
         const adminEntry = await batch.get(EntryType.ADMIN);
@@ -546,7 +547,7 @@ class State extends ReadyResource {
             }
         }
     }
-
+    //TODO: Adjust for binary data
     async #handleApplyBanValidatorOperation(op, view, base, node, batch) {
         const adminEntry = await batch.get(EntryType.ADMIN);
         if (null === adminEntry || !this.#isAdminApply(adminEntry.value, node)) return;

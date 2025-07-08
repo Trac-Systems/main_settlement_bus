@@ -258,7 +258,7 @@ export class MainSettlementBus extends ReadyResource {
         this.#state.base.on(EventType.IS_NON_INDEXER, () => {
             console.log('Current node is not an indexer anymore');
         });
-
+        //TODO: FIX AFTER BINARY 
         this.#state.base.on(EventType.WRITABLE, async () => {
             const updatedNodeEntry = await this.#state.get(this.#wallet.publicKey);
             const canEnableWriterEvents = updatedNodeEntry &&

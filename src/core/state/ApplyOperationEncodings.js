@@ -1,7 +1,6 @@
 import b4a from 'b4a';
 
-// TODO: b-garbacz: I think we will use some of these functions also in index js so it should be moved to utils (maybe buffer.js?)
-
+//TODO; Integrate with bench32m
 
 // Buffer standard sizes in bytes
 const WRITING_KEY_SIZE = 32;
