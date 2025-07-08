@@ -308,25 +308,68 @@ export function removeIndexer(indexerAddr, indexersEntry) {
 
 // ------------ LENGTH MANAGEMENT ------------ //
 
-// Probably we will use it only once for length initialization so I do not expect any throw
-// in this case incoming data is always from state which should be always valid 
-
+/**
+ * Initializes a length entry buffer with a default value of 0.
+ * The buffer is 4 bytes long and uses little-endian encoding.
+ *
+ * @returns {Buffer} A buffer initialized to 0.
+ */
 export function setUpLengthEntry() {
     const buf = b4a.alloc(4, 0x00); // rid off magic numbers
     return buf;
 }
 
+/**
+ * Decodes a length entry buffer into an integer.
+ * Assumes the buffer is 4 bytes long and uses little-endian encoding.
+ *
+ * @param {Buffer} bufferData - The buffer containing the length entry.
+ * @returns {number} The decoded integer value.
+ */
 export function decodeLengthEntry(bufferData) {
     return bufferData.readUInt32LE();
 }
 
+/**
+ * Encodes an integer length into a 4-byte buffer.
+ * Uses little-endian encoding.
+ *
+ * @param {number} length - The integer length to encode.
+ * @returns {Buffer} A buffer containing the encoded length.
+ */
 export function encodeLengthEntry(length) {
     const buf = b4a.alloc(4);
     buf.writeUInt32LE(length); // little endian or big endian? For example for cryptographic purposes we should use little endian to avoid dobule conversions - we forget about it.
     return buf;
 }
 
+/**
+ * Increments a given length by 1 and encodes it into a buffer.
+ * Uses little-endian encoding.
+ *
+ * @param {number} length - The current length to increment.
+ * @returns {Buffer} A buffer containing the incremented length.
+ */
 export function incrementLengthEntry(length) {
-    const nextValue = length + 1
+    const nextValue = length + 1;
     return encodeLengthEntry(nextValue);
+}
+
+export default {
+    NodeRole,
+    encodeAdminEntry,
+    decodeAdminEntry,
+    encodeNodeEntry,
+    decodeNodeEntry,
+    isWhitelisted,
+    isWriter,
+    isIndexer,
+    setNodeEntryRole,
+    appendIndexer,
+    getIndexerIndex,
+    removeIndexer,
+    setUpLengthEntry,
+    decodeLengthEntry,
+    encodeLengthEntry,
+    incrementLengthEntry
 }

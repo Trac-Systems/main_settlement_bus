@@ -16,23 +16,7 @@ import MsgUtils from '../../utils/msgUtils.js';
 import Check from '../../utils/check.js';
 import { safeDecodeApplyOperation } from '../../utils/protobuf/operationHelpers.js';
 import { createMessage } from '../../utils/buffer.js';
-import {
-    encodeAdminEntry,
-    decodeAdminEntry,
-    appendIndexer,
-    getIndexerIndex,
-    encodeNodeEntry,
-    isWhitelisted,
-    setNodeEntryRole,
-    isWriter,
-    NodeRole,
-    decodeNodeEntry,
-    encodeLengthEntry,
-    decodeLengthEntry,
-    incrementLengthEntry,
-    setUpLengthEntry
-} from './ApplyOperationEncodings.js';
-import { decode } from 'compact-encoding';
+import ApplyOperationEncodings from './ApplyOperationEncodings.js';
 
 class State extends ReadyResource {
 
@@ -123,12 +107,12 @@ class State extends ReadyResource {
 
     async getAdminEntry() {
         const adminEntry = await this.get(EntryType.ADMIN);
-        return adminEntry ? decodeAdminEntry(adminEntry) : null;
+        return adminEntry ? ApplyOperationEncodings.decodeAdminEntry(adminEntry) : null;
     }
 
     async getNodeEntry(address) {
         const nodeEntry = await this.get(address);
-        return nodeEntry ? decodeNodeEntry(nodeEntry) : null;
+        return nodeEntry ? ApplyOperationEncodings.decodeNodeEntry(nodeEntry) : null;
     }
 
     async isAddressWhitelisted(address) {
@@ -211,7 +195,7 @@ class State extends ReadyResource {
         if (!this.check.sanitizeExtendedKeyOpSchema(op)) return;
 
         const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
-        const decodedAdminEntry = decodeAdminEntry(adminEntry);
+        const decodedAdminEntry = ApplyOperationEncodings.decodeAdminEntry(adminEntry);
 
         if (null === decodedAdminEntry) {
             await this.#addAdminIfNotSet(op, view, node, batch);
@@ -237,8 +221,8 @@ class State extends ReadyResource {
             null === await batch.get(hash)
         ) {
             const indexersEntry = await batch.get(EntryType.INDEXERS);
-            const indexerIndex = getIndexerIndex(indexersEntry, adminEntry.tracAddr);
-            const newAdminEntry = encodeAdminEntry(adminEntry.tracAddr, op.eko.wk);
+            const indexerIndex = ApplyOperationEncodings.getIndexerIndex(indexersEntry, adminEntry.tracAddr);
+            const newAdminEntry = ApplyOperationEncodings.encodeAdminEntry(adminEntry.tracAddr, op.eko.wk);
             if (indexersEntry === null || indexerIndex === -1 || adminEntry.length === 0) return;
 
             await base.removeWriter(newAdminEntry.wk);
@@ -269,8 +253,8 @@ class State extends ReadyResource {
             !null === await batch.get(hash)
         ) return;
 
-        const adminEntry = encodeAdminEntry(tracAddr, op.eko.wk);
-        const initIndexers = appendIndexer(tracAddr);
+        const adminEntry = ApplyOperationEncodings.encodeAdminEntry(tracAddr, op.eko.wk);
+        const initIndexers = ApplyOperationEncodings.appendIndexer(tracAddr);
 
         if (initIndexers.length === 0 || adminEntry.length === 0) return;
 
@@ -285,7 +269,7 @@ class State extends ReadyResource {
         if (!this.check.sanitizeBasicKeyOp(op)) return;// TODO change name to validateBasicKeyOp
 
         const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
-        const decodedAdminEntry = decodeAdminEntry(adminEntry);
+        const decodedAdminEntry = ApplyOperationEncodings.decodeAdminEntry(adminEntry);
         if (null === decodedAdminEntry || !this.#isAdminApply(decodedAdminEntry, node)) return;
 
         const adminTracAddr = decodedAdminEntry.tracAddr
@@ -303,7 +287,7 @@ class State extends ReadyResource {
         if (!isMessageVerifed || null !== await batch.get(hash)) return;
 
         const nodeEntry = await this.#getEntryApply(op.key.toString('hex'), batch);
-        if (isWhitelisted(nodeEntry)) return;
+        if (ApplyOperationEncodings.isWhitelisted(nodeEntry)) return;
         if (!nodeEntry) {
             /*
                 Dear reader,
@@ -330,12 +314,12 @@ class State extends ReadyResource {
                 in the network if you possess a valid wk. As an indirect user, this characteristic doesn't affect you.             
 
             */
-            const createdNodeEntry = encodeNodeEntry(b4a.alloc(32, 0), NodeRole.WHITELISTED);
+            const createdNodeEntry = ApplyOperationEncodings.encodeNodeEntry(b4a.alloc(32, 0), ApplyOperationEncodings.NodeRole.WHITELISTED);
             await batch.put(op.key.toString('hex'), createdNodeEntry);
             await batch.put(hash.toString('hex'), node.value);
 
         } else {
-            const editedNodeEntry = setNodeEntryRole(nodeEntry, NodeRole.WHITELISTED);
+            const editedNodeEntry = ApplyOperationEncodings.setNodeEntryRole(nodeEntry, ApplyOperationEncodings.NodeRole.WHITELISTED);
             await batch.put(op.key.toString('hex'), editedNodeEntry);
             await batch.put(hash.toString('hex'), node.value);
         }
@@ -351,10 +335,10 @@ class State extends ReadyResource {
 
         const tracPublicKey = nodeTracAddr.slice(1, 33);
         const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
-        const decodedAdminEntry = decodeAdminEntry(adminEntry);
+        const decodedAdminEntry = ApplyOperationEncodings.decodeAdminEntry(adminEntry);
         if (null === decodedAdminEntry || !this.#isAdminApply(decodedAdminEntry, node)) return;
         const nodeEntry = await this.#getEntryApply(op.key.toString('hex'), batch);
-        const isNodeWhitelisted = isWhitelisted(nodeEntry);
+        const isNodeWhitelisted = ApplyOperationEncodings.isWhitelisted(nodeEntry);
 
         if (!isNodeWhitelisted) return;
         const message = createMessage(op.key, op.eko.wk, op.eko.nonce, op.type)
@@ -365,28 +349,28 @@ class State extends ReadyResource {
         if (isMessageVerifed &&
             null === opEntry
         ) {
-            await this.#addWriter(op, base, node, batch ,hash);
+            await this.#addWriter(op, base, node, batch, hash);
         }
     }
 
-    async #addWriter(op, base, node, batch ,hash) {
+    async #addWriter(op, base, node, batch, hash) {
         const nodeEntry = await this.#getEntryApply(op.key.toString('hex'), batch);
         if (nodeEntry === null) return;
 
         let length = await this.#getEntryApply('wrl', batch);
         let incrementedLength = null;
         if (null === length) {
-            const bufferedLength = setUpLengthEntry(0);
-            length = decodeLengthEntry(bufferedLength);
-            incrementedLength = incrementLengthEntry(length);
+            const bufferedLength = ApplyOperationEncodings.setUpLengthEntry(0);
+            length = ApplyOperationEncodings.decodeLengthEntry(bufferedLength);
+            incrementedLength = ApplyOperationEncodings.incrementLengthEntry(length);
         } else {
-            length = decodeLengthEntry(length);
-            incrementedLength = incrementLengthEntry(length);
+            length = ApplyOperationEncodings.decodeLengthEntry(length);
+            incrementedLength = ApplyOperationEncodings.incrementLengthEntry(length);
         }
         if (null === incrementedLength) return;
 
-        if (!isWriter(nodeEntry)) {
-            const editedNodeEntry = encodeNodeEntry(op.eko.wk, NodeRole.WRITER);
+        if (!ApplyOperationEncodings.isWriter(nodeEntry)) {
+            const editedNodeEntry = ApplyOperationEncodings.encodeNodeEntry(op.eko.wk, ApplyOperationEncodings.NodeRole.WRITER);
             if (editedNodeEntry.length === 0) return;
             await base.addWriter(op.eko.wk, { isIndexer: false })
             await batch.put(op.key.toString('hex'), editedNodeEntry);
@@ -400,45 +384,56 @@ class State extends ReadyResource {
 
     async #handleApplyRemoveWriterOperation(op, view, base, node, batch) {
         if (!this.check.sanitizeExtendedKeyOpSchema(op)) return;
-        const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
-        if (null === adminEntry || !this.#isAdminApply(adminEntry, node)) return;
 
-        const tracAddr = op.key;
-        const networkPrefix = tracAddr.slice(0, 1);
-        if (networkPrefix.readUInt8(0) !== TRAC_NETWORK_PREFIX) return;
-        const tracPublicKey = tracAddr.slice(1, 33);
+        const nodeTracAddr = op.key;
+        const nodeNetworkPrefix = nodeTracAddr.slice(0, 1);
+        if (nodeNetworkPrefix.readUInt8(0) !== TRAC_NETWORK_PREFIX) return;
+        const tracPublicKey = nodeTracAddr.slice(1, 33);
+
+        const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
+        const decodedAdminEntry = ApplyOperationEncodings.decodeAdminEntry(adminEntry);
+        if (null === decodedAdminEntry || !this.#isAdminApply(decodedAdminEntry, node)) return;
 
         const message = createMessage(op.key, op.eko.wk, op.eko.nonce, op.type);
         const hash = await createHash('sha256', message);
         const isMessageVerifed = this.#wallet.verify(op.eko.sig, hash, tracPublicKey);
 
         if (!isMessageVerifed || null !== await batch.get(hash)) return;
-        await this.#removeWriter(op, batch, base, hash);
-
+        await this.#removeWriter(op, base, node, batch, hash);
     }
 
-    async #removeWriter(op, batch, base, hash) {
+    async #removeWriter(op, base, node, batch, hash) {
         let nodeEntry = await this.#getEntryApply(op.key.toString('hex'), batch);
         if (null === nodeEntry) return;
+        const isNodeWriter = ApplyOperationEncodings.isWriter(nodeEntry);
+        const isNodeIndexer = ApplyOperationEncodings.isIndexer(nodeEntry);
+        if (isNodeWriter && !isNodeIndexer) {
+            const decodedNodeEntry = ApplyOperationEncodings.decodeNodeEntry(nodeEntry);
+            if (decodedNodeEntry === null) return;
+            const updatedNodeEntry = ApplyOperationEncodings.encodeNodeEntry(decodedNodeEntry.wk, ApplyOperationEncodings.NodeRole.WHITELISTED)
+            if (updatedNodeEntry.length === 0) return;
 
-
-        await base.removeWriter(b4a.from(nodeEntry.wk, 'hex'));
-        nodeEntry.isWriter = false;
-        if (nodeEntry.isIndexer) {
-            nodeEntry.isIndexer = false;
-            const indexersEntry = await batch.get(EntryType.INDEXERS);
-            if (null !== indexersEntry && indexersEntry.value.includes(op.key)) {
-                const idx = indexersEntry.value.indexOf(op.key);
-                if (idx !== -1) {
-                    indexersEntry.value.splice(idx, 1);
-                    await batch.put(EntryType.INDEXERS, indexersEntry.value);
-                }
-            }
+            await base.removeWriter(decodedNodeEntry.wk);
+            await batch.put(op.key.toString('hex'), updatedNodeEntry);
+            await batch.put(hash.toString('hex'), node.value);
+            console.log(`Writer removed: ${op.key.toString('hex')}:${decodedNodeEntry.wk.toString('hex')}`);
         }
+        else if (isNodeIndexer) {
+            const decodedNodeEntry = ApplyOperationEncodings.decodeNodeEntry(nodeEntry);
+            if (decodedNodeEntry === null) return;
+            const updatedNodeEntry = ApplyOperationEncodings.encodeNodeEntry(decodedNodeEntry.wk, ApplyOperationEncodings.NodeRole.WHITELISTED)
+            if (updatedNodeEntry.length === 0) return;
+            const indexersEntry = await this.#getEntryApply(op.key.toString('hex'), batch);
+            if (null === indexersEntry) return;
+            const updatedIndexerEntry = ApplyOperationEncodings.removeIndexer(op.key, indexersEntry);
+            if (updatedIndexerEntry.length === 0) return;
 
-        await batch.put(op.key, nodeEntry);
-        await batch.put(hash, op);
-        console.log(`Writer removed: ${op.key}${op.value.wk ? `:${op.value.wk}` : ''}`);
+            await base.removeWriter(decodedNodeEntry.wk);
+            await batch.put(op.key.toString('hex'), updatedNodeEntry);
+            await batch.put(EntryType.INDEXERS, updatedIndexerEntry);
+            console.log(`Indexer removed trought removeWriter: ${op.key.toString('hex')}:${decodedNodeEntry.wk.toString('hex')}`);
+
+        }
     }
 
     async #handleApplyAddIndexerOperation(op, view, base, node, batch) {

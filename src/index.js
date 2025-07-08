@@ -493,7 +493,18 @@ export class MainSettlementBus extends ReadyResource {
             default:
                 if (input.startsWith('/get_node_info')) {
                     const splitted = input.split(' ');
-                    console.log("whitelist entry:", await this.#isWhitelisted(splitted[1]))
+                    const address = splitted[1];
+                    const nodeEntry = await this.#state.getNodeEntry("0" + TRAC_NETWORK_PREFIX.toString() + address);
+                    if (nodeEntry) {
+                        console.log("Node Entry:", {
+                            WritingKey: nodeEntry.wk.toString('hex'),
+                            IsWhitelisted: nodeEntry.isWhitelisted,
+                            IsWriter: nodeEntry.isWriter,
+                            IsIndexer: nodeEntry.isIndexer
+                        });
+                    } else {
+                        console.log("Node Entry not found for address:", address);
+                    }
                 } else if (input.startsWith('/add_indexer')) {
                     const splitted = input.split(' ');
                     const tracPublicKey = splitted[1]
