@@ -6,6 +6,8 @@ export const EntryType = Object.freeze({
     ADMIN: 'admin',
     WHITELIST: 'whitelist',
     INDEXERS: 'indexers',
+    WRITERS_LENGTH: 'wrl',
+    WRITERS_INDEX: 'wri/',
 });
 
 export const OperationType = Object.freeze({

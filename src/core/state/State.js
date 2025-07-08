@@ -7,7 +7,6 @@ import {
     ACK_INTERVAL,
     EntryType,
     OperationType,
-    MAX_INDEXERS,
     TRAC_NETWORK_PREFIX,
 } from '../../utils/constants.js';
 import { sleep } from '../../utils/helpers.js';
@@ -378,7 +377,7 @@ class State extends ReadyResource {
         const nodeEntry = await this.#getEntryApply(op.key.toString('hex'), batch);
         if (nodeEntry === null) return;
 
-        let length = await this.#getEntryApply('wrl', batch);
+        let length = await this.#getEntryApply(EntryType.WRITERS_LENGTH, batch);
         let incrementedLength = null;
         if (null === length) {
             const bufferedLength = ApplyOperationEncodings.setUpLengthEntry(0);
@@ -396,8 +395,8 @@ class State extends ReadyResource {
             await base.addWriter(op.eko.wk, { isIndexer: false })
             await batch.put(op.key.toString('hex'), editedNodeEntry);
 
-            await batch.put('wri/' + length, op.key);
-            await batch.put('wrl', incrementedLength);
+            await batch.put(EntryType.WRITERS_INDEX + length, op.key);
+            await batch.put(EntryType.WRITERS_LENGTH, incrementedLength);
             await batch.put(hashHexString, node.value);
             console.log(`Writer added: ${op.key.toString('hex')}:${op.eko.wk.toString('hex')}`);
         }
