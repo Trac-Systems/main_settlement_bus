@@ -371,7 +371,7 @@ class State extends ReadyResource {
         const opEntry = await batch.get(hashHexString);
 
         if (!isMessageVerifed || null !== opEntry) return;
-            await this.#addWriter(op, base, node, batch, hashHexString);
+        await this.#addWriter(op, base, node, batch, hashHexString);
     }
 
     async #addWriter(op, base, node, batch, hashHexString) {
@@ -425,35 +425,44 @@ class State extends ReadyResource {
     }
 
     async #removeWriter(op, base, node, batch, hashHexString) {
+        // Retrieve the node entry for the given key
         const nodeEntry = await this.#getEntryApply(op.key.toString('hex'), batch);
         if (null === nodeEntry) return;
+
+        // Check if the node is a writer or an indexer
         const isNodeWriter = ApplyOperationEncodings.isWriter(nodeEntry);
         const isNodeIndexer = ApplyOperationEncodings.isIndexer(nodeEntry);
+
         if (isNodeWriter && !isNodeIndexer) {
+            // Decode the node entry and update its role to WHITELISTED
             const decodedNodeEntry = ApplyOperationEncodings.decodeNodeEntry(nodeEntry);
             if (decodedNodeEntry === null) return;
-            const updatedNodeEntry = ApplyOperationEncodings.encodeNodeEntry(decodedNodeEntry.wk, ApplyOperationEncodings.NodeRole.WHITELISTED)
+            const updatedNodeEntry = ApplyOperationEncodings.encodeNodeEntry(decodedNodeEntry.wk, ApplyOperationEncodings.NodeRole.WHITELISTED);
             if (updatedNodeEntry.length === 0) return;
 
+            // Remove the writer role and update the state
             await base.removeWriter(decodedNodeEntry.wk);
             await batch.put(op.key.toString('hex'), updatedNodeEntry);
             await batch.put(hashHexString, node.value);
             console.log(`Writer removed: ${op.key.toString('hex')}:${decodedNodeEntry.wk.toString('hex')}`);
-        }
-        else if (isNodeIndexer) {
+        } else if (isNodeIndexer) {
+            // Decode the node entry and update its role to WHITELISTED
             const decodedNodeEntry = ApplyOperationEncodings.decodeNodeEntry(nodeEntry);
             if (decodedNodeEntry === null) return;
-            const updatedNodeEntry = ApplyOperationEncodings.encodeNodeEntry(decodedNodeEntry.wk, ApplyOperationEncodings.NodeRole.WHITELISTED)
+            const updatedNodeEntry = ApplyOperationEncodings.encodeNodeEntry(decodedNodeEntry.wk, ApplyOperationEncodings.NodeRole.WHITELISTED);
             if (updatedNodeEntry.length === 0) return;
+
+            // Retrieve the indexers entry and remove the indexer
             const indexersEntry = await this.#getEntryApply(EntryType.INDEXERS, batch);
             if (null === indexersEntry) return;
             const updatedIndexerEntry = ApplyOperationEncodings.removeIndexer(op.key, indexersEntry);
             if (updatedIndexerEntry.length === 0) return;
+
+            // Remove the writer role and update the state
             await base.removeWriter(decodedNodeEntry.wk);
             await batch.put(op.key.toString('hex'), updatedNodeEntry);
             await batch.put(EntryType.INDEXERS, updatedIndexerEntry);
             console.log(`Indexer removed trought removeWriter: ${op.key.toString('hex')}:${decodedNodeEntry.wk.toString('hex')}`);
-
         }
     }
 
@@ -501,7 +510,9 @@ class State extends ReadyResource {
         const indexersEntry = await this.#getEntryApply(EntryType.INDEXERS, batch);
         if (null === indexersEntry) return;
         const indexerListHasAddress = ApplyOperationEncodings.getIndexerIndex(indexersEntry, op.key) !== -1;
+
         if (indexerListHasAddress) return;
+
         const updatedIndexerEntry = ApplyOperationEncodings.appendIndexer(op.key, indexersEntry);
         if (updatedIndexerEntry.length === 0) return;
 
@@ -519,34 +530,82 @@ class State extends ReadyResource {
     //TODO: Adjust for binary data
     async #handleApplyRemoveIndexerOperation(op, view, base, node, batch) {
         if (!this.check.sanitizeBasicKeyOp(op)) return;
-        const adminEntry = await batch.get(EntryType.ADMIN);
-        let indexersEntry = await batch.get(EntryType.INDEXERS);
-        if (null === adminEntry || !this.#isAdminApply(adminEntry.value, node) || null === indexersEntry || !Array.from(indexersEntry.value).includes(op.key) || Array.from(indexersEntry.value).length <= 1) return;
-        const message = MsgUtils.createMessage(op.key, op.value.nonce, op.type);
-        const isMessageVerifed = await this.#verifyMessageApply(op.value.sig, adminEntry.value.tracPublicKey, message)
+
+        // validate address
+        const nodeTracAddr = op.key;
+        const nodeNetworkPrefix = nodeTracAddr.slice(0, 1);
+        if (nodeNetworkPrefix.readUInt8(0) !== TRAC_NETWORK_PREFIX) return;
+        const tracPublicKey = nodeTracAddr.slice(1, 33);
+
+        // ensure that an admin invoked this operation
+        const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
+        const decodedAdminEntry = ApplyOperationEncodings.decodeAdminEntry(adminEntry);
+        if (null === decodedAdminEntry || b4a.equals(tracPublicKey, decodedAdminEntry.tracAddr) || !this.#isAdminApply(decodedAdminEntry, node)) return;
+        const adminTracPublicKey = decodedAdminEntry.tracAddr.slice(1, 33);
+
+        // verify signature
+        const message = createMessage(op.key, op.bko.nonce, op.type);
         const hash = await createHash('sha256', message);
-        if (isMessageVerifed &&
-            null === await batch.get(hash)) {
-            let nodeEntry = await batch.get(op.key);
-            if (nodeEntry !== null && nodeEntry.value.isWriter && nodeEntry.value.isIndexer) {
-                indexersEntry = indexersEntry.value;
-                nodeEntry = nodeEntry.value;
-                await base.removeWriter(b4a.from(nodeEntry.wk, 'hex'));
-
-                nodeEntry.isWriter = false;
-                nodeEntry.isIndexer = false;
-                await batch.put(op.key, nodeEntry);
-
-                const idx = indexersEntry.indexOf(op.key);
-                if (idx !== -1) {
-                    indexersEntry.splice(idx, 1);
-                    await batch.put(EntryType.INDEXERS, indexersEntry);
-                }
-                await batch.put(hash, op);
-                console.log(`Indexer removed: ${op.key}:${nodeEntry.wk}`);
-            }
-        }
+        const isMessageVerifed = this.#wallet.verify(op.bko.sig, hash, adminTracPublicKey);
+        const hashHexString = hash.toString('hex');
+        // check if the operation has already been applied
+        const opEntry = await batch.get(hashHexString);
+        if (!isMessageVerifed || null !== opEntry) return;
+        
+        await this.#removeIndexer(op, batch, base, hashHexString);
     }
+
+    async #removeIndexer(op, batch, base, hashHexString) {
+        const nodeEntry = await this.#getEntryApply(op.key.toString('hex'), batch);
+        const decodedNodeEntry = ApplyOperationEncodings.decodeNodeEntry(nodeEntry);
+        if (null === nodeEntry || null === decodedNodeEntry) return;
+
+        //check if node is allowed to be indexer
+        const isNodeIndexer = ApplyOperationEncodings.isIndexer(nodeEntry);
+        if (!isNodeIndexer) return;
+
+        //update node entry to writer/whitelisted
+        const updatedNodeEntry = ApplyOperationEncodings.encodeNodeEntry(decodedNodeEntry.wk, ApplyOperationEncodings.NodeRole.WRITER)
+        if (updatedNodeEntry.length === 0) return;
+
+        // ensure that indexers entry exists and that it does contain the address already
+        const indexersEntry = await this.#getEntryApply(EntryType.INDEXERS, batch);
+        if (null === indexersEntry) return;
+
+        const indexerListHasAddress = ApplyOperationEncodings.getIndexerIndex(indexersEntry, op.key) !== -1;
+        if (!indexerListHasAddress) return;
+        // remove indexer from indexers entry
+        const updatedIndexerEntry = ApplyOperationEncodings.removeIndexer(op.key, indexersEntry);
+        if (updatedIndexerEntry.length === 0) return;
+
+        // get writers length and increment it
+        let length = await this.#getEntryApply(EntryType.WRITERS_LENGTH, batch);
+        let incrementedLength = null;
+        if (null === length) {
+            const bufferedLength = ApplyOperationEncodings.setUpLengthEntry(0);
+            length = ApplyOperationEncodings.decodeLengthEntry(bufferedLength);
+            incrementedLength = ApplyOperationEncodings.incrementLengthEntry(length);
+        } else {
+            length = ApplyOperationEncodings.decodeLengthEntry(length);
+            incrementedLength = ApplyOperationEncodings.incrementLengthEntry(length);
+        }
+        if (null === incrementedLength) return;
+
+        // downgrade role to writer
+        await base.removeWriter(decodedNodeEntry.wk);
+        await base.addWriter(decodedNodeEntry.wk, { isIndexer: false });
+        // update writers index and length
+        await batch.put(EntryType.WRITERS_INDEX + length, op.key);
+        await batch.put(EntryType.WRITERS_LENGTH, incrementedLength);
+        //update node entry and indexers entry
+        await batch.put(EntryType.INDEXERS, updatedIndexerEntry);
+        await batch.put(op.key.toString('hex'), updatedNodeEntry);
+        // store operation hash to avoid replay attack. 
+        await batch.put(hashHexString, op.value);
+        console.log(`Indexer has been removed: ${op.key.toString('hex')}:${decodedNodeEntry.wk.toString('hex')}`);
+
+    }
+
     //TODO: Adjust for binary data
     async #handleApplyBanValidatorOperation(op, view, base, node, batch) {
         const adminEntry = await batch.get(EntryType.ADMIN);

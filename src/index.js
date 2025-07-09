@@ -390,14 +390,15 @@ export class MainSettlementBus extends ReadyResource {
                 const assembledAddIndexerMessage = await MsgUtils2.assembleAddIndexerMessage(this.#wallet, b4a.from(tracPubKey, 'hex'));
                 await this.#state.append(assembledAddIndexerMessage);
             }
-        } //else {
-        //     const canRemoveIndexer = !toAdd && nodeEntry.isIndexer && indexersEntry.length > MIN_INDEXERS;
-        //     if (canRemoveIndexer) {
-        //         const assembledRemoveIndexer = await MsgUtils2.assembleRemoveIndexerMessage(this.#wallet, tempAddress);
-        //         await this.#state.append(assembledRemoveIndexer);
-        //     }
+        } 
+        else {
+            const canRemoveIndexer = !toAdd && nodeEntry.isIndexer
+            if (canRemoveIndexer) {
+                const assembledRemoveIndexer = await MsgUtils2.assembleRemoveIndexerMessage(this.#wallet, b4a.from(tracPubKey, 'hex'));
+                await this.#state.append(assembledRemoveIndexer);
+            }
 
-        // }
+        }
     }
 
     async #banValidator(tracPublicKey) {
