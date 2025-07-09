@@ -225,27 +225,31 @@ class State extends ReadyResource {
 
     async #addAdminIfSet(adminEntry, op, view, base, batch) {
 
-        //TODO wrap in sub function 
+        // Extract and validate the network prefix from the node's address
         const tracAddr = adminEntry.tracAddr
         const networkPrefix = tracAddr.slice(0, 1);
         if (networkPrefix.readUInt8(0) !== TRAC_NETWORK_PREFIX) return;
         const tracPublicKey = tracAddr.slice(1, 33);
 
+        // verify signature
         const message = createMessage(tracPublicKey, op.eko.wk, op.eko.nonce, op.type)
         const hash = await createHash('sha256', message);
         const isMessageVerifed = this.#wallet.verify(op.eko.sig, hash, tracPublicKey)
         const hashHexString = hash.toString('hex');
+        // Check if the operation has already been applied
         const opEntry = await batch.get(hashHexString);
 
         if (!isMessageVerifed || null !== opEntry) return
-
+        // Check if the admin and indexers entry is valid
         const indexersEntry = await batch.get(EntryType.INDEXERS);
         const indexerIndex = ApplyOperationEncodings.getIndexerIndex(indexersEntry, adminEntry.tracAddr);
         const newAdminEntry = ApplyOperationEncodings.encodeAdminEntry(adminEntry.tracAddr, op.eko.wk);
         if (indexersEntry === null || indexerIndex === -1 || adminEntry.length === 0) return;
 
+        // Revoke old wk and add new one as an indexer
         await base.removeWriter(newAdminEntry.wk);
         await base.addWriter(op.eko.wk, { isIndexer: true });
+        // Remove the old admin entry and add the new one
         await batch.put(EntryType.ADMIN, newAdminEntry);
         await batch.put(hashHexString, node.value);
         console.log(`Admin updated: ${adminEntry.tracAddr}:${op.value.wk}`);
@@ -254,17 +258,19 @@ class State extends ReadyResource {
     }
 
     async #addAdminIfNotSet(op, view, node, batch) {
-        //TODO wrap in sub function 
+        
+        // Extract and validate the network prefix from the node's address
         const tracAddr = op.key;
         const networkPrefix = tracAddr.slice(0, 1);
         if (networkPrefix.readUInt8(0) !== TRAC_NETWORK_PREFIX) return;
         const tracPublicKey = tracAddr.slice(1, 33);
 
-
+        // verify signature
         const message = createMessage(op.key, op.eko.wk, op.eko.nonce, op.type)
         const hash = await createHash('sha256', message);
         const isMessageVerifed = this.#wallet.verify(op.eko.sig, hash, tracPublicKey)
         const hashHexString = hash.toString('hex');
+        // Check if the operation has already been applied
         const opEntry = await batch.get(hashHexString);
 
         if (
@@ -273,12 +279,12 @@ class State extends ReadyResource {
             !isMessageVerifed ||
             null !== opEntry
         ) return;
-
+        // Create a new admin entry
         const adminEntry = ApplyOperationEncodings.encodeAdminEntry(tracAddr, op.eko.wk);
         const initIndexers = ApplyOperationEncodings.appendIndexer(tracAddr);
 
         if (initIndexers.length === 0 || adminEntry.length === 0) return;
-
+        // initialize admin entry and indexers entry
         await batch.put(EntryType.ADMIN, adminEntry);
         await batch.put(EntryType.INDEXERS, initIndexers);
         await batch.put(hashHexString, node.value);
@@ -289,29 +295,38 @@ class State extends ReadyResource {
     async #handleApplyAppendWhitelistOperation(op, view, base, node, batch) {
         if (!this.check.sanitizeBasicKeyOp(op)) return;// TODO change name to validateBasicKeyOp
 
+        // Retrieve and decode the admin entry to verify the operation is initiated by an admin
         const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
         const decodedAdminEntry = ApplyOperationEncodings.decodeAdminEntry(adminEntry);
         if (null === decodedAdminEntry || !this.#isAdminApply(decodedAdminEntry, node)) return;
 
-        const adminTracAddr = decodedAdminEntry.tracAddr
+        // Extract and validate the network prefix from the admin's address
+        const adminTracAddr = decodedAdminEntry.tracAddr;
         const networkPrefix = adminTracAddr.slice(0, 1);
         if (networkPrefix.readUInt8(0) !== TRAC_NETWORK_PREFIX) return;
         const adminTracPublicKey = adminTracAddr.slice(1, 33);
 
+        // Extract and validate the network prefix from the node's address
         const nodeTracAddr = op.key;
         const nodeNetworkPrefix = nodeTracAddr.slice(0, 1);
         if (nodeNetworkPrefix.readUInt8(0) !== TRAC_NETWORK_PREFIX) return;
 
+        // verify signature
         const message = createMessage(op.key, op.bko.nonce, op.type);
         const hash = await createHash('sha256', message);
-        const isMessageVerifed = this.#wallet.verify(op.bko.sig, hash, adminTracPublicKey)
+        const isMessageVerifed = this.#wallet.verify(op.bko.sig, hash, adminTracPublicKey);
         const hashHexString = hash.toString('hex');
+
+        // Check if the operation has already been applied
         const opEntry = await batch.get(hashHexString);
         if (!isMessageVerifed || null !== opEntry) return;
 
+        // Retrieve the node entry to check its current role
         const nodeEntry = await this.#getEntryApply(op.key.toString('hex'), batch);
-        if (ApplyOperationEncodings.isWhitelisted(nodeEntry)) return;
+        if (ApplyOperationEncodings.isWhitelisted(nodeEntry)) return; // Node is already whitelisted
+
         if (!nodeEntry) {
+            // If the node entry does not exist, create a new whitelisted node entry
             /*
                 Dear reader,
                 wk = 00000000000000000000000000000000 on ed25519 is point P.
@@ -319,7 +334,7 @@ class State extends ReadyResource {
                 This point lies on the curve but is not a valid point.
                 Point P belongs to the torsion subgroup E(Fp)_TOR of the curve.
 
-                Yes, you could theoretically (easly) forge a signature on this point.
+                Yes, you could theoretically (easily) forge a signature on this point.
                 No, you don’t need to worry about it.
 
                 Why? Because `wk` is only used as an identifier in our network:
@@ -342,6 +357,7 @@ class State extends ReadyResource {
             await batch.put(hashHexString, node.value);
 
         } else {
+            // If the node entry exists, update its role to WHITELISTED. Case if wallet out of network will buy license from market but it existed before.
             const editedNodeEntry = ApplyOperationEncodings.setNodeEntryRole(nodeEntry, ApplyOperationEncodings.NodeRole.WHITELISTED);
             await batch.put(op.key.toString('hex'), editedNodeEntry);
             await batch.put(hashHexString, node.value);
@@ -367,7 +383,7 @@ class State extends ReadyResource {
         const hash = await createHash('sha256', message);
         const isMessageVerifed = this.#wallet.verify(op.eko.sig, hash, tracPublicKey);
         const hashHexString = hash.toString('hex');
-        
+
         // Check if the operation has already been applied
         const opEntry = await batch.get(hashHexString);
 
