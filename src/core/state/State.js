@@ -162,7 +162,6 @@ class State extends ReadyResource {
         const batch = view.batch();
         for (const node of nodes) {
             const op = safeDecodeApplyOperation(node.value);
-            console.log(op)
             if (op === null) return;
 
             const handler = this.#getApplyOperationHandler(op.type);
@@ -258,7 +257,6 @@ class State extends ReadyResource {
     }
 
     async #addAdminIfNotSet(op, view, node, batch) {
-        
         // Extract and validate the network prefix from the node's address
         const tracAddr = op.key;
         const networkPrefix = tracAddr.slice(0, 1);
@@ -646,40 +644,45 @@ class State extends ReadyResource {
 
     //TODO: Adjust for binary data
     async #handleApplyBanValidatorOperation(op, view, base, node, batch) {
-        const adminEntry = await batch.get(EntryType.ADMIN);
-        if (null === adminEntry || !this.#isAdminApply(adminEntry.value, node)) return;
         if (!this.check.sanitizeBasicKeyOp(op)) return;
-        const isWhitelisted = await this.#isWhitelistedApply(op.key, batch);
-        if (!isWhitelisted) return;
-
-        const nodeEntry = await batch.get(op.key)
-        if (null === nodeEntry || nodeEntry.value.isIndexer === true) return; // even if node is not writable atm it should be possible to ban it.
-        const message = MsgUtils.createMessage(op.key, op.value.nonce, op.type);
-        const isMessageVerifed = await this.#verifyMessageApply(op.value.sig, adminEntry.value.tracPublicKey, message);
+        // Extract and validate the network prefix from the node's address
+        const nodeTracAddr = op.key;
+        const nodeNetworkPrefix = nodeTracAddr.slice(0, 1);
+        if (nodeNetworkPrefix.readUInt8(0) !== TRAC_NETWORK_PREFIX) return;
+        const tracPublicKey = nodeTracAddr.slice(1, 33);
+        // ensure that an admin invoked this operation
+        const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
+        const decodedAdminEntry = ApplyOperationEncodings.decodeAdminEntry(adminEntry);
+        if (null === decodedAdminEntry || b4a.equals(tracPublicKey, decodedAdminEntry.tracAddr) || !this.#isAdminApply(decodedAdminEntry, node)) return;
+        const adminTracPublicKey = decodedAdminEntry.tracAddr.slice(1, 33);
+        // verify signature
+        const message = createMessage(op.key, op.bko.nonce, op.type);
         const hash = await createHash('sha256', message);
-        if (!isMessageVerifed || null !== await batch.get(hash)) return;
-        await this.#deleteWhitelistEntry(batch, op.key);
-        await this.#removeWriter(op, batch, base, hash);
+        const isMessageVerifed = this.#wallet.verify(op.bko.sig, hash, adminTracPublicKey);
+        const hashHexString = hash.toString('hex');
+        // check if the operation has already been applied
+        const opEntry = await batch.get(hashHexString);
+        if (!isMessageVerifed || null !== opEntry) return;
 
-    }
+        const nodeEntry = await this.#getEntryApply(op.key.toString('hex'), batch);
+        if (null === nodeEntry) return; // Node entry must exist to ban it.
+        // Atleast writer must be whitelisted to ban it.
+        const isWhitelisted = await ApplyOperationEncodings.isWhitelisted(nodeEntry);
+        const isWriter = ApplyOperationEncodings.isWriter(nodeEntry);
+        const isIndexer = ApplyOperationEncodings.isIndexer(nodeEntry);
+        // only writer/whitelisted node can be banned.
+        if (!isWhitelisted || !isWriter || isIndexer) return;
+        
+        const updatedNodeEtrny = ApplyOperationEncodings.setNodeEntryRole(nodeEntry, ApplyOperationEncodings.NodeRole.READER);
+        if (updatedNodeEtrny.length === 0) return;
+        const decodedNodeEntry = ApplyOperationEncodings.decodeNodeEntry(updatedNodeEtrny);
+        if (null === decodedNodeEntry) return;
 
-    //todo: delete
-    async #deleteWhitelistEntry(batch, pubKey) {
-        const whitelistKey = WHITELIST_PREFIX + pubKey;
-        await batch.del(whitelistKey);
-    }
-
-    //todo: delete. No longer necessary we dont need to calculate hash twice...
-    async #verifyMessageApply(signature, publicKey, bufferMessage) {
-        const bufferPublicKey = b4a.from(publicKey, 'hex');
-        const hash = await createHash('sha256', bufferMessage);
-        return this.#wallet.verify(signature, hash, bufferPublicKey);
-    }
-
-    //todo: delete
-    async #isWhitelistedApply(address, batch) {
-        const whitelistEntry = await this.#getEntryApply(address, batch)
-        return !!whitelistEntry;
+        // Remove the writer role and update the state
+        await base.removeWriter(decodedNodeEntry.wk);
+        await batch.put(op.key.toString('hex'), updatedNodeEtrny);
+        await batch.put(hashHexString, op.value);
+        console.log(`Node has been banned: ${op.key.toString('hex')}:${decodedNodeEntry.wk.toString('hex')}`);
     }
 
     #isAdminApply(adminEntry, node) {

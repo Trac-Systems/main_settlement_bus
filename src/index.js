@@ -406,13 +406,13 @@ export class MainSettlementBus extends ReadyResource {
     }
     //todo refactor this method to use MsgUtils2 and adjust it to binary data
     async #banValidator(tracPublicKey) {
-        const adminEntry = await this.#state.get(EntryType.ADMIN);
+        const tempAddressApproach = "01" + tracPublicKey;
+        const adminEntry = await this.#state.getAdminEntry();
         if (!this.#isAdmin(adminEntry)) return;
-        const isWhitelisted = await this.#isWhitelisted(tracPublicKey);
-        const nodeEntry = await this.#state.get(tracPublicKey);
+        const isWhitelisted = await this.#state.isAddressWhitelisted(tempAddressApproach);
+        const nodeEntry = await this.#state.getNodeEntry(tempAddressApproach);
         if (!isWhitelisted || null === nodeEntry || nodeEntry.isIndexer === true) return;
-
-        //const assembledBanValidatorMessage = await MsgUtils.assembleBanValidatorMessage(this.#wallet, tracPublicKey);
+        const assembledBanValidatorMessage = await MsgUtils2.assembleBanWriterMessage(this.#wallet, b4a.from(tracPublicKey, 'hex'));
         await this.#state.append(assembledBanValidatorMessage);
 
     }
