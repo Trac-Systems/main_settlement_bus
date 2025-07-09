@@ -236,6 +236,7 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async #writerEventListener() {
+        //TODO; Fix admin recovery
         this.on(EventType.WRITER_EVENT, async (parsedRequest, bufferedRequest) => {
             if (this.#enable_wallet === false) return;
             const adminEntry = await this.#state.get(EntryType.ADMIN);
@@ -260,7 +261,7 @@ export class MainSettlementBus extends ReadyResource {
         });
         //TODO: FIX AFTER BINARY 
         this.#state.base.on(EventType.WRITABLE, async () => {
-            const updatedNodeEntry = await this.#state.get(this.#wallet.publicKey);
+            const updatedNodeEntry = await this.#state.get(this.#wallet.address.toString('hex'));
             const canEnableWriterEvents = updatedNodeEntry &&
                 updatedNodeEntry.wk === this.#state.writingKey &&
                 !this.#shouldListenToWriterEvents;
@@ -329,6 +330,7 @@ export class MainSettlementBus extends ReadyResource {
         }
 
         const totelElements = assembledWhitelistMessages.length;
+        //TODO: enable connection to node and inform it that it became a writer.
 
         for (let i = 0; i < totelElements; i++) {
             // const isWhitelisted = await this.#isWhitelisted(assembledWhitelistMessages[i].key);
@@ -352,6 +354,7 @@ export class MainSettlementBus extends ReadyResource {
             const isAllowedToRequestRole = await this.#isAllowedToRequestRole(adminEntry, nodeEntry);
             const canAddWriter = !!(!this.#state.isWritable() && !isAlreadyWriter && isAllowedToRequestRole);
             if (canAddWriter) {
+                //TODO: network module should handle this in binary format however for now it is ok
                 assembledMessage = {
                     op: 'addWriter',
                     message: await MsgUtils2.assembleAddWriterMessage(this.#wallet, this.#state.writingKey),
@@ -360,6 +363,7 @@ export class MainSettlementBus extends ReadyResource {
         }
         else {
             if (isAlreadyWriter) {
+                //TODO: network module should handle this in binary format however for now it is ok
                 assembledMessage = {
                     op: 'removeWriter',
                     message: await MsgUtils2.assembleRemoveWriterMessage(this.#wallet, this.#state.writingKey),
@@ -400,7 +404,7 @@ export class MainSettlementBus extends ReadyResource {
 
         }
     }
-
+    //todo refactor this method to use MsgUtils2 and adjust it to binary data
     async #banValidator(tracPublicKey) {
         const adminEntry = await this.#state.get(EntryType.ADMIN);
         if (!this.#isAdmin(adminEntry)) return;
@@ -456,9 +460,6 @@ export class MainSettlementBus extends ReadyResource {
                 if (rl) rl.close();
                 await this.close();
                 break;
-            case '/push_writer_add':
-                await this.#requestWriterRole(true)
-                break;
             case '/add_admin':
                 await this.#handleAdminOperations();
                 break;
@@ -472,16 +473,20 @@ export class MainSettlementBus extends ReadyResource {
                 await this.#handleRemoveWriterOperation();
                 break
             case '/flags':
+                //TODO: consider to move it into the get node info or stats
                 console.log("shouldListenToAdminEvents: ", this.#shouldListenToAdminEvents);
                 console.log("shouldListenToWriterEvents: ", this.#shouldListenToWriterEvents);
                 console.log("isWritable: ", this.#state.isWritable());
                 console.log("isIndexer: ", this.#state.isIndexer());
                 break
             case '/show':
+                //TODO: Implement formater for users
                 const admin = await this.#state.get(EntryType.ADMIN);
                 console.log('Admin:', admin);
                 const indexers = await this.#state.get(EntryType.INDEXERS);
                 console.log('Indexers:', indexers);
+                const wrl = await this.#state.get(EntryType.WRITERS_LENGTH);
+                console.log('Writers Length:', wrl);
                 break;
             case '/stats':
                 await verifyDag(this.#state.base, this.#network.swarm, this.#wallet, this.#state.writingKey);
