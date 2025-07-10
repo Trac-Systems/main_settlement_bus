@@ -194,14 +194,6 @@ export class MainSettlementBus extends ReadyResource {
         return nodeEntry && nodeEntry.isWhitelisted && !this.#isAdmin(adminEntry);
     }
 
-    //todo: delete state.js method have it
-    async #isWhitelisted(address) {
-        //TODO rewrite with new binary logic
-        const whitelistEntry = await this.#state.isAddressWhitelisted(address)
-        return !!whitelistEntry;
-    }
-
-
     async #handleIncomingEvent(bufferedRequest) {
         try {
             const decodedRequest = safeDecodeApplyOperation(bufferedRequest);
@@ -213,7 +205,7 @@ export class MainSettlementBus extends ReadyResource {
                     //This request must be handled by WRITER
                     this.emit(EventType.WRITER_EVENT, decodedRequest, bufferedRequest);
 
-                }
+                }//TODO: FIX THIS
                 else if (parsedRequest.type === OperationType.WHITELISTED) {
                     const adminEntry = await this.#state.get(EntryType.ADMIN);
                     const reconstructedMessage = MsgUtils.createMessage(parsedRequest.key, parsedRequest.value.nonce, OperationType.WHITELISTED);
