@@ -243,20 +243,30 @@ export class MainSettlementBus extends ReadyResource {
         this.#state.base.on(EventType.IS_INDEXER, () => {
             if (this.#state.listenerCount(EventType.WRITER_EVENT) > 0) {
                 this.#state.removeAllListeners(EventType.WRITER_EVENT);
-                this.#shouldListenToWriterEvents = false;
             }
+            this.#shouldListenToWriterEvents = false;
             console.log('Current node is an indexer');
         });
 
-        this.#state.base.on(EventType.IS_NON_INDEXER, () => {
+        this.#state.base.on(EventType.IS_NON_INDEXER, async() => {
+            // downgrate from indexer to non-indexer makes that node is writable
+            const updatedNodeEntry = await this.#state.getNodeEntry(this.#wallet.address.toString('hex'));
+            const canEnableWriterEvents = updatedNodeEntry &&
+                b4a.equals(updatedNodeEntry.wk, this.#state.writingKey) &&
+                !this.#shouldListenToWriterEvents;
+
+            if (canEnableWriterEvents) {
+                this.#shouldListenToWriterEvents = true;
+                this.#writerEventListener();
+                console.log('Current node is writable');
+            }
             console.log('Current node is not an indexer anymore');
         });
         //TODO: FIX AFTER BINARY 
         this.#state.base.on(EventType.WRITABLE, async () => {
             const updatedNodeEntry = await this.#state.getNodeEntry(this.#wallet.address.toString('hex'));
-            console.log('Updated node entry in listener:', updatedNodeEntry);
             const canEnableWriterEvents = updatedNodeEntry &&
-                updatedNodeEntry.wk === this.#state.writingKey &&
+                b4a.equals(updatedNodeEntry.wk, this.#state.writingKey) &&
                 !this.#shouldListenToWriterEvents;
 
             if (canEnableWriterEvents) {
@@ -271,7 +281,7 @@ export class MainSettlementBus extends ReadyResource {
                 console.log('Current node is unwritable');
                 return;
             }
-            const updatedNodeEntry = await this.#state.get(this.#wallet.publicKey);
+            const updatedNodeEntry = await this.#state.getNodeEntry(this.#wallet.address.toString('hex'));
             const canDisableWriterEvents = updatedNodeEntry &&
                 !updatedNodeEntry.isWriter &&
                 this.#shouldListenToWriterEvents;
@@ -329,7 +339,6 @@ export class MainSettlementBus extends ReadyResource {
 
         if (!this.#isAdmin(adminEntry)) return;
         const assembledWhitelistMessages = await MsgUtils2.assembleAppendWhitelistMessages(this.#wallet);
-        console.log(assembledWhitelistMessages)
         if (!assembledWhitelistMessages) {
             console.log('Whitelist message not sent.');
             return;
@@ -493,7 +502,7 @@ export class MainSettlementBus extends ReadyResource {
                 console.log('Indexers:', indexers);
                 const wrl = await this.#state.getWriterLength();
                 console.log('Writers Length:', wrl);
-                const indexers2 =  this.#state.getInfoFromLinearizer();
+                const indexers2 = this.#state.getInfoFromLinearizer();
                 console.log('Indexers from Linearizer:', indexers2);
                 break;
             case '/stats':
