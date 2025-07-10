@@ -183,11 +183,8 @@ class Network extends ReadyResource {
 
                                 await handleIncomingEvent(b4a.from(msg.message));
                                 network.#swarm.leavePeer(connection.remotePublicKey)
-                            } else if (msg.type !== undefined && msg.key !== undefined && msg.value !== undefined && msg.type === 'addAdmin') {
-
-                                const adminEntry = await state.get(EntryType.ADMIN);
-                                if (null === adminEntry || (adminEntry.tracPublicKey !== msg.key)) return;
-                                await handleIncomingEvent(msg);
+                            } else if (msg.message !== undefined && msg.op === 'addAdmin') {
+                                await handleIncomingEvent(b4a.from(msg.message));
                                 network.#swarm.leavePeer(connection.remotePublicKey)
                             }
                             else if (msg.type !== undefined && msg.key !== undefined && msg.value !== undefined && msg.type === 'whitelisted') {
@@ -351,8 +348,8 @@ class Network extends ReadyResource {
                         !validatorEntry.isWriter ||
                         validatorEntry.isIndexer
                     ) return;
-                    
-                     await this.tryConnection(validatorPubKey, 'validator');
+
+                    await this.tryConnection(validatorPubKey, 'validator');
                 };
 
                 const promises = [];
@@ -373,7 +370,7 @@ class Network extends ReadyResource {
     }
 
     async tryConnection(publicKey, type = null) {
-         //TODO: we should throw an error instead of returning null
+        //TODO: we should throw an error instead of returning null
         if (null === this.#swarm) return null;
 
         if (this.validator_stream !== null && publicKey !== b4a.toString(this.validator_stream.remotePublicKey, 'hex')) {
@@ -598,6 +595,16 @@ class Network extends ReadyResource {
             this.admin = adminPublicKey;
         }
     }
-
+    
+    displayNetworkInformation() {
+        console.log("Network Information:");
+        console.log("--------------------");
+        console.log("Admin Stream:", this.admin_stream ? "Connected" : "Not Connected");
+        console.log("Admin Public Key:", this.admin ? this.admin.toString('hex') : "None");
+        console.log("Validator Stream:", this.validator_stream ? "Connected" : "Not Connected");
+        console.log("Validator Public Key:", this.validator ? this.validator.toString('hex') : "None");
+        console.log("Custom Stream:", this.custom_stream ? "Connected" : "Not Connected");
+        console.log("Custom Node Address:", this.custom_node ? this.custom_node.toString('hex') : "None");
+    }
 }
 export default Network;

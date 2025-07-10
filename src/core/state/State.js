@@ -3,7 +3,6 @@ import Autobase from 'autobase';
 import Hyperbee from 'hyperbee';
 import b4a from 'b4a';
 import {
-    WHITELIST_PREFIX,
     ACK_INTERVAL,
     EntryType,
     OperationType,
@@ -11,7 +10,6 @@ import {
 } from '../../utils/constants.js';
 import { sleep } from '../../utils/helpers.js';
 import { createHash, generateTx } from '../../utils/crypto.js';
-import MsgUtils from '../../utils/msgUtils.js';
 import Check from '../../utils/check.js';
 import { safeDecodeApplyOperation } from '../../utils/protobuf/operationHelpers.js';
 import { createMessage } from '../../utils/buffer.js';
@@ -157,6 +155,10 @@ class State extends ReadyResource {
     async append(payload) {
         await this.#base.append(payload);
     }
+    // this is helpful
+    async getInfoFromLinearizer() {
+        return this.#base.linearizer.indexers
+    }
 
     #setupHyperbee(store) {
         this.#bee = new Hyperbee(store.get('view'), {
@@ -174,7 +176,6 @@ class State extends ReadyResource {
         for (const node of nodes) {
             const op = safeDecodeApplyOperation(node.value);
             if (op === null) return;
-
             const handler = this.#getApplyOperationHandler(op.type);
             if (handler) {
                 await handler(op, view, base, node, batch);
@@ -221,20 +222,17 @@ class State extends ReadyResource {
 
     async #handleApplyAddAdminOperation(op, view, base, node, batch) {
         if (!this.check.sanitizeExtendedKeyOpSchema(op)) return;
-
         const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
         const decodedAdminEntry = ApplyOperationEncodings.decodeAdminEntry(adminEntry);
-
         if (null === decodedAdminEntry) {
             await this.#addAdminIfNotSet(op, view, node, batch);
         }
-        else if (decodedAdminEntry.tracAddr === op.key) {
-            await this.#addAdminIfSet(decodedAdminEntry, op, view, base, batch);
+        else if (b4a.equals(decodedAdminEntry.tracAddr, op.key)) {
+            await this.#addAdminIfSet(decodedAdminEntry, op, view, node, base, batch);
         }
     }
 
-    async #addAdminIfSet(adminEntry, op, view, base, batch) {
-
+    async #addAdminIfSet(adminEntry, op, view, node, base, batch) {
         // Extract and validate the network prefix from the node's address
         const tracAddr = adminEntry.tracAddr
         const networkPrefix = tracAddr.slice(0, 1);
@@ -242,7 +240,7 @@ class State extends ReadyResource {
         const tracPublicKey = tracAddr.slice(1, 33);
 
         // verify signature
-        const message = createMessage(tracPublicKey, op.eko.wk, op.eko.nonce, op.type)
+        const message = createMessage(tracAddr, op.eko.wk, op.eko.nonce, op.type)
         const hash = await createHash('sha256', message);
         const isMessageVerifed = this.#wallet.verify(op.eko.sig, hash, tracPublicKey)
         const hashHexString = hash.toString('hex');
@@ -251,18 +249,18 @@ class State extends ReadyResource {
 
         if (!isMessageVerifed || null !== opEntry) return
         // Check if the admin and indexers entry is valid
-        const indexersEntry = await batch.get(EntryType.INDEXERS);
+        const indexersEntry = await this.#getEntryApply(EntryType.INDEXERS, batch);
         const indexerIndex = ApplyOperationEncodings.getIndexerIndex(indexersEntry, adminEntry.tracAddr);
         const newAdminEntry = ApplyOperationEncodings.encodeAdminEntry(adminEntry.tracAddr, op.eko.wk);
-        if (indexersEntry === null || indexerIndex === -1 || adminEntry.length === 0) return;
 
+        if (indexersEntry === null || indexerIndex === -1 || adminEntry.length === 0) return;
         // Revoke old wk and add new one as an indexer
-        await base.removeWriter(newAdminEntry.wk);
+        await base.removeWriter(adminEntry.wk);
         await base.addWriter(op.eko.wk, { isIndexer: true });
         // Remove the old admin entry and add the new one
         await batch.put(EntryType.ADMIN, newAdminEntry);
         await batch.put(hashHexString, node.value);
-        console.log(`Admin updated: ${adminEntry.tracAddr}:${op.value.wk}`);
+        console.log(`Admin updated: ${adminEntry.tracAddr.toString('hex')}:${op.eko.wk.toString('hex')}`);
 
 
     }
@@ -297,7 +295,7 @@ class State extends ReadyResource {
         await batch.put(EntryType.ADMIN, adminEntry);
         await batch.put(EntryType.INDEXERS, initIndexers);
         await batch.put(hashHexString, node.value);
-
+        
         console.log(`Admin added: ${tracPublicKey.toString('hex')}:${this.#bootstrap.toString('hex')}`);
     }
 
@@ -683,7 +681,7 @@ class State extends ReadyResource {
         const isIndexer = ApplyOperationEncodings.isIndexer(nodeEntry);
         // only writer/whitelisted node can be banned.
         if (!isWhitelisted || !isWriter || isIndexer) return;
-        
+
         const updatedNodeEtrny = ApplyOperationEncodings.setNodeEntryRole(nodeEntry, ApplyOperationEncodings.NodeRole.READER);
         if (updatedNodeEtrny.length === 0) return;
         const decodedNodeEntry = ApplyOperationEncodings.decodeNodeEntry(updatedNodeEtrny);

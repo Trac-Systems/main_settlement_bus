@@ -11,7 +11,7 @@ import Corestore from 'corestore';
 import MsgUtils from './utils/msgUtils.js';
 import MsgUtils2 from "./messages/MessageOperations.js"
 import { extractPublickeyFromAddress } from './utils/helpers.js';
-import {safeDecodeApplyOperation} from '../src/utils/protobuf/operationHelpers.js';
+import { safeDecodeApplyOperation } from '../src/utils/protobuf/operationHelpers.js';
 import {
     LISTENER_TIMEOUT,
     EntryType,
@@ -93,6 +93,7 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async _open() {
+
         await this.#state.ready();
         this.#stateEventsListener();
 
@@ -203,16 +204,15 @@ export class MainSettlementBus extends ReadyResource {
 
     async #handleIncomingEvent(bufferedRequest) {
         try {
-
             const decodedRequest = safeDecodeApplyOperation(bufferedRequest);
             if (decodedRequest.type) {
-
                 if (decodedRequest.type === OperationType.ADD_WRITER || decodedRequest.type === OperationType.REMOVE_WRITER) {
                     //This request must be hanlded by ADMIN
                     this.emit(EventType.ADMIN_EVENT, decodedRequest, bufferedRequest);
-                } else if (parsedRequest.type === OperationType.ADD_ADMIN) {
+                } else if (decodedRequest.type === OperationType.ADD_ADMIN) {
                     //This request must be handled by WRITER
-                    this.emit(EventType.WRITER_EVENT, parsedRequest, bufferedRequest);
+                    this.emit(EventType.WRITER_EVENT, decodedRequest, bufferedRequest);
+
                 }
                 else if (parsedRequest.type === OperationType.WHITELISTED) {
                     const adminEntry = await this.#state.get(EntryType.ADMIN);
@@ -232,9 +232,8 @@ export class MainSettlementBus extends ReadyResource {
         this.on(EventType.ADMIN_EVENT, async (parsedRequest, bufferedRequest) => {
             if (this.#enable_wallet === false) return;
             const isEventMessageValid = await MsgUtils2.verifyEventMessage(parsedRequest, this.#wallet, this.check, this.#state)
-            if (isEventMessageValid) {
-                await this.#state.append(bufferedRequest);
-            }
+            if (!isEventMessageValid) return;
+            await this.#state.append(bufferedRequest);
         });
     }
 
@@ -242,11 +241,9 @@ export class MainSettlementBus extends ReadyResource {
         //TODO; Fix admin recovery
         this.on(EventType.WRITER_EVENT, async (parsedRequest, bufferedRequest) => {
             if (this.#enable_wallet === false) return;
-            const adminEntry = await this.#state.get(EntryType.ADMIN);
-            const isEventMessageVerifed = await MsgUtils.verifyEventMessage(parsedRequest, this.#wallet, this.check)
-            if (adminEntry && adminEntry.tracPublicKey === parsedRequest.key && isEventMessageVerifed) {
-                await this.#state.append(parsedRequest);
-            }
+            const isEventMessageVerifed = await MsgUtils2.verifyEventMessage(parsedRequest, this.#wallet, this.check, this.#state);
+            if (!isEventMessageVerifed) return;
+            await this.#state.append(bufferedRequest);
         });
     }
 
@@ -264,7 +261,8 @@ export class MainSettlementBus extends ReadyResource {
         });
         //TODO: FIX AFTER BINARY 
         this.#state.base.on(EventType.WRITABLE, async () => {
-            const updatedNodeEntry = await this.#state.get(this.#wallet.address.toString('hex'));
+            const updatedNodeEntry = await this.#state.getNodeEntry(this.#wallet.address.toString('hex'));
+            console.log('Updated node entry in listener:', updatedNodeEntry);
             const canEnableWriterEvents = updatedNodeEntry &&
                 updatedNodeEntry.wk === this.#state.writingKey &&
                 !this.#shouldListenToWriterEvents;
@@ -296,15 +294,28 @@ export class MainSettlementBus extends ReadyResource {
 
     async #handleAdminOperations() {
         try {
-            const adminEntry = await this.#state.get(EntryType.ADMIN);
+            const adminEntry = await this.#state.getAdminEntry();
             const addAdminMessage = await MsgUtils2.assembleAddAdminMessage(adminEntry, this.#state.writingKey, this.#wallet, this.#bootstrap);
-
-            if (!adminEntry && this.#wallet && this.#state.writingKey && this.#state.writingKey === this.#bootstrap) {
+            if (!adminEntry &&
+                this.#wallet &&
+                this.#state.writingKey &&
+                b4a.equals(this.#state.writingKey, this.#bootstrap)
+            ) {
                 await this.#state.append(addAdminMessage);
-            } else if (adminEntry && this.#wallet && adminEntry.tracPublicKey === this.#wallet.publicKey && this.#state.writingKey && this.#state.writingKey !== adminEntry.wk) {
+            } else if (adminEntry &&
+                this.#wallet &&
+                b4a.equals(adminEntry.tracAddr, this.#wallet.address) &&
+                this.#state.writingKey &&
+                !b4a.equals(this.#state.writingKey, adminEntry.wk)
+            ) {
+
                 if (null === this.#network.validator_stream) return;
-                //TODO: it should be refactored at the end
-                //await this.#network.validator_stream.messenger.send(addAdminMessage);
+                const payloadForValidator = {
+                    op: 'addAdmin',
+                    message: addAdminMessage,
+
+                }
+                await this.#network.validator_stream.messenger.send(payloadForValidator);
             }
 
             setTimeout(async () => {
@@ -397,7 +408,7 @@ export class MainSettlementBus extends ReadyResource {
                 const assembledAddIndexerMessage = await MsgUtils2.assembleAddIndexerMessage(this.#wallet, b4a.from(tracPubKey, 'hex'));
                 await this.#state.append(assembledAddIndexerMessage);
             }
-        } 
+        }
         else {
             const canRemoveIndexer = !toAdd && nodeEntry.isIndexer
             if (canRemoveIndexer) {
@@ -484,15 +495,18 @@ export class MainSettlementBus extends ReadyResource {
                 break
             case '/show':
                 //TODO: Implement formater for users
-                const admin = await this.#state.get(EntryType.ADMIN);
+                const admin = await this.#state.getAdminEntry();
                 console.log('Admin:', admin);
-                const indexers = await this.#state.get(EntryType.INDEXERS);
+                const indexers = await this.#state.getIndexersEntry();
                 console.log('Indexers:', indexers);
-                const wrl = await this.#state.get(EntryType.WRITERS_LENGTH);
+                const wrl = await this.#state.getWriterLength();
                 console.log('Writers Length:', wrl);
+                const indexers2 =  this.#state.getInfoFromLinearizer();
+                console.log('Indexers from Linearizer:', indexers2);
                 break;
             case '/stats':
                 await verifyDag(this.#state.base, this.#network.swarm, this.#wallet, this.#state.writingKey);
+                this.#network.displayNetworkInformation();
                 break;
             default:
                 if (input.startsWith('/get_node_info')) {

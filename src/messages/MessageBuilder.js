@@ -109,26 +109,13 @@ class MessageBuilder extends Builder {
 
         switch (operationType) {
             case OperationType.ADD_ADMIN:
-                if (!writingKey) {
-                    throw new Error('Writer key must be set for ADD_ADMIN operation.');
-                }
-
-                const shouldAssembleAdmin = this.#canAssembleAdminMessage(adminEntry, writingKey, bootstrap, tracPublicKey);
-
-                if (!shouldAssembleAdmin) {
-                    throw new Error('Conditions for assembling ADD_ADMIN message are not met.');
-                }
-                msg = createMessage(tracPublicKey, writingKey, nonce, operationType);
-                break;
-
             case OperationType.ADD_WRITER:
             case OperationType.REMOVE_WRITER:
                 if (!writingKey) {
-                    throw new Error('Writer key must be set for writer operations (ADD_WRITER or REMOVE_WRITER).');
+                    throw new Error('Writer key must be set for writer operations (ADD_WRITER REMOVE_WRITER or ADD_ADMIN operation).');
                 }
                 msg = createMessage(tracPublicKey, writingKey, nonce, operationType);
                 break;
-
 
             case OperationType.APPEND_WHITELIST:
             case OperationType.ADD_INDEXER:
@@ -181,8 +168,8 @@ class MessageBuilder extends Builder {
     };
 
     #canAssembleAdminMessage(adminEntry, writingKey, bootstrap, tracPublicKey) {
-        const firstCondition = Boolean(!adminEntry && b4a.equals(writingKey, bootstrap)) // Admin entry doesn't exist yet, thus admin public key can only be associated with bootstrap writing key
-        const secondCondition = Boolean(adminEntry && b4a.equals(adminEntry.tracPublicKey, tracPublicKey) && writingKey && !b4a.equals(writingKey, adminEntry.wk)); // Admin entry exists and we have to update its writing key in base, so it can recover admin access
+        const firstCondition = !!(!adminEntry && b4a.equals(writingKey, bootstrap)) // Admin entry doesn't exist yet, thus admin public key can only be associated with bootstrap writing key
+        const secondCondition = !!(adminEntry && b4a.equals(adminEntry.tracAddr, tracPublicKey) && writingKey && !b4a.equals(writingKey, adminEntry.wk)); // Admin entry exists and we have to update its writing key in base, so it can recover admin access
         return (firstCondition || secondCondition)
     }
     getPayload() {

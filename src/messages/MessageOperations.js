@@ -140,6 +140,7 @@ class MessageOperations {
         ) {
             return false;
         }
+
         const sanitizationResult = check.sanitizeExtendedKeyOpSchema(parsedRequest);
         if (!sanitizationResult) return false;
 
@@ -180,6 +181,27 @@ class MessageOperations {
             const msg = createMessage(parsedRequest.key, parsedRequest.eko.wk, parsedRequest.eko.nonce, parsedRequest.type);
             const hash = await createHash('sha256', msg);
 
+            return wallet.verify(parsedRequest.eko.sig, hash, nodePublicKey);
+        }
+        else if (type === OperationType.ADD_ADMIN) {
+            const adminEntry = await state.getAdminEntry();
+            
+            const isRecoveryCase = !!(
+                adminEntry &&
+                b4a.equals(adminEntry.tracAddr, parsedRequest.key) &&
+                parsedRequest.eko.wk &&
+                !b4a.equals(parsedRequest.eko.wk, adminEntry.wk)
+            );
+            if (!isRecoveryCase) return false;
+
+            const adminTracAddress = parsedRequest.key
+            const networkPrefix = adminTracAddress.slice(0, 1);
+            if (networkPrefix.readUInt8(0) !== TRAC_NETWORK_PREFIX) return false;
+
+            const nodePublicKey = adminTracAddress.slice(1, 33);
+
+            const msg = createMessage(adminEntry.tracAddr, parsedRequest.eko.wk, parsedRequest.eko.nonce, parsedRequest.type);
+            const hash = await createHash('sha256', msg);
             return wallet.verify(parsedRequest.eko.sig, hash, nodePublicKey);
         }
     }
