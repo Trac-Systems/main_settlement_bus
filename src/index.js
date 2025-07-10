@@ -230,7 +230,6 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async #writerEventListener() {
-        //TODO; Fix admin recovery
         this.on(EventType.WRITER_EVENT, async (parsedRequest, bufferedRequest) => {
             if (this.#enable_wallet === false) return;
             const isEventMessageVerifed = await MsgUtils2.verifyEventMessage(parsedRequest, this.#wallet, this.check, this.#state);
@@ -262,7 +261,7 @@ export class MainSettlementBus extends ReadyResource {
             }
             console.log('Current node is not an indexer anymore');
         });
-        //TODO: FIX AFTER BINARY 
+
         this.#state.base.on(EventType.WRITABLE, async () => {
             const updatedNodeEntry = await this.#state.getNodeEntry(this.#wallet.address.toString('hex'));
             const canEnableWriterEvents = updatedNodeEntry &&
@@ -411,6 +410,7 @@ export class MainSettlementBus extends ReadyResource {
             }
         }
         else {
+            //TODO: ensure if this works
             const canRemoveIndexer = !toAdd && nodeEntry.isIndexer
             if (canRemoveIndexer) {
                 const assembledRemoveIndexer = await MsgUtils2.assembleRemoveIndexerMessage(this.#wallet, b4a.from(tracPubKey, 'hex'));
