@@ -6,6 +6,7 @@ import b4a from 'b4a';
 import Wallet from 'trac-wallet';
 import {TRAC_NETWORK_PREFIX} from '../utils/constants.js';
 
+
 class MessageBuilder extends Builder {
     #wallet;
     #operationType;
@@ -167,11 +168,6 @@ class MessageBuilder extends Builder {
         ].includes(type);
     };
 
-    #canAssembleAdminMessage(adminEntry, writingKey, bootstrap, tracPublicKey) {
-        const firstCondition = !!(!adminEntry && b4a.equals(writingKey, bootstrap)) // Admin entry doesn't exist yet, thus admin public key can only be associated with bootstrap writing key
-        const secondCondition = !!(adminEntry && b4a.equals(adminEntry.tracAddr, tracPublicKey) && writingKey && !b4a.equals(writingKey, adminEntry.wk)); // Admin entry exists and we have to update its writing key in base, so it can recover admin access
-        return (firstCondition || secondCondition)
-    }
     getPayload() {
         if (!this.#payload.type || !this.#payload.key || (!this.#payload.bko && !this.#payload.eko)) {
             throw new Error('Product is not fully assembled. Missing type, key, or value (bko/eko).');
