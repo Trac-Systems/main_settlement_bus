@@ -143,6 +143,17 @@ class State extends ReadyResource {
         return indexerListHasAddress;
     }
 
+    async getWriterLength() {
+        const writersLength = await this.get(EntryType.WRITERS_LENGTH);
+        return writersLength ? ApplyOperationEncodings.decodeLengthEntry(writersLength) : null;
+    }
+
+    async getWriterIndex(index) {
+        if (index < 0 || index > Number.MAX_SAFE_INTEGER) return null;
+        const writerPublicKey = await this.get(EntryType.WRITERS_INDEX + index);
+        return writerPublicKey ? writerPublicKey : null;
+    }
+
     async append(payload) {
         await this.#base.append(payload);
     }

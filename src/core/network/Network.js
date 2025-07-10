@@ -125,23 +125,16 @@ class Network extends ReadyResource {
                 message_channel.open()
                 const message = message_channel.addMessage({
                     encoding: c.json,
-                    //TODO:split this into many functions. This function should only contain switch statement
+                    //TODO: split this into many functions. This function should only contain switch statement
                     //TODO: instad of doing return; in cases which does not fit for us, we should perform - swarm.leavePeer(connection.remotePublicKey)
+                    //TODO: In messages module we can create a new builders for cases like get_validator, get_admin, get_node, etc.
+                    //TODO write validators in fastest validator + define protoschemas 
                     async onmessage(msg) {
-                        //TODO write validators in fastest validator + define protoschemas 
                         try {
                             const channelString = b4a.toString(network.channel, 'utf8');
                             //TODO fix finding validators and specific node
                             if (msg === 'get_validator') {
-                                const nonce = Wallet.generateNonce().toString('hex');
-                                const _msg = {
-                                    op: 'validator',
-                                    key: writingKey,
-                                    address: wallet.publicKey,
-                                    channel: channelString
-                                };
-                                const sig = wallet.sign(JSON.stringify(_msg) + nonce);
-                                message.send({ response: _msg, sig, nonce })
+                                network.hangleGetValidatorRequest(message, connection, channelString, state, wallet, writingKey);
                                 network.#swarm.leavePeer(connection.remotePublicKey)
                             } else if (msg === 'get_admin') {
 
@@ -163,16 +156,9 @@ class Network extends ReadyResource {
 
                             }
                             // ---------- HANDLING RECEIVED MESSAGES ----------
-                            else if (msg.response !== undefined && msg.response.op !== undefined && msg.response.op === 'validator') {
-                                const res = await state.get(msg.response.address);
-                                if (res === null) return;
-                                const verified = wallet.verify(msg.sig, JSON.stringify(msg.response) + msg.nonce, msg.response.address)
-                                if (verified && msg.response.channel === channelString && network.validator_stream === null) {
-                                    console.log('Validator stream established', msg.response.address)
-                                    network.validator_stream = connection;
-                                    network.validator = msg.response.address;
-                                }
-                                network.#swarm.leavePeer(connection.remotePublicKey)
+                            else if (msg.response !== undefined && msg.response.op !== undefined && msg.response.op === 'validatorResponse') {
+                                await network.handleValidatorResponse(msg, connection, channelString, state, wallet);
+                                network.#swarm.leavePeer(connection.remotePublicKey);
                             } else if (msg.response !== undefined && msg.response.op !== undefined && msg.response.op === 'adminResponse') {
 
                                 await network.handleAdminResponse(msg, connection, channelString, state, wallet);
@@ -337,47 +323,48 @@ class Network extends ReadyResource {
     // TODO: AFTER WHILE LOOP SIGNAL TO THE PROCESS THAT VALIDATOR OBSERVER STOPPED OPERATING. 
     // OS CALLS, ACCUMULATORS, MAYBE THIS IS POSSIBLE TO CHECK I/O QUEUE IF IT COINTAIN IT. FOR NOW WE ARE USING SLEEP.
     //TODO fix finding validators and specific node
-    async validatorObserver(get, publicKey) {
-        console.log('Validator observer started');
-        while (this.#enableValidatorObserver && this.#enable_wallet) {
-            if (this.validator_stream !== null) {
+    async validatorObserver(getWriterLength, getWriterIndex, getNodeEntry, addresss) {
+        //TODO: we should throw an error instead of returning null
+        try {
+            console.log('Validator observer started');
+            while (this.#enableValidatorObserver && this.#enable_wallet) {
+                if (this.validator_stream !== null) {
+                    await sleep(1000);
+                    continue;
+                }
+                const lengthEntry = await getWriterLength();
+                const length = lengthEntry ?? 0;
+                const findValidator = async () => {
+                    if (this.validator_stream !== null) return;
+                    const rndIndex = Math.floor(Math.random() * length);
+                    const validatorAddressBuffer = await getWriterIndex(rndIndex); //[01][pubkey]
+
+                    if (validatorAddressBuffer === null || b4a.byteLength(validatorAddressBuffer) !== 33 || b4a.equals(validatorAddressBuffer, addresss)) return;
+
+                    const validatorPubKey = extractPublickeyFromAddress(validatorAddressBuffer).toString('hex');
+                    const validatorEntry = await getNodeEntry(validatorAddressBuffer.toString('hex'));
+
+                    if (
+                        this.validator_stream !== null ||
+                        this.validator !== null ||
+                        validatorEntry === null ||
+                        !validatorEntry.isWriter ||
+                        validatorEntry.isIndexer
+                    ) return;
+                    
+                     await this.tryConnection(validatorPubKey, 'validator');
+                };
+
+                const promises = [];
+                for (let i = 0; i < 10; i++) {
+                    promises.push(findValidator());
+                    await sleep(250);
+                }
+                await Promise.all(promises);
                 await sleep(1000);
-                continue;
             }
-            const lengthEntry = await get('wrl');
-            const length = lengthEntry ?? 0;
-
-            const findValidator = async () => {
-                if (this.validator_stream !== null) return;
-
-                const rndIndex = Math.floor(Math.random() * length);
-                const wriEntry = await get('wri/' + rndIndex);
-                if (this.validator_stream !== null || wriEntry === null) return;
-
-                const validatorEntry = await get(wriEntry);
-                if (
-                    this.validator_stream !== null ||
-                    this.validator !== null ||
-                    validatorEntry === null ||
-                    !validatorEntry.isWriter ||
-                    validatorEntry.isIndexer
-                ) return;
-
-                const validatorPubKey = validatorEntry.pub;
-                if (validatorPubKey === publicKey) return;
-
-                console.log('Trying to connect to validator:', validatorPubKey);
-                await this.tryConnection(validatorPubKey, 'validator');
-            };
-
-            const promises = [];
-            for (let i = 0; i < 10; i++) {
-                promises.push(findValidator());
-                await sleep(250);
-            }
-            await Promise.all(promises);
-
-            await sleep(1000);
+        } catch (e) {
+            console.log('Error in validatorObserver:', e);
         }
     }
 
@@ -386,9 +373,9 @@ class Network extends ReadyResource {
     }
 
     async tryConnection(publicKey, type = null) {
-        console.log('in tryConnection', publicKey, type);
+         //TODO: we should throw an error instead of returning null
         if (null === this.#swarm) return null;
-        console.log("this.validator_stream ", this.validator_stream);
+
         if (this.validator_stream !== null && publicKey !== b4a.toString(this.validator_stream.remotePublicKey, 'hex')) {
             this.#swarm.leavePeer(this.validator_stream.remotePublicKey);
             this.validator_stream = null;
@@ -479,7 +466,68 @@ class Network extends ReadyResource {
             console.log(e)
         }
     }
+    //TODO: In the future we will move it to another class to reduce size of this file. It should be moved to a new builder class.
+    async hangleGetValidatorRequest(message, connection, channelString, state, wallet, writingKey) {
+        const nonce = Wallet.generateNonce().toString('hex');
+        const payload = {
+            op: 'validatorResponse',
+            wk: writingKey,
+            address: wallet.address,
+            nonce: nonce,
+            channel: channelString.toString('hex'),
+            issuer: connection.remotePublicKey.toString('hex'),
+            timestamp: Date.now(),
+        };
+        const hash = await wallet.createHash('sha256', JSON.stringify(payload));
+        const sig = wallet.sign(hash);
+        message.send({ response: payload, sig });
 
+    }
+
+    async handleValidatorResponse(msg, connection, channelString, state, wallet) {
+        if (!msg.response || !msg.response.wk || !msg.response.address || !msg.response.nonce || !msg.response.channel || !msg.response.issuer || !msg.response.timestamp) {
+            console.log("Validator response is missing required fields.");
+            this.#swarm.leavePeer(connection.remotePublicKey);
+            return;
+        }
+        const issuerPublicKey = b4a.from(msg.response.issuer, 'hex');
+        if (!b4a.equals(issuerPublicKey, wallet.publicKey)) {
+            console.log("Issuer public key does not match wallet public key.");
+            this.#swarm.leavePeer(connection.remotePublicKey);
+            return;
+        }
+        const timestamp = msg.response.timestamp;
+        const now = Date.now();
+        const fiveSeconds = 5000;
+
+        if (now - timestamp > fiveSeconds) {
+            console.log("Validator response is too old, ignoring.");
+            this.#swarm.leavePeer(connection.remotePublicKey);
+            return;
+        }
+        const validatorEntry = await state.getNodeEntry(b4a.from(msg.response.address).toString('hex'));
+        if (validatorEntry === null || !validatorEntry.isWriter || validatorEntry.isIndexer) {
+            console.log("Validator entry is null or not a writer.");
+            this.#swarm.leavePeer(connection.remotePublicKey);
+            return;
+        }
+        const validatorWritingKey = b4a.from(msg.response.wk, 'hex');
+
+        if (validatorEntry.wk === null || !b4a.equals(validatorEntry.wk, validatorWritingKey)) {
+            console.log("Validator writing key mismatch in response.");
+            this.#swarm.leavePeer(connection.remotePublicKey);
+            return;
+        }
+        const validatorPublicKey = extractPublickeyFromAddress(b4a.from(msg.response.address, 'hex'));
+        const hash = await wallet.createHash('sha256', JSON.stringify(msg.response));
+        const verified = wallet.verify(msg.sig, hash, validatorPublicKey);
+
+        if (verified && msg.response.channel === channelString) {
+            this.validator_stream = connection;
+            this.validator = validatorPublicKey;
+        }
+
+    }
     //TODO: In the future we will move it to another class to reduce size of this file. 
     async handleGetAdminRequest(message, connection, channelString, state, wallet, writingKey) {
         const adminEntry = await state.getAdminEntry();

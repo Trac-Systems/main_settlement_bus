@@ -93,7 +93,6 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async _open() {
-
         await this.#state.ready();
         this.#stateEventsListener();
 
@@ -111,8 +110,12 @@ export class MainSettlementBus extends ReadyResource {
                 this.#handleIncomingEvent.bind(this),
             );
         }
-
-        this.#network.validatorObserver(this.#state.get.bind(this.#state), this.#wallet.publicKey); // can't be await
+        //validator observer can't be awaited.
+        this.#network.validatorObserver(
+            this.#state.getWriterLength.bind(this.#state),
+            this.#state.getWriterIndex.bind(this.#state),
+            this.#state.getNodeEntry.bind(this.#state),
+            this.#wallet.address);
 
         const adminEntry = await this.#state.getAdminEntry();
 
