@@ -676,11 +676,12 @@ class State extends ReadyResource {
         const nodeEntry = await this.#getEntryApply(op.key.toString('hex'), batch);
         if (null === nodeEntry) return; // Node entry must exist to ban it.
         // Atleast writer must be whitelisted to ban it.
-        const isWhitelisted = await ApplyOperationEncodings.isWhitelisted(nodeEntry);
+        const isWhitelisted = ApplyOperationEncodings.isWhitelisted(nodeEntry);
         const isWriter = ApplyOperationEncodings.isWriter(nodeEntry);
         const isIndexer = ApplyOperationEncodings.isIndexer(nodeEntry);
         // only writer/whitelisted node can be banned.
-        if (!isWhitelisted || !isWriter || isIndexer) return;
+        if ((!isWhitelisted && !isWriter) || isIndexer) return;
+
 
         const updatedNodeEtrny = ApplyOperationEncodings.setNodeEntryRole(nodeEntry, ApplyOperationEncodings.NodeRole.READER);
         if (updatedNodeEtrny.length === 0) return;
