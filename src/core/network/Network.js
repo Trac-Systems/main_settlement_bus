@@ -134,24 +134,16 @@ class Network extends ReadyResource {
                             const channelString = b4a.toString(network.channel, 'utf8');
                             //TODO fix finding validators and specific node
                             if (msg === 'get_validator') {
-                                network.hangleGetValidatorRequest(message, connection, channelString, state, wallet, writingKey);
+                                network.hangleGetValidatorRequest(message, connection, channelString, wallet, writingKey);
                                 network.#swarm.leavePeer(connection.remotePublicKey)
-                            } else if (msg === 'get_admin') {
-
-                                network.handleGetAdminRequest(message, connection, channelString, state, wallet, writingKey);
+                            }
+                            else if (msg === 'get_admin') {
+                                network.handleGetAdminRequest(message, connection, channelString, wallet, writingKey, state);
                                 network.#swarm.leavePeer(connection.remotePublicKey)
 
-                            } else if (msg === 'get_node') {
-
-                                const nonce = Wallet.generateNonce().toString('hex');
-                                const _msg = {
-                                    op: 'node',
-                                    key: writingKey,
-                                    address: wallet.publicKey,
-                                    channel: channelString
-                                };
-                                const sig = wallet.sign(JSON.stringify(_msg) + nonce);
-                                message.send({ response: _msg, sig, nonce })
+                            }
+                            else if (msg === 'get_node') {
+                                network.handleCustomNodeRequest(message, connection, channelString, wallet, writingKey)
                                 network.#swarm.leavePeer(connection.remotePublicKey)
 
                             }
@@ -159,36 +151,34 @@ class Network extends ReadyResource {
                             else if (msg.response !== undefined && msg.response.op !== undefined && msg.response.op === 'validatorResponse') {
                                 await network.handleValidatorResponse(msg, connection, channelString, state, wallet);
                                 network.#swarm.leavePeer(connection.remotePublicKey);
-                            } else if (msg.response !== undefined && msg.response.op !== undefined && msg.response.op === 'adminResponse') {
+                            }
+                            else if (msg.response !== undefined && msg.response.op !== undefined && msg.response.op === 'adminResponse') {
 
                                 await network.handleAdminResponse(msg, connection, channelString, state, wallet);
                                 network.#swarm.leavePeer(connection.remotePublicKey)
                             }
-                            else if (msg.response !== undefined && msg.response.op !== undefined && msg.response.op === 'node') {
+                            else if (msg.response !== undefined && msg.response.op !== undefined && msg.response.op === 'nodeResponse') {
 
-                                const verified = wallet.verify(msg.sig, JSON.stringify(msg.response) + msg.nonce, msg.response.address)
-                                if (verified && msg.response.channel === channelString) {
-
-                                    console.log('Node stream established', msg.response.address)
-                                    network.custom_stream = connection;
-                                    network.custom_node = msg.response.address;
-                                }
+                                await network.handleCustomNodeResponse(msg, connection, channelString, state, wallet);
                                 network.#swarm.leavePeer(connection.remotePublicKey)
 
                                 //TODO: Most of this logic below should be moved into the handleIncomingEvent function. Code below can be reduced to call only handleIncomingEvent(msg) with some basic checks.
-                            } else if (msg.message !== undefined && msg.op === 'addWriter') {
-                                await handleIncomingEvent(b4a.from(msg.message));
-                                network.#swarm.leavePeer(connection.remotePublicKey)
-                            } else if (msg.message !== undefined && msg.op === 'removeWriter') {
-
-                                await handleIncomingEvent(b4a.from(msg.message));
-                                network.#swarm.leavePeer(connection.remotePublicKey)
-                            } else if (msg.message !== undefined && msg.op === 'addAdmin') {
+                            }
+                            else if (msg.message !== undefined && msg.op === 'addWriter') {
                                 await handleIncomingEvent(b4a.from(msg.message));
                                 network.#swarm.leavePeer(connection.remotePublicKey)
                             }
-                            else if (msg.type !== undefined && msg.key !== undefined && msg.value !== undefined && msg.type === 'whitelisted') {
-                                await handleIncomingEvent(msg);
+                            else if (msg.message !== undefined && msg.op === 'removeWriter') {
+
+                                await handleIncomingEvent(b4a.from(msg.message));
+                                network.#swarm.leavePeer(connection.remotePublicKey)
+                            }
+                            else if (msg.message !== undefined && msg.op === 'addAdmin') {
+                                await handleIncomingEvent(b4a.from(msg.message));
+                                network.#swarm.leavePeer(connection.remotePublicKey)
+                            }
+                            else if (msg.message !== undefined && msg.op === 'whitelisted') {
+                                await handleIncomingEvent(b4a.from(msg.message));
                                 network.#swarm.leavePeer(connection.remotePublicKey)
                             } else {
                                 if (state.isIndexer() || !state.isWritable()) return;
@@ -444,27 +434,37 @@ class Network extends ReadyResource {
         }
     }
 
-    async sendMessageToNode(address, message) {
+    async sendMessageToNode(nodePublicKey, message) {
         try {
-            if (!address || !message) {
+            if (!nodePublicKey || !message) {
                 return;
             }
-            await this.tryConnection(address, 'node');
+            await this.tryConnection(nodePublicKey, 'node');
 
             await this.spinLock(() =>
-                this.custom_stream === null || this.custom_node !== address
+                this.custom_stream === null ||
+                !b4a.equals(this.custom_node, b4a.from(nodePublicKey, 'hex'))
             );
 
-            if (this.custom_stream !== null) {
+            if (
+                this.custom_stream !== null &&
+                this.custom_node !== null &&
+                b4a.equals(this.custom_node, b4a.from(nodePublicKey, 'hex'))
+            ) {
                 await this.custom_stream.messenger.send(message);
+            } else {
+
+                //Todo: change it to throw error
+                console.log(`Failed to send message to node: ${nodePublicKey}`);
             }
 
         } catch (e) {
             console.log(e)
         }
     }
+
     //TODO: In the future we will move it to another class to reduce size of this file. It should be moved to a new builder class.
-    async hangleGetValidatorRequest(message, connection, channelString, state, wallet, writingKey) {
+    async hangleGetValidatorRequest(message, connection, channelString, wallet, writingKey) {
         const nonce = Wallet.generateNonce().toString('hex');
         const payload = {
             op: 'validatorResponse',
@@ -526,7 +526,7 @@ class Network extends ReadyResource {
 
     }
     //TODO: In the future we will move it to another class to reduce size of this file. 
-    async handleGetAdminRequest(message, connection, channelString, state, wallet, writingKey) {
+    async handleGetAdminRequest(message, connection, channelString, wallet, writingKey, state) {
         const adminEntry = await state.getAdminEntry();
         const adminPublicKey = extractPublickeyFromAddress(adminEntry.tracAddr);
 
@@ -595,7 +595,64 @@ class Network extends ReadyResource {
             this.admin = adminPublicKey;
         }
     }
-    
+
+    async handleCustomNodeRequest(message, connection, channelString, wallet) {
+        const nonce = Wallet.generateNonce().toString('hex');
+        const payload = {
+            op: 'nodeResponse',
+            address: wallet.address,
+            nonce: nonce,
+            channel: channelString.toString('hex'),
+            issuer: connection.remotePublicKey.toString('hex'),
+            timestamp: Date.now(),
+        };
+        const hash = await wallet.createHash('sha256', JSON.stringify(payload));
+        const sig = wallet.sign(hash);
+        message.send({ response: payload, sig });
+    }
+
+    async handleCustomNodeResponse(msg, connection, channelString, state, wallet) {
+        if (!msg.response || !msg.response.address || !msg.response.nonce || !msg.response.channel || !msg.response.issuer || !msg.response.timestamp) {
+            console.log("Custom node response is missing required fields.");
+            this.#swarm.leavePeer(connection.remotePublicKey);
+            return;
+        }
+
+        const issuerPublicKey = b4a.from(msg.response.issuer, 'hex');
+        if (!b4a.equals(issuerPublicKey, wallet.publicKey)) {
+            console.log("Issuer public key does not match wallet public key.");
+            this.#swarm.leavePeer(connection.remotePublicKey);
+            return;
+        }
+        const timestamp = msg.response.timestamp;
+        const now = Date.now();
+        const fiveSeconds = 5000;
+
+        if (now - timestamp > fiveSeconds) {
+            console.log("Custom node response is too old, ignoring.");
+            this.#swarm.leavePeer(connection.remotePublicKey);
+            return;
+        }
+
+        const customNodeAddress = b4a.from(msg.response.address, 'hex')
+        const customNodePublicKey = extractPublickeyFromAddress(customNodeAddress);
+        const customNodeEntry = await state.getNodeEntry(customNodeAddress.toString('hex'));
+
+        if (customNodeEntry === null) {
+            console.log("Custom node entry is null.");
+            this.#swarm.leavePeer(connection.remotePublicKey);
+            return;
+        }
+
+        const hash = await wallet.createHash('sha256', JSON.stringify(msg.response));
+        const verified = wallet.verify(msg.sig, hash, customNodePublicKey);
+
+        if (verified && msg.response.channel === channelString) {
+            this.custom_stream = connection;
+            this.custom_node = customNodePublicKey;
+        }
+    }
+
     displayNetworkInformation() {
         console.log("Network Information:");
         console.log("--------------------");

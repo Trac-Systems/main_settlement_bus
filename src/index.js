@@ -8,10 +8,10 @@ import { verifyDag, printHelp, printWalletInfo } from './utils/cli.js';
 import PeerWallet from "trac-wallet"
 import tty from 'tty';
 import Corestore from 'corestore';
-import MsgUtils from './utils/msgUtils.js';
-import MsgUtils2 from "./messages/MessageOperations.js"
+import messageOperations from "./messages/MessageOperations.js"
 import { extractPublickeyFromAddress } from './utils/helpers.js';
 import { safeDecodeApplyOperation } from '../src/utils/protobuf/operationHelpers.js';
+import { createMessage } from './utils/buffer.js';
 import {
     LISTENER_TIMEOUT,
     EntryType,
@@ -201,29 +201,36 @@ export class MainSettlementBus extends ReadyResource {
                 if (decodedRequest.type === OperationType.ADD_WRITER || decodedRequest.type === OperationType.REMOVE_WRITER) {
                     //This request must be hanlded by ADMIN
                     this.emit(EventType.ADMIN_EVENT, decodedRequest, bufferedRequest);
-                } else if (decodedRequest.type === OperationType.ADD_ADMIN) {
+                }
+                else if (decodedRequest.type === OperationType.ADD_ADMIN) {
                     //This request must be handled by WRITER
                     this.emit(EventType.WRITER_EVENT, decodedRequest, bufferedRequest);
 
-                }//TODO: FIX THIS
-                else if (parsedRequest.type === OperationType.WHITELISTED) {
-                    const adminEntry = await this.#state.get(EntryType.ADMIN);
-                    const reconstructedMessage = MsgUtils.createMessage(parsedRequest.key, parsedRequest.value.nonce, OperationType.WHITELISTED);
+                }
+                else if (decodedRequest.type === OperationType.WHITELISTED) {
+                    //TODO: We should create separated listener for whitelisted operation which only be working if wallet is enabled and node is not a writer. 
+                    // also this listener should be turned off when node become writable. But for now it is ok.
+                    const adminEntry = await this.#state.getAdminEntry();
+                    if (!adminEntry || this.#enable_wallet === false) return;
+                    const adminPublicKey = extractPublickeyFromAddress(adminEntry.tracAddr);
+                    const reconstructedMessage = createMessage(decodedRequest.key, decodedRequest.bko.nonce, OperationType.WHITELISTED);
                     const hash = await createHash('sha256', reconstructedMessage);
-                    if (this.#wallet.verify(b4a.from(parsedRequest.value.sig, 'hex'), b4a.from(hash), b4a.from(adminEntry.tracPublicKey, 'hex')) && !this.#state.isWritable() && parsedRequest.key === this.#wallet.publicKey) {
-                        await this.#handleAddWriterOperation()
-                    }
+                    const isWhitelisted = await this.#state.isAddressWhitelisted(this.#wallet.address.toString('hex'));
+                    const isMessageVerifed = this.#wallet.verify(decodedRequest.bko.sig, hash, adminPublicKey);
+                    const isKeyMatchingWalletAddress = b4a.equals(decodedRequest.key, this.#wallet.address)
+                    if (!isMessageVerifed || !isKeyMatchingWalletAddress || !isWhitelisted || this.#state.isWritable()) return;
+                    await this.#handleAddWriterOperation()
                 }
             }
         } catch (error) {
             // for now ignore the error
         }
     }
-
+    
     async #adminEventListener() {
         this.on(EventType.ADMIN_EVENT, async (parsedRequest, bufferedRequest) => {
             if (this.#enable_wallet === false) return;
-            const isEventMessageValid = await MsgUtils2.verifyEventMessage(parsedRequest, this.#wallet, this.check, this.#state)
+            const isEventMessageValid = await messageOperations.verifyEventMessage(parsedRequest, this.#wallet, this.check, this.#state)
             if (!isEventMessageValid) return;
             await this.#state.append(bufferedRequest);
         });
@@ -232,7 +239,7 @@ export class MainSettlementBus extends ReadyResource {
     async #writerEventListener() {
         this.on(EventType.WRITER_EVENT, async (parsedRequest, bufferedRequest) => {
             if (this.#enable_wallet === false) return;
-            const isEventMessageVerifed = await MsgUtils2.verifyEventMessage(parsedRequest, this.#wallet, this.check, this.#state);
+            const isEventMessageVerifed = await messageOperations.verifyEventMessage(parsedRequest, this.#wallet, this.check, this.#state);
             if (!isEventMessageVerifed) return;
             await this.#state.append(bufferedRequest);
         });
@@ -247,7 +254,7 @@ export class MainSettlementBus extends ReadyResource {
             console.log('Current node is an indexer');
         });
 
-        this.#state.base.on(EventType.IS_NON_INDEXER, async() => {
+        this.#state.base.on(EventType.IS_NON_INDEXER, async () => {
             // downgrate from indexer to non-indexer makes that node is writable
             const updatedNodeEntry = await this.#state.getNodeEntry(this.#wallet.address.toString('hex'));
             const canEnableWriterEvents = updatedNodeEntry &&
@@ -296,7 +303,7 @@ export class MainSettlementBus extends ReadyResource {
     async #handleAdminOperations() {
         try {
             const adminEntry = await this.#state.getAdminEntry();
-            const addAdminMessage = await MsgUtils2.assembleAddAdminMessage(adminEntry, this.#state.writingKey, this.#wallet, this.#bootstrap);
+            const addAdminMessage = await messageOperations.assembleAddAdminMessage(adminEntry, this.#state.writingKey, this.#wallet, this.#bootstrap);
             if (!adminEntry &&
                 this.#wallet &&
                 this.#state.writingKey &&
@@ -337,23 +344,33 @@ export class MainSettlementBus extends ReadyResource {
         const adminEntry = await this.#state.getAdminEntry();
 
         if (!this.#isAdmin(adminEntry)) return;
-        const assembledWhitelistMessages = await MsgUtils2.assembleAppendWhitelistMessages(this.#wallet);
+        const assembledWhitelistMessages = await messageOperations.assembleAppendWhitelistMessages(this.#wallet);
         if (!assembledWhitelistMessages) {
             console.log('Whitelist message not sent.');
             return;
         }
 
-        const totelElements = assembledWhitelistMessages.length;
-        //TODO: enable connection to node and inform it that it became a writer.
+        const totalElements = assembledWhitelistMessages.size;
+        let processedCount = 0;
 
-        for (let i = 0; i < totelElements; i++) {
-            // const isWhitelisted = await this.#isWhitelisted(assembledWhitelistMessages[i].key);
-            // if (!isWhitelisted) {
-            await this.#state.append(assembledWhitelistMessages[i]);
-            // await this.#network.sendMessageToNode(assembledWhitelistMessages[i].key, whitelistedMessage);
-            // await sleep(WHITELIST_SLEEP_INTERVAL);
-            // console.log(`Whitelist message sent (public key ${(i + 1)}/${totelElements})`);
-            //}
+        for (const [pubKey, encodedPayload] of assembledWhitelistMessages) {
+            processedCount++;
+            const isWhitelisted = await this.#state.isAddressWhitelisted("01" + pubKey); //TODO: TEMP workaround until we won't have trac address standard
+            if (isWhitelisted) {
+                console.log(`Public key ${pubKey} is already whitelisted.`);
+                continue;
+            }
+
+            const whitelistedMessage = {
+                op: 'whitelisted',
+                message: encodedPayload,
+            };
+
+            await this.#state.append(encodedPayload);
+            await this.#network.sendMessageToNode(pubKey, whitelistedMessage)
+            await sleep(WHITELIST_SLEEP_INTERVAL);
+            console.log(`Whitelist message processed (${processedCount}/${totalElements})`);
+
         }
     }
 
@@ -371,7 +388,7 @@ export class MainSettlementBus extends ReadyResource {
                 //TODO: network module should handle this in binary format however for now it is ok
                 assembledMessage = {
                     op: 'addWriter',
-                    message: await MsgUtils2.assembleAddWriterMessage(this.#wallet, this.#state.writingKey),
+                    message: await messageOperations.assembleAddWriterMessage(this.#wallet, this.#state.writingKey),
                 }
             }
         }
@@ -380,7 +397,7 @@ export class MainSettlementBus extends ReadyResource {
                 //TODO: network module should handle this in binary format however for now it is ok
                 assembledMessage = {
                     op: 'removeWriter',
-                    message: await MsgUtils2.assembleRemoveWriterMessage(this.#wallet, this.#state.writingKey),
+                    message: await messageOperations.assembleRemoveWriterMessage(this.#wallet, this.#state.writingKey),
 
                 }
             }
@@ -405,7 +422,7 @@ export class MainSettlementBus extends ReadyResource {
         if (toAdd) {
             const canAddIndexer = nodeEntry.isWhitelisted && nodeEntry.isWriter && !nodeEntry.isIndexer;
             if (canAddIndexer) {
-                const assembledAddIndexerMessage = await MsgUtils2.assembleAddIndexerMessage(this.#wallet, b4a.from(tracPubKey, 'hex'));
+                const assembledAddIndexerMessage = await messageOperations.assembleAddIndexerMessage(this.#wallet, b4a.from(tracPubKey, 'hex'));
                 await this.#state.append(assembledAddIndexerMessage);
             }
         }
@@ -413,13 +430,12 @@ export class MainSettlementBus extends ReadyResource {
             //TODO: ensure if this works
             const canRemoveIndexer = !toAdd && nodeEntry.isIndexer
             if (canRemoveIndexer) {
-                const assembledRemoveIndexer = await MsgUtils2.assembleRemoveIndexerMessage(this.#wallet, b4a.from(tracPubKey, 'hex'));
+                const assembledRemoveIndexer = await messageOperations.assembleRemoveIndexerMessage(this.#wallet, b4a.from(tracPubKey, 'hex'));
                 await this.#state.append(assembledRemoveIndexer);
             }
 
         }
     }
-    //todo refactor this method to use MsgUtils2 and adjust it to binary data
     async #banValidator(tracPublicKey) {
         const tempAddressApproach = "01" + tracPublicKey;
         const adminEntry = await this.#state.getAdminEntry();
@@ -427,7 +443,7 @@ export class MainSettlementBus extends ReadyResource {
         const isWhitelisted = await this.#state.isAddressWhitelisted(tempAddressApproach);
         const nodeEntry = await this.#state.getNodeEntry(tempAddressApproach);
         if (!isWhitelisted || null === nodeEntry || nodeEntry.isIndexer === true) return;
-        const assembledBanValidatorMessage = await MsgUtils2.assembleBanWriterMessage(this.#wallet, b4a.from(tracPublicKey, 'hex'));
+        const assembledBanValidatorMessage = await messageOperations.assembleBanWriterMessage(this.#wallet, b4a.from(tracPublicKey, 'hex'));
         await this.#state.append(assembledBanValidatorMessage);
 
     }

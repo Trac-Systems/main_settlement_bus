@@ -96,17 +96,16 @@ class MessageOperations {
             const director = new MessageDirector();
             director.builder = builder;
 
-            const messages = [];
-            const pubKeys = await fileUtils.readPublicKeysFromFile(); // TODO: This method should return public keys in Buffer, not string format
+            const messages = new Map();
+            const pubKeys = await fileUtils.readPublicKeysFromFile(); //SHOULD WE LOAD ADDRESSES OR PUBLIC KEYS? -> QUESTION TO LEO
 
             for (const pubKey of pubKeys) {
                 const payload = await director.buildAppendWhitelistMessage(b4a.from(pubKey, 'hex'));
                 const encodedPayload = safeEncodeApplyOperation(payload);
-                messages.push(encodedPayload);
+                messages.set(pubKey, encodedPayload);
             }
 
             return messages;
-
         } catch (error) {
             console.error(`Failed to assemble append whitelist message via MessageOperations: ${error.message}`);
             return null;
