@@ -125,7 +125,7 @@ class Network extends ReadyResource {
                 message_channel.open()
                 const message = message_channel.addMessage({
                     encoding: c.json,
-                    //TODO: split this into many functions. This function should only contain switch statement
+                    //TODO: change it into switch case
                     //TODO: instad of doing return; in cases which does not fit for us, we should perform - swarm.leavePeer(connection.remotePublicKey)
                     //TODO: In messages module we can create a new builders for cases like get_validator, get_admin, get_node, etc.
                     //TODO write validators in fastest validator + define protoschemas 
@@ -161,9 +161,8 @@ class Network extends ReadyResource {
 
                                 await network.handleCustomNodeResponse(msg, connection, channelString, state, wallet);
                                 network.#swarm.leavePeer(connection.remotePublicKey)
-
-                                //TODO: Most of this logic below should be moved into the handleIncomingEvent function. Code below can be reduced to call only handleIncomingEvent(msg) with some basic checks.
                             }
+                            // ---------- HANDLING OPERATIONS ----------
                             else if (msg.message !== undefined && msg.op === 'addWriter') {
                                 await handleIncomingEvent(b4a.from(msg.message));
                                 network.#swarm.leavePeer(connection.remotePublicKey)
