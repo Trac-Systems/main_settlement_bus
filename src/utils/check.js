@@ -1,5 +1,6 @@
 import Validator from 'fastest-validator';
 import { OperationType, ADDRESS_BYTE_LENGTH, WRITER_BYTE_LENGTH, NONCE_BYTE_LENGTH, SIGNATURE_BYTE_LENGTH, HASH_BYTE_LENGTH, MIN_SAFE_VALIDATION_INTEGER, MAX_SAFE_VALIDATION_INTEGER } from './constants.js';
+import {TRAC_ADDRESS_SIZE} from '../core/state/ApplyOperationEncodings.js'
 import b4a from 'b4a';
 class Check {
     #_validator;
@@ -53,7 +54,7 @@ class Check {
         const schema = {
             $$strict: true,
             type: { type: 'number', enum: [OperationType.ADD_ADMIN, OperationType.ADD_WRITER, OperationType.REMOVE_WRITER], positive: true, integer: true, min: MIN_SAFE_VALIDATION_INTEGER, max: MAX_SAFE_VALIDATION_INTEGER, required: true },
-            key: { type: 'buffer', length: ADDRESS_BYTE_LENGTH, required: true },
+            address: { type: 'buffer', length: TRAC_ADDRESS_SIZE, required: true },
             eko: {
                 strict: true,
                 type: 'object',
@@ -75,7 +76,7 @@ class Check {
         const schema = {
             $$strict: true,
             type: { type: 'number', enum: [OperationType.ADD_INDEXER, OperationType.REMOVE_INDEXER, OperationType.APPEND_WHITELIST, OperationType.BAN_VALIDATOR], positive: true, integer: true, min: MIN_SAFE_VALIDATION_INTEGER, max: MAX_SAFE_VALIDATION_INTEGER, required: true },
-            key: { type: 'buffer', length: ADDRESS_BYTE_LENGTH, required: true },
+            address: { type: 'buffer', length: TRAC_ADDRESS_SIZE, required: true },
             bko: {
                 strict: true,
                 type: 'object',
@@ -96,15 +97,15 @@ class Check {
         const schema = {
             $$strict: true,
             op: { type: 'string', enum: ['pre-tx'], required: true },
-            tx: { type: 'string', length: HASH_BYTE_LENGTH * 2, required: true, hex: true }, // tx hash
-            is: { type: 'string', length: SIGNATURE_BYTE_LENGTH * 2, required: true, hex: true }, // signature
-            wp: { type: 'string', length: ADDRESS_BYTE_LENGTH * 2, required: true, hex: true }, // validator public key
-            i: { type: 'string', length: WRITER_BYTE_LENGTH * 2, required: true, hex: true }, // incoming peer writer key
-            ipk: { type: 'string', length: ADDRESS_BYTE_LENGTH * 2, required: true, hex: true }, // incoming peer public key
-            ch: { type: 'string', length: HASH_BYTE_LENGTH * 2, required: true, hex: true }, // content hash
-            in: { type: 'string', length: NONCE_BYTE_LENGTH * 2, required: true, hex: true }, // nonce
-            bs: { type: 'string', length: WRITER_BYTE_LENGTH * 2, required: true, hex: true }, // peer contract bootstrap
-            mbs: { type: 'string', length: WRITER_BYTE_LENGTH * 2, required: true, hex: true }, // msb bootstrap
+            tx: { type: 'string', length: 64, required: true, hex: true }, // tx hash
+            is: { type: 'string', length: 128, required: true, hex: true }, // signature
+            wp: { type: 'string', length: 64, required: true, hex: true }, // validator public key
+            i: { type: 'string', length: 64, required: true, hex: true }, // incoming peer writer key
+            ipk: { type: 'string', length: 64, required: true, hex: true }, // incoming peer public key
+            ch: { type: 'string', length: 64, required: true, hex: true }, // content hash
+            in: { type: 'string', length: 64, required: true, hex: true }, // nonce
+            bs: { type: 'string', length: 64, required: true, hex: true }, // peer contract bootstrap
+            mbs: { type: 'string', length: 64, required: true, hex: true }, // msb bootstrap
         };
         return this.#_validator.compile(schema);
     }
@@ -116,7 +117,7 @@ class Check {
         const schema = {
             $$strict: true,
             type: { type: 'number', enum: [OperationType.POST_TX], positive: true, integer: true, min: MIN_SAFE_VALIDATION_INTEGER, max: MAX_SAFE_VALIDATION_INTEGER, required: true },
-            key: { type: 'buffer', length: HASH_BYTE_LENGTH, required: true }, // tx hash
+            tx: { type: 'buffer', length: HASH_BYTE_LENGTH, required: true }, // tx hash
             txo: {
                 strict: true,
                 type: "object",

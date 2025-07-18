@@ -28,3 +28,19 @@ export const createMessage = (...args) => {
     if (buffers.length === 0) return b4a.alloc(0);
     return b4a.concat(buffers);
 }
+
+export function normalizeBuffer(message) {
+    if (b4a.isBuffer(message)) {
+        return message;
+    }
+    
+    if (message.type === 'Buffer' && Array.isArray(message.data)) {
+        return b4a.from(message.data);
+    }
+    
+    if (typeof message === 'object' && Object.keys(message).every(key => !isNaN(key))) {
+        return b4a.from(Object.values(message));
+    }
+    
+    return null;
+}

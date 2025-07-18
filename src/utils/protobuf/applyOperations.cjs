@@ -429,8 +429,8 @@ function defineOperation () {
       var len = encodings.enum.encodingLength(obj.type)
       length += 1 + len
     }
-    if (defined(obj.key)) {
-      var len = encodings.bytes.encodingLength(obj.key)
+    if (defined(obj.address)) {
+      var len = encodings.bytes.encodingLength(obj.address)
       length += 1 + len
     }
     if (defined(obj.bko)) {
@@ -461,9 +461,9 @@ function defineOperation () {
       encodings.enum.encode(obj.type, buf, offset)
       offset += encodings.enum.encode.bytes
     }
-    if (defined(obj.key)) {
+    if (defined(obj.address)) {
       buf[offset++] = 18
-      encodings.bytes.encode(obj.key, buf, offset)
+      encodings.bytes.encode(obj.address, buf, offset)
       offset += encodings.bytes.encode.bytes
     }
     if (defined(obj.bko)) {
@@ -498,7 +498,7 @@ function defineOperation () {
     var oldOffset = offset
     var obj = {
       type: 0,
-      key: null,
+      address: null,
       bko: null,
       eko: null,
       txo: null
@@ -517,7 +517,7 @@ function defineOperation () {
         offset += encodings.enum.decode.bytes
         break
         case 2:
-        obj.key = encodings.bytes.decode(buf, offset)
+        obj.address = encodings.bytes.decode(buf, offset)
         offset += encodings.bytes.decode.bytes
         break
         case 3:

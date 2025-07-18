@@ -1,8 +1,11 @@
 import {OperationType as OP} from './protobuf/applyOperations.cjs';
+
 export const EntryType = Object.freeze({
     ADMIN: 'admin',
     WHITELIST: 'whitelist',
     INDEXERS: 'indexers',
+    WRITERS_LENGTH: 'wrl',
+    WRITERS_INDEX: 'wri/',
 });
 
 export const OperationType = Object.freeze({
@@ -36,9 +39,6 @@ export const EventType = Object.freeze({
 export const WHITELIST_FILEPATH = './Whitelist/pubkeys.csv';
 export const LISTENER_TIMEOUT = 10_000;
 export const TRAC_NAMESPACE = 'TracNetwork';
-export const WHITELIST_PREFIX = 'whitelist/';
-export const MAX_INDEXERS = 3;
-export const MIN_INDEXERS = 1;
 export const WHITELIST_SLEEP_INTERVAL = 1_000;
 export const MAX_PEERS = 64;
 export const MAX_PARALLEL = 64;
@@ -47,7 +47,7 @@ export const MAX_CLIENT_CONNECTIONS = Infinity;
 export const ACK_INTERVAL = 1_000;
 
 // checkjs
-export const ADDRESS_BYTE_LENGTH = 32;
+export const ADDRESS_BYTE_LENGTH = 33;
 export const WRITER_BYTE_LENGTH = 32;
 export const NONCE_BYTE_LENGTH = 32;
 export const HASH_BYTE_LENGTH = 32;

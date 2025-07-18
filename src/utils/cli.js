@@ -1,26 +1,43 @@
-export async function verifyDag(base, swarm, wallet, writerKey) {
+import b4a from 'b4a';
+import { TRAC_ADDRESS_SIZE } from '../core/state/ApplyOperationEncodings.js';
+
+export async function verifyDag(state, network, wallet, writerKey, shouldListenToAdminEvents, shouldListenToWriterEvents) {
     try {
-        console.log('--- Stats ---');
-        const dagView = await base.view.core.treeHash();
-        const lengthdagView = base.view.core.length;
-        const dagSystem = await base.system.core.treeHash();
-        const lengthdagSystem = base.system.core.length;
-        console.log(`isIndexer: ${base.isIndexer}`);
-        console.log(`isWriter: ${base.writable}`);
-        console.log('wallet.publicKey:', wallet !== null ? wallet.publicKey : 'unset');
-        console.log('msb.writerKey:', writerKey);
-        console.log('swarm.connections.size:', swarm.connections.size);
-        console.log('base.view.core.signedLength:', base.view.core.signedLength);
-        console.log('base.view.core.length:', base.view.core.length);
-        console.log("base.signedLength", base.signedLength);
-        console.log("base.indexedLength", base.indexedLength);
-        console.log("base.linearizer.indexers.length", base.linearizer.indexers.length);
-        console.log(`base.key: ${base.key.toString('hex')}`);
-        console.log('discoveryKey:', b4a.toString(base.discoveryKey, 'hex'));
+        console.log('---------- node & network stats ----------');
+        const dagView = await state.base.view.core.treeHash();
+        const lengthdagView = state.base.view.core.length;
+        const dagSystem = await state.base.system.core.treeHash();
+        const lengthdagSystem = state.base.system.core.length;
+
+        console.log('wallet.publicKey:', wallet !== null ? wallet.publicKey.toString('hex') : 'unset');
+        console.log('wallet.address:', wallet !== null ? wallet.address : 'unset');
+        console.log('msb.writerKey:', writerKey.toString('hex'));
+        console.log('swarm.connections.size:', network.swarm.connections.size);
+        console.log('base.view.core.signedLength:', state.base.view.core.signedLength);
+        console.log('base.view.core.length:', state.base.view.core.length);
+        console.log("base.signedLength", state.base.signedLength);
+        console.log("base.indexedLength", state.base.indexedLength);
+        console.log("base.linearizer.indexers.length", state.base.linearizer.indexers.length);
+        console.log(`base.key: ${state.base.key.toString('hex')}`);
+        console.log('discoveryKey:', b4a.toString(state.base.discoveryKey, 'hex'));
         console.log(`VIEW Dag: ${dagView.toString('hex')} (length: ${lengthdagView})`);
         console.log(`SYSTEM Dag: ${dagSystem.toString('hex')} (length: ${lengthdagSystem})`);
-        const wl = await base.view.get('wrl');
-        console.log('Total Registered Writers:', wl !== null ? wl.value : 0);
+        const wl = await state.getWriterLength();
+        console.log('Total Registered Writers:', wl !== null ? wl : 0);
+
+        console.log("---------- connections stats ----------");
+        console.log("Admin Stream:", network.admin_stream ? "Connected" : "Not Connected");
+        console.log("Admin Public Key:", network.admin ? network.admin.toString('hex') : "None");
+        console.log("Validator Stream:", network.validator_stream ? "Connected" : "Not Connected");
+        console.log("Validator Public Key:", network.validator ? network.validator.toString('hex') : "None");
+        console.log("Custom Stream:", network.custom_stream ? "Connected" : "Not Connected");
+        console.log("Custom Node Address:", network.custom_node ? network.custom_node.toString('hex') : "None");
+
+        console.log("---------- flags ----------");
+        console.log(`isIndexer: ${state.isIndexer()}`);
+        console.log(`isWriter: ${state.isWritable()}`);
+        console.log("shouldListenToAdminEvents: ", shouldListenToAdminEvents);
+        console.log("shouldListenToWriterEvents: ", shouldListenToWriterEvents);
 
     } catch (error) {
         console.error('Error during DAG monitoring:', error.message);
@@ -42,10 +59,31 @@ export function printHelp() {
     console.log('- /help: display this help.');
 }
 
-export const printWalletInfo = (tracPublicKey, writingKey) => {
+export const printWalletInfo = (address, writingKey) => {
     console.log('');
     console.log('#####################################################################################');
-    console.log('# MSB Address:    ', tracPublicKey.toString('hex'), '#');
-    console.log('# MSB Writer:     ', writingKey, '#');
+    console.log('# MSB Address:   ', address.toString('hex'), ' #');
+    console.log('# MSB Writer:    ', writingKey.toString('hex'), '#');
     console.log('#####################################################################################');
+}
+
+export function formatIndexersEntry(indexersEntry) {
+    if (!b4a.isBuffer(indexersEntry) || indexersEntry.length < 1) {
+        return 'No indexers';
+    }
+
+    const count = indexersEntry[0];
+    const indexers = [];
+
+    for (let i = 0; i < count; i++) {
+        const start = 1 + (i * TRAC_ADDRESS_SIZE);
+        const end = start + TRAC_ADDRESS_SIZE;
+        const indexerAddr = indexersEntry.subarray(start, end);
+        indexers.push(indexerAddr.toString('ascii'));
+    }
+
+    return {
+        count,
+        addresses: indexers
+    };
 }
