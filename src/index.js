@@ -55,7 +55,7 @@ export class MainSettlementBus extends ReadyResource {
     #initInternalAttributes(options) {
         this.#STORES_DIRECTORY = options.stores_directory;
         this.#KEY_PAIR_PATH = `${this.#STORES_DIRECTORY}${options.store_name}/db/keypair.json`
-        this.#bootstrap = this.#bootstrap = options.bootstrap ? b4a.from(options.bootstrap, 'hex') : null;;
+        this.#bootstrap = this.#bootstrap = options.bootstrap ? b4a.from(options.bootstrap, 'hex') : null;
         this.#channel = b4a.alloc(32).fill(options.channel) || null;
         this.#store = new Corestore(this.#STORES_DIRECTORY + options.store_name);
         this.#enable_wallet = options.enable_wallet !== false;
@@ -195,7 +195,7 @@ export class MainSettlementBus extends ReadyResource {
             const decodedRequest = safeDecodeApplyOperation(bufferedRequest);
             if (decodedRequest.type) {
                 if (decodedRequest.type === OperationType.ADD_WRITER || decodedRequest.type === OperationType.REMOVE_WRITER) {
-                    //This request must be hanlded by ADMIN
+                    //This request must be handled by ADMIN
                     this.emit(EventType.ADMIN_EVENT, decodedRequest, bufferedRequest);
                 }
                 else if (decodedRequest.type === OperationType.ADD_ADMIN) {

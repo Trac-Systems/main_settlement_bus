@@ -26,9 +26,7 @@ export async function createHash(type, message) {
     } else {
         // this is only available here for completeness and in fact will never be used in the MSB.
         // just keep it as it is.
-        //return crypto.createHash(type).update(!b4a.isBuffer(message) ? b4a.from(message) : message).digest('hex')
         return b4a.from(crypto.createHash(type).update(message).digest('hex'), 'hex');
-
     }
 }
 

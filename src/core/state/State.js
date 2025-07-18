@@ -15,7 +15,6 @@ import { safeDecodeApplyOperation } from '../../utils/protobuf/operationHelpers.
 import { createMessage } from '../../utils/buffer.js';
 import ApplyOperationEncodings, { ZERO_WK } from './ApplyOperationEncodings.js';
 //TODO: describe apply operation +- what is going on to increase readability.
-//TODO; Integrate with bench32m
 class State extends ReadyResource {
 
     #base;
@@ -175,8 +174,6 @@ class State extends ReadyResource {
         const batch = view.batch();
         for (const node of nodes) {
             const op = safeDecodeApplyOperation(node.value);
-            // console.log("hostcall", base.system)
-            // console.log("1op:", op);
             if (op === null) return;
             const handler = this.#getApplyOperationHandler(op.type);
             if (handler) {

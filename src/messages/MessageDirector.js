@@ -35,11 +35,11 @@ class MessageDirector {
         return this.#builder.getPayload();
     }
 
-    async buildRemoveWriterMessage(writingKey, tracAddres) {
+    async buildRemoveWriterMessage(writingKey, tracAddress) {
         if (!this.#builder) throw new Error('Builder has not been set.');
 
         await this.#builder.forOperationType(OperationType.REMOVE_WRITER)
-            .withTracAddress(tracAddres)
+            .withTracAddress(tracAddress)
             .withWriterKey(writingKey)
             .buildValueAndSign();
 
