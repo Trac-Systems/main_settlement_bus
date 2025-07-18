@@ -5,8 +5,9 @@ import fileUtils from '../../src/utils/fileUtils.js';
 import { OperationType } from '../utils/constants.js';
 import { createMessage } from '../utils/buffer.js';
 import { createHash } from '../utils/crypto.js';
-import { TRAC_NETWORK_PREFIX } from '../utils/constants.js';
 import b4a from 'b4a';
+import PeerWallet from 'trac-wallet';
+import ApplyOperationEncodings from '../core/state/ApplyOperationEncodings.js';
 
 class MessageOperations {
     static async assembleAddAdminMessage(adminEntry, writingKey, wallet, bootstrap) {
@@ -15,7 +16,7 @@ class MessageOperations {
             const director = new MessageDirector();
             director.builder = builder;
 
-            const payload = await director.buildAddAdminMessage(adminEntry, writingKey, bootstrap, wallet.publicKey);
+            const payload = await director.buildAddAdminMessage(adminEntry, writingKey, bootstrap, wallet.address);
             const encodedPayload = safeEncodeApplyOperation(payload);
             return encodedPayload;
 
@@ -31,7 +32,7 @@ class MessageOperations {
             const director = new MessageDirector();
             director.builder = builder;
 
-            const payload = await director.buildAddWriterMessage(writingKey, wallet.publicKey);
+            const payload = await director.buildAddWriterMessage(writingKey, wallet.address);
             const encodedPayload = safeEncodeApplyOperation(payload);
             return encodedPayload;
 
@@ -47,7 +48,7 @@ class MessageOperations {
             const director = new MessageDirector();
             director.builder = builder;
 
-            const payload = await director.buildRemoveWriterMessage(writingKey, wallet.publicKey);
+            const payload = await director.buildRemoveWriterMessage(writingKey, wallet.address);
             const encodedPayload = safeEncodeApplyOperation(payload);
             return encodedPayload;
 
@@ -57,13 +58,13 @@ class MessageOperations {
         }
     }
 
-    static async assembleAddIndexerMessage(wallet, tracPublicKey) {
+    static async assembleAddIndexerMessage(wallet, address) {
         try {
             const builder = new MessageBuilder(wallet);
             const director = new MessageDirector();
             director.builder = builder;
 
-            const payload = await director.buildAddIndexerMessage(tracPublicKey);
+            const payload = await director.buildAddIndexerMessage(address);
             const encodedPayload = safeEncodeApplyOperation(payload);
             return encodedPayload;
 
@@ -73,13 +74,13 @@ class MessageOperations {
         }
     }
 
-    static async assembleRemoveIndexerMessage(wallet, tracPublicKey) {
+    static async assembleRemoveIndexerMessage(wallet, address) {
         try {
             const builder = new MessageBuilder(wallet);
             const director = new MessageDirector();
             director.builder = builder;
 
-            const payload = await director.buildRemoveIndexerMessage(tracPublicKey);
+            const payload = await director.buildRemoveIndexerMessage(address);
             const encodedPayload = safeEncodeApplyOperation(payload);
             return encodedPayload;
 
@@ -97,14 +98,13 @@ class MessageOperations {
             director.builder = builder;
 
             const messages = new Map();
-            const pubKeys = await fileUtils.readPublicKeysFromFile(); //SHOULD WE LOAD ADDRESSES OR PUBLIC KEYS? -> QUESTION TO LEO
+            const addresses = await fileUtils.readPublicKeysFromFile();
 
-            for (const pubKey of pubKeys) {
-                const payload = await director.buildAppendWhitelistMessage(b4a.from(pubKey, 'hex'));
+            for (const address of addresses) {
+                const payload = await director.buildAppendWhitelistMessage(address);
                 const encodedPayload = safeEncodeApplyOperation(payload);
-                messages.set(pubKey, encodedPayload);
+                messages.set(address, encodedPayload);
             }
-
             return messages;
         } catch (error) {
             console.error(`Failed to assemble append whitelist message via MessageOperations: ${error.message}`);
@@ -112,13 +112,13 @@ class MessageOperations {
         }
     }
 
-    static async assembleBanWriterMessage(wallet, tracPublicKey) {
+    static async assembleBanWriterMessage(wallet, address) {
         try {
             const builder = new MessageBuilder(wallet);
             const director = new MessageDirector();
             director.builder = builder;
 
-            const payload = await director.buildBanWriterMessage(tracPublicKey);
+            const payload = await director.buildBanWriterMessage(address);
             const encodedPayload = safeEncodeApplyOperation(payload);
             return encodedPayload;
 
@@ -128,80 +128,81 @@ class MessageOperations {
         }
     }
 
-    //todo refactor when all cases are implemented. Missing addAdmin
     //TODO: This method can be simplified.
     static async verifyEventMessage(parsedRequest, wallet, check, state) {
-        const { type } = parsedRequest;
-        if (
-            type !== OperationType.ADD_ADMIN &&
-            type !== OperationType.ADD_WRITER &&
-            type !== OperationType.REMOVE_WRITER
-        ) {
-            return false;
-        }
+        try {
+            const { type } = parsedRequest;
+            if (
+                type !== OperationType.ADD_ADMIN &&
+                type !== OperationType.ADD_WRITER &&
+                type !== OperationType.REMOVE_WRITER
+            ) {
+                return false;
+            }
 
         const sanitizationResult = check.sanitizeExtendedKeyOpSchema(parsedRequest);
         if (!sanitizationResult) return false;
 
         if (type === OperationType.ADD_WRITER) {
+            const nodeAddress = ApplyOperationEncodings.bufferToAddress(parsedRequest.address);
+            if (nodeAddress === null) return false;
 
-            const nodeEntry = await state.getNodeEntry(parsedRequest.key.toString('hex'));
+            const nodeEntry = await state.getNodeEntry(nodeAddress);
             if (!nodeEntry) return false;
 
             const isNodeAlreadyWriter = nodeEntry.isWriter;
             const isNodeWhitelisted = nodeEntry.isWhitelisted;
             const canAddWriter = state.isWritable() && !isNodeAlreadyWriter && isNodeWhitelisted;
 
-            if (parsedRequest.key === wallet.address || !canAddWriter) return false;
+            if (parsedRequest.address === wallet.address || !canAddWriter) return false;
 
-            const nodeTracAddress = parsedRequest.key
-            const networkPrefix = nodeTracAddress.slice(0, 1);
-            if (networkPrefix.readUInt8(0) !== TRAC_NETWORK_PREFIX) return false;
-            const nodePublicKey = nodeTracAddress.slice(1, 33);
+            const nodePublicKey = PeerWallet.decodeBech32m(nodeAddress);
 
-            const msg = createMessage(parsedRequest.key, parsedRequest.eko.wk, parsedRequest.eko.nonce, parsedRequest.type);
+            const msg = createMessage(parsedRequest.address, parsedRequest.eko.wk, parsedRequest.eko.nonce, parsedRequest.type);
             const hash = await createHash('sha256', msg);
 
             return wallet.verify(parsedRequest.eko.sig, hash, nodePublicKey);
         } else if (type === OperationType.REMOVE_WRITER) {
+            const nodeAddress = ApplyOperationEncodings.bufferToAddress(parsedRequest.address);
+            if (nodeAddress === null) return false;
 
-            const nodeEntry = await state.getNodeEntry(parsedRequest.key.toString('hex'));
+            const nodeEntry = await state.getNodeEntry(nodeAddress);
             if (!nodeEntry) return false;
 
             const isAlreadyWriter = nodeEntry.isWriter;
             const canRemoveWriter = state.isWritable() && isAlreadyWriter;
-            if (parsedRequest.key === wallet.address || !canRemoveWriter) return false;
+            if (nodeAddress === wallet.address || !canRemoveWriter) return false;
 
-            const nodeTracAddress = parsedRequest.key
-            const networkPrefix = nodeTracAddress.slice(0, 1);
-            if (networkPrefix.readUInt8(0) !== TRAC_NETWORK_PREFIX) return false;
-            const nodePublicKey = nodeTracAddress.slice(1, 33);
+            const nodePublicKey = PeerWallet.decodeBech32m(nodeAddress);
 
-            const msg = createMessage(parsedRequest.key, parsedRequest.eko.wk, parsedRequest.eko.nonce, parsedRequest.type);
+            const msg = createMessage(parsedRequest.address, parsedRequest.eko.wk, parsedRequest.eko.nonce, parsedRequest.type);
             const hash = await createHash('sha256', msg);
 
             return wallet.verify(parsedRequest.eko.sig, hash, nodePublicKey);
         }
         else if (type === OperationType.ADD_ADMIN) {
             const adminEntry = await state.getAdminEntry();
-            
+            if (!adminEntry) return false;
+            const adminAddressBuffer = parsedRequest.address;
+            const adminAddress = ApplyOperationEncodings.bufferToAddress(adminAddressBuffer);
+            if (adminAddress === null) return false;
+
             const isRecoveryCase = !!(
-                adminEntry &&
-                b4a.equals(adminEntry.tracAddr, parsedRequest.key) &&
+                adminEntry.tracAddr === adminAddress &&
                 parsedRequest.eko.wk &&
                 !b4a.equals(parsedRequest.eko.wk, adminEntry.wk)
             );
             if (!isRecoveryCase) return false;
 
-            const adminTracAddress = parsedRequest.key
-            const networkPrefix = adminTracAddress.slice(0, 1);
-            if (networkPrefix.readUInt8(0) !== TRAC_NETWORK_PREFIX) return false;
+            const incomingAdminPublicKey = PeerWallet.decodeBech32m(adminAddress);
 
-            const nodePublicKey = adminTracAddress.slice(1, 33);
-
-            const msg = createMessage(adminEntry.tracAddr, parsedRequest.eko.wk, parsedRequest.eko.nonce, parsedRequest.type);
+            const msg = createMessage(adminAddressBuffer, parsedRequest.eko.wk, parsedRequest.eko.nonce, parsedRequest.type);
             const hash = await createHash('sha256', msg);
-            return wallet.verify(parsedRequest.eko.sig, hash, nodePublicKey);
+            return wallet.verify(parsedRequest.eko.sig, hash, incomingAdminPublicKey);
+        }
+        } catch (error) {
+            console.error(`Failed to verify event message: ${error.message}`);
+            return false;
         }
     }
 }

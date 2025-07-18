@@ -4,21 +4,19 @@ import b4a from 'b4a';
 import readline from 'readline';
 import { sleep } from './utils/helpers.js';
 import { createHash } from './utils/crypto.js';
-import { verifyDag, printHelp, printWalletInfo } from './utils/cli.js';
+import { verifyDag, printHelp, printWalletInfo, formatIndexersEntry } from './utils/cli.js';
 import PeerWallet from "trac-wallet"
 import tty from 'tty';
 import Corestore from 'corestore';
 import messageOperations from "./messages/MessageOperations.js"
-import { extractPublickeyFromAddress } from './utils/helpers.js';
 import { safeDecodeApplyOperation } from '../src/utils/protobuf/operationHelpers.js';
 import { createMessage } from './utils/buffer.js';
+import ApplyOperationEncodings from './core/state/ApplyOperationEncodings.js';
 import {
     LISTENER_TIMEOUT,
-    EntryType,
     OperationType,
     EventType,
     WHITELIST_SLEEP_INTERVAL,
-    TRAC_NETWORK_PREFIX,
 } from './utils/constants.js';
 import Network from './core/network/Network.js';
 import Check from './utils/check.js';
@@ -99,7 +97,7 @@ export class MainSettlementBus extends ReadyResource {
 
         if (this.#enable_wallet) {
             await this.#wallet.initKeyPair(this.KEY_PAIR_PATH, this.#readline_instance);
-            printWalletInfo(this.#wallet.publicKey, this.#state.writingKey);
+            printWalletInfo(this.#wallet.address, this.#state.writingKey);
         }
         await this.#network.ready();
         if (this.#replicate) {
@@ -129,8 +127,7 @@ export class MainSettlementBus extends ReadyResource {
             this.#writerEventListener(); // only for writers
         }
 
-        // temporary turned off
-        //await this.#setUpRoleAutomatically(adminEntry);
+        await this.#setUpRoleAutomatically(adminEntry);
 
         console.log(`isIndexer: ${this.#state.isIndexer()}`);
         console.log(`isWriter: ${this.#state.isWritable()}`);
@@ -185,8 +182,7 @@ export class MainSettlementBus extends ReadyResource {
 
     #isAdmin(adminEntry) {
         if (!adminEntry || this.#enable_wallet === false) return false;
-        const adminTracPublicKey = extractPublickeyFromAddress(adminEntry.tracAddr);
-        return !!(b4a.equals(this.#wallet.publicKey, adminTracPublicKey) && b4a.equals(adminEntry.wk, this.#state.writingKey));
+        return !!(this.#wallet.address === adminEntry.tracAddr && b4a.equals(adminEntry.wk, this.#state.writingKey));
 
     }
 
@@ -212,13 +208,18 @@ export class MainSettlementBus extends ReadyResource {
                     // also this listener should be turned off when node become writable. But for now it is ok.
                     const adminEntry = await this.#state.getAdminEntry();
                     if (!adminEntry || this.#enable_wallet === false) return;
-                    const adminPublicKey = extractPublickeyFromAddress(adminEntry.tracAddr);
-                    const reconstructedMessage = createMessage(decodedRequest.key, decodedRequest.bko.nonce, OperationType.WHITELISTED);
+                    const adminPublicKey = PeerWallet.decodeBech32m(adminEntry.tracAddr)
+                    const reconstructedMessage = createMessage(decodedRequest.address, decodedRequest.bko.nonce, OperationType.WHITELISTED);
                     const hash = await createHash('sha256', reconstructedMessage);
-                    const isWhitelisted = await this.#state.isAddressWhitelisted(this.#wallet.address.toString('hex'));
+                    const isWhitelisted = await this.#state.isAddressWhitelisted(this.#wallet.address);
                     const isMessageVerifed = this.#wallet.verify(decodedRequest.bko.sig, hash, adminPublicKey);
-                    const isKeyMatchingWalletAddress = b4a.equals(decodedRequest.key, this.#wallet.address)
-                    if (!isMessageVerifed || !isKeyMatchingWalletAddress || !isWhitelisted || this.#state.isWritable()) return;
+                    const nodeAddress = ApplyOperationEncodings.bufferToAddress(decodedRequest.address);
+                    const isKeyMatchingWalletAddress = nodeAddress === this.#wallet.address;
+
+                    if (!isMessageVerifed || !isKeyMatchingWalletAddress || !isWhitelisted || this.#state.isWritable()) {
+                        console.error('Conditions not met for whitelisted operation');
+                        return;
+                    }
                     await this.#handleAddWriterOperation()
                 }
             }
@@ -226,7 +227,7 @@ export class MainSettlementBus extends ReadyResource {
             // for now ignore the error
         }
     }
-    
+
     async #adminEventListener() {
         this.on(EventType.ADMIN_EVENT, async (parsedRequest, bufferedRequest) => {
             if (this.#enable_wallet === false) return;
@@ -312,11 +313,10 @@ export class MainSettlementBus extends ReadyResource {
                 await this.#state.append(addAdminMessage);
             } else if (adminEntry &&
                 this.#wallet &&
-                b4a.equals(adminEntry.tracAddr, this.#wallet.address) &&
+                adminEntry.tracAddr === this.#wallet.address &&
                 this.#state.writingKey &&
                 !b4a.equals(this.#state.writingKey, adminEntry.wk)
             ) {
-
                 if (null === this.#network.validator_stream) return;
                 const payloadForValidator = {
                     op: 'addAdmin',
@@ -353,11 +353,12 @@ export class MainSettlementBus extends ReadyResource {
         const totalElements = assembledWhitelistMessages.size;
         let processedCount = 0;
 
-        for (const [pubKey, encodedPayload] of assembledWhitelistMessages) {
+        for (const [address, encodedPayload] of assembledWhitelistMessages) {
             processedCount++;
-            const isWhitelisted = await this.#state.isAddressWhitelisted("01" + pubKey); //TODO: TEMP workaround until we won't have trac address standard
+            const isWhitelisted = await this.#state.isAddressWhitelisted(address);
+            const correstpondingPublicKey = PeerWallet.decodeBech32m(address).toString('hex');
             if (isWhitelisted) {
-                console.log(`Public key ${pubKey} is already whitelisted.`);
+                console.log(`Public key ${address} is already whitelisted.`);
                 continue;
             }
 
@@ -367,7 +368,8 @@ export class MainSettlementBus extends ReadyResource {
             };
 
             await this.#state.append(encodedPayload);
-            await this.#network.sendMessageToNode(pubKey, whitelistedMessage)
+            // timesleep and validate if it becomes whitelisted
+            await this.#network.sendMessageToNode(correstpondingPublicKey, whitelistedMessage)
             await sleep(WHITELIST_SLEEP_INTERVAL);
             console.log(`Whitelist message processed (${processedCount}/${totalElements})`);
 
@@ -377,7 +379,7 @@ export class MainSettlementBus extends ReadyResource {
     async #requestWriterRole(toAdd) {
         if (this.#enable_wallet === false) return;
         const adminEntry = await this.#state.getAdminEntry();
-        const nodeEntry = await this.#state.getNodeEntry(this.#wallet.address.toString('hex'));
+        const nodeEntry = await this.#state.getNodeEntry(this.#wallet.address);
         const isAlreadyWriter = !!(nodeEntry && nodeEntry.isWriter === true)
         let assembledMessage = null;
 
@@ -408,52 +410,50 @@ export class MainSettlementBus extends ReadyResource {
         }
     }
 
-    async #updateIndexerRole(tracPubKey, toAdd) {
-        const tempAddressApproach = "01" + tracPubKey;
+    async #updateIndexerRole(tracAddress, toAdd) {
         if (this.#enable_wallet === false) return;
         const adminEntry = await this.#state.getAdminEntry();
         if (!this.#isAdmin(adminEntry) && !this.#state.isWritable()) return;
-        const nodeEntry = await this.#state.getNodeEntry(tempAddressApproach);
-        if (!nodeEntry || !nodeEntry.isWriter) return;
+        const nodeEntry = await this.#state.getNodeEntry(tracAddress);
+        if (!nodeEntry) return;
 
         const indexersEntry = await this.#state.getIndexersEntry();
-        const indexerListHasAddress = await this.#state.isAddressInIndexersEntry(tempAddressApproach, indexersEntry);
-        if (indexerListHasAddress) return;
+        const indexerListHasAddress = await this.#state.isAddressInIndexersEntry(tracAddress, indexersEntry);
+
         if (toAdd) {
-            const canAddIndexer = nodeEntry.isWhitelisted && nodeEntry.isWriter && !nodeEntry.isIndexer;
+            if (indexerListHasAddress) return;
+            const canAddIndexer = nodeEntry.isWhitelisted && nodeEntry.isWriter && !nodeEntry.isIndexer && !indexerListHasAddress;
             if (canAddIndexer) {
-                const assembledAddIndexerMessage = await messageOperations.assembleAddIndexerMessage(this.#wallet, b4a.from(tracPubKey, 'hex'));
+                const assembledAddIndexerMessage = await messageOperations.assembleAddIndexerMessage(this.#wallet, tracAddress);
                 await this.#state.append(assembledAddIndexerMessage);
             }
         }
         else {
-            //TODO: ensure if this works
-            const canRemoveIndexer = !toAdd && nodeEntry.isIndexer
+            const canRemoveIndexer = !toAdd && nodeEntry.isIndexer && indexerListHasAddress;
             if (canRemoveIndexer) {
-                const assembledRemoveIndexer = await messageOperations.assembleRemoveIndexerMessage(this.#wallet, b4a.from(tracPubKey, 'hex'));
+                const assembledRemoveIndexer = await messageOperations.assembleRemoveIndexerMessage(this.#wallet, tracAddress);
                 await this.#state.append(assembledRemoveIndexer);
             }
 
         }
     }
-    async #banValidator(tracPublicKey) {
-        const tempAddressApproach = "01" + tracPublicKey;
+    async #banValidator(address) {
         const adminEntry = await this.#state.getAdminEntry();
         if (!this.#isAdmin(adminEntry)) return;
-        const isWhitelisted = await this.#state.isAddressWhitelisted(tempAddressApproach);
-        const nodeEntry = await this.#state.getNodeEntry(tempAddressApproach);
+        const isWhitelisted = await this.#state.isAddressWhitelisted(address);
+        const nodeEntry = await this.#state.getNodeEntry(address);
         if (!isWhitelisted || null === nodeEntry || nodeEntry.isIndexer === true) return;
-        const assembledBanValidatorMessage = await messageOperations.assembleBanWriterMessage(this.#wallet, b4a.from(tracPublicKey, 'hex'));
+        const assembledBanValidatorMessage = await messageOperations.assembleBanWriterMessage(this.#wallet, address);
         await this.#state.append(assembledBanValidatorMessage);
 
     }
 
-    async #handleAddIndexerOperation(tracAddress) {
-        this.#updateIndexerRole(tracAddress, true);
+    async #handleAddIndexerOperation(address) {
+        this.#updateIndexerRole(address, true);
     }
 
-    async #handleRemoveIndexerOperation(tracPublicKey) {
-        this.#updateIndexerRole(tracPublicKey, false);
+    async #handleRemoveIndexerOperation(address) {
+        this.#updateIndexerRole(address, false);
     }
 
     async #handleAddWriterOperation() {
@@ -464,8 +464,8 @@ export class MainSettlementBus extends ReadyResource {
         await this.#requestWriterRole(false);
     }
 
-    async #handleBanValidatorOperation(tracPublicKey) {
-        await this.#banValidator(tracPublicKey);
+    async #handleBanValidatorOperation(address) {
+        await this.#banValidator(address);
     }
 
     async interactiveMode() {
@@ -502,36 +502,28 @@ export class MainSettlementBus extends ReadyResource {
                 break;
             case '/remove_writer':
                 await this.#handleRemoveWriterOperation();
-                break
-            case '/flags':
-                //TODO: consider to move it into the get node info or stats
-                console.log("shouldListenToAdminEvents: ", this.#shouldListenToAdminEvents);
-                console.log("shouldListenToWriterEvents: ", this.#shouldListenToWriterEvents);
-                console.log("isWritable: ", this.#state.isWritable());
-                console.log("isIndexer: ", this.#state.isIndexer());
-                break
-            case '/show':
-                //TODO: Implement formater for users
+                break;
+            case '/core':
                 const admin = await this.#state.getAdminEntry();
-                console.log('Admin:', admin);
+                console.log('Admin:', admin ? {
+                    address: admin.tracAddr,
+                    writingKey: admin.wk.toString('hex')
+                } : null);
                 const indexers = await this.#state.getIndexersEntry();
-                console.log('Indexers:', indexers);
+                console.log('Indexers:', formatIndexersEntry(indexers));
                 const wrl = await this.#state.getWriterLength();
                 console.log('Writers Length:', wrl);
-                const indexers2 = this.#state.getInfoFromLinearizer();
-                console.log('Indexers from Linearizer:', indexers2);
+                // const linealizer = this.#state.getInfoFromLinearizer();
+                // console.log('Indexers from Linearizer:', linealizer);
                 break;
             case '/stats':
-                await verifyDag(this.#state.base, this.#network.swarm, this.#wallet, this.#state.writingKey);
-                this.#network.displayNetworkInformation();
+                await verifyDag(this.#state, this.#network, this.#wallet, this.#state.writingKey, this.#shouldListenToAdminEvents, this.#shouldListenToWriterEvents);
                 break;
             default:
                 if (input.startsWith('/get_node_info')) {
                     const splitted = input.split(' ');
                     const address = splitted[1];
-                    const tempAddress = "0" + TRAC_NETWORK_PREFIX.toString() + address;
-                    console.log("Temporary Address:", tempAddress);
-                    const nodeEntry = await this.#state.getNodeEntry(tempAddress);
+                    const nodeEntry = await this.#state.getNodeEntry(address);
                     if (nodeEntry) {
                         console.log("Node Entry:", {
                             WritingKey: nodeEntry.wk.toString('hex'),
@@ -544,18 +536,18 @@ export class MainSettlementBus extends ReadyResource {
                     }
                 } else if (input.startsWith('/add_indexer')) {
                     const splitted = input.split(' ');
-                    const tracPublicKey = splitted[1]
-                    await this.#handleAddIndexerOperation(tracPublicKey);
+                    const address = splitted[1]
+                    await this.#handleAddIndexerOperation(address);
                 }
                 else if (input.startsWith('/remove_indexer')) {
                     const splitted = input.split(' ');
-                    const tracPublicKey = splitted[1]
-                    await this.#handleRemoveIndexerOperation(tracPublicKey);
+                    const address = splitted[1]
+                    await this.#handleRemoveIndexerOperation(address);
                 }
                 else if (input.startsWith('/ban_writer')) {
                     const splitted = input.split(' ');
-                    const tracPublicKey = splitted[1]
-                    await this.#handleBanValidatorOperation(tracPublicKey);
+                    const address = splitted[1]
+                    await this.#handleBanValidatorOperation(address);
                 }
         }
     }

@@ -1,7 +1,5 @@
 import {OperationType as OP} from './protobuf/applyOperations.cjs';
 
-export const TRAC_NETWORK_PREFIX = 0x01; // 1 byte prefix for TRAC network
-
 export const EntryType = Object.freeze({
     ADMIN: 'admin',
     WHITELIST: 'whitelist',
@@ -41,9 +39,6 @@ export const EventType = Object.freeze({
 export const WHITELIST_FILEPATH = './Whitelist/pubkeys.csv';
 export const LISTENER_TIMEOUT = 10_000;
 export const TRAC_NAMESPACE = 'TracNetwork';
-export const WHITELIST_PREFIX = 'whitelist/';
-export const MAX_INDEXERS = 3;
-export const MIN_INDEXERS = 1;
 export const WHITELIST_SLEEP_INTERVAL = 1_000;
 export const MAX_PEERS = 64;
 export const MAX_PARALLEL = 64;

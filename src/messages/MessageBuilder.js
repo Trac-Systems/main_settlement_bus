@@ -4,37 +4,33 @@ import { createMessage } from '../utils/buffer.js';
 import { OperationType } from '../utils/protobuf/applyOperations.cjs'
 import b4a from 'b4a';
 import Wallet from 'trac-wallet';
-import {TRAC_NETWORK_PREFIX} from '../utils/constants.js';
-
+import { TRAC_ADDRESS_SIZE, addressToBuffer } from '../core/state/ApplyOperationEncodings.js';
 
 class MessageBuilder extends Builder {
     #wallet;
     #operationType;
-    #tracPublicKey;
+    #tracAddress;
     #writingKey;
     #bootstrap;
     #adminEntry;
     #payload;
-    #networkPrefix;
 
-    constructor(wallet, networkPrefix = TRAC_NETWORK_PREFIX) {
+    constructor(wallet) {
         super();
         if (!wallet || typeof wallet !== 'object' || !b4a.isBuffer(wallet.publicKey)) {
             throw new Error('MessageBuilder requires a valid Wallet instance with a 32-byte public key Buffer.');
         }
         this.#wallet = wallet;
-        this.#networkPrefix = networkPrefix;
         this.reset();
     }
 
     reset() {
         this.#operationType = OperationType.UNKNOWN;
-        this.#tracPublicKey = null;
+        this.#tracAddress = null;
         this.#writingKey = null;
         this.#bootstrap = null;
         this.#adminEntry = null;
         this.#payload = {}
-        this.#networkPrefix = TRAC_NETWORK_PREFIX;
     }
 
     forOperationType(operationType) {
@@ -46,13 +42,12 @@ class MessageBuilder extends Builder {
         return this;
     }
 
-    withTracPubKey(publicKey) {
-        if (!b4a.isBuffer(publicKey) || publicKey.length !== 32) {
-            throw new Error('Key parameter must be a 32 length buffer.');
-
+    withTracAddress(address) {
+        if (!(typeof address === 'string') || address.length !== TRAC_ADDRESS_SIZE) {
+            throw new Error(`Address must be a ${TRAC_ADDRESS_SIZE} length buffer.`);
         }
-        this.#tracPublicKey = b4a.from([this.#networkPrefix, ...publicKey]);
-        this.#payload.key = this.#tracPublicKey;
+        this.#tracAddress =  addressToBuffer(address);
+        this.#payload.address = this.#tracAddress;
 
         return this;
     }
@@ -62,7 +57,6 @@ class MessageBuilder extends Builder {
             throw new Error('Writer key must be a 32 length buffer.');
         }
         this.#writingKey = writingKey;
-        this.#payload.wk = writingKey;
         return this;
     }
 
@@ -82,14 +76,12 @@ class MessageBuilder extends Builder {
     async buildValueAndSign() {
         const wallet = this.#wallet;
         const operationType = this.#operationType;
-        const tracPublicKey = this.#tracPublicKey;
+        const tracAddress = this.#tracAddress;
         const writingKey = this.#writingKey;
-        const bootstrap = this.#bootstrap;
-        const adminEntry = this.#adminEntry;
         
         // writer key is not required for all operations, but it is required for some...
-        if (!operationType || !tracPublicKey) {
-            throw new Error('Operation type, trac public key must be set before building the message.');
+        if (!operationType || !tracAddress) {
+            throw new Error('Operation type, trac address must be set before building the message.');
         }
 
         // for now we assume post_tx operation is not supported by this MessageBuilder
@@ -115,14 +107,14 @@ class MessageBuilder extends Builder {
                 if (!writingKey) {
                     throw new Error('Writer key must be set for writer operations (ADD_WRITER REMOVE_WRITER or ADD_ADMIN operation).');
                 }
-                msg = createMessage(tracPublicKey, writingKey, nonce, operationType);
+                msg = createMessage(tracAddress, writingKey, nonce, operationType);
                 break;
 
             case OperationType.APPEND_WHITELIST:
             case OperationType.ADD_INDEXER:
             case OperationType.REMOVE_INDEXER:
             case OperationType.BAN_WRITER:
-                msg = createMessage(tracPublicKey, nonce, operationType);
+                msg = createMessage(tracAddress, nonce, operationType);
                 break;
             default:
                 throw new Error(`Unsupported operation type for building value: ${OperationType[operationType]}.`);
@@ -169,8 +161,8 @@ class MessageBuilder extends Builder {
     };
 
     getPayload() {
-        if (!this.#payload.type || !this.#payload.key || (!this.#payload.bko && !this.#payload.eko)) {
-            throw new Error('Product is not fully assembled. Missing type, key, or value (bko/eko).');
+        if (!this.#payload.type || !this.#payload.address || (!this.#payload.bko && !this.#payload.eko)) {
+            throw new Error('Product is not fully assembled. Missing type, address, or value (bko/eko).');
         }
         const res = this.#payload;
         this.reset();

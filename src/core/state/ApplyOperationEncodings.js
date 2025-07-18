@@ -1,20 +1,22 @@
 import b4a from 'b4a';
 import { bech32m } from 'bech32';
-import { TRAC_NETWORK_MAINNET_PREFIX } from 'trac-wallet/constants.js';
+import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
+//TODO: SPLIT IT INTO MANY FILES - THIS IS HARD TO READ.
+//This file is part of contract. DO NOT CHANGE AFTER DEPLOYMENT.
+
 
 // Keys sizes in bytes
-const WRITING_KEY_SIZE = 32;
-const TRAC_PUB_KEY_SIZE = 32;
+const WRITING_KEY_SIZE = 32; // TODO: WE HAVE THIS CONSTANT ALREADY IN CONSTANT.JS
+const TRAC_PUB_KEY_SIZE = 32; // TODO: WE HAVE THIS CONSTANT ALREADY IN CONSTANT.JS
 
 // Bech32m constants
-const BECH32M_HRP_SIZE = TRAC_NETWORK_MAINNET_PREFIX.length + 1; // +1 for the separator
+const BECH32M_HRP_SIZE = TRAC_NETWORK_MSB_MAINNET_PREFIX.length + 1; // +1 for the separator
 const BECH32M_DATA_SIZE = Math.ceil(TRAC_PUB_KEY_SIZE * 8 / 5); // rounded up to the nearest 5-byte multiple (should be 52 for 32 byte keys)
 const BECH32M_CHECKSUM_SIZE = 6;
-const BECK32M_ADDRESS_SIZE = BECH32M_HRP_SIZE + BECH32M_DATA_SIZE + BECH32M_CHECKSUM_SIZE;
+export const TRAC_ADDRESS_SIZE = BECH32M_HRP_SIZE + BECH32M_DATA_SIZE + BECH32M_CHECKSUM_SIZE;
 
 // Buffer standars sizes in bytes
-const CONVERTED_TRAC_ADDRESS_SIZE = BECH32M_DATA_SIZE + BECH32M_CHECKSUM_SIZE; // TODO: SHould we really take away the HRP when storing data in the base?
-const ADMIN_ENTRY_SIZE = CONVERTED_TRAC_ADDRESS_SIZE + WRITING_KEY_SIZE;
+const ADMIN_ENTRY_SIZE = TRAC_ADDRESS_SIZE + WRITING_KEY_SIZE;
 const NODE_ENTRY_SIZE = WRITING_KEY_SIZE + 1;
 
 // Role masks
@@ -24,11 +26,13 @@ const WRITER_MASK = 0x2;
 const INDEXER_MASK = 0x4;
 
 export const NodeRole = {
-    READER: 0x0,
-    WHITELISTED: 0x1,
-    WRITER: 0x3,
-    INDEXER: 0x7,
+    READER: 0x0, // Participant in the network able to read transactions and states 
+    WHITELISTED: 0x1, // A Reader that is also able to apply to become a writer.
+    WRITER: 0x3, // A Whitelisted node that is also able to write transactions.
+    INDEXER: 0x7, // Special writer that only participates in consensus.
 }
+
+export const ZERO_WK = b4a.alloc(32, 0);
 
 // ------------ HELPER FUNCTIONS  ------------ //
 
@@ -58,8 +62,8 @@ function isNodeRoleValid(role) {
 function isAddressValid(address) {
     // Check if the address is a valid bech32m-encoded string
     if (typeof address !== 'string' ||
-        address.length !== BECK32M_ADDRESS_SIZE ||
-        !address.startsWith(TRAC_NETWORK_MAINNET_PREFIX + '1')) {
+        address.length !== TRAC_ADDRESS_SIZE ||
+        !address.startsWith(TRAC_NETWORK_MSB_MAINNET_PREFIX + '1')) {
         return false;
     }
     // Check if we can decode the address using bech32m
@@ -94,30 +98,28 @@ function calculateNodeRole(nodeObj) {
  */
 export function addressToBuffer(bech32mAddress) {
     try {
-        const sepIndex = bech32mAddress.indexOf('1');
-        if (sepIndex === -1) return b4a.alloc(0); // Invalid bech32m address
-        const dataPart = bech32mAddress.substring(sepIndex + 1);
-        return b4a.from(dataPart, 'utf8');
+        if (!isAddressValid(bech32mAddress)) {
+            return b4a.alloc(0); // Return an empty buffer if the address is invalid
+        }
+        return b4a.from(bech32mAddress, 'ascii');
     } catch (error) {
         console.error('Error converting address to buffer:', error);
         return b4a.alloc(0); // Return an empty buffer on error
     }
 }
 
-/**
+/**x
  * Converts a buffer of 8-bit characters (the data part of a bech32m address, excluding HRP and separator)
  * back into a bech32m-encoded address string, including the provided HRP.
  *
  * @param {Buffer} dataBuffer - Buffer containing the UTF-8 bytes of the address data (excluding HRP and separator).
- * @param {string} hrp - The human-readable part to prepend.
  * @returns {string|null} The full bech32m-encoded address string (with HRP) or null if something fails.
  */
-export function bufferToAddress(dataBuffer, hrp = TRAC_NETWORK_MAINNET_PREFIX) {
+export function bufferToAddress(dataBuffer) {
     try {
-        // Convert buffer back to string (the data part)
-        const dataPart = dataBuffer.toString('utf8');
-        // Concatenate HRP, separator, and data part
-        return `${hrp}1${dataPart}`;
+        const address = dataBuffer.toString('ascii');
+        if (!isAddressValid(address)) return null;
+        return address;
     }
     catch (error) {
         console.error('Error converting buffer to address:', error);
@@ -133,20 +135,19 @@ export function bufferToAddress(dataBuffer, hrp = TRAC_NETWORK_MAINNET_PREFIX) {
  * The buffer format is: [TRAC_ADDRESS][WRITING_KEY(32)]
  * Where TRAC_ADDRESS is a bech32m-encoded address without the HRP and separator.
  *
- * @param {String} tracAddr - The TRAC address.
+ * @param {Buffer} tracAddr - The TRAC address.
  * @param {Buffer} wk - The admin's writing key buffer (must be 32 bytes).
  * @returns {Buffer} The encoded admin entry buffer, or an empty buffer if input is invalid.
  */
 export function encodeAdminEntry(tracAddr, wk) {
-    if (!isAddressValid(tracAddr) || !isBufferValid(wk, WRITING_KEY_SIZE)) {
+    if (!isBufferValid(wk, WRITING_KEY_SIZE)) {
         return b4a.alloc(0);
     }
 
     try {
-        const adminEntry = b4a.alloc(CONVERTED_TRAC_ADDRESS_SIZE + WRITING_KEY_SIZE);
-        const addrPart = addressToBuffer(tracAddr);
-        b4a.copy(addrPart, adminEntry, 0);
-        b4a.copy(wk, adminEntry, addrPart.length);
+        const adminEntry = b4a.alloc(TRAC_ADDRESS_SIZE + WRITING_KEY_SIZE);
+        b4a.copy(tracAddr, adminEntry, 0);
+        b4a.copy(wk, adminEntry, TRAC_ADDRESS_SIZE);
         return adminEntry;
     } catch (error) {
         console.error('Error when encoding admin entry:', error);
@@ -161,7 +162,7 @@ export function encodeAdminEntry(tracAddr, wk) {
  * Where TRAC_ADDRESS is a bech32m-encoded address without the HRP and separator.
  *
  * @param {Buffer} adminEntry - The encoded admin entry buffer.
- * @returns {Object} An object with:
+ * @returns {Object | null} An object with:
  *   - tracAddr: String containing the TRAC address.
  *   - wk: Buffer containing the writing key.
  */
@@ -171,9 +172,9 @@ export function decodeAdminEntry(adminEntry) {
     }
 
     try {
-        const tracAddrPart = adminEntry.subarray(0, CONVERTED_TRAC_ADDRESS_SIZE);
-        const tracAddr = bufferToAddress(tracAddrPart, TRAC_NETWORK_MAINNET_PREFIX);
-        const wk = adminEntry.subarray(CONVERTED_TRAC_ADDRESS_SIZE);
+        const tracAddrPart = adminEntry.subarray(0, TRAC_ADDRESS_SIZE);
+        const tracAddr = bufferToAddress(tracAddrPart, TRAC_NETWORK_MSB_MAINNET_PREFIX);
+        const wk = adminEntry.subarray(TRAC_ADDRESS_SIZE);
         return { tracAddr, wk };
     }
     catch (error) {
@@ -184,6 +185,31 @@ export function decodeAdminEntry(adminEntry) {
 
 
 // ------------ NODE ENTRY ------------ //
+
+/**
+ * Initializes a new node entry with given writing key and role.
+ * Creates a buffer in format: [NODE_ROLE_MASK(1)][WRITING_KEY(32)]
+ *
+ * @param {Buffer} writingKey - The writing key for the node (must be 32 bytes)
+ * @param {number} role - Initial role from NodeRole enum 
+ * @returns {Buffer} The initialized node entry buffer, or empty buffer if invalid input
+ */
+export function initNodeEntry(writingKey, role) {
+    if (!isBufferValid(writingKey, WRITING_KEY_SIZE) || !isNodeRoleValid(role)) {
+        console.error('Invalid input for node initialization');
+        return b4a.alloc(0);
+    }
+
+    try {
+        const nodeEntry = b4a.alloc(NODE_ENTRY_SIZE);
+        nodeEntry[0] = role;
+        b4a.copy(writingKey, nodeEntry, 1);
+        return nodeEntry;
+    } catch (error) {
+        console.error('Error initializing node entry:', error);
+        return b4a.alloc(0);
+    }
+}
 
 /**
  * Encodes a node entry as a buffer containing the node's role mask and writing key.
@@ -287,14 +313,54 @@ export function isIndexer(nodeEntry) {
  * @param {boolean} isWhitelisted - Whether the node should be marked as whitelisted.
  * @param {boolean} isWriter - Whether the node should be marked as a writer.
  * @param {boolean} isIndexer - Whether the node should be marked as an indexer.
- * @returns {Buffer} The updated node entry buffer (same instance as input).
+ * @returns {Buffer | null} The updated node entry buffer or null if the input is invalid.
  */
 export function setNodeEntryRole(nodeEntry, nodeRole) {
-    if (!isNodeRoleValid(nodeRole)) nodeEntry;
+    if (!isNodeRoleValid(nodeRole)) return null;
     if (isBufferValid(nodeEntry, NODE_ENTRY_SIZE)) {
         nodeEntry[0] = nodeRole;
     }
     return nodeEntry;
+}
+
+export function setWritingKey(nodeEntry, writingKey) {
+    try {
+
+        if (!isBufferValid(nodeEntry, NODE_ENTRY_SIZE) || !isBufferValid(writingKey, WRITING_KEY_SIZE)) {
+            console.error('Invalid input for setting writing key');
+            return null;
+        }
+
+        b4a.copy(writingKey, nodeEntry, 1);
+        return nodeEntry;
+    } catch (error) {
+        console.error('Error setting writing key in node entry:', error);
+        return null;
+    }
+}
+
+export function setNodeEntry(nodeEntry, nodeRole, writingKey) {
+    try {
+        if (!isNodeRoleValid(nodeRole) || !isBufferValid(writingKey, WRITING_KEY_SIZE)) {
+            console.error('Invalid input for setting node entry');
+            return null;
+        }
+
+        if (!isBufferValid(nodeEntry, NODE_ENTRY_SIZE)) {
+            console.error('Invalid node entry buffer size');
+            return null;
+        }
+
+        nodeEntry[0] = nodeRole;
+
+        b4a.copy(writingKey, nodeEntry, 1);
+
+        return nodeEntry;
+
+    } catch (error) {
+        console.error('Error setting node entry role and writing key:', error);
+        return null;
+    }
 }
 
 // ------------ INDEXER MANAGEMENT ------------ //
@@ -310,16 +376,16 @@ export function setNodeEntryRole(nodeEntry, nodeRole) {
  * @returns {Buffer} The updated indexers entry buffer or an empty buffer in case something goes wrong.
  */
 export function appendIndexer(indexerAddr, indexersEntry = null) {
-    if (!isBufferValid(indexerAddr, CONVERTED_TRAC_ADDRESS_SIZE)) {
+    if (!isBufferValid(indexerAddr, TRAC_ADDRESS_SIZE)) {
         return b4a.alloc(0); // If the indexer address is invalid, do nothing
     }
     // Append the indexer address to the database
     try {
         // Indexers entry will have the following format:
-        // [count(1)][indexerAddr1(33)][indexerAddr2(33)]...[indexerAddrN(33)]
+        // [count(1)][indexerAddr1(TRAC_ADDRESS_SIZE)][indexerAddr2(TRAC_ADDRESS_SIZE)]...[indexerAddrN(TRAC_ADDRESS_SIZE)]
         // where count is the number of indexers
         let newIndexersEntry;
-        if (!b4a.isBuffer(indexersEntry) || indexersEntry.length < CONVERTED_TRAC_ADDRESS_SIZE + 1) {
+        if (!b4a.isBuffer(indexersEntry) || indexersEntry.length < TRAC_ADDRESS_SIZE + 1) {
             newIndexersEntry = b4a.concat([b4a.from([1]), indexerAddr]);
         }
         else {
@@ -346,14 +412,14 @@ export function appendIndexer(indexerAddr, indexersEntry = null) {
 export function getIndexerIndex(indexersEntry, indexerAddr) {
     if (
         !b4a.isBuffer(indexersEntry) ||
-        !isBufferValid(indexerAddr, CONVERTED_TRAC_ADDRESS_SIZE) ||
-        indexersEntry.length < CONVERTED_TRAC_ADDRESS_SIZE + 1 // it should ensure minimal length of the indexersEntry
+        !isBufferValid(indexerAddr, TRAC_ADDRESS_SIZE) ||
+        indexersEntry.length < TRAC_ADDRESS_SIZE + 1 // it should ensure minimal length of the indexersEntry
     ) {
         return -1;
     }
     // step through the indexersEntry until we find indexerAddr
     for (let i = 0; i < indexersEntry[0]; i++) {
-        if (b4a.equals(indexersEntry.subarray(1 + i * CONVERTED_TRAC_ADDRESS_SIZE, 1 + (i + 1) * CONVERTED_TRAC_ADDRESS_SIZE), indexerAddr)) {
+        if (b4a.equals(indexersEntry.subarray(1 + i * TRAC_ADDRESS_SIZE, 1 + (i + 1) * TRAC_ADDRESS_SIZE), indexerAddr)) {
             return i;
         }
     }
@@ -372,8 +438,8 @@ export function getIndexerIndex(indexersEntry, indexerAddr) {
  */
 export function removeIndexer(indexerAddr, indexersEntry) {
     if (!b4a.isBuffer(indexersEntry) ||
-        indexersEntry.length < CONVERTED_TRAC_ADDRESS_SIZE + 1 ||
-        !isBufferValid(indexerAddr, CONVERTED_TRAC_ADDRESS_SIZE)) {
+        indexersEntry.length < TRAC_ADDRESS_SIZE + 1 ||
+        !isBufferValid(indexerAddr, TRAC_ADDRESS_SIZE)) {
         return b4a.alloc(0); // If the indexer address is invalid, do nothing
     }
 
@@ -387,8 +453,8 @@ export function removeIndexer(indexerAddr, indexersEntry) {
         }
         // Remove the indexer address from the entry
         const newIndexersEntry = b4a.concat([
-            indexersEntry.subarray(0, 1 + index * CONVERTED_TRAC_ADDRESS_SIZE),
-            indexersEntry.subarray(1 + (index + 1) * CONVERTED_TRAC_ADDRESS_SIZE)
+            indexersEntry.subarray(0, 1 + index * TRAC_ADDRESS_SIZE),
+            indexersEntry.subarray(1 + (index + 1) * TRAC_ADDRESS_SIZE)
         ]);
 
         newIndexersEntry[0]--; // Decrease the count of indexers
@@ -452,16 +518,21 @@ export function incrementLengthEntry(length) {
 
 export default {
     NodeRole,
+    ZERO_WK,
+    TRAC_ADDRESS_SIZE,
     addressToBuffer,
     bufferToAddress,
     encodeAdminEntry,
     decodeAdminEntry,
     encodeNodeEntry,
     decodeNodeEntry,
+    initNodeEntry,
     isWhitelisted,
     isWriter,
     isIndexer,
     setNodeEntryRole,
+    setWritingKey,
+    setNodeEntry,
     appendIndexer,
     getIndexerIndex,
     removeIndexer,
