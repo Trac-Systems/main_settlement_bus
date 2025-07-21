@@ -16,13 +16,14 @@ class Check {
                 buffer: "The '{field}' field must be a Buffer! Actual: {actual}",
                 bufferLength: "The '{field}' field must be a Buffer with length {expected}! Actual: {actual}",
                 nonZeroBuffer: "The '{field}' field must not be an empty or zero-filled Buffer!",
+                emptyBuffer: "The '{field}' field must not be an empty Buffer!",
             },
         });
         const isBuffer = b4a.isBuffer;
         this.#_validator.add("buffer", function ({ schema, messages }, path, context) {
             return {
                 source:
-                    `   
+                    `
                     if (!${isBuffer}(value)) {
                         ${this.makeError({ type: "buffer", actual: "value", messages })}
                     }
