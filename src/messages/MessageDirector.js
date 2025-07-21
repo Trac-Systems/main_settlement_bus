@@ -11,11 +11,11 @@ class MessageDirector {
         this.#builder = builderInstance;
     }
 
-    async buildAddAdminMessage(adminEntry, writingKey, bootstrap, tracAddress) {
+    async buildAddAdminMessage(adminEntry, writingKey, bootstrap, address) {
         if (!this.#builder) throw new Error('Builder has not been set.');
 
         await this.#builder.forOperationType(OperationType.ADD_ADMIN)
-            .withTracAddress(tracAddress)
+            .withAddress(address)
             .withAdminEntry(adminEntry)
             .withWriterKey(writingKey)
             .withBootstrap(bootstrap)
@@ -24,63 +24,62 @@ class MessageDirector {
         return this.#builder.getPayload();
     }
 
-    async buildAddWriterMessage(writingKey, tracAddress) {
+    async buildAddWriterMessage(writingKey, address) {
         if (!this.#builder) throw new Error('Builder has not been set.');
 
         await this.#builder.forOperationType(OperationType.ADD_WRITER)
-            .withTracAddress(tracAddress)
+            .withAddress(address)
             .withWriterKey(writingKey)
             .buildValueAndSign();
 
         return this.#builder.getPayload();
     }
 
-    async buildRemoveWriterMessage(writingKey, tracAddress) {
+    async buildRemoveWriterMessage(writingKey, address) {
         if (!this.#builder) throw new Error('Builder has not been set.');
 
         await this.#builder.forOperationType(OperationType.REMOVE_WRITER)
-            .withTracAddress(tracAddress)
+            .withAddress(address)
             .withWriterKey(writingKey)
             .buildValueAndSign();
 
         return this.#builder.getPayload();
     }
 
-    async buildAddIndexerMessage(tracAddres) {
+    async buildAddIndexerMessage(address) {
         if (!this.#builder) throw new Error('Builder has not been set.');
 
         await this.#builder.forOperationType(OperationType.ADD_INDEXER)
-            .withTracAddress(tracAddres)
+            .withAddress(address)
             .buildValueAndSign();
 
         return this.#builder.getPayload();
     }
 
-    async buildRemoveIndexerMessage(tracAddres) {
+    async buildRemoveIndexerMessage(address) {
         if (!this.#builder) throw new Error('Builder has not been set.');
-        console.log("Building remove indexer message for address:", tracAddres);
         await this.#builder.forOperationType(OperationType.REMOVE_INDEXER)
-            .withTracAddress(tracAddres)
+            .withAddress(address)
             .buildValueAndSign();
 
         return this.#builder.getPayload();
     }
 
-    async buildAppendWhitelistMessage(tracAddres) {
+    async buildAppendWhitelistMessage(address) {
         if (!this.#builder) throw new Error('Builder has not been set.');
 
         await this.#builder.forOperationType(OperationType.APPEND_WHITELIST)
-            .withTracAddress(tracAddres)
+            .withAddress(address)
             .buildValueAndSign();
 
         return this.#builder.getPayload();
     }
 
-    async buildBanWriterMessage(tracAddres) {
+    async buildBanWriterMessage(address) {
         if (!this.#builder) throw new Error('Builder has not been set.');
 
         await this.#builder.forOperationType(OperationType.BAN_WRITER)
-            .withTracAddress(tracAddres)
+            .withAddress(address)
             .buildValueAndSign();
 
         return this.#builder.getPayload();

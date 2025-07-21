@@ -9,7 +9,7 @@ import { TRAC_ADDRESS_SIZE, addressToBuffer } from '../core/state/ApplyOperation
 class MessageBuilder extends Builder {
     #wallet;
     #operationType;
-    #tracAddress;
+    #address;
     #writingKey;
     #bootstrap;
     #adminEntry;
@@ -26,7 +26,7 @@ class MessageBuilder extends Builder {
 
     reset() {
         this.#operationType = OperationType.UNKNOWN;
-        this.#tracAddress = null;
+        this.#address = null;
         this.#writingKey = null;
         this.#bootstrap = null;
         this.#adminEntry = null;
@@ -42,12 +42,12 @@ class MessageBuilder extends Builder {
         return this;
     }
 
-    withTracAddress(address) {
+    withAddress(address) {
         if (!(typeof address === 'string') || address.length !== TRAC_ADDRESS_SIZE) {
             throw new Error(`Address must be a ${TRAC_ADDRESS_SIZE} length buffer.`);
         }
-        this.#tracAddress =  addressToBuffer(address);
-        this.#payload.address = this.#tracAddress;
+        this.#address =  addressToBuffer(address);
+        this.#payload.address = this.#address;
 
         return this;
     }
@@ -76,12 +76,12 @@ class MessageBuilder extends Builder {
     async buildValueAndSign() {
         const wallet = this.#wallet;
         const operationType = this.#operationType;
-        const tracAddress = this.#tracAddress;
+        const address = this.#address;
         const writingKey = this.#writingKey;
         
         // writer key is not required for all operations, but it is required for some...
-        if (!operationType || !tracAddress) {
-            throw new Error('Operation type, trac address must be set before building the message.');
+        if (!operationType || !address) {
+            throw new Error('Operation type, address must be set before building the message.');
         }
 
         // for now we assume post_tx operation is not supported by this MessageBuilder
@@ -107,14 +107,14 @@ class MessageBuilder extends Builder {
                 if (!writingKey) {
                     throw new Error('Writer key must be set for writer operations (ADD_WRITER REMOVE_WRITER or ADD_ADMIN operation).');
                 }
-                msg = createMessage(tracAddress, writingKey, nonce, operationType);
+                msg = createMessage(address, writingKey, nonce, operationType);
                 break;
 
             case OperationType.APPEND_WHITELIST:
             case OperationType.ADD_INDEXER:
             case OperationType.REMOVE_INDEXER:
             case OperationType.BAN_WRITER:
-                msg = createMessage(tracAddress, nonce, operationType);
+                msg = createMessage(address, nonce, operationType);
                 break;
             default:
                 throw new Error(`Unsupported operation type for building value: ${OperationType[operationType]}.`);
