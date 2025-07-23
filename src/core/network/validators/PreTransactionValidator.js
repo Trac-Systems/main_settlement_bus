@@ -10,17 +10,17 @@ class PreTransactionValidator {
     }
 
     async validate(parsedPreTx) {
-        if (!await this.validatePayload(parsedPreTx)) return false;
-        if (!await this.validateRequestingPublicKey(parsedPreTx)) return false;
+        if (!this.validatePayload(parsedPreTx)) return false;
+        if (!this.validateRequestingPublicKey(parsedPreTx)) return false;
         if (!await this.validateTransactionHash(parsedPreTx)) return false;
-        if (!await this.validateSignature(parsedPreTx)) return false;
-        if (!await this.validateValidatorAddress(parsedPreTx)) return false;
+        if (!this.validateSignature(parsedPreTx)) return false;
+        if (!this.validateValidatorAddress(parsedPreTx)) return false;
         if (!await this.validateTransactionUniqueness(parsedPreTx)) return false;
         
         return true;
     }
 
-    async validatePayload(parsedPreTx) {
+    validatePayload(parsedPreTx) {
         const isPayloadValid = this.network.check.validatePreTx(parsedPreTx);
         if (!isPayloadValid) {
             console.error('Invalid pre-tx payload:', parsedPreTx);
@@ -29,7 +29,7 @@ class PreTransactionValidator {
         return true;
     }
 
-    async validateRequestingPublicKey(parsedPreTx) {
+    validateRequestingPublicKey(parsedPreTx) {
         const requestingPublicKey = Wallet.decodeBech32mSafe(parsedPreTx.ia);
         if (requestingPublicKey === null) {
             console.error('Invalid requesting public key in pre-tx payload:', parsedPreTx);
@@ -57,7 +57,7 @@ class PreTransactionValidator {
         return true;
     }
 
-    async validateSignature(parsedPreTx) {
+    validateSignature(parsedPreTx) {
         const requestingPublicKey = Wallet.decodeBech32mSafe(parsedPreTx.ia);
         const requesterSignature = b4a.from(parsedPreTx.is, 'hex');
         const transactionHash = b4a.from(parsedPreTx.tx, 'hex');
@@ -70,7 +70,7 @@ class PreTransactionValidator {
         return true;
     }
 
-    async validateValidatorAddress(parsedPreTx) {
+    validateValidatorAddress(parsedPreTx) {
         if (parsedPreTx.va !== this.wallet.address) {
             console.error('Validator public key does not match wallet address:', parsedPreTx.va, this.wallet.address);
             return false;

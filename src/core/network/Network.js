@@ -18,6 +18,7 @@ import {
 import ApplyOperationEncodings from '../state/ApplyOperationEncodings.js';
 import Check from '../../utils/check.js';
 import StateMessageOperations from '../../messages/stateMessages/StateMessageOperations.js';
+import AdminResponseValidator from './validators/AdminResponseValidator.js';
 const wakeup = new w();
 
 class Network extends ReadyResource {
@@ -578,50 +579,16 @@ class Network extends ReadyResource {
     }
 
     //TODO: In the future we will move it to another class to reduce size of this file. 
-    async handleAdminResponse(msg, connection, channelString, state, wallet) {
-        if (!msg.response || !msg.response.wk || !msg.response.address || !msg.response.nonce || !msg.response.channel || !msg.response.issuer || !msg.response.timestamp) {
-            console.log("Admin response is missing required fields.");
-            this.#swarm.leavePeer(connection.remotePublicKey);
-            return;
-        }
-
-        const issuerPublicKey = b4a.from(msg.response.issuer, 'hex');
-        if (!b4a.equals(issuerPublicKey, wallet.publicKey)) {
-            console.log("Issuer public key does not match wallet public key.");
-            this.#swarm.leavePeer(connection.remotePublicKey);
-            return;
-        }
-
-        const timestamp = msg.response.timestamp;
-        const now = Date.now();
-        const fiveSeconds = 5000;
-
-        if (now - timestamp > fiveSeconds) {
-            console.log("Admin response is too old, ignoring.");
-            this.#swarm.leavePeer(connection.remotePublicKey);
-            return;
-        }
-
-        const adminEntry = await state.getAdminEntry();
-        const adminPublicKey = Wallet.decodeBech32m(adminEntry.tracAddr)
-        const receivedAdminPublicKey = Wallet.decodeBech32m(msg.response.address);
-        const adminWritingKey = b4a.from(msg.response.wk, 'hex');
-
-        if (adminEntry === null || !b4a.equals(adminPublicKey, receivedAdminPublicKey) || !b4a.equals(adminEntry.wk, adminWritingKey)) {
-            console.log("Admin entry is null or admin public key mismatch in response.");
-            this.#swarm.leavePeer(connection.remotePublicKey);
-            return;
-        }
-
-        const hash = await wallet.createHash('sha256', JSON.stringify(msg.response));
-        const signature = b4a.from(msg.sig, 'hex');
-        const verified = wallet.verify(signature, hash, adminPublicKey);
-        if (verified && msg.response.channel === channelString) {
+    async handleAdminResponse(message, connection, channelString, state, wallet) {
+        const adminResponseValidator = new AdminResponseValidator(this,state, wallet);
+        const isValid = await adminResponseValidator.validate(message, channelString);
+        if (isValid) {
+            const adminEntry = await state.getAdminEntry();
+            const adminPublicKey = Wallet.decodeBech32m(adminEntry.tracAddr);
             console.log('Admin stream established:', adminEntry.tracAddr);
             this.admin_stream = connection;
             this.admin = adminPublicKey;
         } else {
-            console.log("Admin response verification failed or channel mismatch.");
             this.#swarm.leavePeer(connection.remotePublicKey);
         }
     }
