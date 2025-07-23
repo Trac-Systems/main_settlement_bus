@@ -11,14 +11,13 @@ import {
     MAX_PARALLEL,
     MAX_SERVER_CONNECTIONS,
     MAX_CLIENT_CONNECTIONS,
-    OperationType,
 } from '../../utils/constants.js';
 import { sleep } from '../../utils/helpers.js';
 import { normalizeBuffer } from '../../utils/buffer.js';
 import ApplyOperationEncodings from '../state/ApplyOperationEncodings.js';
 import Check from '../../utils/check.js';
-import { safeEncodeApplyOperation } from '../../utils/protobuf/operationHelpers.js';
 import { generateTx } from '../../utils/crypto.js';
+import MessageOperations from '../../messages/MessageOperations.js';
 const wakeup = new w();
 
 class Network extends ReadyResource {
@@ -282,46 +281,19 @@ class Network extends ReadyResource {
                                 const isValid = await validatePreTx(parsedPreTx);
 
                                 if (isValid) {
-                                    const preTxToBuffer = (parsedPreTx) => {
-                                        return {
-                                            op: parsedPreTx.op,
-                                            tx: b4a.from(parsedPreTx.tx, 'hex'),
-                                            ia: ApplyOperationEncodings.addressToBuffer(parsedPreTx.ia, 'hex'),
-                                            iw: b4a.from(parsedPreTx.iw, 'hex'),
-                                            in: b4a.from(parsedPreTx.in, 'hex'),
-                                            ch: b4a.from(parsedPreTx.ch, 'hex'),
-                                            is: b4a.from(parsedPreTx.is, 'hex'),
-                                            bs: b4a.from(parsedPreTx.bs, 'hex'),
-                                            mbs: b4a.from(parsedPreTx.mbs, 'hex'),
-                                            va: ApplyOperationEncodings.addressToBuffer(parsedPreTx.va)
-                                        };
-                                    }
-                                    const preTxBuffer = preTxToBuffer(parsedPreTx);
-
-                                    const nonce = Wallet.generateNonce()
-                                    const message = b4a.concat([preTxBuffer.tx, nonce])
-                                    const signature = wallet.sign(message, wallet.secretKey);
-
-                                    const postTx = {
-                                        type: OperationType.TX,
-                                        address: preTxBuffer.va,
-                                        txo: {
-                                            tx: preTxBuffer.tx,
-                                            ia: preTxBuffer.ia,
-                                            iw: preTxBuffer.iw,
-                                            in: preTxBuffer.in,
-                                            ch: preTxBuffer.ch,
-                                            is: preTxBuffer.is,
-                                            bs: preTxBuffer.bs,
-                                            mbs: preTxBuffer.mbs,
-                                            va: preTxBuffer.va,
-                                            vs: signature,
-                                            vn: nonce
-                                        }
-                                    };
-
-                                    const encodedPostTx = safeEncodeApplyOperation(postTx)
-                                    network.tx_pool.push(encodedPostTx);
+                                    const postTx = await MessageOperations.assemblePostTxMessage(
+                                        wallet,
+                                        parsedPreTx.va,
+                                        b4a.from(parsedPreTx.tx, 'hex'),
+                                        parsedPreTx.ia,
+                                        b4a.from(parsedPreTx.iw, 'hex'),
+                                        b4a.from(parsedPreTx.in, 'hex'),
+                                        b4a.from(parsedPreTx.ch, 'hex'),
+                                        b4a.from(parsedPreTx.is, 'hex'),
+                                        b4a.from(parsedPreTx.bs, 'hex'),
+                                        b4a.from(parsedPreTx.mbs,'hex')
+                                    );
+                                    network.tx_pool.push(postTx);
                                 }
 
                                 network.#swarm.leavePeer(connection.remotePublicKey)

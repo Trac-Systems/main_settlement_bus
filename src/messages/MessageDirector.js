@@ -14,11 +14,10 @@ class MessageDirector {
     async buildAddAdminMessage(adminEntry, writingKey, bootstrap, address) {
         if (!this.#builder) throw new Error('Builder has not been set.');
 
-        await this.#builder.forOperationType(OperationType.ADD_ADMIN)
+        await this.#builder
+            .forOperationType(OperationType.ADD_ADMIN)
             .withAddress(address)
-            .withAdminEntry(adminEntry)
             .withWriterKey(writingKey)
-            .withBootstrap(bootstrap)
             .buildValueAndSign();
 
         return this.#builder.getPayload();
@@ -27,7 +26,8 @@ class MessageDirector {
     async buildAddWriterMessage(writingKey, address) {
         if (!this.#builder) throw new Error('Builder has not been set.');
 
-        await this.#builder.forOperationType(OperationType.ADD_WRITER)
+        await this.#builder
+            .forOperationType(OperationType.ADD_WRITER)
             .withAddress(address)
             .withWriterKey(writingKey)
             .buildValueAndSign();
@@ -38,7 +38,8 @@ class MessageDirector {
     async buildRemoveWriterMessage(writingKey, address) {
         if (!this.#builder) throw new Error('Builder has not been set.');
 
-        await this.#builder.forOperationType(OperationType.REMOVE_WRITER)
+        await this.#builder
+            .forOperationType(OperationType.REMOVE_WRITER)
             .withAddress(address)
             .withWriterKey(writingKey)
             .buildValueAndSign();
@@ -49,7 +50,8 @@ class MessageDirector {
     async buildAddIndexerMessage(address) {
         if (!this.#builder) throw new Error('Builder has not been set.');
 
-        await this.#builder.forOperationType(OperationType.ADD_INDEXER)
+        await this.#builder
+            .forOperationType(OperationType.ADD_INDEXER)
             .withAddress(address)
             .buildValueAndSign();
 
@@ -58,7 +60,8 @@ class MessageDirector {
 
     async buildRemoveIndexerMessage(address) {
         if (!this.#builder) throw new Error('Builder has not been set.');
-        await this.#builder.forOperationType(OperationType.REMOVE_INDEXER)
+        await this.#builder
+            .forOperationType(OperationType.REMOVE_INDEXER)
             .withAddress(address)
             .buildValueAndSign();
 
@@ -68,7 +71,8 @@ class MessageDirector {
     async buildAppendWhitelistMessage(address) {
         if (!this.#builder) throw new Error('Builder has not been set.');
 
-        await this.#builder.forOperationType(OperationType.APPEND_WHITELIST)
+        await this.#builder
+            .forOperationType(OperationType.APPEND_WHITELIST)
             .withAddress(address)
             .buildValueAndSign();
 
@@ -78,13 +82,40 @@ class MessageDirector {
     async buildBanWriterMessage(address) {
         if (!this.#builder) throw new Error('Builder has not been set.');
 
-        await this.#builder.forOperationType(OperationType.BAN_WRITER)
+        await this.#builder
+            .forOperationType(OperationType.BAN_WRITER)
             .withAddress(address)
             .buildValueAndSign();
 
         return this.#builder.getPayload();
     }
 
+    async buildPostTxMessage(
+        validatorAddress,
+        txHash,
+        incomingAddress,
+        incomingWriterKey,
+        incomingNonce,
+        contentHash,
+        incomingSignature,
+        externalBootstrap,
+        msbBootstrap) {
+        if (!this.#builder) throw new Error('Builder has not been set.');
+        await this.#builder
+            .forOperationType(OperationType.TX)
+            .withAddress(validatorAddress)
+            .withTxHash(txHash)
+            .withIncomingAddress(incomingAddress)
+            .withIncomingWriterKey(incomingWriterKey)
+            .withIncomingNonce(incomingNonce)
+            .withContentHash(contentHash)
+            .withIncomingSignature(incomingSignature)
+            .withExternalBootstrap(externalBootstrap)
+            .withMsbBootstrap(msbBootstrap)
+            .buildValueAndSign();
+
+        return this.#builder.getPayload();
+    }
 }
 
 export default MessageDirector;

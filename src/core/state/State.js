@@ -225,12 +225,12 @@ class State extends ReadyResource {
         const validatorMessage = b4a.allocUnsafe(32 + 32); // TODO: use constants. tx + nonce sizes. Avoid magic numbers.
         b4a.copy(tx, validatorMessage, 0);
         b4a.copy(validatorNonce, validatorMessage, 32);
-
+        const validatorMessageHash = await createHash('sha256', validatorMessage);
         const validatorAddress = ApplyOperationEncodings.bufferToAddress(validatorAddressBuffer);
         if (null === validatorAddress) return;
         const validatorPublicKey = Wallet.decodeBech32mSafe(validatorAddress);
         if (null === validatorPublicKey) return;
-        const isValidatorSignatureValid = this.#wallet.verify(validatorSignature, validatorMessage, validatorPublicKey);
+        const isValidatorSignatureValid = this.#wallet.verify(validatorSignature, validatorMessageHash, validatorPublicKey);
         if (!isValidatorSignatureValid) return;
 
         //if (this.#signature_whitelist.length !== 0 || !this.#signature_whitelist.includes(op.txo.bs)) return; //TODO: requested deployment by Benny.

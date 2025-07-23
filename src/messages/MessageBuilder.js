@@ -11,9 +11,17 @@ class MessageBuilder extends Builder {
     #operationType;
     #address;
     #writingKey;
-    #bootstrap;
-    #adminEntry;
     #payload;
+    // Fields for postTx
+    #txHash;
+    #incomingAddress;
+    #incomingWriterKey;
+    #incomingNonce;
+    #contentHash;
+    #incomingSignature;
+    #externalBootstrap;
+    #msbBootstrap;
+    #validatorNonce;
 
     constructor(wallet) {
         super();
@@ -28,9 +36,16 @@ class MessageBuilder extends Builder {
         this.#operationType = OperationType.UNKNOWN;
         this.#address = null;
         this.#writingKey = null;
-        this.#bootstrap = null;
-        this.#adminEntry = null;
-        this.#payload = {}
+        this.#payload = {};
+        this.#txHash = null;
+        this.#incomingAddress = null;
+        this.#incomingWriterKey = null;
+        this.#incomingNonce = null;
+        this.#contentHash = null;
+        this.#incomingSignature = null;
+        this.#externalBootstrap = null;
+        this.#msbBootstrap = null;
+        this.#validatorNonce = null;
     }
 
     forOperationType(operationType) {
@@ -44,11 +59,10 @@ class MessageBuilder extends Builder {
 
     withAddress(address) {
         if (!(typeof address === 'string') || address.length !== TRAC_ADDRESS_SIZE) {
-            throw new Error(`Address must be a ${TRAC_ADDRESS_SIZE} length buffer.`);
+            throw new Error(`Address must be a ${TRAC_ADDRESS_SIZE} length string.`);
         }
-        this.#address =  addressToBuffer(address);
+        this.#address = addressToBuffer(address);
         this.#payload.address = this.#address;
-
         return this;
     }
 
@@ -60,16 +74,67 @@ class MessageBuilder extends Builder {
         return this;
     }
 
-    withBootstrap(bootstrap) {
-        if (!b4a.isBuffer(bootstrap) || bootstrap.length !== 32) {
-            throw new Error('Bootstrap key must be a 32 length buffer.');
+    withTxHash(txHash) {
+        if (!b4a.isBuffer(txHash) || txHash.length !== 32) {
+            throw new Error('Transaction hash must be a 32-byte buffer.');
         }
-        this.#bootstrap = bootstrap;
+        this.#txHash = txHash;
         return this;
     }
 
-    withAdminEntry(adminEntry) {
-        this.#adminEntry = adminEntry;
+    withIncomingAddress(address) {
+        if (!(typeof address === 'string') || address.length !== TRAC_ADDRESS_SIZE) {
+            throw new Error(`Incoming address must be a ${TRAC_ADDRESS_SIZE} length string.`);
+        }
+        this.#incomingAddress = addressToBuffer(address);
+        return this;
+    }
+
+    withIncomingWriterKey(writerKey) {
+        if (!b4a.isBuffer(writerKey) || writerKey.length !== 32) {
+            throw new Error('Incoming writer key must be a 32-byte buffer.');
+        }
+        this.#incomingWriterKey = writerKey;
+        return this;
+    }
+
+    withIncomingNonce(nonce) {
+        if (!b4a.isBuffer(nonce) || nonce.length !== 32) {
+            throw new Error('Incoming nonce must be a 32-byte buffer.');
+        }
+        this.#incomingNonce = nonce;
+        return this;
+    }
+
+    withContentHash(contentHash) {
+        if (!b4a.isBuffer(contentHash) || contentHash.length !== 32) {
+            throw new Error('Content hash must be a 32-byte buffer.');
+        }
+        this.#contentHash = contentHash;
+        return this;
+    }
+
+    withIncomingSignature(signature) {
+        if (!b4a.isBuffer(signature) || signature.length !== 64) {
+            throw new Error('Incoming signature must be a 64-byte buffer.');
+        }
+        this.#incomingSignature = signature;
+        return this;
+    }
+
+    withExternalBootstrap(bootstrapKey) {
+        if (!b4a.isBuffer(bootstrapKey) || bootstrapKey.length !== 32) {
+            throw new Error('Bootstrap key must be a 32-byte buffer.');
+        }
+        this.#externalBootstrap = bootstrapKey;
+        return this;
+    }
+
+    withMsbBootstrap(msbBootstrap) {
+        if (!b4a.isBuffer(msbBootstrap) || msbBootstrap.length !== 32) {
+            throw new Error('MSB bootstrap must be a 32-byte buffer.');
+        }
+        this.#msbBootstrap = msbBootstrap;
         return this;
     }
 
@@ -78,19 +143,22 @@ class MessageBuilder extends Builder {
         const operationType = this.#operationType;
         const address = this.#address;
         const writingKey = this.#writingKey;
-        
+
         // writer key is not required for all operations, but it is required for some...
         if (!operationType || !address) {
             throw new Error('Operation type, address must be set before building the message.');
         }
 
-        // for now we assume post_tx operation is not supported by this MessageBuilder
-        if (operationType === OperationType.TX) {
-            throw new Error('PostTxOperation is not supported by this MessageBuilder');
-        }
-
         if (operationType === OperationType.UNKNOWN) {
             throw new Error('UNKNOWN is not allowed to construct');
+        }
+
+        if (operationType === OperationType.TX) {
+            if (!this.#txHash || !this.#incomingAddress || !this.#incomingWriterKey ||
+                !this.#incomingNonce || !this.#contentHash || !this.#incomingSignature ||
+                !this.#externalBootstrap || !this.#msbBootstrap) {
+                throw new Error('All postTx fields must be set before building the message');
+            }
         }
 
         const nonce = Wallet.generateNonce();
@@ -116,6 +184,11 @@ class MessageBuilder extends Builder {
             case OperationType.BAN_WRITER:
                 msg = createMessage(address, nonce, operationType);
                 break;
+
+            case OperationType.TX:
+                msg = b4a.concat([this.#txHash, nonce]);
+                break;
+
             default:
                 throw new Error(`Unsupported operation type for building value: ${OperationType[operationType]}.`);
         }
@@ -136,6 +209,20 @@ class MessageBuilder extends Builder {
                 sig: signature
             }
             this.#payload.bko = value;
+        } else if (this.#isTransaction(operationType)) {
+            value = {
+                tx: this.#txHash,
+                ia: this.#incomingAddress,
+                iw: this.#incomingWriterKey,
+                in: this.#incomingNonce,
+                ch: this.#contentHash,
+                is: this.#incomingSignature,
+                bs: this.#externalBootstrap,
+                mbs: this.#msbBootstrap,
+                vs: signature,
+                vn: nonce,
+            }
+            this.#payload.txo = value;
         } else {
             throw new Error(`No corresponding value type for operation: ${OperationType[operationType]}.`);
         }
@@ -160,9 +247,15 @@ class MessageBuilder extends Builder {
         ].includes(type);
     };
 
+    #isTransaction(type) {
+        return [
+            OperationType.TX
+        ].includes(type);
+    }
+
     getPayload() {
-        if (!this.#payload.type || !this.#payload.address || (!this.#payload.bko && !this.#payload.eko)) {
-            throw new Error('Product is not fully assembled. Missing type, address, or value (bko/eko).');
+        if (!this.#payload.type || !this.#payload.address || (!this.#payload.bko && !this.#payload.eko && !this.#payload.txo)) {
+            throw new Error('Product is not fully assembled. Missing type, address, or value (bko/eko/txo).');
         }
         const res = this.#payload;
         this.reset();

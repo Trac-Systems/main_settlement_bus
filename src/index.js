@@ -512,8 +512,8 @@ export class MainSettlementBus extends ReadyResource {
                 } : null);
                 const indexers = await this.#state.getIndexersEntry();
                 console.log('Indexers:', formatIndexersEntry(indexers));
-                const wrl = await this.#state.getWriterLength();
-                console.log('Writers Length:', wrl);
+                // const wrl = await this.#state.getWriterLength();
+                // console.log('Writers Length:', wrl);
                 // const linealizer = this.#state.getInfoFromLinearizer();
                 // console.log('Indexers from Linearizer:', linealizer);
                 break;
