@@ -1,7 +1,7 @@
 import b4a from 'b4a';
 import Wallet from 'trac-wallet';
 
-class AdminResponseValidator {
+class AdminResponse {
 
     constructor(network, state, wallet) {
         this.state = state;
@@ -99,4 +99,4 @@ class AdminResponseValidator {
     }
 }
 
-export default AdminResponseValidator;
+export default AdminResponse;

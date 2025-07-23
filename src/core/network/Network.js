@@ -7,7 +7,6 @@ import c from 'compact-encoding'
 import ReadyResource from 'ready-resource';
 import { sleep } from '../../utils/helpers.js';
 import { normalizeBuffer } from '../../utils/buffer.js';
-import PreTransactionValidator from './validators/PreTransactionValidator.js';
 import {
     TRAC_NAMESPACE,
     MAX_PEERS,
@@ -18,7 +17,9 @@ import {
 import ApplyOperationEncodings from '../state/ApplyOperationEncodings.js';
 import Check from '../../utils/check.js';
 import StateMessageOperations from '../../messages/stateMessages/StateMessageOperations.js';
-import AdminResponseValidator from './validators/AdminResponseValidator.js';
+import AdminResponse from './validators/AdminResponse.js';
+import PreTransaction from './validators/PreTransaction.js';
+
 const wakeup = new w();
 
 class Network extends ReadyResource {
@@ -236,7 +237,7 @@ class Network extends ReadyResource {
                                 if (b4a.byteLength(JSON.stringify(msg)) > 3072) return;
 
                                 const parsedPreTx = msg;
-                                const validator = new PreTransactionValidator(state, wallet, network);
+                                const validator = new PreTransaction(state, wallet, network);
                                 const isValid = await validator.validate(parsedPreTx);
 
                                 if (isValid) {
@@ -580,7 +581,7 @@ class Network extends ReadyResource {
 
     //TODO: In the future we will move it to another class to reduce size of this file. 
     async handleAdminResponse(message, connection, channelString, state, wallet) {
-        const adminResponseValidator = new AdminResponseValidator(this,state, wallet);
+        const adminResponseValidator = new AdminResponse(this,state, wallet);
         const isValid = await adminResponseValidator.validate(message, channelString);
         if (isValid) {
             const adminEntry = await state.getAdminEntry();

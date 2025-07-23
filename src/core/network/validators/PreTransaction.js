@@ -2,7 +2,7 @@ import b4a from 'b4a';
 import Wallet from 'trac-wallet';
 import { generateTx } from '../../../utils/transactionUtils.js';
 
-class PreTransactionValidator {
+class PreTransaction {
     constructor(state, wallet, network) {
         this.state = state;
         this.wallet = wallet;
@@ -88,4 +88,4 @@ class PreTransactionValidator {
     }
 }
 
-export default PreTransactionValidator;
+export default PreTransaction;
