@@ -24,24 +24,24 @@ class Check {
             return {
                 source:
                     `
-                    if (!${isBuffer}(value)) {
-                        ${this.makeError({ type: "buffer", actual: "value", messages })}
-                    }
-                    if (value.length !== ${schema.length}) {
-                        ${this.makeError({ type: "bufferLength", expected: schema.length, actual: "value.length", messages })}
-                    }
-                    let isEmpty = true;
-                        for (let i = 0; i < value.length; i++) {
-                            if (value[i] !== 0) {
-                                isEmpty = false;
-                                break;
+                        if (!${isBuffer}(value)) {
+                            ${this.makeError({ type: "buffer", actual: "value", messages })}
+                        }
+                        if (value.length !== ${schema.length}) {
+                            ${this.makeError({ type: "bufferLength", expected: schema.length, actual: "value.length", messages })}
+                        }
+                        let isEmpty = true;
+                            for (let i = 0; i < value.length; i++) {
+                                if (value[i] !== 0) {
+                                    isEmpty = false;
+                                    break;
+                                }
                             }
-                        }
-                        if (isEmpty) {
-                            ${this.makeError({ type: "emptyBuffer", actual: "value", messages })}
-                        }
-                        return value;
-                `
+                            if (isEmpty) {
+                                ${this.makeError({ type: "emptyBuffer", actual: "value", messages })}
+                            }
+                            return value;
+                    `
             };
         });
 
