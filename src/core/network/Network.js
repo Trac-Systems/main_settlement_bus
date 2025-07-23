@@ -127,7 +127,6 @@ class Network extends ReadyResource {
                 const message = message_channel.addMessage({
                     encoding: c.json,
                     //TODO: change it into switch case
-                    //TODO: instad of doing return; in cases which does not fit for us, we should perform - swarm.leavePeer(connection.remotePublicKey)
                     //TODO: In messages module we can create a new builders for cases like get_validator, get_admin, get_node, etc.
                     //TODO write validators in fastest validator + define protoschemas 
                     async onmessage(msg) {
