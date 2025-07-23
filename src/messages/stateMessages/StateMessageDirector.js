@@ -1,7 +1,7 @@
 import Builder from './Builder.js';
-import { OperationType } from '../../src/utils/protobuf/applyOperations.cjs'
+import { OperationType } from '../../../src/utils/protobuf/applyOperations.cjs'
 
-class MessageDirector {
+class StateMessageDirector {
     #builder;
 
     set builder(builderInstance) {
@@ -118,4 +118,4 @@ class MessageDirector {
     }
 }
 
-export default MessageDirector;
+export default StateMessageDirector;

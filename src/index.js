@@ -3,12 +3,13 @@ import ReadyResource from 'ready-resource';
 import b4a from 'b4a';
 import readline from 'readline';
 import { sleep } from './utils/helpers.js';
- import { createHash, generatePreTx } from './utils/crypto.js';
+import { createHash } from './utils/crypto.js';
+import { generatePreTx } from './utils/transactionUtils.js';
 import { verifyDag, printHelp, printWalletInfo, formatIndexersEntry } from './utils/cli.js';
 import PeerWallet from "trac-wallet"
 import tty from 'tty';
 import Corestore from 'corestore';
-import messageOperations from "./messages/MessageOperations.js"
+import StateMessageOperations from "./messages/stateMessages/StateMessageOperations.js";
 import { safeDecodeApplyOperation } from '../src/utils/protobuf/operationHelpers.js';
 import { createMessage } from './utils/buffer.js';
 import ApplyOperationEncodings from './core/state/ApplyOperationEncodings.js';
@@ -232,7 +233,7 @@ export class MainSettlementBus extends ReadyResource {
     async #adminEventListener() {
         this.on(EventType.ADMIN_EVENT, async (parsedRequest, bufferedRequest) => {
             if (this.#enable_wallet === false) return;
-            const isEventMessageValid = await messageOperations.verifyEventMessage(parsedRequest, this.#wallet, this.check, this.#state)
+            const isEventMessageValid = await StateMessageOperations.verifyEventMessage(parsedRequest, this.#wallet, this.check, this.#state)
             if (!isEventMessageValid) return;
             await this.#state.append(bufferedRequest);
         });
@@ -241,7 +242,7 @@ export class MainSettlementBus extends ReadyResource {
     async #writerEventListener() {
         this.on(EventType.WRITER_EVENT, async (parsedRequest, bufferedRequest) => {
             if (this.#enable_wallet === false) return;
-            const isEventMessageVerifed = await messageOperations.verifyEventMessage(parsedRequest, this.#wallet, this.check, this.#state);
+            const isEventMessageVerifed = await StateMessageOperations.verifyEventMessage(parsedRequest, this.#wallet, this.check, this.#state);
             if (!isEventMessageVerifed) return;
             await this.#state.append(bufferedRequest);
         });
@@ -305,7 +306,7 @@ export class MainSettlementBus extends ReadyResource {
     async #handleAdminOperations() {
         try {
             const adminEntry = await this.#state.getAdminEntry();
-            const addAdminMessage = await messageOperations.assembleAddAdminMessage(adminEntry, this.#state.writingKey, this.#wallet, this.#bootstrap);
+            const addAdminMessage = await StateMessageOperations.assembleAddAdminMessage(adminEntry, this.#state.writingKey, this.#wallet, this.#bootstrap);
             if (!adminEntry &&
                 this.#wallet &&
                 this.#state.writingKey &&
@@ -345,7 +346,7 @@ export class MainSettlementBus extends ReadyResource {
         const adminEntry = await this.#state.getAdminEntry();
 
         if (!this.#isAdmin(adminEntry)) return;
-        const assembledWhitelistMessages = await messageOperations.assembleAppendWhitelistMessages(this.#wallet);
+        const assembledWhitelistMessages = await StateMessageOperations.assembleAppendWhitelistMessages(this.#wallet);
         if (!assembledWhitelistMessages) {
             console.log('Whitelist message not sent.');
             return;
@@ -391,7 +392,7 @@ export class MainSettlementBus extends ReadyResource {
                 //TODO: network module should handle this in binary format however for now it is ok
                 assembledMessage = {
                     op: 'addWriter',
-                    message: await messageOperations.assembleAddWriterMessage(this.#wallet, this.#state.writingKey),
+                    message: await StateMessageOperations.assembleAddWriterMessage(this.#wallet, this.#state.writingKey),
                 }
             }
         }
@@ -400,7 +401,7 @@ export class MainSettlementBus extends ReadyResource {
                 //TODO: network module should handle this in binary format however for now it is ok
                 assembledMessage = {
                     op: 'removeWriter',
-                    message: await messageOperations.assembleRemoveWriterMessage(this.#wallet, this.#state.writingKey),
+                    message: await StateMessageOperations.assembleRemoveWriterMessage(this.#wallet, this.#state.writingKey),
 
                 }
             }
@@ -425,14 +426,14 @@ export class MainSettlementBus extends ReadyResource {
             if (indexerListHasAddress) return;
             const canAddIndexer = nodeEntry.isWhitelisted && nodeEntry.isWriter && !nodeEntry.isIndexer && !indexerListHasAddress;
             if (canAddIndexer) {
-                const assembledAddIndexerMessage = await messageOperations.assembleAddIndexerMessage(this.#wallet, tracAddress);
+                const assembledAddIndexerMessage = await StateMessageOperations.assembleAddIndexerMessage(this.#wallet, tracAddress);
                 await this.#state.append(assembledAddIndexerMessage);
             }
         }
         else {
             const canRemoveIndexer = !toAdd && nodeEntry.isIndexer && indexerListHasAddress;
             if (canRemoveIndexer) {
-                const assembledRemoveIndexer = await messageOperations.assembleRemoveIndexerMessage(this.#wallet, tracAddress);
+                const assembledRemoveIndexer = await StateMessageOperations.assembleRemoveIndexerMessage(this.#wallet, tracAddress);
                 await this.#state.append(assembledRemoveIndexer);
             }
 
@@ -444,7 +445,7 @@ export class MainSettlementBus extends ReadyResource {
         const isWhitelisted = await this.#state.isAddressWhitelisted(address);
         const nodeEntry = await this.#state.getNodeEntry(address);
         if (!isWhitelisted || null === nodeEntry || nodeEntry.isIndexer === true) return;
-        const assembledBanValidatorMessage = await messageOperations.assembleBanWriterMessage(this.#wallet, address);
+        const assembledBanValidatorMessage = await StateMessageOperations.assembleBanWriterMessage(this.#wallet, address);
         await this.#state.append(assembledBanValidatorMessage);
 
     }

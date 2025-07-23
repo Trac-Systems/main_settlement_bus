@@ -5,6 +5,9 @@ import Wallet from 'trac-wallet';
 import Protomux from 'protomux'
 import c from 'compact-encoding'
 import ReadyResource from 'ready-resource';
+import { sleep } from '../../utils/helpers.js';
+import { normalizeBuffer } from '../../utils/buffer.js';
+import PreTransactionValidator from './validators/PreTransactionValidator.js';
 import {
     TRAC_NAMESPACE,
     MAX_PEERS,
@@ -12,12 +15,9 @@ import {
     MAX_SERVER_CONNECTIONS,
     MAX_CLIENT_CONNECTIONS,
 } from '../../utils/constants.js';
-import { sleep } from '../../utils/helpers.js';
-import { normalizeBuffer } from '../../utils/buffer.js';
 import ApplyOperationEncodings from '../state/ApplyOperationEncodings.js';
 import Check from '../../utils/check.js';
-import { generateTx } from '../../utils/crypto.js';
-import MessageOperations from '../../messages/MessageOperations.js';
+import StateMessageOperations from '../../messages/stateMessages/StateMessageOperations.js';
 const wakeup = new w();
 
 class Network extends ReadyResource {
@@ -236,52 +236,11 @@ class Network extends ReadyResource {
                                 if (b4a.byteLength(JSON.stringify(msg)) > 3072) return;
 
                                 const parsedPreTx = msg;
-
-                                // TODO: like another validators in this module, this function should be moved to another file.
-                                const validatePreTx = async (parsedPreTx) => {
-                                    const isPayloadValid = network.check.validatePreTx(parsedPreTx);
-                                    if (!isPayloadValid) {
-                                        console.error('Invalid pre-tx payload:', parsedPreTx);
-                                        return false;
-                                    }
-                                    const requestingPublicKey = Wallet.decodeBech32mSafe(parsedPreTx.ia);
-
-                                    if (requestingPublicKey === null) {
-                                        console.error('Invalid requesting public key in pre-tx payload:', parsedPreTx);
-                                        return false;
-                                    }
-
-                                    const requesterSignature = b4a.from(parsedPreTx.is, 'hex');
-                                    const transactionHash = b4a.from(parsedPreTx.tx, 'hex');
-                                    const isSignatureValid = Wallet.verify(requesterSignature, transactionHash, requestingPublicKey);
-                                    const regeneratedTx = await generateTx(parsedPreTx.bs, parsedPreTx.mbs, parsedPreTx.va, parsedPreTx.iw, parsedPreTx.ia, parsedPreTx.ch, parsedPreTx.in);
-
-                                    if (!b4a.equals(regeneratedTx, transactionHash)) {
-                                        console.error('Invalid transaction hash in pre-tx payload:', parsedPreTx);
-                                        return false;
-                                    }
-
-                                    if (!isSignatureValid) {
-                                        console.error('Invalid signature in pre-tx payload:', parsedPreTx);
-                                        return false;
-                                    }
-
-                                    if (parsedPreTx.va !== wallet.address) {
-                                        console.error('Validator public key does not match wallet address:', parsedPreTx.va, wallet.address);
-                                        return false;
-                                    }
-
-                                    if (null !== await state.get(transactionHash)) {
-                                        console.error('Transaction already exists:', txHash);
-                                        return false;
-                                    }
-
-                                    return true;
-                                }
-                                const isValid = await validatePreTx(parsedPreTx);
+                                const validator = new PreTransactionValidator(state, wallet, network);
+                                const isValid = await validator.validate(parsedPreTx);
 
                                 if (isValid) {
-                                    const postTx = await MessageOperations.assemblePostTxMessage(
+                                    const postTx = await StateMessageOperations.assemblePostTxMessage(
                                         wallet,
                                         parsedPreTx.va,
                                         b4a.from(parsedPreTx.tx, 'hex'),

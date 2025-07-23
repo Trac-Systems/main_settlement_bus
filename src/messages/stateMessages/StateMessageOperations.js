@@ -1,19 +1,19 @@
-import MessageDirector from './MessageDirector.js';
-import MessageBuilder from './MessageBuilder.js';
-import { safeEncodeApplyOperation } from '../utils/protobuf/operationHelpers.js';
-import fileUtils from '../../src/utils/fileUtils.js';
-import { OperationType } from '../utils/constants.js';
-import { createMessage } from '../utils/buffer.js';
-import { createHash } from '../utils/crypto.js';
+import StateMessageDirector from './StateMessageDirector.js';
+import StateMessageBuilder from './StateMessageBuilder.js';
+import { safeEncodeApplyOperation } from '../../utils/protobuf/operationHelpers.js';
+import fileUtils from '../../../src/utils/fileUtils.js';
+import { OperationType } from '../../utils/constants.js';
+import { createMessage } from '../../utils/buffer.js';
+import { createHash } from '../../utils/crypto.js';
 import b4a from 'b4a';
 import PeerWallet from 'trac-wallet';
-import ApplyOperationEncodings from '../core/state/ApplyOperationEncodings.js';
+import ApplyOperationEncodings from '../../core/state/ApplyOperationEncodings.js';
 
-class MessageOperations {
+class StateMessageOperations {
     static async assembleAddAdminMessage(adminEntry, writingKey, wallet, bootstrap) {
         try {
-            const builder = new MessageBuilder(wallet);
-            const director = new MessageDirector();
+            const builder = new StateMessageBuilder(wallet);
+            const director = new StateMessageDirector();
             director.builder = builder;
 
             const payload = await director.buildAddAdminMessage(adminEntry, writingKey, bootstrap, wallet.address);
@@ -21,15 +21,15 @@ class MessageOperations {
             return encodedPayload;
 
         } catch (error) {
-            console.error(`Failed to assemble admin message via MessageOperations: ${error.message}`);
+            console.error(`Failed to assemble admin message through MessageOperations: ${error.message}`);
             return null;
         }
     }
 
     static async assembleAddWriterMessage(wallet, writingKey) {
         try {
-            const builder = new MessageBuilder(wallet);
-            const director = new MessageDirector();
+            const builder = new StateMessageBuilder(wallet);
+            const director = new StateMessageDirector();
             director.builder = builder;
 
             const payload = await director.buildAddWriterMessage(writingKey, wallet.address);
@@ -37,15 +37,15 @@ class MessageOperations {
             return encodedPayload;
 
         } catch (error) {
-            console.error(`Failed to assemble add writer message via MessageOperations: ${error.message}`);
+            console.error(`Failed to assemble add writer message through MessageOperations: ${error.message}`);
             return null;
         }
     }
 
     static async assembleRemoveWriterMessage(wallet, writingKey) {
         try {
-            const builder = new MessageBuilder(wallet);
-            const director = new MessageDirector();
+            const builder = new StateMessageBuilder(wallet);
+            const director = new StateMessageDirector();
             director.builder = builder;
 
             const payload = await director.buildRemoveWriterMessage(writingKey, wallet.address);
@@ -53,15 +53,15 @@ class MessageOperations {
             return encodedPayload;
 
         } catch (error) {
-            console.error(`Failed to assemble remove writer message via MessageOperations: ${error.message}`);
+            console.error(`Failed to assemble remove writer message through MessageOperations: ${error.message}`);
             return null;
         }
     }
 
     static async assembleAddIndexerMessage(wallet, address) {
         try {
-            const builder = new MessageBuilder(wallet);
-            const director = new MessageDirector();
+            const builder = new StateMessageBuilder(wallet);
+            const director = new StateMessageDirector();
             director.builder = builder;
 
             const payload = await director.buildAddIndexerMessage(address);
@@ -69,15 +69,15 @@ class MessageOperations {
             return encodedPayload;
 
         } catch (error) {
-            console.error(`Failed to assemble add indexer message via MessageOperations: ${error.message}`);
+            console.error(`Failed to assemble add indexer message through MessageOperations: ${error.message}`);
             return null;
         }
     }
 
     static async assembleRemoveIndexerMessage(wallet, address) {
         try {
-            const builder = new MessageBuilder(wallet);
-            const director = new MessageDirector();
+            const builder = new StateMessageBuilder(wallet);
+            const director = new StateMessageDirector();
             director.builder = builder;
 
             const payload = await director.buildRemoveIndexerMessage(address);
@@ -93,8 +93,8 @@ class MessageOperations {
     static async assembleAppendWhitelistMessages(wallet) {
         try {
 
-            const builder = new MessageBuilder(wallet);
-            const director = new MessageDirector();
+            const builder = new StateMessageBuilder(wallet);
+            const director = new StateMessageDirector();
             director.builder = builder;
 
             const messages = new Map();
@@ -114,8 +114,8 @@ class MessageOperations {
 
     static async assembleBanWriterMessage(wallet, address) {
         try {
-            const builder = new MessageBuilder(wallet);
-            const director = new MessageDirector();
+            const builder = new StateMessageBuilder(wallet);
+            const director = new StateMessageDirector();
             director.builder = builder;
 
             const payload = await director.buildBanWriterMessage(address);
@@ -130,8 +130,8 @@ class MessageOperations {
 
     static async assemblePostTxMessage(wallet, validatorAddress, txHash, incomingAddress, incomingWriterKey, incomingNonce, contentHash, incomingSignature, externalBootstrap, msbBootstrap) {
         try {
-            const builder = new MessageBuilder(wallet);
-            const director = new MessageDirector();
+            const builder = new StateMessageBuilder(wallet);
+            const director = new StateMessageDirector();
             director.builder = builder;
             const payload = await director.buildPostTxMessage(
                 validatorAddress,
@@ -232,4 +232,4 @@ class MessageOperations {
     }
 }
 
-export default MessageOperations;
+export default StateMessageOperations;

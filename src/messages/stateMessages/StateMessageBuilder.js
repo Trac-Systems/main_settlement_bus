@@ -1,18 +1,17 @@
 import Builder from './Builder.js';
-import { createHash } from '../utils/crypto.js';
-import { createMessage } from '../utils/buffer.js';
-import { OperationType } from '../utils/protobuf/applyOperations.cjs'
+import { createHash } from '../../utils/crypto.js';
+import { createMessage } from '../../utils/buffer.js';
+import { OperationType } from '../../utils/protobuf/applyOperations.cjs'
 import b4a from 'b4a';
 import Wallet from 'trac-wallet';
-import { TRAC_ADDRESS_SIZE, addressToBuffer } from '../core/state/ApplyOperationEncodings.js';
+import { TRAC_ADDRESS_SIZE, addressToBuffer } from '../../core/state/ApplyOperationEncodings.js';
 
-class MessageBuilder extends Builder {
+class StateMessageBuilder extends Builder {
     #wallet;
     #operationType;
     #address;
     #writingKey;
     #payload;
-    // Fields for postTx
     #txHash;
     #incomingAddress;
     #incomingWriterKey;
@@ -26,7 +25,7 @@ class MessageBuilder extends Builder {
     constructor(wallet) {
         super();
         if (!wallet || typeof wallet !== 'object' || !b4a.isBuffer(wallet.publicKey)) {
-            throw new Error('MessageBuilder requires a valid Wallet instance with a 32-byte public key Buffer.');
+            throw new Error('StateMessageBuilder requires a valid Wallet instance with a 32-byte public key Buffer.');
         }
         this.#wallet = wallet;
         this.reset();
@@ -263,4 +262,4 @@ class MessageBuilder extends Builder {
     }
 }
 
-export default MessageBuilder;
+export default StateMessageBuilder;
