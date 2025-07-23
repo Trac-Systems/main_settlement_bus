@@ -14,10 +14,11 @@ import {
     OperationType,
 } from '../../utils/constants.js';
 import { sleep } from '../../utils/helpers.js';
-import {normalizeBuffer} from '../../utils/buffer.js';
+import { normalizeBuffer } from '../../utils/buffer.js';
 import ApplyOperationEncodings from '../state/ApplyOperationEncodings.js';
 import Check from '../../utils/check.js';
-
+import { safeEncodeApplyOperation } from '../../utils/protobuf/operationHelpers.js';
+import { generateTx } from '../../utils/crypto.js';
 const wakeup = new w();
 
 class Network extends ReadyResource {
@@ -168,7 +169,7 @@ class Network extends ReadyResource {
                                 const messageBuffer = normalizeBuffer(msg.message);
                                 if (!messageBuffer) {
                                     network.#swarm.leavePeer(connection.remotePublicKey)
-                                    throw new Error('Invalid message buffer for addWriter operation');                                    
+                                    throw new Error('Invalid message buffer for addWriter operation');
                                 }
                                 await handleIncomingEvent(messageBuffer);
                                 network.#swarm.leavePeer(connection.remotePublicKey)
@@ -236,30 +237,91 @@ class Network extends ReadyResource {
                                 if (b4a.byteLength(JSON.stringify(msg)) > 3072) return;
 
                                 const parsedPreTx = msg;
-                                //TODO implement separated function for this. 
-                                if (network.check.sanitizePreTx(parsedPreTx) &&
-                                    wallet.verify(b4a.from(parsedPreTx.is, 'hex'), b4a.from(parsedPreTx.tx + parsedPreTx.in), b4a.from(parsedPreTx.ipk, 'hex')) &&
-                                    parsedPreTx.wp === wallet.publicKey &&
-                                    null === await state.get(parsedPreTx.tx)
-                                ) {
-                                    const nonce = Wallet.generateNonce().toString('hex');
-                                    const signature = wallet.sign(b4a.from(parsedPreTx.tx + nonce), b4a.from(wallet.secretKey, 'hex'));
-                                    const append_tx = {
-                                        op: OperationType.POST_TX,
-                                        tx: parsedPreTx.tx,
-                                        is: parsedPreTx.is,
-                                        w: writingKey,
-                                        i: parsedPreTx.i,
-                                        ipk: parsedPreTx.ipk,
-                                        ch: parsedPreTx.ch,
-                                        in: parsedPreTx.in,
-                                        bs: parsedPreTx.bs,
-                                        mbs: parsedPreTx.mbs,
-                                        ws: signature.toString('hex'),
-                                        wp: wallet.publicKey,
-                                        wn: nonce
+
+                                // TODO: like another validators in this module, this function should be moved to another file.
+                                const validatePreTx = async (parsedPreTx) => {
+                                    const isPayloadValid = network.check.validatePreTx(parsedPreTx);
+                                    if (!isPayloadValid) {
+                                        console.error('Invalid pre-tx payload:', parsedPreTx);
+                                        return false;
+                                    }
+                                    const requestingPublicKey = Wallet.decodeBech32mSafe(parsedPreTx.ia);
+
+                                    if (requestingPublicKey === null) {
+                                        console.error('Invalid requesting public key in pre-tx payload:', parsedPreTx);
+                                        return false;
+                                    }
+
+                                    const requesterSignature = b4a.from(parsedPreTx.is, 'hex');
+                                    const transactionHash = b4a.from(parsedPreTx.tx, 'hex');
+                                    const isSignatureValid = Wallet.verify(requesterSignature, transactionHash, requestingPublicKey);
+                                    const regeneratedTx = await generateTx(parsedPreTx.bs, parsedPreTx.mbs, parsedPreTx.va, parsedPreTx.iw, parsedPreTx.ia, parsedPreTx.ch, parsedPreTx.in);
+
+                                    if (!b4a.equals(regeneratedTx, transactionHash)) {
+                                        console.error('Invalid transaction hash in pre-tx payload:', parsedPreTx);
+                                        return false;
+                                    }
+
+                                    if (!isSignatureValid) {
+                                        console.error('Invalid signature in pre-tx payload:', parsedPreTx);
+                                        return false;
+                                    }
+
+                                    if (parsedPreTx.va !== wallet.address) {
+                                        console.error('Validator public key does not match wallet address:', parsedPreTx.va, wallet.address);
+                                        return false;
+                                    }
+
+                                    if (null !== await state.get(transactionHash)) {
+                                        console.error('Transaction already exists:', txHash);
+                                        return false;
+                                    }
+
+                                    return true;
+                                }
+                                const isValid = await validatePreTx(parsedPreTx);
+
+                                if (isValid) {
+                                    const preTxToBuffer = (parsedPreTx) => {
+                                        return {
+                                            op: parsedPreTx.op,
+                                            tx: b4a.from(parsedPreTx.tx, 'hex'),
+                                            ia: ApplyOperationEncodings.addressToBuffer(parsedPreTx.ia, 'hex'),
+                                            iw: b4a.from(parsedPreTx.iw, 'hex'),
+                                            in: b4a.from(parsedPreTx.in, 'hex'),
+                                            ch: b4a.from(parsedPreTx.ch, 'hex'),
+                                            is: b4a.from(parsedPreTx.is, 'hex'),
+                                            bs: b4a.from(parsedPreTx.bs, 'hex'),
+                                            mbs: b4a.from(parsedPreTx.mbs, 'hex'),
+                                            va: ApplyOperationEncodings.addressToBuffer(parsedPreTx.va)
+                                        };
+                                    }
+                                    const preTxBuffer = preTxToBuffer(parsedPreTx);
+
+                                    const nonce = Wallet.generateNonce()
+                                    const message = b4a.concat([preTxBuffer.tx, nonce])
+                                    const signature = wallet.sign(message, wallet.secretKey);
+
+                                    const postTx = {
+                                        type: OperationType.POST_TX,
+                                        address: preTxBuffer.va,
+                                        txo: {
+                                            tx: preTxBuffer.tx,
+                                            ia: preTxBuffer.ia,
+                                            iw: preTxBuffer.iw,
+                                            in: preTxBuffer.in,
+                                            ch: preTxBuffer.ch,
+                                            is: preTxBuffer.is,
+                                            bs: preTxBuffer.bs,
+                                            mbs: preTxBuffer.mbs,
+                                            va: preTxBuffer.va,
+                                            vs: signature,
+                                            vn: nonce
+                                        }
                                     };
-                                    network.tx_pool.push({ tx: parsedPreTx.tx, append_tx: append_tx });
+
+                                    const encodedPostTx = safeEncodeApplyOperation(postTx)
+                                    network.tx_pool.push(encodedPostTx);
                                 }
 
                                 network.#swarm.leavePeer(connection.remotePublicKey)
@@ -313,7 +375,7 @@ class Network extends ReadyResource {
                 const batch = [];
                 for (let i = 0; i < length; i++) {
                     if (i >= 10) break;
-                    batch.push({ type: OperationType.TX, key: this.tx_pool[i].tx, value: this.tx_pool[i].append_tx });
+                    batch.push(this.tx_pool[i]);
                 }
                 await appendState(batch);
                 this.tx_pool.splice(0, batch.length);

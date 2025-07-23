@@ -140,8 +140,8 @@ class MessageOperations {
                 return false;
             }
 
-        const sanitizationResult = check.sanitizeExtendedKeyOpSchema(parsedRequest);
-        if (!sanitizationResult) return false;
+        const validationResult = check.validateExtendedKeyOpSchema(parsedRequest);
+        if (!validationResult) return false;
 
         if (type === OperationType.ADD_WRITER) {
             const nodeAddress = ApplyOperationEncodings.bufferToAddress(parsedRequest.address);

@@ -1,13 +1,13 @@
 import Validator from 'fastest-validator';
 import { OperationType, ADDRESS_BYTE_LENGTH, WRITER_BYTE_LENGTH, NONCE_BYTE_LENGTH, SIGNATURE_BYTE_LENGTH, HASH_BYTE_LENGTH, MIN_SAFE_VALIDATION_INTEGER, MAX_SAFE_VALIDATION_INTEGER } from './constants.js';
-import {TRAC_ADDRESS_SIZE} from '../core/state/ApplyOperationEncodings.js'
+import { TRAC_ADDRESS_SIZE } from '../core/state/ApplyOperationEncodings.js'
 import b4a from 'b4a';
 class Check {
     #_validator;
-    #_sanitizeExtendedKeyOp;
-    #_sanitizeBasicKeyOp;
-    #_sanitizePreTx;
-    #_sanitizePostTx;
+    #_validateExtendedKeyOp;
+    #_validateBasicKeyOp;
+    #_validatePreTx;
+    #_validatePostTx;
     constructor() {
 
         this.#_validator = new Validator({
@@ -45,10 +45,10 @@ class Check {
             };
         });
 
-        this.#_sanitizeExtendedKeyOp = this.#compileExtendedKeyOpSchema();
-        this.#_sanitizeBasicKeyOp = this.#compileBasicKeyOpSchema();
-        this.#_sanitizePreTx = this.#compilePreTxSchema();
-        this.#_sanitizePostTx = this.#compilePostTxSchema();
+        this.#_validateExtendedKeyOp = this.#compileExtendedKeyOpSchema();
+        this.#_validateBasicKeyOp = this.#compileBasicKeyOpSchema();
+        this.#_validatePreTx = this.#compilePreTxSchema();
+        this.#_validatePostTx = this.#compilePostTxSchema();
     }
 
     #compileExtendedKeyOpSchema() {
@@ -69,8 +69,8 @@ class Check {
         return this.#_validator.compile(schema);
     }
 
-    sanitizeExtendedKeyOpSchema(op) {
-        return this.#_sanitizeExtendedKeyOp(op) === true;
+    validateExtendedKeyOpSchema(op) {
+        return this.#_validateExtendedKeyOp(op) === true;
     }
 
     #compileBasicKeyOpSchema() {
@@ -90,59 +90,58 @@ class Check {
         return this.#_validator.compile(schema);
     }
 
-    sanitizeBasicKeyOp(op) {
-        return this.#_sanitizeBasicKeyOp(op) === true;
+    validateBasicKeyOp(op) {
+        return this.#_validateBasicKeyOp(op) === true;
     }
-
+    //TODO: create constants.
     #compilePreTxSchema() {
         const schema = {
             $$strict: true,
-            op: { type: 'string', enum: ['pre-tx'], required: true },
-            tx: { type: 'string', length: 64, required: true, hex: true }, // tx hash
-            is: { type: 'string', length: 128, required: true, hex: true }, // signature
-            wp: { type: 'string', length: 64, required: true, hex: true }, // validator public key
-            i: { type: 'string', length: 64, required: true, hex: true }, // incoming peer writer key
-            ipk: { type: 'string', length: 64, required: true, hex: true }, // incoming peer public key
-            ch: { type: 'string', length: 64, required: true, hex: true }, // content hash
-            in: { type: 'string', length: 64, required: true, hex: true }, // nonce
-            bs: { type: 'string', length: 64, required: true, hex: true }, // peer contract bootstrap
-            mbs: { type: 'string', length: 64, required: true, hex: true }, // msb bootstrap
+            op: { type: 'string', enum: ['pre-tx'], required: true }, // Operation type (must be 'pre-tx')
+            tx: { type: 'string', length: 64, required: true, hex: true }, // Transaction hash (unique identifier for the transaction)
+            ia: { type: 'string', length: TRAC_ADDRESS_SIZE, required: true }, // Address of the requesting node (used for signature verification)
+            iw: { type: 'string', length: 64, required: true, hex: true }, // Writing key of the requesting node (external subnetwork)
+            in: { type: 'string', length: 64, required: true, hex: true }, // Nonce of the requesting node
+            ch: { type: 'string', length: 64, required: true, hex: true }, // Content hash (hash of the transaction's data)
+            is: { type: 'string', length: 128, required: true, hex: true }, // Requester's signature
+            bs: { type: 'string', length: 64, required: true, hex: true }, // External bootstrap contract
+            mbs: { type: 'string', length: 64, required: true, hex: true }, // MSB bootstrap key
+            va: { type: 'string', length: TRAC_ADDRESS_SIZE, required: true }, // Validator address (used for validation)
         };
         return this.#_validator.compile(schema);
     }
-    sanitizePreTx(op) {
-        return this.#_sanitizePreTx(op) === true;
+
+    validatePreTx(op) {
+        return this.#_validatePreTx(op) === true;
     }
 
     #compilePostTxSchema() {
         const schema = {
             $$strict: true,
             type: { type: 'number', enum: [OperationType.POST_TX], positive: true, integer: true, min: MIN_SAFE_VALIDATION_INTEGER, max: MAX_SAFE_VALIDATION_INTEGER, required: true },
-            tx: { type: 'buffer', length: HASH_BYTE_LENGTH, required: true }, // tx hash
+            address: { type: 'buffer', length: TRAC_ADDRESS_SIZE, required: true }, // validator address
             txo: {
                 strict: true,
                 type: "object",
                 props: {
                     tx: { type: 'buffer', length: HASH_BYTE_LENGTH, required: true }, // tx hash
-                    is: { type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true }, // signature
-                    w: { type: 'buffer', length: WRITER_BYTE_LENGTH, required: true }, // msb writer key
-                    i: { type: 'buffer', length: WRITER_BYTE_LENGTH, required: true }, // incoming peer writer key
-                    ipk: { type: 'buffer', length: ADDRESS_BYTE_LENGTH, required: true }, // incoming peer public key
+                    ia: { type: 'buffer', length: TRAC_ADDRESS_SIZE, required: true }, // incoming address
+                    iw: { type: 'buffer', length: WRITER_BYTE_LENGTH, required: true }, // incoming writer key
+                    in: { type: 'buffer', length: NONCE_BYTE_LENGTH, required: true }, // incoming nonce
                     ch: { type: 'buffer', length: HASH_BYTE_LENGTH, required: true }, // content hash
-                    in: { type: 'buffer', length: NONCE_BYTE_LENGTH, required: true }, // nonce
+                    is: { type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true }, // signature
                     bs: { type: 'buffer', length: WRITER_BYTE_LENGTH, required: true }, // peer contract bootstrap
                     mbs: { type: 'buffer', length: WRITER_BYTE_LENGTH, required: true }, // msb bootstrap
-                    ws: { type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true }, // validator/writer signature
-                    wp: { type: 'buffer', length: ADDRESS_BYTE_LENGTH, required: true }, // validator/writer public key
-                    wn: { type: 'buffer', length: NONCE_BYTE_LENGTH, required: true } // validator/writer nonce
+                    vs: { type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true }, // validator/writer signature
+                    vn: { type: 'buffer', length: NONCE_BYTE_LENGTH, required: true } // validator/writer nonce
                 }
             }
         };
         return this.#_validator.compile(schema);
     }
 
-    sanitizePostTx(op) {
-        return this.#_sanitizePostTx(op) === true;
+    validatePostTx(op) {
+        return this.#_validatePostTx(op) === true;
     }
 }
 export default Check;

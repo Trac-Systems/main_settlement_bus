@@ -3,7 +3,7 @@ import ReadyResource from 'ready-resource';
 import b4a from 'b4a';
 import readline from 'readline';
 import { sleep } from './utils/helpers.js';
-import { createHash } from './utils/crypto.js';
+ import { createHash, generatePreTx } from './utils/crypto.js';
 import { verifyDag, printHelp, printWalletInfo, formatIndexersEntry } from './utils/cli.js';
 import PeerWallet from "trac-wallet"
 import tty from 'tty';
@@ -21,6 +21,7 @@ import {
 import Network from './core/network/Network.js';
 import Check from './utils/check.js';
 import State from './core/state/State.js';
+import { randomBytes } from 'crypto';
 
 //TODO create a MODULE which will separate logic responsible for role managment
 
@@ -516,6 +517,58 @@ export class MainSettlementBus extends ReadyResource {
                 // const linealizer = this.#state.getInfoFromLinearizer();
                 // console.log('Indexers from Linearizer:', linealizer);
                 break;
+            case '/test':
+
+                const contentHash = randomBytes(32).toString('hex');
+                const subNetworkBootstrap = randomBytes(32).toString('hex');
+
+                const validatorPubKey = b4a.from(this.#network.validator, 'hex');
+                const validatorAddress = PeerWallet.encodeBech32m(validatorPubKey);
+
+                const preTx = await generatePreTx(this.#wallet, validatorAddress, this.#state.writingKey, this.#wallet.address, contentHash, subNetworkBootstrap, this.bootstrap);
+                await this.#network.validator_stream.messenger.send(preTx);
+
+                break;
+            case '/test2':
+                const transactionInterval = 250;
+                const transactionCount = 500;
+
+                console.log(`Starting test2: Sending ${transactionCount} transactions every ${transactionInterval} ms...`);
+
+                let sentTransactions = 0;
+
+                const interval = setInterval(async () => {
+                    try {
+                        if (sentTransactions >= transactionCount) {
+                            clearInterval(interval);
+
+                            console.log(`Test2 completed: Sent ${sentTransactions} transactions.`);
+                            return;
+                        }
+
+                        const contentHash = randomBytes(32).toString('hex');
+                        const subNetworkBootstrap = randomBytes(32).toString('hex');
+                        const validatorPubKey = b4a.from(this.#network.validator, 'hex');
+                        const validatorAddress = PeerWallet.encodeBech32m(validatorPubKey);
+
+                        const preTx = await generatePreTx(
+                            this.#wallet,
+                            validatorAddress,
+                            this.#state.writingKey,
+                            this.#wallet.address,
+                            contentHash,
+                            subNetworkBootstrap,
+                            this.bootstrap
+                        );
+
+                        await this.#network.validator_stream.messenger.send(preTx);
+                        sentTransactions++;
+                    } catch (error) {
+                        console.error(`Error during transaction processing: ${error.message}`);
+                    }
+                }, transactionInterval);
+                break;
+
             case '/stats':
                 await verifyDag(this.#state, this.#network, this.#wallet, this.#state.writingKey, this.#shouldListenToAdminEvents, this.#shouldListenToWriterEvents);
                 break;

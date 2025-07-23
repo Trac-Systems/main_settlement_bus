@@ -40,6 +40,8 @@ export const WHITELIST_FILEPATH = './Whitelist/pubkeys.csv';
 export const LISTENER_TIMEOUT = 10_000;
 export const TRAC_NAMESPACE = 'TracNetwork';
 export const WHITELIST_SLEEP_INTERVAL = 1_000;
+
+// Connectivity constants
 export const MAX_PEERS = 64;
 export const MAX_PARALLEL = 64;
 export const MAX_SERVER_CONNECTIONS = Infinity;

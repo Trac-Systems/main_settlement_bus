@@ -9,12 +9,11 @@ import {
 } from '../../utils/constants.js';
 import { sleep } from '../../utils/helpers.js';
 import Wallet from 'trac-wallet';
-import { createHash, generateTx } from '../../utils/crypto.js';
+import { createHash } from '../../utils/crypto.js';
 import Check from '../../utils/check.js';
 import { safeDecodeApplyOperation } from '../../utils/protobuf/operationHelpers.js';
 import { createMessage } from '../../utils/buffer.js';
-import ApplyOperationEncodings, { ZERO_WK } from './ApplyOperationEncodings.js';
-//TODO: describe apply operation +- what is going on to increase readability.
+import ApplyOperationEncodings from './ApplyOperationEncodings.js';
 class State extends ReadyResource {
 
     #base;
@@ -201,33 +200,58 @@ class State extends ReadyResource {
     }
 
     async #handleApplyTxOperation(op, view, base, node, batch) {
-        const postTx = op.value;
-        if (this.check.sanitizePostTx(op) && // ATTENTION: The sanitization should be done before ANY other check, otherwise we risk crashing
-            postTx.op === OperationType.POST_TX &&
-            (this.#signature_whitelist.length === 0 || this.#signature_whitelist.includes(postTx.bs)) &&
-            null === await batch.get(op.key) &&
-            op.key === postTx.tx &&
-            this.#wallet.verify(b4a.from(postTx.is, 'hex'), b4a.from(postTx.tx + postTx.in), b4a.from(postTx.ipk, 'hex')) &&
-            this.#wallet.verify(b4a.from(postTx.ws, 'hex'), b4a.from(postTx.tx + postTx.wn), b4a.from(postTx.wp, 'hex')) &&
-            postTx.tx === await generateTx(postTx.bs, this.#bootstrap, postTx.wp, postTx.i, postTx.ipk, postTx.ch, postTx.in) &&
-            b4a.byteLength(JSON.stringify(postTx)) <= 4096
-        ) {
-            await batch.put(op.key, op.value);
-            if (this.#enable_txlogs === true) {
-                console.log(`TX: ${op.key} appended. Signed length: `, this.#base.view.core.signedLength);
-            }
+        if (!this.check.validatePostTx(op)) return; // ATTENTION: The sanitization should be done before ANY other check, otherwise we risk crashing
+        if (b4a.byteLength(node.value) > 4096) return; // TODO: change this to a constant. Avoid magic numbers.
+
+        const tx = op.txo.tx;
+        const validatorAddressBuffer = op.address;
+
+        const regeneratedTxBuffer = await ApplyOperationEncodings.generateTxBuffer(op.txo.bs, this.#bootstrap, validatorAddressBuffer, op.txo.iw, op.txo.ia, op.txo.ch, op.txo.in);
+
+        if (regeneratedTxBuffer.length === 0 || !b4a.equals(regeneratedTxBuffer, tx)) return;
+        // first signature
+        const requesterSignature = op.txo.is;
+        const incomingAddressBuffer = op.txo.ia;
+        const incomingAddress = ApplyOperationEncodings.bufferToAddress(incomingAddressBuffer);
+        if (null === incomingAddress) return;
+        const incomingPublicKey = Wallet.decodeBech32mSafe(incomingAddress);
+        if (null === incomingPublicKey) return;
+        const isRequesterSignatureValid = this.#wallet.verify(requesterSignature, tx, incomingPublicKey); // tx contains already a nonce.
+        if (!isRequesterSignatureValid) return;
+
+        //second signature
+        const validatorSignature = op.txo.vs;
+        const validatorNonce = op.txo.vn;
+        const validatorMessage = b4a.allocUnsafe(32 + 32); // TODO: use constants. tx + nonce sizes. Avoid magic numbers.
+        b4a.copy(tx, validatorMessage, 0);
+        b4a.copy(validatorNonce, validatorMessage, 32);
+
+        const validatorAddress = ApplyOperationEncodings.bufferToAddress(validatorAddressBuffer);
+        if (null === validatorAddress) return;
+        const validatorPublicKey = Wallet.decodeBech32mSafe(validatorAddress);
+        if (null === validatorPublicKey) return;
+        const isValidatorSignatureValid = this.#wallet.verify(validatorSignature, validatorMessage, validatorPublicKey);
+        if (!isValidatorSignatureValid) return;
+
+        //if (this.#signature_whitelist.length !== 0 || !this.#signature_whitelist.includes(op.txo.bs)) return; //TODO: requested deployment by Benny.
+        const opEntry = await this.#getEntryApply(tx, batch);
+        if (null !== opEntry) return;
+
+        await batch.put(tx.toString('hex'), node.value);
+        if (this.#enable_txlogs === true) {
+            console.log(`TX: ${tx.toString('hex')} appended. Signed length: `, this.#base.view.core.signedLength);
         }
     }
 
     async #handleApplyAddAdminOperation(op, view, base, node, batch) {
-        if (!this.check.sanitizeExtendedKeyOpSchema(op)) return;
+        if (!this.check.validateExtendedKeyOpSchema(op)) return;
         const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
-        
+
         if (null === adminEntry) {
             await this.#addAdminIfNotSet(op, view, node, batch);
         }
         else {
-            await this.#addAdminIfSet(adminEntry,op, view, node, base, batch);
+            await this.#addAdminIfSet(adminEntry, op, view, node, base, batch);
         }
     }
 
@@ -235,7 +259,7 @@ class State extends ReadyResource {
         const decodedAdminEntry = ApplyOperationEncodings.decodeAdminEntry(adminEntry);
         if (null === decodedAdminEntry) return;
         const publicKeyAdminEntry = Wallet.decodeBech32mSafe(decodedAdminEntry.tracAddr);
-        
+
         // Extract and validate the network prefix from the node's address
         const adminAddressBuffer = op.address;
         const adminAddress = ApplyOperationEncodings.bufferToAddress(adminAddressBuffer);
@@ -251,7 +275,7 @@ class State extends ReadyResource {
         const isMessageVerifed = this.#wallet.verify(op.eko.sig, hash, publicKeyAdminEntry)
         const hashHexString = hash.toString('hex');
         // Check if the operation has already been applied
-        const opEntry = await batch.get(hashHexString);
+        const opEntry = await this.#getEntryApply(hashHexString, batch);
         if (!isMessageVerifed || null !== opEntry) return
 
         // Check if the admin and indexers entry is valid
@@ -289,7 +313,7 @@ class State extends ReadyResource {
         const hashHexString = hash.toString('hex');
 
         // Check if the operation has already been applied
-        const opEntry = await batch.get(hashHexString);
+        const opEntry = await this.#getEntryApply(hashHexString, batch);
         if (
             !b4a.equals(node.from.key, this.#bootstrap) ||
             !b4a.equals(op.eko.wk, this.#bootstrap) ||
@@ -311,7 +335,7 @@ class State extends ReadyResource {
     }
 
     async #handleApplyAppendWhitelistOperation(op, view, base, node, batch) {
-        if (!this.check.sanitizeBasicKeyOp(op)) return;// TODO change name to validateBasicKeyOp
+        if (!this.check.validateBasicKeyOp(op)) return;// TODO change name to validateBasicKeyOp
 
         // Retrieve and decode the admin entry to verify the operation is initiated by an admin
         const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
@@ -340,7 +364,7 @@ class State extends ReadyResource {
         const hashHexString = hash.toString('hex');
 
         // Check if the operation has already been applied
-        const opEntry = await batch.get(hashHexString);
+        const opEntry = await this.#getEntryApply(hashHexString, batch);
         if (!isMessageVerifed || null !== opEntry) return;
 
         // Retrieve the node entry to check its current role
@@ -388,7 +412,7 @@ class State extends ReadyResource {
     }
 
     async #handleApplyAddWriterOperation(op, view, base, node, batch) {
-        if (!this.check.sanitizeExtendedKeyOpSchema(op)) return;
+        if (!this.check.validateExtendedKeyOpSchema(op)) return;
 
         // Extract and validate the network address
         const nodeAddressBuffer = op.address;
@@ -411,7 +435,7 @@ class State extends ReadyResource {
         const hashHexString = hash.toString('hex');
 
         // Check if the operation has already been applied
-        const opEntry = await batch.get(hashHexString);
+        const opEntry = await this.#getEntryApply(hashHexString, batch);
 
         if (!isMessageVerifed || null !== opEntry) return;
         await this.#addWriter(op, base, node, batch, hashHexString, nodeAddress);
@@ -461,7 +485,7 @@ class State extends ReadyResource {
     }
 
     async #handleApplyRemoveWriterOperation(op, view, base, node, batch) {
-        if (!this.check.sanitizeExtendedKeyOpSchema(op)) return;
+        if (!this.check.validateExtendedKeyOpSchema(op)) return;
 
         // Extract and validate the network address
         const nodeAddressBuffer = op.address;
@@ -482,7 +506,7 @@ class State extends ReadyResource {
         const hashHexString = hash.toString('hex');
 
         // Check if the operation has already been applied
-        const opEntry = await batch.get(hashHexString);
+        const opEntry = await this.#getEntryApply(hashHexString, batch);
         if (!isMessageVerifed || null !== opEntry) return;
 
         // Proceed to remove the writer role from the node
@@ -538,7 +562,7 @@ class State extends ReadyResource {
     }
 
     async #handleApplyAddIndexerOperation(op, view, base, node, batch) {
-        if (!this.check.sanitizeBasicKeyOp(op)) {
+        if (!this.check.validateBasicKeyOp(op)) {
             return;
         }
         // Extract and validate the network address
@@ -561,9 +585,9 @@ class State extends ReadyResource {
         const message = createMessage(op.address, op.bko.nonce, op.type);
         const hash = await createHash('sha256', message);
         const isMessageVerifed = this.#wallet.verify(op.bko.sig, hash, adminPublicKey);
-        // check if the operation has been already applied
-        const opEntry = await batch.get(hash.toString('hex'));
         const hashHexString = hash.toString('hex');
+        // check if the operation has been already applied
+        const opEntry = await this.#getEntryApply(hashHexString, batch);
         if (!isMessageVerifed || null !== opEntry) return;
         await this.#addIndexer(op, batch, base, hashHexString, nodeAddress);
     }
@@ -602,7 +626,7 @@ class State extends ReadyResource {
     }
 
     async #handleApplyRemoveIndexerOperation(op, view, base, node, batch) {
-        if (!this.check.sanitizeBasicKeyOp(op)) return;
+        if (!this.check.validateBasicKeyOp(op)) return;
 
         // Extract and validate the network address
         const nodeAddressBuffer = op.address;
@@ -626,7 +650,7 @@ class State extends ReadyResource {
         const isMessageVerifed = this.#wallet.verify(op.bko.sig, hash, adminPublicKey);
         const hashHexString = hash.toString('hex');
         // check if the operation has already been applied
-        const opEntry = await batch.get(hashHexString);
+        const opEntry = await this.#getEntryApply(hashHexString, batch);
         if (!isMessageVerifed || null !== opEntry) return;
 
         await this.#removeIndexer(op, batch, base, hashHexString, nodeAddress);
@@ -686,7 +710,7 @@ class State extends ReadyResource {
     }
 
     async #handleApplyBanValidatorOperation(op, view, base, node, batch) {
-        if (!this.check.sanitizeBasicKeyOp(op)) return;
+        if (!this.check.validateBasicKeyOp(op)) return;
 
         // Extract and validate the network prefix from the node's address
         const nodeAddressBuffer = op.address;
@@ -709,7 +733,7 @@ class State extends ReadyResource {
         const isMessageVerifed = this.#wallet.verify(op.bko.sig, hash, adminPublicKey);
         const hashHexString = hash.toString('hex');
         // check if the operation has already been applied
-        const opEntry = await batch.get(hashHexString);
+        const opEntry = await this.#getEntryApply(hashHexString, batch);
         if (!isMessageVerifed || null !== opEntry) return;
 
         const nodeEntry = await this.#getEntryApply(nodeAddress, batch);
