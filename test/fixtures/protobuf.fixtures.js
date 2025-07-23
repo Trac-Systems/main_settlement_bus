@@ -2,7 +2,7 @@ import b4a from 'b4a';
 import applyOperations from '../../src/utils/protobuf/applyOperations.cjs';
 
 const validPostTx = {
-  type: applyOperations.OperationType.POST_TX,
+  type: applyOperations.OperationType.TX,
   key: b4a.from('2f0f434b77ac0c85c1c3511ac01e24136d9e5e2425cceca14ef9199f73af5d07', 'hex'),
   txo: {
     //op: 'post-tx', we need to rid off this from transaction. 

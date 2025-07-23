@@ -18,6 +18,7 @@
     "b4a": "1.6.7",
     "bare-readline": "1.0.7",
     "bare-tty": "5.0.2",
+    "bech32": "^2.0.0",
     "brittle": "^3.16.2",
     "compact-encoding": "^2.16.0",
     "corestore": "^7.4.2",
@@ -32,7 +33,7 @@
     "protomux-wakeup": "2.4.0",
     "readline": "npm:bare-node-readline",
     "ready-resource": "1.1.2",
-    "trac-wallet": "0.0.43",
+    "trac-wallet": "git+https://github.com/Trac-Systems/ed25519-key-generator.git#trac-wallet-r2",
     "tty": "npm:bare-node-tty"
   },
   "devDependencies": {

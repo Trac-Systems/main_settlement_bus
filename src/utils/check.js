@@ -1,161 +1,159 @@
 import Validator from 'fastest-validator';
-import { isHexString } from './helpers.js';
-import { OperationType, ADDRESS_CHAR_HEX_LENGTH, WRITER_KEY_CHAR_HEX_LENGTH, NONCE_CHAR_HEX_LENGTH, SIGNATURE_CHAR_HEX_LENGTH, HASH_CHAR_HEX_LENGTH } from './constants.js';
+import { OperationType,
+    WRITER_BYTE_LENGTH,
+    NONCE_BYTE_LENGTH,
+    SIGNATURE_BYTE_LENGTH,
+    HASH_BYTE_LENGTH,
+    MIN_SAFE_VALIDATION_INTEGER,
+    MAX_SAFE_VALIDATION_INTEGER,
+    TX_HASH_HEXSTRING_LENGTH,
+    WRITING_KEY_HEXSTRING_LENGTH,
+    NONCE_HEXSTRING_LENGTH,
+    CONTENT_HASH_HEXSTRING_LENGTH,
+    SIGNATURE_HEXSTRING_LENGTH,
+    BOOTSTRAP_HEXSTRING_LENGTH
+} from './constants.js';
+import { TRAC_ADDRESS_SIZE } from '../core/state/ApplyOperationEncodings.js'
+import b4a from 'b4a';
 class Check {
     #_validator;
-    #_sanitizeExtendedKeyOp;
-    #_sanitizeBasicKeyOp;
-    #_sanitizePreTx;
-    #_sanitizePostTx;
+    #_validateExtendedKeyOp;
+    #_validateBasicKeyOp;
+    #_validatePreTx;
+    #_validatePostTx;
     constructor() {
 
         this.#_validator = new Validator({
             useNewCustomCheckerFunction: true,
             messages: {
-                bufferedHex: "The '{field}' field must be a hex! Actual: {actual}",
-                hexString: "The '{field}' field must be a valid hex string! Actual: {actual}"
+                buffer: "The '{field}' field must be a Buffer! Actual: {actual}",
+                bufferLength: "The '{field}' field must be a Buffer with length {expected}! Actual: {actual}",
+                nonZeroBuffer: "The '{field}' field must not be an empty or zero-filled Buffer!",
+                emptyBuffer: "The '{field}' field must not be an empty Buffer!",
             },
-            customFunctions: {
-                hexCheck: (value, errors) => {
-                    let buf = null;
-                    let result = false;
-                    try {
-                        buf = b4a.from(value, 'hex');
-                        result = value === b4a.toString(buf, 'hex');
-                    } catch (e) {
-                    }
-                    return result;
-                },
-                hexStringCheck: (value, errors) => {
-                    try {
-                        return isHexString(value);
-                    } catch (e) {
-                    }
-                    return false;
-                }
-            }
         });
-
-        this.#_validator.add("is_hex", function ({ schema, messages }, path, context) {
+        const isBuffer = b4a.isBuffer;
+        this.#_validator.add("buffer", function ({ schema, messages }, path, context) {
             return {
-                source: `
-                    const result = context.customFunctions.hexCheck(value, errors);
-                    if(false === result) ${this.makeError({ type: "bufferedHex", actual: "value", messages })}
-                    return value;
-                `
-            };
-        });
-        this.#_validator.add("is_hex_string", function ({ schema, messages }, path, context) {
-            return {
-                source: `
-                    const result = context.customFunctions.hexStringCheck(value, errors);
-                    if(false === result) ${this.makeError({ type: "hexString", actual: "value", messages })}
-                    return value;
-                `
+                source:
+                    `
+                        if (!${isBuffer}(value)) {
+                            ${this.makeError({ type: "buffer", actual: "value", messages })}
+                        }
+                        if (value.length !== ${schema.length}) {
+                            ${this.makeError({ type: "bufferLength", expected: schema.length, actual: "value.length", messages })}
+                        }
+                        let isEmpty = true;
+                            for (let i = 0; i < value.length; i++) {
+                                if (value[i] !== 0) {
+                                    isEmpty = false;
+                                    break;
+                                }
+                            }
+                            if (isEmpty) {
+                                ${this.makeError({ type: "emptyBuffer", actual: "value", messages })}
+                            }
+                            return value;
+                    `
             };
         });
 
-        this.#_sanitizeExtendedKeyOp = this.#compileExtendedKeyOpSchema();
-        this.#_sanitizeBasicKeyOp = this.#compileBasicKeyOpSchema();
-        this.#_sanitizePreTx = this.#compilePreTxSchema();
-        this.#_sanitizePostTx = this.#compilePostTxSchema();
+        this.#_validateExtendedKeyOp = this.#compileExtendedKeyOpSchema();
+        this.#_validateBasicKeyOp = this.#compileBasicKeyOpSchema();
+        this.#_validatePreTx = this.#compilePreTxSchema();
+        this.#_validatePostTx = this.#compilePostTxSchema();
     }
-    
+
     #compileExtendedKeyOpSchema() {
         const schema = {
             $$strict: true,
-            type: { type: 'string', enum: [OperationType.ADD_ADMIN, OperationType.ADD_WRITER, OperationType.REMOVE_WRITER], required: true },
-            key: { type: "string", length: ADDRESS_CHAR_HEX_LENGTH, required: true, hex: true },
-            value: {
+            type: { type: 'number', enum: [OperationType.ADD_ADMIN, OperationType.ADD_WRITER, OperationType.REMOVE_WRITER], positive: true, integer: true, min: MIN_SAFE_VALIDATION_INTEGER, max: MAX_SAFE_VALIDATION_INTEGER, required: true },
+            address: { type: 'buffer', length: TRAC_ADDRESS_SIZE, required: true },
+            eko: {
                 strict: true,
-                type: "object",
+                type: 'object',
                 props: {
-                    pub: { type: 'string', length: ADDRESS_CHAR_HEX_LENGTH, required: true, hex: true },
-                    wk: { type: 'string', length: WRITER_KEY_CHAR_HEX_LENGTH, required: true, hex: true },
-                    nonce: { type: 'string', length: NONCE_CHAR_HEX_LENGTH, required: true, hex: true },
-                    sig: { type: 'string', length: SIGNATURE_CHAR_HEX_LENGTH, required: true, hex: true },
+                    wk: { type: 'buffer', length: WRITER_BYTE_LENGTH, required: true },
+                    nonce: { type: 'buffer', length: NONCE_BYTE_LENGTH, required: true },
+                    sig: { type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true },
                 }
             }
-        }
-
+        };
         return this.#_validator.compile(schema);
     }
 
-    sanitizeExtendedKeyOpSchema(op) {
-        return this.#_sanitizeExtendedKeyOp(op) === true;
+    validateExtendedKeyOpSchema(op) {
+        return this.#_validateExtendedKeyOp(op) === true;
     }
 
     #compileBasicKeyOpSchema() {
         const schema = {
             $$strict: true,
-            type: { type: 'string', enum: [OperationType.ADD_INDEXER, OperationType.REMOVE_INDEXER, OperationType.APPEND_WHITELIST, OperationType.BAN_VALIDATOR], required: true },
-            key: { type: "string", length: ADDRESS_CHAR_HEX_LENGTH, required: true, hex: true },
-            value: {
+            type: { type: 'number', enum: [OperationType.ADD_INDEXER, OperationType.REMOVE_INDEXER, OperationType.APPEND_WHITELIST, OperationType.BAN_VALIDATOR], positive: true, integer: true, min: MIN_SAFE_VALIDATION_INTEGER, max: MAX_SAFE_VALIDATION_INTEGER, required: true },
+            address: { type: 'buffer', length: TRAC_ADDRESS_SIZE, required: true },
+            bko: {
                 strict: true,
-                type: "object",
+                type: 'object',
                 props: {
-                    nonce: { type: 'string', length: NONCE_CHAR_HEX_LENGTH, required: true, hex: true },
-                    sig: { type: 'string', length: SIGNATURE_CHAR_HEX_LENGTH, required: true, hex: true },
+                    nonce: { type: 'buffer', length: NONCE_BYTE_LENGTH, required: true, },
+                    sig: { type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true },
                 }
-
             }
         }
         return this.#_validator.compile(schema);
     }
 
-    sanitizeBasicKeyOp(op) {
-        return this.#_sanitizeBasicKeyOp(op) === true;
+    validateBasicKeyOp(op) {
+        return this.#_validateBasicKeyOp(op) === true;
     }
     #compilePreTxSchema() {
         const schema = {
             $$strict: true,
-            op: { type: 'string', enum: ['pre-tx'], required: true },
-            tx: { type: 'string', length: HASH_CHAR_HEX_LENGTH, required: true, hex: true }, // tx hash
-            is: { type: 'string', length: SIGNATURE_CHAR_HEX_LENGTH, required: true, hex: true }, // signature
-            wp: { type: 'string', length: ADDRESS_CHAR_HEX_LENGTH, required: true, hex: true }, // validator public key
-            i: { type: 'string', length: WRITER_KEY_CHAR_HEX_LENGTH, required: true, hex: true }, // incoming peer writer key
-            ipk: { type: 'string', length: ADDRESS_CHAR_HEX_LENGTH, required: true, hex: true }, // incoming peer public key
-            ch: { type: 'string', length: HASH_CHAR_HEX_LENGTH, required: true, hex: true }, // content hash
-            in: { type: 'string', length: NONCE_CHAR_HEX_LENGTH, required: true, hex: true }, // nonce
-            bs: { type: 'string', length: WRITER_KEY_CHAR_HEX_LENGTH, required: true, hex: true }, // peer contract bootstrap
-            mbs: { type: 'string', length: WRITER_KEY_CHAR_HEX_LENGTH, required: true, hex: true }, // msb bootstrap
+            op: { type: 'string', enum: [OperationType.PRE_TX], required: true }, // Operation type (must be 'pre-tx')
+            tx: { type: 'string', length: TX_HASH_HEXSTRING_LENGTH, required: true, hex: true }, // Transaction hash (unique identifier for the transaction)
+            ia: { type: 'string', length: TRAC_ADDRESS_SIZE, required: true }, // Address of the requesting node (used for signature verification)
+            iw: { type: 'string', length: WRITING_KEY_HEXSTRING_LENGTH, required: true, hex: true }, // Writing key of the requesting node (external subnetwork)
+            in: { type: 'string', length: NONCE_HEXSTRING_LENGTH, required: true, hex: true }, // Nonce of the requesting node
+            ch: { type: 'string', length: CONTENT_HASH_HEXSTRING_LENGTH, required: true, hex: true }, // Content hash (hash of the transaction's data)
+            is: { type: 'string', length: SIGNATURE_HEXSTRING_LENGTH, required: true, hex: true }, // Requester's signature
+            bs: { type: 'string', length: BOOTSTRAP_HEXSTRING_LENGTH, required: true, hex: true }, // External bootstrap contract
+            mbs: { type: 'string', length: BOOTSTRAP_HEXSTRING_LENGTH, required: true, hex: true }, // MSB bootstrap key
+            va: { type: 'string', length: TRAC_ADDRESS_SIZE, required: true }, // Validator address (used for validation)
         };
         return this.#_validator.compile(schema);
     }
-    sanitizePreTx(op) {
-        return this.#_sanitizePreTx(op) === true;
+
+    validatePreTx(op) {
+        return this.#_validatePreTx(op) === true;
     }
 
     #compilePostTxSchema() {
         const schema = {
             $$strict: true,
-            type: { type: 'string', enum: ['tx'], required: true },
-            key: { type: 'string', length: HASH_CHAR_HEX_LENGTH, required: true, hex: true }, // tx hash
-            value: {
+            type: { type: 'number', enum: [OperationType.TX], positive: true, integer: true, min: MIN_SAFE_VALIDATION_INTEGER, max: MAX_SAFE_VALIDATION_INTEGER, required: true },
+            address: { type: 'buffer', length: TRAC_ADDRESS_SIZE, required: true }, // validator address
+            txo: {
                 strict: true,
                 type: "object",
                 props: {
-                    op: { type: 'string', enum: ['post-tx'], required: true }, // operation type
-                    tx: { type: 'string', length: HASH_CHAR_HEX_LENGTH, required: true, hex: true }, // tx hash
-                    is: { type: 'string', length: SIGNATURE_CHAR_HEX_LENGTH, required: true, hex: true }, // signature
-                    w: { type: 'string', length: WRITER_KEY_CHAR_HEX_LENGTH, required: true, hex: true }, // msb writer key
-                    i: { type: 'string', length: WRITER_KEY_CHAR_HEX_LENGTH, required: true, hex: true }, // incoming peer writer key
-                    ipk: { type: 'string', length: ADDRESS_CHAR_HEX_LENGTH, required: true, hex: true }, // incoming peer public key
-                    ch: { type: 'string', length: HASH_CHAR_HEX_LENGTH, required: true, hex: true }, // content hash
-                    in: { type: 'string', length: NONCE_CHAR_HEX_LENGTH, required: true, hex: true }, // nonce
-                    bs: { type: 'string', length: WRITER_KEY_CHAR_HEX_LENGTH, required: true, hex: true }, // peer contract bootstrap
-                    mbs: { type: 'string', length: WRITER_KEY_CHAR_HEX_LENGTH, required: true, hex: true }, // msb bootstrap
-                    ws: { type: 'string', length: SIGNATURE_CHAR_HEX_LENGTH, required: true, hex: true }, // validator/writer signature
-                    wp: { type: 'string', length: ADDRESS_CHAR_HEX_LENGTH, required: true, hex: true }, // validator/writer public key
-                    wn: { type: 'string', length: NONCE_CHAR_HEX_LENGTH, required: true, hex: true } // validator/writer nonce
+                    tx: { type: 'buffer', length: HASH_BYTE_LENGTH, required: true }, // tx hash
+                    ia: { type: 'buffer', length: TRAC_ADDRESS_SIZE, required: true }, // incoming address
+                    iw: { type: 'buffer', length: WRITER_BYTE_LENGTH, required: true }, // incoming writer key
+                    in: { type: 'buffer', length: NONCE_BYTE_LENGTH, required: true }, // incoming nonce
+                    ch: { type: 'buffer', length: HASH_BYTE_LENGTH, required: true }, // content hash
+                    is: { type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true }, // signature
+                    bs: { type: 'buffer', length: WRITER_BYTE_LENGTH, required: true }, // peer contract bootstrap
+                    mbs: { type: 'buffer', length: WRITER_BYTE_LENGTH, required: true }, // msb bootstrap
+                    vs: { type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true }, // validator/writer signature
+                    vn: { type: 'buffer', length: NONCE_BYTE_LENGTH, required: true } // validator/writer nonce
                 }
             }
         };
         return this.#_validator.compile(schema);
     }
 
-    sanitizePostTx(op) {
-        return this.#_sanitizePostTx(op) === true;
+    validatePostTx(op) {
+        return this.#_validatePostTx(op) === true;
     }
 }
 export default Check;
