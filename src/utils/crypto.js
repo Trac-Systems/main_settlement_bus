@@ -5,7 +5,7 @@ export async function createHash(type, message) {
     if (type === 'sha256') {
         const out = b4a.alloc(sodium.crypto_hash_sha256_BYTES);
         sodium.crypto_hash_sha256(out, !b4a.isBuffer(message) ? b4a.from(message) : message);
-        return b4a.toString(out, 'hex');
+        return out;
     }
     if (global.Pear !== undefined) {
         let _type = '';
@@ -26,17 +26,6 @@ export async function createHash(type, message) {
     } else {
         // this is only available here for completeness and in fact will never be used in the MSB.
         // just keep it as it is.
-        return crypto.createHash(type).update(!b4a.isBuffer(message) ? b4a.from(message) : message).digest('hex')
+        return b4a.from(crypto.createHash(type).update(message).digest('hex'), 'hex');
     }
-}
-
-export async function generateTx(bootstrap, msb_bootstrap, validator_writer_key, local_writer_key, local_public_key, content_hash, nonce) {
-    let tx = bootstrap + '-' +
-        msb_bootstrap + '-' +
-        validator_writer_key + '-' +
-        local_writer_key + '-' +
-        local_public_key + '-' +
-        content_hash + '-' +
-        nonce;
-    return await createHash('sha256', await createHash('sha256', tx));
 }

@@ -17,13 +17,13 @@ exports.OperationType = {
   "APPEND_WHITELIST": 2,
   "ADD_WRITER": 3,
   "REMOVE_WRITER": 4,
-  "POST_TX": 5,
+  "TX": 5,
   "ADD_INDEXER": 6,
   "REMOVE_INDEXER": 7,
   "BAN_WRITER": 8
 }
 
-var PostTxOperation = exports.PostTxOperation = {
+var TxOperation = exports.TxOperation = {
   buffer: true,
   encodingLength: null,
   encode: null,
@@ -51,15 +51,15 @@ var Operation = exports.Operation = {
   decode: null
 }
 
-definePostTxOperation()
+defineTxOperation()
 defineBasicKeyOperation()
 defineExtendedKeyOperation()
 defineOperation()
 
-function definePostTxOperation () {
-  PostTxOperation.encodingLength = encodingLength
-  PostTxOperation.encode = encode
-  PostTxOperation.decode = decode
+function defineTxOperation () {
+  TxOperation.encodingLength = encodingLength
+  TxOperation.encode = encode
+  TxOperation.decode = decode
 
   function encodingLength (obj) {
     var length = 0
@@ -67,28 +67,24 @@ function definePostTxOperation () {
       var len = encodings.bytes.encodingLength(obj.tx)
       length += 1 + len
     }
-    if (defined(obj.is)) {
-      var len = encodings.bytes.encodingLength(obj.is)
+    if (defined(obj.ia)) {
+      var len = encodings.bytes.encodingLength(obj.ia)
       length += 1 + len
     }
-    if (defined(obj.w)) {
-      var len = encodings.bytes.encodingLength(obj.w)
+    if (defined(obj.iw)) {
+      var len = encodings.bytes.encodingLength(obj.iw)
       length += 1 + len
     }
-    if (defined(obj.i)) {
-      var len = encodings.bytes.encodingLength(obj.i)
-      length += 1 + len
-    }
-    if (defined(obj.ipk)) {
-      var len = encodings.bytes.encodingLength(obj.ipk)
+    if (defined(obj.in)) {
+      var len = encodings.bytes.encodingLength(obj.in)
       length += 1 + len
     }
     if (defined(obj.ch)) {
       var len = encodings.bytes.encodingLength(obj.ch)
       length += 1 + len
     }
-    if (defined(obj.in)) {
-      var len = encodings.bytes.encodingLength(obj.in)
+    if (defined(obj.is)) {
+      var len = encodings.bytes.encodingLength(obj.is)
       length += 1 + len
     }
     if (defined(obj.bs)) {
@@ -99,16 +95,12 @@ function definePostTxOperation () {
       var len = encodings.bytes.encodingLength(obj.mbs)
       length += 1 + len
     }
-    if (defined(obj.ws)) {
-      var len = encodings.bytes.encodingLength(obj.ws)
+    if (defined(obj.vs)) {
+      var len = encodings.bytes.encodingLength(obj.vs)
       length += 1 + len
     }
-    if (defined(obj.wp)) {
-      var len = encodings.bytes.encodingLength(obj.wp)
-      length += 1 + len
-    }
-    if (defined(obj.wn)) {
-      var len = encodings.bytes.encodingLength(obj.wn)
+    if (defined(obj.vn)) {
+      var len = encodings.bytes.encodingLength(obj.vn)
       length += 1 + len
     }
     return length
@@ -123,59 +115,49 @@ function definePostTxOperation () {
       encodings.bytes.encode(obj.tx, buf, offset)
       offset += encodings.bytes.encode.bytes
     }
-    if (defined(obj.is)) {
+    if (defined(obj.ia)) {
       buf[offset++] = 18
-      encodings.bytes.encode(obj.is, buf, offset)
+      encodings.bytes.encode(obj.ia, buf, offset)
       offset += encodings.bytes.encode.bytes
     }
-    if (defined(obj.w)) {
+    if (defined(obj.iw)) {
       buf[offset++] = 26
-      encodings.bytes.encode(obj.w, buf, offset)
-      offset += encodings.bytes.encode.bytes
-    }
-    if (defined(obj.i)) {
-      buf[offset++] = 34
-      encodings.bytes.encode(obj.i, buf, offset)
-      offset += encodings.bytes.encode.bytes
-    }
-    if (defined(obj.ipk)) {
-      buf[offset++] = 42
-      encodings.bytes.encode(obj.ipk, buf, offset)
-      offset += encodings.bytes.encode.bytes
-    }
-    if (defined(obj.ch)) {
-      buf[offset++] = 50
-      encodings.bytes.encode(obj.ch, buf, offset)
+      encodings.bytes.encode(obj.iw, buf, offset)
       offset += encodings.bytes.encode.bytes
     }
     if (defined(obj.in)) {
-      buf[offset++] = 58
+      buf[offset++] = 34
       encodings.bytes.encode(obj.in, buf, offset)
       offset += encodings.bytes.encode.bytes
     }
+    if (defined(obj.ch)) {
+      buf[offset++] = 42
+      encodings.bytes.encode(obj.ch, buf, offset)
+      offset += encodings.bytes.encode.bytes
+    }
+    if (defined(obj.is)) {
+      buf[offset++] = 50
+      encodings.bytes.encode(obj.is, buf, offset)
+      offset += encodings.bytes.encode.bytes
+    }
     if (defined(obj.bs)) {
-      buf[offset++] = 66
+      buf[offset++] = 58
       encodings.bytes.encode(obj.bs, buf, offset)
       offset += encodings.bytes.encode.bytes
     }
     if (defined(obj.mbs)) {
-      buf[offset++] = 74
+      buf[offset++] = 66
       encodings.bytes.encode(obj.mbs, buf, offset)
       offset += encodings.bytes.encode.bytes
     }
-    if (defined(obj.ws)) {
+    if (defined(obj.vs)) {
+      buf[offset++] = 74
+      encodings.bytes.encode(obj.vs, buf, offset)
+      offset += encodings.bytes.encode.bytes
+    }
+    if (defined(obj.vn)) {
       buf[offset++] = 82
-      encodings.bytes.encode(obj.ws, buf, offset)
-      offset += encodings.bytes.encode.bytes
-    }
-    if (defined(obj.wp)) {
-      buf[offset++] = 90
-      encodings.bytes.encode(obj.wp, buf, offset)
-      offset += encodings.bytes.encode.bytes
-    }
-    if (defined(obj.wn)) {
-      buf[offset++] = 98
-      encodings.bytes.encode(obj.wn, buf, offset)
+      encodings.bytes.encode(obj.vn, buf, offset)
       offset += encodings.bytes.encode.bytes
     }
     encode.bytes = offset - oldOffset
@@ -189,17 +171,15 @@ function definePostTxOperation () {
     var oldOffset = offset
     var obj = {
       tx: null,
-      is: null,
-      w: null,
-      i: null,
-      ipk: null,
-      ch: null,
+      ia: null,
+      iw: null,
       in: null,
+      ch: null,
+      is: null,
       bs: null,
       mbs: null,
-      ws: null,
-      wp: null,
-      wn: null
+      vs: null,
+      vn: null
     }
     while (true) {
       if (end <= offset) {
@@ -215,47 +195,39 @@ function definePostTxOperation () {
         offset += encodings.bytes.decode.bytes
         break
         case 2:
-        obj.is = encodings.bytes.decode(buf, offset)
+        obj.ia = encodings.bytes.decode(buf, offset)
         offset += encodings.bytes.decode.bytes
         break
         case 3:
-        obj.w = encodings.bytes.decode(buf, offset)
+        obj.iw = encodings.bytes.decode(buf, offset)
         offset += encodings.bytes.decode.bytes
         break
         case 4:
-        obj.i = encodings.bytes.decode(buf, offset)
-        offset += encodings.bytes.decode.bytes
-        break
-        case 5:
-        obj.ipk = encodings.bytes.decode(buf, offset)
-        offset += encodings.bytes.decode.bytes
-        break
-        case 6:
-        obj.ch = encodings.bytes.decode(buf, offset)
-        offset += encodings.bytes.decode.bytes
-        break
-        case 7:
         obj.in = encodings.bytes.decode(buf, offset)
         offset += encodings.bytes.decode.bytes
         break
-        case 8:
+        case 5:
+        obj.ch = encodings.bytes.decode(buf, offset)
+        offset += encodings.bytes.decode.bytes
+        break
+        case 6:
+        obj.is = encodings.bytes.decode(buf, offset)
+        offset += encodings.bytes.decode.bytes
+        break
+        case 7:
         obj.bs = encodings.bytes.decode(buf, offset)
         offset += encodings.bytes.decode.bytes
         break
-        case 9:
+        case 8:
         obj.mbs = encodings.bytes.decode(buf, offset)
         offset += encodings.bytes.decode.bytes
         break
+        case 9:
+        obj.vs = encodings.bytes.decode(buf, offset)
+        offset += encodings.bytes.decode.bytes
+        break
         case 10:
-        obj.ws = encodings.bytes.decode(buf, offset)
-        offset += encodings.bytes.decode.bytes
-        break
-        case 11:
-        obj.wp = encodings.bytes.decode(buf, offset)
-        offset += encodings.bytes.decode.bytes
-        break
-        case 12:
-        obj.wn = encodings.bytes.decode(buf, offset)
+        obj.vn = encodings.bytes.decode(buf, offset)
         offset += encodings.bytes.decode.bytes
         break
         default:
@@ -429,8 +401,8 @@ function defineOperation () {
       var len = encodings.enum.encodingLength(obj.type)
       length += 1 + len
     }
-    if (defined(obj.key)) {
-      var len = encodings.bytes.encodingLength(obj.key)
+    if (defined(obj.address)) {
+      var len = encodings.bytes.encodingLength(obj.address)
       length += 1 + len
     }
     if (defined(obj.bko)) {
@@ -444,7 +416,7 @@ function defineOperation () {
       length += 1 + len
     }
     if (defined(obj.txo)) {
-      var len = PostTxOperation.encodingLength(obj.txo)
+      var len = TxOperation.encodingLength(obj.txo)
       length += varint.encodingLength(len)
       length += 1 + len
     }
@@ -461,9 +433,9 @@ function defineOperation () {
       encodings.enum.encode(obj.type, buf, offset)
       offset += encodings.enum.encode.bytes
     }
-    if (defined(obj.key)) {
+    if (defined(obj.address)) {
       buf[offset++] = 18
-      encodings.bytes.encode(obj.key, buf, offset)
+      encodings.bytes.encode(obj.address, buf, offset)
       offset += encodings.bytes.encode.bytes
     }
     if (defined(obj.bko)) {
@@ -482,10 +454,10 @@ function defineOperation () {
     }
     if (defined(obj.txo)) {
       buf[offset++] = 42
-      varint.encode(PostTxOperation.encodingLength(obj.txo), buf, offset)
+      varint.encode(TxOperation.encodingLength(obj.txo), buf, offset)
       offset += varint.encode.bytes
-      PostTxOperation.encode(obj.txo, buf, offset)
-      offset += PostTxOperation.encode.bytes
+      TxOperation.encode(obj.txo, buf, offset)
+      offset += TxOperation.encode.bytes
     }
     encode.bytes = offset - oldOffset
     return buf
@@ -498,7 +470,7 @@ function defineOperation () {
     var oldOffset = offset
     var obj = {
       type: 0,
-      key: null,
+      address: null,
       bko: null,
       eko: null,
       txo: null
@@ -517,7 +489,7 @@ function defineOperation () {
         offset += encodings.enum.decode.bytes
         break
         case 2:
-        obj.key = encodings.bytes.decode(buf, offset)
+        obj.address = encodings.bytes.decode(buf, offset)
         offset += encodings.bytes.decode.bytes
         break
         case 3:
@@ -541,8 +513,8 @@ function defineOperation () {
         delete obj.eko
         var len = varint.decode(buf, offset)
         offset += varint.decode.bytes
-        obj.txo = PostTxOperation.decode(buf, offset, offset + len)
-        offset += PostTxOperation.decode.bytes
+        obj.txo = TxOperation.decode(buf, offset, offset + len)
+        offset += TxOperation.decode.bytes
         break
         default:
         offset = skip(prefix & 7, buf, offset)

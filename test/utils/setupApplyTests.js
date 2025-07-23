@@ -286,7 +286,7 @@ export const generatePostTx = async (msbBootstrap, boostrapPeerWallet, peerWalle
         type: OperationType.TX,
         key: preTxHash,
         value: {
-            op: OperationType.POST_TX,
+            op: OperationType.TX,
             tx: preTxHash,
             is: parsedPreTx.is,
             w: msbBootstrap.bootstrap,
