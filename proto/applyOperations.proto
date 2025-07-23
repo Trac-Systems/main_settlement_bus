@@ -1,7 +1,6 @@
 /**
  * This is the initial builder-based schema (v0.1). In future iterations, we’ll need to extend the postTx message 
  * to support surrogate tx forwarding and daisy-chained execution semantics.
- * PS. current schema got rid off the `op` field from the PostTxOperation message, because it was doubled.
  *
  */
 
@@ -15,25 +14,23 @@ enum OperationType {
     APPEND_WHITELIST = 2;
     ADD_WRITER       = 3;
     REMOVE_WRITER    = 4;
-    POST_TX          = 5;
+    TX               = 5;
     ADD_INDEXER      = 6;
     REMOVE_INDEXER   = 7;
     BAN_WRITER       = 8;
 }
 
-message PostTxOperation {
-    bytes tx   = 1;
-    bytes is   = 2;
-    bytes w    = 3;
-    bytes i    = 4;
-    bytes ipk  = 5;
-    bytes ch   = 6;
-    bytes in   = 7;
-    bytes bs   = 8;
-    bytes mbs  = 9;
-    bytes ws   = 10;
-    bytes wp   = 11;
-    bytes wn   = 12;
+message TxOperation {
+    bytes tx   = 1;  // Transaction hash (unique identifier for the transaction)
+    bytes ia   = 2;  // Address of the requesting node (used for signature verification)
+    bytes iw   = 3;  // Writing key of the requesting node (external subnetwork)
+    bytes in   = 4;  // Nonce of the requesting node
+    bytes ch   = 5;  // Content hash (hash of the transaction's data)
+    bytes is   = 6;  // Requester's signature
+    bytes bs   = 7;  // External bootstrap contract
+    bytes mbs  = 8;  // MSB bootstrap key
+    bytes vs   = 9;  // Validator's signature
+    bytes vn   = 10; // Validator's nonce
 }
 
 message BasicKeyOperation {
@@ -54,6 +51,6 @@ message Operation {
     oneof value {
         BasicKeyOperation      bko  = 3;
         ExtendedKeyOperation   eko  = 4;
-        PostTxOperation        txo  = 5;
+        TxOperation            txo  = 5;
     }
 }

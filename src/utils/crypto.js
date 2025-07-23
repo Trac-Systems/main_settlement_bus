@@ -29,14 +29,3 @@ export async function createHash(type, message) {
         return b4a.from(crypto.createHash(type).update(message).digest('hex'), 'hex');
     }
 }
-
-export async function generateTx(bootstrap, msb_bootstrap, validator_writer_key, local_writer_key, local_public_key, content_hash, nonce) {
-    let tx = bootstrap + '-' +
-        msb_bootstrap + '-' +
-        validator_writer_key + '-' +
-        local_writer_key + '-' +
-        local_public_key + '-' +
-        content_hash + '-' +
-        nonce;
-    return await createHash('sha256', await createHash('sha256', tx));
-}

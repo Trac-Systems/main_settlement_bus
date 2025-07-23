@@ -5,19 +5,19 @@ import Wallet from 'trac-wallet';
 import Protomux from 'protomux'
 import c from 'compact-encoding'
 import ReadyResource from 'ready-resource';
+import { sleep } from '../../utils/helpers.js';
+import { normalizeBuffer } from '../../utils/buffer.js';
+import PreTransactionValidator from './validators/PreTransactionValidator.js';
 import {
     TRAC_NAMESPACE,
     MAX_PEERS,
     MAX_PARALLEL,
     MAX_SERVER_CONNECTIONS,
     MAX_CLIENT_CONNECTIONS,
-    OperationType,
 } from '../../utils/constants.js';
-import { sleep } from '../../utils/helpers.js';
-import {normalizeBuffer} from '../../utils/buffer.js';
 import ApplyOperationEncodings from '../state/ApplyOperationEncodings.js';
 import Check from '../../utils/check.js';
-
+import StateMessageOperations from '../../messages/stateMessages/StateMessageOperations.js';
 const wakeup = new w();
 
 class Network extends ReadyResource {
@@ -127,7 +127,6 @@ class Network extends ReadyResource {
                 const message = message_channel.addMessage({
                     encoding: c.json,
                     //TODO: change it into switch case
-                    //TODO: instad of doing return; in cases which does not fit for us, we should perform - swarm.leavePeer(connection.remotePublicKey)
                     //TODO: In messages module we can create a new builders for cases like get_validator, get_admin, get_node, etc.
                     //TODO write validators in fastest validator + define protoschemas 
                     async onmessage(msg) {
@@ -168,7 +167,7 @@ class Network extends ReadyResource {
                                 const messageBuffer = normalizeBuffer(msg.message);
                                 if (!messageBuffer) {
                                     network.#swarm.leavePeer(connection.remotePublicKey)
-                                    throw new Error('Invalid message buffer for addWriter operation');                                    
+                                    throw new Error('Invalid message buffer for addWriter operation');
                                 }
                                 await handleIncomingEvent(messageBuffer);
                                 network.#swarm.leavePeer(connection.remotePublicKey)
@@ -236,30 +235,23 @@ class Network extends ReadyResource {
                                 if (b4a.byteLength(JSON.stringify(msg)) > 3072) return;
 
                                 const parsedPreTx = msg;
-                                //TODO implement separated function for this. 
-                                if (network.check.sanitizePreTx(parsedPreTx) &&
-                                    wallet.verify(b4a.from(parsedPreTx.is, 'hex'), b4a.from(parsedPreTx.tx + parsedPreTx.in), b4a.from(parsedPreTx.ipk, 'hex')) &&
-                                    parsedPreTx.wp === wallet.publicKey &&
-                                    null === await state.get(parsedPreTx.tx)
-                                ) {
-                                    const nonce = Wallet.generateNonce().toString('hex');
-                                    const signature = wallet.sign(b4a.from(parsedPreTx.tx + nonce), b4a.from(wallet.secretKey, 'hex'));
-                                    const append_tx = {
-                                        op: OperationType.POST_TX,
-                                        tx: parsedPreTx.tx,
-                                        is: parsedPreTx.is,
-                                        w: writingKey,
-                                        i: parsedPreTx.i,
-                                        ipk: parsedPreTx.ipk,
-                                        ch: parsedPreTx.ch,
-                                        in: parsedPreTx.in,
-                                        bs: parsedPreTx.bs,
-                                        mbs: parsedPreTx.mbs,
-                                        ws: signature.toString('hex'),
-                                        wp: wallet.publicKey,
-                                        wn: nonce
-                                    };
-                                    network.tx_pool.push({ tx: parsedPreTx.tx, append_tx: append_tx });
+                                const validator = new PreTransactionValidator(state, wallet, network);
+                                const isValid = await validator.validate(parsedPreTx);
+
+                                if (isValid) {
+                                    const postTx = await StateMessageOperations.assemblePostTxMessage(
+                                        wallet,
+                                        parsedPreTx.va,
+                                        b4a.from(parsedPreTx.tx, 'hex'),
+                                        parsedPreTx.ia,
+                                        b4a.from(parsedPreTx.iw, 'hex'),
+                                        b4a.from(parsedPreTx.in, 'hex'),
+                                        b4a.from(parsedPreTx.ch, 'hex'),
+                                        b4a.from(parsedPreTx.is, 'hex'),
+                                        b4a.from(parsedPreTx.bs, 'hex'),
+                                        b4a.from(parsedPreTx.mbs,'hex')
+                                    );
+                                    network.tx_pool.push(postTx);
                                 }
 
                                 network.#swarm.leavePeer(connection.remotePublicKey)
@@ -313,7 +305,7 @@ class Network extends ReadyResource {
                 const batch = [];
                 for (let i = 0; i < length; i++) {
                     if (i >= 10) break;
-                    batch.push({ type: OperationType.TX, key: this.tx_pool[i].tx, value: this.tx_pool[i].append_tx });
+                    batch.push(this.tx_pool[i]);
                 }
                 await appendState(batch);
                 this.tx_pool.splice(0, batch.length);

@@ -1,9 +1,10 @@
 import b4a from 'b4a';
 import { bech32m } from 'bech32';
 import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
+import { createHash } from '../../utils/crypto.js';
+//TODO: change name of this file because applyOperations.cjs exists in utils/protobuf and it should starts with lowercase because this is not a class.
 //TODO: SPLIT IT INTO MANY FILES - THIS IS HARD TO READ.
 //This file is part of contract. DO NOT CHANGE AFTER DEPLOYMENT.
-
 
 // Keys sizes in bytes
 const WRITING_KEY_SIZE = 32; // TODO: WE HAVE THIS CONSTANT ALREADY IN CONSTANT.JS
@@ -33,6 +34,9 @@ export const NodeRole = {
 }
 
 export const ZERO_WK = b4a.alloc(32, 0);
+
+// bootstrap + validator_address + msb_bootstrap + local_address + local_writer_key + content_hash + nonce
+export const TRANSACTION_TOTAL_SIZE = 32 + 32 + TRAC_ADDRESS_SIZE + 32 + TRAC_ADDRESS_SIZE + 32 + 32;
 
 // ------------ HELPER FUNCTIONS  ------------ //
 
@@ -516,10 +520,41 @@ export function incrementLengthEntry(length) {
     return encodeLengthEntry(nextValue);
 }
 
+export async function generateTxBuffer(bootstrap, msb_bootstrap, validator_address, local_writer_key, local_address, content_hash, nonce) {
+    try {
+        const tx = b4a.allocUnsafe(TRANSACTION_TOTAL_SIZE);
+        let offset = 0;
+
+        bootstrap.copy(tx, offset);
+        offset += bootstrap.length;
+
+        msb_bootstrap.copy(tx, offset);
+        offset += msb_bootstrap.length;
+
+        validator_address.copy(tx, offset);
+        offset += validator_address.length;
+
+        local_writer_key.copy(tx, offset);
+        offset += local_writer_key.length;
+
+        local_address.copy(tx, offset);
+        offset += local_address.length;
+
+        content_hash.copy(tx, offset);
+        offset += content_hash.length;
+
+        nonce.copy(tx, offset);
+        return await createHash('sha256', await createHash('sha256', tx));
+    } catch (error) {
+        return b4a.alloc(0);
+    }
+}
+
 export default {
     NodeRole,
     ZERO_WK,
     TRAC_ADDRESS_SIZE,
+    TRANSACTION_TOTAL_SIZE,
     addressToBuffer,
     bufferToAddress,
     encodeAdminEntry,
@@ -539,5 +574,6 @@ export default {
     setUpLengthEntry,
     decodeLengthEntry,
     encodeLengthEntry,
-    incrementLengthEntry
+    incrementLengthEntry,
+    generateTxBuffer
 }

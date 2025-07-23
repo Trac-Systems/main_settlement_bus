@@ -22,7 +22,7 @@ const validPreTx = {
 };
 
 export const validPostTx = {
-	type: OperationType.POST_TX,
+	type: OperationType.TX,
 	key: b4a.from('2f0f434b77ac0c85c1c3511ac01e24136d9e5e2425cceca14ef9199f73af5d07', 'hex'),
 	txo: {
 		tx: b4a.from('2f0f434b77ac0c85c1c3511ac01e24136d9e5e2425cceca14ef9199f73af5d07', 'hex'),
