@@ -1,5 +1,18 @@
 import Validator from 'fastest-validator';
-import { OperationType, ADDRESS_BYTE_LENGTH, WRITER_BYTE_LENGTH, NONCE_BYTE_LENGTH, SIGNATURE_BYTE_LENGTH, HASH_BYTE_LENGTH, MIN_SAFE_VALIDATION_INTEGER, MAX_SAFE_VALIDATION_INTEGER } from './constants.js';
+import { OperationType,
+    WRITER_BYTE_LENGTH,
+    NONCE_BYTE_LENGTH,
+    SIGNATURE_BYTE_LENGTH,
+    HASH_BYTE_LENGTH,
+    MIN_SAFE_VALIDATION_INTEGER,
+    MAX_SAFE_VALIDATION_INTEGER,
+    TX_HASH_HEXSTRING_LENGTH,
+    WRITING_KEY_HEXSTRING_LENGTH,
+    NONCE_HEXSTRING_LENGTH,
+    CONTENT_HASH_HEXSTRING_LENGTH,
+    SIGNATURE_HEXSTRING_LENGTH,
+    BOOTSTRAP_HEXSTRING_LENGTH
+} from './constants.js';
 import { TRAC_ADDRESS_SIZE } from '../core/state/ApplyOperationEncodings.js'
 import b4a from 'b4a';
 class Check {
@@ -93,19 +106,18 @@ class Check {
     validateBasicKeyOp(op) {
         return this.#_validateBasicKeyOp(op) === true;
     }
-    //TODO: create constants.
     #compilePreTxSchema() {
         const schema = {
             $$strict: true,
-            op: { type: 'string', enum: ['pre-tx'], required: true }, // Operation type (must be 'pre-tx')
-            tx: { type: 'string', length: 64, required: true, hex: true }, // Transaction hash (unique identifier for the transaction)
+            op: { type: 'string', enum: [OperationType.PRE_TX], required: true }, // Operation type (must be 'pre-tx')
+            tx: { type: 'string', length: TX_HASH_HEXSTRING_LENGTH, required: true, hex: true }, // Transaction hash (unique identifier for the transaction)
             ia: { type: 'string', length: TRAC_ADDRESS_SIZE, required: true }, // Address of the requesting node (used for signature verification)
-            iw: { type: 'string', length: 64, required: true, hex: true }, // Writing key of the requesting node (external subnetwork)
-            in: { type: 'string', length: 64, required: true, hex: true }, // Nonce of the requesting node
-            ch: { type: 'string', length: 64, required: true, hex: true }, // Content hash (hash of the transaction's data)
-            is: { type: 'string', length: 128, required: true, hex: true }, // Requester's signature
-            bs: { type: 'string', length: 64, required: true, hex: true }, // External bootstrap contract
-            mbs: { type: 'string', length: 64, required: true, hex: true }, // MSB bootstrap key
+            iw: { type: 'string', length: WRITING_KEY_HEXSTRING_LENGTH, required: true, hex: true }, // Writing key of the requesting node (external subnetwork)
+            in: { type: 'string', length: NONCE_HEXSTRING_LENGTH, required: true, hex: true }, // Nonce of the requesting node
+            ch: { type: 'string', length: CONTENT_HASH_HEXSTRING_LENGTH, required: true, hex: true }, // Content hash (hash of the transaction's data)
+            is: { type: 'string', length: SIGNATURE_HEXSTRING_LENGTH, required: true, hex: true }, // Requester's signature
+            bs: { type: 'string', length: BOOTSTRAP_HEXSTRING_LENGTH, required: true, hex: true }, // External bootstrap contract
+            mbs: { type: 'string', length: BOOTSTRAP_HEXSTRING_LENGTH, required: true, hex: true }, // MSB bootstrap key
             va: { type: 'string', length: TRAC_ADDRESS_SIZE, required: true }, // Validator address (used for validation)
         };
         return this.#_validator.compile(schema);
@@ -118,7 +130,7 @@ class Check {
     #compilePostTxSchema() {
         const schema = {
             $$strict: true,
-            type: { type: 'number', enum: [OperationType.POST_TX], positive: true, integer: true, min: MIN_SAFE_VALIDATION_INTEGER, max: MAX_SAFE_VALIDATION_INTEGER, required: true },
+            type: { type: 'number', enum: [OperationType.TX], positive: true, integer: true, min: MIN_SAFE_VALIDATION_INTEGER, max: MAX_SAFE_VALIDATION_INTEGER, required: true },
             address: { type: 'buffer', length: TRAC_ADDRESS_SIZE, required: true }, // validator address
             txo: {
                 strict: true,

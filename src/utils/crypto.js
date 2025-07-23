@@ -1,6 +1,7 @@
 import sodium from 'sodium-native';
 import b4a from 'b4a';
 import Wallet from 'trac-wallet';
+import { OperationType } from './constants.js'
 import { addressToBuffer } from '../core/state/ApplyOperationEncodings.js';
 
 export async function createHash(type, message) {
@@ -67,7 +68,7 @@ export async function generatePreTx(walletInstance, validator_address, local_wri
     );
 
     return {
-        op: 'pre-tx',
+        op: OperationType.PRE_TX,
         tx: txHash.toString('hex'),
         ia: local_address.toString('hex'),
         iw: local_writer_key.toString('hex'),

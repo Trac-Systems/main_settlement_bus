@@ -187,7 +187,7 @@ class State extends ReadyResource {
 
     #getApplyOperationHandler(type) {
         const handlers = {
-            [OperationType.POST_TX]: this.#handleApplyTxOperation.bind(this),
+            [OperationType.TX]: this.#handleApplyTxOperation.bind(this),
             [OperationType.ADD_ADMIN]: this.#handleApplyAddAdminOperation.bind(this),
             [OperationType.APPEND_WHITELIST]: this.#handleApplyAppendWhitelistOperation.bind(this),
             [OperationType.ADD_WRITER]: this.#handleApplyAddWriterOperation.bind(this),

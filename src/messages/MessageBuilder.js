@@ -85,7 +85,7 @@ class MessageBuilder extends Builder {
         }
 
         // for now we assume post_tx operation is not supported by this MessageBuilder
-        if (operationType === OperationType.POST_TX) {
+        if (operationType === OperationType.TX) {
             throw new Error('PostTxOperation is not supported by this MessageBuilder');
         }
 

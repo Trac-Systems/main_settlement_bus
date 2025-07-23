@@ -14,13 +14,13 @@ enum OperationType {
     APPEND_WHITELIST = 2;
     ADD_WRITER       = 3;
     REMOVE_WRITER    = 4;
-    POST_TX          = 5;
+    TX               = 5;
     ADD_INDEXER      = 6;
     REMOVE_INDEXER   = 7;
     BAN_WRITER       = 8;
 }
 
-message PostTxOperation {
+message TxOperation {
     bytes tx   = 1;  // Transaction hash (unique identifier for the transaction)
     bytes ia   = 2;  // Address of the requesting node (used for signature verification)
     bytes iw   = 3;  // Writing key of the requesting node (external subnetwork)
@@ -51,6 +51,6 @@ message Operation {
     oneof value {
         BasicKeyOperation      bko  = 3;
         ExtendedKeyOperation   eko  = 4;
-        PostTxOperation        txo  = 5;
+        TxOperation            txo  = 5;
     }
 }

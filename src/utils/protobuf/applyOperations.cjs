@@ -17,13 +17,13 @@ exports.OperationType = {
   "APPEND_WHITELIST": 2,
   "ADD_WRITER": 3,
   "REMOVE_WRITER": 4,
-  "POST_TX": 5,
+  "TX": 5,
   "ADD_INDEXER": 6,
   "REMOVE_INDEXER": 7,
   "BAN_WRITER": 8
 }
 
-var PostTxOperation = exports.PostTxOperation = {
+var TxOperation = exports.TxOperation = {
   buffer: true,
   encodingLength: null,
   encode: null,
@@ -51,15 +51,15 @@ var Operation = exports.Operation = {
   decode: null
 }
 
-definePostTxOperation()
+defineTxOperation()
 defineBasicKeyOperation()
 defineExtendedKeyOperation()
 defineOperation()
 
-function definePostTxOperation () {
-  PostTxOperation.encodingLength = encodingLength
-  PostTxOperation.encode = encode
-  PostTxOperation.decode = decode
+function defineTxOperation () {
+  TxOperation.encodingLength = encodingLength
+  TxOperation.encode = encode
+  TxOperation.decode = decode
 
   function encodingLength (obj) {
     var length = 0
@@ -416,7 +416,7 @@ function defineOperation () {
       length += 1 + len
     }
     if (defined(obj.txo)) {
-      var len = PostTxOperation.encodingLength(obj.txo)
+      var len = TxOperation.encodingLength(obj.txo)
       length += varint.encodingLength(len)
       length += 1 + len
     }
@@ -454,10 +454,10 @@ function defineOperation () {
     }
     if (defined(obj.txo)) {
       buf[offset++] = 42
-      varint.encode(PostTxOperation.encodingLength(obj.txo), buf, offset)
+      varint.encode(TxOperation.encodingLength(obj.txo), buf, offset)
       offset += varint.encode.bytes
-      PostTxOperation.encode(obj.txo, buf, offset)
-      offset += PostTxOperation.encode.bytes
+      TxOperation.encode(obj.txo, buf, offset)
+      offset += TxOperation.encode.bytes
     }
     encode.bytes = offset - oldOffset
     return buf
@@ -513,8 +513,8 @@ function defineOperation () {
         delete obj.eko
         var len = varint.decode(buf, offset)
         offset += varint.decode.bytes
-        obj.txo = PostTxOperation.decode(buf, offset, offset + len)
-        offset += PostTxOperation.decode.bytes
+        obj.txo = TxOperation.decode(buf, offset, offset + len)
+        offset += TxOperation.decode.bytes
         break
         default:
         offset = skip(prefix & 7, buf, offset)

@@ -303,7 +303,7 @@ class Network extends ReadyResource {
                                     const signature = wallet.sign(message, wallet.secretKey);
 
                                     const postTx = {
-                                        type: OperationType.POST_TX,
+                                        type: OperationType.TX,
                                         address: preTxBuffer.va,
                                         txo: {
                                             tx: preTxBuffer.tx,

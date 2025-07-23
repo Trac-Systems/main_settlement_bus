@@ -17,14 +17,9 @@ export const OperationType = Object.freeze({
     REMOVE_INDEXER: OP.REMOVE_INDEXER,
     BAN_VALIDATOR: OP.BAN_WRITER,
     WHITELISTED: OP.APPEND_WHITELIST,
-    TX: 'tx',
     PRE_TX: 'pre-tx',
-    POST_TX: OP.POST_TX,
+    TX: OP.TX,
 });
-
-// TODO: Confirm with team whether 'tx' field should be deprecated or retained.
-// Finalize this object structure during applyFunction refactor alignment.
-// and replace OperationType in this enum with applyOperations.OperationType. Just port it.
 
 export const EventType = Object.freeze({
     ADMIN_EVENT: 'adminEvent',
@@ -49,10 +44,15 @@ export const MAX_CLIENT_CONNECTIONS = Infinity;
 export const ACK_INTERVAL = 1_000;
 
 // checkjs
-export const ADDRESS_BYTE_LENGTH = 33;
 export const WRITER_BYTE_LENGTH = 32;
 export const NONCE_BYTE_LENGTH = 32;
 export const HASH_BYTE_LENGTH = 32;
 export const SIGNATURE_BYTE_LENGTH = 64;
 export const MIN_SAFE_VALIDATION_INTEGER = 0x00000001;
 export const MAX_SAFE_VALIDATION_INTEGER = 0xFFFFFFFF;
+export const TX_HASH_HEXSTRING_LENGTH = 64;
+export const WRITING_KEY_HEXSTRING_LENGTH = 64;
+export const NONCE_HEXSTRING_LENGTH = 64;
+export const CONTENT_HASH_HEXSTRING_LENGTH = 64;
+export const SIGNATURE_HEXSTRING_LENGTH = 128;
+export const BOOTSTRAP_HEXSTRING_LENGTH = 64;
