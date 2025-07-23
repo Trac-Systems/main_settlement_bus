@@ -11,7 +11,7 @@ class PreTransactionValidator {
 
     async validate(parsedPreTx) {
         if (!await this.validatePayload(parsedPreTx)) return false;
-        if (!await this.validateRequestingKey(parsedPreTx)) return false;
+        if (!await this.validateRequestingPublicKey(parsedPreTx)) return false;
         if (!await this.validateTransactionHash(parsedPreTx)) return false;
         if (!await this.validateSignature(parsedPreTx)) return false;
         if (!await this.validateValidatorAddress(parsedPreTx)) return false;
@@ -29,7 +29,7 @@ class PreTransactionValidator {
         return true;
     }
 
-    async validateRequestingKey(parsedPreTx) {
+    async validateRequestingPublicKey(parsedPreTx) {
         const requestingPublicKey = Wallet.decodeBech32mSafe(parsedPreTx.ia);
         if (requestingPublicKey === null) {
             console.error('Invalid requesting public key in pre-tx payload:', parsedPreTx);
