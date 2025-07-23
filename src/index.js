@@ -518,58 +518,6 @@ export class MainSettlementBus extends ReadyResource {
                 // const linealizer = this.#state.getInfoFromLinearizer();
                 // console.log('Indexers from Linearizer:', linealizer);
                 break;
-            case '/test':
-
-                const contentHash = randomBytes(32).toString('hex');
-                const subNetworkBootstrap = randomBytes(32).toString('hex');
-
-                const validatorPubKey = b4a.from(this.#network.validator, 'hex');
-                const validatorAddress = PeerWallet.encodeBech32m(validatorPubKey);
-
-                const preTx = await generatePreTx(this.#wallet, validatorAddress, this.#state.writingKey, this.#wallet.address, contentHash, subNetworkBootstrap, this.bootstrap);
-                await this.#network.validator_stream.messenger.send(preTx);
-
-                break;
-            case '/test2':
-                const transactionInterval = 250;
-                const transactionCount = 500;
-
-                console.log(`Starting test2: Sending ${transactionCount} transactions every ${transactionInterval} ms...`);
-
-                let sentTransactions = 0;
-
-                const interval = setInterval(async () => {
-                    try {
-                        if (sentTransactions >= transactionCount) {
-                            clearInterval(interval);
-
-                            console.log(`Test2 completed: Sent ${sentTransactions} transactions.`);
-                            return;
-                        }
-
-                        const contentHash = randomBytes(32).toString('hex');
-                        const subNetworkBootstrap = randomBytes(32).toString('hex');
-                        const validatorPubKey = b4a.from(this.#network.validator, 'hex');
-                        const validatorAddress = PeerWallet.encodeBech32m(validatorPubKey);
-
-                        const preTx = await generatePreTx(
-                            this.#wallet,
-                            validatorAddress,
-                            this.#state.writingKey,
-                            this.#wallet.address,
-                            contentHash,
-                            subNetworkBootstrap,
-                            this.bootstrap
-                        );
-
-                        await this.#network.validator_stream.messenger.send(preTx);
-                        sentTransactions++;
-                    } catch (error) {
-                        console.error(`Error during transaction processing: ${error.message}`);
-                    }
-                }, transactionInterval);
-                break;
-
             case '/stats':
                 await verifyDag(this.#state, this.#network, this.#wallet, this.#state.writingKey, this.#shouldListenToAdminEvents, this.#shouldListenToWriterEvents);
                 break;

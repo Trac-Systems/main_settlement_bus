@@ -210,6 +210,7 @@ class State extends ReadyResource {
 
         if (regeneratedTxBuffer.length === 0 || !b4a.equals(regeneratedTxBuffer, tx)) return;
         // first signature
+        
         const requesterSignature = op.txo.is;
         const incomingAddressBuffer = op.txo.ia;
         const incomingAddress = ApplyOperationEncodings.bufferToAddress(incomingAddressBuffer);
