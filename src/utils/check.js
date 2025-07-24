@@ -16,14 +16,14 @@ import { OperationType,
 import { TRAC_ADDRESS_SIZE } from '../core/state/ApplyOperationEncodings.js'
 import b4a from 'b4a';
 class Check {
-    #_validator;
-    #_validateExtendedKeyOp;
-    #_validateBasicKeyOp;
-    #_validatePreTx;
-    #_validatePostTx;
+    #validator;
+    #validateExtendedKeyOp;
+    #validateBasicKeyOp;
+    #validatePreTx;
+    #validatePostTx;
     constructor() {
 
-        this.#_validator = new Validator({
+        this.#validator = new Validator({
             useNewCustomCheckerFunction: true,
             messages: {
                 buffer: "The '{field}' field must be a Buffer! Actual: {actual}",
@@ -33,7 +33,7 @@ class Check {
             },
         });
         const isBuffer = b4a.isBuffer;
-        this.#_validator.add("buffer", function ({ schema, messages }, path, context) {
+        this.#validator.add("buffer", function ({ schema, messages }, path, context) {
             return {
                 source:
                     `
@@ -58,10 +58,10 @@ class Check {
             };
         });
 
-        this.#_validateExtendedKeyOp = this.#compileExtendedKeyOpSchema();
-        this.#_validateBasicKeyOp = this.#compileBasicKeyOpSchema();
-        this.#_validatePreTx = this.#compilePreTxSchema();
-        this.#_validatePostTx = this.#compilePostTxSchema();
+        this.#validateExtendedKeyOp = this.#compileExtendedKeyOpSchema();
+        this.#validateBasicKeyOp = this.#compileBasicKeyOpSchema();
+        this.#validatePreTx = this.#compilePreTxSchema();
+        this.#validatePostTx = this.#compilePostTxSchema();
     }
 
     #compileExtendedKeyOpSchema() {
@@ -79,11 +79,11 @@ class Check {
                 }
             }
         };
-        return this.#_validator.compile(schema);
+        return this.#validator.compile(schema);
     }
 
     validateExtendedKeyOpSchema(op) {
-        return this.#_validateExtendedKeyOp(op) === true;
+        return this.#validateExtendedKeyOp(op) === true;
     }
 
     #compileBasicKeyOpSchema() {
@@ -100,11 +100,11 @@ class Check {
                 }
             }
         }
-        return this.#_validator.compile(schema);
+        return this.#validator.compile(schema);
     }
 
     validateBasicKeyOp(op) {
-        return this.#_validateBasicKeyOp(op) === true;
+        return this.#validateBasicKeyOp(op) === true;
     }
     #compilePreTxSchema() {
         const schema = {
@@ -120,11 +120,11 @@ class Check {
             mbs: { type: 'string', length: BOOTSTRAP_HEXSTRING_LENGTH, required: true, hex: true }, // MSB bootstrap key
             va: { type: 'string', length: TRAC_ADDRESS_SIZE, required: true }, // Validator address (used for validation)
         };
-        return this.#_validator.compile(schema);
+        return this.#validator.compile(schema);
     }
 
     validatePreTx(op) {
-        return this.#_validatePreTx(op) === true;
+        return this.#validatePreTx(op) === true;
     }
 
     #compilePostTxSchema() {
@@ -149,11 +149,11 @@ class Check {
                 }
             }
         };
-        return this.#_validator.compile(schema);
+        return this.#validator.compile(schema);
     }
 
     validatePostTx(op) {
-        return this.#_validatePostTx(op) === true;
+        return this.#validatePostTx(op) === true;
     }
 }
 export default Check;
