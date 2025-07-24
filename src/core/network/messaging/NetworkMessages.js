@@ -2,6 +2,7 @@
 import Protomux from 'protomux';
 import b4a from 'b4a';
 import c from 'compact-encoding';
+import { MAX_PRE_TX_PAYLOAD_BYTE_SIZE,TRANSACTION_POOL_SIZE } from '../../../utils/constants.js';
 import { normalizeBuffer } from '../../../utils/buffer.js';
 import PreTransaction from '../validators/PreTransaction.js';
 import StateMessageOperations from '../../../messages/stateMessages/StateMessageOperations.js';
@@ -79,7 +80,7 @@ class NetworkMessages {
                             }
                         }
 
-                        if (network.poolService.tx_pool.length >= 1000) {
+                        if (network.poolService.tx_pool.length >= TRANSACTION_POOL_SIZE) {
                             throw new Error("Transaction pool is full, ignoring incoming transaction.");
                         }
 

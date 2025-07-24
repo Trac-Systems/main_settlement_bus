@@ -65,3 +65,7 @@ export const PROCESS_INTERVAL_MS = 5
 export const CLEANUP_INTERVAL_MS = 120_000;
 export const CONNECTION_TIMEOUT_MS = 60_000;
 export const MAX_TRANSACTIONS_PER_SECOND = 50;
+
+// PreTransaction constants
+export const MAX_PRE_TX_PAYLOAD_BYTE_SIZE = 3072;
+export const TRANSACTION_POOL_SIZE = 1000;
