@@ -21,11 +21,10 @@ import AdminResponse from './validators/AdminResponse.js';
 import ValidatorResponse from './validators/ValidatorResponse.js';
 import PreTransaction from './validators/PreTransaction.js';
 import CustomNodeResponse from './validators/CustomNodeResponse.js';
-
+import PoolService from './services/PoolService.js';
 const wakeup = new w();
 
 class Network extends ReadyResource {
-    #shouldStopPool = false;
     #swarm = null;
     #enableValidatorObserver;
     #enable_wallet;
@@ -39,8 +38,7 @@ class Network extends ReadyResource {
         this.#enable_wallet = options.enable_wallet !== false;
         this.#disable_rate_limit = options.disable_rate_limit === true;
         this.#channel = channel;
-        this.tx_pool = [];
-        this.pool(state.append.bind(state));
+        this.poolService = new PoolService(state)
         this.check = new Check();
         this.admin_stream = null;
         this.admin = null;
@@ -63,11 +61,14 @@ class Network extends ReadyResource {
         return this.#channel;
     }
 
-    async _open() { console.log('Network initialization...'); }
+    async _open() { 
+        console.log('Network initialization...'); 
+        this.poolService.start();
+    }
 
     async _close() {
         console.log('Network: closing gracefully...');
-        this.stopPool();
+        this.poolService.stopPool();
         await sleep(100);
 
         if (this.#enableValidatorObserver) {
@@ -255,10 +256,10 @@ class Network extends ReadyResource {
                                         b4a.from(parsedPreTx.bs, 'hex'),
                                         b4a.from(parsedPreTx.mbs, 'hex')
                                     );
-                                    network.tx_pool.push(postTx);
+                                    network.poolService.addTransaction(postTx);
                                 }
 
-                                network.#swarm.leavePeer(connection.remotePublicKey)
+                                network.#swarm.leavePeer(connection.remotePublicKey);
                             }
                         } catch (e) {
                             console.log(e);
@@ -300,26 +301,6 @@ class Network extends ReadyResource {
             this.#swarm.join(this.#channel, { server: true, client: true });
             await this.#swarm.flush();
         }
-    }
-
-    async pool(appendState) {
-        while (!this.#shouldStopPool) {
-            if (this.tx_pool.length > 0) {
-                const length = this.tx_pool.length;
-                const batch = [];
-                for (let i = 0; i < length; i++) {
-                    if (i >= 10) break;
-                    batch.push(this.tx_pool[i]);
-                }
-                await appendState(batch);
-                this.tx_pool.splice(0, batch.length);
-            }
-            await sleep(5);
-        }
-    }
-
-    stopPool() {
-        this.#shouldStopPool = true;
     }
 
     // TODO: AFTER WHILE LOOP SIGNAL TO THE PROCESS THAT VALIDATOR OBSERVER STOPPED OPERATING. 
