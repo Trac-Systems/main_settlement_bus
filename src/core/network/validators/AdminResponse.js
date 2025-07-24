@@ -28,7 +28,7 @@ class AdminResponse {
             !message.response.channel ||
             !message.response.issuer ||
             !message.response.timestamp) {
-            console.log("Admin response is missing required fields.");
+            console.error("Admin response is missing required fields.");
             return false;
         }
         return true;
@@ -37,7 +37,7 @@ class AdminResponse {
     validateIssuerPublicKey(message) {
         const issuerPublicKey = b4a.from(message.response.issuer, 'hex');
         if (!b4a.equals(issuerPublicKey, this.wallet.publicKey)) {
-            console.log("Issuer public key does not match wallet public key.");
+            console.error("Issuer public key does not match wallet public key.");
             return false;
         }
         return true;
@@ -49,7 +49,7 @@ class AdminResponse {
         const fiveSeconds = 5000;
 
         if (now - timestamp > fiveSeconds) {
-            console.log("Admin response is too old, ignoring.");
+            console.error("Admin response is too old, ignoring.");
             return false;
         }
         return true;
@@ -58,7 +58,7 @@ class AdminResponse {
     async validateAdminData(message) {
         const adminEntry = await this.state.getAdminEntry();
         if (!adminEntry) {
-            console.log("Admin entry is null");
+            console.error("Admin entry is null");
             return false;
         }
 
@@ -67,7 +67,7 @@ class AdminResponse {
         const adminWritingKey = b4a.from(message.response.wk, 'hex');
 
         if (!b4a.equals(adminPublicKey, receivedAdminPublicKey) || !b4a.equals(adminEntry.wk, adminWritingKey)) {
-            console.log("Admin public key or writing key mismatch in response.");
+            console.error("Admin public key or writing key mismatch in response.");
             return false;
         }
 
@@ -83,7 +83,7 @@ class AdminResponse {
         const verified = this.wallet.verify(signature, hash, adminPublicKey);
 
         if (!verified) {
-            console.log("Admin response verification failed");
+            console.error("Admin response verification failed");
             return false;
         }
 
@@ -92,7 +92,7 @@ class AdminResponse {
 
     validateChannel(message, channelString) {
         if (message.response.channel !== channelString) {
-            console.log("Channel mismatch in admin response.");
+            console.error("Channel mismatch in admin response.");
             return false;
         }
         return true;
