@@ -7,6 +7,7 @@ import PreTransaction from '../validators/PreTransaction.js';
 import StateMessageOperations from '../../../messages/stateMessages/StateMessageOperations.js';
 import TransactionRateLimiterService from '../services/TransactionRateLimiterService.js';
 
+
 class NetworkMessages {
     #rateLimiter;
 
@@ -20,8 +21,8 @@ class NetworkMessages {
         connection.userData = mux;
         const message_channel = mux.createChannel({
             protocol: b4a.toString(this.network.channel, 'utf8'),
-            onopen() {},
-            onclose() {}
+            onopen() { },
+            onclose() { }
         });
 
         message_channel.open();
@@ -30,7 +31,7 @@ class NetworkMessages {
             onmessage: async (msg) => {
                 try {
                     const channelString = b4a.toString(network.channel, 'utf8');
-                    // create route class for each message type
+
                     if (msg === 'get_validator') {
                         await network.handleGetValidatorResponse(message, connection, channelString, wallet, writingKey);
                         network.swarm.leavePeer(connection.remotePublicKey)
@@ -61,38 +62,10 @@ class NetworkMessages {
                         network.swarm.leavePeer(connection.remotePublicKey)
                     }
                     // ---------- HANDLING OPERATIONS ----------
-                    else if (msg.message !== undefined && msg.op === 'addWriter') {
+                    else if (msg.message !== undefined && ['addWriter', 'removeWriter', 'addAdmin', 'whitelisted'].includes(msg.op)) {
                         const messageBuffer = normalizeBuffer(msg.message);
                         if (!messageBuffer) {
-                            network.swarm.leavePeer(connection.remotePublicKey)
-                            throw new Error('Invalid message buffer for addWriter operation');
-                        }
-                        await handleIncomingEvent(messageBuffer);
-                        network.swarm.leavePeer(connection.remotePublicKey)
-                    }
-                    else if (msg.message !== undefined && msg.op === 'removeWriter') {
-                        const messageBuffer = normalizeBuffer(msg.message);
-                        if (!messageBuffer) {
-                            network.swarm.leavePeer(connection.remotePublicKey)
-                            throw new Error('Invalid message buffer for removeWriter operation');
-                        }
-                        await handleIncomingEvent(messageBuffer);
-                        network.swarm.leavePeer(connection.remotePublicKey)
-                    }
-                    else if (msg.message !== undefined && msg.op === 'addAdmin') {
-                        const messageBuffer = normalizeBuffer(msg.message);
-                        if (!messageBuffer) {
-                            network.swarm.leavePeer(connection.remotePublicKey)
-                            throw new Error('Invalid message buffer for addAdmin operation');
-                        }
-                        await handleIncomingEvent(messageBuffer);
-                        network.swarm.leavePeer(connection.remotePublicKey)
-                    }
-                    else if (msg.message !== undefined && msg.op === 'whitelisted') {
-                        const messageBuffer = normalizeBuffer(msg.message);
-                        if (!messageBuffer) {
-                            network.swarm.leavePeer(connection.remotePublicKey);
-                            throw new Error('Invalid message buffer for whitelisted operation');
+                            throw new Error(`Invalid operation message from peer by ${b4a.toString(connection.remotePublicKey, 'hex')}`);
                         }
                         await handleIncomingEvent(messageBuffer);
                         network.swarm.leavePeer(connection.remotePublicKey);
@@ -102,17 +75,17 @@ class NetworkMessages {
                         if (true !== network.disable_rate_limit) {
                             const shouldDisconnect = this.#rateLimiter.handleRateLimit(connection, network);
                             if (shouldDisconnect) {
-                                network.swarm.leavePeer(connection.remotePublicKey);
-                                return;
+                                throw new Error(`Rate limit exceeded for peer ${b4a.toString(connection.remotePublicKey, 'hex')}. Disconnecting...`);
                             }
                         }
 
                         if (network.poolService.tx_pool.length >= 1000) {
-                            console.log('pool full');
-                            return
+                            throw new Error("Transaction pool is full, ignoring incoming transaction.");
                         }
 
-                        if (b4a.byteLength(JSON.stringify(msg)) > 3072) return;
+                        if (b4a.byteLength(JSON.stringify(msg)) > MAX_PRE_TX_PAYLOAD_BYTE_SIZE) {
+                            throw new Error(`Payload size exceeds maximum limit of ${MAX_PRE_TX_PAYLOAD_BYTE_SIZE} bytes by .`);
+                        }
 
                         const parsedPreTx = msg;
                         const validator = new PreTransaction(state, wallet, network);
@@ -137,9 +110,11 @@ class NetworkMessages {
                         network.swarm.leavePeer(connection.remotePublicKey);
                     }
                 } catch (e) {
-                    console.log(e);
+                    console.error(e);
                 }
                 finally {
+                    // In the future we can send a response to the peer with the status of the operation
+                    // For now, we just disconnect the peer if an error occurs
                     network.swarm.leavePeer(connection.remotePublicKey);
                 }
             }
