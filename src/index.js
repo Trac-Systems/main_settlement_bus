@@ -101,7 +101,9 @@ export class MainSettlementBus extends ReadyResource {
             await this.#wallet.initKeyPair(this.KEY_PAIR_PATH, this.#readline_instance);
             printWalletInfo(this.#wallet.address, this.#state.writingKey);
         }
+        
         await this.#network.ready();
+
         if (this.#replicate) {
             await this.#network.replicate(
                 this.#state,

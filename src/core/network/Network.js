@@ -21,6 +21,7 @@ import NetworkMessages from './messaging/NetworkMessages.js';
 const wakeup = new w();
 
 class Network extends ReadyResource {
+    #dht_bootstrap = ['116.202.214.149:10001', '157.180.12.214:10001', 'node1.hyperdht.org:49737', 'node2.hyperdht.org:49737', 'node3.hyperdht.org:49737'];
     #swarm = null;
     #enableValidatorObserver;
     #enable_wallet;
@@ -28,6 +29,7 @@ class Network extends ReadyResource {
     #channel;
     #dht_bootstrap = ['116.202.214.149:10001', '157.180.12.214:10001', 'node1.hyperdht.org:49737', 'node2.hyperdht.org:49737', 'node3.hyperdht.org:49737'];
     #networkMessages;
+    #poolService;
 
     constructor(state, channel, options = {}) {
         super();
@@ -59,8 +61,12 @@ class Network extends ReadyResource {
         return this.#channel;
     }
 
-    async _open() { 
-        console.log('Network initialization...'); 
+    get poolService() {
+        return this.#poolService;
+    }
+
+    async _open() {
+        console.log('Network initialization...');
         this.poolService.start();
     }
 
@@ -81,7 +87,6 @@ class Network extends ReadyResource {
     }
 
     async replicate(
-        //TODO: we should delete an access to state. We should create a new methods in index.js which will allows access to needed properties and bind them here.
         state,
         writingKey,
         store,
