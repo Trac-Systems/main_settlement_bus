@@ -120,20 +120,15 @@ class Network extends ReadyResource {
 
                 const mux = Protomux.from(connection)
                 connection.userData = mux
-
                 const message_channel = mux.createChannel({
                     protocol: b4a.toString(this.#channel, 'utf8'),
-                    onopen() {
-                    },
-                    onclose() {
-                    }
+                    onopen() {},
+                    onclose() {}
                 })
+
                 message_channel.open()
                 const message = message_channel.addMessage({
                     encoding: c.json,
-                    //TODO: change it into switch case
-                    //TODO: In messages module we can create a new builders for cases like get_validator, get_admin, get_node, etc.
-                    //TODO write validators in fastest validator + define protoschemas 
                     async onmessage(msg) {
                         try {
                             const channelString = b4a.toString(network.channel, 'utf8');
@@ -232,7 +227,7 @@ class Network extends ReadyResource {
                                     }
                                 }
 
-                                if (network.tx_pool.length >= 1000) {
+                                if (network.poolService.tx_pool.length >= 1000) {
                                     console.log('pool full');
                                     return
                                 }
@@ -271,7 +266,6 @@ class Network extends ReadyResource {
                 })
 
                 connection.messenger = message;
-
                 connection.on('close', () => {
                     if (this.validator_stream === connection) {
                         this.validator_stream = null;
