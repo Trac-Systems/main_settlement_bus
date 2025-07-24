@@ -1,4 +1,7 @@
 import b4a from 'b4a';
+/*
+    BaseResponse class for handling common validation logic for network responses.
+*/
 class BaseResponse {
     constructor(network, state, wallet) {
         this.state = state;
