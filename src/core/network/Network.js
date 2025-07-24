@@ -358,7 +358,7 @@ class Network extends ReadyResource {
                         validatorEntry.isIndexer
                     ) return;
 
-                    await this.tryConnection(validatorPubKey, 'validator');
+                    await this.tryConnect(validatorPubKey, 'validator');
                 };
 
                 const promises = [];
@@ -378,7 +378,7 @@ class Network extends ReadyResource {
         this.#enableValidatorObserver = false;
     }
 
-    async tryConnection(publicKey, type = null) {
+    async tryConnect(publicKey, type = null) {
         //TODO: we should throw an error instead of returning null
         if (null === this.#swarm) return null;
 
@@ -443,7 +443,7 @@ class Network extends ReadyResource {
                 return; //change to throw error because we are not in apply 
             }
             const adminPublicKey = Wallet.decodeBech32m(adminEntry.tracAddr).toString('hex');
-            await this.tryConnection(adminPublicKey, 'admin');
+            await this.tryConnect(adminPublicKey, 'admin');
             await this.spinLock(() => this.admin_stream === null);
             if (this.admin_stream !== null) {
                 await this.admin_stream.messenger.send(message);
@@ -458,7 +458,7 @@ class Network extends ReadyResource {
             if (!nodePublicKey || !message) {
                 return;
             }
-            await this.tryConnection(nodePublicKey, 'node');
+            await this.tryConnect(nodePublicKey, 'node');
 
             await this.spinLock(() =>
                 this.custom_stream === null ||
