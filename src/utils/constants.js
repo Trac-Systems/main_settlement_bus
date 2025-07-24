@@ -56,3 +56,7 @@ export const NONCE_HEXSTRING_LENGTH = 64;
 export const CONTENT_HASH_HEXSTRING_LENGTH = 64;
 export const SIGNATURE_HEXSTRING_LENGTH = 128;
 export const BOOTSTRAP_HEXSTRING_LENGTH = 64;
+
+// Pool constants
+export const BATCH_SIZE = 10;
+export const PROCESS_INTERVAL_MS = 5
