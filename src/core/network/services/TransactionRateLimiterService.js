@@ -15,12 +15,12 @@ class TransactionRateLimiterService {
     }
 
     /*
-    Checks if the peer has exceeded the rate limit.
-    A peer is considered to have exceeded the rate limit if:
-    - The time since the last activity is greater than or equal to 1000 ms (1 second)
-    - The number of transactions in the current session is greater than or equal to MAX_TRANSACTIONS_PER_SECOND
-    If the rate limit is exceeded, the peer is disconnected.
-*/
+        Checks if the peer has exceeded the rate limit.
+        A peer is considered to have exceeded the rate limit if:
+        - The time since the last activity is greater than or equal to 1000 ms (1 second)
+        - The number of transactions in the current session is greater than or equal to MAX_TRANSACTIONS_PER_SECOND
+        If the rate limit is exceeded, the peer is disconnected.
+    */
     #hasExceededRateLimit(peer) {
         const peerData = this.#connectionsStatistics.get(peer);
         return peerData.lastActivityTime - peerData.sessionStartTime >= 1000 && peerData.transactionCount >= MAX_TRANSACTIONS_PER_SECOND;
