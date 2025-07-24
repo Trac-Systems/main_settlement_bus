@@ -11,7 +11,7 @@ import Corestore from 'corestore';
 import StateMessageOperations from "./messages/stateMessages/StateMessageOperations.js";
 import { safeDecodeApplyOperation } from '../src/utils/protobuf/operationHelpers.js';
 import { createMessage } from './utils/buffer.js';
-import ApplyOperationEncodings from './core/state/ApplyOperationEncodings.js';
+import addressUtils from './core/state/utils/address.js';
 import {
     LISTENER_TIMEOUT,
     OperationType,
@@ -188,7 +188,7 @@ export class MainSettlementBus extends ReadyResource {
 
     #isAdmin(adminEntry) {
         if (!adminEntry || this.#enable_wallet === false) return false;
-        return !!(this.#wallet.address === adminEntry.tracAddr && b4a.equals(adminEntry.wk, this.#state.writingKey));
+        return !!(this.#wallet.address === adminEntry.address && b4a.equals(adminEntry.wk, this.#state.writingKey));
 
     }
 
@@ -219,7 +219,7 @@ export class MainSettlementBus extends ReadyResource {
                     const hash = await createHash('sha256', reconstructedMessage);
                     const isWhitelisted = await this.#state.isAddressWhitelisted(this.#wallet.address);
                     const isMessageVerifed = this.#wallet.verify(decodedRequest.bko.sig, hash, adminPublicKey);
-                    const nodeAddress = ApplyOperationEncodings.bufferToAddress(decodedRequest.address);
+                    const nodeAddress = addressUtils.bufferToAddress(decodedRequest.address);
                     const isKeyMatchingWalletAddress = nodeAddress === this.#wallet.address;
 
                     if (!isMessageVerifed || !isKeyMatchingWalletAddress || !isWhitelisted || this.#state.isWritable()) {

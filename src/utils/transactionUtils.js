@@ -1,6 +1,6 @@
 import b4a from 'b4a';
 import { createHash } from './crypto.js';
-import { addressToBuffer } from '../core/state/ApplyOperationEncodings.js';
+import { addressToBuffer } from '../core/state/utils/address.js';
 import Wallet from 'trac-wallet';
 import { OperationType } from './constants.js';
 

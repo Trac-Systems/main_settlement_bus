@@ -1,0 +1,59 @@
+import b4a from 'b4a';
+import { createHash } from '../../../utils/crypto.js';
+import { TRAC_ADDRESS_SIZE } from './address.js';
+import { HASH_BYTE_LENGTH, NONCE_BYTE_LENGTH, WRITER_BYTE_LENGTH } from '../../../utils/constants.js';
+
+/**
+ * Total size of a transaction buffer in bytes.
+ * Format: bootstrap + validator_address + msb_bootstrap + local_address + local_writer_key + content_hash + nonce
+ * @type {number}
+ */
+export const TRANSACTION_TOTAL_SIZE = 3 * WRITER_BYTE_LENGTH + 2 * TRAC_ADDRESS_SIZE + HASH_BYTE_LENGTH + NONCE_BYTE_LENGTH;
+
+
+// TODO: This function receives too many arguments. It would be better to encapsulate them in an object.
+/**
+ * Generates a transaction buffer and returns its double SHA-256 hash.
+ * @param {Buffer} bootstrap - The bootstrap buffer.
+ * @param {Buffer} msb_bootstrap - The MSB bootstrap buffer.
+ * @param {Buffer} validator_address - The validator address buffer.
+ * @param {Buffer} local_writer_key - The local writer key buffer.
+ * @param {Buffer} local_address - The local address buffer.
+ * @param {Buffer} content_hash - The content hash buffer.
+ * @param {Buffer} nonce - The nonce buffer.
+ * @returns {Promise<Buffer>} The double SHA-256 hash of the transaction buffer, or an empty buffer on error.
+ */
+export async function generateTxBuffer(bootstrap, msb_bootstrap, validator_address, local_writer_key, local_address, content_hash, nonce) {
+    try {
+        const tx = b4a.allocUnsafe(TRANSACTION_TOTAL_SIZE);
+        let offset = 0;
+
+        bootstrap.copy(tx, offset);
+        offset += bootstrap.length;
+
+        msb_bootstrap.copy(tx, offset);
+        offset += msb_bootstrap.length;
+
+        validator_address.copy(tx, offset);
+        offset += validator_address.length;
+
+        local_writer_key.copy(tx, offset);
+        offset += local_writer_key.length;
+
+        local_address.copy(tx, offset);
+        offset += local_address.length;
+
+        content_hash.copy(tx, offset);
+        offset += content_hash.length;
+
+        nonce.copy(tx, offset);
+        return await createHash('sha256', await createHash('sha256', tx));
+    } catch (error) {
+        return b4a.alloc(0);
+    }
+}
+
+export default {
+    generateTxBuffer,
+    TRANSACTION_TOTAL_SIZE
+};

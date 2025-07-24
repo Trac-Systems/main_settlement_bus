@@ -12,8 +12,14 @@ import Wallet from 'trac-wallet';
 import { createHash } from '../../utils/crypto.js';
 import Check from '../../utils/check.js';
 import { safeDecodeApplyOperation } from '../../utils/protobuf/operationHelpers.js';
-import { createMessage } from '../../utils/buffer.js';
-import ApplyOperationEncodings from './ApplyOperationEncodings.js';
+import { createMessage, ZERO_WK } from '../../utils/buffer.js';
+import addressUtils from './utils/address.js';
+import adminEntryUtils from './utils/adminEntry.js';
+import nodeEntryUtils from './utils/nodeEntry.js';
+import nodeRoleUtils from './utils/roles.js';
+import indexerEntryUtils from './utils/indexer.js';
+import lengthEntryUtils from './utils/lengthEntry.js';
+import transactionUtils from './utils/transaction.js';
 class State extends ReadyResource {
 
     #base;
@@ -103,12 +109,12 @@ class State extends ReadyResource {
 
     async getAdminEntry() {
         const adminEntry = await this.get(EntryType.ADMIN);
-        return adminEntry ? ApplyOperationEncodings.decodeAdminEntry(adminEntry) : null;
+        return adminEntry ? adminEntryUtils.decode(adminEntry) : null;
     }
 
     async getNodeEntry(address) {
         const nodeEntry = await this.get(address);
-        return nodeEntry ? ApplyOperationEncodings.decodeNodeEntry(nodeEntry) : null;
+        return nodeEntry ? nodeEntryUtils.decode(nodeEntry) : null;
     }
 
     async isAddressWhitelisted(address) {
@@ -135,13 +141,13 @@ class State extends ReadyResource {
 
     async isAddressInIndexersEntry(address, indexersEntry) {
         if (indexersEntry === null || address === null) return false;
-        const indexerListHasAddress = ApplyOperationEncodings.getIndexerIndex(indexersEntry, ApplyOperationEncodings.addressToBuffer(address)) !== -1;
+        const indexerListHasAddress = indexerEntryUtils.getIndex(indexersEntry, addressUtils.addressToBuffer(address)) !== -1;
         return indexerListHasAddress;
     }
 
     async getWriterLength() {
         const writersLength = await this.get(EntryType.WRITERS_LENGTH);
-        return writersLength ? ApplyOperationEncodings.decodeLengthEntry(writersLength) : null;
+        return writersLength ? lengthEntryUtils.decode(writersLength) : null;
     }
 
     async getWriterIndex(index) {
@@ -206,14 +212,14 @@ class State extends ReadyResource {
         const tx = op.txo.tx;
         const validatorAddressBuffer = op.address;
 
-        const regeneratedTxBuffer = await ApplyOperationEncodings.generateTxBuffer(op.txo.bs, this.#bootstrap, validatorAddressBuffer, op.txo.iw, op.txo.ia, op.txo.ch, op.txo.in);
+        const regeneratedTxBuffer = await transactionUtils.generateTxBuffer(op.txo.bs, this.#bootstrap, validatorAddressBuffer, op.txo.iw, op.txo.ia, op.txo.ch, op.txo.in);
 
         if (regeneratedTxBuffer.length === 0 || !b4a.equals(regeneratedTxBuffer, tx)) return;
         // first signature
         
         const requesterSignature = op.txo.is;
         const incomingAddressBuffer = op.txo.ia;
-        const incomingAddress = ApplyOperationEncodings.bufferToAddress(incomingAddressBuffer);
+        const incomingAddress = addressUtils.bufferToAddress(incomingAddressBuffer);
         if (null === incomingAddress) return;
         const incomingPublicKey = Wallet.decodeBech32mSafe(incomingAddress);
         if (null === incomingPublicKey) return;
@@ -227,7 +233,7 @@ class State extends ReadyResource {
         b4a.copy(tx, validatorMessage, 0);
         b4a.copy(validatorNonce, validatorMessage, 32);
         const validatorMessageHash = await createHash('sha256', validatorMessage);
-        const validatorAddress = ApplyOperationEncodings.bufferToAddress(validatorAddressBuffer);
+        const validatorAddress = addressUtils.bufferToAddress(validatorAddressBuffer);
         if (null === validatorAddress) return;
         const validatorPublicKey = Wallet.decodeBech32mSafe(validatorAddress);
         if (null === validatorPublicKey) return;
@@ -257,13 +263,13 @@ class State extends ReadyResource {
     }
 
     async #addAdminIfSet(adminEntry, op, view, node, base, batch) {
-        const decodedAdminEntry = ApplyOperationEncodings.decodeAdminEntry(adminEntry);
+        const decodedAdminEntry = adminEntryUtils.decode(adminEntry);
         if (null === decodedAdminEntry) return;
-        const publicKeyAdminEntry = Wallet.decodeBech32mSafe(decodedAdminEntry.tracAddr);
+        const publicKeyAdminEntry = Wallet.decodeBech32mSafe(decodedAdminEntry.address);
 
         // Extract and validate the network prefix from the node's address
         const adminAddressBuffer = op.address;
-        const adminAddress = ApplyOperationEncodings.bufferToAddress(adminAddressBuffer);
+        const adminAddress = addressUtils.bufferToAddress(adminAddressBuffer);
         if (null === adminAddress) return;
         const adminPublicKey = Wallet.decodeBech32mSafe(adminAddress);
         if (adminPublicKey === null) return;
@@ -283,10 +289,10 @@ class State extends ReadyResource {
         const indexersEntry = await this.#getEntryApply(EntryType.INDEXERS, batch);
         if (indexersEntry === null) return;
 
-        const indexerIndex = ApplyOperationEncodings.getIndexerIndex(indexersEntry, adminAddressBuffer);
+        const indexerIndex = indexerEntryUtils.getIndex(indexersEntry, adminAddressBuffer);
         if (indexerIndex === -1) return; // Admin address is not in indexers entry
 
-        const newAdminEntry = ApplyOperationEncodings.encodeAdminEntry(adminAddressBuffer, op.eko.wk);
+        const newAdminEntry = adminEntryUtils.encode(adminAddressBuffer, op.eko.wk);
         if (newAdminEntry.length === 0) return;
 
         // Revoke old wk and add new one as an indexer
@@ -302,7 +308,7 @@ class State extends ReadyResource {
     async #addAdminIfNotSet(op, view, node, batch) {
         // Extract and validate the network address
         const adminAddressBuffer = op.address;
-        const adminAddress = ApplyOperationEncodings.bufferToAddress(adminAddressBuffer);
+        const adminAddress = addressUtils.bufferToAddress(adminAddressBuffer);
         if (adminAddress === null) return;
         const adminPublicKey = Wallet.decodeBech32mSafe(adminAddress);
         if (adminPublicKey === null) return;
@@ -323,8 +329,8 @@ class State extends ReadyResource {
         ) return;
 
         // Create a new admin entry
-        const adminEntry = ApplyOperationEncodings.encodeAdminEntry(adminAddressBuffer, op.eko.wk);
-        const initIndexers = ApplyOperationEncodings.appendIndexer(adminAddressBuffer);
+        const adminEntry = adminEntryUtils.encode(adminAddressBuffer, op.eko.wk);
+        const initIndexers = indexerEntryUtils.append(adminAddressBuffer);
 
         if (initIndexers.length === 0 || adminEntry.length === 0) return;
         // initialize admin entry and indexers entry
@@ -341,7 +347,7 @@ class State extends ReadyResource {
         // Retrieve and decode the admin entry to verify the operation is initiated by an admin
         const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
         if (null === adminEntry) return;
-        const decodedAdminEntry = ApplyOperationEncodings.decodeAdminEntry(adminEntry);
+        const decodedAdminEntry = adminEntryUtils.decode(adminEntry);
         if (null === decodedAdminEntry || !this.#isAdminApply(decodedAdminEntry, node)) return;
 
         // Extract admin entry
@@ -352,7 +358,7 @@ class State extends ReadyResource {
         // Extract and validate the network prefix from the node's address
         const nodeAddressBinnary = op.address;
 
-        const nodeAddressString = ApplyOperationEncodings.bufferToAddress(nodeAddressBinnary);
+        const nodeAddressString = addressUtils.bufferToAddress(nodeAddressBinnary);
         if (nodeAddressString === null) return;
         const nodePublicKey = Wallet.decodeBech32mSafe(nodeAddressString);
         if (nodePublicKey === null) return;
@@ -370,7 +376,7 @@ class State extends ReadyResource {
 
         // Retrieve the node entry to check its current role
         const nodeEntry = await this.#getEntryApply(nodeAddressString, batch);
-        if (ApplyOperationEncodings.isWhitelisted(nodeEntry)) return; // Node is already whitelisted
+        if (nodeEntryUtils.isWhitelisted(nodeEntry)) return; // Node is already whitelisted
 
         if (!nodeEntry) {
             // If the node entry does not exist, create a new whitelisted node entry
@@ -399,12 +405,12 @@ class State extends ReadyResource {
                 in the network if you possess a valid wk. As an indirect user, this characteristic doesn't affect you.             
 
             */
-            const initializedNodeEntry = ApplyOperationEncodings.initNodeEntry(ApplyOperationEncodings.ZERO_WK, ApplyOperationEncodings.NodeRole.WHITELISTED);
+            const initializedNodeEntry = nodeEntryUtils.init(ZERO_WK, nodeRoleUtils.NodeRole.WHITELISTED);
             await batch.put(nodeAddressString, initializedNodeEntry);
             await batch.put(hashHexString, node.value);
         } else {
             // If the node entry exists, update its role to WHITELISTED. Case if account will buy license from market but it existed before - for example it had balance.
-            const editedNodeEntry = ApplyOperationEncodings.setNodeEntryRole(nodeEntry, ApplyOperationEncodings.NodeRole.WHITELISTED);
+            const editedNodeEntry = nodeEntryUtils.setAllRole(nodeEntry, nodeRoleUtils.NodeRole.WHITELISTED);
             await batch.put(nodeAddressString, editedNodeEntry);
             await batch.put(hashHexString, node.value);
         }
@@ -417,16 +423,16 @@ class State extends ReadyResource {
 
         // Extract and validate the network address
         const nodeAddressBuffer = op.address;
-        const nodeAddress = ApplyOperationEncodings.bufferToAddress(nodeAddressBuffer);
+        const nodeAddress = addressUtils.bufferToAddress(nodeAddressBuffer);
         if (nodeAddress === null) return;
         const nodePublicKey = Wallet.decodeBech32mSafe(nodeAddress);
         if (nodePublicKey === null) return;
 
-        if (b4a.equals(op.eko.wk, ApplyOperationEncodings.ZERO_WK)) return;
+        if (b4a.equals(op.eko.wk, ZERO_WK)) return;
 
         // Ensure that an admin invoked this operation
         const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
-        const decodedAdminEntry = ApplyOperationEncodings.decodeAdminEntry(adminEntry);
+        const decodedAdminEntry = adminEntryUtils.decode(adminEntry);
         if (null === decodedAdminEntry || !this.#isAdminApply(decodedAdminEntry, node)) return;
 
         // verify signature
@@ -447,9 +453,9 @@ class State extends ReadyResource {
         const nodeEntry = await this.#getEntryApply(nodeAddress, batch);
         if (nodeEntry === null) return;
 
-        const isWhitelisted = ApplyOperationEncodings.isWhitelisted(nodeEntry);
-        const isWriter = ApplyOperationEncodings.isWriter(nodeEntry);
-        const isIndexer = ApplyOperationEncodings.isIndexer(nodeEntry);
+        const isWhitelisted = nodeEntryUtils.isWhitelisted(nodeEntry);
+        const isWriter = nodeEntryUtils.isWriter(nodeEntry);
+        const isIndexer = nodeEntryUtils.isIndexer(nodeEntry);
 
         // To become a writer the node must be whitelisted and not already a writer or indexer
         if (isIndexer || isWriter || !isWhitelisted) return;
@@ -459,18 +465,18 @@ class State extends ReadyResource {
         let incrementedLength = null;
         if (null === length) {
             // Initialize the writers length entry if it does not exist
-            const bufferedLength = ApplyOperationEncodings.setUpLengthEntry(0);
-            length = ApplyOperationEncodings.decodeLengthEntry(bufferedLength);
-            incrementedLength = ApplyOperationEncodings.incrementLengthEntry(length);
+            const bufferedLength = lengthEntryUtils.init(0);
+            length = lengthEntryUtils.decode(bufferedLength);
+            incrementedLength = lengthEntryUtils.increment(length);
         } else {
             // Decode and increment the existing writers length entry
-            length = ApplyOperationEncodings.decodeLengthEntry(length);
-            incrementedLength = ApplyOperationEncodings.incrementLengthEntry(length);
+            length = lengthEntryUtils.decode(length);
+            incrementedLength = lengthEntryUtils.increment(length);
         }
         if (null === incrementedLength) return;
 
         // Update the node entry to assign the writer role
-        const updatedNodeEntry = ApplyOperationEncodings.setNodeEntry(nodeEntry, ApplyOperationEncodings.NodeRole.WRITER, op.eko.wk);
+        const updatedNodeEntry = nodeEntryUtils.setAll(nodeEntry, nodeRoleUtils.NodeRole.WRITER, op.eko.wk);
         if (updatedNodeEntry === null) return;
 
         // Add the writer role to the base and update the batch
@@ -490,14 +496,14 @@ class State extends ReadyResource {
 
         // Extract and validate the network address
         const nodeAddressBuffer = op.address;
-        const nodeAddress = ApplyOperationEncodings.bufferToAddress(nodeAddressBuffer);
+        const nodeAddress = addressUtils.bufferToAddress(nodeAddressBuffer);
         if (nodeAddress === null) return;
         const nodePublicKey = Wallet.decodeBech32mSafe(nodeAddress);
         if (nodePublicKey === null) return;
 
         // Ensure that an admin invoked this operation
         const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
-        const decodedAdminEntry = ApplyOperationEncodings.decodeAdminEntry(adminEntry);
+        const decodedAdminEntry = adminEntryUtils.decode(adminEntry);
         if (null === decodedAdminEntry || !this.#isAdminApply(decodedAdminEntry, node)) return;
 
         // verify signature
@@ -522,15 +528,15 @@ class State extends ReadyResource {
         // what if we will compre current wk with op.eko.wk?
 
         // Check if the node is a writer or an indexer
-        const isNodeWriter = ApplyOperationEncodings.isWriter(nodeEntry);
-        const isNodeIndexer = ApplyOperationEncodings.isIndexer(nodeEntry);
+        const isNodeWriter = nodeEntryUtils.isWriter(nodeEntry);
+        const isNodeIndexer = nodeEntryUtils.isIndexer(nodeEntry);
 
         if (isNodeWriter && !isNodeIndexer) {
             // Decode the node entry and downgrade its role to WHITELISTED reader.
-            const decodedNodeEntry = ApplyOperationEncodings.decodeNodeEntry(nodeEntry);
+            const decodedNodeEntry = nodeEntryUtils.decode(nodeEntry);
             if (decodedNodeEntry === null) return;
 
-            const updatedNodeEntry = ApplyOperationEncodings.setNodeEntryRole(nodeEntry, ApplyOperationEncodings.NodeRole.WHITELISTED);
+            const updatedNodeEntry = nodeEntryUtils.setAllRole(nodeEntry, nodeRoleUtils.NodeRole.WHITELISTED);
             if (updatedNodeEntry === null) return;
 
             // Remove the writer role and update the state
@@ -541,16 +547,16 @@ class State extends ReadyResource {
 
         } else if (isNodeIndexer) {
             // Decode the node entry and update its role to WHITELISTED
-            const decodedNodeEntry = ApplyOperationEncodings.decodeNodeEntry(nodeEntry);
+            const decodedNodeEntry = nodeEntryUtils.decode(nodeEntry);
             if (decodedNodeEntry === null) return;
 
-            const updatedNodeEntry = ApplyOperationEncodings.setNodeEntryRole(nodeEntry, ApplyOperationEncodings.NodeRole.WHITELISTED);
+            const updatedNodeEntry = nodeEntryUtils.setAllRole(nodeEntry, nodeRoleUtils.NodeRole.WHITELISTED);
             if (updatedNodeEntry === null) return;
 
             // Retrieve the indexers entry and remove the indexer
             const indexersEntry = await this.#getEntryApply(EntryType.INDEXERS, batch);
             if (null === indexersEntry) return;
-            const updatedIndexerEntry = ApplyOperationEncodings.removeIndexer(op.address, indexersEntry);
+            const updatedIndexerEntry = indexerEntryUtils.remove(op.address, indexersEntry);
             if (updatedIndexerEntry.length === 0) return;
 
             // Remove the writer role and update the state
@@ -568,7 +574,7 @@ class State extends ReadyResource {
         }
         // Extract and validate the network address
         const nodeAddressBuffer = op.address;
-        const nodeAddress = ApplyOperationEncodings.bufferToAddress(nodeAddressBuffer);
+        const nodeAddress = addressUtils.bufferToAddress(nodeAddressBuffer);
         if (nodeAddress === null) return;
         const nodePublicKey = Wallet.decodeBech32mSafe(nodeAddress);
         if (nodePublicKey === null) return;
@@ -576,7 +582,7 @@ class State extends ReadyResource {
         // ensure that an admin invoked this operation
         const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
         if (null === adminEntry) return;
-        const decodedAdminEntry = ApplyOperationEncodings.decodeAdminEntry(adminEntry);
+        const decodedAdminEntry = adminEntryUtils.decode(adminEntry);
         if (null === decodedAdminEntry) return;
         const adminPublicKey = Wallet.decodeBech32mSafe(decodedAdminEntry.tracAddr);
         if (adminPublicKey === null) return;
@@ -596,23 +602,23 @@ class State extends ReadyResource {
     async #addIndexer(op, batch, base, hashHexString, nodeAddress) {
         const nodeEntry = await this.#getEntryApply(nodeAddress, batch);
         if (null === nodeEntry) return;
-        const decodedNodeEntry = ApplyOperationEncodings.decodeNodeEntry(nodeEntry);
+        const decodedNodeEntry = nodeEntryUtils.decode(nodeEntry);
         if (null === decodedNodeEntry) return;
 
         //check if node is allowed to become an indexer
-        const isNodeWriter = ApplyOperationEncodings.isWriter(nodeEntry);
-        const isNodeIndexer = ApplyOperationEncodings.isIndexer(nodeEntry);
+        const isNodeWriter = nodeEntryUtils.isWriter(nodeEntry);
+        const isNodeIndexer = nodeEntryUtils.isIndexer(nodeEntry);
         if (!isNodeWriter || isNodeIndexer) return;
         //update node entry to indexer
-        const updatedNodeEntry = ApplyOperationEncodings.setNodeEntryRole(nodeEntry, ApplyOperationEncodings.NodeRole.INDEXER)
+        const updatedNodeEntry = nodeEntryUtils.setAllRole(nodeEntry, nodeRoleUtils.NodeRole.INDEXER)
         if (null === updatedNodeEntry) return;
         // ensure that indexers entry exists and that it does not contain the address already
         const indexersEntry = await this.#getEntryApply(EntryType.INDEXERS, batch);
         if (null === indexersEntry) return;
-        const indexerListHasAddress = ApplyOperationEncodings.getIndexerIndex(indexersEntry, op.address) !== -1;
+        const indexerListHasAddress = indexerEntryUtils.getIndex(indexersEntry, op.address) !== -1;
         if (indexerListHasAddress) return;
         // append indexer to indexers entry
-        const updatedIndexerEntry = ApplyOperationEncodings.appendIndexer(op.address, indexersEntry);
+        const updatedIndexerEntry = indexerEntryUtils.append(op.address, indexersEntry);
         if (updatedIndexerEntry.length === 0) return;
         // set indexer role
         await base.removeWriter(decodedNodeEntry.wk);
@@ -631,7 +637,7 @@ class State extends ReadyResource {
 
         // Extract and validate the network address
         const nodeAddressBuffer = op.address;
-        const nodeAddress = ApplyOperationEncodings.bufferToAddress(nodeAddressBuffer);
+        const nodeAddress = addressUtils.bufferToAddress(nodeAddressBuffer);
         if (nodeAddress === null) return;
         const nodePublicKey = Wallet.decodeBech32mSafe(nodeAddress);
         if (nodePublicKey === null) return;
@@ -639,7 +645,7 @@ class State extends ReadyResource {
         // ensure that an admin invoked this operation
         const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
         if (null === adminEntry) return;
-        const decodedAdminEntry = ApplyOperationEncodings.decodeAdminEntry(adminEntry);
+        const decodedAdminEntry = adminEntryUtils.decode(adminEntry);
         if (null === decodedAdminEntry) return;
         const adminPublicKey = Wallet.decodeBech32mSafe(decodedAdminEntry.tracAddr);
         if (adminPublicKey === null) return;
@@ -660,38 +666,38 @@ class State extends ReadyResource {
     async #removeIndexer(op, batch, base, hashHexString, nodeAddress) {
         const nodeEntry = await this.#getEntryApply(nodeAddress, batch);
         if (null === nodeEntry) return;
-        const decodedNodeEntry = ApplyOperationEncodings.decodeNodeEntry(nodeEntry);
+        const decodedNodeEntry = nodeEntryUtils.decode(nodeEntry);
         if (null === decodedNodeEntry) return;
 
         //check if node is an indexer
-        const isNodeIndexer = ApplyOperationEncodings.isIndexer(nodeEntry);
+        const isNodeIndexer = nodeEntryUtils.isIndexer(nodeEntry);
         if (!isNodeIndexer) return;
 
         //update node entry to writer
-        const updatedNodeEntry = ApplyOperationEncodings.setNodeEntry(nodeEntry, ApplyOperationEncodings.NodeRole.WRITER, decodedNodeEntry.wk)
+        const updatedNodeEntry = nodeEntryUtils.setAll(nodeEntry, nodeRoleUtils.NodeRole.WRITER, decodedNodeEntry.wk)
         if (null === updatedNodeEntry) return;
 
         // ensure that indexers entry exists and that it does contain the address already
         const indexersEntry = await this.#getEntryApply(EntryType.INDEXERS, batch);
         if (null === indexersEntry) return;
 
-        const indexerListHasAddress = ApplyOperationEncodings.getIndexerIndex(indexersEntry, op.address) !== -1;
+        const indexerListHasAddress = indexerEntryUtils.getIndex(indexersEntry, op.address) !== -1;
         if (!indexerListHasAddress) return;
 
         // remove indexer from indexers entry
-        const updatedIndexerEntry = ApplyOperationEncodings.removeIndexer(op.address, indexersEntry);
+        const updatedIndexerEntry = indexerEntryUtils.remove(op.address, indexersEntry);
         if (updatedIndexerEntry.length === 0) return;
 
         // get writers length and increment it
         let length = await this.#getEntryApply(EntryType.WRITERS_LENGTH, batch);
         let incrementedLength = null;
         if (null === length) {
-            const bufferedLength = ApplyOperationEncodings.setUpLengthEntry(0);
-            length = ApplyOperationEncodings.decodeLengthEntry(bufferedLength);
-            incrementedLength = ApplyOperationEncodings.incrementLengthEntry(length);
+            const bufferedLength = lengthEntryUtils.init(0);
+            length = lengthEntryUtils.decode(bufferedLength);
+            incrementedLength = lengthEntryUtils.increment(length);
         } else {
-            length = ApplyOperationEncodings.decodeLengthEntry(length);
-            incrementedLength = ApplyOperationEncodings.incrementLengthEntry(length);
+            length = lengthEntryUtils.decode(length);
+            incrementedLength = lengthEntryUtils.increment(length);
         }
         if (null === incrementedLength) return;
 
@@ -715,7 +721,7 @@ class State extends ReadyResource {
 
         // Extract and validate the network prefix from the node's address
         const nodeAddressBuffer = op.address;
-        const nodeAddress = ApplyOperationEncodings.bufferToAddress(nodeAddressBuffer);
+        const nodeAddress = addressUtils.bufferToAddress(nodeAddressBuffer);
         if (nodeAddress === null) return;
         const nodePublicKey = Wallet.decodeBech32mSafe(nodeAddress);
         if (nodePublicKey === null) return;
@@ -723,7 +729,7 @@ class State extends ReadyResource {
         // ensure that an admin invoked this operation
         const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
         if (null === adminEntry) return;
-        const decodedAdminEntry = ApplyOperationEncodings.decodeAdminEntry(adminEntry);
+        const decodedAdminEntry = adminEntryUtils.decode(adminEntry);
         if (null === decodedAdminEntry) return;
         const adminPublicKey = Wallet.decodeBech32mSafe(decodedAdminEntry.tracAddr);
         if (null === adminPublicKey || b4a.equals(nodePublicKey, adminPublicKey) || !this.#isAdminApply(decodedAdminEntry, node)) return;
@@ -741,16 +747,16 @@ class State extends ReadyResource {
         if (null === nodeEntry) return; // Node entry must exist to ban it.
 
         // Atleast writer must be whitelisted to ban it.
-        const isWhitelisted = ApplyOperationEncodings.isWhitelisted(nodeEntry);
-        const isWriter = ApplyOperationEncodings.isWriter(nodeEntry);
-        const isIndexer = ApplyOperationEncodings.isIndexer(nodeEntry);
+        const isWhitelisted = nodeEntryUtils.isWhitelisted(nodeEntry);
+        const isWriter = nodeEntryUtils.isWriter(nodeEntry);
+        const isIndexer = nodeEntryUtils.isIndexer(nodeEntry);
         // only writer/whitelisted node can be banned.
         if ((!isWhitelisted && !isWriter) || isIndexer) return;
 
 
-        const updatedNodeEntry = ApplyOperationEncodings.setNodeEntryRole(nodeEntry, ApplyOperationEncodings.NodeRole.READER);
+        const updatedNodeEntry = nodeEntryUtils.setAllRole(nodeEntry, nodeRoleUtils.NodeRole.READER);
         if (null === updatedNodeEntry) return;
-        const decodedNodeEntry = ApplyOperationEncodings.decodeNodeEntry(updatedNodeEntry);
+        const decodedNodeEntry = nodeEntryUtils.decode(updatedNodeEntry);
         if (null === decodedNodeEntry) return;
 
         // Remove the writer role and update the state

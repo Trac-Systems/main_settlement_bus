@@ -13,7 +13,7 @@ import { OperationType,
     SIGNATURE_HEXSTRING_LENGTH,
     BOOTSTRAP_HEXSTRING_LENGTH
 } from './constants.js';
-import { TRAC_ADDRESS_SIZE } from '../core/state/ApplyOperationEncodings.js'
+import { TRAC_ADDRESS_SIZE } from '../core/state/utils/address.js';
 import b4a from 'b4a';
 class Check {
     #validator;
