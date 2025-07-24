@@ -1,11 +1,11 @@
 import b4a from 'b4a';
 import ApplyOperationEncodings from '../../state/ApplyOperationEncodings.js';
 import Wallet from 'trac-wallet';
-class CustomNodeResponse {
+import BaseResponse from './base/baseResponse.js';
+
+class CustomNodeResponse extends BaseResponse {
     constructor(network, state, wallet) {
-        this.state = state;
-        this.wallet = wallet;
-        this.network = network;
+        super(network, state, wallet);
     }
 
     async validate(message, channelString) {
@@ -27,27 +27,6 @@ class CustomNodeResponse {
             !message.response.issuer ||
             !message.response.timestamp) {
             console.error("Custom node response is missing required fields.");
-            return false;
-        }
-        return true;
-    }
-
-    validateIssuerPublicKey(message) {
-        const issuerPublicKey = b4a.from(message.response.issuer, 'hex');
-        if (!b4a.equals(issuerPublicKey, this.wallet.publicKey)) {
-            console.error("Issuer public key does not match wallet public key.");
-            return false;
-        }
-        return true;
-    }
-
-    validateTimestamp(message) {
-        const timestamp = message.response.timestamp;
-        const now = Date.now();
-        const fiveSeconds = 5000;
-
-        if (now - timestamp > fiveSeconds) {
-            console.error("Validator response is too old, ignoring.");
             return false;
         }
         return true;
@@ -76,14 +55,6 @@ class CustomNodeResponse {
             return false;
         }
 
-        return true;
-    }
-
-    validateChannel(message, channelString) {
-        if (message.response.channel !== channelString) {
-            console.error("Channel mismatch in validator response.");
-            return false;
-        }
         return true;
     }
 

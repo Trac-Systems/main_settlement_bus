@@ -1,16 +1,15 @@
 import b4a from 'b4a';
 import Wallet from 'trac-wallet';
+import BaseResponse from './base/baseResponse.js';
 
-class AdminResponse {
+class AdminResponse extends BaseResponse {
 
     constructor(network, state, wallet) {
-        this.state = state;
-        this.wallet = wallet;
-        this.network = network;
+        super(network, state, wallet);
     }
 
     async validate(message, channelString) {
-        if (!this.validatePayloadFields(message)) return false;
+        if (!this.validatePayload(message)) return false;
         if (!this.validateIssuerPublicKey(message)) return false;
         if (!this.validateTimestamp(message)) return false;
         if (!await this.validateAdminData(message)) return false;
@@ -20,7 +19,7 @@ class AdminResponse {
         return true;
     }
 
-    validatePayloadFields(message) {
+    validatePayload(message) {
         if (!message.response ||
             !message.response.wk ||
             !message.response.address ||
@@ -29,27 +28,6 @@ class AdminResponse {
             !message.response.issuer ||
             !message.response.timestamp) {
             console.error("Admin response is missing required fields.");
-            return false;
-        }
-        return true;
-    }
-
-    validateIssuerPublicKey(message) {
-        const issuerPublicKey = b4a.from(message.response.issuer, 'hex');
-        if (!b4a.equals(issuerPublicKey, this.wallet.publicKey)) {
-            console.error("Issuer public key does not match wallet public key.");
-            return false;
-        }
-        return true;
-    }
-
-    validateTimestamp(message) {
-        const timestamp = message.response.timestamp;
-        const now = Date.now();
-        const fiveSeconds = 5000;
-
-        if (now - timestamp > fiveSeconds) {
-            console.error("Admin response is too old, ignoring.");
             return false;
         }
         return true;
@@ -87,14 +65,6 @@ class AdminResponse {
             return false;
         }
 
-        return true;
-    }
-
-    validateChannel(message, channelString) {
-        if (message.response.channel !== channelString) {
-            console.error("Channel mismatch in admin response.");
-            return false;
-        }
         return true;
     }
 }
