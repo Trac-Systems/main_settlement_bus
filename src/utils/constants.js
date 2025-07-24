@@ -60,3 +60,8 @@ export const BOOTSTRAP_HEXSTRING_LENGTH = 64;
 // Pool constants
 export const BATCH_SIZE = 10;
 export const PROCESS_INTERVAL_MS = 5
+
+// Rate limiting constants
+export const CLEANUP_INTERVAL_MS = 120_000;
+export const CONNECTION_TIMEOUT_MS = 60_000;
+export const MAX_TRANSACTIONS_PER_SECOND = 50;

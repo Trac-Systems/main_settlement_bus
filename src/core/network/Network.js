@@ -2,11 +2,8 @@ import w from 'protomux-wakeup';
 import b4a from 'b4a';
 import Hyperswarm from 'hyperswarm';
 import Wallet from 'trac-wallet';
-import Protomux from 'protomux'
-import c from 'compact-encoding'
 import ReadyResource from 'ready-resource';
 import { sleep } from '../../utils/helpers.js';
-import { normalizeBuffer } from '../../utils/buffer.js';
 import {
     TRAC_NAMESPACE,
     MAX_PEERS,
@@ -16,12 +13,11 @@ import {
 } from '../../utils/constants.js';
 import ApplyOperationEncodings from '../state/ApplyOperationEncodings.js';
 import Check from '../../utils/check.js';
-import StateMessageOperations from '../../messages/stateMessages/StateMessageOperations.js';
 import AdminResponse from './validators/AdminResponse.js';
 import ValidatorResponse from './validators/ValidatorResponse.js';
-import PreTransaction from './validators/PreTransaction.js';
 import CustomNodeResponse from './validators/CustomNodeResponse.js';
 import PoolService from './services/PoolService.js';
+import NetworkMessages from './messaging/NetworkMessages.js';
 const wakeup = new w();
 
 class Network extends ReadyResource {
@@ -31,6 +27,7 @@ class Network extends ReadyResource {
     #disable_rate_limit;
     #channel;
     #dht_bootstrap = ['116.202.214.149:10001', '157.180.12.214:10001', 'node1.hyperdht.org:49737', 'node2.hyperdht.org:49737', 'node3.hyperdht.org:49737'];
+    #networkMessages;
 
     constructor(state, channel, options = {}) {
         super();
@@ -40,6 +37,7 @@ class Network extends ReadyResource {
         this.#channel = channel;
         this.poolService = new PoolService(state)
         this.check = new Check();
+        this.#networkMessages = new NetworkMessages(this);
         this.admin_stream = null;
         this.admin = null;
         this.validator_stream = null;
@@ -101,9 +99,6 @@ class Network extends ReadyResource {
                 };
             }
 
-            let clean = Date.now();
-            let conns = {};
-
             this.#swarm = new Hyperswarm({
                 keyPair,
                 bootstrap: this.#dht_bootstrap,
@@ -117,155 +112,9 @@ class Network extends ReadyResource {
             const network = this;
 
             this.#swarm.on('connection', async (connection) => {
-
-                const mux = Protomux.from(connection)
-                connection.userData = mux
-                const message_channel = mux.createChannel({
-                    protocol: b4a.toString(this.#channel, 'utf8'),
-                    onopen() {},
-                    onclose() {}
-                })
-
-                message_channel.open()
-                const message = message_channel.addMessage({
-                    encoding: c.json,
-                    async onmessage(msg) {
-                        try {
-                            const channelString = b4a.toString(network.channel, 'utf8');
-                            // create route class for each message type
-                            if (msg === 'get_validator') {
-                                await network.handleGetValidatorResponse(message, connection, channelString, wallet, writingKey);
-                                network.#swarm.leavePeer(connection.remotePublicKey)
-                            }
-                            else if (msg === 'get_admin') {
-                                await network.handleGetAdminRequest(message, connection, channelString, wallet, writingKey, state);
-                                network.#swarm.leavePeer(connection.remotePublicKey)
-
-                            }
-                            else if (msg === 'get_node') {
-                                await network.handleCustomNodeRequest(message, connection, channelString, wallet, writingKey)
-                                network.#swarm.leavePeer(connection.remotePublicKey)
-
-                            }
-                            // ---------- HANDLING RECEIVED MESSAGES ----------
-                            else if (msg.response !== undefined && msg.response.op !== undefined && msg.response.op === 'validatorResponse') {
-                                await network.handleValidatorResponse(msg, connection, channelString, state, wallet);
-                                network.#swarm.leavePeer(connection.remotePublicKey);
-                            }
-                            else if (msg.response !== undefined && msg.response.op !== undefined && msg.response.op === 'adminResponse') {
-
-                                await network.handleAdminResponse(msg, connection, channelString, state, wallet);
-                                network.#swarm.leavePeer(connection.remotePublicKey)
-                            }
-                            else if (msg.response !== undefined && msg.response.op !== undefined && msg.response.op === 'nodeResponse') {
-
-                                await network.handleCustomNodeResponse(msg, connection, channelString, state, wallet);
-                                network.#swarm.leavePeer(connection.remotePublicKey)
-                            }
-                            // ---------- HANDLING OPERATIONS ----------
-                            else if (msg.message !== undefined && msg.op === 'addWriter') {
-                                const messageBuffer = normalizeBuffer(msg.message);
-                                if (!messageBuffer) {
-                                    network.#swarm.leavePeer(connection.remotePublicKey)
-                                    throw new Error('Invalid message buffer for addWriter operation');
-                                }
-                                await handleIncomingEvent(messageBuffer);
-                                network.#swarm.leavePeer(connection.remotePublicKey)
-                            }
-                            else if (msg.message !== undefined && msg.op === 'removeWriter') {
-                                const messageBuffer = normalizeBuffer(msg.message);
-                                if (!messageBuffer) {
-                                    network.#swarm.leavePeer(connection.remotePublicKey)
-                                    throw new Error('Invalid message buffer for removeWriter operation');
-                                }
-                                await handleIncomingEvent(messageBuffer);
-                                network.#swarm.leavePeer(connection.remotePublicKey)
-                            }
-                            else if (msg.message !== undefined && msg.op === 'addAdmin') {
-                                const messageBuffer = normalizeBuffer(msg.message);
-                                if (!messageBuffer) {
-                                    network.#swarm.leavePeer(connection.remotePublicKey)
-                                    throw new Error('Invalid message buffer for addAdmin operation');
-                                }
-                                await handleIncomingEvent(messageBuffer);
-                                network.#swarm.leavePeer(connection.remotePublicKey)
-                            }
-                            else if (msg.message !== undefined && msg.op === 'whitelisted') {
-                                const messageBuffer = normalizeBuffer(msg.message);
-                                if (!messageBuffer) {
-                                    network.#swarm.leavePeer(connection.remotePublicKey);
-                                    throw new Error('Invalid message buffer for whitelisted operation');
-                                }
-                                await handleIncomingEvent(messageBuffer);
-                                network.#swarm.leavePeer(connection.remotePublicKey);
-                            } else {
-                                if (state.isIndexer() || !state.isWritable()) return;
-
-                                if (true !== network.disable_rate_limit) {
-                                    const peer = b4a.toString(connection.remotePublicKey, 'hex');
-                                    const _now = Date.now();
-
-                                    if (_now - clean >= 120_000) {
-                                        clean = _now;
-                                        conns = {};
-                                    }
-
-                                    if (conns[peer] === undefined) {
-                                        conns[peer] = { prev: _now, now: 0, tx_cnt: 0 }
-                                    }
-
-                                    conns[peer].now = _now;
-                                    conns[peer].tx_cnt += 1;
-
-                                    if (conns[peer].now - conns[peer].prev >= 60_000) {
-                                        delete conns[peer];
-                                    }
-
-                                    if (conns[peer] !== undefined && conns[peer].now - conns[peer].prev >= 1000 && conns[peer].tx_cnt >= 50) {
-                                        network.#swarm.leavePeer(connection.remotePublicKey);
-                                        connection.end()
-                                    }
-                                }
-
-                                if (network.poolService.tx_pool.length >= 1000) {
-                                    console.log('pool full');
-                                    return
-                                }
-
-                                if (b4a.byteLength(JSON.stringify(msg)) > 3072) return;
-
-                                const parsedPreTx = msg;
-                                const validator = new PreTransaction(state, wallet, network);
-                                const isValid = await validator.validate(parsedPreTx);
-
-                                if (isValid) {
-                                    const postTx = await StateMessageOperations.assemblePostTxMessage(
-                                        wallet,
-                                        parsedPreTx.va,
-                                        b4a.from(parsedPreTx.tx, 'hex'),
-                                        parsedPreTx.ia,
-                                        b4a.from(parsedPreTx.iw, 'hex'),
-                                        b4a.from(parsedPreTx.in, 'hex'),
-                                        b4a.from(parsedPreTx.ch, 'hex'),
-                                        b4a.from(parsedPreTx.is, 'hex'),
-                                        b4a.from(parsedPreTx.bs, 'hex'),
-                                        b4a.from(parsedPreTx.mbs, 'hex')
-                                    );
-                                    network.poolService.addTransaction(postTx);
-                                }
-
-                                network.#swarm.leavePeer(connection.remotePublicKey);
-                            }
-                        } catch (e) {
-                            console.log(e);
-                        }
-                        finally {
-                            network.#swarm.leavePeer(connection.remotePublicKey);
-                        }
-                    }
-                })
-
+                const { message_channel, message } = this.#networkMessages.setupConnection(connection, this, state, wallet, writingKey, handleIncomingEvent);
                 connection.messenger = message;
+                
                 connection.on('close', () => {
                     if (this.validator_stream === connection) {
                         this.validator_stream = null;
