@@ -20,6 +20,7 @@ import StateMessageOperations from '../../messages/stateMessages/StateMessageOpe
 import AdminResponse from './validators/AdminResponse.js';
 import ValidatorResponse from './validators/ValidatorResponse.js';
 import PreTransaction from './validators/PreTransaction.js';
+import CustomNodeResponse from './validators/CustomNodeResponse.js';
 
 const wakeup = new w();
 
@@ -574,44 +575,13 @@ class Network extends ReadyResource {
 
     }
 
-    async handleCustomNodeResponse(msg, connection, channelString, state, wallet) {
-        if (!msg.response || !msg.response.address || !msg.response.nonce || !msg.response.channel || !msg.response.issuer || !msg.response.timestamp) {
-            console.log("Custom node response is missing required fields.");
-            this.#swarm.leavePeer(connection.remotePublicKey);
-            return;
-        }
+    async handleCustomNodeResponse(message, connection, channelString, state, wallet) {
+        const customNodeValidator = new CustomNodeResponse(this, state, wallet);
+        const isValid = await customNodeValidator.validate(message, channelString);
+        if (isValid) {
+            const customNodeAddressString = message.response.address;
+            const customNodePublicKey = Wallet.decodeBech32m(customNodeAddressString);
 
-        const issuerPublicKey = b4a.from(msg.response.issuer, 'hex');
-        if (!b4a.equals(issuerPublicKey, wallet.publicKey)) {
-            console.log("Issuer public key does not match wallet public key.");
-            this.#swarm.leavePeer(connection.remotePublicKey);
-            return;
-        }
-        const timestamp = msg.response.timestamp;
-        const now = Date.now();
-        const fiveSeconds = 5000;
-
-        if (now - timestamp > fiveSeconds) {
-            console.log("Custom node response is too old, ignoring.");
-            this.#swarm.leavePeer(connection.remotePublicKey);
-            return;
-        }
-
-        const customNodeAddressString = msg.response.address;
-        const customNodePublicKey = Wallet.decodeBech32m(customNodeAddressString);
-        const customNodeEntry = await state.getNodeEntry(customNodeAddressString);
-
-        if (customNodeEntry === null) {
-            console.log("Custom node entry is null - entry is not initialized.");
-            this.#swarm.leavePeer(connection.remotePublicKey);
-            return;
-        }
-
-        const hash = await wallet.createHash('sha256', JSON.stringify(msg.response));
-        const signature = b4a.from(msg.sig, 'hex');
-        const verified = wallet.verify(signature, hash, customNodePublicKey);
-
-        if (verified && msg.response.channel === channelString) {
             console.log('Custom node stream established:', customNodeAddressString);
             this.custom_stream = connection;
             this.custom_node = customNodePublicKey;
