@@ -4,8 +4,8 @@ import w from 'protomux-wakeup';
 import b4a from 'b4a';
 import Wallet from 'trac-wallet';
 
-import ApplyOperationEncodings from '../state/ApplyOperationEncodings.js';
 import PoolService from './services/PoolService.js';
+import ValidatorObserverService from './services/ValidatorObserverService.js';
 import NetworkMessages from './messaging/NetworkMessages.js';
 import { sleep } from '../../utils/helpers.js';
 import {
@@ -17,7 +17,6 @@ import {
     NETWORK_MESSAGE_TYPES,
     DHT_BOOTSTRAPS
 } from '../../utils/constants.js';
-import ValidatorObserverService from './services/ValidatorObserverService.js';
 
 const wakeup = new w();
 
@@ -35,7 +34,6 @@ class Network extends ReadyResource {
         super();
         this.#enable_wallet = options.enable_wallet !== false;
         this.#channel = channel;
-        this.#state = state;
         this.#poolService = new PoolService(state)
         this.#validatorObserverService = new ValidatorObserverService(this, state, options)
         this.#networkMessages = new NetworkMessages(this, options);
@@ -65,9 +63,6 @@ class Network extends ReadyResource {
         return this.#validatorObserverService;
     }
 
-    get state() {
-        return this.#state;
-    }
     async _open() {
         console.log('Network initialization...');
         this.poolService.start();
@@ -166,8 +161,8 @@ class Network extends ReadyResource {
     }
 
     async tryConnect(publicKey, type = null) {
-        //TODO: we should throw an error instead of returning null
-        if (null === this.#swarm) return null;
+        
+        if (null === this.#swarm) throw new Error('Network swarm is not initialized');
 
         if (this.validator_stream !== null && publicKey !== b4a.toString(this.validator_stream.remotePublicKey, 'hex')) {
             this.#swarm.leavePeer(this.validator_stream.remotePublicKey);
