@@ -28,7 +28,7 @@ class NetworkMessages {
         );
     }
 
-    setupProtocolMessages(connection) {
+    setupProtomuxMessages(connection) {
         const mux = Protomux.from(connection);
         connection.userData = mux;
         const message_channel = mux.createChannel({
