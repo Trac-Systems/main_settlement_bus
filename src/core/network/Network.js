@@ -34,12 +34,9 @@ class Network extends ReadyResource {
         super();
         this.#enableValidatorObserver = options.enableValidatorObserver !== undefined ? options.enableValidatorObserver : true;
         this.#enable_wallet = options.enable_wallet !== false;
-        // DISABLE RATE LIMIT SHOWULD BE PROPAGATED TO THE PRETX VALIDATION BECAUSE RATE LIMIT IS NO LONGER USED THERE.
         this.#disable_rate_limit = options.disable_rate_limit === true;
         this.#channel = channel;
         this.#poolService = new PoolService(state)
-        //TODO: DELETE CHECK
-        this.check = new Check();
         this.#networkMessages = new NetworkMessages(this, options = {});
         //TODO: move streams maybe to HASHMAP?
         this.admin_stream = null;
