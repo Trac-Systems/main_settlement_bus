@@ -43,6 +43,7 @@ class TransactionRateLimiterService {
         }
 
         if (this.#hasExceededRateLimit(peer)) {
+            console.warn(`Rate limit exceeded for peer ${peer}. Disconnecting...`);
             network.swarm.leavePeer(connection.remotePublicKey);
             connection.end();
             return true;
@@ -102,6 +103,7 @@ class TransactionRateLimiterService {
         const peerData = this.#connectionsStatistics.get(peer);
         peerData.lastActivityTime = timestamp;
         peerData.transactionCount += 1;
+        this.#connectionsStatistics.set(peer, peerData);
     }
 
     /*
