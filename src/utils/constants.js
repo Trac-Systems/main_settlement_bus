@@ -17,7 +17,7 @@ export const OperationType = Object.freeze({
     REMOVE_INDEXER: OP.REMOVE_INDEXER,
     BAN_VALIDATOR: OP.BAN_WRITER,
     WHITELISTED: OP.APPEND_WHITELIST,
-    PRE_TX: 'pre-tx',
+    PRE_TX: 'PRE_TX',
     TX: OP.TX,
 });
 
