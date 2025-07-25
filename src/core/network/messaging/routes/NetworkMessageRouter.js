@@ -45,6 +45,7 @@ class NetworkMessageRouter {
                 await this.#handlers.transaction.handle(incomingMessage, connection);
                 this.network.swarm.leavePeer(connection.remotePublicKey);
             }
+            
         } catch (error) {
             throw new Error(`Failed to route message: ${error}`);
         }

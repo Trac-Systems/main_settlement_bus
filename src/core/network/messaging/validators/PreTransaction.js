@@ -14,12 +14,15 @@ class PreTransaction {
         this.#network = network;
         this.#check = new Check();
     }
+
     get state() {
         return this.#state;
     }
+
     get network() {
         return this.#network;
     }
+    
     get check() {
         return this.#check;
     }

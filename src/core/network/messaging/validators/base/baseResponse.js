@@ -1,12 +1,15 @@
 import b4a from 'b4a';
 import Wallet from 'trac-wallet';
 import ApplyOperationEncodings from '../../../../state/ApplyOperationEncodings.js';
+
 /*
     BaseResponse class for handling common validation logic for network responses.
 */
+
 class BaseResponse {
     #wallet;
     #state;
+
     constructor(state, wallet) {
         this.#state = state;
         this.#wallet = wallet;

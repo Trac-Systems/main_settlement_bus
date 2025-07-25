@@ -5,6 +5,7 @@ import b4a from 'b4a';
 class GetRequestHandler {
     #wallet;
     #state;
+
     constructor(wallet, state) {
         this.#wallet = wallet;
         this.#state = state;
@@ -29,7 +30,6 @@ class GetRequestHandler {
                 throw new Error(`Unhandled GET type: ${message}`);
         }
     }
-
 
     async handleGetValidatorResponse(messageProtomux, connection, channelString) {
         const nonce = Wallet.generateNonce().toString('hex');

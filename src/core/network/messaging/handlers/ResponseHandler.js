@@ -11,6 +11,7 @@ class ResponseHandler {
     #responseValidator;
     #adminValidator;
     #customNodeValidator;
+    
     constructor(network, state, wallet) {
         this.#network = network;
         this.#state = state;

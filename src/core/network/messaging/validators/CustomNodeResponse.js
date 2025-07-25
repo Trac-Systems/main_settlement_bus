@@ -1,6 +1,7 @@
 import BaseResponse from './base/baseResponse.js';
 
 class CustomNodeResponse extends BaseResponse {
+
     constructor(state, wallet) {
         super(state, wallet);
     }

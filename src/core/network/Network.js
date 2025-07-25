@@ -308,4 +308,5 @@ class Network extends ReadyResource {
         }
     }
 }
+
 export default Network;

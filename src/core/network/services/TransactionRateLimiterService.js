@@ -25,6 +25,7 @@ class TransactionRateLimiterService {
         const peerData = this.#connectionsStatistics.get(peer);
         return peerData.lastActivityTime - peerData.sessionStartTime >= 1000 && peerData.transactionCount >= MAX_TRANSACTIONS_PER_SECOND;
     }
+
     /*
         Handles the rate limiting for a peer connection.
         If the peer has exceeded the rate limit, it disconnects the peer.
@@ -76,6 +77,7 @@ class TransactionRateLimiterService {
 
         this.#lastCleanup = currentTime;
     }
+
     /*
         Initializes the connection statistics for a peer.
         Connection is a HashMap with the following structure:
@@ -95,6 +97,7 @@ class TransactionRateLimiterService {
             });
         }
     }
+    
     /*
         When external peer sends a transaction, this method updates the connection info.
         It updates the last activity time and increments the transaction count.
