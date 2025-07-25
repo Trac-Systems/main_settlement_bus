@@ -42,6 +42,7 @@ export class MainSettlementBus extends ReadyResource {
     #network;
     #readline_instance;
     #enable_validator_observer;
+    #enable_role_requester;
     #state;
 
     constructor(options = {}) {
@@ -70,8 +71,9 @@ export class MainSettlementBus extends ReadyResource {
         this.#wallet = new PeerWallet(options);
         this.#readline_instance = null;
         this.enable_interactive_mode = options.enable_interactive_mode !== false;
+        this.#enable_role_requester = options.enable_role_requester !== undefined ? options.enable_role_requester : true;
         this.#enable_validator_observer = options.enable_validator_observer !== undefined ? options.enable_validator_observer : true;
-        
+
         if (this.enable_interactive_mode !== false) {
             try {
                 this.#readline_instance = readline.createInterface({
@@ -176,7 +178,7 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async #setUpRoleAutomatically() {
-        if (!this.#state.isWritable() && this.#enable_validator_observer) {
+        if (!this.#state.isWritable() && this.#enable_role_requester) {
             console.log('Requesting writer role... This may take a moment.');
             await this.#requestWriterRole(false)
             setTimeout(async () => {
@@ -522,6 +524,18 @@ export class MainSettlementBus extends ReadyResource {
                 break;
             case '/stats':
                 await verifyDag(this.#state, this.#network, this.#wallet, this.#state.writingKey, this.#shouldListenToAdminEvents, this.#shouldListenToWriterEvents);
+                break;
+            case '/test':
+
+                const contentHash = randomBytes(32).toString('hex');
+                const subNetworkBootstrap = randomBytes(32).toString('hex');
+
+                const validatorPubKey = b4a.from(this.#network.validator, 'hex');
+                const validatorAddress = PeerWallet.encodeBech32m(validatorPubKey);
+
+                const preTx = await generatePreTx(this.#wallet, validatorAddress, this.#state.writingKey, this.#wallet.address, contentHash, subNetworkBootstrap, this.bootstrap);
+                await this.#network.validator_stream.messenger.send(preTx);
+
                 break;
             default:
                 if (input.startsWith('/get_node_info')) {
