@@ -40,7 +40,7 @@ class Network extends ReadyResource {
         this.#poolService = new PoolService(state)
         //TODO: DELETE CHECK
         this.check = new Check();
-        this.#networkMessages = new NetworkMessages(this);
+        this.#networkMessages = new NetworkMessages(this, options = {});
         //TODO: move streams maybe to HASHMAP?
         this.admin_stream = null;
         this.admin = null;

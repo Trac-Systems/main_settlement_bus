@@ -7,9 +7,11 @@ import NetworkMessageRouter from './routes/NetworkMessageRouter.js';
 class NetworkMessages {
     #messageRouter;
     #network;
+    #options;
 
-    constructor(network) {
+    constructor(network, options = {}) {
         this.#network = network;
+        this.#options = options;
     }
 
     get network() {
@@ -21,7 +23,8 @@ class NetworkMessages {
             this.network,
             state,
             wallet,
-            handleIncomingEvent
+            handleIncomingEvent,
+            this.#options
         );
     }
 

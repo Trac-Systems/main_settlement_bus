@@ -54,7 +54,6 @@ class ResponseHandler {
     }
 
     async handleValidatorResponse(message, connection, channelString) {
-        console.log(message)
         const isValid = await this.validator.validate(message, channelString);
         if (isValid) {
             const validatorAddressString = message.address;
