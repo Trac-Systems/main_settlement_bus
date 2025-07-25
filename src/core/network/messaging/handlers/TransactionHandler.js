@@ -43,45 +43,51 @@ class TransactionHandler {
     get rateLimiter() {
         return this.#rateLimiter;
     }
+
     get disable_rate_limit() {
         return this.#disable_rate_limit;
     }
 
     async handle(parsedPreTx, connection) {
-        
+
         if (this.state.isIndexer() || !this.state.isWritable()) return {
             throw: new Error('TransactionHandler: State is not writable or is an indexer.')
         }
+
+        if (this.network.poolService.tx_pool.length >= TRANSACTION_POOL_SIZE) {
+            throw new Error("TransactionHandler: Transaction pool is full, ignoring incoming transaction.");
+        }
+
+        if (b4a.byteLength(JSON.stringify(parsedPreTx)) > MAX_PRE_TX_PAYLOAD_BYTE_SIZE) {
+            throw new Error(`TransactionHandler: Payload size exceeds maximum limit of ${MAX_PRE_TX_PAYLOAD_BYTE_SIZE} bytes by ${b4a.byteLength(JSON.stringify(parsedPreTx)) - MAX_PRE_TX_PAYLOAD_BYTE_SIZE} bytes.`);
+        }
+
+        const isValid = await this.transactionValidator.validate(parsedPreTx);
+
+        if (!isValid) {
+            throw new Error("TransactionHandler: Transaction validation failed.");
+        }
+
         if (true !== this.disable_rate_limit) {
             const shouldDisconnect = this.#rateLimiter.handleRateLimit(connection, this.network);
             if (shouldDisconnect) {
-                throw new Error(`Rate limit exceeded for peer ${b4a.toString(connection.remotePublicKey, 'hex')}. Disconnecting...`);
+                throw new Error(`TransactionHandler: Rate limit exceeded for peer ${b4a.toString(connection.remotePublicKey, 'hex')}. Disconnecting...`);
             }
         }
 
-        if (this.network.poolService.tx_pool.length >= TRANSACTION_POOL_SIZE) {
-            throw new Error("Transaction pool is full, ignoring incoming transaction.");
-        }
-        if (b4a.byteLength(JSON.stringify(parsedPreTx)) > MAX_PRE_TX_PAYLOAD_BYTE_SIZE) {
-            throw new Error(`Payload size exceeds maximum limit of ${MAX_PRE_TX_PAYLOAD_BYTE_SIZE} bytes by ${b4a.byteLength(JSON.stringify(parsedPreTx)) - MAX_PRE_TX_PAYLOAD_BYTE_SIZE} bytes.`);
-        }
-  
-        const isValid = await this.transactionValidator.validate(parsedPreTx);
-        if (isValid) {
-            const postTx = await StateMessageOperations.assemblePostTxMessage(
-                this.wallet,
-                parsedPreTx.va,
-                b4a.from(parsedPreTx.tx, 'hex'),
-                parsedPreTx.ia,
-                b4a.from(parsedPreTx.iw, 'hex'),
-                b4a.from(parsedPreTx.in, 'hex'),
-                b4a.from(parsedPreTx.ch, 'hex'),
-                b4a.from(parsedPreTx.is, 'hex'),
-                b4a.from(parsedPreTx.bs, 'hex'),
-                b4a.from(parsedPreTx.mbs, 'hex')
-            );
-            this.network.poolService.addTransaction(postTx);
-        }
+        const postTx = await StateMessageOperations.assemblePostTxMessage(
+            this.wallet,
+            parsedPreTx.va,
+            b4a.from(parsedPreTx.tx, 'hex'),
+            parsedPreTx.ia,
+            b4a.from(parsedPreTx.iw, 'hex'),
+            b4a.from(parsedPreTx.in, 'hex'),
+            b4a.from(parsedPreTx.ch, 'hex'),
+            b4a.from(parsedPreTx.is, 'hex'),
+            b4a.from(parsedPreTx.bs, 'hex'),
+            b4a.from(parsedPreTx.mbs, 'hex')
+        );
+        this.network.poolService.addTransaction(postTx);
 
     }
 }
