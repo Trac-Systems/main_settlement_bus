@@ -17,24 +17,27 @@ import {
     NETWORK_MESSAGE_TYPES,
     DHT_BOOTSTRAPS
 } from '../../utils/constants.js';
+import ValidatorObserverService from './services/ValidatorObserverService.js';
 
 const wakeup = new w();
 
 class Network extends ReadyResource {
     #dht_bootstrap = DHT_BOOTSTRAPS;
     #swarm = null;
-    #enableValidatorObserver;
     #enable_wallet;
     #channel;
+    #state;
     #networkMessages;
     #poolService;
+    #validatorObserverService;
 
     constructor(state, channel, options = {}) {
         super();
-        this.#enableValidatorObserver = options.enableValidatorObserver !== undefined ? options.enableValidatorObserver : true;
         this.#enable_wallet = options.enable_wallet !== false;
         this.#channel = channel;
+        this.#state = state;
         this.#poolService = new PoolService(state)
+        this.#validatorObserverService = new ValidatorObserverService(this, state, options)
         this.#networkMessages = new NetworkMessages(this, options);
         //TODO: move streams maybe to HASHMAP? To discuss because this change will affect the whole network module and it's usage. It is not a priority right now
         //However, it gives us more flexibility in the future, because we can create set of streams. Maybe in this case exist better data structure?
@@ -58,6 +61,13 @@ class Network extends ReadyResource {
         return this.#poolService;
     }
 
+    get validatorObserverService() {
+        return this.#validatorObserverService;
+    }
+
+    get state() {
+        return this.#state;
+    }
     async _open() {
         console.log('Network initialization...');
         this.poolService.start();
@@ -68,8 +78,8 @@ class Network extends ReadyResource {
         this.poolService.stopPool();
         await sleep(100);
 
-        if (this.#enableValidatorObserver) {
-            this.stopValidatorObserver();
+        if (this.#validatorObserverService.enable_validator_observer) {
+            this.#validatorObserverService.stopValidatorObserver();
         }
 
         await sleep(5_000);
@@ -77,6 +87,11 @@ class Network extends ReadyResource {
         if (this.#swarm !== null) {
             this.#swarm.destroy();
         }
+    }
+
+    startValidatorObserver(address) {
+        this.#validatorObserverService.startValidatorObserver();
+        this.#validatorObserverService.validatorObserver(address);
     }
 
     async replicate(
@@ -148,63 +163,6 @@ class Network extends ReadyResource {
             };
             return keyPair;
         }
-    }
-    
-    //TODO: Move this as a new service
-    // TODO: AFTER WHILE LOOP SIGNAL TO THE PROCESS THAT VALIDATOR OBSERVER STOPPED OPERATING. 
-    // OS CALLS, ACCUMULATORS, MAYBE THIS IS POSSIBLE TO CHECK I/O QUEUE IF IT COINTAIN IT. FOR NOW WE ARE USING SLEEP.
-    //TODO fix finding validators and specific node
-    async validatorObserver(getWriterLength, getWriterIndex, getNodeEntry, addresss) {
-        //TODO: we should throw an error instead of returning null
-        try {
-            console.log('Validator observer started');
-            while (this.#enableValidatorObserver && this.#enable_wallet) {
-                if (this.validator_stream !== null) {
-                    await sleep(1000);
-                    continue;
-                }
-                const lengthEntry = await getWriterLength();
-                const length = lengthEntry ?? 0;
-                
-                const findValidator = async () => {
-                    if (this.validator_stream !== null) return;
-                    const rndIndex = Math.floor(Math.random() * length);
-                    const validatorAddressBuffer = await getWriterIndex(rndIndex);
-
-                    if (validatorAddressBuffer === null || b4a.byteLength(validatorAddressBuffer) !== ApplyOperationEncodings.TRAC_ADDRESS_SIZE) return;
-
-                    const validatorAddress = ApplyOperationEncodings.bufferToAddress(validatorAddressBuffer);
-                    if (validatorAddress === addresss) return;
-
-                    const validatorPubKey = Wallet.decodeBech32m(validatorAddress).toString('hex');
-                    const validatorEntry = await getNodeEntry(validatorAddress);
-
-                    if (
-                        this.validator_stream !== null ||
-                        this.validator !== null ||
-                        validatorEntry === null ||
-                        !validatorEntry.isWriter ||
-                        validatorEntry.isIndexer
-                    ) return;
-
-                    await this.tryConnect(validatorPubKey, 'validator');
-                };
-
-                const promises = [];
-                for (let i = 0; i < 10; i++) {
-                    promises.push(findValidator());
-                    await sleep(250);
-                }
-                await Promise.all(promises);
-                await sleep(1000);
-            }
-        } catch (e) {
-            console.log('Error in validatorObserver:', e);
-        }
-    }
-
-    stopValidatorObserver() {
-        this.#enableValidatorObserver = false;
     }
 
     async tryConnect(publicKey, type = null) {

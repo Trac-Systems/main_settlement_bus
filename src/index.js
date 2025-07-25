@@ -41,7 +41,7 @@ export class MainSettlementBus extends ReadyResource {
     #wallet;
     #network;
     #readline_instance;
-    #enableRoleRequester;
+    #enable_validator_observer;
     #state;
 
     constructor(options = {}) {
@@ -70,7 +70,8 @@ export class MainSettlementBus extends ReadyResource {
         this.#wallet = new PeerWallet(options);
         this.#readline_instance = null;
         this.enable_interactive_mode = options.enable_interactive_mode !== false;
-        this.#enableRoleRequester = options.enableRoleRequester !== undefined ? options.enableRoleRequester : true;
+        this.#enable_validator_observer = options.enable_validator_observer !== undefined ? options.enable_validator_observer : true;
+        
         if (this.enable_interactive_mode !== false) {
             try {
                 this.#readline_instance = readline.createInterface({
@@ -101,6 +102,7 @@ export class MainSettlementBus extends ReadyResource {
     async _open() {
 
         await this.#state.ready();
+        await this.#network.ready();
         this.#stateEventsListener();
 
         if (this.#enable_wallet) {
@@ -108,20 +110,17 @@ export class MainSettlementBus extends ReadyResource {
             printWalletInfo(this.#wallet.address, this.#state.writingKey);
         }
 
-        await this.#network.ready();
         await this.#network.replicate(
-                this.#state,
-                this.#store,
-                this.#wallet,
-                this.#handleIncomingEvent.bind(this),
-            );
-            
+            this.#state,
+            this.#store,
+            this.#wallet,
+            this.#handleIncomingEvent.bind(this),
+        );
+
         //validator observer can't be awaited.
-        this.#network.validatorObserver(
-            this.#state.getWriterLength.bind(this.#state),
-            this.#state.getWriterIndex.bind(this.#state),
-            this.#state.getNodeEntry.bind(this.#state),
-            this.#wallet.address);
+        if (this.#enable_validator_observer) {
+            this.#network.startValidatorObserver(this.#wallet.address);
+        }
 
         const adminEntry = await this.#state.getAdminEntry();
 
@@ -177,7 +176,7 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async #setUpRoleAutomatically() {
-        if (!this.#state.isWritable() && this.#enableRoleRequester) {
+        if (!this.#state.isWritable() && this.#enable_validator_observer) {
             console.log('Requesting writer role... This may take a moment.');
             await this.#requestWriterRole(false)
             setTimeout(async () => {
