@@ -1,11 +1,11 @@
 import b4a from 'b4a';
-import ApplyOperationEncodings from '../../state/ApplyOperationEncodings.js';
+import ApplyOperationEncodings from '../../../state/ApplyOperationEncodings.js';
 import Wallet from 'trac-wallet';
 import BaseResponse from './base/baseResponse.js';
 
 class CustomNodeResponse extends BaseResponse {
-    constructor(network, state, wallet) {
-        super(network, state, wallet);
+    constructor(state, wallet) {
+        super(state, wallet);
     }
 
     async validate(message, channelString) {
@@ -20,12 +20,13 @@ class CustomNodeResponse extends BaseResponse {
     }
 
     validatePayload(message) {
-        if (!message.response ||
-            !message.response.address ||
-            !message.response.nonce ||
-            !message.response.channel ||
-            !message.response.issuer ||
-            !message.response.timestamp) {
+        if (!message ||
+            !message.op ||
+            !message.address ||
+            !message.nonce ||
+            !message.channel ||
+            !message.issuer ||
+            !message.timestamp) {
             console.error("Custom node response is missing required fields.");
             return false;
         }
@@ -33,7 +34,7 @@ class CustomNodeResponse extends BaseResponse {
     }
 
     async validateCustomNodeEntry(message) {
-        const customNodeAddressString = message.response.address;
+        const customNodeAddressString = message.address;
         const customNodeEntry = await this.state.getNodeEntry(customNodeAddressString);
         if (customNodeEntry === null) {
             console.error("Custom node entry is null - entry is not initialized.");
@@ -43,10 +44,13 @@ class CustomNodeResponse extends BaseResponse {
     }
 
     async validateSignature(message) {
-        const customNodeAddressString = ApplyOperationEncodings.bufferToAddress(message.response.address);
+        const customNodeAddressString = ApplyOperationEncodings.bufferToAddress(message.address);
         const customNodePublicKey = Wallet.decodeBech32m(customNodeAddressString);
 
-        const hash = await this.wallet.createHash('sha256', JSON.stringify(message.response));
+        const messageWithoutSig = { ...message };
+        delete messageWithoutSig.sig;
+
+        const hash = await this.wallet.createHash('sha256', JSON.stringify(messageWithoutSig));
         const signature = b4a.from(message.sig, 'hex');
         const verified = this.wallet.verify(signature, hash, customNodePublicKey);
 

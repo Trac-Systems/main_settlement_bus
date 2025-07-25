@@ -107,7 +107,6 @@ export class MainSettlementBus extends ReadyResource {
         if (this.#replicate) {
             await this.#network.replicate(
                 this.#state,
-                this.#state.writingKey,
                 this.#store,
                 this.#wallet,
                 this.#handleIncomingEvent.bind(this),
@@ -324,7 +323,7 @@ export class MainSettlementBus extends ReadyResource {
                 if (null === this.#network.validator_stream) return;
                 const payloadForValidator = {
                     op: 'addAdmin',
-                    message: addAdminMessage,
+                    transactionPayload: addAdminMessage,
 
                 }
                 await this.#network.validator_stream.messenger.send(payloadForValidator);
@@ -368,7 +367,7 @@ export class MainSettlementBus extends ReadyResource {
 
             const whitelistedMessage = {
                 op: 'whitelisted',
-                message: encodedPayload,
+                transactionPayload: encodedPayload,
             };
 
             await this.#state.append(encodedPayload);
@@ -391,19 +390,17 @@ export class MainSettlementBus extends ReadyResource {
             const isAllowedToRequestRole = await this.#isAllowedToRequestRole(adminEntry, nodeEntry);
             const canAddWriter = !!(!this.#state.isWritable() && !isAlreadyWriter && isAllowedToRequestRole);
             if (canAddWriter) {
-                //TODO: network module should handle this in binary format however for now it is ok
                 assembledMessage = {
                     op: 'addWriter',
-                    message: await StateMessageOperations.assembleAddWriterMessage(this.#wallet, this.#state.writingKey),
+                    transactionPayload: await StateMessageOperations.assembleAddWriterMessage(this.#wallet, this.#state.writingKey),
                 }
             }
         }
         else {
             if (isAlreadyWriter) {
-                //TODO: network module should handle this in binary format however for now it is ok
                 assembledMessage = {
                     op: 'removeWriter',
-                    message: await StateMessageOperations.assembleRemoveWriterMessage(this.#wallet, this.#state.writingKey),
+                    transactionPayload: await StateMessageOperations.assembleRemoveWriterMessage(this.#wallet, this.#state.writingKey),
 
                 }
             }

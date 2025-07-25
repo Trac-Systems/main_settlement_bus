@@ -1,10 +1,10 @@
 import b4a from 'b4a';
-import ApplyOperationEncodings from '../../state/ApplyOperationEncodings.js';
+import ApplyOperationEncodings from '../../../state/ApplyOperationEncodings.js';
 import Wallet from 'trac-wallet';
 import BaseResponse from './base/baseResponse.js';
 class ValidatorResponse extends BaseResponse {
-    constructor(network, state, wallet) {
-        super(network, state, wallet);
+    constructor(state, wallet) {
+        super(state, wallet);
     }
 
     async validate(message, channelString) {
@@ -20,13 +20,14 @@ class ValidatorResponse extends BaseResponse {
     }
 
     validatePayload(message) {
-        if (!message.response ||
-            !message.response.wk ||
-            !message.response.address ||
-            !message.response.nonce ||
-            !message.response.channel ||
-            !message.response.issuer ||
-            !message.response.timestamp) {
+        if (!message ||
+            !message.op ||
+            !message.wk ||
+            !message.address ||
+            !message.nonce ||
+            !message.channel ||
+            !message.issuer ||
+            !message.timestamp) {
             console.error("Validator response is missing required fields.");
             return false;
         }
@@ -34,7 +35,7 @@ class ValidatorResponse extends BaseResponse {
     }
 
     async validateNodeEntry(message) {
-        const validatorEntry = await this.state.getNodeEntry(message.response.address);
+        const validatorEntry = await this.state.getNodeEntry(message.address);
         if (validatorEntry === null || !validatorEntry.isWriter || validatorEntry.isIndexer) {
             console.error("Validator entry not found in state.");
             return false;
@@ -43,8 +44,8 @@ class ValidatorResponse extends BaseResponse {
     }
 
     async validateWritingKey(message) {
-        const writingKey = b4a.from(message.response.wk, 'hex');
-        const validatorEntry = await this.state.getNodeEntry(message.response.address);
+        const writingKey = b4a.from(message.wk, 'hex');
+        const validatorEntry = await this.state.getNodeEntry(message.address);
         
         if (!validatorEntry || !b4a.equals(validatorEntry.wk, writingKey)) {
             console.error("Writing key does not match validator entry.");
@@ -54,10 +55,11 @@ class ValidatorResponse extends BaseResponse {
     }
 
     async validateSignature(message) {
-        const validatorAddressString = ApplyOperationEncodings.bufferToAddress(message.response.address);
+        const validatorAddressString = ApplyOperationEncodings.bufferToAddress(message.address);
         const validatorPublicKey = Wallet.decodeBech32m(validatorAddressString);
-
-        const hash = await this.wallet.createHash('sha256', JSON.stringify(message.response));
+        const messageWithoutSig = { ...message };
+        delete messageWithoutSig.sig;
+        const hash = await this.wallet.createHash('sha256', JSON.stringify(messageWithoutSig));
         const signature = b4a.from(message.sig, 'hex');
         const verified = this.wallet.verify(signature, hash, validatorPublicKey);
 

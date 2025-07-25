@@ -1,8 +1,12 @@
+import ReadyResource from 'ready-resource';
+import Hyperswarm from 'hyperswarm';
 import w from 'protomux-wakeup';
 import b4a from 'b4a';
-import Hyperswarm from 'hyperswarm';
 import Wallet from 'trac-wallet';
-import ReadyResource from 'ready-resource';
+import ApplyOperationEncodings from '../state/ApplyOperationEncodings.js';
+import Check from '../../utils/check.js';
+import PoolService from './services/PoolService.js';
+import NetworkMessages from './messaging/NetworkMessages.js';
 import { sleep } from '../../utils/helpers.js';
 import {
     TRAC_NAMESPACE,
@@ -10,14 +14,8 @@ import {
     MAX_PARALLEL,
     MAX_SERVER_CONNECTIONS,
     MAX_CLIENT_CONNECTIONS,
+    NETWORK_MESSAGE_TYPES
 } from '../../utils/constants.js';
-import ApplyOperationEncodings from '../state/ApplyOperationEncodings.js';
-import Check from '../../utils/check.js';
-import AdminResponse from './validators/AdminResponse.js';
-import ValidatorResponse from './validators/ValidatorResponse.js';
-import CustomNodeResponse from './validators/CustomNodeResponse.js';
-import PoolService from './services/PoolService.js';
-import NetworkMessages from './messaging/NetworkMessages.js';
 const wakeup = new w();
 
 class Network extends ReadyResource {
@@ -27,7 +25,6 @@ class Network extends ReadyResource {
     #enable_wallet;
     #disable_rate_limit;
     #channel;
-    #dht_bootstrap = ['116.202.214.149:10001', '157.180.12.214:10001', 'node1.hyperdht.org:49737', 'node2.hyperdht.org:49737', 'node3.hyperdht.org:49737'];
     #networkMessages;
     #poolService;
 
@@ -37,9 +34,10 @@ class Network extends ReadyResource {
         this.#enable_wallet = options.enable_wallet !== false;
         this.#disable_rate_limit = options.disable_rate_limit === true;
         this.#channel = channel;
-        this.poolService = new PoolService(state)
+        this.#poolService = new PoolService(state)
         this.check = new Check();
         this.#networkMessages = new NetworkMessages(this);
+        
         this.admin_stream = null;
         this.admin = null;
         this.validator_stream = null;
@@ -88,7 +86,6 @@ class Network extends ReadyResource {
 
     async replicate(
         state,
-        writingKey,
         store,
         wallet,
         handleIncomingEvent,
@@ -114,12 +111,12 @@ class Network extends ReadyResource {
             });
 
             console.log(`Channel: ${b4a.toString(this.#channel)}`);
-            const network = this;
+            this.#networkMessages.initializeMessageRouter(state, wallet, handleIncomingEvent);
 
             this.#swarm.on('connection', async (connection) => {
-                const { message_channel, message } = this.#networkMessages.setupConnection(connection, this, state, wallet, writingKey, handleIncomingEvent);
+                const { message_channel, message } = this.#networkMessages.setupProtocolMessages(connection);
                 connection.messenger = message;
-                
+
                 connection.on('close', () => {
                     if (this.validator_stream === connection) {
                         this.validator_stream = null;
@@ -247,11 +244,11 @@ class Network extends ReadyResource {
         }[type];
 
         if (type === 'validator') {
-            await stream.messenger.send('get_validator');
+            await stream.messenger.send(NETWORK_MESSAGE_TYPES.GET.VALIDATOR);
         } else if (type === 'admin') {
-            await stream.messenger.send('get_admin');
+            await stream.messenger.send(NETWORK_MESSAGE_TYPES.GET.ADMIN);
         } else if (type === 'node') {
-            await stream.messenger.send('get_node');
+            await stream.messenger.send(NETWORK_MESSAGE_TYPES.GET.NODE);
         } else {
             return;
         }
@@ -269,7 +266,7 @@ class Network extends ReadyResource {
     async sendMessageToAdmin(adminEntry, message) {
         try {
             if (!adminEntry || !message) {
-                return; //change to throw error because we are not in apply 
+                throw new Error('Invalid admin entry or message');
             }
             const adminPublicKey = Wallet.decodeBech32m(adminEntry.tracAddr).toString('hex');
             await this.tryConnect(adminPublicKey, 'admin');
@@ -300,125 +297,12 @@ class Network extends ReadyResource {
             ) {
                 await this.custom_stream.messenger.send(message);
             } else {
-
-                //Todo: change it to throw error
-                console.log(`Failed to send message to node: ${nodePublicKey}`);
+                throw new Error(`Failed to send message to node: ${nodePublicKey}`);
             }
 
         } catch (e) {
             console.log(e)
         }
     }
-
-    //TODO: In the future we will move it to another class to reduce size of this file. It should be moved to a new builder class.
-    async handleGetValidatorResponse(message, connection, channelString, wallet, writingKey) {
-        const nonce = Wallet.generateNonce().toString('hex');
-        const payload = {
-            op: 'validatorResponse',
-            wk: writingKey.toString('hex'),
-            address: wallet.address,
-            nonce: nonce,
-            channel: channelString,
-            issuer: connection.remotePublicKey.toString('hex'),
-            timestamp: Date.now(),
-        };
-        const hash = await wallet.createHash('sha256', JSON.stringify(payload));
-        const sig = wallet.sign(hash);
-        message.send({ response: payload, sig: sig.toString('hex') });
-    }
-
-    async handleValidatorResponse(message, connection, channelString, state, wallet) {
-        const validator = new ValidatorResponse(this, state, wallet);
-        const isValid = await validator.validate(message, channelString);
-        if (isValid) {
-            const validatorAddressString = message.response.address;
-            const validatorPublicKey = Wallet.decodeBech32m(validatorAddressString);
-            console.log('Validator stream established', validatorAddressString);
-            this.validator_stream = connection;
-            this.validator = validatorPublicKey;
-        } else {
-            console.error("Validator response verification failed or channel mismatch.");
-            this.#swarm.leavePeer(connection.remotePublicKey);
-        }
-    }
-
-    async handleGetAdminRequest(message, connection, channelString, wallet, writingKey, state) {
-        const adminEntry = await state.getAdminEntry();
-        if (adminEntry === null) {
-            console.log("Admin entry is null. This is not possible to create admin stream.");
-            return;
-        }
-
-        const adminPublicKey = Wallet.decodeBech32m(adminEntry.tracAddr);
-
-        if (!b4a.equals(wallet.publicKey, adminPublicKey)) {
-            console.log("You are not an admin. This is not possible to create admin stream.");
-            return;
-        }
-
-        const nonce = Wallet.generateNonce().toString('hex');
-        const payload = {
-            op: 'adminResponse',
-            wk: writingKey.toString('hex'),
-            address: wallet.address,
-            nonce: nonce,
-            channel: channelString,
-            issuer: connection.remotePublicKey.toString('hex'),
-            timestamp: Date.now(),
-        };
-        const hash = await wallet.createHash('sha256', JSON.stringify(payload));
-        const sig = wallet.sign(hash);
-
-        message.send({ response: payload, sig: sig.toString('hex') });
-    }
-
-    async handleAdminResponse(message, connection, channelString, state, wallet) {
-        const adminResponseValidator = new AdminResponse(this, state, wallet);
-        const isValid = await adminResponseValidator.validate(message, channelString);
-        if (isValid) {
-            const adminEntry = await state.getAdminEntry();
-            const adminPublicKey = Wallet.decodeBech32m(adminEntry.tracAddr);
-            console.log('Admin stream established:', adminEntry.tracAddr);
-            this.admin_stream = connection;
-            this.admin = adminPublicKey;
-        } else {
-            this.#swarm.leavePeer(connection.remotePublicKey);
-        }
-    }
-
-    async handleCustomNodeRequest(message, connection, channelString, wallet) {
-        const nonce = Wallet.generateNonce().toString('hex');
-        const payload = {
-            op: 'nodeResponse',
-            address: wallet.address,
-            nonce: nonce,
-            channel: channelString,
-            issuer: connection.remotePublicKey.toString('hex'),
-            timestamp: Date.now(),
-        };
-        const hash = await wallet.createHash('sha256', JSON.stringify(payload));
-        const sig = wallet.sign(hash);
-
-        console.log('Custom node request sent:', connection.remotePublicKey.toString('hex'));
-        message.send({ response: payload, sig: sig.toString('hex') });
-
-    }
-
-    async handleCustomNodeResponse(message, connection, channelString, state, wallet) {
-        const customNodeValidator = new CustomNodeResponse(this, state, wallet);
-        const isValid = await customNodeValidator.validate(message, channelString);
-        if (isValid) {
-            const customNodeAddressString = message.response.address;
-            const customNodePublicKey = Wallet.decodeBech32m(customNodeAddressString);
-
-            console.log('Custom node stream established:', customNodeAddressString);
-            this.custom_stream = connection;
-            this.custom_node = customNodePublicKey;
-        } else {
-            console.log("Custom node response verification failed or channel mismatch.");
-            this.#swarm.leavePeer(connection.remotePublicKey);
-        }
-    }
-
 }
 export default Network;

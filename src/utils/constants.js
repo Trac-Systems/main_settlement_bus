@@ -1,4 +1,4 @@
-import {OperationType as OP} from './protobuf/applyOperations.cjs';
+import { OperationType as OP } from './protobuf/applyOperations.cjs';
 
 export const EntryType = Object.freeze({
     ADMIN: 'admin',
@@ -66,6 +66,28 @@ export const CLEANUP_INTERVAL_MS = 120_000;
 export const CONNECTION_TIMEOUT_MS = 60_000;
 export const MAX_TRANSACTIONS_PER_SECOND = 50;
 
-// PreTransaction constants
+// PreTransaction constants // todo change name?
 export const MAX_PRE_TX_PAYLOAD_BYTE_SIZE = 3072;
 export const TRANSACTION_POOL_SIZE = 1000;
+
+// Network message constants
+export const NETWORK_MESSAGE_TYPES = Object.freeze({
+    GET: {
+        VALIDATOR: 'get_validator_pop',
+        ADMIN: 'get_admin_pop',
+        NODE: 'get_node_pop'
+    },
+
+    RESPONSE: {
+        VALIDATOR: 'validatorResponse',
+        ADMIN: 'adminResponse',
+        NODE: 'nodeResponse'
+    },
+
+    OPERATION: {
+        ADD_WRITER: 'addWriter',
+        REMOVE_WRITER: 'removeWriter',
+        ADD_ADMIN: 'addAdmin',
+        WHITELISTED: 'whitelisted'
+    }
+});

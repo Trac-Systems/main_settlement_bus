@@ -4,8 +4,8 @@ import BaseResponse from './base/baseResponse.js';
 
 class AdminResponse extends BaseResponse {
 
-    constructor(network, state, wallet) {
-        super(network, state, wallet);
+    constructor(state, wallet) {
+        super(state, wallet);
     }
 
     async validate(message, channelString) {
@@ -20,13 +20,14 @@ class AdminResponse extends BaseResponse {
     }
 
     validatePayload(message) {
-        if (!message.response ||
-            !message.response.wk ||
-            !message.response.address ||
-            !message.response.nonce ||
-            !message.response.channel ||
-            !message.response.issuer ||
-            !message.response.timestamp) {
+        if (!message ||
+            !message.op ||
+            !message.wk ||
+            !message.address ||
+            !message.nonce ||
+            !message.channel ||
+            !message.issuer ||
+            !message.timestamp) {
             console.error("Admin response is missing required fields.");
             return false;
         }
@@ -41,8 +42,8 @@ class AdminResponse extends BaseResponse {
         }
 
         const adminPublicKey = Wallet.decodeBech32m(adminEntry.tracAddr);
-        const receivedAdminPublicKey = Wallet.decodeBech32m(message.response.address);
-        const adminWritingKey = b4a.from(message.response.wk, 'hex');
+        const receivedAdminPublicKey = Wallet.decodeBech32m(message.address);
+        const adminWritingKey = b4a.from(message.wk, 'hex');
 
         if (!b4a.equals(adminPublicKey, receivedAdminPublicKey) || !b4a.equals(adminEntry.wk, adminWritingKey)) {
             console.error("Admin public key or writing key mismatch in response.");
@@ -55,8 +56,9 @@ class AdminResponse extends BaseResponse {
     async validateAdminSignature(message) {
         const adminEntry = await this.state.getAdminEntry();
         const adminPublicKey = Wallet.decodeBech32m(adminEntry.tracAddr);
-
-        const hash = await this.wallet.createHash('sha256', JSON.stringify(message.response));
+        const messageWithoutSig = { ...message };
+        delete messageWithoutSig.sig;
+        const hash = await this.wallet.createHash('sha256', JSON.stringify(messageWithoutSig));
         const signature = b4a.from(message.sig, 'hex');
         const verified = this.wallet.verify(signature, hash, adminPublicKey);
 
