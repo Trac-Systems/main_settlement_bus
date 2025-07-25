@@ -14,12 +14,14 @@ import {
     MAX_PARALLEL,
     MAX_SERVER_CONNECTIONS,
     MAX_CLIENT_CONNECTIONS,
-    NETWORK_MESSAGE_TYPES
+    NETWORK_MESSAGE_TYPES,
+    DHT_BOOTSTRAPS
 } from '../../utils/constants.js';
+
 const wakeup = new w();
 
 class Network extends ReadyResource {
-    #dht_bootstrap = ['116.202.214.149:10001', '157.180.12.214:10001', 'node1.hyperdht.org:49737', 'node2.hyperdht.org:49737', 'node3.hyperdht.org:49737'];
+    #dht_bootstrap = DHT_BOOTSTRAPS;
     #swarm = null;
     #enableValidatorObserver;
     #enable_wallet;
@@ -32,19 +34,20 @@ class Network extends ReadyResource {
         super();
         this.#enableValidatorObserver = options.enableValidatorObserver !== undefined ? options.enableValidatorObserver : true;
         this.#enable_wallet = options.enable_wallet !== false;
+        // DISABLE RATE LIMIT SHOWULD BE PROPAGATED TO THE PRETX VALIDATION BECAUSE RATE LIMIT IS NO LONGER USED THERE.
         this.#disable_rate_limit = options.disable_rate_limit === true;
         this.#channel = channel;
         this.#poolService = new PoolService(state)
+        //TODO: DELETE CHECK
         this.check = new Check();
         this.#networkMessages = new NetworkMessages(this);
-        
+        //TODO: move streams maybe to HASHMAP?
         this.admin_stream = null;
         this.admin = null;
         this.validator_stream = null;
         this.validator = null;
         this.custom_stream = null;
         this.custom_node = null;
-
     }
 
     get swarm() {
@@ -83,7 +86,9 @@ class Network extends ReadyResource {
             this.#swarm.destroy();
         }
     }
-
+    async initializeNetworkingKeyPair(store) {
+        //TODO: PLACEHOLDER
+    }
     async replicate(
         state,
         store,
@@ -122,6 +127,7 @@ class Network extends ReadyResource {
                         this.validator_stream = null;
                         this.validator = null;
                     }
+                    
                     if (this.admin_stream === connection) {
                         this.admin_stream = null;
                         this.admin = null;
@@ -135,7 +141,7 @@ class Network extends ReadyResource {
                     message_channel.close()
                 });
 
-                // must be called AFTER the protomux init above
+                // ATTENTION: Must be called AFTER the protomux init above
                 const stream = store.replicate(connection);
                 wakeup.addStream(stream);
 
@@ -147,7 +153,7 @@ class Network extends ReadyResource {
             await this.#swarm.flush();
         }
     }
-
+    //TODO: Move this as a new service
     // TODO: AFTER WHILE LOOP SIGNAL TO THE PROCESS THAT VALIDATOR OBSERVER STOPPED OPERATING. 
     // OS CALLS, ACCUMULATORS, MAYBE THIS IS POSSIBLE TO CHECK I/O QUEUE IF IT COINTAIN IT. FOR NOW WE ARE USING SLEEP.
     //TODO fix finding validators and specific node
