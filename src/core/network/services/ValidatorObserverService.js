@@ -4,7 +4,6 @@ import b4a from "b4a";
 import ApplyOperationEncodings from "../../state/ApplyOperationEncodings.js";
 import { sleep } from '../../../utils/helpers.js';
 
-
 class ValidatorObserverService {
     #enable_validator_observer;
     #enable_wallet;
