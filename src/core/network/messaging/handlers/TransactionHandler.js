@@ -32,10 +32,6 @@ class TransactionHandler {
         return this.#state;
     }
 
-    get wallet() {
-        return this.#wallet;
-    }
-
     get transactionValidator() {
         return this.#transactionValidator;
     }
@@ -76,7 +72,7 @@ class TransactionHandler {
         }
 
         const postTx = await StateMessageOperations.assemblePostTxMessage(
-            this.wallet,
+            this.#wallet,
             parsedPreTx.va,
             b4a.from(parsedPreTx.tx, 'hex'),
             parsedPreTx.ia,
