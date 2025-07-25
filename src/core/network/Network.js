@@ -38,7 +38,8 @@ class Network extends ReadyResource {
         this.#channel = channel;
         this.#poolService = new PoolService(state)
         this.#networkMessages = new NetworkMessages(this, options = {});
-        //TODO: move streams maybe to HASHMAP?
+        //TODO: move streams maybe to HASHMAP? To discuss because this change will affect the whole network module and it's usage. It is not a priority right now
+        //However, it gives us more flexibility in the future, because we can create set of streams. Maybe in this case exist better data structure?
         this.admin_stream = null;
         this.admin = null;
         this.validator_stream = null;
@@ -83,9 +84,7 @@ class Network extends ReadyResource {
             this.#swarm.destroy();
         }
     }
-    async initializeNetworkingKeyPair(store) {
-        //TODO: PLACEHOLDER
-    }
+
     async replicate(
         state,
         store,
@@ -93,16 +92,7 @@ class Network extends ReadyResource {
         handleIncomingEvent,
     ) {
         if (!this.#swarm) {
-            let keyPair;
-            if (!this.#enable_wallet) {
-                keyPair = await store.createKeyPair(TRAC_NAMESPACE);
-            } else {
-                keyPair = {
-                    publicKey: b4a.from(wallet.publicKey, 'hex'),
-                    secretKey: b4a.from(wallet.secretKey, 'hex')
-                };
-            }
-
+            const keyPair = await this.initializeNetworkingKeyPair(store, wallet);
             this.#swarm = new Hyperswarm({
                 keyPair,
                 bootstrap: this.#dht_bootstrap,
@@ -124,7 +114,7 @@ class Network extends ReadyResource {
                         this.validator_stream = null;
                         this.validator = null;
                     }
-                    
+
                     if (this.admin_stream === connection) {
                         this.admin_stream = null;
                         this.admin = null;
@@ -142,7 +132,9 @@ class Network extends ReadyResource {
                 const stream = store.replicate(connection);
                 wakeup.addStream(stream);
 
-                connection.on('error', (error) => { });
+                connection.on('error', (error) => {
+                    //TODO: handle error
+                });
 
             });
 
@@ -150,6 +142,20 @@ class Network extends ReadyResource {
             await this.#swarm.flush();
         }
     }
+
+    async initializeNetworkingKeyPair(store, wallet) {
+        if (!this.#enable_wallet) {
+            const keyPair = await store.createKeyPair(TRAC_NAMESPACE);
+            return keyPair;
+        } else {
+            const keyPair = {
+                publicKey: wallet.publicKey,
+                secretKey: wallet.secretKey
+            };
+            return keyPair;
+        }
+    }
+    
     //TODO: Move this as a new service
     // TODO: AFTER WHILE LOOP SIGNAL TO THE PROCESS THAT VALIDATOR OBSERVER STOPPED OPERATING. 
     // OS CALLS, ACCUMULATORS, MAYBE THIS IS POSSIBLE TO CHECK I/O QUEUE IF IT COINTAIN IT. FOR NOW WE ARE USING SLEEP.
@@ -165,7 +171,7 @@ class Network extends ReadyResource {
                 }
                 const lengthEntry = await getWriterLength();
                 const length = lengthEntry ?? 0;
-
+                
                 const findValidator = async () => {
                     if (this.validator_stream !== null) return;
                     const rndIndex = Math.floor(Math.random() * length);
