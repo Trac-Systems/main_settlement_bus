@@ -10,10 +10,6 @@ class GetRequestHandler {
         this.#state = state;
     }
 
-    get wallet() {
-        return this.#wallet;
-    }
-
     get state() {
         return this.#state;
     }
@@ -40,15 +36,15 @@ class GetRequestHandler {
         const payload = {
             op: 'validatorResponse',
             wk: this.state.writingKey.toString('hex'),
-            address: this.wallet.address,
+            address: this.#wallet.address,
             nonce: nonce,
             channel: channelString,
             issuer: connection.remotePublicKey.toString('hex'),
             timestamp: Date.now(),
         };
 
-        const hash = await this.wallet.createHash('sha256', JSON.stringify(payload));
-        const sig = this.wallet.sign(hash);
+        const hash = await this.#wallet.createHash('sha256', JSON.stringify(payload));
+        const sig = this.#wallet.sign(hash);
 
         const responseMessage = {
             ...payload,
@@ -65,7 +61,7 @@ class GetRequestHandler {
 
         const adminPublicKey = Wallet.decodeBech32m(adminEntry.tracAddr);
 
-        if (!b4a.equals(this.wallet.publicKey, adminPublicKey)) {
+        if (!b4a.equals(this.#wallet.publicKey, adminPublicKey)) {
             throw new Error("You are not an admin. This is not possible to create admin stream.");
         }
 
@@ -73,14 +69,14 @@ class GetRequestHandler {
         const payload = {
             op: 'adminResponse',
             wk: this.state.writingKey.toString('hex'),
-            address: this.wallet.address,
+            address: this.#wallet.address,
             nonce: nonce,
             channel: channelString,
             issuer: connection.remotePublicKey.toString('hex'),
             timestamp: Date.now(),
         };
-        const hash = await this.wallet.createHash('sha256', JSON.stringify(payload));
-        const sig = this.wallet.sign(hash);
+        const hash = await this.#wallet.createHash('sha256', JSON.stringify(payload));
+        const sig = this.#wallet.sign(hash);
 
         const responseMessage = {
             ...payload,
@@ -93,15 +89,15 @@ class GetRequestHandler {
         const nonce = Wallet.generateNonce().toString('hex');
         const payload = {
             op: 'nodeResponse',
-            address: this.wallet.address,
+            address: this.#wallet.address,
             nonce: nonce,
             channel: channelString,
             issuer: connection.remotePublicKey.toString('hex'),
             timestamp: Date.now(),
         };
         
-        const hash = await this.wallet.createHash('sha256', JSON.stringify(payload));
-        const sig = this.wallet.sign(hash);
+        const hash = await this.#wallet.createHash('sha256', JSON.stringify(payload));
+        const sig = this.#wallet.sign(hash);
 
         const responseMessage = {
             ...payload,

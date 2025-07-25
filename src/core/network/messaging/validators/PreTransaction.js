@@ -7,7 +7,7 @@ class PreTransaction {
     #wallet;
     #network;
     #check;
-    
+
     constructor(state, wallet, network) {
         this.#state = state;
         this.#wallet = wallet;
@@ -16,9 +16,6 @@ class PreTransaction {
     }
     get state() {
         return this.#state;
-    }
-    get wallet() {
-        return this.#wallet;
     }
     get network() {
         return this.#network;
@@ -89,8 +86,8 @@ class PreTransaction {
     }
 
     validateValidatorAddress(parsedPreTx) {
-        if (parsedPreTx.va !== this.wallet.address) {
-            console.error('Validator public key does not match wallet address:', parsedPreTx.va, this.wallet.address);
+        if (parsedPreTx.va !== this.#wallet.address) {
+            console.error('Validator public key does not match wallet address:', parsedPreTx.va, this.#wallet.address);
             return false;
         }
         return true;

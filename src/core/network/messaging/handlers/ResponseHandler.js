@@ -8,16 +8,15 @@ import Wallet from 'trac-wallet';
 class ResponseHandler {
     #network;
     #state;
-    #wallet;
-    responseValidator;
-    adminValidator;
+    #responseValidator;
+    #adminValidator;
+    #customNodeValidator;
     constructor(network, state, wallet) {
         this.#network = network;
         this.#state = state;
-        this.#wallet = wallet;
-        this.responseValidator = new ValidatorResponse(this.state, this.wallet);
-        this.adminValidator = new AdminResponse(this.state, this.wallet);
-        this.customNodeValidator = new CustomNodeResponse(this.state, this.wallet);
+        this.#responseValidator = new ValidatorResponse(this.state, wallet);
+        this.#adminValidator = new AdminResponse(this.state, wallet);
+        this.#customNodeValidator = new CustomNodeResponse(this.state, wallet);
 
     }
 
@@ -29,32 +28,36 @@ class ResponseHandler {
         return this.#state;
     }
 
-    get wallet() {
-        return this.#wallet;
+    get responseValidator() {
+        return this.#responseValidator;
     }
 
-    get validator() {
-        return this.responseValidator;
+    get adminValidator() {
+        return this.#adminValidator;
+    }
+    
+    get customNodeValidator() {
+        return this.#customNodeValidator;
     }
 
     async handle(message, connection, channelString) {
         switch (message.op) {
             case NETWORK_MESSAGE_TYPES.RESPONSE.VALIDATOR:
-                await this.handleValidatorResponse(message, connection, channelString);
+                await this.#handleValidatorResponse(message, connection, channelString);
                 break;
             case NETWORK_MESSAGE_TYPES.RESPONSE.ADMIN:
-                await this.handleAdminResponse(message, connection, channelString);
+                await this.#handleAdminResponse(message, connection, channelString);
                 break;
             case NETWORK_MESSAGE_TYPES.RESPONSE.NODE:
-                await this.handleCustomNodeResponse(message, connection, channelString);
+                await this.#handleCustomNodeResponse(message, connection, channelString);
                 break;
             default:
                 throw new Error(`Unhandled RESPONSE type: ${message}`);
         }
     }
 
-    async handleValidatorResponse(message, connection, channelString) {
-        const isValid = await this.validator.validate(message, channelString);
+    async #handleValidatorResponse(message, connection, channelString) {
+        const isValid = await this.responseValidator.validate(message, channelString);
         if (isValid) {
             const validatorAddressString = message.address;
             const validatorPublicKey = Wallet.decodeBech32m(validatorAddressString);
@@ -67,7 +70,7 @@ class ResponseHandler {
         }
     }
 
-    async handleAdminResponse(message, connection, channelString) {
+    async #handleAdminResponse(message, connection, channelString) {
         const isValid = await this.adminValidator.validate(message, channelString);
         if (isValid) {
             const adminEntry = await this.state.getAdminEntry();
@@ -81,7 +84,7 @@ class ResponseHandler {
         }
     }
 
-    async handleCustomNodeResponse(message, connection, channelString) {
+    async #handleCustomNodeResponse(message, connection, channelString) {
         const isValid = await this.customNodeValidator.validate(message, channelString);
         if (isValid) {
             const customNodeAddressString = message.address;

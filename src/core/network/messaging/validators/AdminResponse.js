@@ -52,23 +52,6 @@ class AdminResponse extends BaseResponse {
 
         return true;
     }
-
-    async validateAdminSignature(message) {
-        const adminEntry = await this.state.getAdminEntry();
-        const adminPublicKey = Wallet.decodeBech32m(adminEntry.tracAddr);
-        const messageWithoutSig = { ...message };
-        delete messageWithoutSig.sig;
-        const hash = await this.wallet.createHash('sha256', JSON.stringify(messageWithoutSig));
-        const signature = b4a.from(message.sig, 'hex');
-        const verified = this.wallet.verify(signature, hash, adminPublicKey);
-
-        if (!verified) {
-            console.error("Admin response verification failed");
-            return false;
-        }
-
-        return true;
-    }
 }
 
 export default AdminResponse;

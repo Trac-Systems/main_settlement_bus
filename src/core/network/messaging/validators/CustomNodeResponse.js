@@ -1,6 +1,3 @@
-import b4a from 'b4a';
-import ApplyOperationEncodings from '../../../state/ApplyOperationEncodings.js';
-import Wallet from 'trac-wallet';
 import BaseResponse from './base/baseResponse.js';
 
 class CustomNodeResponse extends BaseResponse {
@@ -13,7 +10,7 @@ class CustomNodeResponse extends BaseResponse {
         if (!this.validateIssuerPublicKey(message)) return false;
         if (!this.validateTimestamp(message)) return false;
         if (!await this.validateCustomNodeEntry(message)) return false;
-        if (!await this.validateSignature(message)) return false;
+        if (!await this.validateCustomNodeSignature(message)) return false;
         if (!this.validateChannel(message, channelString)) return false;
 
         return true;
@@ -42,25 +39,5 @@ class CustomNodeResponse extends BaseResponse {
         }
         return true;
     }
-
-    async validateSignature(message) {
-        const customNodeAddressString = ApplyOperationEncodings.bufferToAddress(message.address);
-        const customNodePublicKey = Wallet.decodeBech32m(customNodeAddressString);
-
-        const messageWithoutSig = { ...message };
-        delete messageWithoutSig.sig;
-
-        const hash = await this.wallet.createHash('sha256', JSON.stringify(messageWithoutSig));
-        const signature = b4a.from(message.sig, 'hex');
-        const verified = this.wallet.verify(signature, hash, customNodePublicKey);
-
-        if (!verified) {
-            console.error("Validator response verification failed");
-            return false;
-        }
-
-        return true;
-    }
-
 }
 export default CustomNodeResponse;
