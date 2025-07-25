@@ -25,7 +25,6 @@ class Network extends ReadyResource {
     #swarm = null;
     #enableValidatorObserver;
     #enable_wallet;
-    #disable_rate_limit;
     #channel;
     #networkMessages;
     #poolService;
@@ -34,10 +33,9 @@ class Network extends ReadyResource {
         super();
         this.#enableValidatorObserver = options.enableValidatorObserver !== undefined ? options.enableValidatorObserver : true;
         this.#enable_wallet = options.enable_wallet !== false;
-        this.#disable_rate_limit = options.disable_rate_limit === true;
         this.#channel = channel;
         this.#poolService = new PoolService(state)
-        this.#networkMessages = new NetworkMessages(this, options = {});
+        this.#networkMessages = new NetworkMessages(this, options);
         //TODO: move streams maybe to HASHMAP? To discuss because this change will affect the whole network module and it's usage. It is not a priority right now
         //However, it gives us more flexibility in the future, because we can create set of streams. Maybe in this case exist better data structure?
         this.admin_stream = null;
@@ -50,10 +48,6 @@ class Network extends ReadyResource {
 
     get swarm() {
         return this.#swarm;
-    }
-
-    get disable_rate_limit() {
-        return this.#disable_rate_limit;
     }
 
     get channel() {
