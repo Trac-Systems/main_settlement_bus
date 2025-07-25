@@ -3,8 +3,8 @@ import Hyperswarm from 'hyperswarm';
 import w from 'protomux-wakeup';
 import b4a from 'b4a';
 import Wallet from 'trac-wallet';
+
 import ApplyOperationEncodings from '../state/ApplyOperationEncodings.js';
-import Check from '../../utils/check.js';
 import PoolService from './services/PoolService.js';
 import NetworkMessages from './messaging/NetworkMessages.js';
 import { sleep } from '../../utils/helpers.js';

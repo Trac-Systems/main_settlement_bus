@@ -22,7 +22,6 @@ class TransactionHandler {
         this.#wallet = wallet;
         this.#transactionValidator = new PreTransaction(this.#state, this.#wallet, this.#network);
         this.#rateLimiter = new TransactionRateLimiterService();
-
     }
 
     get network() {

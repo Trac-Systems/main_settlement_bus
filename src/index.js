@@ -39,32 +39,38 @@ export class MainSettlementBus extends ReadyResource {
     #store;
     #enable_wallet;
     #wallet;
-    #replicate;
     #network;
     #readline_instance;
     #enableRoleRequester;
     #state;
+
     constructor(options = {}) {
         super();
-
-        this.check = new Check();
         this.#initInternalAttributes(options);
+        this.check = new Check();
         this.#state = new State(this.#store, this.bootstrap, this.#wallet, options);
         this.#network = new Network(this.#state, this.#channel, options);
-        this.#enableRoleRequester = options.enableRoleRequester !== undefined ? options.enableRoleRequester : true;
     }
 
     #initInternalAttributes(options) {
         this.#STORES_DIRECTORY = options.stores_directory;
         this.#KEY_PAIR_PATH = `${this.#STORES_DIRECTORY}${options.store_name}/db/keypair.json`
-        this.#bootstrap = this.#bootstrap = options.bootstrap ? b4a.from(options.bootstrap, 'hex') : null;
-        this.#channel = b4a.alloc(32).fill(options.channel) || null;
+        if (!options.bootstrap) {
+            throw new Error('MainSettlementBus: Bootstrap key is required. Application cannot start without bootstrap.');
+        }
+        this.#bootstrap = b4a.from(options.bootstrap, 'hex');
+
+        if (!options.channel) {
+            throw new Error('MainSettlementBus: Channel is required. Application cannot start without channel.');
+        }
+        this.#channel = b4a.alloc(32).fill(options.channel);
+
         this.#store = new Corestore(this.#STORES_DIRECTORY + options.store_name);
         this.#enable_wallet = options.enable_wallet !== false;
         this.#wallet = new PeerWallet(options);
-        this.#replicate = options.replicate !== false;
         this.#readline_instance = null;
         this.enable_interactive_mode = options.enable_interactive_mode !== false;
+        this.#enableRoleRequester = options.enableRoleRequester !== undefined ? options.enableRoleRequester : true;
         if (this.enable_interactive_mode !== false) {
             try {
                 this.#readline_instance = readline.createInterface({
@@ -101,17 +107,14 @@ export class MainSettlementBus extends ReadyResource {
             await this.#wallet.initKeyPair(this.KEY_PAIR_PATH, this.#readline_instance);
             printWalletInfo(this.#wallet.address, this.#state.writingKey);
         }
-        
-        await this.#network.ready();
 
-        if (this.#replicate) {
-            await this.#network.replicate(
+        await this.#network.ready();
+        await this.#network.replicate(
                 this.#state,
                 this.#store,
                 this.#wallet,
                 this.#handleIncomingEvent.bind(this),
             );
-        }
         //validator observer can't be awaited.
         this.#network.validatorObserver(
             this.#state.getWriterLength.bind(this.#state),
