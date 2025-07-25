@@ -115,6 +115,7 @@ export class MainSettlementBus extends ReadyResource {
                 this.#wallet,
                 this.#handleIncomingEvent.bind(this),
             );
+            
         //validator observer can't be awaited.
         this.#network.validatorObserver(
             this.#state.getWriterLength.bind(this.#state),

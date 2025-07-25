@@ -47,8 +47,8 @@ class TransactionHandler {
         return this.#disable_rate_limit;
     }
 
-    async handle(incomingMessage, connection) {
-
+    async handle(parsedPreTx, connection) {
+        
         if (this.state.isIndexer() || !this.state.isWritable()) return {
             throw: new Error('TransactionHandler: State is not writable or is an indexer.')
         }
@@ -62,12 +62,10 @@ class TransactionHandler {
         if (this.network.poolService.tx_pool.length >= TRANSACTION_POOL_SIZE) {
             throw new Error("Transaction pool is full, ignoring incoming transaction.");
         }
-
-        if (b4a.byteLength(JSON.stringify(incomingMessage)) > MAX_PRE_TX_PAYLOAD_BYTE_SIZE) {
-            throw new Error(`Payload size exceeds maximum limit of ${MAX_PRE_TX_PAYLOAD_BYTE_SIZE} bytes by ${b4a.byteLength(JSON.stringify(incomingMessage)) - MAX_PRE_TX_PAYLOAD_BYTE_SIZE} bytes.`);
+        if (b4a.byteLength(JSON.stringify(parsedPreTx)) > MAX_PRE_TX_PAYLOAD_BYTE_SIZE) {
+            throw new Error(`Payload size exceeds maximum limit of ${MAX_PRE_TX_PAYLOAD_BYTE_SIZE} bytes by ${b4a.byteLength(JSON.stringify(parsedPreTx)) - MAX_PRE_TX_PAYLOAD_BYTE_SIZE} bytes.`);
         }
-
-        const parsedPreTx = incomingMessage;
+  
         const isValid = await this.transactionValidator.validate(parsedPreTx);
         if (isValid) {
             const postTx = await StateMessageOperations.assemblePostTxMessage(

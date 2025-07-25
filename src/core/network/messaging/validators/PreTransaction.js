@@ -1,12 +1,30 @@
 import b4a from 'b4a';
 import Wallet from 'trac-wallet';
 import { generateTx } from '../../../../utils/transactionUtils.js';
-
+import Check from '../../../../utils/check.js';
 class PreTransaction {
+    #state;
+    #wallet;
+    #network;
+    #check;
+    
     constructor(state, wallet, network) {
-        this.state = state;
-        this.wallet = wallet;
-        this.network = network;
+        this.#state = state;
+        this.#wallet = wallet;
+        this.#network = network;
+        this.#check = new Check();
+    }
+    get state() {
+        return this.#state;
+    }
+    get wallet() {
+        return this.#wallet;
+    }
+    get network() {
+        return this.#network;
+    }
+    get check() {
+        return this.#check;
     }
 
     async validate(parsedPreTx) {
@@ -21,7 +39,7 @@ class PreTransaction {
     }
 
     validatePayload(parsedPreTx) {
-        const isPayloadValid = this.network.check.validatePreTx(parsedPreTx);
+        const isPayloadValid = this.check.validatePreTx(parsedPreTx);
         if (!isPayloadValid) {
             console.error('Invalid pre-tx payload:', parsedPreTx);
             return false;

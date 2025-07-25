@@ -109,7 +109,7 @@ class Check {
     #compilePreTxSchema() {
         const schema = {
             $$strict: true,
-            op: { type: 'string', enum: [OperationType.PRE_TX], required: true }, // Operation type (must be 'pre-tx')
+            op: { type: 'string', enum: [OperationType.PRE_TX], required: true }, // Operation type (must be 'PRE_TX')
             tx: { type: 'string', length: TX_HASH_HEXSTRING_LENGTH, required: true, hex: true }, // Transaction hash (unique identifier for the transaction)
             ia: { type: 'string', length: TRAC_ADDRESS_SIZE, required: true }, // Address of the requesting node (used for signature verification)
             iw: { type: 'string', length: WRITING_KEY_HEXSTRING_LENGTH, required: true, hex: true }, // Writing key of the requesting node (external subnetwork)
