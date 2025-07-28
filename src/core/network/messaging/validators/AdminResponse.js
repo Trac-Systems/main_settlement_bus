@@ -1,6 +1,6 @@
 import b4a from 'b4a';
 import Wallet from 'trac-wallet';
-import BaseResponse from './base/baseResponse.js';
+import BaseResponse from './base/BaseResponse.js';
 
 class AdminResponse extends BaseResponse {
 
