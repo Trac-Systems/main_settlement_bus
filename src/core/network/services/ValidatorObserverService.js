@@ -63,11 +63,13 @@ class ValidatorObserverService {
         const validatorPubKey = Wallet.decodeBech32m(validatorAddress).toString('hex');
         const validatorEntry = await this.state.getNodeEntry(validatorAddress);
 
-        if (this.#network.validator_stream !== null) return;
-        if (this.#network.validator !== null) return;
-        if (validatorEntry === null) return;
-        if (!validatorEntry.isWriter) return;
-        if (validatorEntry.isIndexer) return;
+        if (
+            this.#network.validator_stream !== null ||
+            this.#network.validator !== null ||
+            validatorEntry === null ||
+            !validatorEntry.isWriter ||
+            validatorEntry.isIndexer
+        ) return;
 
         await this.#network.tryConnect(validatorPubKey, 'validator');
     };
