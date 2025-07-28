@@ -25,7 +25,6 @@ class Network extends ReadyResource {
     #swarm = null;
     #enable_wallet;
     #channel;
-    #state;
     #networkMessages;
     #poolService;
     #validatorObserverService;
@@ -225,7 +224,7 @@ class Network extends ReadyResource {
             if (!adminEntry || !message) {
                 throw new Error('Invalid admin entry or message');
             }
-            const adminPublicKey = Wallet.decodeBech32m(adminEntry.tracAddr).toString('hex');
+            const adminPublicKey = Wallet.decodeBech32m(adminEntry.address).toString('hex');
             await this.tryConnect(adminPublicKey, 'admin');
             await this.spinLock(() => this.admin_stream === null);
             if (this.admin_stream !== null) {

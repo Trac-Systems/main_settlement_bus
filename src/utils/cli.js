@@ -1,5 +1,5 @@
 import b4a from 'b4a';
-import { TRAC_ADDRESS_SIZE } from '../core/state/ApplyOperationEncodings.js';
+import {  TRAC_ADDRESS_SIZE } from 'trac-wallet/constants.js';
 
 export async function verifyDag(state, network, wallet, writerKey, shouldListenToAdminEvents, shouldListenToWriterEvents) {
     try {
