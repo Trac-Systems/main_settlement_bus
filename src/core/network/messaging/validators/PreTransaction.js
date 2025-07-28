@@ -41,7 +41,7 @@ class PreTransaction {
     validatePayload(parsedPreTx) {
         const isPayloadValid = this.check.validatePreTx(parsedPreTx);
         if (!isPayloadValid) {
-            console.error('Invalid pre-tx payload:', parsedPreTx);
+            console.error('PreTx payload is invalid.');
             return false;
         }
         return true;
@@ -50,7 +50,7 @@ class PreTransaction {
     validateRequestingPublicKey(parsedPreTx) {
         const requestingPublicKey = Wallet.decodeBech32mSafe(parsedPreTx.ia);
         if (requestingPublicKey === null) {
-            console.error('Invalid requesting public key in pre-tx payload:', parsedPreTx);
+            console.error('Invalid requesting public key in PreTx payload.');
             return false;
         }
         return true;
@@ -69,7 +69,7 @@ class PreTransaction {
         const transactionHash = b4a.from(parsedPreTx.tx, 'hex');
 
         if (!b4a.equals(regeneratedTx, transactionHash)) {
-            console.error('Invalid transaction hash in pre-tx payload:', parsedPreTx);
+            console.error('Invalid transaction hash in PreTx payload.');
             return false;
         }
         return true;
@@ -82,7 +82,7 @@ class PreTransaction {
         
         const isSignatureValid = Wallet.verify(requesterSignature, transactionHash, requestingPublicKey);
         if (!isSignatureValid) {
-            console.error('Invalid signature in pre-tx payload:', parsedPreTx);
+            console.error('Invalid signature in PreTx payload.');
             return false;
         }
         return true;

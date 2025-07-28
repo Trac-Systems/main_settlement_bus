@@ -7,12 +7,17 @@ class CustomNodeResponse extends BaseResponse {
     }
 
     async validate(message, channelString) {
-        if (!this.validatePayload(message)) return false;
-        if (!this.validateIssuerPublicKey(message)) return false;
-        if (!this.validateTimestamp(message)) return false;
-        if (!await this.validateCustomNodeEntry(message)) return false;
-        if (!await this.validateCustomNodeSignature(message)) return false;
-        if (!this.validateChannel(message, channelString)) return false;
+        if (
+            !this.validatePayload(message) ||
+            !this.validateIssuerPublicKey(message) ||
+            !this.validateTimestamp(message) ||
+            !await this.validateCustomNodeEntry(message) ||
+            !await this.validateSignature(message) ||
+            !this.validateChannel(message, channelString)
+        ) {
+            console.error("Custom node response validation failed");
+            return false;
+        }
 
         return true;
     }

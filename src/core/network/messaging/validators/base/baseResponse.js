@@ -56,56 +56,34 @@ class BaseResponse {
         Therefore, all logic requiring access to the wallet must be implemented here.
     */
 
-    async validateAdminSignature(message) {
-        const adminEntry = await this.state.getAdminEntry();
-        const adminPublicKey = Wallet.decodeBech32m(adminEntry.tracAddr);
+    async validateSignature(message, type = null) {
+        let publicKey = null;
+        switch (type) {
+            case 'admin':
+                const adminEntry = await this.state.getAdminEntry();
+                publicKey = Wallet.decodeBech32m(adminEntry.tracAddr);
+
+                break;
+            default:
+                const addressString = ApplyOperationEncodings.bufferToAddress(message.address);
+                publicKey = Wallet.decodeBech32m(addressString);
+        }
+
+        if (!publicKey) {
+            console.error("Failed to derive public key from message.");
+            return false;
+        }
+
         const messageWithoutSig = { ...message };
         delete messageWithoutSig.sig;
         const hash = await this.#wallet.createHash('sha256', JSON.stringify(messageWithoutSig));
         const signature = b4a.from(message.sig, 'hex');
-        const verified = this.#wallet.verify(signature, hash, adminPublicKey);
+        const verified = this.#wallet.verify(signature, hash, publicKey);
 
         if (!verified) {
-            console.error("Admin response verification failed");
+            console.error("Signature in the response verification failed.");
             return false;
         }
-
-        return true;
-    }
-
-    async validateValidatorSignature(message) {
-        const validatorAddressString = ApplyOperationEncodings.bufferToAddress(message.address);
-        const validatorPublicKey = Wallet.decodeBech32m(validatorAddressString);
-        const messageWithoutSig = { ...message };
-        delete messageWithoutSig.sig;
-        const hash = await this.#wallet.createHash('sha256', JSON.stringify(messageWithoutSig));
-        const signature = b4a.from(message.sig, 'hex');
-        const verified = this.#wallet.verify(signature, hash, validatorPublicKey);
-
-        if (!verified) {
-            console.error("Validator response verification failed");
-            return false;
-        }
-
-        return true;
-    }
-
-    async validateCustomNodeSignature(message) {
-        const customNodeAddressString = ApplyOperationEncodings.bufferToAddress(message.address);
-        const customNodePublicKey = Wallet.decodeBech32m(customNodeAddressString);
-
-        const messageWithoutSig = { ...message };
-        delete messageWithoutSig.sig;
-
-        const hash = await this.#wallet.createHash('sha256', JSON.stringify(messageWithoutSig));
-        const signature = b4a.from(message.sig, 'hex');
-        const verified = this.#wallet.verify(signature, hash, customNodePublicKey);
-
-        if (!verified) {
-            console.error("Custom node response verification failed");
-            return false;
-        }
-
         return true;
     }
 }

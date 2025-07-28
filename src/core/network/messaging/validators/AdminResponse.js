@@ -9,12 +9,17 @@ class AdminResponse extends BaseResponse {
     }
 
     async validate(message, channelString) {
-        if (!this.validatePayload(message)) return false;
-        if (!this.validateIssuerPublicKey(message)) return false;
-        if (!this.validateTimestamp(message)) return false;
-        if (!await this.validateAdminData(message)) return false;
-        if (!await this.validateAdminSignature(message)) return false;
-        if (!this.validateChannel(message, channelString)) return false;
+        if (
+            !this.validatePayload(message) ||
+            !this.validateIssuerPublicKey(message) ||
+            !this.validateTimestamp(message) ||
+            !await this.validateAdminData(message) ||
+            !await this.validateSignature(message) ||
+            !this.validateChannel(message, channelString)
+        ) {
+            console.error("Admin response validation failed");
+            return false;
+        }
 
         return true;
     }
