@@ -4,7 +4,6 @@ import b4a from 'b4a';
 import readline from 'readline';
 import { sleep } from './utils/helpers.js';
 import { createHash } from './utils/crypto.js';
-import { generatePreTx } from './utils/transactionUtils.js';
 import { verifyDag, printHelp, printWalletInfo, formatIndexersEntry } from './utils/cli.js';
 import PeerWallet from "trac-wallet"
 import tty from 'tty';
@@ -22,7 +21,6 @@ import {
 import Network from './core/network/Network.js';
 import Check from './utils/check.js';
 import State from './core/state/State.js';
-import { randomBytes } from 'crypto';
 
 //TODO create a MODULE which will separate logic responsible for role managment
 
@@ -39,32 +37,41 @@ export class MainSettlementBus extends ReadyResource {
     #store;
     #enable_wallet;
     #wallet;
-    #replicate;
     #network;
     #readline_instance;
-    #enableRoleRequester;
+    #enable_validator_observer;
+    #enable_role_requester;
     #state;
+
     constructor(options = {}) {
         super();
-
-        this.check = new Check();
         this.#initInternalAttributes(options);
+        this.check = new Check();
         this.#state = new State(this.#store, this.bootstrap, this.#wallet, options);
         this.#network = new Network(this.#state, this.#channel, options);
-        this.#enableRoleRequester = options.enableRoleRequester !== undefined ? options.enableRoleRequester : true;
     }
 
     #initInternalAttributes(options) {
         this.#STORES_DIRECTORY = options.stores_directory;
         this.#KEY_PAIR_PATH = `${this.#STORES_DIRECTORY}${options.store_name}/db/keypair.json`
-        this.#bootstrap = this.#bootstrap = options.bootstrap ? b4a.from(options.bootstrap, 'hex') : null;
-        this.#channel = b4a.alloc(32).fill(options.channel) || null;
+        if (!options.bootstrap) {
+            throw new Error('MainSettlementBus: Bootstrap key is required. Application cannot start without bootstrap.');
+        }
+        this.#bootstrap = b4a.from(options.bootstrap, 'hex');
+
+        if (!options.channel) {
+            throw new Error('MainSettlementBus: Channel is required. Application cannot start without channel.');
+        }
+        this.#channel = b4a.alloc(32).fill(options.channel);
+
         this.#store = new Corestore(this.#STORES_DIRECTORY + options.store_name);
         this.#enable_wallet = options.enable_wallet !== false;
         this.#wallet = new PeerWallet(options);
-        this.#replicate = options.replicate !== false;
         this.#readline_instance = null;
         this.enable_interactive_mode = options.enable_interactive_mode !== false;
+        this.#enable_role_requester = options.enable_role_requester !== undefined ? options.enable_role_requester : true;
+        this.#enable_validator_observer = options.enable_validator_observer !== undefined ? options.enable_validator_observer : true;
+
         if (this.enable_interactive_mode !== false) {
             try {
                 this.#readline_instance = readline.createInterface({
@@ -95,28 +102,25 @@ export class MainSettlementBus extends ReadyResource {
     async _open() {
 
         await this.#state.ready();
+        await this.#network.ready();
         this.#stateEventsListener();
 
         if (this.#enable_wallet) {
             await this.#wallet.initKeyPair(this.KEY_PAIR_PATH, this.#readline_instance);
             printWalletInfo(this.#wallet.address, this.#state.writingKey);
         }
-        await this.#network.ready();
-        if (this.#replicate) {
-            await this.#network.replicate(
-                this.#state,
-                this.#state.writingKey,
-                this.#store,
-                this.#wallet,
-                this.#handleIncomingEvent.bind(this),
-            );
-        }
+
+        await this.#network.replicate(
+            this.#state,
+            this.#store,
+            this.#wallet,
+            this.#handleIncomingEvent.bind(this),
+        );
+
         //validator observer can't be awaited.
-        this.#network.validatorObserver(
-            this.#state.getWriterLength.bind(this.#state),
-            this.#state.getWriterIndex.bind(this.#state),
-            this.#state.getNodeEntry.bind(this.#state),
-            this.#wallet.address);
+        if (this.#enable_validator_observer) {
+            this.#network.startValidatorObserver(this.#wallet.address);
+        }
 
         const adminEntry = await this.#state.getAdminEntry();
 
@@ -172,7 +176,7 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async #setUpRoleAutomatically() {
-        if (!this.#state.isWritable() && this.#enableRoleRequester) {
+        if (!this.#state.isWritable() && this.#enable_role_requester) {
             console.log('Requesting writer role... This may take a moment.');
             await this.#requestWriterRole(false)
             setTimeout(async () => {
@@ -322,7 +326,7 @@ export class MainSettlementBus extends ReadyResource {
                 if (null === this.#network.validator_stream) return;
                 const payloadForValidator = {
                     op: 'addAdmin',
-                    message: addAdminMessage,
+                    transactionPayload: addAdminMessage,
 
                 }
                 await this.#network.validator_stream.messenger.send(payloadForValidator);
@@ -366,7 +370,7 @@ export class MainSettlementBus extends ReadyResource {
 
             const whitelistedMessage = {
                 op: 'whitelisted',
-                message: encodedPayload,
+                transactionPayload: encodedPayload,
             };
 
             await this.#state.append(encodedPayload);
@@ -389,19 +393,17 @@ export class MainSettlementBus extends ReadyResource {
             const isAllowedToRequestRole = await this.#isAllowedToRequestRole(adminEntry, nodeEntry);
             const canAddWriter = !!(!this.#state.isWritable() && !isAlreadyWriter && isAllowedToRequestRole);
             if (canAddWriter) {
-                //TODO: network module should handle this in binary format however for now it is ok
                 assembledMessage = {
                     op: 'addWriter',
-                    message: await StateMessageOperations.assembleAddWriterMessage(this.#wallet, this.#state.writingKey),
+                    transactionPayload: await StateMessageOperations.assembleAddWriterMessage(this.#wallet, this.#state.writingKey),
                 }
             }
         }
         else {
             if (isAlreadyWriter) {
-                //TODO: network module should handle this in binary format however for now it is ok
                 assembledMessage = {
                     op: 'removeWriter',
-                    message: await StateMessageOperations.assembleRemoveWriterMessage(this.#wallet, this.#state.writingKey),
+                    transactionPayload: await StateMessageOperations.assembleRemoveWriterMessage(this.#wallet, this.#state.writingKey),
 
                 }
             }

@@ -1,38 +1,56 @@
 import b4a from 'b4a';
 import Wallet from 'trac-wallet';
-import { generateTx } from '../../../utils/transactionUtils.js';
+import { generateTx } from '../../../../utils/transactionUtils.js';
+import Check from '../../../../utils/check.js';
+class PreTransaction {
+    #state;
+    #wallet;
+    #network;
+    #check;
 
-class PreTransactionValidator {
     constructor(state, wallet, network) {
-        this.state = state;
-        this.wallet = wallet;
-        this.network = network;
+        this.#state = state;
+        this.#wallet = wallet;
+        this.#network = network;
+        this.#check = new Check();
+    }
+
+    get state() {
+        return this.#state;
+    }
+
+    get network() {
+        return this.#network;
+    }
+    
+    get check() {
+        return this.#check;
     }
 
     async validate(parsedPreTx) {
-        if (!await this.validatePayload(parsedPreTx)) return false;
-        if (!await this.validateRequestingPublicKey(parsedPreTx)) return false;
+        if (!this.validatePayload(parsedPreTx)) return false;
+        if (!this.validateRequestingPublicKey(parsedPreTx)) return false;
         if (!await this.validateTransactionHash(parsedPreTx)) return false;
-        if (!await this.validateSignature(parsedPreTx)) return false;
-        if (!await this.validateValidatorAddress(parsedPreTx)) return false;
+        if (!this.validateSignature(parsedPreTx)) return false;
+        if (!this.validateValidatorAddress(parsedPreTx)) return false;
         if (!await this.validateTransactionUniqueness(parsedPreTx)) return false;
         
         return true;
     }
 
-    async validatePayload(parsedPreTx) {
-        const isPayloadValid = this.network.check.validatePreTx(parsedPreTx);
+    validatePayload(parsedPreTx) {
+        const isPayloadValid = this.check.validatePreTx(parsedPreTx);
         if (!isPayloadValid) {
-            console.error('Invalid pre-tx payload:', parsedPreTx);
+            console.error('PreTx payload is invalid.');
             return false;
         }
         return true;
     }
 
-    async validateRequestingPublicKey(parsedPreTx) {
+    validateRequestingPublicKey(parsedPreTx) {
         const requestingPublicKey = Wallet.decodeBech32mSafe(parsedPreTx.ia);
         if (requestingPublicKey === null) {
-            console.error('Invalid requesting public key in pre-tx payload:', parsedPreTx);
+            console.error('Invalid requesting public key in PreTx payload.');
             return false;
         }
         return true;
@@ -51,28 +69,28 @@ class PreTransactionValidator {
         const transactionHash = b4a.from(parsedPreTx.tx, 'hex');
 
         if (!b4a.equals(regeneratedTx, transactionHash)) {
-            console.error('Invalid transaction hash in pre-tx payload:', parsedPreTx);
+            console.error('Invalid transaction hash in PreTx payload.');
             return false;
         }
         return true;
     }
 
-    async validateSignature(parsedPreTx) {
+    validateSignature(parsedPreTx) {
         const requestingPublicKey = Wallet.decodeBech32mSafe(parsedPreTx.ia);
         const requesterSignature = b4a.from(parsedPreTx.is, 'hex');
         const transactionHash = b4a.from(parsedPreTx.tx, 'hex');
         
         const isSignatureValid = Wallet.verify(requesterSignature, transactionHash, requestingPublicKey);
         if (!isSignatureValid) {
-            console.error('Invalid signature in pre-tx payload:', parsedPreTx);
+            console.error('Invalid signature in PreTx payload.');
             return false;
         }
         return true;
     }
 
-    async validateValidatorAddress(parsedPreTx) {
-        if (parsedPreTx.va !== this.wallet.address) {
-            console.error('Validator public key does not match wallet address:', parsedPreTx.va, this.wallet.address);
+    validateValidatorAddress(parsedPreTx) {
+        if (parsedPreTx.va !== this.#wallet.address) {
+            console.error('Validator public key does not match wallet address:', parsedPreTx.va, this.#wallet.address);
             return false;
         }
         return true;
@@ -88,4 +106,4 @@ class PreTransactionValidator {
     }
 }
 
-export default PreTransactionValidator;
+export default PreTransaction;
