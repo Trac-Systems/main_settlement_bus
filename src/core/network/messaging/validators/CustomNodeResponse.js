@@ -1,4 +1,4 @@
-import BaseResponse from './base/baseResponse.js';
+import BaseResponse from './base/BaseResponse.js';
 
 class CustomNodeResponse extends BaseResponse {
 

@@ -1,5 +1,5 @@
 import b4a from 'b4a';
-import BaseResponse from './base/baseResponse.js';
+import BaseResponse from './base/BaseResponse.js';
 class ValidatorResponse extends BaseResponse {
 
     constructor(state, wallet) {
