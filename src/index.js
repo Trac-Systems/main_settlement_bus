@@ -214,7 +214,7 @@ export class MainSettlementBus extends ReadyResource {
                     // also this listener should be turned off when node become writable. But for now it is ok.
                     const adminEntry = await this.#state.getAdminEntry();
                     if (!adminEntry || this.#enable_wallet === false) return;
-                    const adminPublicKey = PeerWallet.decodeBech32m(adminEntry.tracAddr)
+                    const adminPublicKey = PeerWallet.decodeBech32m(adminEntry.address)
                     const reconstructedMessage = createMessage(decodedRequest.address, decodedRequest.bko.nonce, OperationType.WHITELISTED);
                     const hash = await createHash('sha256', reconstructedMessage);
                     const isWhitelisted = await this.#state.isAddressWhitelisted(this.#wallet.address);
@@ -319,7 +319,7 @@ export class MainSettlementBus extends ReadyResource {
                 await this.#state.append(addAdminMessage);
             } else if (adminEntry &&
                 this.#wallet &&
-                adminEntry.tracAddr === this.#wallet.address &&
+                adminEntry.address === this.#wallet.address &&
                 this.#state.writingKey &&
                 !b4a.equals(this.#state.writingKey, adminEntry.wk)
             ) {
@@ -414,28 +414,28 @@ export class MainSettlementBus extends ReadyResource {
         }
     }
 
-    async #updateIndexerRole(tracAddress, toAdd) {
+    async #updateIndexerRole(address, toAdd) {
         if (this.#enable_wallet === false) return;
         const adminEntry = await this.#state.getAdminEntry();
         if (!this.#isAdmin(adminEntry) && !this.#state.isWritable()) return;
-        const nodeEntry = await this.#state.getNodeEntry(tracAddress);
+        const nodeEntry = await this.#state.getNodeEntry(address);
         if (!nodeEntry) return;
 
         const indexersEntry = await this.#state.getIndexersEntry();
-        const indexerListHasAddress = await this.#state.isAddressInIndexersEntry(tracAddress, indexersEntry);
+        const indexerListHasAddress = await this.#state.isAddressInIndexersEntry(address, indexersEntry);
 
         if (toAdd) {
             if (indexerListHasAddress) return;
             const canAddIndexer = nodeEntry.isWhitelisted && nodeEntry.isWriter && !nodeEntry.isIndexer && !indexerListHasAddress;
             if (canAddIndexer) {
-                const assembledAddIndexerMessage = await StateMessageOperations.assembleAddIndexerMessage(this.#wallet, tracAddress);
+                const assembledAddIndexerMessage = await StateMessageOperations.assembleAddIndexerMessage(this.#wallet, address);
                 await this.#state.append(assembledAddIndexerMessage);
             }
         }
         else {
             const canRemoveIndexer = !toAdd && nodeEntry.isIndexer && indexerListHasAddress;
             if (canRemoveIndexer) {
-                const assembledRemoveIndexer = await StateMessageOperations.assembleRemoveIndexerMessage(this.#wallet, tracAddress);
+                const assembledRemoveIndexer = await StateMessageOperations.assembleRemoveIndexerMessage(this.#wallet, address);
                 await this.#state.append(assembledRemoveIndexer);
             }
 
@@ -510,7 +510,7 @@ export class MainSettlementBus extends ReadyResource {
             case '/core':
                 const admin = await this.#state.getAdminEntry();
                 console.log('Admin:', admin ? {
-                    address: admin.tracAddr,
+                    address: admin.address,
                     writingKey: admin.wk.toString('hex')
                 } : null);
                 const indexers = await this.#state.getIndexersEntry();

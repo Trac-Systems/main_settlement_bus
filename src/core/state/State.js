@@ -17,7 +17,7 @@ import addressUtils from './utils/address.js';
 import adminEntryUtils from './utils/adminEntry.js';
 import nodeEntryUtils from './utils/nodeEntry.js';
 import nodeRoleUtils from './utils/roles.js';
-import indexerEntryUtils from './utils/indexer.js';
+import indexerEntryUtils from './utils/indexerEntry.js';
 import lengthEntryUtils from './utils/lengthEntry.js';
 import transactionUtils from './utils/transaction.js';
 class State extends ReadyResource {
@@ -302,7 +302,7 @@ class State extends ReadyResource {
         // Remove the old admin entry and add the new one
         await batch.put(EntryType.ADMIN, newAdminEntry);
         await batch.put(hashHexString, node.value);
-        console.log(`Admin updated: ${decodedAdminEntry.tracAddr}:${op.eko.wk.toString('hex')}`);
+        console.log(`Admin updated: ${decodedAdminEntry.address}:${op.eko.wk.toString('hex')}`);
     }
 
     async #addAdminIfNotSet(op, view, node, batch) {
@@ -351,7 +351,7 @@ class State extends ReadyResource {
         if (null === decodedAdminEntry || !this.#isAdminApply(decodedAdminEntry, node)) return;
 
         // Extract admin entry
-        const adminAddress = decodedAdminEntry.tracAddr;
+        const adminAddress = decodedAdminEntry.address;
         const adminPublicKey = Wallet.decodeBech32mSafe(adminAddress);
         if (adminPublicKey === null) return;
 
@@ -410,7 +410,7 @@ class State extends ReadyResource {
             await batch.put(hashHexString, node.value);
         } else {
             // If the node entry exists, update its role to WHITELISTED. Case if account will buy license from market but it existed before - for example it had balance.
-            const editedNodeEntry = nodeEntryUtils.setAllRole(nodeEntry, nodeRoleUtils.NodeRole.WHITELISTED);
+            const editedNodeEntry = nodeEntryUtils.setRole(nodeEntry, nodeRoleUtils.NodeRole.WHITELISTED);
             await batch.put(nodeAddressString, editedNodeEntry);
             await batch.put(hashHexString, node.value);
         }
@@ -476,7 +476,7 @@ class State extends ReadyResource {
         if (null === incrementedLength) return;
 
         // Update the node entry to assign the writer role
-        const updatedNodeEntry = nodeEntryUtils.setAll(nodeEntry, nodeRoleUtils.NodeRole.WRITER, op.eko.wk);
+        const updatedNodeEntry = nodeEntryUtils.setRoleAndWriterKey(nodeEntry, nodeRoleUtils.NodeRole.WRITER, op.eko.wk);
         if (updatedNodeEntry === null) return;
 
         // Add the writer role to the base and update the batch
@@ -536,7 +536,7 @@ class State extends ReadyResource {
             const decodedNodeEntry = nodeEntryUtils.decode(nodeEntry);
             if (decodedNodeEntry === null) return;
 
-            const updatedNodeEntry = nodeEntryUtils.setAllRole(nodeEntry, nodeRoleUtils.NodeRole.WHITELISTED);
+            const updatedNodeEntry = nodeEntryUtils.setRole(nodeEntry, nodeRoleUtils.NodeRole.WHITELISTED);
             if (updatedNodeEntry === null) return;
 
             // Remove the writer role and update the state
@@ -550,7 +550,7 @@ class State extends ReadyResource {
             const decodedNodeEntry = nodeEntryUtils.decode(nodeEntry);
             if (decodedNodeEntry === null) return;
 
-            const updatedNodeEntry = nodeEntryUtils.setAllRole(nodeEntry, nodeRoleUtils.NodeRole.WHITELISTED);
+            const updatedNodeEntry = nodeEntryUtils.setRole(nodeEntry, nodeRoleUtils.NodeRole.WHITELISTED);
             if (updatedNodeEntry === null) return;
 
             // Retrieve the indexers entry and remove the indexer
@@ -584,7 +584,7 @@ class State extends ReadyResource {
         if (null === adminEntry) return;
         const decodedAdminEntry = adminEntryUtils.decode(adminEntry);
         if (null === decodedAdminEntry) return;
-        const adminPublicKey = Wallet.decodeBech32mSafe(decodedAdminEntry.tracAddr);
+        const adminPublicKey = Wallet.decodeBech32mSafe(decodedAdminEntry.address);
         if (adminPublicKey === null) return;
         if (b4a.equals(nodePublicKey, adminPublicKey) || !this.#isAdminApply(decodedAdminEntry, node)) return;
 
@@ -610,7 +610,7 @@ class State extends ReadyResource {
         const isNodeIndexer = nodeEntryUtils.isIndexer(nodeEntry);
         if (!isNodeWriter || isNodeIndexer) return;
         //update node entry to indexer
-        const updatedNodeEntry = nodeEntryUtils.setAllRole(nodeEntry, nodeRoleUtils.NodeRole.INDEXER)
+        const updatedNodeEntry = nodeEntryUtils.setRole(nodeEntry, nodeRoleUtils.NodeRole.INDEXER)
         if (null === updatedNodeEntry) return;
         // ensure that indexers entry exists and that it does not contain the address already
         const indexersEntry = await this.#getEntryApply(EntryType.INDEXERS, batch);
@@ -647,7 +647,7 @@ class State extends ReadyResource {
         if (null === adminEntry) return;
         const decodedAdminEntry = adminEntryUtils.decode(adminEntry);
         if (null === decodedAdminEntry) return;
-        const adminPublicKey = Wallet.decodeBech32mSafe(decodedAdminEntry.tracAddr);
+        const adminPublicKey = Wallet.decodeBech32mSafe(decodedAdminEntry.address);
         if (adminPublicKey === null) return;
         if (b4a.equals(nodePublicKey, adminPublicKey) || !this.#isAdminApply(decodedAdminEntry, node)) return;
 
@@ -674,7 +674,7 @@ class State extends ReadyResource {
         if (!isNodeIndexer) return;
 
         //update node entry to writer
-        const updatedNodeEntry = nodeEntryUtils.setAll(nodeEntry, nodeRoleUtils.NodeRole.WRITER, decodedNodeEntry.wk)
+        const updatedNodeEntry = nodeEntryUtils.setRoleAndWriterKey(nodeEntry, nodeRoleUtils.NodeRole.WRITER, decodedNodeEntry.wk)
         if (null === updatedNodeEntry) return;
 
         // ensure that indexers entry exists and that it does contain the address already
@@ -731,7 +731,7 @@ class State extends ReadyResource {
         if (null === adminEntry) return;
         const decodedAdminEntry = adminEntryUtils.decode(adminEntry);
         if (null === decodedAdminEntry) return;
-        const adminPublicKey = Wallet.decodeBech32mSafe(decodedAdminEntry.tracAddr);
+        const adminPublicKey = Wallet.decodeBech32mSafe(decodedAdminEntry.address);
         if (null === adminPublicKey || b4a.equals(nodePublicKey, adminPublicKey) || !this.#isAdminApply(decodedAdminEntry, node)) return;
 
         // verify signature
@@ -754,7 +754,7 @@ class State extends ReadyResource {
         if ((!isWhitelisted && !isWriter) || isIndexer) return;
 
 
-        const updatedNodeEntry = nodeEntryUtils.setAllRole(nodeEntry, nodeRoleUtils.NodeRole.READER);
+        const updatedNodeEntry = nodeEntryUtils.setRole(nodeEntry, nodeRoleUtils.NodeRole.READER);
         if (null === updatedNodeEntry) return;
         const decodedNodeEntry = nodeEntryUtils.decode(updatedNodeEntry);
         if (null === decodedNodeEntry) return;

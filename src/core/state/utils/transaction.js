@@ -1,6 +1,7 @@
 import b4a from 'b4a';
+
 import { createHash } from '../../../utils/crypto.js';
-import { TRAC_ADDRESS_SIZE } from './address.js';
+import { TRAC_ADDRESS_SIZE } from 'trac-wallet/constants.js';
 import { HASH_BYTE_LENGTH, NONCE_BYTE_LENGTH, WRITER_BYTE_LENGTH } from '../../../utils/constants.js';
 
 /**

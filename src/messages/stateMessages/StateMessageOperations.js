@@ -1,3 +1,6 @@
+import PeerWallet from 'trac-wallet';
+import b4a from 'b4a';
+
 import StateMessageDirector from './StateMessageDirector.js';
 import StateMessageBuilder from './StateMessageBuilder.js';
 import { safeEncodeApplyOperation } from '../../utils/protobuf/operationHelpers.js';
@@ -5,10 +8,7 @@ import fileUtils from '../../../src/utils/fileUtils.js';
 import { OperationType } from '../../utils/constants.js';
 import { createMessage } from '../../utils/buffer.js';
 import { createHash } from '../../utils/crypto.js';
-import b4a from 'b4a';
-import PeerWallet from 'trac-wallet';
-import ApplyOperationEncodings from '../../core/state/ApplyOperationEncodings.js';
-
+import { bufferToAddress } from '../../core/state/utils/address.js';
 class StateMessageOperations {
     static async assembleAddAdminMessage(adminEntry, writingKey, wallet, bootstrap) {
         try {
@@ -169,7 +169,7 @@ class StateMessageOperations {
             if (!validationResult) return false;
 
             if (type === OperationType.ADD_WRITER) {
-                const nodeAddress = ApplyOperationEncodings.bufferToAddress(parsedRequest.address);
+                const nodeAddress = bufferToAddress(parsedRequest.address);
                 if (nodeAddress === null) return false;
 
                 const nodeEntry = await state.getNodeEntry(nodeAddress);
@@ -188,7 +188,7 @@ class StateMessageOperations {
 
                 return wallet.verify(parsedRequest.eko.sig, hash, nodePublicKey);
             } else if (type === OperationType.REMOVE_WRITER) {
-                const nodeAddress = ApplyOperationEncodings.bufferToAddress(parsedRequest.address);
+                const nodeAddress = bufferToAddress(parsedRequest.address);
                 if (nodeAddress === null) return false;
 
                 const nodeEntry = await state.getNodeEntry(nodeAddress);
@@ -209,11 +209,11 @@ class StateMessageOperations {
                 const adminEntry = await state.getAdminEntry();
                 if (!adminEntry) return false;
                 const adminAddressBuffer = parsedRequest.address;
-                const adminAddress = ApplyOperationEncodings.bufferToAddress(adminAddressBuffer);
+                const adminAddress = bufferToAddress(adminAddressBuffer);
                 if (adminAddress === null) return false;
 
                 const isRecoveryCase = !!(
-                    adminEntry.tracAddr === adminAddress &&
+                    adminEntry.address === adminAddress &&
                     parsedRequest.eko.wk &&
                     !b4a.equals(parsedRequest.eko.wk, adminEntry.wk)
                 );

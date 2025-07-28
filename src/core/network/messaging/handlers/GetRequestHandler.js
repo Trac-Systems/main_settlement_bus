@@ -59,7 +59,7 @@ class GetRequestHandler {
             throw new Error("Admin entry is null. This is not possible to create admin stream.");
         }
 
-        const adminPublicKey = Wallet.decodeBech32m(adminEntry.tracAddr);
+        const adminPublicKey = Wallet.decodeBech32m(adminEntry.address);
 
         if (!b4a.equals(this.#wallet.publicKey, adminPublicKey)) {
             throw new Error("You are not an admin. This is not possible to create admin stream.");

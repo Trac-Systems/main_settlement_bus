@@ -1,4 +1,5 @@
 import b4a from 'b4a';
+
 import { WRITER_MASK, INDEXER_MASK, WHITELISTED_MASK, calculateNodeRole, isNodeRoleValid } from './roles.js';
 import { WRITER_BYTE_LENGTH } from '../../../utils/constants.js';
 import { isBufferValid } from '../../../utils/buffer.js';
@@ -14,7 +15,7 @@ const NODE_ENTRY_SIZE = WRITER_BYTE_LENGTH + 1;
  * @returns {Buffer} The initialized node entry buffer, or empty buffer if invalid input
  */
 export function init(writingKey, role) {
-    if (!isBufferValid(writingKey, WRITING_KEY_SIZE) || !isNodeRoleValid(role)) {
+    if (!isBufferValid(writingKey, WRITER_BYTE_LENGTH) || !isNodeRoleValid(role)) {
         console.error('Invalid input for node initialization');
         return b4a.alloc(0);
     }
@@ -47,7 +48,7 @@ export function init(writingKey, role) {
  */
 export function encode(node) {
     const nodeRole = calculateNodeRole(node);
-    if (!isBufferValid(node.wk, WRITING_KEY_SIZE) || !isNodeRoleValid(nodeRole)) {
+    if (!isBufferValid(node.wk, WRITER_BYTE_LENGTH) || !isNodeRoleValid(nodeRole)) {
         return b4a.alloc(0); // Return an empty buffer if one of the inputs is invalid
     }
 
@@ -163,7 +164,7 @@ export function setRole(nodeEntry, nodeRole) {
  */
 export function setWritingKey(nodeEntry, writingKey) {
     try {
-        if (!isBufferValid(nodeEntry, NODE_ENTRY_SIZE) || !isBufferValid(writingKey, WRITING_KEY_SIZE)) {
+        if (!isBufferValid(nodeEntry, NODE_ENTRY_SIZE) || !isBufferValid(writingKey, WRITER_BYTE_LENGTH)) {
             console.error('Invalid input for setting writing key');
             return null;
         }
@@ -182,7 +183,7 @@ export function setWritingKey(nodeEntry, writingKey) {
  * @param {Buffer} writingKey - The writing key buffer to set.
  * @returns {Buffer|null} The updated node entry buffer, or null if invalid.
  */
-export function setAll(nodeEntry, nodeRole, writingKey) {
+export function setRoleAndWriterKey(nodeEntry, nodeRole, writingKey) {
     try {
         if (!isNodeRoleValid(nodeRole) || !isBufferValid(writingKey, WRITER_BYTE_LENGTH)) {
             console.error('Invalid input for setting node entry');
@@ -207,5 +208,8 @@ export default {
     decode,
     setRole,
     setWritingKey,
-    setAll
+    setRoleAndWriterKey,
+    isWhitelisted,
+    isWriter,
+    isIndexer
 };

@@ -1,6 +1,7 @@
 import b4a from 'b4a';
+
 import { bufferToAddress } from './address.js';
-import { TRAC_ADDRESS_SIZE } from 'trac-wallet/constants.js';
+import { TRAC_ADDRESS_SIZE, TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
 import { WRITER_BYTE_LENGTH } from '../../../utils/constants.js';
 import { isBufferValid } from '../../../utils/buffer.js';
 
@@ -17,12 +18,12 @@ const ADMIN_ENTRY_SIZE = TRAC_ADDRESS_SIZE + WRITER_BYTE_LENGTH;
  * @returns {Buffer} The encoded admin entry buffer, or an empty buffer if input is invalid.
  */
 export function encode(address, wk) {
-    if (!isBufferValid(wk, WRITING_KEY_SIZE)) {
+    if (!isBufferValid(wk, WRITER_BYTE_LENGTH)) {
         return b4a.alloc(0);
     }
 
     try {
-        const adminEntry = b4a.alloc(TRAC_ADDRESS_SIZE + WRITING_KEY_SIZE);
+        const adminEntry = b4a.alloc(TRAC_ADDRESS_SIZE + WRITER_BYTE_LENGTH);
         b4a.copy(address, adminEntry, 0);
         b4a.copy(wk, adminEntry, TRAC_ADDRESS_SIZE);
         return adminEntry;
@@ -40,7 +41,7 @@ export function encode(address, wk) {
  *
  * @param {Buffer} adminEntry - The encoded admin entry buffer.
  * @returns {Object | null} An object with:
- *   - tracAddr: String containing the TRAC address.
+ *   - address: String containing the TRAC address.
  *   - wk: Buffer containing the writing key.
  */
 export function decode(adminEntry) {
@@ -49,8 +50,8 @@ export function decode(adminEntry) {
     }
 
     try {
-        const tracAddrPart = adminEntry.subarray(0, TRAC_ADDRESS_SIZE);
-        const address = bufferToAddress(tracAddrPart, TRAC_NETWORK_MSB_MAINNET_PREFIX);
+        const addressPart = adminEntry.subarray(0, TRAC_ADDRESS_SIZE);
+        const address = bufferToAddress(addressPart, TRAC_NETWORK_MSB_MAINNET_PREFIX);
         const wk = adminEntry.subarray(TRAC_ADDRESS_SIZE);
         return { address, wk };
     }
