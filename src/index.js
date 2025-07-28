@@ -4,7 +4,6 @@ import b4a from 'b4a';
 import readline from 'readline';
 import { sleep } from './utils/helpers.js';
 import { createHash } from './utils/crypto.js';
-import { generatePreTx } from './utils/transactionUtils.js';
 import { verifyDag, printHelp, printWalletInfo, formatIndexersEntry } from './utils/cli.js';
 import PeerWallet from "trac-wallet"
 import tty from 'tty';
@@ -22,7 +21,6 @@ import {
 import Network from './core/network/Network.js';
 import Check from './utils/check.js';
 import State from './core/state/State.js';
-import { randomBytes } from 'crypto';
 
 //TODO create a MODULE which will separate logic responsible for role managment
 
@@ -524,18 +522,6 @@ export class MainSettlementBus extends ReadyResource {
                 break;
             case '/stats':
                 await verifyDag(this.#state, this.#network, this.#wallet, this.#state.writingKey, this.#shouldListenToAdminEvents, this.#shouldListenToWriterEvents);
-                break;
-            case '/test':
-
-                const contentHash = randomBytes(32).toString('hex');
-                const subNetworkBootstrap = randomBytes(32).toString('hex');
-
-                const validatorPubKey = b4a.from(this.#network.validator, 'hex');
-                const validatorAddress = PeerWallet.encodeBech32m(validatorPubKey);
-
-                const preTx = await generatePreTx(this.#wallet, validatorAddress, this.#state.writingKey, this.#wallet.address, contentHash, subNetworkBootstrap, this.bootstrap);
-                await this.#network.validator_stream.messenger.send(preTx);
-
                 break;
             default:
                 if (input.startsWith('/get_node_info')) {
