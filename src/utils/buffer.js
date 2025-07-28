@@ -1,6 +1,12 @@
 import b4a from 'b4a';
 
+export const ZERO_WK = b4a.alloc(32, 0); // 32 bytes of zeroes, used as a placeholder for writing keys
+
 const isUInt32 = (n) => { return Number.isInteger(n) && n >= 1 && n <= 0xFFFFFFFF; }
+
+export function isBufferValid(key, size) {
+    return b4a.isBuffer(key) && key.length === size;
+}
 
 export const safeWriteUInt32BE = (value, offset) => {
     try {

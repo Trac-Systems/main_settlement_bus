@@ -15,6 +15,7 @@ import {
     addressToBuffer,
 } from '../../src/core/state/ApplyOperationEncodings.js';
 
+//whole test must be changed. 
 const WRITING_KEY_SIZE = 32;
 const TRAC_PUB_KEY_SIZE = 32;
 
@@ -50,27 +51,27 @@ test('Convert bech32m address to and from buffer - Happy Path', t => {
 });
 
 test('Encode and Decode Admin Entry - Happy Path', t => {
-    const tracAddr = randomAddress();
+    const address = randomAddress();
     const wk = randomBuffer(WRITING_KEY_SIZE);
 
-    const encoded = encodeAdminEntry(tracAddr, wk);
+    const encoded = encodeAdminEntry(address, wk);
     t.is(encoded.length, ADMIN_ENTRY_SIZE, "encoding has valid length");
 
     const decoded = decodeAdminEntry(encoded);
     t.ok(decoded, 'decoded should not be null');
-    t.ok(decoded.tracAddr === tracAddr, 'tracAddr matches');
+    t.ok(decoded.address === address, 'address matches');
     t.ok(b4a.equals(decoded.wk, wk), 'wk matches');
 });
 
 test('encodeAdminEntry returns empty buffer on invalid input', t => {
-    const validTracAddr = randomAddress();
-    const invalidTracAddr = randomAddress().substring(BECH32M_HRP_SIZE + 1); // missing HRP
+    const validAddress = randomAddress();
+    const invalidAddress = randomAddress().substring(BECH32M_HRP_SIZE + 1); // missing HRP
 
     const validWk = randomBuffer(WRITING_KEY_SIZE);
     const invalidWk = randomBuffer(10);
 
-    const encoded1 = encodeAdminEntry(validTracAddr, invalidWk);
-    const encoded2 = encodeAdminEntry(invalidTracAddr, validWk);
+    const encoded1 = encodeAdminEntry(validAddress, invalidWk);
+    const encoded2 = encodeAdminEntry(invalidAddress, validWk);
 
     t.is(encoded1.length, 0);
     t.is(encoded2.length, 0);

@@ -9,6 +9,7 @@ const opts = {
     enable_wallet: true,
     enable_validator_observer: true,
     enable_interactive_mode: true,
+    disable_rate_limit: true,
     enable_txlogs: true,
 };
 

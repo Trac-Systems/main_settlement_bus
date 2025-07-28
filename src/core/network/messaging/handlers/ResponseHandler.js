@@ -75,9 +75,9 @@ class ResponseHandler {
         const isValid = await this.adminValidator.validate(message, channelString);
         if (isValid) {
             const adminEntry = await this.state.getAdminEntry();
-            const adminPublicKey = Wallet.decodeBech32m(adminEntry.tracAddr);
+            const adminPublicKey = Wallet.decodeBech32m(adminEntry.address);
 
-            console.log('Admin stream established:', adminEntry.tracAddr);
+            console.log('Admin stream established:', adminEntry.address);
             this.network.admin_stream = connection;
             this.network.admin = adminPublicKey;
         } else {

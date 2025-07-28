@@ -46,7 +46,7 @@ class AdminResponse extends BaseResponse {
             return false;
         }
 
-        const adminPublicKey = Wallet.decodeBech32m(adminEntry.tracAddr);
+        const adminPublicKey = Wallet.decodeBech32m(adminEntry.address);
         const receivedAdminPublicKey = Wallet.decodeBech32m(message.address);
         const adminWritingKey = b4a.from(message.wk, 'hex');
 

@@ -1,7 +1,9 @@
 
 import Wallet from "trac-wallet"
+import { TRAC_ADDRESS_SIZE } from 'trac-wallet/constants.js';
 import b4a from "b4a";
-import ApplyOperationEncodings from "../../state/ApplyOperationEncodings.js";
+
+import { bufferToAddress } from '../../state/utils/address.js';
 import { sleep } from '../../../utils/helpers.js';
 
 class ValidatorObserverService {
@@ -55,9 +57,9 @@ class ValidatorObserverService {
         const rndIndex = Math.floor(Math.random() * length);
         const validatorAddressBuffer = await this.state.getWriterIndex(rndIndex);
 
-        if (validatorAddressBuffer === null || b4a.byteLength(validatorAddressBuffer) !== ApplyOperationEncodings.TRAC_ADDRESS_SIZE) return;
+        if (validatorAddressBuffer === null || b4a.byteLength(validatorAddressBuffer) !== TRAC_ADDRESS_SIZE) return;
 
-        const validatorAddress = ApplyOperationEncodings.bufferToAddress(validatorAddressBuffer);
+        const validatorAddress = bufferToAddress(validatorAddressBuffer);
         if (validatorAddress === address) return;
 
         const validatorPubKey = Wallet.decodeBech32m(validatorAddress).toString('hex');

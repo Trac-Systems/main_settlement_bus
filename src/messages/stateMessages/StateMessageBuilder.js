@@ -1,10 +1,12 @@
+import b4a from 'b4a';
+import Wallet from 'trac-wallet';
+
 import Builder from './Builder.js';
 import { createHash } from '../../utils/crypto.js';
 import { createMessage } from '../../utils/buffer.js';
 import { OperationType } from '../../utils/protobuf/applyOperations.cjs'
-import b4a from 'b4a';
-import Wallet from 'trac-wallet';
-import { TRAC_ADDRESS_SIZE, addressToBuffer } from '../../core/state/ApplyOperationEncodings.js';
+import { addressToBuffer } from '../../core/state/utils/address.js';
+import { TRAC_ADDRESS_SIZE } from 'trac-wallet/constants.js';
 
 class StateMessageBuilder extends Builder {
     #wallet;

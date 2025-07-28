@@ -43,6 +43,7 @@ export const MAX_SERVER_CONNECTIONS = Infinity;
 export const MAX_CLIENT_CONNECTIONS = Infinity;
 export const ACK_INTERVAL = 1_000;
 export const DHT_BOOTSTRAPS = ['116.202.214.149:10001', '157.180.12.214:10001', 'node1.hyperdht.org:49737', 'node2.hyperdht.org:49737', 'node3.hyperdht.org:49737'];
+
 // checkjs
 export const WRITER_BYTE_LENGTH = 32;
 export const NONCE_BYTE_LENGTH = 32;

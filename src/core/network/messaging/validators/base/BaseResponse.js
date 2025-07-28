@@ -1,6 +1,6 @@
 import b4a from 'b4a';
 import Wallet from 'trac-wallet';
-import ApplyOperationEncodings from '../../../../state/ApplyOperationEncodings.js';
+import { bufferToAddress } from '../../../../state/utils/address.js';
 
 /*
     BaseResponse class for handling common validation logic for network responses.
@@ -61,11 +61,11 @@ class BaseResponse {
         switch (type) {
             case 'admin':
                 const adminEntry = await this.state.getAdminEntry();
-                publicKey = Wallet.decodeBech32m(adminEntry.tracAddr);
+                publicKey = Wallet.decodeBech32m(adminEntry.address);
 
                 break;
             default:
-                const addressString = ApplyOperationEncodings.bufferToAddress(message.address);
+                const addressString = bufferToAddress(message.address);
                 publicKey = Wallet.decodeBech32m(addressString);
         }
 
