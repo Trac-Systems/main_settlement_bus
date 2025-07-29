@@ -2,9 +2,11 @@ import test from 'brittle'
 import checkFixtures from '../fixtures/check.fixtures.js'
 import Check from '../../src/utils/check.js'
 import b4a from 'b4a'
+import { MIN_SAFE_VALIDATION_INTEGER, MAX_SAFE_VALIDATION_INTEGER } from '../../src/utils/constants.js';
+import {TRAC_ADDRESS_SIZE} from 'trac-wallet/constants.js';
 const check = new Check()
 
-test('sanitizeExtendedKeyOpSchema - happy paths for all operation types', t => {
+test('validateExtendedKeyOpSchema - happy paths for all operation types', t => {
     const validInputs = [
         checkFixtures.validAddAdmin,
         checkFixtures.validAddWriter,
@@ -12,87 +14,94 @@ test('sanitizeExtendedKeyOpSchema - happy paths for all operation types', t => {
     ]
 
     for (const validInput of validInputs) {
-        t.ok(check.sanitizeExtendedKeyOpSchema(validInput), `Valid payload for ${validInput.type} should pass`)
+        t.ok(check.validateExtendedKeyOpSchema(validInput), `Valid payload for ${validInput.type} should pass`)
     }
 })
 
-test('sanitizeExtendedKeyOpSchema - data type validation TOP LEVEL', t => {
-    const invalid = {
+test('validateExtendedKeyOpSchema - data type validation TOP LEVEL', t => {
+    // testing strict
+    const invalidInput = {
         ...checkFixtures.validAddWriter,
-        extra: 'redundant field'
-    };
-    t.absent(check.sanitizeExtendedKeyOpSchema(invalid), 'Extra field should fail due to $$strict');
-    t.absent(check.sanitizeExtendedKeyOpSchema({}), 'Empty object should fail');
+        extra: b4a.from('redundant field', 'utf-8')
+    }
+    t.absent(check.validateExtendedKeyOpSchema(invalidInput), 'Extra field should fail due to $$strict');
+    t.absent(check.validateExtendedKeyOpSchema({}), 'Empty object should fail');
+
     const invalidOperationType = { ...checkFixtures.validAddWriter, type: 'invalid-op' }
-    t.absent(check.sanitizeExtendedKeyOpSchema(invalidOperationType), 'Invalid operation type should fail');
+    t.absent(check.validateExtendedKeyOpSchema(invalidOperationType), 'Invalid operation type should fail');
+
+    const belowMin = { ...checkFixtures.validAddWriter, type: MIN_SAFE_VALIDATION_INTEGER - 1 };
+    const aboveMax = { ...checkFixtures.validAddWriter, type: MAX_SAFE_VALIDATION_INTEGER + 1 };
+    t.absent(check.validateExtendedKeyOpSchema(belowMin), 'Type below allowed min should fail');
+    t.absent(check.validateExtendedKeyOpSchema(aboveMax), 'Type above allowed max should fail');
 
     // testing for nested objects
     const nestedObjectInsideValue = {
         ...checkFixtures.validAddWriter,
         eko: {
             ...checkFixtures.validAddWriter.eko,
-            nested: { foo: 'bar' }
+            nested: { foo: b4a.from('bar', 'utf-8') }
         }
     };
-
-    t.absent(check.sanitizeExtendedKeyOpSchema(nestedObjectInsideValue), 'Unexpected nested field inside eko should fail');
+    t.absent(check.validateExtendedKeyOpSchema(nestedObjectInsideValue), 'Unexpected nested field inside `eko` should fail due to strict');
 
     const nestedObjectInsideValue2 = {
         ...checkFixtures.validAddWriter,
-        nested: { foo: 'bar' }
+        nested: { foo: b4a.from('bar', 'utf-8') }
     };
-    t.absent(check.sanitizeExtendedKeyOpSchema(nestedObjectInsideValue2), 'Unexpected nested field inside object should fail due to strict');
+    t.absent(check.validateExtendedKeyOpSchema(nestedObjectInsideValue2), 'Unexpected nested field inside object should fail due to strict');
 
     const nestedObjectInsideValue3 = {
         ...checkFixtures.validAddWriter,
         type: {
-            foo: 'bar',
-            nested: { foo: 'bar' }
+            foo: b4a.from('bar', 'utf-8'),
+            nested: { foo: b4a.from('bar', 'utf-8') }
         }
     };
-    t.absent(check.sanitizeExtendedKeyOpSchema(nestedObjectInsideValue3), 'Unexpected nested field inside `type` field should fail due to strict');
+    t.absent(check.validateExtendedKeyOpSchema(nestedObjectInsideValue3), 'Unexpected nested field inside `type` field should fail due to strict');
 
     const nestedObjectInsideValue4 = {
         ...checkFixtures.validAddWriter,
         key: {
-            foo: 'bar',
-            nested: { foo: 'bar' }
+            foo: b4a.from('bar', 'utf-8'),
+            nested: { foo: b4a.from('bar', 'utf-8') }
         }
     };
-    t.absent(check.sanitizeExtendedKeyOpSchema(nestedObjectInsideValue4), 'Unexpected nested field inside `key` field should fail due to strict');
+    t.absent(check.validateExtendedKeyOpSchema(nestedObjectInsideValue4), 'Unexpected nested field inside `key` field should fail due to strict');
 
+    //testing for invalid data types
     for (const invalidDataType of checkFixtures.notAllowedDataTypes) {
-        const invalidDataTypeForTypeValue = { ...checkFixtures.validAddWriter, type: invalidDataType };
-        if ( typeof invalidDataTypeForTypeValue.type === 'number') {
+        const invalidDataTypeForType = { ...checkFixtures.validAddWriter, type: invalidDataType };
+        if (typeof invalidDataType === 'number') {
             continue;
         }
-        t.absent(check.sanitizeExtendedKeyOpSchema(invalidDataTypeForTypeValue), `Invalid data type for 'type' key ${String(invalidDataType)} (${typeof invalidDataType}) should fail`);
+        t.absent(check.validateExtendedKeyOpSchema(invalidDataTypeForType), `Invalid data type for 'type' key ${String(invalidDataType)} (${typeof invalidDataType}) should fail`);
     }
 
     for (const invalidDataType of checkFixtures.notAllowedDataTypes) {
-        const invalidDataTypeForKeyValue = { ...checkFixtures.validAddWriter, key: invalidDataType };
-        t.absent(check.sanitizeExtendedKeyOpSchema(invalidDataTypeForKeyValue), `Invalid data type for 'key' key ${String(invalidDataType)} (${typeof invalidDataType}) should fail`);
+        const invalidTypForTypeKey = { ...checkFixtures.validAddWriter, key: invalidDataType };
+        t.absent(check.validateExtendedKeyOpSchema(invalidTypForTypeKey), `Invalid data type for 'key' key ${String(invalidDataType)} (${typeof invalidDataType}) should fail`);
     }
 
     for (const invalidDataType of checkFixtures.notAllowedDataTypes) {
         if (String(invalidDataType) === '[object Object]') {
             continue;
         }
-        const invalidTypeForEkoValue = { ...checkFixtures.validAddWriter, eko: invalidDataType };
-        t.absent(check.sanitizeExtendedKeyOpSchema(invalidTypeForEkoValue), `Invalid data type for 'eko' key ${String(invalidDataType)} (${typeof invalidDataType}) should fail`);
+        const invalidTypeForTypeValue = { ...checkFixtures.validAddWriter, eko: invalidDataType };
+        t.absent(check.validateExtendedKeyOpSchema(invalidTypeForTypeValue), `Invalid data type for 'eko' key ${String(invalidDataType)} (${typeof invalidDataType}) should fail`);
     }
 
-    const invalidOperationTypeDiffType = { ...checkFixtures.validAddWriter, type: 'string' }
-    t.absent(check.sanitizeExtendedKeyOpSchema(invalidOperationTypeDiffType), 'Incorrect data type for `type` should fail')
+    const invalidOperationTypeDiffType = { ...checkFixtures.validAddWriter, type: "string" }
+    t.absent(check.validateExtendedKeyOpSchema(invalidOperationTypeDiffType), 'Wrong type for `type` should fail')
 
     for (const mainField of checkFixtures.topFieldsEko) {
         const missingFieldInvalidInput = { ...checkFixtures.validAddWriter }
         delete missingFieldInvalidInput[mainField]
-        t.absent(check.sanitizeExtendedKeyOpSchema(missingFieldInvalidInput), `Missing ${mainField} should fail`);
+        t.absent(check.validateExtendedKeyOpSchema(missingFieldInvalidInput), `Missing ${mainField} should fail`);
     }
 });
 
-test('sanitizeExtendedKeyOpSchema - data type validation VALUE LEVEL (eko)', t => {
+test('validateExtendedKeyOpSchema - data type validation VALUE LEVEL (eko)', t => {
 
     // missing value fields
     for (const field of checkFixtures.extendedKeyOpValueFields) {
@@ -101,7 +110,7 @@ test('sanitizeExtendedKeyOpSchema - data type validation VALUE LEVEL (eko)', t =
             eko: { ...checkFixtures.validAddWriter.eko }
         };
         delete missing.eko[field];
-        t.absent(check.sanitizeExtendedKeyOpSchema(missing), `Missing eko.${field} should fail`);
+        t.absent(check.validateExtendedKeyOpSchema(missing), `Missing eko.${field} should fail`);
     }
 
     // Incorrect types for each field in value (eko)
@@ -114,7 +123,7 @@ test('sanitizeExtendedKeyOpSchema - data type validation VALUE LEVEL (eko)', t =
                     [field]: invalidType
                 }
             };
-            t.absent(check.sanitizeExtendedKeyOpSchema(withInvalidDataType), `Invalid data type for value.${field}: ${String(invalidType)} (${typeof invalidType}) should fail`);
+            t.absent(check.validateExtendedKeyOpSchema(withInvalidDataType), `Invalid data type for value.${field}: ${String(invalidType)} (${typeof invalidType}) should fail`);
         }
     }
 
@@ -127,7 +136,7 @@ test('sanitizeExtendedKeyOpSchema - data type validation VALUE LEVEL (eko)', t =
                 [field]: ''
             }
         };
-        t.absent(check.sanitizeExtendedKeyOpSchema(emptyStr), `Empty string for eko.${field} should fail`);
+        t.absent(check.validateExtendedKeyOpSchema(emptyStr), `Empty string for eko.${field} should fail`);
     }
 
     for (const field of checkFixtures.extendedKeyOpValueFields) {
@@ -139,7 +148,7 @@ test('sanitizeExtendedKeyOpSchema - data type validation VALUE LEVEL (eko)', t =
             }
         };
 
-        t.absent(check.sanitizeExtendedKeyOpSchema(nestedObj), `Nested object for eko.${field} should fail under strict mode`);
+        t.absent(check.validateExtendedKeyOpSchema(nestedObj), `Nested object for eko.${field} should fail under strict mode`);
     }
 
     const extraInValue = {
@@ -149,7 +158,7 @@ test('sanitizeExtendedKeyOpSchema - data type validation VALUE LEVEL (eko)', t =
             extraField: 'redundant'
         }
     }
-    t.absent(check.sanitizeExtendedKeyOpSchema(extraInValue), 'Extra field should fail due to $$strict')
+    t.absent(check.validateExtendedKeyOpSchema(extraInValue), 'Extra field should fail due to $$strict')
 
     for (const field of checkFixtures.extendedKeyOpValueFields) {
         const emptyObjForField = {
@@ -159,13 +168,13 @@ test('sanitizeExtendedKeyOpSchema - data type validation VALUE LEVEL (eko)', t =
                 [field]: {}
             }
         }
-        t.absent(check.sanitizeExtendedKeyOpSchema(emptyObjForField), `Empty object for eko.${field} should fail`)
+        t.absent(check.validateExtendedKeyOpSchema(emptyObjForField), `Empty object for eko.${field} should fail`)
     }
 
 });
 
 test('sanitizeExtendedKeyOpSchema - buffer length validation - TOP LEVEL', t => {
-    const expectedLen = 32;
+    const expectedLen = TRAC_ADDRESS_SIZE;
 
     const emptyBuffer = b4a.alloc(0);
     const oneTooShort = b4a.alloc(expectedLen - 1, 0x01);
@@ -175,23 +184,23 @@ test('sanitizeExtendedKeyOpSchema - buffer length validation - TOP LEVEL', t => 
     const tooLong = b4a.alloc(expectedLen + 2, 0x01);
 
     const inputs = {
-        emptyBufferInput: { ...checkFixtures.validAddWriter, key: emptyBuffer },
-        shortInput: { ...checkFixtures.validAddWriter, key: tooShort },
-        oneTooShortInput: { ...checkFixtures.validAddWriter, key: oneTooShort },
-        exactInput: { ...checkFixtures.validAddWriter, key: exact },
-        oneTooLongInput: { ...checkFixtures.validAddWriter, key: oneTooLong },
-        longInput: { ...checkFixtures.validAddWriter, key: tooLong },
+        emptyBufferInput: { ...checkFixtures.validAddWriter, address: emptyBuffer },
+        shortInput: { ...checkFixtures.validAddWriter, address: tooShort },
+        oneTooShortInput: { ...checkFixtures.validAddWriter, address: oneTooShort },
+        exactInput: { ...checkFixtures.validAddWriter, address: exact },
+        oneTooLongInput: { ...checkFixtures.validAddWriter, address: oneTooLong },
+        longInput: { ...checkFixtures.validAddWriter, address: tooLong },
     };
 
-    t.absent(check.sanitizeExtendedKeyOpSchema(inputs.emptyBufferInput), `'key' empty buffer (length ${emptyBuffer.length}) should fail`);
+    t.absent(check.validateExtendedKeyOpSchema(inputs.emptyBufferInput), `'key' empty buffer (length ${emptyBuffer.length}) should fail`);
     
-    t.absent(check.sanitizeExtendedKeyOpSchema(inputs.shortInput), `'key' too short (length ${tooShort.length}, non-zero) should fail`);
-    t.absent(check.sanitizeExtendedKeyOpSchema(inputs.oneTooShortInput), `'key' one too short (length ${oneTooShort.length}, non-zero) should fail`);
+    t.absent(check.validateExtendedKeyOpSchema(inputs.shortInput), `'key' too short (length ${tooShort.length}, non-zero) should fail`);
+    t.absent(check.validateExtendedKeyOpSchema(inputs.oneTooShortInput), `'key' one too short (length ${oneTooShort.length}, non-zero) should fail`);
 
-    t.ok(check.sanitizeExtendedKeyOpSchema(inputs.exactInput), `'key' exact length (length ${exact.length}, non-zero) should pass`);
+    t.ok(check.validateExtendedKeyOpSchema(inputs.exactInput), `'key' exact length (length ${exact.length}, non-zero) should pass`);
 
-    t.absent(check.sanitizeExtendedKeyOpSchema(inputs.oneTooLongInput), `'key' one too long (length ${oneTooLong.length}, non-zero) should fail`);
-    t.absent(check.sanitizeExtendedKeyOpSchema(inputs.longInput), `'key' too long (length ${tooLong.length}, non-zero) should fail`);
+    t.absent(check.validateExtendedKeyOpSchema(inputs.oneTooLongInput), `'key' one too long (length ${oneTooLong.length}, non-zero) should fail`);
+    t.absent(check.validateExtendedKeyOpSchema(inputs.longInput), `'key' too long (length ${tooLong.length}, non-zero) should fail`);
 });
 
 test('sanitizeExtendedKeyOpSchema - buffer length validation - VALUE LEVEL (eko)', t => {
@@ -221,16 +230,16 @@ test('sanitizeExtendedKeyOpSchema - buffer length validation - VALUE LEVEL (eko)
             longInput: buildValueLevel(tooLong),
         };
 
-        t.absent(check.sanitizeExtendedKeyOpSchema(inputs.emptyBufferInput), `eko.${field} empty buffer (length ${emptyBuffer.length}) should fail`);
+        t.absent(check.validateExtendedKeyOpSchema(inputs.emptyBufferInput), `eko.${field} empty buffer (length ${emptyBuffer.length}) should fail`);
 
-        t.absent(check.sanitizeExtendedKeyOpSchema(inputs.shortInput), `eko.${field} too short (length ${tooShort.length}, non-zero) should fail`);
+        t.absent(check.validateExtendedKeyOpSchema(inputs.shortInput), `eko.${field} too short (length ${tooShort.length}, non-zero) should fail`);
 
-        t.absent(check.sanitizeExtendedKeyOpSchema(inputs.oneTooShortInput), `eko.${field} one too short (length ${oneTooShort.length}, non-zero) should fail`);
+        t.absent(check.validateExtendedKeyOpSchema(inputs.oneTooShortInput), `eko.${field} one too short (length ${oneTooShort.length}, non-zero) should fail`);
 
-        t.ok(check.sanitizeExtendedKeyOpSchema(inputs.exactInput), `eko.${field} exact length (length ${exact.length}, non-zero) should pass`);
+        t.ok(check.validateExtendedKeyOpSchema(inputs.exactInput), `eko.${field} exact length (length ${exact.length}, non-zero) should pass`);
 
-        t.absent(check.sanitizeExtendedKeyOpSchema(inputs.oneTooLongInput), `eko.${field} one too long (length ${oneTooLong.length}, non-zero) should fail`);
+        t.absent(check.validateExtendedKeyOpSchema(inputs.oneTooLongInput), `eko.${field} one too long (length ${oneTooLong.length}, non-zero) should fail`);
         
-        t.absent(check.sanitizeExtendedKeyOpSchema(inputs.longInput), `eko.${field} too long (length ${tooLong.length}, non-zero) should fail`);
+        t.absent(check.validateExtendedKeyOpSchema(inputs.longInput), `eko.${field} too long (length ${tooLong.length}, non-zero) should fail`);
     }
 });
