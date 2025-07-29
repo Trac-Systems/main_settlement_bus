@@ -1,4 +1,5 @@
 import b4a from 'b4a';
+
 import { MIN_SAFE_VALIDATION_INTEGER, MAX_SAFE_VALIDATION_INTEGER } from '../../src/utils/constants.js';
 import { TRAC_ADDRESS_SIZE } from 'trac-wallet/constants.js';
 

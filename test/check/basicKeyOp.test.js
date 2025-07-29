@@ -1,15 +1,17 @@
 import test from 'brittle'
-import checkFixtures from '../fixtures/check.fixtures.js'
+
 import Check from '../../src/utils/check.js';
+import { BKO, notAllowedDataTypes } from '../fixtures/check.fixtures.js';
 import { topLevelValidationTests, valueLevelValidationTest, addressBufferLengthTest, fieldsBufferLengthTest } from './common.test.js';
+
 const check = new Check();
 
 test('validateBasicKeyOp - happy paths for all operation types', t => {
     const validInputs = [
-        checkFixtures.validAddIndexer,
-        checkFixtures.validRemoveIndexer,
-        checkFixtures.validAppendWhitelist,
-        checkFixtures.validBanValidator
+        BKO.validAddIndexer,
+        BKO.validRemoveIndexer,
+        BKO.validAppendWhitelist,
+        BKO.validBanValidator
     ]
 
     for (const validInput of validInputs) {
@@ -21,10 +23,10 @@ test('validateBasicKeyOp - top-level structure and type validation', t => {
     topLevelValidationTests(
         t,
         check.validateBasicKeyOp.bind(check),
-        checkFixtures.validAddIndexer,
+        BKO.validAddIndexer,
         'bko',
-        checkFixtures.notAllowedDataTypes,
-        checkFixtures.topFieldsBko
+        notAllowedDataTypes,
+        BKO.topFieldsBko
     );
 })
 
@@ -32,10 +34,10 @@ test('validateBasicKeyOp - value level validation (bko)', t => {
     valueLevelValidationTest(
         t,
         check.validateBasicKeyOp.bind(check),
-        checkFixtures.validAddIndexer,
+        BKO.validAddIndexer,
         'bko',
-        checkFixtures.basicKeyOpValueFields,
-        checkFixtures.notAllowedDataTypes
+        BKO.basicKeyOpValueFields,
+        notAllowedDataTypes
     );
 })
 
@@ -43,7 +45,7 @@ test('validateBasicKeyOp - address buffer length validation - TOP LEVEL', t => {
     addressBufferLengthTest(
         t,
         check.validateBasicKeyOp.bind(check),
-        checkFixtures.validAddIndexer,
+        BKO.validAddIndexer,
     );
 });
 
@@ -52,8 +54,8 @@ test('validateBasicKeyOp - fields buffer length validation - VALUE LEVEL (bko)',
     fieldsBufferLengthTest(
         t,
         check.validateBasicKeyOp.bind(check),
-        checkFixtures.validAddIndexer,
+        BKO.validAddIndexer,
         'bko',
-        checkFixtures.requiredLengthOfFieldsForBasicKeyOp
+        BKO.requiredLengthOfFieldsForBasicKeyOp
     )
 });
