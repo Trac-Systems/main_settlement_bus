@@ -6,11 +6,11 @@ async function runTests() {
   test.pause();
 
   // await import('./encodings/ApplyOperationEncodings.test.js');
-  // await import('./check/check.test.js');
+  await import('./check/check.test.js');
+  await import('./protobuf/protobuf.test.js');
   //await import('./functions/functions.test.js');
   //await import('./fileUtils/readPublicKeysFromFile.test.js'); 
   //await import('./messageOperations/messageOperations.test.js'); 
-  await import('./protobuf/protobuf.test.js');
   // await import('./apply/apply.test.js'); // after 108-adjust-checkjs-for-incoming-buffer-data commit this test is failing due to changes in check.js
   test.resume();
 }
