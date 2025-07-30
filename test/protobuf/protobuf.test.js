@@ -1,11 +1,12 @@
 import test from 'brittle';
+import b4a from 'b4a';
+
 import applyOperations from '../../src/utils/protobuf/applyOperations.cjs';
 import fixtures from '../fixtures/protobuf.fixtures.js';
-import b4a from 'b4a';
-const testName = 'Happy path encode/decode roundtrip for protobuf applyOperation payloads';
-test(testName, t => {
+
+test('Happy path encode/decode roundtrip for protobuf applyOperation payloads', t => {
     const payloadsHashMap = new Map([
-        ["post-tx", fixtures.validPostTx],
+        ["tx", fixtures.validPostTx],
         ["addIndexer", fixtures.validAddIndexer],
         ["removeIndexer", fixtures.validRemoveIndexr],
         ["appendWhitelist", fixtures.validAppendWhitelist],
@@ -14,7 +15,6 @@ test(testName, t => {
         ["addWriter", fixtures.validAddWriter],
         ["removeWriter", fixtures.validRemoveWriter]
     ]);
-
 
     for (const [key, value] of payloadsHashMap) {
         console.log(`Testing payload: ${key} ${value}`);
@@ -70,5 +70,27 @@ test('Decode throws on buffer with unknown wire type (skip case)', t => {
         console.error('Caught error:', err);
         t.ok(err instanceof Error && err.message.includes('Could not decode varint'), 'Should throw an error instance to be thrown for unknown wire type');
     }
+});
+
+// We could cover all types of protobuf messages. For now it will be just TX.
+// If someone will send to us  shuffled TXO, we should be able to decode it and it will be in correct order.
+test('Protobuf encode/decode is order-independent', t => {
+
+    const shuffleObject = (obj) => {
+        const keys = Object.keys(obj);
+        for (let i = keys.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [keys[i], keys[j]] = [keys[j], keys[i]];
+        }
+        const shuffled = {};
+        for (const k of keys) shuffled[k] = obj[k];
+        return shuffled;
+    }
+
+    const shuffledTxo = shuffleObject(fixtures.validPostTx.txo);
+    const shuffledPayload = { ...fixtures.validPostTx, txo: shuffledTxo };
+    const encoded = applyOperations.Operation.encode(shuffledPayload);
+    const decoded = applyOperations.Operation.decode(encoded);
+    t.ok(JSON.stringify(decoded) === JSON.stringify(fixtures.validPostTx), 'Payload validPostTx encodes and decodes correctly even with shuffled txo fields');
 });
 
