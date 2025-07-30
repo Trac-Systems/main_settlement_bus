@@ -1,5 +1,8 @@
 import b4a from 'b4a';
 
+// TODO: All of those functions can throw errors. We should implement try-catch blocks
+// and return a Result type instead of throwing exceptions directly.
+
 /**
  * Initializes a length entry buffer with a default value of 0.
  * The buffer is 4 bytes long and uses little-endian encoding.

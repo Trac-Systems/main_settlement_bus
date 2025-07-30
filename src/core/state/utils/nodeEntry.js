@@ -4,7 +4,7 @@ import { WRITER_MASK, INDEXER_MASK, WHITELISTED_MASK, calculateNodeRole, isNodeR
 import { WRITER_BYTE_LENGTH } from '../../../utils/constants.js';
 import { isBufferValid } from '../../../utils/buffer.js';
 
-const NODE_ENTRY_SIZE = WRITER_BYTE_LENGTH + 1;
+export const NODE_ENTRY_SIZE = WRITER_BYTE_LENGTH + 1;
 
 /**
  * Initializes a new node entry with given writing key and role.
@@ -203,6 +203,7 @@ export function setRoleAndWriterKey(nodeEntry, nodeRole, writingKey) {
 }
 
 export default {
+    NODE_ENTRY_SIZE,
     init,
     encode,
     decode,
