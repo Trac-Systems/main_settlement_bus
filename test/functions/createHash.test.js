@@ -1,16 +1,16 @@
 import test from 'brittle';
+import b4a from 'b4a';
 import { createHash } from '../../src/utils/crypto.js';
 
 test('createHash', async (t) => {
     t.test('sha256', async (k) => {
         const hash = await createHash('sha256', 'test');
-        const expectedResult = "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08";
-        k.is(typeof hash, 'string', 'Hash should be a string');
-        k.ok(hash.length === 64, 'Hash should be 64 characters long');
-        k.ok(hash.match(/^[a-f0-9]+$/), 'Hash should be a hex string');
-        k.ok(hash === expectedResult, 'Hash result should be the expected one')
-        k.ok(hash === await createHash('sha256', 'test'), 'Hash should be the same for the same input');
-        k.ok(hash !== await createHash('sha256', 'Test'), 'Hash should be different for different inputs');
+        const expectedResult = b4a.from("9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08", 'hex');
+        k.ok(b4a.isBuffer(hash), 'Hash should be a buffer');
+        k.ok(hash.length === 32, 'Hash should be 32 bytes long');
+        k.ok(hash.equals(expectedResult), 'Hash result should be the expected one');
+        k.ok(hash.equals(await createHash('sha256', 'test')), 'Hash should be the same for the same input');
+        k.ok(!hash.equals(await createHash('sha256', 'Test')), 'Hash should be different for different inputs');
     });
 
     // TODO: Uncomment the following tests when the createHash function is fixed to work in the Bare environment
