@@ -20,6 +20,9 @@ export const NodeRole = {
 
  /**
  * Calculates the node role bitmask from a node object.
+ * **Note**: This function only sets the bits which represent each role. Some results might be invalid,
+ * such as a node that is an indexer without being a writer or a writer which is not whitelisted.
+ * We recommend using the `isNodeRoleValid` function to validate the result.
  * @param {{isWhitelisted?: boolean, isWriter?: boolean, isIndexer?: boolean}} nodeObj - The node object.
  * @returns {number} The calculated node role bitmask.
  */
