@@ -4,6 +4,7 @@ import { OperationType,
     NONCE_BYTE_LENGTH,
     SIGNATURE_BYTE_LENGTH,
     HASH_BYTE_LENGTH,
+    BOOTSTRAP_BYTE_LENGTH,
     MIN_SAFE_VALIDATION_INTEGER,
     MAX_SAFE_VALIDATION_INTEGER,
     TX_HASH_HEXSTRING_LENGTH,
@@ -11,7 +12,7 @@ import { OperationType,
     NONCE_HEXSTRING_LENGTH,
     CONTENT_HASH_HEXSTRING_LENGTH,
     SIGNATURE_HEXSTRING_LENGTH,
-    BOOTSTRAP_HEXSTRING_LENGTH
+    BOOTSTRAP_HEXSTRING_LENGTH,
 } from './constants.js';
 import { TRAC_ADDRESS_SIZE } from 'trac-wallet/constants.js';
 
@@ -143,8 +144,8 @@ class Check {
                     in: { type: 'buffer', length: NONCE_BYTE_LENGTH, required: true }, // incoming nonce
                     ch: { type: 'buffer', length: HASH_BYTE_LENGTH, required: true }, // content hash
                     is: { type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true }, // signature
-                    bs: { type: 'buffer', length: WRITER_BYTE_LENGTH, required: true }, // peer contract bootstrap
-                    mbs: { type: 'buffer', length: WRITER_BYTE_LENGTH, required: true }, // msb bootstrap
+                    bs: { type: 'buffer', length: BOOTSTRAP_BYTE_LENGTH, required: true }, // peer contract bootstrap
+                    mbs: { type: 'buffer', length: BOOTSTRAP_BYTE_LENGTH, required: true }, // msb bootstrap
                     vs: { type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true }, // validator/writer signature
                     vn: { type: 'buffer', length: NONCE_BYTE_LENGTH, required: true } // validator/writer nonce
                 }
