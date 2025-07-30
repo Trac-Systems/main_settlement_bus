@@ -4,7 +4,8 @@ import { default as test } from 'brittle';
 
 async function runTests() {
   test.pause();
-  // await import('./encodings/ApplyOperationEncodings.test.js');
+
+  await import('./state/stateTests.test.js');
   await import('./check/check.test.js');
   await import('./protobuf/protobuf.test.js');
   await import('./functions/functions.test.js');
