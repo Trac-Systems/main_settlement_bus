@@ -1,20 +1,45 @@
-import { MainSettlementBus } from '../../src/index.js'
-import fileUtils from '../../src/utils/fileUtils.js'
-import MsgUtils from '../../src/utils/msgUtils.js'
-import { EntryType } from '../../src/utils/constants.js';
-import { OperationType } from '../../src/utils/constants.js'
-import { sleep } from '../../src/utils/helpers.js'
-import { createHash  } from '../../src/utils/crypto.js'
-
-import { generateTx } from '../../src/utils/crypto.js';
 import sodium from 'sodium-native';
 import { generateMnemonic, mnemonicToSeed } from 'bip39-mnemonic';
 import b4a from 'b4a'
-import os from 'os'
-import path from 'path'
-import fs from 'fs/promises'
 import PeerWallet from "trac-wallet"
-import { randomBytes } from 'crypto'
+import path from 'path';
+import StateMessageOperations from '../../src/messages/stateMessages/StateMessageOperations.js';
+
+import { MainSettlementBus } from '../../src/index.js'
+import fileUtils from '../../src/utils/fileUtils.js'
+import { EntryType } from '../../src/utils/constants.js';
+import { OperationType } from '../../src/utils/constants.js'
+import { sleep } from '../../src/utils/helpers.js'
+import { createHash } from '../../src/utils/crypto.js'
+import { generateTx } from '../../src/utils/transactionUtils.js';
+import { TRAC_ADDRESS_SIZE } from 'trac-wallet/constants.js';
+let os, fsp;
+
+/**
+ * Ensures that the environment is ready for file system and OS operations.
+ */
+
+async function ensureEnvReady() {
+    if (!os || !fsp) {
+        if (typeof globalThis.Bare !== 'undefined') {
+            const bareOS = await import('bare-os');
+            os = bareOS.default || bareOS;
+            const bareFS = await import('bare-fs');
+            fsp = (bareFS.default || bareFS).promises;
+        } else {
+            const nodeOS = await import('os');
+            os = nodeOS.default || nodeOS;
+            const nodeFS = await import('fs/promises');
+            fsp = nodeFS.default || nodeFS;
+        }
+    }
+}
+
+export function randomBytes() {
+    const buf = b4a.allocUnsafe(32);
+    sodium.randombytes_buf(buf);
+    return buf;
+}
 
 async function randomKeypair() {
     const keypair = {};
@@ -43,12 +68,11 @@ export async function initMsbPeer(peerName, peerKeyPair, temporaryDirectory, opt
     peer.options = options
     peer.options.stores_directory = peer.storesDirectory;
     peer.options.store_name = peer.storeName;
-
     const msb = new MainSettlementBus(peer.options);
+
 
     const wallet = new PeerWallet();
     wallet.initKeyPair(peer.keypath);
-
     peer.msb = msb;
     peer.wallet = wallet;
 
@@ -87,21 +111,20 @@ export async function setupMsbAdmin(keyPair, temporaryDirectory, options = {}) {
 export async function setupMsbWriter(admin, peerName, peerKeyPair, temporaryDirectory, options = {}) {
     try {
         const writerCandidate = await setupMsbPeer(peerName, peerKeyPair, temporaryDirectory, options);
-        await setupWhitelist(admin, [writerCandidate.wallet.publicKey]);
+        await setupWhitelist(admin, [writerCandidate.wallet.address]);
 
-        const isWriter = async (key) => {
-            const result = await admin.msb.state.get(key);
+        const isWriter = async (address) => {
+            const result = await admin.msb.state.getNodeEntry(address);
             return result && result.isWriter && !result.isIndexer;
         }
 
-        const req = await MsgUtils.assembleAddWriterMessage(writerCandidate.wallet, writerCandidate.msb.state.writingKey);
+        const req = await StateMessageOperations.assembleAddWriterMessage(writerCandidate.wallet, writerCandidate.msb.state.writingKey);
         await admin.msb.state.append(req);
         await tick(); // wait for the request to be processed
-
         let counter;
         const limit = 10; // maximum number of attempts to verify the role
         for (counter = 0; counter < limit; counter++) {
-            const res = await isWriter(req.key);
+            const res = await isWriter(writerCandidate.wallet.address);
             if (res) {
                 break;
             }
@@ -117,23 +140,24 @@ export async function setupMsbWriter(admin, peerName, peerKeyPair, temporaryDire
 
 export async function setupMsbIndexer(indexerCandidate, admin) {
     try {
-        const req = await MsgUtils.assembleAddIndexerMessage(admin.wallet, indexerCandidate.wallet.publicKey);
+        const req = await StateMessageOperations.assembleAddIndexerMessage(admin.wallet, indexerCandidate.wallet.address);
         await admin.msb.state.append(req);
         await tick(); // wait for the request to be processed
 
         const isIndexer = async () => {
-            const indexers = await admin.msb.state.get(EntryType.INDEXERS)
-            if (!indexers) {
+            const indexersEntry = await admin.msb.state.getIndexersEntry();
+            if (!indexersEntry) {
                 return false;
             }
-            // Check if the peer's public key is in the indexers list
-            return Array.from(indexers).includes(indexerCandidate.wallet.publicKey);
+            const formatted = formatIndexersEntry(indexersEntry);
+            if (!formatted || !formatted.addresses) return false;
+            return formatted.addresses.includes(indexerCandidate.wallet.address);
         }
 
         let counter;
         const limit = 10; // maximum number of attempts to verify the role
         for (counter = 0; counter < limit; counter++) {
-            const res = await isIndexer(req.key);
+            const res = await isIndexer(indexerCandidate.wallet.address);
             if (res) {
                 break;
             }
@@ -147,50 +171,72 @@ export async function setupMsbIndexer(indexerCandidate, admin) {
     }
 }
 
-export async function setupWhitelist(admin, whitelistKeys) {
+function formatIndexersEntry(indexersEntry) {
+    const count = indexersEntry[0];
+    const indexers = [];
+    for (let i = 0; i < count; i++) {
+        const start = 1 + (i * TRAC_ADDRESS_SIZE);
+        const end = start + TRAC_ADDRESS_SIZE;
+        const indexerAddr = indexersEntry.subarray(start, end);
+        indexers.push(indexerAddr.toString('ascii'));
+    }
+    return {
+        count,
+        addresses: indexers
+    };
+}
+
+export async function setupWhitelist(admin, whitelistAddresses) {
     if (!admin || !admin.msb || !admin.wallet) {
         throw new Error('Admin is not properly initialized');
     }
 
-    if (!Array.isArray(whitelistKeys) || whitelistKeys.length === 0) {
-        throw new Error('Whitelist keys must be a non-empty array');
+    if (!Array.isArray(whitelistAddresses) || whitelistAddresses.length === 0) {
+        throw new Error('Whitelist addresses must be a non-empty array');
     }
 
     const adminEntry = await admin.msb.state.get(EntryType.ADMIN);
     if (!adminEntry) {
         throw new Error('Admin is not initialized. Execute /add_admin command first.');
     }
-
     // set up mock whitelist
     const originalReadPublicKeysFromFile = fileUtils.readPublicKeysFromFile;
-    fileUtils.readPublicKeysFromFile = async () => whitelistKeys;
-    const assembledWhitelistMessages = await MsgUtils.assembleWhitelistMessages(adminEntry, admin.wallet);
-    await admin.msb.state.append(assembledWhitelistMessages);
+    fileUtils.readPublicKeysFromFile = async () => whitelistAddresses;
+    const assembledWhitelistMessages = await StateMessageOperations.assembleAppendWhitelistMessages(admin.wallet);
+    for (const [_, msg] of assembledWhitelistMessages.entries()) {
+        await admin.msb.state.append(msg);
+    }
     fileUtils.readPublicKeysFromFile = originalReadPublicKeysFromFile;
 }
 
 export async function initTemporaryDirectory() {
-    const temporaryDirectory = await fs.mkdtemp(path.join(os.tmpdir(), 'tempTestStore-'));
+    await ensureEnvReady();
+    const tmpDir = os.tmpdir();
+    const unique = `tempTestStore-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const temporaryDirectory = path.join(tmpDir, unique);
+    await fsp.mkdir(temporaryDirectory, { recursive: true });
     console.log('temporary directory: ', temporaryDirectory);
     return temporaryDirectory;
 }
 
 export async function removeTemporaryDirectory(temporaryDirectory) {
-    await fs.rm(temporaryDirectory, { recursive: true, force: true })
+    await ensureEnvReady();
+    await fsp.rm(temporaryDirectory, { recursive: true, force: true })
 }
 
 async function initDirectoryStructure(peerName, keyPair, temporaryDirectory) {
     try {
+        await ensureEnvReady();
         const storesDirectory = temporaryDirectory + '/stores/';
         const storeName = peerName + '/';
         const corestoreDbDirectory = path.join(storesDirectory, storeName, 'db');
-        await fs.mkdir(corestoreDbDirectory, { recursive: true });
+        await fsp.mkdir(corestoreDbDirectory, { recursive: true });
 
         const keypath = path.join(corestoreDbDirectory, 'keypair.json');
         if (!keyPair || !keyPair.publicKey || !keyPair.secretKey) {
             keyPair = await randomKeypair();
         }
-        await fs.writeFile(keypath, JSON.stringify(keyPair, null, 2));
+        await fsp.writeFile(keypath, JSON.stringify(keyPair, null, 2));
         return {
             storesDirectory,
             storeName,
@@ -205,11 +251,11 @@ async function initDirectoryStructure(peerName, keyPair, temporaryDirectory) {
 
 export async function addKeyToWhitelist(filepath, key) {
     try {
+        await ensureEnvReady();
         // Check if the file exists, if not create it
-        await fs.mkdir(path.dirname(filepath), { recursive: true })
-        
+        await fsp.mkdir(path.dirname(filepath), { recursive: true })
         // Append the key to the file, followed by a newline
-        await fs.appendFile(filepath, key + '\n', { encoding: 'utf8' });
+        await fsp.appendFile(filepath, key + '\n', { encoding: 'utf8' });
     } catch (error) {
         throw new Error('Error adding key to whitelist: ' + error);
     }
@@ -218,16 +264,17 @@ export async function addKeyToWhitelist(filepath, key) {
 export async function restoreWhitelistFromBackup(filepath) {
     const backupPath = filepath + '.bak';
     try {
+        await ensureEnvReady();
         // Check if the backup file exists
-        await fs.access(backupPath);
+        await fsp.access(backupPath);
         // Remove the current file if it exists
         try {
-            await fs.unlink(filepath);
+            await fsp.unlink(filepath);
         } catch (e) {
             // File may not exist, that's fine
         }
         // Rename the backup back to the original filename
-        await fs.rename(backupPath, filepath);
+        await fsp.rename(backupPath, filepath);
     } catch (e) {
         // Backup does not exist, nothing to restore
     }

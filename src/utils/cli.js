@@ -1,5 +1,4 @@
 import b4a from 'b4a';
-import {  TRAC_ADDRESS_SIZE } from 'trac-wallet/constants.js';
 
 export async function verifyDag(state, network, wallet, writerKey, shouldListenToAdminEvents, shouldListenToWriterEvents) {
     try {
@@ -65,25 +64,4 @@ export const printWalletInfo = (address, writingKey) => {
     console.log('# MSB Address:   ', address.toString('hex'), ' #');
     console.log('# MSB Writer:    ', writingKey.toString('hex'), '#');
     console.log('#####################################################################################');
-}
-
-export function formatIndexersEntry(indexersEntry) {
-    if (!b4a.isBuffer(indexersEntry) || indexersEntry.length < 1) {
-        return 'No indexers';
-    }
-
-    const count = indexersEntry[0];
-    const indexers = [];
-
-    for (let i = 0; i < count; i++) {
-        const start = 1 + (i * TRAC_ADDRESS_SIZE);
-        const end = start + TRAC_ADDRESS_SIZE;
-        const indexerAddr = indexersEntry.subarray(start, end);
-        indexers.push(indexerAddr.toString('ascii'));
-    }
-
-    return {
-        count,
-        addresses: indexers
-    };
 }
