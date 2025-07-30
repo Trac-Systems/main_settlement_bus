@@ -11,7 +11,7 @@ class StateMessageDirector {
         this.#builder = builderInstance;
     }
 
-    async buildAddAdminMessage(adminEntry, writingKey, bootstrap, address) {
+    async buildAddAdminMessage(writingKey, address) {
         if (!this.#builder) throw new Error('Builder has not been set.');
 
         await this.#builder
