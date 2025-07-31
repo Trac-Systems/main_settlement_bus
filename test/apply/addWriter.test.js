@@ -58,10 +58,10 @@ test('handleApplyAddWriterOperation (apply) - Append addWriter payload into the 
 
 });
 
-test('handleApplyAddWriterOperation (apply) - Append addWriter payload into the base twice - idempotence', async (t) => {
+test('handleApplyAddWriterOperation (apply) - Append addWriter payload into the base - idempotence', async (t) => {
     try {
         // writer1 is already added, so we try to add it again
-        const req = await StateMessageOperations.assembleAddWriterMessage(
+        const reqAddWriter = await StateMessageOperations.assembleAddWriterMessage(
             writer1.wallet,
             writer1.msb.state.writingKey,
         );
@@ -70,7 +70,7 @@ test('handleApplyAddWriterOperation (apply) - Append addWriter payload into the 
         const signedLengthWriter1Before = writer1.msb.state.getSignedLength();
 
         // add writer to base
-        await admin.msb.state.append(req); // Send `add writer` request to apply function
+        await admin.msb.state.append(reqAddWriter); // Send `add writer` request to apply function
         await tick();
         await sleep(5000); // wait for both peers to sync state
 
@@ -91,7 +91,7 @@ test('handleApplyAddWriterOperation (apply) - Append addWriter payload into the 
     try {
         // writer1 is already added, so we try to add it again
         // writer2 is not a writer atm, but it is whitelisted.
-        const req = await StateMessageOperations.assembleAddWriterMessage(
+        const reqAddWriter = await StateMessageOperations.assembleAddWriterMessage(
             writer2.wallet,
             writer2.msb.state.writingKey,
         );
@@ -101,7 +101,7 @@ test('handleApplyAddWriterOperation (apply) - Append addWriter payload into the 
         const signedLengthWriter2Before = writer2.msb.state.getSignedLength();
 
         // add writer to base
-        await writer1.msb.state.append(req); // Send `add writer` request to apply function
+        await writer1.msb.state.append(reqAddWriter); // Send `add writer` request to apply function
         await tick();
         await sleep(5000); // wait for both peers to sync state
 
@@ -132,7 +132,7 @@ test('handleApplyAddWriterOperation (apply) - Append addWriter payload into the 
 test('handleApplyAddWriterOperation (apply) - Append addWriter payload into the base - ZERO_WK', async (t) => {
     try {
         // writer2 is not a writer atm, but it is whitelisted.
-        const req = await StateMessageOperations.assembleAddWriterMessage(
+        const reqAddWriter = await StateMessageOperations.assembleAddWriterMessage(
             writer2.wallet,
             ZERO_WK,
         );
@@ -141,7 +141,7 @@ test('handleApplyAddWriterOperation (apply) - Append addWriter payload into the 
         const signedLengthWriter2Before = writer2.msb.state.getSignedLength();
 
         // add writer to base
-        await admin.msb.state.append(req); // Send `add writer` request to apply function
+        await admin.msb.state.append(reqAddWriter); // Send `add writer` request to apply function
         await tick();
         await sleep(5000); // wait for both peers to sync state
 
@@ -169,7 +169,7 @@ test('handleApplyAddWriterOperation (apply) - Append addWriter payload into the 
 test('handleApplyAddWriterOperation (apply) - Append addWriter payload into the base - node is already an indexer', async (t) => {
     try {
         console.log("await admin.msb.state.getNodeEntry(indexer1.wallet.address)", await admin.msb.state.getNodeEntry(indexer1.wallet.address))
-        const req = await StateMessageOperations.assembleAddWriterMessage(
+        const reqAddWriter = await StateMessageOperations.assembleAddWriterMessage(
             indexer1.wallet,
             indexer1.msb.state.writingKey,
         );
@@ -178,7 +178,7 @@ test('handleApplyAddWriterOperation (apply) - Append addWriter payload into the 
         const signedLengthIndexer1Before = indexer1.msb.state.getSignedLength();
 
         // add writer to base
-        await admin.msb.state.append(req); // Send `add writer` request to apply function
+        await admin.msb.state.append(reqAddWriter); // Send `add writer` request to apply function
         await tick();
         await sleep(5000); // wait for both peers to sync state
 
@@ -207,13 +207,13 @@ test('handleApplyAddWriterOperation (apply) - Append addWriter payload into the 
 
 test('handleApplyAddWriterOperation (apply) - Append addWriter payload into the base - banned writer', async (t) => {
     try {
-        const req = await StateMessageOperations.assembleAddWriterMessage(
+        const reqAddWriter = await StateMessageOperations.assembleAddWriterMessage(
             writer2.wallet,
             writer2.msb.state.writingKey,
         );
 
         // add writer to base
-        await admin.msb.state.append(req); // Send `add writer` request to apply function
+        await admin.msb.state.append(reqAddWriter); // Send `add writer` request to apply function
         await tick();
         await sleep(5000); // wait for both peers to sync state
         const result = await writer2.msb.state.getNodeEntry(writer2.wallet.address); // check if the writer entry was added successfully in the base
@@ -224,21 +224,21 @@ test('handleApplyAddWriterOperation (apply) - Append addWriter payload into the 
         t.ok(b4a.equals(result.wk, writer2.msb.state.writingKey), 'Result writing key should match writer writing key');
         t.ok(result.isWriter, 'Result should indicate that the peer is a valid writer');
 
-        const banReq = await StateMessageOperations.assembleBanWriterMessage(
+        const reqBanWriter = await StateMessageOperations.assembleBanWriterMessage(
             admin.wallet,
             writer2.wallet.address,
         );
 
-        await admin.msb.state.append(banReq);
+        await admin.msb.state.append(reqBanWriter);
         await tick();
         await sleep(5000);
 
-        const req2 = await StateMessageOperations.assembleAddWriterMessage(
+        const reqAddWriter2 = await StateMessageOperations.assembleAddWriterMessage(
             writer2.wallet,
             writer2.msb.state.writingKey,
         );
 
-        await admin.msb.state.append(req2);
+        await admin.msb.state.append(reqAddWriter2);
         await tick();
         await sleep(5000);
 
@@ -256,13 +256,13 @@ test('handleApplyAddWriterOperation (apply) - Append addWriter payload into the 
 
 test('handleApplyAddWriterOperation (apply) - Append addWriter payload into the base - non-whitelisted peer', async (t) => {
     try {
-        const req = await StateMessageOperations.assembleAddWriterMessage(
+        const reqAddWriter = await StateMessageOperations.assembleAddWriterMessage(
             writer3.wallet,
             writer3.msb.state.writingKey,
         );
 
         // add writer to base
-        await admin.msb.state.append(req); // Send `add writer` request to apply function
+        await admin.msb.state.append(reqAddWriter); // Send `add writer` request to apply function
         await tick();
 
         await sleep(5000); // wait for both peers to sync state

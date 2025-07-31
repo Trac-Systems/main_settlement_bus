@@ -107,6 +107,35 @@ export async function setupMsbAdmin(keyPair, temporaryDirectory, options = {}) {
     return admin;
 }
 
+export async function setupNodeAsWriter(admin, writerCandidate) {
+    try {
+        await setupWhitelist(admin, [writerCandidate.wallet.address]); // ensure if is whitelisted
+
+        const isWriter = async (address) => {
+            const result = await admin.msb.state.getNodeEntry(address);
+            return result && result.isWriter && !result.isIndexer;
+        }
+
+        const req = await StateMessageOperations.assembleAddWriterMessage(writerCandidate.wallet, writerCandidate.msb.state.writingKey);
+        await admin.msb.state.append(req);
+        await tick(); // wait for the request to be processed
+        let counter;
+        const limit = 10; // maximum number of attempts to verify the role
+        for (counter = 0; counter < limit; counter++) {
+            const res = await isWriter(writerCandidate.wallet.address);
+            if (res) {
+                break;
+            }
+            await sleep(1000); // wait for the peer to sync state
+        }
+
+        return writerCandidate;
+    }
+    catch (error) {
+        throw new Error('Error setting up MSB writer: ', error.message);
+    }
+}
+
 export async function setupMsbWriter(admin, peerName, peerKeyPair, temporaryDirectory, options = {}) {
     try {
         const writerCandidate = await setupMsbPeer(peerName, peerKeyPair, temporaryDirectory, options);
@@ -335,4 +364,49 @@ export const generatePostTx = async (msbBootstrap, boostrapPeerWallet, peerWalle
 
     return { postTx, preTxHash };
 
+}
+
+/*
+    You can synchronize multiple nodes by passing them as arguments.
+    However they need to be writable.
+*/
+export const tryToSyncWriters = async (...args) => {
+    try {
+        const N = 100;
+        for (let i = 0; i < N; i++) {
+            for (const node of args) {
+                await sleep(50)
+                await node.msb.state.append(null);
+            }
+            await tick();
+        }
+
+    } catch (error) {
+        console.error('node is not a writer', error);
+    }
+}
+
+export async function waitForNotIndexer(indexer, maxAttempts = 30, delayMs = 1000) {
+
+    const isNotIndexer = async () => {
+        const indexersEntry = await indexer.msb.state.getIndexersEntry();
+        if (!indexersEntry) {
+            return false;
+        }
+        const formatted = formatIndexersEntry(indexersEntry);
+        if (!formatted || !formatted.addresses) return false;
+
+        const nodeEntry = await indexer.msb.state.getNodeEntry(indexer.wallet.address);
+        if (!nodeEntry) return false;
+        return !nodeEntry.isIndexer && !formatted.addresses.includes(indexer.wallet.address);
+    }
+
+    for (let counter = 0; counter < maxAttempts; counter++) {
+        const res = await isNotIndexer(indexer.wallet.address);
+        if (res) {
+            return true;
+        }
+        await sleep(delayMs);
+    }
+    return false;
 }
