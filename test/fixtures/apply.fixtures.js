@@ -21,3 +21,9 @@ export const testKeyPair4 = {
     secretKey: "aaa800b8f5666f5a9e3036b22dff56d33f0da4d7dc09dad6319605b2312d022094bb26ad3449feb0039f201051ab7e0efb7e75cf6d919811b21b80ad7d111c68",
     mnemonic: "blue moral east arch pistol episode misery garment spoil tip inflict mean seven improve doll loan artist you skill shoe aerobic decide border demand"
 }
+
+export const testKeyPair5 = {
+  publicKey: "6822a868e5a30c2c571e548f0807f3bd9760d04c4d6a32fe27d30c23c0eaa04b",
+  secretKey: "a573ec441c4f45a451ca615c5b31f4171e567c0c19e906cfe9af308826e6d37d6822a868e5a30c2c571e548f0807f3bd9760d04c4d6a32fe27d30c23c0eaa04b",
+  mnemonic: "walnut disagree toward verify shaft decade stage cactus very asset gasp recycle occur steel gorilla diamond slice sunset train train pill embrace senior clutch"
+}

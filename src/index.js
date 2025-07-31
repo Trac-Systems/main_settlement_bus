@@ -518,7 +518,12 @@ export class MainSettlementBus extends ReadyResource {
                     writingKey: admin.wk.toString('hex')
                 } : null);
                 const indexers = await this.#state.getIndexersEntry();
-                console.log('Indexers:', formatIndexersEntry(indexers));
+                const formattedIndexers = formatIndexersEntry(indexers);
+                if (formattedIndexers.length === 0) {
+                    console.log('Indexers: no-indexers');
+                } else {
+                    console.log('Indexers:', formattedIndexers);
+                }
                 // const wrl = await this.#state.getWriterLength();
                 // console.log('Writers Length:', wrl);
                 // const linealizer = this.#state.getInfoFromLinearizer();

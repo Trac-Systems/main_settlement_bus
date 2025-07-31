@@ -27,9 +27,6 @@ export const safeJsonParse = (str) => {
 }
 
 export function formatIndexersEntry(indexersEntry) {
-    if (!b4a.isBuffer(indexersEntry) || indexersEntry.length < 1) {
-        return 'No indexers';
-    }
 
     const count = indexersEntry[0];
     const indexers = [];
