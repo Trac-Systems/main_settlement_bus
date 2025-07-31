@@ -17,7 +17,7 @@ hook('Initialize nodes for addAdmin tests', async () => {
         enable_interactive_mode: false,
         enable_role_requester: false,
         channel: randomChannel,
-        enable_validator_observer: true,
+        enable_validator_observer: false,
         
     }
     tmpDirectory = await initTemporaryDirectory();
