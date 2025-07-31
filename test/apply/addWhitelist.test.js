@@ -1,16 +1,23 @@
 import { test, hook } from 'brittle';
-import { setupMsbAdmin, initTemporaryDirectory, removeTemporaryDirectory } from '../utils/setupApplyTests.js';
+import b4a from 'b4a';
+import Wallet from 'trac-wallet';
+
+import { setupMsbAdmin, initTemporaryDirectory, removeTemporaryDirectory, randomBytes } from '../utils/setupApplyTests.js';
 import { testKeyPair1, testKeyPair2 } from '../fixtures/apply.fixtures.js';
 import fileUtils from '../../src/utils/fileUtils.js';
-import MsgUtils from '../../src/utils/msgUtils.js';
-import { EntryType, WHITELIST_PREFIX } from '../../src/utils/constants.js';
+import StateMessageOperations from '../../src/messages/stateMessages/StateMessageOperations.js';
+
 
 let admin, whitelistKeys, tmpDirectory, originalReadPublicKeysFromFile;
+const address = Wallet.encodeBech32m(b4a.from(testKeyPair2.publicKey, 'hex'));
 hook('Initialize admin node for addWhitelist tests', async () => {
+    const randomChannel = randomBytes().toString('hex');
     const baseOptions = {
         enable_txchannels: false,
         enable_txlogs: false,
         enable_interactive_mode: false,
+        enable_role_requester: false,
+        channel: randomChannel,
     }
     tmpDirectory = await initTemporaryDirectory();
 
@@ -19,17 +26,18 @@ hook('Initialize admin node for addWhitelist tests', async () => {
     await admin.msb.ready();
 
     // Configure whitelist
-    whitelistKeys = [testKeyPair2.publicKey];
+    whitelistKeys = [address];
     originalReadPublicKeysFromFile = fileUtils.readPublicKeysFromFile;
     fileUtils.readPublicKeysFromFile = async () => whitelistKeys;
 });
 
 test('Apply function addWhitelist - happy path', async (t) => {
-    const adminEntry = await admin.msb.state.get(EntryType.ADMIN);
-    const assembledWhitelistMessages = await MsgUtils.assembleWhitelistMessages(adminEntry, admin.wallet);
-    await admin.msb.state.append(assembledWhitelistMessages);
-    const whitelist = await admin.msb.state.get(WHITELIST_PREFIX + testKeyPair2.publicKey);
-    t.is(whitelist, true, 'Whitelist entry should be created and true');
+    const assembledWhitelistMessages = await StateMessageOperations.assembleAppendWhitelistMessages(admin.wallet);
+    const payload = assembledWhitelistMessages.get(address);
+
+    await admin.msb.state.append(payload);
+    const isWhitelisted = await admin.msb.state.isAddressWhitelisted(address);
+    t.is(isWhitelisted, true, 'Whitelist entry should be created and true');
 });
 
 hook('Cleanup after addWhitelist tests', async () => {

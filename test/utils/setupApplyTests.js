@@ -12,7 +12,7 @@ import { OperationType } from '../../src/utils/constants.js'
 import { sleep } from '../../src/utils/helpers.js'
 import { createHash } from '../../src/utils/crypto.js'
 import { generateTx } from '../../src/utils/transactionUtils.js';
-import { TRAC_ADDRESS_SIZE } from 'trac-wallet/constants.js';
+import { formatIndexersEntry } from '../../src/utils/helpers.js';
 let os, fsp;
 
 /**
@@ -101,8 +101,7 @@ export async function setupMsbAdmin(keyPair, temporaryDirectory, options = {}) {
     const admin = await initMsbAdmin(keyPair, temporaryDirectory, options);
 
     await admin.msb.ready();
-    const adminEntry = await admin.msb.state.get(EntryType.ADMIN)
-    const addAdminMessage = await MsgUtils.assembleAdminMessage(adminEntry, admin.msb.state.writingKey, admin.wallet, admin.options.bootstrap);
+    const addAdminMessage = await StateMessageOperations.assembleAddAdminMessage(admin.msb.state.writingKey, admin.wallet);
     await admin.msb.state.append(addAdminMessage);
     await tick();
     return admin;
@@ -169,21 +168,6 @@ export async function setupMsbIndexer(indexerCandidate, admin) {
     catch (error) {
         throw new Error('Error setting up MSB indexer: ', error.message);
     }
-}
-
-function formatIndexersEntry(indexersEntry) {
-    const count = indexersEntry[0];
-    const indexers = [];
-    for (let i = 0; i < count; i++) {
-        const start = 1 + (i * TRAC_ADDRESS_SIZE);
-        const end = start + TRAC_ADDRESS_SIZE;
-        const indexerAddr = indexersEntry.subarray(start, end);
-        indexers.push(indexerAddr.toString('ascii'));
-    }
-    return {
-        count,
-        addresses: indexers
-    };
 }
 
 export async function setupWhitelist(admin, whitelistAddresses) {
