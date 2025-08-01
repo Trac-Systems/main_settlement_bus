@@ -123,7 +123,7 @@ test('Apply function addAdmin - happy path', async (t) => {
         }
     });
 });
-
+//TODO: ADD TEST WHEN NON-ADMIN NODE FORGES ADD ADMIN OPERATION AND BROADCASTS IT TO THE STATE -  SHOULD BE REJECTED
 hook('Clean up addAdmin setup', async () => {
     // close msb intances and remove temp directory
     if (admin && admin.msb) await admin.msb.close();
