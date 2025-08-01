@@ -34,11 +34,6 @@ hook('Initialize nodes', async t => {
     maliciousWriter = await setupMsbWriter(admin, 'malicious', testKeyPair3, tmpDirectory, admin.options);
     externalNode = await setupMsbPeer('reader', testKeyPair4, tmpDirectory, admin.options);
 
-    legitWallet = new PeerWallet();
-    maliciousWallet = new PeerWallet();
-
-    await legitWallet.initKeyPair(legitPeerKeyPath);
-    await maliciousWallet.initKeyPair(maliciousPeerKeyPath);
 });
 
 test('handleApplyTxOperation (apply) - Append POST_TX into the base - Happy path', async t => {
