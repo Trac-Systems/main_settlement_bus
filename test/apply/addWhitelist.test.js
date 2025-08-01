@@ -40,6 +40,8 @@ test('Apply function addWhitelist - happy path', async (t) => {
     t.is(isWhitelisted, true, 'Whitelist entry should be created and true');
 });
 
+//TODO: ADD TEST TO APPEND ADDRESS WHICH IS ALREADY WHITELISTED - SIGNED LENGTH SHOULD NOT CHANGE
+
 hook('Cleanup after addWhitelist tests', async () => {
     if (admin && admin.msb) {
         await admin.msb.close();

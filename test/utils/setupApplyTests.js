@@ -367,8 +367,8 @@ export const generatePostTx = async (msbBootstrap, boostrapPeerWallet, peerWalle
 }
 
 /*
-    You can synchronize multiple nodes by passing them as arguments.
-    However they need to be writable.
+    You can synchronize multiple nodes by passing them as arguments,
+    Useful for aligning signedLength values. If node is not a writer, it will be skipped.
 */
 export const tryToSyncWriters = async (...args) => {
     try {
@@ -382,7 +382,7 @@ export const tryToSyncWriters = async (...args) => {
         }
 
     } catch (error) {
-        console.error('node is not a writer', error);
+        console.log('node is not a writer', error);
     }
 }
 

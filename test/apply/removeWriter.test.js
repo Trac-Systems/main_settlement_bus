@@ -153,6 +153,7 @@ test('handleApplyRemoveWriterOperation (apply) - Append removeWriter payload int
         if (!isIndexer) {
             t.fail('Indexer should not be an indexer anymore');
         }
+        
         const resultRemoveWriter = await indexer.msb.state.getNodeEntry(indexer.wallet.address); // check if the writer entry was removed successfully in the base
 
         const indexersEntry = await indexer.msb.state.getIndexersEntry();
@@ -167,8 +168,6 @@ test('handleApplyRemoveWriterOperation (apply) - Append removeWriter payload int
         t.is(indexer.msb.state.isWritable(), false, 'Peer should not be writable');
         // t.is(indexer.msb.state.isIndexer(), false, 'Peer should not be an indexer');
         // Note: Sometimes the isIndexer flag updates slower than expected. Until the autobase will update this flag more faster, this assertion is commented out.
-
-
     }
     catch (error) {
         t.fail('Failed to remove writer: ' + error.message);
