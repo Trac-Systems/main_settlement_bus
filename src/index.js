@@ -2,9 +2,9 @@
 import ReadyResource from 'ready-resource';
 import b4a from 'b4a';
 import readline from 'readline';
-import { sleep } from './utils/helpers.js';
+import { sleep, formatIndexersEntry } from './utils/helpers.js';
 import { createHash } from './utils/crypto.js';
-import { verifyDag, printHelp, printWalletInfo, formatIndexersEntry } from './utils/cli.js';
+import { verifyDag, printHelp, printWalletInfo } from './utils/cli.js';
 import PeerWallet from "trac-wallet"
 import tty from 'tty';
 import Corestore from 'corestore';
@@ -18,6 +18,7 @@ import {
     EventType,
     WHITELIST_SLEEP_INTERVAL,
 } from './utils/constants.js';
+
 import Network from './core/network/Network.js';
 import Check from './utils/check.js';
 import State from './core/state/State.js';
@@ -42,6 +43,7 @@ export class MainSettlementBus extends ReadyResource {
     #enable_validator_observer;
     #enable_role_requester;
     #state;
+    #isClosing = false;
 
     constructor(options = {}) {
         super();
@@ -53,24 +55,20 @@ export class MainSettlementBus extends ReadyResource {
 
     #initInternalAttributes(options) {
         this.#STORES_DIRECTORY = options.stores_directory;
-        this.#KEY_PAIR_PATH = `${this.#STORES_DIRECTORY}${options.store_name}/db/keypair.json`
-        if (!options.bootstrap) {
-            throw new Error('MainSettlementBus: Bootstrap key is required. Application cannot start without bootstrap.');
-        }
-        this.#bootstrap = b4a.from(options.bootstrap, 'hex');
+        this.#KEY_PAIR_PATH = `${this.#STORES_DIRECTORY}${options.store_name}/db/keypair.json`;
+        this.#enable_wallet = options.enable_wallet !== false;
+        this.enable_interactive_mode = options.enable_interactive_mode !== false;
+        this.#enable_role_requester = options.enable_role_requester !== undefined ? options.enable_role_requester : true;
+        this.#enable_validator_observer = options.enable_validator_observer !== undefined ? options.enable_validator_observer : true;
+        this.#bootstrap = options.bootstrap ? b4a.from(options.bootstrap, 'hex') : null;
 
         if (!options.channel) {
             throw new Error('MainSettlementBus: Channel is required. Application cannot start without channel.');
         }
         this.#channel = b4a.alloc(32).fill(options.channel);
-
         this.#store = new Corestore(this.#STORES_DIRECTORY + options.store_name);
-        this.#enable_wallet = options.enable_wallet !== false;
         this.#wallet = new PeerWallet(options);
         this.#readline_instance = null;
-        this.enable_interactive_mode = options.enable_interactive_mode !== false;
-        this.#enable_role_requester = options.enable_role_requester !== undefined ? options.enable_role_requester : true;
-        this.#enable_validator_observer = options.enable_validator_observer !== undefined ? options.enable_validator_observer : true;
 
         if (this.enable_interactive_mode !== false) {
             try {
@@ -145,6 +143,7 @@ export class MainSettlementBus extends ReadyResource {
     async _close() {
         console.log('Closing everything gracefully... This may take a moment.');
 
+        this.#isClosing = true;
         await this.#network.close();
 
         await sleep(100);
@@ -262,8 +261,12 @@ export class MainSettlementBus extends ReadyResource {
         });
 
         this.#state.base.on(EventType.IS_NON_INDEXER, async () => {
+            // Prevent further actions if closing is in progress
+            // The reason is that getNodeEntry is async and may cause issues if we will access state after closing
+            if (this.#isClosing) return;
+
             // downgrate from indexer to non-indexer makes that node is writable
-            const updatedNodeEntry = await this.#state.getNodeEntry(this.#wallet.address.toString('hex'));
+            const updatedNodeEntry = await this.#state.getNodeEntry(this.#wallet.address);
             const canEnableWriterEvents = updatedNodeEntry &&
                 b4a.equals(updatedNodeEntry.wk, this.#state.writingKey) &&
                 !this.#shouldListenToWriterEvents;
@@ -277,7 +280,7 @@ export class MainSettlementBus extends ReadyResource {
         });
 
         this.#state.base.on(EventType.WRITABLE, async () => {
-            const updatedNodeEntry = await this.#state.getNodeEntry(this.#wallet.address.toString('hex'));
+            const updatedNodeEntry = await this.#state.getNodeEntry(this.#wallet.address);
             const canEnableWriterEvents = updatedNodeEntry &&
                 b4a.equals(updatedNodeEntry.wk, this.#state.writingKey) &&
                 !this.#shouldListenToWriterEvents;
@@ -294,7 +297,7 @@ export class MainSettlementBus extends ReadyResource {
                 console.log('Current node is unwritable');
                 return;
             }
-            const updatedNodeEntry = await this.#state.getNodeEntry(this.#wallet.address.toString('hex'));
+            const updatedNodeEntry = await this.#state.getNodeEntry(this.#wallet.address);
             const canDisableWriterEvents = updatedNodeEntry &&
                 !updatedNodeEntry.isWriter &&
                 this.#shouldListenToWriterEvents;
@@ -441,6 +444,7 @@ export class MainSettlementBus extends ReadyResource {
 
         }
     }
+
     async #banValidator(address) {
         const adminEntry = await this.#state.getAdminEntry();
         if (!this.#isAdmin(adminEntry)) return;
@@ -514,7 +518,12 @@ export class MainSettlementBus extends ReadyResource {
                     writingKey: admin.wk.toString('hex')
                 } : null);
                 const indexers = await this.#state.getIndexersEntry();
-                console.log('Indexers:', formatIndexersEntry(indexers));
+                const formattedIndexers = formatIndexersEntry(indexers);
+                if (formattedIndexers.length === 0) {
+                    console.log('Indexers: no-indexers');
+                } else {
+                    console.log('Indexers:', formattedIndexers);
+                }
                 // const wrl = await this.#state.getWriterLength();
                 // console.log('Writers Length:', wrl);
                 // const linealizer = this.#state.getInfoFromLinearizer();

@@ -18,7 +18,15 @@ export async function generateTx(bootstrap, msb_bootstrap, validator_address, lo
     return await createHash('sha256', await createHash('sha256', tx));
 }
 
-export async function generatePreTx(walletInstance, validator_address, local_writer_key, local_address, content_hash, sub_network_bootstrap, msb_bootstrap) {
+export async function generatePreTx(
+    walletInstance,
+    validator_address,
+    local_writer_key,
+    local_address,
+    content_hash,
+    sub_network_bootstrap,
+    msb_bootstrap
+) {
     const nonce = Wallet.generateNonce().toString('hex');
     const txHash = await generateTx(
         sub_network_bootstrap,
@@ -41,7 +49,7 @@ export async function generatePreTx(walletInstance, validator_address, local_wri
         ia: local_address.toString('hex'),
         iw: local_writer_key.toString('hex'),
         in: nonce,
-        ch: content_hash,
+        ch: content_hash.toString('hex'),
         is: signature.toString('hex'),
         bs: sub_network_bootstrap,
         mbs: msb_bootstrap.toString('hex'),

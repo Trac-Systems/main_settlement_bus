@@ -1,199 +1,225 @@
-import { test, hook } from 'brittle';
-import path from 'path';
-import fs from 'fs/promises';
-import { randomBytes } from 'crypto';
-import PeerWallet from "trac-wallet";
-import { tick, generatePostTx, setupMsbAdmin, initTemporaryDirectory, removeTemporaryDirectory } from '../utils/setupApplyTests.js';
-import { testKeyPair1, testKeyPair2, testKeyPair3 } from '../fixtures/apply.fixtures.js';
-import { generateTx } from '../../src/utils/crypto.js';
+import {hook, test} from 'brittle';
+import {
+    generatePostTx,
+    initTemporaryDirectory,
+    randomBytes,
+    removeTemporaryDirectory,
+    setupMsbAdmin,
+    setupMsbPeer,
+    setupMsbWriter,
+    tick
+} from '../utils/setupApplyTests.js';
+import {safeDecodeApplyOperation, safeEncodeApplyOperation} from '../../src/utils/protobuf/operationHelpers.js'
+import {testKeyPair1, testKeyPair2, testKeyPair3, testKeyPair4} from '../fixtures/apply.fixtures.js';
+import b4a from "b4a";
+import {OperationType} from "../../src/utils/constants.js";
+import {addressToBuffer} from "../../src/core/state/utils/address.js";
 
-let tmpDirectory, admin, legitWallet, maliciousWallet;
+let tmpDirectory, admin, writer, maliciousWriter, externalNode;
 
 hook('Initialize nodes', async t => {
-    tmpDirectory = await initTemporaryDirectory()
-    admin = await setupMsbAdmin(testKeyPair1, tmpDirectory, {});
+    const randomChannel = randomBytes(32).toString('hex');
 
-    const legitPeerKeyPath = path.join(admin.corestoreDbDirectory, 'keypair2.json');
-    const maliciousPeerKeyPath = path.join(admin.corestoreDbDirectory, 'keypair3.json');
+    const baseOptions = {
+        enable_txlogs: false,
+        enable_interactive_mode: false,
+        enable_role_requester: false,
+        enable_validator_observer: false,
+        channel: randomChannel,
+    }
 
-    await fs.writeFile(legitPeerKeyPath, JSON.stringify(testKeyPair2, null, 2));
-    await fs.writeFile(maliciousPeerKeyPath, JSON.stringify(testKeyPair3, null, 2));
+    tmpDirectory = await initTemporaryDirectory();
+    admin = await setupMsbAdmin(testKeyPair1, tmpDirectory, baseOptions);
+    writer = await setupMsbWriter(admin, 'writer', testKeyPair2, tmpDirectory, admin.options);
+    maliciousWriter = await setupMsbWriter(admin, 'malicious', testKeyPair3, tmpDirectory, admin.options);
+    externalNode = await setupMsbPeer('reader', testKeyPair4, tmpDirectory, admin.options);
 
-    legitWallet = new PeerWallet();
-    maliciousWallet = new PeerWallet();
-
-    await legitWallet.initKeyPair(legitPeerKeyPath);
-    await maliciousWallet.initKeyPair(maliciousPeerKeyPath);
 });
 
-test('handleApplyTxOperation (apply) - Append transaction into the base', async t => {
-    t.plan(1)
-
-    const { postTx, preTxHash } = await generatePostTx(admin.msb, admin.wallet, legitWallet)
-    await admin.msb.state.append(postTx);
+test('handleApplyTxOperation (apply) - Append POST_TX into the base - Happy path', async t => {
+    const {postTx, txHash} = await generatePostTx(writer, externalNode)
+    await writer.msb.state.append(postTx);
     await tick();
     await tick();
 
-    const result = await admin.msb.state.get(preTxHash);
+    const result = await writer.msb.state.get(txHash);
     t.ok(result, 'post tx added to the base');
 })
 
 test('handleApplyTxOperation (apply) - negative', async t => {
-    t.test('sanitizePostTx - nested object in postTx', async t => {
-        //sanitizePostTx is already tested in /test/check/postTx.test.js
-        let { postTx, preTxHash } = await generatePostTx(admin.msb, admin.wallet, legitWallet)
-        postTx = {
-            ...postTx,
-            foo: 'bar',
+    // TODO: This test has been disabled because we got rid of JSON schema validation in favor of protobuf validation. To enable this test again, we need to write a fake protobuf schema for postTx (maybe also for other operations) and forge an invalid payload.
+
+    // t.test('nested object in postTx', async t => {
+    //     //is already tested in /test/check/postTx.test.js
+    //     let { postTx, preTxHash: txHash } = await generatePostTx(admin.msb, admin.wallet, legitWallet)
+    //     postTx = {
+    //         ...postTx,
+    //         foo: 'bar',
+    //     }
+    //     await admin.msb.state.append(postTx);
+    //     await tick();
+    //
+    //     t.absent(await admin.msb.state.get(txHash), 'post tx with nested object should not be added to the base');
+    //     postTx = {
+    //         ...postTx,
+    //         value: {
+    //             ...postTx.value,
+    //             foo: 'bar',
+    //         }
+    //     }
+    //     await admin.msb.state.append(postTx);
+    //     await tick();
+    //     t.absent(await admin.msb.state.get(txHash), 'post tx with nested object in value property should not be added to the base');
+    //
+    // })
+
+    //
+    t.test('handleApplyTxOperation (apply) - different operation type', async t => {
+        const {postTx, txHash} = await generatePostTx(writer, externalNode)
+
+        const replaceByte = (input, index, replacement) => {
+            const bufferHex = b4a.from(input, 'hex');
+            bufferHex[index] = replacement;
+            return b4a.from(bufferHex, 'hex');
         }
-        await admin.msb.state.append(postTx);
+
+        const replacedPostTx = replaceByte(postTx, 1, OperationType.ADD_ADMIN);
+
+        await writer.msb.state.append(replacedPostTx);
         await tick();
 
-        t.absent(await admin.msb.state.get(preTxHash), 'post tx with nested object should not be added to the base');
-        postTx = {
-            ...postTx,
-            value: {
-                ...postTx.value,
-                foo: 'bar',
-            }
-        }
-        await admin.msb.state.append(postTx);
-        await tick();
-        t.absent(await admin.msb.state.get(preTxHash), 'post tx with nested object in value property should not be added to the base');
-
+        t.absent(await writer.msb.state.get(txHash), 'post tx with incorrect operation type should not be added to the base');
     })
 
-    t.test('different operation type in value', async t => {
-        let { postTx, preTxHash } = await generatePostTx(admin.msb, admin.wallet, legitWallet)
-        postTx = {
-            ...postTx,
-            value: {
-                ...postTx.value,
-                op: 'invalidOp',
-            }
-        }
-        await admin.msb.state.append(postTx);
+    t.test('handleApplyTxOperation (apply) - replay attack', async t => {
+        const {postTx, txHash} = await generatePostTx(writer, externalNode)
+        await writer.msb.state.append(postTx);
+        await tick();
+        const firstRes = await writer.msb.state.get(txHash);
+
+        await writer.msb.state.append(postTx);
         await tick();
 
-        t.absent(await admin.msb.state.get(preTxHash), 'post tx with incorrect operation type should not be added to the base');
-    })
-
-    t.test('replay attack', async t => {
-        const { postTx, preTxHash } = await generatePostTx(admin.msb, admin.wallet, legitWallet);
-        await admin.msb.state.append(postTx);
-        await tick();
-        const firstRes = await admin.msb.state.get(preTxHash);
-
-        await admin.msb.state.append(postTx);
-        await tick();
-
-        const secondRes = await admin.msb.state.get(preTxHash);
+        const secondRes = await writer.msb.state.get(txHash);
 
 
         t.is(firstRes.seq, secondRes.seq, 'post tx should not be added to the base twice');
     })
 
-    t.test('invalid key - key hash does not match tx hash', async t => {
-        let { postTx, preTxHash } = await generatePostTx(admin.msb, admin.wallet, legitWallet);
-        postTx = {
-            ...postTx,
-            key: randomBytes(32).toString('hex'),
-        }
-        await admin.msb.state.append(postTx);
-        await tick();
-        const result = await admin.msb.state.get(preTxHash);
-        t.absent(result, 'post tx with invalid key hash should not be added to the base');
+    t.test('handleApplyTxOperation (apply) - invalid postTx signature (adversary signature - writer signature)', async t => {
+        const {postTx, txHash} = await generatePostTx(writer, externalNode)
 
-    })
+        let decodedPostTx = safeDecodeApplyOperation(postTx);
 
-    t.test('invalid postTx signature - adversary signature (peer signature)', async t => {
-        let { postTx, preTxHash } = await generatePostTx(admin.msb, admin.wallet, legitWallet);
-
-        const adversarySignature = maliciousWallet.sign(
-            Buffer.from(postTx.value.tx + postTx.value.in)
+        decodedPostTx.txo.vs = maliciousWriter.wallet.sign(
+            b4a.concat([decodedPostTx.txo.tx, decodedPostTx.txo.vn])
         );
+        const encodedMaliciousPostTx = safeEncodeApplyOperation(decodedPostTx);
 
-        postTx.value.is = adversarySignature.toString('hex');
-
-        await admin.msb.state.append(postTx);
+        await writer.msb.state.append(encodedMaliciousPostTx);
         await tick();
 
-        const result = await admin.msb.state.get(preTxHash);
-        t.absent(result, 'adversary prepared fake preTx signature (third key pair) should not be added to the base');
+        const result = await admin.msb.state.get(txHash);
+        t.absent(result, 'adversary\'s fake signature should not be added to the base');
     });
 
-    t.test('invalid postTx signature - adversary signature (writer signature)', async t => {
-        let { postTx, preTxHash } = await generatePostTx(admin.msb, admin.wallet, legitWallet);
 
+    t.test('handleApplyTxOperation (apply) - invalid postTx signature (adversary signature - peer signature)', async t => {
+        const {postTx, txHash} = await generatePostTx(writer, externalNode)
 
-        const adversarySignature = maliciousWallet.sign(
-            Buffer.from(postTx.value.tx + postTx.value.in)
+        let decodedPostTx = safeDecodeApplyOperation(postTx);
+
+        decodedPostTx.txo.is = maliciousWriter.wallet.sign(
+            decodedPostTx.txo.tx
         );
-
-        postTx.ws = adversarySignature.toString('hex');
-
-        await admin.msb.state.append(postTx);
+        const encodedMaliciousPostTx = safeEncodeApplyOperation(decodedPostTx);
+        await writer.msb.state.append(encodedMaliciousPostTx);
         await tick();
 
-        const result = await admin.msb.state.get(preTxHash);
+        const result = await writer.msb.state.get(txHash);
         t.absent(result, 'adversary prepared fake postTx signature (third key pair) should not be added to the base');
     });
 
-    t.test('invalid generateTx (all inputs)', async t => {
-        const { postTx } = await generatePostTx(admin.msb, admin.wallet, legitWallet);
-
+    t.test('handleApplyTxOperation (apply) - invalid txo sub-values', async t => {
+        const {postTx, txHash} = await generatePostTx(writer, externalNode)
+        const decodedPostTx = safeDecodeApplyOperation(postTx);
+        // is and vs is already covered
         const testCases = [
-            { name: 'modified peer bootstrap', mod: (tx, maliciousValue) => { return { ...tx.value, bs: maliciousValue }; } },
-            { name: 'modified msb bootstrap', mod: (tx, maliciousValue) => { return { ...tx.value, mbs: maliciousValue }; } },
-            { name: 'modified validator pub key', mod: (tx, maliciousValue) => { return { ...tx.value, wp: maliciousValue }; } },
-            { name: 'modified writer key', mod: (tx, maliciousValue) => { return { ...tx.value, i: maliciousValue }; } },
-            { name: 'modified peer pub key', mod: (tx, maliciousValue) => { return { ...tx.value, ipk: maliciousValue }; } },
-            { name: 'modified content hash', mod: (tx, maliciousValue) => { return { ...tx.value, ch: maliciousValue }; } },
-            { name: 'modified nonce', mod: (tx, maliciousValue) => { return { ...tx.value, in: maliciousValue }; } },
+            { name: 'modified tx', mod: (txPayload, maliciousValue) => { return { ...txPayload.txo, tx: maliciousValue }; } },
+            // { name: 'modified incoming address', mod: (txPayload, maliciousValue) => { return { ...txPayload.txo, ia: maliciousValue }; } },
+            { name: 'modified incoming writingKey', mod: (txPayload, maliciousValue) => { return { ...txPayload.txo, iw: maliciousValue }; } },
+            { name: 'modified incoming nonce', mod: (txPayload, maliciousValue) => { return { ...txPayload.txo, in: maliciousValue }; } },
+            { name: 'modified content hash', mod: (txPayload, maliciousValue) => { return { ...txPayload.txo, ch: maliciousValue }; } },
+            { name: 'modified external bootstrap', mod: (txPayload, maliciousValue) => { return { ...txPayload.txo, bs: maliciousValue }; } },
+            { name: 'modified MSB bootstrap', mod: (txPayload, maliciousValue) => { return { ...txPayload.txo, mbs: maliciousValue }; } },
+            { name: 'modified validator nonce', mod: (txPayload, maliciousValue) => { return { ...txPayload.txo, vn: maliciousValue }; } },
         ];
 
         for (const testCase of testCases) {
-            const maliciousValue = randomBytes(32).toString('hex');
-            const modifiedValue = testCase.mod(postTx, maliciousValue);
-            const maliciousTxHash = await generateTx(
-                modifiedValue.bs ?? postTx.value.bs,
-                modifiedValue.mbs ?? postTx.value.mbs,
-                modifiedValue.wp ?? postTx.value.wp,
-                modifiedValue.i ?? postTx.value.i,
-                modifiedValue.ipk ?? postTx.value.ipk,
-                modifiedValue.ch ?? postTx.value.ch,
-                modifiedValue.in ?? postTx.value.in
-            );
+            // all of these values are buffers 32 bytes long
+            const maliciousValue = randomBytes(32);
 
-            const maliciousPostTx = {
-                ...postTx,
-                key: maliciousTxHash,
-                value: {
-                    tx: maliciousTxHash,
-                    ...postTx.value,
-                    ...modifiedValue,
-                },
+            const modifiedTxo = testCase.mod(decodedPostTx, maliciousValue);
+            const modifiedPostTx = {
+                ...decodedPostTx,
+                txo: modifiedTxo
             };
+            const encodedMaliciousPostTx = safeEncodeApplyOperation(modifiedPostTx);
 
-            await admin.msb.state.append(maliciousPostTx);
+            await writer.msb.state.append(encodedMaliciousPostTx);
             await tick();
-            const result = await admin.msb.state.get(maliciousTxHash);
-            t.absent(result, `post tx with ${testCase.name} should not be added to the base`);
+
+            if (testCase.name === 'modified tx') {
+                const result = await admin.msb.state.get(maliciousValue.toString('hex'));
+                t.absent(result, `post tx with ${testCase.name} should not be added to the base`);
+            } else {
+                const result = await admin.msb.state.get(txHash);
+                t.absent(result, `post tx with ${testCase.name} should not be added to the base`);
+            }
         }
     });
 
-    t.test('oversized transaction', async t => {
-        let { postTx, preTxHash } = await generatePostTx(admin.msb, admin.wallet, legitWallet);
-        postTx.value.extraData = randomBytes(4500).toString('hex'); // fastest validator have good schemas and it will be protected by this validator but this case should be considered
-        await admin.msb.state.append(postTx);
+    t.test('handleApplyTxOperation (apply) - oversized transaction', async t => {
+        const {postTx, txHash} = await generatePostTx(writer, externalNode)
+        let decodedPostTx = safeDecodeApplyOperation(postTx);
+
+        decodedPostTx.txo.vn = randomBytes(5000);
+        const encodedMaliciousPostTx = safeEncodeApplyOperation(decodedPostTx);
+
+        await writer.msb.state.append(encodedMaliciousPostTx);
         await tick();
-        const result = await admin.msb.state.get(preTxHash);
+        const result = await admin.msb.state.get(txHash);
         t.absent(result, 'oversized post tx should not be added to the base');
+    });
+
+    t.test('handleApplyTxOperation (apply) - invalid postTx address (malicious node replaces address)', async t => {
+        const {postTx, txHash} = await generatePostTx(writer, externalNode)
+        let decodedPostTx = safeDecodeApplyOperation(postTx);
+        decodedPostTx.address = addressToBuffer(maliciousWriter.wallet.address);
+        const encodedMaliciousPostTx = safeEncodeApplyOperation(decodedPostTx);
+        await writer.msb.state.append(encodedMaliciousPostTx);
+        await tick();
+        const result = await admin.msb.state.get(txHash);
+        t.absent(result, 'post tx with malicious address should not be added to the base');
+    });
+
+    t.test('handleApplyTxOperation (apply) - invalid postTx txo.ia (malicious node replaces ia)', async t => {
+        const {postTx, txHash} = await generatePostTx(writer, externalNode)
+        let decodedPostTx = safeDecodeApplyOperation(postTx);
+        decodedPostTx.txo.ia = addressToBuffer(maliciousWriter.wallet.address);
+        const encodedMaliciousPostTx = safeEncodeApplyOperation(decodedPostTx);
+        await writer.msb.state.append(encodedMaliciousPostTx);
+        await tick();
+        const result = await admin.msb.state.get(txHash);
+        t.absent(result, 'post tx with malicious txo.ia should not be added to the base');
     });
 })
 
 hook('Clean up postTx setup', async t => {
     // close msbBoostrap and remove temp directory
     if (admin && admin.msb) await admin.msb.close();
+    if (writer && writer.msb) await writer.msb.close();
+    if (externalNode && externalNode.msb) await externalNode.msb.close();
+    if (maliciousWriter && maliciousWriter.msb) await maliciousWriter.msb.close();
     if (tmpDirectory) await removeTemporaryDirectory(tmpDirectory);
 });

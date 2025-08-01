@@ -16,6 +16,7 @@
   "dependencies": {
     "autobase": "7.6.2",
     "b4a": "1.6.7",
+    "bare-fs": "^4.1.6",
     "bare-readline": "1.0.7",
     "bare-tty": "5.0.2",
     "bech32": "^2.0.0",
@@ -38,7 +39,8 @@
   },
   "devDependencies": {
     "bip39-mnemonic": "^2.4.0",
-    "protocol-buffers": "^4.2.0"
+    "protocol-buffers": "^4.2.0",
+    "bare-os": "^3.6.1"
   },
   "publishConfig": {
     "registry": "https://registry.npmjs.org",
