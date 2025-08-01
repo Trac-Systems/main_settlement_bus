@@ -168,7 +168,6 @@ test('handleApplyAddWriterOperation (apply) - Append addWriter payload into the 
 
 test('handleApplyAddWriterOperation (apply) - Append addWriter payload into the base - node is already an indexer', async (t) => {
     try {
-        console.log("await admin.msb.state.getNodeEntry(indexer1.wallet.address)", await admin.msb.state.getNodeEntry(indexer1.wallet.address))
         const reqAddWriter = await StateMessageOperations.assembleAddWriterMessage(
             indexer1.wallet,
             indexer1.msb.state.writingKey,
