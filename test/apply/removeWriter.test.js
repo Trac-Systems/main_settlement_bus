@@ -23,7 +23,7 @@ let admin, writer1, writer2, indexer, tmpDirectory;
 
 hook('Initialize nodes for removeWriter tests', async t => {
     tmpDirectory = await initTemporaryDirectory()
-    const randomChannel = randomBytes().toString('hex');
+    const randomChannel = randomBytes(32).toString('hex');
 
     admin = await setupMsbAdmin(testKeyPair1, tmpDirectory, {
         enable_txlogs: false,

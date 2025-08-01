@@ -19,7 +19,7 @@ let tmpDirectory, admin, indexer1, reader;
 let indexersEntryAddressesCount = 1;
 
 hook('Initialize nodes for addIndexer tests', async t => {
-    const randomChannel = randomBytes().toString('hex');
+    const randomChannel = randomBytes(32).toString('hex');
     const baseOptions = {
         enable_txlogs: false,
         enable_interactive_mode: false,

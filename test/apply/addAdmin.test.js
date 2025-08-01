@@ -11,7 +11,7 @@ let indexer1, indexer2, writer;
 let tmpDirectory;
 
 hook('Initialize nodes for addAdmin tests', async () => {
-    const randomChannel = randomBytes().toString('hex');
+    const randomChannel = randomBytes(32).toString('hex');
     const baseOptions = {
         enable_txlogs: false,
         enable_interactive_mode: false,

@@ -35,8 +35,8 @@ async function ensureEnvReady() {
     }
 }
 
-export function randomBytes() {
-    const buf = b4a.allocUnsafe(32);
+export function randomBytes(num) {
+    const buf = b4a.allocUnsafe(num);
     sodium.randombytes_buf(buf);
     return buf;
 }

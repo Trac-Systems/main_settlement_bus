@@ -11,7 +11,7 @@ import StateMessageOperations from '../../src/messages/stateMessages/StateMessag
 let admin, whitelistKeys, tmpDirectory, originalReadPublicKeysFromFile;
 const address = Wallet.encodeBech32m(b4a.from(testKeyPair2.publicKey, 'hex'));
 hook('Initialize admin node for addWhitelist tests', async () => {
-    const randomChannel = randomBytes().toString('hex');
+    const randomChannel = randomBytes(32).toString('hex');
     const baseOptions = {
         enable_txchannels: false,
         enable_txlogs: false,
