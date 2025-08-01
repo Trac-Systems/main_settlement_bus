@@ -49,8 +49,8 @@ test('handleApplyTxOperation (apply) - Append POST_TX into the base - Happy path
 test('handleApplyTxOperation (apply) - negative', async t => {
     // TODO: This test has been disabled because we got rid of JSON schema validation in favor of protobuf validation. To enable this test again, we need to write a fake protobuf schema for postTx (maybe also for other operations) and forge an invalid payload.
 
-    // t.test('sanitizePostTx - nested object in postTx', async t => {
-    //     //sanitizePostTx is already tested in /test/check/postTx.test.js
+    // t.test('nested object in postTx', async t => {
+    //     //is already tested in /test/check/postTx.test.js
     //     let { postTx, preTxHash: txHash } = await generatePostTx(admin.msb, admin.wallet, legitWallet)
     //     postTx = {
     //         ...postTx,
