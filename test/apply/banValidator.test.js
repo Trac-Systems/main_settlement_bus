@@ -32,7 +32,6 @@ hook('Initialize nodes for banValidator tests', async () => {
     indexer = await setupMsbIndexer(indexer, admin);
     writer1 = await setupMsbWriter(admin, 'writer1', testKeyPair3, tmpDirectory, admin.options);
     writer2 = await setupMsbWriter(admin, 'writer2', testKeyPair4, tmpDirectory, admin.options);
-    //reader = await setupMsbPeer('reader', testKeyPair4, tmpDirectory, admin.options);
 });
 
 test('handleApplyBanValidatorOperation (apply) - Append banValidator payload - ban indexer', async t => {
@@ -116,6 +115,5 @@ hook('Clean up banValidator setup', async t => {
     if (indexer && indexer.msb) await indexer.msb.close();
     if (writer1 && writer1.msb) await writer1.msb.close();
     if (writer2 && writer2.msb) await writer2.msb.close();
-
     if (tmpDirectory) await removeTemporaryDirectory(tmpDirectory);
 })
