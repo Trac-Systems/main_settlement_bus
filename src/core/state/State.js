@@ -159,6 +159,7 @@ class State extends ReadyResource {
     async append(payload) {
         await this.#base.append(payload);
     }
+
     // this is helpful
     async getInfoFromLinearizer() {
         return this.#base.linearizer.indexers
@@ -215,8 +216,8 @@ class State extends ReadyResource {
         const regeneratedTxBuffer = await transactionUtils.generateTxBuffer(op.txo.bs, this.#bootstrap, validatorAddressBuffer, op.txo.iw, op.txo.ia, op.txo.ch, op.txo.in);
 
         if (regeneratedTxBuffer.length === 0 || !b4a.equals(regeneratedTxBuffer, tx)) return;
+
         // first signature
-        
         const requesterSignature = op.txo.is;
         const incomingAddressBuffer = op.txo.ia;
         const incomingAddress = addressUtils.bufferToAddress(incomingAddressBuffer);

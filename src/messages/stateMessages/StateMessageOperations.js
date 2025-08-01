@@ -9,14 +9,16 @@ import { OperationType } from '../../utils/constants.js';
 import { createMessage } from '../../utils/buffer.js';
 import { createHash } from '../../utils/crypto.js';
 import { bufferToAddress } from '../../core/state/utils/address.js';
+
 class StateMessageOperations {
-    static async assembleAddAdminMessage(adminEntry, writingKey, wallet, bootstrap) {
+
+    static async assembleAddAdminMessage(writingKey, wallet) {
         try {
             const builder = new StateMessageBuilder(wallet);
             const director = new StateMessageDirector();
             director.builder = builder;
 
-            const payload = await director.buildAddAdminMessage(adminEntry, writingKey, bootstrap, wallet.address);
+            const payload = await director.buildAddAdminMessage(writingKey, wallet.address);
             const encodedPayload = safeEncodeApplyOperation(payload);
             return encodedPayload;
 

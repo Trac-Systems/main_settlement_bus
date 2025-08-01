@@ -1,20 +1,45 @@
-import { MainSettlementBus } from '../../src/index.js'
-import fileUtils from '../../src/utils/fileUtils.js'
-import MsgUtils from '../../src/utils/msgUtils.js'
-import { EntryType } from '../../src/utils/constants.js';
-import { OperationType } from '../../src/utils/constants.js'
-import { sleep } from '../../src/utils/helpers.js'
-import { createHash  } from '../../src/utils/crypto.js'
-
-import { generateTx } from '../../src/utils/crypto.js';
 import sodium from 'sodium-native';
 import { generateMnemonic, mnemonicToSeed } from 'bip39-mnemonic';
 import b4a from 'b4a'
-import os from 'os'
-import path from 'path'
-import fs from 'fs/promises'
 import PeerWallet from "trac-wallet"
-import { randomBytes } from 'crypto'
+import path from 'path';
+import StateMessageOperations from '../../src/messages/stateMessages/StateMessageOperations.js';
+
+import { MainSettlementBus } from '../../src/index.js'
+import fileUtils from '../../src/utils/fileUtils.js'
+import { EntryType } from '../../src/utils/constants.js';
+import { sleep } from '../../src/utils/helpers.js'
+import { createHash } from '../../src/utils/crypto.js'
+import { formatIndexersEntry } from '../../src/utils/helpers.js';
+import { generatePreTx } from '../../src/utils/transactionUtils.js';
+
+let os, fsp;
+
+/**
+ * Ensures that the environment is ready for file system and OS operations.
+ */
+
+async function ensureEnvReady() {
+    if (!os || !fsp) {
+        if (typeof globalThis.Bare !== 'undefined') {
+            const bareOS = await import('bare-os');
+            os = bareOS.default || bareOS;
+            const bareFS = await import('bare-fs');
+            fsp = (bareFS.default || bareFS).promises;
+        } else {
+            const nodeOS = await import('os');
+            os = nodeOS.default || nodeOS;
+            const nodeFS = await import('fs/promises');
+            fsp = nodeFS.default || nodeFS;
+        }
+    }
+}
+
+export function randomBytes(num) {
+    const buf = b4a.allocUnsafe(num);
+    sodium.randombytes_buf(buf);
+    return buf;
+}
 
 async function randomKeypair() {
     const keypair = {};
@@ -43,12 +68,11 @@ export async function initMsbPeer(peerName, peerKeyPair, temporaryDirectory, opt
     peer.options = options
     peer.options.stores_directory = peer.storesDirectory;
     peer.options.store_name = peer.storeName;
-
     const msb = new MainSettlementBus(peer.options);
+
 
     const wallet = new PeerWallet();
     wallet.initKeyPair(peer.keypath);
-
     peer.msb = msb;
     peer.wallet = wallet;
 
@@ -77,31 +101,58 @@ export async function setupMsbAdmin(keyPair, temporaryDirectory, options = {}) {
     const admin = await initMsbAdmin(keyPair, temporaryDirectory, options);
 
     await admin.msb.ready();
-    const adminEntry = await admin.msb.state.get(EntryType.ADMIN)
-    const addAdminMessage = await MsgUtils.assembleAdminMessage(adminEntry, admin.msb.state.writingKey, admin.wallet, admin.options.bootstrap);
+    const addAdminMessage = await StateMessageOperations.assembleAddAdminMessage(admin.msb.state.writingKey, admin.wallet);
     await admin.msb.state.append(addAdminMessage);
     await tick();
     return admin;
 }
 
-export async function setupMsbWriter(admin, peerName, peerKeyPair, temporaryDirectory, options = {}) {
+export async function setupNodeAsWriter(admin, writerCandidate) {
     try {
-        const writerCandidate = await setupMsbPeer(peerName, peerKeyPair, temporaryDirectory, options);
-        await setupWhitelist(admin, [writerCandidate.wallet.publicKey]);
+        await setupWhitelist(admin, [writerCandidate.wallet.address]); // ensure if is whitelisted
 
-        const isWriter = async (key) => {
-            const result = await admin.msb.state.get(key);
+        const isWriter = async (address) => {
+            const result = await admin.msb.state.getNodeEntry(address);
             return result && result.isWriter && !result.isIndexer;
         }
 
-        const req = await MsgUtils.assembleAddWriterMessage(writerCandidate.wallet, writerCandidate.msb.state.writingKey);
+        const req = await StateMessageOperations.assembleAddWriterMessage(writerCandidate.wallet, writerCandidate.msb.state.writingKey);
         await admin.msb.state.append(req);
         await tick(); // wait for the request to be processed
-
         let counter;
         const limit = 10; // maximum number of attempts to verify the role
         for (counter = 0; counter < limit; counter++) {
-            const res = await isWriter(req.key);
+            const res = await isWriter(writerCandidate.wallet.address);
+            if (res) {
+                break;
+            }
+            await sleep(1000); // wait for the peer to sync state
+        }
+
+        return writerCandidate;
+    }
+    catch (error) {
+        throw new Error('Error setting up MSB writer: ', error.message);
+    }
+}
+
+export async function setupMsbWriter(admin, peerName, peerKeyPair, temporaryDirectory, options = {}) {
+    try {
+        const writerCandidate = await setupMsbPeer(peerName, peerKeyPair, temporaryDirectory, options);
+        await setupWhitelist(admin, [writerCandidate.wallet.address]);
+
+        const isWriter = async (address) => {
+            const result = await admin.msb.state.getNodeEntry(address);
+            return result && result.isWriter && !result.isIndexer;
+        }
+
+        const req = await StateMessageOperations.assembleAddWriterMessage(writerCandidate.wallet, writerCandidate.msb.state.writingKey);
+        await admin.msb.state.append(req);
+        await tick(); // wait for the request to be processed
+        let counter;
+        const limit = 10; // maximum number of attempts to verify the role
+        for (counter = 0; counter < limit; counter++) {
+            const res = await isWriter(writerCandidate.wallet.address);
             if (res) {
                 break;
             }
@@ -117,23 +168,24 @@ export async function setupMsbWriter(admin, peerName, peerKeyPair, temporaryDire
 
 export async function setupMsbIndexer(indexerCandidate, admin) {
     try {
-        const req = await MsgUtils.assembleAddIndexerMessage(admin.wallet, indexerCandidate.wallet.publicKey);
+        const req = await StateMessageOperations.assembleAddIndexerMessage(admin.wallet, indexerCandidate.wallet.address);
         await admin.msb.state.append(req);
         await tick(); // wait for the request to be processed
 
         const isIndexer = async () => {
-            const indexers = await admin.msb.state.get(EntryType.INDEXERS)
-            if (!indexers) {
+            const indexersEntry = await admin.msb.state.getIndexersEntry();
+            if (!indexersEntry) {
                 return false;
             }
-            // Check if the peer's public key is in the indexers list
-            return Array.from(indexers).includes(indexerCandidate.wallet.publicKey);
+            const formatted = formatIndexersEntry(indexersEntry);
+            if (!formatted || !formatted.addresses) return false;
+            return formatted.addresses.includes(indexerCandidate.wallet.address);
         }
 
         let counter;
         const limit = 10; // maximum number of attempts to verify the role
         for (counter = 0; counter < limit; counter++) {
-            const res = await isIndexer(req.key);
+            const res = await isIndexer(indexerCandidate.wallet.address);
             if (res) {
                 break;
             }
@@ -147,50 +199,57 @@ export async function setupMsbIndexer(indexerCandidate, admin) {
     }
 }
 
-export async function setupWhitelist(admin, whitelistKeys) {
+export async function setupWhitelist(admin, whitelistAddresses) {
     if (!admin || !admin.msb || !admin.wallet) {
         throw new Error('Admin is not properly initialized');
     }
 
-    if (!Array.isArray(whitelistKeys) || whitelistKeys.length === 0) {
-        throw new Error('Whitelist keys must be a non-empty array');
+    if (!Array.isArray(whitelistAddresses) || whitelistAddresses.length === 0) {
+        throw new Error('Whitelist addresses must be a non-empty array');
     }
 
     const adminEntry = await admin.msb.state.get(EntryType.ADMIN);
     if (!adminEntry) {
         throw new Error('Admin is not initialized. Execute /add_admin command first.');
     }
-
     // set up mock whitelist
     const originalReadPublicKeysFromFile = fileUtils.readPublicKeysFromFile;
-    fileUtils.readPublicKeysFromFile = async () => whitelistKeys;
-    const assembledWhitelistMessages = await MsgUtils.assembleWhitelistMessages(adminEntry, admin.wallet);
-    await admin.msb.state.append(assembledWhitelistMessages);
+    fileUtils.readPublicKeysFromFile = async () => whitelistAddresses;
+    const assembledWhitelistMessages = await StateMessageOperations.assembleAppendWhitelistMessages(admin.wallet);
+    for (const [_, msg] of assembledWhitelistMessages.entries()) {
+        await admin.msb.state.append(msg);
+    }
     fileUtils.readPublicKeysFromFile = originalReadPublicKeysFromFile;
 }
 
 export async function initTemporaryDirectory() {
-    const temporaryDirectory = await fs.mkdtemp(path.join(os.tmpdir(), 'tempTestStore-'));
+    await ensureEnvReady();
+    const tmpDir = os.tmpdir();
+    const unique = `tempTestStore-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const temporaryDirectory = path.join(tmpDir, unique);
+    await fsp.mkdir(temporaryDirectory, { recursive: true });
     console.log('temporary directory: ', temporaryDirectory);
     return temporaryDirectory;
 }
 
 export async function removeTemporaryDirectory(temporaryDirectory) {
-    await fs.rm(temporaryDirectory, { recursive: true, force: true })
+    await ensureEnvReady();
+    await fsp.rm(temporaryDirectory, { recursive: true, force: true })
 }
 
 async function initDirectoryStructure(peerName, keyPair, temporaryDirectory) {
     try {
+        await ensureEnvReady();
         const storesDirectory = temporaryDirectory + '/stores/';
         const storeName = peerName + '/';
         const corestoreDbDirectory = path.join(storesDirectory, storeName, 'db');
-        await fs.mkdir(corestoreDbDirectory, { recursive: true });
+        await fsp.mkdir(corestoreDbDirectory, { recursive: true });
 
         const keypath = path.join(corestoreDbDirectory, 'keypair.json');
         if (!keyPair || !keyPair.publicKey || !keyPair.secretKey) {
             keyPair = await randomKeypair();
         }
-        await fs.writeFile(keypath, JSON.stringify(keyPair, null, 2));
+        await fsp.writeFile(keypath, JSON.stringify(keyPair, null, 2));
         return {
             storesDirectory,
             storeName,
@@ -205,11 +264,11 @@ async function initDirectoryStructure(peerName, keyPair, temporaryDirectory) {
 
 export async function addKeyToWhitelist(filepath, key) {
     try {
+        await ensureEnvReady();
         // Check if the file exists, if not create it
-        await fs.mkdir(path.dirname(filepath), { recursive: true })
-        
+        await fsp.mkdir(path.dirname(filepath), { recursive: true })
         // Append the key to the file, followed by a newline
-        await fs.appendFile(filepath, key + '\n', { encoding: 'utf8' });
+        await fsp.appendFile(filepath, key + '\n', { encoding: 'utf8' });
     } catch (error) {
         throw new Error('Error adding key to whitelist: ' + error);
     }
@@ -218,27 +277,28 @@ export async function addKeyToWhitelist(filepath, key) {
 export async function restoreWhitelistFromBackup(filepath) {
     const backupPath = filepath + '.bak';
     try {
+        await ensureEnvReady();
         // Check if the backup file exists
-        await fs.access(backupPath);
+        await fsp.access(backupPath);
         // Remove the current file if it exists
         try {
-            await fs.unlink(filepath);
+            await fsp.unlink(filepath);
         } catch (e) {
             // File may not exist, that's fine
         }
         // Rename the backup back to the original filename
-        await fs.rename(backupPath, filepath);
+        await fsp.rename(backupPath, filepath);
     } catch (e) {
         // Backup does not exist, nothing to restore
     }
 }
 
-export const generatePostTx = async (msbBootstrap, boostrapPeerWallet, peerWallet) => {
+export const generatePostTx = async (writer, externalNode) => {
+    const externalContractBootstrap = randomBytes(32).toString('hex');
+    const validatorAddress = writer.wallet.address;
 
-    const peerBootstrap = randomBytes(32).toString('hex');
-    const validatorPubKey = msbBootstrap.tracPublicKey;
     const peerWriterKey = randomBytes(32).toString('hex');
-    const peerPublicKey = peerWallet.publicKey;
+    const peerAddress = externalNode.wallet.address;
 
     const testObj = {
         type: 'deployTest',
@@ -250,58 +310,77 @@ export const generatePostTx = async (msbBootstrap, boostrapPeerWallet, peerWalle
             dec: 18
         }
     };
-
     const contentHash = await createHash('sha256', JSON.stringify(testObj));
-    const nonce = PeerWallet.generateNonce().toString('hex');
-
-    const preTxHash = await generateTx(
-        peerBootstrap,
-        msbBootstrap.bootstrap,
-        validatorPubKey,
+    const preTx = await generatePreTx(
+        externalNode.wallet,
+        validatorAddress,
         peerWriterKey,
-        peerPublicKey,
+        peerAddress,
         contentHash,
-        nonce
+        externalContractBootstrap,
+        writer.msb.bootstrap
     );
 
-    const parsedPreTx = {
-        op: 'pre-tx',
-        tx: preTxHash,
-        is: peerWallet.sign(Buffer.from(preTxHash + nonce)),
-        wp: validatorPubKey,
-        i: peerWriterKey,
-        ipk: peerPublicKey,
-        ch: contentHash,
-        in: nonce,
-        bs: peerBootstrap,
-        mbs: msbBootstrap.bootstrap
-    };
-
-    const postTxSig = boostrapPeerWallet.sign(
-        b4a.from(parsedPreTx.tx + nonce),
-        b4a.from(boostrapPeerWallet.secretKey, 'hex')
+    const postTx = await StateMessageOperations.assemblePostTxMessage(
+        writer.wallet,
+        preTx.va,
+        b4a.from(preTx.tx, 'hex'),
+        preTx.ia,
+        b4a.from(preTx.iw, 'hex'),
+        b4a.from(preTx.in, 'hex'),
+        b4a.from(preTx.ch, 'hex'),
+        b4a.from(preTx.is, 'hex'),
+        b4a.from(preTx.bs, 'hex'),
+        b4a.from(preTx.mbs, 'hex')
     );
 
-    const postTx = {
-        type: OperationType.TX,
-        key: preTxHash,
-        value: {
-            op: OperationType.TX,
-            tx: preTxHash,
-            is: parsedPreTx.is,
-            w: msbBootstrap.bootstrap,
-            i: parsedPreTx.i,
-            ipk: parsedPreTx.ipk,
-            ch: parsedPreTx.ch,
-            in: parsedPreTx.in,
-            bs: parsedPreTx.bs,
-            mbs: parsedPreTx.mbs,
-            ws: postTxSig.toString('hex'),
-            wp: parsedPreTx.wp,
-            wn: nonce
+    const txHash = preTx.tx;
+
+    return { postTx, txHash };
+
+}
+
+/*
+    You can synchronize multiple nodes by passing them as arguments,
+    Useful for aligning signedLength values. If node is not a writer, it will be skipped.
+*/
+export const tryToSyncWriters = async (...args) => {
+    try {
+        const N = 100;
+        for (let i = 0; i < N; i++) {
+            for (const node of args) {
+                await sleep(50)
+                await node.msb.state.append(null);
+            }
+            await tick();
         }
-    };
 
-    return { postTx, preTxHash };
+    } catch (error) {
+        console.log('node is not a writer', error);
+    }
+}
 
+export async function waitForNotIndexer(indexer, maxAttempts = 30, delayMs = 1000) {
+
+    const isNotIndexer = async () => {
+        const indexersEntry = await indexer.msb.state.getIndexersEntry();
+        if (!indexersEntry) {
+            return false;
+        }
+        const formatted = formatIndexersEntry(indexersEntry);
+        if (!formatted || !formatted.addresses) return false;
+
+        const nodeEntry = await indexer.msb.state.getNodeEntry(indexer.wallet.address);
+        if (!nodeEntry) return false;
+        return !nodeEntry.isIndexer && !formatted.addresses.includes(indexer.wallet.address);
+    }
+
+    for (let counter = 0; counter < maxAttempts; counter++) {
+        const res = await isNotIndexer(indexer.wallet.address);
+        if (res) {
+            return true;
+        }
+        await sleep(delayMs);
+    }
+    return false;
 }
