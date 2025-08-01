@@ -8,11 +8,11 @@ import StateMessageOperations from '../../src/messages/stateMessages/StateMessag
 import { MainSettlementBus } from '../../src/index.js'
 import fileUtils from '../../src/utils/fileUtils.js'
 import { EntryType } from '../../src/utils/constants.js';
-import { OperationType } from '../../src/utils/constants.js'
 import { sleep } from '../../src/utils/helpers.js'
 import { createHash } from '../../src/utils/crypto.js'
-import { generateTx } from '../../src/utils/transactionUtils.js';
 import { formatIndexersEntry } from '../../src/utils/helpers.js';
+import { generatePreTx } from '../../src/utils/transactionUtils.js';
+
 let os, fsp;
 
 /**
@@ -293,12 +293,12 @@ export async function restoreWhitelistFromBackup(filepath) {
     }
 }
 
-export const generatePostTx = async (msbBootstrap, boostrapPeerWallet, peerWallet) => {
+export const generatePostTx = async (writer, externalNode) => {
+    const externalContractBootstrap = randomBytes(32).toString('hex');
+    const validatorAddress = writer.wallet.address;
 
-    const peerBootstrap = randomBytes(32).toString('hex');
-    const validatorPubKey = msbBootstrap.tracPublicKey;
     const peerWriterKey = randomBytes(32).toString('hex');
-    const peerPublicKey = peerWallet.publicKey;
+    const peerAddress = externalNode.wallet.address;
 
     const testObj = {
         type: 'deployTest',
@@ -310,59 +310,33 @@ export const generatePostTx = async (msbBootstrap, boostrapPeerWallet, peerWalle
             dec: 18
         }
     };
-
     const contentHash = await createHash('sha256', JSON.stringify(testObj));
-    const nonce = PeerWallet.generateNonce().toString('hex');
-
-    const preTxHash = await generateTx(
-        peerBootstrap,
-        msbBootstrap.bootstrap,
-        validatorPubKey,
+    const preTx = await generatePreTx(
+        externalNode.wallet,
+        validatorAddress,
         peerWriterKey,
-        peerPublicKey,
+        peerAddress,
         contentHash,
-        nonce
+        externalContractBootstrap,
+        writer.msb.bootstrap
     );
 
-    const parsedPreTx = {
-        op: 'pre-tx',
-        tx: preTxHash,
-        is: peerWallet.sign(Buffer.from(preTxHash + nonce)),
-        wp: validatorPubKey,
-        i: peerWriterKey,
-        ipk: peerPublicKey,
-        ch: contentHash,
-        in: nonce,
-        bs: peerBootstrap,
-        mbs: msbBootstrap.bootstrap
-    };
-
-    const postTxSig = boostrapPeerWallet.sign(
-        b4a.from(parsedPreTx.tx + nonce),
-        b4a.from(boostrapPeerWallet.secretKey, 'hex')
+    const postTx = await StateMessageOperations.assemblePostTxMessage(
+        writer.wallet,
+        preTx.va,
+        b4a.from(preTx.tx, 'hex'),
+        preTx.ia,
+        b4a.from(preTx.iw, 'hex'),
+        b4a.from(preTx.in, 'hex'),
+        b4a.from(preTx.ch, 'hex'),
+        b4a.from(preTx.is, 'hex'),
+        b4a.from(preTx.bs, 'hex'),
+        b4a.from(preTx.mbs, 'hex')
     );
 
-    const postTx = {
-        type: OperationType.TX,
-        key: preTxHash,
-        value: {
-            op: OperationType.TX,
-            tx: preTxHash,
-            is: parsedPreTx.is,
-            w: msbBootstrap.bootstrap,
-            i: parsedPreTx.i,
-            ipk: parsedPreTx.ipk,
-            ch: parsedPreTx.ch,
-            in: parsedPreTx.in,
-            bs: parsedPreTx.bs,
-            mbs: parsedPreTx.mbs,
-            ws: postTxSig.toString('hex'),
-            wp: parsedPreTx.wp,
-            wn: nonce
-        }
-    };
+    const txHash = preTx.tx;
 
-    return { postTx, preTxHash };
+    return { postTx, txHash };
 
 }
 
