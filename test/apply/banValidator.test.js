@@ -1,10 +1,7 @@
 import {test, hook} from 'brittle';
 import {
-    tick,
-    initMsbAdmin,
     initTemporaryDirectory,
     removeTemporaryDirectory,
-    setupMsbPeer,
     setupMsbWriter,
     setupMsbIndexer,
     setupMsbAdmin, tryToSyncWriters
@@ -13,7 +10,6 @@ import {randomBytes} from '../utils/setupApplyTests.js';
 import StateMessageOperations from '../../src/messages/stateMessages/StateMessageOperations.js';
 import {testKeyPair1, testKeyPair2, testKeyPair3, testKeyPair4} from '../fixtures/apply.fixtures.js';
 import {formatIndexersEntry, sleep} from '../../src/utils/helpers.js';
-import b4a from 'b4a';
 
 let admin;
 let indexer, writer1, writer2;
@@ -101,7 +97,7 @@ test('handleApplyBanValidatorOperation (apply) - Append banValidator payload int
         const nodeInfo = await writer2.msb.state.getNodeEntry(writer2.wallet.address);
 
         const assembledBanWriter2 = await StateMessageOperations.assembleBanWriterMessage(admin.wallet, writer2.wallet.address);
-        await admin.msb.state.append(assembledBanWriter);
+        await admin.msb.state.append(assembledBanWriter2);
         await sleep(5000); // wait for both peers to sync state
 
         t.is(nodeInfo.isIndexer, false, 'Node info should indicate that the node is not a writer anymore');
@@ -109,9 +105,6 @@ test('handleApplyBanValidatorOperation (apply) - Append banValidator payload int
         t.is(nodeInfo.isWhitelisted, false, 'Node info should indicate that the node is not whitelisted anymore');
         t.is(writer1.msb.state.isWritable(), false, 'Writer2 should not be a writer anymore');
         t.is(writer1.msb.state.isIndexer(), false, 'Writer2 should not be a writer anymore');
-
-
-
     } catch (error) {
         t.fail('Failed to add indexer: ' + error.message);
     }
