@@ -10,7 +10,7 @@ async function runTests() {
   //await import('./functions/functions.test.js');
   //await import('./fileUtils/readPublicKeysFromFile.test.js'); 
   //await import('./messageOperations/messageOperations.test.js'); 
-  // await import('./apply/apply.test.js'); // after 108-adjust-checkjs-for-incoming-buffer-data commit this test is failing due to changes in check.js
+  await import('./apply/apply.test.js');
   test.resume();
 }
 
