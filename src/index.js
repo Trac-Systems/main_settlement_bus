@@ -9,7 +9,7 @@ import PeerWallet from "trac-wallet"
 import tty from 'tty';
 import Corestore from 'corestore';
 import StateMessageOperations from "./messages/stateMessages/StateMessageOperations.js";
-import { safeDecodeApplyOperation } from '../src/utils/protobuf/operationHelpers.js';
+import { safeDecodeApplyOperation } from './utils/protobuf/operationHelpers.js';
 import { createMessage } from './utils/buffer.js';
 import addressUtils from './core/state/utils/address.js';
 import {
@@ -344,7 +344,7 @@ export class MainSettlementBus extends ReadyResource {
             }, LISTENER_TIMEOUT);
 
         } catch (e) {
-            console.log(e);
+            console.error(e);
         }
     }
 

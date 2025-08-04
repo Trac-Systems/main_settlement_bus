@@ -3,12 +3,12 @@ import b4a from 'b4a';
 
 import StateMessageDirector from './StateMessageDirector.js';
 import StateMessageBuilder from './StateMessageBuilder.js';
-import { safeEncodeApplyOperation } from '../../utils/protobuf/operationHelpers.js';
+import {safeEncodeApplyOperation} from '../../utils/protobuf/operationHelpers.js';
 import fileUtils from '../../../src/utils/fileUtils.js';
-import { OperationType } from '../../utils/constants.js';
-import { createMessage } from '../../utils/buffer.js';
-import { createHash } from '../../utils/crypto.js';
-import { bufferToAddress } from '../../core/state/utils/address.js';
+import {OperationType} from '../../utils/constants.js';
+import {createMessage} from '../../utils/buffer.js';
+import {createHash} from '../../utils/crypto.js';
+import {bufferToAddress} from '../../core/state/utils/address.js';
 
 class StateMessageOperations {
 
@@ -24,7 +24,7 @@ class StateMessageOperations {
 
         } catch (error) {
             console.error(`Failed to assemble admin message through MessageOperations: ${error.message}`);
-            return null;
+            throw new Error(`Failed to assemble admin message: ${error.message}`);
         }
     }
 

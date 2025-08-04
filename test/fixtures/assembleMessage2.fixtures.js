@@ -14,15 +14,15 @@ export const walletAdmin = new PeerWallet();
 export const walletNonAdmin = new PeerWallet();
 
 export const adminEntry = {
-    tracPublicKey: null,
+    address: null,
     wk: null,
 }
 
 export const initAll = async () => {
     if (!walletAdmin.publicKey) await walletAdmin.generateKeyPair(mnemonicAdmin);
     if (!walletNonAdmin.publicKey) await walletNonAdmin.generateKeyPair(walletNonAdmin.generateMnemonic());
-    if (!adminEntry.tracPublicKey && !adminEntry.wk) {
-        adminEntry.tracPublicKey = walletAdmin.publicKey;
+    if (!adminEntry.address && !adminEntry.wk) {
+        adminEntry.address = walletAdmin.address;
         adminEntry.wk = writingKeyAdmin;
     }
 }
