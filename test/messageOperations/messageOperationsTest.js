@@ -1,7 +1,6 @@
 import b4a from 'b4a';
 import {OperationType} from "../../src/utils/constants.js";
 import {bufferToAddress, isAddressValid} from "../../src/core/state/utils/address.js";
-import StateMessageOperations from "../../src/messages/stateMessages/StateMessageOperations.js";
 import {errorMessageIncludes} from "../utils/regexHelper.js"
 
 export async function messageOperationsEkoTest(t, fnName, assembler, wallet, writingKey, opType, msgValueLength, expectedMessageAddress) {
