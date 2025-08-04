@@ -12,7 +12,7 @@ import {bufferToAddress} from '../../core/state/utils/address.js';
 
 class StateMessageOperations {
 
-    static async assembleAddAdminMessage(writingKey, wallet) {
+    static async assembleAddAdminMessage(wallet, writingKey) {
         try {
             const builder = new StateMessageBuilder(wallet);
             const director = new StateMessageDirector();
@@ -22,7 +22,6 @@ class StateMessageOperations {
             return safeEncodeApplyOperation(payload);
 
         } catch (error) {
-            console.error(`Failed to assemble admin message through MessageOperations: ${error.message}`);
             throw new Error(`Failed to assemble admin message: ${error.message}`);
         }
     }
@@ -37,8 +36,7 @@ class StateMessageOperations {
             return safeEncodeApplyOperation(payload);
 
         } catch (error) {
-            console.error(`Failed to assemble add writer message through MessageOperations: ${error.message}`);
-            return null;
+            throw new Error(`Failed to assemble add writer message: ${error.message}`);
         }
     }
 
@@ -52,8 +50,7 @@ class StateMessageOperations {
             return safeEncodeApplyOperation(payload);
 
         } catch (error) {
-            console.error(`Failed to assemble remove writer message through MessageOperations: ${error.message}`);
-            return null;
+            throw new Error(`Failed to assemble remove writer message: ${error.message}`);
         }
     }
 

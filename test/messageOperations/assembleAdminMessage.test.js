@@ -1,11 +1,12 @@
 import test from 'brittle';
 import StateMessageOperations from '../../src/messages/stateMessages/StateMessageOperations.js';
-import { default as fixtures } from '../fixtures/assembleMessage2.fixtures.js';
+import {default as fixtures} from '../fixtures/assembleMessage2.fixtures.js';
 import {OperationType} from "../../src/utils/constants.js";
 import {bufferToAddress} from "../../src/core/state/utils/address.js";
 import b4a from 'b4a';
-import { safeDecodeApplyOperation } from '../../src/utils/protobuf/operationHelpers.js';
+import {safeDecodeApplyOperation} from '../../src/utils/protobuf/operationHelpers.js';
 import {isAddressValid} from "../../src/core/state/utils/address.js";
+import {errorMessageIncludes} from "../utils/regexHelper.js";
 
 test('assembleAdminMessage', async (t) => {
     await fixtures.initAll();
@@ -17,12 +18,12 @@ test('assembleAdminMessage', async (t) => {
 
     t.test('assembleAdminMessage - setup admin entry', async (k) => {
 
-        const msg = safeDecodeApplyOperation(await StateMessageOperations.assembleAddAdminMessage(writingKeyAdmin, walletAdmin));
+        const msg = safeDecodeApplyOperation(await StateMessageOperations.assembleAddAdminMessage(walletAdmin, writingKeyAdmin));
 
         k.ok(msg, 'Message should be created');
         k.is(Object.keys(msg).length, 3, 'Message should have 3 keys');
         k.is(Object.keys(msg.eko).length, 3, 'Message value have 3 keys');
-        k.is(msg.type,OperationType.ADD_ADMIN, 'Message type should be ADD_ADMIN');
+        k.is(msg.type, OperationType.ADD_ADMIN, 'Message type should be ADD_ADMIN');
         k.is(bufferToAddress(msg.address), walletAdmin.address, 'Message key should be the public key of the wallet');
 
         k.ok(isAddressValid(msg.address), 'Message address should be a valid address');
@@ -35,13 +36,12 @@ test('assembleAdminMessage', async (t) => {
     });
 
     t.test('assembleAdminMessage - admin recovery message', async (k) => {
-        const msg = safeDecodeApplyOperation(await StateMessageOperations.assembleAddAdminMessage(writingKeyNonAdmin, walletAdmin));
-
+        const msg = safeDecodeApplyOperation(await StateMessageOperations.assembleAddAdminMessage(walletAdmin, writingKeyNonAdmin));
 
         k.ok(msg, 'Message should be created');
         k.is(Object.keys(msg).length, 3, 'Message should have 3 keys');
         k.is(Object.keys(msg.eko).length, 3, 'Message value have 3 keys');
-        k.is(msg.type,OperationType.ADD_ADMIN, 'Message type should be ADD_ADMIN');
+        k.is(msg.type, OperationType.ADD_ADMIN, 'Message type should be ADD_ADMIN');
 
         k.is(bufferToAddress(msg.address), walletAdmin.address, 'Message key should be the public key of the wallet');
         k.ok(isAddressValid(msg.address), 'Message address should be a valid address');
@@ -53,11 +53,16 @@ test('assembleAdminMessage', async (t) => {
     });
 
     t.test('assembleAdminMessage - writer key is null', async (k) => {
-        await k.exception(async () => await StateMessageOperations.assembleAddAdminMessage(null, walletAdmin), 'Failed to assemble admin message: Writer key must be a 32 length buffer');
-
+        await k.exception(
+            async () => await StateMessageOperations.assembleAddAdminMessage(walletAdmin, null),
+            errorMessageIncludes('Writer key must be a 32 length buffer')
+        );
     });
 
     t.test("assembleAdminMessage - admin entry is set. Admin pubkey doesn't match wallet pubkey", async (k) => {
-        await k.exception(async () => await StateMessageOperations.assembleAddAdminMessage(writingKeyAdmin, null), 'Failed to assemble admin message: Wallet must be a valid wallet object');
+        await k.exception(
+            async () => await StateMessageOperations.assembleAddAdminMessage(null, writingKeyAdmin),
+            errorMessageIncludes('Wallet must be a valid wallet object')
+        );
     });
 });

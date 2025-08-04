@@ -43,3 +43,4 @@ export function formatIndexersEntry(indexersEntry) {
         addresses: indexers
     };
 }
+
