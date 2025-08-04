@@ -11,7 +11,7 @@ class StateMessageDirector {
         this.#builder = builderInstance;
     }
 
-    async buildAddAdminMessage(writingKey, address) {
+    async buildAddAdminMessage(address, writingKey) {
         if (!this.#builder) throw new Error('Builder has not been set.');
 
         await this.#builder
@@ -23,7 +23,7 @@ class StateMessageDirector {
         return this.#builder.getPayload();
     }
 
-    async buildAddWriterMessage(writingKey, address) {
+    async buildAddWriterMessage(address, writingKey) {
         if (!this.#builder) throw new Error('Builder has not been set.');
 
         await this.#builder
@@ -35,7 +35,7 @@ class StateMessageDirector {
         return this.#builder.getPayload();
     }
 
-    async buildRemoveWriterMessage(writingKey, address) {
+    async buildRemoveWriterMessage(address, writingKey) {
         if (!this.#builder) throw new Error('Builder has not been set.');
 
         await this.#builder

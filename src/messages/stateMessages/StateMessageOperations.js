@@ -18,7 +18,7 @@ class StateMessageOperations {
             const director = new StateMessageDirector();
             director.builder = builder;
 
-            const payload = await director.buildAddAdminMessage(writingKey, wallet.address);
+            const payload = await director.buildAddAdminMessage(wallet.address, writingKey);
             return safeEncodeApplyOperation(payload);
 
         } catch (error) {
@@ -32,7 +32,7 @@ class StateMessageOperations {
             const director = new StateMessageDirector();
             director.builder = builder;
 
-            const payload = await director.buildAddWriterMessage(writingKey, wallet.address);
+            const payload = await director.buildAddWriterMessage(wallet.address, writingKey);
             return safeEncodeApplyOperation(payload);
 
         } catch (error) {
@@ -46,7 +46,7 @@ class StateMessageOperations {
             const director = new StateMessageDirector();
             director.builder = builder;
 
-            const payload = await director.buildRemoveWriterMessage(writingKey, wallet.address);
+            const payload = await director.buildRemoveWriterMessage(wallet.address, writingKey);
             return safeEncodeApplyOperation(payload);
 
         } catch (error) {
@@ -64,8 +64,7 @@ class StateMessageOperations {
             return safeEncodeApplyOperation(payload);
 
         } catch (error) {
-            console.error(`Failed to assemble add indexer message through MessageOperations: ${error.message}`);
-            return null;
+            throw new Error(`Failed to assemble addIndexerMessage: ${error.message}`);
         }
     }
 
@@ -79,8 +78,7 @@ class StateMessageOperations {
             return safeEncodeApplyOperation(payload);
 
         } catch (error) {
-            console.error(`Failed to assemble remove indexer message via MessageOperations: ${error.message}`);
-            return null;
+            throw new Error(`Failed to assemble removeIndexerMessage: ${error.message}`);
         }
     }
 
@@ -101,8 +99,7 @@ class StateMessageOperations {
             }
             return messages;
         } catch (error) {
-            console.error(`Failed to assemble append whitelist message via MessageOperations: ${error.message}`);
-            return null;
+            throw new Error(`Failed to assemble appendWhitelistMessages: ${error.message}`);
         }
     }
 
@@ -116,8 +113,7 @@ class StateMessageOperations {
             return safeEncodeApplyOperation(payload);
 
         } catch (error) {
-            console.error(`Failed to assemble ban writer message via MessageOperations: ${error.message}`);
-            return null;
+            throw new Error(`Failed to assemble ban writer message: ${error.message}`);
         }
     }
 
@@ -140,8 +136,7 @@ class StateMessageOperations {
             return safeEncodeApplyOperation(payload);
 
         } catch (error) {
-            console.error(`Failed to assemble pre-transaction message via MessageOperations: ${error.message}`);
-            return null;
+            throw new Error(`Failed to assemble postTxMessage: ${error.message}`);
         }
     }
 
