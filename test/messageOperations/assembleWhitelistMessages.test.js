@@ -54,11 +54,5 @@ test('assembleWhitelistMessages', async (t) => {
 
     });
 
-
-    // TODO: After implementing whitelist file mocking, implement tests for the following cases:
-    // t.test('assembleWhitelistMessages - Should return empty array when whitelist file is empty', async (k) => {});
-    // t.test('assembleWhitelistMessages - Should return empty array when whitelist file is invalid', async (k) => {});
-    // t.test('assembleWhitelistMessages - Should return null when whitelist file is not found or not readabble', async (k) => {});
-    // t.test('assembleWhitelistMessages - Should return conly valid entries in a file that cointains some invalid entries', async (k) => {});
     fileUtils.readPublicKeysFromFile = originalReadPublicKeysFromFile;
 });
