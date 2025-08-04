@@ -59,7 +59,7 @@ test('assembleAdminMessage', async (t) => {
         );
     });
 
-    t.test("assembleAdminMessage - admin entry is set. Admin pubkey doesn't match wallet pubkey", async (k) => {
+    t.test("assembleAdminMessage - admin wallet is null", async (k) => {
         await k.exception(
             async () => await StateMessageOperations.assembleAddAdminMessage(null, writingKeyAdmin),
             errorMessageIncludes('Wallet must be a valid wallet object')
