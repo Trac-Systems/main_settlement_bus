@@ -19,8 +19,7 @@ class StateMessageOperations {
             director.builder = builder;
 
             const payload = await director.buildAddAdminMessage(writingKey, wallet.address);
-            const encodedPayload = safeEncodeApplyOperation(payload);
-            return encodedPayload;
+            return safeEncodeApplyOperation(payload);
 
         } catch (error) {
             console.error(`Failed to assemble admin message through MessageOperations: ${error.message}`);
@@ -35,8 +34,7 @@ class StateMessageOperations {
             director.builder = builder;
 
             const payload = await director.buildAddWriterMessage(writingKey, wallet.address);
-            const encodedPayload = safeEncodeApplyOperation(payload);
-            return encodedPayload;
+            return safeEncodeApplyOperation(payload);
 
         } catch (error) {
             console.error(`Failed to assemble add writer message through MessageOperations: ${error.message}`);
@@ -51,8 +49,7 @@ class StateMessageOperations {
             director.builder = builder;
 
             const payload = await director.buildRemoveWriterMessage(writingKey, wallet.address);
-            const encodedPayload = safeEncodeApplyOperation(payload);
-            return encodedPayload;
+            return safeEncodeApplyOperation(payload);
 
         } catch (error) {
             console.error(`Failed to assemble remove writer message through MessageOperations: ${error.message}`);
@@ -67,8 +64,7 @@ class StateMessageOperations {
             director.builder = builder;
 
             const payload = await director.buildAddIndexerMessage(address);
-            const encodedPayload = safeEncodeApplyOperation(payload);
-            return encodedPayload;
+            return safeEncodeApplyOperation(payload);
 
         } catch (error) {
             console.error(`Failed to assemble add indexer message through MessageOperations: ${error.message}`);
@@ -83,8 +79,7 @@ class StateMessageOperations {
             director.builder = builder;
 
             const payload = await director.buildRemoveIndexerMessage(address);
-            const encodedPayload = safeEncodeApplyOperation(payload);
-            return encodedPayload;
+            return safeEncodeApplyOperation(payload);
 
         } catch (error) {
             console.error(`Failed to assemble remove indexer message via MessageOperations: ${error.message}`);
@@ -121,8 +116,7 @@ class StateMessageOperations {
             director.builder = builder;
 
             const payload = await director.buildBanWriterMessage(address);
-            const encodedPayload = safeEncodeApplyOperation(payload);
-            return encodedPayload;
+            return safeEncodeApplyOperation(payload);
 
         } catch (error) {
             console.error(`Failed to assemble ban writer message via MessageOperations: ${error.message}`);
@@ -146,8 +140,7 @@ class StateMessageOperations {
                 externalBootstrap,
                 msbBootstrap
             );
-            const encodedPayload = safeEncodeApplyOperation(payload);
-            return encodedPayload;
+            return safeEncodeApplyOperation(payload);
 
         } catch (error) {
             console.error(`Failed to assemble pre-transaction message via MessageOperations: ${error.message}`);
