@@ -1,9 +1,10 @@
 import test from 'brittle';
+import b4a from 'b4a';
+
 import StateMessageOperations from '../../src/messages/stateMessages/StateMessageOperations.js';
 import {default as fixtures} from '../fixtures/assembleMessage.fixtures.js';
 import {OperationType} from "../../src/utils/constants.js";
 import {bufferToAddress} from "../../src/core/state/utils/address.js";
-import b4a from 'b4a';
 import {safeDecodeApplyOperation} from '../../src/utils/protobuf/operationHelpers.js';
 import {isAddressValid} from "../../src/core/state/utils/address.js";
 import {errorMessageIncludes} from "../utils/regexHelper.js";

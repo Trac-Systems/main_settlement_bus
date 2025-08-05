@@ -1,6 +1,6 @@
 import test from 'brittle';
 import b4a from 'b4a';
-import { createMessage, isBufferValid, safeWriteUInt32BE } from '../../src/utils/buffer.js';
+import {createMessage, isBufferValid, safeWriteUInt32BE} from '../../src/utils/buffer.js';
 
 const invalidDataTypes = [
     null,
@@ -75,8 +75,7 @@ test('createMessage', async (t) => {
 
     t.test('createMessage handles mixed buffer and number arguments', async k => {
         const num = 0x01020304;
-        const partBuf = buf1;
-        const result = createMessage(partBuf, num, buf2);
+        const result = createMessage(buf1, num, buf2);
         k.is(result.length, 8 + 4 + 8, 'combined length');
         k.ok(b4a.equals(result.subarray(0, 8), buf1), 'first segment');
         k.is(result.readUInt32BE(8), num, 'middle segment number');
