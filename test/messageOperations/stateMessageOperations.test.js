@@ -2,7 +2,6 @@ import { default as test } from 'brittle';
 
 async function runMsgUtilsTests() {
     test.pause();
-
     await import('./assembleAdminMessage.test.js');
     await import('./assembleAddWriterMessage.test.js');
     await import('./assembleRemoveWriterMessage.test.js');
@@ -10,10 +9,11 @@ async function runMsgUtilsTests() {
     await import('./assembleRemoveIndexerMessage.test.js');
     await import('./assembleBanWriterMessage.test.js');
     await import('./assembleWhitelistMessages.test.js');
-    await import('./createMessage.test.js');
-    // TODO: Implement mocked tests for MessageOperations.verifyEventMessage
+    await import('./assembleWhitelistMessages.test.js');
+    await import('./assemblePostTransaction.test.js');
 
+    // TODO: Implement mocked tests for MessageOperations.verifyEventMessage
     test.resume();
 }
 
-runMsgUtilsTests();
+await runMsgUtilsTests();
