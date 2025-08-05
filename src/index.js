@@ -506,7 +506,7 @@ export class MainSettlementBus extends ReadyResource {
         if (toAdd) {
 
             if (indexerListHasAddress) {
-                throw new Error('Cannot update indexer role for: ${address} - address is already in indexers list.');
+                throw new Error(`Cannot update indexer role for: ${address} - address is already in indexers list.`);
             }
 
             const canAddIndexer = nodeEntry.isWhitelisted && nodeEntry.isWriter && !nodeEntry.isIndexer && !indexerListHasAddress;
