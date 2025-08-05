@@ -158,14 +158,12 @@ class Network extends ReadyResource {
 
     async initializeNetworkingKeyPair(store, wallet) {
         if (!this.#enable_wallet) {
-            const keyPair = await store.createKeyPair(TRAC_NAMESPACE);
-            return keyPair;
+            return await store.createKeyPair(TRAC_NAMESPACE);
         } else {
-            const keyPair = {
+            return {
                 publicKey: wallet.publicKey,
                 secretKey: wallet.secretKey
             };
-            return keyPair;
         }
     }
 
