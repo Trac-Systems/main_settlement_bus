@@ -136,7 +136,17 @@ class Network extends ReadyResource {
                 wakeup.addStream(stream);
 
                 connection.on('error', (error) => {
-                    //TODO: handle error
+                    if (
+                        error && error.message && (
+                            error.message.includes('connection reset by peer') ||
+                            error.message.includes('Duplicate connection')
+                        )
+                    ) {
+                        // TODO: decide if we want to handle this error in a specific way. It generates a lot of logs.
+                        return;
+                    }
+                    console.error(error.message)
+
                 });
 
             });

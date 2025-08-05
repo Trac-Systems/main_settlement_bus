@@ -47,7 +47,7 @@ class NetworkMessageRouter {
             }
             
         } catch (error) {
-            throw new Error(`Failed to route message: ${error}`);
+            throw new Error(`Failed to route message: ${error.message}`);
         }
     }
 
