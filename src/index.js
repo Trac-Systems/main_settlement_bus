@@ -242,7 +242,7 @@ export class MainSettlementBus extends ReadyResource {
                 }
             }
         } catch (error) {
-            console.error("HIE:", error);
+            console.error("Handle incoming event:", error);
         }
     }
 
