@@ -1,6 +1,6 @@
 import test from 'brittle';
 import StateMessageOperations from '../../src/messages/stateMessages/StateMessageOperations.js';
-import {default as fixtures} from '../fixtures/assembleMessage2.fixtures.js';
+import {default as fixtures} from '../fixtures/assembleMessage.fixtures.js';
 import {OperationType} from "../../src/utils/constants.js";
 import {bufferToAddress} from "../../src/core/state/utils/address.js";
 import b4a from 'b4a';
@@ -16,7 +16,7 @@ test('assembleAdminMessage', async (t) => {
     const writingKeyNonAdmin = fixtures.writingKeyNonAdmin;
 
 
-    t.test('assembleAdminMessage - setup admin entry', async (k) => {
+    t.test('assembleAdminMessage - setup admin', async (k) => {
 
         const msg = safeDecodeApplyOperation(await StateMessageOperations.assembleAddAdminMessage(walletAdmin, writingKeyAdmin));
 
@@ -24,7 +24,7 @@ test('assembleAdminMessage', async (t) => {
         k.is(Object.keys(msg).length, 3, 'Message should have 3 keys');
         k.is(Object.keys(msg.eko).length, 3, 'Message value have 3 keys');
         k.is(msg.type, OperationType.ADD_ADMIN, 'Message type should be ADD_ADMIN');
-        k.is(bufferToAddress(msg.address), walletAdmin.address, 'Message key should be the public key of the wallet');
+        k.is(bufferToAddress(msg.address), walletAdmin.address, 'Message address should be the public key of the wallet');
 
         k.ok(isAddressValid(msg.address), 'Message address should be a valid address');
 
@@ -43,7 +43,7 @@ test('assembleAdminMessage', async (t) => {
         k.is(Object.keys(msg.eko).length, 3, 'Message value have 3 keys');
         k.is(msg.type, OperationType.ADD_ADMIN, 'Message type should be ADD_ADMIN');
 
-        k.is(bufferToAddress(msg.address), walletAdmin.address, 'Message key should be the public key of the wallet');
+        k.is(bufferToAddress(msg.address), walletAdmin.address, 'Message address should be address of the wallet');
         k.ok(isAddressValid(msg.address), 'Message address should be a valid address');
 
         k.ok(b4a.equals(msg.eko.wk, writingKeyNonAdmin), 'Message wk should be the writing key');

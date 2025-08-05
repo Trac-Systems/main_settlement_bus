@@ -2,7 +2,7 @@ import { test, hook } from 'brittle';
 import { tick, initMsbAdmin, initTemporaryDirectory, removeTemporaryDirectory, setupMsbPeer, setupMsbWriter, setupMsbIndexer } from '../utils/setupApplyTests.js';
 import { randomBytes } from '../utils/setupApplyTests.js';
 import StateMessageOperations from '../../src/messages/stateMessages/StateMessageOperations.js';
-import { testKeyPair1 } from '../fixtures/apply.fixtures.js';
+import { testKeyPair1, testKeyPair2, testKeyPair3, testKeyPair4 } from '../fixtures/apply.fixtures.js';
 import { sleep } from '../../src/utils/helpers.js';
 import b4a from 'b4a';
 
@@ -32,8 +32,8 @@ test('Apply function addAdmin - happy path', async (t) => {
             k.is(adminEntryBefore, null, 'Admin entry should be null before adding a new admin');
 
             const addAdminMessage = await StateMessageOperations.assembleAddAdminMessage(
-                admin.msb.state.writingKey,
                 admin.wallet,
+                admin.msb.state.writingKey
             );
 
             console.log(addAdminMessage);
@@ -60,10 +60,10 @@ test('Apply function addAdmin - happy path', async (t) => {
 
     try {
         // Setup all peers as writers
-        writer = await setupMsbWriter(admin, 'writer', null, tmpDirectory, admin.options);
+        writer = await setupMsbWriter(admin, 'writer', testKeyPair2, tmpDirectory, admin.options);
 
-        indexer1 = await setupMsbWriter(admin, 'indexer1', null, tmpDirectory, admin.options);
-        indexer2 = await setupMsbWriter(admin, 'indexer2', null, tmpDirectory, admin.options);
+        indexer1 = await setupMsbWriter(admin, 'indexer1', testKeyPair3, tmpDirectory, admin.options);
+        indexer2 = await setupMsbWriter(admin, 'indexer2', testKeyPair4, tmpDirectory, admin.options);
         await sleep(5000); // wait for the peers to sync with admin
 
         // Initialize indexers
@@ -100,8 +100,8 @@ test('Apply function addAdmin - happy path', async (t) => {
             await newAdmin.msb.ready();
 
             const addAdminMessage = await StateMessageOperations.assembleAddAdminMessage(
-                newAdmin.msb.state.writingKey,
                 newAdmin.wallet,
+                newAdmin.msb.state.writingKey
             );
 
             // add admin to base

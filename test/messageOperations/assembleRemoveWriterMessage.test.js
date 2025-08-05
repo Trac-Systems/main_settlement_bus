@@ -1,8 +1,8 @@
 import test from 'brittle';
 import StateMessageOperations from '../../src/messages/stateMessages/StateMessageOperations.js';
 import {OperationType} from '../../src/utils/protobuf/applyOperations.cjs';
-import {initAll, walletNonAdmin, writingKeyNonAdmin} from '../fixtures/assembleMessage2.fixtures.js';
-import {messageOperationsEkoTest} from './messageOperationsTest.js';
+import {initAll, walletNonAdmin, writingKeyNonAdmin} from '../fixtures/assembleMessage.fixtures.js';
+import {messageOperationsEkoTest} from './commonsStateMessageOperationsTest.js';
 import {safeDecodeApplyOperation} from '../../src/utils/protobuf/operationHelpers.js';
 
 

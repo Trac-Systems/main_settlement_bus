@@ -1,6 +1,6 @@
 import test from 'brittle';
 import { OperationType } from '../../src/utils/protobuf/applyOperations.cjs';
-import { default as fixtures } from '../fixtures/assembleMessage2.fixtures.js';
+import { default as fixtures } from '../fixtures/assembleMessage.fixtures.js';
 import { safeDecodeApplyOperation } from '../../src/utils/protobuf/operationHelpers.js';
 import b4a from 'b4a';
 import fileUtils from "../../src/utils/fileUtils.js";

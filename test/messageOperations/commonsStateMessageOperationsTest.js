@@ -248,7 +248,7 @@ export async function messageOperationsBkoTest(t, fnName, assembler, wallet, wri
         );
     });
 
-    t.test(`${fnName} - Address parameter - Null Wallet`, async (k) => {
+    t.test(`${fnName} - Address parameter - Null`, async (k) => {
 
         await k.exception(
             async () => await assembler(wallet, null),
@@ -256,7 +256,7 @@ export async function messageOperationsBkoTest(t, fnName, assembler, wallet, wri
         );
     });
 
-    t.test(`${fnName} - Address parameter - undefined Wallet`, async (k) => {
+    t.test(`${fnName} - Address parameter - undefined`, async (k) => {
         await k.exception(
             async () => await assembler(wallet, undefined),
             errorMessageIncludes('Address field must be a valid TRAC bech32m address with length 63')
