@@ -3,28 +3,26 @@ import b4a from 'b4a';
 
 import StateMessageDirector from './StateMessageDirector.js';
 import StateMessageBuilder from './StateMessageBuilder.js';
-import { safeEncodeApplyOperation } from '../../utils/protobuf/operationHelpers.js';
+import {safeEncodeApplyOperation} from '../../utils/protobuf/operationHelpers.js';
 import fileUtils from '../../../src/utils/fileUtils.js';
-import { OperationType } from '../../utils/constants.js';
-import { createMessage } from '../../utils/buffer.js';
-import { createHash } from '../../utils/crypto.js';
-import { bufferToAddress } from '../../core/state/utils/address.js';
+import {OperationType} from '../../utils/constants.js';
+import {createMessage} from '../../utils/buffer.js';
+import {createHash} from '../../utils/crypto.js';
+import {bufferToAddress} from '../../core/state/utils/address.js';
 
 class StateMessageOperations {
 
-    static async assembleAddAdminMessage(writingKey, wallet) {
+    static async assembleAddAdminMessage(wallet, writingKey) {
         try {
             const builder = new StateMessageBuilder(wallet);
             const director = new StateMessageDirector();
             director.builder = builder;
 
-            const payload = await director.buildAddAdminMessage(writingKey, wallet.address);
-            const encodedPayload = safeEncodeApplyOperation(payload);
-            return encodedPayload;
+            const payload = await director.buildAddAdminMessage(wallet.address, writingKey);
+            return safeEncodeApplyOperation(payload);
 
         } catch (error) {
-            console.error(`Failed to assemble admin message through MessageOperations: ${error.message}`);
-            return null;
+            throw new Error(`Failed to assemble admin message: ${error.message}`);
         }
     }
 
@@ -34,13 +32,11 @@ class StateMessageOperations {
             const director = new StateMessageDirector();
             director.builder = builder;
 
-            const payload = await director.buildAddWriterMessage(writingKey, wallet.address);
-            const encodedPayload = safeEncodeApplyOperation(payload);
-            return encodedPayload;
+            const payload = await director.buildAddWriterMessage(wallet.address, writingKey);
+            return safeEncodeApplyOperation(payload);
 
         } catch (error) {
-            console.error(`Failed to assemble add writer message through MessageOperations: ${error.message}`);
-            return null;
+            throw new Error(`Failed to assemble add writer message: ${error.message}`);
         }
     }
 
@@ -50,13 +46,11 @@ class StateMessageOperations {
             const director = new StateMessageDirector();
             director.builder = builder;
 
-            const payload = await director.buildRemoveWriterMessage(writingKey, wallet.address);
-            const encodedPayload = safeEncodeApplyOperation(payload);
-            return encodedPayload;
+            const payload = await director.buildRemoveWriterMessage(wallet.address, writingKey);
+            return safeEncodeApplyOperation(payload);
 
         } catch (error) {
-            console.error(`Failed to assemble remove writer message through MessageOperations: ${error.message}`);
-            return null;
+            throw new Error(`Failed to assemble remove writer message: ${error.message}`);
         }
     }
 
@@ -67,12 +61,10 @@ class StateMessageOperations {
             director.builder = builder;
 
             const payload = await director.buildAddIndexerMessage(address);
-            const encodedPayload = safeEncodeApplyOperation(payload);
-            return encodedPayload;
+            return safeEncodeApplyOperation(payload);
 
         } catch (error) {
-            console.error(`Failed to assemble add indexer message through MessageOperations: ${error.message}`);
-            return null;
+            throw new Error(`Failed to assemble addIndexerMessage: ${error.message}`);
         }
     }
 
@@ -83,12 +75,10 @@ class StateMessageOperations {
             director.builder = builder;
 
             const payload = await director.buildRemoveIndexerMessage(address);
-            const encodedPayload = safeEncodeApplyOperation(payload);
-            return encodedPayload;
+            return safeEncodeApplyOperation(payload);
 
         } catch (error) {
-            console.error(`Failed to assemble remove indexer message via MessageOperations: ${error.message}`);
-            return null;
+            throw new Error(`Failed to assemble removeIndexerMessage: ${error.message}`);
         }
     }
 
@@ -109,8 +99,7 @@ class StateMessageOperations {
             }
             return messages;
         } catch (error) {
-            console.error(`Failed to assemble append whitelist message via MessageOperations: ${error.message}`);
-            return null;
+            throw new Error(`Failed to assemble appendWhitelistMessages: ${error.message}`);
         }
     }
 
@@ -121,12 +110,10 @@ class StateMessageOperations {
             director.builder = builder;
 
             const payload = await director.buildBanWriterMessage(address);
-            const encodedPayload = safeEncodeApplyOperation(payload);
-            return encodedPayload;
+            return safeEncodeApplyOperation(payload);
 
         } catch (error) {
-            console.error(`Failed to assemble ban writer message via MessageOperations: ${error.message}`);
-            return null;
+            throw new Error(`Failed to assemble ban writer message: ${error.message}`);
         }
     }
 
@@ -146,12 +133,10 @@ class StateMessageOperations {
                 externalBootstrap,
                 msbBootstrap
             );
-            const encodedPayload = safeEncodeApplyOperation(payload);
-            return encodedPayload;
+            return safeEncodeApplyOperation(payload);
 
         } catch (error) {
-            console.error(`Failed to assemble pre-transaction message via MessageOperations: ${error.message}`);
-            return null;
+            throw new Error(`Failed to assemble postTxMessage: ${error.message}`);
         }
     }
 

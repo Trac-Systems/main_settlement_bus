@@ -1,4 +1,7 @@
 import {hook, test} from 'brittle';
+import b4a from "b4a";
+
+
 import {
     generatePostTx,
     initTemporaryDirectory,
@@ -11,7 +14,6 @@ import {
 } from '../utils/setupApplyTests.js';
 import {safeDecodeApplyOperation, safeEncodeApplyOperation} from '../../src/utils/protobuf/operationHelpers.js'
 import {testKeyPair1, testKeyPair2, testKeyPair3, testKeyPair4} from '../fixtures/apply.fixtures.js';
-import b4a from "b4a";
 import {OperationType} from "../../src/utils/constants.js";
 import {addressToBuffer} from "../../src/core/state/utils/address.js";
 

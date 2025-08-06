@@ -1,4 +1,5 @@
 import { test, hook } from 'brittle';
+
 import StateMessageOperations from '../../src/messages/stateMessages/StateMessageOperations.js';
 import { formatIndexersEntry } from '../../src/utils/helpers.js';
 import { sleep } from '../../src/utils/helpers.js';
@@ -8,9 +9,7 @@ import {
     setupMsbAdmin,
     setupMsbWriter,
     randomBytes,
-    setupMsbPeer,
     tryToSyncWriters,
-    setupWhitelist,
     setupMsbIndexer
 } from '../utils/setupApplyTests.js';
 import { testKeyPair1, testKeyPair2, testKeyPair3, testKeyPair4 } from '../fixtures/apply.fixtures.js';

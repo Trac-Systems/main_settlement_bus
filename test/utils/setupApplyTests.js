@@ -101,7 +101,7 @@ export async function setupMsbAdmin(keyPair, temporaryDirectory, options = {}) {
     const admin = await initMsbAdmin(keyPair, temporaryDirectory, options);
 
     await admin.msb.ready();
-    const addAdminMessage = await StateMessageOperations.assembleAddAdminMessage(admin.msb.state.writingKey, admin.wallet);
+    const addAdminMessage = await StateMessageOperations.assembleAddAdminMessage(admin.wallet, admin.msb.state.writingKey);
     await admin.msb.state.append(addAdminMessage);
     await tick();
     return admin;
@@ -310,6 +310,7 @@ export const generatePostTx = async (writer, externalNode) => {
             dec: 18
         }
     };
+
     const contentHash = await createHash('sha256', JSON.stringify(testObj));
     const preTx = await generatePreTx(
         externalNode.wallet,

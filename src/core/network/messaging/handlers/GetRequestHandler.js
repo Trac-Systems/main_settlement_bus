@@ -18,7 +18,7 @@ class GetRequestHandler {
     async handle(message, messageProtomux, connection, channelString) {
         switch (message) {
             case NETWORK_MESSAGE_TYPES.GET.VALIDATOR:
-                this.handleGetValidatorResponse(messageProtomux, connection, channelString);
+                await this.handleGetValidatorResponse(messageProtomux, connection, channelString);
                 break;
             case NETWORK_MESSAGE_TYPES.GET.ADMIN:
                 await this.handleGetAdminRequest(messageProtomux, connection, channelString);

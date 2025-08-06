@@ -2,11 +2,12 @@ import b4a from 'b4a';
 import Wallet from 'trac-wallet';
 
 import Builder from './Builder.js';
-import { createHash } from '../../utils/crypto.js';
-import { createMessage } from '../../utils/buffer.js';
-import { OperationType } from '../../utils/protobuf/applyOperations.cjs'
-import { addressToBuffer } from '../../core/state/utils/address.js';
-import { TRAC_ADDRESS_SIZE } from 'trac-wallet/constants.js';
+import {createHash} from '../../utils/crypto.js';
+import {createMessage} from '../../utils/buffer.js';
+import {OperationType} from '../../utils/protobuf/applyOperations.cjs'
+import {addressToBuffer, bufferToAddress} from '../../core/state/utils/address.js';
+import {TRAC_ADDRESS_SIZE} from 'trac-wallet/constants.js';
+import {isAddressValid} from "../../core/state/utils/address.js";
 
 class StateMessageBuilder extends Builder {
     #wallet;
@@ -26,9 +27,14 @@ class StateMessageBuilder extends Builder {
 
     constructor(wallet) {
         super();
-        if (!wallet || typeof wallet !== 'object' || !b4a.isBuffer(wallet.publicKey)) {
-            throw new Error('StateMessageBuilder requires a valid Wallet instance with a 32-byte public key Buffer.');
+        if (!wallet || typeof wallet !== 'object') {
+            throw new Error('Wallet must be a valid wallet object');
         }
+        if (!isAddressValid(wallet.address)) {
+            throw new Error('Wallet should have a valid TRAC address.');
+        }
+
+
         this.#wallet = wallet;
         this.reset();
     }
@@ -59,8 +65,8 @@ class StateMessageBuilder extends Builder {
     }
 
     withAddress(address) {
-        if (!(typeof address === 'string') || address.length !== TRAC_ADDRESS_SIZE) {
-            throw new Error(`Address must be a ${TRAC_ADDRESS_SIZE} length string.`);
+        if (!isAddressValid(address)) {
+            throw new Error(`Address field must be a valid TRAC bech32m address with length ${TRAC_ADDRESS_SIZE}.`);
         }
         this.#address = addressToBuffer(address);
         this.#payload.address = this.#address;
@@ -183,6 +189,10 @@ class StateMessageBuilder extends Builder {
             case OperationType.ADD_INDEXER:
             case OperationType.REMOVE_INDEXER:
             case OperationType.BAN_WRITER:
+                if (this.#wallet.address === bufferToAddress(address)) {
+                    throw new Error('Address must not be the same as the wallet address for basic operations.');
+                }
+
                 msg = createMessage(address, nonce, operationType);
                 break;
 

@@ -1,27 +1,28 @@
 /** @typedef {import('pear-interface')} */ /* global Pear */
 import ReadyResource from 'ready-resource';
+import Corestore from 'corestore';
+import PeerWallet from "trac-wallet"
 import b4a from 'b4a';
 import readline from 'readline';
-import { sleep, formatIndexersEntry } from './utils/helpers.js';
-import { createHash } from './utils/crypto.js';
-import { verifyDag, printHelp, printWalletInfo } from './utils/cli.js';
-import PeerWallet from "trac-wallet"
 import tty from 'tty';
-import Corestore from 'corestore';
+
+
+import {sleep, formatIndexersEntry} from './utils/helpers.js';
+import {createHash} from './utils/crypto.js';
+import {verifyDag, printHelp, printWalletInfo} from './utils/cli.js';
 import StateMessageOperations from "./messages/stateMessages/StateMessageOperations.js";
-import { safeDecodeApplyOperation } from '../src/utils/protobuf/operationHelpers.js';
-import { createMessage } from './utils/buffer.js';
-import addressUtils from './core/state/utils/address.js';
+import {safeDecodeApplyOperation} from './utils/protobuf/operationHelpers.js';
+import {createMessage} from './utils/buffer.js';
+import addressUtils, {isAddressValid} from './core/state/utils/address.js';
+import Network from './core/network/Network.js';
+import Check from './utils/check.js';
+import State from './core/state/State.js';
 import {
     LISTENER_TIMEOUT,
     OperationType,
     EventType,
     WHITELIST_SLEEP_INTERVAL,
 } from './utils/constants.js';
-
-import Network from './core/network/Network.js';
-import Check from './utils/check.js';
-import State from './core/state/State.js';
 
 //TODO create a MODULE which will separate logic responsible for role managment
 
@@ -65,6 +66,7 @@ export class MainSettlementBus extends ReadyResource {
         if (!options.channel) {
             throw new Error('MainSettlementBus: Channel is required. Application cannot start without channel.');
         }
+
         this.#channel = b4a.alloc(32).fill(options.channel);
         this.#store = new Corestore(this.#STORES_DIRECTORY + options.store_name);
         this.#wallet = new PeerWallet(options);
@@ -76,21 +78,34 @@ export class MainSettlementBus extends ReadyResource {
                     input: new tty.ReadStream(0),
                     output: new tty.WriteStream(1)
                 });
-            } catch (e) { }
+            } catch (e) {
+            }
         }
     }
 
-    get STORES_DIRECTORY() { return this.#STORES_DIRECTORY; }
+    get STORES_DIRECTORY() {
+        return this.#STORES_DIRECTORY;
+    }
 
-    get KEY_PAIR_PATH() { return this.#KEY_PAIR_PATH; }
+    get KEY_PAIR_PATH() {
+        return this.#KEY_PAIR_PATH;
+    }
 
-    get bootstrap() { return this.#bootstrap; }
+    get bootstrap() {
+        return this.#bootstrap;
+    }
 
-    get state() { return this.#state; }
+    get state() {
+        return this.#state;
+    }
 
-    get channel() { return this.#channel; }
+    get channel() {
+        return this.#channel;
+    }
 
-    get network() { return this.#network; }
+    get network() {
+        return this.#network;
+    }
 
     get tracPublicKey() {
         if (!this.#wallet) return null;
@@ -202,13 +217,11 @@ export class MainSettlementBus extends ReadyResource {
                 if (decodedRequest.type === OperationType.ADD_WRITER || decodedRequest.type === OperationType.REMOVE_WRITER) {
                     //This request must be handled by ADMIN
                     this.emit(EventType.ADMIN_EVENT, decodedRequest, bufferedRequest);
-                }
-                else if (decodedRequest.type === OperationType.ADD_ADMIN) {
+                } else if (decodedRequest.type === OperationType.ADD_ADMIN) {
                     //This request must be handled by WRITER
                     this.emit(EventType.WRITER_EVENT, decodedRequest, bufferedRequest);
 
-                }
-                else if (decodedRequest.type === OperationType.WHITELISTED) {
+                } else if (decodedRequest.type === OperationType.WHITELISTED) {
                     //TODO: We should create separated listener for whitelisted operation which only be working if wallet is enabled and node is not a writer. 
                     // also this listener should be turned off when node become writable. But for now it is ok.
                     const adminEntry = await this.#state.getAdminEntry();
@@ -229,25 +242,33 @@ export class MainSettlementBus extends ReadyResource {
                 }
             }
         } catch (error) {
-            // for now ignore the error
+            console.error("Handle incoming event:", error);
         }
     }
 
     async #adminEventListener() {
         this.on(EventType.ADMIN_EVENT, async (parsedRequest, bufferedRequest) => {
-            if (this.#enable_wallet === false) return;
-            const isEventMessageValid = await StateMessageOperations.verifyEventMessage(parsedRequest, this.#wallet, this.check, this.#state)
-            if (!isEventMessageValid) return;
-            await this.#state.append(bufferedRequest);
+            try {
+                if (this.#enable_wallet === false) return;
+                const isEventMessageValid = await StateMessageOperations.verifyEventMessage(parsedRequest, this.#wallet, this.check, this.#state)
+                if (!isEventMessageValid) return;
+                await this.#state.append(bufferedRequest);
+            } catch (error) {
+                console.error('ADMIN_EVENT:', error.message);
+            }
         });
     }
 
     async #writerEventListener() {
         this.on(EventType.WRITER_EVENT, async (parsedRequest, bufferedRequest) => {
-            if (this.#enable_wallet === false) return;
-            const isEventMessageVerifed = await StateMessageOperations.verifyEventMessage(parsedRequest, this.#wallet, this.check, this.#state);
-            if (!isEventMessageVerifed) return;
-            await this.#state.append(bufferedRequest);
+            try {
+                if (this.#enable_wallet === false) return;
+                const isEventMessageVerifed = await StateMessageOperations.verifyEventMessage(parsedRequest, this.#wallet, this.check, this.#state);
+                if (!isEventMessageVerifed) return;
+                await this.#state.append(bufferedRequest);
+            } catch (error) {
+                console.error('WRITER_EVENT:', error.message);
+            }
         });
     }
 
@@ -310,30 +331,28 @@ export class MainSettlementBus extends ReadyResource {
         });
     }
 
-    async #handleAdminOperations() {
-        try {
-            const adminEntry = await this.#state.getAdminEntry();
-            const addAdminMessage = await StateMessageOperations.assembleAddAdminMessage(adminEntry, this.#state.writingKey, this.#wallet, this.#bootstrap);
-            if (!adminEntry &&
-                this.#wallet &&
-                this.#state.writingKey &&
-                b4a.equals(this.#state.writingKey, this.#bootstrap)
-            ) {
-                await this.#state.append(addAdminMessage);
-            } else if (adminEntry &&
-                this.#wallet &&
-                adminEntry.address === this.#wallet.address &&
-                this.#state.writingKey &&
-                !b4a.equals(this.#state.writingKey, adminEntry.wk)
-            ) {
-                if (null === this.#network.validator_stream) return;
-                const payloadForValidator = {
-                    op: 'addAdmin',
-                    transactionPayload: addAdminMessage,
+    async #handleAdminOperations(recovery = false) {
+        if (this.#enable_wallet === false) {
+            throw new Error('Can not initialize an admin - wallet is not enabled.');
+        }
+        const adminEntry = await this.#state.getAdminEntry();
 
-                }
-                await this.#network.validator_stream.messenger.send(payloadForValidator);
+        if (recovery === false) {
+            if (adminEntry) {
+                throw new Error('Can not initialize an admin - admin already exists.');
             }
+            if (!this.#wallet) {
+                throw new Error('Can not initialize an admin - wallet is not initialized.');
+            }
+            if (!this.#state.writingKey) {
+                throw new Error('Can not initialize an admin - writing key is not initialized.');
+            }
+            if (!b4a.equals(this.#state.writingKey, this.#bootstrap)) {
+                throw new Error('Can not initialize an admin - bootstrap is not equal to writing key.');
+            }
+
+            const addAdminMessage = await StateMessageOperations.assembleAddAdminMessage(this.#wallet, this.#state.writingKey);
+            await this.#state.append(addAdminMessage);
 
             setTimeout(async () => {
                 const updatedAdminEntry = await this.#state.getAdminEntry();
@@ -342,21 +361,50 @@ export class MainSettlementBus extends ReadyResource {
                     this.#adminEventListener();
                 }
             }, LISTENER_TIMEOUT);
-
-        } catch (e) {
-            console.log(e);
+            return;
         }
+
+        if (!adminEntry) {
+            throw new Error('Can not perform recovery - admin has been not initialized.');
+        }
+        if (!this.#wallet) {
+            throw new Error('Can not perform recovery - wallet is not initialized.');
+        }
+        if (adminEntry.address !== this.#wallet.address) {
+            throw new Error('Can not perform recovery - you are not the admin.');
+        }
+        if (b4a.equals(this.#state.writingKey, adminEntry.wk)) {
+            throw new Error('Can not perform recovery - writer key condition is not met.');
+        }
+
+        const addAdminMessage = await StateMessageOperations.assembleAddAdminMessage(this.#wallet, this.#state.writingKey);
+        const payloadForValidator = {
+            op: 'addAdmin',
+            transactionPayload: addAdminMessage,
+        }
+        await this.#network.validator_stream.messenger.send(payloadForValidator);
+
+        setTimeout(async () => {
+            const updatedAdminEntry = await this.#state.getAdminEntry();
+            if (this.#isAdmin(updatedAdminEntry) && !this.#shouldListenToAdminEvents) {
+                this.#shouldListenToAdminEvents = true;
+                this.#adminEventListener();
+            }
+        }, LISTENER_TIMEOUT);
     }
 
     async #handleWhitelistOperations() {
+        if (this.#enable_wallet === false) {
+            throw new Error('Cannot perform whitelisting - wallet is not enabled.');
+        }
+
         if (this.#enable_wallet === false) return;
         const adminEntry = await this.#state.getAdminEntry();
 
         if (!this.#isAdmin(adminEntry)) return;
         const assembledWhitelistMessages = await StateMessageOperations.assembleAppendWhitelistMessages(this.#wallet);
         if (!assembledWhitelistMessages) {
-            console.log('Whitelist message not sent.');
-            return;
+            throw new Error('No whitelisted messages to process.')
         }
 
         const totalElements = assembledWhitelistMessages.size;
@@ -365,9 +413,10 @@ export class MainSettlementBus extends ReadyResource {
         for (const [address, encodedPayload] of assembledWhitelistMessages) {
             processedCount++;
             const isWhitelisted = await this.#state.isAddressWhitelisted(address);
-            const correstpondingPublicKey = PeerWallet.decodeBech32m(address).toString('hex');
+            const correspondingPublicKey = PeerWallet.decodeBech32m(address).toString('hex');
             if (isWhitelisted) {
-                console.log(`Public key ${address} is already whitelisted.`);
+                console.error(`Public key ${address} is already whitelisted.`);
+                console.log(`Whitelist message skipped (${processedCount}/${totalElements})`);
                 continue;
             }
 
@@ -378,7 +427,7 @@ export class MainSettlementBus extends ReadyResource {
 
             await this.#state.append(encodedPayload);
             // timesleep and validate if it becomes whitelisted
-            await this.#network.sendMessageToNode(correstpondingPublicKey, whitelistedMessage)
+            await this.#network.sendMessageToNode(correspondingPublicKey, whitelistedMessage)
             await sleep(WHITELIST_SLEEP_INTERVAL);
             console.log(`Whitelist message processed (${processedCount}/${totalElements})`);
 
@@ -386,82 +435,138 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async #requestWriterRole(toAdd) {
-        if (this.#enable_wallet === false) return;
+        if (this.#enable_wallet === false) {
+            throw new Error('Cannot request writer role - wallet is not enabled');
+        }
+
         const adminEntry = await this.#state.getAdminEntry();
         const nodeEntry = await this.#state.getNodeEntry(this.#wallet.address);
-        const isAlreadyWriter = !!(nodeEntry && nodeEntry.isWriter === true)
-        let assembledMessage = null;
+        const isAlreadyWriter = !!(nodeEntry && nodeEntry.isWriter === true);
 
         if (toAdd) {
-            const isAllowedToRequestRole = await this.#isAllowedToRequestRole(adminEntry, nodeEntry);
-            const canAddWriter = !!(!this.#state.isWritable() && !isAlreadyWriter && isAllowedToRequestRole);
-            if (canAddWriter) {
-                assembledMessage = {
-                    op: 'addWriter',
-                    transactionPayload: await StateMessageOperations.assembleAddWriterMessage(this.#wallet, this.#state.writingKey),
-                }
-            }
-        }
-        else {
             if (isAlreadyWriter) {
-                assembledMessage = {
-                    op: 'removeWriter',
-                    transactionPayload: await StateMessageOperations.assembleRemoveWriterMessage(this.#wallet, this.#state.writingKey),
-
-                }
+                throw new Error('Cannot request writer role - state indicates you are already a writer');
             }
+
+            const isAllowedToRequestRole = await this.#isAllowedToRequestRole(adminEntry, nodeEntry);
+            if (!isAllowedToRequestRole) {
+                throw new Error('Cannot request writer role - node is not allowed to request this role');
+            }
+
+            if (this.#state.isWritable()) {
+                throw new Error('Cannot request writer role - internal state is already writable');
+            }
+
+            const assembledMessage = {
+                op: 'addWriter',
+                transactionPayload: await StateMessageOperations.assembleAddWriterMessage(this.#wallet, this.#state.writingKey),
+            }
+            await this.#network.sendMessageToAdmin(adminEntry, assembledMessage);
+            return;
         }
 
-        if (assembledMessage) {
-            await this.#network.sendMessageToAdmin(adminEntry, assembledMessage);
+        if (!isAlreadyWriter) {
+            throw new Error('Cannot remove writer role - you are not a writer');
         }
+
+        const assembledMessage = {
+            op: 'removeWriter',
+            transactionPayload: await StateMessageOperations.assembleRemoveWriterMessage(this.#wallet, this.#state.writingKey),
+        }
+        await this.#network.sendMessageToAdmin(adminEntry, assembledMessage);
     }
 
     async #updateIndexerRole(address, toAdd) {
-        if (this.#enable_wallet === false) return;
+        if (this.#enable_wallet === false) {
+            throw new Error(`Can not request indexer role for: ${address} - wallet is not enabled.`);
+        }
+
         const adminEntry = await this.#state.getAdminEntry();
-        if (!this.#isAdmin(adminEntry) && !this.#state.isWritable()) return;
+
+        if (!adminEntry) {
+            throw new Error(`Can not request indexer role for: ${address} - admin entry has not been initialized.`);
+        }
+
+        if (!isAddressValid(address)) {
+            throw new Error(`Can not request indexer role for: ${address} - invalid address.`);
+        }
+
+        if (!this.#isAdmin(adminEntry) && !this.#state.isWritable()) {
+            throw new Error(`Can not request indexer role for: ${address} - You are not an admin or writer.`);
+
+        }
         const nodeEntry = await this.#state.getNodeEntry(address);
-        if (!nodeEntry) return;
+        if (!nodeEntry) {
+            throw new Error(`Can not request indexer role for: ${address} - node entry has not been not initialized.`);
+        }
 
         const indexersEntry = await this.#state.getIndexersEntry();
         const indexerListHasAddress = await this.#state.isAddressInIndexersEntry(address, indexersEntry);
 
         if (toAdd) {
-            if (indexerListHasAddress) return;
+
+            if (indexerListHasAddress) {
+                throw new Error(`Cannot update indexer role for: ${address} - address is already in indexers list.`);
+            }
+
             const canAddIndexer = nodeEntry.isWhitelisted && nodeEntry.isWriter && !nodeEntry.isIndexer && !indexerListHasAddress;
-            if (canAddIndexer) {
-                const assembledAddIndexerMessage = await StateMessageOperations.assembleAddIndexerMessage(this.#wallet, address);
-                await this.#state.append(assembledAddIndexerMessage);
+
+            if (!canAddIndexer) {
+                throw new Error(`Can not request indexer role for: ${address} - node is not whitelisted, not a writer or already an indexer.`);
             }
-        }
-        else {
+
+            const assembledAddIndexerMessage = await StateMessageOperations.assembleAddIndexerMessage(this.#wallet, address);
+            await this.#state.append(assembledAddIndexerMessage);
+
+        } else {
             const canRemoveIndexer = !toAdd && nodeEntry.isIndexer && indexerListHasAddress;
-            if (canRemoveIndexer) {
-                const assembledRemoveIndexer = await StateMessageOperations.assembleRemoveIndexerMessage(this.#wallet, address);
-                await this.#state.append(assembledRemoveIndexer);
+
+            if (!canRemoveIndexer) {
+                throw new Error(`Can not remove indexer role for: ${address} - node is not an indexer or address is not in indexers list.`);
             }
+
+            const assembledRemoveIndexer = await StateMessageOperations.assembleRemoveIndexerMessage(this.#wallet, address);
+            await this.#state.append(assembledRemoveIndexer);
 
         }
     }
 
     async #banValidator(address) {
+        if (this.#enable_wallet === false) {
+            throw new Error(`Can not ban writer with address: ${address} - wallet is not enabled.`);
+        }
         const adminEntry = await this.#state.getAdminEntry();
-        if (!this.#isAdmin(adminEntry)) return;
+
+        if (!adminEntry) {
+            throw new Error(`Can not ban writer with address: ${address} - admin entry has not been initialized.`);
+        }
+
+        if (!isAddressValid(address)) {
+            throw new Error(`Can not ban writer with address:  ${address} - invalid address.`);
+        }
+
+        if (!this.#isAdmin(adminEntry)) {
+            throw new Error(`Can not ban writer with address: ${address} - You are not an admin.`);
+        }
+
         const isWhitelisted = await this.#state.isAddressWhitelisted(address);
         const nodeEntry = await this.#state.getNodeEntry(address);
-        if (!isWhitelisted || null === nodeEntry || nodeEntry.isIndexer === true) return;
+
+        if (!isWhitelisted || null === nodeEntry || nodeEntry.isIndexer === true) {
+            throw new Error(`Can not ban writer with address: ${address} - node is not whitelisted or is an indexer.`);
+        }
+
         const assembledBanValidatorMessage = await StateMessageOperations.assembleBanWriterMessage(this.#wallet, address);
         await this.#state.append(assembledBanValidatorMessage);
 
     }
 
     async #handleAddIndexerOperation(address) {
-        this.#updateIndexerRole(address, true);
+        await this.#updateIndexerRole(address, true);
     }
 
     async #handleRemoveIndexerOperation(address) {
-        this.#updateIndexerRole(address, false);
+        await this.#updateIndexerRole(address, false);
     }
 
     async #handleAddWriterOperation() {
@@ -483,7 +588,11 @@ export class MainSettlementBus extends ReadyResource {
         printHelp();
 
         rl.on('line', async (input) => {
-            this.handleCommand(input.trim(), rl);
+            try {
+                await this.handleCommand(input.trim(), rl);
+            } catch (err) {
+                console.error(`${err}`);
+            }
             rl.prompt();
         });
 
@@ -501,6 +610,9 @@ export class MainSettlementBus extends ReadyResource {
                 break;
             case '/add_admin':
                 await this.#handleAdminOperations();
+                break;
+            case '/add_admin --recovery':
+                await this.#handleAdminOperations(true);
                 break;
             case '/add_whitelist':
                 await this.#handleWhitelistOperations();
@@ -524,10 +636,6 @@ export class MainSettlementBus extends ReadyResource {
                 } else {
                     console.log('Indexers:', formattedIndexers);
                 }
-                // const wrl = await this.#state.getWriterLength();
-                // console.log('Writers Length:', wrl);
-                // const linealizer = this.#state.getInfoFromLinearizer();
-                // console.log('Indexers from Linearizer:', linealizer);
                 break;
             case '/stats':
                 await verifyDag(this.#state, this.#network, this.#wallet, this.#state.writingKey, this.#shouldListenToAdminEvents, this.#shouldListenToWriterEvents);
@@ -551,20 +659,18 @@ export class MainSettlementBus extends ReadyResource {
                     const splitted = input.split(' ');
                     const address = splitted[1]
                     await this.#handleAddIndexerOperation(address);
-                }
-                else if (input.startsWith('/remove_indexer')) {
+                } else if (input.startsWith('/remove_indexer')) {
                     const splitted = input.split(' ');
                     const address = splitted[1]
                     await this.#handleRemoveIndexerOperation(address);
-                }
-                else if (input.startsWith('/ban_writer')) {
+                } else if (input.startsWith('/ban_writer')) {
                     const splitted = input.split(' ');
                     const address = splitted[1]
                     await this.#handleBanValidatorOperation(address);
                 }
         }
+        if (rl) rl.prompt();
     }
-
 }
 
 export default MainSettlementBus;

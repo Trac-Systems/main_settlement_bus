@@ -1,7 +1,7 @@
 import { test, hook } from 'brittle';
+
 import StateMessageOperations from '../../src/messages/stateMessages/StateMessageOperations.js';
 import { formatIndexersEntry } from '../../src/utils/helpers.js';
-
 import { sleep } from '../../src/utils/helpers.js';
 import {
     initTemporaryDirectory,
