@@ -29,7 +29,11 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
           cache: 'npm'
-      - run: npm ci
-      - run: npm run test:node
-      # - run: npm i -g bare     uncomment after fixing bare issues in testing
-      # - run: npm run test:bare uncomment after fixing bare issues in testing
+      - name: Install dependencies
+        run: npm ci
+      - name: Run node tests
+        run: npm run test:node
+      #- name: Install bare
+      #  run: npm i -g bare     #uncomment after fixing bare issues in testing
+      #- name: Run bare tests
+      #  run: npm run test:bare
