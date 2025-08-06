@@ -47,7 +47,7 @@ export function printHelp() {
     console.log('Available commands:');
     console.log('- /add_writer: add yourself as validator to this MSB once whitelisted.');
     console.log('- /remove_writer: remove yourself from this MSB.');
-    console.log('- /add_admin: register admin entry with bootstrap key. (initial setup)');
+    console.log('- /add_admin: register admin entry with bootstrap key (initial setup), or use --recovery flag to recover admin role (admin only).');
     console.log('- /add_whitelist: add all specified whitelist addresses. (admin only)');
     console.log('- /add_indexer <address>: change a role of the selected writer node to indexer role. (admin only)');
     console.log('- /remove_indexer <address>: change a role of the selected indexer node to default role. (admin only)');

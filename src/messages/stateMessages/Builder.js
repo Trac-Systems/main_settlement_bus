@@ -10,8 +10,6 @@ class Builder {
     forOperationType(operationType) {throw new Error("Method 'forOperationType()' must be implemented.");}
     withAddress(address) { throw new Error("Method 'withAddress()' must be implemented.");}
     withWriterKey(writerKey) { throw new Error("Method 'withWriterKey()' must be implemented.");}
-    withBootstrap(bootstrap) { throw new Error("Method 'withBootstrap()' must be implemented.");}
-    withAdminEntry(adminEntry) { throw new Error("Method 'withAdminEntry()' must be implemented.");}
     async buildValueAndSign() { throw new Error("Method 'buildValueAndSign()' must be implemented.");}
 }
 

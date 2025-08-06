@@ -26,8 +26,7 @@ export const createMessage = (...args) => {
         if (b4a.isBuffer(arg)) {
             return arg;
         } else if (typeof arg === 'number' && isUInt32(arg)) {
-            const buf = safeWriteUInt32BE(arg, 0);
-            return buf;
+            return safeWriteUInt32BE(arg, 0);
         }
     }).filter(buf => b4a.isBuffer(buf));
 

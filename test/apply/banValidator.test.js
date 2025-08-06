@@ -1,4 +1,5 @@
 import {test, hook} from 'brittle';
+
 import {
     initTemporaryDirectory,
     removeTemporaryDirectory,

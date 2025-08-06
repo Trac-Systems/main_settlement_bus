@@ -1,18 +1,18 @@
 import test from 'brittle';
-import MessageOperations from '../../src/messages/MessageOperations.js';
+import StateMessageOperations from '../../src/messages/stateMessages/StateMessageOperations.js';
 import { OperationType } from '../../src/utils/protobuf/applyOperations.cjs';
-import { writingKeyNonAdmin, walletNonAdmin, initAll ,walletAdmin} from '../fixtures/assembleMessage2.fixtures.js';
-import { messageOperationsBkoTest } from './messageOperationsTest.js';
+import { writingKeyNonAdmin, walletNonAdmin, initAll ,walletAdmin} from '../fixtures/assembleMessage.fixtures.js';
+import { messageOperationsBkoTest } from './commonsStateMessageOperationsTest.js';
 import { safeDecodeApplyOperation } from '../../src/utils/protobuf/operationHelpers.js';
 
 const testName = 'assembleRemoveIndexerMessage';
 test(testName, async (t) => {
     await initAll();
-    const fn = async (x, y) => {
-        const ret = safeDecodeApplyOperation(await MessageOperations.assembleRemoveIndexerMessage(x, y));
-        return ret;
+    const assembler = async (wallet,address) => {
+        return safeDecodeApplyOperation(await StateMessageOperations.assembleRemoveIndexerMessage(wallet,address));
     }
-    messageOperationsBkoTest(t, testName, fn, walletNonAdmin, writingKeyNonAdmin, OperationType.REMOVE_INDEXER, 2, walletNonAdmin.publicKey);
+
+    await messageOperationsBkoTest(t, testName, assembler, walletAdmin, writingKeyNonAdmin, OperationType.REMOVE_INDEXER, 2, walletNonAdmin.address);
 });
 
 
