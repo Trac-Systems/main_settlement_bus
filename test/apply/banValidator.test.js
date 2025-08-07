@@ -5,7 +5,8 @@ import {
     removeTemporaryDirectory,
     setupMsbWriter,
     setupMsbIndexer,
-    setupMsbAdmin, tryToSyncWriters
+    setupMsbAdmin,
+    tryToSyncWriters
 } from '../utils/setupApplyTests.js';
 import {randomBytes} from '../utils/setupApplyTests.js';
 import StateMessageOperations from '../../src/messages/stateMessages/StateMessageOperations.js';

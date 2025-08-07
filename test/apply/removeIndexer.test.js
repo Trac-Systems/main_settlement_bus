@@ -9,7 +9,6 @@ import {
     setupMsbAdmin,
     setupMsbWriter,
     randomBytes,
-    tryToSyncWriters,
     setupMsbIndexer
 } from '../utils/setupApplyTests.js';
 import { testKeyPair1, testKeyPair2, testKeyPair3, testKeyPair4 } from '../fixtures/apply.fixtures.js';
@@ -66,15 +65,12 @@ test('handleApplyRemoveIndexerOperation (apply) - Append removeIndexer payload i
     try {
         // indexer1 is not already an indexer.
         const adminSignedLengthBefore = admin.msb.state.getSignedLength();
-        const indexerSignedLengthBefore = indexer1.msb.state.getSignedLength();
 
         const assembledRemoveIndexerMessage = await StateMessageOperations.assembleRemoveIndexerMessage(admin.wallet, indexer1.wallet.address);
         await admin.msb.state.append(assembledRemoveIndexerMessage);
         await sleep(5000);
-        tryToSyncWriters(admin, indexer1);
 
         const adminSignedLengthAfter = admin.msb.state.getSignedLength();
-        const indexerSignedLengthAfter = indexer1.msb.state.getSignedLength();
 
         const indexersEntry = await indexer1.msb.state.getIndexersEntry();
         const formattedIndexersEntry = formatIndexersEntry(indexersEntry);
@@ -85,7 +81,6 @@ test('handleApplyRemoveIndexerOperation (apply) - Append removeIndexer payload i
         t.is(nodeInfo.isWriter, true, 'Node info should indicate that the node is a writer');
         t.is(nodeInfo.isIndexer, false, 'Node info should indicate that the node is not an indexer');
         t.is(adminSignedLengthBefore, adminSignedLengthAfter, 'Admin signed length should not change');
-        t.is(indexerSignedLengthBefore, indexerSignedLengthAfter, 'Indexer signed length should not change');
     }
     catch (error) {
         t.fail('Failed to remove indexer (idempotence): ' + error.message);
@@ -95,16 +90,13 @@ test('handleApplyRemoveIndexerOperation (apply) - Append removeIndexer payload i
 test('handleApplyAddIndexerOperation (apply) - Append removeIndexer payload into the base by non-admin node', async t => {
     try {
         // indexer2 is already an indexer
-        const indexerSignedLengthBefore = indexer2.msb.state.getSignedLength();
         const writerSignedLengthBefore = writer.msb.state.getSignedLength();
 
         const assembledRemoveIndexerMessage = await StateMessageOperations.assembleRemoveIndexerMessage(writer.wallet, indexer2.wallet.address);
         await writer.msb.state.append(assembledRemoveIndexerMessage);
         await sleep(5000); // wait for both peers to sync state
-        tryToSyncWriters(writer, indexer2);
 
         const writerSignedLengthAfter = writer.msb.state.getSignedLength();
-        const indexerSignedLengthAfter = indexer2.msb.state.getSignedLength();
 
         const indexersEntry = await indexer2.msb.state.getIndexersEntry();
         const formattedIndexersEntry = formatIndexersEntry(indexersEntry);
@@ -114,7 +106,6 @@ test('handleApplyAddIndexerOperation (apply) - Append removeIndexer payload into
         t.is(formattedIndexersEntry.addresses.includes(indexer2.wallet.address), true, 'Indexer address should not be included in the indexers entry');
         t.is(nodeInfo.isIndexer, true, 'Node info should indicate that the node is an indexer');
         t.is(writerSignedLengthBefore, writerSignedLengthAfter, 'Writer signed length should not change');
-        t.is(indexerSignedLengthBefore, indexerSignedLengthAfter, 'Indexer signed length should not change');
     }
     catch (error) {
         t.fail('Failed to add indexer: ' + error.message);

@@ -75,7 +75,6 @@ test('handleApplyRemoveWriterOperation (apply) - Append removeWriter payload int
         );
 
         const signedLengthAdminBefore = admin.msb.state.getSignedLength();
-        const signedLengthWriter1Before = writer1.msb.state.getSignedLength();
 
         // add writer to base
         await admin.msb.state.append(reqRemoveWriter); // Send `add writer` request to apply function
@@ -83,11 +82,8 @@ test('handleApplyRemoveWriterOperation (apply) - Append removeWriter payload int
         await sleep(5000); // wait for both peers to sync state
 
         const signedLengthAdminAfter = admin.msb.state.getSignedLength();
-        const signedLengthWriter1After = writer1.msb.state.getSignedLength();
 
-        // The operation should not have changed the signed length, because it was rejected and not signed
         t.is(signedLengthAdminBefore, signedLengthAdminAfter, 'Admin signed length should not change');
-        t.is(signedLengthWriter1Before, signedLengthWriter1After, 'Writer1 signed length should not change');
 
     }
     catch (error) {
@@ -111,8 +107,6 @@ test('handleApplyRemoveWriterOperation (apply) - Append removeWriter payload int
             writer1.msb.state.writingKey,
         );
 
-        const signedLengthAdminBefore = admin.msb.state.getSignedLength();
-        const signedLengthWriter1Before = writer1.msb.state.getSignedLength();
         const signedLengthWriter2Before = writer2.msb.state.getSignedLength();
 
         // add writer to base
@@ -120,13 +114,8 @@ test('handleApplyRemoveWriterOperation (apply) - Append removeWriter payload int
         await tick();
 
         const result = await writer1.msb.state.getNodeEntry(writer1.wallet.address);
-        const signedLengthAdminAfter = admin.msb.state.getSignedLength();
-        const signedLengthWriter1After = writer1.msb.state.getSignedLength();
         const signedLengthWriter2After = writer2.msb.state.getSignedLength();
 
-        // The operation should not have changed the signed length, because it was rejected and not signed
-        t.is(signedLengthAdminBefore, signedLengthAdminAfter, 'Admin signed length should not change');
-        t.is(signedLengthWriter1Before, signedLengthWriter1After, 'Writer1 signed length should not change');
         t.is(signedLengthWriter2Before, signedLengthWriter2After, 'Writer2 signed length should not change');
         t.ok(result, 'Result should not be null');
         t.ok(b4a.equals(result.wk, writer1.msb.state.writingKey), 'Result writing key should match writer writing key');

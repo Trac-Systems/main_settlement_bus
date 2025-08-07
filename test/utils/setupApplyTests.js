@@ -1,17 +1,17 @@
 import sodium from 'sodium-native';
-import { generateMnemonic, mnemonicToSeed } from 'bip39-mnemonic';
+import {generateMnemonic, mnemonicToSeed} from 'bip39-mnemonic';
 import b4a from 'b4a'
 import PeerWallet from "trac-wallet"
 import path from 'path';
 import StateMessageOperations from '../../src/messages/stateMessages/StateMessageOperations.js';
 
-import { MainSettlementBus } from '../../src/index.js'
+import {MainSettlementBus} from '../../src/index.js'
 import fileUtils from '../../src/utils/fileUtils.js'
-import { EntryType } from '../../src/utils/constants.js';
-import { sleep } from '../../src/utils/helpers.js'
-import { createHash } from '../../src/utils/crypto.js'
-import { formatIndexersEntry } from '../../src/utils/helpers.js';
-import { generatePreTx } from '../../src/utils/transactionUtils.js';
+import {EntryType} from '../../src/utils/constants.js';
+import {sleep} from '../../src/utils/helpers.js'
+import {createHash} from '../../src/utils/crypto.js'
+import {formatIndexersEntry} from '../../src/utils/helpers.js';
+import {generatePreTx} from '../../src/utils/transactionUtils.js';
 
 let os, fsp;
 
@@ -72,9 +72,10 @@ export async function initMsbPeer(peerName, peerKeyPair, temporaryDirectory, opt
 
 
     const wallet = new PeerWallet();
-    wallet.initKeyPair(peer.keypath);
+    await wallet.initKeyPair(peer.keypath);
     peer.msb = msb;
     peer.wallet = wallet;
+    peer.name = peerName;
 
     return peer;
 }
@@ -130,8 +131,7 @@ export async function setupNodeAsWriter(admin, writerCandidate) {
         }
 
         return writerCandidate;
-    }
-    catch (error) {
+    } catch (error) {
         throw new Error('Error setting up MSB writer: ', error.message);
     }
 }
@@ -148,20 +148,19 @@ export async function setupMsbWriter(admin, peerName, peerKeyPair, temporaryDire
 
         const req = await StateMessageOperations.assembleAddWriterMessage(writerCandidate.wallet, writerCandidate.msb.state.writingKey);
         await admin.msb.state.append(req);
-        await tick(); // wait for the request to be processed
+        await tick();
         let counter;
         const limit = 10; // maximum number of attempts to verify the role
         for (counter = 0; counter < limit; counter++) {
-            const res = await isWriter(writerCandidate.wallet.address);
-            if (res) {
+            console.log('peername', peerName, await isWriter(writerCandidate.wallet.address), await writerCandidate.msb.state.isWritable())
+            if (await isWriter(writerCandidate.wallet.address) && await writerCandidate.msb.state.isWritable()) {
                 break;
             }
             await sleep(1000); // wait for the peer to sync state
         }
 
         return writerCandidate;
-    }
-    catch (error) {
+    } catch (error) {
         throw new Error('Error setting up MSB writer: ', error.message);
     }
 }
@@ -193,8 +192,7 @@ export async function setupMsbIndexer(indexerCandidate, admin) {
         }
 
         return indexerCandidate;
-    }
-    catch (error) {
+    } catch (error) {
         throw new Error('Error setting up MSB indexer: ', error.message);
     }
 }
@@ -227,14 +225,14 @@ export async function initTemporaryDirectory() {
     const tmpDir = os.tmpdir();
     const unique = `tempTestStore-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const temporaryDirectory = path.join(tmpDir, unique);
-    await fsp.mkdir(temporaryDirectory, { recursive: true });
+    await fsp.mkdir(temporaryDirectory, {recursive: true});
     console.log('temporary directory: ', temporaryDirectory);
     return temporaryDirectory;
 }
 
 export async function removeTemporaryDirectory(temporaryDirectory) {
     await ensureEnvReady();
-    await fsp.rm(temporaryDirectory, { recursive: true, force: true })
+    await fsp.rm(temporaryDirectory, {recursive: true, force: true})
 }
 
 async function initDirectoryStructure(peerName, keyPair, temporaryDirectory) {
@@ -243,7 +241,7 @@ async function initDirectoryStructure(peerName, keyPair, temporaryDirectory) {
         const storesDirectory = temporaryDirectory + '/stores/';
         const storeName = peerName + '/';
         const corestoreDbDirectory = path.join(storesDirectory, storeName, 'db');
-        await fsp.mkdir(corestoreDbDirectory, { recursive: true });
+        await fsp.mkdir(corestoreDbDirectory, {recursive: true});
 
         const keypath = path.join(corestoreDbDirectory, 'keypair.json');
         if (!keyPair || !keyPair.publicKey || !keyPair.secretKey) {
@@ -256,8 +254,7 @@ async function initDirectoryStructure(peerName, keyPair, temporaryDirectory) {
             corestoreDbDirectory,
             keypath,
         }
-    }
-    catch (error) {
+    } catch (error) {
         throw new Error('Error creating directory structure: ' + error)
     }
 }
@@ -266,9 +263,9 @@ export async function addKeyToWhitelist(filepath, key) {
     try {
         await ensureEnvReady();
         // Check if the file exists, if not create it
-        await fsp.mkdir(path.dirname(filepath), { recursive: true })
+        await fsp.mkdir(path.dirname(filepath), {recursive: true})
         // Append the key to the file, followed by a newline
-        await fsp.appendFile(filepath, key + '\n', { encoding: 'utf8' });
+        await fsp.appendFile(filepath, key + '\n', {encoding: 'utf8'});
     } catch (error) {
         throw new Error('Error adding key to whitelist: ' + error);
     }
@@ -337,30 +334,51 @@ export const generatePostTx = async (writer, externalNode) => {
 
     const txHash = preTx.tx;
 
-    return { postTx, txHash };
+    return {postTx, txHash};
 
 }
 
-/*
-    You can synchronize multiple nodes by passing them as arguments,
-    Useful for aligning signedLength values. If node is not a writer, it will be skipped.
-*/
+/**
+ * You can synchronize multiple nodes by passing them as arguments,
+ * Useful for aligning signedLength values. If node is not a writer, it will be skipped.
+ *
+ * @example
+ * await tryToSyncWriters(admin, writer1, writer2, indexer1);
+ */
 export const tryToSyncWriters = async (...args) => {
-    try {
-        const N = 100;
-        for (let i = 0; i < N; i++) {
-            for (const node of args) {
-                await sleep(50)
-                await node.msb.state.append(null);
-            }
-            await tick();
-        }
+    console.log('Before sync:');
+    args.forEach(node => {
+        console.log(`${node.name}: ${node.msb.state.getSignedLength()}`);
+    });
 
-    } catch (error) {
-        console.log('node is not a writer', error);
+    let maxLength = Math.max(...args.map(node => node.msb.state.getSignedLength()));
+    console.log("maxLength", maxLength);
+
+    let allSynced = false;
+    while (!allSynced) {
+        allSynced = true;
+        for (const node of args) {
+            let signedLength = node.msb.state.getSignedLength();
+            console.log(`getUnsignedLength: ${node.msb.state.getUnsignedLength()}`);
+            if (signedLength < maxLength) {
+                await sleep(100);
+                await node.msb.state.append(null);
+                await node.msb.state.base.update()
+                await node.msb.state.base.view.update()
+
+                allSynced = false;
+                console.log("signedLength", signedLength, "of", node.name);
+            }
+        }
     }
+    console.log('After sync:');
+    args.forEach(node => {
+        console.log(`${node.name}: ${node.msb.state.getSignedLength()}`);
+    });
 }
 
+
+// TODO: to delete tomorrow - waitForNodeState is better
 export async function waitForNotIndexer(indexer, maxAttempts = 30, delayMs = 1000) {
 
     const isNotIndexer = async () => {
@@ -384,4 +402,80 @@ export async function waitForNotIndexer(indexer, maxAttempts = 30, delayMs = 100
         await sleep(delayMs);
     }
     return false;
+}
+
+
+/**
+ * Waits until the node's state matches the expected properties (wk, isWhitelisted, isWriter, isIndexer).
+ *
+ * @param {object} node - The node object with msb.state and wallet.address
+ * @param {object} expected - Object with properties: wk (Buffer), isWhitelisted (boolean), isWriter (boolean), isIndexer (boolean)
+ * @returns {Promise<void>} Resolves when the state matches expected values
+ *
+ * @example
+ * await waitForNodeState(node, {
+ *   wk: node.msb.state.writingKey,
+ *   isWhitelisted: true,
+ *   isWriter: true,
+ *   isIndexer: false
+ * });
+ */
+export async function waitForNodeState(node, expected) {
+    while (true) {
+        const state = await node.msb.state.getNodeEntry(node.wallet.address);
+        if (
+            b4a.equals(state.wk, expected.wk) &&
+            state.isWhitelisted === expected.isWhitelisted &&
+            state.isWriter === expected.isWriter &&
+            state.isIndexer === expected.isIndexer
+        ) {
+            break;
+        }
+        await sleep(100);
+    }
+}
+
+/**
+ * Waits until the given node sees the expected state for a target address.
+ *
+ * @param {object} node - The node whose state will be checked (the observer).
+ * @param {string} address - The address whose state we want to observe.
+ * @param {object} expected - Object with properties: wk (Buffer), isWhitelisted (boolean), isWriter (boolean), isIndexer (boolean)
+ * @returns {Promise<void>} Resolves when the observed state matches expected values.
+ *
+ * @example
+ * await waitForRemoteNodeState(writer1, writer2.wallet.address, {
+ *   wk: writer2.msb.state.writingKey,
+ *   isWhitelisted: true,
+ *   isWriter: true,
+ *   isIndexer: false
+ * });
+ */
+
+export async function waitForRemoteNodeState(node, address, expected) {
+    while (true) {
+        const state = await node.msb.state.getNodeEntry(address);
+        if (
+            b4a.equals(state.wk, expected.wk) &&
+            state.isWhitelisted === expected.isWhitelisted &&
+            state.isWriter === expected.isWriter &&
+            state.isIndexer === expected.isIndexer
+        ) {
+            break;
+        }
+        await sleep(100);
+    }
+}
+
+export async function waitForAdminEntry(node, expected) {
+    while (true) {
+        const adminEntry = await node.msb.state.getAdminEntry();
+        if (
+            b4a.equals(adminEntry.wk, expected.wk) &&
+            adminEntry.address === expected.address
+        ) {
+            break;
+        }
+        await sleep(100);
+    }
 }
