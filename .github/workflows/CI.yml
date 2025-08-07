@@ -15,13 +15,11 @@ concurrency:
 
 jobs:
   tests:
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
 
     strategy:
       matrix:
-        node-version: [20]
-        os: [ubuntu-latest, macos-latest, windows-latest]
-
+        node-version: [lts/*]
     steps:
       - uses: actions/checkout@v4
       - name: Use Node.js ${{ matrix.node-version }}
@@ -33,7 +31,7 @@ jobs:
         run: npm ci
       - name: Run node tests
         run: npm run test:node
-      #- name: Install bare
-      #  run: npm i -g bare     #uncomment after fixing bare issues in testing
-      #- name: Run bare tests
-      #  run: npm run test:bare
+      - name: Install bare
+        run: npm i -g bare
+      - name: Run bare tests
+        run: npm run test:bare
