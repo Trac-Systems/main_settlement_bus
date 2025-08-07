@@ -10,8 +10,10 @@
   "scripts": {
     "dev": "pear run -d .",
     "protobuf": "node scripts/generate-protobufs.js",
-    "test:node": "brittle-node -c -t 120000 test/all.test.js",
-    "test:bare": "brittle-bare -c -t 120000 test/all.test.js"
+    "test:node": "brittle-node -t 120000 test/all.test.js",
+    "test:bare": "brittle-bare -t 120000 test/all.test.js",
+    "test:node:cov": "brittle-node -c -t 120000 test/all.test.js",
+    "test:bare:cov": "brittle-bare -c -t 120000 test/all.test.js"
   },
   "dependencies": {
     "autobase": "7.16.1",
