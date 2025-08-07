@@ -10,22 +10,22 @@
   "scripts": {
     "dev": "pear run -d .",
     "protobuf": "node scripts/generate-protobufs.js",
-    "test:node": "brittle -c -t 120000 test/all.test.js",
-    "test:bare": "bare test/all.test.js"
+    "test:node": "brittle-node -c -t 120000 test/all.test.js",
+    "test:bare": "brittle-bare -c -t 120000 test/all.test.js"
   },
   "dependencies": {
     "autobase": "7.16.1",
-    "hypercore": "^11.6.3",
-    "corestore": "^7.4.2",
     "b4a": "1.6.7",
     "bare-fs": "^4.1.6",
     "bare-readline": "1.0.7",
     "bare-tty": "5.0.2",
     "bech32": "^2.0.0",
-    "brittle": "^3.16.2",
+    "brittle": "^3.17.1",
     "compact-encoding": "^2.16.0",
+    "corestore": "^7.4.2",
     "fastest-validator": "1.19.0",
     "hyperbee": "^2.24.2",
+    "hypercore": "^11.6.3",
     "hypercore-crypto": "^3.4.0",
     "hyperdht": "^6.20.5",
     "hyperswarm": "^4.11.5",
@@ -38,9 +38,9 @@
     "tty": "npm:bare-node-tty"
   },
   "devDependencies": {
+    "bare-os": "^3.6.1",
     "bip39-mnemonic": "^2.4.0",
-    "protocol-buffers": "^4.2.0",
-    "bare-os": "^3.6.1"
+    "protocol-buffers": "^4.2.0"
   },
   "publishConfig": {
     "registry": "https://registry.npmjs.org",

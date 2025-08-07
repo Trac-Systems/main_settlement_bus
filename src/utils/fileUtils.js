@@ -1,4 +1,4 @@
-import fs from 'fs';
+import fs from 'fs'; // TODO: If we are using bare environment, we should use bare-fs instead
 import {WHITELIST_FILEPATH} from '../utils/constants.js';
 
 
