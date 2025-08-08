@@ -14,5 +14,6 @@ stores_/
 # Coverage reports
 coverage/
 
+# Whitelist directory 
 whitelist/*
 !whitelist/.gitkeep
