@@ -85,6 +85,3 @@ test('safeDecodeApplyOperation - decode calls skip() on unknown wire type, safel
     const decoded = safeDecodeApplyOperation(bufWithUnknownWire);
     t.ok(decoded === null || typeof decoded === 'object', 'Should return null or object on unknown wire type');
 });
-
-
-

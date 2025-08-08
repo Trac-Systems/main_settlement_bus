@@ -80,8 +80,8 @@ export async function messageOperationsEkoTest(t, fnName, assembler, wallet, wri
         );
     });
     //
-    // Test removed as b4a.from() with 'hex' encoding will throw on invalid hex characters,
-    // making this test redundant. The validation is handled by the b4a library itself.
+    // //TODO: fix -  works on node, but not on bare.
+    //
     //
     // t.test(`${fnName} - Invalid writing key - not hex`, async (k) => {
     //     try {
@@ -274,7 +274,4 @@ export async function messageOperationsBkoTest(t, fnName, assembler, wallet, wri
             errorMessageIncludes('Address must not be the same as the wallet address for basic operations')
         );
     });
-
-
-
 }
