@@ -21,16 +21,33 @@ test('Happy path encode/decode roundtrip for protobuf applyOperation payloads', 
         t.ok(encoded, 'encoded !== null')
         t.ok(encoded instanceof Buffer || b4a.isBuffer(encoded), 'encoded to Buffer')
         const decoded = safeDecodeApplyOperation(encoded)
-        t.ok(JSON.stringify(value) === JSON.stringify(decoded), `Payload with ${key} shoukd be endoded and decoded correctly`);
+        t.ok(JSON.stringify(value) === JSON.stringify(decoded), `Payload with ${key} should be encoded and decoded correctly`);
     }
 });
 
 test('safeEncodeAppyOperation - handles invalid payloads by returning a Buffer', t => {
     for (const invalidPayload of fixtures.invalidPayloads) {
-        const encoded = safeEncodeApplyOperation(invalidPayload)
-        t.ok(b4a.isBuffer(encoded), `For payload ${typeof invalidPayload === 'bigint' ? invalidPayload.toString() + 'n' : (() => { try { return JSON.stringify(invalidPayload) } catch { return String(invalidPayload) } })()} should return a Buffer`);
+        let encoded;
+        try {
+            encoded = safeEncodeApplyOperation(invalidPayload);
+        } catch {
+            encoded = null;
+        }
+        let display;
+        if (typeof invalidPayload === 'bigint') {
+            display = invalidPayload.toString() + 'n';
+        } else {
+            try {
+                const str = JSON.stringify(invalidPayload);
+                display = str.length > 128 ? `(payload size: ${str.length} bytes)` : str;
+            } catch {
+                const s = String(invalidPayload);
+                display = s.length > 128 ? `(payload size: ${s.length} bytes)` : s;
+            }
+        }
+        t.ok(b4a.isBuffer(encoded), `payload: ${display}`);
     }
-})
+});
 
 test('safeDecodeApplyOperation - handles invalid payloads by returning null or object', t => {
     for (const invalidPayload of fixtures.invalidPayloads) {
@@ -68,6 +85,3 @@ test('safeDecodeApplyOperation - decode calls skip() on unknown wire type, safel
     const decoded = safeDecodeApplyOperation(bufWithUnknownWire);
     t.ok(decoded === null || typeof decoded === 'object', 'Should return null or object on unknown wire type');
 });
-
-
-

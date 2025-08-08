@@ -5,7 +5,8 @@ import {
     removeTemporaryDirectory,
     setupMsbWriter,
     setupMsbIndexer,
-    setupMsbAdmin, tryToSyncWriters
+    setupMsbAdmin,
+    tryToSyncWriters
 } from '../utils/setupApplyTests.js';
 import {randomBytes} from '../utils/setupApplyTests.js';
 import StateMessageOperations from '../../src/messages/stateMessages/StateMessageOperations.js';
@@ -31,6 +32,7 @@ hook('Initialize nodes for banValidator tests', async () => {
 
     indexer = await setupMsbWriter(admin, 'indexer', testKeyPair2, tmpDirectory, admin.options);
     indexer = await setupMsbIndexer(indexer, admin);
+
     writer1 = await setupMsbWriter(admin, 'writer1', testKeyPair3, tmpDirectory, admin.options);
     writer2 = await setupMsbWriter(admin, 'writer2', testKeyPair4, tmpDirectory, admin.options);
 });
@@ -40,7 +42,7 @@ test('handleApplyBanValidatorOperation (apply) - Append banValidator payload - b
 
         const assembledBanWriter = await StateMessageOperations.assembleBanWriterMessage(admin.wallet, indexer.wallet.address);
         await admin.msb.state.append(assembledBanWriter);
-        await sleep(5000); // wait for both peers to sync state
+        await tryToSyncWriters(admin, indexer, writer1, writer2);
 
         const indexersEntry = await indexer.msb.state.getIndexersEntry();
         const formattedIndexersEntry = formatIndexersEntry(indexersEntry);

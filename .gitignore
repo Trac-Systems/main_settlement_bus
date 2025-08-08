@@ -10,7 +10,6 @@ stores_/
 
 # NPM configuration and lock file
 .npmrc
-package-lock.json
 
 # Coverage reports
 coverage/

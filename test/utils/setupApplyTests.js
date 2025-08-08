@@ -1,17 +1,17 @@
 import sodium from 'sodium-native';
-import { generateMnemonic, mnemonicToSeed } from 'bip39-mnemonic';
+import {generateMnemonic, mnemonicToSeed} from 'bip39-mnemonic';
 import b4a from 'b4a'
 import PeerWallet from "trac-wallet"
 import path from 'path';
 import StateMessageOperations from '../../src/messages/stateMessages/StateMessageOperations.js';
 
-import { MainSettlementBus } from '../../src/index.js'
+import {MainSettlementBus} from '../../src/index.js'
 import fileUtils from '../../src/utils/fileUtils.js'
-import { EntryType } from '../../src/utils/constants.js';
-import { sleep } from '../../src/utils/helpers.js'
-import { createHash } from '../../src/utils/crypto.js'
-import { formatIndexersEntry } from '../../src/utils/helpers.js';
-import { generatePreTx } from '../../src/utils/transactionUtils.js';
+import {EntryType} from '../../src/utils/constants.js';
+import {sleep} from '../../src/utils/helpers.js'
+import {createHash} from '../../src/utils/crypto.js'
+import {formatIndexersEntry} from '../../src/utils/helpers.js';
+import {generatePreTx} from '../../src/utils/transactionUtils.js';
 
 let os, fsp;
 
@@ -72,9 +72,10 @@ export async function initMsbPeer(peerName, peerKeyPair, temporaryDirectory, opt
 
 
     const wallet = new PeerWallet();
-    wallet.initKeyPair(peer.keypath);
+    await wallet.initKeyPair(peer.keypath);
     peer.msb = msb;
     peer.wallet = wallet;
+    peer.name = peerName;
 
     return peer;
 }
@@ -122,16 +123,17 @@ export async function setupNodeAsWriter(admin, writerCandidate) {
         let counter;
         const limit = 10; // maximum number of attempts to verify the role
         for (counter = 0; counter < limit; counter++) {
-            const res = await isWriter(writerCandidate.wallet.address);
-            if (res) {
+            if (await isWriter(writerCandidate.wallet.address) && await writerCandidate.msb.state.isWritable()) {
                 break;
             }
+            await writerCandidate.msb.state.base.update();
+            await writerCandidate.msb.state.base.view.update();
+            await writerCandidate.msb.network.swarm.flush()
             await sleep(1000); // wait for the peer to sync state
         }
 
         return writerCandidate;
-    }
-    catch (error) {
+    } catch (error) {
         throw new Error('Error setting up MSB writer: ', error.message);
     }
 }
@@ -152,19 +154,21 @@ export async function setupMsbWriter(admin, peerName, peerKeyPair, temporaryDire
         let counter;
         const limit = 10; // maximum number of attempts to verify the role
         for (counter = 0; counter < limit; counter++) {
-            const res = await isWriter(writerCandidate.wallet.address);
-            if (res) {
+            if (await isWriter(writerCandidate.wallet.address) && await writerCandidate.msb.state.isWritable()) {
                 break;
             }
+            await writerCandidate.msb.state.base.update();
+            await writerCandidate.msb.state.base.view.update();
+            await writerCandidate.msb.network.swarm.flush()
             await sleep(1000); // wait for the peer to sync state
         }
 
         return writerCandidate;
-    }
-    catch (error) {
+    } catch (error) {
         throw new Error('Error setting up MSB writer: ', error.message);
     }
 }
+
 
 export async function setupMsbIndexer(indexerCandidate, admin) {
     try {
@@ -185,16 +189,18 @@ export async function setupMsbIndexer(indexerCandidate, admin) {
         let counter;
         const limit = 10; // maximum number of attempts to verify the role
         for (counter = 0; counter < limit; counter++) {
-            const res = await isIndexer(indexerCandidate.wallet.address);
-            if (res) {
+            if (await isIndexer(indexerCandidate.wallet.address) && await indexerCandidate.msb.state.isIndexer()) {
                 break;
             }
+            await indexerCandidate.msb.state.append(null);
+            await indexerCandidate.msb.state.base.update();
+            await indexerCandidate.msb.state.base.view.update();
+            await indexerCandidate.msb.network.swarm.flush()
             await sleep(1000); // wait for the peer to sync state
         }
 
         return indexerCandidate;
-    }
-    catch (error) {
+    } catch (error) {
         throw new Error('Error setting up MSB indexer: ', error.message);
     }
 }
@@ -227,14 +233,14 @@ export async function initTemporaryDirectory() {
     const tmpDir = os.tmpdir();
     const unique = `tempTestStore-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const temporaryDirectory = path.join(tmpDir, unique);
-    await fsp.mkdir(temporaryDirectory, { recursive: true });
+    await fsp.mkdir(temporaryDirectory, {recursive: true});
     console.log('temporary directory: ', temporaryDirectory);
     return temporaryDirectory;
 }
 
 export async function removeTemporaryDirectory(temporaryDirectory) {
     await ensureEnvReady();
-    await fsp.rm(temporaryDirectory, { recursive: true, force: true })
+    await fsp.rm(temporaryDirectory, {recursive: true, force: true})
 }
 
 async function initDirectoryStructure(peerName, keyPair, temporaryDirectory) {
@@ -243,7 +249,7 @@ async function initDirectoryStructure(peerName, keyPair, temporaryDirectory) {
         const storesDirectory = temporaryDirectory + '/stores/';
         const storeName = peerName + '/';
         const corestoreDbDirectory = path.join(storesDirectory, storeName, 'db');
-        await fsp.mkdir(corestoreDbDirectory, { recursive: true });
+        await fsp.mkdir(corestoreDbDirectory, {recursive: true});
 
         const keypath = path.join(corestoreDbDirectory, 'keypair.json');
         if (!keyPair || !keyPair.publicKey || !keyPair.secretKey) {
@@ -256,40 +262,8 @@ async function initDirectoryStructure(peerName, keyPair, temporaryDirectory) {
             corestoreDbDirectory,
             keypath,
         }
-    }
-    catch (error) {
-        throw new Error('Error creating directory structure: ' + error)
-    }
-}
-
-export async function addKeyToWhitelist(filepath, key) {
-    try {
-        await ensureEnvReady();
-        // Check if the file exists, if not create it
-        await fsp.mkdir(path.dirname(filepath), { recursive: true })
-        // Append the key to the file, followed by a newline
-        await fsp.appendFile(filepath, key + '\n', { encoding: 'utf8' });
     } catch (error) {
-        throw new Error('Error adding key to whitelist: ' + error);
-    }
-}
-
-export async function restoreWhitelistFromBackup(filepath) {
-    const backupPath = filepath + '.bak';
-    try {
-        await ensureEnvReady();
-        // Check if the backup file exists
-        await fsp.access(backupPath);
-        // Remove the current file if it exists
-        try {
-            await fsp.unlink(filepath);
-        } catch (e) {
-            // File may not exist, that's fine
-        }
-        // Rename the backup back to the original filename
-        await fsp.rename(backupPath, filepath);
-    } catch (e) {
-        // Backup does not exist, nothing to restore
+        throw new Error('Error creating directory structure: ' + error)
     }
 }
 
@@ -337,51 +311,158 @@ export const generatePostTx = async (writer, externalNode) => {
 
     const txHash = preTx.tx;
 
-    return { postTx, txHash };
+    return {postTx, txHash};
 
 }
 
-/*
-    You can synchronize multiple nodes by passing them as arguments,
-    Useful for aligning signedLength values. If node is not a writer, it will be skipped.
-*/
+/**
+ * You can synchronize multiple nodes by passing them as arguments,
+ * Useful for aligning signedLength values. If node is not a writer, it will be skipped.
+ *
+ * @example
+ * await tryToSyncWriters(admin, writer1, writer2, indexer1);
+ */
 export const tryToSyncWriters = async (...args) => {
     try {
-        const N = 100;
-        for (let i = 0; i < N; i++) {
+        let attempts = 0;
+        const maxAttempts = 10;
+        while (attempts < maxAttempts) {
+            let maxLength = Math.max(...args.map(node => node.msb.state.getSignedLength()));
+            let allSynced = true;
             for (const node of args) {
-                await sleep(50)
-                await node.msb.state.append(null);
+                let signedLength = node.msb.state.getSignedLength();
+                if (signedLength < maxLength) {
+                    //await node.msb.state.append(null);
+                    await node.msb.state.base.update();
+                    await node.msb.state.base.view.update();
+                    await node.msb.network.swarm.flush()
+                    await sleep(1000);
+                    allSynced = false;
+                }
             }
-            await tick();
+            if (allSynced) break;
+            attempts++;
         }
-
     } catch (error) {
-        console.log('node is not a writer', error);
+        throw new Error("Error synchronizing writers: " + error.message);
     }
 }
 
-export async function waitForNotIndexer(indexer, maxAttempts = 30, delayMs = 1000) {
 
-    const isNotIndexer = async () => {
-        const indexersEntry = await indexer.msb.state.getIndexersEntry();
-        if (!indexersEntry) {
-            return false;
+export async function waitForNotIndexer(indexer) {
+    try {
+        let attempts = 0;
+        const maxAttempts = 20;
+        while (attempts < maxAttempts) {
+            await indexer.msb.state.base.update();
+            await indexer.msb.state.base.view.update();
+            const indexersEntry = await indexer.msb.state.getIndexersEntry();
+            let notIndexer = false;
+            if (!indexersEntry) {
+                notIndexer = true;
+            } else {
+                const formatted = formatIndexersEntry(indexersEntry);
+                if (!formatted || !formatted.addresses) {
+                    notIndexer = true;
+                } else if (!formatted.addresses.includes(indexer.wallet.address)) {
+                    notIndexer = true;
+                }
+            }
+            if (notIndexer) {
+                break;
+            }
+            await indexer.msb.network.swarm.flush()
+            await sleep(1000);
+            attempts++;
         }
-        const formatted = formatIndexersEntry(indexersEntry);
-        if (!formatted || !formatted.addresses) return false;
+    } catch (error) {
+        throw new Error("Error waiting for indexer to not be an indexer: " + error.message);
+    }
+}
 
-        const nodeEntry = await indexer.msb.state.getNodeEntry(indexer.wallet.address);
-        if (!nodeEntry) return false;
-        return !nodeEntry.isIndexer && !formatted.addresses.includes(indexer.wallet.address);
+/**
+ * Waits until the given node sees the expected state for a target address.
+ *
+ * @param {object} node - The node whose state will be checked (the observer).
+ * @param {string} address - The address whose state we want to observe.
+ * @param {object} expected - Object with properties: wk (Buffer), isWhitelisted (boolean), isWriter (boolean), isIndexer (boolean)
+ * @returns {Promise<void>} Resolves when the observed state matches expected values.
+ *
+ * @example
+ * await waitForRemoteNodeState(writer1, writer2.wallet.address, {
+ *   wk: writer2.msb.state.writingKey,
+ *   isWhitelisted: true,
+ *   isWriter: true,
+ *   isIndexer: false
+ * });
+ */
+
+export async function waitForNodeState(node, address, expected) {
+    try {
+        let attempts = 0;
+        const maxAttempts = 20;
+        while (attempts < maxAttempts) {
+            const state = await node.msb.state.getNodeEntry(address);
+            if (
+                state &&
+                b4a.equals(state.wk, expected.wk) &&
+                state.isWhitelisted === (expected.isWhitelisted ?? expected.isWhiteListed) &&
+                state.isWriter === expected.isWriter &&
+                state.isIndexer === expected.isIndexer
+            ) {
+                return;
+            }
+            await node.msb.network.swarm.flush()
+            await sleep(1000);
+            attempts++;
+        }
+    } catch (error) {
+        throw new Error("Error synchronizing node state: " + error.message);
+    }
+}
+
+export async function waitForAdminEntry(node, expected) {
+    try {
+        let attempts = 0;
+        const maxAttempts = 20;
+        while (attempts < maxAttempts) {
+            const adminEntry = await node.msb.state.getAdminEntry();
+            if (
+                adminEntry &&
+                b4a.equals(adminEntry.wk, expected.wk) &&
+                adminEntry.address === expected.address
+            ) {
+                break;
+            }
+            await node.msb.network.swarm.flush()
+            await sleep(1000);
+            attempts++;
+        }
+    } catch (error) {
+        throw new Error('Error waiting for admin entry: ' + error.message);
+    }
+}
+
+export async function waitForIndexersEntry(node, expected) {
+    try {
+        let attempts = 0;
+        const maxAttempts = 20;
+        while (attempts < maxAttempts) {
+            const indexersEntry = await node.msb.state.getIndexersEntry();
+            if (!indexersEntry) {
+                attempts++;
+                await sleep(250);
+                continue;
+            }
+            const formatted = formatIndexersEntry(indexersEntry);
+            if (formatted && formatted.addresses && formatted.addresses.includes(expected.address)) {
+                break;
+            }
+            await sleep(250);
+            attempts++;
+        }
+    } catch (error) {
+        throw new Error("Error waiting for indexers entry: " + error.message);
     }
 
-    for (let counter = 0; counter < maxAttempts; counter++) {
-        const res = await isNotIndexer(indexer.wallet.address);
-        if (res) {
-            return true;
-        }
-        await sleep(delayMs);
-    }
-    return false;
 }
