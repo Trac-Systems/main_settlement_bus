@@ -10,8 +10,11 @@
   "scripts": {
     "dev": "pear run -d .",
     "protobuf": "node scripts/generate-protobufs.js",
-    "test:node": "brittle-node -c -t 120000 test/all.test.js",
-    "test:bare": "brittle-bare -c -t 120000 test/all.test.js"
+    "test:node": "brittle-node -t 120000 test/all.test.js",
+    "test:bare": "brittle-bare -t 120000 test/all.test.js",
+    "test:node:cov": "brittle-node -c -t 120000 test/all.test.js",
+    "test:bare:cov": "brittle-bare -c -t 120000 test/all.test.js"
+
   },
   "dependencies": {
     "autobase": "7.16.1",
@@ -34,7 +37,7 @@
     "protomux-wakeup": "2.4.0",
     "readline": "npm:bare-node-readline",
     "ready-resource": "1.1.2",
-    "trac-wallet": "git+https://github.com/Trac-Systems/ed25519-key-generator.git#trac-wallet-r2",
+    "trac-wallet": "0.0.43-msb-r2.1",
     "tty": "npm:bare-node-tty"
   },
   "devDependencies": {

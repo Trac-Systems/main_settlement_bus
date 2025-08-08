@@ -27,3 +27,15 @@ export const testKeyPair5 = {
   secretKey: "a573ec441c4f45a451ca615c5b31f4171e567c0c19e906cfe9af308826e6d37d6822a868e5a30c2c571e548f0807f3bd9760d04c4d6a32fe27d30c23c0eaa04b",
   mnemonic: "walnut disagree toward verify shaft decade stage cactus very asset gasp recycle occur steel gorilla diamond slice sunset train train pill embrace senior clutch"
 }
+
+export const testKeyPair6 = {
+    publicKey: "362020e3249c6942d6ecfded6776820cf7c32242ee56ad169b97637fb32fa654",
+    secretKey: "6ab0b0102e31f1115b4e5a6d9de75aef64e83e3b98d683d09665789dd6811d52362020e3249c6942d6ecfded6776820cf7c32242ee56ad169b97637fb32fa654",
+    mnemonic: "marriage clean edit portion panic easy member worry cave elevator abuse math squirrel scorpion syrup eager horror human cruise robust duty trophy biology edit"
+}
+
+export const testKeyPair7 = {
+    publicKey: "e3d788961c2f0b9114e2545233c519bc3fc1c13ad0f8e00b624f308ce377e441",
+    secretKey: "9e7710867b2194fc06bfe72e2ceca043c045029edbf818a3538095b32f81f7cbe3d788961c2f0b9114e2545233c519bc3fc1c13ad0f8e00b624f308ce377e441",
+    mnemonic: "gift carry tackle motion siren ten hope slice danger wide miss abandon basic version nothing jar jeans coconut accuse lumber ocean swamp jump chef"
+}
