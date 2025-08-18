@@ -7,7 +7,7 @@ import {
     EntryType,
     OperationType,
 } from '../../utils/constants.js';
-import { sleep } from '../../utils/helpers.js';
+import {isHexString, sleep} from '../../utils/helpers.js';
 import Wallet from 'trac-wallet';
 import Check from '../../utils/check.js';
 import { safeDecodeApplyOperation } from '../../utils/protobuf/operationHelpers.js';
@@ -26,7 +26,6 @@ class State extends ReadyResource {
     #bee;
     #bootstrap;
     #store;
-    #signature_whitelist;
     #wallet;
     #enable_txlogs;
     #writingKey;
@@ -37,7 +36,6 @@ class State extends ReadyResource {
         this.#store = store;
         this.#bootstrap = bootstrap;
         this.#wallet = wallet;
-        this.#signature_whitelist = options.signature_whitelist !== undefined && Array.isArray(options.signature_whitelist) ? options.signature_whitelist : [];
         this.#enable_txlogs = options.enable_txlogs === true;
 
         this.check = new Check();
@@ -56,6 +54,10 @@ class State extends ReadyResource {
 
     get writingKey() {
         return this.#writingKey;
+    }
+
+    get bootstrap() {
+        return this.#bootstrap;
     }
 
     async _open() {
@@ -156,11 +158,17 @@ class State extends ReadyResource {
         return writerPublicKey ? writerPublicKey : null;
     }
 
+    async getRegisteredBootstrapEntry(bootstrap) {
+        if(!bootstrap || !isHexString(bootstrap) || bootstrap.length !== 64) return null;
+        return await this.getSigned(EntryType.DEPLOYMENT+bootstrap);
+
+    }
+
     async append(payload) {
         await this.#base.append(payload);
     }
 
-    // this is helpful
+    // this is helpful and we will need it.
     async getInfoFromLinearizer() {
         return this.#base.linearizer.indexers
     }
@@ -202,13 +210,15 @@ class State extends ReadyResource {
             [OperationType.ADD_INDEXER]: this.#handleApplyAddIndexerOperation.bind(this),
             [OperationType.REMOVE_INDEXER]: this.#handleApplyRemoveIndexerOperation.bind(this),
             [OperationType.BAN_VALIDATOR]: this.#handleApplyBanValidatorOperation.bind(this),
+            [OperationType.BOOTSTRAP_DEPLOYMENT]: this.#handleApplyBootstrapDeploymentOperation.bind(this),
         };
         return handlers[type] || null;
     }
 
     async #handleApplyTxOperation(op, view, base, node, batch) {
-        if (!this.check.validatePostTx(op)) return; // ATTENTION: The sanitization should be done before ANY other check, otherwise we risk crashing
+        //TODO: ADD check to ensure both nonces are different to increase security.
         if (b4a.byteLength(node.value) > 4096) return; // TODO: change this to a constant. Avoid magic numbers.
+        if (!this.check.validatePostTx(op)) return; // ATTENTION: The sanitization should be done before ANY other check, otherwise we risk crashing
 
         const tx = op.txo.tx;
         const validatorAddressBuffer = op.address;
@@ -241,7 +251,12 @@ class State extends ReadyResource {
         const isValidatorSignatureValid = this.#wallet.verify(validatorSignature, validatorMessageHash, validatorPublicKey);
         if (!isValidatorSignatureValid) return;
 
-        //if (this.#signature_whitelist.length !== 0 || !this.#signature_whitelist.includes(op.txo.bs)) return; //TODO: requested deployment by Benny.
+        // if user is performing a transaction on deployed bootstrap, then we need to reject it.
+        // if deployment/<bootstrap> is not null then it means that the bootstrap is already deployed, and it should
+        // point to payload, which is pointing to the txHash.
+        const deploymentEntry = await this.#getDeploymentEntryApply(op.txo.bs.toString('hex'), batch);
+        if (deploymentEntry === null) return;
+
         const opEntry = await this.#getEntryApply(tx, batch);
         if (null !== opEntry) return;
 
@@ -767,7 +782,63 @@ class State extends ReadyResource {
         console.log(`Node has been banned: ${nodeAddress}:${decodedNodeEntry.wk.toString('hex')}`);
     }
 
+    async #handleApplyBootstrapDeploymentOperation(op, view, base, node, batch) {
+        if (b4a.byteLength(node.value) > 4096) return;
+        if (!this.check.validateBootstrapDeployment(op)) return;
 
+        // if transaction is not complete, do not process it.
+        if (!Object.hasOwn(op.bdo,"vs") || !Object.hasOwn(op.bdo,"va")|| !Object.hasOwn(op.bdo,"vn")) return;
+        const tx =  op.bdo.tx
+        // ensure that tx is valid
+        const regeneratedTxBuffer = await transactionUtils.generateBootstrapDeploymentTxBuffer(op.bdo.bs, op.bdo.in, OperationType.BOOTSTRAP_DEPLOYMENT)
+        if (regeneratedTxBuffer.length === 0 || !b4a.equals(regeneratedTxBuffer, tx)) return;
+
+        // for additional security, nonces should be different.
+        if (b4a.equals(op.bdo.in, op.bdo.vn)) return;
+
+        // do not allow to deploy bootstrap deployment on the same bootstrap.
+        if (b4a.equals(op.bdo.bs, this.bootstrap)) return;
+
+        // first signature
+        const incomingAddressBuffer = op.address;
+        const incomingAddress = addressUtils.bufferToAddress(incomingAddressBuffer);
+        if (null === incomingAddress) return;
+
+        const incomingPublicKey = Wallet.decodeBech32mSafe(incomingAddress);
+        if (null === incomingPublicKey) return;
+
+        const isRequesterSignatureValid = this.#wallet.verify(op.bdo.is, tx, incomingPublicKey); // tx contains already a nonce.
+        if (!isRequesterSignatureValid) return;
+
+        //second signature
+        const validatorAddressBuffer = op.bdo.va;
+
+        const validatorAddress = addressUtils.bufferToAddress(validatorAddressBuffer);
+        if (null === validatorAddress) return;
+
+        const validatorPublicKey = Wallet.decodeBech32mSafe(validatorAddress);
+        if (null === validatorPublicKey) return;
+
+        const validatorMessage = b4a.allocUnsafe(32 + 32); // TODO: use constants. tx + nonce sizes. Avoid magic numbers.
+        b4a.copy(tx, validatorMessage, 0);
+        b4a.copy(op.bdo.vn, validatorMessage, 32);
+        const validatorMessageHash = await createHash('sha256', validatorMessage);
+
+        const isValidatorSignatureValid = this.#wallet.verify(op.bdo.vs, validatorMessageHash, validatorPublicKey);
+        if (!isValidatorSignatureValid) return;
+
+        const deploymentEntry = await this.#getDeploymentEntryApply(op.bdo.bs.toString('hex'), batch);
+        if (deploymentEntry !== null) return; // Deployment already exists, do not apply it again.
+
+        const opEntry = await this.#getEntryApply(tx, batch);
+        if (null !== opEntry) return;
+
+        await batch.put(tx.toString('hex'), node.value);
+        await batch.put(EntryType.DEPLOYMENT + op.bdo.bs.toString('hex'), node.value);
+        if (this.#enable_txlogs === true) {
+            console.log(`TX: ${tx.toString('hex')} and deployment/${op.bdo.bs.toString('hex')} have been appended. Signed length: `, this.#base.view.core.signedLength);
+        }
+    }
 
     #isAdminApply(adminEntry, node) {
         if (!adminEntry || !node) return false;
@@ -776,6 +847,11 @@ class State extends ReadyResource {
 
     async #getEntryApply(key, batch) {
         const entry = await batch.get(key);
+        return entry !== null ? entry.value : null
+    }
+
+    async #getDeploymentEntryApply(key, batch) {
+        const entry = await batch.get(EntryType.DEPLOYMENT + key);
         return entry !== null ? entry.value : null
     }
 }

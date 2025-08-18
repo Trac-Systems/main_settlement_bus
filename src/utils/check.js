@@ -23,6 +23,7 @@ class Check {
     #validateBasicKeyOp;
     #validatePreTx;
     #validatePostTx;
+    #validateDeployment;
     constructor() {
 
         this.#validator = new Validator({
@@ -64,6 +65,7 @@ class Check {
         this.#validateBasicKeyOp = this.#compileBasicKeyOpSchema();
         this.#validatePreTx = this.#compilePreTxSchema();
         this.#validatePostTx = this.#compilePostTxSchema();
+        this.#validateDeployment = this.#compileBootstrapDeploymentSchema();
     }
 
     #compileExtendedKeyOpSchema() {
@@ -157,5 +159,59 @@ class Check {
     validatePostTx(op) {
         return this.#validatePostTx(op) === true;
     }
+
+    #compileBootstrapDeploymentSchema() {
+        const schema = {
+            $$strict: true,
+            type: { type: 'number', enum: [OperationType.BOOTSTRAP_DEPLOYMENT], positive: true, integer: true, min: MIN_SAFE_VALIDATION_INTEGER, max: MAX_SAFE_VALIDATION_INTEGER, required: true },
+            address: { type: 'buffer', length: TRAC_ADDRESS_SIZE, required: true },
+            bdo: {
+
+                strict: true,
+                type: "object",
+                props: {
+                    tx: { type: 'buffer', length: HASH_BYTE_LENGTH, required: true },
+                    bs: { type: 'buffer', length: BOOTSTRAP_BYTE_LENGTH, required: true },
+                    in: { type: 'buffer', length: NONCE_BYTE_LENGTH, required: true },
+                    is: { type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true },
+                    va: { type: 'buffer', length: TRAC_ADDRESS_SIZE, optional: true},
+                    vn: { type: 'buffer', length: NONCE_BYTE_LENGTH, optional: true},
+                    vs: { type: 'buffer', length: SIGNATURE_BYTE_LENGTH, optional: true},
+                },
+                custom: (value, errors) => {
+                    if (!value || typeof value !== 'object') return value;
+                    const {vn, vs, va} = value;
+                    const vnPresent = vn !== undefined
+                    const vsPresent = vs !== undefined
+                    const vaPresent = va !== undefined
+
+                    const fieldsPresent = [vnPresent, vsPresent, vaPresent].filter(Boolean).length;
+
+                    if (fieldsPresent > 0 && fieldsPresent < 3) {
+                        errors.push({
+                            type: 'conditionalDependency',
+                            field: 'bdo',
+                            message: 'Fields "vn", "vs", and "va" must all be present if any one is provided'
+                        });
+                    }
+                    if (vn === null || vs === null || va === null) {
+                        errors.push({
+                            type: 'buffer',
+                            field: 'bdo',
+                            message: 'Validator fields cannot be null, must be a Buffer or undefined'
+                        });
+                    }
+
+                    return value;
+                }
+            }
+        };
+        return this.#validator.compile(schema);
+    }
+
+    validateBootstrapDeployment(op) {
+        return this.#validateDeployment(op) === true;
+    }
 }
+
 export default Check;

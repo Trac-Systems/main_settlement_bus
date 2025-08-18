@@ -20,14 +20,8 @@ exports.OperationType = {
   "TX": 5,
   "ADD_INDEXER": 6,
   "REMOVE_INDEXER": 7,
-  "BAN_WRITER": 8
-}
-
-var TxOperation = exports.TxOperation = {
-  buffer: true,
-  encodingLength: null,
-  encode: null,
-  decode: null
+  "BAN_WRITER": 8,
+  "BOOTSTRAP_DEPLOYMENT": 9
 }
 
 var BasicKeyOperation = exports.BasicKeyOperation = {
@@ -44,6 +38,20 @@ var ExtendedKeyOperation = exports.ExtendedKeyOperation = {
   decode: null
 }
 
+var TxOperation = exports.TxOperation = {
+  buffer: true,
+  encodingLength: null,
+  encode: null,
+  decode: null
+}
+
+var DeploymentOperation = exports.DeploymentOperation = {
+  buffer: true,
+  encodingLength: null,
+  encode: null,
+  decode: null
+}
+
 var Operation = exports.Operation = {
   buffer: true,
   encodingLength: null,
@@ -51,10 +59,163 @@ var Operation = exports.Operation = {
   decode: null
 }
 
-defineTxOperation()
 defineBasicKeyOperation()
 defineExtendedKeyOperation()
+defineTxOperation()
+defineDeploymentOperation()
 defineOperation()
+
+function defineBasicKeyOperation () {
+  BasicKeyOperation.encodingLength = encodingLength
+  BasicKeyOperation.encode = encode
+  BasicKeyOperation.decode = decode
+
+  function encodingLength (obj) {
+    var length = 0
+    if (defined(obj.nonce)) {
+      var len = encodings.bytes.encodingLength(obj.nonce)
+      length += 1 + len
+    }
+    if (defined(obj.sig)) {
+      var len = encodings.bytes.encodingLength(obj.sig)
+      length += 1 + len
+    }
+    return length
+  }
+
+  function encode (obj, buf, offset) {
+    if (!offset) offset = 0
+    if (!buf) buf = b4a.allocUnsafe(encodingLength(obj))
+    var oldOffset = offset
+    if (defined(obj.nonce)) {
+      buf[offset++] = 10
+      encodings.bytes.encode(obj.nonce, buf, offset)
+      offset += encodings.bytes.encode.bytes
+    }
+    if (defined(obj.sig)) {
+      buf[offset++] = 18
+      encodings.bytes.encode(obj.sig, buf, offset)
+      offset += encodings.bytes.encode.bytes
+    }
+    encode.bytes = offset - oldOffset
+    return buf
+  }
+
+  function decode (buf, offset, end) {
+    if (!offset) offset = 0
+    if (!end) end = buf.length
+    if (!(end <= buf.length && offset <= buf.length)) throw new Error("Decoded message is not valid")
+    var oldOffset = offset
+    var obj = {
+      nonce: null,
+      sig: null
+    }
+    while (true) {
+      if (end <= offset) {
+        decode.bytes = offset - oldOffset
+        return obj
+      }
+      var prefix = varint.decode(buf, offset)
+      offset += varint.decode.bytes
+      var tag = prefix >> 3
+      switch (tag) {
+        case 1:
+        obj.nonce = encodings.bytes.decode(buf, offset)
+        offset += encodings.bytes.decode.bytes
+        break
+        case 2:
+        obj.sig = encodings.bytes.decode(buf, offset)
+        offset += encodings.bytes.decode.bytes
+        break
+        default:
+        offset = skip(prefix & 7, buf, offset)
+      }
+    }
+  }
+}
+
+function defineExtendedKeyOperation () {
+  ExtendedKeyOperation.encodingLength = encodingLength
+  ExtendedKeyOperation.encode = encode
+  ExtendedKeyOperation.decode = decode
+
+  function encodingLength (obj) {
+    var length = 0
+    if (defined(obj.wk)) {
+      var len = encodings.bytes.encodingLength(obj.wk)
+      length += 1 + len
+    }
+    if (defined(obj.nonce)) {
+      var len = encodings.bytes.encodingLength(obj.nonce)
+      length += 1 + len
+    }
+    if (defined(obj.sig)) {
+      var len = encodings.bytes.encodingLength(obj.sig)
+      length += 1 + len
+    }
+    return length
+  }
+
+  function encode (obj, buf, offset) {
+    if (!offset) offset = 0
+    if (!buf) buf = b4a.allocUnsafe(encodingLength(obj))
+    var oldOffset = offset
+    if (defined(obj.wk)) {
+      buf[offset++] = 10
+      encodings.bytes.encode(obj.wk, buf, offset)
+      offset += encodings.bytes.encode.bytes
+    }
+    if (defined(obj.nonce)) {
+      buf[offset++] = 18
+      encodings.bytes.encode(obj.nonce, buf, offset)
+      offset += encodings.bytes.encode.bytes
+    }
+    if (defined(obj.sig)) {
+      buf[offset++] = 26
+      encodings.bytes.encode(obj.sig, buf, offset)
+      offset += encodings.bytes.encode.bytes
+    }
+    encode.bytes = offset - oldOffset
+    return buf
+  }
+
+  function decode (buf, offset, end) {
+    if (!offset) offset = 0
+    if (!end) end = buf.length
+    if (!(end <= buf.length && offset <= buf.length)) throw new Error("Decoded message is not valid")
+    var oldOffset = offset
+    var obj = {
+      wk: null,
+      nonce: null,
+      sig: null
+    }
+    while (true) {
+      if (end <= offset) {
+        decode.bytes = offset - oldOffset
+        return obj
+      }
+      var prefix = varint.decode(buf, offset)
+      offset += varint.decode.bytes
+      var tag = prefix >> 3
+      switch (tag) {
+        case 1:
+        obj.wk = encodings.bytes.decode(buf, offset)
+        offset += encodings.bytes.decode.bytes
+        break
+        case 2:
+        obj.nonce = encodings.bytes.decode(buf, offset)
+        offset += encodings.bytes.decode.bytes
+        break
+        case 3:
+        obj.sig = encodings.bytes.decode(buf, offset)
+        offset += encodings.bytes.decode.bytes
+        break
+        default:
+        offset = skip(prefix & 7, buf, offset)
+      }
+    }
+  }
+}
 
 function defineTxOperation () {
   TxOperation.encodingLength = encodingLength
@@ -237,19 +398,39 @@ function defineTxOperation () {
   }
 }
 
-function defineBasicKeyOperation () {
-  BasicKeyOperation.encodingLength = encodingLength
-  BasicKeyOperation.encode = encode
-  BasicKeyOperation.decode = decode
+function defineDeploymentOperation () {
+  DeploymentOperation.encodingLength = encodingLength
+  DeploymentOperation.encode = encode
+  DeploymentOperation.decode = decode
 
   function encodingLength (obj) {
     var length = 0
-    if (defined(obj.nonce)) {
-      var len = encodings.bytes.encodingLength(obj.nonce)
+    if (defined(obj.tx)) {
+      var len = encodings.bytes.encodingLength(obj.tx)
       length += 1 + len
     }
-    if (defined(obj.sig)) {
-      var len = encodings.bytes.encodingLength(obj.sig)
+    if (defined(obj.bs)) {
+      var len = encodings.bytes.encodingLength(obj.bs)
+      length += 1 + len
+    }
+    if (defined(obj.in)) {
+      var len = encodings.bytes.encodingLength(obj.in)
+      length += 1 + len
+    }
+    if (defined(obj.is)) {
+      var len = encodings.bytes.encodingLength(obj.is)
+      length += 1 + len
+    }
+    if (defined(obj.va)) {
+      var len = encodings.bytes.encodingLength(obj.va)
+      length += 1 + len
+    }
+    if (defined(obj.vn)) {
+      var len = encodings.bytes.encodingLength(obj.vn)
+      length += 1 + len
+    }
+    if (defined(obj.vs)) {
+      var len = encodings.bytes.encodingLength(obj.vs)
       length += 1 + len
     }
     return length
@@ -259,92 +440,39 @@ function defineBasicKeyOperation () {
     if (!offset) offset = 0
     if (!buf) buf = b4a.allocUnsafe(encodingLength(obj))
     var oldOffset = offset
-    if (defined(obj.nonce)) {
+    if (defined(obj.tx)) {
       buf[offset++] = 10
-      encodings.bytes.encode(obj.nonce, buf, offset)
+      encodings.bytes.encode(obj.tx, buf, offset)
       offset += encodings.bytes.encode.bytes
     }
-    if (defined(obj.sig)) {
+    if (defined(obj.bs)) {
       buf[offset++] = 18
-      encodings.bytes.encode(obj.sig, buf, offset)
+      encodings.bytes.encode(obj.bs, buf, offset)
       offset += encodings.bytes.encode.bytes
     }
-    encode.bytes = offset - oldOffset
-    return buf
-  }
-
-  function decode (buf, offset, end) {
-    if (!offset) offset = 0
-    if (!end) end = buf.length
-    if (!(end <= buf.length && offset <= buf.length)) throw new Error("Decoded message is not valid")
-    var oldOffset = offset
-    var obj = {
-      nonce: null,
-      sig: null
-    }
-    while (true) {
-      if (end <= offset) {
-        decode.bytes = offset - oldOffset
-        return obj
-      }
-      var prefix = varint.decode(buf, offset)
-      offset += varint.decode.bytes
-      var tag = prefix >> 3
-      switch (tag) {
-        case 1:
-        obj.nonce = encodings.bytes.decode(buf, offset)
-        offset += encodings.bytes.decode.bytes
-        break
-        case 2:
-        obj.sig = encodings.bytes.decode(buf, offset)
-        offset += encodings.bytes.decode.bytes
-        break
-        default:
-        offset = skip(prefix & 7, buf, offset)
-      }
-    }
-  }
-}
-
-function defineExtendedKeyOperation () {
-  ExtendedKeyOperation.encodingLength = encodingLength
-  ExtendedKeyOperation.encode = encode
-  ExtendedKeyOperation.decode = decode
-
-  function encodingLength (obj) {
-    var length = 0
-    if (defined(obj.wk)) {
-      var len = encodings.bytes.encodingLength(obj.wk)
-      length += 1 + len
-    }
-    if (defined(obj.nonce)) {
-      var len = encodings.bytes.encodingLength(obj.nonce)
-      length += 1 + len
-    }
-    if (defined(obj.sig)) {
-      var len = encodings.bytes.encodingLength(obj.sig)
-      length += 1 + len
-    }
-    return length
-  }
-
-  function encode (obj, buf, offset) {
-    if (!offset) offset = 0
-    if (!buf) buf = b4a.allocUnsafe(encodingLength(obj))
-    var oldOffset = offset
-    if (defined(obj.wk)) {
-      buf[offset++] = 10
-      encodings.bytes.encode(obj.wk, buf, offset)
-      offset += encodings.bytes.encode.bytes
-    }
-    if (defined(obj.nonce)) {
-      buf[offset++] = 18
-      encodings.bytes.encode(obj.nonce, buf, offset)
-      offset += encodings.bytes.encode.bytes
-    }
-    if (defined(obj.sig)) {
+    if (defined(obj.in)) {
       buf[offset++] = 26
-      encodings.bytes.encode(obj.sig, buf, offset)
+      encodings.bytes.encode(obj.in, buf, offset)
+      offset += encodings.bytes.encode.bytes
+    }
+    if (defined(obj.is)) {
+      buf[offset++] = 34
+      encodings.bytes.encode(obj.is, buf, offset)
+      offset += encodings.bytes.encode.bytes
+    }
+    if (defined(obj.va)) {
+      buf[offset++] = 42
+      encodings.bytes.encode(obj.va, buf, offset)
+      offset += encodings.bytes.encode.bytes
+    }
+    if (defined(obj.vn)) {
+      buf[offset++] = 50
+      encodings.bytes.encode(obj.vn, buf, offset)
+      offset += encodings.bytes.encode.bytes
+    }
+    if (defined(obj.vs)) {
+      buf[offset++] = 58
+      encodings.bytes.encode(obj.vs, buf, offset)
       offset += encodings.bytes.encode.bytes
     }
     encode.bytes = offset - oldOffset
@@ -357,9 +485,13 @@ function defineExtendedKeyOperation () {
     if (!(end <= buf.length && offset <= buf.length)) throw new Error("Decoded message is not valid")
     var oldOffset = offset
     var obj = {
-      wk: null,
-      nonce: null,
-      sig: null
+      tx: null,
+      bs: null,
+      in: null,
+      is: null,
+      va: null,
+      vn: null,
+      vs: null
     }
     while (true) {
       if (end <= offset) {
@@ -371,15 +503,31 @@ function defineExtendedKeyOperation () {
       var tag = prefix >> 3
       switch (tag) {
         case 1:
-        obj.wk = encodings.bytes.decode(buf, offset)
+        obj.tx = encodings.bytes.decode(buf, offset)
         offset += encodings.bytes.decode.bytes
         break
         case 2:
-        obj.nonce = encodings.bytes.decode(buf, offset)
+        obj.bs = encodings.bytes.decode(buf, offset)
         offset += encodings.bytes.decode.bytes
         break
         case 3:
-        obj.sig = encodings.bytes.decode(buf, offset)
+        obj.in = encodings.bytes.decode(buf, offset)
+        offset += encodings.bytes.decode.bytes
+        break
+        case 4:
+        obj.is = encodings.bytes.decode(buf, offset)
+        offset += encodings.bytes.decode.bytes
+        break
+        case 5:
+        obj.va = encodings.bytes.decode(buf, offset)
+        offset += encodings.bytes.decode.bytes
+        break
+        case 6:
+        obj.vn = encodings.bytes.decode(buf, offset)
+        offset += encodings.bytes.decode.bytes
+        break
+        case 7:
+        obj.vs = encodings.bytes.decode(buf, offset)
         offset += encodings.bytes.decode.bytes
         break
         default:
@@ -396,7 +544,7 @@ function defineOperation () {
 
   function encodingLength (obj) {
     var length = 0
-    if ((+defined(obj.bko) + +defined(obj.eko) + +defined(obj.txo)) > 1) throw new Error("only one of the properties defined in oneof value can be set")
+    if ((+defined(obj.bko) + +defined(obj.eko) + +defined(obj.txo) + +defined(obj.bdo)) > 1) throw new Error("only one of the properties defined in oneof value can be set")
     if (defined(obj.type)) {
       var len = encodings.enum.encodingLength(obj.type)
       length += 1 + len
@@ -420,6 +568,11 @@ function defineOperation () {
       length += varint.encodingLength(len)
       length += 1 + len
     }
+    if (defined(obj.bdo)) {
+      var len = DeploymentOperation.encodingLength(obj.bdo)
+      length += varint.encodingLength(len)
+      length += 1 + len
+    }
     return length
   }
 
@@ -427,7 +580,7 @@ function defineOperation () {
     if (!offset) offset = 0
     if (!buf) buf = b4a.allocUnsafe(encodingLength(obj))
     var oldOffset = offset
-    if ((+defined(obj.bko) + +defined(obj.eko) + +defined(obj.txo)) > 1) throw new Error("only one of the properties defined in oneof value can be set")
+    if ((+defined(obj.bko) + +defined(obj.eko) + +defined(obj.txo) + +defined(obj.bdo)) > 1) throw new Error("only one of the properties defined in oneof value can be set")
     if (defined(obj.type)) {
       buf[offset++] = 8
       encodings.enum.encode(obj.type, buf, offset)
@@ -459,6 +612,13 @@ function defineOperation () {
       TxOperation.encode(obj.txo, buf, offset)
       offset += TxOperation.encode.bytes
     }
+    if (defined(obj.bdo)) {
+      buf[offset++] = 50
+      varint.encode(DeploymentOperation.encodingLength(obj.bdo), buf, offset)
+      offset += varint.encode.bytes
+      DeploymentOperation.encode(obj.bdo, buf, offset)
+      offset += DeploymentOperation.encode.bytes
+    }
     encode.bytes = offset - oldOffset
     return buf
   }
@@ -473,7 +633,8 @@ function defineOperation () {
       address: null,
       bko: null,
       eko: null,
-      txo: null
+      txo: null,
+      bdo: null
     }
     while (true) {
       if (end <= offset) {
@@ -495,6 +656,7 @@ function defineOperation () {
         case 3:
         delete obj.eko
         delete obj.txo
+        delete obj.bdo
         var len = varint.decode(buf, offset)
         offset += varint.decode.bytes
         obj.bko = BasicKeyOperation.decode(buf, offset, offset + len)
@@ -503,6 +665,7 @@ function defineOperation () {
         case 4:
         delete obj.bko
         delete obj.txo
+        delete obj.bdo
         var len = varint.decode(buf, offset)
         offset += varint.decode.bytes
         obj.eko = ExtendedKeyOperation.decode(buf, offset, offset + len)
@@ -511,10 +674,20 @@ function defineOperation () {
         case 5:
         delete obj.bko
         delete obj.eko
+        delete obj.bdo
         var len = varint.decode(buf, offset)
         offset += varint.decode.bytes
         obj.txo = TxOperation.decode(buf, offset, offset + len)
         offset += TxOperation.decode.bytes
+        break
+        case 6:
+        delete obj.bko
+        delete obj.eko
+        delete obj.txo
+        var len = varint.decode(buf, offset)
+        offset += varint.decode.bytes
+        obj.bdo = DeploymentOperation.decode(buf, offset, offset + len)
+        offset += DeploymentOperation.decode.bytes
         break
         default:
         offset = skip(prefix & 7, buf, offset)

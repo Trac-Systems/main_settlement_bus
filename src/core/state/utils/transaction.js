@@ -10,7 +10,7 @@ import { blake3Hash } from '../../../utils/crypto.js';
  * @type {number}
  */
 export const TRANSACTION_TOTAL_SIZE = 3 * WRITER_BYTE_LENGTH + 2 * TRAC_ADDRESS_SIZE + HASH_BYTE_LENGTH + NONCE_BYTE_LENGTH;
-
+export const BOOTSTRAP_DEPLOYMENT_SIZE = WRITER_BYTE_LENGTH + NONCE_BYTE_LENGTH + 4; // 4 bytes for OperationType because it is a UInt32BE
 
 // TODO: This function receives too many arguments. It would be better to encapsulate them in an object.
 /**
@@ -50,11 +50,52 @@ export async function generateTxBuffer(bootstrap, msb_bootstrap, validator_addre
         nonce.copy(tx, offset);
         return await blake3Hash(tx)
     } catch (error) {
+        console.error('Error in generateTxBuffer:', error);
+        return b4a.alloc(0);
+    }
+}
+
+/**
+ * Generates a transaction buffer for bootstrap deployment and returns its SHA-256 hash.
+ * The buffer consists of three parts concatenated in the following order:
+ * 1. bootstrap (32 bytes) - The bootstrap identifier
+ * 2. incoming_nonce (32 bytes) - Nonce from the requesting node
+ * 3. operationType (4 bytes) - UInt32BE representing the operation type
+ *
+ * Total size: BOOTSTRAP_DEPLOYMENT_SIZE (68 bytes)
+ *
+ * @param {Buffer} bootstrap - The bootstrap identifier buffer (32 bytes)
+ * @param {Buffer} incoming_nonce - The nonce from the requesting node (32 bytes)
+ * @param {number} operationType - The operation type (should be OperationType.BOOTSTRAP_DEPLOYMENT)
+ * @returns {Promise<Buffer>} The SHA-256 hash of the transaction buffer, or an empty buffer on error
+ */
+export async function generateBootstrapDeploymentTxBuffer(bootstrap, incoming_nonce, operationType) {
+    try {
+
+        const opTypeBuffer = safeWriteUInt32BE(operationType, 0);
+        if (opTypeBuffer.length !== 4) {
+            return b4a.alloc(0);
+        }
+        const tx = b4a.alloc(BOOTSTRAP_DEPLOYMENT_SIZE);
+        let offset = 0;
+
+        bootstrap.copy(tx, offset);
+        offset += bootstrap.length;
+
+        incoming_nonce.copy(tx, offset);
+        offset += incoming_nonce.length;
+
+        opTypeBuffer.copy(tx, offset);
+
+        return await blake3Hash(tx)
+    } catch (error) {
+        console.error('Error in generateBootstrapDeploymentTxBuffer:', error);
         return b4a.alloc(0);
     }
 }
 
 export default {
     generateTxBuffer,
+    generateBootstrapDeploymentTxBuffer,
     TRANSACTION_TOTAL_SIZE
 };

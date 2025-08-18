@@ -54,6 +54,7 @@ export function printHelp() {
     console.log('- /ban_writer <address>: demote a whitelisted writer to default role and remove it from the whitelist. (admin only)');
     console.log('- /get_node_info <address>: get information about a node with the given address.');
     console.log('- /stats: check system stats such as writing key, DAG, etc.');
+    console.log('- /deployment <subnetwork_bootstrap>: deploy a subnetwork with the given bootstrap.');
     console.log('- /exit: Exit the program.');
     console.log('- /help: display this help.');
 }

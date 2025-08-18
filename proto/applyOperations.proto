@@ -14,10 +14,22 @@ enum OperationType {
     APPEND_WHITELIST = 2;
     ADD_WRITER       = 3;
     REMOVE_WRITER    = 4;
-    TX               = 5;
+    TX               = 5;// TODO: CHANGE THIS TO PARTIAL TRANSACTION
     ADD_INDEXER      = 6;
     REMOVE_INDEXER   = 7;
     BAN_WRITER       = 8;
+    BOOTSTRAP_DEPLOYMENT = 9;
+}
+
+message BasicKeyOperation {
+  bytes nonce = 1;
+  bytes sig   = 2;
+}
+
+message ExtendedKeyOperation {
+  bytes wk    = 1;
+  bytes nonce = 2;
+  bytes sig   = 3;
 }
 
 message TxOperation {
@@ -33,15 +45,14 @@ message TxOperation {
     bytes vn   = 10; // Validator's nonce
 }
 
-message BasicKeyOperation {
-    bytes nonce = 1;
-    bytes sig   = 2;
-}
-
-message ExtendedKeyOperation {
-    bytes wk    = 1;
-    bytes nonce = 2;
-    bytes sig   = 3;
+message DeploymentOperation {
+    bytes tx   = 1; // Transaction hash (unique identifier for the transaction)
+    bytes bs   = 2; // Bootstrap contract address
+    bytes in   = 3; // Nonce of the contract invoker
+    bytes is   = 4; // Signature of the contract invoker
+    bytes va   = 5; // Validator's address
+    bytes vn   = 6; // Validator's nonce
+    bytes vs   = 7; // Validator's signature
 }
 
 message Operation {
@@ -52,5 +63,6 @@ message Operation {
         BasicKeyOperation      bko  = 3;
         ExtendedKeyOperation   eko  = 4;
         TxOperation            txo  = 5;
+        DeploymentOperation    bdo  = 6;
     }
 }

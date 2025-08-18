@@ -6,6 +6,7 @@ export const EntryType = Object.freeze({
     INDEXERS: 'indexers',
     WRITERS_LENGTH: 'wrl',
     WRITERS_INDEX: 'wri/',
+    DEPLOYMENT: 'deployment/',
 });
 
 export const OperationType = Object.freeze({
@@ -19,6 +20,7 @@ export const OperationType = Object.freeze({
     WHITELISTED: OP.APPEND_WHITELIST,
     PRE_TX: 'PRE_TX',
     TX: OP.TX,
+    BOOTSTRAP_DEPLOYMENT: OP.BOOTSTRAP_DEPLOYMENT,
 });
 
 export const EventType = Object.freeze({

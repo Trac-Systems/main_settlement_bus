@@ -5,7 +5,7 @@ import GetRequestHandler from "../handlers/GetRequestHandler.js";
 import ResponseHandler from "../handlers/ResponseHandler.js";
 import OperationHandler from "../handlers/OperationHandler.js";
 import TransactionHandler from "../handlers/TransactionHandler.js";
-import { NETWORK_MESSAGE_TYPES } from '../../../../utils/constants.js';
+import {NETWORK_MESSAGE_TYPES, OperationType} from '../../../../utils/constants.js';
 
 class NetworkMessageRouter {
     #network;
@@ -28,21 +28,26 @@ class NetworkMessageRouter {
     async route(incomingMessage, connection, messageProtomux) {
         try {
             const channelString = b4a.toString(this.network.channel, 'utf8');
-
             if (this.#isGetRequest(incomingMessage)) {
                 await this.#handlers.get.handle(incomingMessage, messageProtomux, connection, channelString);
                 this.network.swarm.leavePeer(connection.remotePublicKey);
 
-            } else if (this.#isResponse(incomingMessage)) {
+            }
+            else if (this.#isResponse(incomingMessage)) {
                 await this.#handlers.response.handle(incomingMessage, connection, channelString);
                 this.network.swarm.leavePeer(connection.remotePublicKey);
 
-            } else if (this.#isOperation(incomingMessage)) {
+            }
+            else if (this.#isOperation(incomingMessage)) {
                 await this.#handlers.operation.handle(incomingMessage, connection);
                 this.network.swarm.leavePeer(connection.remotePublicKey);
             }
-            else {
+            // TODO: TEMPORARY SOLUTION, WE SHOULD CHANGE PRE_TX AND POST_TX TO TX WHICH IS PARTIAL AND COMPLETE
+            else if (this.#isPartialTransaction(incomingMessage) || incomingMessage.op === OperationType.PRE_TX) {
                 await this.#handlers.transaction.handle(incomingMessage, connection);
+                this.network.swarm.leavePeer(connection.remotePublicKey);
+            }
+            else {
                 this.network.swarm.leavePeer(connection.remotePublicKey);
             }
             
@@ -62,6 +67,16 @@ class NetworkMessageRouter {
 
     #isOperation(message) {
         return Object.values(NETWORK_MESSAGE_TYPES.OPERATION).includes(message.op);
+    }
+
+    #isPartialTransaction(msg) {
+        if (!msg || typeof msg !== 'object') return false;
+        if (msg.type === OperationType.BOOTSTRAP_DEPLOYMENT && msg.bdo ) {
+            return true
+        }
+        if (msg.type === OperationType.PRE_TX) {
+        }
+        return false;
     }
 }
 

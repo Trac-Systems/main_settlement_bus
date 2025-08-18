@@ -1,6 +1,7 @@
 import b4a from 'b4a';
-import { addressToBuffer } from '../core/state/utils/address.js';
 import Wallet from 'trac-wallet';
+
+import { addressToBuffer } from '../core/state/utils/address.js';
 import { OperationType } from './constants.js';
 import { blake3Hash } from './crypto.js';
 

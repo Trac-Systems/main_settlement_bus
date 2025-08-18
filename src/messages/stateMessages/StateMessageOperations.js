@@ -10,6 +10,9 @@ import {createMessage} from '../../utils/buffer.js';
 import {bufferToAddress} from '../../core/state/utils/address.js';
 import {blake3Hash} from '../../utils/crypto.js';
 
+// TODO: RENAME TO CompleteStateMessageOperations
+
+
 class StateMessageOperations {
 
     static async assembleAddAdminMessage(wallet, writingKey) {
@@ -140,10 +143,37 @@ class StateMessageOperations {
         }
     }
 
+    static async assembleCompleteBootstrapDeployment(
+        wallet,
+        invokerAddress,
+        transactionHash,
+        externalBootstrap,
+        incomingNonce,
+        incomingSignature
+    ) {
+        try {
+            const builder = new StateMessageBuilder(wallet);
+            const director = new StateMessageDirector();
+            director.builder = builder;
+
+            const payload = await director.buildBootstrapDeploymentMessage(
+                invokerAddress,
+                transactionHash,
+                externalBootstrap,
+                incomingNonce,
+                incomingSignature,
+            );
+            return safeEncodeApplyOperation(payload);
+
+        } catch (error) {
+            throw new Error(`Failed to assemble ban writer message: ${error.message}`);
+        }
+    }
+
     //TODO: This method can be simplified and moved to another module responsible for message verification.
     static async verifyEventMessage(parsedRequest, wallet, check, state) {
         try {
-            const { type } = parsedRequest;
+            const {type} = parsedRequest;
             if (
                 type !== OperationType.ADD_ADMIN &&
                 type !== OperationType.ADD_WRITER &&
@@ -217,6 +247,7 @@ class StateMessageOperations {
             return false;
         }
     }
+
 }
 
 export default StateMessageOperations;

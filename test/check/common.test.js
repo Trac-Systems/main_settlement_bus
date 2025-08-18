@@ -7,7 +7,7 @@ export function topLevelValidationTests(
     t,
     validateFn,
     validFixture,
-    valueKey, // 'bko', 'txo', 'eko'
+    valueKey, // 'bko', 'txo', 'eko', 'bdo'
     notAllowedDataTypes,
     topFields
 ) {
@@ -112,25 +112,16 @@ export function topLevelValidationTests(
     });
 }
 
-export function valueLevelValidationTest(
-    t,
-    validateFn,
-    validFixture,
-    valueKey, // 'bko', 'txo', 'eko'
-    operationTypeFields,
-    notAllowedDataTypes,
-) {
-    t.test("missing value fields", t => {
-        for (const field of operationTypeFields) {
-            const missing = {
-                ...validFixture,
-                [valueKey]: { ...validFixture[valueKey] }
-            };
-            delete missing[valueKey][field];
-            //console.log('missing', missing);
-            t.absent(validateFn(missing), `Missing ${valueKey}.${field} should fail`);
-        }
-    });
+export const valueLevelValidationTest = (t, validationFunction, validData, valueKey, valueFields, notAllowedDataTypes) => {
+    for (const field of valueFields) {
+        if (valueKey === 'bdo' && (field === 'is' || field === 'vn' || field === 'vs')) continue;
+        const missing = {
+            ...validData,
+            [valueKey]: { ...validData[valueKey] }
+        };
+        delete missing[valueKey][field];
+        t.absent(validationFunction(missing), `Missing ${valueKey}.${field} should fail`);
+    }
 
     t.test(`Invalid data types for each field in ${valueKey}`, t => {
         for (const field of operationTypeFields) {
