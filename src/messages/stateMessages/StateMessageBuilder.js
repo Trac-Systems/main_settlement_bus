@@ -2,12 +2,12 @@ import b4a from 'b4a';
 import Wallet from 'trac-wallet';
 
 import Builder from './Builder.js';
-import {createHash} from '../../utils/crypto.js';
 import {createMessage} from '../../utils/buffer.js';
 import {OperationType} from '../../utils/protobuf/applyOperations.cjs'
 import {addressToBuffer, bufferToAddress} from '../../core/state/utils/address.js';
 import {TRAC_ADDRESS_SIZE} from 'trac-wallet/constants.js';
 import {isAddressValid} from "../../core/state/utils/address.js";
+import {blake3Hash} from '../../utils/crypto.js';
 
 class StateMessageBuilder extends Builder {
     #wallet;
@@ -204,7 +204,7 @@ class StateMessageBuilder extends Builder {
                 throw new Error(`Unsupported operation type for building value: ${OperationType[operationType]}.`);
         }
 
-        hash = await createHash('sha256', msg);
+        hash = await blake3Hash(msg);
         signature = wallet.sign(hash);
 
         if (this.#isExtended(operationType)) {

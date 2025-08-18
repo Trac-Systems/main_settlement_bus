@@ -1,8 +1,8 @@
 import b4a from 'b4a';
-import { createHash } from './crypto.js';
 import { addressToBuffer } from '../core/state/utils/address.js';
 import Wallet from 'trac-wallet';
 import { OperationType } from './constants.js';
+import { blake3Hash } from './crypto.js';
 
 export async function generateTx(bootstrap, msb_bootstrap, validator_address, local_writer_key, local_address, content_hash, nonce) {
     const tx = b4a.concat([
@@ -15,7 +15,7 @@ export async function generateTx(bootstrap, msb_bootstrap, validator_address, lo
         b4a.from(nonce, 'hex')
     ]);
 
-    return await createHash('sha256', await createHash('sha256', tx));
+    return await blake3Hash(tx);
 }
 
 export async function generatePreTx(

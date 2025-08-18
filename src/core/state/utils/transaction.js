@@ -1,8 +1,8 @@
 import b4a from 'b4a';
 
-import { createHash } from '../../../utils/crypto.js';
 import { TRAC_ADDRESS_SIZE } from 'trac-wallet/constants.js';
 import { HASH_BYTE_LENGTH, NONCE_BYTE_LENGTH, WRITER_BYTE_LENGTH } from '../../../utils/constants.js';
+import { blake3Hash } from '../../../utils/crypto.js';
 
 /**
  * Total size of a transaction buffer in bytes.
@@ -48,7 +48,7 @@ export async function generateTxBuffer(bootstrap, msb_bootstrap, validator_addre
         offset += content_hash.length;
 
         nonce.copy(tx, offset);
-        return await createHash('sha256', await createHash('sha256', tx));
+        return await blake3Hash(tx)
     } catch (error) {
         return b4a.alloc(0);
     }
