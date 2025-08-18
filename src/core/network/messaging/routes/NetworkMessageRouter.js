@@ -75,6 +75,7 @@ class NetworkMessageRouter {
             return true
         }
         if (msg.type === OperationType.PRE_TX) {
+            return true
         }
         return false;
     }
