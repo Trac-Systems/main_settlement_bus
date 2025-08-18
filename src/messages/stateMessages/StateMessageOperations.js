@@ -7,8 +7,8 @@ import {safeEncodeApplyOperation} from '../../utils/protobuf/operationHelpers.js
 import fileUtils from '../../../src/utils/fileUtils.js';
 import {OperationType} from '../../utils/constants.js';
 import {createMessage} from '../../utils/buffer.js';
-import {createHash} from '../../utils/crypto.js';
 import {bufferToAddress} from '../../core/state/utils/address.js';
+import {blake3Hash} from '../../utils/crypto.js';
 
 class StateMessageOperations {
 
@@ -171,7 +171,7 @@ class StateMessageOperations {
                 const nodePublicKey = PeerWallet.decodeBech32m(nodeAddress);
 
                 const msg = createMessage(parsedRequest.address, parsedRequest.eko.wk, parsedRequest.eko.nonce, parsedRequest.type);
-                const hash = await createHash('sha256', msg);
+                const hash = await blake3Hash(msg);
 
                 return wallet.verify(parsedRequest.eko.sig, hash, nodePublicKey);
             } else if (type === OperationType.REMOVE_WRITER) {
@@ -188,7 +188,7 @@ class StateMessageOperations {
                 const nodePublicKey = PeerWallet.decodeBech32m(nodeAddress);
 
                 const msg = createMessage(parsedRequest.address, parsedRequest.eko.wk, parsedRequest.eko.nonce, parsedRequest.type);
-                const hash = await createHash('sha256', msg);
+                const hash = await blake3Hash(msg);
 
                 return wallet.verify(parsedRequest.eko.sig, hash, nodePublicKey);
             }
@@ -209,7 +209,7 @@ class StateMessageOperations {
                 const incomingAdminPublicKey = PeerWallet.decodeBech32m(adminAddress);
 
                 const msg = createMessage(adminAddressBuffer, parsedRequest.eko.wk, parsedRequest.eko.nonce, parsedRequest.type);
-                const hash = await createHash('sha256', msg);
+                const hash = await blake3Hash(msg);
                 return wallet.verify(parsedRequest.eko.sig, hash, incomingAdminPublicKey);
             }
         } catch (error) {
