@@ -28,17 +28,17 @@ class PreTransaction {
     }
 
     async validate(parsedPreTx) {
-        if (!this.validatePayload(parsedPreTx)) return false;
-        if (!this.validateRequestingPublicKey(parsedPreTx)) return false;
-        if (!await this.validateTransactionHash(parsedPreTx)) return false;
-        if (!this.validateSignature(parsedPreTx)) return false;
-        if (!this.validateValidatorAddress(parsedPreTx)) return false;
-        if (!await this.validateTransactionUniqueness(parsedPreTx)) return false;
+        if (!this.#isPayloadSchemaValid(parsedPreTx)) return false;
+        if (!this.#validateRequestingPublicKey(parsedPreTx)) return false;
+        if (!await this.#validateTransactionHash(parsedPreTx)) return false;
+        if (!this.#validateSignature(parsedPreTx)) return false;
+        if (!this.#validateValidatorAddress(parsedPreTx)) return false;
+        if (!await this.#validateTransactionUniqueness(parsedPreTx)) return false;
         
         return true;
     }
 
-    validatePayload(parsedPreTx) {
+    #isPayloadSchemaValid(parsedPreTx) {
         const isPayloadValid = this.check.validatePreTx(parsedPreTx);
         if (!isPayloadValid) {
             console.error('PreTx payload is invalid.');
@@ -47,7 +47,7 @@ class PreTransaction {
         return true;
     }
 
-    validateRequestingPublicKey(parsedPreTx) {
+    #validateRequestingPublicKey(parsedPreTx) {
         const requestingPublicKey = Wallet.decodeBech32mSafe(parsedPreTx.ia);
         if (requestingPublicKey === null) {
             console.error('Invalid requesting public key in PreTx payload.');
@@ -56,7 +56,7 @@ class PreTransaction {
         return true;
     }
 
-    async validateTransactionHash(parsedPreTx) {
+    async #validateTransactionHash(parsedPreTx) {
         const regeneratedTx = await generateTx(
             parsedPreTx.bs,
             parsedPreTx.mbs,
@@ -75,7 +75,7 @@ class PreTransaction {
         return true;
     }
 
-    validateSignature(parsedPreTx) {
+    #validateSignature(parsedPreTx) {
         const requestingPublicKey = Wallet.decodeBech32mSafe(parsedPreTx.ia);
         const requesterSignature = b4a.from(parsedPreTx.is, 'hex');
         const transactionHash = b4a.from(parsedPreTx.tx, 'hex');
@@ -88,7 +88,7 @@ class PreTransaction {
         return true;
     }
 
-    validateValidatorAddress(parsedPreTx) {
+    #validateValidatorAddress(parsedPreTx) {
         if (parsedPreTx.va !== this.#wallet.address) {
             console.error('Validator public key does not match wallet address:', parsedPreTx.va, this.#wallet.address);
             return false;
@@ -96,7 +96,7 @@ class PreTransaction {
         return true;
     }
 
-    async validateTransactionUniqueness(parsedPreTx) {
+    async #validateTransactionUniqueness(parsedPreTx) {
         const transactionHash = b4a.from(parsedPreTx.tx, 'hex');
         if (null !== await this.state.get(transactionHash)) {
             console.error('Transaction already exists:', parsedPreTx.tx);

@@ -32,7 +32,7 @@ class PartialBootstrapDeployment {
     }
 
     async validate(payload) {
-        if (!this.#validatePayload(payload)) return false;
+        if (!this.#isPayloadSchemaValid(payload)) return false;
         if (!this.#validateRequestingPublicKey(payload)) return false;
         if (!await this.#validateSignature(payload)) return false;
         if (!await this.#isBootstrapAlreadyRegistered(payload)) return false;
@@ -40,7 +40,7 @@ class PartialBootstrapDeployment {
         return true;
     }
 
-    #validatePayload(payload) {
+    #isPayloadSchemaValid(payload) {
         const isPayloadValid = this.check.validateBootstrapDeployment(payload);
 
         if (!isPayloadValid) {
