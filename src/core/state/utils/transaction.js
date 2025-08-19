@@ -15,7 +15,7 @@ export const BOOTSTRAP_DEPLOYMENT_SIZE = WRITER_BYTE_LENGTH + NONCE_BYTE_LENGTH 
 
 // TODO: This function receives too many arguments. It would be better to encapsulate them in an object.
 /**
- * Generates a transaction buffer and returns its double SHA-256 hash.
+ * Generates a transaction buffer and returns its double BLAKE-3 hash.
  * @param {Buffer} bootstrap - The bootstrap buffer.
  * @param {Buffer} msb_bootstrap - The MSB bootstrap buffer.
  * @param {Buffer} validator_address - The validator address buffer.
@@ -23,7 +23,7 @@ export const BOOTSTRAP_DEPLOYMENT_SIZE = WRITER_BYTE_LENGTH + NONCE_BYTE_LENGTH 
  * @param {Buffer} local_address - The local address buffer.
  * @param {Buffer} content_hash - The content hash buffer.
  * @param {Buffer} nonce - The nonce buffer.
- * @returns {Promise<Buffer>} The double SHA-256 hash of the transaction buffer, or an empty buffer on error.
+ * @returns {Promise<Buffer>} The double BLAKE-3 hash of the transaction buffer, or an empty buffer on error.
  */
 export async function generateTxBuffer(bootstrap, msb_bootstrap, validator_address, local_writer_key, local_address, content_hash, nonce) {
     try {
@@ -57,7 +57,7 @@ export async function generateTxBuffer(bootstrap, msb_bootstrap, validator_addre
 }
 
 /**
- * Generates a transaction buffer for bootstrap deployment and returns its SHA-256 hash.
+ * Generates a transaction buffer for bootstrap deployment and returns its BLAKE-3 hash.
  * The buffer consists of three parts concatenated in the following order:
  * 1. bootstrap (32 bytes) - The bootstrap identifier
  * 2. incoming_nonce (32 bytes) - Nonce from the requesting node
@@ -68,7 +68,7 @@ export async function generateTxBuffer(bootstrap, msb_bootstrap, validator_addre
  * @param {Buffer} bootstrap - The bootstrap identifier buffer (32 bytes)
  * @param {Buffer} incoming_nonce - The nonce from the requesting node (32 bytes)
  * @param {number} operationType - The operation type (should be OperationType.BOOTSTRAP_DEPLOYMENT)
- * @returns {Promise<Buffer>} The SHA-256 hash of the transaction buffer, or an empty buffer on error
+ * @returns {Promise<Buffer>} The BLAKE-3 hash of the transaction buffer, or an empty buffer on error
  */
 export async function generateBootstrapDeploymentTxBuffer(bootstrap, incoming_nonce, operationType) {
     try {
