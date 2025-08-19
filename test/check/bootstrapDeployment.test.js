@@ -159,9 +159,7 @@ test('validateBootstrapDeployment - optional fields null cases', async t => {
                 va: null
             }
         }
-        console.log(test)
         const result = check.validateBootstrapDeployment(test)
-        console.log(result)
         t.is(result, false, 'Should fail when multiple validator fields are null')
     })
 })

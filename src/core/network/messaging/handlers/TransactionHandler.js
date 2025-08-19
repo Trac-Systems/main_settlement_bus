@@ -100,7 +100,6 @@ class TransactionHandler {
             b4a.from(parsedPreTx.bs, 'hex'),
             b4a.from(parsedPreTx.mbs, 'hex')
         );
-        console.log(postTx)
         this.network.poolService.addTransaction(postTx);
     }
 
