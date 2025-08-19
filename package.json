@@ -16,7 +16,7 @@
     "test:bare:cov": "brittle-bare -c -t 120000 test/all.test.js"
   },
   "dependencies": {
-    "@tracsystems/blake3": "^0.0.3",
+    "@tracsystems/blake3": "^0.0.5",
     "autobase": "7.16.1",
     "b4a": "1.6.7",
     "bare-fs": "^4.1.6",
