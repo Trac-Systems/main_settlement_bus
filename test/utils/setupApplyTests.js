@@ -399,6 +399,7 @@ export async function waitForNotIndexer(indexer) {
 
 export async function waitForNodeState(node, address, expected) {
     try {
+        await node.msb.state.base.flush()
         let attempts = 0;
         const maxAttempts = 20;
         while (attempts < maxAttempts) {

@@ -272,7 +272,7 @@ class State extends ReadyResource {
         const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
 
         if (null === adminEntry) {
-            await this.#addAdminIfNotSet(op, view, node, batch);
+            await this.#addAdminIfNotSet(op, base, node, batch);
         }
         else {
             await this.#addAdminIfSet(adminEntry, op, view, node, base, batch);
@@ -322,7 +322,7 @@ class State extends ReadyResource {
         console.log(`Admin updated: ${decodedAdminEntry.address}:${op.eko.wk.toString('hex')}`);
     }
 
-    async #addAdminIfNotSet(op, view, node, batch) {
+    async #addAdminIfNotSet(op, base, node, batch) {
         // Extract and validate the network address
         const adminAddressBuffer = op.address;
         const adminAddress = addressUtils.bufferToAddress(adminAddressBuffer);
@@ -344,7 +344,10 @@ class State extends ReadyResource {
             !isMessageVerifed ||
             null !== opEntry
         ) return;
-
+        const initializedNodeEntry = nodeEntryUtils.init(op.eko.wk, nodeRoleUtils.NodeRole.WRITER);
+        const updatedNodeEntry = nodeEntryUtils.setRole(initializedNodeEntry, nodeRoleUtils.NodeRole.INDEXER);
+        await batch.put(op.address, updatedNodeEntry);
+        await this.#addToWriters(op, batch)
         // Create a new admin entry
         const adminEntry = adminEntryUtils.encode(adminAddressBuffer, op.eko.wk);
         const initIndexers = indexerEntryUtils.append(adminAddressBuffer);
@@ -354,7 +357,6 @@ class State extends ReadyResource {
         await batch.put(EntryType.ADMIN, adminEntry);
         await batch.put(EntryType.INDEXERS, initIndexers);
         await batch.put(hashHexString, node.value);
-
         console.log(`Admin added: ${adminAddress}:${this.#bootstrap.toString('hex')}`);
     }
 
@@ -447,11 +449,6 @@ class State extends ReadyResource {
 
         if (b4a.equals(op.eko.wk, ZERO_WK)) return;
 
-        // Ensure that an admin invoked this operation
-        const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
-        const decodedAdminEntry = adminEntryUtils.decode(adminEntry);
-        if (null === decodedAdminEntry || !this.#isAdminApply(decodedAdminEntry, node)) return;
-
         // verify signature
         const message = createMessage(op.address, op.eko.wk, op.eko.nonce, op.type)
         const hash = await blake3Hash(message);
@@ -465,18 +462,7 @@ class State extends ReadyResource {
         await this.#addWriter(op, base, node, batch, hashHexString, nodeAddress);
     }
 
-    async #addWriter(op, base, node, batch, hashHexString, nodeAddress) {
-        // Retrieve the node entry for the given key
-        const nodeEntry = await this.#getEntryApply(nodeAddress, batch);
-        if (nodeEntry === null) return;
-
-        const isWhitelisted = nodeEntryUtils.isWhitelisted(nodeEntry);
-        const isWriter = nodeEntryUtils.isWriter(nodeEntry);
-        const isIndexer = nodeEntryUtils.isIndexer(nodeEntry);
-
-        // To become a writer the node must be whitelisted and not already a writer or indexer
-        if (isIndexer || isWriter || !isWhitelisted) return;
-
+    async #addToWriters(op, batch) {
         // Retrieve and increment the writers length entry
         let length = await this.#getEntryApply(EntryType.WRITERS_LENGTH, batch);
         let incrementedLength = null;
@@ -492,19 +478,33 @@ class State extends ReadyResource {
         }
         if (null === incrementedLength) return;
 
+        // Update the writers index and length entries
+        await batch.put(EntryType.WRITERS_INDEX + length, op.address);
+        await batch.put(EntryType.WRITERS_LENGTH, incrementedLength);
+    }
+
+    async #addWriter(op, base, node, batch, hashHexString, nodeAddress) {
+        // Retrieve the node entry for the given key
+        const nodeEntry = await this.#getEntryApply(nodeAddress, batch);
+        if (nodeEntry === null) return;
+
+        const isWhitelisted = nodeEntryUtils.isWhitelisted(nodeEntry);
+        const isWriter = nodeEntryUtils.isWriter(nodeEntry);
+        const isIndexer = nodeEntryUtils.isIndexer(nodeEntry);
+
+        // To become a writer the node must be whitelisted and not already a writer or indexer
+        if (isIndexer || isWriter || !isWhitelisted) return;
         // Update the node entry to assign the writer role
         const updatedNodeEntry = nodeEntryUtils.setRoleAndWriterKey(nodeEntry, nodeRoleUtils.NodeRole.WRITER, op.eko.wk);
         if (updatedNodeEntry === null) return;
 
         // Add the writer role to the base and update the batch
-        await base.addWriter(op.eko.wk, { isIndexer: false });
         await batch.put(nodeAddress, updatedNodeEntry);
+        await base.addWriter(op.eko.wk, { isIndexer: false });
 
-        // Update the writers index and length entries
-        await batch.put(EntryType.WRITERS_INDEX + length, op.address);
-        await batch.put(EntryType.WRITERS_LENGTH, incrementedLength);
+        await this.#addToWriters(op, batch);
+
         await batch.put(hashHexString, node.value);
-
         console.log(`Writer added: ${nodeAddress}:${op.eko.wk.toString('hex')}`);
     }
 
@@ -517,11 +517,6 @@ class State extends ReadyResource {
         if (nodeAddress === null) return;
         const nodePublicKey = Wallet.decodeBech32mSafe(nodeAddress);
         if (nodePublicKey === null) return;
-
-        // Ensure that an admin invoked this operation
-        const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
-        const decodedAdminEntry = adminEntryUtils.decode(adminEntry);
-        if (null === decodedAdminEntry || !this.#isAdminApply(decodedAdminEntry, node)) return;
 
         // verify signature
         const message = createMessage(op.address, op.eko.wk, op.eko.nonce, op.type);

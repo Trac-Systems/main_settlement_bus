@@ -17,3 +17,4 @@ coverage/
 # Whitelist directory 
 whitelist/*
 !whitelist/.gitkeep
+.vscode/

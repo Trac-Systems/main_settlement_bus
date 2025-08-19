@@ -41,7 +41,6 @@ hook('Initialize admin for addAdmin tests', async () => {
 
 test('Apply function addAdmin for recovery - happy path', async (k) => {
     try {
-        console.log(admin.msb.state.isWritable(), writer.msb.state.isWritable(), indexer1.msb.state.isWritable(), indexer2.msb.state.isWritable())
         await tryToSyncWriters(admin, writer, indexer1, indexer2);
 
         const adminEntryBefore = await admin.msb.state.getAdminEntry();
