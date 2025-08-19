@@ -107,7 +107,9 @@ class TransactionHandler {
     async #partialBootstrapDeploymentSubHandler(payload) {
         const normalizedPayload = this.#normalizeBootstrapDeployment(payload);// maybe it does need to be normalized yet
         const isValid = await this.#partialBootstrapDeploymentValidator.validate(normalizedPayload);
-        console.log('isvalid', isValid);
+        if (!isValid) {
+            throw new Error("TransactionHandler: bootstrap deploymend validation failed.");
+        }
         const completeBootstrapDeploymentOperation = await StateMessageOperations.assembleCompleteBootstrapDeployment(
             this.#wallet,
             normalizedPayload.address,
