@@ -142,10 +142,6 @@ class TransactionHandler {
             in: normalizeHex(bdo.in),
             is: normalizeHex(bdo.is)
         };
-        if (bdo.tx) normalizedBdo.tx = normalizeHex(bdo.tx);
-        if (bdo.va) normalizedBdo.va = addressToBuffer(bdo.va)
-        if (bdo.vn) normalizedBdo.vn = normalizeHex(bdo.vn);
-        if (bdo.vs) normalizedBdo.vs = normalizeHex(bdo.vs);
 
         return {
             type,
