@@ -1,6 +1,7 @@
 import b4a from 'b4a';
 import Wallet from 'trac-wallet';
 import { bufferToAddress } from '../../../../state/utils/address.js';
+import { blake3Hash } from '../../../../../utils/crypto.js';
 
 /*
     BaseResponse class for handling common validation logic for network responses.
@@ -76,7 +77,7 @@ class BaseResponse {
 
         const messageWithoutSig = { ...message };
         delete messageWithoutSig.sig;
-        const hash = await this.#wallet.createHash('sha256', JSON.stringify(messageWithoutSig));
+        const hash = await blake3Hash(JSON.stringify(messageWithoutSig));
         const signature = b4a.from(message.sig, 'hex');
         const verified = this.#wallet.verify(signature, hash, publicKey);
 
