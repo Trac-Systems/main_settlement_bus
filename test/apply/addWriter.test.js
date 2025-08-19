@@ -140,46 +140,36 @@ test('handleApplyAddWriterOperation (apply) - Append addWriter payload into the 
 });
 
 test('handleApplyAddWriterOperation (apply) - Append addWriter payload into the base by non admin node', async (t) => {
-    try {
-        // writer1 is already a writer.
-        // writer2 is already a writer.
-        // writer3 is not a writer yet, but it is whitelisted and won't become a writer.
-        //writer4 is reader
-        // indexer1 is already an indexer.
+    // writer1 is already a writer.
+    // writer2 is already a writer.
+    // writer3 is not a writer yet, but it is whitelisted and wwill become a writer.
+    //writer4 is reader
+    // indexer1 is already an indexer.
 
+    const signedLengthWriter1Before = writer1.msb.state.getSignedLength();
+    const reqAddWriter = await StateMessageOperations.assembleAddWriterMessage(
+        writer3.wallet,
+        writer3.msb.state.writingKey,
+    );
 
-        const reqAddWriter = await StateMessageOperations.assembleAddWriterMessage(
-            writer3.wallet,
-            writer3.msb.state.writingKey,
-        );
+    await writer1.msb.state.append(reqAddWriter); // Send `add writer` request to apply function
 
-        const signedLengthWriter1Before = writer1.msb.state.getSignedLength();
+    await tryToSyncWriters(writer1, writer3, indexer1);
+    await waitForNodeState(writer1, writer3.wallet.address, {
+        wk: writer3.msb.state.writingKey,
+        isWhitelisted: true,
+        isWriter: true,
+        isIndexer: false
+    });
 
-        await writer1.msb.state.append(reqAddWriter); // Send `add writer` request to apply function
+    const writer1Result = await writer1.msb.state.getNodeEntry(writer3.wallet.address);
 
-        await tryToSyncWriters(admin, writer1, indexer1);
-        await waitForNodeState(writer1, writer3.wallet.address, {
-            wk: ZERO_WK,
-            isWhitelisted: true,
-            isWriter: false,
-            isIndexer: false
-        });
+    const signedLengthWriter1After = writer1.msb.state.getSignedLength();
 
-        const writer1Result = await writer1.msb.state.getNodeEntry(writer3.wallet.address);
-
-        const signedLengthWriter1After = writer1.msb.state.getSignedLength();
-
-
-        t.is(signedLengthWriter1Before, signedLengthWriter1After, 'Writer1 signed length should not change');
-        t.ok(writer1Result, 'Result should not be null - writer2 is whitelisted but not a writer');
-        t.ok(!b4a.equals(writer1Result.wk, writer3.msb.state.writingKey), 'Result writing key should not match writer writing key');
-        t.ok(b4a.equals(writer1Result.wk, ZERO_WK), 'Result writing key should be ZERO_WK');
-        t.is(writer1Result.isWriter, false, 'Result should indicate that the peer is not a writer');
-
-
-    } catch (error) {
-        t.fail('Failed to add writer: ' + error.message);
-    }
+    t.is(signedLengthWriter1Before, signedLengthWriter1After, 'Writer1 signed length should not change');
+    t.ok(writer1Result, 'Result should not be null - writer2 is whitelisted but not a writer');
+    t.ok(b4a.equals(writer1Result.wk, writer3.msb.state.writingKey), 'Result writing key should match writer writing key');
+    t.is(writer1Result.isWriter, true, 'Result should indicate that the peer is a writer');
 });
 
 test('handleApplyAddWriterOperation (apply) - Append addWriter payload into the base - ZERO_WK', async (t) => {

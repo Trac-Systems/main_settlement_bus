@@ -200,6 +200,11 @@ class Network extends ReadyResource {
         }
     }
 
+    async isConnected(publicKey) {
+        return this.#swarm.peers.has(publicKey) && 
+                this.#swarm.peers.get(publicKey).connectedTime != -1
+    }
+
     async #sendRequestByType(stream, type) {
         const waitFor = {
             validator: () => this.validator_stream,
@@ -224,22 +229,6 @@ class Network extends ReadyResource {
         while (conditionFn() && counter < maxIterations) {
             await sleep(intervalMs);
             counter++;
-        }
-    }
-
-    async sendMessageToAdmin(adminEntry, message) {
-        try {
-            if (!adminEntry || !message) {
-                throw new Error('Invalid admin entry or message');
-            }
-            const adminPublicKey = Wallet.decodeBech32m(adminEntry.address).toString('hex');
-            await this.tryConnect(adminPublicKey, 'admin');
-            await this.spinLock(() => this.admin_stream === null);
-            if (this.admin_stream !== null) {
-                await this.admin_stream.messenger.send(message);
-            }
-        } catch (e) {
-            console.log(e)
         }
     }
 
