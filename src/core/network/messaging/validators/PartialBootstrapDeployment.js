@@ -4,7 +4,7 @@ import Wallet from 'trac-wallet';
 import Check from '../../../../utils/check.js';
 import {bufferToAddress} from "../../../state/utils/address.js";
 import {OperationType} from "../../../../utils/protobuf/applyOperations.cjs";
-import {createHash} from "../../../../utils/crypto.js";
+import {blake3Hash} from "../../../../utils/crypto.js";
 import {createMessage} from "../../../../utils/buffer.js";
 class PartialBootstrapDeployment {
     #state;
@@ -67,7 +67,7 @@ class PartialBootstrapDeployment {
         const incomingTx = b4a.from(payload.bdo.tx, 'hex');
 
         const message =  createMessage(payload.bdo.bs, payload.bdo.in, OperationType.BOOTSTRAP_DEPLOYMENT)
-        const hash = await createHash('sha256', message);
+        const hash = await blake3Hash(message);
 
         if ( !b4a.equals(incomingTx, hash)) {
             return false;
@@ -100,7 +100,6 @@ class PartialBootstrapDeployment {
         const { va, vn, vs } = payload.bdo;
         return (va === undefined && vn === undefined && vs === undefined);
     }
-
 
 }
 

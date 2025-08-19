@@ -1,11 +1,12 @@
+import Wallet from "trac-wallet";
+import b4a from "b4a";
+
 import StateBuilder from '../base/StateBuilder.js'
 import {OperationType} from '../../utils/protobuf/applyOperations.cjs';
 import {isAddressValid} from '../../core/state/utils/address.js';
 import {TRAC_ADDRESS_SIZE} from "trac-wallet/constants.js";
 import {isHexString} from "../../utils/helpers.js";
-import Wallet from "trac-wallet";
-import {createHash} from "../../utils/crypto.js";
-import b4a from "b4a";
+import {blake3Hash} from "../../utils/crypto.js";
 
 class PartialStateMessageBuilder extends StateBuilder {
     #wallet;
@@ -90,7 +91,7 @@ class PartialStateMessageBuilder extends StateBuilder {
             default:
                 throw new Error(`Unsupported operation type: ${this.#operationType}`);
         }
-        hash = await createHash('sha256', txMsg);
+        hash = await blake3Hash(txMsg);
         signature = this.#wallet.sign(hash);
 
         if (this.#isBootstrapDeployment(this.#operationType)) {
