@@ -721,7 +721,7 @@ export class MainSettlementBus extends ReadyResource {
                 } else if (input.startsWith('/get_deployment')) {
                     const splitted = input.split(' ');
                     const bootstrapHex = splitted[1];
-                    const deployment = await this.#state.get("deployment/" + bootstrapHex);
+                    const deployment = await this.#state.getSigned("deployment/" + bootstrapHex);
                     if (deployment) {
                         console.log("Deployment for", bootstrapHex, ":", deployment);
                     } else {
