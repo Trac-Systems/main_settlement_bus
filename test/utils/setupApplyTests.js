@@ -9,9 +9,9 @@ import {MainSettlementBus} from '../../src/index.js'
 import fileUtils from '../../src/utils/fileUtils.js'
 import {EntryType} from '../../src/utils/constants.js';
 import {sleep} from '../../src/utils/helpers.js'
-import {createHash} from '../../src/utils/crypto.js'
 import {formatIndexersEntry} from '../../src/utils/helpers.js';
 import {generatePreTx} from '../../src/utils/transactionUtils.js';
+import {blake3Hash} from '../../src/utils/crypto.js';
 
 let os, fsp;
 
@@ -285,7 +285,7 @@ export const generatePostTx = async (writer, externalNode) => {
         }
     };
 
-    const contentHash = await createHash('sha256', JSON.stringify(testObj));
+    const contentHash = await blake3Hash(JSON.stringify(testObj));
     const preTx = await generatePreTx(
         externalNode.wallet,
         validatorAddress,

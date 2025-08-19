@@ -9,7 +9,6 @@ import {
 } from '../../utils/constants.js';
 import { sleep } from '../../utils/helpers.js';
 import Wallet from 'trac-wallet';
-import { createHash } from '../../utils/crypto.js';
 import Check from '../../utils/check.js';
 import { safeDecodeApplyOperation } from '../../utils/protobuf/operationHelpers.js';
 import { createMessage, ZERO_WK } from '../../utils/buffer.js';
@@ -20,6 +19,7 @@ import nodeRoleUtils from './utils/roles.js';
 import indexerEntryUtils from './utils/indexerEntry.js';
 import lengthEntryUtils from './utils/lengthEntry.js';
 import transactionUtils from './utils/transaction.js';
+import {blake3Hash} from '../../utils/crypto.js';
 class State extends ReadyResource {
 
     #base;
@@ -233,7 +233,7 @@ class State extends ReadyResource {
         const validatorMessage = b4a.allocUnsafe(32 + 32); // TODO: use constants. tx + nonce sizes. Avoid magic numbers.
         b4a.copy(tx, validatorMessage, 0);
         b4a.copy(validatorNonce, validatorMessage, 32);
-        const validatorMessageHash = await createHash('sha256', validatorMessage);
+        const validatorMessageHash = await blake3Hash(validatorMessage);
         const validatorAddress = addressUtils.bufferToAddress(validatorAddressBuffer);
         if (null === validatorAddress) return;
         const validatorPublicKey = Wallet.decodeBech32mSafe(validatorAddress);
@@ -279,7 +279,7 @@ class State extends ReadyResource {
 
         // verify signature
         const message = createMessage(adminAddressBuffer, op.eko.wk, op.eko.nonce, op.type)
-        const hash = await createHash('sha256', message);
+        const hash = await blake3Hash(message);
         const isMessageVerifed = this.#wallet.verify(op.eko.sig, hash, publicKeyAdminEntry)
         const hashHexString = hash.toString('hex');
         // Check if the operation has already been applied
@@ -316,7 +316,7 @@ class State extends ReadyResource {
 
         // verify signature
         const message = createMessage(adminAddressBuffer, op.eko.wk, op.eko.nonce, op.type)
-        const hash = await createHash('sha256', message);
+        const hash = await blake3Hash(message);
         const isMessageVerifed = this.#wallet.verify(op.eko.sig, hash, adminPublicKey)
         const hashHexString = hash.toString('hex');
 
@@ -367,7 +367,7 @@ class State extends ReadyResource {
 
         // verify signature
         const message = createMessage(op.address, op.bko.nonce, op.type);
-        const hash = await createHash('sha256', message);
+        const hash = await blake3Hash(message);
         const isMessageVerifed = this.#wallet.verify(op.bko.sig, hash, adminPublicKey);
         const hashHexString = hash.toString('hex');
 
@@ -438,7 +438,7 @@ class State extends ReadyResource {
 
         // verify signature
         const message = createMessage(op.address, op.eko.wk, op.eko.nonce, op.type)
-        const hash = await createHash('sha256', message);
+        const hash = await blake3Hash(message);
         const isMessageVerifed = this.#wallet.verify(op.eko.sig, hash, nodePublicKey);
         const hashHexString = hash.toString('hex');
 
@@ -509,7 +509,7 @@ class State extends ReadyResource {
 
         // verify signature
         const message = createMessage(op.address, op.eko.wk, op.eko.nonce, op.type);
-        const hash = await createHash('sha256', message);
+        const hash = await blake3Hash(message);
         const isMessageVerifed = this.#wallet.verify(op.eko.sig, hash, nodePublicKey);
         const hashHexString = hash.toString('hex');
 
@@ -591,7 +591,7 @@ class State extends ReadyResource {
 
         // verify signature
         const message = createMessage(op.address, op.bko.nonce, op.type);
-        const hash = await createHash('sha256', message);
+        const hash = await blake3Hash(message);
         const isMessageVerifed = this.#wallet.verify(op.bko.sig, hash, adminPublicKey);
         const hashHexString = hash.toString('hex');
         // check if the operation has been already applied
@@ -654,7 +654,7 @@ class State extends ReadyResource {
 
         // verify signature
         const message = createMessage(op.address, op.bko.nonce, op.type);
-        const hash = await createHash('sha256', message);
+        const hash = await blake3Hash(message);
         const isMessageVerifed = this.#wallet.verify(op.bko.sig, hash, adminPublicKey);
         const hashHexString = hash.toString('hex');
         // check if the operation has already been applied
@@ -737,7 +737,7 @@ class State extends ReadyResource {
 
         // verify signature
         const message = createMessage(op.address, op.bko.nonce, op.type);
-        const hash = await createHash('sha256', message);
+        const hash = await blake3Hash(message);
         const isMessageVerifed = this.#wallet.verify(op.bko.sig, hash, adminPublicKey);
         const hashHexString = hash.toString('hex');
         // check if the operation has already been applied

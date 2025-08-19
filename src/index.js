@@ -8,7 +8,6 @@ import tty from 'tty';
 
 
 import {sleep, formatIndexersEntry} from './utils/helpers.js';
-import {createHash} from './utils/crypto.js';
 import {verifyDag, printHelp, printWalletInfo} from './utils/cli.js';
 import StateMessageOperations from "./messages/stateMessages/StateMessageOperations.js";
 import {safeDecodeApplyOperation} from './utils/protobuf/operationHelpers.js';
@@ -23,6 +22,7 @@ import {
     EventType,
     WHITELIST_SLEEP_INTERVAL,
 } from './utils/constants.js';
+import {blake3Hash} from './utils/crypto.js';
 
 //TODO create a MODULE which will separate logic responsible for role managment
 
@@ -228,7 +228,7 @@ export class MainSettlementBus extends ReadyResource {
                     if (!adminEntry || this.#enable_wallet === false) return;
                     const adminPublicKey = PeerWallet.decodeBech32m(adminEntry.address)
                     const reconstructedMessage = createMessage(decodedRequest.address, decodedRequest.bko.nonce, OperationType.WHITELISTED);
-                    const hash = await createHash('sha256', reconstructedMessage);
+                    const hash = await blake3Hash(reconstructedMessage);
                     const isWhitelisted = await this.#state.isAddressWhitelisted(this.#wallet.address);
                     const isMessageVerifed = this.#wallet.verify(decodedRequest.bko.sig, hash, adminPublicKey);
                     const nodeAddress = addressUtils.bufferToAddress(decodedRequest.address);
