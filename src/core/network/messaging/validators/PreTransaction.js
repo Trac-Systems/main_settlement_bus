@@ -2,6 +2,7 @@ import b4a from 'b4a';
 import Wallet from 'trac-wallet';
 import { generateTx } from '../../../../utils/transactionUtils.js';
 import Check from '../../../../utils/check.js';
+import {safeDecodeApplyOperation} from "../../../../utils/protobuf/operationHelpers.js";
 class PreTransaction {
     #state;
     #wallet;
@@ -27,19 +28,21 @@ class PreTransaction {
         return this.#check;
     }
 
-    async validate(parsedPreTx) {
-        if (!this.#isPayloadSchemaValid(parsedPreTx)) return false;
-        if (!this.#validateRequestingPublicKey(parsedPreTx)) return false;
-        if (!await this.#validateTransactionHash(parsedPreTx)) return false;
-        if (!this.#validateSignature(parsedPreTx)) return false;
-        if (!this.#validateValidatorAddress(parsedPreTx)) return false;
-        if (!await this.#validateTransactionUniqueness(parsedPreTx)) return false;
+    async validate(payload) {
+        if (!this.#isPayloadSchemaValid(payload)) return false;
+        if (!this.#validateRequestingPublicKey(payload)) return false;
+        if (!await this.#validateTransactionHash(payload)) return false;
+        if (!this.#validateSignature(payload)) return false;
+        if (!this.#validateValidatorAddress(payload)) return false;
+        if (!await this.#validateTransactionUniqueness(payload)) return false;
+        if (!await this.#validateIfExternalBootstrapHasBeenDeployed(payload)) return false;
+        if (!await this.#validateIfExternalBoostrapIsMsbBootstrap(payload)) return false;
         
         return true;
     }
 
-    #isPayloadSchemaValid(parsedPreTx) {
-        const isPayloadValid = this.check.validatePreTx(parsedPreTx);
+    #isPayloadSchemaValid(payload) {
+        const isPayloadValid = this.check.validatePreTx(payload);
         if (!isPayloadValid) {
             console.error('PreTx payload is invalid.');
             return false;
@@ -47,8 +50,8 @@ class PreTransaction {
         return true;
     }
 
-    #validateRequestingPublicKey(parsedPreTx) {
-        const requestingPublicKey = Wallet.decodeBech32mSafe(parsedPreTx.ia);
+    #validateRequestingPublicKey(payload) {
+        const requestingPublicKey = Wallet.decodeBech32mSafe(payload.ia);
         if (requestingPublicKey === null) {
             console.error('Invalid requesting public key in PreTx payload.');
             return false;
@@ -56,17 +59,17 @@ class PreTransaction {
         return true;
     }
 
-    async #validateTransactionHash(parsedPreTx) {
+    async #validateTransactionHash(payload) {
         const regeneratedTx = await generateTx(
-            parsedPreTx.bs,
-            parsedPreTx.mbs,
-            parsedPreTx.va,
-            parsedPreTx.iw,
-            parsedPreTx.ia,
-            parsedPreTx.ch,
-            parsedPreTx.in
+            payload.bs,
+            payload.mbs,
+            payload.va,
+            payload.iw,
+            payload.ia,
+            payload.ch,
+            payload.in
         );
-        const transactionHash = b4a.from(parsedPreTx.tx, 'hex');
+        const transactionHash = b4a.from(payload.tx, 'hex');
 
         if (!b4a.equals(regeneratedTx, transactionHash)) {
             console.error('Invalid transaction hash in PreTx payload.');
@@ -75,10 +78,10 @@ class PreTransaction {
         return true;
     }
 
-    #validateSignature(parsedPreTx) {
-        const requestingPublicKey = Wallet.decodeBech32mSafe(parsedPreTx.ia);
-        const requesterSignature = b4a.from(parsedPreTx.is, 'hex');
-        const transactionHash = b4a.from(parsedPreTx.tx, 'hex');
+    #validateSignature(payload) {
+        const requestingPublicKey = Wallet.decodeBech32mSafe(payload.ia);
+        const requesterSignature = b4a.from(payload.is, 'hex');
+        const transactionHash = b4a.from(payload.tx, 'hex');
         
         const isSignatureValid = Wallet.verify(requesterSignature, transactionHash, requestingPublicKey);
         if (!isSignatureValid) {
@@ -88,18 +91,41 @@ class PreTransaction {
         return true;
     }
 
-    #validateValidatorAddress(parsedPreTx) {
-        if (parsedPreTx.va !== this.#wallet.address) {
-            console.error('Validator public key does not match wallet address:', parsedPreTx.va, this.#wallet.address);
+    #validateValidatorAddress(payload) {
+        if (payload.va !== this.#wallet.address) {
+            console.error('Validator public key does not match wallet address:', payload.va, this.#wallet.address);
             return false;
         }
         return true;
     }
 
-    async #validateTransactionUniqueness(parsedPreTx) {
-        const transactionHash = b4a.from(parsedPreTx.tx, 'hex');
-        if (null !== await this.state.get(transactionHash)) {
-            console.error('Transaction already exists:', parsedPreTx.tx);
+    async #validateTransactionUniqueness(payload) {
+        const transactionHash = b4a.from(payload.tx, 'hex');
+        if (null !== await this.state.getSigned(transactionHash)) {
+            console.error('Transaction already exists:', payload.tx);
+            return false;
+        }
+        return true;
+    }
+
+    async #validateIfExternalBoostrapIsMsbBootstrap(payload) {
+        if (b4a.equals(this.state.bootstrap, b4a.from(payload.bs, 'hex'))) {
+            console.error('External bootstrap is the same as the current MSB bootstrap:', payload.bs);
+            return false;
+        }
+        return true;
+    }
+
+    async #validateIfExternalBootstrapHasBeenDeployed(payload) {
+        const externalBootstrapResult = await this.state.getRegisteredBootstrapEntry(payload.bs)
+        if (null === externalBootstrapResult) {
+            console.error("External bootstrap is not registered as deployment/<bootstrap>:", payload.bs);
+            return false;
+        }
+
+        const decodedBootstrapDeployment = safeDecodeApplyOperation(externalBootstrapResult)
+        if (null === await this.state.getSigned(decodedBootstrapDeployment.bdo.tx.toString('hex'))) {
+            console.error('External bootstrap is not registered as usual tx', decodedBootstrapDeployment.bdo.tx.toString('hex'), ':', payload);
             return false;
         }
         return true;
