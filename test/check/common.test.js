@@ -112,19 +112,19 @@ export function topLevelValidationTests(
     });
 }
 
-export const valueLevelValidationTest = (t, validationFunction, validData, valueKey, valueFields, notAllowedDataTypes) => {
+export const valueLevelValidationTest = (t, validateFn, validFixture, valueKey, valueFields, notAllowedDataTypes) => {
     for (const field of valueFields) {
         if (valueKey === 'bdo' && (field === 'is' || field === 'vn' || field === 'vs')) continue;
         const missing = {
-            ...validData,
-            [valueKey]: { ...validData[valueKey] }
+            ...validFixture,
+            [valueKey]: { ...validFixture[valueKey] }
         };
         delete missing[valueKey][field];
-        t.absent(validationFunction(missing), `Missing ${valueKey}.${field} should fail`);
+        t.absent(validateFn(missing), `Missing ${valueKey}.${field} should fail`);
     }
 
     t.test(`Invalid data types for each field in ${valueKey}`, t => {
-        for (const field of operationTypeFields) {
+        for (const field of valueFields) {
             for (const invalidType of notAllowedDataTypes) {
                 const withInvalidDataType = {
                     ...validFixture,
@@ -140,7 +140,7 @@ export const valueLevelValidationTest = (t, validationFunction, validData, value
     });
 
     t.test("Empty strings for each field in value", t => {
-        for (const field of operationTypeFields) {
+        for (const field of valueFields) {
             const emptyStr = {
                 ...validFixture,
                 [valueKey]: {
@@ -154,7 +154,7 @@ export const valueLevelValidationTest = (t, validationFunction, validData, value
     })
 
     t.test("Nested objects for each field in value", t => {
-        for (const field of operationTypeFields) {
+        for (const field of valueFields) {
             const nestedObj = {
                 ...validFixture,
                 [valueKey]: {
@@ -180,7 +180,7 @@ export const valueLevelValidationTest = (t, validationFunction, validData, value
     });
 
     t.test("Empty object for each field in value", t => {
-        for (const field of operationTypeFields) {
+        for (const field of valueFields) {
             const emptyObjForField = {
                 ...validFixture,
                 [valueKey]: {

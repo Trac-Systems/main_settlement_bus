@@ -13,6 +13,7 @@ test('validateBootstrapDeployment - happy-path case', t => {
         type: OperationType.BOOTSTRAP_DEPLOYMENT,
         address: addressToBuffer("trac1lj5ccpygyelu266enxjr2m0hkf2p5nkr4ua2gq9a2pj6ewq54p9qkydxud"),
         bdo: {
+            tx: b4a.from('1bd4f96adeffba9c04943a82993c5b19660c3a5f572620d82a67464f381640e2', 'hex'),
             bs: b4a.from('f24e61cf7941256b080be2133bccb520414c78021215edfcb781622da526c414', 'hex'),
             in: b4a.from('0ad7fe36a35a27ea4df932b800200823a97d4db31bca247f43ad7523b0493645', 'hex'),
             is: b4a.from('5b534be7a374148962c271d194c26cf5b1ad705ab218a87709a33fe74f9d1b811772447c939b17b2f803e3da7648f49b666b929fbb20e458ced952f147162c08', 'hex'),
@@ -28,6 +29,7 @@ test('validateBootstrapDeployment - happy-path case', t => {
 
 test('validateBootstrapDeployment - missing validator fields combinations', async t => {
     const baseBdo = {
+        tx: b4a.from('1bd4f96adeffba9c04943a82993c5b19660c3a5f572620d82a67464f381640e2', 'hex'),
         bs: b4a.from('f24e61cf7941256b080be2133bccb520414c78021215edfcb781622da526c414', 'hex'),
         in: b4a.from('0ad7fe36a35a27ea4df932b800200823a97d4db31bca247f43ad7523b0493645', 'hex'),
         is: b4a.from('5b534be7a374148962c271d194c26cf5b1ad705ab218a87709a33fe74f9d1b811772447c939b17b2f803e3da7648f49b666b929fbb20e458ced952f147162c08', 'hex'),
