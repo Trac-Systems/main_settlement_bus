@@ -188,6 +188,7 @@ class State extends ReadyResource {
         const batch = view.batch();
         for (const node of nodes) {
             const op = safeDecodeApplyOperation(node.value);
+            console.log('op', op);
             if (op === null) return;
             const handler = this.#getApplyOperationHandler(op.type);
             if (handler) {
@@ -255,12 +256,13 @@ class State extends ReadyResource {
         const deploymentEntry = await this.#getDeploymentEntryApply(op.txo.bs.toString('hex'), batch);
         if (deploymentEntry === null) return;
 
-        const opEntry = await this.#getEntryApply(tx, batch);
+        const hashHexString = tx.toString('hex');
+        const opEntry = await this.#getEntryApply(hashHexString, batch);
         if (null !== opEntry) return;
 
-        await batch.put(tx.toString('hex'), node.value);
+        await batch.put(hashHexString, node.value);
         if (this.#enable_txlogs === true) {
-            console.log(`TX: ${tx.toString('hex')} appended. Signed length: `, this.#base.view.core.signedLength);
+            console.log(`TX: ${hashHexString} appended. Signed length: `, this.#base.view.core.signedLength);
         }
     }
 
@@ -578,7 +580,7 @@ class State extends ReadyResource {
             await batch.put(nodeAddress, updatedNodeEntry);
             await batch.put(EntryType.INDEXERS, updatedIndexerEntry);
             await batch.put(hashHexString, node.value);
-            console.log(`Indexer removed trought removeWriter: ${nodeAddress}:${decodedNodeEntry.wk.toString('hex')}`);
+            console.log(`Indexer removed thought removeWriter: ${nodeAddress}:${decodedNodeEntry.wk.toString('hex')}`);
         }
     }
 
@@ -719,7 +721,7 @@ class State extends ReadyResource {
         await base.removeWriter(decodedNodeEntry.wk);
         await base.addWriter(decodedNodeEntry.wk, { isIndexer: false });
         // update writers index and length
-        await batch.put(EntryType.WRITERS_INDEX + length, op.key);
+        await batch.put(EntryType.WRITERS_INDEX + length, op.address);
         await batch.put(EntryType.WRITERS_LENGTH, incrementedLength);
         //update node entry and indexers entry
         await batch.put(EntryType.INDEXERS, updatedIndexerEntry);
@@ -828,13 +830,14 @@ class State extends ReadyResource {
         const deploymentEntry = await this.#getDeploymentEntryApply(op.bdo.bs.toString('hex'), batch);
         if (deploymentEntry !== null) return; // Deployment already exists, do not apply it again.
 
-        const opEntry = await this.#getEntryApply(tx, batch);
-        if (null !== opEntry) return;
+        const hashHexString = tx.toString('hex');
+        const opEntry = await this.#getEntryApply(hashHexString, batch);
+        if (null !== opEntry) return; // Operation has already been applied.
 
-        await batch.put(tx.toString('hex'), node.value);
-        await batch.put(EntryType.DEPLOYMENT + op.bdo.bs.toString('hex'), node.value);
+        await batch.put(hashHexString, node.value);
+        await batch.put(EntryType.DEPLOYMENT + op.bdo.bs.toString('hex'), tx);
         if (this.#enable_txlogs === true) {
-            console.log(`TX: ${tx.toString('hex')} and deployment/${op.bdo.bs.toString('hex')} have been appended. Signed length: `, this.#base.view.core.signedLength);
+            console.log(`TX: ${hashHexString} and deployment/${op.bdo.bs.toString('hex')} have been appended. Signed length: `, this.#base.view.core.signedLength);
         }
     }
 
