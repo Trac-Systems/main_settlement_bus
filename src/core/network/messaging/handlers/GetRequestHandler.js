@@ -1,6 +1,7 @@
 import { NETWORK_MESSAGE_TYPES } from '../../../../utils/constants.js';
 import Wallet from 'trac-wallet';
 import b4a from 'b4a';
+import { blake3Hash } from '../../../../utils/crypto.js';
 
 class GetRequestHandler {
     #wallet;
@@ -43,7 +44,7 @@ class GetRequestHandler {
             timestamp: Date.now(),
         };
 
-        const hash = await this.#wallet.createHash('sha256', JSON.stringify(payload));
+        const hash = await blake3Hash(JSON.stringify(payload));
         const sig = this.#wallet.sign(hash);
 
         const responseMessage = {
@@ -75,7 +76,7 @@ class GetRequestHandler {
             issuer: connection.remotePublicKey.toString('hex'),
             timestamp: Date.now(),
         };
-        const hash = await this.#wallet.createHash('sha256', JSON.stringify(payload));
+        const hash = await blake3Hash(JSON.stringify(payload));
         const sig = this.#wallet.sign(hash);
 
         const responseMessage = {
@@ -96,7 +97,7 @@ class GetRequestHandler {
             timestamp: Date.now(),
         };
         
-        const hash = await this.#wallet.createHash('sha256', JSON.stringify(payload));
+        const hash = await blake3Hash(JSON.stringify(payload));
         const sig = this.#wallet.sign(hash);
 
         const responseMessage = {
