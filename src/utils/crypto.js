@@ -1,13 +1,14 @@
+import b4a from 'b4a';
+
 if (typeof globalThis.atob === 'undefined') {
-  globalThis.atob = (str) => Buffer.from(str, 'base64').toString('binary');
+  globalThis.atob = (str) => b4a.from(str, 'base64').toString('binary');
 }
 
 if (typeof globalThis.btoa === 'undefined') {
-  globalThis.btoa = (str) => Buffer.from(str, 'binary').toString('base64');
+  globalThis.btoa = (str) => b4a.from(str, 'binary').toString('base64');
 }
 
 import { blake3 } from '@tracsystems/blake3';
-import b4a from 'b4a';
 
 export async function blake3Hash(input, hashLength = 32) {
   if (typeof input === 'string') {
