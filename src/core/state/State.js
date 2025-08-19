@@ -188,7 +188,6 @@ class State extends ReadyResource {
         const batch = view.batch();
         for (const node of nodes) {
             const op = safeDecodeApplyOperation(node.value);
-            console.log('op', op);
             if (op === null) return;
             const handler = this.#getApplyOperationHandler(op.type);
             if (handler) {

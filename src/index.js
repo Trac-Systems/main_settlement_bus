@@ -588,9 +588,7 @@ export class MainSettlementBus extends ReadyResource {
         if (externalBootstrap.length !== BOOTSTRAP_HEXSTRING_LENGTH) {
             throw new Error(`Can not perform bootstrap deployment - bootstrap is not a hex: ${externalBootstrap}`);
         }
-
-        const isAlreadyDeployed = await this.#state.getSigned(externalBootstrap);
-
+        const isAlreadyDeployed = await this.#state.getRegisteredBootstrapEntry(externalBootstrap);
         if (isAlreadyDeployed !== null) {
             throw new Error(`Can not perform bootstrap deployment - bootstrap ${externalBootstrap} is already deployed.`);
         }
@@ -721,11 +719,18 @@ export class MainSettlementBus extends ReadyResource {
                 } else if (input.startsWith('/get_deployment')) {
                     const splitted = input.split(' ');
                     const bootstrapHex = splitted[1];
-                    const deployment = await this.#state.getSigned("deployment/" + bootstrapHex);
-                    if (deployment) {
-                        console.log("Deployment for", bootstrapHex, ":", deployment);
+                    const txHash = await this.#state.getRegisteredBootstrapEntry(bootstrapHex);
+                    if (txHash) {
+                        console.log(`Bootstrap deployed under transaction hash: ${txHash.toString('hex')}`);
+                        const payload = await this.#state.getSigned(txHash.toString('hex'));
+                        if (payload) {
+                            const decoded = safeDecodeApplyOperation(payload);
+                            console.log('Decoded Bootstrap Deployment Payload:', decoded);
+                        } else {
+                            console.log(`No payload found for transaction hash: ${txHash.toString('hex')}`);
+                        }
                     } else {
-                        console.log("No deployment found for", bootstrapHex);
+                        console.log(`No deployment found for bootstrap: ${bootstrapHex}`);
                     }
                 }
         }

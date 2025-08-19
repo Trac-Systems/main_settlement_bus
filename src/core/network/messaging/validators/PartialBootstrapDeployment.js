@@ -82,12 +82,13 @@ class PartialBootstrapDeployment {
     }
 
     async #isBootstrapAlreadyRegistered(payload) {
-        const bootstrapString = b4a.from(payload.bdo.bs, 'hex');
+        const bootstrapString = payload.bdo.bs.toString('hex');
         if (null !== await this.state.getRegisteredBootstrapEntry(bootstrapString)) {
             console.error('Bootstrap is already registered:', bootstrapString);
             return false;
         }
-        const txString = b4a.from(payload.bdo.tx, 'hex');
+
+        const txString = payload.bdo.tx.toString('hex');
         if (null !== await this.state.getSigned(txString)) {
             console.error('Transaction is already registered tx:', txString);
             return false;

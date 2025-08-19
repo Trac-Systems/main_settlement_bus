@@ -123,11 +123,21 @@ class PreTransaction {
             return false;
         }
 
-        const decodedBootstrapDeployment = safeDecodeApplyOperation(externalBootstrapResult)
-        if (null === await this.state.getSigned(decodedBootstrapDeployment.bdo.tx.toString('hex'))) {
-            console.error('External bootstrap is not registered as usual tx', decodedBootstrapDeployment.bdo.tx.toString('hex'), ':', payload);
+        const getBootstrapTransactionTxPayload = await this.state.getSigned(externalBootstrapResult.toString('hex'));
+
+        if (null === getBootstrapTransactionTxPayload) {
+            console.error('External bootstrap is not registered as usual tx', externalBootstrapResult.toString('hex'), ':', payload);
             return false;
         }
+
+        const decodedBootstrapDeployment = safeDecodeApplyOperation(getBootstrapTransactionTxPayload)
+
+        // probably not possible case, howeverwe are going to cover it just in case.
+        if (decodedBootstrapDeployment.bdo.bs.toString('hex') !== payload.bs) {
+            console.error('External bootstrap does not match the one in the transaction payload:', decodedBootstrapDeployment.bdo.bs.toString('hex'), payload.bs);
+            return false;
+        }
+
         return true;
     }
 }
