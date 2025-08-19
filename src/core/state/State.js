@@ -110,12 +110,12 @@ class State extends ReadyResource {
     }
 
     async getAdminEntry() {
-        const adminEntry = await this.get(EntryType.ADMIN);
+        const adminEntry = await this.getSigned(EntryType.ADMIN);
         return adminEntry ? adminEntryUtils.decode(adminEntry) : null;
     }
 
     async getNodeEntry(address) {
-        const nodeEntry = await this.get(address);
+        const nodeEntry = await this.getSigned(address);
         return nodeEntry ? nodeEntryUtils.decode(nodeEntry) : null;
     }
 
@@ -137,7 +137,7 @@ class State extends ReadyResource {
     }
 
     async getIndexersEntry() {
-        const indexersEntry = await this.get(EntryType.INDEXERS);
+        const indexersEntry = await this.getSigned(EntryType.INDEXERS);
         return indexersEntry
     }
 
@@ -148,19 +148,19 @@ class State extends ReadyResource {
     }
 
     async getWriterLength() {
-        const writersLength = await this.get(EntryType.WRITERS_LENGTH);
+        const writersLength = await this.getSigned(EntryType.WRITERS_LENGTH);
         return writersLength ? lengthEntryUtils.decode(writersLength) : null;
     }
 
     async getWriterIndex(index) {
         if (index < 0 || index > Number.MAX_SAFE_INTEGER) return null;
-        const writerPublicKey = await this.get(EntryType.WRITERS_INDEX + index);
+        const writerPublicKey = await this.getSigned(EntryType.WRITERS_INDEX + index);
         return writerPublicKey ? writerPublicKey : null;
     }
 
     async getRegisteredBootstrapEntry(bootstrap) {
         if(!bootstrap || !isHexString(bootstrap) || bootstrap.length !== 64) return null;
-        return await this.getSigned(EntryType.DEPLOYMENT+bootstrap);
+        return await this.getSigned(EntryType.DEPLOYMENT + bootstrap);
 
     }
 
@@ -181,7 +181,7 @@ class State extends ReadyResource {
         })
         return this.#bee;
     }
-
+    // ATTENTION: DO NOT USE METHODS ABOVE IN APPLY PART!
     ///////////////////////////////APPLY////////////////////////////////////
 
     async #apply(nodes, view, base) {
@@ -224,9 +224,7 @@ class State extends ReadyResource {
         const validatorAddressBuffer = op.address;
 
         const regeneratedTxBuffer = await transactionUtils.generateTxBuffer(op.txo.bs, this.#bootstrap, validatorAddressBuffer, op.txo.iw, op.txo.ia, op.txo.ch, op.txo.in);
-
         if (regeneratedTxBuffer.length === 0 || !b4a.equals(regeneratedTxBuffer, tx)) return;
-
         // first signature
         const requesterSignature = op.txo.is;
         const incomingAddressBuffer = op.txo.ia;
@@ -400,7 +398,7 @@ class State extends ReadyResource {
                 Dear reader,
                 wk = 00000000000000000000000000000000 on ed25519 is point P.
                 P = (19681161376707505956807079304988542015446066515923890162744021073123829784752,0).
-                This point lies on the curve but is not a valid point.
+                This point belongs to the curve but is not a valid point.
                 Point P belongs to the torsion subgroup E(Fp)_TOR of the curve.
 
                 Yes, you could theoretically (easily) forge a signature on this point.
@@ -418,7 +416,7 @@ class State extends ReadyResource {
                     This protects against attacks involving small-order points;
                 3. Even if you are assigned this specific wk (the all-zero identifier), you can rest assured
                 that you won't be able to perform any network actions with it. You can only directly participate
-                in the network if you possess a valid wk. As an indirect user, this characteristic doesn't affect you.             
+                in the network if you possess a valid wk. As an indirect user, this characteristic doesn't affect you.
 
             */
             const initializedNodeEntry = nodeEntryUtils.init(ZERO_WK, nodeRoleUtils.NodeRole.WHITELISTED);
@@ -430,7 +428,7 @@ class State extends ReadyResource {
             await batch.put(nodeAddressString, editedNodeEntry);
             await batch.put(hashHexString, node.value);
         }
-        // Only whitelisted node will be able to become a writer/indexer. 
+        // Only whitelisted node will be able to become a writer/indexer.
 
     }
 
@@ -642,7 +640,7 @@ class State extends ReadyResource {
         // update node entry and indexers entry
         await batch.put(EntryType.INDEXERS, updatedIndexerEntry);
         await batch.put(nodeAddress, updatedNodeEntry);
-        // store operation hash to avoid replay attack. 
+        // store operation hash to avoid replay attack.
         await batch.put(hashHexString, op.value);
 
         console.log(`Indexer added: ${nodeAddress}:${decodedNodeEntry.wk.toString('hex')}`);
@@ -726,7 +724,7 @@ class State extends ReadyResource {
         //update node entry and indexers entry
         await batch.put(EntryType.INDEXERS, updatedIndexerEntry);
         await batch.put(nodeAddress, updatedNodeEntry);
-        // store operation hash to avoid replay attack. 
+        // store operation hash to avoid replay attack.
         await batch.put(hashHexString, op.value);
         console.log(`Indexer has been removed: ${nodeAddress}:${decodedNodeEntry.wk.toString('hex')}`);
 
@@ -822,7 +820,7 @@ class State extends ReadyResource {
         const validatorMessage = b4a.allocUnsafe(32 + 32); // TODO: use constants. tx + nonce sizes. Avoid magic numbers.
         b4a.copy(tx, validatorMessage, 0);
         b4a.copy(op.bdo.vn, validatorMessage, 32);
-        const validatorMessageHash = await createHash('sha256', validatorMessage);
+        const validatorMessageHash = await blake3Hash(validatorMessage);
 
         const isValidatorSignatureValid = this.#wallet.verify(op.bdo.vs, validatorMessageHash, validatorPublicKey);
         if (!isValidatorSignatureValid) return;
