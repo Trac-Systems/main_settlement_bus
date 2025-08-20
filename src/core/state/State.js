@@ -579,7 +579,7 @@ class State extends ReadyResource {
             await batch.put(nodeAddress, updatedNodeEntry);
             await batch.put(EntryType.INDEXERS, updatedIndexerEntry);
             await batch.put(hashHexString, node.value);
-            console.log(`Indexer removed thought removeWriter: ${nodeAddress}:${decodedNodeEntry.wk.toString('hex')}`);
+            console.log(`Indexer removed through removeWriter: ${nodeAddress}:${decodedNodeEntry.wk.toString('hex')}`);
         }
     }
 
