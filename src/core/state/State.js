@@ -18,7 +18,7 @@ import nodeEntryUtils from './utils/nodeEntry.js';
 import nodeRoleUtils from './utils/roles.js';
 import indexerEntryUtils from './utils/indexerEntry.js';
 import lengthEntryUtils from './utils/lengthEntry.js';
-import transactionUtils, {MAXIMUM_OPERATION_PAYLOAD_SIZE, MAXIMUM_TRANSACTION_SIZE} from './utils/transaction.js';
+import transactionUtils from './utils/transaction.js';
 import {blake3Hash} from '../../utils/crypto.js';
 class State extends ReadyResource {
 
