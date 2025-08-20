@@ -6,8 +6,7 @@ import b4a from 'b4a';
 import readline from 'readline';
 import tty from 'tty';
 
-
-import {sleep, formatIndexersEntry} from './utils/helpers.js';
+import {sleep, formatIndexersEntry, isHexString} from './utils/helpers.js';
 import {verifyDag, printHelp, printWalletInfo} from './utils/cli.js';
 import StateMessageOperations from "./messages/stateMessages/StateMessageOperations.js";
 import {safeDecodeApplyOperation} from './utils/protobuf/operationHelpers.js';
@@ -16,11 +15,13 @@ import addressUtils, {isAddressValid} from './core/state/utils/address.js';
 import Network from './core/network/Network.js';
 import Check from './utils/check.js';
 import State from './core/state/State.js';
+import PartialStateMessageOperations from './messages/partialStateMessages/PartialStateMessageOperations.js';
 import {
     LISTENER_TIMEOUT,
     OperationType,
     EventType,
     WHITELIST_SLEEP_INTERVAL,
+    BOOTSTRAP_HEXSTRING_LENGTH,
 } from './utils/constants.js';
 import {blake3Hash} from './utils/crypto.js';
 
@@ -561,6 +562,46 @@ export class MainSettlementBus extends ReadyResource {
 
     }
 
+    async #deployBootstrap(externalBootstrap) {
+        if (this.#enable_wallet === false) {
+            throw new Error('Can not perform bootstrap deployment - wallet is not enabled.');
+        }
+
+        if (!this.#wallet) {
+            throw new Error('Can not perform bootstrap deployment - wallet is not initialized.');
+        }
+
+        const adminEntry = await this.#state.getAdminEntry();
+
+        if (!adminEntry) {
+            throw new Error(`Can not perform bootstrap deployment - admin entry has not been initialized.`);
+        }
+
+        if (!externalBootstrap) {
+            throw new Error(`Can not perform bootstrap deployment - external bootstrap is not provided.`);
+        }
+
+        if (!isHexString(externalBootstrap)) {
+            throw new Error(`Can not perform bootstrap deployment - bootstrap is not a hex: ${externalBootstrap}`);
+        }
+
+        if (externalBootstrap.length !== BOOTSTRAP_HEXSTRING_LENGTH) {
+            throw new Error(`Can not perform bootstrap deployment - bootstrap is not a hex: ${externalBootstrap}`);
+        }
+        const isAlreadyDeployed = await this.#state.getRegisteredBootstrapEntry(externalBootstrap);
+        if (isAlreadyDeployed !== null) {
+            throw new Error(`Can not perform bootstrap deployment - bootstrap ${externalBootstrap} is already deployed.`);
+        }
+
+        if (externalBootstrap === this.bootstrap.toString('hex')) {
+            throw new Error(`Can not perform bootstrap deployment - bootstrap ${externalBootstrap} is equal to MSB bootstrap!`);
+        }
+
+        const payload = await PartialStateMessageOperations.assembleBootstrapDeployment(this.#wallet, externalBootstrap)
+        await this.#network.validator_stream.messenger.send(payload);
+
+    }
+
     async #handleAddIndexerOperation(address) {
         await this.#updateIndexerRole(address, true);
     }
@@ -579,6 +620,10 @@ export class MainSettlementBus extends ReadyResource {
 
     async #handleBanValidatorOperation(address) {
         await this.#banValidator(address);
+    }
+
+    async #handleBootstrapDeploymentOperation(bootstrapHex) {
+        await this.#deployBootstrap(bootstrapHex);
     }
 
     async interactiveMode() {
@@ -632,7 +677,7 @@ export class MainSettlementBus extends ReadyResource {
                 const indexers = await this.#state.getIndexersEntry();
                 const formattedIndexers = formatIndexersEntry(indexers);
                 if (formattedIndexers.length === 0) {
-                    console.log('Indexers: no-indexers');
+                    console.log('Indexers: no indexers');
                 } else {
                     console.log('Indexers:', formattedIndexers);
                 }
@@ -667,6 +712,26 @@ export class MainSettlementBus extends ReadyResource {
                     const splitted = input.split(' ');
                     const address = splitted[1]
                     await this.#handleBanValidatorOperation(address);
+                } else if (input.startsWith('/deployment')) {
+                    const splitted = input.split(' ');
+                    const bootstrap_to_deploy = splitted[1]
+                    await this.#handleBootstrapDeploymentOperation(bootstrap_to_deploy)
+                } else if (input.startsWith('/get_deployment')) {
+                    const splitted = input.split(' ');
+                    const bootstrapHex = splitted[1];
+                    const txHash = await this.#state.getRegisteredBootstrapEntry(bootstrapHex);
+                    if (txHash) {
+                        console.log(`Bootstrap deployed under transaction hash: ${txHash.toString('hex')}`);
+                        const payload = await this.#state.getSigned(txHash.toString('hex'));
+                        if (payload) {
+                            const decoded = safeDecodeApplyOperation(payload);
+                            console.log('Decoded Bootstrap Deployment Payload:', decoded);
+                        } else {
+                            console.log(`No payload found for transaction hash: ${txHash.toString('hex')}`);
+                        }
+                    } else {
+                        console.log(`No deployment found for bootstrap: ${bootstrapHex}`);
+                    }
                 }
         }
         if (rl) rl.prompt();
