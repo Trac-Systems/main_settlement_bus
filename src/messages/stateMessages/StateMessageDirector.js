@@ -1,11 +1,13 @@
-import Builder from './Builder.js';
-import { OperationType } from '../../utils/protobuf/applyOperations.cjs'
+import StateBuilder from '../base/StateBuilder.js'
+import {OperationType} from '../../utils/protobuf/applyOperations.cjs'
+
+// TODO: RENAME TO CompleteStateMessageDirector
 
 class StateMessageDirector {
     #builder;
 
     set builder(builderInstance) {
-        if (!(builderInstance instanceof Builder)) {
+        if (!(builderInstance instanceof StateBuilder)) {
             throw new Error('Director requires a Builder instance.');
         }
         this.#builder = builderInstance;
@@ -112,6 +114,27 @@ class StateMessageDirector {
             .withIncomingSignature(incomingSignature)
             .withExternalBootstrap(externalBootstrap)
             .withMsbBootstrap(msbBootstrap)
+            .buildValueAndSign();
+
+        return this.#builder.getPayload();
+    }
+
+    async buildBootstrapDeploymentMessage(
+        invokerAddress,
+        transactionHash,
+        externalBootstrap,
+        incomingNonce,
+        incomingSignature
+    ) {
+        if (!this.#builder) throw new Error('Builder has not been set.');
+
+        await this.#builder
+            .forOperationType(OperationType.BOOTSTRAP_DEPLOYMENT)
+            .withAddress(invokerAddress)
+            .withTxHash(transactionHash)
+            .withExternalBootstrap(externalBootstrap)
+            .withIncomingNonce(incomingNonce)
+            .withIncomingSignature(incomingSignature)
             .buildValueAndSign();
 
         return this.#builder.getPayload();

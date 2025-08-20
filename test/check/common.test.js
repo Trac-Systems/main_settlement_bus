@@ -7,7 +7,7 @@ export function topLevelValidationTests(
     t,
     validateFn,
     validFixture,
-    valueKey, // 'bko', 'txo', 'eko'
+    valueKey, // 'bko', 'txo', 'eko', 'bdo'
     notAllowedDataTypes,
     topFields
 ) {
@@ -112,28 +112,19 @@ export function topLevelValidationTests(
     });
 }
 
-export function valueLevelValidationTest(
-    t,
-    validateFn,
-    validFixture,
-    valueKey, // 'bko', 'txo', 'eko'
-    operationTypeFields,
-    notAllowedDataTypes,
-) {
-    t.test("missing value fields", t => {
-        for (const field of operationTypeFields) {
-            const missing = {
-                ...validFixture,
-                [valueKey]: { ...validFixture[valueKey] }
-            };
-            delete missing[valueKey][field];
-            //console.log('missing', missing);
-            t.absent(validateFn(missing), `Missing ${valueKey}.${field} should fail`);
-        }
-    });
+export const valueLevelValidationTest = (t, validateFn, validFixture, valueKey, valueFields, notAllowedDataTypes) => {
+    for (const field of valueFields) {
+        if (valueKey === 'bdo' && (field === 'is' || field === 'vn' || field === 'vs')) continue;
+        const missing = {
+            ...validFixture,
+            [valueKey]: { ...validFixture[valueKey] }
+        };
+        delete missing[valueKey][field];
+        t.absent(validateFn(missing), `Missing ${valueKey}.${field} should fail`);
+    }
 
     t.test(`Invalid data types for each field in ${valueKey}`, t => {
-        for (const field of operationTypeFields) {
+        for (const field of valueFields) {
             for (const invalidType of notAllowedDataTypes) {
                 const withInvalidDataType = {
                     ...validFixture,
@@ -149,7 +140,7 @@ export function valueLevelValidationTest(
     });
 
     t.test("Empty strings for each field in value", t => {
-        for (const field of operationTypeFields) {
+        for (const field of valueFields) {
             const emptyStr = {
                 ...validFixture,
                 [valueKey]: {
@@ -163,7 +154,7 @@ export function valueLevelValidationTest(
     })
 
     t.test("Nested objects for each field in value", t => {
-        for (const field of operationTypeFields) {
+        for (const field of valueFields) {
             const nestedObj = {
                 ...validFixture,
                 [valueKey]: {
@@ -189,7 +180,7 @@ export function valueLevelValidationTest(
     });
 
     t.test("Empty object for each field in value", t => {
-        for (const field of operationTypeFields) {
+        for (const field of valueFields) {
             const emptyObjForField = {
                 ...validFixture,
                 [valueKey]: {

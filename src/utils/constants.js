@@ -1,13 +1,16 @@
 import { OperationType as OP } from './protobuf/applyOperations.cjs';
 
+//ATTENTION - THIS IS USED IN THE APPLY FUNCTION!
 export const EntryType = Object.freeze({
     ADMIN: 'admin',
     WHITELIST: 'whitelist',
     INDEXERS: 'indexers',
     WRITERS_LENGTH: 'wrl',
     WRITERS_INDEX: 'wri/',
+    DEPLOYMENT: 'deployment/',
 });
 
+//ATTENTION - THIS IS USED IN THE APPLY FUNCTION!
 export const OperationType = Object.freeze({
     ADD_ADMIN: OP.ADD_ADMIN,
     APPEND_WHITELIST: OP.APPEND_WHITELIST,
@@ -19,6 +22,7 @@ export const OperationType = Object.freeze({
     WHITELISTED: OP.APPEND_WHITELIST,
     PRE_TX: 'PRE_TX',
     TX: OP.TX,
+    BOOTSTRAP_DEPLOYMENT: OP.BOOTSTRAP_DEPLOYMENT,
 });
 
 export const EventType = Object.freeze({
@@ -45,6 +49,7 @@ export const ACK_INTERVAL = 1_000;
 export const DHT_BOOTSTRAPS = ['116.202.214.149:10001', '157.180.12.214:10001', 'node1.hyperdht.org:49737', 'node2.hyperdht.org:49737', 'node3.hyperdht.org:49737'];
 
 // checkjs
+//ATTENTION - THIS IS USED IN THE APPLY FUNCTION!
 export const WRITER_BYTE_LENGTH = 32;
 export const BOOTSTRAP_BYTE_LENGTH = 32;
 export const NONCE_BYTE_LENGTH = 32;
@@ -52,7 +57,6 @@ export const HASH_BYTE_LENGTH = 32;
 export const SIGNATURE_BYTE_LENGTH = 64;
 export const MIN_SAFE_VALIDATION_INTEGER = 0x00000001;
 export const MAX_SAFE_VALIDATION_INTEGER = 0xFFFFFFFF;
-
 export const TX_HASH_HEXSTRING_LENGTH = 64;
 export const WRITING_KEY_HEXSTRING_LENGTH = 64;
 export const NONCE_HEXSTRING_LENGTH = 64;

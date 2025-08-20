@@ -1,7 +1,7 @@
 import b4a from 'b4a';
 import Wallet from 'trac-wallet';
 
-import Builder from './Builder.js';
+import StateBuilder from '../base/StateBuilder.js'
 import {createMessage} from '../../utils/buffer.js';
 import {OperationType} from '../../utils/protobuf/applyOperations.cjs'
 import {addressToBuffer, bufferToAddress} from '../../core/state/utils/address.js';
@@ -9,7 +9,8 @@ import {TRAC_ADDRESS_SIZE} from 'trac-wallet/constants.js';
 import {isAddressValid} from "../../core/state/utils/address.js";
 import {blake3Hash} from '../../utils/crypto.js';
 
-class StateMessageBuilder extends Builder {
+// TODO: RENAME TO CompleteStateMessageBuilder
+class StateMessageBuilder extends StateBuilder {
     #wallet;
     #operationType;
     #address;
@@ -65,6 +66,10 @@ class StateMessageBuilder extends Builder {
     }
 
     withAddress(address) {
+        if (b4a.isBuffer(address) && address.length === TRAC_ADDRESS_SIZE) {
+            address = bufferToAddress(address);
+        }
+
         if (!isAddressValid(address)) {
             throw new Error(`Address field must be a valid TRAC bech32m address with length ${TRAC_ADDRESS_SIZE}.`);
         }
@@ -146,26 +151,14 @@ class StateMessageBuilder extends Builder {
     }
 
     async buildValueAndSign() {
-        const wallet = this.#wallet;
-        const operationType = this.#operationType;
-        const address = this.#address;
-        const writingKey = this.#writingKey;
 
         // writer key is not required for all operations, but it is required for some...
-        if (!operationType || !address) {
+        if (!this.#operationType || !this.#address) {
             throw new Error('Operation type, address must be set before building the message.');
         }
 
-        if (operationType === OperationType.UNKNOWN) {
+        if (this.#operationType === OperationType.UNKNOWN) {
             throw new Error('UNKNOWN is not allowed to construct');
-        }
-
-        if (operationType === OperationType.TX) {
-            if (!this.#txHash || !this.#incomingAddress || !this.#incomingWriterKey ||
-                !this.#incomingNonce || !this.#contentHash || !this.#incomingSignature ||
-                !this.#externalBootstrap || !this.#msbBootstrap) {
-                throw new Error('All postTx fields must be set before building the message');
-            }
         }
 
         const nonce = Wallet.generateNonce();
@@ -175,52 +168,67 @@ class StateMessageBuilder extends Builder {
         let hash = null;
         let signature = null;
 
-        switch (operationType) {
+        switch (this.#operationType) {
             case OperationType.ADD_ADMIN:
             case OperationType.ADD_WRITER:
             case OperationType.REMOVE_WRITER:
-                if (!writingKey) {
+                if (!this.#writingKey) {
                     throw new Error('Writer key must be set for writer operations (ADD_WRITER REMOVE_WRITER or ADD_ADMIN operation).');
                 }
-                msg = createMessage(address, writingKey, nonce, operationType);
+                msg = createMessage(this.#address, this.#writingKey, nonce, this.#operationType);
                 break;
 
             case OperationType.APPEND_WHITELIST:
             case OperationType.ADD_INDEXER:
             case OperationType.REMOVE_INDEXER:
             case OperationType.BAN_WRITER:
-                if (this.#wallet.address === bufferToAddress(address)) {
+                if (this.#wallet.address === bufferToAddress(this.#address)) {
                     throw new Error('Address must not be the same as the wallet address for basic operations.');
                 }
 
-                msg = createMessage(address, nonce, operationType);
+                msg = createMessage(this.#address, nonce, this.#operationType);
                 break;
 
             case OperationType.TX:
+                if (!this.#txHash || !this.#incomingAddress || !this.#incomingWriterKey ||
+                    !this.#incomingNonce || !this.#contentHash || !this.#incomingSignature ||
+                    !this.#externalBootstrap || !this.#msbBootstrap) {
+                    throw new Error('All postTx fields must be set before building the message!');
+                }
                 msg = b4a.concat([this.#txHash, nonce]);
+                break;
+            case OperationType.BOOTSTRAP_DEPLOYMENT:
+
+                if (!this.#txHash || !this.#externalBootstrap || !this.#incomingNonce || !this.#incomingSignature) {
+                    throw new Error('All bootstrap deployment fields must be set before building the message!');
+                }
+                msg = createMessage(
+                    this.#txHash,
+                    nonce,
+                );
                 break;
 
             default:
-                throw new Error(`Unsupported operation type for building value: ${OperationType[operationType]}.`);
+                throw new Error(`Unsupported operation type for building value: ${OperationType[this.#operationType]}.`);
         }
 
         hash = await blake3Hash(msg);
-        signature = wallet.sign(hash);
+        signature = this.#wallet.sign(hash);
 
-        if (this.#isExtended(operationType)) {
+        if (this.#isExtended(this.#operationType)) {
             value = {
-                wk: writingKey,
+                wk: this.#writingKey,
                 nonce: nonce,
                 sig: signature
             }
             this.#payload.eko = value;
-        } else if (this.#isBasic(operationType)) {
+        } else if (this.#isBasic(this.#operationType)) {
             value = {
                 nonce: nonce,
                 sig: signature
             }
             this.#payload.bko = value;
-        } else if (this.#isTransaction(operationType)) {
+        } else if (this.#isTransaction(this.#operationType)) {
             value = {
                 tx: this.#txHash,
                 ia: this.#incomingAddress,
@@ -234,8 +242,19 @@ class StateMessageBuilder extends Builder {
                 vn: nonce,
             }
             this.#payload.txo = value;
+        } else if (this.#isBootstrapDeployment(this.#operationType)) {
+            value = {
+                tx: this.#txHash,
+                bs: this.#externalBootstrap,
+                in: this.#incomingNonce,
+                is: this.#incomingSignature,
+                va: addressToBuffer(this.#wallet.address),
+                vn: nonce,
+                vs: signature
+            }
+            this.#payload.bdo = value;
         } else {
-            throw new Error(`No corresponding value type for operation: ${OperationType[operationType]}.`);
+            throw new Error(`No corresponding value type for operation: ${OperationType[this.#operationType]}.`);
         }
 
         return this;
@@ -264,9 +283,18 @@ class StateMessageBuilder extends Builder {
         ].includes(type);
     }
 
+    #isBootstrapDeployment(type) {
+        return [
+            OperationType.BOOTSTRAP_DEPLOYMENT
+        ].includes(type);
+    }
+
     getPayload() {
-        if (!this.#payload.type || !this.#payload.address || (!this.#payload.bko && !this.#payload.eko && !this.#payload.txo)) {
-            throw new Error('Product is not fully assembled. Missing type, address, or value (bko/eko/txo).');
+        if (
+            !this.#payload.type ||
+            !this.#payload.address ||
+            (!this.#payload.bko && !this.#payload.eko && !this.#payload.txo && !this.#payload.bdo)) {
+            throw new Error('Product is not fully assembled. Missing type, address, or value (bko/eko/txo/bdo).');
         }
         const res = this.#payload;
         this.reset();

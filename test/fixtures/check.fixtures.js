@@ -1,5 +1,6 @@
 import { TRAC_ADDRESS_SIZE } from 'trac-wallet/constants.js';
 import b4a from 'b4a';
+
 import { addressToBuffer } from '../../src/core/state/utils/address.js';
 import {
 	TX_HASH_HEXSTRING_LENGTH,
@@ -17,7 +18,31 @@ import {
 	OperationType,
 } from '../../src/utils/constants.js';
 
-
+export const BSD = {
+    valid_bootstrap_deployment: {
+        type: OperationType.BOOTSTRAP_DEPLOYMENT,
+        address: addressToBuffer("trac1cep6jwcf02vmwekr4s0sttraqv736v8nf2gkaejz2203zhf7j7csnf44nm"),
+        bdo: {
+            tx: b4a.from('1bd4f96adeffba9c04943a82993c5b19660c3a5f572620d82a67464f381640e2', 'hex'),
+            bs: b4a.from('f24e61cf7941256b080be2133bccb520414c78021215edfcb781622da526c414', 'hex'),
+            in: b4a.from('0ad7fe36a35a27ea4df932b800200823a97d4db31bca247f43ad7523b0493645', 'hex'),
+            is: b4a.from('5b534be7a374148962c271d194c26cf5b1ad705ab218a87709a33fe74f9d1b811772447c939b17b2f803e3da7648f49b666b929fbb20e458ced952f147162c08', 'hex'),
+            vn: b4a.from('0ad7fe36a35a27ea4df932b800200823a97d4db31bca247f43ad7523b0493645', 'hex'),
+            vs: b4a.from('5b534be7a374148962c271d194c26cf5b1ad705ab218a87709a33fe74f9d1b811772447c939b17b2f803e3da7648f49b666b929fbb20e458ced952f147162c08', 'hex'),
+            va: addressToBuffer('trac18qq7h503y3326v6msgvq0jwc0e8jp4t4q53z9p9jvd98arj7mtpqfac04p'),
+        }
+    },
+    topFieldsBootstrapDeployment: ['type', 'address', 'bdo'],
+    bootstrapDeploymentValueFields: ['bs', 'in', 'is', 'vn', 'vs', 'va'],
+    requiredLengthOfFieldsForBootstrapDeployment: {
+        bs: BOOTSTRAP_BYTE_LENGTH,
+        in: NONCE_BYTE_LENGTH,
+        is: SIGNATURE_BYTE_LENGTH,
+        vn: NONCE_BYTE_LENGTH,
+        vs: SIGNATURE_BYTE_LENGTH,
+        va: TRAC_ADDRESS_SIZE
+    }
+}
 
 export const PRETX = {
 
@@ -166,14 +191,21 @@ export const notAllowedDataTypes = [
 	true,
 	null,
 	undefined,
+    Infinity,
 	{},
 	[],
 	() => { },
-	"string",
-	//Symbol('sym'), test will throw but protocol won't accept it TODO: cover it somehow in the future if possible
+    //Symbol('sym'), test will throw but protocol won't accept it TODO: cover it somehow in the future if possible
+    "string",
 	BigInt(997),
 	new Date(),
 	NaN,
 	new Map(),
-	new Set()
+	new Set(),
+	/abc/,
+	new Error('fail'),
+	Promise.resolve(),
+	new Uint8Array([1,2,3]),
+	new Float32Array([1.1, 2.2]),
+	b4a.alloc(10),
 ];

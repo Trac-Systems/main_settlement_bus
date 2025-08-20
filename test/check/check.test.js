@@ -7,6 +7,7 @@ async function runCheckTests() {
   await import('./extendedKeyOp.test.js');
   await import('./postTx.test.js');
   await import('./preTx.test.js');
+  await import ('./bootstrapDeployment.test.js');
   test.resume();
 }
 
