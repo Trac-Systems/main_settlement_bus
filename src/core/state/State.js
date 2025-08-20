@@ -18,7 +18,7 @@ import nodeEntryUtils from './utils/nodeEntry.js';
 import nodeRoleUtils from './utils/roles.js';
 import indexerEntryUtils from './utils/indexerEntry.js';
 import lengthEntryUtils from './utils/lengthEntry.js';
-import transactionUtils from './utils/transaction.js';
+import transactionUtils, {MAXIMUM_OPERATION_PAYLOAD_SIZE, MAXIMUM_TRANSACTION_SIZE} from './utils/transaction.js';
 import {blake3Hash} from '../../utils/crypto.js';
 class State extends ReadyResource {
 
@@ -188,7 +188,10 @@ class State extends ReadyResource {
         const batch = view.batch();
         for (const node of nodes) {
             const op = safeDecodeApplyOperation(node.value);
+
             if (op === null) return;
+            if (b4a.byteLength(node.value) > transactionUtils.MAXIMUM_OPERATION_PAYLOAD_SIZE) return;
+
             const handler = this.#getApplyOperationHandler(op.type);
             if (handler) {
                 await handler(op, view, base, node, batch);
@@ -217,7 +220,6 @@ class State extends ReadyResource {
 
     async #handleApplyTxOperation(op, view, base, node, batch) {
         //TODO: ADD check to ensure both nonces are different to increase security.
-        if (b4a.byteLength(node.value) > 4096) return; // TODO: change this to a constant. Avoid magic numbers.
         if (!this.check.validatePostTx(op)) return; // ATTENTION: The sanitization should be done before ANY other check, otherwise we risk crashing
 
         const tx = op.txo.tx;
@@ -782,7 +784,6 @@ class State extends ReadyResource {
     }
 
     async #handleApplyBootstrapDeploymentOperation(op, view, base, node, batch) {
-        if (b4a.byteLength(node.value) > 4096) return;
         if (!this.check.validateBootstrapDeployment(op)) return;
 
         // if transaction is not complete, do not process it.
