@@ -2,11 +2,10 @@ import b4a from 'b4a';
 import Wallet from 'trac-wallet';
 
 import Check from '../../../../utils/check.js';
-import {bufferToAddress} from "../../../state/utils/address.js";
+import {addressToBuffer, bufferToAddress} from "../../../state/utils/address.js";
 import {OperationType} from "../../../../utils/constants.js";
 import {blake3Hash} from "../../../../utils/crypto.js";
 import {createMessage} from "../../../../utils/buffer.js";
-
 class PartialBootstrapDeployment {
     #state;
     #wallet;
@@ -39,7 +38,6 @@ class PartialBootstrapDeployment {
         if (!await this.#isBootstrapAlreadyRegistered(payload)) return false;
         if (!this.#isBootstrapDeploymentAlreadyNotCompleted(payload)) return false;
         if (!this.#isExternalBootstrapDifferentFromMSB(payload)) return false;
-        if (!await this.#validateTransactionValidity(payload)) return false;
         return true;
     }
 
@@ -101,7 +99,7 @@ class PartialBootstrapDeployment {
 
         const txString = payload.bdo.tx.toString('hex');
         if (null !== await this.state.getSigned(txString)) {
-            console.error(`Transaction with hash ${txString} already exists in the state.`);
+            console.error(`Transaction with hash ${txString} already exists in the state. Possible replay attack detected.`);
             return false;
         }
         return true;
@@ -117,16 +115,6 @@ class PartialBootstrapDeployment {
         const msbBootstrap =  this.state.bootstrap;
         if (b4a.equals(msbBootstrap, payload.bdo.bs)) {
             console.error('External bootstrap must be different from MSB bootstrap.');
-            return false;
-        }
-        return true;
-    }
-
-    async #validateTransactionValidity(payload) {
-        const currentTxv = await this.state.getIndexerSequenceState()
-        const incomingTxv = payload.bdo.txv
-        if (!b4a.equals(currentTxv, incomingTxv)) {
-            console.error(`Transaction validity: ${incomingTxv.toString('hex')} does not match the current indexer sequence state: ${currentTxv.toString('hex')}`);
             return false;
         }
         return true;

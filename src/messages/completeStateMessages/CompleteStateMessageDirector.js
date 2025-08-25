@@ -1,6 +1,8 @@
 import StateBuilder from '../base/StateBuilder.js'
 import {OperationType} from '../../utils/protobuf/applyOperations.cjs'
 
+// TODO: RENAME TO CompleteStateMessageDirector
+
 class CompleteStateMessageDirector {
     #builder;
 
@@ -11,12 +13,12 @@ class CompleteStateMessageDirector {
         this.#builder = builderInstance;
     }
 
-    async buildAddAdminMessage(invokerAddress, writingKey, txValidity) {
+    async buildAddAdminMessage(address, writingKey, txValidity) {
         if (!this.#builder) throw new Error('Builder has not been set.');
 
         await this.#builder
             .forOperationType(OperationType.ADD_ADMIN)
-            .withAddress(invokerAddress)
+            .withAddress(address)
             .withWriterKey(writingKey)
             .withTxValidity(txValidity)
             .buildValueAndSign();
@@ -24,106 +26,57 @@ class CompleteStateMessageDirector {
         return this.#builder.getPayload();
     }
 
-    async buildAddWriterMessage(
-        invokerAddress,
-        txHash,
-        txValidity,
-        incomingWritingKey,
-        incomingNonce,
-        incomingSignature
-    ) {
+    async buildAddWriterMessage(address, writingKey) {
         if (!this.#builder) throw new Error('Builder has not been set.');
 
         await this.#builder
             .forOperationType(OperationType.ADD_WRITER)
-            .withAddress(invokerAddress)
-            .withTxHash(txHash)
-            .withTxValidity(txValidity)
-            .withIncomingWriterKey(incomingWritingKey)
-            .withIncomingNonce(incomingNonce)
-            .withIncomingSignature(incomingSignature)
+            .withAddress(address)
+            .withWriterKey(writingKey)
             .buildValueAndSign();
 
         return this.#builder.getPayload();
     }
 
-    async buildRemoveWriterMessage(
-        invokerAddress,
-        txHash,
-        txValidity,
-        incomingWritingKey,
-        incomingNonce,
-        incomingSignature
-    ) {
+    async buildRemoveWriterMessage(address, writingKey) {
         if (!this.#builder) throw new Error('Builder has not been set.');
 
         await this.#builder
             .forOperationType(OperationType.REMOVE_WRITER)
-            .withAddress(invokerAddress)
-            .withTxHash(txHash)
-            .withTxValidity(txValidity)
-            .withIncomingWriterKey(incomingWritingKey)
-            .withIncomingNonce(incomingNonce)
-            .withIncomingSignature(incomingSignature)
+            .withAddress(address)
+            .withWriterKey(writingKey)
             .buildValueAndSign();
 
         return this.#builder.getPayload();
     }
 
-    async buildAdminRecoveryMessage(
-        invokerAddress,
-        txHash,
-        txValidity,
-        incomingWritingKey,
-        incomingNonce,
-        incomingSignature
-    ) {
-        if (!this.#builder) throw new Error('Builder has not been set.');
-
-        await this.#builder
-            .forOperationType(OperationType.ADMIN_RECOVERY)
-            .withAddress(invokerAddress)
-            .withTxHash(txHash)
-            .withTxValidity(txValidity)
-            .withIncomingWriterKey(incomingWritingKey)
-            .withIncomingNonce(incomingNonce)
-            .withIncomingSignature(incomingSignature)
-            .buildValueAndSign();
-
-        return this.#builder.getPayload();
-    }
-
-    async buildAddIndexerMessage(invokerAddress, incomingAddress, txValidity) {
+    async buildAddIndexerMessage(address) {
         if (!this.#builder) throw new Error('Builder has not been set.');
 
         await this.#builder
             .forOperationType(OperationType.ADD_INDEXER)
-            .withAddress(invokerAddress)
-            .withTxValidity(txValidity)
-            .withIncomingAddress(incomingAddress)
+            .withAddress(address)
             .buildValueAndSign();
 
         return this.#builder.getPayload();
     }
 
-    async buildRemoveIndexerMessage(invokerAddress, incomingAddress, txValidity) {
+    async buildRemoveIndexerMessage(address) {
         if (!this.#builder) throw new Error('Builder has not been set.');
         await this.#builder
             .forOperationType(OperationType.REMOVE_INDEXER)
-            .withAddress(invokerAddress)
-            .withTxValidity(txValidity)
-            .withIncomingAddress(incomingAddress)
+            .withAddress(address)
             .buildValueAndSign();
 
         return this.#builder.getPayload();
     }
 
-    async buildAppendWhitelistMessage(invokerAddress, incomingAddress ,txValidity) {
+    async buildAppendWhitelistMessage(address, incomingAddress ,txValidity) {
         if (!this.#builder) throw new Error('Builder has not been set.');
 
         await this.#builder
             .forOperationType(OperationType.APPEND_WHITELIST)
-            .withAddress(invokerAddress)
+            .withAddress(address)
             .withTxValidity(txValidity)
             .withIncomingAddress(incomingAddress)
             .buildValueAndSign();
@@ -131,14 +84,12 @@ class CompleteStateMessageDirector {
         return this.#builder.getPayload();
     }
 
-    async buildBanWriterMessage(invokerAddress ,incomingAddress, txValidity) {
+    async buildBanWriterMessage(address) {
         if (!this.#builder) throw new Error('Builder has not been set.');
 
         await this.#builder
             .forOperationType(OperationType.BAN_VALIDATOR)
-            .withAddress(invokerAddress)
-            .withTxValidity(txValidity)
-            .withIncomingAddress(incomingAddress)
+            .withAddress(address)
             .buildValueAndSign();
 
         return this.#builder.getPayload();

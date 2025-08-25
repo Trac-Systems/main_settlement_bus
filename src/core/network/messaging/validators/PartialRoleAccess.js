@@ -2,10 +2,11 @@ import b4a from 'b4a';
 import Wallet from 'trac-wallet';
 
 import Check from '../../../../utils/check.js';
+import {addressToBuffer, bufferToAddress} from "../../../state/utils/address.js";
 import {OperationType} from "../../../../utils/constants.js";
 import {blake3Hash} from "../../../../utils/crypto.js";
 import {createMessage} from "../../../../utils/buffer.js";
-import {addressToBuffer, bufferToAddress} from "../../../state/utils/address.js";
+import PeerWallet from "trac-wallet";
 
 class PartialRoleAccess {
     #state;
@@ -38,7 +39,6 @@ class PartialRoleAccess {
         if (!await this.#validateTransactionUniqueness(payload)) return false;
         if (!await this.#validateSignature(payload)) return false;
         if (!await this.#isRequesterAllowedToChangeRole(payload)) return false;
-        if (!await this.#validateTransactionValidity(payload)) return false;
         return true;
     }
 
@@ -139,12 +139,6 @@ class PartialRoleAccess {
                 return false;
             }
 
-            const isAlreadyIndexer = nodeEntry.isIndexer;
-            if (isAlreadyIndexer) {
-                console.error(`Node with address ${nodeAddress} is an indexer.`);
-                return false;
-            }
-
             return true;
         } else if (type === OperationType.ADMIN_RECOVERY) {
             const adminEntry = await this.state.getAdminEntry();
@@ -167,16 +161,6 @@ class PartialRoleAccess {
             return true;
         }
         return false;
-    }
-
-    async #validateTransactionValidity(payload) {
-        const currentTxv = await this.state.getIndexerSequenceState()
-        const incomingTxv = payload.rao.txv
-        if (!b4a.equals(currentTxv, incomingTxv)) {
-            console.error(`Transaction validity: ${incomingTxv.toString('hex')} does not match the current indexer sequence state: ${currentTxv.toString('hex')}`);
-            return false;
-        }
-        return true;
     }
 }
 

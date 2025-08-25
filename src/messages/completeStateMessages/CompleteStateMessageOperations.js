@@ -1,7 +1,14 @@
+import PeerWallet from 'trac-wallet';
+import b4a from 'b4a';
+
 import CompleteStateMessageDirector from './CompleteStateMessageDirector.js';
 import CompleteStateMessageBuilder from './CompleteStateMessageBuilder.js';
 import {safeEncodeApplyOperation} from '../../utils/protobuf/operationHelpers.js';
 import fileUtils from '../../../src/utils/fileUtils.js';
+import {OperationType} from '../../utils/constants.js';
+import {createMessage} from '../../utils/buffer.js';
+import {bufferToAddress} from '../../core/state/utils/address.js';
+import {blake3Hash} from '../../utils/crypto.js';
 
 class CompleteStateMessageOperations {
 
@@ -12,6 +19,7 @@ class CompleteStateMessageOperations {
             director.builder = builder;
 
             const payload = await director.buildAddAdminMessage(wallet.address, writingKey, txValidity);
+            console.log(payload)
             return safeEncodeApplyOperation(payload);
 
         } catch (error) {
@@ -19,28 +27,13 @@ class CompleteStateMessageOperations {
         }
     }
 
-    static async assembleAddWriterMessage(
-        wallet,
-        invokerAddress,
-        transactionHash,
-        txValidity,
-        incomingWritingKey,
-        incomingNonce,
-        incomingSignature
-    ) {
+    static async assembleAddWriterMessage(wallet, writingKey, txValidity) {
         try {
             const builder = new CompleteStateMessageBuilder(wallet);
             const director = new CompleteStateMessageDirector();
             director.builder = builder;
 
-            const payload = await director.buildAddWriterMessage(
-                invokerAddress,
-                transactionHash,
-                txValidity,
-                incomingWritingKey,
-                incomingNonce,
-                incomingSignature
-            );
+            const payload = await director.buildAddWriterMessage(wallet.address, writingKey, txValidity);
             return safeEncodeApplyOperation(payload);
 
         } catch (error) {
@@ -48,28 +41,13 @@ class CompleteStateMessageOperations {
         }
     }
 
-    static async assembleRemoveWriterMessage(
-        wallet,
-        invokerAddress,
-        transactionHash,
-        txValidity,
-        incomingWritingKey,
-        incomingNonce,
-        incomingSignature
-    ) {
+    static async assembleRemoveWriterMessage(wallet, writingKey) {
         try {
             const builder = new CompleteStateMessageBuilder(wallet);
             const director = new CompleteStateMessageDirector();
             director.builder = builder;
 
-            const payload = await director.buildRemoveWriterMessage(
-                invokerAddress,
-                transactionHash,
-                txValidity,
-                incomingWritingKey,
-                incomingNonce,
-                incomingSignature
-            );
+            const payload = await director.buildRemoveWriterMessage(wallet.address, writingKey);
             return safeEncodeApplyOperation(payload);
 
         } catch (error) {
@@ -77,42 +55,13 @@ class CompleteStateMessageOperations {
         }
     }
 
-    static async assembleAdminRecoveryMessage(
-        wallet,
-        invokerAddress,
-        transactionHash,
-        txValidity,
-        incomingWritingKey,
-        incomingNonce,
-        incomingSignature
-    ) {
+    static async assembleAddIndexerMessage(wallet, address) {
         try {
             const builder = new CompleteStateMessageBuilder(wallet);
             const director = new CompleteStateMessageDirector();
             director.builder = builder;
 
-            const payload = await director.buildAdminRecoveryMessage(
-                invokerAddress,
-                transactionHash,
-                txValidity,
-                incomingWritingKey,
-                incomingNonce,
-                incomingSignature
-            );
-            return safeEncodeApplyOperation(payload);
-
-        } catch (error) {
-            throw new Error(`Failed to assemble remove writer message: ${error.message}`);
-        }
-    }
-
-    static async assembleAddIndexerMessage(wallet, incomingAddress, txValidity) {
-        try {
-            const builder = new CompleteStateMessageBuilder(wallet);
-            const director = new CompleteStateMessageDirector();
-            director.builder = builder;
-
-            const payload = await director.buildAddIndexerMessage(wallet.address, incomingAddress, txValidity);
+            const payload = await director.buildAddIndexerMessage(address);
             return safeEncodeApplyOperation(payload);
 
         } catch (error) {
@@ -120,15 +69,13 @@ class CompleteStateMessageOperations {
         }
     }
 
-
-
-    static async assembleRemoveIndexerMessage(wallet, incomingAddress, txValidity) {
+    static async assembleRemoveIndexerMessage(wallet, address) {
         try {
             const builder = new CompleteStateMessageBuilder(wallet);
             const director = new CompleteStateMessageDirector();
             director.builder = builder;
 
-            const payload = await director.buildRemoveIndexerMessage(wallet.address, incomingAddress, txValidity);
+            const payload = await director.buildRemoveIndexerMessage(address);
             return safeEncodeApplyOperation(payload);
 
         } catch (error) {
@@ -157,13 +104,13 @@ class CompleteStateMessageOperations {
         }
     }
 
-    static async assembleBanWriterMessage(wallet, incomingAddress, txValidity) {
+    static async assembleBanWriterMessage(wallet, address) {
         try {
             const builder = new CompleteStateMessageBuilder(wallet);
             const director = new CompleteStateMessageDirector();
             director.builder = builder;
 
-            const payload = await director.buildBanWriterMessage(wallet.address, incomingAddress, txValidity);
+            const payload = await director.buildBanWriterMessage(address);
             return safeEncodeApplyOperation(payload);
 
         } catch (error) {
@@ -198,6 +145,7 @@ class CompleteStateMessageOperations {
                 externalBootstrap,
                 msbBootstrap,
             );
+            console.log(payload)
             return safeEncodeApplyOperation(payload);
 
         } catch (error) {
@@ -231,6 +179,83 @@ class CompleteStateMessageOperations {
 
         } catch (error) {
             throw new Error(`Failed to assemble ban writer message: ${error.message}`);
+        }
+    }
+
+    //TODO: This method can be simplified and moved to another module responsible for message verification.
+    static async verifyEventMessage(parsedRequest, wallet, check, state) {
+        try {
+            const {type} = parsedRequest;
+            if (
+                type !== OperationType.ADD_ADMIN &&
+                type !== OperationType.ADD_WRITER &&
+                type !== OperationType.REMOVE_WRITER
+            ) {
+                return false;
+            }
+
+            const validationResult = check.validateExtendedKeyOpSchema(parsedRequest);
+            if (!validationResult) return false;
+
+            if (type === OperationType.ADD_WRITER) {
+                const nodeAddress = bufferToAddress(parsedRequest.address);
+                if (nodeAddress === null) return false;
+
+                const nodeEntry = await state.getNodeEntry(nodeAddress);
+                if (!nodeEntry) return false;
+
+                const isNodeAlreadyWriter = nodeEntry.isWriter;
+                const isNodeWhitelisted = nodeEntry.isWhitelisted;
+                const canAddWriter = state.isWritable() && !isNodeAlreadyWriter && isNodeWhitelisted;
+
+                if (parsedRequest.address === wallet.address || !canAddWriter) return false;
+
+                const nodePublicKey = PeerWallet.decodeBech32m(nodeAddress);
+
+                const msg = createMessage(parsedRequest.address, parsedRequest.eko.wk, parsedRequest.eko.nonce, parsedRequest.type);
+                const hash = await blake3Hash(msg);
+
+                return wallet.verify(parsedRequest.eko.sig, hash, nodePublicKey);
+            } else if (type === OperationType.REMOVE_WRITER) {
+                const nodeAddress = bufferToAddress(parsedRequest.address);
+                if (nodeAddress === null) return false;
+
+                const nodeEntry = await state.getNodeEntry(nodeAddress);
+                if (!nodeEntry) return false;
+
+                const isAlreadyWriter = nodeEntry.isWriter;
+                const canRemoveWriter = state.isWritable() && isAlreadyWriter;
+                if (nodeAddress === wallet.address || !canRemoveWriter) return false;
+
+                const nodePublicKey = PeerWallet.decodeBech32m(nodeAddress);
+
+                const msg = createMessage(parsedRequest.address, parsedRequest.eko.wk, parsedRequest.eko.nonce, parsedRequest.type);
+                const hash = await blake3Hash(msg);
+
+                return wallet.verify(parsedRequest.eko.sig, hash, nodePublicKey);
+            } else if (type === OperationType.ADD_ADMIN) {
+                const adminEntry = await state.getAdminEntry();
+                if (!adminEntry) return false;
+                const adminAddressBuffer = parsedRequest.address;
+                const adminAddress = bufferToAddress(adminAddressBuffer);
+                if (adminAddress === null) return false;
+
+                const isRecoveryCase = !!(
+                    adminEntry.address === adminAddress &&
+                    parsedRequest.eko.wk &&
+                    !b4a.equals(parsedRequest.eko.wk, adminEntry.wk)
+                );
+                if (!isRecoveryCase) return false;
+
+                const incomingAdminPublicKey = PeerWallet.decodeBech32m(adminAddress);
+
+                const msg = createMessage(adminAddressBuffer, parsedRequest.eko.wk, parsedRequest.eko.nonce, parsedRequest.type);
+                const hash = await blake3Hash(msg);
+                return wallet.verify(parsedRequest.eko.sig, hash, incomingAdminPublicKey);
+            }
+        } catch (error) {
+            console.error(`Failed to verify event message: ${error.message}`);
+            return false;
         }
     }
 

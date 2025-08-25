@@ -2,7 +2,6 @@ syntax = "proto3";
 
 package apply.operations;
 
-//DO NOT CHANGE THE ORDER AFTER RELEASE - ONLY APPEND NEW ONES
 enum OperationType {
     UNKNOWN              = 0;
     ADD_ADMIN            = 1; // complete
@@ -13,8 +12,8 @@ enum OperationType {
     ADD_INDEXER          = 6; // complete
     REMOVE_INDEXER       = 7; // complete
     BAN_VALIDATOR        = 8; // complete
-    BOOTSTRAP_DEPLOYMENT = 9; // partial
-    TX                   = 10; // partial
+    TX                   = 9; // partial
+    BOOTSTRAP_DEPLOYMENT = 10; // partial
     //INIT_BALANCE         = 11; // complete TODO: UNCOMMENT DURING IMPLEMENTATION
     //TOKEN_TRANSFER       = 12; // partial TODO: UNCOMMENT DURING IMPLEMENTATION
 }
@@ -105,12 +104,12 @@ message Operation {
     bytes address      = 2; // address of the invoker
 
     oneof value {
-        CoreAdminOperation                cao  = 3;
-        AdminControlOperation             aco  = 4;
-        InitBalanceOperation              ibo  = 5;
-        TokenTransferOperation            tto  = 6;
-        RoleAccessOperation               rao  = 7;
-        BootstrapDeploymentOperation      bdo  = 8;
-        TxOperation                       txo  = 9;
+        CoreAdminOperation       cao  = 3;
+        AdminControlOperation    aco  = 4;
+        InitBalanceOperation     ibo  = 5;
+        TokenTransferOperation   tto  = 6;
+        RoleAccessOperation      rao  = 7;
+        TxOperation              txo  = 8;
+        BootstrapDeploymentOperation      bdo  = 9;
     }
 }

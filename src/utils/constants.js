@@ -4,6 +4,7 @@ import { OperationType as OP } from './protobuf/applyOperations.cjs';
 //ATTENTION - THIS IS USED IN THE APPLY FUNCTION!
 export const EntryType = Object.freeze({
     ADMIN: 'admin',
+    WHITELIST: 'whitelist',
     INDEXERS: 'indexers',
     WRITERS_LENGTH: 'wrl',
     WRITERS_INDEX: 'wri/',
@@ -21,12 +22,13 @@ export const OperationType = Object.freeze({
     ADD_INDEXER: OP.ADD_INDEXER,
     REMOVE_INDEXER: OP.REMOVE_INDEXER,
     BAN_VALIDATOR: OP.BAN_VALIDATOR,
-    BOOTSTRAP_DEPLOYMENT: OP.BOOTSTRAP_DEPLOYMENT,
     TX: OP.TX,
+    BOOTSTRAP_DEPLOYMENT: OP.BOOTSTRAP_DEPLOYMENT,
 });
 
 // Role managment constants
 export const EventType = Object.freeze({
+    ADMIN_EVENT: 'admin-event',
     WRITER_EVENT: 'writer-event',
     IS_INDEXER: 'is-indexer',
     IS_NON_INDEXER: 'is-non-indexer',
@@ -36,6 +38,7 @@ export const EventType = Object.freeze({
 });
 
 export const WHITELIST_FILEPATH = './whitelist/addresses.csv';
+export const LISTENER_TIMEOUT = 10_000;
 export const TRAC_NAMESPACE = 'TracNetwork';
 export const WHITELIST_SLEEP_INTERVAL = 1_000;
 
@@ -56,8 +59,11 @@ export const HASH_BYTE_LENGTH = 32;
 export const SIGNATURE_BYTE_LENGTH = 64;
 export const MIN_SAFE_VALIDATION_INTEGER = 0x00000001;
 export const MAX_SAFE_VALIDATION_INTEGER = 0xFFFFFFFF;
-
-// index
+export const TX_HASH_HEXSTRING_LENGTH = 64;
+export const WRITING_KEY_HEXSTRING_LENGTH = 64;
+export const NONCE_HEXSTRING_LENGTH = 64;
+export const CONTENT_HASH_HEXSTRING_LENGTH = 64;
+export const SIGNATURE_HEXSTRING_LENGTH = 128;
 export const BOOTSTRAP_HEXSTRING_LENGTH = 64;
 
 // Pool constants
@@ -86,4 +92,11 @@ export const NETWORK_MESSAGE_TYPES = Object.freeze({
         ADMIN: 'adminResponse',
         NODE: 'nodeResponse'
     },
+
+    OPERATION: {
+        ADD_WRITER: 'addWriter',
+        REMOVE_WRITER: 'removeWriter',
+        ADD_ADMIN: 'addAdmin',
+        WHITELISTED: 'whitelisted'
+    }
 });

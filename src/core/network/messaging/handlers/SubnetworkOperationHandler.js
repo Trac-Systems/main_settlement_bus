@@ -8,7 +8,6 @@ import {
 import PartialBootstrapDeployment from "../validators/PartialBootstrapDeployment.js";
 import {addressToBuffer, bufferToAddress} from "../../../state/utils/address.js";
 import PartialTransaction from "../validators/PartialTransaction.js";
-import {normalizeHex} from "../../../../utils/helpers.js";
 
 /**
  * THIS CLASS IS ULTRA IMPORTANT BECAUSE IF SOMEONE WILL SEND A TRASH TO VALIDATOR AND IT WON'T BE HANDLED PROPERTLY -
@@ -16,7 +15,7 @@ import {normalizeHex} from "../../../../utils/helpers.js";
  * MUST BE REFUSED.
  * TODO: WE SHOULD AUDIT VALIDATORS AND MAKE SURE THEY ARE NOT BROADCASTING TRASH TO THE INDEXER LAYER.
  */
-class SubnetworkOperationHandler {
+class TransactionHandler {
     #disable_rate_limit;
     #network;
     #state;
@@ -57,10 +56,7 @@ class SubnetworkOperationHandler {
     }
 
     async handle(payload, connection) {
-        // TODO: This check can be moved to a router layer after resolving role separation.
-        // Context: An admin node can be both a writer and an indexer simultaneously.
-        // While indexers primarily focus on the consensus layer, admin nodes should be allowed
-        // to handle certain operations until the network reaches a sufficient number of validators.
+        // TODO: it should be handled somewhere else. Maybe in the router?
         if (this.state.isIndexer() || !this.state.isWritable()) {
             throw new Error('TransactionHandler: State is not writable or is an indexer.');
         }
@@ -114,12 +110,10 @@ class SubnetworkOperationHandler {
         if (!isValid) {
             throw new Error("TransactionHandler: bootstrap deployment validation failed.");
         }
-
         const completeBootstrapDeploymentOperation = await CompleteStateMessageOperations.assembleCompleteBootstrapDeployment(
             this.#wallet,
             normalizedPayload.address,
             normalizedPayload.bdo.tx,
-            normalizedPayload.bdo.txv,
             normalizedPayload.bdo.bs,
             normalizedPayload.bdo.in,
             normalizedPayload.bdo.is,
@@ -141,6 +135,7 @@ class SubnetworkOperationHandler {
             throw new Error('Missing required fields in bootstrap deployment payload.');
         }
 
+        const normalizeHex = field => (typeof field === 'string' ? b4a.from(field, 'hex') : field);
         const normalizedBdo = {
             tx: normalizeHex(bdo.tx),
             txv: normalizeHex(bdo.txv),
@@ -170,6 +165,7 @@ class SubnetworkOperationHandler {
             throw new Error('Missing required fields in transaction operation payload.');
         }
 
+        const normalizeHex = field => (typeof field === 'string' ? b4a.from(field, 'hex') : field);
         const normalizedTxo = {
             tx: normalizeHex(txo.tx),    // Transaction hash
             txv: normalizeHex(txo.txv),  // Transaction validity
@@ -189,4 +185,4 @@ class SubnetworkOperationHandler {
     }
 }
 
-export default SubnetworkOperationHandler;
+export default TransactionHandler;

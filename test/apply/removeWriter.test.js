@@ -141,10 +141,10 @@ test('handleApplyRemoveWriterOperation (apply) - Append removeWriter payload int
     // writer4 is already a writer.
     // indexer is already an indexer.
 
-    const reqRemoveWriter4 = await CompleteStateMessageOperations.assembleRemoveWriterMessage(
-        writer4.wallet,
-        writer4.msb.state.writingKey,
-    );
+        const reqRemoveWriter4 = await CompleteStateMessageOperations.assembleRemoveWriterMessage(
+            writer4.wallet,
+            writer4.msb.state.writingKey,
+        );
 
     await writer3.msb.state.append(reqRemoveWriter4);
     await writer3.msb.state.base.flush();
@@ -163,7 +163,7 @@ test('handleApplyRemoveWriterOperation (apply) - Append removeWriter payload int
     t.is(writer4.msb.state.isWritable(), false, 'peer should not be writable');
 });
 
-test('handleApplyRemoveWriterOperation (apply) - Append removeWriter payload into the base - indexer will NOT be removed', async (t) => {
+test('handleApplyRemoveWriterOperation (apply) - Append removeWriter payload into the base - remove writer who is an indexer', async (t) => {
     // writer1 is not a writer.
     // writer2 is not a writer
     // writer3 is already a writer.
@@ -186,13 +186,17 @@ test('handleApplyRemoveWriterOperation (apply) - Append removeWriter payload int
         })
 
         await waitForNotIndexer(indexer);
-        await writer3.msb.state.getNodeEntry(indexer.wallet.address);
+        const resultRemoveWriter = await writer3.msb.state.getNodeEntry(indexer.wallet.address);
         const indexersEntry = await writer3.msb.state.getIndexersEntry();
         const formattedIndexersEntry = formatIndexersEntry(indexersEntry);
 
         t.ok(indexersEntry, 'Indexers entry should not be null');
-        t.is(formattedIndexersEntry.addresses.includes(indexer.wallet.address), true, 'Indexer address should still be included in indexers entry');
-        t.is(indexer.msb.state.isWritable(), true, 'Peer should remain writable');
+        t.is(formattedIndexersEntry.addresses.includes(indexer.wallet.address), false, 'Indexer address should not be included in indexers entry');
+        t.ok(resultRemoveWriter, 'Result should not be null');
+        t.ok(b4a.equals(resultRemoveWriter.wk, indexer.msb.state.writingKey), 'Result writing key should match writer writing key');
+        t.is(resultRemoveWriter.isWriter, false, 'Node should not be a writer anymore');
+        t.is(resultRemoveWriter.isIndexer, false, 'Result should not indicate that the peer is an indexer');
+        t.is(indexer.msb.state.isWritable(), false, 'Peer should not be writable');
     } catch (error) {
         t.fail('Failed to remove writer: ' + error.message);
     }

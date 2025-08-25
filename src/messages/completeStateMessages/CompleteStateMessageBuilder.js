@@ -9,6 +9,7 @@ import {TRAC_ADDRESS_SIZE} from 'trac-wallet/constants.js';
 import {isAddressValid} from "../../core/state/utils/address.js";
 import {blake3Hash} from '../../utils/crypto.js';
 
+// TODO: RENAME TO CompleteStateMessageBuilder
 class CompleteStateMessageBuilder extends StateBuilder {
     #wallet;
     #operationType;
@@ -104,7 +105,6 @@ class CompleteStateMessageBuilder extends StateBuilder {
         if (!isAddressValid(address)) {
             throw new Error(`Address field must be a valid TRAC bech32m address with length ${TRAC_ADDRESS_SIZE}.`);
         }
-
         this.#incomingAddress = addressToBuffer(address);
         return this;
     }
@@ -180,34 +180,30 @@ class CompleteStateMessageBuilder extends StateBuilder {
         let tx = null;
         let signature = null;
 
-        // all incoming data from setters should be as buffer data type, createMessage accept only buffer and uint32
+        // all incoming data from setters should be BUFFER, createMessage accept only BUFFER and uint32
         switch (this.#operationType) {
             // Complete by default
             case OperationType.ADD_ADMIN:
                 msg = createMessage(this.#address, this.#txValidity, this.#writingKey, nonce, this.#operationType);
                 break;
-
             // Partial need to be signed
             case OperationType.ADD_WRITER:
             case OperationType.REMOVE_WRITER:
-            case OperationType.ADMIN_RECOVERY:
-                msg = createMessage(
-                    this.#txHash,
-                    addressToBuffer(this.#wallet.address),
-                    nonce,
-                    this.#operationType
-                );
+                msg = createMessage(this.#address, this.#writingKey, nonce, this.#operationType);
                 break;
             // Complete by default
             case OperationType.APPEND_WHITELIST:
+                msg = createMessage(this.#address, this.#txValidity, this.#incomingAddress, nonce, this.#operationType);
+                break;
+            // Complete by default
             case OperationType.ADD_INDEXER:
             case OperationType.REMOVE_INDEXER:
             case OperationType.BAN_VALIDATOR:
-                if (this.#wallet.address === bufferToAddress(this.#incomingAddress)) {
+                if (this.#wallet.address === bufferToAddress(this.#address)) {
                     throw new Error('Address must not be the same as the wallet address for basic operations.');
                 }
 
-                msg = createMessage(this.#address, this.#txValidity, this.#incomingAddress, nonce, this.#operationType);
+                msg = createMessage(this.#address, nonce, this.#operationType);
                 break;
             // Partial need to be signed
             case OperationType.TX:
@@ -225,6 +221,7 @@ class CompleteStateMessageBuilder extends StateBuilder {
                 break;
             // Partial need to be signed
             case OperationType.BOOTSTRAP_DEPLOYMENT:
+
                 if (!this.#txHash || !this.#externalBootstrap || !this.#incomingNonce || !this.#incomingSignature) {
                     throw new Error('All bootstrap deployment fields must be set before building the message!');
                 }
@@ -258,18 +255,6 @@ class CompleteStateMessageBuilder extends StateBuilder {
                 in: nonce,
                 ia: this.#incomingAddress,
                 is: signature
-            };
-        }
-        else if (this.#isRoleAccessOperation(this.#operationType)) {
-            this.#payload.rao = {
-                tx: this.#txHash,
-                txv: this.#txValidity,
-                iw: this.#incomingWriterKey,
-                in: this.#incomingNonce,
-                is: this.#incomingSignature,
-                va: addressToBuffer(this.#wallet.address),
-                vn: nonce,
-                vs: signature,
             };
         } else if (this.#isTransaction(this.#operationType)) {
             this.#payload.txo = {
