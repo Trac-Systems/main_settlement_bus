@@ -8,7 +8,7 @@ import tty from "tty";
 
 import { sleep, formatIndexersEntry, isHexString } from "./utils/helpers.js";
 import { verifyDag, printHelp, printWalletInfo } from "./utils/cli.js";
-import StateMessageOperations from "./messages/stateMessages/StateMessageOperations.js";
+import CompleteStateMessageOperations from "./messages/completeStateMessages/CompleteStateMessageOperations.js";
 import { safeDecodeApplyOperation } from "./utils/protobuf/operationHelpers.js";
 import { createMessage } from "./utils/buffer.js";
 import addressUtils, { bufferToAddress, isAddressValid } from "./core/state/utils/address.js";
@@ -24,6 +24,9 @@ import {
     BOOTSTRAP_HEXSTRING_LENGTH,
 } from "./utils/constants.js";
 import { blake3Hash } from "./utils/crypto.js";
+import partialStateMessageOperations from "./messages/partialStateMessages/PartialStateMessageOperations.js";
+import {randomBytes} from "hypercore-crypto";
+import completeStateMessageOperations from "./messages/completeStateMessages/CompleteStateMessageOperations.js";
 
 //TODO create a MODULE which will separate logic responsible for role managment
 
@@ -236,7 +239,7 @@ export class MainSettlementBus extends ReadyResource {
             if (decodedRequest.type) {
                 if(OperationType.ADD_ADMIN){
                     this.emit(EventType.ADMIN_EVENT, decodedRequest, bufferedRequest);
-                }  
+                }
                 if ([OperationType.ADD_WRITER, OperationType.REMOVE_WRITER, OperationType.ADD_ADMIN].includes(decodedRequest.type)) {
                     //This request must be handled by ADMIN
                     this.emit(EventType.WRITER_EVENT, decodedRequest, bufferedRequest);
@@ -288,7 +291,7 @@ export class MainSettlementBus extends ReadyResource {
             try {
                 if (this.#enable_wallet === false) return;
                 const isEventMessageValid =
-                    await StateMessageOperations.verifyEventMessage(
+                    await CompleteStateMessageOperations.verifyEventMessage(
                         parsedRequest,
                         this.#wallet,
                         this.check,
@@ -321,7 +324,7 @@ export class MainSettlementBus extends ReadyResource {
             try {
                 if (this.#enable_wallet === false) return;
                 const isEventMessageVerifed =
-                    await StateMessageOperations.verifyEventMessage(
+                    await CompleteStateMessageOperations.verifyEventMessage(
                         parsedRequest,
                         this.#wallet,
                         this.check,
@@ -429,11 +432,14 @@ export class MainSettlementBus extends ReadyResource {
                 );
             }
 
-            const addAdminMessage =
-                await StateMessageOperations.assembleAddAdminMessage(
-                    this.#wallet,
-                    this.#state.writingKey
-                );
+            await this.#state.append(null); // before initialization system.indexers is empty, we need to initialize first block to create system.indexers array
+            const txValidity = await this.#state.getIndexerSequenceState();
+            const addAdminMessage = await CompleteStateMessageOperations.assembleAddAdminMessage(
+                this.#wallet,
+                this.#state.writingKey,
+                txValidity
+            );
+
             await this.#state.append(addAdminMessage);
 
             setTimeout(async () => {
@@ -445,7 +451,7 @@ export class MainSettlementBus extends ReadyResource {
                     this.#shouldListenToAdminEvents = true;
                     this.#adminEventListener();
                 }
-                
+
                 if (
                     this.#isAdmin(updatedAdminEntry) &&
                     !this.#shouldListenToWriterEvents
@@ -474,16 +480,19 @@ export class MainSettlementBus extends ReadyResource {
             );
         }
 
-        const addAdminMessage =
-            await StateMessageOperations.assembleAddAdminMessage(
-                this.#wallet,
-                this.#state.writingKey
-            );
+        const txValidity = await this.#state.getIndexerSequenceState();
+        const addAdminMessage = await partialStateMessageOperations.assembleAdminRecoveryMessage(
+            this.#wallet,
+            this.#state.writingKey.toString('hex'),
+            txValidity.toString('hex')
+        );
+
         const payloadForValidator = {
             op: "addAdmin",
             transactionPayload: addAdminMessage,
-        };
-        await this.#network.validator_stream.messenger.send(payloadForValidator);
+        }
+        console.log(payloadForValidator)
+        // await this.#network.validator_stream.messenger.send(payloadForValidator);
 
         setTimeout(async () => {
             const updatedAdminEntry = await this.#state.getAdminEntry();
@@ -513,11 +522,15 @@ export class MainSettlementBus extends ReadyResource {
         if (this.#enable_wallet === false) return;
         const adminEntry = await this.#state.getAdminEntry();
 
-        if (!this.#isAdmin(adminEntry)) return;
-        const assembledWhitelistMessages =
-            await StateMessageOperations.assembleAppendWhitelistMessages(
-                this.#wallet
-            );
+        if (!this.#isAdmin(adminEntry)) {
+            throw new Error('Cannot perform whitelisting - you are not the admin!.');
+        }
+
+        const txValidity = await this.#state.getIndexerSequenceState();
+        const assembledWhitelistMessages = await CompleteStateMessageOperations.assembleAppendWhitelistMessages(
+            this.#wallet,
+            txValidity
+        );
         if (!assembledWhitelistMessages) {
             throw new Error("No whitelisted messages to process.");
         }
@@ -528,8 +541,7 @@ export class MainSettlementBus extends ReadyResource {
         for (const [address, encodedPayload] of assembledWhitelistMessages) {
             processedCount++;
             const isWhitelisted = await this.#state.isAddressWhitelisted(address);
-            const correspondingPublicKey =
-                PeerWallet.decodeBech32m(address).toString("hex");
+            const correspondingPublicKey = PeerWallet.decodeBech32m(address).toString("hex");
             if (isWhitelisted) {
                 console.error(`Public key ${address} is already whitelisted.`);
                 console.log(
@@ -542,14 +554,10 @@ export class MainSettlementBus extends ReadyResource {
                 op: "whitelisted",
                 transactionPayload: encodedPayload,
             };
-
             await this.#state.append(encodedPayload);
             // timesleep and validate if it becomes whitelisted
+            await this.#network.sendMessageToNode(correspondingPublicKey, whitelistedMessage)
             await sleep(WHITELIST_SLEEP_INTERVAL);
-            await this.#network.sendMessageToNode(
-                correspondingPublicKey,
-                whitelistedMessage
-            );
             console.log(
                 `Whitelist message processed (${processedCount}/${totalElements})`
             );
@@ -587,41 +595,44 @@ export class MainSettlementBus extends ReadyResource {
                     "Cannot request writer role - internal state is already writable"
                 );
             }
-
+            const txValidity = await this.#state.getIndexerSequenceState();
             const assembledMessage = {
-                op: "addWriter",
-                transactionPayload:
-                    await StateMessageOperations.assembleAddWriterMessage(
-                        this.#wallet,
-                        this.#state.writingKey
-                    ),
-            };
-            let dispatcher = await this.#pickWriter()
-            console.log(dispatcher);
-
-            if (dispatcher) {
-                await this.#network.sendMessageToNode(dispatcher, assembledMessage);
+                op: 'addWriter',
+                transactionPayload: await PartialStateMessageOperations.assembleAddWriterMessage(
+                    this.#wallet,
+                    this.#state.writingKey.toString('hex'),
+                    txValidity.toString('hex')
+                ),
             }
+            console.log(assembledMessage)
+
+            // await this.#network.sendMessageToAdmin(adminEntry, assembledMessage);
+            // let dispatcher = await this.#pickWriter()
+            // console.log(dispatcher);
+            //
+            // if (dispatcher) {
+            //     await this.#network.sendMessageToNode(dispatcher, assembledMessage);
+            // }
             return;
         }
 
         if (!isAlreadyWriter) {
             throw new Error("Cannot remove writer role - you are not a writer");
         }
-
+        const txValidity = await this.#state.getIndexerSequenceState();
         const assembledMessage = {
-            op: "removeWriter",
-            transactionPayload:
-                await StateMessageOperations.assembleRemoveWriterMessage(
-                    this.#wallet,
-                    this.#state.writingKey
-                ),
-        };
-
-        let dispatcher = await this.#pickWriter()
-        if (dispatcher) {
-            await this.#network.sendMessageToNode(dispatcher, assembledMessage);
+            op: 'removeWriter',
+            transactionPayload: await PartialStateMessageOperations.assembleRemoveWriterMessage(
+                this.#wallet,
+                this.#state.writingKey.toString('hex'),
+                txValidity.toString('hex')
+            )
         }
+        console.log(assembledMessage)
+        //await this.#network.sendMessageToAdmin(adminEntry, assembledMessage);
+        // let dispatcher = await this.#pickWriter()
+        // if (dispatcher) {
+        //     await this.#network.sendMessageToNode(dispatcher, assembledMessage);
     }
 
     async #updateIndexerRole(address, toAdd) {
@@ -682,11 +693,7 @@ export class MainSettlementBus extends ReadyResource {
                 );
             }
 
-            const assembledAddIndexerMessage =
-                await StateMessageOperations.assembleAddIndexerMessage(
-                    this.#wallet,
-                    address
-                );
+            const assembledAddIndexerMessage = await CompleteStateMessageOperations.assembleAddIndexerMessage(this.#wallet, address);
             await this.#state.append(assembledAddIndexerMessage);
         } else {
             const canRemoveIndexer =
@@ -698,11 +705,7 @@ export class MainSettlementBus extends ReadyResource {
                 );
             }
 
-            const assembledRemoveIndexer =
-                await StateMessageOperations.assembleRemoveIndexerMessage(
-                    this.#wallet,
-                    address
-                );
+            const assembledRemoveIndexer = await CompleteStateMessageOperations.assembleRemoveIndexerMessage(this.#wallet, address);
             await this.#state.append(assembledRemoveIndexer);
         }
     }
@@ -742,11 +745,7 @@ export class MainSettlementBus extends ReadyResource {
             );
         }
 
-        const assembledBanValidatorMessage =
-            await StateMessageOperations.assembleBanWriterMessage(
-                this.#wallet,
-                address
-            );
+        const assembledBanValidatorMessage = await CompleteStateMessageOperations.assembleBanWriterMessage(this.#wallet, address);
         await this.#state.append(assembledBanValidatorMessage);
     }
 
@@ -788,9 +787,7 @@ export class MainSettlementBus extends ReadyResource {
                 `Can not perform bootstrap deployment - bootstrap is not a hex: ${externalBootstrap}`
             );
         }
-        const isAlreadyDeployed = await this.#state.getRegisteredBootstrapEntry(
-            externalBootstrap
-        );
+        const isAlreadyDeployed = await this.#state.getRegisteredBootstrapEntry(externalBootstrap);
         if (isAlreadyDeployed !== null) {
             throw new Error(
                 `Can not perform bootstrap deployment - bootstrap ${externalBootstrap} is already deployed.`
@@ -802,12 +799,12 @@ export class MainSettlementBus extends ReadyResource {
                 `Can not perform bootstrap deployment - bootstrap ${externalBootstrap} is equal to MSB bootstrap!`
             );
         }
-
-        const payload =
-            await PartialStateMessageOperations.assembleBootstrapDeployment(
-                this.#wallet,
-                externalBootstrap
-            );
+        const txValidity = await this.#state.getIndexerSequenceState();
+        const payload = await PartialStateMessageOperations.assembleBootstrapDeploymentMessage(
+            this.#wallet,
+            externalBootstrap,
+            txValidity.toString('hex')
+        );
         await this.#network.validator_stream.messenger.send(payload);
     }
 
@@ -879,15 +876,10 @@ export class MainSettlementBus extends ReadyResource {
                 break;
             case "/core":
                 const admin = await this.#state.getAdminEntry();
-                console.log(
-                    "Admin:",
-                    admin
-                        ? {
-                            address: admin.address,
-                            writingKey: admin.wk.toString("hex"),
-                        }
-                        : null
-                );
+                console.log("Admin:", admin ? {
+                    address: admin.address,
+                    writingKey: admin.wk.toString("hex")
+                } : null);
                 const indexers = await this.#state.getIndexersEntry();
                 const formattedIndexers = formatIndexersEntry(indexers);
                 if (formattedIndexers.length === 0) {
@@ -905,6 +897,74 @@ export class MainSettlementBus extends ReadyResource {
                     this.#shouldListenToAdminEvents,
                     this.#shouldListenToWriterEvents
                 );
+            case '/stats':
+                await verifyDag(this.#state, this.#network, this.#wallet, this.#state.writingKey, this.#shouldListenToAdminEvents, this.#shouldListenToWriterEvents);
+                break;
+            case '/i':
+                console.log(await this.#state.getIndexerSequenceState())
+                break;
+            case '/test':
+                const normalizeTransactionOperation = (payload) => {
+                    if (!payload || typeof payload !== 'object' || !payload.txo) {
+                        throw new Error('Invalid payload for transaction operation normalization.');
+                    }
+                    const {type, address, txo} = payload;
+                    if (
+                        type !== OperationType.TX ||
+                        !address ||
+                        !txo.tx || !txo.txv || !txo.iw || !txo.in ||
+                        !txo.ch || !txo.is || !txo.bs || !txo.mbs
+                    ) {
+                        throw new Error('Missing required fields in transaction operation payload.');
+                    }
+
+                    const normalizeHex = field => (typeof field === 'string' ? b4a.from(field, 'hex') : field);
+                    const normalizedTxo = {
+                        tx: normalizeHex(txo.tx),    // Transaction hash
+                        txv: normalizeHex(txo.txv),  // Transaction validity
+                        iw: normalizeHex(txo.iw),    // Writing key
+                        in: normalizeHex(txo.in),    // Nonce
+                        ch: normalizeHex(txo.ch),    // Content hash
+                        is: normalizeHex(txo.is),    // Signature
+                        bs: normalizeHex(txo.bs),    // External bootstrap
+                        mbs: normalizeHex(txo.mbs)   // MSB bootstrap key
+                    };
+
+                    return {
+                        type,
+                        address: addressToBuffer(address),
+                        txo: normalizedTxo
+                    };
+                };
+
+                const contentHash = randomBytes(32).toString('hex');
+                const randomExternalBootstrap = randomBytes(32).toString('hex');
+                const randomWk = randomBytes(32).toString('hex');
+                const txValidity = await this.#state.getIndexerSequenceState();
+                const msbBootstrap = this.bootstrap.toString('hex');
+                const assembledTransactionOperation = await PartialStateMessageOperations.assembleTransactionOperationMessage(
+                    this.#wallet,
+                    randomWk,
+                    txValidity.toString('hex'),
+                    contentHash,
+                    randomExternalBootstrap,
+                    msbBootstrap
+                )
+                console.log(assembledTransactionOperation)
+                console.log('normalizedTransactionOperation:', normalizeTransactionOperation(assembledTransactionOperation));
+                const normalizedPayload = normalizeTransactionOperation(assembledTransactionOperation)
+                const complete  = await completeStateMessageOperations.assembleCompleteTransactionOperationMessage(
+                    this.#wallet,
+                    normalizedPayload.address,
+                    normalizedPayload.txo.tx,
+                    normalizedPayload.txo.txv,
+                    normalizedPayload.txo.iw,
+                    normalizedPayload.txo.in,
+                    normalizedPayload.txo.ch,
+                    normalizedPayload.txo.is,
+                    normalizedPayload.txo.bs,
+                    normalizedPayload.txo.mbs,
+                )
                 break;
             default:
                 if (input.startsWith("/get_node_info")) {
@@ -940,25 +1000,15 @@ export class MainSettlementBus extends ReadyResource {
                 } else if (input.startsWith("/get_deployment")) {
                     const splitted = input.split(" ");
                     const bootstrapHex = splitted[1];
-                    const txHash = await this.#state.getRegisteredBootstrapEntry(
-                        bootstrapHex
-                    );
+                    const txHash = await this.#state.getRegisteredBootstrapEntry(bootstrapHex);
                     if (txHash) {
-                        console.log(
-                            `Bootstrap deployed under transaction hash: ${txHash.toString(
-                                "hex"
-                            )}`
-                        );
-                        const payload = await this.#state.getSigned(txHash.toString("hex"));
+                        console.log(`Bootstrap deployed under transaction hash: ${txHash.toString('hex')}`);
+                        const payload = await this.#state.getSigned(txHash.toString('hex'));
                         if (payload) {
                             const decoded = safeDecodeApplyOperation(payload);
-                            console.log("Decoded Bootstrap Deployment Payload:", decoded);
+                            console.log('Decoded Bootstrap Deployment Payload:', decoded);
                         } else {
-                            console.log(
-                                `No payload found for transaction hash: ${txHash.toString(
-                                    "hex"
-                                )}`
-                            );
+                            console.log(`No payload found for transaction hash: ${txHash.toString('hex')}`);
                         }
                     } else {
                         console.log(`No deployment found for bootstrap: ${bootstrapHex}`);

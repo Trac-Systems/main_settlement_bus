@@ -21,7 +21,7 @@ import {
     testKeyPair5,
     testKeyPair6
 } from '../fixtures/apply.fixtures.js';
-import StateMessageOperations from '../../src/messages/stateMessages/StateMessageOperations.js';
+import CompleteStateMessageOperations from '../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
 import {ZERO_WK} from '../../src/utils/buffer.js';
 
 let admin, writer1, writer2, writer3, writer4, indexer1, tmpDirectory;
@@ -57,7 +57,7 @@ test('handleApplyAddWriterOperation (apply) - Append addWriter payload into the 
         // writer3 is not a writer yet, but it is whitelisted.
         // writer4 is reader
         // indexer1 is already an indexer.
-        const req = await StateMessageOperations.assembleAddWriterMessage(
+        const req = await CompleteStateMessageOperations.assembleAddWriterMessage(
             writer1.wallet,
             writer1.msb.state.writingKey,
         );
@@ -94,7 +94,7 @@ test('handleApplyAddWriterOperation (apply) - Append addWriter payload into the 
         // indexer1 is already an indexer.
 
 
-        const reqAddWriter = await StateMessageOperations.assembleAddWriterMessage(
+        const reqAddWriter = await CompleteStateMessageOperations.assembleAddWriterMessage(
             writer2.wallet,
             writer2.msb.state.writingKey,
         );
@@ -113,7 +113,7 @@ test('handleApplyAddWriterOperation (apply) - Append addWriter payload into the 
         const signedLengthAdminBefore = admin.msb.state.getSignedLength();
         const signedLengthWriter2Before = writer2.msb.state.getSignedLength();
 
-        const reqAddWriterAgain = await StateMessageOperations.assembleAddWriterMessage(
+        const reqAddWriterAgain = await CompleteStateMessageOperations.assembleAddWriterMessage(
             writer2.wallet,
             writer2.msb.state.writingKey,
         );
@@ -146,8 +146,9 @@ test('handleApplyAddWriterOperation (apply) - Append addWriter payload into the 
     //writer4 is reader
     // indexer1 is already an indexer.
 
+
     const signedLengthWriter1Before = writer1.msb.state.getSignedLength();
-    const reqAddWriter = await StateMessageOperations.assembleAddWriterMessage(
+    const reqAddWriter = await CompleteStateMessageOperations.assembleAddWriterMessage(
         writer3.wallet,
         writer3.msb.state.writingKey,
     );
@@ -180,7 +181,7 @@ test('handleApplyAddWriterOperation (apply) - Append addWriter payload into the 
         // writer4 is reader
         // indexer1 is already an indexer.
 
-        const reqAddWriter = await StateMessageOperations.assembleAddWriterMessage(
+        const reqAddWriter = await CompleteStateMessageOperations.assembleAddWriterMessage(
             writer3.wallet,
             ZERO_WK,
         );
@@ -216,7 +217,7 @@ test('handleApplyAddWriterOperation (apply) - Append addWriter payload into the 
     // writer4 is reader
     // indexer1 is already an indexer.
     try {
-        const reqAddWriter = await StateMessageOperations.assembleAddWriterMessage(
+        const reqAddWriter = await CompleteStateMessageOperations.assembleAddWriterMessage(
             indexer1.wallet,
             indexer1.msb.state.writingKey,
         );
@@ -255,7 +256,7 @@ test('handleApplyAddWriterOperation (apply) - Append addWriter payload into the 
     // indexer1 is already an indexer
 
     try {
-        const reqAddWriter = await StateMessageOperations.assembleAddWriterMessage(
+        const reqAddWriter = await CompleteStateMessageOperations.assembleAddWriterMessage(
             writer3.wallet,
             writer3.msb.state.writingKey,
         );
@@ -284,7 +285,7 @@ test('handleApplyAddWriterOperation (apply) - Append addWriter payload into the 
         t.ok(b4a.equals(result.wk, writer3.msb.state.writingKey), 'Result writing key should match writer writing key');
         t.ok(result.isWriter, 'Result should indicate that the peer is a valid writer');
 
-        const reqBanWriter = await StateMessageOperations.assembleBanWriterMessage(
+        const reqBanWriter = await CompleteStateMessageOperations.assembleBanWriterMessage(
             admin.wallet,
             writer3.wallet.address,
         );
@@ -317,7 +318,7 @@ test('handleApplyAddWriterOperation (apply) - Append addWriter payload into the 
         const resultAfterWhitelising = await writer1.msb.state.getNodeEntry(writer3.wallet.address);
         t.is(resultAfterWhitelising.isWhitelisted, true, 'Result after whitelisting should indicate that the peer is not whitelisted');
 
-        const reqAddWriterAgain = await StateMessageOperations.assembleAddWriterMessage(
+        const reqAddWriterAgain = await CompleteStateMessageOperations.assembleAddWriterMessage(
             writer3.wallet,
             writer3.msb.state.writingKey,
         );
@@ -356,7 +357,7 @@ test('handleApplyAddWriterOperation (apply) - Append addWriter payload into the 
         // writer4 is reader -> this node will not become a writer.
         // indexer1 is already an indexer
 
-        const reqAddWriter = await StateMessageOperations.assembleAddWriterMessage(
+        const reqAddWriter = await CompleteStateMessageOperations.assembleAddWriterMessage(
             writer4.wallet,
             writer4.msb.state.writingKey,
         );

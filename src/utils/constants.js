@@ -1,4 +1,5 @@
 import { OperationType as OP } from './protobuf/applyOperations.cjs';
+// TODO: We are going to have a lot of contstants. It would be good, to separate them into different files.
 
 //ATTENTION - THIS IS USED IN THE APPLY FUNCTION!
 export const EntryType = Object.freeze({
@@ -12,22 +13,23 @@ export const EntryType = Object.freeze({
 
 //ATTENTION - THIS IS USED IN THE APPLY FUNCTION!
 export const OperationType = Object.freeze({
+    //TODO: ADD INIT_BALANCE,TOKEN_TRANSFER, BALANCE_INITIALIZED (to discuss),
     ADD_ADMIN: OP.ADD_ADMIN,
     APPEND_WHITELIST: OP.APPEND_WHITELIST,
     ADD_WRITER: OP.ADD_WRITER,
     REMOVE_WRITER: OP.REMOVE_WRITER,
+    ADMIN_RECOVERY: OP.ADMIN_RECOVERY,
     ADD_INDEXER: OP.ADD_INDEXER,
     REMOVE_INDEXER: OP.REMOVE_INDEXER,
-    BAN_VALIDATOR: OP.BAN_WRITER,
-    WHITELISTED: OP.APPEND_WHITELIST,
-    PRE_TX: 'PRE_TX',
+    BAN_VALIDATOR: OP.BAN_VALIDATOR,
     TX: OP.TX,
     BOOTSTRAP_DEPLOYMENT: OP.BOOTSTRAP_DEPLOYMENT,
 });
 
+// Role managment constants
 export const EventType = Object.freeze({
-    ADMIN_EVENT: 'adminEvent',
-    WRITER_EVENT: 'writerEvent',
+    ADMIN_EVENT: 'admin-event',
+    WRITER_EVENT: 'writer-event',
     IS_INDEXER: 'is-indexer',
     IS_NON_INDEXER: 'is-non-indexer',
     WRITABLE: 'writable',
@@ -73,8 +75,8 @@ export const CLEANUP_INTERVAL_MS = 120_000;
 export const CONNECTION_TIMEOUT_MS = 60_000;
 export const MAX_TRANSACTIONS_PER_SECOND = 50;
 
-// PreTransaction constants // todo change name?
-export const MAX_PRE_TX_PAYLOAD_BYTE_SIZE = 3072;
+// Operation handler constants
+export const MAX_PARTIAL_TX_PAYLOAD_BYTE_SIZE = 3072;
 export const TRANSACTION_POOL_SIZE = 1000;
 
 // Network message constants

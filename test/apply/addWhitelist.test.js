@@ -5,7 +5,7 @@ import Wallet from 'trac-wallet';
 import { setupMsbAdmin, initTemporaryDirectory, removeTemporaryDirectory, randomBytes } from '../utils/setupApplyTests.js';
 import { testKeyPair1, testKeyPair2 } from '../fixtures/apply.fixtures.js';
 import fileUtils from '../../src/utils/fileUtils.js';
-import StateMessageOperations from '../../src/messages/stateMessages/StateMessageOperations.js';
+import CompleteStateMessageOperations from '../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
 
 
 let admin, whitelistKeys, tmpDirectory, originalReadPublicKeysFromFile;
@@ -32,7 +32,7 @@ hook('Initialize admin node for addWhitelist tests', async () => {
 });
 
 test('Apply function addWhitelist - happy path', async (t) => {
-    const assembledWhitelistMessages = await StateMessageOperations.assembleAppendWhitelistMessages(admin.wallet);
+    const assembledWhitelistMessages = await CompleteStateMessageOperations.assembleAppendWhitelistMessages(admin.wallet);
     const payload = assembledWhitelistMessages.get(address);
 
     await admin.msb.state.append(payload);

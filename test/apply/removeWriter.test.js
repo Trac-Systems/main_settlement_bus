@@ -22,7 +22,7 @@ import {
     testKeyPair5,
     testKeyPair6
 } from '../fixtures/apply.fixtures.js';
-import StateMessageOperations from '../../src/messages/stateMessages/StateMessageOperations.js';
+import CompleteStateMessageOperations from '../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
 
 
 let admin, writer1, writer2, writer3, writer4, indexer, tmpDirectory;
@@ -54,7 +54,7 @@ test('handleApplyRemoveWriterOperation (apply) - Append removeWriter payload int
         // writer3 is already a writer
         // writer4 is already a writer
         // indexer is already an indexer
-        const reqRemoveWriter = await StateMessageOperations.assembleRemoveWriterMessage(
+        const reqRemoveWriter = await CompleteStateMessageOperations.assembleRemoveWriterMessage(
             writer1.wallet,
             writer1.msb.state.writingKey,
         );
@@ -89,7 +89,7 @@ test('handleApplyRemoveWriterOperation (apply) - Append removeWriter payload int
         // writer3 is already a writer
         // writer4 is already a writer
         // indexer is already an indexer.
-        const reqRemoveWriter = await StateMessageOperations.assembleRemoveWriterMessage(
+        const reqRemoveWriter = await CompleteStateMessageOperations.assembleRemoveWriterMessage(
             writer2.wallet,
             writer2.msb.state.writingKey,
         );
@@ -103,7 +103,7 @@ test('handleApplyRemoveWriterOperation (apply) - Append removeWriter payload int
             isIndexer: false,
         });
 
-        const reqRemoveWriterAgain = await StateMessageOperations.assembleRemoveWriterMessage(
+        const reqRemoveWriterAgain = await CompleteStateMessageOperations.assembleRemoveWriterMessage(
             writer2.wallet,
             writer2.msb.state.writingKey,
         );
@@ -141,10 +141,10 @@ test('handleApplyRemoveWriterOperation (apply) - Append removeWriter payload int
     // writer4 is already a writer.
     // indexer is already an indexer.
 
-    const reqRemoveWriter4 = await StateMessageOperations.assembleRemoveWriterMessage(
-        writer4.wallet,
-        writer4.msb.state.writingKey,
-    );
+        const reqRemoveWriter4 = await CompleteStateMessageOperations.assembleRemoveWriterMessage(
+            writer4.wallet,
+            writer4.msb.state.writingKey,
+        );
 
     await writer3.msb.state.append(reqRemoveWriter4);
     await writer3.msb.state.base.flush();
@@ -170,7 +170,7 @@ test('handleApplyRemoveWriterOperation (apply) - Append removeWriter payload int
     // writer4 is already a writer.
     // indexer is already an indexer.
     try {
-        const reqRemoveWriter = await StateMessageOperations.assembleRemoveWriterMessage(
+        const reqRemoveWriter = await CompleteStateMessageOperations.assembleRemoveWriterMessage(
             indexer.wallet,
             indexer.msb.state.writingKey,
         );

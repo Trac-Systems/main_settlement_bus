@@ -1,7 +1,7 @@
 import test from 'brittle';
 import b4a from 'b4a';
 
-import StateMessageOperations from '../../src/messages/stateMessages/StateMessageOperations.js';
+import CompleteStateMessageOperations from '../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
 import {default as fixtures} from '../fixtures/assembleMessage.fixtures.js';
 import {OperationType} from "../../src/utils/constants.js";
 import {bufferToAddress} from "../../src/core/state/utils/address.js";
@@ -19,7 +19,7 @@ test('assembleAdminMessage', async (t) => {
 
     t.test('assembleAdminMessage - setup admin', async (k) => {
 
-        const msg = safeDecodeApplyOperation(await StateMessageOperations.assembleAddAdminMessage(walletAdmin, writingKeyAdmin));
+        const msg = safeDecodeApplyOperation(await CompleteStateMessageOperations.assembleAddAdminMessage(walletAdmin, writingKeyAdmin));
 
         k.ok(msg, 'Message should be created');
         k.is(Object.keys(msg).length, 3, 'Message should have 3 keys');
@@ -37,7 +37,7 @@ test('assembleAdminMessage', async (t) => {
     });
 
     t.test('assembleAdminMessage - admin recovery message', async (k) => {
-        const msg = safeDecodeApplyOperation(await StateMessageOperations.assembleAddAdminMessage(walletAdmin, writingKeyNonAdmin));
+        const msg = safeDecodeApplyOperation(await CompleteStateMessageOperations.assembleAddAdminMessage(walletAdmin, writingKeyNonAdmin));
 
         k.ok(msg, 'Message should be created');
         k.is(Object.keys(msg).length, 3, 'Message should have 3 keys');
@@ -55,14 +55,14 @@ test('assembleAdminMessage', async (t) => {
 
     t.test('assembleAdminMessage - writer key is null', async (k) => {
         await k.exception(
-            async () => await StateMessageOperations.assembleAddAdminMessage(walletAdmin, null),
+            async () => await CompleteStateMessageOperations.assembleAddAdminMessage(walletAdmin, null),
             errorMessageIncludes('Writer key must be a 32 length buffer')
         );
     });
 
     t.test("assembleAdminMessage - admin wallet is null", async (k) => {
         await k.exception(
-            async () => await StateMessageOperations.assembleAddAdminMessage(null, writingKeyAdmin),
+            async () => await CompleteStateMessageOperations.assembleAddAdminMessage(null, writingKeyAdmin),
             errorMessageIncludes('Wallet must be a valid wallet object')
         );
     });

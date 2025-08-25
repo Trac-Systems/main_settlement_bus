@@ -5,11 +5,10 @@ import { addressToBuffer } from '../core/state/utils/address.js';
 import { OperationType } from './constants.js';
 import { blake3Hash } from './crypto.js';
 
-export async function generateTx(bootstrap, msb_bootstrap, validator_address, local_writer_key, local_address, content_hash, nonce) {
+export async function generateTx(bootstrap, msb_bootstrap, local_writer_key, local_address, content_hash, nonce) {
     const tx = b4a.concat([
         b4a.from(bootstrap, 'hex'),
         b4a.from(msb_bootstrap, 'hex'),
-        addressToBuffer(validator_address),
         b4a.from(local_writer_key, 'hex'),
         addressToBuffer(local_address),
         b4a.from(content_hash, 'hex'),

@@ -1,6 +1,6 @@
 import {test, hook} from 'brittle';
 
-import StateMessageOperations from '../../src/messages/stateMessages/StateMessageOperations.js';
+import CompleteStateMessageOperations from '../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
 import {formatIndexersEntry} from '../../src/utils/helpers.js';
 import {
     initTemporaryDirectory,
@@ -43,7 +43,7 @@ test('handleApplyRemoveIndexerOperation (apply) - Append removeIndexer payload i
         // indexer1 is already an indexer -> this indexer will lose its indexer status and will become a writer.
         // indexer2 is already an indexer
         // writer is already a writer
-        const assembledRemoveIndexerMessage = await StateMessageOperations.assembleRemoveIndexerMessage(admin.wallet, indexer1.wallet.address);
+        const assembledRemoveIndexerMessage = await CompleteStateMessageOperations.assembleRemoveIndexerMessage(admin.wallet, indexer1.wallet.address);
         await admin.msb.state.append(assembledRemoveIndexerMessage);
         await tryToSyncWriters(admin, indexer1, indexer2);
         await waitForNodeState(indexer1, indexer1.wallet.address, {
@@ -78,7 +78,7 @@ test('handleApplyRemoveIndexerOperation (apply) - Append removeIndexer payload i
         const indexer2SignedLengthBefore = indexer2.msb.state.getSignedLength();
         const writerSignedLengthBefore = writer.msb.state.getSignedLength();
 
-        const assembledRemoveIndexerMessage = await StateMessageOperations.assembleRemoveIndexerMessage(admin.wallet, indexer1.wallet.address);
+        const assembledRemoveIndexerMessage = await CompleteStateMessageOperations.assembleRemoveIndexerMessage(admin.wallet, indexer1.wallet.address);
         await admin.msb.state.append(assembledRemoveIndexerMessage);
         await tryToSyncWriters(admin, indexer2, writer);
 
@@ -111,7 +111,7 @@ test('handleApplyAddIndexerOperation (apply) - Append removeIndexer payload into
         const writerSignedLengthBefore = admin.msb.state.getSignedLength();
         const indexer2SignedLengthBefore = indexer2.msb.state.getSignedLength();
 
-        const assembledRemoveIndexerMessage = await StateMessageOperations.assembleRemoveIndexerMessage(admin.wallet, indexer2.wallet.address);
+        const assembledRemoveIndexerMessage = await CompleteStateMessageOperations.assembleRemoveIndexerMessage(admin.wallet, indexer2.wallet.address);
         await writer.msb.state.append(assembledRemoveIndexerMessage);
         await tryToSyncWriters(admin, indexer2, writer);
 

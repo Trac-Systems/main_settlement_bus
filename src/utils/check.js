@@ -1,5 +1,8 @@
 import Validator from 'fastest-validator';
-import { OperationType,
+import b4a from 'b4a';
+
+import {
+    OperationType,
     WRITER_BYTE_LENGTH,
     NONCE_BYTE_LENGTH,
     SIGNATURE_BYTE_LENGTH,
@@ -14,16 +17,23 @@ import { OperationType,
     SIGNATURE_HEXSTRING_LENGTH,
     BOOTSTRAP_HEXSTRING_LENGTH,
 } from './constants.js';
-import { TRAC_ADDRESS_SIZE } from 'trac-wallet/constants.js';
+import {TRAC_ADDRESS_SIZE} from 'trac-wallet/constants.js';
 
-import b4a from 'b4a';
+//TODO: ATTENTION - CURRENT IMPLEMENTATION UTILIZES `custom` FOR MULTIPLE TIMES IN MANY SCHEMAS. IT SHOULD BE CLEANED UP
+// TO UTILIZE ONLY ONE FUNCTION COMMON FOR ALL THE SCHEMAS. CREATE A TICKED P2/P3.
 class Check {
     #validator;
     #validateExtendedKeyOp;
     #validateBasicKeyOp;
     #validatePreTx;
     #validatePostTx;
-    #validateDeployment;
+    #validateBootstrapDeploymentSchema;
+    //
+    #validateCoreAdminOperationSchema
+    #validateAdminControlOperationSchema
+    #validateRoleAccessOperationSchema
+    #validateTransactionOperationSchema
+
     constructor() {
 
         this.#validator = new Validator({
@@ -36,15 +46,20 @@ class Check {
             },
         });
         const isBuffer = b4a.isBuffer;
-        this.#validator.add("buffer", function ({ schema, messages }, path, context) {
+        this.#validator.add("buffer", function ({schema, messages}, path, context) {
             return {
                 source:
                     `
                         if (!${isBuffer}(value)) {
-                            ${this.makeError({ type: "buffer", actual: "value", messages })}
+                            ${this.makeError({type: "buffer", actual: "value", messages})}
                         }
                         if (value.length !== ${schema.length}) {
-                            ${this.makeError({ type: "bufferLength", expected: schema.length, actual: "value.length", messages })}
+                            ${this.makeError({
+                        type: "bufferLength",
+                        expected: schema.length,
+                        actual: "value.length",
+                        messages
+                    })}
                         }
                         let isEmpty = true;
                             for (let i = 0; i < value.length; i++) {
@@ -54,7 +69,7 @@ class Check {
                                 }
                             }
                             if (isEmpty) {
-                                ${this.makeError({ type: "emptyBuffer", actual: "value", messages })}
+                                ${this.makeError({type: "emptyBuffer", actual: "value", messages})}
                             }
                             return value;
                     `
@@ -65,118 +80,141 @@ class Check {
         this.#validateBasicKeyOp = this.#compileBasicKeyOpSchema();
         this.#validatePreTx = this.#compilePreTxSchema();
         this.#validatePostTx = this.#compilePostTxSchema();
-        this.#validateDeployment = this.#compileBootstrapDeploymentSchema();
+
+        this.#validateBootstrapDeploymentSchema = this.#compileBootstrapDeploymentSchema();
+        this.#validateCoreAdminOperationSchema = this.#compileCoreAdminOperationSchema();
+        this.#validateAdminControlOperationSchema = this.#compileAdminControlOperationSchema();
+        this.#validateRoleAccessOperationSchema = this.#compileRoleAccessOperationSchema();
+        this.#validateTransactionOperationSchema = this.#compileTransactionOperationSchema();
+
     }
 
-    #compileExtendedKeyOpSchema() {
+    // Complete by default - no writer needed
+    #compileCoreAdminOperationSchema() {
         const schema = {
             $$strict: true,
-            type: { type: 'number', enum: [OperationType.ADD_ADMIN, OperationType.ADD_WRITER, OperationType.REMOVE_WRITER], positive: true, integer: true, min: MIN_SAFE_VALIDATION_INTEGER, max: MAX_SAFE_VALIDATION_INTEGER, required: true },
-            address: { type: 'buffer', length: TRAC_ADDRESS_SIZE, required: true },
-            eko: {
+            type: {
+                type: 'number',
+                required: true,
+                custom: (value, errors) => {
+                    if (value !== OperationType.ADD_ADMIN) {
+                        errors.push({
+                            type: 'valueNotAllowed',
+                            actual: value,
+                            expected: OperationType.ADD_ADMIN,
+                            field: 'type',
+                            message: `Operation type must be ${OperationType.ADD_ADMIN} (ADD_ADMIN)`
+                        });
+                    }
+                    return value;
+                }
+            },
+            address: {type: 'buffer', length: TRAC_ADDRESS_SIZE, required: true}, // invoker adddress (admin)
+            cao: {
                 strict: true,
                 type: 'object',
                 props: {
-                    wk: { type: 'buffer', length: WRITER_BYTE_LENGTH, required: true },
-                    nonce: { type: 'buffer', length: NONCE_BYTE_LENGTH, required: true },
-                    sig: { type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true },
+                    tx: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true}, // tx hash
+                    txv: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true}, // tx validity
+                    iw: {type: 'buffer', length: WRITER_BYTE_LENGTH, required: true}, // writer key of the admin
+                    in: {type: 'buffer', length: NONCE_BYTE_LENGTH, required: true}, // nonce
+                    is: {type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true}, // signature
                 }
             }
         };
         return this.#validator.compile(schema);
     }
 
-    validateExtendedKeyOpSchema(op) {
-        return this.#validateExtendedKeyOp(op) === true;
+    validateCoreAdminOperation(operation) {
+        return this.#validateCoreAdminOperationSchema(operation) === true;
     }
 
-    #compileBasicKeyOpSchema() {
+    // Complete by default - no writer needed
+    #compileAdminControlOperationSchema() {
         const schema = {
             $$strict: true,
-            type: { type: 'number', enum: [OperationType.ADD_INDEXER, OperationType.REMOVE_INDEXER, OperationType.APPEND_WHITELIST, OperationType.BAN_VALIDATOR], positive: true, integer: true, min: MIN_SAFE_VALIDATION_INTEGER, max: MAX_SAFE_VALIDATION_INTEGER, required: true },
-            address: { type: 'buffer', length: TRAC_ADDRESS_SIZE, required: true },
-            bko: {
+            type: {
+                type: 'number',
+                required: true,
+                custom: (value, errors) => {
+                    const allowedTypes = [
+                        OperationType.APPEND_WHITELIST,
+                        OperationType.ADD_INDEXER,
+                        OperationType.REMOVE_INDEXER,
+                        OperationType.BAN_VALIDATOR
+                    ];
+
+                    if (!allowedTypes.includes(value)) {
+                        errors.push({
+                            type: 'valueNotAllowed',
+                            actual: value,
+                            expected: allowedTypes,
+                            field: 'type',
+                            message: `Operation type must be one of: ${allowedTypes.join(', ')}`
+                        });
+                    }
+                    return value;
+                }
+            },
+            address: {type: 'buffer', length: TRAC_ADDRESS_SIZE, required: true}, // invoker adddress (admin)
+            aco: {
                 strict: true,
                 type: 'object',
                 props: {
-                    nonce: { type: 'buffer', length: NONCE_BYTE_LENGTH, required: true, },
-                    sig: { type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true },
-                }
-            }
-        }
-        return this.#validator.compile(schema);
-    }
-
-    validateBasicKeyOp(op) {
-        return this.#validateBasicKeyOp(op) === true;
-    }
-    #compilePreTxSchema() {
-        const schema = {
-            $$strict: true,
-            op: { type: 'string', enum: [OperationType.PRE_TX], required: true }, // Operation type (must be 'PRE_TX')
-            tx: { type: 'string', length: TX_HASH_HEXSTRING_LENGTH, required: true, hex: true }, // Transaction hash (unique identifier for the transaction)
-            ia: { type: 'string', length: TRAC_ADDRESS_SIZE, required: true }, // Address of the requesting node (used for signature verification)
-            iw: { type: 'string', length: WRITING_KEY_HEXSTRING_LENGTH, required: true, hex: true }, // Writing key of the requesting node (external subnetwork)
-            in: { type: 'string', length: NONCE_HEXSTRING_LENGTH, required: true, hex: true }, // Nonce of the requesting node
-            ch: { type: 'string', length: CONTENT_HASH_HEXSTRING_LENGTH, required: true, hex: true }, // Content hash (hash of the transaction's data)
-            is: { type: 'string', length: SIGNATURE_HEXSTRING_LENGTH, required: true, hex: true }, // Requester's signature
-            bs: { type: 'string', length: BOOTSTRAP_HEXSTRING_LENGTH, required: true, hex: true }, // External bootstrap contract
-            mbs: { type: 'string', length: BOOTSTRAP_HEXSTRING_LENGTH, required: true, hex: true }, // MSB bootstrap key
-            va: { type: 'string', length: TRAC_ADDRESS_SIZE, required: true }, // Validator address (used for validation)
-        };
-        return this.#validator.compile(schema);
-    }
-
-    validatePreTx(op) {
-        return this.#validatePreTx(op) === true;
-    }
-
-    #compilePostTxSchema() {
-        const schema = {
-            $$strict: true,
-            type: { type: 'number', enum: [OperationType.TX], positive: true, integer: true, min: MIN_SAFE_VALIDATION_INTEGER, max: MAX_SAFE_VALIDATION_INTEGER, required: true },
-            address: { type: 'buffer', length: TRAC_ADDRESS_SIZE, required: true }, // validator address
-            txo: {
-                strict: true,
-                type: "object",
-                props: {
-                    tx: { type: 'buffer', length: HASH_BYTE_LENGTH, required: true }, // tx hash
-                    ia: { type: 'buffer', length: TRAC_ADDRESS_SIZE, required: true }, // incoming address
-                    iw: { type: 'buffer', length: WRITER_BYTE_LENGTH, required: true }, // incoming writer key
-                    in: { type: 'buffer', length: NONCE_BYTE_LENGTH, required: true }, // incoming nonce
-                    ch: { type: 'buffer', length: HASH_BYTE_LENGTH, required: true }, // content hash
-                    is: { type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true }, // signature
-                    bs: { type: 'buffer', length: BOOTSTRAP_BYTE_LENGTH, required: true }, // peer contract bootstrap
-                    mbs: { type: 'buffer', length: BOOTSTRAP_BYTE_LENGTH, required: true }, // msb bootstrap
-                    vs: { type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true }, // validator/writer signature
-                    vn: { type: 'buffer', length: NONCE_BYTE_LENGTH, required: true } // validator/writer nonce
+                    tx: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true}, // tx hash
+                    txv: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true}, // tx validity
+                    in: {type: 'buffer', length: NONCE_BYTE_LENGTH, required: true}, // nonce
+                    ia: {type: 'buffer', length: TRAC_ADDRESS_SIZE, required: true}, // incoming address - selected address for specific operation
+                    is: {type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true}, // signature
                 }
             }
         };
         return this.#validator.compile(schema);
     }
 
-    validatePostTx(op) {
-        return this.#validatePostTx(op) === true;
+    validateAdminControlOperation(operation) {
+        return this.#validateAdminControlOperationSchema(operation) === true;
     }
 
-    #compileBootstrapDeploymentSchema() {
+    #compileRoleAccessOperationSchema() {
         const schema = {
             $$strict: true,
-            type: { type: 'number', enum: [OperationType.BOOTSTRAP_DEPLOYMENT], positive: true, integer: true, min: MIN_SAFE_VALIDATION_INTEGER, max: MAX_SAFE_VALIDATION_INTEGER, required: true },
-            address: { type: 'buffer', length: TRAC_ADDRESS_SIZE, required: true },
-            bdo: {
+            type: {
+                type: 'number',
+                required: true,
+                custom: (value, errors) => {
+                    const allowedTypes = [
+                        OperationType.ADD_WRITER,
+                        OperationType.REMOVE_WRITER,
+                        OperationType.ADMIN_RECOVERY
+                    ];
 
+                    if (!allowedTypes.includes(value)) {
+                        errors.push({
+                            type: 'valueNotAllowed',
+                            actual: value,
+                            expected: allowedTypes,
+                            field: 'type',
+                            message: `Operation type must be one of: ${allowedTypes.join(', ')}`
+                        });
+                    }
+                    return value;
+                }
+            },
+            address: {type: 'buffer', length: TRAC_ADDRESS_SIZE, required: true},
+            rao: {
                 strict: true,
-                type: "object",
+                type: 'object',
                 props: {
-                    tx: { type: 'buffer', length: HASH_BYTE_LENGTH, required: true },
-                    bs: { type: 'buffer', length: BOOTSTRAP_BYTE_LENGTH, required: true },
-                    in: { type: 'buffer', length: NONCE_BYTE_LENGTH, required: true },
-                    is: { type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true },
-                    va: { type: 'buffer', length: TRAC_ADDRESS_SIZE, optional: true},
-                    vn: { type: 'buffer', length: NONCE_BYTE_LENGTH, optional: true},
-                    vs: { type: 'buffer', length: SIGNATURE_BYTE_LENGTH, optional: true},
+                    tx: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true}, // tx hash
+                    txv: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true}, // tx validity
+                    iw: {type: 'buffer', length: WRITER_BYTE_LENGTH, required: true}, // writing key of the invoker
+                    in: {type: 'buffer', length: NONCE_BYTE_LENGTH, required: true}, // nonce of the invoker
+                    is: {type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true}, // signature
+                    va: {type: 'buffer', length: TRAC_ADDRESS_SIZE, optional: true},
+                    vn: {type: 'buffer', length: NONCE_BYTE_LENGTH, optional: true},
+                    vs: {type: 'buffer', length: SIGNATURE_BYTE_LENGTH, optional: true}
+
                 },
                 custom: (value, errors) => {
                     if (!value || typeof value !== 'object') return value;
@@ -209,9 +247,271 @@ class Check {
         return this.#validator.compile(schema);
     }
 
-    validateBootstrapDeployment(op) {
-        return this.#validateDeployment(op) === true;
+    validateRoleAccessOperation(operation) {
+        return this.#validateRoleAccessOperationSchema(operation) === true;
+    }
+
+    #compileTransactionOperationSchema() {
+        const schema = {
+            $$strict: true,
+            type: {
+                type: 'number',
+                required: true,
+                custom: (value, errors) => { // more secure than enum
+                    if (value !== OperationType.TX) {
+                        errors.push({
+                            type: 'valueNotAllowed',
+                            actual: value,
+                            expected: OperationType.TX,
+                            field: 'type',
+                            message: `Operation type must be ${OperationType.TX} (TX)`
+                        });
+                    }
+                    return value;
+                }
+            },
+            address: {type: 'buffer', length: TRAC_ADDRESS_SIZE, required: true}, // invoker address
+            txo: {
+                strict: true,
+                type: 'object',
+                props: {
+                    tx: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true}, // tx hash
+                    txv: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true}, // tx validity
+                    iw: {type: 'buffer', length: WRITER_BYTE_LENGTH, required: true}, // Writing key of the requesting node (external subnetwork)
+                    in: {type: 'buffer', length: NONCE_BYTE_LENGTH, required: true}, // Nonce of the requesting node
+                    ch: {type: 'buffer', length: NONCE_BYTE_LENGTH, required: true}, // Content hash (hash of the transaction's data)
+                    is: {type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true}, // Requester's signature
+                    bs: {type: 'buffer', length: BOOTSTRAP_BYTE_LENGTH, required: true}, // External bootstrap contract
+                    mbs: {type: 'buffer', length: BOOTSTRAP_BYTE_LENGTH, required: true}, // MSB bootstrap key
+                    va: {type: 'buffer', length: TRAC_ADDRESS_SIZE, optional: true}, //validator address
+                    vn: {type: 'buffer', length: NONCE_BYTE_LENGTH, optional: true}, //validator nonce
+                    vs: {type: 'buffer', length: SIGNATURE_BYTE_LENGTH, optional: true}, //validator signature
+                },
+                custom: (value, errors) => {
+                    if (!value || typeof value !== 'object') return value;
+                    const {vn, vs, va} = value;
+                    const vnPresent = vn !== undefined;
+                    const vsPresent = vs !== undefined;
+                    const vaPresent = va !== undefined;
+
+                    const fieldsPresent = [vnPresent, vsPresent, vaPresent].filter(Boolean).length;
+
+                    if (fieldsPresent > 0 && fieldsPresent < 3) {
+                        errors.push({
+                            type: 'conditionalDependency',
+                            field: 'bdo',
+                            message: 'Fields "vn", "vs", and "va" must all be present if any one is provided'
+                        });
+                    }
+                    if (vn === null || vs === null || va === null) {
+                        errors.push({
+                            type: 'buffer',
+                            field: 'bdo',
+                            message: 'Validator fields cannot be null, must be a Buffer or undefined'
+                        });
+                    }
+
+                    return value;
+                }
+            }
+        };
+        return this.#validator.compile(schema);
+    }
+
+    validateTransactionOperation(op) {
+        return this.#validateTransactionOperationSchema(op) === true;
+    }
+
+    #compileBootstrapDeploymentSchema() {
+        const schema = {
+            $$strict: true,
+            type: {
+                type: 'number',
+                required: true,
+                custom: (value, errors) => {
+                    if (value !== OperationType.BOOTSTRAP_DEPLOYMENT) {
+                        errors.push({
+                            type: 'valueNotAllowed',
+                            actual: value,
+                            expected: OperationType.BOOTSTRAP_DEPLOYMENT,
+                            field: 'type',
+                            message: `Operation type must be ${OperationType.BOOTSTRAP_DEPLOYMENT} (BOOTSTRAP_DEPLOYMENT)`
+                        });
+                    }
+                    return value;
+                }
+            },
+            address: {type: 'buffer', length: TRAC_ADDRESS_SIZE, required: true},
+            bdo: {
+
+                strict: true,
+                type: "object",
+                props: {
+                    tx: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true},
+                    txv: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true},
+                    bs: {type: 'buffer', length: BOOTSTRAP_BYTE_LENGTH, required: true},
+                    in: {type: 'buffer', length: NONCE_BYTE_LENGTH, required: true},
+                    is: {type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true},
+                    va: {type: 'buffer', length: TRAC_ADDRESS_SIZE, optional: true},
+                    vn: {type: 'buffer', length: NONCE_BYTE_LENGTH, optional: true},
+                    vs: {type: 'buffer', length: SIGNATURE_BYTE_LENGTH, optional: true},
+                },
+                custom: (value, errors) => {
+                    if (!value || typeof value !== 'object') return value;
+                    const {vn, vs, va} = value;
+                    const vnPresent = vn !== undefined
+                    const vsPresent = vs !== undefined
+                    const vaPresent = va !== undefined
+
+                    const fieldsPresent = [vnPresent, vsPresent, vaPresent].filter(Boolean).length;
+
+                    if (fieldsPresent > 0 && fieldsPresent < 3) {
+                        errors.push({
+                            type: 'conditionalDependency',
+                            field: 'bdo',
+                            message: 'Fields "vn", "vs", and "va" must all be present if any one is provided'
+                        });
+                    }
+                    if (vn === null || vs === null || va === null) {
+                        errors.push({
+                            type: 'buffer',
+                            field: 'bdo',
+                            message: 'Validator fields cannot be null, must be a Buffer or undefined'
+                        });
+                    }
+
+                    return value;
+                }
+            }
+        };
+        return this.#validator.compile(schema);
+    }
+
+    validateBootstrapDeploymentOperation(op) {
+        return this.#validateBootstrapDeploymentSchema(op) === true;
+    }
+
+    //TODO: IMPLEMENT InitBalanceOperation see protocol buffer
+    //TODO: IMPLEMENT TokenTransferOperation see protocol buffer
+
+    //////////////////////////////EVERYTHING BELOW IS OLD STUFF - TO BE DEPRECATED//////////////////////////////////////
+    #compileExtendedKeyOpSchema() {
+        const schema = {
+            $$strict: true,
+            type: {
+                type: 'number',
+                enum: [OperationType.ADD_ADMIN, OperationType.ADD_WRITER, OperationType.REMOVE_WRITER],
+                positive: true,
+                integer: true,
+                min: MIN_SAFE_VALIDATION_INTEGER,
+                max: MAX_SAFE_VALIDATION_INTEGER,
+                required: true
+            },
+            address: {type: 'buffer', length: TRAC_ADDRESS_SIZE, required: true},
+            eko: {
+                strict: true,
+                type: 'object',
+                props: {
+                    wk: {type: 'buffer', length: WRITER_BYTE_LENGTH, required: true},
+                    nonce: {type: 'buffer', length: NONCE_BYTE_LENGTH, required: true},
+                    sig: {type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true},
+                }
+            }
+        };
+        return this.#validator.compile(schema);
+    }
+
+    validateExtendedKeyOpSchema(op) {
+        return this.#validateExtendedKeyOp(op) === true;
+    }
+
+    #compileBasicKeyOpSchema() {
+        const schema = {
+            $$strict: true,
+            type: {
+                type: 'number',
+                enum: [OperationType.ADD_INDEXER, OperationType.REMOVE_INDEXER, OperationType.APPEND_WHITELIST, OperationType.BAN_VALIDATOR],
+                positive: true,
+                integer: true,
+                min: MIN_SAFE_VALIDATION_INTEGER,
+                max: MAX_SAFE_VALIDATION_INTEGER,
+                required: true
+            },
+            address: {type: 'buffer', length: TRAC_ADDRESS_SIZE, required: true},
+            bko: {
+                strict: true,
+                type: 'object',
+                props: {
+                    nonce: {type: 'buffer', length: NONCE_BYTE_LENGTH, required: true,},
+                    sig: {type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true},
+                }
+            }
+        }
+        return this.#validator.compile(schema);
+    }
+
+    validateBasicKeyOp(op) {
+        return this.#validateBasicKeyOp(op) === true;
+    }
+
+    #compilePreTxSchema() {
+        const schema = {
+            $$strict: true,
+            op: {type: 'string', enum: [OperationType.PRE_TX], required: true}, // Operation type (must be 'PRE_TX')
+            tx: {type: 'string', length: TX_HASH_HEXSTRING_LENGTH, required: true, hex: true}, // Transaction hash (unique identifier for the transaction)
+            ia: {type: 'string', length: TRAC_ADDRESS_SIZE, required: true}, // Address of the requesting node (used for signature verification)
+            iw: {type: 'string', length: WRITING_KEY_HEXSTRING_LENGTH, required: true, hex: true}, // Writing key of the requesting node (external subnetwork)
+            in: {type: 'string', length: NONCE_HEXSTRING_LENGTH, required: true, hex: true}, // Nonce of the requesting node
+            ch: {type: 'string', length: CONTENT_HASH_HEXSTRING_LENGTH, required: true, hex: true}, // Content hash (hash of the transaction's data)
+            is: {type: 'string', length: SIGNATURE_HEXSTRING_LENGTH, required: true, hex: true}, // Requester's signature
+            bs: {type: 'string', length: BOOTSTRAP_HEXSTRING_LENGTH, required: true, hex: true}, // External bootstrap contract
+            mbs: {type: 'string', length: BOOTSTRAP_HEXSTRING_LENGTH, required: true, hex: true}, // MSB bootstrap key
+            va: {type: 'string', length: TRAC_ADDRESS_SIZE, required: true}, // Validator address (used for validation)
+        };
+        return this.#validator.compile(schema);
+    }
+
+    validatePreTx(op) {
+        return this.#validatePreTx(op) === true;
+    }
+
+    #compilePostTxSchema() {
+        const schema = {
+            $$strict: true,
+            type: {
+                type: 'number',
+                enum: [OperationType.TX],
+                positive: true,
+                integer: true,
+                min: MIN_SAFE_VALIDATION_INTEGER,
+                max: MAX_SAFE_VALIDATION_INTEGER,
+                required: true
+            },
+            address: {type: 'buffer', length: TRAC_ADDRESS_SIZE, required: true}, // validator address
+            txo: {
+                strict: true,
+                type: "object",
+                props: {
+                    tx: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true}, // tx hash
+                    ia: {type: 'buffer', length: TRAC_ADDRESS_SIZE, required: true}, // incoming address
+                    iw: {type: 'buffer', length: WRITER_BYTE_LENGTH, required: true}, // incoming writer key
+                    in: {type: 'buffer', length: NONCE_BYTE_LENGTH, required: true}, // incoming nonce
+                    ch: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true}, // content hash
+                    is: {type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true}, // signature
+                    bs: {type: 'buffer', length: BOOTSTRAP_BYTE_LENGTH, required: true}, // peer contract bootstrap
+                    mbs: {type: 'buffer', length: BOOTSTRAP_BYTE_LENGTH, required: true}, // msb bootstrap
+                    vs: {type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true}, // validator/writer signature
+                    vn: {type: 'buffer', length: NONCE_BYTE_LENGTH, required: true} // validator/writer nonce
+                }
+            }
+        };
+        return this.#validator.compile(schema);
+    }
+
+    validatePostTx(op) {
+        return this.#validatePostTx(op) === true;
     }
 }
 
 export default Check;
+

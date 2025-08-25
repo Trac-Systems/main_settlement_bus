@@ -1,5 +1,5 @@
 import test from 'brittle';
-import StateMessageOperations from '../../src/messages/stateMessages/StateMessageOperations.js';
+import CompleteStateMessageOperations from '../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
 import {OperationType} from '../../src/utils/protobuf/applyOperations.cjs';
 import {initAll, walletNonAdmin, writingKeyNonAdmin} from '../fixtures/assembleMessage.fixtures.js';
 import {messageOperationsEkoTest} from './commonsStateMessageOperationsTest.js';
@@ -9,7 +9,7 @@ const testName = 'assembleAddWriterMessage';
 test(testName, async (t) => {
     await initAll();
     const assembler = async (wallet, writingKey) => {
-        return safeDecodeApplyOperation(await StateMessageOperations.assembleAddWriterMessage(wallet, writingKey));
+        return safeDecodeApplyOperation(await CompleteStateMessageOperations.assembleAddWriterMessage(wallet, writingKey));
     }
     
     await messageOperationsEkoTest(t, testName, assembler, walletNonAdmin, writingKeyNonAdmin, OperationType.ADD_WRITER, 3, walletNonAdmin.address);

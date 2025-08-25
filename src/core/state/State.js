@@ -10,8 +10,8 @@ import {
 import {isHexString, sleep} from '../../utils/helpers.js';
 import Wallet from 'trac-wallet';
 import Check from '../../utils/check.js';
-import { safeDecodeApplyOperation } from '../../utils/protobuf/operationHelpers.js';
-import { createMessage, ZERO_WK } from '../../utils/buffer.js';
+import {safeDecodeApplyOperation} from '../../utils/protobuf/operationHelpers.js';
+import {createMessage, ZERO_WK} from '../../utils/buffer.js';
 import addressUtils from './utils/address.js';
 import adminEntryUtils from './utils/adminEntry.js';
 import nodeEntryUtils, { setWritingKey } from './utils/nodeEntry.js';
@@ -20,6 +20,7 @@ import indexerEntryUtils from './utils/indexerEntry.js';
 import lengthEntryUtils from './utils/lengthEntry.js';
 import transactionUtils from './utils/transaction.js';
 import {blake3Hash} from '../../utils/crypto.js';
+
 class State extends ReadyResource {
 
     #base;
@@ -124,6 +125,7 @@ class State extends ReadyResource {
         if (nodeEntry === null) return false;
         return !!nodeEntry.isWhitelisted;
     }
+
     async isAddressWriter(address) {
         const nodeEntry = await this.getNodeEntry(address);
         if (nodeEntry === null) return false;
@@ -159,7 +161,7 @@ class State extends ReadyResource {
     }
 
     async getRegisteredBootstrapEntry(bootstrap) {
-        if(!bootstrap || !isHexString(bootstrap) || bootstrap.length !== 64) return null;
+        if (!bootstrap || !isHexString(bootstrap) || bootstrap.length !== 64) return null;
         return await this.getSigned(EntryType.DEPLOYMENT + bootstrap);
 
     }
@@ -168,9 +170,13 @@ class State extends ReadyResource {
         await this.#base.append(payload);
     }
 
-    // this is helpful and we will need it.
-    async getInfoFromLinearizer() {
-        return this.#base.linearizer.indexers
+    async getIndexerSequenceState() {
+        console.log("indexers:", this.#base.system.indexers)
+        const buf = []
+        for (const indexer of Object.values(this.#base.system.indexers)) {
+            buf.push(indexer.key);
+        }
+        return await blake3Hash(b4a.concat(buf));
     }
 
     #setupHyperbee(store) {
@@ -181,6 +187,7 @@ class State extends ReadyResource {
         })
         return this.#bee;
     }
+
     // ATTENTION: DO NOT USE METHODS ABOVE IN APPLY PART!
     ///////////////////////////////APPLY////////////////////////////////////
 
@@ -220,6 +227,10 @@ class State extends ReadyResource {
 
     async #handleApplyTxOperation(op, view, base, node, batch) {
         //TODO: ADD check to ensure both nonces are different to increase security.
+        //TODO: ADD check to ensure that sigs are diff
+        //TODO: ADD check to ensure that validator did not validate ifself (address !== va)
+        //TODO: ADD check if bs !== mbs.
+        // TODO REIMPLEMENT FOR PARTIAL TX
         if (!this.check.validatePostTx(op)) return; // ATTENTION: The sanitization should be done before ANY other check, otherwise we risk crashing
 
         const tx = op.txo.tx;
@@ -268,18 +279,17 @@ class State extends ReadyResource {
     }
 
     async #handleApplyAddAdminOperation(op, view, base, node, batch) {
-        if (!this.check.validateExtendedKeyOpSchema(op)) return;
+        if (!this.check.validateCoreAdminOperation(op)) return;
         const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
 
         if (null === adminEntry) {
-            await this.#addAdminIfNotSet(op, base, node, batch);
-        }
-        else {
+            await this.#addAdminIfNotSet(op, view, base, node, batch);
+        } else {
             await this.#addAdminIfSet(adminEntry, op, view, node, base, batch);
         }
     }
 
-    async #addAdminIfSet(adminEntry, op, view, node, base, batch) {
+    async #addAdminIfSet(adminEntry, op, view, base, node, batch) {
         const decodedAdminEntry = adminEntryUtils.decode(adminEntry);
         if (null === decodedAdminEntry) return;
         const publicKeyAdminEntry = Wallet.decodeBech32mSafe(decodedAdminEntry.address);
@@ -294,7 +304,7 @@ class State extends ReadyResource {
         if (!b4a.equals(publicKeyAdminEntry, adminPublicKey)) return;
 
         // verify signature
-        const message = createMessage(adminAddressBuffer, op.eko.wk, op.eko.nonce, op.type)
+        const message = createMessage(adminAddressBuffer, op.eko.wk, op.eko.nonce, OperationType.ADD_ADMIN)
         const hash = await blake3Hash(message);
         const isMessageVerifed = this.#wallet.verify(op.eko.sig, hash, publicKeyAdminEntry)
         const hashHexString = hash.toString('hex');
@@ -327,7 +337,7 @@ class State extends ReadyResource {
         console.log(`Admin updated: ${decodedAdminEntry.address}:${op.eko.wk.toString('hex')}`);
     }
 
-    async #addAdminIfNotSet(op, base, node, batch) {
+    async #addAdminIfNotSet(op, view, base, node, batch) {
         // Extract and validate the network address
         const adminAddressBuffer = op.address;
         const adminAddress = addressUtils.bufferToAddress(adminAddressBuffer);
@@ -336,37 +346,45 @@ class State extends ReadyResource {
         if (adminPublicKey === null) return;
 
         // verify signature
-        const message = createMessage(adminAddressBuffer, op.eko.wk, op.eko.nonce, op.type)
+        const message = createMessage(adminAddressBuffer, op.cao.txv, op.cao.iw, op.cao.in, OperationType.ADD_ADMIN)
         const hash = await blake3Hash(message);
-        const isMessageVerifed = this.#wallet.verify(op.eko.sig, hash, adminPublicKey)
-        const hashHexString = hash.toString('hex');
+        if (!b4a.equals(hash, op.cao.tx)) return;
+        const isMessageVerifed = this.#wallet.verify(op.cao.is, op.cao.tx, adminPublicKey)
+        const txHashHexString = op.cao.tx.toString('hex');
+
+        // verify tx validity
+        const indexersSequenceState = await this.#getIndexerSequenceStateApply(base);
+        if (!b4a.equals(op.cao.txv, indexersSequenceState)) return;
 
         // Check if the operation has already been applied
-        const opEntry = await this.#getEntryApply(hashHexString, batch);
+        const opEntry = await this.#getEntryApply(txHashHexString, batch);
         if (
             !b4a.equals(node.from.key, this.#bootstrap) ||
-            !b4a.equals(op.eko.wk, this.#bootstrap) ||
+            !b4a.equals(op.cao.iw, this.#bootstrap) ||
             !isMessageVerifed ||
             null !== opEntry
         ) return;
-        const initializedNodeEntry = nodeEntryUtils.init(op.eko.wk, nodeRoleUtils.NodeRole.WRITER);
-        const updatedNodeEntry = nodeEntryUtils.setRole(initializedNodeEntry, nodeRoleUtils.NodeRole.INDEXER);
-        await batch.put(op.address, updatedNodeEntry);
-        await this.#updateWritersIndex(op, batch)
+
+        const initializedNodeEntry = nodeEntryUtils.init(op.cao.iw, nodeRoleUtils.NodeRole.INDEXER);
+        //const updatedNodeEntry = nodeEntryUtils.setRole(initializedNodeEntry, nodeRoleUtils.NodeRole.INDEXER);
+        await batch.put(adminAddress, initializedNodeEntry);
+        await this.#updateWritersIndex(op, batch);
+
         // Create a new admin entry
-        const adminEntry = adminEntryUtils.encode(adminAddressBuffer, op.eko.wk);
+        const adminEntry = adminEntryUtils.encode(adminAddressBuffer, op.cao.iw);
         const initIndexers = indexerEntryUtils.append(adminAddressBuffer);
 
         if (initIndexers.length === 0 || adminEntry.length === 0) return;
         // initialize admin entry and indexers entry
         await batch.put(EntryType.ADMIN, adminEntry);
         await batch.put(EntryType.INDEXERS, initIndexers);
-        await batch.put(hashHexString, node.value);
+        await batch.put(txHashHexString, node.value);
+
         console.log(`Admin added: ${adminAddress}:${this.#bootstrap.toString('hex')}`);
     }
 
     async #handleApplyAppendWhitelistOperation(op, view, base, node, batch) {
-        if (!this.check.validateBasicKeyOp(op)) return;// TODO change name to validateBasicKeyOp
+        if (!this.check.validateAdminControlOperation(op)) return;
 
         // Retrieve and decode the admin entry to verify the operation is initiated by an admin
         const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
@@ -378,9 +396,8 @@ class State extends ReadyResource {
         const adminAddress = decodedAdminEntry.address;
         const adminPublicKey = Wallet.decodeBech32mSafe(adminAddress);
         if (adminPublicKey === null) return;
-
         // Extract and validate the network prefix from the node's address
-        const nodeAddressBinnary = op.address;
+        const nodeAddressBinnary = op.aco.ia;
 
         const nodeAddressString = addressUtils.bufferToAddress(nodeAddressBinnary);
         if (nodeAddressString === null) return;
@@ -388,16 +405,21 @@ class State extends ReadyResource {
         if (nodePublicKey === null) return;
 
 
-        // verify signature
-        const message = createMessage(op.address, op.bko.nonce, op.type);
+        // verify signature createMessage(this.#address, this.#txValidity, this.#incomingAddress, nonce, this.#operationType);
+        const message = createMessage(op.address, op.aco.txv, op.aco.ia, op.aco.in, OperationType.APPEND_WHITELIST);
         const hash = await blake3Hash(message);
-        const isMessageVerifed = this.#wallet.verify(op.bko.sig, hash, adminPublicKey);
-        const hashHexString = hash.toString('hex');
+        if (!b4a.equals(hash, op.aco.tx)) return;
+        const isMessageVerifed = this.#wallet.verify(op.aco.is, op.aco.tx, adminPublicKey);
+        //txHashHexString
+        const hashHexString = op.aco.tx.toString('hex');
+
+        // verify tx validity
+        const indexersSequenceState = await this.#getIndexerSequenceStateApply(base);
+        if (!b4a.equals(op.aco.txv, indexersSequenceState)) return;
 
         // Check if the operation has already been applied
         const opEntry = await this.#getEntryApply(hashHexString, batch);
         if (!isMessageVerifed || null !== opEntry) return;
-
         // Retrieve the node entry to check its current role
         const nodeEntry = await this.#getEntryApply(nodeAddressString, batch);
         if (nodeEntryUtils.isWhitelisted(nodeEntry)) return; // Node is already whitelisted
@@ -784,7 +806,7 @@ class State extends ReadyResource {
     }
 
     async #handleApplyBootstrapDeploymentOperation(op, view, base, node, batch) {
-        if (!this.check.validateBootstrapDeployment(op)) return;
+        if (!this.check.validateBootstrapDeploymentOperation(op)) return;
 
         // if transaction is not complete, do not process it.
         if (!Object.hasOwn(op.bdo,"vs") || !Object.hasOwn(op.bdo,"va")|| !Object.hasOwn(op.bdo,"vn")) return;
@@ -854,6 +876,16 @@ class State extends ReadyResource {
     async #getDeploymentEntryApply(key, batch) {
         const entry = await batch.get(EntryType.DEPLOYMENT + key);
         return entry !== null ? entry.value : null
+    }
+
+    //TODO: ensure if this method won't throw
+    async #getIndexerSequenceStateApply(base) {
+        // base: Autobase instance passed as argument (from apply context)
+        const buf = [];
+        for (const indexer of Object.values(base.system.indexers)) {
+            buf.push(indexer.key);
+        }
+        return await blake3Hash(b4a.concat(buf));
     }
 }
 

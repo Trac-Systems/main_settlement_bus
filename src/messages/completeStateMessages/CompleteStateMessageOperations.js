@@ -1,8 +1,8 @@
 import PeerWallet from 'trac-wallet';
 import b4a from 'b4a';
 
-import StateMessageDirector from './StateMessageDirector.js';
-import StateMessageBuilder from './StateMessageBuilder.js';
+import CompleteStateMessageDirector from './CompleteStateMessageDirector.js';
+import CompleteStateMessageBuilder from './CompleteStateMessageBuilder.js';
 import {safeEncodeApplyOperation} from '../../utils/protobuf/operationHelpers.js';
 import fileUtils from '../../../src/utils/fileUtils.js';
 import {OperationType} from '../../utils/constants.js';
@@ -10,18 +10,16 @@ import {createMessage} from '../../utils/buffer.js';
 import {bufferToAddress} from '../../core/state/utils/address.js';
 import {blake3Hash} from '../../utils/crypto.js';
 
-// TODO: RENAME TO CompleteStateMessageOperations
+class CompleteStateMessageOperations {
 
-
-class StateMessageOperations {
-
-    static async assembleAddAdminMessage(wallet, writingKey) {
+    static async assembleAddAdminMessage(wallet, writingKey, txValidity) {
         try {
-            const builder = new StateMessageBuilder(wallet);
-            const director = new StateMessageDirector();
+            const builder = new CompleteStateMessageBuilder(wallet);
+            const director = new CompleteStateMessageDirector();
             director.builder = builder;
 
-            const payload = await director.buildAddAdminMessage(wallet.address, writingKey);
+            const payload = await director.buildAddAdminMessage(wallet.address, writingKey, txValidity);
+            console.log(payload)
             return safeEncodeApplyOperation(payload);
 
         } catch (error) {
@@ -29,13 +27,13 @@ class StateMessageOperations {
         }
     }
 
-    static async assembleAddWriterMessage(wallet, writingKey) {
+    static async assembleAddWriterMessage(wallet, writingKey, txValidity) {
         try {
-            const builder = new StateMessageBuilder(wallet);
-            const director = new StateMessageDirector();
+            const builder = new CompleteStateMessageBuilder(wallet);
+            const director = new CompleteStateMessageDirector();
             director.builder = builder;
 
-            const payload = await director.buildAddWriterMessage(wallet.address, writingKey);
+            const payload = await director.buildAddWriterMessage(wallet.address, writingKey, txValidity);
             return safeEncodeApplyOperation(payload);
 
         } catch (error) {
@@ -45,8 +43,8 @@ class StateMessageOperations {
 
     static async assembleRemoveWriterMessage(wallet, writingKey) {
         try {
-            const builder = new StateMessageBuilder(wallet);
-            const director = new StateMessageDirector();
+            const builder = new CompleteStateMessageBuilder(wallet);
+            const director = new CompleteStateMessageDirector();
             director.builder = builder;
 
             const payload = await director.buildRemoveWriterMessage(wallet.address, writingKey);
@@ -59,8 +57,8 @@ class StateMessageOperations {
 
     static async assembleAddIndexerMessage(wallet, address) {
         try {
-            const builder = new StateMessageBuilder(wallet);
-            const director = new StateMessageDirector();
+            const builder = new CompleteStateMessageBuilder(wallet);
+            const director = new CompleteStateMessageDirector();
             director.builder = builder;
 
             const payload = await director.buildAddIndexerMessage(address);
@@ -73,8 +71,8 @@ class StateMessageOperations {
 
     static async assembleRemoveIndexerMessage(wallet, address) {
         try {
-            const builder = new StateMessageBuilder(wallet);
-            const director = new StateMessageDirector();
+            const builder = new CompleteStateMessageBuilder(wallet);
+            const director = new CompleteStateMessageDirector();
             director.builder = builder;
 
             const payload = await director.buildRemoveIndexerMessage(address);
@@ -85,20 +83,20 @@ class StateMessageOperations {
         }
     }
 
-    static async assembleAppendWhitelistMessages(wallet) {
+    static async assembleAppendWhitelistMessages(wallet, txValidity) {
         try {
 
-            const builder = new StateMessageBuilder(wallet);
-            const director = new StateMessageDirector();
+            const builder = new CompleteStateMessageBuilder(wallet);
+            const director = new CompleteStateMessageDirector();
             director.builder = builder;
 
             const messages = new Map();
             const addresses = await fileUtils.readPublicKeysFromFile();
 
-            for (const address of addresses) {
-                const payload = await director.buildAppendWhitelistMessage(address);
+            for (const addressToWhitelist of addresses) {
+                const payload = await director.buildAppendWhitelistMessage(wallet.address, addressToWhitelist, txValidity);
                 const encodedPayload = safeEncodeApplyOperation(payload);
-                messages.set(address, encodedPayload);
+                messages.set(addressToWhitelist, encodedPayload);
             }
             return messages;
         } catch (error) {
@@ -108,8 +106,8 @@ class StateMessageOperations {
 
     static async assembleBanWriterMessage(wallet, address) {
         try {
-            const builder = new StateMessageBuilder(wallet);
-            const director = new StateMessageDirector();
+            const builder = new CompleteStateMessageBuilder(wallet);
+            const director = new CompleteStateMessageDirector();
             director.builder = builder;
 
             const payload = await director.buildBanWriterMessage(address);
@@ -120,26 +118,38 @@ class StateMessageOperations {
         }
     }
 
-    static async assemblePostTxMessage(wallet, validatorAddress, txHash, incomingAddress, incomingWriterKey, incomingNonce, contentHash, incomingSignature, externalBootstrap, msbBootstrap) {
+    static async assembleCompleteTransactionOperationMessage(
+        wallet,
+        invokerAddress,
+        txHash,
+        txValidity,
+        incomingWriterKey,
+        incomingNonce,
+        contentHash,
+        incomingSignature,
+        externalBootstrap,
+        msbBootstrap
+    ) {
         try {
-            const builder = new StateMessageBuilder(wallet);
-            const director = new StateMessageDirector();
+            const builder = new CompleteStateMessageBuilder(wallet);
+            const director = new CompleteStateMessageDirector();
             director.builder = builder;
-            const payload = await director.buildPostTxMessage(
-                validatorAddress,
+            const payload = await director.buildTransactionOperationMessage(
+                invokerAddress,
                 txHash,
-                incomingAddress,
+                txValidity,
                 incomingWriterKey,
                 incomingNonce,
                 contentHash,
                 incomingSignature,
                 externalBootstrap,
-                msbBootstrap
+                msbBootstrap,
             );
+            console.log(payload)
             return safeEncodeApplyOperation(payload);
 
         } catch (error) {
-            throw new Error(`Failed to assemble postTxMessage: ${error.message}`);
+            throw new Error(`Failed to assemble transaction Operation: ${error.message}`);
         }
     }
 
@@ -147,18 +157,20 @@ class StateMessageOperations {
         wallet,
         invokerAddress,
         transactionHash,
+        txValidity,
         externalBootstrap,
         incomingNonce,
         incomingSignature
     ) {
         try {
-            const builder = new StateMessageBuilder(wallet);
-            const director = new StateMessageDirector();
+            const builder = new CompleteStateMessageBuilder(wallet);
+            const director = new CompleteStateMessageDirector();
             director.builder = builder;
 
             const payload = await director.buildBootstrapDeploymentMessage(
                 invokerAddress,
                 transactionHash,
+                txValidity,
                 externalBootstrap,
                 incomingNonce,
                 incomingSignature,
@@ -221,8 +233,7 @@ class StateMessageOperations {
                 const hash = await blake3Hash(msg);
 
                 return wallet.verify(parsedRequest.eko.sig, hash, nodePublicKey);
-            }
-            else if (type === OperationType.ADD_ADMIN) {
+            } else if (type === OperationType.ADD_ADMIN) {
                 const adminEntry = await state.getAdminEntry();
                 if (!adminEntry) return false;
                 const adminAddressBuffer = parsedRequest.address;
@@ -250,4 +261,4 @@ class StateMessageOperations {
 
 }
 
-export default StateMessageOperations;
+export default CompleteStateMessageOperations;
