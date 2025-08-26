@@ -3,8 +3,8 @@ import {MainSettlementBus} from './src/index.js';
 const opts = {
     stores_directory : 'stores/',
     store_name : typeof process !== "undefined" ? process.argv[2] : Pear.config.args[0],
-    bootstrap: '1f558a91c7a08adc1ca478120c209198c281030bd568e42e7a70525c5eb16739',
-    channel: 'whateverchannel',
+    bootstrap: '6d545ae57546d4f07bb5e536acce482992bec47e5819d7b99d9ff3cc0a3a88cd',
+    channel: 'newnewchannel',
     enable_role_requester: false,
     enable_wallet: true,
     enable_validator_observer: true,

@@ -11,7 +11,7 @@ import { verifyDag, printHelp, printWalletInfo } from "./utils/cli.js";
 import StateMessageOperations from "./messages/stateMessages/StateMessageOperations.js";
 import { safeDecodeApplyOperation } from "./utils/protobuf/operationHelpers.js";
 import { createMessage } from "./utils/buffer.js";
-import addressUtils, { isAddressValid } from "./core/state/utils/address.js";
+import addressUtils, { bufferToAddress, isAddressValid } from "./core/state/utils/address.js";
 import Network from "./core/network/Network.js";
 import Check from "./utils/check.js";
 import State from "./core/state/State.js";
@@ -151,7 +151,9 @@ export class MainSettlementBus extends ReadyResource {
 
         if (this.#isAdmin(adminEntry)) {
             this.#shouldListenToAdminEvents = true;
+            this.#shouldListenToWriterEvents = true;
             this.#adminEventListener(); // only for admin
+            this.#writerEventListener(); // only for writers
         } else if (this.#state.isWritable() && !this.#state.isIndexer()) {
             this.#shouldListenToWriterEvents = true;
             this.#writerEventListener(); // only for writers
@@ -232,9 +234,12 @@ export class MainSettlementBus extends ReadyResource {
         try {
             const decodedRequest = safeDecodeApplyOperation(bufferedRequest);
             if (decodedRequest.type) {
+                if(OperationType.ADD_ADMIN){
+                    this.emit(EventType.ADMIN_EVENT, decodedRequest, bufferedRequest);
+                }  
                 if ([OperationType.ADD_WRITER, OperationType.REMOVE_WRITER, OperationType.ADD_ADMIN].includes(decodedRequest.type)) {
                     //This request must be handled by ADMIN
-                    this.emit(EventType.ADMIN_EVENT, decodedRequest, bufferedRequest);
+                    this.emit(EventType.WRITER_EVENT, decodedRequest, bufferedRequest);
                 } else if (decodedRequest.type === OperationType.WHITELISTED) {
                     //TODO: We should create separated listener for whitelisted operation which only be working if wallet is enabled and node is not a writer.
                     // also this listener should be turned off when node become writable. But for now it is ok.
@@ -440,6 +445,14 @@ export class MainSettlementBus extends ReadyResource {
                     this.#shouldListenToAdminEvents = true;
                     this.#adminEventListener();
                 }
+                
+                if (
+                    this.#isAdmin(updatedAdminEntry) &&
+                    !this.#shouldListenToWriterEvents
+                ) {
+                    this.#shouldListenToWriterEvents = true;
+                    this.#writerEventListener();
+                }
             }, LISTENER_TIMEOUT);
             return;
         }
@@ -480,6 +493,14 @@ export class MainSettlementBus extends ReadyResource {
             ) {
                 this.#shouldListenToAdminEvents = true;
                 this.#adminEventListener();
+            }
+
+            if (
+                this.#isAdmin(updatedAdminEntry) &&
+                !this.#shouldListenToWriterEvents
+            ) {
+                this.#shouldListenToWriterEvents = true;
+                this.#writerEventListener();
             }
         }, LISTENER_TIMEOUT);
     }
@@ -524,11 +545,11 @@ export class MainSettlementBus extends ReadyResource {
 
             await this.#state.append(encodedPayload);
             // timesleep and validate if it becomes whitelisted
+            await sleep(WHITELIST_SLEEP_INTERVAL);
             await this.#network.sendMessageToNode(
                 correspondingPublicKey,
                 whitelistedMessage
             );
-            await sleep(WHITELIST_SLEEP_INTERVAL);
             console.log(
                 `Whitelist message processed (${processedCount}/${totalElements})`
             );
