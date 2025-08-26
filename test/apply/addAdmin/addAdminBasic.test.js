@@ -31,6 +31,7 @@ hook('Initialize admin for addAdmin tests', async () => {
 
 test('Apply function addAdmin for the first time - happy path', async (k) => {
     try {
+        const writersLength = await admin.msb.state.getWriterLength();
         const adminEntryBefore = await admin.msb.state.getAdminEntry();
         k.is(adminEntryBefore, null, 'Admin entry should be null before adding a new admin');
 
@@ -43,11 +44,16 @@ test('Apply function addAdmin for the first time - happy path', async (k) => {
         await admin.msb.state.append(addAdminMessage); // Send `add admin` request to apply function
         await tryToSyncWriters(admin);
         const adminEntryAfter = await admin.msb.state.getAdminEntry(); // check if the admin entry was added successfully in the base
+        const nodeAdminEntry = await admin.msb.state.getNodeEntry(adminEntryAfter.address)
+        const newWritersLength = await admin.msb.state.getWriterLength();
         // check the result
         k.ok(adminEntryAfter, 'Result should not be null');
         k.ok(adminEntryAfter.address === admin.wallet.address, 'Admin address in base should match admin wallet address');
         k.ok(b4a.equals(adminEntryAfter.wk, admin.msb.state.writingKey), 'Admin writing key in base should match admin MSB writing key');
         k.ok(b4a.equals(adminEntryAfter.wk, admin.options.bootstrap), 'Admin writing key in base should match bootstrap key');
+        k.is(nodeAdminEntry.isWriter, true, 'Admin should be writer');
+        k.is(nodeAdminEntry.isIndexer, true, 'Admin should be indexer');
+        k.is(newWritersLength, writersLength + 1,  'Admin should increase writers length');
 
     } catch (error) {
         k.fail(error.message);

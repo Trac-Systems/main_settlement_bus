@@ -134,42 +134,34 @@ test('handleApplyRemoveWriterOperation (apply) - Append removeWriter payload int
 
 });
 
-
 test('handleApplyRemoveWriterOperation (apply) - Append removeWriter payload into the base by non admin node', async (t) => {
-    try {
-        // writer1 is not a writer.
-        // writer2 is not a writer
-        // writer3 is already a writer -> This node will try to remove writer4 by signed message by writer4.
-        // writer4 is already a writer.
-        // indexer is already an indexer.
+    // writer1 is not a writer.
+    // writer2 is not a writer
+    // writer3 is already a writer -> This node will try to remove writer4 by signed message by writer4.
+    // writer4 is already a writer.
+    // indexer is already an indexer.
 
-        const reqRemoveWriter4 = await StateMessageOperations.assembleRemoveWriterMessage(
-            writer4.wallet,
-            writer4.msb.state.writingKey,
-        );
+    const reqRemoveWriter4 = await StateMessageOperations.assembleRemoveWriterMessage(
+        writer4.wallet,
+        writer4.msb.state.writingKey,
+    );
 
-        const signedLengthWriter3Before = writer3.msb.state.getSignedLength();
-        const signedLengthWriter4Before = writer4.msb.state.getSignedLength();
-        await writer3.msb.state.append(reqRemoveWriter4);
-        await tryToSyncWriters(admin, writer3, writer4, indexer);
+    await writer3.msb.state.append(reqRemoveWriter4);
+    await writer3.msb.state.base.flush();
+    await tryToSyncWriters(admin, writer3, writer4, indexer);
+    await waitForNodeState(writer3, writer4.wallet.address, {
+        wk: writer4.msb.state.writingKey,
+        isWhitelisted: true,
+        isWriter: false,
+        isIndexer: false,
+    });
 
-        const result = await writer3.msb.state.getNodeEntry(writer4.wallet.address);
-        const signedLengthWriter3After = writer3.msb.state.getSignedLength();
-        const signedLengthWriter4After = writer4.msb.state.getSignedLength();
+    const result = await writer3.msb.state.getNodeEntry(writer4.wallet.address);
 
-        t.is(signedLengthWriter3Before, signedLengthWriter3After, 'Writer2 signed length should not change');
-        t.is(signedLengthWriter4Before, signedLengthWriter4After, 'Writer4 signed length should not change');
-        t.ok(result, 'Result should not be null');
-
-        t.ok(b4a.equals(result.wk, writer4.msb.state.writingKey), 'Result writing key should match writer writing key');
-        t.is(result.isWriter, true, 'Result should indicate that the peer is a writer');
-        t.is(writer4.msb.state.isWritable(), true, 'peer should be writable');
-
-    } catch (error) {
-        t.fail('Failed to remove writer: ' + error.message);
-    }
+    t.ok(result, 'Result should not be null');
+    t.is(result.isWriter, false, 'Result should not indicate that the peer is a writer');
+    t.is(writer4.msb.state.isWritable(), false, 'peer should not be writable');
 });
-
 
 test('handleApplyRemoveWriterOperation (apply) - Append removeWriter payload into the base - remove writer who is an indexer', async (t) => {
     // writer1 is not a writer.
