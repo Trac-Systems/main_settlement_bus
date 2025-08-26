@@ -14,7 +14,7 @@ import { safeDecodeApplyOperation } from '../../utils/protobuf/operationHelpers.
 import { createMessage, ZERO_WK } from '../../utils/buffer.js';
 import addressUtils from './utils/address.js';
 import adminEntryUtils from './utils/adminEntry.js';
-import nodeEntryUtils from './utils/nodeEntry.js';
+import nodeEntryUtils, { setWritingKey } from './utils/nodeEntry.js';
 import nodeRoleUtils from './utils/roles.js';
 import indexerEntryUtils from './utils/indexerEntry.js';
 import lengthEntryUtils from './utils/lengthEntry.js';
@@ -308,9 +308,12 @@ class State extends ReadyResource {
 
         const indexerIndex = indexerEntryUtils.getIndex(indexersEntry, adminAddressBuffer);
         if (indexerIndex === -1) return; // Admin address is not in indexers entry
-
+        // Update admin entry with new writing key
         const newAdminEntry = adminEntryUtils.encode(adminAddressBuffer, op.eko.wk);
         if (newAdminEntry.length === 0) return;
+        // Update node entry of the admin with new writing key
+        const adminNodeEntry = await this.#getEntryApply(adminAddress, batch);
+        const newAdminNodeEntry = setWritingKey(adminNodeEntry, op.eko.wk)
 
         // Revoke old wk and add new one as an indexer
         await base.removeWriter(decodedAdminEntry.wk);
@@ -318,6 +321,8 @@ class State extends ReadyResource {
 
         // Remove the old admin entry and add the new one
         await batch.put(EntryType.ADMIN, newAdminEntry);
+        // This updates the admin node entry with the new writer key
+        await batch.put(adminAddress, newAdminNodeEntry);
         await batch.put(hashHexString, node.value);
         console.log(`Admin updated: ${decodedAdminEntry.address}:${op.eko.wk.toString('hex')}`);
     }
