@@ -352,7 +352,7 @@ class State extends ReadyResource {
         const initializedNodeEntry = nodeEntryUtils.init(op.eko.wk, nodeRoleUtils.NodeRole.WRITER);
         const updatedNodeEntry = nodeEntryUtils.setRole(initializedNodeEntry, nodeRoleUtils.NodeRole.INDEXER);
         await batch.put(op.address, updatedNodeEntry);
-        await this.#addToWriters(op, batch)
+        await this.#updateWritersIndex(op, batch)
         // Create a new admin entry
         const adminEntry = adminEntryUtils.encode(adminAddressBuffer, op.eko.wk);
         const initIndexers = indexerEntryUtils.append(adminAddressBuffer);
@@ -467,7 +467,7 @@ class State extends ReadyResource {
         await this.#addWriter(op, base, node, batch, hashHexString, nodeAddress);
     }
 
-    async #addToWriters(op, batch) {
+    async #updateWritersIndex(op, batch) {
         // Retrieve and increment the writers length entry
         let length = await this.#getEntryApply(EntryType.WRITERS_LENGTH, batch);
         let incrementedLength = null;
@@ -507,7 +507,7 @@ class State extends ReadyResource {
         await batch.put(nodeAddress, updatedNodeEntry);
         await base.addWriter(op.eko.wk, { isIndexer: false });
 
-        await this.#addToWriters(op, batch);
+        await this.#updateWritersIndex(op, batch);
 
         await batch.put(hashHexString, node.value);
         console.log(`Writer added: ${nodeAddress}:${op.eko.wk.toString('hex')}`);
