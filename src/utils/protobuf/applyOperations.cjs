@@ -21,8 +21,8 @@ exports.OperationType = {
   "ADD_INDEXER": 6,
   "REMOVE_INDEXER": 7,
   "BAN_VALIDATOR": 8,
-  "TX": 9,
-  "BOOTSTRAP_DEPLOYMENT": 10
+  "BOOTSTRAP_DEPLOYMENT": 9,
+  "TX": 10
 }
 
 var CoreAdminOperation = exports.CoreAdminOperation = {
