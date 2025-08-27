@@ -1112,7 +1112,7 @@ function defineOperation () {
 
   function encodingLength (obj) {
     var length = 0
-    if ((+defined(obj.cao) + +defined(obj.aco) + +defined(obj.ibo) + +defined(obj.tto) + +defined(obj.rao) + +defined(obj.txo) + +defined(obj.bdo)) > 1) throw new Error("only one of the properties defined in oneof value can be set")
+    if ((+defined(obj.cao) + +defined(obj.aco) + +defined(obj.ibo) + +defined(obj.tto) + +defined(obj.rao) + +defined(obj.bdo) + +defined(obj.txo)) > 1) throw new Error("only one of the properties defined in oneof value can be set")
     if (defined(obj.type)) {
       var len = encodings.enum.encodingLength(obj.type)
       length += 1 + len
@@ -1146,13 +1146,13 @@ function defineOperation () {
       length += varint.encodingLength(len)
       length += 1 + len
     }
-    if (defined(obj.txo)) {
-      var len = TxOperation.encodingLength(obj.txo)
+    if (defined(obj.bdo)) {
+      var len = BootstrapDeploymentOperation.encodingLength(obj.bdo)
       length += varint.encodingLength(len)
       length += 1 + len
     }
-    if (defined(obj.bdo)) {
-      var len = BootstrapDeploymentOperation.encodingLength(obj.bdo)
+    if (defined(obj.txo)) {
+      var len = TxOperation.encodingLength(obj.txo)
       length += varint.encodingLength(len)
       length += 1 + len
     }
@@ -1163,7 +1163,7 @@ function defineOperation () {
     if (!offset) offset = 0
     if (!buf) buf = b4a.allocUnsafe(encodingLength(obj))
     var oldOffset = offset
-    if ((+defined(obj.cao) + +defined(obj.aco) + +defined(obj.ibo) + +defined(obj.tto) + +defined(obj.rao) + +defined(obj.txo) + +defined(obj.bdo)) > 1) throw new Error("only one of the properties defined in oneof value can be set")
+    if ((+defined(obj.cao) + +defined(obj.aco) + +defined(obj.ibo) + +defined(obj.tto) + +defined(obj.rao) + +defined(obj.bdo) + +defined(obj.txo)) > 1) throw new Error("only one of the properties defined in oneof value can be set")
     if (defined(obj.type)) {
       buf[offset++] = 8
       encodings.enum.encode(obj.type, buf, offset)
@@ -1209,19 +1209,19 @@ function defineOperation () {
       RoleAccessOperation.encode(obj.rao, buf, offset)
       offset += RoleAccessOperation.encode.bytes
     }
-    if (defined(obj.txo)) {
-      buf[offset++] = 66
-      varint.encode(TxOperation.encodingLength(obj.txo), buf, offset)
-      offset += varint.encode.bytes
-      TxOperation.encode(obj.txo, buf, offset)
-      offset += TxOperation.encode.bytes
-    }
     if (defined(obj.bdo)) {
-      buf[offset++] = 74
+      buf[offset++] = 66
       varint.encode(BootstrapDeploymentOperation.encodingLength(obj.bdo), buf, offset)
       offset += varint.encode.bytes
       BootstrapDeploymentOperation.encode(obj.bdo, buf, offset)
       offset += BootstrapDeploymentOperation.encode.bytes
+    }
+    if (defined(obj.txo)) {
+      buf[offset++] = 74
+      varint.encode(TxOperation.encodingLength(obj.txo), buf, offset)
+      offset += varint.encode.bytes
+      TxOperation.encode(obj.txo, buf, offset)
+      offset += TxOperation.encode.bytes
     }
     encode.bytes = offset - oldOffset
     return buf
@@ -1240,8 +1240,8 @@ function defineOperation () {
       ibo: null,
       tto: null,
       rao: null,
-      txo: null,
-      bdo: null
+      bdo: null,
+      txo: null
     }
     while (true) {
       if (end <= offset) {
@@ -1265,8 +1265,8 @@ function defineOperation () {
         delete obj.ibo
         delete obj.tto
         delete obj.rao
-        delete obj.txo
         delete obj.bdo
+        delete obj.txo
         var len = varint.decode(buf, offset)
         offset += varint.decode.bytes
         obj.cao = CoreAdminOperation.decode(buf, offset, offset + len)
@@ -1277,8 +1277,8 @@ function defineOperation () {
         delete obj.ibo
         delete obj.tto
         delete obj.rao
-        delete obj.txo
         delete obj.bdo
+        delete obj.txo
         var len = varint.decode(buf, offset)
         offset += varint.decode.bytes
         obj.aco = AdminControlOperation.decode(buf, offset, offset + len)
@@ -1289,8 +1289,8 @@ function defineOperation () {
         delete obj.aco
         delete obj.tto
         delete obj.rao
-        delete obj.txo
         delete obj.bdo
+        delete obj.txo
         var len = varint.decode(buf, offset)
         offset += varint.decode.bytes
         obj.ibo = InitBalanceOperation.decode(buf, offset, offset + len)
@@ -1301,8 +1301,8 @@ function defineOperation () {
         delete obj.aco
         delete obj.ibo
         delete obj.rao
-        delete obj.txo
         delete obj.bdo
+        delete obj.txo
         var len = varint.decode(buf, offset)
         offset += varint.decode.bytes
         obj.tto = TokenTransferOperation.decode(buf, offset, offset + len)
@@ -1313,8 +1313,8 @@ function defineOperation () {
         delete obj.aco
         delete obj.ibo
         delete obj.tto
-        delete obj.txo
         delete obj.bdo
+        delete obj.txo
         var len = varint.decode(buf, offset)
         offset += varint.decode.bytes
         obj.rao = RoleAccessOperation.decode(buf, offset, offset + len)
@@ -1326,11 +1326,11 @@ function defineOperation () {
         delete obj.ibo
         delete obj.tto
         delete obj.rao
-        delete obj.bdo
+        delete obj.txo
         var len = varint.decode(buf, offset)
         offset += varint.decode.bytes
-        obj.txo = TxOperation.decode(buf, offset, offset + len)
-        offset += TxOperation.decode.bytes
+        obj.bdo = BootstrapDeploymentOperation.decode(buf, offset, offset + len)
+        offset += BootstrapDeploymentOperation.decode.bytes
         break
         case 9:
         delete obj.cao
@@ -1338,11 +1338,11 @@ function defineOperation () {
         delete obj.ibo
         delete obj.tto
         delete obj.rao
-        delete obj.txo
+        delete obj.bdo
         var len = varint.decode(buf, offset)
         offset += varint.decode.bytes
-        obj.bdo = BootstrapDeploymentOperation.decode(buf, offset, offset + len)
-        offset += BootstrapDeploymentOperation.decode.bytes
+        obj.txo = TxOperation.decode(buf, offset, offset + len)
+        offset += TxOperation.decode.bytes
         break
         default:
         offset = skip(prefix & 7, buf, offset)
