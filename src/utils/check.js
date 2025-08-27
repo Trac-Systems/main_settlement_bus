@@ -8,14 +8,6 @@ import {
     SIGNATURE_BYTE_LENGTH,
     HASH_BYTE_LENGTH,
     BOOTSTRAP_BYTE_LENGTH,
-    MIN_SAFE_VALIDATION_INTEGER,
-    MAX_SAFE_VALIDATION_INTEGER,
-    TX_HASH_HEXSTRING_LENGTH,
-    WRITING_KEY_HEXSTRING_LENGTH,
-    NONCE_HEXSTRING_LENGTH,
-    CONTENT_HASH_HEXSTRING_LENGTH,
-    SIGNATURE_HEXSTRING_LENGTH,
-    BOOTSTRAP_HEXSTRING_LENGTH,
 } from './constants.js';
 import {TRAC_ADDRESS_SIZE} from 'trac-wallet/constants.js';
 
@@ -393,7 +385,6 @@ class Check {
 
     //TODO: IMPLEMENT InitBalanceOperation see protocol buffer
     //TODO: IMPLEMENT TokenTransferOperation see protocol buffer
-
 }
 
 export default Check;
