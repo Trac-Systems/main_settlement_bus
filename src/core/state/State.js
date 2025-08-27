@@ -224,86 +224,6 @@ class State extends ReadyResource {
         return handlers[type] || null;
     }
 
-    async #handleApplyTxOperation(op, view, base, node, batch) {
-        // ATTENTION: The sanitization should be done before ANY other check, otherwise we risk crashing
-        if (!this.check.validateTransactionOperation(op)) return;
-        // reject transaction which is not complete
-        if (!Object.hasOwn(op.txo,"vs") || !Object.hasOwn(op.txo,"va")|| !Object.hasOwn(op.txo,"vn")) return;
-        // reject if the validator signed their own transaction
-        if (b4a.equals(op.address, op.txo.va)) return;
-        // reject if the nonces are the same
-        if (b4a.equals(op.txo.in, op.txo.vn)) return;
-        // reject if the signatures are the same
-        if (b4a.equals(op.txo.is, op.txo.vs)) return;
-        // reject if the external bootstrap is the same as the network bootstrap
-        if (b4a.equals(op.txo.bs, op.txo.mbs)) return;
-
-        // validate invoker signature
-        const requesterAddressBuffer = op.address;
-        const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer);
-        if (null === requesterAddressString) return;
-        const requesterPublicKey = Wallet.decodeBech32mSafe(requesterAddressString);
-        if (null === requesterPublicKey) return;
-        const requesterMessage = createMessage(
-            op.address,
-            op.txo.txv,
-            op.txo.iw,
-            op.txo.ch,
-            op.txo.in,
-            op.txo.bs,
-            this.#bootstrap,
-            OperationType.TX
-        );
-        if (requesterMessage.length === 0) return;
-
-        const regeneratedTxHash = await blake3Hash(requesterMessage);
-        if (!b4a.equals(regeneratedTxHash, op.txo.tx)) return;
-
-        const isRequesterSignatureValid = this.#wallet.verify(op.txo.is, op.txo.tx, requesterPublicKey); // tx contains already a nonce.
-        if (!isRequesterSignatureValid) return;
-
-        //second signature
-        const validatorAddressBuffer = op.txo.va;
-        const validatorAddressString = addressUtils.bufferToAddress(validatorAddressBuffer);
-        if (null === validatorAddressString) return;
-
-        const validatorPublicKey = Wallet.decodeBech32mSafe(validatorAddressString);
-        if (null === validatorPublicKey) return;
-
-        // recreate validator message
-        const validatorMessage = createMessage(
-            op.txo.tx,
-            op.txo.va,
-            op.txo.vn,
-            OperationType.TX
-        );
-        if (validatorMessage.length === 0) return;
-
-        const validatorMessageHash = await blake3Hash(validatorMessage);
-        const isValidatorSignatureValid = this.#wallet.verify(op.txo.vs, validatorMessageHash, validatorPublicKey);
-        if (!isValidatorSignatureValid) return;
-
-        // verify tx validity - prevent deferred execution attack
-        const indexersSequenceState = await this.#getIndexerSequenceStateApply(base);
-        if (indexersSequenceState === null) return;
-        if (!b4a.equals(op.txo.txv, indexersSequenceState)) return;
-
-        // if user is performing a transaction on non-deployed bootstrap, then we need to reject it.
-        // if deployment/<bootstrap> is not null then it means that the bootstrap is already deployed, and it should
-        // point to payload, which is pointing to the txHash.
-        const deploymentEntry = await this.#getDeploymentEntryApply(op.txo.bs.toString('hex'), batch);
-        if (deploymentEntry === null) return;
-
-        const hashHexString = op.txo.tx.toString('hex');
-        const opEntry = await this.#getEntryApply(hashHexString, batch);
-        if (null !== opEntry) return;
-
-        await batch.put(hashHexString, node.value);
-        if (this.#enable_txlogs === true) {
-            console.log(`TX: ${hashHexString} appended. Signed length: `, this.#base.view.core.signedLength);
-        }
-    }
-
     async #handleApplyAddAdminOperation(op, view, base, node, batch) {
         if (!this.check.validateCoreAdminOperation(op)) return;
 
@@ -1053,6 +973,86 @@ class State extends ReadyResource {
         await batch.put(EntryType.DEPLOYMENT + bootstrapDeploymentHexString, op.bdo.tx);
         if (this.#enable_txlogs === true) {
             console.log(`TX: ${hashHexString} and deployment/${bootstrapDeploymentHexString} have been appended. Signed length: `, this.#base.view.core.signedLength);
+        }
+    }
+
+    async #handleApplyTxOperation(op, view, base, node, batch) {
+        // ATTENTION: The sanitization should be done before ANY other check, otherwise we risk crashing
+        if (!this.check.validateTransactionOperation(op)) return;
+        // reject transaction which is not complete
+        if (!Object.hasOwn(op.txo,"vs") || !Object.hasOwn(op.txo,"va")|| !Object.hasOwn(op.txo,"vn")) return;
+        // reject if the validator signed their own transaction
+        if (b4a.equals(op.address, op.txo.va)) return;
+        // reject if the nonces are the same
+        if (b4a.equals(op.txo.in, op.txo.vn)) return;
+        // reject if the signatures are the same
+        if (b4a.equals(op.txo.is, op.txo.vs)) return;
+        // reject if the external bootstrap is the same as the network bootstrap
+        if (b4a.equals(op.txo.bs, op.txo.mbs)) return;
+
+        // validate invoker signature
+        const requesterAddressBuffer = op.address;
+        const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer);
+        if (null === requesterAddressString) return;
+        const requesterPublicKey = Wallet.decodeBech32mSafe(requesterAddressString);
+        if (null === requesterPublicKey) return;
+        const requesterMessage = createMessage(
+            op.address,
+            op.txo.txv,
+            op.txo.iw,
+            op.txo.ch,
+            op.txo.in,
+            op.txo.bs,
+            this.#bootstrap,
+            OperationType.TX
+        );
+        if (requesterMessage.length === 0) return;
+
+        const regeneratedTxHash = await blake3Hash(requesterMessage);
+        if (!b4a.equals(regeneratedTxHash, op.txo.tx)) return;
+
+        const isRequesterSignatureValid = this.#wallet.verify(op.txo.is, op.txo.tx, requesterPublicKey); // tx contains already a nonce.
+        if (!isRequesterSignatureValid) return;
+
+        //second signature
+        const validatorAddressBuffer = op.txo.va;
+        const validatorAddressString = addressUtils.bufferToAddress(validatorAddressBuffer);
+        if (null === validatorAddressString) return;
+
+        const validatorPublicKey = Wallet.decodeBech32mSafe(validatorAddressString);
+        if (null === validatorPublicKey) return;
+
+        // recreate validator message
+        const validatorMessage = createMessage(
+            op.txo.tx,
+            op.txo.va,
+            op.txo.vn,
+            OperationType.TX
+        );
+        if (validatorMessage.length === 0) return;
+
+        const validatorMessageHash = await blake3Hash(validatorMessage);
+        const isValidatorSignatureValid = this.#wallet.verify(op.txo.vs, validatorMessageHash, validatorPublicKey);
+        if (!isValidatorSignatureValid) return;
+
+        // verify tx validity - prevent deferred execution attack
+        const indexersSequenceState = await this.#getIndexerSequenceStateApply(base);
+        if (indexersSequenceState === null) return;
+        if (!b4a.equals(op.txo.txv, indexersSequenceState)) return;
+
+        // if user is performing a transaction on non-deployed bootstrap, then we need to reject it.
+        // if deployment/<bootstrap> is not null then it means that the bootstrap is already deployed, and it should
+        // point to payload, which is pointing to the txHash.
+        const deploymentEntry = await this.#getDeploymentEntryApply(op.txo.bs.toString('hex'), batch);
+        if (deploymentEntry === null) return;
+
+        const hashHexString = op.txo.tx.toString('hex');
+        const opEntry = await this.#getEntryApply(hashHexString, batch);
+        if (null !== opEntry) return;
+
+        await batch.put(hashHexString, node.value);
+        if (this.#enable_txlogs === true) {
+            console.log(`TX: ${hashHexString} appended. Signed length: `, this.#base.view.core.signedLength);
         }
     }
 

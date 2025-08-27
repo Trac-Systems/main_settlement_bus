@@ -12,8 +12,8 @@ enum OperationType {
     ADD_INDEXER          = 6; // complete
     REMOVE_INDEXER       = 7; // complete
     BAN_VALIDATOR        = 8; // complete
-    TX                   = 9; // partial
-    BOOTSTRAP_DEPLOYMENT = 10; // partial
+    BOOTSTRAP_DEPLOYMENT = 9; // partial
+    TX                   = 10; // partial
     //INIT_BALANCE         = 11; // complete TODO: UNCOMMENT DURING IMPLEMENTATION
     //TOKEN_TRANSFER       = 12; // partial TODO: UNCOMMENT DURING IMPLEMENTATION
 }
