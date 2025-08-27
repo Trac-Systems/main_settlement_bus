@@ -72,6 +72,29 @@ class CompleteStateMessageDirector {
         return this.#builder.getPayload();
     }
 
+    async buildAdminRecoveryMessage(
+        invokerAddress,
+        txHash,
+        txValidity,
+        incomingWritingKey,
+        incomingNonce,
+        incomingSignature
+    ) {
+        if (!this.#builder) throw new Error('Builder has not been set.');
+
+        await this.#builder
+            .forOperationType(OperationType.ADMIN_RECOVERY)
+            .withAddress(invokerAddress)
+            .withTxHash(txHash)
+            .withTxValidity(txValidity)
+            .withIncomingWriterKey(incomingWritingKey)
+            .withIncomingNonce(incomingNonce)
+            .withIncomingSignature(incomingSignature)
+            .buildValueAndSign();
+
+        return this.#builder.getPayload();
+    }
+
     async buildAddIndexerMessage(invokerAddress, incomingAddress, txValidity) {
         if (!this.#builder) throw new Error('Builder has not been set.');
 

@@ -217,6 +217,7 @@ class State extends ReadyResource {
             [OperationType.APPEND_WHITELIST]: this.#handleApplyAppendWhitelistOperation.bind(this),
             [OperationType.ADD_WRITER]: this.#handleApplyAddWriterOperation.bind(this),
             [OperationType.REMOVE_WRITER]: this.#handleApplyRemoveWriterOperation.bind(this),
+            [OperationType.ADMIN_RECOVERY]: this.#handleApplyAdminRecoveryOperation.bind(this),
             [OperationType.ADD_INDEXER]: this.#handleApplyAddIndexerOperation.bind(this),
             [OperationType.REMOVE_INDEXER]: this.#handleApplyRemoveIndexerOperation.bind(this),
             [OperationType.BAN_VALIDATOR]: this.#handleApplyBanValidatorOperation.bind(this),
@@ -280,106 +281,128 @@ class State extends ReadyResource {
 
     async #handleApplyAddAdminOperation(op, view, base, node, batch) {
         if (!this.check.validateCoreAdminOperation(op)) return;
-        const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
 
-        if (null === adminEntry) {
-            await this.#addAdminIfNotSet(op, view, base, node, batch);
-        } else {
-            await this.#addAdminIfSet(adminEntry, op, view, node, base, batch);
-        }
-    }
-
-    async #addAdminIfSet(adminEntry, op, view, base, node, batch) {
-        const decodedAdminEntry = adminEntryUtils.decode(adminEntry);
-        if (null === decodedAdminEntry) return;
-        const publicKeyAdminEntry = Wallet.decodeBech32mSafe(decodedAdminEntry.address);
-
-        // Extract and validate the network prefix from the node's address
-        const adminAddressBuffer = op.address;
-        const adminAddress = addressUtils.bufferToAddress(adminAddressBuffer);
-        if (null === adminAddress) return;
-        const adminPublicKey = Wallet.decodeBech32mSafe(adminAddress);
-        if (adminPublicKey === null) return;
-
-        if (!b4a.equals(publicKeyAdminEntry, adminPublicKey)) return;
-
-        // verify signature
-        const message = createMessage(adminAddressBuffer, op.eko.wk, op.eko.nonce, OperationType.ADD_ADMIN)
-        const hash = await blake3Hash(message);
-        const isMessageVerifed = this.#wallet.verify(op.eko.sig, hash, publicKeyAdminEntry)
-        const hashHexString = hash.toString('hex');
-        // Check if the operation has already been applied
-        const opEntry = await this.#getEntryApply(hashHexString, batch);
-        if (!isMessageVerifed || null !== opEntry) return
-
-        // Check if the admin and indexers entry is valid
-        const indexersEntry = await this.#getEntryApply(EntryType.INDEXERS, batch);
-        if (indexersEntry === null) return;
-
-        const indexerIndex = indexerEntryUtils.getIndex(indexersEntry, adminAddressBuffer);
-        if (indexerIndex === -1) return; // Admin address is not in indexers entry
-        // Update admin entry with new writing key
-        const newAdminEntry = adminEntryUtils.encode(adminAddressBuffer, op.eko.wk);
-        if (newAdminEntry.length === 0) return;
-        // Update node entry of the admin with new writing key
-        const adminNodeEntry = await this.#getEntryApply(adminAddress, batch);
-        const newAdminNodeEntry = setWritingKey(adminNodeEntry, op.eko.wk)
-
-        // Revoke old wk and add new one as an indexer
-        await base.removeWriter(decodedAdminEntry.wk);
-        await base.addWriter(op.eko.wk, { isIndexer: true });
-
-        // Remove the old admin entry and add the new one
-        await batch.put(EntryType.ADMIN, newAdminEntry);
-        // This updates the admin node entry with the new writer key
-        await batch.put(adminAddress, newAdminNodeEntry);
-        await batch.put(hashHexString, node.value);
-        console.log(`Admin updated: ${decodedAdminEntry.address}:${op.eko.wk.toString('hex')}`);
-    }
-
-    async #addAdminIfNotSet(op, view, base, node, batch) {
         // Extract and validate the network address
         const adminAddressBuffer = op.address;
-        const adminAddress = addressUtils.bufferToAddress(adminAddressBuffer);
-        if (adminAddress === null) return;
-        const adminPublicKey = Wallet.decodeBech32mSafe(adminAddress);
+        const adminAddressString = addressUtils.bufferToAddress(adminAddressBuffer);
+        if (adminAddressString === null) return;
+        const adminPublicKey = Wallet.decodeBech32mSafe(adminAddressString);
         if (adminPublicKey === null) return;
+
+        // Check if the operation is being performed by the bootstrap node - the original deployer of the Trac Network
+        if (!b4a.equals(node.from.key, this.#bootstrap) || !b4a.equals(op.cao.iw, this.#bootstrap)) return;
+
         // verify signature
         const message = createMessage(adminAddressBuffer, op.cao.txv, op.cao.iw, op.cao.in, OperationType.ADD_ADMIN)
         const hash = await blake3Hash(message);
         if (!b4a.equals(hash, op.cao.tx)) return;
         const isMessageVerifed = this.#wallet.verify(op.cao.is, op.cao.tx, adminPublicKey)
         const txHashHexString = op.cao.tx.toString('hex');
-
+        if (!isMessageVerifed) return;
         // verify tx validity - prevent deferred execution attack
         const indexersSequenceState = await this.#getIndexerSequenceStateApply(base);
         if (!b4a.equals(op.cao.txv, indexersSequenceState)) return;
 
+        const adminEntryExists = await this.#getEntryApply(EntryType.ADMIN, batch);
+        // if admin entry already exists, cannot perform this operation
+        if (null !== adminEntryExists) return;
+
         // Check if the operation has already been applied
         const opEntry = await this.#getEntryApply(txHashHexString, batch);
-        if (
-            !b4a.equals(node.from.key, this.#bootstrap) ||
-            !b4a.equals(op.cao.iw, this.#bootstrap) ||
-            !isMessageVerifed ||
-            null !== opEntry
-        ) return;
+        if (null !== opEntry) return;
 
         const initializedNodeEntry = nodeEntryUtils.init(op.cao.iw, nodeRoleUtils.NodeRole.INDEXER);
         //const updatedNodeEntry = nodeEntryUtils.setRole(initializedNodeEntry, nodeRoleUtils.NodeRole.INDEXER);
-        await batch.put(adminAddress, initializedNodeEntry);
+        await batch.put(adminAddressString, initializedNodeEntry);
         await this.#updateWritersIndex(adminAddressBuffer, batch);
 
         // Create a new admin entry
-        const adminEntry = adminEntryUtils.encode(adminAddressBuffer, op.cao.iw);
+        const newAdminEntry = adminEntryUtils.encode(adminAddressBuffer, op.cao.iw);
         const initIndexers = indexerEntryUtils.append(adminAddressBuffer);
 
-        if (initIndexers.length === 0 || adminEntry.length === 0) return;
+        if (initIndexers.length === 0 || newAdminEntry.length === 0) return;
         // initialize admin entry and indexers entry
-        await batch.put(EntryType.ADMIN, adminEntry);
+        await batch.put(EntryType.ADMIN, newAdminEntry);
         await batch.put(EntryType.INDEXERS, initIndexers);
         await batch.put(txHashHexString, node.value);
 
-        console.log(`Admin added: ${adminAddress}:${this.#bootstrap.toString('hex')}`);
+        console.log(`Admin added addr:wk:tx - ${adminAddressString}:${op.cao.iw.toString('hex')}:${txHashHexString}`);
+    }
+
+    async #handleApplyAdminRecoveryOperation(op, view, base, node, batch) {
+        if (!this.check.validateRoleAccessOperation(op)) return;
+
+        // Extract and validate the requester address
+        const requesterAdminAddressBuffer = op.address;
+        const requesterAdminAddressString = addressUtils.bufferToAddress(requesterAdminAddressBuffer);
+        if (requesterAdminAddressString === null) return;
+        const requesterAdminPublicKey = Wallet.decodeBech32mSafe(requesterAdminAddressString);
+        if (requesterAdminPublicKey === null) return;
+
+        // verify requester signature
+        const requesterMessage = createMessage(op.address, op.rao.txv, op.rao.iw, op.rao.in, OperationType.ADMIN_RECOVERY)
+        const hash = await blake3Hash(requesterMessage);
+
+        if (!b4a.equals(hash, op.rao.tx)) return;
+
+        const isRequesterMessageVerifed = this.#wallet.verify(op.rao.is, op.rao.tx, requesterAdminPublicKey);
+        const txHashHexString = op.rao.tx.toString('hex');
+        if (!isRequesterMessageVerifed) return;
+
+        // verify validator signature
+        const validatorAddress = op.rao.va;
+        const validatorAddressString = addressUtils.bufferToAddress(validatorAddress);
+        if (validatorAddressString === null) return;
+        const validatorPublicKey = Wallet.decodeBech32mSafe(validatorAddressString);
+        if (validatorPublicKey === null) return;
+
+        const validatorMessage = createMessage(op.rao.tx, op.rao.va, op.rao.vn, OperationType.ADMIN_RECOVERY);
+        const validatorHash = await blake3Hash(validatorMessage);
+        const isValidatorMessageVerifed = this.#wallet.verify(op.rao.vs, validatorHash, validatorPublicKey);
+        if (!isValidatorMessageVerifed) return;
+
+        // verify tx validity - prevent deferred execution attack
+        const indexersSequenceState = await this.#getIndexerSequenceStateApply(base);
+        if (!b4a.equals(op.rao.txv, indexersSequenceState)) return;
+
+        // Check if the operation has already been applied
+        const opEntry = await this.#getEntryApply(txHashHexString, batch);
+
+        // anti-replay attack
+        if (null !== opEntry) return;
+        const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
+        const decodedAdminEntry = adminEntryUtils.decode(adminEntry);
+        console.log("decodedAdminEntry",decodedAdminEntry)
+
+        if (null === decodedAdminEntry) return;
+        const publicKeyAdminEntry = Wallet.decodeBech32mSafe(decodedAdminEntry.address);
+        if (!b4a.equals(requesterAdminPublicKey, publicKeyAdminEntry)) return;
+
+        // Check if the admin and indexers entry is valid
+        const indexersEntry = await this.#getEntryApply(EntryType.INDEXERS, batch);
+        if (indexersEntry === null) return;
+        const indexerIndex = indexerEntryUtils.getIndex(indexersEntry, requesterAdminAddressBuffer);
+        if (indexerIndex === -1) return; // Admin address is not in indexers entry
+
+        // Update admin entry with new writing key
+        const newAdminEntry = adminEntryUtils.encode(requesterAdminAddressBuffer, op.rao.iw);
+        if (newAdminEntry.length === 0) return;
+
+        // Update node entry of the admin with new writing key
+        const adminNodeEntry = await this.#getEntryApply(requesterAdminAddressString, batch);
+        const newAdminNodeEntry = setWritingKey(adminNodeEntry, op.rao.iw)
+
+        // Revoke old wk and add new one as an indexer
+        await base.removeWriter(decodedAdminEntry.wk);
+        await base.addWriter(op.rao.iw, { isIndexer: true });
+
+        // Remove the old admin entry and add the new one
+        await batch.put(EntryType.ADMIN, newAdminEntry);
+        // This updates the admin node entry with the new writer key
+        await batch.put(requesterAdminAddressString, newAdminNodeEntry);
+        await batch.put(txHashHexString, node.value);
+
+        console.log(`Admin has been recovered addr:wk:tx - ${requesterAdminAddressString}:${op.rao.iw.toString('hex')}:${txHashHexString}`);
     }
 
     async #handleApplyAppendWhitelistOperation(op, view, base, node, batch) {

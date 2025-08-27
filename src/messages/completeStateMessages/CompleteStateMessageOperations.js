@@ -85,6 +85,36 @@ class CompleteStateMessageOperations {
         }
     }
 
+    static async assembleAdminRecoveryMessage(
+        wallet,
+        invokerAddress,
+        transactionHash,
+        txValidity,
+        incomingWritingKey,
+        incomingNonce,
+        incomingSignature
+    ) {
+        try {
+            const builder = new CompleteStateMessageBuilder(wallet);
+            const director = new CompleteStateMessageDirector();
+            director.builder = builder;
+
+            const payload = await director.buildAdminRecoveryMessage(
+                invokerAddress,
+                transactionHash,
+                txValidity,
+                incomingWritingKey,
+                incomingNonce,
+                incomingSignature
+            );
+            console.log(payload)
+            return safeEncodeApplyOperation(payload);
+
+        } catch (error) {
+            throw new Error(`Failed to assemble remove writer message: ${error.message}`);
+        }
+    }
+
     static async assembleAddIndexerMessage(wallet, incomingAddress, txValidity) {
         try {
             const builder = new CompleteStateMessageBuilder(wallet);
@@ -98,6 +128,8 @@ class CompleteStateMessageOperations {
             throw new Error(`Failed to assemble addIndexerMessage: ${error.message}`);
         }
     }
+
+
 
     static async assembleRemoveIndexerMessage(wallet, incomingAddress, txValidity) {
         try {
@@ -175,7 +207,6 @@ class CompleteStateMessageOperations {
                 externalBootstrap,
                 msbBootstrap,
             );
-            console.log(payload)
             return safeEncodeApplyOperation(payload);
 
         } catch (error) {

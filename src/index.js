@@ -11,7 +11,7 @@ import {verifyDag, printHelp, printWalletInfo, get_tx_info} from "./utils/cli.js
 import CompleteStateMessageOperations from "./messages/completeStateMessages/CompleteStateMessageOperations.js";
 import {safeDecodeApplyOperation} from "./utils/protobuf/operationHelpers.js";
 import {createMessage} from "./utils/buffer.js";
-import addressUtils, {bufferToAddress, isAddressValid} from "./core/state/utils/address.js";
+import addressUtils, {bufferToAddress, isAddressValid, addressToBuffer} from "./core/state/utils/address.js";
 import Network from "./core/network/Network.js";
 import Check from "./utils/check.js";
 import State from "./core/state/State.js";
@@ -437,27 +437,13 @@ export class MainSettlementBus extends ReadyResource {
         }
 
         const txValidity = await this.#state.getIndexerSequenceState();
-        const addAdminMessage = await partialStateMessageOperations.assembleAdminRecoveryMessage(
+        const adminRecoveryMessage = await partialStateMessageOperations.assembleAdminRecoveryMessage(
             this.#wallet,
             this.#state.writingKey.toString('hex'),
             txValidity.toString('hex')
         );
 
-        const payloadForValidator = {
-            op: "addAdmin",
-            transactionPayload: addAdminMessage,
-        }
-        console.log(payloadForValidator)
-        // await this.#network.validator_stream.messenger.send(payloadForValidator);
-
-        setTimeout(async () => {
-            const updatedAdminEntry = await this.#state.getAdminEntry();
-
-            if (this.#isAdmin(updatedAdminEntry) && !this.#shouldListenToWriterEvents) {
-                this.#shouldListenToWriterEvents = true;
-                this.#writerEventListener();
-            }
-        }, LISTENER_TIMEOUT);
+        await this.#network.validator_stream.messenger.send(adminRecoveryMessage);
     }
 
     async #handleWhitelistOperations() {
@@ -842,6 +828,7 @@ export class MainSettlementBus extends ReadyResource {
                     this.#state.writingKey,
                     this.#shouldListenToWriterEvents
                 );
+                break;
             case '/i':
                 console.log(await this.#state.getIndexerSequenceState())
                 break;
@@ -861,6 +848,7 @@ export class MainSettlementBus extends ReadyResource {
                     }
 
                     const normalizeHex = field => (typeof field === 'string' ? b4a.from(field, 'hex') : field);
+
                     const normalizedTxo = {
                         tx: normalizeHex(txo.tx),    // Transaction hash
                         txv: normalizeHex(txo.txv),  // Transaction validity
@@ -892,8 +880,6 @@ export class MainSettlementBus extends ReadyResource {
                     randomExternalBootstrap,
                     msbBootstrap
                 )
-                console.log(assembledTransactionOperation)
-                console.log('normalizedTransactionOperation:', normalizeTransactionOperation(assembledTransactionOperation));
                 const normalizedPayload = normalizeTransactionOperation(assembledTransactionOperation)
                 const complete = await completeStateMessageOperations.assembleCompleteTransactionOperationMessage(
                     this.#wallet,
@@ -907,6 +893,7 @@ export class MainSettlementBus extends ReadyResource {
                     normalizedPayload.txo.bs,
                     normalizedPayload.txo.mbs,
                 )
+                this.#state.append(complete)
                 break;
             default:
                 if (input.startsWith("/get_node_info")) {
