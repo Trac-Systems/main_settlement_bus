@@ -210,7 +210,6 @@ class State extends ReadyResource {
 
     #getApplyOperationHandler(type) {
         const handlers = {
-            [OperationType.TX]: this.#handleApplyTxOperation.bind(this),
             [OperationType.ADD_ADMIN]: this.#handleApplyAddAdminOperation.bind(this),
             [OperationType.APPEND_WHITELIST]: this.#handleApplyAppendWhitelistOperation.bind(this),
             [OperationType.ADD_WRITER]: this.#handleApplyAddWriterOperation.bind(this),
@@ -220,6 +219,7 @@ class State extends ReadyResource {
             [OperationType.REMOVE_INDEXER]: this.#handleApplyRemoveIndexerOperation.bind(this),
             [OperationType.BAN_VALIDATOR]: this.#handleApplyBanValidatorOperation.bind(this),
             [OperationType.BOOTSTRAP_DEPLOYMENT]: this.#handleApplyBootstrapDeploymentOperation.bind(this),
+            [OperationType.TX]: this.#handleApplyTxOperation.bind(this),
         };
         return handlers[type] || null;
     }
@@ -900,42 +900,66 @@ class State extends ReadyResource {
     }
 
     async #handleApplyBanValidatorOperation(op, view, base, node, batch) {
-        if (!this.check.validateBasicKeyOp(op)) return;
-
+        if (!this.check.validateAdminControlOperation(op)) return;
         // Extract and validate the network prefix from the node's address
-        const nodeAddressBuffer = op.address;
-        const nodeAddress = addressUtils.bufferToAddress(nodeAddressBuffer);
-        if (nodeAddress === null) return;
-        const nodePublicKey = Wallet.decodeBech32mSafe(nodeAddress);
-        if (nodePublicKey === null) return;
+        const requesterAddressBuffer = op.address;
+        const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer);
+        if (requesterAddressString === null) return;
+        const requesterPublicKey = Wallet.decodeBech32mSafe(requesterAddressString);
+        if (requesterPublicKey === null) return;
 
         // ensure that an admin invoked this operation
         const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
         if (null === adminEntry) return;
+
         const decodedAdminEntry = adminEntryUtils.decode(adminEntry);
         if (null === decodedAdminEntry) return;
+
         const adminPublicKey = Wallet.decodeBech32mSafe(decodedAdminEntry.address);
-        if (null === adminPublicKey || b4a.equals(nodePublicKey, adminPublicKey) || !this.#isAdminApply(decodedAdminEntry, node)) return;
+        if (adminPublicKey === null || !b4a.equals(requesterPublicKey, adminPublicKey) || !this.#isAdminApply(decodedAdminEntry, node)) return;
 
-        // verify signature
-        const message = createMessage(op.address, op.bko.nonce, op.type);
-        const hash = await blake3Hash(message);
-        const isMessageVerifed = this.#wallet.verify(op.bko.sig, hash, adminPublicKey);
-        const hashHexString = hash.toString('hex');
+        // recreate requester message
+        const message = createMessage(
+            op.address,
+            op.aco.txv,
+            op.aco.ia,
+            op.aco.in,
+            op.aco.nonce,
+            OperationType.BAN_VALIDATOR
+        );
+        if (message.length === 0) return;
+
+        const regeneratedHash = await blake3Hash(message);
+        if (!b4a.equals(regeneratedHash, op.aco.tx)) return;
+
+        const isMessageVerifed = this.#wallet.verify(op.aco.is, regeneratedHash, adminPublicKey);
+        const txHashHexString = regeneratedHash.toString('hex');
+        if (!isMessageVerifed) return
+
+        // verify tx validity - prevent deferred execution attack
+        const indexersSequenceState = await this.#getIndexerSequenceStateApply(base);
+        if (indexersSequenceState === null) return
+        if (!b4a.equals(op.aco.txv, indexersSequenceState)) return;
+
         // check if the operation has already been applied
-        const opEntry = await this.#getEntryApply(hashHexString, batch);
-        if (!isMessageVerifed || null !== opEntry) return;
+        const opEntry = await this.#getEntryApply(txHashHexString, batch);
+        if (null !== opEntry) return;
 
-        const nodeEntry = await this.#getEntryApply(nodeAddress, batch);
+        // Extract and validate the node address to be banned
+        const nodeToBeBannedAddressBuffer = op.aco.ia;
+        const nodeToBeBannedAddressString = addressUtils.bufferToAddress(nodeToBeBannedAddressBuffer);
+        if (nodeToBeBannedAddressString === null) return;
+
+        const nodeEntry = await this.#getEntryApply(nodeToBeBannedAddressString, batch);
         if (null === nodeEntry) return; // Node entry must exist to ban it.
 
         // Atleast writer must be whitelisted to ban it.
         const isWhitelisted = nodeEntryUtils.isWhitelisted(nodeEntry);
         const isWriter = nodeEntryUtils.isWriter(nodeEntry);
         const isIndexer = nodeEntryUtils.isIndexer(nodeEntry);
+
         // only writer/whitelisted node can be banned.
         if ((!isWhitelisted && !isWriter) || isIndexer) return;
-
 
         const updatedNodeEntry = nodeEntryUtils.setRole(nodeEntry, nodeRoleUtils.NodeRole.READER);
         if (null === updatedNodeEntry) return;
@@ -943,10 +967,12 @@ class State extends ReadyResource {
         if (null === decodedNodeEntry) return;
 
         // Remove the writer role and update the state
-        await base.removeWriter(decodedNodeEntry.wk);
-        await batch.put(nodeAddress, updatedNodeEntry);
-        await batch.put(hashHexString, op.value);
-        console.log(`Node has been banned: ${nodeAddress}:${decodedNodeEntry.wk.toString('hex')}`);
+        if (isWriter) {
+            await base.removeWriter(decodedNodeEntry.wk);
+        }
+        await batch.put(nodeToBeBannedAddressString, updatedNodeEntry);
+        await batch.put(txHashHexString, node.value);
+        console.log(`Node has been banned: addr:wk:tx - ${nodeToBeBannedAddressString}:${decodedNodeEntry.wk.toString('hex')}:${txHashHexString}`);
     }
 
     async #handleApplyBootstrapDeploymentOperation(op, view, base, node, batch) {
