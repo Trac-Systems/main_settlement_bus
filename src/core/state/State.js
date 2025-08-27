@@ -22,7 +22,7 @@ import transactionUtils from './utils/transaction.js';
 import {blake3Hash} from '../../utils/crypto.js';
 
 class State extends ReadyResource {
-
+    //TODO: AFTER createMessage(..args) check if this function did not return NULL
     #base;
     #bee;
     #bootstrap;
@@ -171,7 +171,6 @@ class State extends ReadyResource {
     }
 
     async getIndexerSequenceState() {
-        console.log("this.#base.system.indexers", this.#base.system.indexers)
         const buf = []
         for (const indexer of Object.values(this.#base.system.indexers)) {
             buf.push(indexer.key);
@@ -195,7 +194,6 @@ class State extends ReadyResource {
         const batch = view.batch();
         for (const node of nodes) {
             const op = safeDecodeApplyOperation(node.value);
-
             if (op === null) return;
             if (b4a.byteLength(node.value) > transactionUtils.MAXIMUM_OPERATION_PAYLOAD_SIZE) return;
 
@@ -227,49 +225,76 @@ class State extends ReadyResource {
     }
 
     async #handleApplyTxOperation(op, view, base, node, batch) {
-        //TODO: ADD check to ensure both nonces are different to increase security.
-        //TODO: ADD check to ensure that sigs are diff
-        //TODO: ADD check to ensure that validator did not validate ifself (address !== va)
-        //TODO: ADD check if bs !== mbs.
-        // TODO REIMPLEMENT FOR PARTIAL TX
-        if (!this.check.validatePostTx(op)) return; // ATTENTION: The sanitization should be done before ANY other check, otherwise we risk crashing
+        // ATTENTION: The sanitization should be done before ANY other check, otherwise we risk crashing
+        if (!this.check.validateTransactionOperation(op)) return;
+        // reject transaction which is not complete
+        if (!Object.hasOwn(op.txo,"vs") || !Object.hasOwn(op.txo,"va")|| !Object.hasOwn(op.txo,"vn")) return;
+        // reject if the validator signed their own transaction
+        if (b4a.equals(op.address, op.txo.va)) return;
+        // reject if the nonces are the same
+        if (b4a.equals(op.txo.in, op.txo.vn)) return;
+        // reject if the signatures are the same
+        if (b4a.equals(op.txo.is, op.txo.vs)) return;
+        // reject if the external bootstrap is the same as the network bootstrap
+        if (b4a.equals(op.txo.bs, op.txo.mbs)) return;
 
-        const tx = op.txo.tx;
-        const validatorAddressBuffer = op.address;
+        // validate invoker signature
+        const requesterAddressBuffer = op.address;
+        const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer);
+        if (null === requesterAddressString) return;
+        const requesterPublicKey = Wallet.decodeBech32mSafe(requesterAddressString);
+        if (null === requesterPublicKey) return;
+        const requesterMessage = createMessage(
+            op.address,
+            op.txo.txv,
+            op.txo.iw,
+            op.txo.ch,
+            op.txo.in,
+            op.txo.bs,
+            this.#bootstrap,
+            OperationType.TX
+        );
+        if (requesterMessage.length === 0) return;
 
-        const regeneratedTxBuffer = await transactionUtils.generateTxBuffer(op.txo.bs, this.#bootstrap, validatorAddressBuffer, op.txo.iw, op.txo.ia, op.txo.ch, op.txo.in);
-        if (regeneratedTxBuffer.length === 0 || !b4a.equals(regeneratedTxBuffer, tx)) return;
-        // first signature
-        const requesterSignature = op.txo.is;
-        const incomingAddressBuffer = op.txo.ia;
-        const incomingAddress = addressUtils.bufferToAddress(incomingAddressBuffer);
-        if (null === incomingAddress) return;
-        const incomingPublicKey = Wallet.decodeBech32mSafe(incomingAddress);
-        if (null === incomingPublicKey) return;
-        const isRequesterSignatureValid = this.#wallet.verify(requesterSignature, tx, incomingPublicKey); // tx contains already a nonce.
+        const regeneratedTxHash = await blake3Hash(requesterMessage);
+        if (!b4a.equals(regeneratedTxHash, op.txo.tx)) return;
+
+        const isRequesterSignatureValid = this.#wallet.verify(op.txo.is, op.txo.tx, requesterPublicKey); // tx contains already a nonce.
         if (!isRequesterSignatureValid) return;
 
         //second signature
-        const validatorSignature = op.txo.vs;
-        const validatorNonce = op.txo.vn;
-        const validatorMessage = b4a.allocUnsafe(32 + 32); // TODO: use constants. tx + nonce sizes. Avoid magic numbers.
-        b4a.copy(tx, validatorMessage, 0);
-        b4a.copy(validatorNonce, validatorMessage, 32);
-        const validatorMessageHash = await blake3Hash(validatorMessage);
-        const validatorAddress = addressUtils.bufferToAddress(validatorAddressBuffer);
-        if (null === validatorAddress) return;
-        const validatorPublicKey = Wallet.decodeBech32mSafe(validatorAddress);
+        const validatorAddressBuffer = op.txo.va;
+        const validatorAddressString = addressUtils.bufferToAddress(validatorAddressBuffer);
+        if (null === validatorAddressString) return;
+
+        const validatorPublicKey = Wallet.decodeBech32mSafe(validatorAddressString);
         if (null === validatorPublicKey) return;
-        const isValidatorSignatureValid = this.#wallet.verify(validatorSignature, validatorMessageHash, validatorPublicKey);
+
+        // recreate validator message
+        const validatorMessage = createMessage(
+            op.txo.tx,
+            op.txo.va,
+            op.txo.vn,
+            OperationType.TX
+        );
+        if (validatorMessage.length === 0) return;
+
+        const validatorMessageHash = await blake3Hash(validatorMessage);
+        const isValidatorSignatureValid = this.#wallet.verify(op.txo.vs, validatorMessageHash, validatorPublicKey);
         if (!isValidatorSignatureValid) return;
 
-        // if user is performing a transaction on deployed bootstrap, then we need to reject it.
+        // verify tx validity - prevent deferred execution attack
+        const indexersSequenceState = await this.#getIndexerSequenceStateApply(base);
+        if (indexersSequenceState === null) return;
+        if (!b4a.equals(op.txo.txv, indexersSequenceState)) return;
+
+        // if user is performing a transaction on non-deployed bootstrap, then we need to reject it.
         // if deployment/<bootstrap> is not null then it means that the bootstrap is already deployed, and it should
         // point to payload, which is pointing to the txHash.
         const deploymentEntry = await this.#getDeploymentEntryApply(op.txo.bs.toString('hex'), batch);
         if (deploymentEntry === null) return;
 
-        const hashHexString = tx.toString('hex');
+        const hashHexString = op.txo.tx.toString('hex');
         const opEntry = await this.#getEntryApply(hashHexString, batch);
         if (null !== opEntry) return;
 
@@ -292,15 +317,26 @@ class State extends ReadyResource {
         // Check if the operation is being performed by the bootstrap node - the original deployer of the Trac Network
         if (!b4a.equals(node.from.key, this.#bootstrap) || !b4a.equals(op.cao.iw, this.#bootstrap)) return;
 
-        // verify signature
-        const message = createMessage(adminAddressBuffer, op.cao.txv, op.cao.iw, op.cao.in, OperationType.ADD_ADMIN)
-        const hash = await blake3Hash(message);
+        // recreate requester message
+        const requesterMessage = createMessage(
+            adminAddressBuffer,
+            op.cao.txv,
+            op.cao.iw,
+            op.cao.in,
+            OperationType.ADD_ADMIN
+        );
+        if (requesterMessage.length === 0) return;
+
+        const hash = await blake3Hash(requesterMessage);
         if (!b4a.equals(hash, op.cao.tx)) return;
+
+        // verify signature
         const isMessageVerifed = this.#wallet.verify(op.cao.is, op.cao.tx, adminPublicKey)
         const txHashHexString = op.cao.tx.toString('hex');
         if (!isMessageVerifed) return;
         // verify tx validity - prevent deferred execution attack
         const indexersSequenceState = await this.#getIndexerSequenceStateApply(base);
+        if (indexersSequenceState === null) return;
         if (!b4a.equals(op.cao.txv, indexersSequenceState)) return;
 
         const adminEntryExists = await this.#getEntryApply(EntryType.ADMIN, batch);
@@ -332,37 +368,56 @@ class State extends ReadyResource {
     async #handleApplyAdminRecoveryOperation(op, view, base, node, batch) {
         if (!this.check.validateRoleAccessOperation(op)) return;
 
-        // Extract and validate the requester address
+        // Extract and validate the requester address and pubkey
         const requesterAdminAddressBuffer = op.address;
         const requesterAdminAddressString = addressUtils.bufferToAddress(requesterAdminAddressBuffer);
         if (requesterAdminAddressString === null) return;
         const requesterAdminPublicKey = Wallet.decodeBech32mSafe(requesterAdminAddressString);
         if (requesterAdminPublicKey === null) return;
 
-        // verify requester signature
-        const requesterMessage = createMessage(op.address, op.rao.txv, op.rao.iw, op.rao.in, OperationType.ADMIN_RECOVERY)
-        const hash = await blake3Hash(requesterMessage);
+        // recreate requester message
+        const requesterMessage = createMessage(
+            op.address,
+            op.rao.txv,
+            op.rao.iw,
+            op.rao.in,
+            OperationType.ADMIN_RECOVERY
+        );
+        if (requesterMessage.length === 0) return;
 
+
+        const hash = await blake3Hash(requesterMessage);
         if (!b4a.equals(hash, op.rao.tx)) return;
 
+        // verify requester signature
         const isRequesterMessageVerifed = this.#wallet.verify(op.rao.is, op.rao.tx, requesterAdminPublicKey);
         const txHashHexString = op.rao.tx.toString('hex');
         if (!isRequesterMessageVerifed) return;
 
-        // verify validator signature
+        // Extract and validate the validator address and pubkey
         const validatorAddress = op.rao.va;
         const validatorAddressString = addressUtils.bufferToAddress(validatorAddress);
         if (validatorAddressString === null) return;
         const validatorPublicKey = Wallet.decodeBech32mSafe(validatorAddressString);
         if (validatorPublicKey === null) return;
 
-        const validatorMessage = createMessage(op.rao.tx, op.rao.va, op.rao.vn, OperationType.ADMIN_RECOVERY);
+        // recreate validator message
+        const validatorMessage = createMessage(
+            op.rao.tx,
+            op.rao.va,
+            op.rao.vn,
+            OperationType.ADMIN_RECOVERY
+        );
+        if (validatorMessage.length === 0) return;
+
+        // verify validator signature
         const validatorHash = await blake3Hash(validatorMessage);
         const isValidatorMessageVerifed = this.#wallet.verify(op.rao.vs, validatorHash, validatorPublicKey);
         if (!isValidatorMessageVerifed) return;
 
         // verify tx validity - prevent deferred execution attack
         const indexersSequenceState = await this.#getIndexerSequenceStateApply(base);
+        if (indexersSequenceState === null) return;
         if (!b4a.equals(op.rao.txv, indexersSequenceState)) return;
 
         // Check if the operation has already been applied
@@ -372,7 +427,6 @@ class State extends ReadyResource {
         if (null !== opEntry) return;
         const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
         const decodedAdminEntry = adminEntryUtils.decode(adminEntry);
-        console.log("decodedAdminEntry",decodedAdminEntry)
 
         if (null === decodedAdminEntry) return;
         const publicKeyAdminEntry = Wallet.decodeBech32mSafe(decodedAdminEntry.address);
@@ -437,6 +491,7 @@ class State extends ReadyResource {
 
         // verify tx validity - prevent deferred execution attack
         const indexersSequenceState = await this.#getIndexerSequenceStateApply(base);
+        if (indexersSequenceState === null) return;
         if (!b4a.equals(op.aco.txv, indexersSequenceState)) return;
 
         // Check if the operation has already been applied
@@ -489,7 +544,7 @@ class State extends ReadyResource {
     async #handleApplyAddWriterOperation(op, view, base, node, batch) {
         if (!this.check.validateRoleAccessOperation(op)) return;
 
-        // Extract and validate the network address
+        // Extract and validate the requester address
         const requesterAddressBuffer = op.address;
         const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer);
         if (requesterAddressString === null) return;
@@ -522,6 +577,7 @@ class State extends ReadyResource {
 
         // verify tx validity - prevent deferred execution attack
         const indexersSequenceState = await this.#getIndexerSequenceStateApply(base);
+        if (indexersSequenceState === null) return;
         if (!b4a.equals(op.rao.txv, indexersSequenceState)) return;
 
         // Check if the operation has already been applied
@@ -612,6 +668,7 @@ class State extends ReadyResource {
 
         // verify tx validity - prevent deferred execution attack
         const indexersSequenceState = await this.#getIndexerSequenceStateApply(base);
+        if (indexersSequenceState === null) return;
         if (!b4a.equals(op.rao.txv, indexersSequenceState)) return;
 
         // anti-replay attack
@@ -710,6 +767,7 @@ class State extends ReadyResource {
 
         // verify tx validity - prevent deferred execution attack
         const indexersSequenceState = await this.#getIndexerSequenceStateApply(base);
+        if (indexersSequenceState === null) return;
 
         if (!b4a.equals(op.aco.txv, indexersSequenceState)) return;
 
@@ -792,7 +850,7 @@ class State extends ReadyResource {
 
         // verify tx validity - prevent deferred execution attack
         const indexersSequenceState = await this.#getIndexerSequenceStateApply(base);
-
+        if (indexersSequenceState === null) return;
         if (!b4a.equals(op.aco.txv, indexersSequenceState)) return;
 
         // anti-replay attack
@@ -893,59 +951,82 @@ class State extends ReadyResource {
 
     async #handleApplyBootstrapDeploymentOperation(op, view, base, node, batch) {
         if (!this.check.validateBootstrapDeploymentOperation(op)) return;
-
         // if transaction is not complete, do not process it.
         if (!Object.hasOwn(op.bdo,"vs") || !Object.hasOwn(op.bdo,"va")|| !Object.hasOwn(op.bdo,"vn")) return;
-        const tx =  op.bdo.tx
-        // ensure that tx is valid
-        const regeneratedTxBuffer = await transactionUtils.generateBootstrapDeploymentTxBuffer(op.bdo.bs, op.bdo.in, OperationType.BOOTSTRAP_DEPLOYMENT)
-        if (regeneratedTxBuffer.length === 0 || !b4a.equals(regeneratedTxBuffer, tx)) return;
-
-        // for additional security, nonces should be different.
-        if (b4a.equals(op.bdo.in, op.bdo.vn)) return;
-
         // do not allow to deploy bootstrap deployment on the same bootstrap.
         if (b4a.equals(op.bdo.bs, this.bootstrap)) return;
+        // for additional security, nonces should be different.
+        if (b4a.equals(op.bdo.in, op.bdo.vn)) return;
+        // addresses should be different.
+        if (b4a.equals(op.address, op.bdo.va)) return;
+        // signatures should be different.
+        if (b4a.equals(op.bdo.is, op.bdo.vs)) return;
 
-        // first signature
-        const incomingAddressBuffer = op.address;
-        const incomingAddress = addressUtils.bufferToAddress(incomingAddressBuffer);
-        if (null === incomingAddress) return;
 
-        const incomingPublicKey = Wallet.decodeBech32mSafe(incomingAddress);
-        if (null === incomingPublicKey) return;
+        // validate requester signature
+        const requesterAddressBuffer = op.address;
+        const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer);
+        if (null === requesterAddressString) return;
+        const requesterPublicKey = Wallet.decodeBech32mSafe(requesterAddressString);
+        if (null === requesterPublicKey) return;
 
-        const isRequesterSignatureValid = this.#wallet.verify(op.bdo.is, tx, incomingPublicKey); // tx contains already a nonce.
+        // recreate requester message
+        const requesterMessage = createMessage(
+            op.address,
+            op.bdo.txv,
+            op.bdo.bs,
+            op.bdo.in,
+            OperationType.BOOTSTRAP_DEPLOYMENT
+        );
+        if (requesterMessage.length === 0) return;
+
+        // ensure that tx is valid
+        const regeneratedTxHash = await blake3Hash(requesterMessage);
+        if (!b4a.equals(regeneratedTxHash, op.bdo.tx)) return;
+
+        const isRequesterSignatureValid = this.#wallet.verify(op.bdo.is, regeneratedTxHash, requesterPublicKey);
         if (!isRequesterSignatureValid) return;
+
+        const bootstrapDeploymentHexString = op.bdo.bs.toString('hex');
 
         //second signature
         const validatorAddressBuffer = op.bdo.va;
-
-        const validatorAddress = addressUtils.bufferToAddress(validatorAddressBuffer);
-        if (null === validatorAddress) return;
-
-        const validatorPublicKey = Wallet.decodeBech32mSafe(validatorAddress);
+        const validatorAddressString = addressUtils.bufferToAddress(validatorAddressBuffer);
+        if (null === validatorAddressString) return;
+        const validatorPublicKey = Wallet.decodeBech32mSafe(validatorAddressString);
         if (null === validatorPublicKey) return;
 
-        const validatorMessage = b4a.allocUnsafe(32 + 32); // TODO: use constants. tx + nonce sizes. Avoid magic numbers.
-        b4a.copy(tx, validatorMessage, 0);
-        b4a.copy(op.bdo.vn, validatorMessage, 32);
+        // recreate validator message
+        const validatorMessage = createMessage(
+            op.bdo.tx,
+            op.bdo.va,
+            op.bdo.vn,
+            OperationType.BOOTSTRAP_DEPLOYMENT
+        );
+        if (validatorMessage.length === 0) return;
         const validatorMessageHash = await blake3Hash(validatorMessage);
 
         const isValidatorSignatureValid = this.#wallet.verify(op.bdo.vs, validatorMessageHash, validatorPublicKey);
         if (!isValidatorSignatureValid) return;
 
-        const deploymentEntry = await this.#getDeploymentEntryApply(op.bdo.bs.toString('hex'), batch);
-        if (deploymentEntry !== null) return; // Deployment already exists, do not apply it again.
+        // verify tx validity - prevent deferred execution attack
+        const indexersSequenceState = await this.#getIndexerSequenceStateApply(base);
+        if (indexersSequenceState === null) return;
+        if (!b4a.equals(op.bdo.txv, indexersSequenceState)) return;
 
-        const hashHexString = tx.toString('hex');
+        // anti-replay attack
+        const hashHexString = op.bdo.tx.toString('hex');
         const opEntry = await this.#getEntryApply(hashHexString, batch);
         if (null !== opEntry) return; // Operation has already been applied.
 
+        // If deployment already exists, do not process it again.
+        const deploymentEntry = await this.#getDeploymentEntryApply(bootstrapDeploymentHexString, batch);
+        if (deploymentEntry !== null) return;
+
         await batch.put(hashHexString, node.value);
-        await batch.put(EntryType.DEPLOYMENT + op.bdo.bs.toString('hex'), tx);
+        await batch.put(EntryType.DEPLOYMENT + bootstrapDeploymentHexString, op.bdo.tx);
         if (this.#enable_txlogs === true) {
-            console.log(`TX: ${hashHexString} and deployment/${op.bdo.bs.toString('hex')} have been appended. Signed length: `, this.#base.view.core.signedLength);
+            console.log(`TX: ${hashHexString} and deployment/${bootstrapDeploymentHexString} have been appended. Signed length: `, this.#base.view.core.signedLength);
         }
     }
 
@@ -964,14 +1045,17 @@ class State extends ReadyResource {
         return entry !== null ? entry.value : null
     }
 
-    //TODO: ensure if this method won't throw
     async #getIndexerSequenceStateApply(base) {
-        // base: Autobase instance passed as argument (from apply context)
-        const buf = [];
-        for (const indexer of Object.values(base.system.indexers)) {
-            buf.push(indexer.key);
+        try{
+            const buf = [];
+            for (const indexer of Object.values(base.system.indexers)) {
+                buf.push(indexer.key);
+            }
+            return await blake3Hash(b4a.concat(buf));
+        } catch (error) {
+            console.error(error);
+            return null;
         }
-        return await blake3Hash(b4a.concat(buf));
     }
 }
 

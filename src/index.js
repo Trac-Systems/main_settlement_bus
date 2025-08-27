@@ -11,13 +11,12 @@ import {verifyDag, printHelp, printWalletInfo, get_tx_info} from "./utils/cli.js
 import CompleteStateMessageOperations from "./messages/completeStateMessages/CompleteStateMessageOperations.js";
 import {safeDecodeApplyOperation} from "./utils/protobuf/operationHelpers.js";
 import {createMessage} from "./utils/buffer.js";
-import addressUtils, {bufferToAddress, isAddressValid, addressToBuffer} from "./core/state/utils/address.js";
+import addressUtils, {bufferToAddress, isAddressValid} from "./core/state/utils/address.js";
 import Network from "./core/network/Network.js";
 import Check from "./utils/check.js";
 import State from "./core/state/State.js";
 import PartialStateMessageOperations from "./messages/partialStateMessages/PartialStateMessageOperations.js";
 import {
-    LISTENER_TIMEOUT,
     OperationType,
     EventType,
     WHITELIST_SLEEP_INTERVAL,
@@ -26,7 +25,6 @@ import {
 import {blake3Hash} from "./utils/crypto.js";
 import partialStateMessageOperations from "./messages/partialStateMessages/PartialStateMessageOperations.js";
 import {randomBytes} from "hypercore-crypto";
-import completeStateMessageOperations from "./messages/completeStateMessages/CompleteStateMessageOperations.js";
 
 //TODO create a MODULE which will separate logic responsible for role managment
 
@@ -833,42 +831,8 @@ export class MainSettlementBus extends ReadyResource {
                 console.log(await this.#state.getIndexerSequenceState())
                 break;
             case '/test':
-                const normalizeTransactionOperation = (payload) => {
-                    if (!payload || typeof payload !== 'object' || !payload.txo) {
-                        throw new Error('Invalid payload for transaction operation normalization.');
-                    }
-                    const {type, address, txo} = payload;
-                    if (
-                        type !== OperationType.TX ||
-                        !address ||
-                        !txo.tx || !txo.txv || !txo.iw || !txo.in ||
-                        !txo.ch || !txo.is || !txo.bs || !txo.mbs
-                    ) {
-                        throw new Error('Missing required fields in transaction operation payload.');
-                    }
-
-                    const normalizeHex = field => (typeof field === 'string' ? b4a.from(field, 'hex') : field);
-
-                    const normalizedTxo = {
-                        tx: normalizeHex(txo.tx),    // Transaction hash
-                        txv: normalizeHex(txo.txv),  // Transaction validity
-                        iw: normalizeHex(txo.iw),    // Writing key
-                        in: normalizeHex(txo.in),    // Nonce
-                        ch: normalizeHex(txo.ch),    // Content hash
-                        is: normalizeHex(txo.is),    // Signature
-                        bs: normalizeHex(txo.bs),    // External bootstrap
-                        mbs: normalizeHex(txo.mbs)   // MSB bootstrap key
-                    };
-
-                    return {
-                        type,
-                        address: addressToBuffer(address),
-                        txo: normalizedTxo
-                    };
-                };
-
                 const contentHash = randomBytes(32).toString('hex');
-                const randomExternalBootstrap = randomBytes(32).toString('hex');
+                const randomExternalBootstrap = "ff604717e41e0ece6caf0be5efc1476ad81a684f7e5769584fce5f64cfb26fa3"
                 const randomWk = randomBytes(32).toString('hex');
                 const txValidity = await this.#state.getIndexerSequenceState();
                 const msbBootstrap = this.bootstrap.toString('hex');
@@ -880,20 +844,7 @@ export class MainSettlementBus extends ReadyResource {
                     randomExternalBootstrap,
                     msbBootstrap
                 )
-                const normalizedPayload = normalizeTransactionOperation(assembledTransactionOperation)
-                const complete = await completeStateMessageOperations.assembleCompleteTransactionOperationMessage(
-                    this.#wallet,
-                    normalizedPayload.address,
-                    normalizedPayload.txo.tx,
-                    normalizedPayload.txo.txv,
-                    normalizedPayload.txo.iw,
-                    normalizedPayload.txo.in,
-                    normalizedPayload.txo.ch,
-                    normalizedPayload.txo.is,
-                    normalizedPayload.txo.bs,
-                    normalizedPayload.txo.mbs,
-                )
-                this.#state.append(complete)
+                await this.#network.validator_stream.messenger.send(assembledTransactionOperation);
                 break;
             default:
                 if (input.startsWith("/get_node_info")) {

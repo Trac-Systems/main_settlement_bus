@@ -180,7 +180,7 @@ class CompleteStateMessageBuilder extends StateBuilder {
         let tx = null;
         let signature = null;
 
-        // all incoming data from setters should be BUFFER, createMessage accept only BUFFER and uint32
+        // all incoming data from setters should be as buffer data type, createMessage accept only buffer and uint32
         switch (this.#operationType) {
             // Complete by default
             case OperationType.ADD_ADMIN:
