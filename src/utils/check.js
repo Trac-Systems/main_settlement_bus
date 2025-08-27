@@ -15,15 +15,10 @@ import {TRAC_ADDRESS_SIZE} from 'trac-wallet/constants.js';
 // TO UTILIZE ONLY ONE FUNCTION COMMON FOR ALL THE SCHEMAS. CREATE A TICKED P2/P3.
 class Check {
     #validator;
-    #validateExtendedKeyOp;
-    #validateBasicKeyOp;
-    #validatePreTx;
-    #validatePostTx;
-    #validateBootstrapDeploymentSchema;
-    //
     #validateCoreAdminOperationSchema
     #validateAdminControlOperationSchema
     #validateRoleAccessOperationSchema
+    #validateBootstrapDeploymentSchema;
     #validateTransactionOperationSchema
 
     constructor() {
@@ -68,15 +63,10 @@ class Check {
             };
         });
 
-        this.#validateExtendedKeyOp = this.#compileExtendedKeyOpSchema();
-        this.#validateBasicKeyOp = this.#compileBasicKeyOpSchema();
-        this.#validatePreTx = this.#compilePreTxSchema();
-        this.#validatePostTx = this.#compilePostTxSchema();
-
-        this.#validateBootstrapDeploymentSchema = this.#compileBootstrapDeploymentSchema();
         this.#validateCoreAdminOperationSchema = this.#compileCoreAdminOperationSchema();
         this.#validateAdminControlOperationSchema = this.#compileAdminControlOperationSchema();
         this.#validateRoleAccessOperationSchema = this.#compileRoleAccessOperationSchema();
+        this.#validateBootstrapDeploymentSchema = this.#compileBootstrapDeploymentSchema();
         this.#validateTransactionOperationSchema = this.#compileTransactionOperationSchema();
 
     }
