@@ -6,6 +6,8 @@ import {addressToBuffer, bufferToAddress} from "../../../state/utils/address.js"
 import {OperationType} from "../../../../utils/constants.js";
 import {blake3Hash} from "../../../../utils/crypto.js";
 import {createMessage} from "../../../../utils/buffer.js";
+
+// TODO: add check for txvalidity
 class PartialBootstrapDeployment {
     #state;
     #wallet;

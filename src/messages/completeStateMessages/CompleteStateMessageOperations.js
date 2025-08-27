@@ -27,13 +27,28 @@ class CompleteStateMessageOperations {
         }
     }
 
-    static async assembleAddWriterMessage(wallet, writingKey, txValidity) {
+    static async assembleAddWriterMessage(
+        wallet,
+        invokerAddress,
+        transactionHash,
+        txValidity,
+        incomingWritingKey,
+        incomingNonce,
+        incomingSignature
+    ) {
         try {
             const builder = new CompleteStateMessageBuilder(wallet);
             const director = new CompleteStateMessageDirector();
             director.builder = builder;
 
-            const payload = await director.buildAddWriterMessage(wallet.address, writingKey, txValidity);
+            const payload = await director.buildAddWriterMessage(
+                invokerAddress,
+                transactionHash,
+                txValidity,
+                incomingWritingKey,
+                incomingNonce,
+                incomingSignature
+            );
             return safeEncodeApplyOperation(payload);
 
         } catch (error) {
@@ -41,13 +56,28 @@ class CompleteStateMessageOperations {
         }
     }
 
-    static async assembleRemoveWriterMessage(wallet, writingKey) {
+    static async assembleRemoveWriterMessage(
+        wallet,
+        invokerAddress,
+        transactionHash,
+        txValidity,
+        incomingWritingKey,
+        incomingNonce,
+        incomingSignature
+    ) {
         try {
             const builder = new CompleteStateMessageBuilder(wallet);
             const director = new CompleteStateMessageDirector();
             director.builder = builder;
 
-            const payload = await director.buildRemoveWriterMessage(wallet.address, writingKey);
+            const payload = await director.buildRemoveWriterMessage(
+                invokerAddress,
+                transactionHash,
+                txValidity,
+                incomingWritingKey,
+                incomingNonce,
+                incomingSignature
+            );
             return safeEncodeApplyOperation(payload);
 
         } catch (error) {
@@ -55,13 +85,13 @@ class CompleteStateMessageOperations {
         }
     }
 
-    static async assembleAddIndexerMessage(wallet, address) {
+    static async assembleAddIndexerMessage(wallet, incomingAddress, txValidity) {
         try {
             const builder = new CompleteStateMessageBuilder(wallet);
             const director = new CompleteStateMessageDirector();
             director.builder = builder;
 
-            const payload = await director.buildAddIndexerMessage(address);
+            const payload = await director.buildAddIndexerMessage(wallet.address, incomingAddress, txValidity);
             return safeEncodeApplyOperation(payload);
 
         } catch (error) {
@@ -69,13 +99,13 @@ class CompleteStateMessageOperations {
         }
     }
 
-    static async assembleRemoveIndexerMessage(wallet, address) {
+    static async assembleRemoveIndexerMessage(wallet, incomingAddress, txValidity) {
         try {
             const builder = new CompleteStateMessageBuilder(wallet);
             const director = new CompleteStateMessageDirector();
             director.builder = builder;
 
-            const payload = await director.buildRemoveIndexerMessage(address);
+            const payload = await director.buildRemoveIndexerMessage(wallet.address, incomingAddress, txValidity);
             return safeEncodeApplyOperation(payload);
 
         } catch (error) {
@@ -179,83 +209,6 @@ class CompleteStateMessageOperations {
 
         } catch (error) {
             throw new Error(`Failed to assemble ban writer message: ${error.message}`);
-        }
-    }
-
-    //TODO: This method can be simplified and moved to another module responsible for message verification.
-    static async verifyEventMessage(parsedRequest, wallet, check, state) {
-        try {
-            const {type} = parsedRequest;
-            if (
-                type !== OperationType.ADD_ADMIN &&
-                type !== OperationType.ADD_WRITER &&
-                type !== OperationType.REMOVE_WRITER
-            ) {
-                return false;
-            }
-
-            const validationResult = check.validateExtendedKeyOpSchema(parsedRequest);
-            if (!validationResult) return false;
-
-            if (type === OperationType.ADD_WRITER) {
-                const nodeAddress = bufferToAddress(parsedRequest.address);
-                if (nodeAddress === null) return false;
-
-                const nodeEntry = await state.getNodeEntry(nodeAddress);
-                if (!nodeEntry) return false;
-
-                const isNodeAlreadyWriter = nodeEntry.isWriter;
-                const isNodeWhitelisted = nodeEntry.isWhitelisted;
-                const canAddWriter = state.isWritable() && !isNodeAlreadyWriter && isNodeWhitelisted;
-
-                if (parsedRequest.address === wallet.address || !canAddWriter) return false;
-
-                const nodePublicKey = PeerWallet.decodeBech32m(nodeAddress);
-
-                const msg = createMessage(parsedRequest.address, parsedRequest.eko.wk, parsedRequest.eko.nonce, parsedRequest.type);
-                const hash = await blake3Hash(msg);
-
-                return wallet.verify(parsedRequest.eko.sig, hash, nodePublicKey);
-            } else if (type === OperationType.REMOVE_WRITER) {
-                const nodeAddress = bufferToAddress(parsedRequest.address);
-                if (nodeAddress === null) return false;
-
-                const nodeEntry = await state.getNodeEntry(nodeAddress);
-                if (!nodeEntry) return false;
-
-                const isAlreadyWriter = nodeEntry.isWriter;
-                const canRemoveWriter = state.isWritable() && isAlreadyWriter;
-                if (nodeAddress === wallet.address || !canRemoveWriter) return false;
-
-                const nodePublicKey = PeerWallet.decodeBech32m(nodeAddress);
-
-                const msg = createMessage(parsedRequest.address, parsedRequest.eko.wk, parsedRequest.eko.nonce, parsedRequest.type);
-                const hash = await blake3Hash(msg);
-
-                return wallet.verify(parsedRequest.eko.sig, hash, nodePublicKey);
-            } else if (type === OperationType.ADD_ADMIN) {
-                const adminEntry = await state.getAdminEntry();
-                if (!adminEntry) return false;
-                const adminAddressBuffer = parsedRequest.address;
-                const adminAddress = bufferToAddress(adminAddressBuffer);
-                if (adminAddress === null) return false;
-
-                const isRecoveryCase = !!(
-                    adminEntry.address === adminAddress &&
-                    parsedRequest.eko.wk &&
-                    !b4a.equals(parsedRequest.eko.wk, adminEntry.wk)
-                );
-                if (!isRecoveryCase) return false;
-
-                const incomingAdminPublicKey = PeerWallet.decodeBech32m(adminAddress);
-
-                const msg = createMessage(adminAddressBuffer, parsedRequest.eko.wk, parsedRequest.eko.nonce, parsedRequest.type);
-                const hash = await blake3Hash(msg);
-                return wallet.verify(parsedRequest.eko.sig, hash, incomingAdminPublicKey);
-            }
-        } catch (error) {
-            console.error(`Failed to verify event message: ${error.message}`);
-            return false;
         }
     }
 

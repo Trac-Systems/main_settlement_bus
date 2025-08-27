@@ -189,21 +189,31 @@ class CompleteStateMessageBuilder extends StateBuilder {
             // Partial need to be signed
             case OperationType.ADD_WRITER:
             case OperationType.REMOVE_WRITER:
-                msg = createMessage(this.#address, this.#writingKey, nonce, this.#operationType);
+            case OperationType.ADMIN_RECOVERY:
+                // console.log('ROLE_ACCESS operation inputs:');
+                // console.log('txHash:', this.#txHash?.toString('hex'));
+                // console.log('walletAddressBuffer:', addressToBuffer(this.#wallet.address)?.toString('hex'));
+                // console.log('nonce:', nonce.toString('hex'));
+                // console.log('operationType:', this.#operationType);
+
+                msg = createMessage(
+                    this.#txHash,
+                    addressToBuffer(this.#wallet.address),
+                    nonce,
+                    this.#operationType
+                );
+                // console.log('Generated msg:', msg.toString('hex'));
                 break;
             // Complete by default
             case OperationType.APPEND_WHITELIST:
-                msg = createMessage(this.#address, this.#txValidity, this.#incomingAddress, nonce, this.#operationType);
-                break;
-            // Complete by default
             case OperationType.ADD_INDEXER:
             case OperationType.REMOVE_INDEXER:
             case OperationType.BAN_VALIDATOR:
-                if (this.#wallet.address === bufferToAddress(this.#address)) {
+                if (this.#wallet.address === bufferToAddress(this.#incomingAddress)) {
                     throw new Error('Address must not be the same as the wallet address for basic operations.');
                 }
 
-                msg = createMessage(this.#address, nonce, this.#operationType);
+                msg = createMessage(this.#address, this.#txValidity, this.#incomingAddress, nonce, this.#operationType);
                 break;
             // Partial need to be signed
             case OperationType.TX:
@@ -221,7 +231,6 @@ class CompleteStateMessageBuilder extends StateBuilder {
                 break;
             // Partial need to be signed
             case OperationType.BOOTSTRAP_DEPLOYMENT:
-
                 if (!this.#txHash || !this.#externalBootstrap || !this.#incomingNonce || !this.#incomingSignature) {
                     throw new Error('All bootstrap deployment fields must be set before building the message!');
                 }
@@ -255,6 +264,18 @@ class CompleteStateMessageBuilder extends StateBuilder {
                 in: nonce,
                 ia: this.#incomingAddress,
                 is: signature
+            };
+        }
+        else if (this.#isRoleAccessOperation(this.#operationType)) {
+            this.#payload.rao = {
+                tx: this.#txHash,
+                txv: this.#txValidity,
+                iw: this.#incomingWriterKey,
+                in: this.#incomingNonce,
+                is: this.#incomingSignature,
+                va: addressToBuffer(this.#wallet.address),
+                vn: nonce,
+                vs: signature,
             };
         } else if (this.#isTransaction(this.#operationType)) {
             this.#payload.txo = {

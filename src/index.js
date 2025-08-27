@@ -6,12 +6,12 @@ import b4a from "b4a";
 import readline from "readline";
 import tty from "tty";
 
-import { sleep, formatIndexersEntry, isHexString } from "./utils/helpers.js";
-import { verifyDag, printHelp, printWalletInfo } from "./utils/cli.js";
+import {sleep, formatIndexersEntry, isHexString} from "./utils/helpers.js";
+import {verifyDag, printHelp, printWalletInfo, get_tx_info} from "./utils/cli.js";
 import CompleteStateMessageOperations from "./messages/completeStateMessages/CompleteStateMessageOperations.js";
-import { safeDecodeApplyOperation } from "./utils/protobuf/operationHelpers.js";
-import { createMessage } from "./utils/buffer.js";
-import addressUtils, { bufferToAddress, isAddressValid } from "./core/state/utils/address.js";
+import {safeDecodeApplyOperation} from "./utils/protobuf/operationHelpers.js";
+import {createMessage} from "./utils/buffer.js";
+import addressUtils, {bufferToAddress, isAddressValid} from "./core/state/utils/address.js";
 import Network from "./core/network/Network.js";
 import Check from "./utils/check.js";
 import State from "./core/state/State.js";
@@ -23,7 +23,7 @@ import {
     WHITELIST_SLEEP_INTERVAL,
     BOOTSTRAP_HEXSTRING_LENGTH,
 } from "./utils/constants.js";
-import { blake3Hash } from "./utils/crypto.js";
+import {blake3Hash} from "./utils/crypto.js";
 import partialStateMessageOperations from "./messages/partialStateMessages/PartialStateMessageOperations.js";
 import {randomBytes} from "hypercore-crypto";
 import completeStateMessageOperations from "./messages/completeStateMessages/CompleteStateMessageOperations.js";
@@ -31,8 +31,7 @@ import completeStateMessageOperations from "./messages/completeStateMessages/Com
 //TODO create a MODULE which will separate logic responsible for role managment
 
 export class MainSettlementBus extends ReadyResource {
-    // Internal flags
-    #shouldListenToAdminEvents = false;
+    // Internal flag
     #shouldListenToWriterEvents = false;
 
     // internal attributes
@@ -92,7 +91,8 @@ export class MainSettlementBus extends ReadyResource {
                     input: new tty.ReadStream(0),
                     output: new tty.WriteStream(1),
                 });
-            } catch (e) { }
+            } catch (e) {
+            }
         }
     }
 
@@ -145,7 +145,7 @@ export class MainSettlementBus extends ReadyResource {
             this.#handleIncomingEvent.bind(this)
         );
 
-        //validator observer can't be awaited.
+        //TODO: validator observer can't be awaited. In the future change logic to process events instead of loop?
         if (this.#enable_validator_observer) {
             this.#network.startValidatorObserver(this.#wallet.address);
         }
@@ -153,9 +153,7 @@ export class MainSettlementBus extends ReadyResource {
         const adminEntry = await this.#state.getAdminEntry();
 
         if (this.#isAdmin(adminEntry)) {
-            this.#shouldListenToAdminEvents = true;
             this.#shouldListenToWriterEvents = true;
-            this.#adminEventListener(); // only for admin
             this.#writerEventListener(); // only for writers
         } else if (this.#state.isWritable() && !this.#state.isIndexer()) {
             this.#shouldListenToWriterEvents = true;
@@ -237,11 +235,7 @@ export class MainSettlementBus extends ReadyResource {
         try {
             const decodedRequest = safeDecodeApplyOperation(bufferedRequest);
             if (decodedRequest.type) {
-                if(OperationType.ADD_ADMIN){
-                    this.emit(EventType.ADMIN_EVENT, decodedRequest, bufferedRequest);
-                }
-                if ([OperationType.ADD_WRITER, OperationType.REMOVE_WRITER, OperationType.ADD_ADMIN].includes(decodedRequest.type)) {
-                    //This request must be handled by ADMIN
+                if ([OperationType.ADD_WRITER, OperationType.REMOVE_WRITER, OperationType.ADMIN_RECOVERY].includes(decodedRequest.type)) {
                     this.emit(EventType.WRITER_EVENT, decodedRequest, bufferedRequest);
                 } else if (decodedRequest.type === OperationType.WHITELISTED) {
                     //TODO: We should create separated listener for whitelisted operation which only be working if wallet is enabled and node is not a writer.
@@ -286,28 +280,9 @@ export class MainSettlementBus extends ReadyResource {
         }
     }
 
-    async #adminEventListener() {
-        this.on(EventType.ADMIN_EVENT, async (parsedRequest, bufferedRequest) => {
-            try {
-                if (this.#enable_wallet === false) return;
-                const isEventMessageValid =
-                    await CompleteStateMessageOperations.verifyEventMessage(
-                        parsedRequest,
-                        this.#wallet,
-                        this.check,
-                        this.#state
-                    );
-                if (!isEventMessageValid) return;
-                await this.#state.append(bufferedRequest);
-            } catch (error) {
-                console.error("ADMIN_EVENT:", error.message);
-            }
-        });
-    }
-
     async #pickWriter() {
         const length = await this.#state.getWriterLength()
-        for (var i = 0; i < length; i++) {
+        for (let i = 0; i < length; i++) {
             const writerAddressBuffer = await this.#state.getWriterIndex(i);
             const writerAddressString = bufferToAddress(writerAddressBuffer)
             const validatorPublicKey = PeerWallet.decodeBech32m(writerAddressString).toString("hex");
@@ -323,15 +298,15 @@ export class MainSettlementBus extends ReadyResource {
         this.on(EventType.WRITER_EVENT, async (parsedRequest, bufferedRequest) => {
             try {
                 if (this.#enable_wallet === false) return;
-                const isEventMessageVerifed =
-                    await CompleteStateMessageOperations.verifyEventMessage(
-                        parsedRequest,
-                        this.#wallet,
-                        this.check,
-                        this.#state
-                    );
+                const isEventMessageVerifed = await CompleteStateMessageOperations.verifyEventMessage(
+                    parsedRequest,
+                    this.#wallet,
+                    this.check,
+                    this.#state
+                );
+
                 if (!isEventMessageVerifed) return;
-                await this.#state.append(bufferedRequest);
+                //await this.#state.append(bufferedRequest);
             } catch (error) {
                 console.error("WRITER_EVENT:", error.message);
             }
@@ -441,25 +416,6 @@ export class MainSettlementBus extends ReadyResource {
             );
 
             await this.#state.append(addAdminMessage);
-
-            setTimeout(async () => {
-                const updatedAdminEntry = await this.#state.getAdminEntry();
-                if (
-                    this.#isAdmin(updatedAdminEntry) &&
-                    !this.#shouldListenToAdminEvents
-                ) {
-                    this.#shouldListenToAdminEvents = true;
-                    this.#adminEventListener();
-                }
-
-                if (
-                    this.#isAdmin(updatedAdminEntry) &&
-                    !this.#shouldListenToWriterEvents
-                ) {
-                    this.#shouldListenToWriterEvents = true;
-                    this.#writerEventListener();
-                }
-            }, LISTENER_TIMEOUT);
             return;
         }
 
@@ -496,18 +452,8 @@ export class MainSettlementBus extends ReadyResource {
 
         setTimeout(async () => {
             const updatedAdminEntry = await this.#state.getAdminEntry();
-            if (
-                this.#isAdmin(updatedAdminEntry) &&
-                !this.#shouldListenToAdminEvents
-            ) {
-                this.#shouldListenToAdminEvents = true;
-                this.#adminEventListener();
-            }
 
-            if (
-                this.#isAdmin(updatedAdminEntry) &&
-                !this.#shouldListenToWriterEvents
-            ) {
+            if (this.#isAdmin(updatedAdminEntry) && !this.#shouldListenToWriterEvents) {
                 this.#shouldListenToWriterEvents = true;
                 this.#writerEventListener();
             }
@@ -556,6 +502,7 @@ export class MainSettlementBus extends ReadyResource {
             };
             await this.#state.append(encodedPayload);
             // timesleep and validate if it becomes whitelisted
+            // if node is not active we should not wait to long...
             await this.#network.sendMessageToNode(correspondingPublicKey, whitelistedMessage)
             await sleep(WHITELIST_SLEEP_INTERVAL);
             console.log(
@@ -596,43 +543,42 @@ export class MainSettlementBus extends ReadyResource {
                 );
             }
             const txValidity = await this.#state.getIndexerSequenceState();
-            const assembledMessage = {
-                op: 'addWriter',
-                transactionPayload: await PartialStateMessageOperations.assembleAddWriterMessage(
-                    this.#wallet,
-                    this.#state.writingKey.toString('hex'),
-                    txValidity.toString('hex')
-                ),
-            }
-            console.log(assembledMessage)
+            const assembledMessage = await PartialStateMessageOperations.assembleAddWriterMessage(
+                this.#wallet,
+                this.#state.writingKey.toString('hex'),
+                txValidity.toString('hex')
+            )
 
-            // await this.#network.sendMessageToAdmin(adminEntry, assembledMessage);
-            // let dispatcher = await this.#pickWriter()
+            //let dispatcher = await this.#pickWriter()
             // console.log(dispatcher);
-            //
+
             // if (dispatcher) {
             //     await this.#network.sendMessageToNode(dispatcher, assembledMessage);
             // }
+            await this.#network.validator_stream.messenger.send(assembledMessage);
             return;
         }
 
         if (!isAlreadyWriter) {
             throw new Error("Cannot remove writer role - you are not a writer");
         }
-        const txValidity = await this.#state.getIndexerSequenceState();
-        const assembledMessage = {
-            op: 'removeWriter',
-            transactionPayload: await PartialStateMessageOperations.assembleRemoveWriterMessage(
-                this.#wallet,
-                this.#state.writingKey.toString('hex'),
-                txValidity.toString('hex')
-            )
+
+        if (nodeEntry.isIndexer === true) {
+            throw new Error("Cannot remove writer role - node is an indexer");
         }
-        console.log(assembledMessage)
+
+        const txValidity = await this.#state.getIndexerSequenceState();
+        const assembledMessage = await PartialStateMessageOperations.assembleRemoveWriterMessage(
+            this.#wallet,
+            this.#state.writingKey.toString('hex'),
+            txValidity.toString('hex')
+        )
         //await this.#network.sendMessageToAdmin(adminEntry, assembledMessage);
         // let dispatcher = await this.#pickWriter()
         // if (dispatcher) {
         //     await this.#network.sendMessageToNode(dispatcher, assembledMessage);
+        await this.#network.validator_stream.messenger.send(assembledMessage);
+        return;
     }
 
     async #updateIndexerRole(address, toAdd) {
@@ -692,8 +638,8 @@ export class MainSettlementBus extends ReadyResource {
                     `Can not request indexer role for: ${address} - node is not whitelisted, not a writer or already an indexer.`
                 );
             }
-
-            const assembledAddIndexerMessage = await CompleteStateMessageOperations.assembleAddIndexerMessage(this.#wallet, address);
+            const txValidity = await this.#state.getIndexerSequenceState();
+            const assembledAddIndexerMessage = await CompleteStateMessageOperations.assembleAddIndexerMessage(this.#wallet, address, txValidity);
             await this.#state.append(assembledAddIndexerMessage);
         } else {
             const canRemoveIndexer =
@@ -704,8 +650,8 @@ export class MainSettlementBus extends ReadyResource {
                     `Can not remove indexer role for: ${address} - node is not an indexer or address is not in indexers list.`
                 );
             }
-
-            const assembledRemoveIndexer = await CompleteStateMessageOperations.assembleRemoveIndexerMessage(this.#wallet, address);
+            const txValidity = await this.#state.getIndexerSequenceState();
+            const assembledRemoveIndexer = await CompleteStateMessageOperations.assembleRemoveIndexerMessage(this.#wallet, address, txValidity);
             await this.#state.append(assembledRemoveIndexer);
         }
     }
@@ -894,12 +840,8 @@ export class MainSettlementBus extends ReadyResource {
                     this.#network,
                     this.#wallet,
                     this.#state.writingKey,
-                    this.#shouldListenToAdminEvents,
                     this.#shouldListenToWriterEvents
                 );
-            case '/stats':
-                await verifyDag(this.#state, this.#network, this.#wallet, this.#state.writingKey, this.#shouldListenToAdminEvents, this.#shouldListenToWriterEvents);
-                break;
             case '/i':
                 console.log(await this.#state.getIndexerSequenceState())
                 break;
@@ -953,7 +895,7 @@ export class MainSettlementBus extends ReadyResource {
                 console.log(assembledTransactionOperation)
                 console.log('normalizedTransactionOperation:', normalizeTransactionOperation(assembledTransactionOperation));
                 const normalizedPayload = normalizeTransactionOperation(assembledTransactionOperation)
-                const complete  = await completeStateMessageOperations.assembleCompleteTransactionOperationMessage(
+                const complete = await completeStateMessageOperations.assembleCompleteTransactionOperationMessage(
                     this.#wallet,
                     normalizedPayload.address,
                     normalizedPayload.txo.tx,
@@ -1012,6 +954,15 @@ export class MainSettlementBus extends ReadyResource {
                         }
                     } else {
                         console.log(`No deployment found for bootstrap: ${bootstrapHex}`);
+                    }
+                } else if (input.startsWith("/get_tx_info")) {
+                    const splitted = input.split(" ");
+                    const txHash = splitted[1];
+                    const payload = await get_tx_info(this.#state, txHash);
+                    if (payload) {
+                        console.log(`Payload for transaction hash ${txHash}:`, payload);
+                    } else {
+                        console.log(`No information found for transaction hash: ${txHash}`);
                     }
                 }
         }

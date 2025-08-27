@@ -12,7 +12,7 @@ import Wallet from 'trac-wallet';
 import Check from '../../utils/check.js';
 import {safeDecodeApplyOperation} from '../../utils/protobuf/operationHelpers.js';
 import {createMessage, ZERO_WK} from '../../utils/buffer.js';
-import addressUtils from './utils/address.js';
+import addressUtils, {addressToBuffer} from './utils/address.js';
 import adminEntryUtils from './utils/adminEntry.js';
 import nodeEntryUtils, { setWritingKey } from './utils/nodeEntry.js';
 import nodeRoleUtils from './utils/roles.js';
@@ -171,7 +171,7 @@ class State extends ReadyResource {
     }
 
     async getIndexerSequenceState() {
-        console.log("indexers:", this.#base.system.indexers)
+        console.log("this.#base.system.indexers", this.#base.system.indexers)
         const buf = []
         for (const indexer of Object.values(this.#base.system.indexers)) {
             buf.push(indexer.key);
@@ -344,7 +344,6 @@ class State extends ReadyResource {
         if (adminAddress === null) return;
         const adminPublicKey = Wallet.decodeBech32mSafe(adminAddress);
         if (adminPublicKey === null) return;
-
         // verify signature
         const message = createMessage(adminAddressBuffer, op.cao.txv, op.cao.iw, op.cao.in, OperationType.ADD_ADMIN)
         const hash = await blake3Hash(message);
@@ -352,7 +351,7 @@ class State extends ReadyResource {
         const isMessageVerifed = this.#wallet.verify(op.cao.is, op.cao.tx, adminPublicKey)
         const txHashHexString = op.cao.tx.toString('hex');
 
-        // verify tx validity
+        // verify tx validity - prevent deferred execution attack
         const indexersSequenceState = await this.#getIndexerSequenceStateApply(base);
         if (!b4a.equals(op.cao.txv, indexersSequenceState)) return;
 
@@ -368,7 +367,7 @@ class State extends ReadyResource {
         const initializedNodeEntry = nodeEntryUtils.init(op.cao.iw, nodeRoleUtils.NodeRole.INDEXER);
         //const updatedNodeEntry = nodeEntryUtils.setRole(initializedNodeEntry, nodeRoleUtils.NodeRole.INDEXER);
         await batch.put(adminAddress, initializedNodeEntry);
-        await this.#updateWritersIndex(op, batch);
+        await this.#updateWritersIndex(adminAddressBuffer, batch);
 
         // Create a new admin entry
         const adminEntry = adminEntryUtils.encode(adminAddressBuffer, op.cao.iw);
@@ -413,7 +412,7 @@ class State extends ReadyResource {
         //txHashHexString
         const hashHexString = op.aco.tx.toString('hex');
 
-        // verify tx validity
+        // verify tx validity - prevent deferred execution attack
         const indexersSequenceState = await this.#getIndexerSequenceStateApply(base);
         if (!b4a.equals(op.aco.txv, indexersSequenceState)) return;
 
@@ -465,31 +464,52 @@ class State extends ReadyResource {
     }
 
     async #handleApplyAddWriterOperation(op, view, base, node, batch) {
-        if (!this.check.validateExtendedKeyOpSchema(op)) return;
+        if (!this.check.validateRoleAccessOperation(op)) return;
 
         // Extract and validate the network address
-        const nodeAddressBuffer = op.address;
-        const nodeAddress = addressUtils.bufferToAddress(nodeAddressBuffer);
-        if (nodeAddress === null) return;
-        const nodePublicKey = Wallet.decodeBech32mSafe(nodeAddress);
-        if (nodePublicKey === null) return;
+        const requesterAddressBuffer = op.address;
+        const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer);
+        if (requesterAddressString === null) return;
+        const requesterPublicKey = Wallet.decodeBech32mSafe(requesterAddressString);
+        if (requesterPublicKey === null) return;
 
-        if (b4a.equals(op.eko.wk, ZERO_WK)) return;
+        if (b4a.equals(op.rao.iw, ZERO_WK)) return;
 
-        // verify signature
-        const message = createMessage(op.address, op.eko.wk, op.eko.nonce, op.type)
-        const hash = await blake3Hash(message);
-        const isMessageVerifed = this.#wallet.verify(op.eko.sig, hash, nodePublicKey);
-        const hashHexString = hash.toString('hex');
+        // verify requester signature
+        const requesterMessage = createMessage(op.address, op.rao.txv, op.rao.iw, op.rao.in, OperationType.ADD_WRITER)
+        const hash = await blake3Hash(requesterMessage);
+
+        if (!b4a.equals(hash, op.rao.tx)) return;
+
+        const isRequesterMessageVerifed = this.#wallet.verify(op.rao.is, op.rao.tx, requesterPublicKey);
+        const txHashHexString = op.rao.tx.toString('hex');
+        if (!isRequesterMessageVerifed) return;
+
+        // verify validator signature
+        const validatorAddress = op.rao.va;
+        const validatorAddressString = addressUtils.bufferToAddress(validatorAddress);
+        if (validatorAddressString === null) return;
+        const validatorPublicKey = Wallet.decodeBech32mSafe(validatorAddressString);
+        if (validatorPublicKey === null) return;
+
+        const validatorMessage = createMessage(op.rao.tx, op.rao.va, op.rao.vn, OperationType.ADD_WRITER);
+        const validatorHash = await blake3Hash(validatorMessage);
+        const isValidatorMessageVerifed = this.#wallet.verify(op.rao.vs, validatorHash, validatorPublicKey);
+        if (!isValidatorMessageVerifed) return;
+
+        // verify tx validity - prevent deferred execution attack
+        const indexersSequenceState = await this.#getIndexerSequenceStateApply(base);
+        if (!b4a.equals(op.rao.txv, indexersSequenceState)) return;
 
         // Check if the operation has already been applied
-        const opEntry = await this.#getEntryApply(hashHexString, batch);
+        const opEntry = await this.#getEntryApply(txHashHexString, batch);
 
-        if (!isMessageVerifed || null !== opEntry) return;
-        await this.#addWriter(op, base, node, batch, hashHexString, nodeAddress);
+        // anti-replay attack
+        if (null !== opEntry) return;
+        await this.#addWriter(op, base, node, batch, txHashHexString, requesterAddressString, requesterAddressBuffer);
     }
 
-    async #updateWritersIndex(op, batch) {
+    async #updateWritersIndex(validatorAddressBuffer, batch) {
         // Retrieve and increment the writers length entry
         let length = await this.#getEntryApply(EntryType.WRITERS_LENGTH, batch);
         let incrementedLength = null;
@@ -506,13 +526,13 @@ class State extends ReadyResource {
         if (null === incrementedLength) return;
 
         // Update the writers index and length entries
-        await batch.put(EntryType.WRITERS_INDEX + length, op.address);
+        await batch.put(EntryType.WRITERS_INDEX + length, validatorAddressBuffer);
         await batch.put(EntryType.WRITERS_LENGTH, incrementedLength);
     }
 
-    async #addWriter(op, base, node, batch, hashHexString, nodeAddress) {
-        // Retrieve the node entry for the given key
-        const nodeEntry = await this.#getEntryApply(nodeAddress, batch);
+    async #addWriter(op, base, node, batch, txHashHexString, requesterAddressString, requesterAddressBuffer) {
+        // Retrieve the node entry for the given address, if null then do not process...
+        const nodeEntry = await this.#getEntryApply(requesterAddressString, batch);
         if (nodeEntry === null) return;
 
         const isWhitelisted = nodeEntryUtils.isWhitelisted(nodeEntry);
@@ -522,49 +542,69 @@ class State extends ReadyResource {
         // To become a writer the node must be whitelisted and not already a writer or indexer
         if (isIndexer || isWriter || !isWhitelisted) return;
         // Update the node entry to assign the writer role
-        const updatedNodeEntry = nodeEntryUtils.setRoleAndWriterKey(nodeEntry, nodeRoleUtils.NodeRole.WRITER, op.eko.wk);
+        const updatedNodeEntry = nodeEntryUtils.setRoleAndWriterKey(nodeEntry, nodeRoleUtils.NodeRole.WRITER, op.rao.iw);
         if (updatedNodeEntry === null) return;
 
         // Add the writer role to the base and update the batch
-        await batch.put(nodeAddress, updatedNodeEntry);
-        await base.addWriter(op.eko.wk, { isIndexer: false });
+        await batch.put(requesterAddressString, updatedNodeEntry);
+        await base.addWriter(op.rao.iw, { isIndexer: false });
 
-        await this.#updateWritersIndex(op, batch);
+        await this.#updateWritersIndex(requesterAddressBuffer, batch);
 
-        await batch.put(hashHexString, node.value);
-        console.log(`Writer added: ${nodeAddress}:${op.eko.wk.toString('hex')}`);
+        await batch.put(txHashHexString, node.value);
+        console.log(`Writer added addr:wk:tx - ${requesterAddressString}:${op.rao.iw.toString('hex')}:${txHashHexString}`);
     }
 
     async #handleApplyRemoveWriterOperation(op, view, base, node, batch) {
-        if (!this.check.validateExtendedKeyOpSchema(op)) return;
+        if (!this.check.validateRoleAccessOperation(op)) return;
 
         // Extract and validate the network address
-        const nodeAddressBuffer = op.address;
-        const nodeAddress = addressUtils.bufferToAddress(nodeAddressBuffer);
-        if (nodeAddress === null) return;
-        const nodePublicKey = Wallet.decodeBech32mSafe(nodeAddress);
-        if (nodePublicKey === null) return;
+        const requesterAddress = op.address;
+        const requesterAddressString = addressUtils.bufferToAddress(requesterAddress);
+        if (requesterAddressString === null) return;
+        const requesterPublicKey = Wallet.decodeBech32mSafe(requesterAddressString);
+        if (requesterPublicKey === null) return;
 
-        // verify signature
-        const message = createMessage(op.address, op.eko.wk, op.eko.nonce, op.type);
-        const hash = await blake3Hash(message);
-        const isMessageVerifed = this.#wallet.verify(op.eko.sig, hash, nodePublicKey);
-        const hashHexString = hash.toString('hex');
+        // verify requester signature
+        const requesterMessage = createMessage(op.address, op.rao.txv, op.rao.iw, op.rao.in, OperationType.REMOVE_WRITER)
+        const hash = await blake3Hash(requesterMessage);
 
-        // Check if the operation has already been applied
-        const opEntry = await this.#getEntryApply(hashHexString, batch);
-        if (!isMessageVerifed || null !== opEntry) return;
+        if (!b4a.equals(hash, op.rao.tx)) return;
+
+        const isRequesterMessageVerifed = this.#wallet.verify(op.rao.is, op.rao.tx, requesterPublicKey);
+        const txHashHexString = op.rao.tx.toString('hex');
+        if (!isRequesterMessageVerifed) return;
+
+        // verify validator signature
+        const validatorAddress = op.rao.va;
+        const validatorAddressString = addressUtils.bufferToAddress(validatorAddress);
+        if (validatorAddressString === null) return;
+        const validatorPublicKey = Wallet.decodeBech32mSafe(validatorAddressString);
+        if (validatorPublicKey === null) return;
+
+        const validatorMessage = createMessage(op.rao.tx, op.rao.va, op.rao.vn, OperationType.REMOVE_WRITER);
+        const validatorHash = await blake3Hash(validatorMessage);
+        const isValidatorMessageVerifed = this.#wallet.verify(op.rao.vs, validatorHash, validatorPublicKey);
+        if (!isValidatorMessageVerifed) return;
+
+        // verify tx validity - prevent deferred execution attack
+        const indexersSequenceState = await this.#getIndexerSequenceStateApply(base);
+        if (!b4a.equals(op.rao.txv, indexersSequenceState)) return;
+
+        // anti-replay attack
+        const opEntry = await this.#getEntryApply(txHashHexString, batch);
+        if (null !== opEntry) return;
 
         // Proceed to remove the writer role from the node
-        await this.#removeWriter(op, base, node, batch, hashHexString, nodeAddress);
+        await this.#removeWriter(op, base, node, batch, txHashHexString, requesterAddressString);
     }
 
-    async #removeWriter(op, base, node, batch, hashHexString, nodeAddress) {
+    async #removeWriter(op, base, node, batch, txHashHexString, requesterAddressString) {
         // Retrieve the node entry for the given key
-        const nodeEntry = await this.#getEntryApply(nodeAddress, batch);
+        const nodeEntry = await this.#getEntryApply(requesterAddressString, batch);
         if (null === nodeEntry) return;
 
-        // what if we will compre current wk with op.eko.wk?
+        // TODO: SHOULD WE somehow compare current wk FROM STATE with op.rao.iw? YES, we can ensure that linked wk to the address is the same as the one provided in the operation.
 
         // Check if the node is a writer or an indexer
         const isNodeWriter = nodeEntryUtils.isWriter(nodeEntry);
@@ -574,17 +614,17 @@ class State extends ReadyResource {
             // Decode the node entry and downgrade its role to WHITELISTED reader.
             const decodedNodeEntry = nodeEntryUtils.decode(nodeEntry);
             if (decodedNodeEntry === null) return;
-
+            // Downgrade role from WRITER to WHITELISTED
             const updatedNodeEntry = nodeEntryUtils.setRole(nodeEntry, nodeRoleUtils.NodeRole.WHITELISTED);
             if (updatedNodeEntry === null) return;
-
             // Remove the writer role and update the state
             await base.removeWriter(decodedNodeEntry.wk);
-            await batch.put(nodeAddress, updatedNodeEntry);
-            await batch.put(hashHexString, node.value);
-            console.log(`Writer removed: ${nodeAddress}:${decodedNodeEntry.wk.toString('hex')}`);
+            await batch.put(requesterAddressString, updatedNodeEntry);
+            await batch.put(txHashHexString, node.value);
+            console.log(`Writer removed: addr:wk:tx - ${requesterAddressString}:${op.rao.iw.toString('hex')}:${txHashHexString}`);
 
         } else if (isNodeIndexer) {
+            // TODO: TO DISCUS WITH TEAM. NODE WHICH IS AN INDEXER SHOULD NOT BE ABLE TO REMOVE WRITER ROLE. IT CAN CAUSE A PROBLEM WITH CONSENSUS!
             // Decode the node entry and update its role to WHITELISTED
             const decodedNodeEntry = nodeEntryUtils.decode(nodeEntry);
             if (decodedNodeEntry === null) return;
@@ -600,23 +640,32 @@ class State extends ReadyResource {
 
             // Remove the writer role and update the state
             await base.removeWriter(decodedNodeEntry.wk);
-            await batch.put(nodeAddress, updatedNodeEntry);
+            await batch.put(requesterAddressString, updatedNodeEntry);
+            //
             await batch.put(EntryType.INDEXERS, updatedIndexerEntry);
-            await batch.put(hashHexString, node.value);
-            console.log(`Indexer removed through removeWriter: ${nodeAddress}:${decodedNodeEntry.wk.toString('hex')}`);
+            await batch.put(txHashHexString, node.value);
+            console.log(`Indexer removed through removeWriter addr:wk:tx - ${requesterAddressString}:${op.rao.iw.toString('hex')}:${txHashHexString}`);
         }
     }
 
     async #handleApplyAddIndexerOperation(op, view, base, node, batch) {
-        if (!this.check.validateBasicKeyOp(op)) {
+        if (!this.check.validateAdminControlOperation(op)) {
             return;
         }
-        // Extract and validate the network address
-        const nodeAddressBuffer = op.address;
-        const nodeAddress = addressUtils.bufferToAddress(nodeAddressBuffer);
-        if (nodeAddress === null) return;
-        const nodePublicKey = Wallet.decodeBech32mSafe(nodeAddress);
-        if (nodePublicKey === null) return;
+
+        // Extract and validate the requester address
+        const requesterAddressBuffer = op.address;
+        const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer);
+        if (requesterAddressString === null) return;
+        const requesterPublicKey = Wallet.decodeBech32mSafe(requesterAddressString);
+        if (requesterPublicKey === null) return;
+
+        // Extract and validate pretending indexer address
+        const pretendingAddressBuffer = op.aco.ia;
+        const pretendingAddressString = addressUtils.bufferToAddress(pretendingAddressBuffer);
+        if (pretendingAddressString === null) return;
+        const pretentingPublicKey = Wallet.decodeBech32mSafe(pretendingAddressString);
+        if (pretentingPublicKey === null) return;
 
         // ensure that an admin invoked this operation
         const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
@@ -625,21 +674,31 @@ class State extends ReadyResource {
         if (null === decodedAdminEntry) return;
         const adminPublicKey = Wallet.decodeBech32mSafe(decodedAdminEntry.address);
         if (adminPublicKey === null) return;
-        if (b4a.equals(nodePublicKey, adminPublicKey) || !this.#isAdminApply(decodedAdminEntry, node)) return;
+        if (!b4a.equals(requesterPublicKey, adminPublicKey) || !this.#isAdminApply(decodedAdminEntry, node)) return;
 
-        // verify signature
-        const message = createMessage(op.address, op.bko.nonce, op.type);
+        // verify requester signature
+        const message = createMessage(op.address, op.aco.txv, op.aco.ia, op.aco.in, OperationType.ADD_INDEXER);
         const hash = await blake3Hash(message);
-        const isMessageVerifed = this.#wallet.verify(op.bko.sig, hash, adminPublicKey);
-        const hashHexString = hash.toString('hex');
-        // check if the operation has been already applied
-        const opEntry = await this.#getEntryApply(hashHexString, batch);
-        if (!isMessageVerifed || null !== opEntry) return;
-        await this.#addIndexer(op, batch, base, hashHexString, nodeAddress);
+        if (!b4a.equals(hash, op.aco.tx)) return;
+
+        const isMessageVerifed = this.#wallet.verify(op.aco.is, hash, adminPublicKey);
+        const txHashHexString = hash.toString('hex');
+        if (!isMessageVerifed) return;
+
+        // verify tx validity - prevent deferred execution attack
+        const indexersSequenceState = await this.#getIndexerSequenceStateApply(base);
+
+        if (!b4a.equals(op.aco.txv, indexersSequenceState)) return;
+
+        // anti-replay attack
+        const opEntry = await this.#getEntryApply(txHashHexString, batch);
+        if ( null !== opEntry) return;
+
+        await this.#addIndexer(op, node ,batch, base, txHashHexString, pretendingAddressString);
     }
 
-    async #addIndexer(op, batch, base, hashHexString, nodeAddress) {
-        const nodeEntry = await this.#getEntryApply(nodeAddress, batch);
+    async #addIndexer(op,node, batch, base, txHashHexString, nodeAddressString) {
+        const nodeEntry = await this.#getEntryApply(nodeAddressString, batch);
         if (null === nodeEntry) return;
         const decodedNodeEntry = nodeEntryUtils.decode(nodeEntry);
         if (null === decodedNodeEntry) return;
@@ -654,32 +713,41 @@ class State extends ReadyResource {
         // ensure that indexers entry exists and that it does not contain the address already
         const indexersEntry = await this.#getEntryApply(EntryType.INDEXERS, batch);
         if (null === indexersEntry) return;
-        const indexerListHasAddress = indexerEntryUtils.getIndex(indexersEntry, op.address) !== -1;
-        if (indexerListHasAddress) return;
+
+        const indexerListHasAddress = indexerEntryUtils.getIndex(indexersEntry, op.aco.ia);
+        if (indexerListHasAddress !== -1) return;
+
         // append indexer to indexers entry
-        const updatedIndexerEntry = indexerEntryUtils.append(op.address, indexersEntry);
+        const updatedIndexerEntry = indexerEntryUtils.append(op.aco.ia, indexersEntry);
         if (updatedIndexerEntry.length === 0) return;
         // set indexer role
         await base.removeWriter(decodedNodeEntry.wk);
         await base.addWriter(decodedNodeEntry.wk, { isIndexer: true })
         // update node entry and indexers entry
         await batch.put(EntryType.INDEXERS, updatedIndexerEntry);
-        await batch.put(nodeAddress, updatedNodeEntry);
+        await batch.put(nodeAddressString, updatedNodeEntry);
         // store operation hash to avoid replay attack.
-        await batch.put(hashHexString, op.value);
+        await batch.put(txHashHexString, node.value);
 
-        console.log(`Indexer added: ${nodeAddress}:${decodedNodeEntry.wk.toString('hex')}`);
+        console.log(`Indexer added addr:wk:tx - ${nodeAddressString}:${decodedNodeEntry.wk.toString('hex')}:${txHashHexString}`);
     }
 
     async #handleApplyRemoveIndexerOperation(op, view, base, node, batch) {
-        if (!this.check.validateBasicKeyOp(op)) return;
+        if (!this.check.validateAdminControlOperation(op)) return;
 
-        // Extract and validate the network address
-        const nodeAddressBuffer = op.address;
-        const nodeAddress = addressUtils.bufferToAddress(nodeAddressBuffer);
-        if (nodeAddress === null) return;
-        const nodePublicKey = Wallet.decodeBech32mSafe(nodeAddress);
-        if (nodePublicKey === null) return;
+        // Extract and validate the requester address
+        const requesterAddressBuffer = op.address;
+        const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer);
+        if (requesterAddressString === null) return;
+        const requesterPublicKey = Wallet.decodeBech32mSafe(requesterAddressString);
+        if (requesterPublicKey === null) return;
+
+        // Extract and validate pretending indexer address
+        const toRemoveAddressBuffer = op.aco.ia;
+        const toRemoveAddressString = addressUtils.bufferToAddress(toRemoveAddressBuffer);
+        if (toRemoveAddressString === null) return;
+        const toRemoveAddressPublicKey = Wallet.decodeBech32mSafe(toRemoveAddressString);
+        if (toRemoveAddressPublicKey === null) return;
 
         // ensure that an admin invoked this operation
         const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
@@ -688,22 +756,30 @@ class State extends ReadyResource {
         if (null === decodedAdminEntry) return;
         const adminPublicKey = Wallet.decodeBech32mSafe(decodedAdminEntry.address);
         if (adminPublicKey === null) return;
-        if (b4a.equals(nodePublicKey, adminPublicKey) || !this.#isAdminApply(decodedAdminEntry, node)) return;
+        if (!b4a.equals(requesterPublicKey, adminPublicKey) || !this.#isAdminApply(decodedAdminEntry, node)) return;
 
-        // verify signature
-        const message = createMessage(op.address, op.bko.nonce, op.type);
+        // verify requester signature
+        const message = createMessage(op.address, op.aco.txv, op.aco.ia, op.aco.in, OperationType.REMOVE_INDEXER);
         const hash = await blake3Hash(message);
-        const isMessageVerifed = this.#wallet.verify(op.bko.sig, hash, adminPublicKey);
-        const hashHexString = hash.toString('hex');
-        // check if the operation has already been applied
-        const opEntry = await this.#getEntryApply(hashHexString, batch);
-        if (!isMessageVerifed || null !== opEntry) return;
+        if (!b4a.equals(hash, op.aco.tx)) return;
 
-        await this.#removeIndexer(op, batch, base, hashHexString, nodeAddress);
+        const isMessageVerifed = this.#wallet.verify(op.aco.is, hash, adminPublicKey);
+        const txHashHexString = hash.toString('hex');
+        if (!isMessageVerifed) return;
+
+        // verify tx validity - prevent deferred execution attack
+        const indexersSequenceState = await this.#getIndexerSequenceStateApply(base);
+
+        if (!b4a.equals(op.aco.txv, indexersSequenceState)) return;
+
+        // anti-replay attack
+        const opEntry = await this.#getEntryApply(txHashHexString, batch);
+        if ( null !== opEntry) return;
+        await this.#removeIndexer(op, node, batch, base, txHashHexString, toRemoveAddressString, toRemoveAddressBuffer);
     }
 
-    async #removeIndexer(op, batch, base, hashHexString, nodeAddress) {
-        const nodeEntry = await this.#getEntryApply(nodeAddress, batch);
+    async #removeIndexer(op, node, batch, base, txHashHexString, toRemoveAddressString, toRemoveAddressBuffer) {
+        const nodeEntry = await this.#getEntryApply(toRemoveAddressString, batch);
         if (null === nodeEntry) return;
         const decodedNodeEntry = nodeEntryUtils.decode(nodeEntry);
         if (null === decodedNodeEntry) return;
@@ -711,7 +787,6 @@ class State extends ReadyResource {
         //check if node is an indexer
         const isNodeIndexer = nodeEntryUtils.isIndexer(nodeEntry);
         if (!isNodeIndexer) return;
-
         //update node entry to writer
         const updatedNodeEntry = nodeEntryUtils.setRoleAndWriterKey(nodeEntry, nodeRoleUtils.NodeRole.WRITER, decodedNodeEntry.wk)
         if (null === updatedNodeEntry) return;
@@ -720,39 +795,27 @@ class State extends ReadyResource {
         const indexersEntry = await this.#getEntryApply(EntryType.INDEXERS, batch);
         if (null === indexersEntry) return;
 
-        const indexerListHasAddress = indexerEntryUtils.getIndex(indexersEntry, op.address) !== -1;
-        if (!indexerListHasAddress) return;
+        const indexerListHasAddress = indexerEntryUtils.getIndex(indexersEntry, op.aco.ia);
+        if (indexerListHasAddress === -1) return;
 
         // remove indexer from indexers entry
-        const updatedIndexerEntry = indexerEntryUtils.remove(op.address, indexersEntry);
+        const updatedIndexerEntry = indexerEntryUtils.remove(op.aco.ia, indexersEntry);
         if (updatedIndexerEntry.length === 0) return;
-
-        // get writers length and increment it
-        let length = await this.#getEntryApply(EntryType.WRITERS_LENGTH, batch);
-        let incrementedLength = null;
-        if (null === length) {
-            const bufferedLength = lengthEntryUtils.init(0);
-            length = lengthEntryUtils.decode(bufferedLength);
-            incrementedLength = lengthEntryUtils.increment(length);
-        } else {
-            length = lengthEntryUtils.decode(length);
-            incrementedLength = lengthEntryUtils.increment(length);
-        }
-        if (null === incrementedLength) return;
 
         // downgrade role to writer
         await base.removeWriter(decodedNodeEntry.wk);
         await base.addWriter(decodedNodeEntry.wk, { isIndexer: false });
+
         // update writers index and length
-        await batch.put(EntryType.WRITERS_INDEX + length, op.address);
-        await batch.put(EntryType.WRITERS_LENGTH, incrementedLength);
+        await this.#updateWritersIndex(toRemoveAddressBuffer, batch);
+
         //update node entry and indexers entry
         await batch.put(EntryType.INDEXERS, updatedIndexerEntry);
-        await batch.put(nodeAddress, updatedNodeEntry);
-        // store operation hash to avoid replay attack.
-        await batch.put(hashHexString, op.value);
-        console.log(`Indexer has been removed: ${nodeAddress}:${decodedNodeEntry.wk.toString('hex')}`);
+        await batch.put(toRemoveAddressString, updatedNodeEntry);
 
+        // store operation hash to avoid replay attack.
+        await batch.put(txHashHexString, node.value);
+        console.log(`Indexer has been removed addr:wk:tx - ${toRemoveAddressString}:${decodedNodeEntry.wk.toString('hex')}:${txHashHexString}`);
     }
 
     async #handleApplyBanValidatorOperation(op, view, base, node, batch) {

@@ -8,6 +8,7 @@ import {blake3Hash} from "../../../../utils/crypto.js";
 import {createMessage} from "../../../../utils/buffer.js";
 import PeerWallet from "trac-wallet";
 
+// TODO: add check for txvalidity
 class PartialRoleAccess {
     #state;
     #wallet;

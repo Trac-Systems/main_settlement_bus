@@ -7,6 +7,7 @@ import {addressToBuffer, bufferToAddress} from "../../../state/utils/address.js"
 import {createMessage} from "../../../../utils/buffer.js";
 import {OperationType} from "../../../../utils/constants.js";
 import {blake3Hash} from "../../../../utils/crypto.js";
+// TODO: add check for txvalidity
 class PartialTransaction {
     #state;
     #wallet;
