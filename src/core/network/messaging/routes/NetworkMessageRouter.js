@@ -1,4 +1,3 @@
-
 import b4a from "b4a";
 
 import GetRequestHandler from "../handlers/GetRequestHandler.js";
@@ -44,7 +43,6 @@ class NetworkMessageRouter {
                 this.network.swarm.leavePeer(connection.remotePublicKey);
 
             }
-            // TODO: TEMPORARY SOLUTION, WE SHOULD CHANGE PRE_TX AND POST_TX TO TX WHICH IS PARTIAL AND COMPLETE
             else if (this.#isPartialTransaction(incomingMessage)) {
                 await this.#handlers.transaction.handle(incomingMessage, connection);
                 this.network.swarm.leavePeer(connection.remotePublicKey);

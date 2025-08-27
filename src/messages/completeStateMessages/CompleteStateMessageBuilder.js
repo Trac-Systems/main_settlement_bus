@@ -105,6 +105,7 @@ class CompleteStateMessageBuilder extends StateBuilder {
         if (!isAddressValid(address)) {
             throw new Error(`Address field must be a valid TRAC bech32m address with length ${TRAC_ADDRESS_SIZE}.`);
         }
+
         this.#incomingAddress = addressToBuffer(address);
         return this;
     }
@@ -186,23 +187,17 @@ class CompleteStateMessageBuilder extends StateBuilder {
             case OperationType.ADD_ADMIN:
                 msg = createMessage(this.#address, this.#txValidity, this.#writingKey, nonce, this.#operationType);
                 break;
+
             // Partial need to be signed
             case OperationType.ADD_WRITER:
             case OperationType.REMOVE_WRITER:
             case OperationType.ADMIN_RECOVERY:
-                // console.log('ROLE_ACCESS operation inputs:');
-                // console.log('txHash:', this.#txHash?.toString('hex'));
-                // console.log('walletAddressBuffer:', addressToBuffer(this.#wallet.address)?.toString('hex'));
-                // console.log('nonce:', nonce.toString('hex'));
-                // console.log('operationType:', this.#operationType);
-
                 msg = createMessage(
                     this.#txHash,
                     addressToBuffer(this.#wallet.address),
                     nonce,
                     this.#operationType
                 );
-                // console.log('Generated msg:', msg.toString('hex'));
                 break;
             // Complete by default
             case OperationType.APPEND_WHITELIST:

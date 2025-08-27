@@ -13,12 +13,12 @@ class CompleteStateMessageDirector {
         this.#builder = builderInstance;
     }
 
-    async buildAddAdminMessage(address, writingKey, txValidity) {
+    async buildAddAdminMessage(invokerAddress, writingKey, txValidity) {
         if (!this.#builder) throw new Error('Builder has not been set.');
 
         await this.#builder
             .forOperationType(OperationType.ADD_ADMIN)
-            .withAddress(address)
+            .withAddress(invokerAddress)
             .withWriterKey(writingKey)
             .withTxValidity(txValidity)
             .buildValueAndSign();
@@ -120,12 +120,12 @@ class CompleteStateMessageDirector {
         return this.#builder.getPayload();
     }
 
-    async buildAppendWhitelistMessage(address, incomingAddress ,txValidity) {
+    async buildAppendWhitelistMessage(invokerAddress, incomingAddress ,txValidity) {
         if (!this.#builder) throw new Error('Builder has not been set.');
 
         await this.#builder
             .forOperationType(OperationType.APPEND_WHITELIST)
-            .withAddress(address)
+            .withAddress(invokerAddress)
             .withTxValidity(txValidity)
             .withIncomingAddress(incomingAddress)
             .buildValueAndSign();
@@ -133,12 +133,14 @@ class CompleteStateMessageDirector {
         return this.#builder.getPayload();
     }
 
-    async buildBanWriterMessage(address) {
+    async buildBanWriterMessage(invokerAddress ,incomingAddress, txValidity) {
         if (!this.#builder) throw new Error('Builder has not been set.');
 
         await this.#builder
             .forOperationType(OperationType.BAN_VALIDATOR)
-            .withAddress(address)
+            .withAddress(invokerAddress)
+            .withTxValidity(txValidity)
+            .withIncomingAddress(incomingAddress)
             .buildValueAndSign();
 
         return this.#builder.getPayload();

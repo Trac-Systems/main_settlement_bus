@@ -5,6 +5,7 @@ import Check from '../../../../utils/check.js';
 import {OperationType} from "../../../../utils/constants.js";
 import {blake3Hash} from "../../../../utils/crypto.js";
 import {createMessage} from "../../../../utils/buffer.js";
+import {addressToBuffer, bufferToAddress} from "../../../state/utils/address.js";
 
 class PartialRoleAccess {
     #state;

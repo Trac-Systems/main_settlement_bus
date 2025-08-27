@@ -674,8 +674,12 @@ export class MainSettlementBus extends ReadyResource {
                 `Can not ban writer with address: ${address} - node is not whitelisted or is an indexer.`
             );
         }
-
-        const assembledBanValidatorMessage = await CompleteStateMessageOperations.assembleBanWriterMessage(this.#wallet, address);
+        const txValidity = await this.#state.getIndexerSequenceState();
+        const assembledBanValidatorMessage = await CompleteStateMessageOperations.assembleBanWriterMessage(
+            this.#wallet,
+            address,
+            txValidity
+        );
         await this.#state.append(assembledBanValidatorMessage);
     }
 

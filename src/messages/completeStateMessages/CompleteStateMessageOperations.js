@@ -1,14 +1,8 @@
-import PeerWallet from 'trac-wallet';
-import b4a from 'b4a';
-
 import CompleteStateMessageDirector from './CompleteStateMessageDirector.js';
 import CompleteStateMessageBuilder from './CompleteStateMessageBuilder.js';
 import {safeEncodeApplyOperation} from '../../utils/protobuf/operationHelpers.js';
 import fileUtils from '../../../src/utils/fileUtils.js';
-import {OperationType} from '../../utils/constants.js';
-import {createMessage} from '../../utils/buffer.js';
-import {bufferToAddress} from '../../core/state/utils/address.js';
-import {blake3Hash} from '../../utils/crypto.js';
+
 
 class CompleteStateMessageOperations {
 
@@ -19,7 +13,6 @@ class CompleteStateMessageOperations {
             director.builder = builder;
 
             const payload = await director.buildAddAdminMessage(wallet.address, writingKey, txValidity);
-            console.log(payload)
             return safeEncodeApplyOperation(payload);
 
         } catch (error) {
@@ -107,7 +100,6 @@ class CompleteStateMessageOperations {
                 incomingNonce,
                 incomingSignature
             );
-            console.log(payload)
             return safeEncodeApplyOperation(payload);
 
         } catch (error) {
@@ -166,13 +158,13 @@ class CompleteStateMessageOperations {
         }
     }
 
-    static async assembleBanWriterMessage(wallet, address) {
+    static async assembleBanWriterMessage(wallet, incomingAddress, txValidity) {
         try {
             const builder = new CompleteStateMessageBuilder(wallet);
             const director = new CompleteStateMessageDirector();
             director.builder = builder;
 
-            const payload = await director.buildBanWriterMessage(address);
+            const payload = await director.buildBanWriterMessage(wallet.address, incomingAddress, txValidity);
             return safeEncodeApplyOperation(payload);
 
         } catch (error) {
