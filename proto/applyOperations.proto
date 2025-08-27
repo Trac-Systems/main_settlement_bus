@@ -104,12 +104,12 @@ message Operation {
     bytes address      = 2; // address of the invoker
 
     oneof value {
-        CoreAdminOperation       cao  = 3;
-        AdminControlOperation    aco  = 4;
-        InitBalanceOperation     ibo  = 5;
-        TokenTransferOperation   tto  = 6;
-        RoleAccessOperation      rao  = 7;
-        TxOperation              txo  = 8;
-        BootstrapDeploymentOperation      bdo  = 9;
+        CoreAdminOperation                cao  = 3;
+        AdminControlOperation             aco  = 4;
+        InitBalanceOperation              ibo  = 5;
+        TokenTransferOperation            tto  = 6;
+        RoleAccessOperation               rao  = 7;
+        BootstrapDeploymentOperation      bdo  = 8;
+        TxOperation                       txo  = 9;
     }
 }
