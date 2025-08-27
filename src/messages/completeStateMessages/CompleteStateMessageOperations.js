@@ -3,7 +3,6 @@ import CompleteStateMessageBuilder from './CompleteStateMessageBuilder.js';
 import {safeEncodeApplyOperation} from '../../utils/protobuf/operationHelpers.js';
 import fileUtils from '../../../src/utils/fileUtils.js';
 
-
 class CompleteStateMessageOperations {
 
     static async assembleAddAdminMessage(wallet, writingKey, txValidity) {

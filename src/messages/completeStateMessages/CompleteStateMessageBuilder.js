@@ -9,7 +9,6 @@ import {TRAC_ADDRESS_SIZE} from 'trac-wallet/constants.js';
 import {isAddressValid} from "../../core/state/utils/address.js";
 import {blake3Hash} from '../../utils/crypto.js';
 
-// TODO: RENAME TO CompleteStateMessageBuilder
 class CompleteStateMessageBuilder extends StateBuilder {
     #wallet;
     #operationType;

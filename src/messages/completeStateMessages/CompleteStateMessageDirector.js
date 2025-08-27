@@ -1,8 +1,6 @@
 import StateBuilder from '../base/StateBuilder.js'
 import {OperationType} from '../../utils/protobuf/applyOperations.cjs'
 
-// TODO: RENAME TO CompleteStateMessageDirector
-
 class CompleteStateMessageDirector {
     #builder;
 
