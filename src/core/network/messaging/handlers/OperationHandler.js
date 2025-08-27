@@ -1,10 +1,9 @@
-import b4a from 'b4a';
-
 import {OperationType} from '../../../../utils/constants.js';
 import PartialRoleAccess from "../validators/PartialRoleAccess.js";
 import {addressToBuffer, bufferToAddress} from "../../../state/utils/address.js";
 import CompleteStateMessageOperations
     from "../../../../messages/completeStateMessages/CompleteStateMessageOperations.js";
+import {normalizeHex} from "../../../../utils/helpers.js";
 
 class OperationHandler {
     #handleIncomingEvent
@@ -98,7 +97,6 @@ class OperationHandler {
             throw new Error('Missing required fields in bootstrap deployment payload.');
         }
 
-        const normalizeHex = field => (typeof field === 'string' ? b4a.from(field, 'hex') : field);
         const normalizedRao = {
             tx: normalizeHex(rao.tx),
             txv: normalizeHex(rao.txv),

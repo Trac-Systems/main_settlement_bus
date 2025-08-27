@@ -8,6 +8,7 @@ import {
 import PartialBootstrapDeployment from "../validators/PartialBootstrapDeployment.js";
 import {addressToBuffer, bufferToAddress} from "../../../state/utils/address.js";
 import PartialTransaction from "../validators/PartialTransaction.js";
+import {normalizeHex} from "../../../../utils/helpers.js";
 
 /**
  * THIS CLASS IS ULTRA IMPORTANT BECAUSE IF SOMEONE WILL SEND A TRASH TO VALIDATOR AND IT WON'T BE HANDLED PROPERTLY -
@@ -136,7 +137,6 @@ class TransactionHandler {
             throw new Error('Missing required fields in bootstrap deployment payload.');
         }
 
-        const normalizeHex = field => (typeof field === 'string' ? b4a.from(field, 'hex') : field);
         const normalizedBdo = {
             tx: normalizeHex(bdo.tx),
             txv: normalizeHex(bdo.txv),
@@ -166,7 +166,6 @@ class TransactionHandler {
             throw new Error('Missing required fields in transaction operation payload.');
         }
 
-        const normalizeHex = field => (typeof field === 'string' ? b4a.from(field, 'hex') : field);
         const normalizedTxo = {
             tx: normalizeHex(txo.tx),    // Transaction hash
             txv: normalizeHex(txo.txv),  // Transaction validity

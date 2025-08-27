@@ -1,8 +1,15 @@
 import {  TRAC_ADDRESS_SIZE } from 'trac-wallet/constants.js';
+import b4a from "b4a";
 
 export function isHexString(string) {
     return typeof string === 'string' && string.length > 1 && /^[0-9a-fA-F]+$/.test(string) && string.length % 2 === 0;
 }
+
+
+export const normalizeHex = (input) => {
+    const isString = typeof input === 'string';
+    return isString ? b4a.from(input, 'hex') : input;
+};
 
 export async function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
