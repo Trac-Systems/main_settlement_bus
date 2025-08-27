@@ -56,7 +56,6 @@ class TransactionHandler {
     }
 
     async handle(payload, connection) {
-        // TODO: it should be handled somewhere else. Maybe in the router?
         if (this.state.isIndexer() || !this.state.isWritable()) {
             throw new Error('TransactionHandler: State is not writable or is an indexer.');
         }

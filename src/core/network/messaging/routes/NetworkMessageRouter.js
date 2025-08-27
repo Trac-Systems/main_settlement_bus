@@ -16,7 +16,7 @@ class NetworkMessageRouter {
         this.#handlers = {
             get: new GetRequestHandler(wallet, state),
             response: new ResponseHandler(network, state, wallet),
-            operation: new OperationHandler(handleIncomingEvent),
+            operation: new OperationHandler(handleIncomingEvent, state, wallet, network),
             transaction: new TransactionHandler(network, state, wallet, options)
         }
     }
@@ -27,6 +27,7 @@ class NetworkMessageRouter {
 
     async route(incomingMessage, connection, messageProtomux) {
         try {
+            // TODO: add check here - only writer should be able to process handlers below, and admin node intil wrtiters index < 25
             const channelString = b4a.toString(this.network.channel, 'utf8');
             if (this.#isGetRequest(incomingMessage)) {
                 await this.#handlers.get.handle(incomingMessage, messageProtomux, connection, channelString);
@@ -38,9 +39,10 @@ class NetworkMessageRouter {
                 this.network.swarm.leavePeer(connection.remotePublicKey);
 
             }
-            else if (this.#isOperation(incomingMessage)) {
+            else if (this.#isRoleAccessOperation(incomingMessage)) {
                 await this.#handlers.operation.handle(incomingMessage, connection);
                 this.network.swarm.leavePeer(connection.remotePublicKey);
+
             }
             // TODO: TEMPORARY SOLUTION, WE SHOULD CHANGE PRE_TX AND POST_TX TO TX WHICH IS PARTIAL AND COMPLETE
             else if (this.#isPartialTransaction(incomingMessage) || incomingMessage.op === OperationType.PRE_TX) {
@@ -65,8 +67,8 @@ class NetworkMessageRouter {
         return Object.values(NETWORK_MESSAGE_TYPES.RESPONSE).includes(message.op);
     }
 
-    #isOperation(message) {
-        return Object.values(NETWORK_MESSAGE_TYPES.OPERATION).includes(message.op);
+    #isRoleAccessOperation(message) {
+        return [OperationType.ADMIN_RECOVERY, OperationType.ADD_WRITER, OperationType.REMOVE_WRITER].includes(message.type);
     }
 
     #isPartialTransaction(msg) {

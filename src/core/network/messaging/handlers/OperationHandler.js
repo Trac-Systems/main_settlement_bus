@@ -1,30 +1,106 @@
 import { normalizeBuffer } from "../../../../utils/buffer.js";
-import { NETWORK_MESSAGE_TYPES } from '../../../../utils/constants.js';
+import {NETWORK_MESSAGE_TYPES, OperationType} from '../../../../utils/constants.js';
 import b4a from 'b4a';
+import PartialRoleAccess from "../validators/PartialRoleAccess.js";
+import {addressToBuffer} from "../../../state/utils/address.js";
+import CompleteStateMessageOperations
+    from "../../../../messages/completeStateMessages/CompleteStateMessageOperations.js";
+import {walletAdmin} from "../../../../../test/fixtures/assembleMessage.fixtures.js";
 
 class OperationHandler {
     #handleIncomingEvent
+    #partialRoleAccessValidator;
+    #wallet;
+    #network;
 
-    constructor(handleIncomingEvent) {
+    constructor(handleIncomingEvent, state, wallet, network) {
+        this.#wallet = wallet;
+        this.#network = network;
         this.#handleIncomingEvent = handleIncomingEvent;
+        this.#partialRoleAccessValidator = new PartialRoleAccess(state, wallet, network)
     }
 
-    get handleIncomingEvent() {
-        return this.#handleIncomingEvent;
+    get wallet() {
+        return this.#wallet;
+    }
+
+    get network() {
+        return this.#network;
+    }
+
+    get partialRoleAccessValidator() {
+        return this.#partialRoleAccessValidator;
     }
 
     async handle(message, connection) {
-        if (message.op === NETWORK_MESSAGE_TYPES.OPERATION.ADD_WRITER ||
-            message.op === NETWORK_MESSAGE_TYPES.OPERATION.REMOVE_WRITER ||
-            message.op === NETWORK_MESSAGE_TYPES.OPERATION.ADD_ADMIN ||
-            message.op === NETWORK_MESSAGE_TYPES.OPERATION.WHITELISTED) {
-            const messageBuffer = normalizeBuffer(message.transactionPayload);
-            if (!messageBuffer) {
-                const peer = b4a.toString(connection.remotePublicKey, 'hex');
-                throw new Error(`Invalid operation message from peer ${peer}`);
-            }
-            this.handleIncomingEvent(messageBuffer)
+        const normalizedPartialRoleAccessPayload = this.#normalizePartialRoleAccess(message)
+        const isValid = await this.partialRoleAccessValidator.validate(normalizedPartialRoleAccessPayload)
+        let completePayload =  null
+        if (!isValid) {
+            throw new Error("OperationHandler: partial role access payload validation failed.");
         }
+
+        switch (normalizedPartialRoleAccessPayload.type) {
+            case OperationType.ADD_WRITER:
+                 completePayload = await  CompleteStateMessageOperations.assembleAddWriterMessage(
+                    this.wallet,
+                    normalizedPartialRoleAccessPayload.address,
+                    normalizedPartialRoleAccessPayload.rao.tx,
+                    normalizedPartialRoleAccessPayload.rao.txv,
+                    normalizedPartialRoleAccessPayload.rao.iw,
+                    normalizedPartialRoleAccessPayload.rao.in,
+                    normalizedPartialRoleAccessPayload.rao.is,
+                );
+                break;
+            case OperationType.REMOVE_WRITER:
+                completePayload = await  CompleteStateMessageOperations.assembleRemoveWriterMessage(
+                    this.wallet,
+                    normalizedPartialRoleAccessPayload.address,
+                    normalizedPartialRoleAccessPayload.rao.tx,
+                    normalizedPartialRoleAccessPayload.rao.txv,
+                    normalizedPartialRoleAccessPayload.rao.iw,
+                    normalizedPartialRoleAccessPayload.rao.in,
+                    normalizedPartialRoleAccessPayload.rao.is,
+                );
+                break;
+            default:
+                throw new Error("OperationHandler: Assembling complete role access operation failed due to unsupported operation type.");
+        }
+
+        if (!completePayload) {
+            throw new Error("OperationHandler: Assembling complete role access operation failed.");
+        }
+
+        this.network.poolService.addTransaction(completePayload)
+    }
+
+    #normalizePartialRoleAccess(payload) {
+        if (!payload || typeof payload !== 'object' || !payload.rao) {
+            throw new Error('Invalid payload for bootstrap deployment normalization.');
+        }
+        const {type, address, rao} = payload;
+        if (
+            !type ||
+            !address ||
+            !rao.tx || !rao.txv || !rao.iw || !rao.in || !rao.is
+        ) {
+            throw new Error('Missing required fields in bootstrap deployment payload.');
+        }
+
+        const normalizeHex = field => (typeof field === 'string' ? b4a.from(field, 'hex') : field);
+        const normalizedRao = {
+            tx: normalizeHex(rao.tx),
+            txv: normalizeHex(rao.txv),
+            iw: normalizeHex(rao.iw),
+            in: normalizeHex(rao.in),
+            is: normalizeHex(rao.is)
+        };
+
+        return {
+            type,
+            address: addressToBuffer(address),
+            rao: normalizedRao
+        };
     }
 }
 
