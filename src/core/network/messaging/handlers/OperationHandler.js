@@ -1,4 +1,4 @@
-import { normalizeBuffer } from "../../../../utils/buffer.js";
+import {normalizeBuffer} from "../../../../utils/buffer.js";
 import {NETWORK_MESSAGE_TYPES, OperationType} from '../../../../utils/constants.js';
 import b4a from 'b4a';
 import PartialRoleAccess from "../validators/PartialRoleAccess.js";
@@ -35,14 +35,14 @@ class OperationHandler {
     async handle(message, connection) {
         const normalizedPartialRoleAccessPayload = this.#normalizePartialRoleAccess(message)
         const isValid = await this.partialRoleAccessValidator.validate(normalizedPartialRoleAccessPayload)
-        let completePayload =  null
+        let completePayload = null
         if (!isValid) {
             throw new Error("OperationHandler: partial role access payload validation failed.");
         }
 
         switch (normalizedPartialRoleAccessPayload.type) {
             case OperationType.ADD_WRITER:
-                 completePayload = await  CompleteStateMessageOperations.assembleAddWriterMessage(
+                completePayload = await CompleteStateMessageOperations.assembleAddWriterMessage(
                     this.wallet,
                     normalizedPartialRoleAccessPayload.address,
                     normalizedPartialRoleAccessPayload.rao.tx,
@@ -53,7 +53,7 @@ class OperationHandler {
                 );
                 break;
             case OperationType.REMOVE_WRITER:
-                completePayload = await  CompleteStateMessageOperations.assembleRemoveWriterMessage(
+                completePayload = await CompleteStateMessageOperations.assembleRemoveWriterMessage(
                     this.wallet,
                     normalizedPartialRoleAccessPayload.address,
                     normalizedPartialRoleAccessPayload.rao.tx,
@@ -62,6 +62,18 @@ class OperationHandler {
                     normalizedPartialRoleAccessPayload.rao.in,
                     normalizedPartialRoleAccessPayload.rao.is,
                 );
+                break;
+            case OperationType.ADMIN_RECOVERY:
+                completePayload = await CompleteStateMessageOperations.assembleAdminRecoveryMessage(
+                    this.wallet,
+                    normalizedPartialRoleAccessPayload.address,
+                    normalizedPartialRoleAccessPayload.rao.tx,
+                    normalizedPartialRoleAccessPayload.rao.txv,
+                    normalizedPartialRoleAccessPayload.rao.iw,
+                    normalizedPartialRoleAccessPayload.rao.in,
+                    normalizedPartialRoleAccessPayload.rao.is,
+                );
+                console.log("Assembled complete role access operation:", completePayload);
                 break;
             default:
                 throw new Error("OperationHandler: Assembling complete role access operation failed due to unsupported operation type.");

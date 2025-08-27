@@ -45,7 +45,7 @@ class NetworkMessageRouter {
 
             }
             // TODO: TEMPORARY SOLUTION, WE SHOULD CHANGE PRE_TX AND POST_TX TO TX WHICH IS PARTIAL AND COMPLETE
-            else if (this.#isPartialTransaction(incomingMessage) || incomingMessage.op === OperationType.PRE_TX) {
+            else if (this.#isPartialTransaction(incomingMessage)) {
                 await this.#handlers.transaction.handle(incomingMessage, connection);
                 this.network.swarm.leavePeer(connection.remotePublicKey);
             }
@@ -71,15 +71,8 @@ class NetworkMessageRouter {
         return [OperationType.ADMIN_RECOVERY, OperationType.ADD_WRITER, OperationType.REMOVE_WRITER].includes(message.type);
     }
 
-    #isPartialTransaction(msg) {
-        if (!msg || typeof msg !== 'object') return false;
-        if (msg.type === OperationType.BOOTSTRAP_DEPLOYMENT && msg.bdo ) {
-            return true
-        }
-        if (msg.type === OperationType.PRE_TX) {
-            return true
-        }
-        return false;
+    #isPartialTransaction(message) {
+        return [OperationType.BOOTSTRAP_DEPLOYMENT, OperationType.TX].includes(message.type);
     }
 }
 

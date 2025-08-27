@@ -134,12 +134,12 @@ class PartialStateMessageBuilder extends StateBuilder {
             case OperationType.ADD_WRITER:
             case OperationType.REMOVE_WRITER:
             case OperationType.ADMIN_RECOVERY:
-                console.log('address:', this.#address);
-                console.log('addressBuffer:', addressToBuffer(this.#address));
-                console.log('txValidity:', this.#txValidity);
-                console.log('writingKey:', this.#writingKey);
-                console.log('nonce:', nonce.toString('hex'));
-                console.log('operationType:', this.#operationType);
+                // console.log('address:', this.#address);
+                // console.log('addressBuffer:', addressToBuffer(this.#address));
+                // console.log('txValidity:', this.#txValidity);
+                // console.log('writingKey:', this.#writingKey);
+                // console.log('nonce:', nonce.toString('hex'));
+                // console.log('operationType:', this.#operationType);
                 txMsg = createMessage(
                     addressToBuffer(this.#address),
                     b4a.from(this.#txValidity, 'hex'),
