@@ -109,10 +109,12 @@ class TransactionHandler {
         if (!isValid) {
             throw new Error("TransactionHandler: bootstrap deployment validation failed.");
         }
+
         const completeBootstrapDeploymentOperation = await CompleteStateMessageOperations.assembleCompleteBootstrapDeployment(
             this.#wallet,
             normalizedPayload.address,
             normalizedPayload.bdo.tx,
+            normalizedPayload.bdo.txv,
             normalizedPayload.bdo.bs,
             normalizedPayload.bdo.in,
             normalizedPayload.bdo.is,
