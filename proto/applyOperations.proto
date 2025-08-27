@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package apply.operations;
 
+//DO NOT CHANGE THE ORDER AFTER RELEASE - ONLY APPEND NEW ONES
 enum OperationType {
     UNKNOWN              = 0;
     ADD_ADMIN            = 1; // complete

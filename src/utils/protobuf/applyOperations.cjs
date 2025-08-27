@@ -11,6 +11,7 @@ var encodings = require('protocol-buffers-encodings')
 var varint = encodings.varint
 var skip = encodings.skip
 
+//DO NOT CHANGE THE ORDER AFTER RELEASE - ONLY APPEND NEW ONES
 exports.OperationType = {
   "UNKNOWN": 0,
   "ADD_ADMIN": 1,
