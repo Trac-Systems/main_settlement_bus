@@ -8,6 +8,7 @@ import {TRAC_ADDRESS_SIZE} from "trac-wallet/constants.js";
 import {isHexString} from "../../utils/helpers.js";
 import {blake3Hash} from "../../utils/crypto.js";
 import {createMessage} from "../../utils/buffer.js";
+import { isTransaction, isRoleAccess, isBootstrapDeployment } from "../../utils/operations.js";
 
 class PartialStateMessageBuilder extends StateBuilder {
     #wallet;
@@ -164,7 +165,7 @@ class PartialStateMessageBuilder extends StateBuilder {
         signature = this.#wallet.sign(tx);
 
         // Build the payload based on operation type
-        if (this.#isBootstrapDeployment(this.#operationType)) {
+        if (isBootstrapDeployment(this.#operationType)) {
             this.#payload.bdo = {
                 tx: tx.toString('hex'),
                 txv: this.#txValidity,
@@ -172,7 +173,7 @@ class PartialStateMessageBuilder extends StateBuilder {
                 in: nonce.toString('hex'),
                 is: signature.toString('hex')
             };
-        } else if (this.#isRoleAccessOperation(this.#operationType)) {
+        } else if (isRoleAccess(this.#operationType)) {
             this.#payload.rao = {
                 tx: tx.toString('hex'),
                 txv: this.#txValidity,
@@ -180,7 +181,7 @@ class PartialStateMessageBuilder extends StateBuilder {
                 in: nonce.toString('hex'),
                 is: signature.toString('hex')
             };
-        } else if (this.#isTransactionOperation(this.#operationType)) {
+        } else if (isTransaction(this.#operationType)) {
             this.#payload.txo = {
                 tx: tx.toString('hex'),
                 txv: this.#txValidity,
@@ -194,26 +195,6 @@ class PartialStateMessageBuilder extends StateBuilder {
         }
 
         return this;
-    }
-
-    #isBootstrapDeployment(type) {
-        return [
-            OperationType.BOOTSTRAP_DEPLOYMENT
-        ].includes(type);
-    }
-
-    #isRoleAccessOperation(type) {
-        return [
-            OperationType.ADD_WRITER,
-            OperationType.REMOVE_WRITER,
-            OperationType.ADMIN_RECOVERY,
-        ].includes(type);
-    }
-
-    #isTransactionOperation(type) {
-        return [
-            OperationType.TX,
-        ].includes(type);
     }
 
     getPayload() {

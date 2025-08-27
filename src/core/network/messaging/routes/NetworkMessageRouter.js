@@ -6,6 +6,7 @@ import OperationHandler from "../handlers/OperationHandler.js";
 import SubnetworkOperationHandler from "../handlers/SubnetworkOperationHandler.js";
 import {NETWORK_MESSAGE_TYPES, OperationType} from '../../../../utils/constants.js';
 import WhitelistedEventHandler from "../handlers/WhitelistedEventHandler.js";
+import * as operation from '../../../../utils/operations.js';
 
 class NetworkMessageRouter {
     #network;
@@ -75,11 +76,11 @@ class NetworkMessageRouter {
     }
 
     #isRoleAccessOperation(message) {
-        return [OperationType.ADMIN_RECOVERY, OperationType.ADD_WRITER, OperationType.REMOVE_WRITER].includes(message.type);
+        return operation.isRoleAccess(message.type)
     }
 
     #isSubnetworkOperation(message) {
-        return [OperationType.BOOTSTRAP_DEPLOYMENT, OperationType.TX].includes(message.type);
+        return operation.isTransaction(message.type) || operation.isBootstrapDeployment(message.type)
     }
 }
 
