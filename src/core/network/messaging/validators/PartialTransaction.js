@@ -1,13 +1,12 @@
 import b4a from 'b4a';
 import Wallet from 'trac-wallet';
-import { generateTx } from '../../../../utils/transactionUtils.js';
+
 import Check from '../../../../utils/check.js';
 import {safeDecodeApplyOperation} from "../../../../utils/protobuf/operationHelpers.js";
-import {addressToBuffer, bufferToAddress} from "../../../state/utils/address.js";
+import {bufferToAddress} from "../../../state/utils/address.js";
 import {createMessage} from "../../../../utils/buffer.js";
 import {OperationType} from "../../../../utils/constants.js";
 import {blake3Hash} from "../../../../utils/crypto.js";
-// TODO: add check for txvalidity
 class PartialTransaction {
     #state;
     #wallet;
@@ -41,6 +40,7 @@ class PartialTransaction {
         if (!await this.#validateIfMsbBootstrapIsValid(payload)) return false;
         if (!await this.#validateIfExternalBootstrapHasBeenDeployed(payload)) return false;
         if (!await this.#validateIfExternalBoostrapIsMsbBootstrap(payload)) return false;
+        if (!await this.#validateTransactionValidity(payload)) return false;
 
         return true;
     }
@@ -77,7 +77,7 @@ class PartialTransaction {
             payload.txo.in,
             payload.txo.bs,
             payload.txo.mbs,
-            OperationType.BOOTSTRAP_DEPLOYMENT
+            OperationType.TX
         );
 
         const regeneratedTx = await blake3Hash(message);
@@ -138,11 +138,21 @@ class PartialTransaction {
         const decodedBootstrapDeployment = safeDecodeApplyOperation(getBootstrapTransactionTxPayload)
 
         // probably not possible case, however are going to cover it just in case.
-        if (decodedBootstrapDeployment.bdo.bs.toString('hex') !== payload.txo.bs) {
+        if (!b4a.equals(decodedBootstrapDeployment.bdo.bs, payload.txo.bs)) {
             console.error('External bootstrap does not match the one in the transaction payload:', decodedBootstrapDeployment.bdo.bs.toString('hex'), payload.txo.bs);
             return false;
         }
 
+        return true;
+    }
+
+    async #validateTransactionValidity(payload) {
+        const currentTxv = await this.state.getIndexerSequenceState()
+        const incomingTxv = payload.txo.txv
+        if (!b4a.equals(currentTxv, incomingTxv)) {
+            console.error(`Transaction validity: ${incomingTxv.toString('hex')} does not match the current indexer sequence state: ${currentTxv.toString('hex')}`);
+            return false;
+        }
         return true;
     }
 }
