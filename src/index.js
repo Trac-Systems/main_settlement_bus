@@ -598,10 +598,9 @@ export class MainSettlementBus extends ReadyResource {
             );
         }
 
-        const indexersEntry = await this.#state.getIndexersEntry();
-        const indexerListHasAddress = await this.#state.isAddressInIndexersEntry(
-            address,
-            indexersEntry
+        const indexerNodeEntry = await this.#state.getNodeEntry(address);
+        const indexerListHasAddress = await this.#state.isWkInIndexersEntry(
+            indexerNodeEntry.wk,
         );
 
         if (toAdd) {
