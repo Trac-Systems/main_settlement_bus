@@ -139,6 +139,12 @@ class PartialRoleAccess {
                 return false;
             }
 
+            const isAlreadyIndexer = nodeEntry.isIndexer;
+            if (isAlreadyIndexer) {
+                console.error(`Node with address ${nodeAddress} is an indexer.`);
+                return false;
+            }
+
             return true;
         } else if (type === OperationType.ADMIN_RECOVERY) {
             const adminEntry = await this.state.getAdminEntry();
