@@ -3,7 +3,7 @@ import b4a from "b4a";
 import GetRequestHandler from "../handlers/GetRequestHandler.js";
 import ResponseHandler from "../handlers/ResponseHandler.js";
 import OperationHandler from "../handlers/OperationHandler.js";
-import TransactionHandler from "../handlers/TransactionHandler.js";
+import SubnetworkOperationHandler from "../handlers/SubnetworkOperationHandler.js";
 import {NETWORK_MESSAGE_TYPES, OperationType} from '../../../../utils/constants.js';
 
 class NetworkMessageRouter {
@@ -15,8 +15,8 @@ class NetworkMessageRouter {
         this.#handlers = {
             get: new GetRequestHandler(wallet, state),
             response: new ResponseHandler(network, state, wallet),
-            operation: new OperationHandler(handleIncomingEvent, state, wallet, network),
-            transaction: new TransactionHandler(network, state, wallet, options)
+            roleAccessOperation: new OperationHandler(handleIncomingEvent, state, wallet, network),
+            subnetworkTransaction: new SubnetworkOperationHandler(network, state, wallet, options)
         }
     }
 
@@ -43,7 +43,7 @@ class NetworkMessageRouter {
                 this.network.swarm.leavePeer(connection.remotePublicKey);
 
             }
-            else if (this.#isPartialTransaction(incomingMessage)) {
+            else if (this.#isSubnetworkOperation(incomingMessage)) {
                 await this.#handlers.transaction.handle(incomingMessage, connection);
                 this.network.swarm.leavePeer(connection.remotePublicKey);
             }
@@ -69,7 +69,7 @@ class NetworkMessageRouter {
         return [OperationType.ADMIN_RECOVERY, OperationType.ADD_WRITER, OperationType.REMOVE_WRITER].includes(message.type);
     }
 
-    #isPartialTransaction(message) {
+    #isSubnetworkOperation(message) {
         return [OperationType.BOOTSTRAP_DEPLOYMENT, OperationType.TX].includes(message.type);
     }
 }

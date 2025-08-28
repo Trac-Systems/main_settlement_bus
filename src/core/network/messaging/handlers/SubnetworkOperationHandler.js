@@ -16,7 +16,7 @@ import {normalizeHex} from "../../../../utils/helpers.js";
  * MUST BE REFUSED.
  * TODO: WE SHOULD AUDIT VALIDATORS AND MAKE SURE THEY ARE NOT BROADCASTING TRASH TO THE INDEXER LAYER.
  */
-class TransactionHandler {
+class SubnetworkOperationHandler {
     #disable_rate_limit;
     #network;
     #state;
@@ -185,4 +185,5 @@ class TransactionHandler {
     }
 }
 
-export default TransactionHandler;
+export default SubnetworkOperationHandler;
+
