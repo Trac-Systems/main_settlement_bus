@@ -1,5 +1,6 @@
 import {  TRAC_ADDRESS_SIZE } from 'trac-wallet/constants.js';
 import b4a from "b4a";
+import {bufferToAddress} from "../core/state/utils/address.js";
 
 export function isHexString(string) {
     return typeof string === 'string' && string.length > 1 && /^[0-9a-fA-F]+$/.test(string) && string.length % 2 === 0;
@@ -60,5 +61,19 @@ export function formatIndexersEntry(indexersEntry) {
     return {
         count,
         addresses: indexers
+    };
+}
+
+export function convertAdminCoreOperationPayloadToHex(payload) {
+    return {
+        ...payload,
+        address: bufferToAddress(payload.address),
+        aco: {
+            tx: payload.aco.tx.toString('hex'),
+            txv: payload.aco.txv.toString('hex'),
+            in: payload.aco.in.toString('hex'),
+            ia: payload.aco.ia.toString('hex'),
+            is: payload.aco.is.toString('hex'),
+        },
     };
 }

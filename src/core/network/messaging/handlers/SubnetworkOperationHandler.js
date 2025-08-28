@@ -57,9 +57,10 @@ class SubnetworkOperationHandler {
     }
 
     async handle(payload, connection) {
-        if (this.state.isIndexer() || !this.state.isWritable()) {
-            throw new Error('TransactionHandler: State is not writable or is an indexer.');
-        }
+        // temporarly turned off
+        // if (this.state.isIndexer() || !this.state.isWritable()) {
+        //     throw new Error('TransactionHandler: State is not writable or is an indexer.');
+        // }
 
         if (this.network.poolService.tx_pool.length >= TRANSACTION_POOL_SIZE) {
             throw new Error("TransactionHandler: Transaction pool is full, ignoring incoming transaction.");

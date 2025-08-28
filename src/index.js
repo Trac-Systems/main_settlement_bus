@@ -6,7 +6,7 @@ import b4a from "b4a";
 import readline from "readline";
 import tty from "tty";
 
-import {sleep, formatIndexersEntry, isHexString} from "./utils/helpers.js";
+import {sleep, formatIndexersEntry, isHexString, convertAdminCoreOperationPayloadToHex} from "./utils/helpers.js";
 import {verifyDag, printHelp, printWalletInfo, get_tx_info} from "./utils/cli.js";
 import CompleteStateMessageOperations from "./messages/completeStateMessages/CompleteStateMessageOperations.js";
 import {safeDecodeApplyOperation} from "./utils/protobuf/operationHelpers.js";
@@ -44,6 +44,7 @@ export class MainSettlementBus extends ReadyResource {
     #readline_instance;
     #enable_validator_observer;
     #enable_role_requester;
+    #enable_auto_transaction_consent
     #state;
     #isClosing = false;
 
@@ -63,11 +64,15 @@ export class MainSettlementBus extends ReadyResource {
         this.#enable_role_requester =
             options.enable_role_requester !== undefined
                 ? options.enable_role_requester
-                : true;
+                : false;
         this.#enable_validator_observer =
             options.enable_validator_observer !== undefined
                 ? options.enable_validator_observer
                 : true;
+        this.#enable_auto_transaction_consent =
+            options.enable_auto_transaction_consent !== undefined
+                ? options.enable_auto_transaction_consent
+                : false;
         this.#bootstrap = options.bootstrap
             ? b4a.from(options.bootstrap, "hex")
             : null;
@@ -480,14 +485,13 @@ export class MainSettlementBus extends ReadyResource {
                 continue;
             }
 
-            const whitelistedMessage = {
-                op: "whitelisted",
-                transactionPayload: encodedPayload,
-            };
             await this.#state.append(encodedPayload);
             // timesleep and validate if it becomes whitelisted
             // if node is not active we should not wait to long...
-            await this.#network.sendMessageToNode(correspondingPublicKey, whitelistedMessage)
+            await this.#network.sendMessageToNode(
+                correspondingPublicKey,
+                convertAdminCoreOperationPayloadToHex(safeDecodeApplyOperation(encodedPayload))
+            )
             await sleep(WHITELIST_SLEEP_INTERVAL);
             console.log(
                 `Whitelist message processed (${processedCount}/${totalElements})`

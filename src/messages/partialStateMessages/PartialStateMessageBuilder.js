@@ -147,7 +147,6 @@ class PartialStateMessageBuilder extends StateBuilder {
                     nonce,
                     this.#operationType
                 );
-                console.log('Generated txMsg:', txMsg.toString('hex'));
                 break;
 
             case OperationType.TX:

@@ -86,11 +86,4 @@ export const NETWORK_MESSAGE_TYPES = Object.freeze({
         ADMIN: 'adminResponse',
         NODE: 'nodeResponse'
     },
-
-    OPERATION: {
-        ADD_WRITER: 'addWriter',
-        REMOVE_WRITER: 'removeWriter',
-        ADD_ADMIN: 'addAdmin',
-        WHITELISTED: 'whitelisted'
-    }
 });

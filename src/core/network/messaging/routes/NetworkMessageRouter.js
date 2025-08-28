@@ -5,19 +5,22 @@ import ResponseHandler from "../handlers/ResponseHandler.js";
 import OperationHandler from "../handlers/OperationHandler.js";
 import SubnetworkOperationHandler from "../handlers/SubnetworkOperationHandler.js";
 import {NETWORK_MESSAGE_TYPES, OperationType} from '../../../../utils/constants.js';
+import WhitelistedEventHandler from "../handlers/WhitelistedEventHandler.js";
 
 class NetworkMessageRouter {
     #network;
     #handlers;
-
+    #options;
     constructor(network, state, wallet, handleIncomingEvent, options = {}) {
         this.#network = network;
         this.#handlers = {
             get: new GetRequestHandler(wallet, state),
             response: new ResponseHandler(network, state, wallet),
             roleAccessOperation: new OperationHandler(handleIncomingEvent, state, wallet, network),
-            subnetworkTransaction: new SubnetworkOperationHandler(network, state, wallet, options)
+            subNetworkTransaction: new SubnetworkOperationHandler(network, state, wallet, options),
+            whitelistedEvent: new WhitelistedEventHandler(network, state, wallet, options)
         }
+        this.#options = options;
     }
 
     get network() {
@@ -31,7 +34,6 @@ class NetworkMessageRouter {
             if (this.#isGetRequest(incomingMessage)) {
                 await this.#handlers.get.handle(incomingMessage, messageProtomux, connection, channelString);
                 this.network.swarm.leavePeer(connection.remotePublicKey);
-
             }
             else if (this.#isResponse(incomingMessage)) {
                 await this.#handlers.response.handle(incomingMessage, connection, channelString);
@@ -39,12 +41,17 @@ class NetworkMessageRouter {
 
             }
             else if (this.#isRoleAccessOperation(incomingMessage)) {
-                await this.#handlers.operation.handle(incomingMessage, connection);
+                await this.#handlers.roleAccessOperation.handle(incomingMessage, connection);
                 this.network.swarm.leavePeer(connection.remotePublicKey);
 
             }
             else if (this.#isSubnetworkOperation(incomingMessage)) {
-                await this.#handlers.transaction.handle(incomingMessage, connection);
+                await this.#handlers.subNetworkTransaction.handle(incomingMessage, connection);
+                this.network.swarm.leavePeer(connection.remotePublicKey);
+            }
+            else if (incomingMessage.type === OperationType.APPEND_WHITELIST
+                && this.#options.enable_auto_transaction_consent === true) {
+                    await this.#handlers.whitelistedEvent.handle(incomingMessage, connection);
                 this.network.swarm.leavePeer(connection.remotePublicKey);
             }
             else {
