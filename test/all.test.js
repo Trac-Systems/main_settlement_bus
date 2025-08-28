@@ -8,7 +8,7 @@ async function runTests() {
   await import('./state/stateTests.test.js');
   await import('./check/check.test.js');
   await import('./protobuf/protobuf.test.js');
-  // await import('./functions/functions.test.js');
+  await import('./functions/functions.test.js');
   await import('./fileUtils/readPublicKeysFromFile.test.js');
   // await import('./messageOperations/stateMessageOperations.test.js');
     //
