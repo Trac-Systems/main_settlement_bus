@@ -610,7 +610,9 @@ class State extends ReadyResource {
         const isNodeWriter = nodeEntryUtils.isWriter(nodeEntry);
         const isNodeIndexer = nodeEntryUtils.isIndexer(nodeEntry);
 
-        if (isNodeWriter && !isNodeIndexer) {
+        if (isNodeIndexer) return;
+
+        if (isNodeWriter) {
             // Decode the node entry and downgrade its role to WHITELISTED reader.
             const decodedNodeEntry = nodeEntryUtils.decode(nodeEntry);
             if (decodedNodeEntry === null) return;
@@ -622,29 +624,6 @@ class State extends ReadyResource {
             await batch.put(requesterAddressString, updatedNodeEntry);
             await batch.put(txHashHexString, node.value);
             console.log(`Writer removed: addr:wk:tx - ${requesterAddressString}:${op.rao.iw.toString('hex')}:${txHashHexString}`);
-
-        } else if (isNodeIndexer) {
-            // TODO: TO DISCUS WITH TEAM. NODE WHICH IS AN INDEXER SHOULD NOT BE ABLE TO REMOVE WRITER ROLE. IT CAN CAUSE A PROBLEM WITH CONSENSUS!
-            // Decode the node entry and update its role to WHITELISTED
-            const decodedNodeEntry = nodeEntryUtils.decode(nodeEntry);
-            if (decodedNodeEntry === null) return;
-
-            const updatedNodeEntry = nodeEntryUtils.setRole(nodeEntry, nodeRoleUtils.NodeRole.WHITELISTED);
-            if (updatedNodeEntry === null) return;
-
-            // Retrieve the indexers entry and remove the indexer
-            const indexersEntry = await this.#getEntryApply(EntryType.INDEXERS, batch);
-            if (null === indexersEntry) return;
-            const updatedIndexerEntry = indexerEntryUtils.remove(op.address, indexersEntry);
-            if (updatedIndexerEntry.length === 0) return;
-
-            // Remove the writer role and update the state
-            await base.removeWriter(decodedNodeEntry.wk);
-            await batch.put(requesterAddressString, updatedNodeEntry);
-            //
-            await batch.put(EntryType.INDEXERS, updatedIndexerEntry);
-            await batch.put(txHashHexString, node.value);
-            console.log(`Indexer removed through removeWriter addr:wk:tx - ${requesterAddressString}:${op.rao.iw.toString('hex')}:${txHashHexString}`);
         }
     }
 
