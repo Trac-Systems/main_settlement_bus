@@ -425,6 +425,12 @@ export class MainSettlementBus extends ReadyResource {
             throw new Error("Cannot remove writer role - node is an indexer");
         }
 
+        if (!this.#state.isWritable()) {
+            throw new Error(
+                "Cannot remove writer role - internal state is not writable"
+            );
+        }
+
         const txValidity = await this.#state.getIndexerSequenceState();
         const assembledMessage = await PartialStateMessageOperations.assembleRemoveWriterMessage(
             this.#wallet,
