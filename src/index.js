@@ -10,31 +10,25 @@ import {sleep, formatIndexersEntry, isHexString, convertAdminCoreOperationPayloa
 import {verifyDag, printHelp, printWalletInfo, get_tx_info} from "./utils/cli.js";
 import CompleteStateMessageOperations from "./messages/completeStateMessages/CompleteStateMessageOperations.js";
 import {safeDecodeApplyOperation} from "./utils/protobuf/operationHelpers.js";
-import {createMessage} from "./utils/buffer.js";
-import addressUtils, {bufferToAddress, isAddressValid} from "./core/state/utils/address.js";
+import {bufferToAddress, isAddressValid} from "./core/state/utils/address.js";
 import Network from "./core/network/Network.js";
 import Check from "./utils/check.js";
 import State from "./core/state/State.js";
 import PartialStateMessageOperations from "./messages/partialStateMessages/PartialStateMessageOperations.js";
 import {
-    OperationType,
     EventType,
     WHITELIST_SLEEP_INTERVAL,
     BOOTSTRAP_HEXSTRING_LENGTH,
 } from "./utils/constants.js";
-import {blake3Hash} from "./utils/crypto.js";
 import partialStateMessageOperations from "./messages/partialStateMessages/PartialStateMessageOperations.js";
 import {randomBytes} from "hypercore-crypto";
 
 //TODO create a MODULE which will separate logic responsible for role managment
 
 export class MainSettlementBus extends ReadyResource {
-    // Internal flag
-    #shouldListenToWriterEvents = false;
-
     // internal attributes
-    #STORES_DIRECTORY;
-    #KEY_PAIR_PATH;
+    #stores_directory;
+    #key_pair_path;
     #bootstrap;
     #channel;
     #store;
@@ -50,15 +44,8 @@ export class MainSettlementBus extends ReadyResource {
 
     constructor(options = {}) {
         super();
-        this.#initInternalAttributes(options);
-        this.check = new Check();
-        this.#state = new State(this.#store, this.bootstrap, this.#wallet, options);
-        this.#network = new Network(this.#state, this.#channel, options);
-    }
-
-    #initInternalAttributes(options) {
-        this.#STORES_DIRECTORY = options.stores_directory;
-        this.#KEY_PAIR_PATH = `${this.#STORES_DIRECTORY}${options.store_name}/db/keypair.json`;
+        this.#stores_directory = options.stores_directory;
+        this.#key_pair_path = `${this.#stores_directory}${options.store_name}/db/keypair.json`;
         this.#enable_wallet = options.enable_wallet !== false;
         this.enable_interactive_mode = options.enable_interactive_mode !== false;
         this.#enable_role_requester =
@@ -84,7 +71,7 @@ export class MainSettlementBus extends ReadyResource {
         }
 
         this.#channel = b4a.alloc(32).fill(options.channel);
-        this.#store = new Corestore(this.#STORES_DIRECTORY + options.store_name);
+        this.#store = new Corestore(this.#stores_directory + options.store_name);
         this.#wallet = new PeerWallet(options);
         this.#readline_instance = null;
 
@@ -97,14 +84,18 @@ export class MainSettlementBus extends ReadyResource {
             } catch (e) {
             }
         }
+
+        this.check = new Check();
+        this.#state = new State(this.#store, this.bootstrap, this.#wallet, options);
+        this.#network = new Network(this.#state, this.#channel, options);
     }
 
-    get STORES_DIRECTORY() {
-        return this.#STORES_DIRECTORY;
+    get stores_directory() {
+        return this.#stores_directory;
     }
 
-    get KEY_PAIR_PATH() {
-        return this.#KEY_PAIR_PATH;
+    get key_pair_path() {
+        return this.#key_pair_path;
     }
 
     get bootstrap() {
@@ -135,7 +126,7 @@ export class MainSettlementBus extends ReadyResource {
 
         if (this.#enable_wallet) {
             await this.#wallet.initKeyPair(
-                this.KEY_PAIR_PATH,
+                this.key_pair_path,
                 this.#readline_instance
             );
             printWalletInfo(this.#wallet.address, this.#state.writingKey);
@@ -145,7 +136,6 @@ export class MainSettlementBus extends ReadyResource {
             this.#state,
             this.#store,
             this.#wallet,
-            this.#handleIncomingEvent.bind(this)
         );
 
         //TODO: validator observer can't be awaited. In the future change logic to process events instead of loop?
@@ -154,15 +144,6 @@ export class MainSettlementBus extends ReadyResource {
         }
 
         const adminEntry = await this.#state.getAdminEntry();
-
-        if (this.#isAdmin(adminEntry)) {
-            this.#shouldListenToWriterEvents = true;
-            this.#writerEventListener(); // only for writers
-        } else if (this.#state.isWritable() && !this.#state.isIndexer()) {
-            this.#shouldListenToWriterEvents = true;
-            this.#writerEventListener(); // only for writers
-        }
-
         await this.#setUpRoleAutomatically(adminEntry);
 
         console.log(`isIndexer: ${this.#state.isIndexer()}`);
@@ -234,55 +215,6 @@ export class MainSettlementBus extends ReadyResource {
         return nodeEntry && nodeEntry.isWhitelisted && !this.#isAdmin(adminEntry);
     }
 
-    async #handleIncomingEvent(bufferedRequest) {
-        try {
-            const decodedRequest = safeDecodeApplyOperation(bufferedRequest);
-            if (decodedRequest.type) {
-                if ([OperationType.ADD_WRITER, OperationType.REMOVE_WRITER, OperationType.ADMIN_RECOVERY].includes(decodedRequest.type)) {
-                    this.emit(EventType.WRITER_EVENT, decodedRequest, bufferedRequest);
-                } else if (decodedRequest.type === OperationType.WHITELISTED) {
-                    //TODO: We should create separated listener for whitelisted operation which only be working if wallet is enabled and node is not a writer.
-                    // also this listener should be turned off when node become writable. But for now it is ok.
-                    const adminEntry = await this.#state.getAdminEntry();
-                    if (!adminEntry || this.#enable_wallet === false) return;
-                    const adminPublicKey = PeerWallet.decodeBech32m(adminEntry.address);
-                    const reconstructedMessage = createMessage(
-                        decodedRequest.address,
-                        decodedRequest.bko.nonce,
-                        OperationType.WHITELISTED
-                    );
-                    const hash = await blake3Hash(reconstructedMessage);
-                    const isWhitelisted = await this.#state.isAddressWhitelisted(
-                        this.#wallet.address
-                    );
-                    const isMessageVerifed = this.#wallet.verify(
-                        decodedRequest.bko.sig,
-                        hash,
-                        adminPublicKey
-                    );
-                    const nodeAddress = addressUtils.bufferToAddress(
-                        decodedRequest.address
-                    );
-                    const isKeyMatchingWalletAddress =
-                        nodeAddress === this.#wallet.address;
-
-                    if (
-                        !isMessageVerifed ||
-                        !isKeyMatchingWalletAddress ||
-                        !isWhitelisted ||
-                        this.#state.isWritable()
-                    ) {
-                        console.error("Conditions not met for whitelisted operation");
-                        return;
-                    }
-                    await this.#handleAddWriterOperation();
-                }
-            }
-        } catch (error) {
-            console.error("Handle incoming event:", error);
-        }
-    }
-
     async #pickWriter() {
         const length = await this.#state.getWriterLength()
         for (let i = 0; i < length; i++) {
@@ -297,31 +229,8 @@ export class MainSettlementBus extends ReadyResource {
         }
     }
 
-    async #writerEventListener() {
-        this.on(EventType.WRITER_EVENT, async (parsedRequest, bufferedRequest) => {
-            try {
-                if (this.#enable_wallet === false) return;
-                const isEventMessageVerifed = await CompleteStateMessageOperations.verifyEventMessage(
-                    parsedRequest,
-                    this.#wallet,
-                    this.check,
-                    this.#state
-                );
-
-                if (!isEventMessageVerifed) return;
-                //await this.#state.append(bufferedRequest);
-            } catch (error) {
-                console.error("WRITER_EVENT:", error.message);
-            }
-        });
-    }
-
     async #stateEventsListener() {
         this.#state.base.on(EventType.IS_INDEXER, () => {
-            if (this.#state.listenerCount(EventType.WRITER_EVENT) > 0) {
-                this.#state.removeAllListeners(EventType.WRITER_EVENT);
-            }
-            this.#shouldListenToWriterEvents = false;
             console.log("Current node is an indexer");
         });
 
@@ -329,38 +238,11 @@ export class MainSettlementBus extends ReadyResource {
             // Prevent further actions if closing is in progress
             // The reason is that getNodeEntry is async and may cause issues if we will access state after closing
             if (this.#isClosing) return;
-
-            // downgrate from indexer to non-indexer makes that node is writable
-            const updatedNodeEntry = await this.#state.getNodeEntry(
-                this.#wallet.address
-            );
-            const canEnableWriterEvents =
-                updatedNodeEntry &&
-                b4a.equals(updatedNodeEntry.wk, this.#state.writingKey) &&
-                !this.#shouldListenToWriterEvents;
-
-            if (canEnableWriterEvents) {
-                this.#shouldListenToWriterEvents = true;
-                this.#writerEventListener();
-                console.log("Current node is writable");
-            }
             console.log("Current node is not an indexer anymore");
         });
 
         this.#state.base.on(EventType.WRITABLE, async () => {
-            const updatedNodeEntry = await this.#state.getNodeEntry(
-                this.#wallet.address
-            );
-            const canEnableWriterEvents =
-                updatedNodeEntry &&
-                b4a.equals(updatedNodeEntry.wk, this.#state.writingKey) &&
-                !this.#shouldListenToWriterEvents;
-
-            if (canEnableWriterEvents) {
-                this.#shouldListenToWriterEvents = true;
-                this.#writerEventListener();
-                console.log("Current node is writable");
-            }
+            console.log("Current node is writable");
         });
 
         this.#state.base.on(EventType.UNWRITABLE, async () => {
@@ -368,19 +250,7 @@ export class MainSettlementBus extends ReadyResource {
                 console.log("Current node is unwritable");
                 return;
             }
-            const updatedNodeEntry = await this.#state.getNodeEntry(
-                this.#wallet.address
-            );
-            const canDisableWriterEvents =
-                updatedNodeEntry &&
-                !updatedNodeEntry.isWriter &&
-                this.#shouldListenToWriterEvents;
-
-            if (canDisableWriterEvents) {
-                this.removeAllListeners(EventType.WRITER_EVENT);
-                this.#shouldListenToWriterEvents = false;
-                console.log("Current node is unwritable");
-            }
+            console.log("Current node is unwritable");
         });
     }
 
@@ -832,7 +702,6 @@ export class MainSettlementBus extends ReadyResource {
                     this.#network,
                     this.#wallet,
                     this.#state.writingKey,
-                    this.#shouldListenToWriterEvents
                 );
                 break;
             case '/i':
@@ -840,7 +709,7 @@ export class MainSettlementBus extends ReadyResource {
                 break;
             case '/test':
                 const contentHash = randomBytes(32).toString('hex');
-                const randomExternalBootstrap = "ff604717e41e0ece6caf0be5efc1476ad81a684f7e5769584fce5f64cfb26fa3"
+                const randomExternalBootstrap = "5adb970a73e20e8e2e896cd0c30cf025a0b32ec6fe026b98c6714115239607ac"
                 const randomWk = randomBytes(32).toString('hex');
                 const txValidity = await this.#state.getIndexerSequenceState();
                 const msbBootstrap = this.bootstrap.toString('hex');

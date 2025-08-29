@@ -1,7 +1,7 @@
 import b4a from 'b4a';
 import {safeDecodeApplyOperation} from "./protobuf/operationHelpers.js";
 
-export async function verifyDag(state, network, wallet, writerKey, shouldListenToWriterEvents) {
+export async function verifyDag(state, network, wallet, writerKey) {
     try {
         console.log('---------- node & network stats ----------');
         const dagView = await state.base.view.core.treeHash();
@@ -36,7 +36,6 @@ export async function verifyDag(state, network, wallet, writerKey, shouldListenT
         console.log("---------- flags ----------");
         console.log(`isIndexer: ${state.isIndexer()}`);
         console.log(`isWriter: ${state.isWritable()}`);
-        console.log("shouldListenToWriterEvents: ", shouldListenToWriterEvents);
 
     } catch (error) {
         console.error('Error during DAG monitoring:', error.message);

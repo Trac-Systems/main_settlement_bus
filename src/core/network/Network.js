@@ -92,7 +92,6 @@ class Network extends ReadyResource {
         state,
         store,
         wallet,
-        handleIncomingEvent,
     ) {
         if (!this.#swarm) {
             const keyPair = await this.initializeNetworkingKeyPair(store, wallet);
@@ -106,7 +105,7 @@ class Network extends ReadyResource {
             });
 
             console.log(`Channel: ${b4a.toString(this.#channel)}`);
-            this.#networkMessages.initializeMessageRouter(state, wallet, handleIncomingEvent);
+            this.#networkMessages.initializeMessageRouter(state, wallet);
 
             this.#swarm.on('connection', async (connection) => {
                 const { message_channel, message } = this.#networkMessages.setupProtomuxMessages(connection);

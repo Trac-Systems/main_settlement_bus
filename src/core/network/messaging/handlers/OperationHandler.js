@@ -6,15 +6,13 @@ import CompleteStateMessageOperations
 import {normalizeHex} from "../../../../utils/helpers.js";
 
 class OperationHandler {
-    #handleIncomingEvent
     #partialRoleAccessValidator;
     #wallet;
     #network;
 
-    constructor(handleIncomingEvent, state, wallet, network) {
+    constructor(state, wallet, network) {
         this.#wallet = wallet;
         this.#network = network;
-        this.#handleIncomingEvent = handleIncomingEvent;
         this.#partialRoleAccessValidator = new PartialRoleAccess(state, wallet, network)
     }
 

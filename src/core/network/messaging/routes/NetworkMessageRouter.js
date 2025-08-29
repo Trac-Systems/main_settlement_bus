@@ -11,12 +11,12 @@ class NetworkMessageRouter {
     #network;
     #handlers;
     #options;
-    constructor(network, state, wallet, handleIncomingEvent, options = {}) {
+    constructor(network, state, wallet, options = {}) {
         this.#network = network;
         this.#handlers = {
             get: new GetRequestHandler(wallet, state),
             response: new ResponseHandler(network, state, wallet),
-            roleAccessOperation: new OperationHandler(handleIncomingEvent, state, wallet, network),
+            roleAccessOperation: new OperationHandler(state, wallet, network),
             subNetworkTransaction: new SubnetworkOperationHandler(network, state, wallet, options),
             whitelistedEvent: new WhitelistedEventHandler(network, state, wallet, options)
         }
