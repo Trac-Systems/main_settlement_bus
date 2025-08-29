@@ -57,10 +57,13 @@ class SubnetworkOperationHandler {
     }
 
     async handle(payload, connection) {
-        // temporarly turned off
-        // if (this.state.isIndexer() || !this.state.isWritable()) {
-        //     throw new Error('TransactionHandler: State is not writable or is an indexer.');
-        // }
+        // TODO: This check can be moved to a router layer after resolving role separation.
+        // Context: An admin node can be both a writer and an indexer simultaneously.
+        // While indexers primarily focus on the consensus layer, admin nodes should be allowed
+        // to handle certain operations until the network reaches a sufficient number of validators.
+        if (this.state.isIndexer() || !this.state.isWritable()) {
+            throw new Error('TransactionHandler: State is not writable or is an indexer.');
+        }
 
         if (this.network.poolService.tx_pool.length >= TRANSACTION_POOL_SIZE) {
             throw new Error("TransactionHandler: Transaction pool is full, ignoring incoming transaction.");
@@ -187,4 +190,3 @@ class SubnetworkOperationHandler {
 }
 
 export default SubnetworkOperationHandler;
-
