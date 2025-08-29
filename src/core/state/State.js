@@ -545,8 +545,8 @@ class State extends ReadyResource {
         if (updatedNodeEntry === null) return;
 
         // Add the writer role to the base and update the batch
-        await batch.put(requesterAddressString, updatedNodeEntry);
         await base.addWriter(op.rao.iw, { isIndexer: false });
+        await batch.put(requesterAddressString, updatedNodeEntry);
 
         await this.#updateWritersIndex(requesterAddressBuffer, batch);
 
