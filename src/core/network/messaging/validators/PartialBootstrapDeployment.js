@@ -101,7 +101,7 @@ class PartialBootstrapDeployment {
 
         const txString = payload.bdo.tx.toString('hex');
         if (null !== await this.state.getSigned(txString)) {
-            console.error(`Transaction with hash ${txString} already exists in the state. Possible replay attack detected.`);
+            console.error(`Transaction with hash ${txString} already exists in the state.`);
             return false;
         }
         return true;
