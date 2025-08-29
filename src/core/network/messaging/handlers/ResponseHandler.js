@@ -2,8 +2,8 @@ import { NETWORK_MESSAGE_TYPES } from '../../../../utils/constants.js';
 import ValidatorResponse from '../validators/ValidatorResponse.js';
 import AdminResponse from '../validators/AdminResponse.js';
 import CustomNodeResponse from '../validators/CustomNodeResponse.js';
-import Wallet from 'trac-wallet';
 import b4a from "b4a";
+import PeerWallet from "trac-wallet";
 
 class ResponseHandler {
     #network;
@@ -61,7 +61,7 @@ class ResponseHandler {
         const isValid = await this.responseValidator.validate(message, channelString);
         if (isValid) {
             const validatorAddressString = message.address;
-            const validatorPublicKey = Wallet.decodeBech32m(validatorAddressString);
+            const validatorPublicKey = PeerWallet.decodeBech32m(validatorAddressString);
 
 
             if (this.network.validator_stream !== null &&
@@ -82,7 +82,7 @@ class ResponseHandler {
         const isValid = await this.adminValidator.validate(message, channelString);
         if (isValid) {
             const adminEntry = await this.state.getAdminEntry();
-            const adminPublicKey = Wallet.decodeBech32m(adminEntry.address);
+            const adminPublicKey = PeerWallet.decodeBech32m(adminEntry.address);
 
             console.log('Admin stream established:', adminEntry.address);
             this.network.admin_stream = connection;
@@ -96,7 +96,7 @@ class ResponseHandler {
         const isValid = await this.customNodeValidator.validate(message, channelString);
         if (isValid) {
             const customNodeAddressString = message.address;
-            const customNodePublicKey = Wallet.decodeBech32m(customNodeAddressString);
+            const customNodePublicKey = PeerWallet.decodeBech32m(customNodeAddressString);
 
             console.log('Custom node stream established:', customNodeAddressString);
             this.network.custom_stream = connection;

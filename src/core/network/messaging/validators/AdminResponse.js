@@ -1,5 +1,6 @@
 import b4a from 'b4a';
-import Wallet from 'trac-wallet';
+import PeerWallet from "trac-wallet";
+
 import BaseResponse from './base/BaseResponse.js';
 
 class AdminResponse extends BaseResponse {
@@ -46,8 +47,8 @@ class AdminResponse extends BaseResponse {
             return false;
         }
 
-        const adminPublicKey = Wallet.decodeBech32m(adminEntry.address);
-        const receivedAdminPublicKey = Wallet.decodeBech32m(message.address);
+        const adminPublicKey = PeerWallet.decodeBech32m(adminEntry.address);
+        const receivedAdminPublicKey = PeerWallet.decodeBech32m(message.address);
         const adminWritingKey = b4a.from(message.wk, 'hex');
 
         if (!b4a.equals(adminPublicKey, receivedAdminPublicKey) || !b4a.equals(adminEntry.wk, adminWritingKey)) {

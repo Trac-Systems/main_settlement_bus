@@ -1,4 +1,4 @@
-import Wallet from "trac-wallet"
+import PeerWallet from "trac-wallet"
 import { TRAC_ADDRESS_SIZE } from 'trac-wallet/constants.js';
 import b4a from "b4a";
 
@@ -63,7 +63,7 @@ class ValidatorObserverService {
         const validatorAddress = bufferToAddress(validatorAddressBuffer);
         if (validatorAddress === address) return;
 
-        const validatorPubKey = Wallet.decodeBech32m(validatorAddress).toString('hex');
+        const validatorPubKey = PeerWallet.decodeBech32m(validatorAddress).toString('hex');
         const validatorEntry = await this.state.getNodeEntry(validatorAddress);
         const adminEntry = await this.state.getAdminEntry();
 

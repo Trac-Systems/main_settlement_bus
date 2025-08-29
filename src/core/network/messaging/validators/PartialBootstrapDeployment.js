@@ -1,11 +1,12 @@
 import b4a from 'b4a';
-import Wallet from 'trac-wallet';
+import PeerWallet from "trac-wallet";
 
 import Check from '../../../../utils/check.js';
 import {bufferToAddress} from "../../../state/utils/address.js";
 import {OperationType} from "../../../../utils/constants.js";
 import {blake3Hash} from "../../../../utils/crypto.js";
 import {createMessage} from "../../../../utils/buffer.js";
+
 
 class PartialBootstrapDeployment {
     #state;
@@ -54,7 +55,7 @@ class PartialBootstrapDeployment {
     }
 
     #validateRequestingPublicKey(payload) {
-        const incomingPublicKey = Wallet.decodeBech32mSafe(bufferToAddress(payload.address));
+        const incomingPublicKey = PeerWallet.decodeBech32mSafe(bufferToAddress(payload.address));
 
         if (incomingPublicKey === null) {
             console.error('Invalid requesting public key in bootstrap deployment payload.');
@@ -64,7 +65,7 @@ class PartialBootstrapDeployment {
     }
 
     async #validateSignature(payload) {
-        const incomingPublicKey = Wallet.decodeBech32mSafe(bufferToAddress(payload.address));
+        const incomingPublicKey = PeerWallet.decodeBech32mSafe(bufferToAddress(payload.address));
         const incomingSignature = payload.bdo.is;
 
         const incomingTx = payload.bdo.tx;
@@ -84,7 +85,7 @@ class PartialBootstrapDeployment {
             return false;
         }
 
-        const isSignatureValid = Wallet.verify(incomingSignature, regeneratedTx, incomingPublicKey);
+        const isSignatureValid = PeerWallet.verify(incomingSignature, regeneratedTx, incomingPublicKey);
         if (!isSignatureValid) {
             console.error('Invalid signature in PreTx payload.');
             return false;

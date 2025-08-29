@@ -1,5 +1,4 @@
 import b4a from 'b4a';
-import Wallet from 'trac-wallet';
 
 import StateBuilder from '../base/StateBuilder.js'
 import {createMessage} from '../../utils/buffer.js';
@@ -8,6 +7,7 @@ import {addressToBuffer, bufferToAddress} from '../../core/state/utils/address.j
 import {TRAC_ADDRESS_SIZE} from 'trac-wallet/constants.js';
 import {isAddressValid} from "../../core/state/utils/address.js";
 import {blake3Hash} from '../../utils/crypto.js';
+import PeerWallet from "trac-wallet";
 
 class CompleteStateMessageBuilder extends StateBuilder {
     #wallet;
@@ -174,7 +174,7 @@ class CompleteStateMessageBuilder extends StateBuilder {
             throw new Error('UNKNOWN is not allowed to construct');
         }
 
-        const nonce = Wallet.generateNonce();
+        const nonce = PeerWallet.generateNonce();
 
         let msg = null;
         let tx = null;

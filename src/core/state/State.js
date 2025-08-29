@@ -8,7 +8,7 @@ import {
     OperationType,
 } from '../../utils/constants.js';
 import {isHexString, sleep} from '../../utils/helpers.js';
-import Wallet from 'trac-wallet';
+import PeerWallet from "trac-wallet";
 import Check from '../../utils/check.js';
 import {safeDecodeApplyOperation} from '../../utils/protobuf/operationHelpers.js';
 import {createMessage, ZERO_WK} from '../../utils/buffer.js';
@@ -20,6 +20,7 @@ import indexerEntryUtils from './utils/indexerEntry.js';
 import lengthEntryUtils from './utils/lengthEntry.js';
 import transactionUtils from './utils/transaction.js';
 import {blake3Hash} from '../../utils/crypto.js';
+
 
 class State extends ReadyResource {
     //TODO: AFTER createMessage(..args) check if this function did not return NULL
@@ -231,7 +232,7 @@ class State extends ReadyResource {
         const adminAddressBuffer = op.address;
         const adminAddressString = addressUtils.bufferToAddress(adminAddressBuffer);
         if (adminAddressString === null) return;
-        const adminPublicKey = Wallet.decodeBech32mSafe(adminAddressString);
+        const adminPublicKey = PeerWallet.decodeBech32mSafe(adminAddressString);
         if (adminPublicKey === null) return;
 
         // Check if the operation is being performed by the bootstrap node - the original deployer of the Trac Network
@@ -292,7 +293,7 @@ class State extends ReadyResource {
         const requesterAdminAddressBuffer = op.address;
         const requesterAdminAddressString = addressUtils.bufferToAddress(requesterAdminAddressBuffer);
         if (requesterAdminAddressString === null) return;
-        const requesterAdminPublicKey = Wallet.decodeBech32mSafe(requesterAdminAddressString);
+        const requesterAdminPublicKey = PeerWallet.decodeBech32mSafe(requesterAdminAddressString);
         if (requesterAdminPublicKey === null) return;
 
         // recreate requester message
@@ -318,7 +319,7 @@ class State extends ReadyResource {
         const validatorAddress = op.rao.va;
         const validatorAddressString = addressUtils.bufferToAddress(validatorAddress);
         if (validatorAddressString === null) return;
-        const validatorPublicKey = Wallet.decodeBech32mSafe(validatorAddressString);
+        const validatorPublicKey = PeerWallet.decodeBech32mSafe(validatorAddressString);
         if (validatorPublicKey === null) return;
 
         // recreate validator message
@@ -349,7 +350,7 @@ class State extends ReadyResource {
         const decodedAdminEntry = adminEntryUtils.decode(adminEntry);
 
         if (null === decodedAdminEntry) return;
-        const publicKeyAdminEntry = Wallet.decodeBech32mSafe(decodedAdminEntry.address);
+        const publicKeyAdminEntry = PeerWallet.decodeBech32mSafe(decodedAdminEntry.address);
         if (!b4a.equals(requesterAdminPublicKey, publicKeyAdminEntry)) return;
 
         // Check if the admin and indexers entry is valid
@@ -390,14 +391,14 @@ class State extends ReadyResource {
 
         // Extract admin entry
         const adminAddress = decodedAdminEntry.address;
-        const adminPublicKey = Wallet.decodeBech32mSafe(adminAddress);
+        const adminPublicKey = PeerWallet.decodeBech32mSafe(adminAddress);
         if (adminPublicKey === null) return;
         // Extract and validate the network prefix from the node's address
         const nodeAddressBinnary = op.aco.ia;
 
         const nodeAddressString = addressUtils.bufferToAddress(nodeAddressBinnary);
         if (nodeAddressString === null) return;
-        const nodePublicKey = Wallet.decodeBech32mSafe(nodeAddressString);
+        const nodePublicKey = PeerWallet.decodeBech32mSafe(nodeAddressString);
         if (nodePublicKey === null) return;
 
 
@@ -468,7 +469,7 @@ class State extends ReadyResource {
         const requesterAddressBuffer = op.address;
         const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer);
         if (requesterAddressString === null) return;
-        const requesterPublicKey = Wallet.decodeBech32mSafe(requesterAddressString);
+        const requesterPublicKey = PeerWallet.decodeBech32mSafe(requesterAddressString);
         if (requesterPublicKey === null) return;
 
         if (b4a.equals(op.rao.iw, ZERO_WK)) return;
@@ -487,7 +488,7 @@ class State extends ReadyResource {
         const validatorAddress = op.rao.va;
         const validatorAddressString = addressUtils.bufferToAddress(validatorAddress);
         if (validatorAddressString === null) return;
-        const validatorPublicKey = Wallet.decodeBech32mSafe(validatorAddressString);
+        const validatorPublicKey = PeerWallet.decodeBech32mSafe(validatorAddressString);
         if (validatorPublicKey === null) return;
 
         const validatorMessage = createMessage(op.rao.tx, op.rao.va, op.rao.vn, OperationType.ADD_WRITER);
@@ -561,7 +562,7 @@ class State extends ReadyResource {
         const requesterAddress = op.address;
         const requesterAddressString = addressUtils.bufferToAddress(requesterAddress);
         if (requesterAddressString === null) return;
-        const requesterPublicKey = Wallet.decodeBech32mSafe(requesterAddressString);
+        const requesterPublicKey = PeerWallet.decodeBech32mSafe(requesterAddressString);
         if (requesterPublicKey === null) return;
 
         // verify requester signature
@@ -578,7 +579,7 @@ class State extends ReadyResource {
         const validatorAddress = op.rao.va;
         const validatorAddressString = addressUtils.bufferToAddress(validatorAddress);
         if (validatorAddressString === null) return;
-        const validatorPublicKey = Wallet.decodeBech32mSafe(validatorAddressString);
+        const validatorPublicKey = PeerWallet.decodeBech32mSafe(validatorAddressString);
         if (validatorPublicKey === null) return;
 
         const validatorMessage = createMessage(op.rao.tx, op.rao.va, op.rao.vn, OperationType.REMOVE_WRITER);
@@ -636,14 +637,14 @@ class State extends ReadyResource {
         const requesterAddressBuffer = op.address;
         const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer);
         if (requesterAddressString === null) return;
-        const requesterPublicKey = Wallet.decodeBech32mSafe(requesterAddressString);
+        const requesterPublicKey = PeerWallet.decodeBech32mSafe(requesterAddressString);
         if (requesterPublicKey === null) return;
 
         // Extract and validate pretending indexer address
         const pretendingAddressBuffer = op.aco.ia;
         const pretendingAddressString = addressUtils.bufferToAddress(pretendingAddressBuffer);
         if (pretendingAddressString === null) return;
-        const pretentingPublicKey = Wallet.decodeBech32mSafe(pretendingAddressString);
+        const pretentingPublicKey = PeerWallet.decodeBech32mSafe(pretendingAddressString);
         if (pretentingPublicKey === null) return;
 
         // ensure that an admin invoked this operation
@@ -651,7 +652,7 @@ class State extends ReadyResource {
         if (null === adminEntry) return;
         const decodedAdminEntry = adminEntryUtils.decode(adminEntry);
         if (null === decodedAdminEntry) return;
-        const adminPublicKey = Wallet.decodeBech32mSafe(decodedAdminEntry.address);
+        const adminPublicKey = PeerWallet.decodeBech32mSafe(decodedAdminEntry.address);
         if (adminPublicKey === null) return;
         if (!b4a.equals(requesterPublicKey, adminPublicKey) || !this.#isAdminApply(decodedAdminEntry, node)) return;
 
@@ -719,14 +720,14 @@ class State extends ReadyResource {
         const requesterAddressBuffer = op.address;
         const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer);
         if (requesterAddressString === null) return;
-        const requesterPublicKey = Wallet.decodeBech32mSafe(requesterAddressString);
+        const requesterPublicKey = PeerWallet.decodeBech32mSafe(requesterAddressString);
         if (requesterPublicKey === null) return;
 
         // Extract and validate pretending indexer address
         const toRemoveAddressBuffer = op.aco.ia;
         const toRemoveAddressString = addressUtils.bufferToAddress(toRemoveAddressBuffer);
         if (toRemoveAddressString === null) return;
-        const toRemoveAddressPublicKey = Wallet.decodeBech32mSafe(toRemoveAddressString);
+        const toRemoveAddressPublicKey = PeerWallet.decodeBech32mSafe(toRemoveAddressString);
         if (toRemoveAddressPublicKey === null) return;
 
         // ensure that an admin invoked this operation
@@ -734,7 +735,7 @@ class State extends ReadyResource {
         if (null === adminEntry) return;
         const decodedAdminEntry = adminEntryUtils.decode(adminEntry);
         if (null === decodedAdminEntry) return;
-        const adminPublicKey = Wallet.decodeBech32mSafe(decodedAdminEntry.address);
+        const adminPublicKey = PeerWallet.decodeBech32mSafe(decodedAdminEntry.address);
         if (adminPublicKey === null) return;
         if (!b4a.equals(requesterPublicKey, adminPublicKey) || !this.#isAdminApply(decodedAdminEntry, node)) return;
 
@@ -804,7 +805,7 @@ class State extends ReadyResource {
         const requesterAddressBuffer = op.address;
         const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer);
         if (requesterAddressString === null) return;
-        const requesterPublicKey = Wallet.decodeBech32mSafe(requesterAddressString);
+        const requesterPublicKey = PeerWallet.decodeBech32mSafe(requesterAddressString);
         if (requesterPublicKey === null) return;
 
         // ensure that an admin invoked this operation
@@ -814,7 +815,7 @@ class State extends ReadyResource {
         const decodedAdminEntry = adminEntryUtils.decode(adminEntry);
         if (null === decodedAdminEntry) return;
 
-        const adminPublicKey = Wallet.decodeBech32mSafe(decodedAdminEntry.address);
+        const adminPublicKey = PeerWallet.decodeBech32mSafe(decodedAdminEntry.address);
         if (adminPublicKey === null || !b4a.equals(requesterPublicKey, adminPublicKey) || !this.#isAdminApply(decodedAdminEntry, node)) return;
 
         // recreate requester message
@@ -892,7 +893,7 @@ class State extends ReadyResource {
         const requesterAddressBuffer = op.address;
         const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer);
         if (null === requesterAddressString) return;
-        const requesterPublicKey = Wallet.decodeBech32mSafe(requesterAddressString);
+        const requesterPublicKey = PeerWallet.decodeBech32mSafe(requesterAddressString);
         if (null === requesterPublicKey) return;
 
         // recreate requester message
@@ -918,7 +919,7 @@ class State extends ReadyResource {
         const validatorAddressBuffer = op.bdo.va;
         const validatorAddressString = addressUtils.bufferToAddress(validatorAddressBuffer);
         if (null === validatorAddressString) return;
-        const validatorPublicKey = Wallet.decodeBech32mSafe(validatorAddressString);
+        const validatorPublicKey = PeerWallet.decodeBech32mSafe(validatorAddressString);
         if (null === validatorPublicKey) return;
 
         // recreate validator message
@@ -973,7 +974,7 @@ class State extends ReadyResource {
         const requesterAddressBuffer = op.address;
         const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer);
         if (null === requesterAddressString) return;
-        const requesterPublicKey = Wallet.decodeBech32mSafe(requesterAddressString);
+        const requesterPublicKey = PeerWallet.decodeBech32mSafe(requesterAddressString);
         if (null === requesterPublicKey) return;
         const requesterMessage = createMessage(
             op.address,
@@ -998,7 +999,7 @@ class State extends ReadyResource {
         const validatorAddressString = addressUtils.bufferToAddress(validatorAddressBuffer);
         if (null === validatorAddressString) return;
 
-        const validatorPublicKey = Wallet.decodeBech32mSafe(validatorAddressString);
+        const validatorPublicKey = PeerWallet.decodeBech32mSafe(validatorAddressString);
         if (null === validatorPublicKey) return;
 
         // recreate validator message

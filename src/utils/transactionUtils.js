@@ -1,9 +1,10 @@
 import b4a from 'b4a';
-import Wallet from 'trac-wallet';
+import PeerWallet from "trac-wallet";
 
 import { addressToBuffer } from '../core/state/utils/address.js';
 import { OperationType } from './constants.js';
 import { blake3Hash } from './crypto.js';
+
 
 export async function generateTx(bootstrap, msb_bootstrap, local_writer_key, local_address, content_hash, nonce) {
     const tx = b4a.concat([
@@ -27,7 +28,7 @@ export async function generatePreTx(
     sub_network_bootstrap,
     msb_bootstrap
 ) {
-    const nonce = Wallet.generateNonce().toString('hex');
+    const nonce = PeerWallet.generateNonce().toString('hex');
     const txHash = await generateTx(
         sub_network_bootstrap,
         msb_bootstrap,
