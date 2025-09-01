@@ -18,6 +18,7 @@ class StateBuilder {
     withExternalBootstrap(bootstrapKey) { throw new Error("Method 'withExternalBootstrap()' must be implemented.");}
     withMsbBootstrap(msbBootstrap) { throw new Error("Method 'withMsbBootstrap()' must be implemented.");}
     withTxHash(txHash) { throw new Error("Method 'withTxHash()' must be implemented.");}
+    withTxValidity(txValidity) { throw new Error("Method 'withTxValidity()' must be implemented.");}
 }
 
 export default StateBuilder;

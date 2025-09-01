@@ -39,8 +39,19 @@ class ValidatorResponse extends BaseResponse {
 
     async validateNodeEntry(message) {
         const validatorEntry = await this.state.getNodeEntry(message.address);
-        if (validatorEntry === null || !validatorEntry.isWriter || validatorEntry.isIndexer) {
-            console.error("Validator entry not found in state.");
+        const adminEntry = await this.state.getAdminEntry();
+
+        if (validatorEntry === null || !validatorEntry.isWriter) {
+            console.error("Validator entry not found in state or is not a writer.");
+            return false;
+        }
+
+        if (adminEntry && message.address === adminEntry.address) {
+            return true;
+        }
+
+        if (validatorEntry.isIndexer) {
+            console.error("Validator is an indexer.");
             return false;
         }
         return true;

@@ -5,7 +5,7 @@ import {
 } from '../../utils/setupApplyTests.js';
 
 import {randomBytes} from '../../utils/setupApplyTests.js';
-import StateMessageOperations from '../../../src/messages/stateMessages/StateMessageOperations.js';
+import CompleteStateMessageOperations from '../../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
 import {testKeyPair1, testKeyPair2, testKeyPair3, testKeyPair4} from '../../fixtures/apply.fixtures.js';
 import b4a from 'b4a';
 //TODO: ADD TEST WHEN NON-ADMIN NODE FORGES ADD ADMIN OPERATION AND BROADCASTS IT TO THE STATE -  SHOULD BE REJECTED
@@ -82,7 +82,7 @@ test('Apply function addAdmin for recovery - happy path', async (k) => {
         // Simulate recovery by creating a new admin instance
         newAdmin = await setupMsbPeer('newAdmin', testKeyPair1, tmpDirectory, admin.options);
         await newAdmin.msb.ready();
-        const addAdminMessage = await StateMessageOperations.assembleAddAdminMessage(
+        const addAdminMessage = await CompleteStateMessageOperations.assembleAddAdminMessage(
             newAdmin.wallet,
             newAdmin.msb.state.writingKey
         );

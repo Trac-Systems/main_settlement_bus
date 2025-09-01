@@ -18,12 +18,11 @@ class NetworkMessages {
         return this.#network;
     }
 
-    initializeMessageRouter(state, wallet, handleIncomingEvent) {
+    initializeMessageRouter(state, wallet) {
         this.#messageRouter = new NetworkMessageRouter(
             this.network,
             state,
             wallet,
-            handleIncomingEvent,
             this.#options
         );
     }

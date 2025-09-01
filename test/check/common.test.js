@@ -2,12 +2,13 @@ import b4a from 'b4a';
 
 import { MIN_SAFE_VALIDATION_INTEGER, MAX_SAFE_VALIDATION_INTEGER } from '../../src/utils/constants.js';
 import { TRAC_ADDRESS_SIZE } from 'trac-wallet/constants.js';
+import { partial_operation_value_type } from "../fixtures/check.fixtures.js";
 
 export function topLevelValidationTests(
     t,
     validateFn,
     validFixture,
-    valueKey, // 'bko', 'txo', 'eko', 'bdo'
+    valueKey,
     notAllowedDataTypes,
     topFields
 ) {
@@ -24,6 +25,14 @@ export function topLevelValidationTests(
     t.test('operation type', t => {
         const invalidOperationType = { ...validFixture, type: 'invalid-op' };
         t.absent(validateFn(invalidOperationType), 'Invalid operation type should fail');
+        const notDefinedOperationType = { ...validFixture, type: 999 };
+        t.absent(validateFn(notDefinedOperationType), 'Invalid operation which is not defined in OperationType should fail');
+
+        const zeroValue = { ...validFixture, type: 0 };
+        t.absent(validateFn(zeroValue), 'Type with value 0 should fail');
+
+        const negativeValue = { ...validFixture, type: -1 };
+        t.absent(validateFn(negativeValue), 'Negative type value should fail');
     });
 
     t.test('type range', t => {
@@ -41,7 +50,6 @@ export function topLevelValidationTests(
                 nested: { foo: b4a.from('bar', 'utf-8') }
             }
         };
-        //console.log('nestedObjectInsideValue', nestedObjectInsideValue);
         t.absent(validateFn(nestedObjectInsideValue), `Unexpected nested field inside -${valueKey}- should fail due to strict`);
         const nestedObjectInsideValue2 = {
             ...validFixture,
@@ -68,7 +76,7 @@ export function topLevelValidationTests(
             }
         };
         //console.log('nestedObjectInsideValue4', nestedObjectInsideValue4);
-        t.absent(validateFn(nestedObjectInsideValue4), 'Unexpected nested field inside `key` field should fail due to strict');
+        t.absent(validateFn(nestedObjectInsideValue4), 'Unexpected nested field inside `address` field should fail due to strict');
 
 
     });
@@ -114,12 +122,14 @@ export function topLevelValidationTests(
 
 export const valueLevelValidationTest = (t, validateFn, validFixture, valueKey, valueFields, notAllowedDataTypes) => {
     for (const field of valueFields) {
-        if (valueKey === 'bdo' && (field === 'is' || field === 'vn' || field === 'vs')) continue;
+        if (partial_operation_value_type.includes(valueKey) && (field === 'is' || field === 'vn' || field === 'vs')) continue;
+
         const missing = {
             ...validFixture,
             [valueKey]: { ...validFixture[valueKey] }
         };
         delete missing[valueKey][field];
+        //console.log(missing);
         t.absent(validateFn(missing), `Missing ${valueKey}.${field} should fail`);
     }
 
@@ -216,6 +226,8 @@ export function addressBufferLengthTest(
         longInput: { ...validFixture, address: tooLong },
     };
 
+    //console.log('inputs', inputs);
+
     t.absent(validateFn(inputs.emptyBufferInput), `'address' empty buffer (length ${emptyBuffer.length}) should fail`);
 
     t.absent(validateFn(inputs.shortInput), `'address' too short (length ${tooShort.length}) should fail`);
@@ -233,7 +245,7 @@ export function fieldsBufferLengthTest(
     t,
     validateFn,
     validFixture,
-    valueKey, // 'bko', 'txo', 'eko'
+    valueKey,
     requiredFieldLengthsForValue
 ) {
     for (const [field, expectedLen] of Object.entries(requiredFieldLengthsForValue)) {
@@ -261,6 +273,9 @@ export function fieldsBufferLengthTest(
             longInput: buildValueLevel(tooLong),
         };
 
+        //console.log('inputs', inputs);
+
+
         t.absent(validateFn(inputs.emptyBufferInput), `${valueKey}.${field} empty buffer (length ${emptyBuffer.length}) should fail`);
 
         t.absent(validateFn(inputs.shortInput), `${valueKey}.${field} too short (length ${tooShort.length}) should fail`);
@@ -273,4 +288,132 @@ export function fieldsBufferLengthTest(
 
         t.absent(validateFn(inputs.longInput), `${valueKey}.${field} too long (length ${tooLong.length}) should fail`);
     }
+}
+
+export function partialTypeCommonTests(t, validateFn, validFixture, valueKey) {
+    t.test('missing validator fields combinations for complete payload', async t => {
+        t.test('missing vn only', t => {
+            const test = structuredClone(validFixture)
+            delete test[valueKey].vn
+            const result = validateFn(test)
+            //console.log('test', test);
+            t.is(result, false, 'Should fail when vn is missing')
+        })
+
+        t.test('missing vs only', t => {
+            const test = structuredClone(validFixture)
+            delete test[valueKey].vs
+            const result = validateFn(test)
+            //console.log('test', test);
+            t.is(result, false, 'Should fail when vs is missing')
+        })
+
+        t.test('missing va only', t => {
+            const test = structuredClone(validFixture)
+            delete test[valueKey].va
+            const result = validateFn(test)
+            //console.log('test', test);
+            t.is(result, false, 'Should fail when va is missing')
+        })
+
+        t.test('missing vn and vs', t => {
+            const test = structuredClone(validFixture)
+            delete test[valueKey].vn
+            delete test[valueKey].vs
+            const result = validateFn(test)
+            //console.log('test', test);
+            t.is(result, false, 'Should fail when vn and vs are missing')
+        })
+
+        t.test('missing vn and va', t => {
+            const test = structuredClone(validFixture)
+            delete test[valueKey].vn
+            delete test[valueKey].va
+            const result = validateFn(test)
+            //console.log('test', test);
+            t.is(result, false, 'Should fail when vn and va are missing')
+        })
+
+        t.test('missing vs and va', t => {
+            const test = structuredClone(validFixture)
+            delete test[valueKey].vs
+            delete test[valueKey].va
+            const result = validateFn(test)
+            //console.log('test', test);
+            t.is(result, false, 'Should fail when vs and va are missing')
+        })
+
+        t.test('missing all validator fields', t => {
+            const test = structuredClone(validFixture)
+            delete test[valueKey].vs
+            delete test[valueKey].va
+            delete test[valueKey].vn
+            const result = validateFn(test)
+            //console.log('test', test);
+            t.is(result, true, 'Should not fail when all validator fields are missing')
+        })
+    })
+
+    t.test('optional fields null cases', async t => {
+        t.test('vn null only', t => {
+            const test = structuredClone(validFixture)
+            test[valueKey].vn = null
+            const result = validateFn(test)
+            //console.log('test', test);
+            t.is(result, false, 'Should fail when vn is null')
+        })
+
+        t.test('vs null only', t => {
+            const test = structuredClone(validFixture)
+            test[valueKey].vs = null
+            const result = validateFn(test)
+            //console.log('test', test);
+            t.is(result, false, 'Should fail when vs is null')
+        })
+
+        t.test('va null only', t => {
+            const test = structuredClone(validFixture)
+            test[valueKey].va = null
+            const result = validateFn(test)
+            //console.log('test', test);
+            t.is(result, false, 'Should fail when va is null')
+        })
+
+        t.test('vn and vs null', t => {
+            const test = structuredClone(validFixture)
+            test[valueKey].vn = null
+            test[valueKey].vs = null
+            const result = validateFn(test)
+            //console.log('test', test);
+            t.is(result, false, 'Should fail when vn and vs are null')
+        })
+
+        t.test('vn and va null', t => {
+            const test = structuredClone(validFixture)
+            test[valueKey].vn = null
+            test[valueKey].va = null
+            const result = validateFn(test)
+            //console.log('test', test);
+            t.is(result, false, 'Should fail when vn and va are null')
+        })
+
+        t.test('vs and va null', t => {
+            const test = structuredClone(validFixture)
+            test[valueKey].vs = null
+            test[valueKey].va = null
+            const result = validateFn(test)
+            //console.log('test', test);
+            t.is(result, false, 'Should fail when vs and va are null')
+        })
+
+        t.test('all validator fields null', t => {
+            const test = structuredClone(validFixture)
+            test[valueKey].vn = null
+            test[valueKey].vs = null
+            test[valueKey].va = null
+            const result = validateFn(test)
+            //console.log('test', test);
+            t.is(result, false, 'Should fail when all validator fields are null')
+        })
+    })
 }

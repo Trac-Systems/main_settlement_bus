@@ -1,5 +1,5 @@
 import test from 'brittle';
-import StateMessageOperations from '../../src/messages/stateMessages/StateMessageOperations.js';
+import CompleteStateMessageOperations from '../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
 import {default as fixtures} from '../fixtures/assembleMessage.fixtures.js';
 import {OperationType} from "../../src/utils/constants.js";
 import {bufferToAddress} from "../../src/core/state/utils/address.js";
@@ -26,7 +26,7 @@ test('assemblePostTxMessage - ....', async (k) => {
     const externalBootstrap = randomBytes(32);
     const msbBootstrap = randomBytes(32);
 
-    const decodedPostTx = safeDecodeApplyOperation(await StateMessageOperations.assemblePostTxMessage(
+    const decodedPostTx = safeDecodeApplyOperation(await CompleteStateMessageOperations.assembleCompleteTransactionOperationMessage(
         nonAdminWallet,
         validatorAddress,
         txHash,
@@ -76,7 +76,7 @@ test('assemblePostTxMessage - ....', async (k) => {
             address: 'trac1y6kkq48fgu3ur'
         }
         await k.exception(
-            async () => await StateMessageOperations.assemblePostTxMessage(
+            async () => await CompleteStateMessageOperations.assembleCompleteTransactionOperationMessage(
                 invalidWallet,
                 validatorAddress,
                 txHash,
@@ -97,7 +97,7 @@ test('assemblePostTxMessage - ....', async (k) => {
             address: 'testnet1y6kkq48fgu3urrhg0gm7h8zdyxl3gnaazd2u7568lfl5zxqs285q6kuljk'
         }
         await k.exception(
-            async () => await StateMessageOperations.assemblePostTxMessage(
+            async () => await CompleteStateMessageOperations.assembleCompleteTransactionOperationMessage(
                 invalidWallet,
                 validatorAddress,
                 txHash,
@@ -118,7 +118,7 @@ test('assemblePostTxMessage - ....', async (k) => {
             address: ''
         }
         await k.exception(
-            async () => await StateMessageOperations.assemblePostTxMessage(
+            async () => await CompleteStateMessageOperations.assembleCompleteTransactionOperationMessage(
                 invalidWallet,
                 validatorAddress,
                 txHash,
@@ -136,7 +136,7 @@ test('assemblePostTxMessage - ....', async (k) => {
 
     k.test(`assemblePostTxMessage - Invalid wallet instance - null Wallet `, async (k) => {
         await k.exception(
-            async () => await StateMessageOperations.assemblePostTxMessage(
+            async () => await CompleteStateMessageOperations.assembleCompleteTransactionOperationMessage(
                 null,
                 validatorAddress,
                 txHash,
@@ -154,7 +154,7 @@ test('assemblePostTxMessage - ....', async (k) => {
 
     k.test(`assemblePostTxMessage - Invalid wallet instance - undefined Wallet`, async (k) => {
         await k.exception(
-            async () => await StateMessageOperations.assemblePostTxMessage(
+            async () => await CompleteStateMessageOperations.assembleCompleteTransactionOperationMessage(
                 undefined,
                 validatorAddress,
                 txHash,
@@ -175,7 +175,7 @@ test('assemblePostTxMessage - ....', async (k) => {
         const invalid = 'trac1y6kkq48fgu3urrhg0gm7h8zdyxl3gnaazd2u7568lfl5zxqs285q6kuljką';
 
         await k.exception(
-            async () => await StateMessageOperations.assemblePostTxMessage(
+            async () => await CompleteStateMessageOperations.assembleCompleteTransactionOperationMessage(
                 nonAdminWallet,
                 invalid,
                 txHash,
@@ -195,7 +195,7 @@ test('assemblePostTxMessage - ....', async (k) => {
         const invalid = 'trac1y6kkq48fgu3ur';
 
         await k.exception(
-            async () => await StateMessageOperations.assemblePostTxMessage(
+            async () => await CompleteStateMessageOperations.assembleCompleteTransactionOperationMessage(
                 nonAdminWallet,
                 invalid,
                 txHash,
@@ -215,7 +215,7 @@ test('assemblePostTxMessage - ....', async (k) => {
         const invalid = 'testnet1y6kkq48fgu3urrhg0gm7h8zdyxl3gnaazd2u7568lfl5zxqs285q6kuljk';
 
         await k.exception(
-            async () => await StateMessageOperations.assemblePostTxMessage(
+            async () => await CompleteStateMessageOperations.assembleCompleteTransactionOperationMessage(
                 nonAdminWallet,
                 invalid,
                 txHash,
@@ -235,7 +235,7 @@ test('assemblePostTxMessage - ....', async (k) => {
         const invalid = '';
 
         await k.exception(
-            async () => await StateMessageOperations.assemblePostTxMessage(
+            async () => await CompleteStateMessageOperations.assembleCompleteTransactionOperationMessage(
                 nonAdminWallet,
                 invalid,
                 txHash,
@@ -253,7 +253,7 @@ test('assemblePostTxMessage - ....', async (k) => {
     k.test(`assemblePostTxMessage - Address parameter (validator address) - Null`, async (k) => {
 
         await k.exception(
-            async () => await StateMessageOperations.assemblePostTxMessage(
+            async () => await CompleteStateMessageOperations.assembleCompleteTransactionOperationMessage(
                 nonAdminWallet,
                 null,
                 txHash,
@@ -270,7 +270,7 @@ test('assemblePostTxMessage - ....', async (k) => {
 
     k.test(`assemblePostTxMessage - Address parameter (validator address) - undefined`, async (k) => {
         await k.exception(
-            async () => await StateMessageOperations.assemblePostTxMessage(
+            async () => await CompleteStateMessageOperations.assembleCompleteTransactionOperationMessage(
                 nonAdminWallet,
                 undefined,
                 txHash,
@@ -288,7 +288,7 @@ test('assemblePostTxMessage - ....', async (k) => {
     k.test(`assemblePostTxMessage - Address parameter (incoming address) - 'ą' does not belongs to the TRAC bench alphabet`, async (k) => {
         const invalid = 'trac1y6kkq48fgu3urrhg0gm7h8zdyxl3gnaazd2u7568lfl5zxqs285q6kuljką';
         await k.exception(
-            async () => await StateMessageOperations.assemblePostTxMessage(
+            async () => await CompleteStateMessageOperations.assembleCompleteTransactionOperationMessage(
                 nonAdminWallet,
                 validatorAddress, // correct validator address
                 txHash,
@@ -307,7 +307,7 @@ test('assemblePostTxMessage - ....', async (k) => {
     k.test(`assemblePostTxMessage - Address parameter (incoming address) - trac address is to short`, async (k) => {
         const invalid = 'trac1y6kkq48fgu3ur';
         await k.exception(
-            async () => await StateMessageOperations.assemblePostTxMessage(
+            async () => await CompleteStateMessageOperations.assembleCompleteTransactionOperationMessage(
                 nonAdminWallet,
                 validatorAddress,
                 txHash,
@@ -326,7 +326,7 @@ test('assemblePostTxMessage - ....', async (k) => {
     k.test(`assemblePostTxMessage- Address parameter (incoming address) - invalid prefix`, async (k) => {
         const invalid = 'testnet1y6kkq48fgu3urrhg0gm7h8zdyxl3gnaazd2u7568lfl5zxqs285q6kuljk';
         await k.exception(
-            async () => await StateMessageOperations.assemblePostTxMessage(
+            async () => await CompleteStateMessageOperations.assembleCompleteTransactionOperationMessage(
                 nonAdminWallet,
                 validatorAddress,
                 txHash,
@@ -344,7 +344,7 @@ test('assemblePostTxMessage - ....', async (k) => {
     k.test(`assemblePostTxMessage - Address parameter (incoming address) - empty string`, async (k) => {
         const invalid = '';
         await k.exception(
-            async () => await StateMessageOperations.assemblePostTxMessage(
+            async () => await CompleteStateMessageOperations.assembleCompleteTransactionOperationMessage(
                 nonAdminWallet,
                 validatorAddress,
                 txHash,
@@ -361,7 +361,7 @@ test('assemblePostTxMessage - ....', async (k) => {
 
     k.test(`assemblePostTxMessage - Address parameter (incoming address) - Null`, async (k) => {
         await k.exception(
-            async () => await StateMessageOperations.assemblePostTxMessage(
+            async () => await CompleteStateMessageOperations.assembleCompleteTransactionOperationMessage(
                 nonAdminWallet,
                 validatorAddress,
                 txHash,
@@ -378,7 +378,7 @@ test('assemblePostTxMessage - ....', async (k) => {
 
     k.test(`assemblePostTxMessage - Address parameter (incoming address) - undefined`, async (k) => {
         await k.exception(
-            async () => await StateMessageOperations.assemblePostTxMessage(
+            async () => await CompleteStateMessageOperations.assembleCompleteTransactionOperationMessage(
                 nonAdminWallet,
                 validatorAddress,
                 txHash,
@@ -421,7 +421,7 @@ test('assemblePostTxMessage - ....', async (k) => {
                 };
                 args[param.key] = invalid.value;
                 await k.exception(
-                    async () => await StateMessageOperations.assemblePostTxMessage(
+                    async () => await CompleteStateMessageOperations.assembleCompleteTransactionOperationMessage(
                         nonAdminWallet,
                         validatorAddress,
                         args.txHash,

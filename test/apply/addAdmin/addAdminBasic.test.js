@@ -5,7 +5,7 @@ import {
 } from '../../utils/setupApplyTests.js';
 
 import {randomBytes} from '../../utils/setupApplyTests.js';
-import StateMessageOperations from '../../../src/messages/stateMessages/StateMessageOperations.js';
+import CompleteStateMessageOperations from '../../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
 import {testKeyPair1, testKeyPair2, testKeyPair3, testKeyPair4} from '../../fixtures/apply.fixtures.js';
 import b4a from 'b4a';
 
@@ -35,7 +35,7 @@ test('Apply function addAdmin for the first time - happy path', async (k) => {
         const adminEntryBefore = await admin.msb.state.getAdminEntry();
         k.is(adminEntryBefore, null, 'Admin entry should be null before adding a new admin');
 
-        const addAdminMessage = await StateMessageOperations.assembleAddAdminMessage(
+        const addAdminMessage = await CompleteStateMessageOperations.assembleAddAdminMessage(
             admin.wallet,
             admin.msb.state.writingKey
         );

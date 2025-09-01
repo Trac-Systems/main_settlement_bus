@@ -3,7 +3,7 @@ import {generateMnemonic, mnemonicToSeed} from 'bip39-mnemonic';
 import b4a from 'b4a'
 import PeerWallet from "trac-wallet"
 import path from 'path';
-import StateMessageOperations from '../../src/messages/stateMessages/StateMessageOperations.js';
+import CompleteStateMessageOperations from '../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
 
 import {MainSettlementBus} from '../../src/index.js'
 import fileUtils from '../../src/utils/fileUtils.js'
@@ -102,7 +102,7 @@ export async function setupMsbAdmin(keyPair, temporaryDirectory, options = {}) {
     const admin = await initMsbAdmin(keyPair, temporaryDirectory, options);
 
     await admin.msb.ready();
-    const addAdminMessage = await StateMessageOperations.assembleAddAdminMessage(admin.wallet, admin.msb.state.writingKey);
+    const addAdminMessage = await CompleteStateMessageOperations.assembleAddAdminMessage(admin.wallet, admin.msb.state.writingKey);
     await admin.msb.state.append(addAdminMessage);
     await tick();
     return admin;
@@ -117,7 +117,7 @@ export async function setupNodeAsWriter(admin, writerCandidate) {
             return result && result.isWriter && !result.isIndexer;
         }
 
-        const req = await StateMessageOperations.assembleAddWriterMessage(writerCandidate.wallet, writerCandidate.msb.state.writingKey);
+        const req = await CompleteStateMessageOperations.assembleAddWriterMessage(writerCandidate.wallet, writerCandidate.msb.state.writingKey);
         await admin.msb.state.append(req);
         await tick(); // wait for the request to be processed
         let counter;
@@ -148,7 +148,7 @@ export async function setupMsbWriter(admin, peerName, peerKeyPair, temporaryDire
             return result && result.isWriter && !result.isIndexer;
         }
 
-        const req = await StateMessageOperations.assembleAddWriterMessage(writerCandidate.wallet, writerCandidate.msb.state.writingKey);
+        const req = await CompleteStateMessageOperations.assembleAddWriterMessage(writerCandidate.wallet, writerCandidate.msb.state.writingKey);
         await admin.msb.state.append(req);
         await tick(); // wait for the request to be processed
         let counter;
@@ -172,7 +172,7 @@ export async function setupMsbWriter(admin, peerName, peerKeyPair, temporaryDire
 
 export async function setupMsbIndexer(indexerCandidate, admin) {
     try {
-        const req = await StateMessageOperations.assembleAddIndexerMessage(admin.wallet, indexerCandidate.wallet.address);
+        const req = await CompleteStateMessageOperations.assembleAddIndexerMessage(admin.wallet, indexerCandidate.wallet.address);
         await admin.msb.state.append(req);
         await tick(); // wait for the request to be processed
 
@@ -221,7 +221,7 @@ export async function setupWhitelist(admin, whitelistAddresses) {
     // set up mock whitelist
     const originalReadPublicKeysFromFile = fileUtils.readPublicKeysFromFile;
     fileUtils.readPublicKeysFromFile = async () => whitelistAddresses;
-    const assembledWhitelistMessages = await StateMessageOperations.assembleAppendWhitelistMessages(admin.wallet);
+    const assembledWhitelistMessages = await CompleteStateMessageOperations.assembleAppendWhitelistMessages(admin.wallet);
     for (const [_, msg] of assembledWhitelistMessages.entries()) {
         await admin.msb.state.append(msg);
     }
@@ -296,7 +296,7 @@ export const generatePostTx = async (writer, externalNode) => {
         writer.msb.bootstrap
     );
 
-    const postTx = await StateMessageOperations.assemblePostTxMessage(
+    const postTx = await CompleteStateMessageOperations.assembleCompleteTransactionOperationMessage(
         writer.wallet,
         preTx.va,
         b4a.from(preTx.tx, 'hex'),

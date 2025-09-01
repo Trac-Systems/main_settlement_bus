@@ -5,14 +5,18 @@ import fixtures from '../fixtures/protobuf.fixtures.js';
 
 test('Happy path encode/decode roundtrip for protobuf applyOperation payloads', t => {
     const payloadsHashMap = new Map([
-        ["post-tx", fixtures.validPostTx],
+        ["tx", fixtures.validTransactionOperation],
         ["addIndexer", fixtures.validAddIndexer],
-        ["removeIndexer", fixtures.validRemoveIndexr],
+        ["removeIndexer", fixtures.validRemoveIndexer],
         ["appendWhitelist", fixtures.validAppendWhitelist],
         ["banValidator", fixtures.validBanValidator],
         ["addAdmin", fixtures.validAddAdmin],
-        ["addWriter", fixtures.validAddWriter],
-        ["removeWriter", fixtures.validRemoveWriter]
+        ["addWriterComplete", fixtures.validCompleteAddWriter],
+        ["addWriterPartial", fixtures.validPartialAddWriter],
+        ["removeWriterComplete", fixtures.validCompleteRemoveWriter],
+        ["removeWriterPartial", fixtures.validPartialRemoveWriter],
+        ["adminRecoveryComplete", fixtures.validCompleteAdminRecovery],
+        ["adminRecoveryPartial", fixtures.validPartialAdminRecovery],
     ]);
 
 

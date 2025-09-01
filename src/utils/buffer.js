@@ -19,7 +19,7 @@ export const safeWriteUInt32BE = (value, offset) => {
 }
 
 export const createMessage = (...args) => {
-    
+
     if (args.length === 0) return b4a.alloc(0);
 
     const buffers = args.map(arg => {

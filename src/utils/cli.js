@@ -1,6 +1,7 @@
 import b4a from 'b4a';
+import {safeDecodeApplyOperation} from "./protobuf/operationHelpers.js";
 
-export async function verifyDag(state, network, wallet, writerKey, shouldListenToAdminEvents, shouldListenToWriterEvents) {
+export async function verifyDag(state, network, wallet, writerKey) {
     try {
         console.log('---------- node & network stats ----------');
         const dagView = await state.base.view.core.treeHash();
@@ -35,8 +36,6 @@ export async function verifyDag(state, network, wallet, writerKey, shouldListenT
         console.log("---------- flags ----------");
         console.log(`isIndexer: ${state.isIndexer()}`);
         console.log(`isWriter: ${state.isWritable()}`);
-        console.log("shouldListenToAdminEvents: ", shouldListenToAdminEvents);
-        console.log("shouldListenToWriterEvents: ", shouldListenToWriterEvents);
 
     } catch (error) {
         console.error('Error during DAG monitoring:', error.message);
@@ -56,6 +55,7 @@ export function printHelp() {
     console.log('- /stats: check system stats such as writing key, DAG, etc.');
     console.log('- /deployment <subnetwork_bootstrap>: deploy a subnetwork with the given bootstrap.');
     console.log('- /get_deployment <subnetwork_bootstrap>: get information about a subnetwork deployment with the given bootstrap.');
+    console.log('- /get_tx_info <tx_hash>: get information about a transaction with the given hash.');
     console.log('- /exit: Exit the program.');
     console.log('- /help: display this help.');
 }
@@ -66,4 +66,23 @@ export const printWalletInfo = (address, writingKey) => {
     console.log('# MSB Address:   ', address.toString('hex'), ' #');
     console.log('# MSB Writer:    ', writingKey.toString('hex'), '#');
     console.log('#####################################################################################');
+}
+
+export const get_tx_info = async (state_instance, txHash) => {
+    const payload = await state_instance.getSigned(txHash);
+    if (!payload) {
+        console.error(`No payload found for transaction hash: ${txHash}`);
+        return null;
+    }
+
+    const decoded = safeDecodeApplyOperation(payload);
+    if (!decoded) {
+        console.error(`Failed to decode payload for transaction hash: ${txHash}`);
+        return null;
+    }
+
+    return {
+        payload,
+        decoded
+    }
 }

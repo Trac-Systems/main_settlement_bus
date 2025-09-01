@@ -6,6 +6,7 @@ const opts = {
     bootstrap: '602d5443c19014e36a01254923afb1df56099d559f282761d70370a0da5d1d8a',
     channel: '0002tracnetworkmainsettlementbus',
     enable_role_requester: false,
+    enable_auto_transaction_consent: false,
     enable_wallet: true,
     enable_validator_observer: true,
     enable_interactive_mode: true,
