@@ -349,11 +349,7 @@ class State extends ReadyResource {
         const publicKeyAdminEntry = Wallet.decodeBech32mSafe(decodedAdminEntry.address);
         if (!b4a.equals(requesterAdminPublicKey, publicKeyAdminEntry)) return;
 
-        // Check if the admin and indexers entry is valid
-        const indexersEntry = await this.#getEntryApply(EntryType.INDEXERS, batch);
-        if (indexersEntry === null) return;
-
-        const isOldWkInIndexerList = this.#isWriterKeyInIndexerListApply(decodedAdminEntry.wk, base);
+        const isOldWkInIndexerList = await this.#isWriterKeyInIndexerListApply(decodedAdminEntry.wk, base);
         if (!isOldWkInIndexerList) return; // Old admin wk is not in indexers entry
 
         // Update admin entry with new writing key
@@ -364,7 +360,7 @@ class State extends ReadyResource {
         const adminNodeEntry = await this.#getEntryApply(requesterAdminAddressString, batch);
         const newAdminNodeEntry = setWritingKey(adminNodeEntry, op.rao.iw)
 
-        const isNewWkInIndexerList = this.#isWriterKeyInIndexerListApply(op.rao.iw, base);
+        const isNewWkInIndexerList = await this.#isWriterKeyInIndexerListApply(op.rao.iw, base);
         if (isNewWkInIndexerList) return; // New admin wk is already in indexers entry
 
         // Revoke old wk and add new one as an indexer
@@ -691,11 +687,9 @@ class State extends ReadyResource {
         //update node entry to indexer
         const updatedNodeEntry = nodeEntryUtils.setRole(nodeEntry, nodeRoleUtils.NodeRole.INDEXER)
         if (null === updatedNodeEntry) return;
-        // ensure that indexers entry exists and that it does not contain the address already
-        const indexersEntry = await this.#getEntryApply(EntryType.INDEXERS, batch);
-        if (null === indexersEntry) return;
-
-        const indexerListHasWk = this.#isWriterKeyInIndexerListApply(op.rao.iw, base);
+     
+        // ensure that the node wk does not exist in the indexer list
+        const indexerListHasWk = await this.#isWriterKeyInIndexerListApply(op.rao.iw, base);
         if (indexerListHasWk) return; // Wk is already in indexer list (Node already indexer)
 
         // set indexer role
@@ -769,11 +763,8 @@ class State extends ReadyResource {
         const updatedNodeEntry = nodeEntryUtils.setRoleAndWriterKey(nodeEntry, nodeRoleUtils.NodeRole.WRITER, decodedNodeEntry.wk)
         if (null === updatedNodeEntry) return;
 
-        // ensure that indexers entry exists and that it does contain the address already
-        const indexersEntry = await this.#getEntryApply(EntryType.INDEXERS, batch);
-        if (null === indexersEntry) return;
-
-        const indexerListHasWk = this.#isWriterKeyInIndexerListApply(decodedNodeEntry.wk, base);
+        // Ensure that the node is an indexer
+        const indexerListHasWk = await this.#isWriterKeyInIndexerListApply(decodedNodeEntry.wk, base);
         if (!indexerListHasWk) return; // Node is not an indexer.
 
         // downgrade role to writer
