@@ -9,8 +9,7 @@ import {TRAC_ADDRESS_SIZE} from 'trac-wallet/constants.js';
 import {isAddressValid} from "../../core/state/utils/address.js";
 import {blake3Hash} from '../../utils/crypto.js';
 
-// TODO: RENAME TO CompleteStateMessageBuilder
-class StateMessageBuilder extends StateBuilder {
+class CompleteStateMessageBuilder extends StateBuilder {
     #wallet;
     #operationType;
     #address;
@@ -25,6 +24,7 @@ class StateMessageBuilder extends StateBuilder {
     #externalBootstrap;
     #msbBootstrap;
     #validatorNonce;
+    #txValidity
 
     constructor(wallet) {
         super();
@@ -54,6 +54,7 @@ class StateMessageBuilder extends StateBuilder {
         this.#externalBootstrap = null;
         this.#msbBootstrap = null;
         this.#validatorNonce = null;
+        this.#txValidity = null;
     }
 
     forOperationType(operationType) {
@@ -73,6 +74,7 @@ class StateMessageBuilder extends StateBuilder {
         if (!isAddressValid(address)) {
             throw new Error(`Address field must be a valid TRAC bech32m address with length ${TRAC_ADDRESS_SIZE}.`);
         }
+
         this.#address = addressToBuffer(address);
         this.#payload.address = this.#address;
         return this;
@@ -95,9 +97,14 @@ class StateMessageBuilder extends StateBuilder {
     }
 
     withIncomingAddress(address) {
-        if (!(typeof address === 'string') || address.length !== TRAC_ADDRESS_SIZE) {
-            throw new Error(`Incoming address must be a ${TRAC_ADDRESS_SIZE} length string.`);
+        if (b4a.isBuffer(address) && address.length === TRAC_ADDRESS_SIZE) {
+            address = bufferToAddress(address);
         }
+
+        if (!isAddressValid(address)) {
+            throw new Error(`Address field must be a valid TRAC bech32m address with length ${TRAC_ADDRESS_SIZE}.`);
+        }
+
         this.#incomingAddress = addressToBuffer(address);
         return this;
     }
@@ -150,9 +157,15 @@ class StateMessageBuilder extends StateBuilder {
         return this;
     }
 
-    async buildValueAndSign() {
+    withTxValidity(txValidity) {
+        if (!b4a.isBuffer(txValidity) || txValidity.length !== 32) {
+            throw new Error('Transaction validity must be a 32-byte buffer.');
+        }
+        this.#txValidity = txValidity;
+        return this;
+    }
 
-        // writer key is not required for all operations, but it is required for some...
+    async buildValueAndSign() {
         if (!this.#operationType || !this.#address) {
             throw new Error('Operation type, address must be set before building the message.');
         }
@@ -164,47 +177,62 @@ class StateMessageBuilder extends StateBuilder {
         const nonce = Wallet.generateNonce();
 
         let msg = null;
-        let value = null;
-        let hash = null;
+        let tx = null;
         let signature = null;
 
+        // all incoming data from setters should be as buffer data type, createMessage accept only buffer and uint32
         switch (this.#operationType) {
+            // Complete by default
             case OperationType.ADD_ADMIN:
-            case OperationType.ADD_WRITER:
-            case OperationType.REMOVE_WRITER:
-                if (!this.#writingKey) {
-                    throw new Error('Writer key must be set for writer operations (ADD_WRITER REMOVE_WRITER or ADD_ADMIN operation).');
-                }
-                msg = createMessage(this.#address, this.#writingKey, nonce, this.#operationType);
+                msg = createMessage(this.#address, this.#txValidity, this.#writingKey, nonce, this.#operationType);
                 break;
 
+            // Partial need to be signed
+            case OperationType.ADD_WRITER:
+            case OperationType.REMOVE_WRITER:
+            case OperationType.ADMIN_RECOVERY:
+                msg = createMessage(
+                    this.#txHash,
+                    addressToBuffer(this.#wallet.address),
+                    nonce,
+                    this.#operationType
+                );
+                break;
+            // Complete by default
             case OperationType.APPEND_WHITELIST:
             case OperationType.ADD_INDEXER:
             case OperationType.REMOVE_INDEXER:
-            case OperationType.BAN_WRITER:
-                if (this.#wallet.address === bufferToAddress(this.#address)) {
+            case OperationType.BAN_VALIDATOR:
+                if (this.#wallet.address === bufferToAddress(this.#incomingAddress)) {
                     throw new Error('Address must not be the same as the wallet address for basic operations.');
                 }
 
-                msg = createMessage(this.#address, nonce, this.#operationType);
+                msg = createMessage(this.#address, this.#txValidity, this.#incomingAddress, nonce, this.#operationType);
                 break;
-
+            // Partial need to be signed
             case OperationType.TX:
-                if (!this.#txHash || !this.#incomingAddress || !this.#incomingWriterKey ||
+                if (!this.#txHash || !this.#txValidity || !this.#address || !this.#incomingWriterKey ||
                     !this.#incomingNonce || !this.#contentHash || !this.#incomingSignature ||
                     !this.#externalBootstrap || !this.#msbBootstrap) {
                     throw new Error('All postTx fields must be set before building the message!');
                 }
-                msg = b4a.concat([this.#txHash, nonce]);
+                msg = createMessage(
+                    this.#txHash,
+                    addressToBuffer(this.#wallet.address),
+                    nonce,
+                    this.#operationType
+                );
                 break;
+            // Partial need to be signed
             case OperationType.BOOTSTRAP_DEPLOYMENT:
-
                 if (!this.#txHash || !this.#externalBootstrap || !this.#incomingNonce || !this.#incomingSignature) {
                     throw new Error('All bootstrap deployment fields must be set before building the message!');
                 }
                 msg = createMessage(
                     this.#txHash,
+                    addressToBuffer(this.#wallet.address),
                     nonce,
+                    this.#operationType
                 );
                 break;
 
@@ -212,39 +240,55 @@ class StateMessageBuilder extends StateBuilder {
                 throw new Error(`Unsupported operation type for building value: ${OperationType[this.#operationType]}.`);
         }
 
-        hash = await blake3Hash(msg);
-        signature = this.#wallet.sign(hash);
+        tx = await blake3Hash(msg);
+        signature = this.#wallet.sign(tx);
 
-        if (this.#isExtended(this.#operationType)) {
-            value = {
-                wk: this.#writingKey,
-                nonce: nonce,
-                sig: signature
-            }
-            this.#payload.eko = value;
-        } else if (this.#isBasic(this.#operationType)) {
-            value = {
-                nonce: nonce,
-                sig: signature
-            }
-            this.#payload.bko = value;
-        } else if (this.#isTransaction(this.#operationType)) {
-            value = {
-                tx: this.#txHash,
+        if (this.#isCoreAdminOperation(this.#operationType)) {
+            this.#payload.cao = {
+                tx: tx,
+                txv: this.#txValidity,
+                iw: this.#writingKey,
+                in: nonce,
+                is: signature
+            };
+        } else if (this.#isAdminControlOperation(this.#operationType)) {
+            this.#payload.aco = {
+                tx: tx,
+                txv: this.#txValidity,
+                in: nonce,
                 ia: this.#incomingAddress,
+                is: signature
+            };
+        }
+        else if (this.#isRoleAccessOperation(this.#operationType)) {
+            this.#payload.rao = {
+                tx: this.#txHash,
+                txv: this.#txValidity,
+                iw: this.#incomingWriterKey,
+                in: this.#incomingNonce,
+                is: this.#incomingSignature,
+                va: addressToBuffer(this.#wallet.address),
+                vn: nonce,
+                vs: signature,
+            };
+        } else if (this.#isTransaction(this.#operationType)) {
+            this.#payload.txo = {
+                tx: this.#txHash,
+                txv: this.#txValidity,
                 iw: this.#incomingWriterKey,
                 in: this.#incomingNonce,
                 ch: this.#contentHash,
                 is: this.#incomingSignature,
                 bs: this.#externalBootstrap,
                 mbs: this.#msbBootstrap,
-                vs: signature,
+                va: addressToBuffer(this.#wallet.address),
                 vn: nonce,
-            }
-            this.#payload.txo = value;
+                vs: signature,
+            };
         } else if (this.#isBootstrapDeployment(this.#operationType)) {
-            value = {
+            this.#payload.bdo = {
                 tx: this.#txHash,
+                txv: this.#txValidity,
                 bs: this.#externalBootstrap,
                 in: this.#incomingNonce,
                 is: this.#incomingSignature,
@@ -252,7 +296,6 @@ class StateMessageBuilder extends StateBuilder {
                 vn: nonce,
                 vs: signature
             }
-            this.#payload.bdo = value;
         } else {
             throw new Error(`No corresponding value type for operation: ${OperationType[this.#operationType]}.`);
         }
@@ -260,22 +303,30 @@ class StateMessageBuilder extends StateBuilder {
         return this;
     }
 
-    #isExtended(type) {
+    #isCoreAdminOperation(type) {
         return [
             OperationType.ADD_ADMIN,
-            OperationType.ADD_WRITER,
-            OperationType.REMOVE_WRITER
         ].includes(type);
-    };
+    }
 
-    #isBasic(type) {
+    #isAdminControlOperation(type) {
         return [
             OperationType.APPEND_WHITELIST,
             OperationType.ADD_INDEXER,
             OperationType.REMOVE_INDEXER,
-            OperationType.BAN_WRITER
+            OperationType.BAN_VALIDATOR,
+
         ].includes(type);
-    };
+    }
+
+    #isRoleAccessOperation(type) {
+        return [
+            OperationType.ADD_WRITER,
+            OperationType.REMOVE_WRITER,
+            OperationType.ADMIN_RECOVERY,
+
+        ].includes(type);
+    }
 
     #isTransaction(type) {
         return [
@@ -293,8 +344,13 @@ class StateMessageBuilder extends StateBuilder {
         if (
             !this.#payload.type ||
             !this.#payload.address ||
-            (!this.#payload.bko && !this.#payload.eko && !this.#payload.txo && !this.#payload.bdo)) {
-            throw new Error('Product is not fully assembled. Missing type, address, or value (bko/eko/txo/bdo).');
+            (
+                !this.#payload.cao &&
+                !this.#payload.aco &&
+                !this.#payload.rao &&
+                !this.#payload.txo &&
+                !this.#payload.bdo)) {
+            throw new Error('Product is not fully assembled. Missing type, address, or value (cao/aco/rao/txo/bdo).');
         }
         const res = this.#payload;
         this.reset();
@@ -302,4 +358,4 @@ class StateMessageBuilder extends StateBuilder {
     }
 }
 
-export default StateMessageBuilder;
+export default CompleteStateMessageBuilder;

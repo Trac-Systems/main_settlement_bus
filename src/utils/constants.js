@@ -1,9 +1,9 @@
 import { OperationType as OP } from './protobuf/applyOperations.cjs';
+// TODO: We are going to have a lot of contstants. It would be good, to separate them into different files.
 
 //ATTENTION - THIS IS USED IN THE APPLY FUNCTION!
 export const EntryType = Object.freeze({
     ADMIN: 'admin',
-    WHITELIST: 'whitelist',
     INDEXERS: 'indexers',
     WRITERS_LENGTH: 'wrl',
     WRITERS_INDEX: 'wri/',
@@ -12,22 +12,22 @@ export const EntryType = Object.freeze({
 
 //ATTENTION - THIS IS USED IN THE APPLY FUNCTION!
 export const OperationType = Object.freeze({
+    //TODO: ADD INIT_BALANCE,TOKEN_TRANSFER, BALANCE_INITIALIZED (to discuss),
     ADD_ADMIN: OP.ADD_ADMIN,
     APPEND_WHITELIST: OP.APPEND_WHITELIST,
     ADD_WRITER: OP.ADD_WRITER,
     REMOVE_WRITER: OP.REMOVE_WRITER,
+    ADMIN_RECOVERY: OP.ADMIN_RECOVERY,
     ADD_INDEXER: OP.ADD_INDEXER,
     REMOVE_INDEXER: OP.REMOVE_INDEXER,
-    BAN_VALIDATOR: OP.BAN_WRITER,
-    WHITELISTED: OP.APPEND_WHITELIST,
-    PRE_TX: 'PRE_TX',
-    TX: OP.TX,
+    BAN_VALIDATOR: OP.BAN_VALIDATOR,
     BOOTSTRAP_DEPLOYMENT: OP.BOOTSTRAP_DEPLOYMENT,
+    TX: OP.TX,
 });
 
+// Role managment constants
 export const EventType = Object.freeze({
-    ADMIN_EVENT: 'adminEvent',
-    WRITER_EVENT: 'writerEvent',
+    WRITER_EVENT: 'writer-event',
     IS_INDEXER: 'is-indexer',
     IS_NON_INDEXER: 'is-non-indexer',
     WRITABLE: 'writable',
@@ -36,7 +36,6 @@ export const EventType = Object.freeze({
 });
 
 export const WHITELIST_FILEPATH = './whitelist/addresses.csv';
-export const LISTENER_TIMEOUT = 10_000;
 export const TRAC_NAMESPACE = 'TracNetwork';
 export const WHITELIST_SLEEP_INTERVAL = 1_000;
 
@@ -57,11 +56,8 @@ export const HASH_BYTE_LENGTH = 32;
 export const SIGNATURE_BYTE_LENGTH = 64;
 export const MIN_SAFE_VALIDATION_INTEGER = 0x00000001;
 export const MAX_SAFE_VALIDATION_INTEGER = 0xFFFFFFFF;
-export const TX_HASH_HEXSTRING_LENGTH = 64;
-export const WRITING_KEY_HEXSTRING_LENGTH = 64;
-export const NONCE_HEXSTRING_LENGTH = 64;
-export const CONTENT_HASH_HEXSTRING_LENGTH = 64;
-export const SIGNATURE_HEXSTRING_LENGTH = 128;
+
+// index
 export const BOOTSTRAP_HEXSTRING_LENGTH = 64;
 
 // Pool constants
@@ -73,8 +69,8 @@ export const CLEANUP_INTERVAL_MS = 120_000;
 export const CONNECTION_TIMEOUT_MS = 60_000;
 export const MAX_TRANSACTIONS_PER_SECOND = 50;
 
-// PreTransaction constants // todo change name?
-export const MAX_PRE_TX_PAYLOAD_BYTE_SIZE = 3072;
+// Operation handler constants
+export const MAX_PARTIAL_TX_PAYLOAD_BYTE_SIZE = 3072;
 export const TRANSACTION_POOL_SIZE = 1000;
 
 // Network message constants
@@ -90,11 +86,4 @@ export const NETWORK_MESSAGE_TYPES = Object.freeze({
         ADMIN: 'adminResponse',
         NODE: 'nodeResponse'
     },
-
-    OPERATION: {
-        ADD_WRITER: 'addWriter',
-        REMOVE_WRITER: 'removeWriter',
-        ADD_ADMIN: 'addAdmin',
-        WHITELISTED: 'whitelisted'
-    }
 });

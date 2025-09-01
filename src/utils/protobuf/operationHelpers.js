@@ -34,3 +34,17 @@ export const safeDecodeApplyOperation = (payload) => {
     }
     return null;
 }
+
+export const normalizeIncomingMessage = (message) => {
+    if (!message) return null;
+    if (b4a.isBuffer(message)) {
+        return applyOperations.Operation.decode(message);
+    }
+
+    if (message.type === 'Buffer' && Array.isArray(message.data)) {
+        const buffer = b4a.from(message.data);
+        return applyOperations.Operation.decode(buffer);
+    }
+
+    return null;
+};

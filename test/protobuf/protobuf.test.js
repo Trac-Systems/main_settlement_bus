@@ -6,18 +6,22 @@ import fixtures from '../fixtures/protobuf.fixtures.js';
 
 test('Happy path encode/decode roundtrip for protobuf applyOperation payloads', t => {
     const payloadsHashMap = new Map([
-        ["tx", fixtures.validPostTx],
+        ["tx", fixtures.validTransactionOperation],
         ["addIndexer", fixtures.validAddIndexer],
-        ["removeIndexer", fixtures.validRemoveIndexr],
+        ["removeIndexer", fixtures.validRemoveIndexer],
         ["appendWhitelist", fixtures.validAppendWhitelist],
         ["banValidator", fixtures.validBanValidator],
         ["addAdmin", fixtures.validAddAdmin],
-        ["addWriter", fixtures.validAddWriter],
-        ["removeWriter", fixtures.validRemoveWriter]
+        ["addWriterComplete", fixtures.validCompleteAddWriter],
+        ["addWriterPartial", fixtures.validPartialAddWriter],
+        ["removeWriterComplete", fixtures.validCompleteRemoveWriter],
+        ["removeWriterPartial", fixtures.validPartialRemoveWriter],
+        ["adminRecoveryComplete", fixtures.validCompleteAdminRecovery],
+        ["adminRecoveryPartial", fixtures.validPartialAdminRecovery],
     ]);
 
     for (const [key, value] of payloadsHashMap) {
-        console.log(`Testing payload: ${key} ${value}`);
+        console.log(`Testing payload: ${key}`,value);
         const encoded = applyOperations.Operation.encode(value);
         const decoded = applyOperations.Operation.decode(encoded);
         t.ok(JSON.stringify(value) === JSON.stringify(decoded), `Payload ${key} encodes and decodes correctly`);
@@ -74,8 +78,8 @@ test('Decode throws on buffer with unknown wire type (skip case)', t => {
 
 // We could cover all types of protobuf messages. For now it will be just TX.
 // If someone will send to us  shuffled TXO, we should be able to decode it and it will be in correct order.
-test('Protobuf encode/decode is order-independent', t => {
 
+test('Protobuf encode/decode is order-independent for all operation types', t => {
     const shuffleObject = (obj) => {
         const keys = Object.keys(obj);
         for (let i = keys.length - 1; i > 0; i--) {
@@ -87,10 +91,87 @@ test('Protobuf encode/decode is order-independent', t => {
         return shuffled;
     }
 
-    const shuffledTxo = shuffleObject(fixtures.validPostTx.txo);
-    const shuffledPayload = { ...fixtures.validPostTx, txo: shuffledTxo };
-    const encoded = applyOperations.Operation.encode(shuffledPayload);
-    const decoded = applyOperations.Operation.decode(encoded);
-    t.ok(JSON.stringify(decoded) === JSON.stringify(fixtures.validPostTx), 'Payload validPostTx encodes and decodes correctly even with shuffled txo fields');
-});
+    // Test TX operation
+    const shuffledTxo = shuffleObject(fixtures.validTransactionOperation.txo);
+    const shuffledTx = { ...fixtures.validTransactionOperation, txo: shuffledTxo };
+    let encoded = applyOperations.Operation.encode(shuffledTx);
+    let decoded = applyOperations.Operation.decode(encoded);
+    t.ok(JSON.stringify(decoded) === JSON.stringify(fixtures.validTransactionOperation), 'TX operation encodes/decodes correctly with shuffled fields');
 
+    // Test ADD_INDEXER operation
+    const shuffledAco = shuffleObject(fixtures.validAddIndexer.aco);
+    const shuffledAddIndexer = { ...fixtures.validAddIndexer, aco: shuffledAco };
+    encoded = applyOperations.Operation.encode(shuffledAddIndexer);
+    decoded = applyOperations.Operation.decode(encoded);
+    t.ok(JSON.stringify(decoded) === JSON.stringify(fixtures.validAddIndexer), 'ADD_INDEXER operation encodes/decodes correctly with shuffled fields');
+
+    // Test REMOVE_INDEXER operation
+    const shuffledRemoveIndexerAco = shuffleObject(fixtures.validRemoveIndexer.aco);
+    const shuffledRemoveIndexer = { ...fixtures.validRemoveIndexer, aco: shuffledRemoveIndexerAco };
+    encoded = applyOperations.Operation.encode(shuffledRemoveIndexer);
+    decoded = applyOperations.Operation.decode(encoded);
+    t.ok(JSON.stringify(decoded) === JSON.stringify(fixtures.validRemoveIndexer), 'REMOVE_INDEXER operation encodes/decodes correctly with shuffled fields');
+
+    // Test APPEND_WHITELIST operation
+    const shuffledWhitelistAco = shuffleObject(fixtures.validAppendWhitelist.aco);
+    const shuffledWhitelist = { ...fixtures.validAppendWhitelist, aco: shuffledWhitelistAco };
+    encoded = applyOperations.Operation.encode(shuffledWhitelist);
+    decoded = applyOperations.Operation.decode(encoded);
+    t.ok(JSON.stringify(decoded) === JSON.stringify(fixtures.validAppendWhitelist), 'APPEND_WHITELIST operation encodes/decodes correctly with shuffled fields');
+
+    // Test BAN_VALIDATOR operation
+    const shuffledBanAco = shuffleObject(fixtures.validBanValidator.aco);
+    const shuffledBan = { ...fixtures.validBanValidator, aco: shuffledBanAco };
+    encoded = applyOperations.Operation.encode(shuffledBan);
+    decoded = applyOperations.Operation.decode(encoded);
+    t.ok(JSON.stringify(decoded) === JSON.stringify(fixtures.validBanValidator), 'BAN_VALIDATOR operation encodes/decodes correctly with shuffled fields');
+
+    // Test ADD_ADMIN operation
+    const shuffledCao = shuffleObject(fixtures.validAddAdmin.cao);
+    const shuffledAddAdmin = { ...fixtures.validAddAdmin, cao: shuffledCao };
+    encoded = applyOperations.Operation.encode(shuffledAddAdmin);
+    decoded = applyOperations.Operation.decode(encoded);
+    t.ok(JSON.stringify(decoded) === JSON.stringify(fixtures.validAddAdmin), 'ADD_ADMIN operation encodes/decodes correctly with shuffled fields');
+
+    // Test ADD_WRITER (complete) operation
+    const shuffledCompleteAddWriterRao = shuffleObject(fixtures.validCompleteAddWriter.rao);
+    const shuffledCompleteAddWriter = { ...fixtures.validCompleteAddWriter, rao: shuffledCompleteAddWriterRao };
+    encoded = applyOperations.Operation.encode(shuffledCompleteAddWriter);
+    decoded = applyOperations.Operation.decode(encoded);
+    t.ok(JSON.stringify(decoded) === JSON.stringify(fixtures.validCompleteAddWriter), 'Complete ADD_WRITER operation encodes/decodes correctly with shuffled fields');
+
+    // Test ADD_WRITER (partial) operation
+    const shuffledPartialAddWriterRao = shuffleObject(fixtures.validPartialAddWriter.rao);
+    const shuffledPartialAddWriter = { ...fixtures.validPartialAddWriter, rao: shuffledPartialAddWriterRao };
+    encoded = applyOperations.Operation.encode(shuffledPartialAddWriter);
+    decoded = applyOperations.Operation.decode(encoded);
+    t.ok(JSON.stringify(decoded) === JSON.stringify(fixtures.validPartialAddWriter), 'Partial ADD_WRITER operation encodes/decodes correctly with shuffled fields');
+
+    // Test REMOVE_WRITER (complete) operation
+    const shuffledCompleteRemoveWriterRao = shuffleObject(fixtures.validCompleteRemoveWriter.rao);
+    const shuffledCompleteRemoveWriter = { ...fixtures.validCompleteRemoveWriter, rao: shuffledCompleteRemoveWriterRao };
+    encoded = applyOperations.Operation.encode(shuffledCompleteRemoveWriter);
+    decoded = applyOperations.Operation.decode(encoded);
+    t.ok(JSON.stringify(decoded) === JSON.stringify(fixtures.validCompleteRemoveWriter), 'Complete REMOVE_WRITER operation encodes/decodes correctly with shuffled fields');
+
+    // Test REMOVE_WRITER (partial) operation
+    const shuffledPartialRemoveWriterRao = shuffleObject(fixtures.validPartialRemoveWriter.rao);
+    const shuffledPartialRemoveWriter = { ...fixtures.validPartialRemoveWriter, rao: shuffledPartialRemoveWriterRao };
+    encoded = applyOperations.Operation.encode(shuffledPartialRemoveWriter);
+    decoded = applyOperations.Operation.decode(encoded);
+    t.ok(JSON.stringify(decoded) === JSON.stringify(fixtures.validPartialRemoveWriter), 'Partial REMOVE_WRITER operation encodes/decodes correctly with shuffled fields');
+
+    // Test ADMIN_RECOVERY (complete) operation
+    const shuffledCompleteAdminRecoveryRao = shuffleObject(fixtures.validCompleteAdminRecovery.rao);
+    const shuffledCompleteAdminRecovery = { ...fixtures.validCompleteAdminRecovery, rao: shuffledCompleteAdminRecoveryRao };
+    encoded = applyOperations.Operation.encode(shuffledCompleteAdminRecovery);
+    decoded = applyOperations.Operation.decode(encoded);
+    t.ok(JSON.stringify(decoded) === JSON.stringify(fixtures.validCompleteAdminRecovery), 'Complete ADMIN_RECOVERY operation encodes/decodes correctly with shuffled fields');
+
+    // Test ADMIN_RECOVERY (partial) operation
+    const shuffledPartialAdminRecoveryRao = shuffleObject(fixtures.validPartialAdminRecovery.rao);
+    const shuffledPartialAdminRecovery = { ...fixtures.validPartialAdminRecovery, rao: shuffledPartialAdminRecoveryRao };
+    encoded = applyOperations.Operation.encode(shuffledPartialAdminRecovery);
+    decoded = applyOperations.Operation.decode(encoded);
+    t.ok(JSON.stringify(decoded) === JSON.stringify(fixtures.validPartialAdminRecovery), 'Partial ADMIN_RECOVERY operation encodes/decodes correctly with shuffled fields');
+});

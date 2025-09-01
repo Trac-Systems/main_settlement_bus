@@ -1,68 +1,116 @@
-/**
- * This is the initial builder-based schema (v0.1). In future iterations, we’ll need to extend the postTx message 
- * to support surrogate tx forwarding and daisy-chained execution semantics.
- *
- */
-
 syntax = "proto3";
 
 package apply.operations;
 
+//DO NOT CHANGE THE ORDER AFTER RELEASE - ONLY APPEND NEW ONES
 enum OperationType {
-    UNKNOWN          = 0;
-    ADD_ADMIN        = 1;
-    APPEND_WHITELIST = 2;
-    ADD_WRITER       = 3;
-    REMOVE_WRITER    = 4;
-    TX               = 5;// TODO: CHANGE THIS TO PARTIAL TRANSACTION
-    ADD_INDEXER      = 6;
-    REMOVE_INDEXER   = 7;
-    BAN_WRITER       = 8;
-    BOOTSTRAP_DEPLOYMENT = 9;
+    UNKNOWN              = 0;
+    ADD_ADMIN            = 1; // complete
+    APPEND_WHITELIST     = 2; // complete
+    ADD_WRITER           = 3; // partial
+    REMOVE_WRITER        = 4; // partial
+    ADMIN_RECOVERY       = 5; // partial
+    ADD_INDEXER          = 6; // complete
+    REMOVE_INDEXER       = 7; // complete
+    BAN_VALIDATOR        = 8; // complete
+    BOOTSTRAP_DEPLOYMENT = 9; // partial
+    TX                   = 10; // partial
+    //INIT_BALANCE         = 11; // complete TODO: UNCOMMENT DURING IMPLEMENTATION
+    //TOKEN_TRANSFER       = 12; // partial TODO: UNCOMMENT DURING IMPLEMENTATION
 }
 
-message BasicKeyOperation {
-  bytes nonce = 1;
-  bytes sig   = 2;
+// add admin operation, balance_initialized (complete by default)
+message CoreAdminOperation {
+    bytes tx     = 1; // Transaction hash (unique identifier for the transaction)
+    bytes txv    = 2; // Transaction expiration
+    bytes iw     = 3;  // incoming writer key (admin)
+    bytes in     = 4; // Nonce of the invoker (admin)
+    bytes is     = 5; // Signature of the invoker (admin)
 }
 
-message ExtendedKeyOperation {
-  bytes wk    = 1;
-  bytes nonce = 2;
-  bytes sig   = 3;
+// append_whitelist, add_indexer, remove_indexer, ban_writer (complete by default)
+message AdminControlOperation {
+    bytes tx     = 1; // Transaction hash (unique identifier for the transaction)
+    bytes txv    = 2; // Transaction expiration
+    bytes in     = 3; // Nonce of the invoker (admin)
+    bytes ia     = 4; // selected address to specific operation.
+    bytes is     = 5; // Signature of the invoker (admin)
 }
 
+// initialize_balance (complete by default)
+message InitBalanceOperation {
+    bytes tx     = 1; // Transaction hash (unique identifier for the transaction)
+    bytes txv    = 2; // Transaction expiration
+    bytes in     = 3; // Nonce of the invoker (admin)
+    bytes is     = 4; // Signature of the invoker (admin)
+    bytes sa     = 5; // selected address to specific operation.
+    bytes bn     = 6; // Initial balance to be set for the address
+
+}
+// token_transfer (partial - need to be signed by another writer to be complete) DRAFT
+message TokenTransferOperation {
+    bytes tx      = 1; // Transaction hash (unique identifier for the transaction)
+    bytes txv     = 2; // Transaction expiration
+    bytes in      = 3; // Nonce of the invoker (any account)
+    bytes is      = 4; // Signature of the invoker (any account)
+    bytes to      = 5; // Address of the recipient (any account)
+    bytes amount  = 6; // Amount of tokens to transfer
+    bytes va      = 7; // Validator's address (optional)
+    bytes vn      = 8; // Validator's nonce  (optional)
+    bytes vs      = 9; // Validator's signature (optional)
+}
+
+// add_writer, remove_writer, admin_recovery (partial - need to be signed by another writer to be complete)
+message RoleAccessOperation  {
+    bytes tx      = 1;   // Transaction hash (unique identifier for the transaction)
+    bytes txv     = 2;   // Transaction expiration
+    bytes iw      = 3;  // Writing key of the invoker (whitelisted node, admin to be recovered, Trac Network)
+    bytes in      = 4;  // Nonce of the invoker (whitelisted node, admin to be recovered, Trac Network)
+    bytes is      = 5;  // Signature of the invoker (whitelisted node, admin to be recovered)
+    bytes va      = 6; // Validator's address (optional)
+    bytes vn      = 7; // Validator's nonce  (optional)
+    bytes vs      = 8; // Validator's signature (optional)
+}
+
+// transaction - (partial - need to be signed by another writer to be complete)
 message TxOperation {
     bytes tx   = 1;  // Transaction hash (unique identifier for the transaction)
-    bytes ia   = 2;  // Address of the requesting node (used for signature verification)
+    bytes txv  = 2;   // Transaction expiration
     bytes iw   = 3;  // Writing key of the requesting node (external subnetwork)
     bytes in   = 4;  // Nonce of the requesting node
     bytes ch   = 5;  // Content hash (hash of the transaction's data)
     bytes is   = 6;  // Requester's signature
     bytes bs   = 7;  // External bootstrap contract
     bytes mbs  = 8;  // MSB bootstrap key
-    bytes vs   = 9;  // Validator's signature
-    bytes vn   = 10; // Validator's nonce
+    bytes va   = 9; // Validator's address (optional)
+    bytes vn   = 10; // Validator's nonce  (optional)
+    bytes vs   = 11; // Validator's signature (optional)
 }
 
-message DeploymentOperation {
+// bootstrap deployment - (partial - need to be signed by another writer to be complete)
+message BootstrapDeploymentOperation {
     bytes tx   = 1; // Transaction hash (unique identifier for the transaction)
-    bytes bs   = 2; // Bootstrap contract address
-    bytes in   = 3; // Nonce of the contract invoker
-    bytes is   = 4; // Signature of the contract invoker
-    bytes va   = 5; // Validator's address
-    bytes vn   = 6; // Validator's nonce
-    bytes vs   = 7; // Validator's signature
+    bytes txv  = 2; // Transaction expiration
+    bytes bs   = 3; // Bootstrap contract address
+    bytes in   = 4; // Nonce of the contract invoker
+    bytes is   = 5; // Signature of the contract invoker
+    bytes va   = 6; // Validator's address (optional)
+    bytes vn   = 7; // Validator's nonce (optional)
+    bytes vs   = 8; // Validator's signature (optional)
 }
 
+// Main structure for the operations where messages are
 message Operation {
     OperationType type = 1;
-    bytes address      = 2;
+    bytes address      = 2; // address of the invoker
 
     oneof value {
-        BasicKeyOperation      bko  = 3;
-        ExtendedKeyOperation   eko  = 4;
-        TxOperation            txo  = 5;
-        DeploymentOperation    bdo  = 6;
+        CoreAdminOperation                cao  = 3;
+        AdminControlOperation             aco  = 4;
+        InitBalanceOperation              ibo  = 5;
+        TokenTransferOperation            tto  = 6;
+        RoleAccessOperation               rao  = 7;
+        BootstrapDeploymentOperation      bdo  = 8;
+        TxOperation                       txo  = 9;
     }
 }

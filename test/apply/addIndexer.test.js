@@ -1,6 +1,6 @@
 import {test, hook} from 'brittle';
 
-import StateMessageOperations from '../../src/messages/stateMessages/StateMessageOperations.js';
+import CompleteStateMessageOperations from '../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
 import {formatIndexersEntry} from '../../src/utils/helpers.js';
 import {
     initTemporaryDirectory,
@@ -57,7 +57,7 @@ test('handleApplyAddIndexerOperation (apply) - Append addIndexer payload into th
     // indexer3 is just a writer.
 
     try {
-        const assembledAddIndexerMessage = await StateMessageOperations.assembleAddIndexerMessage(admin.wallet, indexer1.wallet.address);
+        const assembledAddIndexerMessage = await CompleteStateMessageOperations.assembleAddIndexerMessage(admin.wallet, indexer1.wallet.address);
         await admin.msb.state.append(assembledAddIndexerMessage);
         indexersEntryAddressesCount += 1;
 
@@ -90,7 +90,7 @@ test('handleApplyAddIndexerOperation (apply) - Append addIndexer payload into th
         // indexer3 is just a writer.
 
 
-        const assembledAddIndexerMessage = await StateMessageOperations.assembleAddIndexerMessage(
+        const assembledAddIndexerMessage = await CompleteStateMessageOperations.assembleAddIndexerMessage(
             admin.wallet,
             indexer2.wallet.address
         );
@@ -107,7 +107,7 @@ test('handleApplyAddIndexerOperation (apply) - Append addIndexer payload into th
         await tryToSyncWriters(admin, indexer1, indexer2);
 
         const adminSignedLengthBefore = admin.msb.state.getSignedLength();
-        const reqAddIndexerMessageAgain = await StateMessageOperations.assembleAddIndexerMessage(
+        const reqAddIndexerMessageAgain = await CompleteStateMessageOperations.assembleAddIndexerMessage(
             admin.wallet,
             indexer2.wallet.address
         );
@@ -153,7 +153,7 @@ test('handleApplyAddIndexerOperation (apply) - Append addIndexer payload into th
         // indexer3 is just a writer.
 
 
-        const reqAddReader = await StateMessageOperations.assembleAddIndexerMessage(admin.wallet, reader1.wallet.address);
+        const reqAddReader = await CompleteStateMessageOperations.assembleAddIndexerMessage(admin.wallet, reader1.wallet.address);
 
         const adminSignedLengthBefore = admin.msb.state.getSignedLength()
         const indexer1SignedLengthBefore = indexer1.msb.state.getSignedLength();
@@ -191,7 +191,7 @@ test('handleApplyAddIndexerOperation (apply) - Append addIndexer payload into th
         const adminSignedLengthBefore = admin.msb.state.getSignedLength();
 
 
-        const reqAddIndexer2 = await StateMessageOperations.assembleAddIndexerMessage(admin.wallet, reader2.wallet.address);
+        const reqAddIndexer2 = await CompleteStateMessageOperations.assembleAddIndexerMessage(admin.wallet, reader2.wallet.address);
         await admin.msb.state.append(reqAddIndexer2);
         await tryToSyncWriters(admin, indexer1, indexer2);
 
@@ -222,7 +222,7 @@ test('handleApplyAddIndexerOperation (apply) - Append addIndexer payload into th
         // writer is just a writer.
         const adminSignedLengthBefore = admin.msb.state.getSignedLength();
 
-        const assembledAddIndexerMessage = await StateMessageOperations.assembleAddIndexerMessage(admin.wallet, indexer3.wallet.address);
+        const assembledAddIndexerMessage = await CompleteStateMessageOperations.assembleAddIndexerMessage(admin.wallet, indexer3.wallet.address);
 
         await writer.msb.state.append(assembledAddIndexerMessage);
         await tryToSyncWriters(admin, writer, indexer1, indexer2);

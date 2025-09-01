@@ -1,9 +1,9 @@
-
 import { NETWORK_MESSAGE_TYPES } from '../../../../utils/constants.js';
 import ValidatorResponse from '../validators/ValidatorResponse.js';
 import AdminResponse from '../validators/AdminResponse.js';
 import CustomNodeResponse from '../validators/CustomNodeResponse.js';
 import Wallet from 'trac-wallet';
+import b4a from "b4a";
 
 class ResponseHandler {
     #network;
@@ -62,6 +62,13 @@ class ResponseHandler {
         if (isValid) {
             const validatorAddressString = message.address;
             const validatorPublicKey = Wallet.decodeBech32m(validatorAddressString);
+
+
+            if (this.network.validator_stream !== null &&
+                this.network.validator !== null &&
+                b4a.equals(this.network.validator, validatorPublicKey) === 0) {
+                return;
+            }
 
             console.log('Validator stream established', validatorAddressString);
             this.network.validator_stream = connection;
