@@ -16,7 +16,6 @@ import addressUtils, {addressToBuffer} from './utils/address.js';
 import adminEntryUtils from './utils/adminEntry.js';
 import nodeEntryUtils, { setWritingKey } from './utils/nodeEntry.js';
 import nodeRoleUtils from './utils/roles.js';
-import indexerEntryUtils from './utils/indexerEntry.js';
 import lengthEntryUtils from './utils/lengthEntry.js';
 import transactionUtils from './utils/transaction.js';
 import {blake3Hash} from '../../utils/crypto.js';
@@ -353,6 +352,7 @@ class State extends ReadyResource {
         // Check if the admin and indexers entry is valid
         const indexersEntry = await this.#getEntryApply(EntryType.INDEXERS, batch);
         if (indexersEntry === null) return;
+
         const isOldWkInIndexerList = this.#isWriterKeyInIndexerListApply(decodedAdminEntry.wk, base);
         if (!isOldWkInIndexerList) return; // Old admin wk is not in indexers entry
 
@@ -364,12 +364,12 @@ class State extends ReadyResource {
         const adminNodeEntry = await this.#getEntryApply(requesterAdminAddressString, batch);
         const newAdminNodeEntry = setWritingKey(adminNodeEntry, op.rao.iw)
 
+        const isNewWkInIndexerList = this.#isWriterKeyInIndexerListApply(op.rao.iw, base);
+        if (isNewWkInIndexerList) return; // New admin wk is already in indexers entry
+
         // Revoke old wk and add new one as an indexer
         await base.removeWriter(decodedAdminEntry.wk);
         await base.addWriter(op.rao.iw, { isIndexer: true });
-
-        const isNewWkInIndexerList = this.#isWriterKeyInIndexerListApply(op.rao.iw, base);
-        if (!isNewWkInIndexerList) return; // New admin wk is not in indexers entry
 
         // Remove the old admin entry and add the new one
         await batch.put(EntryType.ADMIN, newAdminEntry);
@@ -698,15 +698,10 @@ class State extends ReadyResource {
         const indexerListHasWk = this.#isWriterKeyInIndexerListApply(op.rao.iw, base);
         if (indexerListHasWk) return; // Wk is already in indexer list (Node already indexer)
 
-        // Set writer key only (I assume this is enough because in the future we are linking the node address to it)
-        const updatedIndexerEntry = setWritingKey(indexersEntry, op.rao.iw)
-
         // set indexer role
         await base.removeWriter(decodedNodeEntry.wk);
         await base.addWriter(decodedNodeEntry.wk, { isIndexer: true })
 
-        // update node entry and indexers entry
-        await batch.put(EntryType.INDEXERS, updatedIndexerEntry);
         await batch.put(nodeAddressString, updatedNodeEntry);
 
         // store operation hash to avoid replay attack.
