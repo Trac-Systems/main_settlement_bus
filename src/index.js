@@ -758,7 +758,7 @@ export class MainSettlementBus extends ReadyResource {
                     const bootstrap_to_deploy = splitted[1];
                     await this.#handleBootstrapDeploymentOperation(bootstrap_to_deploy);
                 }
-                else if (input.startsWith("/get_wk_address")) {
+                else if (input.startsWith("/get_validator_addr")) {
                     const splitted = input.split(" ");
                     const wkHexString = splitted[1];
                     const payload = await this.#state.getSigned(EntryType.WRITER_ADDRESS + wkHexString);

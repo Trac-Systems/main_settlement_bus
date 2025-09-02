@@ -56,6 +56,7 @@ export function printHelp() {
     console.log('- /deployment <subnetwork_bootstrap>: deploy a subnetwork with the given bootstrap.');
     console.log('- /get_deployment <subnetwork_bootstrap>: get information about a subnetwork deployment with the given bootstrap.');
     console.log('- /get_tx_info <tx_hash>: get information about a transaction with the given hash.');
+    console.log('- /get_validator_addr <writing_key>: get the validator address mapped to the given writing key.');
     console.log('- /exit: Exit the program.');
     console.log('- /help: display this help.');
 }
