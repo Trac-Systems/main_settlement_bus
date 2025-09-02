@@ -216,20 +216,6 @@ export class MainSettlementBus extends ReadyResource {
         return nodeEntry && nodeEntry.isWhitelisted && !this.#isAdmin(adminEntry);
     }
 
-    async #pickWriter() {
-        const length = await this.#state.getWriterLength()
-        for (let i = 0; i < length; i++) {
-            const writerAddressBuffer = await this.#state.getWriterIndex(i);
-            const writerAddressString = bufferToAddress(writerAddressBuffer)
-            const validatorPublicKey = PeerWallet.decodeBech32m(writerAddressString).toString("hex");
-            const isConnected = this.#network.isConnected(validatorPublicKey);
-
-            if (validatorPublicKey && isConnected) {
-                return validatorPublicKey
-            }
-        }
-    }
-
     async #stateEventsListener() {
         this.#state.base.on(EventType.IS_INDEXER, () => {
             console.log("Current node is an indexer");
@@ -254,44 +240,46 @@ export class MainSettlementBus extends ReadyResource {
             console.log("Current node is unwritable");
         });
     }
-
-    async #handleAdminOperations(recovery = false) {
+    async #handleAdminCreation() {
         if (this.#enable_wallet === false) {
             throw new Error("Can not initialize an admin - wallet is not enabled.");
         }
         const adminEntry = await this.#state.getAdminEntry();
 
-        if (recovery === false) {
-            if (adminEntry) {
-                throw new Error("Can not initialize an admin - admin already exists.");
-            }
-            if (!this.#wallet) {
-                throw new Error(
-                    "Can not initialize an admin - wallet is not initialized."
-                );
-            }
-            if (!this.#state.writingKey) {
-                throw new Error(
-                    "Can not initialize an admin - writing key is not initialized."
-                );
-            }
-            if (!b4a.equals(this.#state.writingKey, this.#bootstrap)) {
-                throw new Error(
-                    "Can not initialize an admin - bootstrap is not equal to writing key."
-                );
-            }
-
-            await this.#state.append(null); // before initialization system.indexers is empty, we need to initialize first block to create system.indexers array
-            const txValidity = await this.#state.getIndexerSequenceState();
-            const addAdminMessage = await CompleteStateMessageOperations.assembleAddAdminMessage(
-                this.#wallet,
-                this.#state.writingKey,
-                txValidity
-            );
-
-            await this.#state.append(addAdminMessage);
-            return;
+        if (adminEntry) {
+            throw new Error("Can not initialize an admin - admin already exists.");
         }
+        if (!this.#wallet) {
+            throw new Error(
+                "Can not initialize an admin - wallet is not initialized."
+            );
+        }
+        if (!this.#state.writingKey) {
+            throw new Error(
+                "Can not initialize an admin - writing key is not initialized."
+            );
+        }
+        if (!b4a.equals(this.#state.writingKey, this.#bootstrap)) {
+            throw new Error(
+                "Can not initialize an admin - bootstrap is not equal to writing key."
+            );
+        }
+
+        await this.#state.append(null); // before initialization system.indexers is empty, we need to initialize first block to create system.indexers array
+        const txValidity = await this.#state.getIndexerSequenceState();
+        const addAdminMessage = await CompleteStateMessageOperations.assembleAddAdminMessage(
+            this.#wallet,
+            this.#state.writingKey,
+            txValidity
+        );
+
+        await this.#state.append(addAdminMessage);
+    }
+    async #handleAdminRecovery() {
+        if (this.#enable_wallet === false) {
+            throw new Error("Can not initialize an admin - wallet is not enabled.");
+        }
+        const adminEntry = await this.#state.getAdminEntry();
 
         if (!adminEntry) {
             throw new Error(
@@ -670,10 +658,10 @@ export class MainSettlementBus extends ReadyResource {
                 await this.close();
                 break;
             case "/add_admin":
-                await this.#handleAdminOperations();
+                await this.#handleAdminCreation();
                 break;
             case "/add_admin --recovery":
-                await this.#handleAdminOperations(true);
+                await this.#handleAdminRecovery();
                 break;
             case "/add_whitelist":
                 await this.#handleWhitelistOperations();
