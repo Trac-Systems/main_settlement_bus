@@ -143,8 +143,9 @@ class State extends ReadyResource {
     }
 
     async isWkInIndexersEntry(wk) {
-        if (indexersEntry === null || address === null) return false;
-        const indexerListHasWk = Object.values(this.#base.system.indexers).includes(wk);
+        if (wk === null) return false;
+        const indexerListHasWk = Object.values(this.#base.system.indexers)
+            .some(entry => b4a.from(entry.key).toString("hex") === b4a.from(wk).toString("hex"));
         return indexerListHasWk;
     }
 
@@ -689,7 +690,7 @@ class State extends ReadyResource {
         if (null === updatedNodeEntry) return;
      
         // ensure that the node wk does not exist in the indexer list
-        const indexerListHasWk = await this.#isWriterKeyInIndexerListApply(op.rao.iw, base);
+        const indexerListHasWk = await this.#isWriterKeyInIndexerListApply(decodedNodeEntry.wk, base);
         if (indexerListHasWk) return; // Wk is already in indexer list (Node already indexer)
 
         // set indexer role
@@ -756,9 +757,6 @@ class State extends ReadyResource {
         const decodedNodeEntry = nodeEntryUtils.decode(nodeEntry);
         if (null === decodedNodeEntry) return;
 
-        //check if node is an indexer
-        const isNodeIndexer = nodeEntryUtils.isIndexer(nodeEntry);
-        if (!isNodeIndexer) return;
         //update node entry to writer
         const updatedNodeEntry = nodeEntryUtils.setRoleAndWriterKey(nodeEntry, nodeRoleUtils.NodeRole.WRITER, decodedNodeEntry.wk)
         if (null === updatedNodeEntry) return;
@@ -1049,7 +1047,8 @@ class State extends ReadyResource {
 
     async #isWriterKeyInIndexerListApply(wk, base) {
         try {
-            return Object.values(base.system.indexers).includes(wk)
+            return Object.values(base.system.indexers)
+                .some(entry => b4a.from(entry.key).toString("hex") === b4a.from(wk).toString("hex"));
         } catch (error) {
             console.log(error);
             return null
