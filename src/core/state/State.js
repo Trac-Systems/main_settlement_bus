@@ -12,13 +12,14 @@ import Wallet from 'trac-wallet';
 import Check from '../../utils/check.js';
 import {safeDecodeApplyOperation} from '../../utils/protobuf/operationHelpers.js';
 import {createMessage, ZERO_WK} from '../../utils/buffer.js';
-import addressUtils, {addressToBuffer} from './utils/address.js';
+import addressUtils from './utils/address.js';
 import adminEntryUtils from './utils/adminEntry.js';
 import nodeEntryUtils, { setWritingKey } from './utils/nodeEntry.js';
 import nodeRoleUtils from './utils/roles.js';
 import lengthEntryUtils from './utils/lengthEntry.js';
 import transactionUtils from './utils/transaction.js';
 import {blake3Hash} from '../../utils/crypto.js';
+import { isRoleAccess, isTransaction, isCoreAdmin, operationToPayload } from '../../utils/operations.js';
 
 class State extends ReadyResource {
     //TODO: AFTER createMessage(..args) check if this function did not return NULL
@@ -259,6 +260,9 @@ class State extends ReadyResource {
         if (indexersSequenceState === null) return;
         if (!b4a.equals(op.cao.txv, indexersSequenceState)) return;
 
+        const writerKey = await this.#getRegisteredWriterKey(batch, op)
+        if (!!writerKey) return; // writer key should NOT exists for a brand new admin
+
         const adminEntryExists = await this.#getEntryApply(EntryType.ADMIN, batch);
         // if admin entry already exists, cannot perform this operation
         if (null !== adminEntryExists) return;
@@ -270,6 +274,7 @@ class State extends ReadyResource {
         const initializedNodeEntry = nodeEntryUtils.init(op.cao.iw, nodeRoleUtils.NodeRole.INDEXER);
         //const updatedNodeEntry = nodeEntryUtils.setRole(initializedNodeEntry, nodeRoleUtils.NodeRole.INDEXER);
         await batch.put(adminAddressString, initializedNodeEntry);
+        await batch.put(EntryType.WRITER_ADDRESS + op.cao.iw.toString('hex'), op.address);
         await this.#updateWritersIndex(adminAddressBuffer, batch);
 
         // Create a new admin entry
@@ -333,6 +338,8 @@ class State extends ReadyResource {
         const isValidatorMessageVerifed = this.#wallet.verify(op.rao.vs, validatorHash, validatorPublicKey);
         if (!isValidatorMessageVerifed) return;
 
+        const writerKey = await this.#getRegisteredWriterKey(batch, op)
+        if (!!writerKey) return; // writer key should NOT have been associated with any address because this is a recovery operation
         // verify tx validity - prevent deferred execution attack
         const indexersSequenceState = await this.#getIndexerSequenceStateApply(base);
         if (indexersSequenceState === null) return;
@@ -367,6 +374,7 @@ class State extends ReadyResource {
         // Revoke old wk and add new one as an indexer
         await base.removeWriter(decodedAdminEntry.wk);
         await base.addWriter(op.rao.iw, { isIndexer: true });
+        await batch.put(EntryType.WRITER_ADDRESS + op.rao.iw.toString('hex'), op.address);
 
         // Remove the old admin entry and add the new one
         await batch.put(EntryType.ADMIN, newAdminEntry);
@@ -503,6 +511,8 @@ class State extends ReadyResource {
 
         // anti-replay attack
         if (null !== opEntry) return;
+        const associatedAddress = await this.#getRegisteredWriterKey(batch, op)
+        if (!!associatedAddress) return;
         await this.#addWriter(op, base, node, batch, txHashHexString, requesterAddressString, requesterAddressBuffer);
     }
 
@@ -545,7 +555,7 @@ class State extends ReadyResource {
         // Add the writer role to the base and update the batch
         await base.addWriter(op.rao.iw, { isIndexer: false });
         await batch.put(requesterAddressString, updatedNodeEntry);
-
+        await batch.put(EntryType.WRITER_ADDRESS + op.rao.iw.toString('hex'), op.address);
         await this.#updateWritersIndex(requesterAddressBuffer, batch);
 
         await batch.put(txHashHexString, node.value);
@@ -954,7 +964,7 @@ class State extends ReadyResource {
         if (b4a.equals(op.txo.is, op.txo.vs)) return;
         // reject if the external bootstrap is the same as the network bootstrap
         if (b4a.equals(op.txo.bs, op.txo.mbs)) return;
-
+        
         // validate invoker signature
         const requesterAddressBuffer = op.address;
         const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer);
@@ -1056,6 +1066,12 @@ class State extends ReadyResource {
             console.log(error);
             return null
         }
+    }
+
+    async #getRegisteredWriterKey(batch, op) {
+        const jsonNode = operationToPayload(op.type)
+        const writingKey = b4a.toString(op[jsonNode].iw, 'hex');
+        return await batch.get(EntryType.WRITER_ADDRESS + writingKey);
     }
 }
 

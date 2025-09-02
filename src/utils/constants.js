@@ -7,6 +7,7 @@ export const EntryType = Object.freeze({
     INDEXERS: 'indexers',
     WRITERS_LENGTH: 'wrl',
     WRITERS_INDEX: 'wri/',
+    WRITER_ADDRESS: 'wka/',
     DEPLOYMENT: 'deployment/',
 });
 

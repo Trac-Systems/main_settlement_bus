@@ -8,6 +8,7 @@ import {addressToBuffer, bufferToAddress} from '../../core/state/utils/address.j
 import {TRAC_ADDRESS_SIZE} from 'trac-wallet/constants.js';
 import {isAddressValid} from "../../core/state/utils/address.js";
 import {blake3Hash} from '../../utils/crypto.js';
+import { isCoreAdmin, isAdminControl, isRoleAccess, isTransaction, isBootstrapDeployment } from '../../utils/operations.js';
 
 class CompleteStateMessageBuilder extends StateBuilder {
     #wallet;
@@ -243,7 +244,7 @@ class CompleteStateMessageBuilder extends StateBuilder {
         tx = await blake3Hash(msg);
         signature = this.#wallet.sign(tx);
 
-        if (this.#isCoreAdminOperation(this.#operationType)) {
+        if (isCoreAdmin(this.#operationType)) {
             this.#payload.cao = {
                 tx: tx,
                 txv: this.#txValidity,
@@ -251,7 +252,7 @@ class CompleteStateMessageBuilder extends StateBuilder {
                 in: nonce,
                 is: signature
             };
-        } else if (this.#isAdminControlOperation(this.#operationType)) {
+        } else if (isAdminControl(this.#operationType)) {
             this.#payload.aco = {
                 tx: tx,
                 txv: this.#txValidity,
@@ -260,7 +261,7 @@ class CompleteStateMessageBuilder extends StateBuilder {
                 is: signature
             };
         }
-        else if (this.#isRoleAccessOperation(this.#operationType)) {
+        else if (isRoleAccess(this.#operationType)) {
             this.#payload.rao = {
                 tx: this.#txHash,
                 txv: this.#txValidity,
@@ -271,7 +272,7 @@ class CompleteStateMessageBuilder extends StateBuilder {
                 vn: nonce,
                 vs: signature,
             };
-        } else if (this.#isTransaction(this.#operationType)) {
+        } else if (isTransaction(this.#operationType)) {
             this.#payload.txo = {
                 tx: this.#txHash,
                 txv: this.#txValidity,
@@ -285,7 +286,7 @@ class CompleteStateMessageBuilder extends StateBuilder {
                 vn: nonce,
                 vs: signature,
             };
-        } else if (this.#isBootstrapDeployment(this.#operationType)) {
+        } else if (isBootstrapDeployment(this.#operationType)) {
             this.#payload.bdo = {
                 tx: this.#txHash,
                 txv: this.#txValidity,
@@ -301,43 +302,6 @@ class CompleteStateMessageBuilder extends StateBuilder {
         }
 
         return this;
-    }
-
-    #isCoreAdminOperation(type) {
-        return [
-            OperationType.ADD_ADMIN,
-        ].includes(type);
-    }
-
-    #isAdminControlOperation(type) {
-        return [
-            OperationType.APPEND_WHITELIST,
-            OperationType.ADD_INDEXER,
-            OperationType.REMOVE_INDEXER,
-            OperationType.BAN_VALIDATOR,
-
-        ].includes(type);
-    }
-
-    #isRoleAccessOperation(type) {
-        return [
-            OperationType.ADD_WRITER,
-            OperationType.REMOVE_WRITER,
-            OperationType.ADMIN_RECOVERY,
-
-        ].includes(type);
-    }
-
-    #isTransaction(type) {
-        return [
-            OperationType.TX
-        ].includes(type);
-    }
-
-    #isBootstrapDeployment(type) {
-        return [
-            OperationType.BOOTSTRAP_DEPLOYMENT
-        ].includes(type);
     }
 
     getPayload() {
