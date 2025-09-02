@@ -757,6 +757,10 @@ class State extends ReadyResource {
         const decodedNodeEntry = nodeEntryUtils.decode(nodeEntry);
         if (null === decodedNodeEntry) return;
 
+        // Check if the node entry is an indexer
+        const isNodeIndexer = nodeEntryUtils.isIndexer(nodeEntry);
+        if (!isNodeIndexer) return;
+
         //update node entry to writer
         const updatedNodeEntry = nodeEntryUtils.setRoleAndWriterKey(nodeEntry, nodeRoleUtils.NodeRole.WRITER, decodedNodeEntry.wk)
         if (null === updatedNodeEntry) return;
