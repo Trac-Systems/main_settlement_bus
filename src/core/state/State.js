@@ -145,7 +145,7 @@ class State extends ReadyResource {
     async isWkInIndexersEntry(wk) {
         if (wk === null) return false;
         const indexerListHasWk = Object.values(this.#base.system.indexers)
-            .some(entry => b4a.from(entry.key).toString("hex") === b4a.from(wk).toString("hex"));
+            .some(entry => b4a.equals(entry.key, wk));
         return indexerListHasWk;
     }
 
@@ -1051,8 +1051,7 @@ class State extends ReadyResource {
 
     async #isWriterKeyInIndexerListApply(wk, base) {
         try {
-            return Object.values(base.system.indexers)
-                .some(entry => b4a.from(entry.key).toString("hex") === b4a.from(wk).toString("hex"));
+            return Object.values(base.system.indexers).some(entry => b4a.equals(entry.key, wk));
         } catch (error) {
             console.log(error);
             return null
