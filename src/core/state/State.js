@@ -16,7 +16,6 @@ import addressUtils, {addressToBuffer} from './utils/address.js';
 import adminEntryUtils from './utils/adminEntry.js';
 import nodeEntryUtils, { setWritingKey } from './utils/nodeEntry.js';
 import nodeRoleUtils from './utils/roles.js';
-import indexerEntryUtils from './utils/indexerEntry.js';
 import lengthEntryUtils from './utils/lengthEntry.js';
 import transactionUtils from './utils/transaction.js';
 import {blake3Hash} from '../../utils/crypto.js';
@@ -143,10 +142,11 @@ class State extends ReadyResource {
         return indexersEntry
     }
 
-    async isAddressInIndexersEntry(address, indexersEntry) {
-        if (indexersEntry === null || address === null) return false;
-        const indexerListHasAddress = indexerEntryUtils.getIndex(indexersEntry, addressUtils.addressToBuffer(address)) !== -1;
-        return indexerListHasAddress;
+    async isWkInIndexersEntry(wk) {
+        if (wk === null) return false;
+        const indexerListHasWk = Object.values(this.#base.system.indexers)
+            .some(entry => b4a.equals(entry.key, wk));
+        return indexerListHasWk;
     }
 
     async getWriterLength() {
@@ -274,12 +274,10 @@ class State extends ReadyResource {
 
         // Create a new admin entry
         const newAdminEntry = adminEntryUtils.encode(adminAddressBuffer, op.cao.iw);
-        const initIndexers = indexerEntryUtils.append(adminAddressBuffer);
+        if (newAdminEntry.length === 0) return;
 
-        if (initIndexers.length === 0 || newAdminEntry.length === 0) return;
         // initialize admin entry and indexers entry
         await batch.put(EntryType.ADMIN, newAdminEntry);
-        await batch.put(EntryType.INDEXERS, initIndexers);
         await batch.put(txHashHexString, node.value);
 
         console.log(`Admin added addr:wk:tx - ${adminAddressString}:${op.cao.iw.toString('hex')}:${txHashHexString}`);
@@ -352,11 +350,8 @@ class State extends ReadyResource {
         const publicKeyAdminEntry = Wallet.decodeBech32mSafe(decodedAdminEntry.address);
         if (!b4a.equals(requesterAdminPublicKey, publicKeyAdminEntry)) return;
 
-        // Check if the admin and indexers entry is valid
-        const indexersEntry = await this.#getEntryApply(EntryType.INDEXERS, batch);
-        if (indexersEntry === null) return;
-        const indexerIndex = indexerEntryUtils.getIndex(indexersEntry, requesterAdminAddressBuffer);
-        if (indexerIndex === -1) return; // Admin address is not in indexers entry
+        const isOldWkInIndexerList = await this.#isWriterKeyInIndexerListApply(decodedAdminEntry.wk, base);
+        if (!isOldWkInIndexerList) return; // Old admin wk is not in indexers entry
 
         // Update admin entry with new writing key
         const newAdminEntry = adminEntryUtils.encode(requesterAdminAddressBuffer, op.rao.iw);
@@ -365,6 +360,9 @@ class State extends ReadyResource {
         // Update node entry of the admin with new writing key
         const adminNodeEntry = await this.#getEntryApply(requesterAdminAddressString, batch);
         const newAdminNodeEntry = setWritingKey(adminNodeEntry, op.rao.iw)
+
+        const isNewWkInIndexerList = await this.#isWriterKeyInIndexerListApply(op.rao.iw, base);
+        if (isNewWkInIndexerList) return; // New admin wk is already in indexers entry
 
         // Revoke old wk and add new one as an indexer
         await base.removeWriter(decodedAdminEntry.wk);
@@ -690,22 +688,17 @@ class State extends ReadyResource {
         //update node entry to indexer
         const updatedNodeEntry = nodeEntryUtils.setRole(nodeEntry, nodeRoleUtils.NodeRole.INDEXER)
         if (null === updatedNodeEntry) return;
-        // ensure that indexers entry exists and that it does not contain the address already
-        const indexersEntry = await this.#getEntryApply(EntryType.INDEXERS, batch);
-        if (null === indexersEntry) return;
+     
+        // ensure that the node wk does not exist in the indexer list
+        const indexerListHasWk = await this.#isWriterKeyInIndexerListApply(decodedNodeEntry.wk, base);
+        if (indexerListHasWk) return; // Wk is already in indexer list (Node already indexer)
 
-        const indexerListHasAddress = indexerEntryUtils.getIndex(indexersEntry, op.aco.ia);
-        if (indexerListHasAddress !== -1) return;
-
-        // append indexer to indexers entry
-        const updatedIndexerEntry = indexerEntryUtils.append(op.aco.ia, indexersEntry);
-        if (updatedIndexerEntry.length === 0) return;
         // set indexer role
         await base.removeWriter(decodedNodeEntry.wk);
         await base.addWriter(decodedNodeEntry.wk, { isIndexer: true })
-        // update node entry and indexers entry
-        await batch.put(EntryType.INDEXERS, updatedIndexerEntry);
+
         await batch.put(nodeAddressString, updatedNodeEntry);
+
         // store operation hash to avoid replay attack.
         await batch.put(txHashHexString, node.value);
 
@@ -764,23 +757,17 @@ class State extends ReadyResource {
         const decodedNodeEntry = nodeEntryUtils.decode(nodeEntry);
         if (null === decodedNodeEntry) return;
 
-        //check if node is an indexer
+        // Check if the node entry is an indexer
         const isNodeIndexer = nodeEntryUtils.isIndexer(nodeEntry);
         if (!isNodeIndexer) return;
+
         //update node entry to writer
         const updatedNodeEntry = nodeEntryUtils.setRoleAndWriterKey(nodeEntry, nodeRoleUtils.NodeRole.WRITER, decodedNodeEntry.wk)
         if (null === updatedNodeEntry) return;
 
-        // ensure that indexers entry exists and that it does contain the address already
-        const indexersEntry = await this.#getEntryApply(EntryType.INDEXERS, batch);
-        if (null === indexersEntry) return;
-
-        const indexerListHasAddress = indexerEntryUtils.getIndex(indexersEntry, op.aco.ia);
-        if (indexerListHasAddress === -1) return;
-
-        // remove indexer from indexers entry
-        const updatedIndexerEntry = indexerEntryUtils.remove(op.aco.ia, indexersEntry);
-        if (updatedIndexerEntry.length === 0) return;
+        // Ensure that the node is an indexer
+        const indexerListHasWk = await this.#isWriterKeyInIndexerListApply(decodedNodeEntry.wk, base);
+        if (!indexerListHasWk) return; // Node is not an indexer.
 
         // downgrade role to writer
         await base.removeWriter(decodedNodeEntry.wk);
@@ -790,7 +777,6 @@ class State extends ReadyResource {
         await this.#updateWritersIndex(toRemoveAddressBuffer, batch);
 
         //update node entry and indexers entry
-        await batch.put(EntryType.INDEXERS, updatedIndexerEntry);
         await batch.put(toRemoveAddressString, updatedNodeEntry);
 
         // store operation hash to avoid replay attack.
@@ -1060,6 +1046,15 @@ class State extends ReadyResource {
         } catch (error) {
             console.error(error);
             return null;
+        }
+    }
+
+    async #isWriterKeyInIndexerListApply(wk, base) {
+        try {
+            return Object.values(base.system.indexers).some(entry => b4a.equals(entry.key, wk));
+        } catch (error) {
+            console.log(error);
+            return null
         }
     }
 }
