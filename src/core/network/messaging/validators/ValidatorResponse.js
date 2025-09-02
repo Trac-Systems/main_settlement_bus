@@ -12,7 +12,7 @@ class ValidatorResponse extends BaseResponse {
             !this.validateIssuerPublicKey(message) ||
             !this.validateTimestamp(message) ||
             !await this.validateNodeEntry(message) ||
-            !await this.validateWritingKey(message) ||
+            //!await this.validateWritingKey(message) || DISABLED BECAUSE WHEN VALIDATOR WANT TO REGISTER NEW WK, THIS IS NOT POSSIBLE
             !await this.validateSignature(message) ||
             !this.validateChannel(message, channelString)
         ) {

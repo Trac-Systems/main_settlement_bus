@@ -19,6 +19,7 @@ import {
     EventType,
     WHITELIST_SLEEP_INTERVAL,
     BOOTSTRAP_HEXSTRING_LENGTH,
+    EntryType,
 } from "./utils/constants.js";
 import partialStateMessageOperations from "./messages/partialStateMessages/PartialStateMessageOperations.js";
 import {randomBytes} from "hypercore-crypto";
@@ -425,11 +426,7 @@ export class MainSettlementBus extends ReadyResource {
             throw new Error("Cannot remove writer role - node is an indexer");
         }
 
-        if (!this.#state.isWritable()) {
-            throw new Error(
-                "Cannot remove writer role - internal state is not writable"
-            );
-        }
+
 
         const txValidity = await this.#state.getIndexerSequenceState();
         const assembledMessage = await PartialStateMessageOperations.assembleRemoveWriterMessage(
@@ -760,7 +757,15 @@ export class MainSettlementBus extends ReadyResource {
                     const splitted = input.split(" ");
                     const bootstrap_to_deploy = splitted[1];
                     await this.#handleBootstrapDeploymentOperation(bootstrap_to_deploy);
-                } else if (input.startsWith("/get_deployment")) {
+                }
+                else if (input.startsWith("/get_validator_addr")) {
+                    const splitted = input.split(" ");
+                    const wkHexString = splitted[1];
+                    const payload = await this.#state.getSigned(EntryType.WRITER_ADDRESS + wkHexString);
+                    console.log("before decode",payload);
+                    console.log("after decode",bufferToAddress(payload))
+                }
+                else if (input.startsWith("/get_deployment")) {
                     const splitted = input.split(" ");
                     const bootstrapHex = splitted[1];
                     const txHash = await this.#state.getRegisteredBootstrapEntry(bootstrapHex);
