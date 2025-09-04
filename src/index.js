@@ -6,7 +6,7 @@ import b4a from "b4a";
 import readline from "readline";
 import tty from "tty";
 
-import {sleep, formatIndexersEntry, isHexString, convertAdminCoreOperationPayloadToHex} from "./utils/helpers.js";
+import {sleep, getFormattedIndexersWithAddresses, isHexString, convertAdminCoreOperationPayloadToHex} from "./utils/helpers.js";
 import {verifyDag, printHelp, printWalletInfo, get_tx_info} from "./utils/cli.js";
 import CompleteStateMessageOperations from "./messages/completeStateMessages/CompleteStateMessageOperations.js";
 import {safeDecodeApplyOperation} from "./utils/protobuf/operationHelpers.js";
@@ -678,8 +678,7 @@ export class MainSettlementBus extends ReadyResource {
                     address: admin.address,
                     writingKey: admin.wk.toString("hex")
                 } : null);
-                const indexers = await this.#state.getIndexersEntry();
-                const formattedIndexers = formatIndexersEntry(indexers);
+                const formattedIndexers = await getFormattedIndexersWithAddresses(this.#state);
                 if (formattedIndexers.length === 0) {
                     console.log("Indexers: no indexers");
                 } else {
@@ -749,8 +748,7 @@ export class MainSettlementBus extends ReadyResource {
                     const splitted = input.split(" ");
                     const wkHexString = splitted[1];
                     const payload = await this.#state.getSigned(EntryType.WRITER_ADDRESS + wkHexString);
-                    console.log("before decode",payload);
-                    console.log("after decode",bufferToAddress(payload))
+                    console.log(`Address assigned to the writer key: ${wkHexString} - ${bufferToAddress(payload)}`)
                 }
                 else if (input.startsWith("/get_deployment")) {
                     const splitted = input.split(" ");
