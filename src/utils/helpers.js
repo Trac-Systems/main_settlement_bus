@@ -1,6 +1,7 @@
 import {  TRAC_ADDRESS_SIZE } from 'trac-wallet/constants.js';
 import b4a from "b4a";
 import {bufferToAddress} from "../core/state/utils/address.js";
+import { EntryType } from "./constants.js";
 
 export function isHexString(string) {
     return typeof string === 'string' && string.length > 1 && /^[0-9a-fA-F]+$/.test(string) && string.length % 2 === 0;
@@ -44,6 +45,28 @@ export const safeJsonParse = (str) => {
         console.error(error);
     }
     return undefined;
+}
+
+export async function getFormattedIndexersWithAddresses(state) {
+    const indexers = await state.getIndexersEntry();
+    const formatted = indexers.map((entry) => ({
+        writingKey: b4a.toString(entry.key, "hex"),
+    }));
+
+    const results = await Promise.all(
+        formatted.map(async (entry) => {
+            console.log(EntryType.WRITER_ADDRESS + entry.writingKey);
+            
+            const address = bufferToAddress(await state.getSigned(EntryType.WRITER_ADDRESS + entry.writingKey));
+
+            return {
+                ...entry,
+                address,
+            };
+        })
+    );
+
+    return results;
 }
 
 export function formatIndexersEntry(indexersEntry) {
