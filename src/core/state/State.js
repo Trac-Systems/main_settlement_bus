@@ -139,7 +139,7 @@ class State extends ReadyResource {
     }
 
     async getIndexersEntry() {
-        const indexersEntry = await this.getSigned(EntryType.INDEXERS);
+        const indexersEntry = Object.values(this.#base.system.indexers);
         return indexersEntry
     }
 
