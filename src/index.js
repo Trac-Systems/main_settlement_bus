@@ -739,6 +739,7 @@ export class MainSettlementBus extends ReadyResource {
                             IsWhitelisted: nodeEntry.isWhitelisted,
                             IsWriter: nodeEntry.isWriter,
                             IsIndexer: nodeEntry.isIndexer,
+                            balance: nodeEntry.balance
                         });
                     } else {
                         console.log("Node Entry not found for address:", address);
