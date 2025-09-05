@@ -258,7 +258,6 @@ class CompleteStateMessageOperations {
                 amount,
                 incomingSignature
             );
-            console.log("Complete transfer operation payload:", payload);
             return safeEncodeApplyOperation(payload);
 
         } catch (error) {

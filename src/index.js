@@ -633,7 +633,7 @@ export class MainSettlementBus extends ReadyResource {
         if (bufferToBigInt(amountBuffer) !== amountBigInt) {
             throw new Error(`conversion error for amount: ${amount}`);
         }
-        console.log(`address ${address}, ${amount}, amountBigInt ${amountBigInt} amountBuffer ${amountBuffer}`)
+
         const txValidity = await this.#state.getIndexerSequenceState();
         const payload = await PartialStateMessageOperations.assembleTransferOperationMessage(
             this.#wallet,
@@ -641,7 +641,6 @@ export class MainSettlementBus extends ReadyResource {
             amountBuffer.toString('hex'),
             txValidity.toString('hex'),
         )
-        console.log(payload)
         await this.broadcastPartialTransaction(payload);
 
     }

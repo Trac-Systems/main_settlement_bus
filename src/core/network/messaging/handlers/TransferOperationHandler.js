@@ -30,10 +30,7 @@ class TransferOperationHandler extends BaseOperationHandler {
 
     async #handleTransfer(payload) {
         const normalizedPayload = this.#normalizeTransfer(payload);
-        console.log('Normalized Transfer Payload:', normalizedPayload);
         const isValid = await this.#partialTransferValidator.validate(normalizedPayload);
-        console.log('Valid:', isValid);
-
         if (!isValid) {
             throw new Error("TransferHandler: Transfer validation failed.");
         }
