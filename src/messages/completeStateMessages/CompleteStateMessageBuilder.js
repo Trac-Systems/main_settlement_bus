@@ -8,7 +8,14 @@ import {addressToBuffer, bufferToAddress} from '../../core/state/utils/address.j
 import {TRAC_ADDRESS_SIZE} from 'trac-wallet/constants.js';
 import {isAddressValid} from "../../core/state/utils/address.js";
 import {blake3Hash} from '../../utils/crypto.js';
-import { isCoreAdmin, isAdminControl, isRoleAccess, isTransaction, isBootstrapDeployment } from '../../utils/operations.js';
+import {
+    isCoreAdmin,
+    isAdminControl,
+    isRoleAccess,
+    isTransaction,
+    isBootstrapDeployment,
+    isTransfer
+} from '../../utils/operations.js';
 
 class CompleteStateMessageBuilder extends StateBuilder {
     #wallet;
@@ -25,7 +32,8 @@ class CompleteStateMessageBuilder extends StateBuilder {
     #externalBootstrap;
     #msbBootstrap;
     #validatorNonce;
-    #txValidity
+    #txValidity;
+    #amount;
 
     constructor(wallet) {
         super();
@@ -56,6 +64,7 @@ class CompleteStateMessageBuilder extends StateBuilder {
         this.#msbBootstrap = null;
         this.#validatorNonce = null;
         this.#txValidity = null;
+        this.#amount = null;
     }
 
     forOperationType(operationType) {
@@ -166,6 +175,15 @@ class CompleteStateMessageBuilder extends StateBuilder {
         return this;
     }
 
+    withAmount(amount) {
+        if (!b4a.isBuffer(amount) || amount.length !== 16) {
+            throw new Error('Amount must be a 16-byte buffer.');
+        }
+
+        this.#amount = amount;
+        return this;
+    }
+
     async buildValueAndSign() {
         if (!this.#operationType || !this.#address) {
             throw new Error('Operation type, address must be set before building the message.');
@@ -235,7 +253,20 @@ class CompleteStateMessageBuilder extends StateBuilder {
                     nonce,
                     this.#operationType
                 );
-                break;
+                break
+
+            case OperationType.TRANSFER:
+                    if (!this.#txHash || !this.#txValidity || !this.#address || !this.#incomingNonce ||
+                        !this.#incomingSignature || !this.#amount || !this.#incomingAddress) {
+                        throw new Error('All transfer fields must be set before building the message!');
+                    }
+                    msg = createMessage(
+                        this.#txHash,
+                        addressToBuffer(this.#wallet.address),
+                        nonce,
+                        this.#operationType
+                    );
+                    break;
 
             default:
                 throw new Error(`Unsupported operation type for building value: ${OperationType[this.#operationType]}.`);
@@ -297,7 +328,20 @@ class CompleteStateMessageBuilder extends StateBuilder {
                 vn: nonce,
                 vs: signature
             }
-        } else {
+        } else if (isTransfer(this.#operationType)) {
+            this.#payload.tro = {
+                tx: this.#txHash,
+                txv: this.#txValidity,
+                in: this.#incomingNonce,
+                to: this.#incomingAddress,
+                am: this.#amount,
+                is: this.#incomingSignature,
+                va: addressToBuffer(this.#wallet.address),
+                vn: nonce,
+                vs: signature
+            }
+        }
+        else {
             throw new Error(`No corresponding value type for operation: ${OperationType[this.#operationType]}.`);
         }
 
@@ -313,8 +357,11 @@ class CompleteStateMessageBuilder extends StateBuilder {
                 !this.#payload.aco &&
                 !this.#payload.rao &&
                 !this.#payload.txo &&
-                !this.#payload.bdo)) {
-            throw new Error('Product is not fully assembled. Missing type, address, or value (cao/aco/rao/txo/bdo).');
+                !this.#payload.bdo &&
+                !this.#payload.tro
+            )
+        ) {
+            throw new Error('Product is not fully assembled. Missing type, address, or value (cao/aco/rao/txo/bdo/tro).');
         }
         const res = this.#payload;
         this.reset();

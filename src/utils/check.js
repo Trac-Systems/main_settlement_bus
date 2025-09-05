@@ -21,6 +21,7 @@ class Check {
     #validateRoleAccessOperationSchema
     #validateBootstrapDeploymentSchema;
     #validateTransactionOperationSchema
+    #validateTransferOperationSchema
 
     constructor() {
 
@@ -69,6 +70,7 @@ class Check {
         this.#validateRoleAccessOperationSchema = this.#compileRoleAccessOperationSchema();
         this.#validateBootstrapDeploymentSchema = this.#compileBootstrapDeploymentSchema();
         this.#validateTransactionOperationSchema = this.#compileTransactionOperationSchema();
+        this.#validateTransferOperationSchema = this.#compileTransferOperationSchema();
 
     }
 
@@ -441,7 +443,7 @@ class Check {
     }
 
     validateTransferOperation(op) {
-        return this.#compileTransferOperationSchema(op) === true;
+        return this.#validateTransferOperationSchema(op) === true;
     }
 
     //TODO: IMPLEMENT InitBalanceOperation see protocol buffer

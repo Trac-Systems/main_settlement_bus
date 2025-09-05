@@ -641,7 +641,8 @@ export class MainSettlementBus extends ReadyResource {
             amountBuffer.toString('hex'),
             txValidity.toString('hex'),
         )
-        console.log("payload", payload);
+        console.log(payload)
+        await this.broadcastPartialTransaction(payload);
 
     }
 

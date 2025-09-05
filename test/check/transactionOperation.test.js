@@ -8,8 +8,8 @@ const check = new Check();
 
 test('validateTransactionOperation - happy-path case', t => {
     // ADD_WRITER
-    const partial_result = check.validateTransactionOperation(TXO.valid_complete_transaction_operation)
-    const complete_result = check.validateTransactionOperation(TXO.valid_partial_transaction_operation)
+    const partial_result = check.validateTransactionOperation(TXO.valid_partial_transaction_operation)
+    const complete_result = check.validateTransactionOperation(TXO.valid_complete_transaction_operation)
     t.ok(partial_result, 'Valid data for partial transaction operation should pass the validation')
     t.ok(complete_result, 'Valid data for complete transaction operation should pass the validation')
 })
@@ -86,7 +86,7 @@ test('validateTransactionOperation - address buffer length validation - TOP LEVE
 });
 
 
-test('validateTransactionOperation - Buffer length validation - VALUE LEVEL (bdo)', t => {
+test('validateTransactionOperation - Buffer length validation - VALUE LEVEL (txo)', t => {
     //complete
     fieldsBufferLengthTest(
         t,
@@ -99,7 +99,7 @@ test('validateTransactionOperation - Buffer length validation - VALUE LEVEL (bdo
     fieldsBufferLengthTest(
         t,
         check.validateTransactionOperation.bind(check),
-        TXO.valid_complete_transaction_operation,
+        TXO.valid_partial_transaction_operation,
         'txo',
         TXO.required_length_of_fields_for_partial_transaction_operation
     );

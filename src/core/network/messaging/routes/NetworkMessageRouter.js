@@ -4,21 +4,26 @@ import GetRequestHandler from "../handlers/GetRequestHandler.js";
 import ResponseHandler from "../handlers/ResponseHandler.js";
 import OperationHandler from "../handlers/OperationHandler.js";
 import SubnetworkOperationHandler from "../handlers/SubnetworkOperationHandler.js";
+import TransferOperationHandler from "../handlers/TransferOperationHandler.js";
 import {NETWORK_MESSAGE_TYPES, OperationType} from '../../../../utils/constants.js';
 import WhitelistedEventHandler from "../handlers/WhitelistedEventHandler.js";
 import * as operation from '../../../../utils/operations.js';
+import TransactionRateLimiterService from "../../services/TransactionRateLimiterService.js";
 
 class NetworkMessageRouter {
     #network;
     #handlers;
     #options;
+    #rateLimiter;
     constructor(network, state, wallet, options = {}) {
         this.#network = network;
+        this.#rateLimiter = new TransactionRateLimiterService();
         this.#handlers = {
             get: new GetRequestHandler(wallet, state),
             response: new ResponseHandler(network, state, wallet),
             roleAccessOperation: new OperationHandler(state, wallet, network),
-            subNetworkTransaction: new SubnetworkOperationHandler(network, state, wallet, options),
+            subNetworkTransaction: new SubnetworkOperationHandler(network, state, wallet, this.#rateLimiter, options),
+            tracNetworkTransaction: new TransferOperationHandler(network, state, wallet, this.#rateLimiter, options),
             whitelistedEvent: new WhitelistedEventHandler(network, state, wallet, options)
         }
         this.#options = options;
@@ -27,6 +32,8 @@ class NetworkMessageRouter {
     get network() {
         return this.#network;
     }
+
+
 
     async route(incomingMessage, connection, messageProtomux) {
         try {
@@ -50,6 +57,10 @@ class NetworkMessageRouter {
             }
             else if (this.#isSubnetworkOperation(incomingMessage)) {
                 await this.#handlers.subNetworkTransaction.handle(incomingMessage, connection);
+                this.network.swarm.leavePeer(connection.remotePublicKey);
+            }
+            else if(this.#isTransferOperation(incomingMessage)) {
+                await this.#handlers.tracNetworkTransaction.handle(incomingMessage, connection);
                 this.network.swarm.leavePeer(connection.remotePublicKey);
             }
             else if (incomingMessage.type === OperationType.APPEND_WHITELIST
@@ -80,7 +91,12 @@ class NetworkMessageRouter {
     }
 
     #isSubnetworkOperation(message) {
-        return operation.isTransaction(message.type) || operation.isBootstrapDeployment(message.type)
+        return operation.isTransaction(message.type) ||
+            operation.isBootstrapDeployment(message.type)
+    }
+
+    #isTransferOperation(message) {
+        return operation.isTransfer(message.type)
     }
 }
 

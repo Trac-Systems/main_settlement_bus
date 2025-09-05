@@ -230,7 +230,7 @@ class PartialStateMessageBuilder extends StateBuilder {
                 tx: tx.toString('hex'),
                 txv: this.#txValidity,
                 in: nonce.toString('hex'),
-                ia: this.#incomingAddress,
+                to: this.#incomingAddress,
                 am: this.#amount,
                 is: signature.toString('hex')
             }
