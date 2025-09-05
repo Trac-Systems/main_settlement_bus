@@ -423,14 +423,14 @@ class Check {
                     if (fieldsPresent > 0 && fieldsPresent < 3) {
                         errors.push({
                             type: 'conditionalDependency',
-                            field: 'bdo',
+                            field: 'tro',
                             message: 'Fields "vn", "vs", and "va" must all be present if any one is provided'
                         });
                     }
                     if (vn === null || vs === null || va === null) {
                         errors.push({
                             type: 'buffer',
-                            field: 'bdo',
+                            field: 'tro',
                             message: 'Validator fields cannot be null, must be a Buffer or undefined'
                         });
                     }
