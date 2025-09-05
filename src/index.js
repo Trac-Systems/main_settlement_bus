@@ -193,6 +193,10 @@ export class MainSettlementBus extends ReadyResource {
         await sleep(100);
     }
 
+    async broadcastPartialTransaction(partialTransactionPayload) {
+        await this.#network.validator_stream.messenger.send(partialTransactionPayload);
+    }
+
     async #setUpRoleAutomatically() {
         if (!this.#state.isWritable() && this.#enable_role_requester) {
             console.log("Requesting writer role... This may take a moment.");
@@ -305,7 +309,7 @@ export class MainSettlementBus extends ReadyResource {
             txValidity.toString('hex')
         );
 
-        await this.#network.validator_stream.messenger.send(adminRecoveryMessage);
+        await this.broadcastPartialTransaction(adminRecoveryMessage);
     }
 
     async #handleWhitelistOperations() {
@@ -396,13 +400,7 @@ export class MainSettlementBus extends ReadyResource {
                 txValidity.toString('hex')
             )
 
-            //let dispatcher = await this.#pickWriter()
-            // console.log(dispatcher);
-
-            // if (dispatcher) {
-            //     await this.#network.sendMessageToNode(dispatcher, assembledMessage);
-            // }
-            await this.#network.validator_stream.messenger.send(assembledMessage);
+            await this.broadcastPartialTransaction(assembledMessage);
             return;
         }
 
@@ -422,11 +420,8 @@ export class MainSettlementBus extends ReadyResource {
             this.#state.writingKey.toString('hex'),
             txValidity.toString('hex')
         )
-        //await this.#network.sendMessageToAdmin(adminEntry, assembledMessage);
-        // let dispatcher = await this.#pickWriter()
-        // if (dispatcher) {
-        //     await this.#network.sendMessageToNode(dispatcher, assembledMessage);
-        await this.#network.validator_stream.messenger.send(assembledMessage);
+
+        await this.broadcastPartialTransaction(assembledMessage);
         return;
     }
 
@@ -603,7 +598,8 @@ export class MainSettlementBus extends ReadyResource {
             externalBootstrap,
             txValidity.toString('hex')
         );
-        await this.#network.validator_stream.messenger.send(payload);
+        await this.broadcastPartialTransaction(payload);
+
     }
 
     async #handleAddIndexerOperation(address) {
@@ -710,7 +706,8 @@ export class MainSettlementBus extends ReadyResource {
                     randomExternalBootstrap,
                     msbBootstrap
                 )
-                await this.#network.validator_stream.messenger.send(assembledTransactionOperation);
+                await this.broadcastPartialTransaction(assembledTransactionOperation);
+
                 break;
             default:
                 if (input.startsWith("/get_node_info")) {
