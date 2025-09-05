@@ -24,6 +24,7 @@ export const OperationType = Object.freeze({
     BAN_VALIDATOR: OP.BAN_VALIDATOR,
     BOOTSTRAP_DEPLOYMENT: OP.BOOTSTRAP_DEPLOYMENT,
     TX: OP.TX,
+    TRANSFER: OP.TRANSFER,
 });
 
 // Role managment constants
@@ -55,6 +56,7 @@ export const BOOTSTRAP_BYTE_LENGTH = 32;
 export const NONCE_BYTE_LENGTH = 32;
 export const HASH_BYTE_LENGTH = 32;
 export const SIGNATURE_BYTE_LENGTH = 64;
+export const AMOUNT_BYTE_LENGTH = 16;
 export const MIN_SAFE_VALIDATION_INTEGER = 0x00000001;
 export const MAX_SAFE_VALIDATION_INTEGER = 0xFFFFFFFF;
 
