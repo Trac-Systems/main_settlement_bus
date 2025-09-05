@@ -23,8 +23,7 @@ import {
 } from "./utils/constants.js";
 import partialStateMessageOperations from "./messages/partialStateMessages/PartialStateMessageOperations.js";
 import {randomBytes} from "hypercore-crypto";
-
-//TODO create a MODULE which will separate logic responsible for role managment
+import {decimalStringToBigInt, bigIntTo16ByteBuffer, bufferToBigInt} from "./utils/amountSerialization.js"
 
 export class MainSettlementBus extends ReadyResource {
     // internal attributes
@@ -626,6 +625,26 @@ export class MainSettlementBus extends ReadyResource {
         await this.#deployBootstrap(bootstrapHex);
     }
 
+    async #handleTransferOperation(address, amount) {
+        //decimalStringToBigInt, bigIntTo16ByteBuffer, bufferToBigInt
+        const amountBigInt = decimalStringToBigInt(amount);
+        const amountBuffer = bigIntTo16ByteBuffer(amountBigInt);
+
+        if (bufferToBigInt(amountBuffer) !== amountBigInt) {
+            throw new Error(`conversion error for amount: ${amount}`);
+        }
+        console.log(`address ${address}, ${amount}, amountBigInt ${amountBigInt} amountBuffer ${amountBuffer}`)
+        const txValidity = await this.#state.getIndexerSequenceState();
+        const payload = await PartialStateMessageOperations.assembleTransferOperationMessage(
+            this.#wallet,
+            address,
+            amountBuffer.toString('hex'),
+            txValidity.toString('hex'),
+        )
+        console.log("payload", payload);
+
+    }
+
     async interactiveMode() {
         if (this.#readline_instance === null) return;
         const rl = this.#readline_instance;
@@ -772,6 +791,11 @@ export class MainSettlementBus extends ReadyResource {
                     } else {
                         console.log(`No information found for transaction hash: ${txHash}`);
                     }
+                } else if (input.startsWith("/transfer")) {
+                    const splitted = input.split(" ");
+                    const address = splitted[1];
+                    const amount = splitted[2];
+                    await this.#handleTransferOperation(address, amount);
                 }
         }
         if (rl) rl.prompt();
