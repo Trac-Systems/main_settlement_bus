@@ -1,5 +1,6 @@
 import b4a from "b4a";
 
+// FUNCTUIONS TO SERIALIZE AND DESERIALIZE AMOUNTS ONLY ON CLI LEVEL. ATTENTION DO NOT USE IT ON PROTOCOL LEVEL
 export function decimalStringToBigInt(inputString, decimals = 18) {
     if (typeof inputString !== 'string') {
         throw new TypeError('Input must be a string');
@@ -17,12 +18,26 @@ export function decimalStringToBigInt(inputString, decimals = 18) {
         throw new Error(`Too many decimal places. Maximum allowed: ${decimals}`);
     }
 
+    // Check if the amount is zero after trimming leading/trailing zeros
+    const isZero = integerPart.replace(/^0+/, '') === '' && (!fractionalPart || fractionalPart.replace(/0+$/, '') === '');
+    if (isZero) {
+        throw new Error('Amount cannot be zero');
+    }
+
     fractionalPart = fractionalPart.padEnd(decimals, '0');
     const fullNumberString = integerPart + fractionalPart;
 
     try {
-        return BigInt(fullNumberString);
+        const value = BigInt(fullNumberString);
+        // Check if the value exceeds maximum allowed (2^128 - 1)
+        if (value > (2n ** 128n - 1n)) {
+            throw new Error('Amount exceeds maximum allowed value (2^128 - 1)');
+        }
+        return value;
     } catch (error) {
+        if (error.message.includes('exceeds maximum')) {
+            throw error;
+        }
         throw new Error(`Failed to convert to BigInt: ${error.message}`);
     }
 }
