@@ -4,6 +4,7 @@ import Hyperbee from 'hyperbee';
 import b4a from 'b4a';
 import {
     ACK_INTERVAL,
+    ADMIN_INITIAL_BALANCE,
     EntryType,
     OperationType,
 } from '../../utils/constants.js';
@@ -19,7 +20,7 @@ import nodeRoleUtils from './utils/roles.js';
 import lengthEntryUtils from './utils/lengthEntry.js';
 import transactionUtils from './utils/transaction.js';
 import {blake3Hash} from '../../utils/crypto.js';
-import { isRoleAccess, isTransaction, isCoreAdmin, operationToPayload } from '../../utils/operations.js';
+import { operationToPayload } from '../../utils/operations.js';
 
 class State extends ReadyResource {
     //TODO: AFTER createMessage(..args) check if this function did not return NULL
@@ -271,7 +272,7 @@ class State extends ReadyResource {
         const opEntry = await this.#getEntryApply(txHashHexString, batch);
         if (null !== opEntry) return;
 
-        const initializedNodeEntry = nodeEntryUtils.init(op.cao.iw, nodeRoleUtils.NodeRole.INDEXER);
+        const initializedNodeEntry = nodeEntryUtils.init(op.cao.iw, nodeRoleUtils.NodeRole.INDEXER, ADMIN_INITIAL_BALANCE);
         //const updatedNodeEntry = nodeEntryUtils.setRole(initializedNodeEntry, nodeRoleUtils.NodeRole.INDEXER);
         await batch.put(adminAddressString, initializedNodeEntry);
         await batch.put(EntryType.WRITER_ADDRESS + op.cao.iw.toString('hex'), op.address);

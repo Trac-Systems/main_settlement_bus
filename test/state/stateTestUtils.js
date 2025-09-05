@@ -10,3 +10,10 @@ export function randomAddress(hrp = TRAC_NETWORK_MSB_MAINNET_PREFIX) {
     const data = randomBuffer(TRAC_PUB_KEY_SIZE);
     return bech32m.encode(hrp, bech32m.toWords(data));
 }
+
+export const TEN_THOUSAND_VALUE = b4a.from([
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x27, 0x10,
+])
