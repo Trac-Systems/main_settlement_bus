@@ -7,7 +7,13 @@ export function decimalStringToBigInt(inputString, decimals = 18) {
     }
 
     const trimmedInput = inputString.trim();
-    if (!/^-?\d+(\.\d+)?$/.test(trimmedInput)) {
+
+    // Check for negative numbers first
+    if (trimmedInput.startsWith('-')) {
+        throw new Error('Negative amounts are not allowed');
+    }
+
+    if (!/^\d+(\.\d+)?$/.test(trimmedInput)) {
         throw new Error('Invalid decimal format. Use format: 123.456');
     }
 
