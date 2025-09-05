@@ -3,6 +3,7 @@ import b4a from 'b4a';
 import { WRITER_MASK, INDEXER_MASK, WHITELISTED_MASK, calculateNodeRole, isNodeRoleValid } from './roles.js';
 import { WRITER_BYTE_LENGTH, BALANCE_BYTE_LENGTH } from '../../../utils/constants.js';
 import { isBufferValid } from '../../../utils/buffer.js';
+import { Balance } from './balance.js';
 
 export const NODE_ENTRY_SIZE = WRITER_BYTE_LENGTH + BALANCE_BYTE_LENGTH + 1;
 export const ZERO_BALANCE = b4a.alloc(BALANCE_BYTE_LENGTH);
@@ -144,6 +145,14 @@ export function isIndexer(nodeEntry) {
         return false;
     }
     return !!(nodeEntry[0] & INDEXER_MASK);
+}
+
+export function balanceOf(nodeEntry) {
+    try{
+        return new Balance(nodeEntry.balance)
+    } catch {
+        return null
+    }
 }
 
 /**
