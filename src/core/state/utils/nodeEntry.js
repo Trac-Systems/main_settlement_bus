@@ -4,6 +4,7 @@ import { WRITER_MASK, INDEXER_MASK, WHITELISTED_MASK, calculateNodeRole, isNodeR
 import { WRITER_BYTE_LENGTH, BALANCE_BYTE_LENGTH } from '../../../utils/constants.js';
 import { isBufferValid } from '../../../utils/buffer.js';
 import { Balance } from './balance.js';
+import { Balance } from './balance.js';
 
 export const NODE_ENTRY_SIZE = WRITER_BYTE_LENGTH + BALANCE_BYTE_LENGTH + 1;
 export const ZERO_BALANCE = b4a.alloc(BALANCE_BYTE_LENGTH);

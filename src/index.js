@@ -25,6 +25,9 @@ import partialStateMessageOperations from "./messages/partialStateMessages/Parti
 import {randomBytes} from "hypercore-crypto";
 import { toBalance } from "./core/state/utils/nodeEntry.js";
 import {decimalStringToBigInt, bigIntTo16ByteBuffer, bufferToBigInt} from "./utils/amountSerialization.js"
+import { balanceOf } from "./core/state/utils/nodeEntry.js";
+
+//TODO create a MODULE which will separate logic responsible for role managment
 
 export class MainSettlementBus extends ReadyResource {
     // internal attributes
