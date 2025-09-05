@@ -14,19 +14,32 @@ test('decimalStringToBigInt', async t => {
 
     // Invalid cases
     await Promise.all([
-        t.exception.all(() => decimalStringToBigInt(123), errorMessageIncludes('Input must be a string')),
-        t.exception(() => decimalStringToBigInt('0'), errorMessageIncludes('Amount cannot be zero')),
-        t.exception(() => decimalStringToBigInt('0.0'), errorMessageIncludes('Amount cannot be zero')),
-        t.exception(() => decimalStringToBigInt('00.00'), errorMessageIncludes('Amount cannot be zero')),
-        t.exception(() => decimalStringToBigInt('abc'), errorMessageIncludes('Invalid decimal format. Use format: 123.456')),
-        t.exception(() => decimalStringToBigInt('123.456.789'), errorMessageIncludes('Invalid decimal format. Use format: 123.456')),
-        t.exception(() => decimalStringToBigInt('123.1234567890123456789'), errorMessageIncludes('Too many decimal places. Maximum allowed: 18')),
-        t.exception(() => decimalStringToBigInt(''), errorMessageIncludes('Invalid decimal format. Use format: 123.456')),
-        t.exception(() => decimalStringToBigInt(' '), errorMessageIncludes('Invalid decimal format. Use format: 123.456')),
-        t.exception(() => decimalStringToBigInt('12..34'), errorMessageIncludes('Invalid decimal format. Use format: 123.456')),
-        t.exception(() => decimalStringToBigInt('.123'), errorMessageIncludes('Invalid decimal format. Use format: 123.456')),
-        t.exception(() => decimalStringToBigInt('340282366920938463463.374607431768211456'), errorMessageIncludes('Amount exceeds maximum allowed value (2^128 - 1)')),
-        t.exception(() => decimalStringToBigInt('999999999999999999999999999999999999999'), errorMessageIncludes('Amount exceeds maximum allowed value (2^128 - 1)'))
+        t.exception.all(() => decimalStringToBigInt(123),
+            errorMessageIncludes('Input must be a string')),
+        t.exception(() => decimalStringToBigInt('0'),
+            errorMessageIncludes('Amount cannot be zero')),
+        t.exception(() => decimalStringToBigInt('0.0'),
+            errorMessageIncludes('Amount cannot be zero')),
+        t.exception(() => decimalStringToBigInt('00.00'),
+            errorMessageIncludes('Amount cannot be zero')),
+        t.exception(() => decimalStringToBigInt('abc'),
+            errorMessageIncludes('Invalid decimal format. Use format: 123.456')),
+        t.exception(() => decimalStringToBigInt('123.456.789'),
+            errorMessageIncludes('Invalid decimal format. Use format: 123.456')),
+        t.exception(() => decimalStringToBigInt('123.1234567890123456789'),
+            errorMessageIncludes('Too many decimal places. Maximum allowed: 18')),
+        t.exception(() => decimalStringToBigInt(''),
+            errorMessageIncludes('Invalid decimal format. Use format: 123.456')),
+        t.exception(() => decimalStringToBigInt(' '),
+            errorMessageIncludes('Invalid decimal format. Use format: 123.456')),
+        t.exception(() => decimalStringToBigInt('12..34'),
+            errorMessageIncludes('Invalid decimal format. Use format: 123.456')),
+        t.exception(() => decimalStringToBigInt('.123'),
+            errorMessageIncludes('Invalid decimal format. Use format: 123.456')),
+        t.exception(() => decimalStringToBigInt('340282366920938463463.374607431768211456'),
+            errorMessageIncludes('Amount exceeds maximum allowed value (2^128 - 1)')),
+        t.exception(() => decimalStringToBigInt('999999999999999999999999999999999999999'),
+            errorMessageIncludes('Amount exceeds maximum allowed value (2^128 - 1)'))
     ]);
 });
 
@@ -52,10 +65,14 @@ test('bigIntTo16ByteBuffer', async t => {
 
     // Error cases tests
     await Promise.all([
-        t.exception.all(() => bigIntTo16ByteBuffer(123), errorMessageIncludes('Input must be a BigInt')),
-        t.exception.all(() => bigIntTo16ByteBuffer('123'), errorMessageIncludes('Input must be a BigInt')),
-        t.exception.all(() => bigIntTo16ByteBuffer(null), errorMessageIncludes('Input must be a BigInt')),
-        t.exception.all(() => bigIntTo16ByteBuffer(undefined), errorMessageIncludes('Input must be a BigInt'))
+        t.exception.all(() => bigIntTo16ByteBuffer(123),
+            errorMessageIncludes('Input must be a BigInt')),
+        t.exception.all(() => bigIntTo16ByteBuffer('123'),
+            errorMessageIncludes('Input must be a BigInt')),
+        t.exception.all(() => bigIntTo16ByteBuffer(null),
+            errorMessageIncludes('Input must be a BigInt')),
+        t.exception.all(() => bigIntTo16ByteBuffer(undefined),
+            errorMessageIncludes('Input must be a BigInt'))
     ]);
 });
 
@@ -84,12 +101,18 @@ test('bufferToBigInt', async t => {
 
     // Error cases tests
     await Promise.all([
-        t.exception.all(() => bufferToBigInt(b4a.alloc(15)), errorMessageIncludes('Input must be a 16-byte Buffer')),
-        t.exception.all(() => bufferToBigInt(b4a.alloc(17)), errorMessageIncludes('Input must be a 16-byte Buffer')),
-        t.exception.all(() => bufferToBigInt(null), errorMessageIncludes('Input must be a 16-byte Buffer')),
-        t.exception.all(() => bufferToBigInt(undefined), errorMessageIncludes('Input must be a 16-byte Buffer')),
-        t.exception.all(() => bufferToBigInt('not a buffer'), errorMessageIncludes('Input must be a 16-byte Buffer')),
-        t.exception.all(() => bufferToBigInt([1,2,3,4]), errorMessageIncludes('Input must be a 16-byte Buffer'))
+        t.exception.all(() => bufferToBigInt(b4a.alloc(15)),
+            errorMessageIncludes('Input must be a 16-byte Buffer')),
+        t.exception.all(() => bufferToBigInt(b4a.alloc(17)),
+            errorMessageIncludes('Input must be a 16-byte Buffer')),
+        t.exception.all(() => bufferToBigInt(null),
+            errorMessageIncludes('Input must be a 16-byte Buffer')),
+        t.exception.all(() => bufferToBigInt(undefined),
+            errorMessageIncludes('Input must be a 16-byte Buffer')),
+        t.exception.all(() => bufferToBigInt('not a buffer'),
+            errorMessageIncludes('Input must be a 16-byte Buffer')),
+        t.exception.all(() => bufferToBigInt([1,2,3,4]),
+            errorMessageIncludes('Input must be a 16-byte Buffer'))
     ]);
 });
 
