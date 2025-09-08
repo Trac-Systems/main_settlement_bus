@@ -1,9 +1,11 @@
 import b4a from 'b4a';
 import { setBalance } from './nodeEntry.js';
-import { isBufferValid } from '../../../utils/buffer.js';
-import { BALANCE_BYTE_LENGTH } from '../../../utils/constants.js';
+import { isBufferValid, bigIntToBuffer } from '../../../utils/buffer.js';
+import { BALANCE_BYTE_LENGTH, TOKEN_DECIMALS } from '../../../utils/constants.js';
 
 class BalanceError extends Error {}
+
+export const $TNK = bigint => bigIntToBuffer(bigint * 10n ** TOKEN_DECIMALS, BALANCE_BYTE_LENGTH)
 
 const addBuffers = (a, b) => {
     if (a.length !== b.length) throw new Error("Buffers must be same length");

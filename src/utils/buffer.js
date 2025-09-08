@@ -49,3 +49,22 @@ export function normalizeBuffer(message) {
     
     return null;
 }
+
+export function bigIntToBuffer(big, size) {
+    if (big < 0n) return b4a.alloc(size)
+  
+    let hex = big.toString(16);
+    if (hex.length % 2) hex = `0${hex}`;
+  
+    let buf = b4a.from(hex, 'hex');
+  
+    if (size) {
+        if (buf.length > size) return b4a.alloc(size)
+        if (buf.length < size) {
+            const padding = b4a.alloc(size - buf.length, 0);
+            buf = b4a.concat([padding, buf]);
+        }
+    }
+  
+    return buf;
+}
