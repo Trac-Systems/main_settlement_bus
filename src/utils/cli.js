@@ -42,17 +42,20 @@ export async function verifyDag(state, network, wallet, writerKey) {
     }
 }
 
-export function printHelp() {
+export function printHelp(isAdmin = false) {
+    if (isAdmin) {
+        console.log('\nAdmin commands:');
+        console.log('- /add_admin: register admin entry with bootstrap key (initial setup), or use --recovery flag to recover admin role');
+        console.log('- /balance_migration: perform balance migration with the given initial balances CSV file');
+        console.log('- /add_whitelist: add all specified whitelist addresses');
+        console.log('- /disable_initialization: disable further balance initializations and whitelisting');
+        console.log('- /add_indexer <address>: change a role of the selected writer node to indexer role');
+        console.log('- /remove_indexer <address>: change a role of the selected indexer node to default role');
+        console.log('- /ban_writer <address>: demote a whitelisted writer to default role and remove it from the whitelist');
+    }
     console.log('Available commands:');
     console.log('- /add_writer: add yourself as validator to this MSB once whitelisted.');
     console.log('- /remove_writer: remove yourself from this MSB.');
-    console.log('- /add_admin: register admin entry with bootstrap key (initial setup), or use --recovery flag to recover admin role (admin only).');
-    console.log('- /balance_migration: perform balance migration with the given initial balances CSV file. (admin only)');
-    console.log('- /add_whitelist: add all specified whitelist addresses. (admin only)');
-    console.log('- /disable_initialization: disable further balance initializations and whitelisting. (admin only)');
-    console.log('- /add_indexer <address>: change a role of the selected writer node to indexer role. (admin only)');
-    console.log('- /remove_indexer <address>: change a role of the selected indexer node to default role. (admin only)');
-    console.log('- /ban_writer <address>: demote a whitelisted writer to default role and remove it from the whitelist. (admin only)');
     console.log('- /get_node_info <address>: get information about a node with the given address.');
     console.log('- /stats: check system stats such as writing key, DAG, etc.');
     console.log('- /deployment <subnetwork_bootstrap>: deploy a subnetwork with the given bootstrap.');

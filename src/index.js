@@ -44,6 +44,7 @@ export class MainSettlementBus extends ReadyResource {
     #enable_auto_transaction_consent
     #state;
     #isClosing = false;
+    #is_admin_node;
 
     constructor(options = {}) {
         super();
@@ -51,6 +52,7 @@ export class MainSettlementBus extends ReadyResource {
         this.#key_pair_path = `${this.#stores_directory}${options.store_name}/db/keypair.json`;
         this.#enable_wallet = options.enable_wallet !== false;
         this.enable_interactive_mode = options.enable_interactive_mode !== false;
+        this.#is_admin_node = options.store_name === 'admin';
         this.#enable_role_requester =
             options.enable_role_requester !== undefined
                 ? options.enable_role_requester
@@ -711,7 +713,7 @@ export class MainSettlementBus extends ReadyResource {
         if (this.#readline_instance === null) return;
         const rl = this.#readline_instance;
 
-        printHelp();
+        printHelp(this.#is_admin_node);
 
         rl.on("line", async (input) => {
             try {
@@ -728,7 +730,7 @@ export class MainSettlementBus extends ReadyResource {
     async handleCommand(input, rl = null) {
         switch (input) {
             case "/help":
-                printHelp();
+                printHelp(this.#is_admin_node);
                 break;
             case "/exit":
                 if (rl) rl.close();
