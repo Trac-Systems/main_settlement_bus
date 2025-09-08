@@ -45,8 +45,8 @@ class PartialRoleAccess {
     async #validateTransactionUniqueness(payload) {
         const tx = payload.rao.tx;
         const txHex = tx.toString('hex');
-        if (await this.state.getSigned(txHex) !== null) {
-            console.error(`Transaction with hash ${txHex} already exists in the state. Possible replay attack detected.`);
+        if (await this.state.get(txHex) !== null) {
+            console.error(`Transaction with hash ${txHex} already exists in the state.`);
             return false;
         }
         return true;
@@ -173,7 +173,7 @@ class PartialRoleAccess {
         const currentTxv = await this.state.getIndexerSequenceState()
         const incomingTxv = payload.rao.txv
         if (!b4a.equals(currentTxv, incomingTxv)) {
-            console.error(`Transaction validity: ${incomingTxv.toString('hex')} does not match the current indexer sequence state: ${currentTxv.toString('hex')}`);
+            console.error(`Transaction has expired.`);
             return false;
         }
         return true;

@@ -120,6 +120,17 @@ class PartialStateMessageDirector {
             .buildValueAndSign();
         return this.#builder.getPayload();
     }
+    async buildTransferOperationMessage(address, recipientAddress, amount, txValidity){
+        if (!this.#builder) throw new Error('Builder has not been set.');
+        await this.#builder
+            .forOperationType(OperationType.TRANSFER)
+            .withAddress(address)
+            .withTxValidity(txValidity)
+            .withIncomingAddress(recipientAddress)
+            .withAmount(amount)
+            .buildValueAndSign();
+        return this.#builder.getPayload();
+    }
 }
 
 export default PartialStateMessageDirector;

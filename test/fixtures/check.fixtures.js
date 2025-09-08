@@ -3,14 +3,64 @@ import b4a from 'b4a';
 
 import { addressToBuffer } from '../../src/core/state/utils/address.js';
 import {
-	HASH_BYTE_LENGTH,
-	SIGNATURE_BYTE_LENGTH,
-	WRITER_BYTE_LENGTH,
-	BOOTSTRAP_BYTE_LENGTH,
-	NONCE_BYTE_LENGTH,
-	OperationType,
+    HASH_BYTE_LENGTH,
+    SIGNATURE_BYTE_LENGTH,
+    WRITER_BYTE_LENGTH,
+    BOOTSTRAP_BYTE_LENGTH,
+    NONCE_BYTE_LENGTH,
+    OperationType, AMOUNT_BYTE_LENGTH,
 } from '../../src/utils/constants.js';
+export const TRO = {
+    valid_partial_transfer: {
+        type: OperationType.TRANSFER,
+        address: addressToBuffer('trac123z3gfpr2epjwww7ntm3m6ud2fhmq0tvts27p2f5mx3qkecsutlqfys769'),
+        tro: {
+            tx: b4a.from('c59f70942febb1de32fcb59febe84560416265d39f39b48fae676592910a98f4', 'hex'),
+            txv: b4a.from('eb59a3e756d1c9597e46b33bcea91e262f8f73e94c238bdf70854aa2e8c42608', 'hex'),
+            in: b4a.from('863fef21f5146553b0396b2ee1a93a8dbfce240411b71ccdcfc504504a6b9b50', 'hex'),
+            to: addressToBuffer('trac1mqktwme8fvklrds4hlhfy6lhmsu9qgfn3c3kuhz7c5zwjt8rc3dqj9tx7h'),
+            am: b4a.from('00000000000000015af1d78b58c40001', 'hex'),
+            is: b4a.from('06acd7faecd5159221259ebb1d7e98eccd7c6e2884de9de45097e6d9d8c37192602901c74dde6bb2f48f6f665edc84140627f6e9c42f774a0e9f55ef3b348e06', 'hex')
+        }
+    },
+    valid_complete_transfer: {
+        type: OperationType.TRANSFER,
+        address: addressToBuffer('trac123z3gfpr2epjwww7ntm3m6ud2fhmq0tvts27p2f5mx3qkecsutlqfys769'),
+        tro: {
+            tx: b4a.from('c59f70942febb1de32fcb59febe84560416265d39f39b48fae676592910a98f4', 'hex'),
+            txv: b4a.from('eb59a3e756d1c9597e46b33bcea91e262f8f73e94c238bdf70854aa2e8c42608', 'hex'),
+            in: b4a.from('863fef21f5146553b0396b2ee1a93a8dbfce240411b71ccdcfc504504a6b9b50', 'hex'),
+            to: addressToBuffer('trac1mqktwme8fvklrds4hlhfy6lhmsu9qgfn3c3kuhz7c5zwjt8rc3dqj9tx7h'),
+            am: b4a.from('00000000000000015af1d78b58c40001', 'hex'),
+            is: b4a.from('06acd7faecd5159221259ebb1d7e98eccd7c6e2884de9de45097e6d9d8c37192602901c74dde6bb2f48f6f665edc84140627f6e9c42f774a0e9f55ef3b348e06', 'hex'),
+            vn: b4a.from('0ad7fe36a35a27ea4df932b800200823a97d4db31bca247f43ad7523b0493645', 'hex'),
+            vs: b4a.from('5b534be7a374148962c271d194c26cf5b1ad705ab218a87709a33fe74f9d1b811772447c939b17b2f803e3da7648f49b666b929fbb20e458ced952f147162c08', 'hex'),
+            va: addressToBuffer('trac18qq7h503y3326v6msgvq0jwc0e8jp4t4q53z9p9jvd98arj7mtpqfac04p'),
+        }
+    },
+    top_fields_transfer: ['type', 'address', 'tro'],
+    partial_transfer_value_fields: ['tx','txv', 'in', 'to', 'am', 'is'],
+    complete_transfer_value_fields: ['tx', 'txv', 'in', 'to', 'am', 'is' ,'va', 'vn', 'vs'],
+    required_length_of_fields_for_partial_transfer: {
+        tx: HASH_BYTE_LENGTH,
+        txv: HASH_BYTE_LENGTH,
+        in: NONCE_BYTE_LENGTH,
+        to: TRAC_ADDRESS_SIZE,
+        am: AMOUNT_BYTE_LENGTH,
+    },
+    required_length_of_fields_for_complete_transfer: {
+        tx: HASH_BYTE_LENGTH,
+        txv: HASH_BYTE_LENGTH,
+        in: NONCE_BYTE_LENGTH,
+        to: TRAC_ADDRESS_SIZE,
+        am: AMOUNT_BYTE_LENGTH,
+        is: SIGNATURE_BYTE_LENGTH,
+        vn: NONCE_BYTE_LENGTH,
+        vs: SIGNATURE_BYTE_LENGTH,
+        va: TRAC_ADDRESS_SIZE
+    },
 
+}
 export const BDO = {
     valid_partial_bootstrap_deployment: {
         type: OperationType.BOOTSTRAP_DEPLOYMENT,
@@ -33,9 +83,9 @@ export const BDO = {
             bs: b4a.from('f24e61cf7941256b080be2133bccb520414c78021215edfcb781622da526c414', 'hex'),
             in: b4a.from('0ad7fe36a35a27ea4df932b800200823a97d4db31bca247f43ad7523b0493645', 'hex'),
             is: b4a.from('5b534be7a374148962c271d194c26cf5b1ad705ab218a87709a33fe74f9d1b811772447c939b17b2f803e3da7648f49b666b929fbb20e458ced952f147162c08', 'hex'),
+            va: addressToBuffer('trac18qq7h503y3326v6msgvq0jwc0e8jp4t4q53z9p9jvd98arj7mtpqfac04p'),
             vn: b4a.from('0ad7fe36a35a27ea4df932b800200823a97d4db31bca247f43ad7523b0493645', 'hex'),
             vs: b4a.from('5b534be7a374148962c271d194c26cf5b1ad705ab218a87709a33fe74f9d1b811772447c939b17b2f803e3da7648f49b666b929fbb20e458ced952f147162c08', 'hex'),
-            va: addressToBuffer('trac18qq7h503y3326v6msgvq0jwc0e8jp4t4q53z9p9jvd98arj7mtpqfac04p'),
         }
     },
 

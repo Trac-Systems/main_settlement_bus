@@ -98,8 +98,8 @@ class PartialTransaction {
     async #validateTransactionUniqueness(payload) {
         const tx = payload.txo.tx;
         const txHex = tx.toString('hex');
-        if (null !== await this.state.getSigned(txHex)) {
-            console.error(`Transaction with hash ${txHex} already exists in the state. Possible replay attack detected.`);
+        if (null !== await this.state.get(txHex)) {
+            console.error(`Transaction with hash ${txHex} already exists in the state.`);
             return false;
         }
         return true;
@@ -128,7 +128,7 @@ class PartialTransaction {
             return false;
         }
 
-        const getBootstrapTransactionTxPayload = await this.state.getSigned(externalBootstrapResult.toString('hex'));
+        const getBootstrapTransactionTxPayload = await this.state.get(externalBootstrapResult.toString('hex'));
 
         if (null === getBootstrapTransactionTxPayload) {
             console.error('External bootstrap is not registered as usual tx', externalBootstrapResult.toString('hex'), ':', payload);
@@ -150,7 +150,7 @@ class PartialTransaction {
         const currentTxv = await this.state.getIndexerSequenceState()
         const incomingTxv = payload.txo.txv
         if (!b4a.equals(currentTxv, incomingTxv)) {
-            console.error(`Transaction validity: ${incomingTxv.toString('hex')} does not match the current indexer sequence state: ${currentTxv.toString('hex')}`);
+            console.error(`Transaction has expired.`);
             return false;
         }
         return true;

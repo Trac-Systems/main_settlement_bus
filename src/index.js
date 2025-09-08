@@ -23,8 +23,7 @@ import {
 } from "./utils/constants.js";
 import partialStateMessageOperations from "./messages/partialStateMessages/PartialStateMessageOperations.js";
 import {randomBytes} from "hypercore-crypto";
-
-//TODO create a MODULE which will separate logic responsible for role managment
+import {decimalStringToBigInt, bigIntTo16ByteBuffer, bufferToBigInt} from "./utils/amountSerialization.js"
 
 export class MainSettlementBus extends ReadyResource {
     // internal attributes
@@ -193,6 +192,10 @@ export class MainSettlementBus extends ReadyResource {
         await sleep(100);
     }
 
+    async broadcastPartialTransaction(partialTransactionPayload) {
+        await this.#network.validator_stream.messenger.send(partialTransactionPayload);
+    }
+
     async #setUpRoleAutomatically() {
         if (!this.#state.isWritable() && this.#enable_role_requester) {
             console.log("Requesting writer role... This may take a moment.");
@@ -305,7 +308,7 @@ export class MainSettlementBus extends ReadyResource {
             txValidity.toString('hex')
         );
 
-        await this.#network.validator_stream.messenger.send(adminRecoveryMessage);
+        await this.broadcastPartialTransaction(adminRecoveryMessage);
     }
 
     async #handleWhitelistOperations() {
@@ -396,13 +399,7 @@ export class MainSettlementBus extends ReadyResource {
                 txValidity.toString('hex')
             )
 
-            //let dispatcher = await this.#pickWriter()
-            // console.log(dispatcher);
-
-            // if (dispatcher) {
-            //     await this.#network.sendMessageToNode(dispatcher, assembledMessage);
-            // }
-            await this.#network.validator_stream.messenger.send(assembledMessage);
+            await this.broadcastPartialTransaction(assembledMessage);
             return;
         }
 
@@ -422,11 +419,8 @@ export class MainSettlementBus extends ReadyResource {
             this.#state.writingKey.toString('hex'),
             txValidity.toString('hex')
         )
-        //await this.#network.sendMessageToAdmin(adminEntry, assembledMessage);
-        // let dispatcher = await this.#pickWriter()
-        // if (dispatcher) {
-        //     await this.#network.sendMessageToNode(dispatcher, assembledMessage);
-        await this.#network.validator_stream.messenger.send(assembledMessage);
+
+        await this.broadcastPartialTransaction(assembledMessage);
         return;
     }
 
@@ -603,7 +597,8 @@ export class MainSettlementBus extends ReadyResource {
             externalBootstrap,
             txValidity.toString('hex')
         );
-        await this.#network.validator_stream.messenger.send(payload);
+        await this.broadcastPartialTransaction(payload);
+
     }
 
     async #handleAddIndexerOperation(address) {
@@ -628,6 +623,26 @@ export class MainSettlementBus extends ReadyResource {
 
     async #handleBootstrapDeploymentOperation(bootstrapHex) {
         await this.#deployBootstrap(bootstrapHex);
+    }
+
+    async #handleTransferOperation(address, amount) {
+        //decimalStringToBigInt, bigIntTo16ByteBuffer, bufferToBigInt
+        const amountBigInt = decimalStringToBigInt(amount);
+        const amountBuffer = bigIntTo16ByteBuffer(amountBigInt);
+
+        if (bufferToBigInt(amountBuffer) !== amountBigInt) {
+            throw new Error(`conversion error for amount: ${amount}`);
+        }
+
+        const txValidity = await this.#state.getIndexerSequenceState();
+        const payload = await PartialStateMessageOperations.assembleTransferOperationMessage(
+            this.#wallet,
+            address,
+            amountBuffer.toString('hex'),
+            txValidity.toString('hex'),
+        )
+        await this.broadcastPartialTransaction(payload);
+
     }
 
     async interactiveMode() {
@@ -710,7 +725,8 @@ export class MainSettlementBus extends ReadyResource {
                     randomExternalBootstrap,
                     msbBootstrap
                 )
-                await this.#network.validator_stream.messenger.send(assembledTransactionOperation);
+                await this.broadcastPartialTransaction(assembledTransactionOperation);
+
                 break;
             default:
                 if (input.startsWith("/get_node_info")) {
@@ -775,6 +791,11 @@ export class MainSettlementBus extends ReadyResource {
                     } else {
                         console.log(`No information found for transaction hash: ${txHash}`);
                     }
+                } else if (input.startsWith("/transfer")) {
+                    const splitted = input.split(" ");
+                    const address = splitted[1];
+                    const amount = splitted[2];
+                    await this.#handleTransferOperation(address, amount);
                 }
         }
         if (rl) rl.prompt();
