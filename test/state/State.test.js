@@ -38,3 +38,14 @@ test('State#derementBalance', async t => {
     const entry = await state.decrementBalance('adminAddress', $TNK(150n))
     t.is(toBalance(decode(entry).balance).asBigInt(), tokenUnits(850n), 'balance matches');
 });
+
+
+test('State#derementBalance lower then', async t => {
+    const State = await esmock('../../src/core/state/State.js', {
+        "autobase": AutoBaseMock
+    });
+    const state = new State(null, null, null)
+
+    const entry = await state.decrementBalance('adminAddress', $TNK(1150n))
+    t.is(entry, null, 'entry is null');
+});
