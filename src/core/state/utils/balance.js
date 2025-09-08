@@ -64,7 +64,7 @@ export class Balance {
     }
 
     update(nodeEntry) {
-        setBalance(nodeEntry, this.#value)
+        return setBalance(nodeEntry, this.#value)
     }
 
     asHex() {

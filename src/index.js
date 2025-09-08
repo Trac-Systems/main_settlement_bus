@@ -23,7 +23,7 @@ import {
 } from "./utils/constants.js";
 import partialStateMessageOperations from "./messages/partialStateMessages/PartialStateMessageOperations.js";
 import {randomBytes} from "hypercore-crypto";
-import { balanceOf } from "./core/state/utils/nodeEntry.js";
+import { toBalance } from "./core/state/utils/nodeEntry.js";
 import {decimalStringToBigInt, bigIntTo16ByteBuffer, bufferToBigInt} from "./utils/amountSerialization.js"
 
 export class MainSettlementBus extends ReadyResource {
@@ -740,7 +740,7 @@ export class MainSettlementBus extends ReadyResource {
                             IsWhitelisted: nodeEntry.isWhitelisted,
                             IsWriter: nodeEntry.isWriter,
                             IsIndexer: nodeEntry.isIndexer,
-                            balance: balanceOf(nodeEntry).asBigInt()
+                            balance: toBalance(nodeEntry.balance).asBigInt()
                         });
                     } else {
                         console.log("Node Entry not found for address:", address);

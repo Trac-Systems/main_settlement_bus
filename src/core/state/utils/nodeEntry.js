@@ -147,9 +147,9 @@ export function isIndexer(nodeEntry) {
     return !!(nodeEntry[0] & INDEXER_MASK);
 }
 
-export function balanceOf(nodeEntry) {
+export function toBalance(balance) {
     try{
-        return new Balance(nodeEntry.balance)
+        return new Balance(balance)
     } catch {
         return null
     }

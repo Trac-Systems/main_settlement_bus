@@ -15,7 +15,7 @@ import {safeDecodeApplyOperation} from '../../utils/protobuf/operationHelpers.js
 import {createMessage, ZERO_WK} from '../../utils/buffer.js';
 import addressUtils from './utils/address.js';
 import adminEntryUtils from './utils/adminEntry.js';
-import nodeEntryUtils, { setWritingKey } from './utils/nodeEntry.js';
+import nodeEntryUtils, { toBalance, setWritingKey } from './utils/nodeEntry.js';
 import nodeRoleUtils from './utils/roles.js';
 import lengthEntryUtils from './utils/lengthEntry.js';
 import transactionUtils from './utils/transaction.js';
@@ -119,6 +119,25 @@ class State extends ReadyResource {
     async getNodeEntry(address) {
         const nodeEntry = await this.getSigned(address);
         return nodeEntry ? nodeEntryUtils.decode(nodeEntry) : null;
+    }
+
+    async incrementBalance(address, toIncrement) {
+        if (toIncrement <= 0n) return null
+        const nodeEntry = await this.getNodeEntry(address);
+        if (nodeEntry === null) return null;
+        const balance = toBalance(nodeEntry.balance)
+        const result = balance.add(toBalance(toIncrement))
+        return result.update(nodeEntry)
+    }
+
+    async decrementBalance(address, toDecrement) {
+        if (toDecrement <= 0n) return null
+        const nodeEntry = await this.getNodeEntry(address);
+        if (nodeEntry === null) return null;
+        if (toBalance(nodeEntry.balance).asBigInt() < toDecrement) return null;
+        const balance = toBalance(nodeEntry.balance)
+        const result = balance.sub(toBalance(toDecrement))
+        return result.update(nodeEntry)
     }
 
     async isAddressWhitelisted(address) {
