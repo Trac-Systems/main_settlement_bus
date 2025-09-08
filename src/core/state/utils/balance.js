@@ -5,10 +5,12 @@ import { BALANCE_BYTE_LENGTH, TOKEN_DECIMALS } from '../../../utils/constants.js
 
 class BalanceError extends Error {}
 
+const EMPTY_BUFFER = b4a.alloc(0)
+
 export const $TNK = bigint => bigIntToBuffer(bigint * 10n ** TOKEN_DECIMALS, BALANCE_BYTE_LENGTH)
 
 const addBuffers = (a, b) => {
-    if (a.length !== b.length) throw new Error("Buffers must be same length");
+    if (a.length !== b.length) return EMPTY_BUFFER
     const result = b4a.alloc(a.length);
     let carry = 0;
     for (let i = a.length - 1; i >= 0; i--) {
@@ -20,7 +22,7 @@ const addBuffers = (a, b) => {
 }
 
 const subBuffers = (a, b) => {
-    if (a.length !== b.length) throw new Error("Buffers must be same length");
+    if (a.length !== b.length) return EMPTY_BUFFER
     const result = b4a.alloc(a.length);
     let borrow = 0;
     for (let i = a.length - 1; i >= 0; i--) {
@@ -67,6 +69,14 @@ export class Balance {
 
     update(nodeEntry) {
         return setBalance(nodeEntry, this.#value)
+    }
+
+    greaterThen(b) {
+        return b4a.compare(this.#value, b.value) === 1;
+    }
+
+    lowerThen(b) {
+        return b4a.compare(this.#value, b.value) === -1;
     }
 
     asHex() {

@@ -52,6 +52,15 @@ test('Balance#asBigInt', t => {
     t.is(addedBalance.asBigInt(), 20_000n, 'balance matches');
 });
 
+test('Balance#greaterThen', t => {
+    const $TNK1000 = $TNK(1000n)
+    const $TNK1001 = $TNK(1001n)
+
+    t.not(toBalance($TNK1000).greaterThen(toBalance($TNK1001)), '1000 not greater then 1001');
+    t.ok(toBalance($TNK1001).greaterThen(toBalance($TNK1000)), '1000 not greater then 1001');
+    t.not(toBalance($TNK1000).greaterThen(toBalance($TNK1000)), '1000 not greater then 1000');
+});
+
 test('Balance $TNK', t => {
     const $TNK300 = $TNK(300n)
     const converted = toBalance($TNK300).asBigInt()

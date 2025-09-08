@@ -134,7 +134,7 @@ class State extends ReadyResource {
         if (toDecrement <= 0n) return null
         const nodeEntry = await this.getNodeEntry(address);
         if (nodeEntry === null) return null;
-        if (toBalance(nodeEntry.balance).asBigInt() < toDecrement) return null;
+        if (toBalance(nodeEntry.balance).lowerThen(toBalance(toDecrement))) return null;
         const balance = toBalance(nodeEntry.balance)
         const result = balance.sub(toBalance(toDecrement))
         return result.update(nodeEntryUtils.encode(nodeEntry))
