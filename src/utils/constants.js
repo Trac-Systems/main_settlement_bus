@@ -44,6 +44,7 @@ export const TOKEN_DECIMALS = 18n
 export const ADMIN_INITIAL_BALANCE = b4a.from([0, 0, 0, 0, 0, 0, 0, 54, 53, 201, 173, 197, 222, 160, 0, 0]) // 1000 in a 18 decimals token
 
 export const WHITELIST_FILEPATH = './whitelist/addresses.csv';
+export const BALANCE_MIGRATION_FILEPATH = './migration/initial_balances.csv';
 export const TRAC_NAMESPACE = 'TracNetwork';
 export const WHITELIST_SLEEP_INTERVAL = 1_000;
 

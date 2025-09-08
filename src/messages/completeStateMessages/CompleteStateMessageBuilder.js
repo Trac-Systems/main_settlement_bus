@@ -14,7 +14,8 @@ import {
     isRoleAccess,
     isTransaction,
     isBootstrapDeployment,
-    isTransfer
+    isTransfer,
+    isBalanceInitialization
 } from '../../utils/operations.js';
 
 class CompleteStateMessageBuilder extends StateBuilder {
@@ -205,7 +206,13 @@ class CompleteStateMessageBuilder extends StateBuilder {
             case OperationType.ADD_ADMIN:
                 msg = createMessage(this.#address, this.#txValidity, this.#writingKey, nonce, this.#operationType);
                 break;
-
+            // Complete by default
+            case OperationType.BALANCE_INITIALIZATION:
+                if (!this.#incomingAddress || !this.#amount || !this.#txValidity || !this.#address ) {
+                    throw new Error('All balance initialization fields must be set before building the message!');
+                }
+                msg = createMessage(this.#address, this.#txValidity, nonce, this.#incomingAddress, this.#amount, this.#operationType);
+                break;
             // Partial need to be signed
             case OperationType.ADD_WRITER:
             case OperationType.REMOVE_WRITER:
@@ -340,6 +347,15 @@ class CompleteStateMessageBuilder extends StateBuilder {
                 vn: nonce,
                 vs: signature
             }
+        } else if(isBalanceInitialization(this.#operationType)) {
+            this.#payload.bio = {
+                tx: tx,
+                txv: this.#txValidity,
+                in: nonce,
+                ia: this.#incomingAddress,
+                am: this.#amount,
+                is: signature
+            }
         }
         else {
             throw new Error(`No corresponding value type for operation: ${OperationType[this.#operationType]}.`);
@@ -358,10 +374,11 @@ class CompleteStateMessageBuilder extends StateBuilder {
                 !this.#payload.rao &&
                 !this.#payload.txo &&
                 !this.#payload.bdo &&
-                !this.#payload.tro
+                !this.#payload.tro &&
+                !this.#payload.bio
             )
         ) {
-            throw new Error('Product is not fully assembled. Missing type, address, or value (cao/aco/rao/txo/bdo/tro).');
+            throw new Error('Product is not fully assembled. Missing type, address, or value (cao/aco/rao/txo/bdo/tro/bio).');
         }
         const res = this.#payload;
         this.reset();

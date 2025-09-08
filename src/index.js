@@ -6,11 +6,11 @@ import b4a from "b4a";
 import readline from "readline";
 import tty from "tty";
 
-import {sleep, getFormattedIndexersWithAddresses, isHexString, convertAdminCoreOperationPayloadToHex} from "./utils/helpers.js";
-import {verifyDag, printHelp, printWalletInfo, get_tx_info} from "./utils/cli.js";
+import { sleep, getFormattedIndexersWithAddresses, isHexString, convertAdminCoreOperationPayloadToHex } from "./utils/helpers.js";
+import { verifyDag, printHelp, printWalletInfo, get_tx_info } from "./utils/cli.js";
 import CompleteStateMessageOperations from "./messages/completeStateMessages/CompleteStateMessageOperations.js";
-import {safeDecodeApplyOperation} from "./utils/protobuf/operationHelpers.js";
-import {bufferToAddress, isAddressValid} from "./core/state/utils/address.js";
+import { safeDecodeApplyOperation } from "./utils/protobuf/operationHelpers.js";
+import { bufferToAddress, isAddressValid } from "./core/state/utils/address.js";
 import Network from "./core/network/Network.js";
 import Check from "./utils/check.js";
 import State from "./core/state/State.js";
@@ -22,8 +22,8 @@ import {
     EntryType,
 } from "./utils/constants.js";
 import partialStateMessageOperations from "./messages/partialStateMessages/PartialStateMessageOperations.js";
-import {randomBytes} from "hypercore-crypto";
-import {decimalStringToBigInt, bigIntTo16ByteBuffer, bufferToBigInt} from "./utils/amountSerialization.js"
+import { randomBytes } from "hypercore-crypto";
+import { decimalStringToBigInt, bigIntTo16ByteBuffer, bufferToBigInt, bigIntToDecimalString } from "./utils/amountSerialization.js"
 import { toBalance } from "./core/state/utils/nodeEntry.js";
 
 //TODO create a MODULE which will separate logic responsible for role managment
@@ -645,7 +645,55 @@ export class MainSettlementBus extends ReadyResource {
             txValidity.toString('hex'),
         )
         await this.broadcastPartialTransaction(payload);
+    }
 
+    async #handleBalanceMigrationOperation() {
+
+        if (this.#enable_wallet === false) {
+            throw new Error("Can not initialize an admin - wallet is not enabled.");
+        }
+        const adminEntry = await this.#state.getAdminEntry();
+
+        if (!adminEntry) {
+            throw new Error("Can not initialize an admin - admin does not exist.");
+        }
+        if (!this.#wallet) {
+            throw new Error(
+                "Can not initialize an admin - wallet is not initialized."
+            );
+        }
+        if (!this.#state.writingKey) {
+            throw new Error(
+                "Can not initialize an admin - writing key is not initialized."
+            );
+        }
+        if (!b4a.equals(this.#state.writingKey, this.#bootstrap)) {
+            throw new Error(
+                "Can not initialize an admin - bootstrap is not equal to writing key."
+            );
+        }
+
+        const txValidity = await this.#state.getIndexerSequenceState();
+        const { messages, totalBalance, totalAddresses } = await CompleteStateMessageOperations.assembleBalanceInitializationMessages(
+            this.#wallet,
+            txValidity
+        );
+        console.log(`Total balance to migrate: ${bigIntToDecimalString(totalBalance)} across ${totalAddresses} addresses.`);
+
+        if (messages.length === 0) {
+            throw new Error("No balance migration messages to process.");
+        }
+        console.log("Starting BRC20 $TRAC TO $TNK native migration...");
+        for (let i = 0; i < messages.length; i++) {
+            const message = messages[i];
+            console.log(`Processing message ${i + 1} of ${messages.length}...`);
+            //await this.#state.append(message);
+            await sleep(WHITELIST_SLEEP_INTERVAL);
+
+        }
+
+        // TODO add validation process that all messages has been processed
+        console.log("Balance migration process completed.");
     }
 
     async interactiveMode() {
@@ -711,9 +759,6 @@ export class MainSettlementBus extends ReadyResource {
                     this.#state.writingKey,
                 );
                 break;
-            case '/i':
-                console.log(await this.#state.getIndexerSequenceState())
-                break;
             case '/test':
                 const contentHash = randomBytes(32).toString('hex');
                 const randomExternalBootstrap = "5adb970a73e20e8e2e896cd0c30cf025a0b32ec6fe026b98c6714115239607ac"
@@ -730,6 +775,9 @@ export class MainSettlementBus extends ReadyResource {
                 )
                 await this.broadcastPartialTransaction(assembledTransactionOperation);
 
+                break;
+            case '/balance_migration':
+                await this.#handleBalanceMigrationOperation();
                 break;
             default:
                 if (input.startsWith('/get_node_info')) {

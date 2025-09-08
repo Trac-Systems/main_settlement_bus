@@ -76,3 +76,26 @@ export function bufferToBigInt(buff) {
 
     return res;
 }
+
+export function bigIntToDecimalString(bigIntValue, decimals = 18) {
+    if (typeof bigIntValue !== 'bigint') {
+        throw new TypeError('Input must be a BigInt');
+    }
+    if (!Number.isInteger(decimals) || decimals < 0) {
+        throw new TypeError('Decimals must be a non-negative integer');
+    }
+    
+    if (bigIntValue < 0n) {
+        throw new Error('Negative amounts are not allowed');
+    }
+    if (bigIntValue > (2n ** 128n - 1n)) {
+        throw new Error('Amount exceeds maximum allowed value (2^128 - 1)');
+    }
+    const str = bigIntValue.toString().padStart(decimals + 1, '0');
+    if (str.length <= decimals) {
+        throw new Error(`Value too small for given decimals (${decimals})`);
+    }
+    const integerPart = str.slice(0, -decimals) || '0';
+    const fractionalPart = str.slice(-decimals).replace(/0+$/, '');
+    return fractionalPart.length > 0 ? `${integerPart}.${fractionalPart}` : integerPart;
+}

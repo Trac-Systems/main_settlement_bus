@@ -1,6 +1,6 @@
 import CompleteStateMessageDirector from './CompleteStateMessageDirector.js';
 import CompleteStateMessageBuilder from './CompleteStateMessageBuilder.js';
-import {safeEncodeApplyOperation} from '../../utils/protobuf/operationHelpers.js';
+import { safeEncodeApplyOperation } from '../../utils/protobuf/operationHelpers.js';
 import fileUtils from '../../../src/utils/fileUtils.js';
 
 class CompleteStateMessageOperations {
@@ -151,9 +151,35 @@ class CompleteStateMessageOperations {
                 const encodedPayload = safeEncodeApplyOperation(payload);
                 messages.set(addressToWhitelist, encodedPayload);
             }
+
             return messages;
         } catch (error) {
             throw new Error(`Failed to assemble appendWhitelistMessages: ${error.message}`);
+        }
+    }
+
+    static async assembleBalanceInitializationMessages(wallet, txValidity) {
+        try {
+            const builder = new CompleteStateMessageBuilder(wallet);
+            const director = new CompleteStateMessageDirector();
+            director.builder = builder;
+
+            const messages = [];
+            const { addressBalancePair, totalBalance, totalAddresses } = await fileUtils.readBalanceMigrationFile();
+
+            for (const [recipientAddress, balanceBuffer] of addressBalancePair) {
+                const payload = await director.buildBalanceInitializationMessage(
+                    wallet.address,
+                    recipientAddress,
+                    balanceBuffer,
+                    txValidity
+                );
+                messages.push(safeEncodeApplyOperation(payload));
+            }
+            return { messages, totalBalance, totalAddresses };
+
+        } catch (error) {
+            throw new Error(`Failed to assemble balance initialization messages: ${error.message}`);
         }
     }
 

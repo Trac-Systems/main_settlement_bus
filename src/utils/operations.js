@@ -41,6 +41,12 @@ const isTransfer = type => {
     ].includes(type);
 }
 
+const isBalanceInitialization = type => {
+    return [
+        OperationType.BALANCE_INITIALIZATION
+    ].includes(type);
+}
+
 const operationToPayload = type => {
     const fromTo = [
         {
@@ -61,6 +67,9 @@ const operationToPayload = type => {
         }, {
             condition: isTransfer,
             jsonPath: 'tro'
+        }, {
+            condition: isBalanceInitialization,
+            jsonPath: 'bio'
         }
     ]
     const match = fromTo.find(entry => !!entry.condition(type))
@@ -74,5 +83,6 @@ export {
     isTransaction,
     isBootstrapDeployment,
     operationToPayload,
-    isTransfer
+    isTransfer,
+    isBalanceInitialization
 }

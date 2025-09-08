@@ -1,5 +1,5 @@
 import StateBuilder from '../base/StateBuilder.js'
-import {OperationType} from '../../utils/protobuf/applyOperations.cjs'
+import { OperationType } from '../../utils/protobuf/applyOperations.cjs'
 
 class CompleteStateMessageDirector {
     #builder;
@@ -19,6 +19,32 @@ class CompleteStateMessageDirector {
             .withAddress(invokerAddress)
             .withWriterKey(writingKey)
             .withTxValidity(txValidity)
+            .buildValueAndSign();
+
+        return this.#builder.getPayload();
+    }
+
+    async buildBalanceInitializationMessage(invokerAddress, recipientAddress, amount, txValidity) {
+        if (!this.#builder) throw new Error('Builder has not been set.');
+        await this.#builder
+            .forOperationType(OperationType.BALANCE_INITIALIZATION)
+            .withAddress(invokerAddress)
+            .withIncomingAddress(recipientAddress)
+            .withAmount(amount)
+            .withTxValidity(txValidity)
+            .buildValueAndSign();
+
+        return this.#builder.getPayload();
+    }
+
+    async buildAppendWhitelistMessage(invokerAddress, incomingAddress, txValidity) {
+        if (!this.#builder) throw new Error('Builder has not been set.');
+
+        await this.#builder
+            .forOperationType(OperationType.APPEND_WHITELIST)
+            .withAddress(invokerAddress)
+            .withTxValidity(txValidity)
+            .withIncomingAddress(incomingAddress)
             .buildValueAndSign();
 
         return this.#builder.getPayload();
@@ -110,19 +136,6 @@ class CompleteStateMessageDirector {
         if (!this.#builder) throw new Error('Builder has not been set.');
         await this.#builder
             .forOperationType(OperationType.REMOVE_INDEXER)
-            .withAddress(invokerAddress)
-            .withTxValidity(txValidity)
-            .withIncomingAddress(incomingAddress)
-            .buildValueAndSign();
-
-        return this.#builder.getPayload();
-    }
-
-    async buildAppendWhitelistMessage(invokerAddress, incomingAddress, txValidity) {
-        if (!this.#builder) throw new Error('Builder has not been set.');
-
-        await this.#builder
-            .forOperationType(OperationType.APPEND_WHITELIST)
             .withAddress(invokerAddress)
             .withTxValidity(txValidity)
             .withIncomingAddress(incomingAddress)
