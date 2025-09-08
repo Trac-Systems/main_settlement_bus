@@ -186,6 +186,17 @@ export const CAO = {
             is: b4a.from('5b534be7a374148962c271d194c26cf5b1ad705ab218a87709a33fe74f9d1b811772447c939b17b2f803e3da7648f49b666b929fbb20e458ced952f147162c08', 'hex')
         }
     },
+    validDisableInitializationOperation: {
+        type: OperationType.DISABLE_INITIALIZATION,
+        address: addressToBuffer('trac1sq3njyxzd27rsy8zcksgv2jmcsl9dlsmklwwqruhx92dufs3cemqgyrpf7'),
+        cao: {
+            tx: b4a.from('0fc518b31505d163a696555df8dceae415032773f85e578a9a1810ad5c99cf0c', 'hex'),
+            txv: b4a.from('dd6b3809673cbca08ee60c32971e9ed9d39fb962c53ab8ef49cd6b467d6977f3', 'hex'),
+            iw: b4a.from('b65d816367a32c723f8d221528a3a3cf986d0b1ac8dbb700b5bbbe322563b3ba', 'hex'),
+            in: b4a.from('e46559a01f1f38f2305e59888d55c23b221fd8fc89fa43ec2f9cbf888b8b5fae', 'hex'),
+            is: b4a.from('5b534be7a374148962c271d194c26cf5b1ad705ab218a87709a33fe74f9d1b811772447c939b17b2f803e3da7648f49b666b929fbb20e458ced952f147162c08', 'hex')
+        }
+    },
     topFieldsCoreAdmin: ['type', 'address', 'cao'],
     coreAdminOperationValuesFields: ['tx', 'txv', 'iw', 'in', 'is'],
     requiredLengthOfFieldsForCoreAdmin: {
