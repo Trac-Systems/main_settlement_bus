@@ -692,7 +692,7 @@ export class MainSettlementBus extends ReadyResource {
 
         }
 
-        // TODO add validation process that all messages has been processed
+        // TODO add validation process that all messages has been processed (compare balancees from file with node Entries)
         console.log("Balance migration process completed.");
     }
 

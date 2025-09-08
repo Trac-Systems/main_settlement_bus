@@ -178,7 +178,7 @@ test('Integration: amount serialization roundtrip', async t => {
     );
 });
 
-test('bigIntToDecimalString', t => {
+test('bigIntToDecimalString', async t => {
     t.is(bigIntToDecimalString(1234567890000000000000000000n), '1234567890');
     t.is(bigIntToDecimalString(123456789012345678901234567890n), '123456789012.34567890123456789');
     t.is(bigIntToDecimalString(1n), '0.000000000000000001');
@@ -186,14 +186,16 @@ test('bigIntToDecimalString', t => {
     t.is(bigIntToDecimalString(1000000000000000000n), '1');
     t.is(bigIntToDecimalString(1000000000000000001n), '1.000000000000000001');
 
-    t.exception.all(() => bigIntToDecimalString(-1n),
-        errorMessageIncludes('Negative amounts are not allowed'))
-    t.exception.all(() => bigIntToDecimalString(2n ** 128n),
-        errorMessageIncludes('Amount exceeds maximum allowed value'))
-    t.exception.all(() => bigIntToDecimalString(1n, -1),
-        errorMessageIncludes('Decimals must be a non-negative integer'))
-    t.exception.all(() => bigIntToDecimalString(1n, 18.5),
-        errorMessageIncludes('Decimals must be a non-negative integer'))
-    t.exception.all(() => bigIntToDecimalString('123n'),
-        errorMessageIncludes('Input must be a BigInt'))
+    await Promise.all([
+        t.exception.all(() => bigIntToDecimalString(-1n),
+            errorMessageIncludes('Negative amounts are not allowed')),
+        t.exception.all(() => bigIntToDecimalString(2n ** 128n),
+            errorMessageIncludes('Amount exceeds maximum allowed value')),
+        t.exception.all(() => bigIntToDecimalString(1n, -1),
+            errorMessageIncludes('Decimals must be a non-negative integer')),
+        t.exception.all(() => bigIntToDecimalString(1n, 18.5),
+            errorMessageIncludes('Decimals must be a non-negative integer')),
+        t.exception.all(() => bigIntToDecimalString('123n'),
+            errorMessageIncludes('Input must be a BigInt'))
+    ]);
 });
