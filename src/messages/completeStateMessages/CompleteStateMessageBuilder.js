@@ -204,6 +204,7 @@ class CompleteStateMessageBuilder extends StateBuilder {
         switch (this.#operationType) {
             // Complete by default
             case OperationType.ADD_ADMIN:
+            case OperationType.DISABLE_INITIALIZATION:
                 msg = createMessage(this.#address, this.#txValidity, this.#writingKey, nonce, this.#operationType);
                 break;
             // Complete by default

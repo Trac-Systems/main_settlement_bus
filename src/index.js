@@ -696,6 +696,17 @@ export class MainSettlementBus extends ReadyResource {
         console.log("Balance migration process completed.");
     }
 
+    async #disableInitialization() {
+        const txValidity = await this.#state.getIndexerSequenceState();
+        const payload = await CompleteStateMessageOperations.assembleDisableInitializationMessage(
+            this.#wallet,
+            this.#state.writingKey.toString('hex'),
+            txValidity.toString('hex'),
+        )
+        console.log('Disabling initialization...');
+        await this.#state.append(payload);
+    }
+
     async interactiveMode() {
         if (this.#readline_instance === null) return;
         const rl = this.#readline_instance;
@@ -778,6 +789,9 @@ export class MainSettlementBus extends ReadyResource {
                 break;
             case '/balance_migration':
                 await this.#handleBalanceMigrationOperation();
+                break;
+            case '/disable_initialization':
+                await this.#disableInitialization();
                 break;
             default:
                 if (input.startsWith('/get_node_info')) {

@@ -24,6 +24,19 @@ class CompleteStateMessageDirector {
         return this.#builder.getPayload();
     }
 
+    async buildDisableInitializationMessage(invokerAddress, writingKey, txValidity) {
+        if (!this.#builder) throw new Error('Builder has not been set.');
+
+        await this.#builder
+            .forOperationType(OperationType.DISABLE_INITIALIZATION)
+            .withAddress(invokerAddress)
+            .withWriterKey(writingKey)
+            .withTxValidity(txValidity)
+            .buildValueAndSign();
+
+        return this.#builder.getPayload();
+    }
+
     async buildBalanceInitializationMessage(invokerAddress, recipientAddress, amount, txValidity) {
         if (!this.#builder) throw new Error('Builder has not been set.');
         await this.#builder

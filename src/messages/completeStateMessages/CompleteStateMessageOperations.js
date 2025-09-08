@@ -19,6 +19,15 @@ class CompleteStateMessageOperations {
         }
     }
 
+    static async assembleDisableInitializationMessage(wallet, writingKey, txValidity) {
+        const builder = new CompleteStateMessageBuilder(wallet);
+        const director = new CompleteStateMessageDirector();
+        director.builder = builder;
+
+        const payload = await director.buildDisableInitializationMessage(wallet.address, writingKey, txValidity);
+        return safeEncodeApplyOperation(payload);
+    }
+
     static async assembleAddWriterMessage(
         wallet,
         invokerAddress,
