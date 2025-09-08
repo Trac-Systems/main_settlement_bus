@@ -127,7 +127,7 @@ class State extends ReadyResource {
         if (nodeEntry === null) return null;
         const balance = toBalance(nodeEntry.balance)
         const result = balance.add(toBalance(toIncrement))
-        return result.update(nodeEntry)
+        return result.update(nodeEntryUtils.encode(nodeEntry))
     }
 
     async decrementBalance(address, toDecrement) {
@@ -137,7 +137,7 @@ class State extends ReadyResource {
         if (toBalance(nodeEntry.balance).asBigInt() < toDecrement) return null;
         const balance = toBalance(nodeEntry.balance)
         const result = balance.sub(toBalance(toDecrement))
-        return result.update(nodeEntry)
+        return result.update(nodeEntryUtils.encode(nodeEntry))
     }
 
     async isAddressWhitelisted(address) {
