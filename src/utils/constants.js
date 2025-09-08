@@ -55,7 +55,7 @@ export const MAX_SERVER_CONNECTIONS = Infinity;
 export const MAX_CLIENT_CONNECTIONS = Infinity;
 export const ACK_INTERVAL = 1_000;
 export const DHT_BOOTSTRAPS = ['116.202.214.149:10001', '157.180.12.214:10001', 'node1.hyperdht.org:49737', 'node2.hyperdht.org:49737', 'node3.hyperdht.org:49737'];
-
+export const MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION = 25;
 // checkjs
 //ATTENTION - THIS IS USED IN THE APPLY FUNCTION!
 export const WRITER_BYTE_LENGTH = 32;
@@ -98,3 +98,4 @@ export const NETWORK_MESSAGE_TYPES = Object.freeze({
         NODE: 'nodeResponse'
     },
 });
+

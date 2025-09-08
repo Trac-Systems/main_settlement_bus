@@ -1,5 +1,5 @@
 import b4a from 'b4a';
-import {MAX_PARTIAL_TX_PAYLOAD_BYTE_SIZE, TRANSACTION_POOL_SIZE} from '../../../../../utils/constants.js';
+import {MAX_PARTIAL_TX_PAYLOAD_BYTE_SIZE, TRANSACTION_POOL_SIZE, MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION} from '../../../../../utils/constants.js';
 
 class BaseOperationHandler {
     #network;
@@ -7,6 +7,7 @@ class BaseOperationHandler {
     #wallet;
     #rateLimiter;
     #disable_rate_limit;
+    #options;
 
     constructor(network, state, wallet, rateLimiter, options = {}) {
         if (new.target === BaseOperationHandler) {
@@ -18,6 +19,7 @@ class BaseOperationHandler {
         this.#wallet = wallet;
         this.#rateLimiter = rateLimiter;
         this.#disable_rate_limit = options.disable_rate_limit === true;
+        this.#options = options;
     }
 
     get network() {
@@ -32,9 +34,18 @@ class BaseOperationHandler {
         return this.#wallet;
     }
 
+    get options() {
+        return this.#options;
+    }
+
     async validateBasicRequirements(payload, connection) {
-        if (this.state.isIndexer() || !this.state.isWritable()) {
-            throw new Error('OperationHandler: State is not writable or is an indexer.');
+        // Validate if operation can be processed:
+        // - Non-writable nodes cannot process operations
+        // - Regular indexers cannot process operations
+        // - Admin-indexer can process operations only when network has less than MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION writers
+        if (!this.state.isWritable() || 
+            (this.state.isIndexer() && (!this.options.store_name === 'admin' || await this.state.getWriterLength() >= MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION))) {
+            throw new Error('OperationHandler: State is not writable or is an indexer without admin privileges.');
         }
 
         if (this.network.poolService.tx_pool.length >= TRANSACTION_POOL_SIZE) {

@@ -44,6 +44,7 @@ export async function verifyDag(state, network, wallet, writerKey) {
 
 export function printHelp(isAdmin = false) {
     if (isAdmin) {
+        console.log('🚨 WARNING: IF YOU ARE NOT AN ADMIN, DO NOT USE THE COMMANDS BELOW! YOU RISK LOSING YOUR FUNDS! 🚨');
         console.log('\nAdmin commands:');
         console.log('- /add_admin: register admin entry with bootstrap key (initial setup), or use --recovery flag to recover admin role');
         console.log('- /balance_migration: perform balance migration with the given initial balances CSV file');

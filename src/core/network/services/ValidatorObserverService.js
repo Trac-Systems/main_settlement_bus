@@ -1,6 +1,7 @@
 import Wallet from "trac-wallet"
 import { TRAC_ADDRESS_SIZE } from 'trac-wallet/constants.js';
 import b4a from "b4a";
+import { MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION } from '../../../utils/constants.js';
 
 import { bufferToAddress } from '../../state/utils/address.js';
 import { sleep } from '../../../utils/helpers.js';
@@ -67,13 +68,17 @@ class ValidatorObserverService {
         const validatorEntry = await this.state.getNodeEntry(validatorAddress);
         const adminEntry = await this.state.getAdminEntry();
 
+        // Connection validation rules:
+        // - Cannot connect if already connected to a validator
+        // - Validator must exist and be a writer
+        // - Cannot connect to indexers, except for admin-indexer
+        // - Admin-indexer connection is allowed only when writers length has less than 25 writers
         if (
             this.#network.validator_stream !== null ||
             this.#network.validator !== null ||
             validatorEntry === null ||
             !validatorEntry.isWriter ||
-            (rndIndex >= 25 && validatorEntry.isIndexer) ||
-            (rndIndex < 25 && validatorEntry.isIndexer && (!adminEntry || validatorAddress !== adminEntry.address))
+            (validatorEntry.isIndexer && (adminEntry === null || validatorAddress !== adminEntry.address || length >= MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION))
         ) {
             return;
         }

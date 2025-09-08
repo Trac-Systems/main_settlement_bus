@@ -3,6 +3,7 @@ import {OperationType} from "./constants.js";
 const isCoreAdmin = type => {
     return [
         OperationType.ADD_ADMIN,
+        OperationType.DISABLE_INITIALIZATION,
     ].includes(type);
 }
 
@@ -52,22 +53,28 @@ const operationToPayload = type => {
         {
             condition: isCoreAdmin,
             jsonPath: 'cao'
-        }, {
+        },
+        {
             condition: isAdminControl,
             jsonPath: 'aco'
-        }, {
+        },
+        {
             condition: isRoleAccess,
             jsonPath: 'rao'
-        }, {
+        },
+        {
             condition: isTransaction,
             jsonPath: 'txo'
-        }, {
+        },
+        {
             condition: isBootstrapDeployment,
             jsonPath: 'bdo'
-        }, {
+        },
+        {
             condition: isTransfer,
             jsonPath: 'tro'
-        }, {
+        },
+        {
             condition: isBalanceInitialization,
             jsonPath: 'bio'
         }
