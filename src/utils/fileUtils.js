@@ -36,12 +36,20 @@ async function readPublicKeysFromFile(filepath = WHITELIST_FILEPATH) {
 
 async function readBalanceMigrationFile(filepath = BALANCE_MIGRATION_FILEPATH) {
     try {
+        if (!filepath.toLowerCase().endsWith('.csv')) {
+            throw new Error(`Invalid file format: ${filepath}. Balance migration file must be a CSV file.`);
+        }
+
         const pairFormatRegex = /^([a-zA-Z0-9]+),(\d+\.[0-9]+)$/;
         const data = await fs.promises.readFile(filepath, 'utf8');
         const lines = data
             .split('\n')
             .map(line => line.trim())
             .filter(line => line.length > 0);
+
+        if (lines.length === 0) {
+            throw new Error('Balance migration file is empty. File must contain at least one valid address balance pair.');
+        }
 
         const addressBalancePair = new Map();
         let totalBalance = BigInt(0);
@@ -74,9 +82,9 @@ async function readBalanceMigrationFile(filepath = BALANCE_MIGRATION_FILEPATH) {
         return {addressBalancePair, totalBalance, totalAddresses};
     } catch (err) {
         if (err.code === 'ENOENT') {
-            throw new Error(`Whitelist file not found: ${filepath}`);
+            throw new Error(`Balance migration file not found: ${filepath}`);
         }
-        throw new Error(`Failed to read public keys from the whitelist file: ${err.message}`);
+        throw new Error(`Failed to read balance migration file: ${err.message}`);
     }
 }
 
