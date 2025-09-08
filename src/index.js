@@ -631,7 +631,7 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async #handleTransferOperation(address, amount) {
-        //decimalStringToBigInt, bigIntTo16ByteBuffer, bufferToBigInt
+        // add more checks
         const amountBigInt = decimalStringToBigInt(amount);
         const amountBuffer = bigIntTo16ByteBuffer(amountBigInt);
 
@@ -646,7 +646,7 @@ export class MainSettlementBus extends ReadyResource {
             amountBuffer.toString('hex'),
             txValidity.toString('hex'),
         )
-        await this.broadcastPartialTransaction(payload);
+        // await this.broadcastPartialTransaction(payload); disabled until onchain part will be implemented
     }
 
     async #handleBalanceMigrationOperation() {
@@ -689,7 +689,7 @@ export class MainSettlementBus extends ReadyResource {
         for (let i = 0; i < messages.length; i++) {
             const message = messages[i];
             console.log(`Processing message ${i + 1} of ${messages.length}...`);
-            //await this.#state.append(message);
+            //await this.#state.append(message); disabled until onchain part will be implemented
             await sleep(WHITELIST_SLEEP_INTERVAL);
 
         }
@@ -699,14 +699,15 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async #disableInitialization() {
+        // add more checks
         const txValidity = await this.#state.getIndexerSequenceState();
         const payload = await CompleteStateMessageOperations.assembleDisableInitializationMessage(
             this.#wallet,
-            this.#state.writingKey.toString('hex'),
-            txValidity.toString('hex'),
+            this.#state.writingKey,
+            txValidity,
         )
         console.log('Disabling initialization...');
-        await this.#state.append(payload);
+        //await this.#state.append(payload); disabled until onchain part will be implemented
     }
 
     async interactiveMode() {
