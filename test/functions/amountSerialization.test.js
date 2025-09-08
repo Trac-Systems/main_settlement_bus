@@ -1,7 +1,7 @@
 import test from 'brittle';
 import b4a from 'b4a';
-import { decimalStringToBigInt, bigIntTo16ByteBuffer, bufferToBigInt } from '../../src/utils/amountSerialization.js';
-import {errorMessageIncludes} from "../utils/regexHelper.js";
+import { decimalStringToBigInt, bigIntTo16ByteBuffer, bufferToBigInt, bigIntToDecimalString } from '../../src/utils/amountSerialization.js';
+import { errorMessageIncludes } from "../utils/regexHelper.js";
 
 test('decimalStringToBigInt', async t => {
     // Valid cases
@@ -119,7 +119,7 @@ test('bufferToBigInt', async t => {
             errorMessageIncludes('Input must be a 16-byte Buffer')),
         t.exception.all(() => bufferToBigInt('not a buffer'),
             errorMessageIncludes('Input must be a 16-byte Buffer')),
-        t.exception.all(() => bufferToBigInt([1,2,3,4]),
+        t.exception.all(() => bufferToBigInt([1, 2, 3, 4]),
             errorMessageIncludes('Input must be a 16-byte Buffer'))
     ]);
 });
@@ -176,4 +176,24 @@ test('Integration: amount serialization roundtrip', async t => {
         },
         errorMessageIncludes('Amount cannot be zero')
     );
+});
+
+test('bigIntToDecimalString', t => {
+    t.is(bigIntToDecimalString(1234567890000000000000000000n), '1234567890');
+    t.is(bigIntToDecimalString(123456789012345678901234567890n), '123456789012.34567890123456789');
+    t.is(bigIntToDecimalString(1n), '0.000000000000000001');
+    t.is(bigIntToDecimalString(0n), '0');
+    t.is(bigIntToDecimalString(1000000000000000000n), '1');
+    t.is(bigIntToDecimalString(1000000000000000001n), '1.000000000000000001');
+
+    t.exception.all(() => bigIntToDecimalString(-1n),
+        errorMessageIncludes('Negative amounts are not allowed'))
+    t.exception.all(() => bigIntToDecimalString(2n ** 128n),
+        errorMessageIncludes('Amount exceeds maximum allowed value'))
+    t.exception.all(() => bigIntToDecimalString(1n, -1),
+        errorMessageIncludes('Decimals must be a non-negative integer'))
+    t.exception.all(() => bigIntToDecimalString(1n, 18.5),
+        errorMessageIncludes('Decimals must be a non-negative integer'))
+    t.exception.all(() => bigIntToDecimalString('123n'),
+        errorMessageIncludes('Input must be a BigInt'))
 });
