@@ -263,17 +263,17 @@ class CompleteStateMessageBuilder extends StateBuilder {
                 break
 
             case OperationType.TRANSFER:
-                    if (!this.#txHash || !this.#txValidity || !this.#address || !this.#incomingNonce ||
-                        !this.#incomingSignature || !this.#amount || !this.#incomingAddress) {
-                        throw new Error('All transfer fields must be set before building the message!');
-                    }
-                    msg = createMessage(
-                        this.#txHash,
-                        addressToBuffer(this.#wallet.address),
-                        nonce,
-                        this.#operationType
-                    );
-                    break;
+                if (!this.#txHash || !this.#txValidity || !this.#address || !this.#incomingNonce ||
+                    !this.#incomingSignature || !this.#amount || !this.#incomingAddress) {
+                    throw new Error('All transfer fields must be set before building the message!');
+                }
+                msg = createMessage(
+                    this.#txHash,
+                    addressToBuffer(this.#wallet.address),
+                    nonce,
+                    this.#operationType
+                );
+                break;
 
             default:
                 throw new Error(`Unsupported operation type for building value: ${OperationType[this.#operationType]}.`);
