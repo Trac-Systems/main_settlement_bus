@@ -46,7 +46,9 @@
   "devDependencies": {
     "bare-os": "^3.6.1",
     "bip39-mnemonic": "^2.4.0",
-    "protocol-buffers": "^4.2.0"
+    "esmock": "^2.7.2",
+    "protocol-buffers": "^4.2.0",
+    "sinon": "^21.0.0"
   },
   "publishConfig": {
     "registry": "https://registry.npmjs.org",

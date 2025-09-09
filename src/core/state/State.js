@@ -4,6 +4,7 @@ import Hyperbee from 'hyperbee';
 import b4a from 'b4a';
 import {
     ACK_INTERVAL,
+    ADMIN_INITIAL_BALANCE,
     EntryType,
     OperationType,
 } from '../../utils/constants.js';
@@ -11,15 +12,15 @@ import {isHexString, sleep} from '../../utils/helpers.js';
 import Wallet from 'trac-wallet';
 import Check from '../../utils/check.js';
 import {safeDecodeApplyOperation} from '../../utils/protobuf/operationHelpers.js';
-import {createMessage, ZERO_WK} from '../../utils/buffer.js';
+import {createMessage, ZERO_WK, isBufferValid} from '../../utils/buffer.js';
 import addressUtils from './utils/address.js';
 import adminEntryUtils from './utils/adminEntry.js';
-import nodeEntryUtils, { setWritingKey } from './utils/nodeEntry.js';
+import nodeEntryUtils, { toBalance, setWritingKey, ZERO_BALANCE, NODE_ENTRY_SIZE } from './utils/nodeEntry.js';
 import nodeRoleUtils from './utils/roles.js';
 import lengthEntryUtils from './utils/lengthEntry.js';
 import transactionUtils from './utils/transaction.js';
 import {blake3Hash} from '../../utils/crypto.js';
-import { isRoleAccess, isTransaction, isCoreAdmin, operationToPayload } from '../../utils/operations.js';
+import { operationToPayload } from '../../utils/operations.js';
 
 class State extends ReadyResource {
     //TODO: AFTER createMessage(..args) check if this function did not return NULL
@@ -118,6 +119,29 @@ class State extends ReadyResource {
     async getNodeEntry(address) {
         const nodeEntry = await this.getSigned(address);
         return nodeEntry ? nodeEntryUtils.decode(nodeEntry) : null;
+    }
+
+    // PLACEHOLDER
+    // WARNING: DO NOT USE IN APPLY FUNCTION!!!
+    async incrementBalance(address, toIncrement) {
+        if (isBufferValid(toIncrement, NODE_ENTRY_SIZE) || b4a.equals(toIncrement, ZERO_BALANCE)) return null
+        const nodeEntry = await this.getNodeEntry(address);
+        if (nodeEntry === null) return null;
+        const balance = toBalance(nodeEntry.balance)
+        const result = balance.add(toBalance(toIncrement))
+        return result.update(nodeEntryUtils.encode(nodeEntry))
+    }
+
+    // PLACEHOLDER
+    // WARNING: DO NOT USE IN APPLY FUNCTION!!!
+    async decrementBalance(address, toDecrement) {
+        if (isBufferValid(toDecrement, NODE_ENTRY_SIZE) || b4a.equals(toDecrement, ZERO_BALANCE)) return null
+        const nodeEntry = await this.getNodeEntry(address);
+        if (nodeEntry === null) return null;
+        if (toBalance(nodeEntry.balance).lowerThan(toBalance(toDecrement))) return null;
+        const balance = toBalance(nodeEntry.balance)
+        const result = balance.sub(toBalance(toDecrement))
+        return result.update(nodeEntryUtils.encode(nodeEntry))
     }
 
     async isAddressWhitelisted(address) {
@@ -271,7 +295,7 @@ class State extends ReadyResource {
         const opEntry = await this.#getEntryApply(txHashHexString, batch);
         if (null !== opEntry) return;
 
-        const initializedNodeEntry = nodeEntryUtils.init(op.cao.iw, nodeRoleUtils.NodeRole.INDEXER);
+        const initializedNodeEntry = nodeEntryUtils.init(op.cao.iw, nodeRoleUtils.NodeRole.INDEXER, ADMIN_INITIAL_BALANCE);
         //const updatedNodeEntry = nodeEntryUtils.setRole(initializedNodeEntry, nodeRoleUtils.NodeRole.INDEXER);
         await batch.put(adminAddressString, initializedNodeEntry);
         await batch.put(EntryType.WRITER_ADDRESS + op.cao.iw.toString('hex'), op.address);
@@ -1072,6 +1096,31 @@ class State extends ReadyResource {
         const jsonNode = operationToPayload(op.type)
         const writingKey = b4a.toString(op[jsonNode].iw, 'hex');
         return await batch.get(EntryType.WRITER_ADDRESS + writingKey);
+    }
+
+    // PLACEHOLDER
+    // TODO: Check if this is used anywhere
+    async #incrementBalanceApply(address, batch, toIncrement) {
+        if (isBufferValid(toIncrement, NODE_ENTRY_SIZE) || b4a.equals(toIncrement, ZERO_BALANCE)) return null
+        const nodeEntry = await this.#getEntryApply(address, batch);
+        if (nodeEntry === null) return null;
+        const decodedNodeEntry = nodeEntryUtils.decode(nodeEntry);
+        const balance = toBalance(decodedNodeEntry.balance)
+        const result = balance.add(toBalance(toIncrement))
+        return result.update(nodeEntryUtils.encode(decodedNodeEntry))
+    }
+
+    // PLACEHOLDER
+    // TODO: Check if this is used anywhere
+    async #decrementBalanceApply(address, batch, toDecrement) {
+        if (isBufferValid(toDecrement, NODE_ENTRY_SIZE) || b4a.equals(toDecrement, ZERO_BALANCE)) return null
+        const nodeEntry = await this.#getEntryApply(address, batch);
+        if (nodeEntry === null) return null;
+        const decodedNodeEntry = nodeEntryUtils.decode(nodeEntry);
+        if (toBalance(decodedNodeEntry.balance).lowerThan(toBalance(toDecrement))) return null;
+        const balance = toBalance(decodedNodeEntry.balance)
+        const result = balance.sub(toBalance(toDecrement))
+        return result.update(nodeEntryUtils.encode(decodedNodeEntry))
     }
 }
 

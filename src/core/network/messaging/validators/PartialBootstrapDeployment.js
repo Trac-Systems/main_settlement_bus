@@ -100,7 +100,7 @@ class PartialBootstrapDeployment {
         }
 
         const txString = payload.bdo.tx.toString('hex');
-        if (null !== await this.state.getSigned(txString)) {
+        if (null !== await this.state.get(txString)) {
             console.error(`Transaction with hash ${txString} already exists in the state.`);
             return false;
         }
@@ -126,7 +126,7 @@ class PartialBootstrapDeployment {
         const currentTxv = await this.state.getIndexerSequenceState()
         const incomingTxv = payload.bdo.txv
         if (!b4a.equals(currentTxv, incomingTxv)) {
-            console.error(`Transaction validity: ${incomingTxv.toString('hex')} does not match the current indexer sequence state: ${currentTxv.toString('hex')}`);
+            console.error(`Transaction has expired.`);
             return false;
         }
         return true;

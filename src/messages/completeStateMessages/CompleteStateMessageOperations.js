@@ -234,6 +234,37 @@ class CompleteStateMessageOperations {
         }
     }
 
+    static async assembleCompleteTransferOperationMessage(
+        wallet,
+        invokerAddress,
+        transactionHash,
+        txValidity,
+        incomingNonce,
+        recipientAddress,
+        amount,
+        incomingSignature
+    ) {
+        try {
+            const builder = new CompleteStateMessageBuilder(wallet);
+            const director = new CompleteStateMessageDirector();
+            director.builder = builder;
+
+            const payload = await director.buildTransferOperationMessage(
+                invokerAddress,
+                transactionHash,
+                txValidity,
+                incomingNonce,
+                recipientAddress,
+                amount,
+                incomingSignature
+            );
+            return safeEncodeApplyOperation(payload);
+
+        } catch (error) {
+            throw new Error(`Failed to assemble transfer operation message: ${error.message}`);
+        }
+    }
+
 }
 
 export default CompleteStateMessageOperations;

@@ -1,4 +1,5 @@
 import { OperationType as OP } from './protobuf/applyOperations.cjs';
+import b4a from 'b4a'
 // TODO: We are going to have a lot of contstants. It would be good, to separate them into different files.
 
 //ATTENTION - THIS IS USED IN THE APPLY FUNCTION!
@@ -24,6 +25,7 @@ export const OperationType = Object.freeze({
     BAN_VALIDATOR: OP.BAN_VALIDATOR,
     BOOTSTRAP_DEPLOYMENT: OP.BOOTSTRAP_DEPLOYMENT,
     TX: OP.TX,
+    TRANSFER: OP.TRANSFER,
 });
 
 // Role managment constants
@@ -35,6 +37,10 @@ export const EventType = Object.freeze({
     UNWRITABLE: 'unwritable',
     WARNING: 'warning',
 });
+
+// Token
+export const TOKEN_DECIMALS = 18n
+export const ADMIN_INITIAL_BALANCE = b4a.from([0, 0, 0, 0, 0, 0, 0, 54, 53, 201, 173, 197, 222, 160, 0, 0]) // 1000 in a 18 decimals token
 
 export const WHITELIST_FILEPATH = './whitelist/addresses.csv';
 export const TRAC_NAMESPACE = 'TracNetwork';
@@ -54,7 +60,9 @@ export const WRITER_BYTE_LENGTH = 32;
 export const BOOTSTRAP_BYTE_LENGTH = 32;
 export const NONCE_BYTE_LENGTH = 32;
 export const HASH_BYTE_LENGTH = 32;
+export const BALANCE_BYTE_LENGTH = 16;
 export const SIGNATURE_BYTE_LENGTH = 64;
+export const AMOUNT_BYTE_LENGTH = 16;
 export const MIN_SAFE_VALIDATION_INTEGER = 0x00000001;
 export const MAX_SAFE_VALIDATION_INTEGER = 0xFFFFFFFF;
 
