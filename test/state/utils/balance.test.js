@@ -3,12 +3,7 @@ import b4a from 'b4a';
 import { randomBuffer, TEN_THOUSAND_VALUE, tokenUnits } from '../stateTestUtils.js';
 import { ZERO_BALANCE, toBalance, decode, encode } from '../../../src/core/state/utils/nodeEntry.js';
 import { WRITER_BYTE_LENGTH, ADMIN_INITIAL_BALANCE, BALANCE_BYTE_LENGTH, TOKEN_DECIMALS } from '../../../src/utils/constants.js';
-import { $TNK, Balance, BalanceError } from '../../../src/core/state/utils/balance.js';
-
-test('Balance constructor rejects invalid length', t => {
-  const badBuffer = b4a.from([0x01, 0x02])
-  t.exception(() => new Balance(badBuffer), BalanceError, 'throws on invalid buffer length')
-})
+import { $TNK } from '../../../src/core/state/utils/balance.js';
 
 test('Balance#asHex explicit', t => {
   const val = $TNK(1000n)

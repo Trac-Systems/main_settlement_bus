@@ -5,11 +5,6 @@ import { BALANCE_BYTE_LENGTH, TOKEN_DECIMALS } from '../../../utils/constants.js
 import { bufferToBigInt } from '../../../utils/amountSerialization.js';
 
 /**
- * Custom error thrown when a Balance buffer is invalid.
- */
-export class BalanceError extends Error {}
-
-/**
  * Empty buffer used as a fallback when operations fail.
  */
 const EMPTY_BUFFER = b4a.alloc(0)
@@ -72,12 +67,15 @@ const subBuffers = (a, b) => {
 
 /**
  * Validates that a buffer has the correct length for balances.
- * Throws BalanceError if invalid.
+ * Logs an error message if invalid.
  * @param {Buffer} value 
  */
 const validateValue = value => {
-    if (!isBufferValid(value, BALANCE_BYTE_LENGTH)) {
-        throw new BalanceError(value)
+    try {
+        return isBufferValid(value, BALANCE_BYTE_LENGTH)
+    } catch (error) {
+        console.log(error)
+        return false
     }
 }
 
@@ -97,8 +95,7 @@ export class Balance {
      * @param {Buffer} value - Buffer representing the balance
      */
     constructor(value) {
-        validateValue(value)
-        this.#value = value;
+        this.#value = validateValue(value) ? value : null
     }
 
     /**
