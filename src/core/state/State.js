@@ -12,10 +12,10 @@ import {isHexString, sleep} from '../../utils/helpers.js';
 import Wallet from 'trac-wallet';
 import Check from '../../utils/check.js';
 import {safeDecodeApplyOperation} from '../../utils/protobuf/operationHelpers.js';
-import {createMessage, ZERO_WK} from '../../utils/buffer.js';
+import {createMessage, ZERO_WK, isBufferValid} from '../../utils/buffer.js';
 import addressUtils from './utils/address.js';
 import adminEntryUtils from './utils/adminEntry.js';
-import nodeEntryUtils, { toBalance, setWritingKey } from './utils/nodeEntry.js';
+import nodeEntryUtils, { toBalance, setWritingKey, ZERO_BALANCE, NODE_ENTRY_SIZE } from './utils/nodeEntry.js';
 import nodeRoleUtils from './utils/roles.js';
 import lengthEntryUtils from './utils/lengthEntry.js';
 import transactionUtils from './utils/transaction.js';
@@ -122,7 +122,7 @@ class State extends ReadyResource {
     }
 
     async incrementBalance(address, toIncrement) {
-        if (toIncrement <= 0n) return null
+        if (isBufferValid(toIncrement, NODE_ENTRY_SIZE) || b4a.equals(toIncrement, ZERO_BALANCE)) return null
         const nodeEntry = await this.getNodeEntry(address);
         if (nodeEntry === null) return null;
         const balance = toBalance(nodeEntry.balance)
@@ -131,7 +131,7 @@ class State extends ReadyResource {
     }
 
     async decrementBalance(address, toDecrement) {
-        if (toDecrement <= 0n) return null
+        if (isBufferValid(toDecrement, NODE_ENTRY_SIZE) || b4a.equals(toDecrement, ZERO_BALANCE)) return null
         const nodeEntry = await this.getNodeEntry(address);
         if (nodeEntry === null) return null;
         if (toBalance(nodeEntry.balance).lowerThen(toBalance(toDecrement))) return null;
