@@ -732,20 +732,28 @@ export class MainSettlementBus extends ReadyResource {
 
                 break;
             default:
-                if (input.startsWith("/get_node_info")) {
-                    const splitted = input.split(" ");
-                    const address = splitted[1];
-                    const nodeEntry = await this.#state.getNodeEntry(address);
+                if (input.startsWith('/get_node_info')) {
+                    const splitted = input.split(' ')
+                    const address = splitted[1]
+                    const nodeEntry = await this.#state.getNodeEntry(address)
                     if (nodeEntry) {
-                        console.log("Node Entry:", {
-                            WritingKey: nodeEntry.wk.toString("hex"),
+                        console.log('Node Entry:', {
+                            WritingKey: nodeEntry.wk.toString('hex'),
                             IsWhitelisted: nodeEntry.isWhitelisted,
                             IsWriter: nodeEntry.isWriter,
                             IsIndexer: nodeEntry.isIndexer,
                             balance: toBalance(nodeEntry.balance).asBigInt()
-                        });
+                        })
+                        return {
+                            balance: 100,
+                            WritingKey: nodeEntry.wk.toString('hex'),
+                            IsWhitelisted: nodeEntry.isWhitelisted,
+                            IsWriter: nodeEntry.isWriter,
+                            IsIndexer: nodeEntry.isIndexer,
+                            balance: toBalance(nodeEntry.balance).asBigInt()
+                        }
                     } else {
-                        console.log("Node Entry not found for address:", address);
+                        console.log('Node Entry not found for address:', address)
                     }
                 } else if (input.startsWith("/add_indexer")) {
                     const splitted = input.split(" ");

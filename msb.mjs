@@ -1,4 +1,5 @@
 import {MainSettlementBus} from './src/index.js';
+import {startRpcServer} from './rpc/rpc_server.mjs';
 
 const opts = {
     stores_directory : 'stores/',
@@ -16,5 +17,16 @@ const opts = {
 
 const msb = new MainSettlementBus(opts);
 
-msb.ready()
-    .then(() => { msb.interactiveMode(); })
+msb.ready().then(() => {
+    const runRpc = Pear.config.args.includes('--rpc')
+
+    if (runRpc) {
+        console.log('Starting RPC server...')
+        startRpcServer(msb)
+    } else {
+        console.log('RPC server will not be started.')
+    }
+
+    msb.interactiveMode()
+})
+
