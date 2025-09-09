@@ -695,7 +695,7 @@ export class MainSettlementBus extends ReadyResource {
 
         }
 
-        // TODO add validation process that all messages has been processed (compare balances from file with node Entries - implement when nodeEntry with balance will be available)
+        // TODO add validation process that all messages has been processed (compare balances from file with node Entries - implement when apply function will be ready. )
         console.log("Balance migration process completed.");
     }
 
@@ -808,14 +808,14 @@ export class MainSettlementBus extends ReadyResource {
                             IsWhitelisted: nodeEntry.isWhitelisted,
                             IsWriter: nodeEntry.isWriter,
                             IsIndexer: nodeEntry.isIndexer,
-                            balance: toBalance(nodeEntry.balance).asBigInt()
+                            balance: bigIntToDecimalString(bufferToBigInt(nodeEntry.balance))
                         })
                         return {
                             WritingKey: nodeEntry.wk.toString('hex'),
                             IsWhitelisted: nodeEntry.isWhitelisted,
                             IsWriter: nodeEntry.isWriter,
                             IsIndexer: nodeEntry.isIndexer,
-                            balance: toBalance(nodeEntry.balance).asBigInt()
+                            balance: bigIntToDecimalString(bufferToBigInt(nodeEntry.balance))
                         }
                     } else {
                         console.log('Node Entry not found for address:', address)
