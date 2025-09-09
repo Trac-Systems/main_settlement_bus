@@ -1093,6 +1093,27 @@ class State extends ReadyResource {
         const writingKey = b4a.toString(op[jsonNode].iw, 'hex');
         return await batch.get(EntryType.WRITER_ADDRESS + writingKey);
     }
+
+    async #incrementBalanceApply(address, batch, toIncrement) {
+        if (isBufferValid(toIncrement, NODE_ENTRY_SIZE) || b4a.equals(toIncrement, ZERO_BALANCE)) return null
+        const nodeEntry = await this.#getEntryApply(address, batch);
+        if (nodeEntry === null) return null;
+        const decodedNodeEntry = nodeEntryUtils.decode(nodeEntry);
+        const balance = toBalance(decodedNodeEntry.balance)
+        const result = balance.add(toBalance(toIncrement))
+        return result.update(nodeEntryUtils.encode(decodedNodeEntry))
+    }
+
+    async #decrementBalanceApply(address, batch, toDecrement) {
+        if (isBufferValid(toDecrement, NODE_ENTRY_SIZE) || b4a.equals(toDecrement, ZERO_BALANCE)) return null
+        const nodeEntry = await this.#getEntryApply(address, batch);
+        if (nodeEntry === null) return null;
+        const decodedNodeEntry = nodeEntryUtils.decode(nodeEntry);
+        if (toBalance(decodedNodeEntry.balance).lowerThan(toBalance(toDecrement))) return null;
+        const balance = toBalance(decodedNodeEntry.balance)
+        const result = balance.sub(toBalance(toDecrement))
+        return result.update(nodeEntryUtils.encode(decodedNodeEntry))
+    }
 }
 
 export default State;

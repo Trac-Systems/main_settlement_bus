@@ -2,7 +2,7 @@ import { test } from 'brittle';
 import b4a from 'b4a';
 import { randomBuffer, TEN_THOUSAND_VALUE, tokenUnits } from '../stateTestUtils.js';
 import { ZERO_BALANCE, toBalance, decode, encode } from '../../../src/core/state/utils/nodeEntry.js';
-import { WRITER_BYTE_LENGTH, ADMIN_INITIAL_BALANCE, BALANCE_BYTE_LENGTH, TOKEN_DECIMALS } from '../../../src/utils/constants.js';
+import { WRITER_BYTE_LENGTH, ADMIN_INITIAL_BALANCE, BALANCE_BYTE_LENGTH } from '../../../src/utils/constants.js';
 import { $TNK } from '../../../src/core/state/utils/balance.js';
 
 test('Balance#asHex explicit', t => {
@@ -43,17 +43,33 @@ test('Balance#add other stuff', t => {
     t.is(addedBalance.asHex(), '00000000000000000000000000004e20', 'balance matches');
 });
 
-test('Balance#add overflow', t => {
-  const max = b4a.alloc(BALANCE_BYTE_LENGTH, 0xFF)
-  const balance = toBalance(max)
+test('Balance#add overflow returns NULL_BUFFER', t => {
+    const max = b4a.alloc(BALANCE_BYTE_LENGTH, 0xFF);
+    const balance = toBalance(max);
 
-  const oneRaw = b4a.alloc(BALANCE_BYTE_LENGTH)
-  oneRaw[oneRaw.length - 1] = 1  
+    const oneRaw = b4a.alloc(BALANCE_BYTE_LENGTH);
+    oneRaw[oneRaw.length - 1] = 1; // +1
 
-  const result = balance.add(toBalance(oneRaw))
+    const result = balance.add(toBalance(oneRaw));
 
-  t.is(result.asBigInt(), 0n, 'wraps to zero')
-})
+    // Should return null-like buffer on overflow
+    t.is(result.value, null, 'overflow returns null');
+});
+
+test('Balance#add edge case: max - 1 + 1 = max', t => {
+    const maxMinusOne = b4a.alloc(BALANCE_BYTE_LENGTH, 0xFF);
+    maxMinusOne[maxMinusOne.length - 1] = 0xFE;
+    const balance = toBalance(maxMinusOne);
+
+    const oneRaw = b4a.alloc(BALANCE_BYTE_LENGTH);
+    oneRaw[oneRaw.length - 1] = 1;
+
+    const result = balance.add(toBalance(oneRaw));
+
+    // Should equal max value
+    const expected = b4a.alloc(BALANCE_BYTE_LENGTH, 0xFF);
+    t.ok(b4a.equals(result.value, expected), 'max - 1 + 1 = max');
+});
 
 test('Balance#sub with zero', t => {
     const node = {
@@ -93,12 +109,31 @@ test('Balance#sub zero from value', t => {
     t.ok(b4a.equals(updated.balance, TEN_THOUSAND_VALUE), 'balance matches');
 });
 
-test('Balance#sub underflow', t => {
-  const a = $TNK(1000n)
-  const b = $TNK(2000n)
-  const result = toBalance(a).sub(toBalance(b))
-  const expected = (2n ** BigInt(BALANCE_BYTE_LENGTH * 8)) - (1000n * 10n ** TOKEN_DECIMALS)
-  t.is(result.asBigInt(), expected, 'wraps around with decimals applied');
+test('Balance#sub underflow returns NULL_BUFFER', t => {
+    const a = $TNK(1000n);
+    const b = $TNK(2000n);
+    const result = toBalance(a).sub(toBalance(b));
+
+    // Should return null-like buffer on underflow
+    t.is(result.value, null, 'overflow returns null');
+});
+
+test('Balance#sub edge case: equal amounts = zero', t => {
+    const a = $TNK(5000n);
+    const b = $TNK(5000n);
+    const result = toBalance(a).sub(toBalance(b));
+
+    const expected = b4a.alloc(BALANCE_BYTE_LENGTH); // all zeros
+    t.ok(b4a.equals(result.value, expected), 'equal amounts subtract to zero');
+});
+
+test('Balance#sub edge case: one less than a', t => {
+    const a = $TNK(1000n);
+    const b = $TNK(999n);
+    const result = toBalance(a).sub(toBalance(b));
+
+    const expected = $TNK(1n);
+    t.ok(b4a.equals(result.value, expected), 'subtracting 999 from 1000 gives 1');
 });
 
 test('Balance#asBigInt', t => {
@@ -162,3 +197,23 @@ test('Node entry integration', t => {
 
     t.is(toBalance(decode(updated).balance).asBigInt(), tokenUnits(1300n), 'balance matches');
 });
+
+test('Balance#greaterThanOrEquals', t => {
+    const b1000 = toBalance($TNK(1000n))
+    const b1001 = toBalance($TNK(1001n))
+    const b1000Dup = toBalance($TNK(1000n))
+
+    t.ok(b1001.greaterThanOrEquals(b1000), '1001 >= 1000')
+    t.ok(b1000.greaterThanOrEquals(b1000Dup), '1000 >= 1000')
+    t.ok(!b1000.greaterThanOrEquals(b1001), '1000 !>= 1001')
+})
+
+test('Balance#lowerThanOrEquals', t => {
+    const b1000 = toBalance($TNK(1000n))
+    const b1001 = toBalance($TNK(1001n))
+    const b1000Dup = toBalance($TNK(1000n))
+
+    t.ok(b1000.lowerThanOrEquals(b1001), '1000 <= 1001')
+    t.ok(b1000.lowerThanOrEquals(b1000Dup), '1000 <= 1000')
+    t.ok(!b1001.lowerThanOrEquals(b1000), '1001 !<= 1000')
+})

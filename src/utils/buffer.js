@@ -1,8 +1,11 @@
 import b4a from 'b4a';
 
 export const ZERO_WK = b4a.alloc(32, 0); // 32 bytes of zeroes, used as a placeholder for writing keys
+export const NULL_BUFFER = b4a.alloc(0) // null buffer (single byte of 0)
 
 const isUInt32 = (n) => { return Number.isInteger(n) && n >= 1 && n <= 0xFFFFFFFF; }
+
+export const isNullBuffer = (buffer) => {b4a.equals(buffer, NULL_BUFFER)}
 
 export function isBufferValid(key, size) {
     return b4a.isBuffer(key) && key.length === size;

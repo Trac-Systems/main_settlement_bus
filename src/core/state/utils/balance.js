@@ -1,6 +1,6 @@
 import b4a from 'b4a';
 import { setBalance } from './nodeEntry.js';
-import { isBufferValid, bigIntToBuffer } from '../../../utils/buffer.js';
+import { isBufferValid, bigIntToBuffer, NULL_BUFFER } from '../../../utils/buffer.js';
 import { BALANCE_BYTE_LENGTH, TOKEN_DECIMALS } from '../../../utils/constants.js';
 import { bufferToBigInt } from '../../../utils/amountSerialization.js';
 
@@ -37,6 +37,8 @@ const addBuffers = (a, b) => {
         result[i] = sum & 0xff;
         carry = sum >> 8;
     }
+
+    if(carry) return NULL_BUFFER // overflow
     return result;
 }
 
@@ -48,8 +50,15 @@ const addBuffers = (a, b) => {
  * @param {Buffer} b 
  * @returns {Buffer} - Resulting buffer
  */
-const subBuffers = (a, b) => {
-    if (a.length !== b.length) return EMPTY_BUFFER
+export const subBuffers = (a, b) => {
+    if (a.length !== b.length) return EMPTY_BUFFER;
+
+    // Check underflow by comparing full buffer
+    for (let i = 0; i < a.length; i++) {
+        if (a[i] > b[i]) break;  // safe
+        if (a[i] < b[i]) return NULL_BUFFER; // underflow
+    }
+
     const result = b4a.alloc(a.length);
     let borrow = 0;
     for (let i = a.length - 1; i >= 0; i--) {
@@ -137,6 +146,18 @@ export class Balance {
     /** Returns true if this balance is lower than another */
     lowerThan(b) {
         return b4a.compare(this.#value, b.value) === -1
+    }
+
+    /** Returns true if this balance is greater than or equal to another */
+    greaterThanOrEquals(b) {
+        const cmp = b4a.compare(this.#value, b.value)
+        return cmp === 1 || cmp === 0
+    }
+
+    /** Returns true if this balance is lower than or equal to another */
+    lowerThanOrEquals(b) {
+        const cmp = b4a.compare(this.#value, b.value)
+        return cmp === -1 || cmp === 0
     }
 
     /** Returns the hex string representation of the balance buffer */
