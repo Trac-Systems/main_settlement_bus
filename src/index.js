@@ -23,7 +23,6 @@ import {
 } from "./utils/constants.js";
 import partialStateMessageOperations from "./messages/partialStateMessages/PartialStateMessageOperations.js";
 import {randomBytes} from "hypercore-crypto";
-import { toBalance } from "./core/state/utils/nodeEntry.js";
 import {decimalStringToBigInt, bigIntTo16ByteBuffer, bufferToBigInt} from "./utils/amountSerialization.js"
 import { toBalance } from "./core/state/utils/nodeEntry.js";
 

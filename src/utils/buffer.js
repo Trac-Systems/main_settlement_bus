@@ -1,4 +1,5 @@
 import b4a from 'b4a';
+import { bigIntTo16ByteBuffer } from './amountSerialization.js';
 
 export const ZERO_WK = b4a.alloc(32, 0); // 32 bytes of zeroes, used as a placeholder for writing keys
 export const NULL_BUFFER = b4a.alloc(0) // null buffer (single byte of 0)
@@ -53,21 +54,4 @@ export function normalizeBuffer(message) {
     return null;
 }
 
-export function bigIntToBuffer(big, size) {
-    if (big < 0n) return b4a.alloc(size)
-  
-    let hex = big.toString(16);
-    if (hex.length % 2) hex = `0${hex}`;
-  
-    let buf = b4a.from(hex, 'hex');
-  
-    if (size) {
-        if (buf.length > size) return b4a.alloc(size)
-        if (buf.length < size) {
-            const padding = b4a.alloc(size - buf.length, 0);
-            buf = b4a.concat([padding, buf]);
-        }
-    }
-  
-    return buf;
-}
+export const bigIntToBuffer = bigIntTo16ByteBuffer

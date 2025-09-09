@@ -5,11 +5,6 @@ import { BALANCE_BYTE_LENGTH, TOKEN_DECIMALS } from '../../../utils/constants.js
 import { bufferToBigInt } from '../../../utils/amountSerialization.js';
 
 /**
- * Empty buffer used as a fallback when operations fail.
- */
-const EMPTY_BUFFER = b4a.alloc(0)
-
-/**
  * Converts a bigint amount of tokens into a fixed-length buffer,
  * scaled according to TOKEN_DECIMALS.
  * @param {bigint} bigint - The amount of tokens
@@ -29,7 +24,7 @@ export const $TNK = bigint => bigIntToBuffer(
  * @returns {Buffer} - Resulting buffer
  */
 const addBuffers = (a, b) => {
-    if (a.length !== b.length) return EMPTY_BUFFER
+    if (a.length !== b.length) return NULL_BUFFER
     const result = b4a.alloc(a.length);
     let carry = 0;
     for (let i = a.length - 1; i >= 0; i--) {
@@ -51,16 +46,11 @@ const addBuffers = (a, b) => {
  * @returns {Buffer} - Resulting buffer
  */
 export const subBuffers = (a, b) => {
-    if (a.length !== b.length) return EMPTY_BUFFER;
-
-    // Check underflow by comparing full buffer
-    for (let i = 0; i < a.length; i++) {
-        if (a[i] > b[i]) break;  // safe
-        if (a[i] < b[i]) return NULL_BUFFER; // underflow
-    }
+    if (a.length !== b.length) return NULL_BUFFER;
 
     const result = b4a.alloc(a.length);
     let borrow = 0;
+
     for (let i = a.length - 1; i >= 0; i--) {
         let diff = a[i] - b[i] - borrow;
         if (diff < 0) {
@@ -71,6 +61,10 @@ export const subBuffers = (a, b) => {
         }
         result[i] = diff;
     }
+
+    // If we ended with borrow, it means a < b (underflow)
+    if (borrow) return NULL_BUFFER;
+
     return result;
 }
 
@@ -165,6 +159,7 @@ export class Balance {
         return b4a.toString(this.#value, 'hex');
     }
 
+    // Note: DO NOT USE IN APPLY FUNCTION.
     /** Returns the balance as a BigInt */
     asBigInt() {
         return bufferToBigInt(this.#value)

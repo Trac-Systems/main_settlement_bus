@@ -121,6 +121,8 @@ class State extends ReadyResource {
         return nodeEntry ? nodeEntryUtils.decode(nodeEntry) : null;
     }
 
+    // PLACEHOLDER
+    // WARNING: DO NOT USE IN APPLY FUNCTION!!!
     async incrementBalance(address, toIncrement) {
         if (isBufferValid(toIncrement, NODE_ENTRY_SIZE) || b4a.equals(toIncrement, ZERO_BALANCE)) return null
         const nodeEntry = await this.getNodeEntry(address);
@@ -130,6 +132,8 @@ class State extends ReadyResource {
         return result.update(nodeEntryUtils.encode(nodeEntry))
     }
 
+    // PLACEHOLDER
+    // WARNING: DO NOT USE IN APPLY FUNCTION!!!
     async decrementBalance(address, toDecrement) {
         if (isBufferValid(toDecrement, NODE_ENTRY_SIZE) || b4a.equals(toDecrement, ZERO_BALANCE)) return null
         const nodeEntry = await this.getNodeEntry(address);
@@ -1094,6 +1098,8 @@ class State extends ReadyResource {
         return await batch.get(EntryType.WRITER_ADDRESS + writingKey);
     }
 
+    // PLACEHOLDER
+    // TODO: Check if this is used anywhere
     async #incrementBalanceApply(address, batch, toIncrement) {
         if (isBufferValid(toIncrement, NODE_ENTRY_SIZE) || b4a.equals(toIncrement, ZERO_BALANCE)) return null
         const nodeEntry = await this.#getEntryApply(address, batch);
@@ -1104,6 +1110,8 @@ class State extends ReadyResource {
         return result.update(nodeEntryUtils.encode(decodedNodeEntry))
     }
 
+    // PLACEHOLDER
+    // TODO: Check if this is used anywhere
     async #decrementBalanceApply(address, batch, toDecrement) {
         if (isBufferValid(toDecrement, NODE_ENTRY_SIZE) || b4a.equals(toDecrement, ZERO_BALANCE)) return null
         const nodeEntry = await this.#getEntryApply(address, batch);
