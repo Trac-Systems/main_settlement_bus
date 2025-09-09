@@ -646,8 +646,8 @@ export class MainSettlementBus extends ReadyResource {
             amountBuffer.toString('hex'),
             txValidity.toString('hex'),
         )
-
-        // await this.broadcastPartialTransaction(payload); disabled until onchain part will be implemented
+        // TODO: disabled until onchain part will be implemented
+        // await this.broadcastPartialTransaction(payload);
     }
 
     async #handleBalanceMigrationOperation() {
@@ -695,7 +695,7 @@ export class MainSettlementBus extends ReadyResource {
 
         }
 
-        // TODO add validation process that all messages has been processed (compare balances from file with node Entries - implement when apply function will be ready. )
+        // TODO: add validation process that all messages has been processed (compare balances from file with node Entries - implement when apply function will be ready. )
         console.log("Balance migration process completed.");
     }
 
@@ -708,7 +708,8 @@ export class MainSettlementBus extends ReadyResource {
             txValidity,
         )
         console.log('Disabling initialization...');
-        //await this.#state.append(payload); disabled until onchain part will be implemented
+        // TODO: disabled until onchain part will be implemented
+        //await this.#state.append(payload);
     }
 
     async interactiveMode() {
