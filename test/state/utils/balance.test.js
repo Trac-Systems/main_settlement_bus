@@ -57,8 +57,23 @@ test('Balance#greaterThen', t => {
     const $TNK1001 = $TNK(1001n)
 
     t.not(toBalance($TNK1000).greaterThen(toBalance($TNK1001)), '1000 not greater then 1001');
-    t.ok(toBalance($TNK1001).greaterThen(toBalance($TNK1000)), '1000 not greater then 1001');
+    t.ok(toBalance($TNK1001).greaterThen(toBalance($TNK1000)), '1001 greater then 1000');
     t.not(toBalance($TNK1000).greaterThen(toBalance($TNK1000)), '1000 not greater then 1000');
+});
+
+test('Balance#lowerThen', t => {
+    const $TNK1000 = $TNK(1000n)
+    const $TNK1001 = $TNK(1001n)
+
+    t.not(toBalance($TNK1001).lowerThen(toBalance($TNK1000)), '1001 not lower then 1000');
+    t.ok(toBalance($TNK1000).lowerThen(toBalance($TNK1001)), '1000 lower then 1001');
+    t.not(toBalance($TNK1000).lowerThen(toBalance($TNK1000)), '1000 not lower then 1000');
+});
+
+test('Balance#lowerThen', t => {
+    const $TNK1000 = $TNK(1000n)
+
+    t.ok(toBalance($TNK1000).equals(toBalance($TNK1000)), '1000 equals 1000');
 });
 
 test('Balance $TNK', t => {

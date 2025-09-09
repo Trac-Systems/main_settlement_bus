@@ -63,20 +63,20 @@ export class Balance {
         return new Balance(subBuffers(this.#value, b.value))
     }
 
-    equal(b) {
-        return b4a.equals(this.#value, b.value);
-    }
-
     update(nodeEntry) {
         return setBalance(nodeEntry, this.#value)
     }
 
+    equals(b) {
+        return b4a.equals(this.#value, b.value)
+    }
+
     greaterThen(b) {
-        return b4a.compare(this.#value, b.value) === 1;
+        return b4a.compare(this.#value, b.value) === 1
     }
 
     lowerThen(b) {
-        return b4a.compare(this.#value, b.value) === -1;
+        return b4a.compare(this.#value, b.value) === -1
     }
 
     asHex() {
