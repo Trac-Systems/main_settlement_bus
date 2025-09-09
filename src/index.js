@@ -745,7 +745,6 @@ export class MainSettlementBus extends ReadyResource {
                             balance: toBalance(nodeEntry.balance).asBigInt()
                         })
                         return {
-                            balance: 100,
                             WritingKey: nodeEntry.wk.toString('hex'),
                             IsWhitelisted: nodeEntry.isWhitelisted,
                             IsWriter: nodeEntry.isWriter,
