@@ -2,6 +2,7 @@ import b4a from 'b4a';
 import { setBalance } from './nodeEntry.js';
 import { isBufferValid, bigIntToBuffer } from '../../../utils/buffer.js';
 import { BALANCE_BYTE_LENGTH, TOKEN_DECIMALS } from '../../../utils/constants.js';
+import { bufferToBigInt } from '../../../utils/amountSerialization.js';
 
 class BalanceError extends Error {}
 
@@ -84,6 +85,6 @@ export class Balance {
     }
 
     asBigInt() {
-        return BigInt(`0x${this.asHex()}`)
+        return bufferToBigInt(this.#value)
     }
 }
