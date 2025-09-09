@@ -646,6 +646,7 @@ export class MainSettlementBus extends ReadyResource {
             amountBuffer.toString('hex'),
             txValidity.toString('hex'),
         )
+
         // await this.broadcastPartialTransaction(payload); disabled until onchain part will be implemented
     }
 
@@ -694,7 +695,7 @@ export class MainSettlementBus extends ReadyResource {
 
         }
 
-        // TODO add validation process that all messages has been processed (compare balancees from file with node Entries)
+        // TODO add validation process that all messages has been processed (compare balances from file with node Entries - implement when nodeEntry with balance will be available)
         console.log("Balance migration process completed.");
     }
 
