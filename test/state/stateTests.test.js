@@ -1,4 +1,5 @@
 import { default as test } from 'brittle';
+import { isBare } from './stateTestUtils.js';
 
 async function runStateTests() {
     test.pause();
@@ -11,8 +12,10 @@ async function runStateTests() {
     await import('./utils/lengthEntry.test.js');
     await import('./utils/roles.test.js');
     // These tests are skipped temoporarily because the mock library sinon does not work with bare.
-    // TODO: replace sinon
-    //  await import('./State.test.js');
+    // TODO: replace esmock, sinon is actually fine
+    if (!isBare()) {
+        await import('./State.test.js');
+    }
 
     test.resume();
 }
