@@ -32,6 +32,19 @@ export function startRpcServer(msbInstance, port) {
                 res.writeHead(500, { 'Content-Type': 'application/json' })
                 res.end(JSON.stringify({ error: 'An error occurred processing the request.' }))
             }
+        } else  if (req.url.startsWith('/txv')) {
+            try {
+                const commandString = '/get_txv'
+                const txvRaw = await msbInstance.handleCommand(commandString)
+                const txv = txvRaw.toString('hex')
+
+                res.writeHead(200, { 'Content-Type': 'application/json' })
+                res.end(JSON.stringify({ txv }))
+            } catch (error) {
+                console.error('Error on retrieving TXV:', error)
+                res.writeHead(500, { 'Content-Type': 'application/json' })
+                res.end(JSON.stringify({ error: 'An error occurred processing the request.' }))
+            }
         } else {
             res.writeHead(404, { 'Content-Type': 'text/plain' })
             res.end('Not Found')

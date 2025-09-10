@@ -874,6 +874,10 @@ export class MainSettlementBus extends ReadyResource {
                     const address = splitted[1];
                     const amount = splitted[2];
                     await this.#handleTransferOperation(address, amount);
+                } else if (input.startsWith("/get_txv")) {
+                    const txv = await this.#state.getIndexerSequenceState();
+                    console.log('Current TXV:', txv.toString('hex'));
+                    return txv
                 }
         }
         if (rl) rl.prompt();
