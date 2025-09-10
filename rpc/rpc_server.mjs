@@ -9,7 +9,7 @@ const sslOptions = {
 }
 
 // Called by msb.mjs file
-export function startRpcServer(msbInstance) {
+export function startRpcServer(msbInstance, port) {
     const server = https.createServer(sslOptions, async (req, res) => {
         if (req.url.startsWith('/balance/')) {
             try {
@@ -38,7 +38,6 @@ export function startRpcServer(msbInstance) {
         }
     })
 
-    const port = 3000
     server.listen(port, () => {
         console.log(`Running RPC with https at https://localhost:${port}`)
     })
