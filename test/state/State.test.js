@@ -1,10 +1,10 @@
 import { test, hook } from 'brittle';
-import { encode, toBalance, decode, ZERO_BALANCE } from '../../src/core/state/utils/nodeEntry.js';
+import { encode, decode, ZERO_BALANCE } from '../../src/core/state/utils/nodeEntry.js';
 import esmock from "esmock";
 import sinon from "sinon";
 import { randomBuffer, tokenUnits } from './stateTestUtils.js';
 import { WRITER_BYTE_LENGTH, ADMIN_INITIAL_BALANCE } from '../../src/utils/constants.js';
-import { $TNK } from '../../src/core/state/utils/balance.js';
+import { $TNK, toBalance } from '../../src/core/state/utils/balance.js';
 import b4a from 'b4a'
 
 let state
