@@ -84,11 +84,11 @@ class PartialTransfer {
             return false;
         }
 
-        const isZero = amountBuffer.every(byte => byte === 0);
-        if (isZero) {
-            console.error('Amount cannot be zero');
-            return false;
-        }
+        // const isZero = amountBuffer.every(byte => byte === 0);
+        // if (isZero) {
+        //     console.error('Amount cannot be zero');
+        //     return false;
+        // }
 
         try {
             const transferAmount = bufferToBigInt(amountBuffer);
@@ -100,10 +100,10 @@ class PartialTransfer {
                 return false;
             }
 
-            if (transferAmount < fee) {
-                console.error(`Transfer amount (${transferAmount}) must be greater than or equal to the minimum fee (${fee})`);
-                return false;
-            }
+            // if (transferAmount < fee) {
+            //     console.error(`Transfer amount (${transferAmount}) must be greater than or equal to the minimum fee (${fee})`);
+            //     return false;
+            // }
 
             return true;
         } catch (error) {

@@ -1,5 +1,5 @@
 import b4a from 'b4a';
-import {safeDecodeApplyOperation} from "./protobuf/operationHelpers.js";
+import { safeDecodeApplyOperation } from "./protobuf/operationHelpers.js";
 
 export async function verifyDag(state, network, wallet, writerKey) {
     try {
@@ -61,6 +61,7 @@ export function printHelp(isAdminMode = false) {
     console.log('- /stats: check system stats such as writing key, DAG, etc.');
     console.log('- /deployment <subnetwork_bootstrap>: deploy a subnetwork with the given bootstrap.');
     console.log('- /get_deployment <subnetwork_bootstrap>: get information about a subnetwork deployment with the given bootstrap.');
+    console.log('- /transfer <to_address> <amount>: transfer the specified amount to the given address.');
     console.log('- /get_tx_info <tx_hash>: get information about a transaction with the given hash.');
     console.log('- /get_validator_addr <writing_key>: get the validator address mapped to the given writing key.');
     console.log('- /exit: Exit the program.');

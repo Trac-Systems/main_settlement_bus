@@ -66,6 +66,27 @@ class Check {
             };
         });
 
+        this.#validator.add("buffer_amount", function ({schema, messages}, path, context) {
+            return {
+                source:
+                    `
+                        if (!${isBuffer}(value)) {
+                            ${this.makeError({type: "buffer", actual: "value", messages})}
+                        }
+                        if (value.length !== ${schema.length}) {
+                            ${this.makeError({
+                        type: "bufferLength",
+                        expected: schema.length,
+                        actual: "value.length",
+                        messages
+                    })}
+                        }
+                        return value;
+                    `
+            };
+        });
+        
+
         this.#validateCoreAdminOperationSchema = this.#compileCoreAdminOperationSchema();
         this.#validateAdminControlOperationSchema = this.#compileAdminControlOperationSchema();
         this.#validateRoleAccessOperationSchema = this.#compileRoleAccessOperationSchema();
@@ -453,7 +474,7 @@ class Check {
                     txv: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true}, // tx validity
                     in: {type: 'buffer', length: NONCE_BYTE_LENGTH, required: true}, // nonce of the invoker
                     to: {type: 'buffer', length: TRAC_ADDRESS_SIZE, required: true}, // recipient address
-                    am: {type: 'buffer', length: AMOUNT_BYTE_LENGTH, required: true}, // amount to transfer
+                    am: {type: 'buffer_amount', length: AMOUNT_BYTE_LENGTH, required: true}, // amount to transfer
                     is: {type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true}, // signature of the invoker
                     va: {type: 'buffer', length: TRAC_ADDRESS_SIZE, optional: true},  // validator address
                     vn: {type: 'buffer', length: NONCE_BYTE_LENGTH, optional: true},  // validator nonce
