@@ -647,8 +647,7 @@ export class MainSettlementBus extends ReadyResource {
             amountBuffer.toString('hex'),
             txValidity.toString('hex'),
         )
-        // TODO: disabled until onchain part will be implemented
-        // await this.broadcastPartialTransaction(payload);
+        await this.broadcastPartialTransaction(payload);
     }
 
     async #handleBalanceMigrationOperation() {

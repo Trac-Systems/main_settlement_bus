@@ -249,6 +249,7 @@ class State extends ReadyResource {
             [OperationType.BAN_VALIDATOR]: this.#handleApplyBanValidatorOperation.bind(this),
             [OperationType.BOOTSTRAP_DEPLOYMENT]: this.#handleApplyBootstrapDeploymentOperation.bind(this),
             [OperationType.TX]: this.#handleApplyTxOperation.bind(this),
+            [OperationType.TRANSFER]: this.#handleApplyTransferOperation.bind(this),
         };
         return handlers[type] || null;
     }
@@ -1057,6 +1058,92 @@ class State extends ReadyResource {
         if (this.#enable_txlogs === true) {
             console.log(`TX: ${hashHexString} appended. Signed length: `, this.#base.view.core.signedLength);
         }
+    }
+
+    async #handleApplyTransferOperation(op, view, base, node, batch) {
+        if (!this.check.validateTransferOperation(op)) return;
+        // if transaction is not complete, do not process it.
+        if (!Object.hasOwn(op.tro,"vs") || !Object.hasOwn(op.tro,"va")|| !Object.hasOwn(op.tro,"vn")) return;
+        // for additional security, nonces should be different.
+        if (b4a.equals(op.tro.in, op.tro.vn)) return;
+        // addresses should be different.
+        if (b4a.equals(op.address, op.tro.va)) return;
+        // signatures should be different.
+        if (b4a.equals(op.tro.is, op.tro.vs)) return;
+
+        // validate requester signature
+        const requesterAddressBuffer = op.address;
+        const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer);
+        if (null === requesterAddressString) return;
+        const requesterPublicKey = Wallet.decodeBech32mSafe(requesterAddressString);
+        if (null === requesterPublicKey) return;
+
+        // recreate requester message
+        const requesterMessage = createMessage(
+            op.address,
+            op.tro.txv,
+            op.tro.in,
+            op.tro.to,
+            op.tro.am,
+            OperationType.TRANSFER
+        );
+
+        if (requesterMessage.length === 0) return;
+
+        // ensure that tx is valid
+        const regeneratedTxHash = await blake3Hash(requesterMessage);
+        if (!b4a.equals(regeneratedTxHash, op.tro.tx)) return;
+
+        const isRequesterSignatureValid = this.#wallet.verify(op.tro.is, regeneratedTxHash, requesterPublicKey);
+        if (!isRequesterSignatureValid) return;
+
+        // signature of the validator
+        const validatorAddressBuffer = op.tro.va;
+        const validatorAddressString = addressUtils.bufferToAddress(validatorAddressBuffer);
+        if (null === validatorAddressString) return;
+        const validatorPublicKey = Wallet.decodeBech32mSafe(validatorAddressString);
+        if (null === validatorPublicKey) return;
+        
+        const validatorMessage = createMessage(
+            op.tro.tx,
+            op.tro.va,
+            op.tro.vn,
+            OperationType.TRANSFER
+        );
+
+        if (validatorMessage.length === 0) return;
+        const validatorMessageHash = await blake3Hash(validatorMessage);
+        const isValidatorSignatureValid = this.#wallet.verify(op.tro.vs, validatorMessageHash, validatorPublicKey);
+        if (!isValidatorSignatureValid) return;
+
+        // verify tx validity - prevent deferred execution attack
+        const indexersSequenceState = await this.#getIndexerSequenceStateApply(base);
+        if (indexersSequenceState === null) return;
+        if (!b4a.equals(op.txo.txv, indexersSequenceState)) return;
+
+        // anti-replay attack
+        const hashHexString = op.txo.tx.toString('hex');
+        const opEntry = await this.#getEntryApply(hashHexString, batch);
+        if (null !== opEntry) return;
+
+        // Check if recipient address is valid.
+        const recipientAddressBuffer = op.tro.to;
+        const recipientAddressString = addressUtils.bufferToAddress(recipientAddressBuffer);
+        if (null === recipientAddressString) return;
+        const recipientPublicKey = Wallet.decodeBech32mSafe(recipientAddressString);
+        if (null === recipientPublicKey) return;
+
+        // now if we have basic checks, we can proceed to transfer the balance.
+        // First we need to check if the sender has enough balance. Because this guy need to cover this case.
+        // Then we have 3 cases:
+        // 1. Recipient address does not exist, then we create a new entry with READER role and the transferred balance.
+        // 2. Recipient address exists, then we just increment the balance it it's nodeEntry.
+        // 3. Recipient address is the same like invoker address
+        // check limits of the artmetic operations
+        // if the transfer amount is zero or negative, do not process it.
+
+        
+
     }
 
     #isAdminApply(adminEntry, node) {
