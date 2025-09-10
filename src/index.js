@@ -708,7 +708,7 @@ export class MainSettlementBus extends ReadyResource {
         )
         console.log('Disabling initialization...');
         // TODO: disabled until onchain part will be implemented
-        //await this.#state.append(payload);
+        await this.#state.append(payload);
     }
 
     async interactiveMode() {

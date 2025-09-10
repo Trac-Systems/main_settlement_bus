@@ -235,6 +235,8 @@ class State extends ReadyResource {
 
     #getApplyOperationHandler(type) {
         const handlers = {
+            [OperationType.BALANCE_INITIALIZATION]: this.#handleApplyInitializeBalanceOperation.bind(this),
+            [OperationType.DISABLE_INITIALIZATION]: this.#handleApplyDisableBalanceInitializeOperation.bind(this),
             [OperationType.ADD_ADMIN]: this.#handleApplyAddAdminOperation.bind(this),
             [OperationType.APPEND_WHITELIST]: this.#handleApplyAppendWhitelistOperation.bind(this),
             [OperationType.ADD_WRITER]: this.#handleApplyAddWriterOperation.bind(this),
@@ -248,6 +250,41 @@ class State extends ReadyResource {
         };
         return handlers[type] || null;
     }
+
+    async #handleApplyInitializeBalanceOperation(op, view, base, node, batch) {
+        const amount = op.bio.am;
+        const recipientAddress = op.bio.in;
+        if (b4a.equals(amount, ZERO_BALANCE)) return;
+
+        // Entry has been disabled so there is nothing to do
+        const targetEntry = await this.#getEntryApply(recipientAddress, batch)
+        if (nodeEntryUtils.isInitlizationDisabled(targetEntry)) return;
+
+        // Ensure that an admin invoked this operation
+        const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
+        const decodedAdminEntry = adminEntryUtils.decode(adminEntry);
+        if (null === decodedAdminEntry || !this.#isAdminApply(decodedAdminEntry, node)) return;
+
+        const initializedNodeEntry  = nodeEntryUtils.init(ZERO_WK, nodeRoleUtils.NodeRole.READER, amount)
+        await batch.put(aAddress, initializedNodeEntry);
+    }
+
+    async #handleApplyDisableBalanceInitializeOperation(op, view, base, node, batch) {
+        const recipientAddress = op.bio.in;
+
+        // Entry has been disabled so there is nothing to do
+        const targetEntry = await this.#getEntryApply(recipientAddress, batch)
+        if (nodeEntryUtils.isInitlizationDisabled(targetEntry)) return;
+
+        // Ensure that an admin invoked this operation
+        const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
+        const decodedAdminEntry = adminEntryUtils.decode(adminEntry);
+        if (null === decodedAdminEntry || !this.#isAdminApply(decodedAdminEntry, node)) return;
+
+        const disabledNodeEntry  = nodeEntryUtils.disableInitialization(targetEntry)
+        await batch.put(aAddress, disabledNodeEntry);
+    }
+
 
     async #handleApplyAddAdminOperation(op, view, base, node, batch) {
         if (!this.check.validateCoreAdminOperation(op)) return;

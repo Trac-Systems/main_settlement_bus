@@ -1,7 +1,7 @@
 import { test } from 'brittle';
 import b4a from 'b4a';
 import { randomBuffer, TEN_THOUSAND_VALUE, tokenUnits } from '../stateTestUtils.js';
-import { ZERO_BALANCE, decode, encode } from '../../../src/core/state/utils/nodeEntry.js';
+import { ZERO_BALANCE, decode, encode, isInitlizationDisabled } from '../../../src/core/state/utils/nodeEntry.js';
 import { WRITER_BYTE_LENGTH, ADMIN_INITIAL_BALANCE, BALANCE_BYTE_LENGTH } from '../../../src/utils/constants.js';
 import { $TNK, toBalance } from '../../../src/core/state/utils/balance.js';
 
@@ -16,7 +16,8 @@ test('Balance#add with zero', t => {
         isWhitelisted: true,
         isWriter: true,
         isIndexer: false,
-        balance: ZERO_BALANCE
+        balance: ZERO_BALANCE,
+        isInitlizationDisabled: false
     };
 
     const balance = toBalance(node.balance)
@@ -35,7 +36,8 @@ test('Balance#add other stuff', t => {
         isWhitelisted: true,
         isWriter: true,
         isIndexer: false,
-        balance: TEN_THOUSAND_VALUE
+        balance: TEN_THOUSAND_VALUE,
+        isInitlizationDisabled: false
     };
 
     const balance = toBalance(node.balance)
@@ -77,7 +79,8 @@ test('Balance#sub with zero', t => {
         isWhitelisted: true,
         isWriter: true,
         isIndexer: false,
-        balance: TEN_THOUSAND_VALUE
+        balance: TEN_THOUSAND_VALUE,
+        isInitlizationDisabled: false
     };
 
     const balance = toBalance(node.balance)
@@ -96,7 +99,8 @@ test('Balance#sub zero from value', t => {
         isWhitelisted: true,
         isWriter: true,
         isIndexer: false,
-        balance: TEN_THOUSAND_VALUE
+        balance: TEN_THOUSAND_VALUE,
+        isInitlizationDisabled: false
     };
 
     const balance = toBalance(node.balance)
@@ -142,7 +146,8 @@ test('Balance#asBigInt', t => {
         isWhitelisted: true,
         isWriter: true,
         isIndexer: false,
-        balance: TEN_THOUSAND_VALUE
+        balance: TEN_THOUSAND_VALUE,
+        isInitlizationDisabled: false
     };
 
     const balance = toBalance(node.balance)
@@ -186,7 +191,8 @@ test('Node entry integration', t => {
         isWhitelisted: true,
         isWriter: true,
         isIndexer: true,
-        balance: ADMIN_INITIAL_BALANCE
+        balance: ADMIN_INITIAL_BALANCE,
+        isInitlizationDisabled: false
     });
 
     const decoded = decode(entry)

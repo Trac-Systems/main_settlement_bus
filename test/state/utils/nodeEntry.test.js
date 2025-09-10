@@ -25,6 +25,7 @@ test('Node Entry - init - Happy Path', t => {
     t.is(decoded.isWhitelisted, true, 'isWhitelisted matches');
     t.is(decoded.isWriter, false, 'isWriter matches');
     t.is(decoded.isIndexer, false, 'isIndexer matches');
+    t.is(decoded.isInitlizationDisabled, false, 'isInitlizationDisabled matches');
     t.ok(b4a.equals(decoded.balance, ZERO_BALANCE), 'balance matches');
 });
 
@@ -49,7 +50,8 @@ test('Node Entry - encode and decode - Happy Path', t => {
         isWhitelisted: true,
         isWriter: true,
         isIndexer: false,
-        balance: ZERO_BALANCE
+        balance: ZERO_BALANCE,
+        isInitlizationDisabled: true
     };
 
     const encoded = encodeNodeEntry(node);
@@ -61,6 +63,7 @@ test('Node Entry - encode and decode - Happy Path', t => {
     t.is(decoded.isWhitelisted, true, 'isWhitelisted matches');
     t.is(decoded.isWriter, true, 'isWriter matches');
     t.is(decoded.isIndexer, false, 'isIndexer matches');
+    t.is(decoded.isInitlizationDisabled, true, 'isIndexer matches');
     t.ok(b4a.equals(decoded.balance, ZERO_BALANCE), 'balance matches');
 });
 
@@ -70,7 +73,8 @@ test('Node Entry - encode returns empty buffer on invalid wk', t => {
         isWhitelisted: false,
         isWriter: false,
         isIndexer: true,
-        balance: ZERO_BALANCE
+        balance: ZERO_BALANCE,
+        isInitlizationDisabled: true
     };
     const encoded = encodeNodeEntry(node);
     t.is(encoded.length, 0);
@@ -82,7 +86,8 @@ test('Node Entry - encode returns empty buffer on invalid node role', t => {
         isWhitelisted: false,
         isWriter: true, // can't be a writer without being whitelisted
         isIndexer: false,
-        balance: ZERO_BALANCE
+        balance: ZERO_BALANCE,
+        isInitlizationDisabled: true
     };
     const encoded = encodeNodeEntry(node);
     t.is(encoded.length, 0);
@@ -98,7 +103,8 @@ test('Node Entry - encode returns empty buffer on invalid balance', t => {
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x27,
             0x10,
-        ])
+        ]),
+        isInitlizationDisabled: true
     };
     const encoded = encodeNodeEntry(node);
     t.is(encoded.length, 0);
@@ -124,7 +130,8 @@ test('Node Entry - setRole updates role flags', t => {
         isWhitelisted: false,
         isWriter: false,
         isIndexer: false,
-        balance: TEN_THOUSAND_VALUE
+        balance: TEN_THOUSAND_VALUE,
+        isInitlizationDisabled: true
     });
 
     // Set maximum tier role (0x7)
@@ -150,7 +157,8 @@ test('Node Entry - setBalance updates the balance', t => {
         isWhitelisted: false,
         isWriter: false,
         isIndexer: false,
-        balance: ZERO_BALANCE
+        balance: ZERO_BALANCE,
+        isInitlizationDisabled: true
     });
 
     entry = setNodeEntryBalance(entry, TEN_THOUSAND_VALUE);
