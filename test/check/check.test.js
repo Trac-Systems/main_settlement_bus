@@ -9,6 +9,7 @@ async function runCheckTests() {
     await import('./roleAccessOperation.test.js')
     await import('./transactionOperation.test.js')
     await import('./transferOperation.test.js')
+    await import('./balanceInitializationOperation.test.js')
 
   test.resume();
 }

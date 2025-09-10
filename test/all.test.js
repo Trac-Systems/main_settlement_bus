@@ -10,6 +10,7 @@ async function runTests() {
   await import('./protobuf/protobuf.test.js');
   await import('./functions/functions.test.js');
   await import('./fileUtils/readPublicKeysFromFile.test.js');
+  await import('./fileUtils/readBalanceMigrationFile.test.js');
   // await import('./messageOperations/stateMessageOperations.test.js');
   await import('./buffer/buffer.test.js')
   //await import('./apply/apply.test.js'); Do not work. Unstable.

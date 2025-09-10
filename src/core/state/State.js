@@ -284,8 +284,8 @@ class State extends ReadyResource {
         if (indexersSequenceState === null) return;
         if (!b4a.equals(op.cao.txv, indexersSequenceState)) return;
 
-        const writerKey = await this.#getRegisteredWriterKey(batch, op)
-        if (!!writerKey) return; // writer key should NOT exists for a brand new admin
+        const writerKeyIsRegistered = await this.#getRegisteredWriterKeyApply(batch, op.cao.iw.toString('hex'))
+        if (!!writerKeyIsRegistered) return; // writer key should NOT exists for a brand new admin
 
         const adminEntryExists = await this.#getEntryApply(EntryType.ADMIN, batch);
         // if admin entry already exists, cannot perform this operation
@@ -362,8 +362,8 @@ class State extends ReadyResource {
         const isValidatorMessageVerifed = this.#wallet.verify(op.rao.vs, validatorHash, validatorPublicKey);
         if (!isValidatorMessageVerifed) return;
 
-        const writerKey = await this.#getRegisteredWriterKey(batch, op)
-        if (!!writerKey) return; // writer key should NOT have been associated with any address because this is a recovery operation
+        const writerKeyIsRegistered = await this.#getRegisteredWriterKeyApply(batch, op.rao.iw.toString('hex'))
+        if (!!writerKeyIsRegistered) return; // writer key should NOT have been associated with any address because this is a recovery operation
         // verify tx validity - prevent deferred execution attack
         const indexersSequenceState = await this.#getIndexerSequenceStateApply(base);
         if (indexersSequenceState === null) return;
@@ -535,8 +535,8 @@ class State extends ReadyResource {
 
         // anti-replay attack
         if (null !== opEntry) return;
-        const associatedAddress = await this.#getRegisteredWriterKey(batch, op)
-        if (!!associatedAddress) return;
+        const writerKeyIsRegistered = await this.#getRegisteredWriterKeyApply(batch, op.rao.iw.toString('hex'))
+        if (!!writerKeyIsRegistered) return;
         await this.#addWriter(op, base, node, batch, txHashHexString, requesterAddressString, requesterAddressBuffer);
     }
 
@@ -1092,9 +1092,7 @@ class State extends ReadyResource {
         }
     }
 
-    async #getRegisteredWriterKey(batch, op) {
-        const jsonNode = operationToPayload(op.type)
-        const writingKey = b4a.toString(op[jsonNode].iw, 'hex');
+    async #getRegisteredWriterKeyApply(batch, writingKey) {
         return await batch.get(EntryType.WRITER_ADDRESS + writingKey);
     }
 

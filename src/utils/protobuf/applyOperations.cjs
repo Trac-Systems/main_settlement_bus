@@ -14,16 +14,18 @@ var skip = encodings.skip
 exports.OperationType = {
   "UNKNOWN": 0,
   "ADD_ADMIN": 1,
-  "APPEND_WHITELIST": 2,
-  "ADD_WRITER": 3,
-  "REMOVE_WRITER": 4,
-  "ADMIN_RECOVERY": 5,
-  "ADD_INDEXER": 6,
-  "REMOVE_INDEXER": 7,
-  "BAN_VALIDATOR": 8,
-  "BOOTSTRAP_DEPLOYMENT": 9,
-  "TX": 10,
-  "TRANSFER": 11
+  "DISABLE_INITIALIZATION": 2,
+  "BALANCE_INITIALIZATION": 3,
+  "APPEND_WHITELIST": 4,
+  "ADD_WRITER": 5,
+  "REMOVE_WRITER": 6,
+  "ADMIN_RECOVERY": 7,
+  "ADD_INDEXER": 8,
+  "REMOVE_INDEXER": 9,
+  "BAN_VALIDATOR": 10,
+  "BOOTSTRAP_DEPLOYMENT": 11,
+  "TX": 12,
+  "TRANSFER": 13
 }
 
 var CoreAdminOperation = exports.CoreAdminOperation = {
@@ -40,7 +42,7 @@ var AdminControlOperation = exports.AdminControlOperation = {
   decode: null
 }
 
-var InitBalanceOperation = exports.InitBalanceOperation = {
+var BalanceInitializationOperation = exports.BalanceInitializationOperation = {
   buffer: true,
   encodingLength: null,
   encode: null,
@@ -84,7 +86,7 @@ var Operation = exports.Operation = {
 
 defineCoreAdminOperation()
 defineAdminControlOperation()
-defineInitBalanceOperation()
+defineBalanceInitializationOperation()
 defineTransferOperation()
 defineRoleAccessOperation()
 defineTxOperation()
@@ -313,10 +315,10 @@ function defineAdminControlOperation () {
   }
 }
 
-function defineInitBalanceOperation () {
-  InitBalanceOperation.encodingLength = encodingLength
-  InitBalanceOperation.encode = encode
-  InitBalanceOperation.decode = decode
+function defineBalanceInitializationOperation () {
+  BalanceInitializationOperation.encodingLength = encodingLength
+  BalanceInitializationOperation.encode = encode
+  BalanceInitializationOperation.decode = decode
 
   function encodingLength (obj) {
     var length = 0
@@ -332,16 +334,16 @@ function defineInitBalanceOperation () {
       var len = encodings.bytes.encodingLength(obj.in)
       length += 1 + len
     }
+    if (defined(obj.ia)) {
+      var len = encodings.bytes.encodingLength(obj.ia)
+      length += 1 + len
+    }
+    if (defined(obj.am)) {
+      var len = encodings.bytes.encodingLength(obj.am)
+      length += 1 + len
+    }
     if (defined(obj.is)) {
       var len = encodings.bytes.encodingLength(obj.is)
-      length += 1 + len
-    }
-    if (defined(obj.sa)) {
-      var len = encodings.bytes.encodingLength(obj.sa)
-      length += 1 + len
-    }
-    if (defined(obj.bn)) {
-      var len = encodings.bytes.encodingLength(obj.bn)
       length += 1 + len
     }
     return length
@@ -366,19 +368,19 @@ function defineInitBalanceOperation () {
       encodings.bytes.encode(obj.in, buf, offset)
       offset += encodings.bytes.encode.bytes
     }
-    if (defined(obj.is)) {
+    if (defined(obj.ia)) {
       buf[offset++] = 34
-      encodings.bytes.encode(obj.is, buf, offset)
+      encodings.bytes.encode(obj.ia, buf, offset)
       offset += encodings.bytes.encode.bytes
     }
-    if (defined(obj.sa)) {
+    if (defined(obj.am)) {
       buf[offset++] = 42
-      encodings.bytes.encode(obj.sa, buf, offset)
+      encodings.bytes.encode(obj.am, buf, offset)
       offset += encodings.bytes.encode.bytes
     }
-    if (defined(obj.bn)) {
+    if (defined(obj.is)) {
       buf[offset++] = 50
-      encodings.bytes.encode(obj.bn, buf, offset)
+      encodings.bytes.encode(obj.is, buf, offset)
       offset += encodings.bytes.encode.bytes
     }
     encode.bytes = offset - oldOffset
@@ -394,9 +396,9 @@ function defineInitBalanceOperation () {
       tx: null,
       txv: null,
       in: null,
-      is: null,
-      sa: null,
-      bn: null
+      ia: null,
+      am: null,
+      is: null
     }
     while (true) {
       if (end <= offset) {
@@ -420,15 +422,15 @@ function defineInitBalanceOperation () {
         offset += encodings.bytes.decode.bytes
         break
         case 4:
-        obj.is = encodings.bytes.decode(buf, offset)
+        obj.ia = encodings.bytes.decode(buf, offset)
         offset += encodings.bytes.decode.bytes
         break
         case 5:
-        obj.sa = encodings.bytes.decode(buf, offset)
+        obj.am = encodings.bytes.decode(buf, offset)
         offset += encodings.bytes.decode.bytes
         break
         case 6:
-        obj.bn = encodings.bytes.decode(buf, offset)
+        obj.is = encodings.bytes.decode(buf, offset)
         offset += encodings.bytes.decode.bytes
         break
         default:
@@ -1113,7 +1115,7 @@ function defineOperation () {
 
   function encodingLength (obj) {
     var length = 0
-    if ((+defined(obj.cao) + +defined(obj.aco) + +defined(obj.ibo) + +defined(obj.tro) + +defined(obj.rao) + +defined(obj.bdo) + +defined(obj.txo)) > 1) throw new Error("only one of the properties defined in oneof value can be set")
+    if ((+defined(obj.cao) + +defined(obj.aco) + +defined(obj.bio) + +defined(obj.tro) + +defined(obj.rao) + +defined(obj.bdo) + +defined(obj.txo)) > 1) throw new Error("only one of the properties defined in oneof value can be set")
     if (defined(obj.type)) {
       var len = encodings.enum.encodingLength(obj.type)
       length += 1 + len
@@ -1132,8 +1134,8 @@ function defineOperation () {
       length += varint.encodingLength(len)
       length += 1 + len
     }
-    if (defined(obj.ibo)) {
-      var len = InitBalanceOperation.encodingLength(obj.ibo)
+    if (defined(obj.bio)) {
+      var len = BalanceInitializationOperation.encodingLength(obj.bio)
       length += varint.encodingLength(len)
       length += 1 + len
     }
@@ -1164,7 +1166,7 @@ function defineOperation () {
     if (!offset) offset = 0
     if (!buf) buf = b4a.allocUnsafe(encodingLength(obj))
     var oldOffset = offset
-    if ((+defined(obj.cao) + +defined(obj.aco) + +defined(obj.ibo) + +defined(obj.tro) + +defined(obj.rao) + +defined(obj.bdo) + +defined(obj.txo)) > 1) throw new Error("only one of the properties defined in oneof value can be set")
+    if ((+defined(obj.cao) + +defined(obj.aco) + +defined(obj.bio) + +defined(obj.tro) + +defined(obj.rao) + +defined(obj.bdo) + +defined(obj.txo)) > 1) throw new Error("only one of the properties defined in oneof value can be set")
     if (defined(obj.type)) {
       buf[offset++] = 8
       encodings.enum.encode(obj.type, buf, offset)
@@ -1189,12 +1191,12 @@ function defineOperation () {
       AdminControlOperation.encode(obj.aco, buf, offset)
       offset += AdminControlOperation.encode.bytes
     }
-    if (defined(obj.ibo)) {
+    if (defined(obj.bio)) {
       buf[offset++] = 42
-      varint.encode(InitBalanceOperation.encodingLength(obj.ibo), buf, offset)
+      varint.encode(BalanceInitializationOperation.encodingLength(obj.bio), buf, offset)
       offset += varint.encode.bytes
-      InitBalanceOperation.encode(obj.ibo, buf, offset)
-      offset += InitBalanceOperation.encode.bytes
+      BalanceInitializationOperation.encode(obj.bio, buf, offset)
+      offset += BalanceInitializationOperation.encode.bytes
     }
     if (defined(obj.tro)) {
       buf[offset++] = 50
@@ -1238,7 +1240,7 @@ function defineOperation () {
       address: null,
       cao: null,
       aco: null,
-      ibo: null,
+      bio: null,
       tro: null,
       rao: null,
       bdo: null,
@@ -1263,7 +1265,7 @@ function defineOperation () {
         break
         case 3:
         delete obj.aco
-        delete obj.ibo
+        delete obj.bio
         delete obj.tro
         delete obj.rao
         delete obj.bdo
@@ -1275,7 +1277,7 @@ function defineOperation () {
         break
         case 4:
         delete obj.cao
-        delete obj.ibo
+        delete obj.bio
         delete obj.tro
         delete obj.rao
         delete obj.bdo
@@ -1294,13 +1296,13 @@ function defineOperation () {
         delete obj.txo
         var len = varint.decode(buf, offset)
         offset += varint.decode.bytes
-        obj.ibo = InitBalanceOperation.decode(buf, offset, offset + len)
-        offset += InitBalanceOperation.decode.bytes
+        obj.bio = BalanceInitializationOperation.decode(buf, offset, offset + len)
+        offset += BalanceInitializationOperation.decode.bytes
         break
         case 6:
         delete obj.cao
         delete obj.aco
-        delete obj.ibo
+        delete obj.bio
         delete obj.rao
         delete obj.bdo
         delete obj.txo
@@ -1312,7 +1314,7 @@ function defineOperation () {
         case 7:
         delete obj.cao
         delete obj.aco
-        delete obj.ibo
+        delete obj.bio
         delete obj.tro
         delete obj.bdo
         delete obj.txo
@@ -1324,7 +1326,7 @@ function defineOperation () {
         case 8:
         delete obj.cao
         delete obj.aco
-        delete obj.ibo
+        delete obj.bio
         delete obj.tro
         delete obj.rao
         delete obj.txo
@@ -1336,7 +1338,7 @@ function defineOperation () {
         case 9:
         delete obj.cao
         delete obj.aco
-        delete obj.ibo
+        delete obj.bio
         delete obj.tro
         delete obj.rao
         delete obj.bdo

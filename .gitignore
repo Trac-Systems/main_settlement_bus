@@ -23,5 +23,8 @@ whitelist/*
 key.pem
 cert.pem
 
-
 .prettierrc
+# Migration directory
+migration/*
+!migration/.gitkeep
+.vscode/
