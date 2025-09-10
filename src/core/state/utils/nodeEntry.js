@@ -2,7 +2,7 @@ import b4a from 'b4a';
 
 import { WRITER_MASK, INDEXER_MASK, WHITELISTED_MASK, calculateNodeRole, isNodeRoleValid } from './roles.js';
 import { WRITER_BYTE_LENGTH, BALANCE_BYTE_LENGTH } from '../../../utils/constants.js';
-import { isBufferValid } from '../../../utils/buffer.js';
+import { isBufferValid, NULL_BUFFER } from '../../../utils/buffer.js';
 
 export const NODE_ENTRY_SIZE = 2 + WRITER_BYTE_LENGTH + BALANCE_BYTE_LENGTH;
 export const ZERO_BALANCE = b4a.alloc(BALANCE_BYTE_LENGTH);
@@ -54,7 +54,7 @@ export function init(writingKey, role, balance = ZERO_BALANCE) {
  * @returns {Buffer|null} The updated node entry buffer, or null if invalid.
  */
 export function disableInitialization(nodeEntry) {
-    if (nodeEntry?.[1] !== initialization.ENABLED) return null;
+    if (nodeEntry?.[1] !== initialization.ENABLED) return NULL_BUFFER;
 
     nodeEntry[1] = initialization.DISABLE
     return nodeEntry;

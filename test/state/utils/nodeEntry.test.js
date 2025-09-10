@@ -10,8 +10,10 @@ import {
     encode as encodeNodeEntry,
     decode as decodeNodeEntry,
     setRole as setNodeEntryRole,
-    setBalance as setNodeEntryBalance
+    setBalance as setNodeEntryBalance,
+    disableInitialization as disableNodeEntryInitialization
 } from '../../../src/core/state/utils/nodeEntry.js';
+import { NULL_BUFFER } from '../../../src/utils/buffer.js';
 
 // Test init()
 test('Node Entry - init - Happy Path', t => {
@@ -40,6 +42,7 @@ test('Node Entry - init - Happy Path with balance', t => {
     t.is(decoded.isWhitelisted, true, 'isWhitelisted matches');
     t.is(decoded.isWriter, false, 'isWriter matches');
     t.is(decoded.isIndexer, false, 'isIndexer matches');
+    t.is(decoded.isInitlizationDisabled, false, 'isInitlizationDisabled matches');
     t.ok(b4a.equals(decoded.balance, TEN_THOUSAND_VALUE), 'balance matches');
 });
 
@@ -65,6 +68,19 @@ test('Node Entry - encode and decode - Happy Path', t => {
     t.is(decoded.isIndexer, false, 'isIndexer matches');
     t.is(decoded.isInitlizationDisabled, true, 'isIndexer matches');
     t.ok(b4a.equals(decoded.balance, ZERO_BALANCE), 'balance matches');
+});
+
+test('Node Entry - encode returns empty buffer on invalid isInitlizationDisabled', t => {
+    const node = {
+        wk: randomBuffer(10), // invalid size
+        isWhitelisted: false,
+        isWriter: false,
+        isIndexer: true,
+        balance: ZERO_BALANCE,
+        isInitlizationDisabled: null
+    };
+    const encoded = encodeNodeEntry(node);
+    t.is(encoded.length, 0);
 });
 
 test('Node Entry - encode returns empty buffer on invalid wk', t => {
@@ -178,4 +194,35 @@ test('Node Entry - setBalance updates the balance', t => {
     entry = setNodeEntryBalance(entry, INVALID_BALANCE);
     const decoded2 = decodeNodeEntry(entry);
     t.is(decoded2, null);
+});
+
+test('Node Entry - disableInitialization disables', t => {
+    const wk = randomBuffer(WRITER_BYTE_LENGTH)
+    const entry = initNodeEntry(wk, NodeRole.READER)
+
+    const decoded = decodeNodeEntry(entry);
+    t.not(decoded.isWhitelisted, 'isWhitelisted should not be true');
+    t.not(decoded.isWriter, 'isWriter should not be true');
+    t.not(decoded.isIndexer, 'isIndexer should not be true');
+    t.not(decoded.isInitlizationDisabled, 'isInitlizationDisabled should not be true');
+    t.ok(b4a.equals(decoded.balance, ZERO_BALANCE), 'balance should be 0');
+
+    const updated = disableNodeEntryInitialization(entry);
+    const updatedDecoded = decodeNodeEntry(updated);
+    t.not(updatedDecoded.isWhitelisted, 'isWhitelisted should not be true');
+    t.not(updatedDecoded.isWriter, 'isWriter should not be true');
+    t.not(updatedDecoded.isIndexer, 'isIndexer should not be true');
+    t.not(updatedDecoded.isInitlizationDisabled, 'isInitlizationDisabled should not be true');
+    t.ok(b4a.equals(updatedDecoded.balance, ZERO_BALANCE), 'balance should be 0');
+});
+
+test('Node Entry - cannot double disable', t => {
+    const wk = randomBuffer(WRITER_BYTE_LENGTH)
+    const entry = initNodeEntry(wk, NodeRole.READER)
+
+    const updated = disableNodeEntryInitialization(entry);
+    t.ok(!b4a.equals(updated, NULL_BUFFER), 'updated should not be null');
+
+    const invalid = disableNodeEntryInitialization(updated);
+    t.ok(b4a.equals(invalid, NULL_BUFFER), 'invalid should be null');
 });

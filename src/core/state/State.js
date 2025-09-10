@@ -282,6 +282,7 @@ class State extends ReadyResource {
         if (null === decodedAdminEntry || !this.#isAdminApply(decodedAdminEntry, node)) return;
 
         const disabledNodeEntry  = nodeEntryUtils.disableInitialization(targetEntry)
+        if (b4a.equals(disabledNodeEntry, NULL_BUFFER)) return; // This shouldnt happen
         await batch.put(aAddress, disabledNodeEntry);
     }
 
