@@ -1,3 +1,4 @@
+
 /** @typedef {import('pear-interface')} */ /* global Pear */
 import ReadyResource from "ready-resource";
 import Corestore from "corestore";
@@ -878,6 +879,10 @@ export class MainSettlementBus extends ReadyResource {
                     const txv = await this.#state.getIndexerSequenceState();
                     console.log('Current TXV:', txv.toString('hex'));
                     return txv
+                }  else if (input.startsWith("/get_fee")) {
+                    const fee = this.#state.getFee();
+                    console.log('Current FEE:', bigIntToDecimalString(bufferToBigInt(fee)));
+                    return bigIntToDecimalString(bufferToBigInt(fee))
                 }
         }
         if (rl) rl.prompt();
