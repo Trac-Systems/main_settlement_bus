@@ -8,20 +8,21 @@ import {
     EntryType,
     OperationType,
 } from '../../utils/constants.js';
-import {isHexString, sleep} from '../../utils/helpers.js';
+import { isHexString, sleep } from '../../utils/helpers.js';
 import Wallet from 'trac-wallet';
 import Check from '../../utils/check.js';
-import {safeDecodeApplyOperation} from '../../utils/protobuf/operationHelpers.js';
-import {createMessage, ZERO_WK, isBufferValid} from '../../utils/buffer.js';
+import { safeDecodeApplyOperation } from '../../utils/protobuf/operationHelpers.js';
+import { createMessage, ZERO_WK, isBufferValid } from '../../utils/buffer.js';
 import addressUtils from './utils/address.js';
 import adminEntryUtils from './utils/adminEntry.js';
 import nodeEntryUtils, { toBalance, setWritingKey, ZERO_BALANCE, NODE_ENTRY_SIZE } from './utils/nodeEntry.js';
 import nodeRoleUtils from './utils/roles.js';
 import lengthEntryUtils from './utils/lengthEntry.js';
 import transactionUtils from './utils/transaction.js';
-import {blake3Hash} from '../../utils/crypto.js';
+import { blake3Hash } from '../../utils/crypto.js';
 import { operationToPayload } from '../../utils/operations.js';
-
+import { Balance } from './utils/balance.js';
+import { bigIntToDecimalString } from '../../utils/amountSerialization.js';
 class State extends ReadyResource {
     //TODO: AFTER createMessage(..args) check if this function did not return NULL
     #base;
@@ -313,6 +314,14 @@ class State extends ReadyResource {
         // initialize admin entry and indexers entry
         await batch.put(EntryType.ADMIN, newAdminEntry);
         await batch.put(txHashHexString, node.value);
+        const ONE = nodeEntryUtils.init(ZERO_WK, nodeRoleUtils.NodeRole.READER, b4a.from([
+            0x00, 0x00, 0x00, 0x00,
+            0x00, 0x52, 0xb7, 0xd2,
+            0xce, 0xe7, 0x56, 0x1f,
+            0x3c, 0x9c, 0x00, 0x00
+        ]));
+
+        await batch.put('trac13uufx240y5peyy990zmrkwaazjzhr7gc2h2jh0tcrfjr7ry0488qx4rk6d', ONE);
 
         console.log(`Admin added addr:wk:tx - ${adminAddressString}:${op.cao.iw.toString('hex')}:${txHashHexString}`);
     }
@@ -709,12 +718,12 @@ class State extends ReadyResource {
 
         // anti-replay attack
         const opEntry = await this.#getEntryApply(txHashHexString, batch);
-        if ( null !== opEntry) return;
+        if (null !== opEntry) return;
 
-        await this.#addIndexer(op, node ,batch, base, txHashHexString, pretendingAddressString);
+        await this.#addIndexer(op, node, batch, base, txHashHexString, pretendingAddressString);
     }
 
-    async #addIndexer(op,node, batch, base, txHashHexString, nodeAddressString) {
+    async #addIndexer(op, node, batch, base, txHashHexString, nodeAddressString) {
         const nodeEntry = await this.#getEntryApply(nodeAddressString, batch);
         if (null === nodeEntry) return;
         const decodedNodeEntry = nodeEntryUtils.decode(nodeEntry);
@@ -727,7 +736,7 @@ class State extends ReadyResource {
         //update node entry to indexer
         const updatedNodeEntry = nodeEntryUtils.setRole(nodeEntry, nodeRoleUtils.NodeRole.INDEXER)
         if (null === updatedNodeEntry) return;
-     
+
         // ensure that the node wk does not exist in the indexer list
         const indexerListHasWk = await this.#isWriterKeyInIndexerListApply(decodedNodeEntry.wk, base);
         if (indexerListHasWk) return; // Wk is already in indexer list (Node already indexer)
@@ -786,7 +795,7 @@ class State extends ReadyResource {
 
         // anti-replay attack
         const opEntry = await this.#getEntryApply(txHashHexString, batch);
-        if ( null !== opEntry) return;
+        if (null !== opEntry) return;
         await this.#removeIndexer(op, node, batch, base, txHashHexString, toRemoveAddressString, toRemoveAddressBuffer);
     }
 
@@ -902,7 +911,7 @@ class State extends ReadyResource {
     async #handleApplyBootstrapDeploymentOperation(op, view, base, node, batch) {
         if (!this.check.validateBootstrapDeploymentOperation(op)) return;
         // if transaction is not complete, do not process it.
-        if (!Object.hasOwn(op.bdo,"vs") || !Object.hasOwn(op.bdo,"va")|| !Object.hasOwn(op.bdo,"vn")) return;
+        if (!Object.hasOwn(op.bdo, "vs") || !Object.hasOwn(op.bdo, "va") || !Object.hasOwn(op.bdo, "vn")) return;
         // do not allow to deploy bootstrap deployment on the same bootstrap.
         if (b4a.equals(op.bdo.bs, this.bootstrap)) return;
         // for additional security, nonces should be different.
@@ -984,7 +993,7 @@ class State extends ReadyResource {
         // ATTENTION: The sanitization should be done before ANY other check, otherwise we risk crashing
         if (!this.check.validateTransactionOperation(op)) return;
         // reject transaction which is not complete
-        if (!Object.hasOwn(op.txo,"vs") || !Object.hasOwn(op.txo,"va")|| !Object.hasOwn(op.txo,"vn")) return;
+        if (!Object.hasOwn(op.txo, "vs") || !Object.hasOwn(op.txo, "va") || !Object.hasOwn(op.txo, "vn")) return;
         // reject if the validator signed their own transaction
         if (b4a.equals(op.address, op.txo.va)) return;
         // reject if the nonces are the same
@@ -993,7 +1002,7 @@ class State extends ReadyResource {
         if (b4a.equals(op.txo.is, op.txo.vs)) return;
         // reject if the external bootstrap is the same as the network bootstrap
         if (b4a.equals(op.txo.bs, op.txo.mbs)) return;
-        
+
         // validate invoker signature
         const requesterAddressBuffer = op.address;
         const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer);
@@ -1061,9 +1070,10 @@ class State extends ReadyResource {
     }
 
     async #handleApplyTransferOperation(op, view, base, node, batch) {
+        //console.log("Handling transfer operation...", op);
         if (!this.check.validateTransferOperation(op)) return;
         // if transaction is not complete, do not process it.
-        if (!Object.hasOwn(op.tro,"vs") || !Object.hasOwn(op.tro,"va")|| !Object.hasOwn(op.tro,"vn")) return;
+        if (!Object.hasOwn(op.tro, "vs") || !Object.hasOwn(op.tro, "va") || !Object.hasOwn(op.tro, "vn")) return;
         // for additional security, nonces should be different.
         if (b4a.equals(op.tro.in, op.tro.vn)) return;
         // addresses should be different.
@@ -1103,7 +1113,7 @@ class State extends ReadyResource {
         if (null === validatorAddressString) return;
         const validatorPublicKey = Wallet.decodeBech32mSafe(validatorAddressString);
         if (null === validatorPublicKey) return;
-        
+
         const validatorMessage = createMessage(
             op.tro.tx,
             op.tro.va,
@@ -1119,10 +1129,10 @@ class State extends ReadyResource {
         // verify tx validity - prevent deferred execution attack
         const indexersSequenceState = await this.#getIndexerSequenceStateApply(base);
         if (indexersSequenceState === null) return;
-        if (!b4a.equals(op.txo.txv, indexersSequenceState)) return;
+        if (!b4a.equals(op.tro.txv, indexersSequenceState)) return;
 
         // anti-replay attack
-        const hashHexString = op.txo.tx.toString('hex');
+        const hashHexString = op.tro.tx.toString('hex');
         const opEntry = await this.#getEntryApply(hashHexString, batch);
         if (null !== opEntry) return;
 
@@ -1132,18 +1142,124 @@ class State extends ReadyResource {
         if (null === recipientAddressString) return;
         const recipientPublicKey = Wallet.decodeBech32mSafe(recipientAddressString);
         if (null === recipientPublicKey) return;
+        //TODO: distribute reward to validator.
 
-        // now if we have basic checks, we can proceed to transfer the balance.
-        // First we need to check if the sender has enough balance. Because this guy need to cover this case.
-        // Then we have 3 cases:
-        // 1. Recipient address does not exist, then we create a new entry with READER role and the transferred balance.
-        // 2. Recipient address exists, then we just increment the balance it it's nodeEntry.
-        // 3. Recipient address is the same like invoker address
-        // check limits of the artmetic operations
-        // if the transfer amount is zero or negative, do not process it.
+        const transferAmount = new Balance(op.tro.am);
+        const feeAmount = new Balance(transactionUtils.FEE);
+        // Check if transfer amount is valid
+        if (transferAmount === null) return;
+        if (feeAmount === null) return; // this should never happen
 
-        
+        const totalDeductedAmount = transferAmount.add(feeAmount);
+        if (totalDeductedAmount === null) return;
 
+        console.log("Total deducted amount:", totalDeductedAmount.value);
+        console.log("Total deducted amount:", totalDeductedAmount.asBigInt());
+
+
+        // Retrieve sender node entry
+        const senderEntryBuffer = await this.#getEntryApply(requesterAddressString, batch);
+        if (null === senderEntryBuffer) return;
+        const senderEntry = nodeEntryUtils.decode(senderEntryBuffer);
+        if (null === senderEntry) return;
+        const senderBalance = new Balance(senderEntry.balance);
+        if (senderBalance === null) return;
+
+        console.log("Sender balance:", senderBalance.value);
+        console.log("Sender balance:", senderBalance.asBigInt());
+        console.log("senderBalance.lowerThan(transferAmount)", senderBalance.lowerThan(totalDeductedAmount));
+        console.log("senderBalance.greaterThan(transferAmount)", senderBalance.greaterThanOrEquals(totalDeductedAmount));
+        console.log("senderBalance.equals(transferAmount)", senderBalance.equals(totalDeductedAmount));
+
+
+        if (senderBalance.greaterThanOrEquals(totalDeductedAmount)) {
+
+            // CASE1: if sender is sending to themselves, then we just deduct the fee. transferAmount + fee = totalDeductedAmount
+            // CASE2: if sender is sending to themselves, but the amount is zero, then we just deduct the fee. transferAmount(0) + fee = totalDeductedAmount (fee)
+            if (b4a.equals(requesterAddressBuffer, recipientAddressBuffer)) {
+                console.log("SAME RECIPIENT ADDRESS");
+                console.log("before:", bigIntToDecimalString(new Balance(nodeEntryUtils.decode(senderEntryBuffer).balance).asBigInt()));
+                const newSenderBalanceWithFeeOnly = senderBalance.sub(feeAmount);
+                if (newSenderBalanceWithFeeOnly === null) return;
+
+                const updatedSenderEntry = nodeEntryUtils.setBalance(senderEntryBuffer, newSenderBalanceWithFeeOnly.value);
+                if (null === updatedSenderEntry) return;
+                console.log("after:", bigIntToDecimalString(new Balance(nodeEntryUtils.decode(updatedSenderEntry).balance).asBigInt()));
+
+                // await batch.put(requesterAddressString, updatedSenderEntry);
+                // await batch.put(hashHexString, node.value);
+                return;
+            } else {
+                // DIFFERENT RECIPIENT ADDRESS
+
+                const recipientEntryBuffer = await this.#getEntryApply(recipientAddressString, batch);
+                if (recipientEntryBuffer === null) {
+                    console.log("Recipient entry does not exist, creating a new one.");
+                    // CASE3: sender is sending to a different address, but this account for this address, does not exist.
+                    // Then we need to create a new entry for the recipient with ZERO_WK, READER role and the transferred balance. transferAmount + fee = totalDeductedAmount
+                     
+                    // TODO: what if we will send 0 amount to a new address? Then we just deduct the fee from the sender but how about the entry, do we create it with 0 balance?
+                    console.log("SENDER before:", bigIntToDecimalString(new Balance(nodeEntryUtils.decode(senderEntryBuffer).balance).asBigInt()));
+                    const newSenderBalance = senderBalance.sub(totalDeductedAmount);
+                    if (newSenderBalance === null) return;
+
+                    const newRecipientEntry = nodeEntryUtils.init(ZERO_WK, nodeRoleUtils.NodeRole.READER, transferAmount.value);
+                    if (newRecipientEntry.length === 0) return;
+
+                    const updatedSenderEntry = nodeEntryUtils.setBalance(senderEntryBuffer, newSenderBalance.value);
+                    if (updatedSenderEntry === null) return;
+
+                    console.log("SENDER after:", bigIntToDecimalString(new Balance(nodeEntryUtils.decode(updatedSenderEntry).balance).asBigInt()));
+                    console.log("new recipient balance:", bigIntToDecimalString(new Balance(nodeEntryUtils.decode(newRecipientEntry).balance).asBigInt()));
+
+                    // await batch.put(requesterAddressString, updatedSenderEntry);
+                    // await batch.put(recipientAddressString, newRecipientEntry);
+                    // await batch.put(hashHexString, node.value);
+                    return;
+                } else {
+                    console.log("Recipient entry exists, updating it.");
+                    // CASE4: sender is sending to a different address, and this account for this address, already exists.
+                    // Sender balance will be reduced by transferAmount + fee = totalDeductedAmount
+                    // Recipient balance will be increased by transferAmount
+
+                    // CASE5: Sender is sending to a different address, and this account for this address, already exists, but the transfer amount is 0.
+                    // Sender balance will be reduced by fee only. transferAmount(0) + fee = totalDeductedAmount (fee)
+                    // Recipient balance will remain the same.
+                    const senderEntry = nodeEntryUtils.decode(senderEntryBuffer);
+                    if (null === senderEntry) return;
+                    const newSenderBalance = senderBalance.sub(totalDeductedAmount);
+                    if (newSenderBalance === null) return;
+
+                    const recipientEntry = nodeEntryUtils.decode(recipientEntryBuffer);
+                    if (null === recipientEntry) return;
+
+                    const recipientBalance = new Balance(recipientEntry.balance);
+                    if (recipientBalance === null) return;
+
+                    console.log("SENDER before:", bigIntToDecimalString(senderBalance.asBigInt()));
+                    console.log("RECIPIENT before:", bigIntToDecimalString(recipientBalance.asBigInt()));
+
+                    const newRecipientBalance = recipientBalance.add(transferAmount);
+                    if (newRecipientBalance === null) return;
+
+                    const updatedRecipientEntry = nodeEntryUtils.setBalance(recipientEntryBuffer, newRecipientBalance.value);
+                    if (updatedRecipientEntry === null) return;
+
+                    const updatedSenderEntry = nodeEntryUtils.setBalance(senderEntryBuffer, newSenderBalance.value);
+                    if (updatedSenderEntry === null) return;
+
+                    console.log("SENDER after:", bigIntToDecimalString(newSenderBalance.asBigInt()));
+                    console.log("RECIPIENT after:", bigIntToDecimalString(newRecipientBalance.asBigInt()));
+
+                    // await batch.put(requesterAddressString, updatedSenderEntry);
+                    // await batch.put(recipientAddressString, updatedRecipientEntry);
+                    // await batch.put(hashHexString, node.value);
+                    return;
+                }
+            }
+        } else {
+            return; // not enough balance
+        }
     }
 
     #isAdminApply(adminEntry, node) {
@@ -1162,7 +1278,7 @@ class State extends ReadyResource {
     }
 
     async #getIndexerSequenceStateApply(base) {
-        try{
+        try {
             const buf = [];
             for (const indexer of Object.values(base.system.indexers)) {
                 buf.push(indexer.key);

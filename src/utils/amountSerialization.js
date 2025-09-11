@@ -26,9 +26,10 @@ export function decimalStringToBigInt(inputString, decimals = 18) {
 
     // Check if the amount is zero after trimming leading/trailing zeros
     const isZero = integerPart.replace(/^0+/, '') === '' && (!fractionalPart || fractionalPart.replace(/0+$/, '') === '');
-    if (isZero) {
-        throw new Error('Amount cannot be zero');
-    }
+    
+    // if (isZero) {
+    //     throw new Error('Amount cannot be zero');
+    // }
 
     fractionalPart = fractionalPart.padEnd(decimals, '0');
     const fullNumberString = integerPart + fractionalPart;

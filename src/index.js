@@ -26,6 +26,7 @@ import partialStateMessageOperations from "./messages/partialStateMessages/Parti
 import { randomBytes } from "hypercore-crypto";
 import { decimalStringToBigInt, bigIntTo16ByteBuffer, bufferToBigInt, bigIntToDecimalString } from "./utils/amountSerialization.js"
 import { toBalance } from "./core/state/utils/nodeEntry.js";
+import { ZERO_WK } from "./utils/buffer.js";
 
 //TODO create a MODULE which will separate logic responsible for role managment
 
@@ -647,6 +648,7 @@ export class MainSettlementBus extends ReadyResource {
             amountBuffer.toString('hex'),
             txValidity.toString('hex'),
         )
+        console.log("Transfer operation payload:", payload);
         await this.broadcastPartialTransaction(payload);
     }
 
@@ -819,7 +821,13 @@ export class MainSettlementBus extends ReadyResource {
                             balance: bigIntToDecimalString(bufferToBigInt(nodeEntry.balance))
                         }
                     } else {
-                        console.log('Node Entry not found for address:', address)
+                        console.log('Node Entry:', {
+                            WritingKey: ZERO_WK.toString('hex'),
+                            IsWhitelisted: false,
+                            IsWriter: false,
+                            IsIndexer: false,
+                            balance: bigIntToDecimalString(0n)
+                        })
                     }
                 } else if (input.startsWith("/add_indexer")) {
                     const splitted = input.split(" ");
