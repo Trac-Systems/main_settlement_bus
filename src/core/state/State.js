@@ -263,10 +263,17 @@ class State extends ReadyResource {
     }
 
     async #handleApplyInitializeBalanceOperation(op, view, base, node, batch) {
+        if (!this.check.validateBalanceInitialization(op)) return;
+
+        // Extract and validate the network address
+        const adminAddressBuffer = op.address;
+        const adminAddressString = addressUtils.bufferToAddress(adminAddressBuffer);
+        if (adminAddressString === null) return;
+
+        // Verify that the amount is not zero
         const amount = op.bio.am;
         const recipientAddress = op.bio.ia;
         const recipientAddressString = addressUtils.bufferToAddress(recipientAddress);
-
         if (b4a.equals(amount, ZERO_BALANCE)) return;
 
         // Entry has been disabled so there is nothing to do
@@ -274,46 +281,76 @@ class State extends ReadyResource {
 
         // Ensure that an admin invoked this operation
         const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
-
         const decodedAdminEntry = adminEntryUtils.decode(adminEntry);
         if (null === decodedAdminEntry || !this.#isAdminApply(decodedAdminEntry, node)) return;
-
         const adminPublicKey = Wallet.decodeBech32mSafe(decodedAdminEntry.address);
         if (adminPublicKey === null) return;
 
+        // Recreate requester message
         const message = createMessage(op.address, op.bio.txv, op.bio.in, op.bio.ia, amount, OperationType.BALANCE_INITIALIZATION);
+        if (message.length === 0) return;
+
         const hash = await blake3Hash(message);
+        const txHashHexString = op.bio.tx.toString('hex');
         if (!b4a.equals(hash, op.bio.tx)) return;
 
+        // Verify signature
         const isMessageVerifed = this.#wallet.verify(op.bio.is, hash, adminPublicKey);
         if (!isMessageVerifed) return;
 
-        const initializedNodeEntry  = nodeEntryUtils.init(ZERO_WK, nodeRoleUtils.NodeRole.READER, amount)
+        // Verify tx validity - prevent deferred execution attack
+        const indexersSequenceState = await this.#getIndexerSequenceStateApply(base);
+        if (indexersSequenceState === null) return;
+        if (!b4a.equals(op.bio.txv, indexersSequenceState)) return;
+
+        // Check if the operation has already been applied
+        const opEntry = await this.#getEntryApply(txHashHexString, batch);
+        if (null !== opEntry) return;
+
+        const initializedNodeEntry = nodeEntryUtils.init(ZERO_WK, nodeRoleUtils.NodeRole.READER, amount)
         await batch.put(recipientAddressString, initializedNodeEntry);
+        await batch.put(txHashHexString, node.value);
     }
 
     async #handleApplyDisableBalanceInitializeOperation(op, view, base, node, batch) {
+        if (!this.check.validateCoreAdminOperation(op)) return;
+
         // Entry has been disabled so there is nothing to do
         if (await this.#isApplyInitalizationDisabled(batch)) return;
 
+        // Extract and validate the network address
+        const adminAddressBuffer = op.address;
+        const adminAddressString = addressUtils.bufferToAddress(adminAddressBuffer);
+        if (adminAddressString === null) return;
+
         // Ensure that an admin invoked this operation
         const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
-        
         const decodedAdminEntry = adminEntryUtils.decode(adminEntry);
         if (null === decodedAdminEntry || !this.#isAdminApply(decodedAdminEntry, node)) return;
-
         const adminPublicKey = Wallet.decodeBech32mSafe(decodedAdminEntry.address);
         if (adminPublicKey === null) return;
 
+        // Recreate requester message
         const message = createMessage(op.address, op.cao.txv, op.cao.iw, op.cao.in, OperationType.DISABLE_INITIALIZATION);
-
         const hash = await blake3Hash(message);
+        const txHashHexString = op.cao.tx.toString('hex');
         if (!b4a.equals(hash, op.cao.tx)) return;
 
+        // Verify signature
         const isMessageVerifed = this.#wallet.verify(op.cao.is, hash, adminPublicKey);
         if (!isMessageVerifed) return;
 
+        // Verify tx validity - prevent deferred execution attack
+        const indexersSequenceState = await this.#getIndexerSequenceStateApply(base);
+        if (indexersSequenceState === null) return;
+        if (!b4a.equals(op.cao.txv, indexersSequenceState)) return;
+
+        // Check if the operation has already been applied
+        const opEntry = await this.#getEntryApply(txHashHexString, batch);
+        if (null !== opEntry) return;
+
         await batch.put(EntryType.INITIALIZATION, safeWriteUInt32BE(1, 0));
+        await batch.put(txHashHexString, node.value);
     }
 
     async #handleApplyAddAdminOperation(op, view, base, node, batch) {
