@@ -258,7 +258,7 @@ class State extends ReadyResource {
 
         // Entry has been disabled so there is nothing to do
         const targetEntry = await this.#getEntryApply(recipientAddress, batch)
-        if (nodeEntryUtils.isInitlizationDisabled(targetEntry)) return;
+        if (await this.#isInitalizationDisabled(batch)) return;
 
         // Ensure that an admin invoked this operation
         const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
@@ -270,20 +270,15 @@ class State extends ReadyResource {
     }
 
     async #handleApplyDisableBalanceInitializeOperation(op, view, base, node, batch) {
-        const recipientAddress = op.bio.in;
-
         // Entry has been disabled so there is nothing to do
-        const targetEntry = await this.#getEntryApply(recipientAddress, batch)
-        if (nodeEntryUtils.isInitlizationDisabled(targetEntry)) return;
+        if (await this.#isInitalizationDisabled(batch)) return;
 
         // Ensure that an admin invoked this operation
         const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
         const decodedAdminEntry = adminEntryUtils.decode(adminEntry);
         if (null === decodedAdminEntry || !this.#isAdminApply(decodedAdminEntry, node)) return;
 
-        const disabledNodeEntry  = nodeEntryUtils.disableInitialization(targetEntry)
-        if (b4a.equals(disabledNodeEntry, NULL_BUFFER)) return; // This shouldnt happen
-        await batch.put(aAddress, disabledNodeEntry);
+        await this.#setInitialization(batch, 0x1)
     }
 
 
@@ -576,6 +571,23 @@ class State extends ReadyResource {
         const writerKeyIsRegistered = await this.#getRegisteredWriterKeyApply(batch, op.rao.iw.toString('hex'))
         if (!!writerKeyIsRegistered) return;
         await this.#addWriter(op, base, node, batch, txHashHexString, requesterAddressString, requesterAddressBuffer);
+    }
+
+    async #isInitalizationDisabled(batch) {
+        // Retrieve the flag to verify if initialization is allowed
+        let initialization = await this.#getEntryApply('initialization', batch);
+        if (null === initialization) {
+            return false
+        } else {
+            return !!initialization
+        }
+    }
+
+    async #setInitialization(batch, value) {
+        // Retrieve the flag to verify if initialization is allowed
+        let initialization = await this.#getEntryApply('initialization', batch);
+        if (null === initialization) return; // shouldnt happen but its part of life
+        await batch.put(requesterAddressString, value);
     }
 
     async #updateWritersIndex(validatorAddressBuffer, batch) {
