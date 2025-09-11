@@ -659,6 +659,11 @@ export class MainSettlementBus extends ReadyResource {
         if (!adminEntry) {
             throw new Error("Can not initialize an admin - admin does not exist.");
         }
+
+        if (!this.#isAdmin(adminEntry)) {
+            throw new Error('Cannot perform whitelisting - you are not the admin!.');
+        }
+
         if (!this.#wallet) {
             throw new Error(
                 "Can not initialize an admin - wallet is not initialized."
@@ -699,6 +704,18 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async #disableInitialization() {
+        if (this.#enable_wallet === false) {
+            throw new Error("Can not initialize an admin - wallet is not enabled.");
+        }
+        const adminEntry = await this.#state.getAdminEntry();
+
+        if (!adminEntry) {
+            throw new Error("Can not initialize an admin - admin does not exist.");
+        }
+
+        if (!this.#isAdmin(adminEntry)) {
+            throw new Error('Cannot perform whitelisting - you are not the admin!.');
+        }
         // add more checks
         const txValidity = await this.#state.getIndexerSequenceState();
         const payload = await CompleteStateMessageOperations.assembleDisableInitializationMessage(

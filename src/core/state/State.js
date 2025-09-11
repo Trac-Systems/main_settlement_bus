@@ -341,6 +341,7 @@ class State extends ReadyResource {
         // initialize admin entry and indexers entry
         await batch.put(EntryType.ADMIN, newAdminEntry);
         await batch.put(txHashHexString, node.value);
+        await this.#setInitialization(batch, 0)
 
         console.log(`Admin added addr:wk:tx - ${adminAddressString}:${op.cao.iw.toString('hex')}:${txHashHexString}`);
     }
@@ -575,7 +576,7 @@ class State extends ReadyResource {
 
     async #isInitalizationDisabled(batch) {
         // Retrieve the flag to verify if initialization is allowed
-        let initialization = await this.#getEntryApply('initialization', batch);
+        let initialization = await this.#getEntryApply(EntryType.INITIALIZATION, batch);
         if (null === initialization) {
             return false
         } else {
@@ -585,9 +586,9 @@ class State extends ReadyResource {
 
     async #setInitialization(batch, value) {
         // Retrieve the flag to verify if initialization is allowed
-        let initialization = await this.#getEntryApply('initialization', batch);
+        let initialization = await this.#getEntryApply(EntryType.INITIALIZATION, batch);
         if (null === initialization) return; // shouldnt happen but its part of life
-        await batch.put(requesterAddressString, value);
+        await batch.put(EntryType.INITIALIZATION, value);
     }
 
     async #updateWritersIndex(validatorAddressBuffer, batch) {
