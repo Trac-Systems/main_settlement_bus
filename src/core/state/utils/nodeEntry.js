@@ -2,23 +2,10 @@ import b4a from 'b4a';
 
 import { WRITER_MASK, INDEXER_MASK, WHITELISTED_MASK, calculateNodeRole, isNodeRoleValid } from './roles.js';
 import { WRITER_BYTE_LENGTH, BALANCE_BYTE_LENGTH } from '../../../utils/constants.js';
-import { isBufferValid, NULL_BUFFER } from '../../../utils/buffer.js';
+import { isBufferValid } from '../../../utils/buffer.js';
 
-export const NODE_ENTRY_SIZE = 2 + WRITER_BYTE_LENGTH + BALANCE_BYTE_LENGTH;
+export const NODE_ENTRY_SIZE = WRITER_BYTE_LENGTH + BALANCE_BYTE_LENGTH + 1;
 export const ZERO_BALANCE = b4a.alloc(BALANCE_BYTE_LENGTH);
-
-const initialization = {
-    ENABLED: 0x0,
-    DISABLE: 0x1
-}
-
-function isInitlizationDisabledValid(flag) {
-    return typeof flag === 'boolean'
-}
-
-export function isInitlizationDisabled(nodeEntry) {
-    return isBufferValid(nodeEntry, NODE_ENTRY_SIZE) || nodeEntry?.[1] !== initialization.ENABLED
-}
 
 /**
  * Initializes a new node entry with given writing key and role and the balance is set to zero.
@@ -38,26 +25,13 @@ export function init(writingKey, role, balance = ZERO_BALANCE) {
     try {
         const nodeEntry = b4a.alloc(NODE_ENTRY_SIZE);
         nodeEntry[0] = role;
-        nodeEntry[1] = initialization.ENABLED;
-        b4a.copy(writingKey, nodeEntry, 2);
-        b4a.copy(balance, nodeEntry, 2 + WRITER_BYTE_LENGTH);
+        b4a.copy(writingKey, nodeEntry, 1);
+        b4a.copy(balance, nodeEntry, WRITER_BYTE_LENGTH + 1);
         return nodeEntry;
     } catch (error) {
         console.error('Error initializing node entry:', error);
         return b4a.alloc(0);
     }
-}
-
-/**
- * Disables initializiation. Beware, this changes the incoming reference as well.
- * @param {Buffer} nodeEntry - The node entry buffer.
- * @returns {Buffer|null} The updated node entry buffer, or null if invalid.
- */
-export function disableInitialization(nodeEntry) {
-    if (nodeEntry?.[1] !== initialization.ENABLED) return NULL_BUFFER;
-
-    nodeEntry[1] = initialization.DISABLE
-    return nodeEntry;
 }
 
 /**
@@ -74,22 +48,20 @@ export function disableInitialization(nodeEntry) {
  *   - isWhitelisted: Boolean indicating if the node is whitelisted.
  *   - isWriter: Boolean indicating if the node is a writer.
  *   - isIndexer: Boolean indicating if the node is an indexer.
- *   - isInitlizationDisabled: Boolean indicating if the node initialization is disabled.
  *   - balance: Buffer indicating the node balance.
  * @returns {Buffer} The encoded node entry buffer, or an empty buffer if input is invalid.
  */
 export function encode(node) {
     const nodeRole = calculateNodeRole(node);
-    if (!isBufferValid(node.wk, WRITER_BYTE_LENGTH) || !isBufferValid(node.balance, BALANCE_BYTE_LENGTH) || !isNodeRoleValid(nodeRole) || !isInitlizationDisabledValid(node.isInitlizationDisabled)) {
+    if (!isBufferValid(node.wk, WRITER_BYTE_LENGTH) || !isBufferValid(node.balance, BALANCE_BYTE_LENGTH) || !isNodeRoleValid(nodeRole)) {
         return b4a.alloc(0); // Return an empty buffer if one of the inputs is invalid
     }
 
     try {
         let entry = b4a.alloc(NODE_ENTRY_SIZE);
         entry[0] = nodeRole;
-        entry[1] = node.isInitlizationDisabled ? initialization.DISABLE : initialization.ENABLED;
-        b4a.copy(node.wk, entry, 2);
-        b4a.copy(node.balance, entry, 2 + WRITER_BYTE_LENGTH);
+        b4a.copy(node.wk, entry, 1);
+        b4a.copy(node.balance, entry, WRITER_BYTE_LENGTH + 1);
         return entry;
     }
     catch (error) {
@@ -112,7 +84,6 @@ export function encode(node) {
  *   - isWhitelisted: Boolean indicating if the node is whitelisted.
  *   - isWriter: Boolean indicating if the node is a writer.
  *   - isIndexer: Boolean indicating if the node is an indexer.
- *   - isInitlizationDisabled: Boolean indicating if the node is an indexer.
  *   - balance: Buffer representing the balance in its atomic unit.
  *   Returns null if the buffer is invalid or an error occurs.
  */
@@ -128,11 +99,10 @@ export function decode(nodeEntry) {
         const isWriter = !!(role & WRITER_MASK);
         const isIndexer = !!(role & INDEXER_MASK);
 
-        const isInitlizationDisabled = !!nodeEntry[1];
-        const wk = nodeEntry.subarray(2, 2 + WRITER_BYTE_LENGTH);
-        const balance = nodeEntry.subarray(WRITER_BYTE_LENGTH + 2, NODE_ENTRY_SIZE);
+        const wk = nodeEntry.subarray(1, WRITER_BYTE_LENGTH + 1);
+        const balance = nodeEntry.subarray(WRITER_BYTE_LENGTH + 1, NODE_ENTRY_SIZE);
 
-        return { wk, isWhitelisted, isWriter, isIndexer, balance, isInitlizationDisabled };
+        return { wk, isWhitelisted, isWriter, isIndexer, balance };
     }
     catch (error) {
         console.error('Error decoding node entry:', error);
@@ -228,7 +198,7 @@ export function setBalance(nodeEntry, balance) {
             return null;
         }
 
-        b4a.copy(balance, nodeEntry, WRITER_BYTE_LENGTH + 2);
+        b4a.copy(balance, nodeEntry, WRITER_BYTE_LENGTH + 1);
         return nodeEntry;
     } catch (error) {
         console.error('Error setting balance in node entry:', error);
