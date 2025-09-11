@@ -174,7 +174,7 @@ class CompleteStateMessageOperations {
             director.builder = builder;
 
             const messages = [];
-            const { addressBalancePair, totalBalance, totalAddresses } = await fileUtils.readBalanceMigrationFile();
+            const { addressBalancePair, totalBalance, totalAddresses, addresses } = await fileUtils.readBalanceMigrationFile();
 
             for (const [recipientAddress, balanceBuffer] of addressBalancePair) {
                 const payload = await director.buildBalanceInitializationMessage(
@@ -185,7 +185,7 @@ class CompleteStateMessageOperations {
                 );
                 messages.push(safeEncodeApplyOperation(payload));
             }
-            return { messages, totalBalance, totalAddresses };
+            return { messages, totalBalance, totalAddresses, addresses };
 
         } catch (error) {
             throw new Error(`Failed to assemble balance initialization messages: ${error.message}`);

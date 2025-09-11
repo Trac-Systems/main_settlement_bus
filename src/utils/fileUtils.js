@@ -54,6 +54,7 @@ async function readBalanceMigrationFile(filepath = BALANCE_MIGRATION_FILEPATH) {
         const addressBalancePair = new Map();
         let totalBalance = BigInt(0);
         let totalAddresses = 0;
+        let addresses = []
 
         for (const line of lines) {
             const match = line.match(pairFormatRegex);
@@ -77,9 +78,10 @@ async function readBalanceMigrationFile(filepath = BALANCE_MIGRATION_FILEPATH) {
             }
             totalBalance += parsedBalance;
             totalAddresses += 1;
+            addresses.push({ address, parsedBalance })
             addressBalancePair.set(address, balanceBuffer);
         }
-        return {addressBalancePair, totalBalance, totalAddresses};
+        return {addressBalancePair, totalBalance, totalAddresses, addresses};
     } catch (err) {
         if (err.code === 'ENOENT') {
             throw new Error(`Balance migration file not found: ${filepath}`);
