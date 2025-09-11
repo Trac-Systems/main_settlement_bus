@@ -98,6 +98,10 @@ class State extends ReadyResource {
         return this.#base.view.core.signedLength;
     }
 
+    getFee() {
+        return transactionUtils.FEE;
+    }
+
     async get(key) {
         const result = await this.#base.view.get(key);
         if (result === null) return null;

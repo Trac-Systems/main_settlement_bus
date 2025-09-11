@@ -45,6 +45,18 @@ export function startRpcServer(msbInstance, port) {
                 res.writeHead(500, { 'Content-Type': 'application/json' })
                 res.end(JSON.stringify({ error: 'An error occurred processing the request.' }))
             }
+        } else  if (req.url.startsWith('/fee')) {
+            try {
+                const commandString = '/get_fee'
+                const fee = await msbInstance.handleCommand(commandString)
+                
+                res.writeHead(200, { 'Content-Type': 'application/json' })
+                res.end(JSON.stringify({ fee }))
+            } catch (error) {
+                console.error('Error on retrieving fee:', error)
+                res.writeHead(500, { 'Content-Type': 'application/json' })
+                res.end(JSON.stringify({ error: 'An error occurred processing the request.' }))
+            }
         } else {
             res.writeHead(404, { 'Content-Type': 'text/plain' })
             res.end('Not Found')

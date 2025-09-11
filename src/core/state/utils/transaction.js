@@ -106,5 +106,6 @@ export default {
     generateTxBuffer,
     generateBootstrapDeploymentTxBuffer,
     TRANSACTION_TOTAL_SIZE,
-    MAXIMUM_OPERATION_PAYLOAD_SIZE
+    MAXIMUM_OPERATION_PAYLOAD_SIZE,
+    FEE
 };
