@@ -9,7 +9,7 @@
   "type": "module",
   "scripts": {
     "dev": "pear run -d .",
-    "dev-rpc": "pear run -d . ${npm_config_store} --rpc",
+    "dev-rpc": "pear run -d . ${npm_config_store} --rpc --port ${npm_config_port}",
     "protobuf": "node scripts/generate-protobufs.js",
     "test:node": "brittle-node -t 120000 test/all.test.js",
     "test:bare": "brittle-bare -t 120000 test/all.test.js",
