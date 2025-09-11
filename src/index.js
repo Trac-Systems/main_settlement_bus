@@ -651,6 +651,12 @@ export class MainSettlementBus extends ReadyResource {
 
     async #handleBalanceMigrationOperation() {
 
+        const isInitDisabled = await this.#state.isInitalizationDisabled()
+
+        if (isInitDisabled){
+            throw new Error("Can not initialize balance - balance initialization is disabled.");
+        }
+
         if (this.#enable_wallet === false) {
             throw new Error("Can not initialize an admin - wallet is not enabled.");
         }
@@ -694,7 +700,7 @@ export class MainSettlementBus extends ReadyResource {
         for (let i = 0; i < messages.length; i++) {
             const message = messages[i];
             console.log(`Processing message ${i + 1} of ${messages.length}...`);
-            //await this.#state.append(message); disabled until onchain part will be implemented
+            await this.#state.append(message); 
             await sleep(WHITELIST_SLEEP_INTERVAL);
 
         }
