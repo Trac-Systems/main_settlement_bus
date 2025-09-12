@@ -1142,6 +1142,7 @@ class State extends ReadyResource {
         if (null === recipientAddressString) return;
         const recipientPublicKey = Wallet.decodeBech32mSafe(recipientAddressString);
         if (null === recipientPublicKey) return;
+
         //TODO: distribute reward to validator.
 
         const transferAmount = new Balance(op.tro.am);
@@ -1162,104 +1163,103 @@ class State extends ReadyResource {
         if (null === senderEntryBuffer) return;
         const senderEntry = nodeEntryUtils.decode(senderEntryBuffer);
         if (null === senderEntry) return;
+
         const senderBalance = new Balance(senderEntry.balance);
+        console.log("Sender balance before if:", senderBalance.value);
         if (senderBalance === null) return;
 
-        console.log("Sender balance:", senderBalance.value);
-        console.log("Sender balance:", senderBalance.asBigInt());
+        console.log("Sender balance after if:", senderBalance.value);
+        console.log("Sender balance :", senderBalance.asBigInt());
         console.log("senderBalance.lowerThan(transferAmount)", senderBalance.lowerThan(totalDeductedAmount));
         console.log("senderBalance.greaterThan(transferAmount)", senderBalance.greaterThanOrEquals(totalDeductedAmount));
         console.log("senderBalance.equals(transferAmount)", senderBalance.equals(totalDeductedAmount));
 
+        // /transfer trac13pqh3dsk85kvepye6dhv49v2jhdrpt2flxf8w82furw6cunuma2s4yqghe 1
+        if (!senderBalance.greaterThanOrEquals(totalDeductedAmount)) return;
 
-        if (senderBalance.greaterThanOrEquals(totalDeductedAmount)) {
+        // CASE1: if sender is sending to themselves, then we just deduct the fee. transferAmount + fee = totalDeductedAmount
+        // CASE2: if sender is sending to themselves, but the amount is zero, then we just deduct the fee. transferAmount(0) + fee = totalDeductedAmount (fee)
+        if (b4a.equals(requesterAddressBuffer, recipientAddressBuffer)) {
+            console.log("SAME RECIPIENT ADDRESS");
+            console.log("before:", bigIntToDecimalString(new Balance(nodeEntryUtils.decode(senderEntryBuffer).balance).asBigInt()));
+            const newSenderBalanceWithFeeOnly = senderBalance.sub(feeAmount);
+            if (newSenderBalanceWithFeeOnly === null) return;
 
-            // CASE1: if sender is sending to themselves, then we just deduct the fee. transferAmount + fee = totalDeductedAmount
-            // CASE2: if sender is sending to themselves, but the amount is zero, then we just deduct the fee. transferAmount(0) + fee = totalDeductedAmount (fee)
-            if (b4a.equals(requesterAddressBuffer, recipientAddressBuffer)) {
-                console.log("SAME RECIPIENT ADDRESS");
-                console.log("before:", bigIntToDecimalString(new Balance(nodeEntryUtils.decode(senderEntryBuffer).balance).asBigInt()));
-                const newSenderBalanceWithFeeOnly = senderBalance.sub(feeAmount);
-                if (newSenderBalanceWithFeeOnly === null) return;
+            const updatedSenderEntry = nodeEntryUtils.setBalance(senderEntryBuffer, newSenderBalanceWithFeeOnly.value);
+            if (null === updatedSenderEntry) return;
+            console.log("after:", bigIntToDecimalString(new Balance(nodeEntryUtils.decode(updatedSenderEntry).balance).asBigInt()));
 
-                const updatedSenderEntry = nodeEntryUtils.setBalance(senderEntryBuffer, newSenderBalanceWithFeeOnly.value);
-                if (null === updatedSenderEntry) return;
-                console.log("after:", bigIntToDecimalString(new Balance(nodeEntryUtils.decode(updatedSenderEntry).balance).asBigInt()));
-
-                // await batch.put(requesterAddressString, updatedSenderEntry);
-                // await batch.put(hashHexString, node.value);
-                return;
-            } else {
-                // DIFFERENT RECIPIENT ADDRESS
-
-                const recipientEntryBuffer = await this.#getEntryApply(recipientAddressString, batch);
-                if (recipientEntryBuffer === null) {
-                    console.log("Recipient entry does not exist, creating a new one.");
-                    // CASE3: sender is sending to a different address, but this account for this address, does not exist.
-                    // Then we need to create a new entry for the recipient with ZERO_WK, READER role and the transferred balance. transferAmount + fee = totalDeductedAmount
-                     
-                    // TODO: what if we will send 0 amount to a new address? Then we just deduct the fee from the sender but how about the entry, do we create it with 0 balance?
-                    console.log("SENDER before:", bigIntToDecimalString(new Balance(nodeEntryUtils.decode(senderEntryBuffer).balance).asBigInt()));
-                    const newSenderBalance = senderBalance.sub(totalDeductedAmount);
-                    if (newSenderBalance === null) return;
-
-                    const newRecipientEntry = nodeEntryUtils.init(ZERO_WK, nodeRoleUtils.NodeRole.READER, transferAmount.value);
-                    if (newRecipientEntry.length === 0) return;
-
-                    const updatedSenderEntry = nodeEntryUtils.setBalance(senderEntryBuffer, newSenderBalance.value);
-                    if (updatedSenderEntry === null) return;
-
-                    console.log("SENDER after:", bigIntToDecimalString(new Balance(nodeEntryUtils.decode(updatedSenderEntry).balance).asBigInt()));
-                    console.log("new recipient balance:", bigIntToDecimalString(new Balance(nodeEntryUtils.decode(newRecipientEntry).balance).asBigInt()));
-
-                    // await batch.put(requesterAddressString, updatedSenderEntry);
-                    // await batch.put(recipientAddressString, newRecipientEntry);
-                    // await batch.put(hashHexString, node.value);
-                    return;
-                } else {
-                    console.log("Recipient entry exists, updating it.");
-                    // CASE4: sender is sending to a different address, and this account for this address, already exists.
-                    // Sender balance will be reduced by transferAmount + fee = totalDeductedAmount
-                    // Recipient balance will be increased by transferAmount
-
-                    // CASE5: Sender is sending to a different address, and this account for this address, already exists, but the transfer amount is 0.
-                    // Sender balance will be reduced by fee only. transferAmount(0) + fee = totalDeductedAmount (fee)
-                    // Recipient balance will remain the same.
-                    const senderEntry = nodeEntryUtils.decode(senderEntryBuffer);
-                    if (null === senderEntry) return;
-                    const newSenderBalance = senderBalance.sub(totalDeductedAmount);
-                    if (newSenderBalance === null) return;
-
-                    const recipientEntry = nodeEntryUtils.decode(recipientEntryBuffer);
-                    if (null === recipientEntry) return;
-
-                    const recipientBalance = new Balance(recipientEntry.balance);
-                    if (recipientBalance === null) return;
-
-                    console.log("SENDER before:", bigIntToDecimalString(senderBalance.asBigInt()));
-                    console.log("RECIPIENT before:", bigIntToDecimalString(recipientBalance.asBigInt()));
-
-                    const newRecipientBalance = recipientBalance.add(transferAmount);
-                    if (newRecipientBalance === null) return;
-
-                    const updatedRecipientEntry = nodeEntryUtils.setBalance(recipientEntryBuffer, newRecipientBalance.value);
-                    if (updatedRecipientEntry === null) return;
-
-                    const updatedSenderEntry = nodeEntryUtils.setBalance(senderEntryBuffer, newSenderBalance.value);
-                    if (updatedSenderEntry === null) return;
-
-                    console.log("SENDER after:", bigIntToDecimalString(newSenderBalance.asBigInt()));
-                    console.log("RECIPIENT after:", bigIntToDecimalString(newRecipientBalance.asBigInt()));
-
-                    // await batch.put(requesterAddressString, updatedSenderEntry);
-                    // await batch.put(recipientAddressString, updatedRecipientEntry);
-                    // await batch.put(hashHexString, node.value);
-                    return;
-                }
-            }
-        } else {
-            return; // not enough balance
+            // await batch.put(requesterAddressString, updatedSenderEntry);
+            // await batch.put(hashHexString, node.value);
+            return;
         }
+
+        // DIFFERENT RECIPIENT ADDRESS
+        const recipientEntryBuffer = await this.#getEntryApply(recipientAddressString, batch);
+        if (recipientEntryBuffer === null) {
+            console.log("Recipient entry does not exist, creating a new one.");
+            // CASE3: sender is sending to a different address, but this account for this address, does not exist.
+            // Then we need to create a new entry for the recipient with ZERO_WK, READER role and the transferred balance. transferAmount + fee = totalDeductedAmount
+
+            // TODO: what if we will send 0 amount to a new address? Then we just deduct the fee from the sender but how about the entry, do we create it with 0 balance?
+            console.log("SENDER before:", bigIntToDecimalString(new Balance(nodeEntryUtils.decode(senderEntryBuffer).balance).asBigInt()));
+            const newSenderBalance = senderBalance.sub(totalDeductedAmount);
+            if (newSenderBalance === null) return;
+
+            const newRecipientEntry = nodeEntryUtils.init(ZERO_WK, nodeRoleUtils.NodeRole.READER, transferAmount.value);
+            if (newRecipientEntry.length === 0) return;
+
+            const updatedSenderEntry = nodeEntryUtils.setBalance(senderEntryBuffer, newSenderBalance.value);
+            if (updatedSenderEntry === null) return;
+
+            console.log("SENDER after:", bigIntToDecimalString(new Balance(nodeEntryUtils.decode(updatedSenderEntry).balance).asBigInt()));
+            console.log("new recipient balance:", bigIntToDecimalString(new Balance(nodeEntryUtils.decode(newRecipientEntry).balance).asBigInt()));
+
+            // await batch.put(requesterAddressString, updatedSenderEntry);
+            // await batch.put(recipientAddressString, newRecipientEntry);
+            // await batch.put(hashHexString, node.value);
+            return;
+        } else {
+            console.log("Recipient entry exists, updating it.");
+            // CASE4: sender is sending to a different address, and this account for this address, already exists.
+            // Sender balance will be reduced by transferAmount + fee = totalDeductedAmount
+            // Recipient balance will be increased by transferAmount
+
+            // CASE5: Sender is sending to a different address, and this account for this address, already exists, but the transfer amount is 0.
+            // Sender balance will be reduced by fee only. transferAmount(0) + fee = totalDeductedAmount (fee)
+            // Recipient balance will remain the same.
+            const senderEntry = nodeEntryUtils.decode(senderEntryBuffer);
+            if (null === senderEntry) return;
+            const newSenderBalance = senderBalance.sub(totalDeductedAmount);
+            if (newSenderBalance === null) return;
+
+            const recipientEntry = nodeEntryUtils.decode(recipientEntryBuffer);
+            if (null === recipientEntry) return;
+
+            const recipientBalance = new Balance(recipientEntry.balance);
+            if (recipientBalance === null) return;
+
+            console.log("SENDER before:", bigIntToDecimalString(senderBalance.asBigInt()));
+            console.log("RECIPIENT before:", bigIntToDecimalString(recipientBalance.asBigInt()));
+
+            const newRecipientBalance = recipientBalance.add(transferAmount);
+            if (newRecipientBalance === null) return;
+
+            const updatedRecipientEntry = nodeEntryUtils.setBalance(recipientEntryBuffer, newRecipientBalance.value);
+            if (updatedRecipientEntry === null) return;
+
+            const updatedSenderEntry = nodeEntryUtils.setBalance(senderEntryBuffer, newSenderBalance.value);
+            if (updatedSenderEntry === null) return;
+
+            console.log("SENDER after:", bigIntToDecimalString(newSenderBalance.asBigInt()));
+            console.log("RECIPIENT after:", bigIntToDecimalString(newRecipientBalance.asBigInt()));
+
+            // await batch.put(requesterAddressString, updatedSenderEntry);
+            // await batch.put(recipientAddressString, updatedRecipientEntry);
+            // await batch.put(hashHexString, node.value);
+            return;
+        }
+
     }
 
     #isAdminApply(adminEntry, node) {
