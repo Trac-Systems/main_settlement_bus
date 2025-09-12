@@ -57,6 +57,18 @@ export function startRpcServer(msbInstance, port) {
                 res.writeHead(500, { 'Content-Type': 'application/json' })
                 res.end(JSON.stringify({ error: 'An error occurred processing the request.' }))
             }
+        } else  if (req.url.startsWith('/confirmed-length')) {
+            try {
+                const commandString = '/confirmed_length'
+                const confirmed_length = await msbInstance.handleCommand(commandString)
+                
+                res.writeHead(200, { 'Content-Type': 'application/json' })
+                res.end(JSON.stringify({ confirmed_length }))
+            } catch (error) {
+                console.error('Error on retrieving confirmed_length:', error)
+                res.writeHead(500, { 'Content-Type': 'application/json' })
+                res.end(JSON.stringify({ error: 'An error occurred processing the request.' }))
+            }
         } else {
             res.writeHead(404, { 'Content-Type': 'text/plain' })
             res.end('Not Found')
