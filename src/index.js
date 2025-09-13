@@ -883,7 +883,13 @@ export class MainSettlementBus extends ReadyResource {
                     const fee = this.#state.getFee();
                     console.log('Current FEE:', bigIntToDecimalString(bufferToBigInt(fee)));
                     return bigIntToDecimalString(bufferToBigInt(fee))
+                }  else if (input.startsWith("/confirmed_length")) {
+                    const confirmed_length = this.#state.getSignedLength();
+                    console.log('Confirmed_length:', confirmed_length);
+                    return confirmed_length
                 }
+
+                
         }
         if (rl) rl.prompt();
     }
