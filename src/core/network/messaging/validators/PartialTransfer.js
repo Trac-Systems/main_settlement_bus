@@ -43,7 +43,6 @@ class PartialTransfer {
         if (!this.#isPayloadSchemaValid(payload)) return false;
         if (!this.#validateRequesterAddress(payload)) return false;
         if (!this.#validateRecepientAddress(payload)) return false;
-        if (!this.#validateAmount(payload)) return false;
         if (!await this.#validateSignature(payload)) return false;
         if (!await this.#validateTransactionUniqueness(payload)) return false;
         if (!await this.#validateTransactionValidity(payload)) return false;
@@ -95,33 +94,6 @@ class PartialTransfer {
     }
 
 
-    #validateAmount(payload) {
-        const amountBuffer = payload.tro.am;
-        if (!b4a.isBuffer(amountBuffer) || amountBuffer.length !== 16) {
-            console.error('Amount must be a 16-byte buffer');
-            return false;
-        }
-
-        try {
-            const transferAmount = bufferToBigInt(amountBuffer);
-
-            if (transferAmount > MAX_AMOUNT) {
-                console.error('Transfer amount exceeds maximum allowed value');
-                return false;
-            }
-
-            const totalDeductedAmount = transferAmount + FEE_BIGINT;
-            if (totalDeductedAmount > MAX_AMOUNT) {
-                console.error('Total amount (transfer + fee) exceeds maximum allowed value');
-                return false;
-            }
-
-            return true;
-        } catch (error) {
-            console.error('Failed to parse amount:', error);
-            return false;
-        }
-    }
 
     async #validateSignature(payload) {
         const incomingPublicKey = Wallet.decodeBech32mSafe(bufferToAddress(payload.address));
@@ -185,22 +157,28 @@ class PartialTransfer {
             }
 
             const transferAmount = bufferToBigInt(payload.tro.am);
-            const senderBalance = bufferToBigInt(senderEntry.balance);
-
-            const totalDeductedAmount = transferAmount + FEE_BIGINT;
-            if (!(senderBalance >= totalDeductedAmount)) {
-                console.error('Insufficient balance for transfer + fee');
+            if (transferAmount > MAX_AMOUNT) {
+                console.error('Transfer amount exceeds maximum allowed value');
                 return false;
             }
 
-            const recipientEntry = await this.state.getNodeEntry(recipientAddress);
-            if (recipientEntry) {
+            const senderBalance = bufferToBigInt(senderEntry.balance);
+            const isSelfTransfer = senderAddress === recipientAddress;
+            const totalDeductedAmount = isSelfTransfer ? FEE_BIGINT : (transferAmount + FEE_BIGINT);
+            if (!(senderBalance >= totalDeductedAmount)) {
+                console.error('Insufficient balance for transfer' + (isSelfTransfer ? ' fee' : ' + fee'));
+                return false;
+            }
 
-                const recipientBalance = bufferToBigInt(recipientEntry.balance);
-                const newRecipientBalance = recipientBalance + transferAmount;
-                if (newRecipientBalance > MAX_AMOUNT) {
-                    console.error('Transfer would cause recipient balance to exceed maximum allowed value');
-                    return false;
+            if (!isSelfTransfer) {
+                const recipientEntry = await this.state.getNodeEntry(recipientAddress);
+                if (recipientEntry) {
+                    const recipientBalance = bufferToBigInt(recipientEntry.balance);
+                    const newRecipientBalance = recipientBalance + transferAmount;
+                    if (newRecipientBalance > MAX_AMOUNT) {
+                        console.error('Transfer would cause recipient balance to exceed maximum allowed value');
+                        return false;
+                    }
                 }
             }
 
