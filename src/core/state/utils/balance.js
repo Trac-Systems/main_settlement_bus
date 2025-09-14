@@ -7,6 +7,7 @@ import { bufferToBigInt } from '../../../utils/amountSerialization.js';
 /**
  * Converts a bigint amount of tokens into a fixed-length buffer,
  * scaled according to TOKEN_DECIMALS.
+ * Note: DO NOT USE IN APPLY FUNCTION.
  * @param {bigint} bigint - The amount of tokens
  * @returns {Buffer} - Fixed-length buffer representing token amount
  */
@@ -161,6 +162,7 @@ class Balance {
         return cmp === -1 || cmp === 0
     }
 
+    // Note: DO NOT USE IN APPLY FUNCTION.
     /** Returns the hex string representation of the balance buffer */
     asHex() {
         return b4a.toString(this.#value, 'hex');
