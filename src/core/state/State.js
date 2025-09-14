@@ -1289,7 +1289,7 @@ class State extends ReadyResource {
         await batch.put(hashHexString, node.value);
 
         if (this.#enable_txlogs === true) {
-            console.log(`TX: ${hashHexString} appended. Signed length: `, this.#base.view.core.signedLength);
+            console.log(`TRANSFER: ${hashHexString} appended. Signed length: `, this.#base.view.core.signedLength);
         }
 
     }
