@@ -2,13 +2,17 @@ import b4a from 'b4a';
 import Wallet from 'trac-wallet';
 
 import Check from '../../../../utils/check.js';
-import {safeDecodeApplyOperation} from "../../../../utils/protobuf/operationHelpers.js";
-import {addressToBuffer, bufferToAddress} from "../../../state/utils/address.js";
-import {createMessage} from "../../../../utils/buffer.js";
-import {OperationType} from "../../../../utils/constants.js";
-import {blake3Hash} from "../../../../utils/crypto.js";
-import {bufferToBigInt} from "../../../../utils/amountSerialization.js";
-import {FEE} from "../../../state/utils/transaction.js";
+import { addressToBuffer, bufferToAddress } from "../../../state/utils/address.js";
+import { createMessage } from "../../../../utils/buffer.js";
+import { OperationType } from "../../../../utils/constants.js";
+import { blake3Hash } from "../../../../utils/crypto.js";
+import { bufferToBigInt } from "../../../../utils/amountSerialization.js";
+import { FEE } from "../../../state/utils/transaction.js";
+
+//TODO: Implement BASE VALIDATOR CLASS AND MOVE COMMON METHODS THERE
+
+const MAX_AMOUNT = BigInt('0xffffffffffffffffffffffffffffffff');
+const FEE_BIGINT = bufferToBigInt(FEE);
 
 class PartialTransfer {
     #state;
@@ -43,7 +47,7 @@ class PartialTransfer {
         if (!await this.#validateSignature(payload)) return false;
         if (!await this.#validateTransactionUniqueness(payload)) return false;
         if (!await this.#validateTransactionValidity(payload)) return false;
-        // if (!await this.#validateSenderBalance(payload)) return false; // TODO: Placeholder until NodeEntry with arithmetic balance is NOT implemented
+        if (!await this.#validateStateBalances(payload)) return false;
 
 
         return true;
@@ -81,8 +85,8 @@ class PartialTransfer {
             return false;
         }
 
-        incomingAddress = Wallet.decodeBech32mSafe(incomingAddress);
-        if (incomingAddress === null) {
+        const incomingPublicKey = Wallet.decodeBech32mSafe(incomingAddress);
+        if (incomingPublicKey === null) {
             console.error('Invalid recipient public key in transfer payload.');
             return false;
         }
@@ -101,6 +105,7 @@ class PartialTransfer {
         try {
             const transferAmount = bufferToBigInt(amountBuffer);
 
+            if (transferAmount > MAX_AMOUNT) {
                 console.error('Transfer amount exceeds maximum allowed value');
                 return false;
             }
@@ -166,11 +171,45 @@ class PartialTransfer {
         }
         return true;
     }
-    // TODO: Placeholder until NodeEntry with arithmetic balance is NOT implemented
-    // check if sender has enough balance to cover the transfer amount + fee
-    // and prevet double spending
-    async #validateSenderBalance(payload) {
-        return undefined
+
+    async #validateStateBalances(payload) {
+        try {
+
+            const senderAddress = bufferToAddress(payload.address);
+            const recipientAddress = bufferToAddress(payload.tro.to);
+
+            const senderEntry = await this.state.getNodeEntry(senderAddress);
+            if (!senderEntry) {
+                console.error('Sender account not found');
+                return false;
+            }
+
+            const transferAmount = bufferToBigInt(payload.tro.am);
+            console.log(`senderEntry: ${senderEntry}`);
+            const senderBalance = bufferToBigInt(senderEntry.balance);
+
+            const totalDeductedAmount = transferAmount + FEE_BIGINT;
+            if (!(senderBalance >= totalDeductedAmount)) {
+                console.error('Insufficient balance for transfer + fee');
+                return false;
+            }
+
+            const recipientEntry = await this.state.getNodeEntry(recipientAddress);
+            if (recipientEntry) {
+
+                const recipientBalance = bufferToBigInt(recipientEntry.balance);
+                const newRecipientBalance = recipientBalance + transferAmount;
+                if (newRecipientBalance > MAX_AMOUNT) {
+                    console.error('Transfer would cause recipient balance to exceed maximum allowed value');
+                    return false;
+                }
+            }
+
+            return true;
+        } catch (error) {
+            console.error('Error in validateStateBalances:', error);
+            return false;
+        }
     }
 }
 
