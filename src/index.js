@@ -8,7 +8,7 @@ import readline from "readline";
 import tty from "tty";
 
 import { sleep, getFormattedIndexersWithAddresses, isHexString, convertAdminCoreOperationPayloadToHex } from "./utils/helpers.js";
-import { verifyDag, printHelp, printWalletInfo, get_tx_info } from "./utils/cli.js";
+import { verifyDag, printHelp, printWalletInfo, get_tx_info, printBalance } from "./utils/cli.js";
 import CompleteStateMessageOperations from "./messages/completeStateMessages/CompleteStateMessageOperations.js";
 import { safeDecodeApplyOperation } from "./utils/protobuf/operationHelpers.js";
 import { bufferToAddress, isAddressValid } from "./core/state/utils/address.js";
@@ -25,7 +25,6 @@ import {
 import partialStateMessageOperations from "./messages/partialStateMessages/PartialStateMessageOperations.js";
 import { randomBytes } from "hypercore-crypto";
 import { decimalStringToBigInt, bigIntTo16ByteBuffer, bufferToBigInt, bigIntToDecimalString } from "./utils/amountSerialization.js"
-import { toBalance } from "./core/state/utils/nodeEntry.js";
 import { ZERO_WK } from "./utils/buffer.js";
 
 //TODO create a MODULE which will separate logic responsible for role managment
@@ -136,7 +135,7 @@ export class MainSettlementBus extends ReadyResource {
                 this.key_pair_path,
                 this.#readline_instance
             );
-            printWalletInfo(this.#wallet.address, this.#state.writingKey);
+            await printWalletInfo(this.#wallet.address, this.#state.writingKey, this.#state, this.#enable_wallet);
         }
 
         await this.#network.replicate(
@@ -157,7 +156,8 @@ export class MainSettlementBus extends ReadyResource {
         console.log(`isWriter: ${this.#state.isWritable()}`);
         console.log("MSB Unsigned Length:", this.#state.getUnsignedLength());
         console.log("MSB Signed Length:", this.#state.getSignedLength());
-        console.log("");
+
+        await printBalance(this.#wallet.address, this.#state, this.#enable_wallet);
     }
 
     async _close() {

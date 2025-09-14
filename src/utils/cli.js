@@ -1,5 +1,6 @@
 import b4a from 'b4a';
 import { safeDecodeApplyOperation } from "./protobuf/operationHelpers.js";
+import { bigIntToDecimalString, bufferToBigInt } from "./amountSerialization.js";
 
 export async function verifyDag(state, network, wallet, writerKey) {
     try {
@@ -74,6 +75,14 @@ export const printWalletInfo = (address, writingKey) => {
     console.log('# MSB Address:   ', address.toString('hex'), ' #');
     console.log('# MSB Writer:    ', writingKey.toString('hex'), '#');
     console.log('#####################################################################################');
+}
+
+export const printBalance = async (address, state, wallet_enabled) => {
+    if (wallet_enabled && state) {
+        const nodeEntry = await state.getNodeEntry(address);
+        const balance = nodeEntry ? bigIntToDecimalString(bufferToBigInt(nodeEntry.balance)) : '0';
+        console.log(`Balance: ${balance}`);
+    }
 }
 
 export const get_tx_info = async (state_instance, txHash) => {
