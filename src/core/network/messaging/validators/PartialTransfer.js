@@ -185,7 +185,6 @@ class PartialTransfer {
             }
 
             const transferAmount = bufferToBigInt(payload.tro.am);
-            console.log(`senderEntry: ${senderEntry}`);
             const senderBalance = bufferToBigInt(senderEntry.balance);
 
             const totalDeductedAmount = transferAmount + FEE_BIGINT;

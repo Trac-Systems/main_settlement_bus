@@ -1325,7 +1325,6 @@ class State extends ReadyResource {
 
         const updatedSenderEntry = nodeEntryUtils.setBalance(senderEntryBuffer, newSenderBalance.value);
         if (updatedSenderEntry === null) return null;
-
         const result = {
             senderEntry: updatedSenderEntry,
             recipientEntry: null,

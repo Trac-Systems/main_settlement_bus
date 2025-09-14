@@ -633,12 +633,48 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async #handleTransferOperation(address, amount) {
-        // add more checks
+        if (this.#enable_wallet === false) {
+            throw new Error(
+                "Can not perform transfer - wallet is not enabled."
+            );
+        }
+
+        if (!this.#wallet) {
+            throw new Error(
+                "Can not perform transfer - wallet is not initialized."
+            );
+        }
+
+        if (!isAddressValid(address)) {
+            throw new Error("Invalid recipient address");
+        }
+
         const amountBigInt = decimalStringToBigInt(amount);
+
+        const MAX_AMOUNT = BigInt('0xffffffffffffffffffffffffffffffff');
+        if (amountBigInt > MAX_AMOUNT) {
+            throw new Error("Transfer amount exceeds maximum allowed value");
+        }
+
         const amountBuffer = bigIntTo16ByteBuffer(amountBigInt);
 
         if (bufferToBigInt(amountBuffer) !== amountBigInt) {
             throw new Error(`conversion error for amount: ${amount}`);
+        }
+
+        const senderEntry = await this.#state.getNodeEntry(this.#wallet.address);
+        if (!senderEntry) {
+            throw new Error("Sender account not found");
+        }
+
+        const fee = await this.#state.getFee();
+        const feeBigInt = bufferToBigInt(fee);
+        const senderBalance = bufferToBigInt(senderEntry.balance);
+        const isSelfTransfer = address === this.#wallet.address;
+        const totalDeductedAmount = isSelfTransfer ? feeBigInt : amountBigInt + feeBigInt;
+
+        if (!(senderBalance >= totalDeductedAmount)) {
+            throw new Error("Insufficient balance for transfer + fee");
         }
 
         const txValidity = await this.#state.getIndexerSequenceState();
@@ -649,6 +685,19 @@ export class MainSettlementBus extends ReadyResource {
             txValidity.toString('hex'),
         )
         await this.broadcastPartialTransaction(payload);
+
+        const expectedNewBalance = senderBalance - totalDeductedAmount;
+        console.log('Transfer Details:');
+        if (isSelfTransfer) {
+            console.log('Self transfer - only fee will be deducted');
+            console.log(`Fee: ${bigIntToDecimalString(feeBigInt)}`);
+            console.log(`Total amount to send: ${bigIntToDecimalString(totalDeductedAmount)}`);
+        } else {
+            console.log(`Amount: ${bigIntToDecimalString(amountBigInt)}`);
+            console.log(`Fee: ${bigIntToDecimalString(feeBigInt)}`);
+            console.log(`Total: ${bigIntToDecimalString(totalDeductedAmount)}`);
+        }
+        console.log(`Expected Balance After Transfer: ${bigIntToDecimalString(expectedNewBalance)}`);
     }
 
     async #handleBalanceMigrationOperation() {
@@ -918,7 +967,7 @@ export class MainSettlementBus extends ReadyResource {
                     const txv = await this.#state.getIndexerSequenceState();
                     console.log('Current TXV:', txv.toString('hex'));
                     return txv
-                }  else if (input.startsWith("/get_fee")) {
+                } else if (input.startsWith("/get_fee")) {
                     const fee = this.#state.getFee();
                     console.log('Current FEE:', bigIntToDecimalString(bufferToBigInt(fee)));
                     return bigIntToDecimalString(bufferToBigInt(fee))
