@@ -7,6 +7,8 @@ import {blake3Hash} from "../../../../utils/crypto.js";
 import {createMessage} from "../../../../utils/buffer.js";
 import {addressToBuffer, bufferToAddress} from "../../../state/utils/address.js";
 
+//TODO: Implement BASE VALIDATOR CLASS AND MOVE COMMON METHODS THERE
+
 class PartialRoleAccess {
     #state;
     #wallet;
@@ -34,7 +36,7 @@ class PartialRoleAccess {
 
     async validate(payload) {
         if (!this.#isPayloadSchemaValid(payload)) return false;
-        if (!this.#validateRequestingPublicKey(payload)) return false;
+        if (!this.#validateRequesterAddress(payload)) return false;
         if (!await this.#validateTransactionUniqueness(payload)) return false;
         if (!await this.#validateSignature(payload)) return false;
         if (!await this.#isRequesterAllowedToChangeRole(payload)) return false;
@@ -62,11 +64,17 @@ class PartialRoleAccess {
         return true;
     }
 
-    #validateRequestingPublicKey(payload) {
-        const incomingPublicKey = Wallet.decodeBech32mSafe(bufferToAddress(payload.address));
+    #validateRequesterAddress(payload) {
+        const incomingAddress = bufferToAddress(payload.address);
+        if (!incomingAddress) {
+            console.error('Invalid requesting address in role access payload.');
+            return false;
+        }
+
+        const incomingPublicKey = Wallet.decodeBech32mSafe(incomingAddress);
 
         if (incomingPublicKey === null) {
-            console.error('Invalid requesting public key in the access operation payload.');
+            console.error('Invalid requesting public key in role access payload.');
             return false;
         }
         return true;

@@ -37,8 +37,8 @@ class PartialTransfer {
 
     async validate(payload) {
         if (!this.#isPayloadSchemaValid(payload)) return false;
-        if (!this.#validateRequestingPublicKey(payload)) return false;
-        if (!this.#validateRecepientPublicKey(payload)) return false;
+        if (!this.#validateRequesterAddress(payload)) return false;
+        if (!this.#validateRecepientAddress(payload)) return false;
         if (!this.#validateAmount(payload)) return false;
         if (!await this.#validateSignature(payload)) return false;
         if (!await this.#validateTransactionUniqueness(payload)) return false;
@@ -58,24 +58,38 @@ class PartialTransfer {
         return true;
     }
 
-    #validateRequestingPublicKey(payload) {
-        const incomingPublicKey = Wallet.decodeBech32mSafe(bufferToAddress(payload.address));
+    #validateRequesterAddress(payload) {
+        const incomingAddress = bufferToAddress(payload.address);
+        if (!incomingAddress) {
+            console.error('Invalid requesting address in transfer payload.');
+            return false;
+        }
+
+        const incomingPublicKey = Wallet.decodeBech32mSafe(incomingAddress);
 
         if (incomingPublicKey === null) {
-            console.error('Invalid requesting public key in transaction payload.');
+            console.error('Invalid requesting public key in transfer payload.');
             return false;
         }
         return true;
     }
 
-    #validateRecepientPublicKey(payload) {
-        const incomingPublicKey = Wallet.decodeBech32mSafe(bufferToAddress(payload.tro.to));
-        if (incomingPublicKey === null) {
-            console.error('Invalid recipient public key in transaction payload.');
+    #validateRecepientAddress(payload) {
+        const incomingAddress = bufferToAddress(payload.tro.to);
+        if (!incomingAddress) {
+            console.error('Invalid recipient address in transfer payload.');
             return false;
         }
+
+        incomingAddress = Wallet.decodeBech32mSafe(incomingAddress);
+        if (incomingAddress === null) {
+            console.error('Invalid recipient public key in transfer payload.');
+            return false;
+        }
+
         return true;
     }
+
 
     #validateAmount(payload) {
         const amountBuffer = payload.tro.am;
@@ -84,26 +98,18 @@ class PartialTransfer {
             return false;
         }
 
-        // const isZero = amountBuffer.every(byte => byte === 0);
-        // if (isZero) {
-        //     console.error('Amount cannot be zero');
-        //     return false;
-        // }
-
         try {
             const transferAmount = bufferToBigInt(amountBuffer);
-            const fee = bufferToBigInt(FEE);
 
-            const MAX_AMOUNT = BigInt('0xffffffffffffffffffffffffffffffff');
-            if (transferAmount > MAX_AMOUNT) {
-                console.error('Total amount transfer exceeds maximum allowed value');
+                console.error('Transfer amount exceeds maximum allowed value');
                 return false;
             }
 
-            // if (transferAmount < fee) {
-            //     console.error(`Transfer amount (${transferAmount}) must be greater than or equal to the minimum fee (${fee})`);
-            //     return false;
-            // }
+            const totalDeductedAmount = transferAmount + FEE_BIGINT;
+            if (totalDeductedAmount > MAX_AMOUNT) {
+                console.error('Total amount (transfer + fee) exceeds maximum allowed value');
+                return false;
+            }
 
             return true;
         } catch (error) {
@@ -129,13 +135,13 @@ class PartialTransfer {
         const regeneratedTx = await blake3Hash(message);
 
         // ensure that regenerated tx matches the incoming tx
-        if ( !b4a.equals(incomingTx, regeneratedTx)) {
+        if (!b4a.equals(incomingTx, regeneratedTx)) {
             return false;
         }
 
         const isSignatureValid = Wallet.verify(incomingSignature, regeneratedTx, incomingPublicKey);
         if (!isSignatureValid) {
-            console.error('Invalid signature in transaction payload');
+            console.error('Invalid signature in transfer payload');
             return false;
         }
         return true;
@@ -144,8 +150,8 @@ class PartialTransfer {
     async #validateTransactionUniqueness(payload) {
         const tx = payload.tro.tx;
         const txHex = tx.toString('hex');
-        if (null !== await this.state.getSigned(txHex)) {
-            console.error(`Transaction with hash ${txHex} already exists in the state. Possible replay attack detected.`);
+        if (null !== await this.state.get(txHex)) {
+            console.error(`Transaction with hash ${txHex} already exists in the state.`);
             return false;
         }
         return true;

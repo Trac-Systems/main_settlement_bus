@@ -7,6 +7,9 @@ import {bufferToAddress} from "../../../state/utils/address.js";
 import {createMessage} from "../../../../utils/buffer.js";
 import {OperationType} from "../../../../utils/constants.js";
 import {blake3Hash} from "../../../../utils/crypto.js";
+
+//TODO: Implement BASE VALIDATOR CLASS AND MOVE COMMON METHODS THERE
+
 class PartialTransaction {
     #state;
     #wallet;
@@ -34,7 +37,7 @@ class PartialTransaction {
 
     async validate(payload) {
         if (!this.#isPayloadSchemaValid(payload)) return false;
-        if (!this.#validateRequestingPublicKey(payload)) return false;
+        if (!this.#validateRequesterAddress(payload)) return false;
         if (!await this.#validateSignature(payload)) return false;
         if (!await this.#validateTransactionUniqueness(payload)) return false;
         if (!await this.#validateIfMsbBootstrapIsValid(payload)) return false;
@@ -54,8 +57,14 @@ class PartialTransaction {
         return true;
     }
 
-    #validateRequestingPublicKey(payload) {
-        const incomingPublicKey = Wallet.decodeBech32mSafe(bufferToAddress(payload.address));
+    #validateRequesterAddress(payload) {
+        const incomingAddress = bufferToAddress(payload.address);
+        if (!incomingAddress) {
+            console.error('Invalid requesting address in transaction payload.');
+            return false;
+        }
+
+        const incomingPublicKey = Wallet.decodeBech32mSafe(incomingAddress);
 
         if (incomingPublicKey === null) {
             console.error('Invalid requesting public key in transaction payload.');
