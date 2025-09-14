@@ -1307,21 +1307,21 @@ class State extends ReadyResource {
         }
         const transferAmount = new Balance(transferAmountBuffer);
         const feeAmount = new Balance(feeAmountBuffer);
-        if (transferAmount === null || feeAmount === null) return null;
+        if (transferAmount.value === null || feeAmount.value === null) return null;
 
         // totalDeductedAmount = transferAmount + fee. When transferamount is 0, then totalDeductedAmount = fee. Because 0 + fee = fee.
         const totalDeductedAmount = isSelfTransfer ? feeAmount : transferAmount.add(feeAmount);
-        if (totalDeductedAmount === null) return null;
+        if (totalDeductedAmount.value === null) return null;
         const senderEntryBuffer = await this.#getEntryApply(senderAddressString, batch);
         if (senderEntryBuffer === null) return null;
         const senderEntry = nodeEntryUtils.decode(senderEntryBuffer);
         if (senderEntry === null) return null;
         const senderBalance = new Balance(senderEntry.balance);
-        if (senderBalance === null) return null;
+        if (senderBalance.value === null) return null;
         if (!senderBalance.greaterThanOrEquals(totalDeductedAmount)) return null;
 
         const newSenderBalance = senderBalance.sub(totalDeductedAmount);
-        if (newSenderBalance === null) return null;
+        if (newSenderBalance.value === null) return null;
 
         const updatedSenderEntry = nodeEntryUtils.setBalance(senderEntryBuffer, newSenderBalance.value);
         if (updatedSenderEntry === null) return null;
@@ -1346,10 +1346,10 @@ class State extends ReadyResource {
                 if (recipientEntry === null) return null;
 
                 const recipientBalance = new Balance(recipientEntry.balance);
-                if (recipientBalance === null) return null;
+                if (recipientBalance.value === null) return null;
 
                 const newRecipientBalance = recipientBalance.add(transferAmount);
-                if (newRecipientBalance === null) return null;
+                if (newRecipientBalance.value === null) return null;
 
                 const updatedRecipientEntry = nodeEntryUtils.setBalance(recipientEntryBuffer, newRecipientBalance.value);
                 if (updatedRecipientEntry === null) return null;
