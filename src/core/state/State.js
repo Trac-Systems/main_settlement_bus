@@ -275,8 +275,8 @@ class State extends ReadyResource {
         if (requesterAdminPublicKey === null) return;
 
         // Verify that the amount is not zero
-        const amount = op.bio.am;
-        if (b4a.equals(amount, ZERO_BALANCE)) return;
+        const amount = toBalance(op.bio.am);
+        if (amount == null) return;
         const recipientAddress = op.bio.ia;
         const recipientAddressString = addressUtils.bufferToAddress(recipientAddress);
 
@@ -295,10 +295,10 @@ class State extends ReadyResource {
         if (adminPublicKey === null) return;
 
         // Admin consistency check
-        if(adminPublicKey !== requesterAdminPublicKey) return
+        if(!b4a.equals(adminPublicKey, requesterAdminPublicKey)) return
 
         // Recreate requester message
-        const message = createMessage(op.address, op.bio.txv, op.bio.in, op.bio.ia, amount, OperationType.BALANCE_INITIALIZATION);
+        const message = createMessage(op.address, op.bio.txv, op.bio.in, op.bio.ia, amount.value, OperationType.BALANCE_INITIALIZATION);
         if (message.length === 0) return;
 
         const hash = await blake3Hash(message);
@@ -318,7 +318,7 @@ class State extends ReadyResource {
         const opEntry = await this.#getEntryApply(txHashHexString, batch);
         if (null !== opEntry) return;
 
-        const initializedNodeEntry = nodeEntryUtils.init(ZERO_WK, nodeRoleUtils.NodeRole.READER, amount)
+        const initializedNodeEntry = nodeEntryUtils.init(ZERO_WK, nodeRoleUtils.NodeRole.READER, amount.value)
         await batch.put(recipientAddressString, initializedNodeEntry);
         await batch.put(txHashHexString, node.value);
     }
@@ -346,12 +346,12 @@ class State extends ReadyResource {
         if (adminPublicKey === null) return;
 
         // Admin consistency check
-        if(adminPublicKey !== requesterAdminPublicKey) return
+        if(!b4a.equals(adminPublicKey, requesterAdminPublicKey)) return
 
         // Recreate requester message
         const message = createMessage(op.address, op.cao.txv, op.cao.iw, op.cao.in, OperationType.DISABLE_INITIALIZATION);
         if (message.length === 0) return;
-        
+
         const hash = await blake3Hash(message);
         const txHashHexString = op.cao.tx.toString('hex');
         if (!b4a.equals(hash, op.cao.tx)) return;

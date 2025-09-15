@@ -82,7 +82,8 @@ const validateValue = value => {
 export function toBalance(balance) {
     try{
         return new Balance(balance)
-    } catch {
+    } catch(e) {
+        console.error(e)
         return null
     }
 }
