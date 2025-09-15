@@ -8,11 +8,11 @@ import {
     EntryType,
     OperationType,
 } from '../../utils/constants.js';
-import {isHexString, sleep} from '../../utils/helpers.js';
-import Wallet from 'trac-wallet';
+import { isHexString, sleep } from '../../utils/helpers.js';
+import PeerWallet from 'trac-wallet';
 import Check from '../../utils/check.js';
-import {safeDecodeApplyOperation} from '../../utils/protobuf/operationHelpers.js';
-import {createMessage, ZERO_WK, isBufferValid, safeWriteUInt32BE} from '../../utils/buffer.js';
+import { safeDecodeApplyOperation } from '../../utils/protobuf/operationHelpers.js';
+import { createMessage, ZERO_WK, isBufferValid } from '../../utils/buffer.js';
 import addressUtils from './utils/address.js';
 import adminEntryUtils from './utils/adminEntry.js';
 import nodeEntryUtils, { setWritingKey, ZERO_BALANCE, NODE_ENTRY_SIZE } from './utils/nodeEntry.js';
@@ -21,7 +21,6 @@ import lengthEntryUtils from './utils/lengthEntry.js';
 import transactionUtils from './utils/transaction.js';
 import {blake3Hash} from '../../utils/crypto.js';
 import { toBalance } from './utils/balance.js';
-
 class State extends ReadyResource {
     //TODO: AFTER createMessage(..args) check if this function did not return NULL
     #base;
@@ -122,6 +121,12 @@ class State extends ReadyResource {
 
     async getNodeEntry(address) {
         const nodeEntry = await this.getSigned(address);
+        return nodeEntry ? nodeEntryUtils.decode(nodeEntry) : null;
+    }
+
+    // PLACEHOLDER
+    async getUnsignedNodeEntry(address) {
+        const nodeEntry = await this.get(address);
         return nodeEntry ? nodeEntryUtils.decode(nodeEntry) : null;
     }
 
@@ -262,6 +267,7 @@ class State extends ReadyResource {
             [OperationType.BAN_VALIDATOR]: this.#handleApplyBanValidatorOperation.bind(this),
             [OperationType.BOOTSTRAP_DEPLOYMENT]: this.#handleApplyBootstrapDeploymentOperation.bind(this),
             [OperationType.TX]: this.#handleApplyTxOperation.bind(this),
+            [OperationType.TRANSFER]: this.#handleApplyTransferOperation.bind(this),
         };
         return handlers[type] || null;
     }
@@ -384,7 +390,7 @@ class State extends ReadyResource {
         const adminAddressBuffer = op.address;
         const adminAddressString = addressUtils.bufferToAddress(adminAddressBuffer);
         if (adminAddressString === null) return;
-        const adminPublicKey = Wallet.decodeBech32mSafe(adminAddressString);
+        const adminPublicKey = PeerWallet.decodeBech32mSafe(adminAddressString);
         if (adminPublicKey === null) return;
 
         // Check if the operation is being performed by the bootstrap node - the original deployer of the Trac Network
@@ -448,7 +454,7 @@ class State extends ReadyResource {
         const requesterAdminAddressBuffer = op.address;
         const requesterAdminAddressString = addressUtils.bufferToAddress(requesterAdminAddressBuffer);
         if (requesterAdminAddressString === null) return;
-        const requesterAdminPublicKey = Wallet.decodeBech32mSafe(requesterAdminAddressString);
+        const requesterAdminPublicKey = PeerWallet.decodeBech32mSafe(requesterAdminAddressString);
         if (requesterAdminPublicKey === null) return;
 
         // recreate requester message
@@ -474,7 +480,7 @@ class State extends ReadyResource {
         const validatorAddress = op.rao.va;
         const validatorAddressString = addressUtils.bufferToAddress(validatorAddress);
         if (validatorAddressString === null) return;
-        const validatorPublicKey = Wallet.decodeBech32mSafe(validatorAddressString);
+        const validatorPublicKey = PeerWallet.decodeBech32mSafe(validatorAddressString);
         if (validatorPublicKey === null) return;
 
         // recreate validator message
@@ -507,7 +513,7 @@ class State extends ReadyResource {
         const decodedAdminEntry = adminEntryUtils.decode(adminEntry);
 
         if (null === decodedAdminEntry) return;
-        const publicKeyAdminEntry = Wallet.decodeBech32mSafe(decodedAdminEntry.address);
+        const publicKeyAdminEntry = PeerWallet.decodeBech32mSafe(decodedAdminEntry.address);
         if (!b4a.equals(requesterAdminPublicKey, publicKeyAdminEntry)) return;
 
         const isOldWkInIndexerList = await this.#isWriterKeyInIndexerListApply(decodedAdminEntry.wk, base);
@@ -549,14 +555,14 @@ class State extends ReadyResource {
 
         // Extract admin entry
         const adminAddress = decodedAdminEntry.address;
-        const adminPublicKey = Wallet.decodeBech32mSafe(adminAddress);
+        const adminPublicKey = PeerWallet.decodeBech32mSafe(adminAddress);
         if (adminPublicKey === null) return;
         // Extract and validate the network prefix from the node's address
         const nodeAddressBinnary = op.aco.ia;
 
         const nodeAddressString = addressUtils.bufferToAddress(nodeAddressBinnary);
         if (nodeAddressString === null) return;
-        const nodePublicKey = Wallet.decodeBech32mSafe(nodeAddressString);
+        const nodePublicKey = PeerWallet.decodeBech32mSafe(nodeAddressString);
         if (nodePublicKey === null) return;
 
 
@@ -627,7 +633,7 @@ class State extends ReadyResource {
         const requesterAddressBuffer = op.address;
         const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer);
         if (requesterAddressString === null) return;
-        const requesterPublicKey = Wallet.decodeBech32mSafe(requesterAddressString);
+        const requesterPublicKey = PeerWallet.decodeBech32mSafe(requesterAddressString);
         if (requesterPublicKey === null) return;
 
         if (b4a.equals(op.rao.iw, ZERO_WK)) return;
@@ -646,7 +652,7 @@ class State extends ReadyResource {
         const validatorAddress = op.rao.va;
         const validatorAddressString = addressUtils.bufferToAddress(validatorAddress);
         if (validatorAddressString === null) return;
-        const validatorPublicKey = Wallet.decodeBech32mSafe(validatorAddressString);
+        const validatorPublicKey = PeerWallet.decodeBech32mSafe(validatorAddressString);
         if (validatorPublicKey === null) return;
 
         const validatorMessage = createMessage(op.rao.tx, op.rao.va, op.rao.vn, OperationType.ADD_WRITER);
@@ -732,7 +738,7 @@ class State extends ReadyResource {
         const requesterAddress = op.address;
         const requesterAddressString = addressUtils.bufferToAddress(requesterAddress);
         if (requesterAddressString === null) return;
-        const requesterPublicKey = Wallet.decodeBech32mSafe(requesterAddressString);
+        const requesterPublicKey = PeerWallet.decodeBech32mSafe(requesterAddressString);
         if (requesterPublicKey === null) return;
 
         // verify requester signature
@@ -749,7 +755,7 @@ class State extends ReadyResource {
         const validatorAddress = op.rao.va;
         const validatorAddressString = addressUtils.bufferToAddress(validatorAddress);
         if (validatorAddressString === null) return;
-        const validatorPublicKey = Wallet.decodeBech32mSafe(validatorAddressString);
+        const validatorPublicKey = PeerWallet.decodeBech32mSafe(validatorAddressString);
         if (validatorPublicKey === null) return;
 
         const validatorMessage = createMessage(op.rao.tx, op.rao.va, op.rao.vn, OperationType.REMOVE_WRITER);
@@ -807,14 +813,14 @@ class State extends ReadyResource {
         const requesterAddressBuffer = op.address;
         const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer);
         if (requesterAddressString === null) return;
-        const requesterPublicKey = Wallet.decodeBech32mSafe(requesterAddressString);
+        const requesterPublicKey = PeerWallet.decodeBech32mSafe(requesterAddressString);
         if (requesterPublicKey === null) return;
 
         // Extract and validate pretending indexer address
         const pretendingAddressBuffer = op.aco.ia;
         const pretendingAddressString = addressUtils.bufferToAddress(pretendingAddressBuffer);
         if (pretendingAddressString === null) return;
-        const pretentingPublicKey = Wallet.decodeBech32mSafe(pretendingAddressString);
+        const pretentingPublicKey = PeerWallet.decodeBech32mSafe(pretendingAddressString);
         if (pretentingPublicKey === null) return;
 
         // ensure that an admin invoked this operation
@@ -822,7 +828,7 @@ class State extends ReadyResource {
         if (null === adminEntry) return;
         const decodedAdminEntry = adminEntryUtils.decode(adminEntry);
         if (null === decodedAdminEntry) return;
-        const adminPublicKey = Wallet.decodeBech32mSafe(decodedAdminEntry.address);
+        const adminPublicKey = PeerWallet.decodeBech32mSafe(decodedAdminEntry.address);
         if (adminPublicKey === null) return;
         if (!b4a.equals(requesterPublicKey, adminPublicKey) || !this.#isAdminApply(decodedAdminEntry, node)) return;
 
@@ -843,12 +849,12 @@ class State extends ReadyResource {
 
         // anti-replay attack
         const opEntry = await this.#getEntryApply(txHashHexString, batch);
-        if ( null !== opEntry) return;
+        if (null !== opEntry) return;
 
-        await this.#addIndexer(op, node ,batch, base, txHashHexString, pretendingAddressString);
+        await this.#addIndexer(op, node, batch, base, txHashHexString, pretendingAddressString);
     }
 
-    async #addIndexer(op,node, batch, base, txHashHexString, nodeAddressString) {
+    async #addIndexer(op, node, batch, base, txHashHexString, nodeAddressString) {
         const nodeEntry = await this.#getEntryApply(nodeAddressString, batch);
         if (null === nodeEntry) return;
         const decodedNodeEntry = nodeEntryUtils.decode(nodeEntry);
@@ -861,7 +867,7 @@ class State extends ReadyResource {
         //update node entry to indexer
         const updatedNodeEntry = nodeEntryUtils.setRole(nodeEntry, nodeRoleUtils.NodeRole.INDEXER)
         if (null === updatedNodeEntry) return;
-     
+
         // ensure that the node wk does not exist in the indexer list
         const indexerListHasWk = await this.#isWriterKeyInIndexerListApply(decodedNodeEntry.wk, base);
         if (indexerListHasWk) return; // Wk is already in indexer list (Node already indexer)
@@ -885,14 +891,14 @@ class State extends ReadyResource {
         const requesterAddressBuffer = op.address;
         const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer);
         if (requesterAddressString === null) return;
-        const requesterPublicKey = Wallet.decodeBech32mSafe(requesterAddressString);
+        const requesterPublicKey = PeerWallet.decodeBech32mSafe(requesterAddressString);
         if (requesterPublicKey === null) return;
 
         // Extract and validate pretending indexer address
         const toRemoveAddressBuffer = op.aco.ia;
         const toRemoveAddressString = addressUtils.bufferToAddress(toRemoveAddressBuffer);
         if (toRemoveAddressString === null) return;
-        const toRemoveAddressPublicKey = Wallet.decodeBech32mSafe(toRemoveAddressString);
+        const toRemoveAddressPublicKey = PeerWallet.decodeBech32mSafe(toRemoveAddressString);
         if (toRemoveAddressPublicKey === null) return;
 
         // ensure that an admin invoked this operation
@@ -900,7 +906,7 @@ class State extends ReadyResource {
         if (null === adminEntry) return;
         const decodedAdminEntry = adminEntryUtils.decode(adminEntry);
         if (null === decodedAdminEntry) return;
-        const adminPublicKey = Wallet.decodeBech32mSafe(decodedAdminEntry.address);
+        const adminPublicKey = PeerWallet.decodeBech32mSafe(decodedAdminEntry.address);
         if (adminPublicKey === null) return;
         if (!b4a.equals(requesterPublicKey, adminPublicKey) || !this.#isAdminApply(decodedAdminEntry, node)) return;
 
@@ -920,7 +926,7 @@ class State extends ReadyResource {
 
         // anti-replay attack
         const opEntry = await this.#getEntryApply(txHashHexString, batch);
-        if ( null !== opEntry) return;
+        if (null !== opEntry) return;
         await this.#removeIndexer(op, node, batch, base, txHashHexString, toRemoveAddressString, toRemoveAddressBuffer);
     }
 
@@ -963,7 +969,7 @@ class State extends ReadyResource {
         const requesterAddressBuffer = op.address;
         const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer);
         if (requesterAddressString === null) return;
-        const requesterPublicKey = Wallet.decodeBech32mSafe(requesterAddressString);
+        const requesterPublicKey = PeerWallet.decodeBech32mSafe(requesterAddressString);
         if (requesterPublicKey === null) return;
 
         // ensure that an admin invoked this operation
@@ -973,7 +979,7 @@ class State extends ReadyResource {
         const decodedAdminEntry = adminEntryUtils.decode(adminEntry);
         if (null === decodedAdminEntry) return;
 
-        const adminPublicKey = Wallet.decodeBech32mSafe(decodedAdminEntry.address);
+        const adminPublicKey = PeerWallet.decodeBech32mSafe(decodedAdminEntry.address);
         if (adminPublicKey === null || !b4a.equals(requesterPublicKey, adminPublicKey) || !this.#isAdminApply(decodedAdminEntry, node)) return;
 
         // recreate requester message
@@ -1036,7 +1042,7 @@ class State extends ReadyResource {
     async #handleApplyBootstrapDeploymentOperation(op, view, base, node, batch) {
         if (!this.check.validateBootstrapDeploymentOperation(op)) return;
         // if transaction is not complete, do not process it.
-        if (!Object.hasOwn(op.bdo,"vs") || !Object.hasOwn(op.bdo,"va")|| !Object.hasOwn(op.bdo,"vn")) return;
+        if (!Object.hasOwn(op.bdo, "vs") || !Object.hasOwn(op.bdo, "va") || !Object.hasOwn(op.bdo, "vn")) return;
         // do not allow to deploy bootstrap deployment on the same bootstrap.
         if (b4a.equals(op.bdo.bs, this.bootstrap)) return;
         // for additional security, nonces should be different.
@@ -1051,7 +1057,7 @@ class State extends ReadyResource {
         const requesterAddressBuffer = op.address;
         const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer);
         if (null === requesterAddressString) return;
-        const requesterPublicKey = Wallet.decodeBech32mSafe(requesterAddressString);
+        const requesterPublicKey = PeerWallet.decodeBech32mSafe(requesterAddressString);
         if (null === requesterPublicKey) return;
 
         // recreate requester message
@@ -1077,7 +1083,7 @@ class State extends ReadyResource {
         const validatorAddressBuffer = op.bdo.va;
         const validatorAddressString = addressUtils.bufferToAddress(validatorAddressBuffer);
         if (null === validatorAddressString) return;
-        const validatorPublicKey = Wallet.decodeBech32mSafe(validatorAddressString);
+        const validatorPublicKey = PeerWallet.decodeBech32mSafe(validatorAddressString);
         if (null === validatorPublicKey) return;
 
         // recreate validator message
@@ -1118,7 +1124,7 @@ class State extends ReadyResource {
         // ATTENTION: The sanitization should be done before ANY other check, otherwise we risk crashing
         if (!this.check.validateTransactionOperation(op)) return;
         // reject transaction which is not complete
-        if (!Object.hasOwn(op.txo,"vs") || !Object.hasOwn(op.txo,"va")|| !Object.hasOwn(op.txo,"vn")) return;
+        if (!Object.hasOwn(op.txo, "vs") || !Object.hasOwn(op.txo, "va") || !Object.hasOwn(op.txo, "vn")) return;
         // reject if the validator signed their own transaction
         if (b4a.equals(op.address, op.txo.va)) return;
         // reject if the nonces are the same
@@ -1127,12 +1133,12 @@ class State extends ReadyResource {
         if (b4a.equals(op.txo.is, op.txo.vs)) return;
         // reject if the external bootstrap is the same as the network bootstrap
         if (b4a.equals(op.txo.bs, op.txo.mbs)) return;
-        
+
         // validate invoker signature
         const requesterAddressBuffer = op.address;
         const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer);
         if (null === requesterAddressString) return;
-        const requesterPublicKey = Wallet.decodeBech32mSafe(requesterAddressString);
+        const requesterPublicKey = PeerWallet.decodeBech32mSafe(requesterAddressString);
         if (null === requesterPublicKey) return;
         const requesterMessage = createMessage(
             op.address,
@@ -1157,7 +1163,7 @@ class State extends ReadyResource {
         const validatorAddressString = addressUtils.bufferToAddress(validatorAddressBuffer);
         if (null === validatorAddressString) return;
 
-        const validatorPublicKey = Wallet.decodeBech32mSafe(validatorAddressString);
+        const validatorPublicKey = PeerWallet.decodeBech32mSafe(validatorAddressString);
         if (null === validatorPublicKey) return;
 
         // recreate validator message
@@ -1194,6 +1200,175 @@ class State extends ReadyResource {
         }
     }
 
+    async #handleApplyTransferOperation(op, view, base, node, batch) {
+        if (!this.check.validateTransferOperation(op)) return;
+        // if transaction is not complete, do not process it.
+        if (!Object.hasOwn(op.tro, "vs") || !Object.hasOwn(op.tro, "va") || !Object.hasOwn(op.tro, "vn")) return;
+        // for additional security, nonces should be different.
+        if (b4a.equals(op.tro.in, op.tro.vn)) return;
+        // addresses should be different.
+        if (b4a.equals(op.address, op.tro.va)) return;
+        // signatures should be different.
+        if (b4a.equals(op.tro.is, op.tro.vs)) return;
+
+        // validate requester signature
+        const requesterAddressBuffer = op.address;
+        const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer);
+        if (requesterAddressString === null) return;
+        const requesterPublicKey = PeerWallet.decodeBech32mSafe(requesterAddressString);
+        if (requesterPublicKey === null) return;
+
+        // recreate requester message
+        const requesterMessage = createMessage(
+            op.address,
+            op.tro.txv,
+            op.tro.in,
+            op.tro.to,
+            op.tro.am,
+            OperationType.TRANSFER
+        );
+        if (requesterMessage.length === 0) return;
+
+        // ensure that tx is valid
+        const regeneratedTxHash = await blake3Hash(requesterMessage);
+        if (!b4a.equals(regeneratedTxHash, op.tro.tx)) return;
+
+        const isRequesterSignatureValid = this.#wallet.verify(op.tro.is, regeneratedTxHash, requesterPublicKey);
+        if (!isRequesterSignatureValid) return;
+
+        // signature of the validator
+        const validatorAddressBuffer = op.tro.va;
+        const validatorAddressString = addressUtils.bufferToAddress(validatorAddressBuffer);
+        if (validatorAddressString === null) return;
+        const validatorPublicKey = PeerWallet.decodeBech32mSafe(validatorAddressString);
+        if (validatorPublicKey === null) return;
+
+        const validatorMessage = createMessage(
+            op.tro.tx,
+            op.tro.va,
+            op.tro.vn,
+            OperationType.TRANSFER
+        );
+
+        if (validatorMessage.length === 0) return;
+        const validatorMessageHash = await blake3Hash(validatorMessage);
+        const isValidatorSignatureValid = this.#wallet.verify(op.tro.vs, validatorMessageHash, validatorPublicKey);
+        if (!isValidatorSignatureValid) return;
+
+        // verify tx validity - prevent deferred execution attack
+        const indexersSequenceState = await this.#getIndexerSequenceStateApply(base);
+        if (indexersSequenceState === null) return;
+        if (!b4a.equals(op.tro.txv, indexersSequenceState)) return;
+
+        // anti-replay attack
+        const hashHexString = op.tro.tx.toString('hex');
+        const opEntry = await this.#getEntryApply(hashHexString, batch);
+        if (opEntry !== null) return;
+
+        // Check if recipient address is valid.
+        const recipientAddressBuffer = op.tro.to;
+        const recipientAddressString = addressUtils.bufferToAddress(recipientAddressBuffer);
+        if (recipientAddressString === null) return;
+        const recipientPublicKey = PeerWallet.decodeBech32mSafe(recipientAddressString);
+        if (recipientPublicKey === null) return;
+
+        const isSelfTransfer = b4a.equals(requesterAddressBuffer, recipientAddressBuffer);
+
+        const transferResult = await this.#transfer(
+            requesterAddressString,
+            recipientAddressString,
+            validatorAddressString,
+            op.tro.am,
+            transactionUtils.FEE,
+            isSelfTransfer,
+            batch
+        );
+
+        if (null === transferResult) return;
+        await batch.put(requesterAddressString, transferResult.senderEntry);
+
+        if (!isSelfTransfer) {
+            await batch.put(recipientAddressString, transferResult.recipientEntry);
+        }
+
+        await batch.put(hashHexString, node.value);
+
+        if (this.#enable_txlogs === true) {
+            console.log(`TRANSFER: ${hashHexString} appended. Signed length: `, this.#base.view.core.signedLength);
+        }
+
+    }
+
+    async #transfer(senderAddressString, recipientAddressString, validatorAddressString, transferAmountBuffer, feeAmountBuffer, isSelfTransfer, batch) {
+        if (senderAddressString === null ||
+            recipientAddressString === null ||
+            validatorAddressString === null ||
+            transferAmountBuffer === null ||
+            feeAmountBuffer === null ||
+            isSelfTransfer === null ||
+            batch === null
+        ) {
+            return null;
+        }
+        const transferAmount = toBalance(transferAmountBuffer);
+        const feeAmount = toBalance(feeAmountBuffer);
+        if (transferAmount === null || feeAmount === null) return null;
+
+        // totalDeductedAmount = transferAmount + fee. When transferamount is 0, then totalDeductedAmount = fee. Because 0 + fee = fee.
+        const totalDeductedAmount = isSelfTransfer ? feeAmount : transferAmount.add(feeAmount);
+        if (totalDeductedAmount === null) return null;
+        const senderEntryBuffer = await this.#getEntryApply(senderAddressString, batch);
+        if (senderEntryBuffer === null) return null;
+        const senderEntry = nodeEntryUtils.decode(senderEntryBuffer);
+        if (senderEntry === null) return null;
+        const senderBalance = toBalance(senderEntry.balance);
+        if (senderBalance === null) return null;
+        if (!senderBalance.greaterThanOrEquals(totalDeductedAmount)) return null;
+
+        const newSenderBalance = senderBalance.sub(totalDeductedAmount);
+        if (newSenderBalance === null) return null;
+
+        const updatedSenderEntry = nodeEntryUtils.setBalance(senderEntryBuffer, newSenderBalance.value);
+        if (updatedSenderEntry === null) return null;
+        const result = {
+            senderEntry: updatedSenderEntry,
+            recipientEntry: null,
+            validatorEntry: null,
+        };
+
+        if (!isSelfTransfer) {
+            const recipientEntryBuffer = await this.#getEntryApply(recipientAddressString, batch);
+            if (recipientEntryBuffer === null) {
+                if (transferAmount.value === null) return null;
+                const newRecipientEntry = nodeEntryUtils.init(
+                    ZERO_WK,
+                    nodeRoleUtils.NodeRole.READER,
+                    transferAmount.value
+                );
+                if (newRecipientEntry.length === 0) return null;
+                result.recipientEntry = newRecipientEntry;
+            } else {
+                const recipientEntry = nodeEntryUtils.decode(recipientEntryBuffer);
+                if (recipientEntry === null) return null;
+
+                const recipientBalance = toBalance(recipientEntry.balance);
+                if (recipientBalance === null) return null;
+
+                const newRecipientBalance = recipientBalance.add(transferAmount);
+                if (newRecipientBalance === null) return null;
+
+                const updatedRecipientEntry = nodeEntryUtils.setBalance(recipientEntryBuffer, newRecipientBalance.value);
+                if (updatedRecipientEntry === null) return null;
+                result.recipientEntry = updatedRecipientEntry;
+            }
+        }
+
+        // TODO: implement validator reward distribution in this place, and assign NEW balance to result.validatorEntry
+
+        return result;
+
+    }
+
     #isAdminApply(adminEntry, node) {
         if (!adminEntry || !node) return false;
         return b4a.equals(adminEntry.wk, node.from.key);
@@ -1210,7 +1385,7 @@ class State extends ReadyResource {
     }
 
     async #getIndexerSequenceStateApply(base) {
-        try{
+        try {
             const buf = [];
             for (const indexer of Object.values(base.system.indexers)) {
                 buf.push(indexer.key);

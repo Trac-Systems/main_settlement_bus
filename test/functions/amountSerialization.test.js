@@ -4,6 +4,11 @@ import { decimalStringToBigInt, bigIntTo16ByteBuffer, bufferToBigInt, bigIntToDe
 import { errorMessageIncludes } from "../utils/regexHelper.js";
 
 test('decimalStringToBigInt', async t => {
+    // Zero cases - all valid
+    t.is(decimalStringToBigInt('0'), 0n, 'Simple zero');
+    t.is(decimalStringToBigInt('0.0'), 0n, 'Zero with decimal point');
+    t.is(decimalStringToBigInt('00.00'), 0n, 'Zero with leading and trailing zeros');
+
     // Valid cases
     t.is(decimalStringToBigInt('123'), 123000000000000000000n, 'Simple integer');
     t.is(decimalStringToBigInt('123.456'), 123456000000000000000n, 'Decimal number');
@@ -24,12 +29,6 @@ test('decimalStringToBigInt', async t => {
             errorMessageIncludes('Negative amounts are not allowed')),
         t.exception(() => decimalStringToBigInt('-0'),
             errorMessageIncludes('Negative amounts are not allowed')),
-        t.exception(() => decimalStringToBigInt('0'),
-            errorMessageIncludes('Amount cannot be zero')),
-        t.exception(() => decimalStringToBigInt('0.0'),
-            errorMessageIncludes('Amount cannot be zero')),
-        t.exception(() => decimalStringToBigInt('00.00'),
-            errorMessageIncludes('Amount cannot be zero')),
         t.exception(() => decimalStringToBigInt('abc'),
             errorMessageIncludes('Invalid decimal format. Use format: 123.456')),
         t.exception(() => decimalStringToBigInt('123.456.789'),
@@ -167,15 +166,11 @@ test('Integration: amount serialization roundtrip', async t => {
     const maxValueRoundtrip = bufferToBigInt(maxValueBuffer);
     t.is(maxValueRoundtrip, maxValueBigInt, 'Should preserve maximum allowed value through conversion');
 
-    // Verify that zero throws error
-    await t.exception(
-        () => {
-            const zeroBigInt = decimalStringToBigInt('0');
-            const zeroBuffer = bigIntTo16ByteBuffer(zeroBigInt);
-            return bufferToBigInt(zeroBuffer);
-        },
-        errorMessageIncludes('Amount cannot be zero')
-    );
+    // Verify that zero is handled correctly
+    const zeroBigInt = decimalStringToBigInt('0');
+    const zeroBuffer = bigIntTo16ByteBuffer(zeroBigInt);
+    const zeroRoundtrip = bufferToBigInt(zeroBuffer);
+    t.is(zeroRoundtrip, 0n, 'Should preserve zero through conversion');
 });
 
 test('bigIntToDecimalString', async t => {

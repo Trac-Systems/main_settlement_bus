@@ -1,11 +1,13 @@
 import b4a from 'b4a';
-import Wallet from 'trac-wallet';
+import PeerWallet from 'trac-wallet';
 
 import Check from '../../../../utils/check.js';
 import {bufferToAddress} from "../../../state/utils/address.js";
 import {OperationType} from "../../../../utils/constants.js";
 import {blake3Hash} from "../../../../utils/crypto.js";
 import {createMessage} from "../../../../utils/buffer.js";
+
+//TODO: Implement BASE VALIDATOR CLASS AND MOVE COMMON METHODS THERE
 
 class PartialBootstrapDeployment {
     #state;
@@ -34,7 +36,7 @@ class PartialBootstrapDeployment {
 
     async validate(payload) {
         if (!this.#isPayloadSchemaValid(payload)) return false;
-        if (!this.#validateRequestingPublicKey(payload)) return false;
+        if (!this.#validateRequesterAddress(payload)) return false;
         if (!await this.#validateSignature(payload)) return false;
         if (!await this.#isBootstrapAlreadyRegistered(payload)) return false;
         if (!this.#isBootstrapDeploymentAlreadyNotCompleted(payload)) return false;
@@ -53,8 +55,14 @@ class PartialBootstrapDeployment {
         return true;
     }
 
-    #validateRequestingPublicKey(payload) {
-        const incomingPublicKey = Wallet.decodeBech32mSafe(bufferToAddress(payload.address));
+    #validateRequesterAddress(payload) {
+        const incomingAddress = bufferToAddress(payload.address);
+        if (!incomingAddress) {
+            console.error('Invalid requesting address in bootstrap deployment payload.');
+            return false;
+        }
+
+        const incomingPublicKey = PeerWallet.decodeBech32mSafe(incomingAddress);
 
         if (incomingPublicKey === null) {
             console.error('Invalid requesting public key in bootstrap deployment payload.');
@@ -64,7 +72,7 @@ class PartialBootstrapDeployment {
     }
 
     async #validateSignature(payload) {
-        const incomingPublicKey = Wallet.decodeBech32mSafe(bufferToAddress(payload.address));
+        const incomingPublicKey = PeerWallet.decodeBech32mSafe(bufferToAddress(payload.address));
         const incomingSignature = payload.bdo.is;
 
         const incomingTx = payload.bdo.tx;
@@ -84,7 +92,7 @@ class PartialBootstrapDeployment {
             return false;
         }
 
-        const isSignatureValid = Wallet.verify(incomingSignature, regeneratedTx, incomingPublicKey);
+        const isSignatureValid = PeerWallet.verify(incomingSignature, regeneratedTx, incomingPublicKey);
         if (!isSignatureValid) {
             console.error('Invalid signature in PreTx payload.');
             return false;
@@ -98,7 +106,7 @@ class PartialBootstrapDeployment {
             console.error(`Bootstrap with hash ${bootstrapString} already exists in the state. Bootstrap must be unique.`);
             return false;
         }
-
+        // TODO: SPLIT IT INTO validateTransactionUniqueness. Becasuse we can move this check into the base validator class in the future
         const txString = payload.bdo.tx.toString('hex');
         if (null !== await this.state.get(txString)) {
             console.error(`Transaction with hash ${txString} already exists in the state.`);

@@ -124,7 +124,6 @@ class PartialStateMessageBuilder extends StateBuilder {
     }
 
     withAmount(amount) {
-        console.log(amount.length);
         if (!isHexString(amount) || amount.length !== 32) {
             throw new Error('Amount must be a 32-length hexstring.');
         }
