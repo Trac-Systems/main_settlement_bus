@@ -74,18 +74,24 @@ export const subBuffers = (a, b) => {
  * @param {Buffer} value 
  */
 const validateValue = value => {
-    try {
-        return isBufferValid(value, BALANCE_BYTE_LENGTH)
-    } catch (error) {
-        console.log(error)
-        return false
+    if (!isBufferValid(value, BALANCE_BYTE_LENGTH)) {
+        throw new Error('Invalid balance') // Should be a qualified exception
+    }
+}
+
+export function toBalance(balance) {
+    try{
+        return new Balance(balance)
+    } catch(e) {
+        console.error(e)
+        return null
     }
 }
 
 /**
  * Balance class encapsulates a token balance stored as a fixed-length buffer.
  */
-export class Balance {
+class Balance {
     #value
 
     /** Returns the internal buffer */
@@ -98,7 +104,8 @@ export class Balance {
      * @param {Buffer} value - Buffer representing the balance
      */
     constructor(value) {
-        this.#value = validateValue(value) ? value : null
+        validateValue(value)
+        this.#value = value
     }
 
     /**
@@ -107,7 +114,7 @@ export class Balance {
      * @returns {Balance} - New Balance instance
      */
     add(b) {
-        return new Balance(addBuffers(this.#value, b.value))
+        return toBalance(addBuffers(this.#value, b.value))
     }
 
     /**
@@ -116,7 +123,7 @@ export class Balance {
      * @returns {Balance} - New Balance instance
      */
     sub(b) {
-        return new Balance(subBuffers(this.#value, b.value))
+        return toBalance(subBuffers(this.#value, b.value))
     }
 
     /**

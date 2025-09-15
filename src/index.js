@@ -25,7 +25,7 @@ import {
 import partialStateMessageOperations from "./messages/partialStateMessages/PartialStateMessageOperations.js";
 import { randomBytes } from "hypercore-crypto";
 import { decimalStringToBigInt, bigIntTo16ByteBuffer, bufferToBigInt, bigIntToDecimalString } from "./utils/amountSerialization.js"
-import { toBalance } from "./core/state/utils/nodeEntry.js";
+import { toBalance } from "./core/state/utils/balance.js";
 
 //TODO create a MODULE which will separate logic responsible for role managment
 
@@ -653,6 +653,12 @@ export class MainSettlementBus extends ReadyResource {
 
     async #handleBalanceMigrationOperation() {
 
+        const isInitDisabled = await this.#state.isInitalizationDisabled()
+
+        if (isInitDisabled){
+            throw new Error("Can not initialize balance - balance initialization is disabled.");
+        }
+
         if (this.#enable_wallet === false) {
             throw new Error("Can not initialize an admin - wallet is not enabled.");
         }
@@ -661,6 +667,11 @@ export class MainSettlementBus extends ReadyResource {
         if (!adminEntry) {
             throw new Error("Can not initialize an admin - admin does not exist.");
         }
+
+        if (!this.#isAdmin(adminEntry)) {
+            throw new Error('Cannot perform whitelisting - you are not the admin!.');
+        }
+
         if (!this.#wallet) {
             throw new Error(
                 "Can not initialize an admin - wallet is not initialized."
@@ -678,7 +689,7 @@ export class MainSettlementBus extends ReadyResource {
         }
 
         const txValidity = await this.#state.getIndexerSequenceState();
-        const { messages, totalBalance, totalAddresses } = await CompleteStateMessageOperations.assembleBalanceInitializationMessages(
+        const { messages, totalBalance, totalAddresses, addresses } = await CompleteStateMessageOperations.assembleBalanceInitializationMessages(
             this.#wallet,
             txValidity
         );
@@ -691,16 +702,39 @@ export class MainSettlementBus extends ReadyResource {
         for (let i = 0; i < messages.length; i++) {
             const message = messages[i];
             console.log(`Processing message ${i + 1} of ${messages.length}...`);
-            //await this.#state.append(message); disabled until onchain part will be implemented
+            await this.#state.append(message); 
             await sleep(WHITELIST_SLEEP_INTERVAL);
-
         }
 
-        // TODO: add validation process that all messages has been processed (compare balances from file with node Entries - implement when apply function will be ready. )
-        console.log("Balance migration process completed.");
+        await sleep(WHITELIST_SLEEP_INTERVAL);
+
+        let allBalancesMigrated = true;
+        for (let i = 0; i < addresses.length; i++) {
+            const entry = await this.#state.getNodeEntry(addresses[i].address); 
+            const expectedBalance = addresses[i].parsedBalance;
+            if(toBalance(entry.balance).asBigInt() !== expectedBalance){
+                allBalancesMigrated = false
+                console.log(`Balance of ${expectedBalance} failed to migrate to address: ${addresses[i].address}, ${addresses[i].parsedBalance}`);
+                break
+            }
+        }
+
+        console.log("Balance migration successful: ", allBalancesMigrated);
     }
 
     async #disableInitialization() {
+        if (this.#enable_wallet === false) {
+            throw new Error("Can not initialize an admin - wallet is not enabled.");
+        }
+        const adminEntry = await this.#state.getAdminEntry();
+
+        if (!adminEntry) {
+            throw new Error("Can not initialize an admin - admin does not exist.");
+        }
+
+        if (!this.#isAdmin(adminEntry)) {
+            throw new Error('Cannot perform whitelisting - you are not the admin!.');
+        }
         // add more checks
         const txValidity = await this.#state.getIndexerSequenceState();
         const payload = await CompleteStateMessageOperations.assembleDisableInitializationMessage(
@@ -708,9 +742,8 @@ export class MainSettlementBus extends ReadyResource {
             this.#state.writingKey,
             txValidity,
         )
-        console.log('Disabling initialization...');
-        // TODO: disabled until onchain part will be implemented
-        //await this.#state.append(payload);
+        console.log('Disabling initialization...'); 
+        await this.#state.append(payload);
     }
 
     async interactiveMode() {

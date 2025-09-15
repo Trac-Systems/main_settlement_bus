@@ -1,9 +1,10 @@
 import { test } from 'brittle';
 import b4a from 'b4a';
 import { randomBuffer, TEN_THOUSAND_VALUE, tokenUnits } from '../stateTestUtils.js';
-import { ZERO_BALANCE, toBalance, decode, encode } from '../../../src/core/state/utils/nodeEntry.js';
+import { ZERO_BALANCE, decode, encode } from '../../../src/core/state/utils/nodeEntry.js';
 import { WRITER_BYTE_LENGTH, ADMIN_INITIAL_BALANCE, BALANCE_BYTE_LENGTH } from '../../../src/utils/constants.js';
-import { $TNK } from '../../../src/core/state/utils/balance.js';
+import { $TNK, toBalance } from '../../../src/core/state/utils/balance.js';
+import { NULL_BUFFER } from '../../../src/utils/buffer.js';
 
 test('Balance#asHex explicit', t => {
   const val = $TNK(1000n)
@@ -53,7 +54,7 @@ test('Balance#add overflow returns NULL_BUFFER', t => {
     const result = balance.add(toBalance(oneRaw));
 
     // Should return null-like buffer on overflow
-    t.is(result.value, null, 'overflow returns null');
+    t.is(result, null, 'overflow returns null');
 });
 
 test('Balance#add edge case: max - 1 + 1 = max', t => {
@@ -115,7 +116,7 @@ test('Balance#sub underflow returns NULL_BUFFER', t => {
     const result = toBalance(a).sub(toBalance(b));
 
     // Should return null-like buffer on underflow
-    t.is(result.value, null, 'overflow returns null');
+    t.is(result, null, 'overflow returns null');
 });
 
 test('Balance#sub edge case: equal amounts = zero', t => {
