@@ -126,6 +126,12 @@ class State extends ReadyResource {
     }
 
     // PLACEHOLDER
+    async getUnsignedNodeEntry(address) {
+        const nodeEntry = await this.get(address);
+        return nodeEntry ? nodeEntryUtils.decode(nodeEntry) : null;
+    }
+
+    // PLACEHOLDER
     // WARNING: DO NOT USE IN APPLY FUNCTION!!!
     async incrementBalance(address, toIncrement) {
         if (isBufferValid(toIncrement, NODE_ENTRY_SIZE) || b4a.equals(toIncrement, ZERO_BALANCE)) return null
