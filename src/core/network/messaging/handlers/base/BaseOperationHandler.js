@@ -14,12 +14,12 @@ class BaseOperationHandler {
             throw new Error('BaseOperationHandler is abstract and cannot be instantiated directly');
         }
 
+        this.#disable_rate_limit = options.disable_rate_limit === true;
+        this.#options = options;
         this.#network = network;
         this.#state = state;
         this.#wallet = wallet;
-        this.#rateLimiter = rateLimiter;
-        this.#disable_rate_limit = options.disable_rate_limit === true;
-        this.#options = options;
+        this.#rateLimiter = options.disable_rate_limit === true ? null : rateLimiter;
     }
 
     get network() {

@@ -69,10 +69,44 @@ export function startRpcServer(msbInstance, port) {
                 res.writeHead(500, { 'Content-Type': 'application/json' })
                 res.end(JSON.stringify({ error: 'An error occurred processing the request.' }))
             }
+        } else if (req.url === '/broadcast-transaction' && req.method === 'POST') {
+            let body = '';
+            req.on('data', chunk => {
+                body += chunk.toString();
+            });
+
+            req.on('end', async () => {
+                try {
+                    const { payload } = JSON.parse(body);
+
+                    if (!payload) {
+                        res.writeHead(400, { 'Content-Type': 'application/json' });
+                        res.end(JSON.stringify({ error: 'Payload is missing.' }));
+                        return;
+                    }
+
+                    // Decoded the Base64 string to a buffer and then to a JSON string.
+                    // The decoded object will be passed to handleCommand.
+                    const decodedPayloadBuffer = Buffer.from(payload, 'base64');
+                    const decodedPayload = JSON.parse(decodedPayloadBuffer.toString('utf-8'));
+                    
+                    // Pass the decoded payload to handleCommand and await the result.
+                    const result = await msbInstance.handleCommand('/broadcast_transaction', null, decodedPayload);
+
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ result }));
+                } catch (error) {
+                    console.error('Error on broadcasting transaction:', error);
+                    res.writeHead(500, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'An error occurred processing the request.' }));
+                }
+            });
         } else {
             res.writeHead(404, { 'Content-Type': 'text/plain' })
             res.end('Not Found')
         }
+
+        
     })
 
     server.listen(port, () => {

@@ -26,6 +26,11 @@ import partialStateMessageOperations from "./messages/partialStateMessages/Parti
 import { randomBytes } from "hypercore-crypto";
 import { decimalStringToBigInt, bigIntTo16ByteBuffer, bufferToBigInt, bigIntToDecimalString } from "./utils/amountSerialization.js"
 import { ZERO_WK } from "./utils/buffer.js";
+import deploymentEntryUtils from "./core/state/utils/deploymentEntry.js"
+import { toBalance } from "./core/state/utils/balance.js";
+import { normalizeTransferOperation } from "./utils/normalizers.js"
+import PartialTransfer from "./core/network/messaging/validators/PartialTransfer.js";
+
 //TODO create a MODULE which will separate logic responsible for role managment
 
 export class MainSettlementBus extends ReadyResource {
@@ -45,6 +50,7 @@ export class MainSettlementBus extends ReadyResource {
     #state;
     #isClosing = false;
     #is_admin_mode;
+    #partialTransferValidator;
 
     constructor(options = {}) {
         super();
@@ -136,6 +142,8 @@ export class MainSettlementBus extends ReadyResource {
             );
             printWalletInfo(this.#wallet.address, this.#state.writingKey, this.#state, this.#enable_wallet);
         }
+
+        this.#partialTransferValidator = new PartialTransfer(this.state, null, null);
 
         await this.#network.replicate(
             this.#state,
@@ -813,7 +821,7 @@ export class MainSettlementBus extends ReadyResource {
         rl.prompt();
     }
 
-    async handleCommand(input, rl = null) {
+    async handleCommand(input, rl = null, payload = null) {
         switch (input) {
             case "/help":
                 printHelp(this.#is_admin_mode);
@@ -980,6 +988,26 @@ export class MainSettlementBus extends ReadyResource {
                     const confirmed_length = this.#state.getSignedLength();
                     console.log('Confirmed_length:', confirmed_length);
                     return confirmed_length
+                }  else if (input.startsWith("/broadcast_transaction")) {
+                    // The payload from the RPC server is now passed as an argument.
+                    // The 'magic' goes here to validate and broadcast the transaction.
+                    if (payload) {
+                        const normalizedPayload = normalizeTransferOperation(payload);
+                        console.log("Original Payload:", payload);
+                        console.log("Normalized Payload:", normalizedPayload);
+                        const isValid = await this.#partialTransferValidator.validate(normalizedPayload);
+                        console.log("Is payload valid?", isValid);
+                        if (!isValid) {
+                            throw new Error("Invalid transaction payload.");
+                        }
+                        await this.broadcastPartialTransaction(payload);
+                        const message = "Transaction broadcasted successfully."
+                        console.log(message);
+                        return message;
+                    } else {
+                        // Handle case where payload is missing if called internally without one.
+                        throw new Error("Transaction payload is required for broadcast_transaction command.");
+                    }
                 }
 
 
