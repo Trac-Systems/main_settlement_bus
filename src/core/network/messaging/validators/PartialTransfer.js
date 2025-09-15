@@ -1,5 +1,5 @@
 import b4a from 'b4a';
-import Wallet from 'trac-wallet';
+import PeerWallet from 'trac-wallet';
 
 import Check from '../../../../utils/check.js';
 import { addressToBuffer, bufferToAddress } from "../../../state/utils/address.js";
@@ -42,7 +42,7 @@ class PartialTransfer {
     async validate(payload) {
         if (!this.#isPayloadSchemaValid(payload)) return false;
         if (!this.#validateRequesterAddress(payload)) return false;
-        if (!this.#validateRecepientAddress(payload)) return false;
+        if (!this.#validateRecipientAddress(payload)) return false;
         if (!await this.#validateSignature(payload)) return false;
         if (!await this.#validateTransactionUniqueness(payload)) return false;
         if (!await this.#validateTransactionValidity(payload)) return false;
@@ -68,7 +68,7 @@ class PartialTransfer {
             return false;
         }
 
-        const incomingPublicKey = Wallet.decodeBech32mSafe(incomingAddress);
+        const incomingPublicKey = PeerWallet.decodeBech32mSafe(incomingAddress);
 
         if (incomingPublicKey === null) {
             console.error('Invalid requesting public key in transfer payload.');
@@ -77,14 +77,14 @@ class PartialTransfer {
         return true;
     }
 
-    #validateRecepientAddress(payload) {
+    #validateRecipientAddress(payload) {
         const incomingAddress = bufferToAddress(payload.tro.to);
         if (!incomingAddress) {
             console.error('Invalid recipient address in transfer payload.');
             return false;
         }
 
-        const incomingPublicKey = Wallet.decodeBech32mSafe(incomingAddress);
+        const incomingPublicKey = PeerWallet.decodeBech32mSafe(incomingAddress);
         if (incomingPublicKey === null) {
             console.error('Invalid recipient public key in transfer payload.');
             return false;
@@ -96,7 +96,7 @@ class PartialTransfer {
 
 
     async #validateSignature(payload) {
-        const incomingPublicKey = Wallet.decodeBech32mSafe(bufferToAddress(payload.address));
+        const incomingPublicKey = PeerWallet.decodeBech32mSafe(bufferToAddress(payload.address));
         const incomingSignature = payload.tro.is;
 
         const incomingTx = payload.tro.tx;
@@ -116,7 +116,7 @@ class PartialTransfer {
             return false;
         }
 
-        const isSignatureValid = Wallet.verify(incomingSignature, regeneratedTx, incomingPublicKey);
+        const isSignatureValid = PeerWallet.verify(incomingSignature, regeneratedTx, incomingPublicKey);
         if (!isSignatureValid) {
             console.error('Invalid signature in transfer payload');
             return false;

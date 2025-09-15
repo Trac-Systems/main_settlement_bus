@@ -1,5 +1,5 @@
 import b4a from 'b4a';
-import Wallet from 'trac-wallet';
+import PeerWallet from 'trac-wallet';
 
 import Check from '../../../../utils/check.js';
 import {OperationType} from "../../../../utils/constants.js";
@@ -71,7 +71,7 @@ class PartialRoleAccess {
             return false;
         }
 
-        const incomingPublicKey = Wallet.decodeBech32mSafe(incomingAddress);
+        const incomingPublicKey = PeerWallet.decodeBech32mSafe(incomingAddress);
 
         if (incomingPublicKey === null) {
             console.error('Invalid requesting public key in role access payload.');
@@ -81,7 +81,7 @@ class PartialRoleAccess {
     }
 
     async #validateSignature(payload) {
-        const incomingPublicKey = Wallet.decodeBech32mSafe(bufferToAddress(payload.address));
+        const incomingPublicKey = PeerWallet.decodeBech32mSafe(bufferToAddress(payload.address));
         const incomingSignature = payload.rao.is;
 
         const incomingTx = payload.rao.tx;
@@ -102,7 +102,7 @@ class PartialRoleAccess {
             return false;
         }
 
-        const isSignatureValid = Wallet.verify(incomingSignature, regeneratedTx, incomingPublicKey);
+        const isSignatureValid = PeerWallet.verify(incomingSignature, regeneratedTx, incomingPublicKey);
         if (!isSignatureValid) {
             console.error('Invalid signature in PreTx payload.');
             return false;

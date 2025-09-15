@@ -1,5 +1,5 @@
 import b4a from 'b4a';
-import Wallet from 'trac-wallet';
+import PeerWallet from 'trac-wallet';
 
 import Check from '../../../../utils/check.js';
 import {safeDecodeApplyOperation} from "../../../../utils/protobuf/operationHelpers.js";
@@ -64,7 +64,7 @@ class PartialTransaction {
             return false;
         }
 
-        const incomingPublicKey = Wallet.decodeBech32mSafe(incomingAddress);
+        const incomingPublicKey = PeerWallet.decodeBech32mSafe(incomingAddress);
 
         if (incomingPublicKey === null) {
             console.error('Invalid requesting public key in transaction payload.');
@@ -74,7 +74,7 @@ class PartialTransaction {
     }
 
     async #validateSignature(payload) {
-        const incomingPublicKey = Wallet.decodeBech32mSafe(bufferToAddress(payload.address));
+        const incomingPublicKey = PeerWallet.decodeBech32mSafe(bufferToAddress(payload.address));
         const incomingSignature = payload.txo.is;
 
         const incomingTx = payload.txo.tx;
@@ -96,7 +96,7 @@ class PartialTransaction {
             return false;
         }
 
-        const isSignatureValid = Wallet.verify(incomingSignature, regeneratedTx, incomingPublicKey);
+        const isSignatureValid = PeerWallet.verify(incomingSignature, regeneratedTx, incomingPublicKey);
         if (!isSignatureValid) {
             console.error('Invalid signature in transaction payload');
             return false;
