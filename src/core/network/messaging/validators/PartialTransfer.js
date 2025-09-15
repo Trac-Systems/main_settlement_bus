@@ -150,21 +150,22 @@ class PartialTransfer {
             const senderAddress = bufferToAddress(payload.address);
             const recipientAddress = bufferToAddress(payload.tro.to);
 
-            const senderEntry = await this.state.getNodeEntry(senderAddress);
-            if (!senderEntry) {
-                console.error('Sender account not found');
-                return false;
-            }
-
             const transferAmount = bufferToBigInt(payload.tro.am);
             if (transferAmount > MAX_AMOUNT) {
                 console.error('Transfer amount exceeds maximum allowed value');
                 return false;
             }
 
-            const senderBalance = bufferToBigInt(senderEntry.balance);
             const isSelfTransfer = senderAddress === recipientAddress;
             const totalDeductedAmount = isSelfTransfer ? FEE_BIGINT : (transferAmount + FEE_BIGINT);
+
+            const senderEntry = await this.state.getNodeEntry(senderAddress);
+            if (!senderEntry) {
+                console.error('Sender account not found');
+                return false;
+            }
+
+            const senderBalance = bufferToBigInt(senderEntry.balance);
             if (!(senderBalance >= totalDeductedAmount)) {
                 console.error('Insufficient balance for transfer' + (isSelfTransfer ? ' fee' : ' + fee'));
                 return false;
