@@ -1,4 +1,4 @@
-import { test } from 'brittle';
+import { test, solo } from 'brittle';
 import b4a from 'b4a';
 import { randomBuffer, TEN_THOUSAND_VALUE, tokenUnits } from '../stateTestUtils.js';
 import { ZERO_BALANCE, decode, encode } from '../../../src/core/state/utils/nodeEntry.js';

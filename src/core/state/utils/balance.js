@@ -35,7 +35,6 @@ export const $TNK = bigint => bigIntToBuffer(
     bigint * 10n ** TOKEN_DECIMALS, 
     BALANCE_BYTE_LENGTH
 )
-
 /**
  * Converts a bigint into a fixed-length buffer reprenseting a positive number
  * scaled according to TOKEN_DECIMALS.
