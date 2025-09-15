@@ -707,7 +707,6 @@ export class MainSettlementBus extends ReadyResource {
 
         await sleep(WHITELIST_SLEEP_INTERVAL);
 
-        // TODO: add validation process that all messages has been processed (compare balances from file with node Entries - implement when apply function will be ready. )
         let allBalancesMigrated = true;
         for (let i = 0; i < addresses.length; i++) {
             const entry = await this.#state.getNodeEntry(addresses[i].address); 
