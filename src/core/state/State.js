@@ -953,10 +953,10 @@ class State extends ReadyResource {
         const opEntry = await this.#getEntryApply(txHashHexString, batch);
         if (null !== opEntry) return;
 
-        await this.#addIndexer(op, node, batch, base, txHashHexString, pretendingAddressString);
+        await this.#addIndexer(op, node, batch, base, txHashHexString, pretendingAddressString, requesterAddressString);
     }
 
-    async #addIndexer(op, node, batch, base, txHashHexString, nodeAddressString) {
+    async #addIndexer(op, node, batch, base, txHashHexString, nodeAddressString, requesterAddressString) {
         const nodeEntry = await this.#getEntryApply(nodeAddressString, batch);
         if (null === nodeEntry) return;
         const decodedNodeEntry = nodeEntryUtils.decode(nodeEntry);
@@ -974,11 +974,33 @@ class State extends ReadyResource {
         const indexerListHasWk = await this.#isWriterKeyInIndexerListApply(decodedNodeEntry.wk, base);
         if (indexerListHasWk) return; // Wk is already in indexer list (Node already indexer)
 
+        // charge fee from the admin
+        const feeAmount = toBalance(transactionUtils.FEE);
+        if (feeAmount === null) return;
+
+        const adminNodeEntry = await this.#getEntryApply(requesterAddressString, batch);
+        if (null === adminNodeEntry) return;
+
+        const adminBalanceBuffer = nodeEntryUtils.getBalance(adminNodeEntry);
+        if (adminBalanceBuffer === null) return;
+
+        const adminBalance = toBalance(adminBalanceBuffer);
+        if (adminBalance === null) return;
+
+        if (!adminBalance.greaterThanOrEquals(feeAmount)) return;
+        const newAdminBalance = adminBalance.sub(feeAmount);
+        if (newAdminBalance === null) return;
+
+        const updatedAdminNodeEntry = nodeEntryUtils.setBalance(adminNodeEntry, newAdminBalance.value);
+        if (updatedAdminNodeEntry === null) return null;
+
         // set indexer role
         await base.removeWriter(decodedNodeEntry.wk);
         await base.addWriter(decodedNodeEntry.wk, { isIndexer: true })
 
+        // change node entry to indexer and update admin balance after fee deduction
         await batch.put(nodeAddressString, updatedNodeEntry);
+        await batch.put(requesterAddressString, updatedAdminNodeEntry);
 
         // store operation hash to avoid replay attack.
         await batch.put(txHashHexString, node.value);
