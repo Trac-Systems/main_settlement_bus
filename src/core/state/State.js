@@ -198,7 +198,7 @@ class State extends ReadyResource {
 
     async getRegisteredBootstrapEntry(bootstrap) {
         if (!bootstrap || !isHexString(bootstrap) || bootstrap.length !== 64) return null;
-        return await this.getSigned(EntryType.DEPLOYMENT + bootstrap);
+        return await this.get(EntryType.DEPLOYMENT + bootstrap);
 
     }
 
@@ -1314,7 +1314,7 @@ class State extends ReadyResource {
 
         const updatedValidatorNodeEntry = nodeEntryUtils.setBalance(validatorNodeEntryBuffer, newValidatorBalance.value);
         if (updatedValidatorNodeEntry === null) return;
-        console.log("EntryType.DEPLOYMENT + bootstrapDeploymentHexString", EntryType.DEPLOYMENT + bootstrapDeploymentHexString)
+        
         await batch.put(hashHexString, node.value);
         await batch.put(EntryType.DEPLOYMENT + bootstrapDeploymentHexString, deploymentEntry);
         await batch.put(requesterAddressString, updatedRequesterNodeEntry);
@@ -1389,16 +1389,80 @@ class State extends ReadyResource {
         if (indexersSequenceState === null) return;
         if (!b4a.equals(op.txo.txv, indexersSequenceState)) return;
 
+        // anti-replay attack
+        const hashHexString = op.txo.tx.toString('hex');
+        const opEntry = await this.#getEntryApply(hashHexString, batch);
+        if (opEntry !== null) return;
+
         // if user is performing a transaction on non-deployed bootstrap, then we need to reject it.
         // if deployment/<bootstrap> is not null then it means that the bootstrap is already deployed, and it should
         // point to payload, which is pointing to the txHash.
-        const deploymentEntry = await this.#getDeploymentEntryApply(op.txo.bs.toString('hex'), batch);
+        const bootstrapHasBeenRegistered = await this.#getDeploymentEntryApply(op.txo.bs.toString('hex'), batch);
+        if (bootstrapHasBeenRegistered === null) return;
+
+        // check the subnetwork creator address
+        const deploymentEntry = deploymentEntryUtils.decode(bootstrapHasBeenRegistered);
         if (deploymentEntry === null) return;
 
-        const hashHexString = op.txo.tx.toString('hex');
-        const opEntry = await this.#getEntryApply(hashHexString, batch);
-        if (null !== opEntry) return;
+        const subnetworkCreatorAddressString = addressUtils.bufferToAddress(deploymentEntry.address);
+        if (subnetworkCreatorAddressString === null) return;
 
+        const feeAmount = toBalance(transactionUtils.FEE);
+        if (feeAmount === null) return;
+        // charge fee from the invoker
+        const requesterNodeEntryBuffer = await this.#getEntryApply(requesterAddressString, batch);
+        if (requesterNodeEntryBuffer === null) return;
+
+        const requesterNodeEntry = nodeEntryUtils.decode(requesterNodeEntryBuffer);
+        if (requesterNodeEntry === null) return;
+
+        const requesterBalance = toBalance(requesterNodeEntry.balance);
+        if (requesterBalance === null) return;
+
+        if (!requesterBalance.greaterThanOrEquals(feeAmount)) return;
+        const newRequesterBalance = requesterBalance.sub(feeAmount);
+        if (newRequesterBalance === null) return;
+
+        const updatedRequesterNodeEntry = nodeEntryUtils.setBalance(requesterNodeEntryBuffer, newRequesterBalance.value);
+        if (updatedRequesterNodeEntry === null) return;
+        // reward validator for processing this transaction. 50% of the fee goes to the validator
+        const validatorNodeEntryBuffer = await this.#getEntryApply(validatorAddressString, batch);
+        if (validatorNodeEntryBuffer === null) return;
+
+        const validatorNodeEntry = nodeEntryUtils.decode(validatorNodeEntryBuffer);
+        if (validatorNodeEntry === null) return;
+
+        const validatorBalance = toBalance(validatorNodeEntry.balance);
+        if (validatorBalance === null) return;
+
+        const newValidatorBalance = validatorBalance.add(feeAmount.percentage(percent(50)));
+        if (newValidatorBalance === null) return;
+
+        const updatedValidatorNodeEntry = nodeEntryUtils.setBalance(validatorNodeEntryBuffer, newValidatorBalance.value);
+        if (updatedValidatorNodeEntry === null) return;
+
+        // reward subnetwork creator for allowing this transaction to be executed on their bootstrap.
+        // 25% of the fee goes to the subnetwork creator.
+
+        const subnetworkCreatorNodeEntryBuffer = await this.#getEntryApply(subnetworkCreatorAddressString, batch);
+        if (subnetworkCreatorNodeEntryBuffer === null) return;
+
+        const subnetworkCreatorNodeEntry = nodeEntryUtils.decode(subnetworkCreatorNodeEntryBuffer);
+        if (subnetworkCreatorNodeEntry === null) return;
+
+        const subnetworkCreatorBalance = toBalance(subnetworkCreatorNodeEntry.balance);
+        if (subnetworkCreatorBalance === null) return;
+
+        const newSubnetworkCreatorBalance = subnetworkCreatorBalance.add(feeAmount.percentage(percent(25)));
+        if (newSubnetworkCreatorBalance === null) return;
+
+        const updatedSubnetworkCreatorNodeEntry = nodeEntryUtils.setBalance(subnetworkCreatorNodeEntryBuffer, newSubnetworkCreatorBalance.value);
+        if (updatedSubnetworkCreatorNodeEntry === null) return;
+
+        // 25% of the fee is burned.
+        await batch.put(requesterAddressString, updatedRequesterNodeEntry);
+        await batch.put(subnetworkCreatorAddressString, updatedSubnetworkCreatorNodeEntry);
+        await batch.put(validatorAddressString, updatedValidatorNodeEntry);
         await batch.put(hashHexString, node.value);
         if (this.#enable_txlogs === true) {
             console.log(`TX: ${hashHexString} appended. Signed length: `, this.#base.view.core.signedLength);

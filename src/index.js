@@ -859,6 +859,8 @@ export class MainSettlementBus extends ReadyResource {
                     this.#state.writingKey,
                 );
                 break;
+            
+            // DELETE BEFORE DEPLOYMENT /TEST
             case '/test':
                 const contentHash = randomBytes(32).toString('hex');
                 const randomExternalBootstrap = "5adb970a73e20e8e2e896cd0c30cf025a0b32ec6fe026b98c6714115239607ac"

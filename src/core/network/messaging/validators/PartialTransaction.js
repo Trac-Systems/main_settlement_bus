@@ -7,7 +7,7 @@ import { bufferToAddress } from "../../../state/utils/address.js";
 import { createMessage } from "../../../../utils/buffer.js";
 import { OperationType } from "../../../../utils/constants.js";
 import { blake3Hash } from "../../../../utils/crypto.js";
-
+import deploymentEntryUtils from "../../../state/utils/deploymentEntry.js";
 //TODO: Implement BASE VALIDATOR CLASS AND MOVE COMMON METHODS THERE
 
 class PartialTransaction {
@@ -137,9 +137,10 @@ class PartialTransaction {
             console.error("External bootstrap is not registered as deployment/<bootstrap>:", payload.txo.bs.toString('hex'));
             return false;
         }
-
-        const getBootstrapTransactionTxPayload = await this.state.get(externalBootstrapResult.toString('hex'));
-
+        const decodedPayload = deploymentEntryUtils.decode(externalBootstrapResult);
+        const txHash =  decodedPayload.txHash
+        const getBootstrapTransactionTxPayload = await this.state.get(txHash.toString('hex'));
+        console.log('getBootstrapTransactionTxPayload', getBootstrapTransactionTxPayload);
         if (null === getBootstrapTransactionTxPayload) {
             console.error('External bootstrap is not registered as usual tx', externalBootstrapResult.toString('hex'), ':', payload);
             return false;
