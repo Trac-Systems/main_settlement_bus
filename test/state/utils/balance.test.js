@@ -225,13 +225,6 @@ test('Balance#burn 0%', t => {
     t.ok(b4a.equals(burned.value, balance.value), 'burn 0% leaves balance unchanged');
 });
 
-test('Balance#burn 100%', t => {
-    const balance = toBalance($TNK(1000n));
-    const burned = burn(balance, 100n);
-    const expected = b4a.alloc(BALANCE_BYTE_LENGTH); // zero buffer
-    t.ok(b4a.equals(burned.value, expected), 'burn 100% results in zero balance');
-});
-
 test('Balance#burn 18% with rounding up', t => {
     // Starting balance in token units (scaled by TOKEN_DECIMALS)
     const startingBalance = $TNK(999n);
@@ -251,10 +244,6 @@ test('Balance#burn 18% with rounding up', t => {
         : addBuffers(quotient, b4a.from([...Array(BALANCE_BYTE_LENGTH - 1).fill(0), 1])); 
 
     const expected = toBalance(subBuffers(balance.value, roundedQuotient));
-
-    console.log('starting balance:', balance.asBigInt());
-    console.log('burned balance:', burned.asBigInt());
-    console.log('expected balance:', expected.asBigInt());
 
     t.ok(b4a.equals(burned.value, expected.value), 'burn 18% with remainder rounds up');
 });
@@ -306,8 +295,7 @@ test('Balance#burn 100% burns all', t => {
         ? addBuffers(quotient, b4a.from([...Array(BALANCE_BYTE_LENGTH - 1).fill(0), 1]))
         : quotient;
 
-    const expected = toBalance(subBuffers(balance.value, roundedQuotient));
-    t.ok(b4a.equals(burned.value, expected.value), 'burn 100% results in zero balance');
+    t.ok(b4a.equals(burned.value, ZERO_BALANCE), 'burn 100% results in zero balance');
 });
 
 test('Balance#burn edge rounding up', t => {
