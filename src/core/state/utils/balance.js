@@ -1,5 +1,5 @@
 import b4a from 'b4a';
-import { setBalance } from './nodeEntry.js';
+import { setBalance, ZERO_BALANCE } from './nodeEntry.js';
 import { isBufferValid, bigIntToBuffer, NULL_BUFFER } from '../../../utils/buffer.js';
 import { BALANCE_BYTE_LENGTH, DEFAULT_PERCENTAGE, TOKEN_DECIMALS } from '../../../utils/constants.js';
 import { bufferToBigInt } from '../../../utils/amountSerialization.js';
@@ -16,6 +16,23 @@ export const $TNK = bigint => bigIntToBuffer(
     BALANCE_BYTE_LENGTH
 )
 
+export const toTerm = bigint => bigIntToBuffer(
+    bigint, 
+    BALANCE_BYTE_LENGTH
+)
+
+// Thank you gpt
+const shiftLeft1 = buf => {
+    const res = b4a.alloc(BALANCE_BYTE_LENGTH)
+    let carry = 0
+    for (let i = BALANCE_BYTE_LENGTH - 1; i >= 0; i--) {
+        const val = (buf[i] << 1) | carry
+        res[i] = val & 0xff
+        carry = val >> 8
+    }
+    return res
+}
+
 /**
  * Adds two buffers of equal length as unsigned integers.
  * Returns a new buffer containing the result.
@@ -24,7 +41,7 @@ export const $TNK = bigint => bigIntToBuffer(
  * @param {Buffer} b 
  * @returns {Buffer} - Resulting buffer
  */
-const addBuffers = (a, b) => {
+export const addBuffers = (a, b) => {
     if (a.length !== b.length) return NULL_BUFFER
     const result = b4a.alloc(a.length);
     let carry = 0;
@@ -69,12 +86,58 @@ export const subBuffers = (a, b) => {
     return result;
 }
 
-export const divideBuffers = (a, b) => {
-    return NULL_BUFFER
+export const divBuffers = (dividend, divisor) => {
+    if (dividend.length !== BALANCE_BYTE_LENGTH || divisor.length !== BALANCE_BYTE_LENGTH) {
+        return NULL_BUFFER
+    }
+    if (divisor.equals(ZERO_BALANCE)) {
+        return NULL_BUFFER
+    }
+
+    let quotient = b4a.alloc(BALANCE_BYTE_LENGTH)
+    let remainder = b4a.alloc(BALANCE_BYTE_LENGTH)
+
+    for (let bit = 0; bit < BALANCE_BYTE_LENGTH * 8; bit++) {
+        remainder = shiftLeft1(remainder)
+        const byteIndex = Math.floor(bit / 8)
+        const bitIndex = 7 - (bit % 8)
+        const bitVal = (dividend[byteIndex] >> bitIndex) & 1
+        remainder[BALANCE_BYTE_LENGTH - 1] |= bitVal
+        if (b4a.compare(remainder, divisor) >= 0) {
+            remainder = subBuffers(remainder, divisor)
+            quotient[byteIndex] |= (1 << bitIndex)
+        }
+    }
+
+    return {quotient, remainder}
 }
 
-export const multiplyBuffers = (a, b) => {
-    return NULL_BUFFER
+export const mulBuffers = (a, b) => {
+    if (a.length !== BALANCE_BYTE_LENGTH || b.length !== BALANCE_BYTE_LENGTH) {
+      return NULL_BUFFER
+    }
+
+    const alen = a.length;
+    const blen = b.length;
+    const result = b4a.alloc(BALANCE_BYTE_LENGTH * 2); // up to 32 bytes
+
+    for (let i = alen - 1; i >= 0; i--) {
+        let carry = 0;
+        for (let j = blen - 1; j >= 0; j--) {
+        const ai = a[i];
+        const bj = b[j];
+
+        const pos = i + j + 1;
+        const mul = ai * bj + result[pos] + carry;
+
+        result[pos] = mul & 0xff;   // low byte
+        carry = mul >>> 8;          // high byte
+        }
+        result[i] += carry;
+    }
+
+    // Truncate
+    return result.slice(BALANCE_BYTE_LENGTH * -1)
 }
 
 /**
@@ -96,6 +159,30 @@ export function toBalance(balance) {
         return null
     }
 }
+
+/**
+ * Burns a percentage of a balance, rounding up any remainder.
+ * @param {Balance} balance - The original balance
+ * @param {bigint} percentage - Percentage to burn (e.g., 18n for 18%)
+ * @returns {Balance} - New Balance instance after burn
+ */
+export function burn(balance, percentage) {
+    const { quotient, remainder } = divBuffers(
+        mulBuffers(balance.value, toTerm(percentage)),
+        toTerm(100n) // DEFAULT_PERCENTAGE
+    );
+
+    const one = b4a.alloc(BALANCE_BYTE_LENGTH)
+    one[BALANCE_BYTE_LENGTH - 1] = 1
+
+    // If there’s any remainder, round up
+    const roundedQuotient = b4a.equals(remainder, b4a.alloc(BALANCE_BYTE_LENGTH))
+        ? quotient
+        : addBuffers(quotient, one)
+
+    return toBalance(subBuffers(balance.value, roundedQuotient));
+}
+
 
 /**
  * Balance class encapsulates a token balance stored as a fixed-length buffer.
@@ -180,18 +267,5 @@ class Balance {
     /** Returns the balance as a BigInt */
     asBigInt() {
         return bufferToBigInt(this.#value)
-    }
-
-    /**
-     * Burns/subtracts a percentage of current balance from itself.
-     * @param {BigInt} p - Percentage described with a BigInt
-     * @returns {Balance} - New Balance instance with updated balance
-     */
-    burn(p) {
-        const pAmt = divideBuffers(
-            multiplyBuffers(this.#value, bigIntToBuffer(p, BALANCE_BYTE_LENGTH)), 
-            bigIntToBuffer(DEFAULT_PERCENTAGE, BALANCE_BYTE_LENGTH))
-
-        return toBalance(subBuffers(this.#value, pAmt))
     }
 }

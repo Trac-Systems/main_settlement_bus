@@ -2,8 +2,8 @@ import { test } from 'brittle';
 import b4a from 'b4a';
 import { randomBuffer, TEN_THOUSAND_VALUE, tokenUnits } from '../stateTestUtils.js';
 import { ZERO_BALANCE, decode, encode } from '../../../src/core/state/utils/nodeEntry.js';
-import { WRITER_BYTE_LENGTH, ADMIN_INITIAL_BALANCE, BALANCE_BYTE_LENGTH } from '../../../src/utils/constants.js';
-import { $TNK, toBalance } from '../../../src/core/state/utils/balance.js';
+import { WRITER_BYTE_LENGTH, ADMIN_INITIAL_BALANCE, BALANCE_BYTE_LENGTH, TOKEN_DECIMALS, DEFAULT_PERCENTAGE } from '../../../src/utils/constants.js';
+import { $TNK, addBuffers, burn, divBuffers, mulBuffers, subBuffers, toBalance, toTerm } from '../../../src/core/state/utils/balance.js';
 import { NULL_BUFFER } from '../../../src/utils/buffer.js';
 
 test('Balance#asHex explicit', t => {
@@ -218,3 +218,129 @@ test('Balance#lowerThanOrEquals', t => {
     t.ok(b1000.lowerThanOrEquals(b1000Dup), '1000 <= 1000')
     t.ok(!b1001.lowerThanOrEquals(b1000), '1001 !<= 1000')
 })
+
+test('Balance#burn 0%', t => {
+    const balance = toBalance($TNK(1000n));
+    const burned = burn(balance, 0n);
+    t.ok(b4a.equals(burned.value, balance.value), 'burn 0% leaves balance unchanged');
+});
+
+test('Balance#burn 100%', t => {
+    const balance = toBalance($TNK(1000n));
+    const burned = burn(balance, 100n);
+    const expected = b4a.alloc(BALANCE_BYTE_LENGTH); // zero buffer
+    t.ok(b4a.equals(burned.value, expected), 'burn 100% results in zero balance');
+});
+
+test('Balance#burn 18% with rounding up', t => {
+    // Starting balance in token units (scaled by TOKEN_DECIMALS)
+    const startingBalance = $TNK(999n);
+    const balance = toBalance(startingBalance);
+
+    // Perform burn 18%
+    const burned = burn(balance, 18n); // buffer-based burn, rounding up
+
+    // Compute expected burn buffer using the same buffer logic
+    const { quotient, remainder } = divBuffers(
+        mulBuffers(balance.value, toTerm(18n)),
+        toTerm(100n) 
+    );
+
+    const roundedQuotient = b4a.equals(remainder, b4a.alloc(BALANCE_BYTE_LENGTH))
+        ? quotient
+        : addBuffers(quotient, b4a.from([...Array(BALANCE_BYTE_LENGTH - 1).fill(0), 1])); 
+
+    const expected = toBalance(subBuffers(balance.value, roundedQuotient));
+
+    console.log('starting balance:', balance.asBigInt());
+    console.log('burned balance:', burned.asBigInt());
+    console.log('expected balance:', expected.asBigInt());
+
+    t.ok(b4a.equals(burned.value, expected.value), 'burn 18% with remainder rounds up');
+});
+
+test('Balance#burn 1% with rounding up', t => {
+    const balance = toBalance($TNK(101n));
+    const burned = burn(balance, 1n);
+
+    const { quotient, remainder } = divBuffers(
+        mulBuffers(balance.value, toTerm(1n)),
+        toTerm(100n)
+    );
+
+    const roundedQuotient = b4a.compare(remainder, b4a.alloc(BALANCE_BYTE_LENGTH)) > 0
+        ? add(quotient, b4a.from([...Array(BALANCE_BYTE_LENGTH - 1).fill(0), 1]))
+        : quotient;
+
+    const expected = toBalance(subBuffers(balance.value, roundedQuotient));
+    t.ok(b4a.equals(burned.value, expected.value), 'burn 1% rounds up correctly');
+});
+
+test('Balance#burn 50% with rounding up', t => {
+    const balance = toBalance($TNK(1000n));
+    const burned = burn(balance, 50n);
+
+    const { quotient, remainder } = divBuffers(
+        mulBuffers(balance.value, toTerm(50n)),
+        toTerm(100n)
+    );
+
+    const roundedQuotient = b4a.compare(remainder, b4a.alloc(BALANCE_BYTE_LENGTH)) > 0
+        ? addBuffers(quotient, b4a.from([...Array(BALANCE_BYTE_LENGTH - 1).fill(0), 1]))
+        : quotient;
+
+    const expected = toBalance(subBuffers(balance.value, roundedQuotient));
+    t.ok(b4a.equals(burned.value, expected.value), 'burn 50% rounds up correctly');
+});
+
+test('Balance#burn 100% burns all', t => {
+    const balance = toBalance($TNK(1000n));
+    const burned = burn(balance, 100n);
+
+    const { quotient, remainder } = divBuffers(
+        mulBuffers(balance.value, toTerm(100n)),
+        toTerm(100n)
+    );
+
+    const roundedQuotient = b4a.compare(remainder, b4a.alloc(BALANCE_BYTE_LENGTH)) > 0
+        ? addBuffers(quotient, b4a.from([...Array(BALANCE_BYTE_LENGTH - 1).fill(0), 1]))
+        : quotient;
+
+    const expected = toBalance(subBuffers(balance.value, roundedQuotient));
+    t.ok(b4a.equals(burned.value, expected.value), 'burn 100% results in zero balance');
+});
+
+test('Balance#burn edge rounding up', t => {
+    const balance = toBalance($TNK(999n)); // small number to force rounding
+    const burned = burn(balance, 18n);
+
+    const { quotient, remainder } = divBuffers(
+        mulBuffers(balance.value, toTerm(18n)),
+        toTerm(100n)
+    );
+
+    const roundedQuotient = b4a.compare(remainder, b4a.alloc(BALANCE_BYTE_LENGTH)) > 0
+        ? addBuffers(quotient, b4a.from([...Array(BALANCE_BYTE_LENGTH - 1).fill(0), 1]))
+        : quotient;
+
+    const expected = toBalance(subBuffers(balance.value, roundedQuotient));
+    t.ok(b4a.equals(burned.value, expected.value), 'burn 18% with remainder rounds up');
+});
+
+test('Balance#burn max buffer edge case', t => {
+    const max = b4a.alloc(BALANCE_BYTE_LENGTH, 0xFF);
+    const balance = toBalance(max);
+    const burned = burn(balance, 1n); // 1% of max
+
+    const { quotient, remainder } = divBuffers(
+        mulBuffers(balance.value, toTerm(1n)),
+        toTerm(100n)
+    );
+
+    const roundedQuotient = b4a.compare(remainder, b4a.alloc(BALANCE_BYTE_LENGTH)) > 0
+        ? addBuffers(quotient, b4a.from([...Array(BALANCE_BYTE_LENGTH - 1).fill(0), 1]))
+        : quotient;
+
+    const expected = toBalance(subBuffers(balance.value, roundedQuotient));
+    t.ok(b4a.equals(burned.value, expected.value), 'burn 1% from max buffer rounds correctly');
+});
