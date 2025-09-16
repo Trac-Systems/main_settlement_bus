@@ -17,7 +17,13 @@ const opts = {
     enable_txlogs: true,
 };
 
-const msb = new MainSettlementBus(opts);
+const rpc_opts = {
+    ...opts,
+    enable_wallet: false,
+    enable_txlogs: false,
+}
+
+const msb = new MainSettlementBus(args.includes('--rpc') ? rpc_opts : opts);
 
 msb.ready().then(async () => {
     const runRpc = args.includes('--rpc');

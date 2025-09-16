@@ -1,12 +1,67 @@
 // rpc_server.mjs
 import https from 'https'
 import fs from 'bare-fs'
+import b4a from 'b4a';
 
 // SSL Certifications
 const sslOptions = {
     key: fs.readFileSync('./key.pem'),
     cert: fs.readFileSync('./cert.pem'),
 }
+
+function decodePayload(base64) {
+    let decodedPayloadString;
+    try {
+        decodedPayloadString = b4a.from(base64, 'base64').toString('utf-8');
+    } catch (err) {
+        throw new Error('Failed to decode base64 payload.');
+    }
+
+    
+    try {
+        return JSON.parse(decodedPayloadString);
+    } catch (err) {
+        throw new Error('Decoded payload is not valid JSON.');
+    }
+}
+
+function isBase64(str) {
+    const base64Regex = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
+    return base64Regex.test(str);
+}
+
+function validatePayloadStructure(payload) {
+    // VALIDATE PAYLOAD
+    if (
+        typeof payload !== 'object' || payload === null || typeof payload.type !== 'number' || typeof payload.address !== 'string' || typeof payload.tro !== 'object'
+    ) {
+        throw new Error('Invalid payload structure.');
+    }
+}
+
+function sanitizePayload(payload) {
+  if (payload.address && typeof payload.address === 'string') {
+    payload.address = payload.address.trim();
+  }
+
+  if (payload.tro && typeof payload.tro === 'object') {
+    for (const [key, value] of Object.entries(payload.tro)) {
+      if (typeof value === 'string') {
+        let sanitized = value.trim();
+
+        // normalize hex-like strings
+        if (/^[0-9A-F]+$/i.test(sanitized)) {
+          sanitized = sanitized.toLowerCase();
+        }
+
+        payload.tro[key] = sanitized;
+      }
+    }
+  }
+
+  return payload;
+}
+
 
 // Called by msb.mjs file
 export function startRpcServer(msbInstance, port) {
@@ -85,20 +140,26 @@ export function startRpcServer(msbInstance, port) {
                         return;
                     }
 
-                    // Decoded the Base64 string to a buffer and then to a JSON string.
-                    // The decoded object will be passed to handleCommand.
-                    const decodedPayloadBuffer = Buffer.from(payload, 'base64');
-                    const decodedPayload = JSON.parse(decodedPayloadBuffer.toString('utf-8'));
+                    // VALIDATE IS BASE64
+                    if (!isBase64(payload)) {
+                        res.writeHead(400, { 'Content-Type': 'application/json' });
+                        res.end(JSON.stringify({ error: 'Payload must be a valid base64 string.' }));
+                        return;
+                    }
+
+                    const decodedPayload = decodePayload(payload);
+                    validatePayloadStructure(decodedPayload);
+                    const sanitizedPayload = sanitizePayload(decodedPayload);
                     
-                    // Pass the decoded payload to handleCommand and await the result.
-                    const result = await msbInstance.handleCommand('/broadcast_transaction', null, decodedPayload);
+                    // Pass the decoded object to handleCommand.
+                    const result = await msbInstance.handleCommand('/broadcast_transaction', null, sanitizedPayload);
 
                     res.writeHead(200, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({ result }));
                 } catch (error) {
                     console.error('Error on broadcasting transaction:', error);
                     res.writeHead(500, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ error: 'An error occurred processing the request.' }));
+                    res.end(JSON.stringify({ error: error.message }));
                 }
             });
         } else {

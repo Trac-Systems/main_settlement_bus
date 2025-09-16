@@ -926,27 +926,23 @@ export class MainSettlementBus extends ReadyResource {
                     console.log('Confirmed_length:', confirmed_length);
                     return confirmed_length
                 }  else if (input.startsWith("/broadcast_transaction")) {
-                    // The payload from the RPC server is now passed as an argument.
-                    // The 'magic' goes here to validate and broadcast the transaction.
                     if (payload) {
                         const normalizedPayload = normalizeTransferOperation(payload);
-                        console.log("Original Payload:", payload);
-                        console.log("Normalized Payload:", normalizedPayload);
                         const isValid = await this.#partialTransferValidator.validate(normalizedPayload);
-                        console.log("Is payload valid?", isValid);
-                        if (!isValid) {
-                            throw new Error("Invalid transaction payload.");
-                        }
+                        if (!isValid) throw new Error("Invalid transaction payload.");
+
+                        const signedLength = this.#state.getSignedLength();
+                        const unsignedLength = this.#state.getUnsignedLength();
+                            
                         await this.broadcastPartialTransaction(payload);
-                        const message = "Transaction broadcasted successfully."
-                        console.log(message);
-                        return message;
+                        const result = { message: "Transaction broadcasted successfully.", signedLength, unsignedLength };
+                        console.log(result);
+                        return result;
                     } else {
                         // Handle case where payload is missing if called internally without one.
                         throw new Error("Transaction payload is required for broadcast_transaction command.");
                     }
                 }
-
                 
         }
         if (rl) rl.prompt();
