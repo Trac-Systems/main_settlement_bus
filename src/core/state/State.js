@@ -1122,6 +1122,9 @@ class State extends ReadyResource {
         const adminPublicKey = PeerWallet.decodeBech32mSafe(decodedAdminEntry.address);
         if (adminPublicKey === null || !b4a.equals(requesterPublicKey, adminPublicKey) || !this.#isAdminApply(decodedAdminEntry, node)) return;
 
+        // Admin consistency check
+        if (!b4a.equals(adminPublicKey, requesterPublicKey)) return;
+
         // recreate requester message
         const message = createMessage(
             op.address,
