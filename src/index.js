@@ -705,6 +705,7 @@ export class MainSettlementBus extends ReadyResource {
             console.log(`Total: ${bigIntToDecimalString(totalDeductedAmount)}`);
         }
         console.log(`Expected Balance After Transfer: ${bigIntToDecimalString(expectedNewBalance)}`);
+        
     }
 
     async #handleBalanceMigrationOperation() {

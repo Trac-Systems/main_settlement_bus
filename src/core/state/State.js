@@ -21,6 +21,8 @@ import lengthEntryUtils from './utils/lengthEntry.js';
 import transactionUtils from './utils/transaction.js';
 import {blake3Hash} from '../../utils/crypto.js';
 import { toBalance } from './utils/balance.js';
+import {safeWriteUInt32BE} from '../../utils/buffer.js'
+
 class State extends ReadyResource {
     //TODO: AFTER createMessage(..args) check if this function did not return NULL
     #base;
