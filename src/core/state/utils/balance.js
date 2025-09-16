@@ -1,7 +1,7 @@
 import b4a from 'b4a';
 import { setBalance } from './nodeEntry.js';
 import { isBufferValid, bigIntToBuffer, NULL_BUFFER } from '../../../utils/buffer.js';
-import { BALANCE_BYTE_LENGTH, TOKEN_DECIMALS } from '../../../utils/constants.js';
+import { BALANCE_BYTE_LENGTH, DEFAULT_PERCENTAGE, TOKEN_DECIMALS } from '../../../utils/constants.js';
 import { bufferToBigInt } from '../../../utils/amountSerialization.js';
 
 /**
@@ -67,6 +67,14 @@ export const subBuffers = (a, b) => {
     if (borrow) return NULL_BUFFER;
 
     return result;
+}
+
+export const divideBuffers = (a, b) => {
+    return NULL_BUFFER
+}
+
+export const multiplyBuffers = (a, b) => {
+    return NULL_BUFFER
 }
 
 /**
@@ -172,5 +180,18 @@ class Balance {
     /** Returns the balance as a BigInt */
     asBigInt() {
         return bufferToBigInt(this.#value)
+    }
+
+    /**
+     * Burns/subtracts a percentage of current balance from itself.
+     * @param {BigInt} p - Percentage described with a BigInt
+     * @returns {Balance} - New Balance instance with updated balance
+     */
+    burn(p) {
+        const pAmt = divideBuffers(
+            multiplyBuffers(this.#value, bigIntToBuffer(p, BALANCE_BYTE_LENGTH)), 
+            bigIntToBuffer(DEFAULT_PERCENTAGE, BALANCE_BYTE_LENGTH))
+
+        return toBalance(subBuffers(this.#value, pAmt))
     }
 }
