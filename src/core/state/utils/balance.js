@@ -35,6 +35,7 @@ export const $TNK = bigint => bigIntToBuffer(
     bigint * 10n ** TOKEN_DECIMALS, 
     BALANCE_BYTE_LENGTH
 )
+
 /**
  * Converts a bigint into a fixed-length buffer reprenseting a positive number
  * scaled according to TOKEN_DECIMALS.
@@ -219,6 +220,15 @@ class Balance {
         const dividend = mulBuffers(this.#value, percent)
         const result = divBuffers(dividend, PERCENTAGE_TERM)
         return toBalance(result)
+    }
+
+    /**
+     * Reduce to its percentage
+     * @param {Buffer} percent - the buffer percentage (with two extra decimals). Expected to be used along with percent function.
+     * @returns {Balance} - New Balance instance
+     */
+    percentage(percent) {
+        return toBalance(NULL_BYTES)
     }
 
     /**
