@@ -19,10 +19,10 @@ import nodeEntryUtils, { setWritingKey, ZERO_BALANCE, NODE_ENTRY_SIZE } from './
 import nodeRoleUtils from './utils/roles.js';
 import lengthEntryUtils from './utils/lengthEntry.js';
 import transactionUtils from './utils/transaction.js';
-import {blake3Hash} from '../../utils/crypto.js';
-import { BALANCE_FEE, toBalance, PERCENT_75 } from './utils/balance.js';
+import { blake3Hash } from '../../utils/crypto.js';
+import { BALANCE_FEE, toBalance, PERCENT_75, percent } from './utils/balance.js';
 import { safeWriteUInt32BE } from '../../utils/buffer.js';
-
+import deploymentEntryUtils from './utils/deploymentEntry.js';
 class State extends ReadyResource {
     //TODO: AFTER createMessage(..args) check if this function did not return NULL
     #base;
@@ -217,7 +217,7 @@ class State extends ReadyResource {
     async isInitalizationDisabled() {
         // Retrieve the flag to verify if initialization is allowed
         let initialization = await this.getSigned(EntryType.INITIALIZATION);
-        
+
         if (null === initialization) {
             return false
         } else {
@@ -619,7 +619,7 @@ class State extends ReadyResource {
         const nodeEntry = await this.#getEntryApply(nodeAddressString, batch);
         if (nodeEntryUtils.isWhitelisted(nodeEntry)) return; // Node is already whitelisted
 
-        if (await this.#isApplyInitalizationDisabled(batch)) {            
+        if (await this.#isApplyInitalizationDisabled(batch)) {
             // Fee
             const adminNodeEntry = await this.#getEntryApply(adminAddressString, batch);
             if (null === adminNodeEntry) return;
@@ -1274,11 +1274,52 @@ class State extends ReadyResource {
         if (null !== opEntry) return; // Operation has already been applied.
 
         // If deployment already exists, do not process it again.
-        const deploymentEntry = await this.#getDeploymentEntryApply(bootstrapDeploymentHexString, batch);
-        if (deploymentEntry !== null) return;
+        const alreadyRegisteredBootstrap = await this.#getDeploymentEntryApply(bootstrapDeploymentHexString, batch);
+        if (alreadyRegisteredBootstrap !== null) return;
 
+        const deploymentEntry = deploymentEntryUtils.encode(op.bdo.tx, requesterAddressBuffer);
+        if (deploymentEntry.length === 0) return;
+
+        const feeAmount = toBalance(transactionUtils.FEE);
+        if (feeAmount === null) return;
+        // charke fee from the invoker
+        const requesterNodeEntryBuffer = await this.#getEntryApply(requesterAddressString, batch);
+        if (requesterNodeEntryBuffer === null) return;
+
+        const requesterNodeEntry = nodeEntryUtils.decode(requesterNodeEntryBuffer);
+        if (requesterNodeEntry === null) return;
+
+        const requesterBalance = toBalance(requesterNodeEntry.balance);
+        if (requesterBalance === null) return;
+
+        if (!requesterBalance.greaterThanOrEquals(feeAmount)) return;
+        const newRequesterBalance = requesterBalance.sub(feeAmount);
+        if (newRequesterBalance === null) return;
+
+        const updatedRequesterNodeEntry = nodeEntryUtils.setBalance(requesterNodeEntryBuffer, newRequesterBalance.value);
+        if (updatedRequesterNodeEntry === null) return;
+
+        // reward validator for processing this transaction.
+        const validatorNodeEntryBuffer = await this.#getEntryApply(validatorAddressString, batch);
+        if (validatorNodeEntryBuffer === null) return;
+
+        const validatorNodeEntry = nodeEntryUtils.decode(validatorNodeEntryBuffer);
+        if (validatorNodeEntry === null) return;
+
+        const validatorBalance = toBalance(validatorNodeEntry.balance);
+        if (validatorBalance === null) return;
+
+        const newValidatorBalance = validatorBalance.add(feeAmount.percentage(percent(75)));
+        if (newValidatorBalance === null) return;
+
+        const updatedValidatorNodeEntry = nodeEntryUtils.setBalance(validatorNodeEntryBuffer, newValidatorBalance.value);
+        if (updatedValidatorNodeEntry === null) return;
+        console.log("EntryType.DEPLOYMENT + bootstrapDeploymentHexString", EntryType.DEPLOYMENT + bootstrapDeploymentHexString)
         await batch.put(hashHexString, node.value);
-        await batch.put(EntryType.DEPLOYMENT + bootstrapDeploymentHexString, op.bdo.tx);
+        await batch.put(EntryType.DEPLOYMENT + bootstrapDeploymentHexString, deploymentEntry);
+        await batch.put(requesterAddressString, updatedRequesterNodeEntry);
+        await batch.put(validatorAddressString, updatedValidatorNodeEntry);
+
         if (this.#enable_txlogs === true) {
             console.log(`TX: ${hashHexString} and deployment/${bootstrapDeploymentHexString} have been appended. Signed length: `, this.#base.view.core.signedLength);
         }
