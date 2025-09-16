@@ -8,7 +8,7 @@ import readline from "readline";
 import tty from "tty";
 
 import { sleep, getFormattedIndexersWithAddresses, isHexString, convertAdminCoreOperationPayloadToHex } from "./utils/helpers.js";
-import { verifyDag, printHelp, printWalletInfo, get_tx_info } from "./utils/cli.js";
+import { verifyDag, printHelp, printWalletInfo, get_tx_info, printBalance } from "./utils/cli.js";
 import CompleteStateMessageOperations from "./messages/completeStateMessages/CompleteStateMessageOperations.js";
 import { safeDecodeApplyOperation } from "./utils/protobuf/operationHelpers.js";
 import { bufferToAddress, isAddressValid } from "./core/state/utils/address.js";
@@ -28,6 +28,8 @@ import { decimalStringToBigInt, bigIntTo16ByteBuffer, bufferToBigInt, bigIntToDe
 import { toBalance } from "./core/state/utils/balance.js";
 import { normalizeTransferOperation } from "./utils/normalizers.js"
 import PartialTransfer from "./core/network/messaging/validators/PartialTransfer.js";
+import { ZERO_WK } from "./utils/buffer.js";
+
 
 //TODO create a MODULE which will separate logic responsible for role managment
 
@@ -138,7 +140,7 @@ export class MainSettlementBus extends ReadyResource {
                 this.key_pair_path,
                 this.#readline_instance
             );
-            printWalletInfo(this.#wallet.address, this.#state.writingKey);
+            printWalletInfo(this.#wallet.address, this.#state.writingKey, this.#state, this.#enable_wallet);
         }
 
         this.#partialTransferValidator = new PartialTransfer(this.state, null, null);
@@ -161,7 +163,8 @@ export class MainSettlementBus extends ReadyResource {
         console.log(`isWriter: ${this.#state.isWritable()}`);
         console.log("MSB Unsigned Length:", this.#state.getUnsignedLength());
         console.log("MSB Signed Length:", this.#state.getSignedLength());
-        console.log("");
+
+        await printBalance(this.#wallet.address, this.#state, this.#enable_wallet);
     }
 
     async _close() {
@@ -637,12 +640,48 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async #handleTransferOperation(address, amount) {
-        // add more checks
+        if (this.#enable_wallet === false) {
+            throw new Error(
+                "Can not perform transfer - wallet is not enabled."
+            );
+        }
+
+        if (!this.#wallet) {
+            throw new Error(
+                "Can not perform transfer - wallet is not initialized."
+            );
+        }
+
+        if (!isAddressValid(address)) {
+            throw new Error("Invalid recipient address");
+        }
+
         const amountBigInt = decimalStringToBigInt(amount);
+
+        const MAX_AMOUNT = BigInt('0xffffffffffffffffffffffffffffffff');
+        if (amountBigInt > MAX_AMOUNT) {
+            throw new Error("Transfer amount exceeds maximum allowed value");
+        }
+
         const amountBuffer = bigIntTo16ByteBuffer(amountBigInt);
 
         if (bufferToBigInt(amountBuffer) !== amountBigInt) {
             throw new Error(`conversion error for amount: ${amount}`);
+        }
+
+        const senderEntry = await this.#state.getNodeEntry(this.#wallet.address);
+        if (!senderEntry) {
+            throw new Error("Sender account not found");
+        }
+
+        const fee = await this.#state.getFee();
+        const feeBigInt = bufferToBigInt(fee);
+        const senderBalance = bufferToBigInt(senderEntry.balance);
+        const isSelfTransfer = address === this.#wallet.address;
+        const totalDeductedAmount = isSelfTransfer ? feeBigInt : amountBigInt + feeBigInt;
+
+        if (!(senderBalance >= totalDeductedAmount)) {
+            throw new Error("Insufficient balance for transfer + fee");
         }
 
         const txValidity = await this.#state.getIndexerSequenceState();
@@ -652,8 +691,20 @@ export class MainSettlementBus extends ReadyResource {
             amountBuffer.toString('hex'),
             txValidity.toString('hex'),
         )
-        // TODO: disabled until onchain part will be implemented
-        // await this.broadcastPartialTransaction(payload);
+        await this.broadcastPartialTransaction(payload);
+
+        const expectedNewBalance = senderBalance - totalDeductedAmount;
+        console.log('Transfer Details:');
+        if (isSelfTransfer) {
+            console.log('Self transfer - only fee will be deducted');
+            console.log(`Fee: ${bigIntToDecimalString(feeBigInt)}`);
+            console.log(`Total amount to send: ${bigIntToDecimalString(totalDeductedAmount)}`);
+        } else {
+            console.log(`Amount: ${bigIntToDecimalString(amountBigInt)}`);
+            console.log(`Fee: ${bigIntToDecimalString(feeBigInt)}`);
+            console.log(`Total: ${bigIntToDecimalString(totalDeductedAmount)}`);
+        }
+        console.log(`Expected Balance After Transfer: ${bigIntToDecimalString(expectedNewBalance)}`);
     }
 
     async #handleBalanceMigrationOperation() {
@@ -858,7 +909,13 @@ export class MainSettlementBus extends ReadyResource {
                             balance: bigIntToDecimalString(bufferToBigInt(nodeEntry.balance))
                         }
                     } else {
-                        console.log('Node Entry not found for address:', address)
+                        console.log('Node Entry:', {
+                            WritingKey: ZERO_WK.toString('hex'),
+                            IsWhitelisted: false,
+                            IsWriter: false,
+                            IsIndexer: false,
+                            balance: bigIntToDecimalString(0n)
+                        })
                     }
                 } else if (input.startsWith("/add_indexer")) {
                     const splitted = input.split(" ");
@@ -917,7 +974,7 @@ export class MainSettlementBus extends ReadyResource {
                     const txv = await this.#state.getIndexerSequenceState();
                     console.log('Current TXV:', txv.toString('hex'));
                     return txv
-                }  else if (input.startsWith("/get_fee")) {
+                } else if (input.startsWith("/get_fee")) {
                     const fee = this.#state.getFee();
                     console.log('Current FEE:', bigIntToDecimalString(bufferToBigInt(fee)));
                     return bigIntToDecimalString(bufferToBigInt(fee))

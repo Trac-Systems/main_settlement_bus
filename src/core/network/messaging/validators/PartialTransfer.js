@@ -1,14 +1,18 @@
 import b4a from 'b4a';
-import Wallet from 'trac-wallet';
+import PeerWallet from 'trac-wallet';
 
 import Check from '../../../../utils/check.js';
-import {safeDecodeApplyOperation} from "../../../../utils/protobuf/operationHelpers.js";
-import {addressToBuffer, bufferToAddress} from "../../../state/utils/address.js";
-import {createMessage} from "../../../../utils/buffer.js";
-import {OperationType} from "../../../../utils/constants.js";
-import {blake3Hash} from "../../../../utils/crypto.js";
-import {bufferToBigInt} from "../../../../utils/amountSerialization.js";
-import {FEE} from "../../../state/utils/transaction.js";
+import { addressToBuffer, bufferToAddress } from "../../../state/utils/address.js";
+import { createMessage } from "../../../../utils/buffer.js";
+import { OperationType } from "../../../../utils/constants.js";
+import { blake3Hash } from "../../../../utils/crypto.js";
+import { bufferToBigInt } from "../../../../utils/amountSerialization.js";
+import { FEE } from "../../../state/utils/transaction.js";
+
+//TODO: Implement BASE VALIDATOR CLASS AND MOVE COMMON METHODS THERE
+
+const MAX_AMOUNT = BigInt('0xffffffffffffffffffffffffffffffff');
+const FEE_BIGINT = bufferToBigInt(FEE);
 
 class PartialTransfer {
     #state;
@@ -37,13 +41,12 @@ class PartialTransfer {
 
     async validate(payload) {
         if (!this.#isPayloadSchemaValid(payload)) return false;
-        if (!this.#validateRequestingPublicKey(payload)) return false;
-        if (!this.#validateRecepientPublicKey(payload)) return false;
-        if (!this.#validateAmount(payload)) return false;
+        if (!this.#validateRequesterAddress(payload)) return false;
+        if (!this.#validateRecipientAddress(payload)) return false;
         if (!await this.#validateSignature(payload)) return false;
         if (!await this.#validateTransactionUniqueness(payload)) return false;
         if (!await this.#validateTransactionValidity(payload)) return false;
-        // if (!await this.#validateSenderBalance(payload)) return false; // TODO: Placeholder until NodeEntry with arithmetic balance is NOT implemented
+        if (!await this.#validateStateBalances(payload)) return false;
 
 
         return true;
@@ -58,62 +61,42 @@ class PartialTransfer {
         return true;
     }
 
-    #validateRequestingPublicKey(payload) {
-        const incomingPublicKey = Wallet.decodeBech32mSafe(bufferToAddress(payload.address));
+    #validateRequesterAddress(payload) {
+        const incomingAddress = bufferToAddress(payload.address);
+        if (!incomingAddress) {
+            console.error('Invalid requesting address in transfer payload.');
+            return false;
+        }
+
+        const incomingPublicKey = PeerWallet.decodeBech32mSafe(incomingAddress);
 
         if (incomingPublicKey === null) {
-            console.error('Invalid requesting public key in transaction payload.');
+            console.error('Invalid requesting public key in transfer payload.');
             return false;
         }
         return true;
     }
 
-    #validateRecepientPublicKey(payload) {
-        const incomingPublicKey = Wallet.decodeBech32mSafe(bufferToAddress(payload.tro.to));
-        if (incomingPublicKey === null) {
-            console.error('Invalid recipient public key in transaction payload.');
+    #validateRecipientAddress(payload) {
+        const incomingAddress = bufferToAddress(payload.tro.to);
+        if (!incomingAddress) {
+            console.error('Invalid recipient address in transfer payload.');
             return false;
         }
+
+        const incomingPublicKey = PeerWallet.decodeBech32mSafe(incomingAddress);
+        if (incomingPublicKey === null) {
+            console.error('Invalid recipient public key in transfer payload.');
+            return false;
+        }
+
         return true;
     }
 
-    #validateAmount(payload) {
-        const amountBuffer = payload.tro.am;
-        if (!b4a.isBuffer(amountBuffer) || amountBuffer.length !== 16) {
-            console.error('Amount must be a 16-byte buffer');
-            return false;
-        }
 
-        const isZero = amountBuffer.every(byte => byte === 0);
-        if (isZero) {
-            console.error('Amount cannot be zero');
-            return false;
-        }
-
-        try {
-            const transferAmount = bufferToBigInt(amountBuffer);
-            const fee = bufferToBigInt(FEE);
-
-            const MAX_AMOUNT = BigInt('0xffffffffffffffffffffffffffffffff');
-            if (transferAmount > MAX_AMOUNT) {
-                console.error('Total amount transfer exceeds maximum allowed value');
-                return false;
-            }
-
-            if (transferAmount < fee) {
-                console.error(`Transfer amount (${transferAmount}) must be greater than or equal to the minimum fee (${fee})`);
-                return false;
-            }
-
-            return true;
-        } catch (error) {
-            console.error('Failed to parse amount:', error);
-            return false;
-        }
-    }
 
     async #validateSignature(payload) {
-        const incomingPublicKey = Wallet.decodeBech32mSafe(bufferToAddress(payload.address));
+        const incomingPublicKey = PeerWallet.decodeBech32mSafe(bufferToAddress(payload.address));
         const incomingSignature = payload.tro.is;
 
         const incomingTx = payload.tro.tx;
@@ -129,13 +112,13 @@ class PartialTransfer {
         const regeneratedTx = await blake3Hash(message);
 
         // ensure that regenerated tx matches the incoming tx
-        if ( !b4a.equals(incomingTx, regeneratedTx)) {
+        if (!b4a.equals(incomingTx, regeneratedTx)) {
             return false;
         }
 
-        const isSignatureValid = Wallet.verify(incomingSignature, regeneratedTx, incomingPublicKey);
+        const isSignatureValid = PeerWallet.verify(incomingSignature, regeneratedTx, incomingPublicKey);
         if (!isSignatureValid) {
-            console.error('Invalid signature in transaction payload');
+            console.error('Invalid signature in transfer payload');
             return false;
         }
         return true;
@@ -144,8 +127,8 @@ class PartialTransfer {
     async #validateTransactionUniqueness(payload) {
         const tx = payload.tro.tx;
         const txHex = tx.toString('hex');
-        if (null !== await this.state.getSigned(txHex)) {
-            console.error(`Transaction with hash ${txHex} already exists in the state. Possible replay attack detected.`);
+        if (null !== await this.state.get(txHex)) {
+            console.error(`Transaction with hash ${txHex} already exists in the state.`);
             return false;
         }
         return true;
@@ -160,11 +143,51 @@ class PartialTransfer {
         }
         return true;
     }
-    // TODO: Placeholder until NodeEntry with arithmetic balance is NOT implemented
-    // check if sender has enough balance to cover the transfer amount + fee
-    // and prevet double spending
-    async #validateSenderBalance(payload) {
-        return undefined
+
+    async #validateStateBalances(payload) {
+        try {
+
+            const senderAddress = bufferToAddress(payload.address);
+            const recipientAddress = bufferToAddress(payload.tro.to);
+
+            const transferAmount = bufferToBigInt(payload.tro.am);
+            if (transferAmount > MAX_AMOUNT) {
+                console.error('Transfer amount exceeds maximum allowed value');
+                return false;
+            }
+
+            const isSelfTransfer = senderAddress === recipientAddress;
+            const totalDeductedAmount = isSelfTransfer ? FEE_BIGINT : (transferAmount + FEE_BIGINT);
+
+            const senderEntry = await this.state.getNodeEntry(senderAddress);
+            if (!senderEntry) {
+                console.error('Sender account not found');
+                return false;
+            }
+
+            const senderBalance = bufferToBigInt(senderEntry.balance);
+            if (!(senderBalance >= totalDeductedAmount)) {
+                console.error('Insufficient balance for transfer' + (isSelfTransfer ? ' fee' : ' + fee'));
+                return false;
+            }
+
+            if (!isSelfTransfer) {
+                const recipientEntry = await this.state.getNodeEntry(recipientAddress);
+                if (recipientEntry) {
+                    const recipientBalance = bufferToBigInt(recipientEntry.balance);
+                    const newRecipientBalance = recipientBalance + transferAmount;
+                    if (newRecipientBalance > MAX_AMOUNT) {
+                        console.error('Transfer would cause recipient balance to exceed maximum allowed value');
+                        return false;
+                    }
+                }
+            }
+
+            return true;
+        } catch (error) {
+            console.error('Error in validateStateBalances:', error);
+            return false;
+        }
     }
 }
 
