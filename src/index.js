@@ -992,9 +992,7 @@ export class MainSettlementBus extends ReadyResource {
                         const unsignedLength = this.#state.getUnsignedLength();
                             
                         await this.broadcastPartialTransaction(payload);
-                        const result = { message: "Transaction broadcasted successfully.", signedLength, unsignedLength };
-                        console.log(result);
-                        return result;
+                        return { message: "Transaction broadcasted successfully.", signedLength, unsignedLength };
                     } else {
                         // Handle case where payload is missing if called internally without one.
                         throw new Error("Transaction payload is required for broadcast_transaction command.");

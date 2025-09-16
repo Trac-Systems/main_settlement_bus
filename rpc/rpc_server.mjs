@@ -1,67 +1,13 @@
 // rpc_server.mjs
 import https from 'https'
 import fs from 'bare-fs'
-import b4a from 'b4a';
+import {decodeBase64Payload, isBase64, sanitizeTransferPayload, validatePayloadStructure} from "./utils/helpers"
 
 // SSL Certifications
 const sslOptions = {
     key: fs.readFileSync('./key.pem'),
     cert: fs.readFileSync('./cert.pem'),
 }
-
-function decodePayload(base64) {
-    let decodedPayloadString;
-    try {
-        decodedPayloadString = b4a.from(base64, 'base64').toString('utf-8');
-    } catch (err) {
-        throw new Error('Failed to decode base64 payload.');
-    }
-
-    
-    try {
-        return JSON.parse(decodedPayloadString);
-    } catch (err) {
-        throw new Error('Decoded payload is not valid JSON.');
-    }
-}
-
-function isBase64(str) {
-    const base64Regex = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
-    return base64Regex.test(str);
-}
-
-function validatePayloadStructure(payload) {
-    // VALIDATE PAYLOAD
-    if (
-        typeof payload !== 'object' || payload === null || typeof payload.type !== 'number' || typeof payload.address !== 'string' || typeof payload.tro !== 'object'
-    ) {
-        throw new Error('Invalid payload structure.');
-    }
-}
-
-function sanitizePayload(payload) {
-  if (payload.address && typeof payload.address === 'string') {
-    payload.address = payload.address.trim();
-  }
-
-  if (payload.tro && typeof payload.tro === 'object') {
-    for (const [key, value] of Object.entries(payload.tro)) {
-      if (typeof value === 'string') {
-        let sanitized = value.trim();
-
-        // normalize hex-like strings
-        if (/^[0-9A-F]+$/i.test(sanitized)) {
-          sanitized = sanitized.toLowerCase();
-        }
-
-        payload.tro[key] = sanitized;
-      }
-    }
-  }
-
-  return payload;
-}
-
 
 // Called by msb.mjs file
 export function startRpcServer(msbInstance, port) {
@@ -147,9 +93,9 @@ export function startRpcServer(msbInstance, port) {
                         return;
                     }
 
-                    const decodedPayload = decodePayload(payload);
+                    const decodedPayload = decodeBase64Payload(payload);
                     validatePayloadStructure(decodedPayload);
-                    const sanitizedPayload = sanitizePayload(decodedPayload);
+                    const sanitizedPayload = sanitizeTransferPayload(decodedPayload);
                     
                     // Pass the decoded object to handleCommand.
                     const result = await msbInstance.handleCommand('/broadcast_transaction', null, sanitizedPayload);
