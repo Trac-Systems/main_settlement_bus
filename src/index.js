@@ -26,7 +26,7 @@ import partialStateMessageOperations from "./messages/partialStateMessages/Parti
 import { randomBytes } from "hypercore-crypto";
 import { decimalStringToBigInt, bigIntTo16ByteBuffer, bufferToBigInt, bigIntToDecimalString } from "./utils/amountSerialization.js"
 import { ZERO_WK } from "./utils/buffer.js";
-
+import deploymentEntryUtils from "./core/state/utils/deploymentEntry.js"
 //TODO create a MODULE which will separate logic responsible for role managment
 
 export class MainSettlementBus extends ReadyResource {
@@ -704,7 +704,7 @@ export class MainSettlementBus extends ReadyResource {
 
         const isInitDisabled = await this.#state.isInitalizationDisabled()
 
-        if (isInitDisabled){
+        if (isInitDisabled) {
             throw new Error("Can not initialize balance - balance initialization is disabled.");
         }
 
@@ -751,7 +751,7 @@ export class MainSettlementBus extends ReadyResource {
         for (let i = 0; i < messages.length; i++) {
             const message = messages[i];
             console.log(`Processing message ${i + 1} of ${messages.length}...`);
-            await this.#state.append(message); 
+            await this.#state.append(message);
             await sleep(WHITELIST_SLEEP_INTERVAL);
         }
 
@@ -759,9 +759,10 @@ export class MainSettlementBus extends ReadyResource {
 
         let allBalancesMigrated = true;
         for (let i = 0; i < addresses.length; i++) {
-            const entry = await this.#state.getNodeEntry(addresses[i].address); 
+            const entry = await this.#state.getNodeEntry(addresses[i].address);
             const expectedBalance = addresses[i].parsedBalance;
-            if(toBalance(entry.balance).asBigInt() !== expectedBalance){
+            const amountBigInt = bufferToBigInt(entry.balance);
+            if (amountBigInt !== expectedBalance) {
                 allBalancesMigrated = false
                 console.log(`Balance of ${expectedBalance} failed to migrate to address: ${addresses[i].address}, ${addresses[i].parsedBalance}`);
                 break
@@ -791,7 +792,7 @@ export class MainSettlementBus extends ReadyResource {
             this.#state.writingKey,
             txValidity,
         )
-        console.log('Disabling initialization...'); 
+        console.log('Disabling initialization...');
         await this.#state.append(payload);
     }
 
@@ -971,13 +972,13 @@ export class MainSettlementBus extends ReadyResource {
                     const fee = this.#state.getFee();
                     console.log('Current FEE:', bigIntToDecimalString(bufferToBigInt(fee)));
                     return bigIntToDecimalString(bufferToBigInt(fee))
-                }  else if (input.startsWith("/confirmed_length")) {
+                } else if (input.startsWith("/confirmed_length")) {
                     const confirmed_length = this.#state.getSignedLength();
                     console.log('Confirmed_length:', confirmed_length);
                     return confirmed_length
                 }
 
-                
+
         }
         if (rl) rl.prompt();
     }

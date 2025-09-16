@@ -21,6 +21,8 @@ import lengthEntryUtils from './utils/lengthEntry.js';
 import transactionUtils from './utils/transaction.js';
 import {blake3Hash} from '../../utils/crypto.js';
 import { toBalance } from './utils/balance.js';
+import {safeWriteUInt32BE} from '../../utils/buffer.js'
+
 class State extends ReadyResource {
     //TODO: AFTER createMessage(..args) check if this function did not return NULL
     #base;
@@ -281,7 +283,7 @@ class State extends ReadyResource {
         if (adminAddressString === null) return;
 
         // Verify requester admin public key
-        const requesterAdminPublicKey = Wallet.decodeBech32mSafe(adminAddressString);
+        const requesterAdminPublicKey = PeerWallet.decodeBech32mSafe(adminAddressString);
         if (requesterAdminPublicKey === null) return;
 
         // Verify that the amount is not zero
@@ -291,7 +293,7 @@ class State extends ReadyResource {
         const recipientAddressString = addressUtils.bufferToAddress(recipientAddress);
 
         // Validate recipient public key
-        const recipientPublicKey = Wallet.decodeBech32mSafe(recipientAddressString);
+        const recipientPublicKey = PeerWallet.decodeBech32mSafe(recipientAddressString);
         if (recipientPublicKey === null) return;
 
         // Entry has been disabled so there is nothing to do
@@ -301,11 +303,11 @@ class State extends ReadyResource {
         const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
         const decodedAdminEntry = adminEntryUtils.decode(adminEntry);
         if (null === decodedAdminEntry || !this.#isAdminApply(decodedAdminEntry, node)) return;
-        const adminPublicKey = Wallet.decodeBech32mSafe(decodedAdminEntry.address);
+        const adminPublicKey = PeerWallet.decodeBech32mSafe(decodedAdminEntry.address);
         if (adminPublicKey === null) return;
 
         // Admin consistency check
-        if(!b4a.equals(adminPublicKey, requesterAdminPublicKey)) return
+        if (!b4a.equals(adminPublicKey, requesterAdminPublicKey)) return
 
         // Recreate requester message
         const message = createMessage(op.address, op.bio.txv, op.bio.in, op.bio.ia, amount.value, OperationType.BALANCE_INITIALIZATION);
@@ -345,18 +347,18 @@ class State extends ReadyResource {
         if (adminAddressString === null) return;
 
         // Validate requester admin public key
-        const requesterAdminPublicKey = Wallet.decodeBech32mSafe(adminAddressString);
+        const requesterAdminPublicKey = PeerWallet.decodeBech32mSafe(adminAddressString);
         if (requesterAdminPublicKey === null) return;
 
         // Ensure that an admin invoked this operation
         const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
         const decodedAdminEntry = adminEntryUtils.decode(adminEntry);
         if (null === decodedAdminEntry || !this.#isAdminApply(decodedAdminEntry, node)) return;
-        const adminPublicKey = Wallet.decodeBech32mSafe(decodedAdminEntry.address);
+        const adminPublicKey = PeerWallet.decodeBech32mSafe(decodedAdminEntry.address);
         if (adminPublicKey === null) return;
 
         // Admin consistency check
-        if(!b4a.equals(adminPublicKey, requesterAdminPublicKey)) return
+        if (!b4a.equals(adminPublicKey, requesterAdminPublicKey)) return
 
         // Recreate requester message
         const message = createMessage(op.address, op.cao.txv, op.cao.iw, op.cao.in, OperationType.DISABLE_INITIALIZATION);
