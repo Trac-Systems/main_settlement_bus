@@ -108,6 +108,68 @@ export function startRpcServer(msbInstance, port) {
                     res.end(JSON.stringify({ error: error.message }));
                 }
             });
+        } else if (req.url.startsWith("/tx-hashes/")) {
+            try {
+                const startSignedLengthStr = req.url.split('/')[2];
+                const endSignedLengthStr = req.url.split('/')[3];
+
+                const startSignedLength = parseInt(startSignedLengthStr);
+                const endSignedLength = parseInt(endSignedLengthStr);
+
+                // 1. Check if the parsed values are valid numbers
+                if (isNaN(startSignedLength) || isNaN(endSignedLength)) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'startSignedLength and endSignedLength must be valid numbers.' }));
+                    return;
+                }
+
+                // 2. Check for non-negative numbers
+                // The requirement is "non-negative," which includes 0.
+                if (startSignedLength < 0 || endSignedLength < 0) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'startSignedLength and endSignedLength must be non-negative.' }));
+                    return;
+                }
+
+                // 3. endSignedLength must be >= startSignedLength
+                if (endSignedLength < startSignedLength) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'endSignedLength must be greater than or equal to startSignedLength.' }));
+                    return;
+                }
+
+                // 4. If startSeq > endSeq, return an empty array
+                const startSeq = startSignedLength;
+                const endSeq = endSignedLength - 1;
+                if (startSeq > endSeq) {
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ txHashes: [] }));
+                    return;
+                }
+
+                // 5. Get Confirmed length
+                // endSignedLength cannot exceed the current signedLength
+                const commandLengthString = '/confirmed_length'
+                const currentSignedLength = await msbInstance.handleCommand(commandLengthString);
+                console.log("currentSignedLength", currentSignedLength);
+
+                if (endSignedLength > currentSignedLength) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: `endSignedLength cannot exceed the current signedLength of ${currentSignedLength}.` }));
+                    return;
+                }
+
+                // 6. Fetch txs hashes
+                const commandString = `/get_txs_hashes ${startSignedLength} ${endSignedLength}`;
+                const txHashes = await msbInstance.handleCommand(commandString);
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ txHashes }));
+                
+            } catch (error) {
+                console.error('Error on searching for tx hashes:', error);
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: error.message || 'An error occurred processing the request.' }));
+            }
         } else {
             res.writeHead(404, { 'Content-Type': 'text/plain' })
             res.end('Not Found')

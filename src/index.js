@@ -1004,6 +1004,21 @@ export class MainSettlementBus extends ReadyResource {
                         // Handle case where payload is missing if called internally without one.
                         throw new Error("Transaction payload is required for broadcast_transaction command.");
                     }
+                } else if(input.startsWith("/get_txs_hashes")) {
+                    const splitted = input.split(' ')
+                    const start = splitted[1]
+                    const end = splitted[2]
+
+                    if (start && end) {
+                        // hardcoded txs hashes
+                        return [
+                            "df03e28ddc75db31ff569241c64ec8273c4eb438cd11270f8f452cd3f1a458ff", 
+                            "4145531eef87ce31d5ed2167660177a759fb64c95cc4f9cf61b996f3da849ff9", 
+                            "19d6fa8d48058980b2c63217443c7b17f8d9e142998be853f9a391c277b32c67"
+                        ];
+                    } else {
+                        throw new Error("Invalid params to perform the request.");
+                    }
                 }
         }
         if (rl) rl.prompt();
