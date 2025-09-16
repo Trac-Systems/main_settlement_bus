@@ -15,6 +15,7 @@ export const $TNK = bigint => bigIntToBuffer(
     bigint * 10n ** TOKEN_DECIMALS, 
     BALANCE_BYTE_LENGTH
 )
+
 /**
  * Converts a bigint into a fixed-length buffer reprenseting a positive number
  * scaled according to TOKEN_DECIMALS.
@@ -25,6 +26,17 @@ export const toTerm = bigint => bigIntToBuffer(
     bigint, 
     BALANCE_BYTE_LENGTH
 )
+
+/**
+ * Converts a decimal to a buffer that can be used along with Balance#percentage. 
+ * Should be used to define readable constants.
+ * @param {number} value - The % with two decimal digits
+ * @returns {Buffer} - Fixed-length buffer representing the percentage to be applied
+ */
+export const percent = value => {
+    const bigint = BigInt(Math.round(value * 100))
+    return bigIntToBuffer(bigint, BALANCE_BYTE_LENGTH)
+}
 
 // Thank you gpt
 const shiftLeft1 = buf => {
@@ -188,12 +200,21 @@ class Balance {
     }
 
     /**
-     * Multiplay a balance for a number in bytes
+     * Multiply a balance for a number in bytes
      * @param {Buffer} num - to be used along `toTerm`
      * @returns {Balance} - New Balance instance
      */
     mul(num) {
         return toBalance(mulBuffers(this.#value, num))
+    }
+
+    /**
+     * Reduce to its percentage
+     * @param {Buffer} percent - the buffer percentage (with two extra decimals). Expected to be used along with percent function.
+     * @returns {Balance} - New Balance instance
+     */
+    percentage(percent) {
+        return toBalance(NULL_BYTES)
     }
 
     /**
