@@ -4,6 +4,9 @@ import { isBufferValid, bigIntToBuffer, NULL_BUFFER } from '../../../utils/buffe
 import { BALANCE_BYTE_LENGTH, TOKEN_DECIMALS } from '../../../utils/constants.js';
 import { bufferToBigInt } from '../../../utils/amountSerialization.js';
 
+const DOUBLE_LENGTH = BALANCE_BYTE_LENGTH * 2
+const PERCENTAGE_TERM = bigIntToBuffer(10_000n, DOUBLE_LENGTH)
+
 /**
  * Converts a bigint amount of tokens into a fixed-length buffer,
  * scaled according to TOKEN_DECIMALS.
@@ -122,7 +125,7 @@ const mulBuffers = (a, b) => {
   
     const alen = a.length;
     const blen = b.length;
-    const result = b4a.alloc(BALANCE_BYTE_LENGTH * 2); // up to 32 bytes
+    const result = b4a.alloc(DOUBLE_LENGTH); // up to 32 bytes
   
     for (let i = alen - 1; i >= 0; i--) {
         let carry = 0;
@@ -207,7 +210,8 @@ class Balance {
      * @returns {Balance} - New Balance instance
      */
     mul(num) {
-        return toBalance(mulBuffers(this.#value, num))
+        const result = mulBuffers(this.#value, num)
+        return toBalance(result)
     }
 
     /**
@@ -216,7 +220,9 @@ class Balance {
      * @returns {Balance} - New Balance instance
      */
     percentage(percent) {
-        return toBalance(NULL_BUFFER)
+        const dividend = mulBuffers(this.#value, percent)
+        const result = divBuffers(dividend, PERCENTAGE_TERM)
+        return toBalance(result)
     }
 
     /**
