@@ -978,20 +978,20 @@ class State extends ReadyResource {
         const feeAmount = toBalance(transactionUtils.FEE);
         if (feeAmount === null) return;
 
-        const adminNodeEntry = await this.#getEntryApply(requesterAddressString, batch);
-        if (null === adminNodeEntry) return;
+        const adminNodeEntryBuffer = await this.#getEntryApply(requesterAddressString, batch);
+        if (adminNodeEntryBuffer === null) return;
 
-        const adminBalanceBuffer = nodeEntryUtils.getBalance(adminNodeEntry);
-        if (adminBalanceBuffer === null) return;
+        const adminNodeEntry = nodeEntryUtils.decode(adminNodeEntryBuffer);
+        if (adminNodeEntry === null) return;
 
-        const adminBalance = toBalance(adminBalanceBuffer);
+        const adminBalance = toBalance(adminNodeEntry.balance);
         if (adminBalance === null) return;
 
         if (!adminBalance.greaterThanOrEquals(feeAmount)) return;
         const newAdminBalance = adminBalance.sub(feeAmount);
         if (newAdminBalance === null) return;
 
-        const updatedAdminNodeEntry = nodeEntryUtils.setBalance(adminNodeEntry, newAdminBalance.value);
+        const updatedAdminNodeEntry = nodeEntryUtils.setBalance(adminNodeEntryBuffer, newAdminBalance.value);
         if (updatedAdminNodeEntry === null) return null;
 
         // set indexer role
@@ -1177,20 +1177,20 @@ class State extends ReadyResource {
         const feeAmount = toBalance(transactionUtils.FEE);
         if (feeAmount === null) return;
 
-        const adminNodeEntry = await this.#getEntryApply(requesterAddressString, batch);
-        if (null === adminNodeEntry) return;
+        const adminNodeEntryBuffer = await this.#getEntryApply(requesterAddressString, batch);
+        if (adminNodeEntryBuffer === null) return;
 
-        const adminBalanceBuffer = nodeEntryUtils.getBalance(adminNodeEntry);
-        if (adminBalanceBuffer === null) return;
+        const adminNodeEntry = nodeEntryUtils.decode(adminNodeEntryBuffer);
+        if (adminNodeEntry === null) return;
 
-        const adminBalance = toBalance(adminBalanceBuffer);
+        const adminBalance = toBalance(adminNodeEntry.balance);
         if (adminBalance === null) return;
 
         if (!adminBalance.greaterThanOrEquals(feeAmount)) return;
         const newAdminBalance = adminBalance.sub(feeAmount);
         if (newAdminBalance === null) return;
 
-        const updatedAdminNodeEntry = nodeEntryUtils.setBalance(adminNodeEntry, newAdminBalance.value);
+        const updatedAdminNodeEntry = nodeEntryUtils.setBalance(adminNodeEntryBuffer, newAdminBalance.value);
         if (updatedAdminNodeEntry === null) return null;
 
         // Remove the writer role and update the state
@@ -1198,6 +1198,7 @@ class State extends ReadyResource {
             await base.removeWriter(decodedNodeEntry.wk);
         }
         await batch.put(nodeToBeBannedAddressString, updatedNodeEntry);
+        await batch.put(requesterAddressString, updatedAdminNodeEntry);
         await batch.put(txHashHexString, node.value);
         console.log(`Node has been banned: addr:wk:tx - ${nodeToBeBannedAddressString}:${decodedNodeEntry.wk.toString('hex')}:${txHashHexString}`);
     }
