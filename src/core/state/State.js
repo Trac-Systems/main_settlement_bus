@@ -386,6 +386,12 @@ class State extends ReadyResource {
     }
 
     async #handleApplyAddAdminOperation(op, view, base, node, batch) {
+        /*
+            ADD ADMIN OPERATION INITIALIZES THE NETWORK. THIS OPERATION CAN BE PERFORMED ONLY ONCE, AND THE NETWORK CREATOR
+            DOES NOT HAVE TO PAY A FEE IN THIS CASE. ATTENTION: IF ANY VALIDATOR ATTEMPTS THIS OPERATION AFTER THE NETWORK
+            INITIALIZATION, THEIR STAKED BALANCE WILL BE REDUCED (PUNISHMENT).
+        */
+
         if (!this.check.validateCoreAdminOperation(op)) return;
 
         // Extract and validate the network address
@@ -902,7 +908,7 @@ class State extends ReadyResource {
             return;
         }
 
-        // Extract and validate the requester address
+        // Extract and validate the requester address (admin)
         const requesterAddressBuffer = op.address;
         const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer);
         if (requesterAddressString === null) return;
@@ -924,6 +930,9 @@ class State extends ReadyResource {
         const adminPublicKey = PeerWallet.decodeBech32mSafe(decodedAdminEntry.address);
         if (adminPublicKey === null) return;
         if (!b4a.equals(requesterPublicKey, adminPublicKey) || !this.#isAdminApply(decodedAdminEntry, node)) return;
+
+        // Admin consistency check
+        if (!b4a.equals(adminPublicKey, requesterPublicKey)) return;
 
         // verify requester signature
         const message = createMessage(op.address, op.aco.txv, op.aco.ia, op.aco.in, OperationType.ADD_INDEXER);
