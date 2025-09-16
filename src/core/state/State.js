@@ -21,8 +21,7 @@ import lengthEntryUtils from './utils/lengthEntry.js';
 import transactionUtils from './utils/transaction.js';
 import {blake3Hash} from '../../utils/crypto.js';
 import { toBalance } from './utils/balance.js';
-import {safeWriteUInt32BE} from '../../utils/buffer.js'
-
+import { percent } from './utils/balance.js';
 class State extends ReadyResource {
     //TODO: AFTER createMessage(..args) check if this function did not return NULL
     #base;
@@ -1288,6 +1287,7 @@ class State extends ReadyResource {
 
         if (null === transferResult) return;
         await batch.put(requesterAddressString, transferResult.senderEntry);
+        await batch.put(validatorAddressString, transferResult.validatorEntry);
 
         if (!isSelfTransfer) {
             await batch.put(recipientAddressString, transferResult.recipientEntry);
@@ -1321,21 +1321,32 @@ class State extends ReadyResource {
         if (totalDeductedAmount === null) return null;
         const senderEntryBuffer = await this.#getEntryApply(senderAddressString, batch);
         if (senderEntryBuffer === null) return null;
+        const validatorEntryBuffer = await this.#getEntryApply(validatorAddressString, batch);
+        if (validatorEntryBuffer === null) return null;
+        const validatorEntry = nodeEntryUtils.decode(validatorEntryBuffer);
+        if (validatorEntry === null) return null;
         const senderEntry = nodeEntryUtils.decode(senderEntryBuffer);
         if (senderEntry === null) return null;
         const senderBalance = toBalance(senderEntry.balance);
         if (senderBalance === null) return null;
         if (!senderBalance.greaterThanOrEquals(totalDeductedAmount)) return null;
+        const validatorBalance = toBalance(senderEntry.balance);
+        if (validatorBalance === null) return null;
+
+
+        const newValidatorBalance = senderBalance.add(feeAmount.percentage(percent(75)));
+        if (newValidatorBalance === null) return null;
+        const updatedValidatorEntry = newValidatorBalance.update(validatorEntryBuffer)
 
         const newSenderBalance = senderBalance.sub(totalDeductedAmount);
         if (newSenderBalance === null) return null;
 
-        const updatedSenderEntry = nodeEntryUtils.setBalance(senderEntryBuffer, newSenderBalance.value);
+        const updatedSenderEntry = newSenderBalance.update(senderEntryBuffer);
         if (updatedSenderEntry === null) return null;
         const result = {
             senderEntry: updatedSenderEntry,
             recipientEntry: null,
-            validatorEntry: null,
+            validatorEntry: updatedValidatorEntry,
         };
 
         if (!isSelfTransfer) {
