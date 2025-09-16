@@ -1173,6 +1173,26 @@ class State extends ReadyResource {
         const decodedNodeEntry = nodeEntryUtils.decode(updatedNodeEntry);
         if (null === decodedNodeEntry) return;
 
+        // charge fee from the admin
+        const feeAmount = toBalance(transactionUtils.FEE);
+        if (feeAmount === null) return;
+
+        const adminNodeEntry = await this.#getEntryApply(requesterAddressString, batch);
+        if (null === adminNodeEntry) return;
+
+        const adminBalanceBuffer = nodeEntryUtils.getBalance(adminNodeEntry);
+        if (adminBalanceBuffer === null) return;
+
+        const adminBalance = toBalance(adminBalanceBuffer);
+        if (adminBalance === null) return;
+
+        if (!adminBalance.greaterThanOrEquals(feeAmount)) return;
+        const newAdminBalance = adminBalance.sub(feeAmount);
+        if (newAdminBalance === null) return;
+
+        const updatedAdminNodeEntry = nodeEntryUtils.setBalance(adminNodeEntry, newAdminBalance.value);
+        if (updatedAdminNodeEntry === null) return null;
+
         // Remove the writer role and update the state
         if (isWriter) {
             await base.removeWriter(decodedNodeEntry.wk);
