@@ -47,8 +47,7 @@ class PartialTransfer {
         if (!await this.#validateTransactionUniqueness(payload)) return false;
         if (!await this.#validateTransactionValidity(payload)) return false;
         if (!await this.#validateStateBalances(payload)) return false;
-
-
+        if (!this.#isTransferOperationNotCompleted(payload)) return false;
         return true;
     }
 
@@ -189,6 +188,18 @@ class PartialTransfer {
             return false;
         }
     }
+
+    #isTransferOperationNotCompleted(payload) {
+        if (!payload || !payload.tro) return false;
+        const { va, vn, vs } = payload.tro;
+        const condition = !!(va === undefined && vn === undefined && vs === undefined);
+        if (!condition) {
+            console.error('Transfer operation must not be completed already (va, vn, vs must be undefined).');
+            return false;
+        }
+        return true;
+    }
+
 }
 
 export default PartialTransfer;
