@@ -1,9 +1,10 @@
-import { test, solo } from 'brittle';
+import { test } from 'brittle';
 import b4a from 'b4a';
 import { randomBuffer, TEN_THOUSAND_VALUE, tokenUnits } from '../stateTestUtils.js';
 import { ZERO_BALANCE, decode, encode } from '../../../src/core/state/utils/nodeEntry.js';
 import { WRITER_BYTE_LENGTH, ADMIN_INITIAL_BALANCE, BALANCE_BYTE_LENGTH } from '../../../src/utils/constants.js';
 import { $TNK, toBalance, toTerm } from '../../../src/core/state/utils/balance.js';
+import { bufferToBigInt } from '../../../src/utils/amountSerialization.js';
 
 test('Balance#asHex explicit', t => {
   const val = $TNK(1000n)
@@ -140,21 +141,62 @@ test('Balance#sub', () => {
     });
 })
 
-test('Balance#mul', t => {
-    const a = $TNK(1000n);
-    const result = toBalance(a).mul(toTerm(4n));
+test('Balance#mul', () => {
+    test('basic multiplication', t => {
+        const a = $TNK(1000n);
+        const result = toBalance(a).mul(toTerm(4n));
 
-    // Should return null-like buffer on underflow
-    t.ok(toBalance($TNK(4000n)).equals(result), 'overflow returns null');
+        // Should return null-like buffer on underflow
+        t.ok(toBalance($TNK(4000n)).equals(result), 'equal 4000n');
+    })
+
+    test('zero multiplication', t => {
+        const a = $TNK(4000n);
+        const result = toBalance(a).mul(toTerm(0n));
+    
+        // Should return null-like buffer on underflow
+        t.ok(result.equals(toBalance($TNK(0n))), 'returns zero');
+    })
+
+    test('zero value multiplication', t => {
+        const a = toBalance($TNK(0n));
+        const result = a.mul(toTerm(1000n));
+    
+        // Should return null-like buffer on underflow
+        t.ok(result.equals(toBalance($TNK(0n))), 'returns zero');
+    })
 })
 
-test('Balance#div', t => {
-    const a = $TNK(4000n);
-    const result = toBalance(a).div(toTerm(4n));
+test('Balance#div', () => {
+    test('basic division', t => {
+        const a = $TNK(4000n);
+        const result = toBalance(a).div(toTerm(4n));
+    
+        // Should return null-like buffer on underflow
+        t.ok(toBalance($TNK(1000n)).equals(result), 'equal 1000n');
+    })
 
-    // Should return null-like buffer on underflow
-    t.ok(toBalance($TNK(1000n)).equals(result), 'overflow returns null');
-});
+    test('zero division', t => {
+        const a = $TNK(4000n);
+        const result = toBalance(a).div(toTerm(0n));
+    
+        // Should return null-like buffer on underflow
+        t.is(result, null, 'returns null');
+    })
+
+    test('zero value division', t => {
+        const a = toBalance($TNK(0n));
+        const result = a.div(toTerm(1000n));
+    
+        // Should return null-like buffer on underflow
+        t.ok(result.equals(toBalance($TNK(0n))), 'returns 0');
+    })
+})
+
+test('toTerm', t => {
+    const converted = bufferToBigInt(toTerm(4n))
+    t.is(converted, 4n, 'overflow returns null');
+})
 
 test('Balance#asBigInt', t => {
     const node = {
