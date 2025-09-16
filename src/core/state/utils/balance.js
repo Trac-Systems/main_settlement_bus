@@ -24,6 +24,9 @@ export const percent = value => {
  */
 export const PERCENT_75 = percent(75)
 
+const DOUBLE_LENGTH = BALANCE_BYTE_LENGTH * 2
+const PERCENTAGE_TERM = bigIntToBuffer(10_000n, DOUBLE_LENGTH)
+
 /**
  * Converts a bigint amount of tokens into a fixed-length buffer,
  * scaled according to TOKEN_DECIMALS.
@@ -228,7 +231,9 @@ class Balance {
      * @returns {Balance} - New Balance instance
      */
     percentage(percent) {
-        return toBalance(NULL_BUFFER)
+        const dividend = mulBuffers(this.#value, percent)
+        const result = divBuffers(dividend, PERCENTAGE_TERM)
+        return toBalance(result)
     }
 
     /**
