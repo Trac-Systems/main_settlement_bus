@@ -228,7 +228,7 @@ class Balance {
      * @returns {Balance} - New Balance instance
      */
     percentage(percent) {
-        return toBalance(NULL_BYTES)
+        return toBalance(NULL_BUFFER)
     }
 
     /**
