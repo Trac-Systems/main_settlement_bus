@@ -38,6 +38,8 @@ export const percent = value => {
     return bigIntToBuffer(bigint, BALANCE_BYTE_LENGTH)
 }
 
+const truncate = buf => buf.slice(BALANCE_BYTE_LENGTH * -1)
+
 // Thank you gpt
 const shiftLeft1 = buf => {
     const res = b4a.alloc(BALANCE_BYTE_LENGTH)
@@ -138,7 +140,7 @@ const mulBuffers = (a, b) => {
     }
   
     // Truncate
-    return result.slice(BALANCE_BYTE_LENGTH * -1)
+    return truncate(result)
 }
 
 /**
@@ -214,7 +216,7 @@ class Balance {
      * @returns {Balance} - New Balance instance
      */
     percentage(percent) {
-        return toBalance(NULL_BYTES)
+        return toBalance(NULL_BUFFER)
     }
 
     /**
@@ -236,7 +238,7 @@ class Balance {
 
     /** Compares equality with another balance */
     equals(b) {
-        return b4a.equals(this.#value, b.value)
+        return isBufferValid(b?.value, BALANCE_BYTE_LENGTH) && b4a.equals(this.#value, b.value)
     }
 
     /** Returns true if this balance is greater than another */

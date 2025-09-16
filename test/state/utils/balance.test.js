@@ -3,7 +3,7 @@ import b4a from 'b4a';
 import { randomBuffer, TEN_THOUSAND_VALUE, tokenUnits } from '../stateTestUtils.js';
 import { ZERO_BALANCE, decode, encode } from '../../../src/core/state/utils/nodeEntry.js';
 import { WRITER_BYTE_LENGTH, ADMIN_INITIAL_BALANCE, BALANCE_BYTE_LENGTH } from '../../../src/utils/constants.js';
-import { $TNK, toBalance, toTerm } from '../../../src/core/state/utils/balance.js';
+import { $TNK, toBalance, toTerm, percent } from '../../../src/core/state/utils/balance.js';
 import { bufferToBigInt } from '../../../src/utils/amountSerialization.js';
 
 test('Balance#asHex explicit', t => {
@@ -190,6 +190,16 @@ test('Balance#div', () => {
     
         // Should return null-like buffer on underflow
         t.ok(result.equals(toBalance($TNK(0n))), 'returns 0');
+    })
+})
+
+test('Balance#percentage', () => {
+    test('basic percentage', t => {
+        const a = $TNK(1000n);
+        const result = toBalance(a).percentage(percent(4));
+    
+        // Should return null-like buffer on underflow
+        t.ok(toBalance($TNK(40n)).equals(result), 'equal 40n');
     })
 })
 
