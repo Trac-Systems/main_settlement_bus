@@ -23,6 +23,14 @@ export const percent = value => {
  * Short term for 75% to be used with balance. Extracted to avoid buffer conversions during request time.
  */
 export const PERCENT_75 = percent(75)
+/**
+ * Short term for 50% to be used with balance. Extracted to avoid buffer conversions during request time.
+ */
+export const PERCENT_50 = percent(50)
+/**
+ * Short term for 25% to be used with balance. Extracted to avoid buffer conversions during request time.
+ */
+export const PERCENT_25 = percent(25)
 
 /**
  * Converts a bigint amount of tokens into a fixed-length buffer,

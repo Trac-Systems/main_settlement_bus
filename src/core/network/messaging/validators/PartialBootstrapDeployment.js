@@ -118,7 +118,12 @@ class PartialBootstrapDeployment {
     #isBootstrapDeploymentAlreadyNotCompleted(payload) {
         if (!payload || !payload.bdo) return false;
         const { va, vn, vs } = payload.bdo;
-        return (va === undefined && vn === undefined && vs === undefined);
+        const condition = !!(va === undefined && vn === undefined && vs === undefined);
+        if (!condition) {
+            console.error('Bootstrap deployment must not be completed already (va, vn, vs must be undefined).');
+            return false;
+        }
+        return true;
     }
 
     #isExternalBootstrapDifferentFromMSB(payload) {

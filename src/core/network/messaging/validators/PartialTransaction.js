@@ -2,12 +2,12 @@ import b4a from 'b4a';
 import PeerWallet from 'trac-wallet';
 
 import Check from '../../../../utils/check.js';
-import {safeDecodeApplyOperation} from "../../../../utils/protobuf/operationHelpers.js";
-import {bufferToAddress} from "../../../state/utils/address.js";
-import {createMessage} from "../../../../utils/buffer.js";
-import {OperationType} from "../../../../utils/constants.js";
-import {blake3Hash} from "../../../../utils/crypto.js";
-
+import { safeDecodeApplyOperation } from "../../../../utils/protobuf/operationHelpers.js";
+import { bufferToAddress } from "../../../state/utils/address.js";
+import { createMessage } from "../../../../utils/buffer.js";
+import { OperationType } from "../../../../utils/constants.js";
+import { blake3Hash } from "../../../../utils/crypto.js";
+import deploymentEntryUtils from "../../../state/utils/deploymentEntry.js";
 //TODO: Implement BASE VALIDATOR CLASS AND MOVE COMMON METHODS THERE
 
 class PartialTransaction {
@@ -44,6 +44,7 @@ class PartialTransaction {
         if (!await this.#validateIfExternalBootstrapHasBeenDeployed(payload)) return false;
         if (!await this.#validateIfExternalBoostrapIsMsbBootstrap(payload)) return false;
         if (!await this.#validateTransactionValidity(payload)) return false;
+        if (!this.#isTransactionOperationNotCompleted(payload)) return false;
 
         return true;
     }
@@ -92,7 +93,7 @@ class PartialTransaction {
         const regeneratedTx = await blake3Hash(message);
 
         // ensure that regenerated tx matches the incoming tx
-        if ( !b4a.equals(incomingTx, regeneratedTx)) {
+        if (!b4a.equals(incomingTx, regeneratedTx)) {
             return false;
         }
 
@@ -136,9 +137,10 @@ class PartialTransaction {
             console.error("External bootstrap is not registered as deployment/<bootstrap>:", payload.txo.bs.toString('hex'));
             return false;
         }
-
-        const getBootstrapTransactionTxPayload = await this.state.get(externalBootstrapResult.toString('hex'));
-
+        const decodedPayload = deploymentEntryUtils.decode(externalBootstrapResult);
+        const txHash =  decodedPayload.txHash
+        const getBootstrapTransactionTxPayload = await this.state.get(txHash.toString('hex'));
+        console.log('getBootstrapTransactionTxPayload', getBootstrapTransactionTxPayload);
         if (null === getBootstrapTransactionTxPayload) {
             console.error('External bootstrap is not registered as usual tx', externalBootstrapResult.toString('hex'), ':', payload);
             return false;
@@ -164,6 +166,18 @@ class PartialTransaction {
         }
         return true;
     }
+
+    #isTransactionOperationNotCompleted(payload) {
+        if (!payload || !payload.txo) return false;
+        const { va, vn, vs } = payload.txo;
+        const condition = !!(va === undefined && vn === undefined && vs === undefined);
+        if (!condition) {
+            console.error('Transaction operation must not be completed already (va, vn, vs must be undefined).');
+            return false;
+        }
+        return true;
+    }
+
 }
 
 export default PartialTransaction;

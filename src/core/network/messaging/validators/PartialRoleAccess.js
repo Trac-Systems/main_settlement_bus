@@ -41,6 +41,7 @@ class PartialRoleAccess {
         if (!await this.#validateSignature(payload)) return false;
         if (!await this.#isRequesterAllowedToChangeRole(payload)) return false;
         if (!await this.#validateTransactionValidity(payload)) return false;
+        if (!this.#isRoleAccessOperationNotCompleted(payload)) return false;
         return true;
     }
 
@@ -182,6 +183,17 @@ class PartialRoleAccess {
         const incomingTxv = payload.rao.txv
         if (!b4a.equals(currentTxv, incomingTxv)) {
             console.error(`Transaction has expired.`);
+            return false;
+        }
+        return true;
+    }
+
+    #isRoleAccessOperationNotCompleted(payload) {
+        if (!payload || !payload.rao) return false;
+        const { va, vn, vs } = payload.rao;
+        const condition = !!(va === undefined && vn === undefined && vs === undefined);
+        if (!condition) {
+            console.error('Role access operation must not be completed already (va, vn, vs must be undefined).');
             return false;
         }
         return true;
