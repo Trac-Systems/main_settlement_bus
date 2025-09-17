@@ -731,6 +731,8 @@ class State extends ReadyResource {
             op.rao.vn,
             OperationType.ADD_WRITER
         );
+        if (validatorMessage.length === 0) return;
+
         const validatorHash = await blake3Hash(validatorMessage);
         const isValidatorMessageVerifed = this.#wallet.verify(op.rao.vs, validatorHash, validatorPublicKey);
         if (!isValidatorMessageVerifed) return;
@@ -793,7 +795,7 @@ class State extends ReadyResource {
 
         const updatedValidatorBalance = validatorBalance.add(BALANCE_FEE.percentage(PERCENT_75))
         if (updatedValidatorBalance === null) return;
-        
+
         const updatedValidatorEntry = updatedValidatorBalance.update(validatorEntry)
         if (updatedValidatorEntry === null) return;
 
@@ -817,13 +819,23 @@ class State extends ReadyResource {
         const requesterAddress = op.address;
         const requesterAddressString = addressUtils.bufferToAddress(requesterAddress);
         if (requesterAddressString === null) return;
+
+        // Validate requester public key
         const requesterPublicKey = PeerWallet.decodeBech32mSafe(requesterAddressString);
         if (requesterPublicKey === null) return;
 
         // verify requester signature
-        const requesterMessage = createMessage(op.address, op.rao.txv, op.rao.iw, op.rao.in, OperationType.REMOVE_WRITER)
-        const hash = await blake3Hash(requesterMessage);
+        const requesterMessage = createMessage(
+            op.address,
+            op.rao.txv,
+            op.rao.iw,
+            op.rao.in,
+            OperationType.REMOVE_WRITER
+        );
+        if (requesterMessage.length === 0) return;
 
+        // compare hashes
+        const hash = await blake3Hash(requesterMessage);
         if (!b4a.equals(hash, op.rao.tx)) return;
 
         const isRequesterMessageVerifed = this.#wallet.verify(op.rao.is, op.rao.tx, requesterPublicKey);
@@ -834,10 +846,19 @@ class State extends ReadyResource {
         const validatorAddress = op.rao.va;
         const validatorAddressString = addressUtils.bufferToAddress(validatorAddress);
         if (validatorAddressString === null) return;
+
+        // validate validator public key
         const validatorPublicKey = PeerWallet.decodeBech32mSafe(validatorAddressString);
         if (validatorPublicKey === null) return;
 
-        const validatorMessage = createMessage(op.rao.tx, op.rao.va, op.rao.vn, OperationType.REMOVE_WRITER);
+        const validatorMessage = createMessage(
+            op.rao.tx,
+            op.rao.va,
+            op.rao.vn,
+            OperationType.REMOVE_WRITER
+        );
+        if (validatorMessage.length === 0) return;
+
         const validatorHash = await blake3Hash(validatorMessage);
         const isValidatorMessageVerifed = this.#wallet.verify(op.rao.vs, validatorHash, validatorPublicKey);
         if (!isValidatorMessageVerifed) return;
@@ -849,7 +870,7 @@ class State extends ReadyResource {
 
         // anti-replay attack
         const opEntry = await this.#getEntryApply(txHashHexString, batch);
-        if (null !== opEntry) return;
+        if (opEntry !== null) return;
 
         // Proceed to remove the writer role from the node
         await this.#removeWriter(op, base, node, batch, txHashHexString, requesterAddressString, validatorAddressString);
@@ -857,55 +878,59 @@ class State extends ReadyResource {
 
     async #removeWriter(op, base, node, batch, txHashHexString, requesterAddressString, validatorAddressString) {
         // Retrieve the node entry for the given key
-        const nodeEntry = await this.#getEntryApply(requesterAddressString, batch);
-        if (null === nodeEntry) return;
+        const requesterNodeEntry = await this.#getEntryApply(requesterAddressString, batch);
+        if (requesterNodeEntry === null) return;
+
         // Retrieve the validator to receive the fee
         const validatorNodeEntry = await this.#getEntryApply(validatorAddressString, batch);
-        if (null === validatorNodeEntry) return;
+        if (validatorNodeEntry === null) return;
 
         // TODO: SHOULD WE somehow compare current wk FROM STATE with op.rao.iw? YES, we can ensure that linked wk to the address is the same as the one provided in the operation.
 
         // Check if the node is a writer or an indexer
-        const isNodeWriter = nodeEntryUtils.isWriter(nodeEntry);
-        const isNodeIndexer = nodeEntryUtils.isIndexer(nodeEntry);
+        const isNodeWriter = nodeEntryUtils.isWriter(requesterNodeEntry);
+        const isNodeIndexer = nodeEntryUtils.isIndexer(requesterNodeEntry);
 
-        if (isNodeIndexer) return;
+        if (isNodeIndexer || !isNodeWriter) return;
 
-        if (isNodeWriter) {
-            // Decode the node entry and downgrade its role to WHITELISTED reader.
-            const decodedValidatorEntry = nodeEntryUtils.decode(validatorEntry);
-            if (decodedValidatorEntry === null) return;
-            const validatorBalance = toBalance(decodedNodeEntry.balance)
-            if (validatorBalance === null) return;
-            const paidBalance = requesterBalance.add(BALANCE_FEE.percentage(PERCENT_75))
-            if (paidBalance === null) return;
-            const updateValidatorEntry = paidBalance.update(validatorEntry)
-            if (updateValidatorEntry === null) return;
+        // Charging fee from the requester
+        const decodedNodeEntry = nodeEntryUtils.decode(requesterNodeEntry);
+        if (decodedNodeEntry === null) return;
 
-            const decodedNodeEntry = nodeEntryUtils.decode(nodeEntry);
-            if (decodedNodeEntry === null) return;
+        const requesterBalance = toBalance(decodedNodeEntry.balance);
+        if (requesterBalance === null) return;
 
-            // Fee
-            const requesterBalance = toBalance(decodedNodeEntry.balance)
-            if (requesterBalance === null) return;
-            if (!requesterBalance.greaterThanOrEquals(BALANCE_FEE)) return;
-            const updatedBalance = requesterBalance.sub(BALANCE_FEE) // Remove the fee
-            if (updatedBalance === null) return;
+        if (!requesterBalance.greaterThanOrEquals(BALANCE_FEE)) return;
 
-            // Downgrade role from WRITER to WHITELISTED
-            const updatedNodeEntry = nodeEntryUtils.setRole(nodeEntry, nodeRoleUtils.NodeRole.WHITELISTED);
-            if (updatedNodeEntry === null) return;
-            const chargedNodeEntry = updatedBalance.update(updatedNodeEntry)
-            if (chargedNodeEntry === null) return;
+        const updatedBalance = requesterBalance.sub(BALANCE_FEE);
+        if (updatedBalance === null) return;
 
-            // Actually pay the fee
-            await batch.put(validatorAddressString, updateValidatorEntry);
-            // Remove the writer role and update the state
-            await base.removeWriter(decodedNodeEntry.wk);
-            await batch.put(requesterAddressString, chargedNodeEntry);
-            await batch.put(txHashHexString, node.value);
-            console.log(`Writer removed: addr:wk:tx - ${requesterAddressString}:${op.rao.iw.toString('hex')}:${txHashHexString}`);
-        }
+        // Downgrade role from WRITER to WHITELISTED and deduct the fee from the requester's balance
+        const updatedNodeEntry = nodeEntryUtils.setRole(requesterNodeEntry, nodeRoleUtils.NodeRole.WHITELISTED);
+        if (updatedNodeEntry === null) return;
+        const chargedNodeEntry = updatedBalance.update(updatedNodeEntry);
+        if (chargedNodeEntry === null) return;
+
+        // Validator reward logic 
+        const decodedValidatorEntry = nodeEntryUtils.decode(validatorNodeEntry);
+        if (decodedValidatorEntry === null) return;
+
+        const validatorBalance = toBalance(decodedValidatorEntry.balance)
+        if (validatorBalance === null) return;
+
+        const validatorNewBalance = validatorBalance.add(BALANCE_FEE.percentage(PERCENT_75))
+        if (validatorNewBalance === null) return;
+
+        const updateValidatorEntry = validatorNewBalance.update(validatorNodeEntry)
+        if (updateValidatorEntry === null) return;
+
+        // Remove the writer role and update the state
+        await base.removeWriter(decodedNodeEntry.wk);
+        await batch.put(requesterAddressString, chargedNodeEntry);
+        // Actually pay the fee
+        await batch.put(validatorAddressString, updateValidatorEntry);
+        await batch.put(txHashHexString, node.value);
+        console.log(`Writer removed: addr:wk:tx - ${requesterAddressString}:${op.rao.iw.toString('hex')}:${txHashHexString}`);
     }
 
     async #handleApplyAddIndexerOperation(op, view, base, node, batch) {
