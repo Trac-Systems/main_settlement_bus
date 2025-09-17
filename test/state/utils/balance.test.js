@@ -3,139 +3,230 @@ import b4a from 'b4a';
 import { randomBuffer, TEN_THOUSAND_VALUE, tokenUnits } from '../stateTestUtils.js';
 import { ZERO_BALANCE, decode, encode } from '../../../src/core/state/utils/nodeEntry.js';
 import { WRITER_BYTE_LENGTH, ADMIN_INITIAL_BALANCE, BALANCE_BYTE_LENGTH } from '../../../src/utils/constants.js';
-import { $TNK, toBalance } from '../../../src/core/state/utils/balance.js';
-import { NULL_BUFFER } from '../../../src/utils/buffer.js';
+import { $TNK, toBalance, toTerm, percent } from '../../../src/core/state/utils/balance.js';
+import { bufferToBigInt } from '../../../src/utils/amountSerialization.js';
 
 test('Balance#asHex explicit', t => {
   const val = $TNK(1000n)
   t.is(toBalance(val).asHex(), b4a.toString(val, 'hex'), 'hex matches')
 })
 
-test('Balance#add with zero', t => {
-    const node = {
-        wk: randomBuffer(WRITER_BYTE_LENGTH),
-        isWhitelisted: true,
-        isWriter: true,
-        isIndexer: false,
-        balance: ZERO_BALANCE
-    };
+test('Balance#add', () => {
+    test('with zero', t => {
+        const node = {
+            wk: randomBuffer(WRITER_BYTE_LENGTH),
+            isWhitelisted: true,
+            isWriter: true,
+            isIndexer: false,
+            balance: ZERO_BALANCE
+        };
+    
+        const balance = toBalance(node.balance)
+        const addedBalance = balance.add(toBalance(TEN_THOUSAND_VALUE))
+    
+        const encoded = encode(node)
+        addedBalance.update(encoded)
+    
+        const updated = decode(encoded)
+        t.ok(b4a.equals(updated.balance, TEN_THOUSAND_VALUE), 'balance matches');
+    });
+    
+    test('other stuff', t => {
+        const node = {
+            wk: randomBuffer(WRITER_BYTE_LENGTH),
+            isWhitelisted: true,
+            isWriter: true,
+            isIndexer: false,
+            balance: TEN_THOUSAND_VALUE
+        };
+    
+        const balance = toBalance(node.balance)
+        const addedBalance = balance.add(toBalance(TEN_THOUSAND_VALUE))
+        t.is(addedBalance.asHex(), '00000000000000000000000000004e20', 'balance matches');
+    });
+    
+    test('overflow returns NULL_BUFFER', t => {
+        const max = b4a.alloc(BALANCE_BYTE_LENGTH, 0xFF);
+        const balance = toBalance(max);
+    
+        const oneRaw = b4a.alloc(BALANCE_BYTE_LENGTH);
+        oneRaw[oneRaw.length - 1] = 1; // +1
+    
+        const result = balance.add(toBalance(oneRaw));
+    
+        // Should return null-like buffer on overflow
+        t.is(result, null, 'overflow returns null');
+    });
+    
+    test('edge case: max - 1 + 1 = max', t => {
+        const maxMinusOne = b4a.alloc(BALANCE_BYTE_LENGTH, 0xFF);
+        maxMinusOne[maxMinusOne.length - 1] = 0xFE;
+        const balance = toBalance(maxMinusOne);
+    
+        const oneRaw = b4a.alloc(BALANCE_BYTE_LENGTH);
+        oneRaw[oneRaw.length - 1] = 1;
+    
+        const result = balance.add(toBalance(oneRaw));
+    
+        // Should equal max value
+        const expected = b4a.alloc(BALANCE_BYTE_LENGTH, 0xFF);
+        t.ok(b4a.equals(result.value, expected), 'max - 1 + 1 = max');
+    });
+})
 
-    const balance = toBalance(node.balance)
-    const addedBalance = balance.add(toBalance(TEN_THOUSAND_VALUE))
+test('Balance#sub', () => {
+    test('with zero', t => {
+        const node = {
+            wk: randomBuffer(WRITER_BYTE_LENGTH),
+            isWhitelisted: true,
+            isWriter: true,
+            isIndexer: false,
+            balance: TEN_THOUSAND_VALUE
+        };
+    
+        const balance = toBalance(node.balance)
+        const subBalance = balance.sub(toBalance(ZERO_BALANCE))
+    
+        const encoded = encode(node)
+        subBalance.update(encoded)
+    
+        const updated = decode(encoded)
+        t.ok(b4a.equals(updated.balance, TEN_THOUSAND_VALUE), 'balance matches');
+    });
+    
+    test('zero from value', t => {
+        const node = {
+            wk: randomBuffer(WRITER_BYTE_LENGTH),
+            isWhitelisted: true,
+            isWriter: true,
+            isIndexer: false,
+            balance: TEN_THOUSAND_VALUE
+        };
+    
+        const balance = toBalance(node.balance)
+        const subBalance = balance.sub(toBalance(ZERO_BALANCE))
+    
+        const encoded = encode(node)
+        subBalance.update(encoded)
+    
+        const updated = decode(encoded)
+        t.ok(b4a.equals(updated.balance, TEN_THOUSAND_VALUE), 'balance matches');
+    });
+    
+    test('underflow returns NULL_BUFFER', t => {
+        const a = $TNK(1000n);
+        const b = $TNK(2000n);
+        const result = toBalance(a).sub(toBalance(b));
+    
+        // Should return null-like buffer on underflow
+        t.is(result, null, 'overflow returns null');
+    });
+    
+    test('edge case: equal amounts = zero', t => {
+        const a = $TNK(5000n);
+        const b = $TNK(5000n);
+        const result = toBalance(a).sub(toBalance(b));
+    
+        const expected = b4a.alloc(BALANCE_BYTE_LENGTH); // all zeros
+        t.ok(b4a.equals(result.value, expected), 'equal amounts subtract to zero');
+    });
+    
+    test('edge case: one less than a', t => {
+        const a = $TNK(1000n);
+        const b = $TNK(999n);
+        const result = toBalance(a).sub(toBalance(b));
+    
+        const expected = $TNK(1n);
+        t.ok(b4a.equals(result.value, expected), 'subtracting 999 from 1000 gives 1');
+    });
+})
 
-    const encoded = encode(node)
-    addedBalance.update(encoded)
+test('Balance#mul', () => {
+    test('basic multiplication', t => {
+        const a = $TNK(1000n);
+        const result = toBalance(a).mul(toTerm(4n));
 
-    const updated = decode(encoded)
-    t.ok(b4a.equals(updated.balance, TEN_THOUSAND_VALUE), 'balance matches');
-});
+        // Should return null-like buffer on underflow
+        t.ok(toBalance($TNK(4000n)).equals(result), 'equal 4000n');
+    })
 
-test('Balance#add other stuff', t => {
-    const node = {
-        wk: randomBuffer(WRITER_BYTE_LENGTH),
-        isWhitelisted: true,
-        isWriter: true,
-        isIndexer: false,
-        balance: TEN_THOUSAND_VALUE
-    };
+    test('zero multiplication', t => {
+        const a = $TNK(4000n);
+        const result = toBalance(a).mul(toTerm(0n));
+    
+        // Should return null-like buffer on underflow
+        t.ok(result.equals(toBalance($TNK(0n))), 'returns zero');
+    })
 
-    const balance = toBalance(node.balance)
-    const addedBalance = balance.add(toBalance(TEN_THOUSAND_VALUE))
-    t.is(addedBalance.asHex(), '00000000000000000000000000004e20', 'balance matches');
-});
+    test('zero value multiplication', t => {
+        const a = toBalance($TNK(0n));
+        const result = a.mul(toTerm(1000n));
+    
+        // Should return null-like buffer on underflow
+        t.ok(result.equals(toBalance($TNK(0n))), 'returns zero');
+    })
 
-test('Balance#add overflow returns NULL_BUFFER', t => {
-    const max = b4a.alloc(BALANCE_BYTE_LENGTH, 0xFF);
-    const balance = toBalance(max);
+    test('zero value multiplication', t => {
+        const a = toBalance($TNK(0n));
+        const result = a.mul(toTerm(1000n));
+    
+        // Should return null-like buffer on underflow
+        t.ok(result.equals(toBalance($TNK(0n))), 'returns zero');
+    })
 
-    const oneRaw = b4a.alloc(BALANCE_BYTE_LENGTH);
-    oneRaw[oneRaw.length - 1] = 1; // +1
+    test('overflow returns NULL_BUFFER', t => {
+        const max = b4a.alloc(BALANCE_BYTE_LENGTH, 0xFF);
+        const balance = toBalance(max);
+       
+        const balance2 = toBalance(max);
+    
+        const result = balance.mul(balance2);
+    
+        // Should return null-like buffer on overflow
+        t.is(result, null, 'overflow returns null');
+    });
+})
 
-    const result = balance.add(toBalance(oneRaw));
+test('Balance#div', () => {
+    test('basic division', t => {
+        const a = $TNK(4000n);
+        const result = toBalance(a).div(toTerm(4n));
+    
+        // Should return null-like buffer on underflow
+        t.ok(toBalance($TNK(1000n)).equals(result), 'equal 1000n');
+    })
 
-    // Should return null-like buffer on overflow
-    t.is(result, null, 'overflow returns null');
-});
+    test('zero division', t => {
+        const a = $TNK(4000n);
+        const result = toBalance(a).div(toTerm(0n));
+    
+        // Should return null-like buffer on underflow
+        t.is(result, null, 'returns null');
+    })
 
-test('Balance#add edge case: max - 1 + 1 = max', t => {
-    const maxMinusOne = b4a.alloc(BALANCE_BYTE_LENGTH, 0xFF);
-    maxMinusOne[maxMinusOne.length - 1] = 0xFE;
-    const balance = toBalance(maxMinusOne);
+    test('zero value division', t => {
+        const a = toBalance($TNK(0n));
+        const result = a.div(toTerm(1000n));
+    
+        // Should return null-like buffer on underflow
+        t.ok(result.equals(toBalance($TNK(0n))), 'returns 0');
+    })
+})
 
-    const oneRaw = b4a.alloc(BALANCE_BYTE_LENGTH);
-    oneRaw[oneRaw.length - 1] = 1;
+test('Balance#percentage', () => {
+    test('basic percentage', t => {
+        const a = $TNK(1000n);
+        const result = toBalance(a).percentage(percent(4));
+    
+        // Should return null-like buffer on underflow
+        t.ok(toBalance($TNK(40n)).equals(result), 'equal 40n');
+    })
+})
 
-    const result = balance.add(toBalance(oneRaw));
-
-    // Should equal max value
-    const expected = b4a.alloc(BALANCE_BYTE_LENGTH, 0xFF);
-    t.ok(b4a.equals(result.value, expected), 'max - 1 + 1 = max');
-});
-
-test('Balance#sub with zero', t => {
-    const node = {
-        wk: randomBuffer(WRITER_BYTE_LENGTH),
-        isWhitelisted: true,
-        isWriter: true,
-        isIndexer: false,
-        balance: TEN_THOUSAND_VALUE
-    };
-
-    const balance = toBalance(node.balance)
-    const subBalance = balance.sub(toBalance(ZERO_BALANCE))
-
-    const encoded = encode(node)
-    subBalance.update(encoded)
-
-    const updated = decode(encoded)
-    t.ok(b4a.equals(updated.balance, TEN_THOUSAND_VALUE), 'balance matches');
-});
-
-test('Balance#sub zero from value', t => {
-    const node = {
-        wk: randomBuffer(WRITER_BYTE_LENGTH),
-        isWhitelisted: true,
-        isWriter: true,
-        isIndexer: false,
-        balance: TEN_THOUSAND_VALUE
-    };
-
-    const balance = toBalance(node.balance)
-    const subBalance = balance.sub(toBalance(ZERO_BALANCE))
-
-    const encoded = encode(node)
-    subBalance.update(encoded)
-
-    const updated = decode(encoded)
-    t.ok(b4a.equals(updated.balance, TEN_THOUSAND_VALUE), 'balance matches');
-});
-
-test('Balance#sub underflow returns NULL_BUFFER', t => {
-    const a = $TNK(1000n);
-    const b = $TNK(2000n);
-    const result = toBalance(a).sub(toBalance(b));
-
-    // Should return null-like buffer on underflow
-    t.is(result, null, 'overflow returns null');
-});
-
-test('Balance#sub edge case: equal amounts = zero', t => {
-    const a = $TNK(5000n);
-    const b = $TNK(5000n);
-    const result = toBalance(a).sub(toBalance(b));
-
-    const expected = b4a.alloc(BALANCE_BYTE_LENGTH); // all zeros
-    t.ok(b4a.equals(result.value, expected), 'equal amounts subtract to zero');
-});
-
-test('Balance#sub edge case: one less than a', t => {
-    const a = $TNK(1000n);
-    const b = $TNK(999n);
-    const result = toBalance(a).sub(toBalance(b));
-
-    const expected = $TNK(1n);
-    t.ok(b4a.equals(result.value, expected), 'subtracting 999 from 1000 gives 1');
-});
+test('toTerm', t => {
+    const converted = bufferToBigInt(toTerm(4n))
+    t.is(converted, 4n, 'overflow returns null');
+})
 
 test('Balance#asBigInt', t => {
     const node = {

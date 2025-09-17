@@ -858,6 +858,8 @@ export class MainSettlementBus extends ReadyResource {
                     this.#state.writingKey,
                 );
                 break;
+            
+            // DELETE BEFORE DEPLOYMENT /TEST
             case '/test':
                 const contentHash = randomBytes(32).toString('hex');
                 const randomExternalBootstrap = "5adb970a73e20e8e2e896cd0c30cf025a0b32ec6fe026b98c6714115239607ac"
@@ -936,15 +938,18 @@ export class MainSettlementBus extends ReadyResource {
                 else if (input.startsWith("/get_deployment")) {
                     const splitted = input.split(" ");
                     const bootstrapHex = splitted[1];
-                    const txHash = await this.#state.getRegisteredBootstrapEntry(bootstrapHex);
-                    if (txHash) {
-                        console.log(`Bootstrap deployed under transaction hash: ${txHash.toString('hex')}`);
-                        const payload = await this.#state.getSigned(txHash.toString('hex'));
+                    const deploymentEntry = await this.#state.getRegisteredBootstrapEntry(bootstrapHex);
+
+                    if (deploymentEntry) {
+                        const decodedDeploymentEntry = deploymentEntryUtils.decode(deploymentEntry)
+                        const txhash = decodedDeploymentEntry.txHash.toString('hex');
+                        console.log(`Bootstrap deployed under transaction hash: ${txhash}`);
+                        const payload = await this.#state.getSigned(txhash);
                         if (payload) {
                             const decoded = safeDecodeApplyOperation(payload);
                             console.log('Decoded Bootstrap Deployment Payload:', decoded);
                         } else {
-                            console.log(`No payload found for transaction hash: ${txHash.toString('hex')}`);
+                            console.log(`No payload found for transaction hash: ${txhash}`);
                         }
                     } else {
                         console.log(`No deployment found for bootstrap: ${bootstrapHex}`);
