@@ -1011,7 +1011,7 @@ export class MainSettlementBus extends ReadyResource {
                         const hashes = await this.#state.confirmedTransactionsBetween(start, end);    
                         return { hashes }
                     } catch (error) {
-                        throw new Error("Invalid params to perform the request.", error);
+                        throw new Error("Invalid params to perform the request.", error.message);
                     }
                 }
         }
