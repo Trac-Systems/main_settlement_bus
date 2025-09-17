@@ -514,7 +514,7 @@ class State extends ReadyResource {
 
         const writerKeyHasBeenRegistered = await this.#getRegisteredWriterKeyApply(batch, op.rao.iw.toString('hex'))
         if (writerKeyHasBeenRegistered !== null) return; // writer key should NOT have been associated with any address because this is a recovery operation
-        
+
         // verify tx validity - prevent deferred execution attack
         const indexersSequenceState = await this.#getIndexerSequenceStateApply(base);
         if (indexersSequenceState === null) return;
@@ -601,7 +601,7 @@ class State extends ReadyResource {
         // Validate recipient public key
         const requesterAdminPublicKey = PeerWallet.decodeBech32mSafe(adminAddressString);
         if (requesterAdminPublicKey === null) return;
-        
+
         // Retrieve and decode the admin entry to verify the operation is initiated by an admin
         const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
         if (adminEntry === null) return;
@@ -612,7 +612,7 @@ class State extends ReadyResource {
         const adminAddress = decodedAdminEntry.address;
         const adminPublicKey = PeerWallet.decodeBech32mSafe(adminAddress);
         if (adminPublicKey === null) return;
-        
+
         //admin consistency check
         if (!b4a.equals(adminPublicKey, requesterAdminPublicKey)) return;
 
@@ -627,7 +627,7 @@ class State extends ReadyResource {
         // verify signature createMessage(this.#address, this.#txValidity, this.#incomingAddress, nonce, this.#operationType);
         const message = createMessage(op.address, op.aco.txv, op.aco.ia, op.aco.in, OperationType.APPEND_WHITELIST);
         if (message.length === 0) return;
-        
+
         // verify signature
         const hash = await blake3Hash(message);
         if (!b4a.equals(hash, op.aco.tx)) return;
@@ -643,7 +643,7 @@ class State extends ReadyResource {
         // Check if the operation has already been applied
         const opEntry = await this.#getEntryApply(hashHexString, batch);
         if (opEntry !== null) return;
-        
+
         // Retrieve the node entry to check its current role
         const nodeEntry = await this.#getEntryApply(nodeAddressString, batch);
         if (nodeEntryUtils.isWhitelisted(nodeEntry)) return; // Node is already whitelisted
@@ -719,12 +719,20 @@ class State extends ReadyResource {
         const requesterPublicKey = PeerWallet.decodeBech32mSafe(requesterAddressString);
         if (requesterPublicKey === null) return;
 
+        // if node want to register ZERO_WK, then this is NOT ALLOWED
         if (b4a.equals(op.rao.iw, ZERO_WK)) return;
 
         // verify requester signature
-        const requesterMessage = createMessage(op.address, op.rao.txv, op.rao.iw, op.rao.in, OperationType.ADD_WRITER)
-        const hash = await blake3Hash(requesterMessage);
+        const requesterMessage = createMessage(
+            op.address,
+            op.rao.txv,
+            op.rao.iw,
+            op.rao.in,
+            OperationType.ADD_WRITER
+        );
+        if (requesterMessage.length === 0) return;
 
+        const hash = await blake3Hash(requesterMessage);
         if (!b4a.equals(hash, op.rao.tx)) return;
 
         const isRequesterMessageVerifed = this.#wallet.verify(op.rao.is, op.rao.tx, requesterPublicKey);
@@ -735,10 +743,17 @@ class State extends ReadyResource {
         const validatorAddress = op.rao.va;
         const validatorAddressString = addressUtils.bufferToAddress(validatorAddress);
         if (validatorAddressString === null) return;
+
+        // validate validator public key
         const validatorPublicKey = PeerWallet.decodeBech32mSafe(validatorAddressString);
         if (validatorPublicKey === null) return;
 
-        const validatorMessage = createMessage(op.rao.tx, op.rao.va, op.rao.vn, OperationType.ADD_WRITER);
+        const validatorMessage = createMessage(
+            op.rao.tx,
+            op.rao.va,
+            op.rao.vn,
+            OperationType.ADD_WRITER
+        );
         const validatorHash = await blake3Hash(validatorMessage);
         const isValidatorMessageVerifed = this.#wallet.verify(op.rao.vs, validatorHash, validatorPublicKey);
         if (!isValidatorMessageVerifed) return;
@@ -748,13 +763,13 @@ class State extends ReadyResource {
         if (indexersSequenceState === null) return;
         if (!b4a.equals(op.rao.txv, indexersSequenceState)) return;
 
-        // Check if the operation has already been applied
-        const opEntry = await this.#getEntryApply(txHashHexString, batch);
-
         // anti-replay attack
-        if (null !== opEntry) return;
-        const writerKeyIsRegistered = await this.#getRegisteredWriterKeyApply(batch, op.rao.iw.toString('hex'))
-        if (!!writerKeyIsRegistered) return;
+        const opEntry = await this.#getEntryApply(txHashHexString, batch);
+        if (opEntry !== null) return;
+
+        const writerKeyHasBeenRegistered = await this.#getRegisteredWriterKeyApply(batch, op.rao.iw.toString('hex'))
+        if (writerKeyHasBeenRegistered !== null) return;
+
         await this.#addWriter(op, base, node, batch, txHashHexString, requesterAddressString, requesterAddressBuffer, validatorAddressString);
     }
 
@@ -791,42 +806,52 @@ class State extends ReadyResource {
 
     async #addWriter(op, base, node, batch, txHashHexString, requesterAddressString, requesterAddressBuffer, validatorAddressString) {
         // Retrieve the node entry for the given address, if null then do not process...
-        const nodeEntry = await this.#getEntryApply(requesterAddressString, batch);
-        if (nodeEntry === null) return;
+        const requesterNodeEntry = await this.#getEntryApply(requesterAddressString, batch);
+        if (requesterNodeEntry === null) return;
 
-        const isWhitelisted = nodeEntryUtils.isWhitelisted(nodeEntry);
-        const isWriter = nodeEntryUtils.isWriter(nodeEntry);
-        const isIndexer = nodeEntryUtils.isIndexer(nodeEntry);
+        const isWhitelisted = nodeEntryUtils.isWhitelisted(requesterNodeEntry);
+        const isWriter = nodeEntryUtils.isWriter(requesterNodeEntry);
+        const isIndexer = nodeEntryUtils.isIndexer(requesterNodeEntry);
 
         // To become a writer the node must be whitelisted and not already a writer or indexer
         if (isIndexer || isWriter || !isWhitelisted) return;
 
-        // Fee
-        const decodedNodeEntry = nodeEntryUtils.decode(nodeEntry)
+        // Charging fee from the requester
+        const decodedNodeEntry = nodeEntryUtils.decode(requesterNodeEntry)
         if (decodedNodeEntry === null) return;
+
         const requesterBalance = toBalance(decodedNodeEntry.balance)
         if (requesterBalance === null) return;
+
         if (!requesterBalance.greaterThanOrEquals(BALANCE_FEE)) return;
+
         const updatedBalance = requesterBalance.sub(BALANCE_FEE) // Remove the fee
         if (updatedBalance === null) return;
-        const validatorEntry = await this.#getEntryApply(validatorAddressString, batch);
-        if (validatorEntry === null) return;
-        const decodedValidatorEntry = nodeEntryUtils.decode(validatorEntry)
-        if (decodedValidatorEntry === null) return;
-        const validatorBalance = toBalance(decodedValidatorEntry.balance)
-        if (validatorBalance === null) return;
-        const updatedValidatorBalance = validatorBalance.add(BALANCE_FEE.percentage(PERCENT_75)) // Credit a percentage to validator
-        if (updatedValidatorBalance === null) return;
-        const updatedValidatorEntry = updatedValidatorBalance.update(validatorEntry)
-        if (updatedValidatorEntry === null) return;
 
-        // Update the node entry to assign the writer role
-        const updatedNodeEntry = nodeEntryUtils.setRoleAndWriterKey(nodeEntry, nodeRoleUtils.NodeRole.WRITER, op.rao.iw);
+        // Update the node entry to assign the writer role and deduct the fee from the requester's balance
+        const updatedNodeEntry = nodeEntryUtils.setRoleAndWriterKey(requesterNodeEntry, nodeRoleUtils.NodeRole.WRITER, op.rao.iw);
         if (updatedNodeEntry === null) return;
+
         const chargedUpdatedNodeEntry = updatedBalance.update(updatedNodeEntry)
         if (chargedUpdatedNodeEntry === null) return;
 
-        // Pay the fee
+        // reward the validator
+        const validatorEntry = await this.#getEntryApply(validatorAddressString, batch);
+        if (validatorEntry === null) return;
+
+        const decodedValidatorEntry = nodeEntryUtils.decode(validatorEntry)
+        if (decodedValidatorEntry === null) return;
+
+        const validatorBalance = toBalance(decodedValidatorEntry.balance)
+        if (validatorBalance === null) return;
+
+        const updatedValidatorBalance = validatorBalance.add(BALANCE_FEE.percentage(PERCENT_75))
+        if (updatedValidatorBalance === null) return;
+        
+        const updatedValidatorEntry = updatedValidatorBalance.update(validatorEntry)
+        if (updatedValidatorEntry === null) return;
+
+        // Pay the fee to the validator
         await batch.put(validatorAddressString, updatedValidatorEntry);
 
         // Add the writer role to the base and update the batch
