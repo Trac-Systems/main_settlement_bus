@@ -587,18 +587,20 @@ class State extends ReadyResource {
         const nodeEntry = await this.#getEntryApply(nodeAddressString, batch);
         if (nodeEntryUtils.isWhitelisted(nodeEntry)) return; // Node is already whitelisted
 
-        // Fee
-        const adminNodeEntry = await this.#getEntryApply(adminAddressString, batch);
-        if (null === adminNodeEntry) return;
-        const decodedNodeEntry = nodeEntryUtils.decode(adminNodeEntry)
-        if (null === decodedNodeEntry) return;
-        const adminBalance = toBalance(decodedNodeEntry.balance)
-        if (null === adminBalance) return;
-        const newAdminBalance = adminBalance.sub(transactionUtils.FEE) // we burn
-        if (null === newAdminBalance) return;
-        const updatedAdminEntry = newAdminBalance.update(adminNodeEntry)
-        if (null === updatedRequesterEntry) return;
-        await batch.put(adminAddressString, updatedAdminEntry);
+        if (await this.#isApplyInitalizationDisabled(batch)) {            
+            // Fee
+            const adminNodeEntry = await this.#getEntryApply(adminAddressString, batch);
+            if (null === adminNodeEntry) return;
+            const decodedNodeEntry = nodeEntryUtils.decode(adminNodeEntry)
+            if (null === decodedNodeEntry) return;
+            const adminBalance = toBalance(decodedNodeEntry.balance)
+            if (null === adminBalance) return;
+            const newAdminBalance = adminBalance.sub(BALANCE_FEE) // we burn
+            if (null === newAdminBalance) return;
+            const updatedAdminEntry = newAdminBalance.update(adminNodeEntry)
+            if (null === updatedRequesterEntry) return;
+            await batch.put(adminAddressString, updatedAdminEntry);
+        }
 
         if (!nodeEntry) {
             // If the node entry does not exist, create a new whitelisted node entry
@@ -686,7 +688,7 @@ class State extends ReadyResource {
         if (null !== opEntry) return;
         const writerKeyIsRegistered = await this.#getRegisteredWriterKeyApply(batch, op.rao.iw.toString('hex'))
         if (!!writerKeyIsRegistered) return;
-        await this.#addWriter(op, base, node, batch, txHashHexString, requesterAddressString, requesterAddressBuffer);
+        await this.#addWriter(op, base, node, batch, txHashHexString, requesterAddressString, requesterAddressBuffer, validatorAddressString);
     }
 
     async #isApplyInitalizationDisabled(batch) {
@@ -720,7 +722,7 @@ class State extends ReadyResource {
         await batch.put(EntryType.WRITERS_LENGTH, incrementedLength);
     }
 
-    async #addWriter(op, base, node, batch, txHashHexString, requesterAddressString, requesterAddressBuffer) {
+    async #addWriter(op, base, node, batch, txHashHexString, requesterAddressString, requesterAddressBuffer, validatorAddressString) {
         // Retrieve the node entry for the given address, if null then do not process...
         const nodeEntry = await this.#getEntryApply(requesterAddressString, batch);
         if (nodeEntry === null) return;
@@ -731,13 +733,36 @@ class State extends ReadyResource {
 
         // To become a writer the node must be whitelisted and not already a writer or indexer
         if (isIndexer || isWriter || !isWhitelisted) return;
+
+        // Fee
+        const decodedNodeEntry = nodeEntryUtils.decode(nodeEntry)
+        if (decodedNodeEntry === null) return;
+        const requesterBalance = toBalance(decodedNodeEntry.balance)
+        if (requesterBalance === null) return;
+        const updatedBalance = requesterBalance.sub(BALANCE_FEE) // Remove the fee
+        const validatorEntry = await this.#getEntryApply(validatorAddressString, batch);
+        if (validatorEntry === null) return;
+        const decodedValidatorEntry = nodeEntryUtils.decode(validatorEntry)
+        if (decodedValidatorEntry === null) return;
+        const validatorBalance = toBalance(decodedValidatorEntry.balance)
+        if (validatorBalance === null) return;
+        const updatedValidatorBalance = validatorBalance.add(BALANCE_FEE.percentage(feeRate.TRANSFER)) // Credit a percentage to validator
+        if (updatedValidatorBalance === null) return;
+        const updatedValidatorEntry = updatedValidatorBalance.update(validatorEntry)
+        if (updatedValidatorEntry === null) return;
+
         // Update the node entry to assign the writer role
         const updatedNodeEntry = nodeEntryUtils.setRoleAndWriterKey(nodeEntry, nodeRoleUtils.NodeRole.WRITER, op.rao.iw);
         if (updatedNodeEntry === null) return;
+        const chargedUpdatedNodeEntry = updatedBalance.update(updatedNodeEntry)
+        if (chargedUpdatedNodeEntry === null) return;
+
+        // Pay the fee
+        await batch.put(validatorAddressString, updatedValidatorEntry);
 
         // Add the writer role to the base and update the batch
         await base.addWriter(op.rao.iw, { isIndexer: false });
-        await batch.put(requesterAddressString, updatedNodeEntry);
+        await batch.put(requesterAddressString, chargedUpdatedNodeEntry);
         await batch.put(EntryType.WRITER_ADDRESS + op.rao.iw.toString('hex'), op.address);
         await this.#updateWritersIndex(requesterAddressBuffer, batch);
 
@@ -957,7 +982,7 @@ class State extends ReadyResource {
         if (null === decodedRequesterEntry) return;
         const requesterBalance = toBalance(decodedRequesterEntry.balance)
         if (null === requesterBalance) return;
-        const newRequesterBalance = requesterBalance.sub(transactionUtils.FEE) // we burn
+        const newRequesterBalance = requesterBalance.sub(BALANCE_FEE) // we burn
         if (null === newRequesterBalance) return;
         const updatedRequesterEntry = newRequesterBalance.update(requesterEntry)
         if (null === updatedRequesterEntry) return;

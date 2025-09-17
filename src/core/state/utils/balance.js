@@ -3,9 +3,12 @@ import { setBalance, ZERO_BALANCE } from './nodeEntry.js';
 import { isBufferValid, bigIntToBuffer, NULL_BUFFER } from '../../../utils/buffer.js';
 import { BALANCE_BYTE_LENGTH, TOKEN_DECIMALS } from '../../../utils/constants.js';
 import { bufferToBigInt } from '../../../utils/amountSerialization.js';
+import { FEE } from './transaction.js';
 
 const DOUBLE_LENGTH = BALANCE_BYTE_LENGTH * 2
 const PERCENTAGE_TERM = bigIntToBuffer(10_000n, DOUBLE_LENGTH)
+
+export const BALANCE_FEE = toBalance(FEE)
 
 /**
  * Converts a bigint amount of tokens into a fixed-length buffer,
