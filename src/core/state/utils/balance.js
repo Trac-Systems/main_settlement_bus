@@ -231,17 +231,6 @@ class Balance {
     }
 
     /**
-     * Reduce to its percentage
-     * @param {Buffer} percent - the buffer percentage (with two extra decimals). Expected to be used along with percent function.
-     * @returns {Balance} - New Balance instance
-     */
-    percentage(percent) {
-        const dividend = mulBuffers(this.#value, percent)
-        const result = divBuffers(dividend, PERCENTAGE_TERM)
-        return toBalance(result)
-    }
-
-    /**
      * Divide a balance by a number in bytes
      * @param {Buffer} b - to be used along `toTerm`
      * @returns {Balance} - New Balance instance
