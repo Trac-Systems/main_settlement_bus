@@ -1227,7 +1227,7 @@ class State extends ReadyResource {
         const requesterAddressBuffer = op.address;
         const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer);
         if (requesterAddressString === null) return;
-        
+
         // Validate requester public key
         const requesterPublicKey = PeerWallet.decodeBech32mSafe(requesterAddressString);
         if (requesterPublicKey === null) return;
@@ -1255,7 +1255,7 @@ class State extends ReadyResource {
             OperationType.BAN_VALIDATOR
         );
         if (message.length === 0) return;
-        
+
         // compare hashes
         const regeneratedHash = await blake3Hash(message);
         if (!b4a.equals(regeneratedHash, op.aco.tx)) return;
@@ -1345,9 +1345,11 @@ class State extends ReadyResource {
         // validate requester signature
         const requesterAddressBuffer = op.address;
         const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer);
-        if (null === requesterAddressString) return;
+        if (requesterAddressString === null) return;
+
+        // validate requester public key
         const requesterPublicKey = PeerWallet.decodeBech32mSafe(requesterAddressString);
-        if (null === requesterPublicKey) return;
+        if (requesterPublicKey === null) return;
 
         // recreate requester message
         const requesterMessage = createMessage(
@@ -1357,7 +1359,6 @@ class State extends ReadyResource {
             op.bdo.in,
             OperationType.BOOTSTRAP_DEPLOYMENT
         );
-
         if (requesterMessage.length === 0) return;
 
         // ensure that tx is valid
@@ -1369,12 +1370,14 @@ class State extends ReadyResource {
 
         const bootstrapDeploymentHexString = op.bdo.bs.toString('hex');
 
-        //second signature
+        //validation of validator signature
         const validatorAddressBuffer = op.bdo.va;
         const validatorAddressString = addressUtils.bufferToAddress(validatorAddressBuffer);
-        if (null === validatorAddressString) return;
+        if (validatorAddressString === null) return;
+
+        // validate validator public key
         const validatorPublicKey = PeerWallet.decodeBech32mSafe(validatorAddressString);
-        if (null === validatorPublicKey) return;
+        if (validatorPublicKey === null) return;
 
         // recreate validator message
         const validatorMessage = createMessage(
@@ -1397,7 +1400,7 @@ class State extends ReadyResource {
         // anti-replay attack
         const hashHexString = op.bdo.tx.toString('hex');
         const opEntry = await this.#getEntryApply(hashHexString, batch);
-        if (null !== opEntry) return; // Operation has already been applied.
+        if (opEntry !== null) return; // Operation has already been applied.
 
         // If deployment already exists, do not process it again.
         const alreadyRegisteredBootstrap = await this.#getDeploymentEntryApply(bootstrapDeploymentHexString, batch);
@@ -1589,6 +1592,10 @@ class State extends ReadyResource {
         if (updatedSubnetworkCreatorNodeEntry === null) return;
 
         // 25% of the fee is burned.
+
+        // OBSERVATION: If TX operation will be requested by the subnetwork creator on their own bootstrap, how we should charge the fee? It looks like Bootstrap deployer
+        // is paying 0.03, however they are receiving 0.0075 back, so the final fee is 0.0225. I think it's fair enough. It this case we should burn reward for Bootstrap deployer.
+
         await batch.put(requesterAddressString, updatedRequesterNodeEntry);
         await batch.put(subnetworkCreatorAddressString, updatedSubnetworkCreatorNodeEntry);
         await batch.put(validatorAddressString, updatedValidatorNodeEntry);
@@ -1684,13 +1691,15 @@ class State extends ReadyResource {
         );
 
         if (null === transferResult) return;
-        await batch.put(requesterAddressString, transferResult.senderEntry);
-        await batch.put(validatorAddressString, transferResult.validatorEntry);
-
+        if (null === transferResult.senderEntry) return;
+        if (null === transferResult.validatorEntry) return;
         if (!isSelfTransfer) {
+            if (null === transferResult.recipientEntry) return;
             await batch.put(recipientAddressString, transferResult.recipientEntry);
         }
 
+        await batch.put(requesterAddressString, transferResult.senderEntry);
+        await batch.put(validatorAddressString, transferResult.validatorEntry);
         await batch.put(hashHexString, node.value);
 
         if (this.#enable_txlogs === true) {
@@ -1710,6 +1719,7 @@ class State extends ReadyResource {
         ) {
             return null;
         }
+
         const transferAmount = toBalance(transferAmountBuffer);
         const feeAmount = toBalance(feeAmountBuffer);
         if (transferAmount === null || feeAmount === null) return null;
@@ -1717,34 +1727,27 @@ class State extends ReadyResource {
         // totalDeductedAmount = transferAmount + fee. When transferamount is 0, then totalDeductedAmount = fee. Because 0 + fee = fee.
         const totalDeductedAmount = isSelfTransfer ? feeAmount : transferAmount.add(feeAmount);
         if (totalDeductedAmount === null) return null;
+
         const senderEntryBuffer = await this.#getEntryApply(senderAddressString, batch);
         if (senderEntryBuffer === null) return null;
-        const validatorEntryBuffer = await this.#getEntryApply(validatorAddressString, batch);
-        if (validatorEntryBuffer === null) return null;
-        const validatorEntry = nodeEntryUtils.decode(validatorEntryBuffer);
-        if (validatorEntry === null) return null;
+
         const senderEntry = nodeEntryUtils.decode(senderEntryBuffer);
         if (senderEntry === null) return null;
+
         const senderBalance = toBalance(senderEntry.balance);
         if (senderBalance === null) return null;
         if (!senderBalance.greaterThanOrEquals(totalDeductedAmount)) return null;
-        const validatorBalance = toBalance(senderEntry.balance);
-        if (validatorBalance === null) return null;
-
-
-        const newValidatorBalance = senderBalance.add(feeAmount.percentage(PERCENT_75));
-        if (newValidatorBalance === null) return null;
-        const updatedValidatorEntry = newValidatorBalance.update(validatorEntryBuffer)
 
         const newSenderBalance = senderBalance.sub(totalDeductedAmount);
         if (newSenderBalance === null) return null;
 
         const updatedSenderEntry = newSenderBalance.update(senderEntryBuffer);
         if (updatedSenderEntry === null) return null;
+
         const result = {
             senderEntry: updatedSenderEntry,
             recipientEntry: null,
-            validatorEntry: updatedValidatorEntry,
+            validatorEntry: null,
         };
 
         if (!isSelfTransfer) {
@@ -1774,7 +1777,22 @@ class State extends ReadyResource {
             }
         }
 
-        // TODO: implement validator reward distribution in this place, and assign NEW balance to result.validatorEntry
+        const validatorEntryBuffer = await this.#getEntryApply(validatorAddressString, batch);
+        if (validatorEntryBuffer === null) return null;
+
+        const validatorEntry = nodeEntryUtils.decode(validatorEntryBuffer);
+        if (validatorEntry === null) return null;
+
+        const validatorBalance = toBalance(validatorEntry.balance);
+        if (validatorBalance === null) return null;
+
+        const newValidatorBalance = validatorBalance.add(feeAmount.percentage(PERCENT_75));
+        if (newValidatorBalance === null) return null;
+
+        const updatedValidatorEntry = newValidatorBalance.update(validatorEntryBuffer)
+        if (updatedValidatorEntry === null) return null;
+
+        result.validatorEntry = updatedValidatorEntry;
 
         return result;
 
