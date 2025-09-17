@@ -812,13 +812,16 @@ class State extends ReadyResource {
         if (null !== opEntry) return;
 
         // Proceed to remove the writer role from the node
-        await this.#removeWriter(op, base, node, batch, txHashHexString, requesterAddressString);
+        await this.#removeWriter(op, base, node, batch, txHashHexString, requesterAddressString, validatorAddressString);
     }
 
-    async #removeWriter(op, base, node, batch, txHashHexString, requesterAddressString) {
+    async #removeWriter(op, base, node, batch, txHashHexString, requesterAddressString, validatorAddressString) {
         // Retrieve the node entry for the given key
         const nodeEntry = await this.#getEntryApply(requesterAddressString, batch);
         if (null === nodeEntry) return;
+        // Retrieve the validator to receive the fee
+        const validatorNodeEntry = await this.#getEntryApply(validatorAddressString, batch);
+        if (null === validatorNodeEntry) return;
 
         // TODO: SHOULD WE somehow compare current wk FROM STATE with op.rao.iw? YES, we can ensure that linked wk to the address is the same as the one provided in the operation.
 
@@ -830,14 +833,34 @@ class State extends ReadyResource {
 
         if (isNodeWriter) {
             // Decode the node entry and downgrade its role to WHITELISTED reader.
+            const decodedValidatorEntry = nodeEntryUtils.decode(validatorEntry);
+            if (decodedValidatorEntry === null) return;
+            const validatorBalance = toBalance(decodedNodeEntry.balance)
+            if (validatorBalance === null) return;
+            const paidBalance = requesterBalance.add(BALANCE_FEE.percentage(feeRate.TRANSFER))
+            if (paidBalance === null) return;
+            const updateValidatorEntry = paidBalance.update(validatorEntry)
+            if (updateValidatorEntry === null) return;
+
             const decodedNodeEntry = nodeEntryUtils.decode(nodeEntry);
             if (decodedNodeEntry === null) return;
+
+            // Fee
+            const requesterBalance = toBalance(decodedNodeEntry.balance)
+            if (requesterBalance === null) return;
+            const updatedBalance = requesterBalance.sub(BALANCE_FEE) // Remove the fee
+
             // Downgrade role from WRITER to WHITELISTED
             const updatedNodeEntry = nodeEntryUtils.setRole(nodeEntry, nodeRoleUtils.NodeRole.WHITELISTED);
             if (updatedNodeEntry === null) return;
+            const chargedNodeEntry = updatedBalance.update(updatedNodeEntry)
+            if (chargedNodeEntry === null) return;
+
+            // Actually pay the fee
+            await batch.put(validatorAddressString, updateValidatorEntry);
             // Remove the writer role and update the state
             await base.removeWriter(decodedNodeEntry.wk);
-            await batch.put(requesterAddressString, updatedNodeEntry);
+            await batch.put(requesterAddressString, chargedNodeEntry);
             await batch.put(txHashHexString, node.value);
             console.log(`Writer removed: addr:wk:tx - ${requesterAddressString}:${op.rao.iw.toString('hex')}:${txHashHexString}`);
         }
