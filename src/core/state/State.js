@@ -991,8 +991,8 @@ class State extends ReadyResource {
         const newAdminBalance = adminBalance.sub(feeAmount);
         if (newAdminBalance === null) return;
 
-        const updatedAdminNodeEntry = nodeEntryUtils.setBalance(adminNodeEntryBuffer, newAdminBalance.value);
-        if (updatedAdminNodeEntry === null) return null;
+        const updatedAdminNodeEntry = newAdminBalance.update(adminNodeEntryBuffer);
+        if (updatedAdminNodeEntry === null) return;
 
         // set indexer role
         await base.removeWriter(decodedNodeEntry.wk);
@@ -1190,7 +1190,7 @@ class State extends ReadyResource {
         const newAdminBalance = adminBalance.sub(feeAmount);
         if (newAdminBalance === null) return;
 
-        const updatedAdminNodeEntry = nodeEntryUtils.setBalance(adminNodeEntryBuffer, newAdminBalance.value);
+        const updatedAdminNodeEntry = newAdminBalance.update(adminNodeEntryBuffer);
         if (updatedAdminNodeEntry === null) return null;
 
         // Remove the writer role and update the state
@@ -1232,6 +1232,7 @@ class State extends ReadyResource {
             op.bdo.in,
             OperationType.BOOTSTRAP_DEPLOYMENT
         );
+
         if (requesterMessage.length === 0) return;
 
         // ensure that tx is valid
@@ -1282,7 +1283,8 @@ class State extends ReadyResource {
 
         const feeAmount = toBalance(transactionUtils.FEE);
         if (feeAmount === null) return;
-        // charke fee from the invoker
+
+        // charge fee from the invoker
         const requesterNodeEntryBuffer = await this.#getEntryApply(requesterAddressString, batch);
         if (requesterNodeEntryBuffer === null) return;
 
@@ -1296,7 +1298,7 @@ class State extends ReadyResource {
         const newRequesterBalance = requesterBalance.sub(feeAmount);
         if (newRequesterBalance === null) return;
 
-        const updatedRequesterNodeEntry = nodeEntryUtils.setBalance(requesterNodeEntryBuffer, newRequesterBalance.value);
+        const updatedRequesterNodeEntry = newRequesterBalance.update(requesterNodeEntryBuffer);
         if (updatedRequesterNodeEntry === null) return;
 
         // reward validator for processing this transaction.
@@ -1312,7 +1314,7 @@ class State extends ReadyResource {
         const newValidatorBalance = validatorBalance.add(feeAmount.percentage(percent(75)));
         if (newValidatorBalance === null) return;
 
-        const updatedValidatorNodeEntry = nodeEntryUtils.setBalance(validatorNodeEntryBuffer, newValidatorBalance.value);
+        const updatedValidatorNodeEntry = newValidatorBalance.update(validatorNodeEntryBuffer);
         if (updatedValidatorNodeEntry === null) return;
         
         await batch.put(hashHexString, node.value);
@@ -1378,6 +1380,7 @@ class State extends ReadyResource {
             op.txo.vn,
             OperationType.TX
         );
+
         if (validatorMessage.length === 0) return;
 
         const validatorMessageHash = await blake3Hash(validatorMessage);
@@ -1409,7 +1412,7 @@ class State extends ReadyResource {
 
         const feeAmount = toBalance(transactionUtils.FEE);
         if (feeAmount === null) return;
-        // charge fee from the invoker
+        // charge fee from the requester
         const requesterNodeEntryBuffer = await this.#getEntryApply(requesterAddressString, batch);
         if (requesterNodeEntryBuffer === null) return;
 
@@ -1422,9 +1425,10 @@ class State extends ReadyResource {
         if (!requesterBalance.greaterThanOrEquals(feeAmount)) return;
         const newRequesterBalance = requesterBalance.sub(feeAmount);
         if (newRequesterBalance === null) return;
-
-        const updatedRequesterNodeEntry = nodeEntryUtils.setBalance(requesterNodeEntryBuffer, newRequesterBalance.value);
+        
+        const updatedRequesterNodeEntry = newRequesterBalance.update(requesterNodeEntryBuffer);
         if (updatedRequesterNodeEntry === null) return;
+
         // reward validator for processing this transaction. 50% of the fee goes to the validator
         const validatorNodeEntryBuffer = await this.#getEntryApply(validatorAddressString, batch);
         if (validatorNodeEntryBuffer === null) return;
@@ -1438,7 +1442,7 @@ class State extends ReadyResource {
         const newValidatorBalance = validatorBalance.add(feeAmount.percentage(percent(50)));
         if (newValidatorBalance === null) return;
 
-        const updatedValidatorNodeEntry = nodeEntryUtils.setBalance(validatorNodeEntryBuffer, newValidatorBalance.value);
+        const updatedValidatorNodeEntry = newValidatorBalance.update(validatorNodeEntryBuffer)
         if (updatedValidatorNodeEntry === null) return;
 
         // reward subnetwork creator for allowing this transaction to be executed on their bootstrap.
@@ -1456,7 +1460,7 @@ class State extends ReadyResource {
         const newSubnetworkCreatorBalance = subnetworkCreatorBalance.add(feeAmount.percentage(percent(25)));
         if (newSubnetworkCreatorBalance === null) return;
 
-        const updatedSubnetworkCreatorNodeEntry = nodeEntryUtils.setBalance(subnetworkCreatorNodeEntryBuffer, newSubnetworkCreatorBalance.value);
+        const updatedSubnetworkCreatorNodeEntry = newSubnetworkCreatorBalance.update(subnetworkCreatorNodeEntryBuffer);
         if (updatedSubnetworkCreatorNodeEntry === null) return;
 
         // 25% of the fee is burned.
@@ -1464,6 +1468,7 @@ class State extends ReadyResource {
         await batch.put(subnetworkCreatorAddressString, updatedSubnetworkCreatorNodeEntry);
         await batch.put(validatorAddressString, updatedValidatorNodeEntry);
         await batch.put(hashHexString, node.value);
+
         if (this.#enable_txlogs === true) {
             console.log(`TX: ${hashHexString} appended. Signed length: `, this.#base.view.core.signedLength);
         }
