@@ -21,6 +21,7 @@ import lengthEntryUtils from './utils/lengthEntry.js';
 import transactionUtils from './utils/transaction.js';
 import {blake3Hash} from '../../utils/crypto.js';
 import { BALANCE_FEE, toBalance, FEE_REWARD } from './utils/balance.js';
+import { safeWriteUInt32BE } from '../../utils/buffer.js';
 
 class State extends ReadyResource {
     //TODO: AFTER createMessage(..args) check if this function did not return NULL
@@ -764,6 +765,7 @@ class State extends ReadyResource {
         const requesterBalance = toBalance(decodedNodeEntry.balance)
         if (requesterBalance === null) return;
         const updatedBalance = requesterBalance.sub(BALANCE_FEE) // Remove the fee
+        if (updatedBalance === null) return;
         const validatorEntry = await this.#getEntryApply(validatorAddressString, batch);
         if (validatorEntry === null) return;
         const decodedValidatorEntry = nodeEntryUtils.decode(validatorEntry)
@@ -873,6 +875,7 @@ class State extends ReadyResource {
             const requesterBalance = toBalance(decodedNodeEntry.balance)
             if (requesterBalance === null) return;
             const updatedBalance = requesterBalance.sub(BALANCE_FEE) // Remove the fee
+            if (updatedBalance === null) return;
 
             // Downgrade role from WRITER to WHITELISTED
             const updatedNodeEntry = nodeEntryUtils.setRole(nodeEntry, nodeRoleUtils.NodeRole.WHITELISTED);

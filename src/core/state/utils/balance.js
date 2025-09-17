@@ -19,7 +19,6 @@ export const percent = value => {
     return bigIntToBuffer(bigint, BALANCE_BYTE_LENGTH)
 }
 
-export const BALANCE_FEE = toBalance(FEE)
 export const FEE_REWARD = percent(75)
 
 /**
@@ -161,15 +160,6 @@ const validateValue = value => {
     }
 }
 
-export function toBalance(balance) {
-    try{
-        return new Balance(balance)
-    } catch(e) {
-        console.error(e)
-        return null
-    }
-}
-
 /**
  * Balance class encapsulates a token balance stored as a fixed-length buffer.
  */
@@ -285,3 +275,14 @@ class Balance {
         return bufferToBigInt(this.#value)
     }
 }
+
+export function toBalance(balance) {
+    try{
+        return new Balance(balance)
+    } catch(e) {
+        console.error(e)
+        return null
+    }
+}
+
+export const BALANCE_FEE = toBalance(FEE)
