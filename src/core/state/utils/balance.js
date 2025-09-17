@@ -8,7 +8,19 @@ import { FEE } from './transaction.js';
 const DOUBLE_LENGTH = BALANCE_BYTE_LENGTH * 2
 const PERCENTAGE_TERM = bigIntToBuffer(10_000n, DOUBLE_LENGTH)
 
+/**
+ * Converts a decimal to a buffer that can be used along with Balance#percentage. 
+ * Should be used to define readable constants.
+ * @param {number} value - The % with two decimal digits
+ * @returns {Buffer} - Fixed-length buffer representing the percentage to be applied
+ */
+export const percent = value => {
+    const bigint = BigInt(Math.round(value * 100))
+    return bigIntToBuffer(bigint, BALANCE_BYTE_LENGTH)
+}
+
 export const BALANCE_FEE = toBalance(FEE)
+export const FEE_REWARD = percent(75)
 
 /**
  * Converts a bigint amount of tokens into a fixed-length buffer,
@@ -32,17 +44,6 @@ export const toTerm = bigint => bigIntToBuffer(
     bigint, 
     BALANCE_BYTE_LENGTH
 )
-
-/**
- * Converts a decimal to a buffer that can be used along with Balance#percentage. 
- * Should be used to define readable constants.
- * @param {number} value - The % with two decimal digits
- * @returns {Buffer} - Fixed-length buffer representing the percentage to be applied
- */
-export const percent = value => {
-    const bigint = BigInt(Math.round(value * 100))
-    return bigIntToBuffer(bigint, BALANCE_BYTE_LENGTH)
-}
 
 const truncate = buf => buf.slice(BALANCE_BYTE_LENGTH * -1)
 

@@ -6,7 +6,7 @@ import {
     ACK_INTERVAL,
     ADMIN_INITIAL_BALANCE,
     EntryType,
-    OperationType,
+    OperationType
 } from '../../utils/constants.js';
 import { isHexString, sleep } from '../../utils/helpers.js';
 import PeerWallet from 'trac-wallet';
@@ -18,9 +18,9 @@ import adminEntryUtils from './utils/adminEntry.js';
 import nodeEntryUtils, { setWritingKey, ZERO_BALANCE, NODE_ENTRY_SIZE } from './utils/nodeEntry.js';
 import nodeRoleUtils from './utils/roles.js';
 import lengthEntryUtils from './utils/lengthEntry.js';
-import transactionUtils, { feeRate } from './utils/transaction.js';
+import transactionUtils from './utils/transaction.js';
 import {blake3Hash} from '../../utils/crypto.js';
-import { BALANCE_FEE, toBalance } from './utils/balance.js';
+import { BALANCE_FEE, toBalance, FEE_REWARD } from './utils/balance.js';
 
 class State extends ReadyResource {
     //TODO: AFTER createMessage(..args) check if this function did not return NULL
@@ -544,7 +544,7 @@ class State extends ReadyResource {
         if (validatorNodeEntry === null) return;
         const validatorBalance = toBalance(validatorNodeEntry.balance);
         if (validatorBalance === null) return;
-        const newValidatorBalance = validatorBalance.add(feeAmount.percentage(feeRate.TRANSFER));
+        const newValidatorBalance = validatorBalance.add(feeAmount.percentage(FEE_REWARD));
         if (newValidatorBalance === null) return;
         const updatedValidatorNodeEntry = newValidatorBalance.update(validatorNodeEntry)
         if (updatedValidatorNodeEntry === null) return;
@@ -770,7 +770,7 @@ class State extends ReadyResource {
         if (decodedValidatorEntry === null) return;
         const validatorBalance = toBalance(decodedValidatorEntry.balance)
         if (validatorBalance === null) return;
-        const updatedValidatorBalance = validatorBalance.add(BALANCE_FEE.percentage(feeRate.TRANSFER)) // Credit a percentage to validator
+        const updatedValidatorBalance = validatorBalance.add(BALANCE_FEE.percentage(FEE_REWARD)) // Credit a percentage to validator
         if (updatedValidatorBalance === null) return;
         const updatedValidatorEntry = updatedValidatorBalance.update(validatorEntry)
         if (updatedValidatorEntry === null) return;
@@ -861,7 +861,7 @@ class State extends ReadyResource {
             if (decodedValidatorEntry === null) return;
             const validatorBalance = toBalance(decodedNodeEntry.balance)
             if (validatorBalance === null) return;
-            const paidBalance = requesterBalance.add(BALANCE_FEE.percentage(feeRate.TRANSFER))
+            const paidBalance = requesterBalance.add(BALANCE_FEE.percentage(FEE_REWARD))
             if (paidBalance === null) return;
             const updateValidatorEntry = paidBalance.update(validatorEntry)
             if (updateValidatorEntry === null) return;
@@ -1434,7 +1434,7 @@ class State extends ReadyResource {
         if (validatorBalance === null) return null;
 
 
-        const newValidatorBalance = senderBalance.add(feeAmount.percentage(feeRate.TRANSFER));
+        const newValidatorBalance = senderBalance.add(feeAmount.percentage(FEE_REWARD));
         if (newValidatorBalance === null) return null;
         const updatedValidatorEntry = newValidatorBalance.update(validatorEntryBuffer)
 
