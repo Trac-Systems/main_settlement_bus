@@ -40,7 +40,7 @@ async function readBalanceMigrationFile(filepath = BALANCE_MIGRATION_FILEPATH) {
             throw new Error(`Invalid file format: ${filepath}. Balance migration file must be a CSV file.`);
         }
 
-        const pairFormatRegex = /^([a-zA-Z0-9]+),(\d+\.[0-9]+)$/;
+        const pairFormatRegex = /^([a-zA-Z0-9]+),(\d+(?:\.\d{1,18})?|\d+)$/;
         const data = await fs.promises.readFile(filepath, 'utf8');
         const lines = data
             .split('\n')
