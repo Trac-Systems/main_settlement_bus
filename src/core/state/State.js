@@ -20,7 +20,7 @@ import nodeRoleUtils from './utils/roles.js';
 import lengthEntryUtils from './utils/lengthEntry.js';
 import transactionUtils, { feeRate } from './utils/transaction.js';
 import {blake3Hash} from '../../utils/crypto.js';
-import { toBalance } from './utils/balance.js';
+import { BALANCE_FEE, toBalance } from './utils/balance.js';
 
 class State extends ReadyResource {
     //TODO: AFTER createMessage(..args) check if this function did not return NULL
@@ -528,6 +528,27 @@ class State extends ReadyResource {
         const adminNodeEntry = await this.#getEntryApply(requesterAdminAddressString, batch);
         const newAdminNodeEntry = setWritingKey(adminNodeEntry, op.rao.iw)
 
+        // Fee
+        const decodedAdminNodeEntry = nodeEntryUtils.decode(newAdminNodeEntry)
+        if (decodedAdminNodeEntry === null) return
+        const adminBalance = toBalance(decodedAdminNodeEntry.balance)
+        if (adminBalance === null) return
+        const updatedFee = adminBalance.sub(BALANCE_FEE)
+        if (updatedFee === null) return
+        const chargedAdminEntry = updatedFee.update(newAdminNodeEntry)
+
+        // Reward logic
+        const validatorNodeEntryBuffer = await this.#getEntryApply(validatorAddressString, batch);
+        if (validatorNodeEntryBuffer === null) return;
+        const validatorNodeEntry = nodeEntryUtils.decode(validatorNodeEntryBuffer);
+        if (validatorNodeEntry === null) return;
+        const validatorBalance = toBalance(validatorNodeEntry.balance);
+        if (validatorBalance === null) return;
+        const newValidatorBalance = validatorBalance.add(feeAmount.percentage(feeRate.TRANSFER));
+        if (newValidatorBalance === null) return;
+        const updatedValidatorNodeEntry = newValidatorBalance.update(validatorNodeEntry)
+        if (updatedValidatorNodeEntry === null) return;
+
         const isNewWkInIndexerList = await this.#isWriterKeyInIndexerListApply(op.rao.iw, base);
         if (isNewWkInIndexerList) return; // New admin wk is already in indexers entry
 
@@ -539,8 +560,11 @@ class State extends ReadyResource {
         // Remove the old admin entry and add the new one
         await batch.put(EntryType.ADMIN, newAdminEntry);
         // This updates the admin node entry with the new writer key
-        await batch.put(requesterAdminAddressString, newAdminNodeEntry);
+        await batch.put(requesterAdminAddressString, chargedAdminEntry);
         await batch.put(txHashHexString, node.value);
+
+        // Actually pay the fee
+        await batch.put(validatorAddressString, updatedValidatorNodeEntry);
 
         console.log(`Admin has been recovered addr:wk:tx - ${requesterAdminAddressString}:${op.rao.iw.toString('hex')}:${txHashHexString}`);
     }
