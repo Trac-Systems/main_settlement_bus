@@ -1175,7 +1175,7 @@ class State extends ReadyResource {
         const requesterAddressBuffer = op.address;
         const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer);
         if (requesterAddressString === null) return;
-        
+
         // Validate requester public key
         const requesterPublicKey = PeerWallet.decodeBech32mSafe(requesterAddressString);
         if (requesterPublicKey === null) return;
@@ -1203,7 +1203,7 @@ class State extends ReadyResource {
             OperationType.BAN_VALIDATOR
         );
         if (message.length === 0) return;
-        
+
         // compare hashes
         const regeneratedHash = await blake3Hash(message);
         if (!b4a.equals(regeneratedHash, op.aco.tx)) return;
@@ -1293,9 +1293,11 @@ class State extends ReadyResource {
         // validate requester signature
         const requesterAddressBuffer = op.address;
         const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer);
-        if (null === requesterAddressString) return;
+        if (requesterAddressString === null) return;
+
+        // validate requester public key
         const requesterPublicKey = PeerWallet.decodeBech32mSafe(requesterAddressString);
-        if (null === requesterPublicKey) return;
+        if (requesterPublicKey === null) return;
 
         // recreate requester message
         const requesterMessage = createMessage(
@@ -1305,7 +1307,6 @@ class State extends ReadyResource {
             op.bdo.in,
             OperationType.BOOTSTRAP_DEPLOYMENT
         );
-
         if (requesterMessage.length === 0) return;
 
         // ensure that tx is valid
@@ -1317,12 +1318,14 @@ class State extends ReadyResource {
 
         const bootstrapDeploymentHexString = op.bdo.bs.toString('hex');
 
-        //second signature
+        //validation of validator signature
         const validatorAddressBuffer = op.bdo.va;
         const validatorAddressString = addressUtils.bufferToAddress(validatorAddressBuffer);
-        if (null === validatorAddressString) return;
+        if (validatorAddressString === null) return;
+
+        // validate validator public key
         const validatorPublicKey = PeerWallet.decodeBech32mSafe(validatorAddressString);
-        if (null === validatorPublicKey) return;
+        if (validatorPublicKey === null) return;
 
         // recreate validator message
         const validatorMessage = createMessage(
@@ -1345,7 +1348,7 @@ class State extends ReadyResource {
         // anti-replay attack
         const hashHexString = op.bdo.tx.toString('hex');
         const opEntry = await this.#getEntryApply(hashHexString, batch);
-        if (null !== opEntry) return; // Operation has already been applied.
+        if (opEntry !== null) return; // Operation has already been applied.
 
         // If deployment already exists, do not process it again.
         const alreadyRegisteredBootstrap = await this.#getDeploymentEntryApply(bootstrapDeploymentHexString, batch);
@@ -1537,6 +1540,10 @@ class State extends ReadyResource {
         if (updatedSubnetworkCreatorNodeEntry === null) return;
 
         // 25% of the fee is burned.
+
+        // OBSERVATION: If TX operation will be requested by the subnetwork creator on their own bootstrap, how we should charge the fee? It looks like Bootstrap deployer
+        // is paying 0.03, however they are receiving 0.0075 back, so the final fee is 0.0225. I think it's fair enough. It this case we should burn reward for Bootstrap deployer.
+
         await batch.put(requesterAddressString, updatedRequesterNodeEntry);
         await batch.put(subnetworkCreatorAddressString, updatedSubnetworkCreatorNodeEntry);
         await batch.put(validatorAddressString, updatedValidatorNodeEntry);
