@@ -203,6 +203,57 @@ class State extends ReadyResource {
         }
     }
 
+    async confirmedTransactionsBetween(startSignedLength, endSignedLength) {
+        // 1. Check for integer numbers
+        if (!Number.isInteger(startSignedLength) || !Number.isInteger(endSignedLength)) {
+            throw new Error("Params must be integer");
+        }
+
+        // 2. Ensure non-negative numbers
+        if (startSignedLength < 0 || endSignedLength < 0) {
+            throw new Error("Params must be non-negative");
+        }
+
+        // 3. Handle invalid range and the case where start and end are the same
+        if (startSignedLength > endSignedLength) {
+            throw new Error("endSignedLength must be greater than or equal to startSignedLength");
+        }
+
+        // 4. If the range is empty (start and end are the same), return an empty array
+        if (startSignedLength === endSignedLength) return [];
+
+        const currentSignedLength = this.getSignedLength();
+        const signedLength2End = Math.min(currentSignedLength, endSignedLength);
+
+        const startSeq = startSignedLength;
+        const endSeq = signedLength2End - 1;
+
+        if (startSeq > endSeq) {
+            throw new Error("Invalid range");
+        }
+
+        const historyStream = this.#base.view.createHistoryStream({
+            gte: startSeq,
+            lte: endSeq
+        });
+
+        const filters = (entry) => {
+            const isPut = entry.type === "put";
+            const isHex = isHexString(entry.key);
+            const is64 = entry.key.length === 64;
+            return isPut && isHex && is64;
+        }
+
+        let hashes = [];
+        for await (const entry of historyStream) {
+            if (filters(entry)) {
+                hashes.push(entry.key);
+            }
+        }
+
+        return hashes;
+    }
+
     #setupHyperbee(store) {
         this.#bee = new Hyperbee(store.get('view'), {
             extension: false,

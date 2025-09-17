@@ -26,8 +26,6 @@ import partialStateMessageOperations from "./messages/partialStateMessages/Parti
 import { randomBytes } from "hypercore-crypto";
 import { decimalStringToBigInt, bigIntTo16ByteBuffer, bufferToBigInt, bigIntToDecimalString } from "./utils/amountSerialization.js"
 import { ZERO_WK } from "./utils/buffer.js";
-import deploymentEntryUtils from "./core/state/utils/deploymentEntry.js"
-import { toBalance } from "./core/state/utils/balance.js";
 import { normalizeTransferOperation } from "./utils/normalizers.js"
 import PartialTransfer from "./core/network/messaging/validators/PartialTransfer.js";
 
@@ -1006,18 +1004,14 @@ export class MainSettlementBus extends ReadyResource {
                     }
                 } else if(input.startsWith("/get_txs_hashes")) {
                     const splitted = input.split(' ')
-                    const start = splitted[1]
-                    const end = splitted[2]
+                    const start = parseInt(splitted[1]);
+                    const end = parseInt(splitted[2]);
 
-                    if (start && end) {
-                        // hardcoded txs hashes
-                        return [
-                            "df03e28ddc75db31ff569241c64ec8273c4eb438cd11270f8f452cd3f1a458ff", 
-                            "4145531eef87ce31d5ed2167660177a759fb64c95cc4f9cf61b996f3da849ff9", 
-                            "19d6fa8d48058980b2c63217443c7b17f8d9e142998be853f9a391c277b32c67"
-                        ];
-                    } else {
-                        throw new Error("Invalid params to perform the request.");
+                    try {
+                        const hashes = await this.#state.confirmedTransactionsBetween(start, end);    
+                        return { hashes }
+                    } catch (error) {
+                        throw new Error("Invalid params to perform the request.", error);
                     }
                 }
         }

@@ -119,7 +119,7 @@ export function startRpcServer(msbInstance, port) {
                 // 1. Check if the parsed values are valid numbers
                 if (isNaN(startSignedLength) || isNaN(endSignedLength)) {
                     res.writeHead(400, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ error: 'startSignedLength and endSignedLength must be valid numbers.' }));
+                    res.end(JSON.stringify({ error: 'Params must be integer' }));
                     return;
                 }
 
@@ -127,7 +127,7 @@ export function startRpcServer(msbInstance, port) {
                 // The requirement is "non-negative," which includes 0.
                 if (startSignedLength < 0 || endSignedLength < 0) {
                     res.writeHead(400, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ error: 'startSignedLength and endSignedLength must be non-negative.' }));
+                    res.end(JSON.stringify({ error: 'Params must be non-negative' }));
                     return;
                 }
 
@@ -138,32 +138,18 @@ export function startRpcServer(msbInstance, port) {
                     return;
                 }
 
-                // 4. If startSeq > endSeq, return an empty array
-                const startSeq = startSignedLength;
-                const endSeq = endSignedLength - 1;
-                if (startSeq > endSeq) {
-                    res.writeHead(200, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ txHashes: [] }));
-                    return;
-                }
+                // 4. Get current confirmed length
+                const currentConfirmedLength = await msbInstance.handleCommand('/confirmed_length');
 
-                // 5. Get Confirmed length
-                // endSignedLength cannot exceed the current signedLength
-                const commandLengthString = '/confirmed_length'
-                const currentSignedLength = await msbInstance.handleCommand(commandLengthString);
-                console.log("currentSignedLength", currentSignedLength);
+                // 5. Adjust the end index to not exceed the confirmed length.
+                const adjustedEndLength = Math.min(endSignedLength, currentConfirmedLength);
+                
+                // 6. Fetch txs hashes for the adjusted range, assuming the command takes start and end index.
+                const commandString = `/get_txs_hashes ${startSignedLength} ${adjustedEndLength}`;
+                const { hashes } = await msbInstance.handleCommand(commandString);
 
-                if (endSignedLength > currentSignedLength) {
-                    res.writeHead(400, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ error: `endSignedLength cannot exceed the current signedLength of ${currentSignedLength}.` }));
-                    return;
-                }
-
-                // 6. Fetch txs hashes
-                const commandString = `/get_txs_hashes ${startSignedLength} ${endSignedLength}`;
-                const txHashes = await msbInstance.handleCommand(commandString);
                 res.writeHead(200, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ txHashes }));
+                res.end(JSON.stringify({ hashes }));
                 
             } catch (error) {
                 console.error('Error on searching for tx hashes:', error);
