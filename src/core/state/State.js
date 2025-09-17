@@ -934,14 +934,14 @@ class State extends ReadyResource {
     }
 
     async #handleApplyAddIndexerOperation(op, view, base, node, batch) {
-        if (!this.check.validateAdminControlOperation(op)) {
-            return;
-        }
+        if (!this.check.validateAdminControlOperation(op)) return;
 
         // Extract and validate the requester address (admin)
         const requesterAddressBuffer = op.address;
         const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer);
         if (requesterAddressString === null) return;
+
+        // Validate requester public key
         const requesterPublicKey = PeerWallet.decodeBech32mSafe(requesterAddressString);
         if (requesterPublicKey === null) return;
 
@@ -949,23 +949,34 @@ class State extends ReadyResource {
         const pretendingAddressBuffer = op.aco.ia;
         const pretendingAddressString = addressUtils.bufferToAddress(pretendingAddressBuffer);
         if (pretendingAddressString === null) return;
+        
+        // Validate pretending indexer public key
         const pretentingPublicKey = PeerWallet.decodeBech32mSafe(pretendingAddressString);
         if (pretentingPublicKey === null) return;
 
         // ensure that an admin invoked this operation
         const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
-        if (null === adminEntry) return;
+        if (adminEntry === null) return;
         const decodedAdminEntry = adminEntryUtils.decode(adminEntry);
-        if (null === decodedAdminEntry) return;
+        if (decodedAdminEntry === null || !this.#isAdminApply(decodedAdminEntry, node)) return;
+
+        // Extract admin public key 
         const adminPublicKey = PeerWallet.decodeBech32mSafe(decodedAdminEntry.address);
         if (adminPublicKey === null) return;
-        if (!b4a.equals(requesterPublicKey, adminPublicKey) || !this.#isAdminApply(decodedAdminEntry, node)) return;
 
         // Admin consistency check
         if (!b4a.equals(adminPublicKey, requesterPublicKey)) return;
 
         // verify requester signature
-        const message = createMessage(op.address, op.aco.txv, op.aco.ia, op.aco.in, OperationType.ADD_INDEXER);
+        const message = createMessage(
+            op.address,
+            op.aco.txv,
+            op.aco.ia,
+            op.aco.in,
+            OperationType.ADD_INDEXER
+        );
+        if (message.length === 0) return;
+
         const hash = await blake3Hash(message);
         if (!b4a.equals(hash, op.aco.tx)) return;
 
@@ -981,30 +992,32 @@ class State extends ReadyResource {
 
         // anti-replay attack
         const opEntry = await this.#getEntryApply(txHashHexString, batch);
-        if (null !== opEntry) return;
+        if (opEntry !== null) return;
 
         await this.#addIndexer(op, node, batch, base, txHashHexString, pretendingAddressString, requesterAddressString);
     }
 
-    async #addIndexer(op, node, batch, base, txHashHexString, nodeAddressString, requesterAddressString) {
-        const nodeEntry = await this.#getEntryApply(nodeAddressString, batch);
-        if (null === nodeEntry) return;
-        const decodedNodeEntry = nodeEntryUtils.decode(nodeEntry);
-        if (null === decodedNodeEntry) return;
+    async #addIndexer(op, node, batch, base, txHashHexString, pretendingAddressString, requesterAddressString) {
+
+        const pretenderNodeEntry = await this.#getEntryApply(pretendingAddressString, batch);
+        if (pretenderNodeEntry === null) return;
+        const decodedPretenderNodeEntry = nodeEntryUtils.decode(pretenderNodeEntry);
+        if (decodedPretenderNodeEntry === null) return;
 
         //check if node is allowed to become an indexer
-        const isNodeWriter = nodeEntryUtils.isWriter(nodeEntry);
-        const isNodeIndexer = nodeEntryUtils.isIndexer(nodeEntry);
+        const isNodeWriter = nodeEntryUtils.isWriter(pretenderNodeEntry);
+        const isNodeIndexer = nodeEntryUtils.isIndexer(pretenderNodeEntry);
         if (!isNodeWriter || isNodeIndexer) return;
+
         //update node entry to indexer
-        const updatedNodeEntry = nodeEntryUtils.setRole(nodeEntry, nodeRoleUtils.NodeRole.INDEXER)
-        if (null === updatedNodeEntry) return;
+        const updatedNodeEntry = nodeEntryUtils.setRole(pretenderNodeEntry, nodeRoleUtils.NodeRole.INDEXER)
+        if (updatedNodeEntry === null) return;
 
         // ensure that the node wk does not exist in the indexer list
-        const indexerListHasWk = await this.#isWriterKeyInIndexerListApply(decodedNodeEntry.wk, base);
+        const indexerListHasWk = await this.#isWriterKeyInIndexerListApply(decodedPretenderNodeEntry.wk, base);
         if (indexerListHasWk) return; // Wk is already in indexer list (Node already indexer)
 
-        // charge fee from the admin
+        // charge fee from the admin (requester)
         const feeAmount = toBalance(transactionUtils.FEE);
         if (feeAmount === null) return;
 
@@ -1018,6 +1031,8 @@ class State extends ReadyResource {
         if (adminBalance === null) return;
 
         if (!adminBalance.greaterThanOrEquals(feeAmount)) return;
+
+        // 100% fee charged from admin will be burned
         const newAdminBalance = adminBalance.sub(feeAmount);
         if (newAdminBalance === null) return;
 
@@ -1025,17 +1040,17 @@ class State extends ReadyResource {
         if (updatedAdminNodeEntry === null) return;
 
         // set indexer role
-        await base.removeWriter(decodedNodeEntry.wk);
-        await base.addWriter(decodedNodeEntry.wk, { isIndexer: true })
+        await base.removeWriter(decodedPretenderNodeEntry.wk);
+        await base.addWriter(decodedPretenderNodeEntry.wk, { isIndexer: true })
 
         // change node entry to indexer and update admin balance after fee deduction
-        await batch.put(nodeAddressString, updatedNodeEntry);
+        await batch.put(pretendingAddressString, updatedNodeEntry);
         await batch.put(requesterAddressString, updatedAdminNodeEntry);
 
         // store operation hash to avoid replay attack.
         await batch.put(txHashHexString, node.value);
 
-        console.log(`Indexer added addr:wk:tx - ${nodeAddressString}:${decodedNodeEntry.wk.toString('hex')}:${txHashHexString}`);
+        console.log(`Indexer added addr:wk:tx - ${pretendingAddressString}:${decodedPretenderNodeEntry.wk.toString('hex')}:${txHashHexString}`);
     }
 
     async #handleApplyRemoveIndexerOperation(op, view, base, node, batch) {
