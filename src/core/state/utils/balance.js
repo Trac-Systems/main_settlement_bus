@@ -19,7 +19,10 @@ export const percent = value => {
     return bigIntToBuffer(bigint, BALANCE_BYTE_LENGTH)
 }
 
-export const FEE_REWARD = percent(75)
+/**
+ * Short term for 75% to be used with balance. Extracted to avoid buffer conversions during request time.
+ */
+export const PERCENT_75 = percent(75)
 
 /**
  * Converts a bigint amount of tokens into a fixed-length buffer,
@@ -46,7 +49,6 @@ export const toTerm = bigint => bigIntToBuffer(
 
 const truncate = buf => buf.slice(BALANCE_BYTE_LENGTH * -1)
 
-// Thank you gpt
 const shiftLeft1 = buf => {
     const res = b4a.alloc(BALANCE_BYTE_LENGTH)
     let carry = 0

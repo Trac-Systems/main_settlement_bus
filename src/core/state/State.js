@@ -20,7 +20,7 @@ import nodeRoleUtils from './utils/roles.js';
 import lengthEntryUtils from './utils/lengthEntry.js';
 import transactionUtils from './utils/transaction.js';
 import {blake3Hash} from '../../utils/crypto.js';
-import { BALANCE_FEE, toBalance, FEE_REWARD } from './utils/balance.js';
+import { BALANCE_FEE, toBalance, PERCENT_75 } from './utils/balance.js';
 import { safeWriteUInt32BE } from '../../utils/buffer.js';
 
 class State extends ReadyResource {
@@ -529,11 +529,15 @@ class State extends ReadyResource {
         const adminNodeEntry = await this.#getEntryApply(requesterAdminAddressString, batch);
         const newAdminNodeEntry = setWritingKey(adminNodeEntry, op.rao.iw)
 
+        const isNewWkInIndexerList = await this.#isWriterKeyInIndexerListApply(op.rao.iw, base);
+        if (isNewWkInIndexerList) return; // New admin wk is already in indexers entry
+
         // Fee
         const decodedAdminNodeEntry = nodeEntryUtils.decode(newAdminNodeEntry)
         if (decodedAdminNodeEntry === null) return
         const adminBalance = toBalance(decodedAdminNodeEntry.balance)
         if (adminBalance === null) return
+        if (!adminBalance.greaterThanOrEquals(BALANCE_FEE)) return;
         const updatedFee = adminBalance.sub(BALANCE_FEE)
         if (updatedFee === null) return
         const chargedAdminEntry = updatedFee.update(newAdminNodeEntry)
@@ -545,13 +549,10 @@ class State extends ReadyResource {
         if (validatorNodeEntry === null) return;
         const validatorBalance = toBalance(validatorNodeEntry.balance);
         if (validatorBalance === null) return;
-        const newValidatorBalance = validatorBalance.add(feeAmount.percentage(FEE_REWARD));
+        const newValidatorBalance = validatorBalance.add(feeAmount.percentage(PERCENT_75));
         if (newValidatorBalance === null) return;
         const updatedValidatorNodeEntry = newValidatorBalance.update(validatorNodeEntry)
         if (updatedValidatorNodeEntry === null) return;
-
-        const isNewWkInIndexerList = await this.#isWriterKeyInIndexerListApply(op.rao.iw, base);
-        if (isNewWkInIndexerList) return; // New admin wk is already in indexers entry
 
         // Revoke old wk and add new one as an indexer
         await base.removeWriter(decodedAdminEntry.wk);
@@ -620,6 +621,7 @@ class State extends ReadyResource {
             if (null === decodedNodeEntry) return;
             const adminBalance = toBalance(decodedNodeEntry.balance)
             if (null === adminBalance) return;
+            if (!adminBalance.greaterThanOrEquals(BALANCE_FEE)) return;
             const newAdminBalance = adminBalance.sub(BALANCE_FEE) // we burn
             if (null === newAdminBalance) return;
             const updatedAdminEntry = newAdminBalance.update(adminNodeEntry)
@@ -764,6 +766,7 @@ class State extends ReadyResource {
         if (decodedNodeEntry === null) return;
         const requesterBalance = toBalance(decodedNodeEntry.balance)
         if (requesterBalance === null) return;
+        if (!requesterBalance.greaterThanOrEquals(BALANCE_FEE)) return;
         const updatedBalance = requesterBalance.sub(BALANCE_FEE) // Remove the fee
         if (updatedBalance === null) return;
         const validatorEntry = await this.#getEntryApply(validatorAddressString, batch);
@@ -772,7 +775,7 @@ class State extends ReadyResource {
         if (decodedValidatorEntry === null) return;
         const validatorBalance = toBalance(decodedValidatorEntry.balance)
         if (validatorBalance === null) return;
-        const updatedValidatorBalance = validatorBalance.add(BALANCE_FEE.percentage(FEE_REWARD)) // Credit a percentage to validator
+        const updatedValidatorBalance = validatorBalance.add(BALANCE_FEE.percentage(PERCENT_75)) // Credit a percentage to validator
         if (updatedValidatorBalance === null) return;
         const updatedValidatorEntry = updatedValidatorBalance.update(validatorEntry)
         if (updatedValidatorEntry === null) return;
@@ -863,7 +866,7 @@ class State extends ReadyResource {
             if (decodedValidatorEntry === null) return;
             const validatorBalance = toBalance(decodedNodeEntry.balance)
             if (validatorBalance === null) return;
-            const paidBalance = requesterBalance.add(BALANCE_FEE.percentage(FEE_REWARD))
+            const paidBalance = requesterBalance.add(BALANCE_FEE.percentage(PERCENT_75))
             if (paidBalance === null) return;
             const updateValidatorEntry = paidBalance.update(validatorEntry)
             if (updateValidatorEntry === null) return;
@@ -874,6 +877,7 @@ class State extends ReadyResource {
             // Fee
             const requesterBalance = toBalance(decodedNodeEntry.balance)
             if (requesterBalance === null) return;
+            if (!requesterBalance.greaterThanOrEquals(BALANCE_FEE)) return;
             const updatedBalance = requesterBalance.sub(BALANCE_FEE) // Remove the fee
             if (updatedBalance === null) return;
 
@@ -1032,6 +1036,7 @@ class State extends ReadyResource {
         if (null === decodedRequesterEntry) return;
         const requesterBalance = toBalance(decodedRequesterEntry.balance)
         if (null === requesterBalance) return;
+        if (!requesterBalance.greaterThanOrEquals(BALANCE_FEE)) return;
         const newRequesterBalance = requesterBalance.sub(BALANCE_FEE) // we burn
         if (null === newRequesterBalance) return;
         const updatedRequesterEntry = newRequesterBalance.update(requesterEntry)
@@ -1437,7 +1442,7 @@ class State extends ReadyResource {
         if (validatorBalance === null) return null;
 
 
-        const newValidatorBalance = senderBalance.add(feeAmount.percentage(FEE_REWARD));
+        const newValidatorBalance = senderBalance.add(feeAmount.percentage(PERCENT_75));
         if (newValidatorBalance === null) return null;
         const updatedValidatorEntry = newValidatorBalance.update(validatorEntryBuffer)
 
