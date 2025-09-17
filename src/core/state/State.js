@@ -18,10 +18,10 @@ import adminEntryUtils from './utils/adminEntry.js';
 import nodeEntryUtils, { setWritingKey, ZERO_BALANCE, NODE_ENTRY_SIZE } from './utils/nodeEntry.js';
 import nodeRoleUtils from './utils/roles.js';
 import lengthEntryUtils from './utils/lengthEntry.js';
-import transactionUtils from './utils/transaction.js';
+import transactionUtils, { feeRate } from './utils/transaction.js';
 import {blake3Hash} from '../../utils/crypto.js';
 import { toBalance } from './utils/balance.js';
-import { percent } from './utils/balance.js';
+
 class State extends ReadyResource {
     //TODO: AFTER createMessage(..args) check if this function did not return NULL
     #base;
@@ -928,14 +928,26 @@ class State extends ReadyResource {
         // anti-replay attack
         const opEntry = await this.#getEntryApply(txHashHexString, batch);
         if (null !== opEntry) return;
-        await this.#removeIndexer(op, node, batch, base, txHashHexString, toRemoveAddressString, toRemoveAddressBuffer);
+        await this.#removeIndexer(op, node, batch, base, txHashHexString, toRemoveAddressString, toRemoveAddressBuffer, requesterAddressString);
     }
 
-    async #removeIndexer(op, node, batch, base, txHashHexString, toRemoveAddressString, toRemoveAddressBuffer) {
+    async #removeIndexer(op, node, batch, base, txHashHexString, toRemoveAddressString, toRemoveAddressBuffer, requesterAddressString) {
         const nodeEntry = await this.#getEntryApply(toRemoveAddressString, batch);
         if (null === nodeEntry) return;
         const decodedNodeEntry = nodeEntryUtils.decode(nodeEntry);
         if (null === decodedNodeEntry) return;
+
+        // Fee
+        const requesterEntry = await this.#getEntryApply(requesterAddressString, batch);
+        if (null === requesterEntry) return;
+        const decodedRequesterEntry = nodeEntryUtils.decode(requesterEntry)
+        if (null === decodedRequesterEntry) return;
+        const requesterBalance = toBalance(decodedNodeEntry.balance)
+        if (null === requesterBalance) return;
+        const newRequesterBalance = requesterBalance.sub(transactionUtils.FEE) // we burn
+        if (null === newRequesterBalance) return;
+        const updatedRequesterEntry = newRequesterBalance.update(newRequesterBalance)
+        if (null === updatedRequesterEntry) return;
 
         // Check if the node entry is an indexer
         const isNodeIndexer = nodeEntryUtils.isIndexer(nodeEntry);
@@ -958,6 +970,9 @@ class State extends ReadyResource {
 
         //update node entry and indexers entry
         await batch.put(toRemoveAddressString, updatedNodeEntry);
+
+        // update node entry with the fee
+        await batch.put(requesterAddressString, updatedRequesterEntry);
 
         // store operation hash to avoid replay attack.
         await batch.put(txHashHexString, node.value);
@@ -1334,7 +1349,7 @@ class State extends ReadyResource {
         if (validatorBalance === null) return null;
 
 
-        const newValidatorBalance = senderBalance.add(feeAmount.percentage(percent(75)));
+        const newValidatorBalance = senderBalance.add(feeAmount.percentage(feeRate.TRANSFER));
         if (newValidatorBalance === null) return null;
         const updatedValidatorEntry = newValidatorBalance.update(validatorEntryBuffer)
 

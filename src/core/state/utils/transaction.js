@@ -4,6 +4,7 @@ import { TRAC_ADDRESS_SIZE } from 'trac-wallet/constants.js';
 import { HASH_BYTE_LENGTH, NONCE_BYTE_LENGTH, WRITER_BYTE_LENGTH } from '../../../utils/constants.js';
 import { blake3Hash } from '../../../utils/crypto.js';
 import {safeWriteUInt32BE} from "../../../utils/buffer.js";
+import { percent } from './balance.js';
 
 /**
  * Total size of a transaction buffer in bytes.
@@ -20,6 +21,11 @@ export const FEE = b4a.from([
     0x00, 0x6a, 0x94, 0xd7,
     0x4f, 0x43, 0x00, 0x00,
 ]);
+
+export const feeRate = {
+    TRANSFER: percent(75),
+}
+
 // TODO: This function receives too many arguments. It would be better to encapsulate them in an object.
 /**
  * Generates a transaction buffer and returns its double BLAKE-3 hash.
