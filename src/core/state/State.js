@@ -277,7 +277,7 @@ class State extends ReadyResource {
     async #handleApplyInitializeBalanceOperation(op, view, base, node, batch) {
         if (!this.check.validateBalanceInitialization(op)) return;
 
-        // Extract and validate the network address
+        // Extract and validate the requester network address
         const adminAddressBuffer = op.address;
         const adminAddressString = addressUtils.bufferToAddress(adminAddressBuffer);
         if (adminAddressString === null) return;
@@ -286,15 +286,18 @@ class State extends ReadyResource {
         const requesterAdminPublicKey = PeerWallet.decodeBech32mSafe(adminAddressString);
         if (requesterAdminPublicKey === null) return;
 
-        // Verify that the amount is not zero
-        const amount = toBalance(op.bio.am);
-        if (amount == null) return;
+
+        // Validate recipient address
         const recipientAddress = op.bio.ia;
         const recipientAddressString = addressUtils.bufferToAddress(recipientAddress);
-
+        if (recipientAddressString === null) return;
         // Validate recipient public key
         const recipientPublicKey = PeerWallet.decodeBech32mSafe(recipientAddressString);
         if (recipientPublicKey === null) return;
+
+        // Verify that the amount is not zero
+        const amount = toBalance(op.bio.am);
+        if (amount == null) return;
 
         // Entry has been disabled so there is nothing to do
         if (await this.#isApplyInitalizationDisabled(batch)) return;
@@ -353,6 +356,7 @@ class State extends ReadyResource {
         // Ensure that an admin invoked this operation
         const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
         const decodedAdminEntry = adminEntryUtils.decode(adminEntry);
+
         if (null === decodedAdminEntry || !this.#isAdminApply(decodedAdminEntry, node)) return;
         const adminPublicKey = PeerWallet.decodeBech32mSafe(decodedAdminEntry.address);
         if (adminPublicKey === null) return;
