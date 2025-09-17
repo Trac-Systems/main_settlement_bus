@@ -6,7 +6,7 @@ import {
     ACK_INTERVAL,
     ADMIN_INITIAL_BALANCE,
     EntryType,
-    OperationType,
+    OperationType
 } from '../../utils/constants.js';
 import { isHexString, sleep } from '../../utils/helpers.js';
 import PeerWallet from 'trac-wallet';
@@ -20,8 +20,8 @@ import nodeRoleUtils from './utils/roles.js';
 import lengthEntryUtils from './utils/lengthEntry.js';
 import transactionUtils from './utils/transaction.js';
 import {blake3Hash} from '../../utils/crypto.js';
-import { toBalance } from './utils/balance.js';
-import {safeWriteUInt32BE} from '../../utils/buffer.js'
+import { BALANCE_FEE, toBalance, PERCENT_75 } from './utils/balance.js';
+import { safeWriteUInt32BE } from '../../utils/buffer.js';
 
 class State extends ReadyResource {
     //TODO: AFTER createMessage(..args) check if this function did not return NULL
@@ -532,6 +532,28 @@ class State extends ReadyResource {
         const isNewWkInIndexerList = await this.#isWriterKeyInIndexerListApply(op.rao.iw, base);
         if (isNewWkInIndexerList) return; // New admin wk is already in indexers entry
 
+        // Fee
+        const decodedAdminNodeEntry = nodeEntryUtils.decode(newAdminNodeEntry)
+        if (decodedAdminNodeEntry === null) return
+        const adminBalance = toBalance(decodedAdminNodeEntry.balance)
+        if (adminBalance === null) return
+        if (!adminBalance.greaterThanOrEquals(BALANCE_FEE)) return;
+        const updatedFee = adminBalance.sub(BALANCE_FEE)
+        if (updatedFee === null) return
+        const chargedAdminEntry = updatedFee.update(newAdminNodeEntry)
+
+        // Reward logic
+        const validatorNodeEntryBuffer = await this.#getEntryApply(validatorAddressString, batch);
+        if (validatorNodeEntryBuffer === null) return;
+        const validatorNodeEntry = nodeEntryUtils.decode(validatorNodeEntryBuffer);
+        if (validatorNodeEntry === null) return;
+        const validatorBalance = toBalance(validatorNodeEntry.balance);
+        if (validatorBalance === null) return;
+        const newValidatorBalance = validatorBalance.add(feeAmount.percentage(PERCENT_75));
+        if (newValidatorBalance === null) return;
+        const updatedValidatorNodeEntry = newValidatorBalance.update(validatorNodeEntry)
+        if (updatedValidatorNodeEntry === null) return;
+
         // Revoke old wk and add new one as an indexer
         await base.removeWriter(decodedAdminEntry.wk);
         await base.addWriter(op.rao.iw, { isIndexer: true });
@@ -540,8 +562,11 @@ class State extends ReadyResource {
         // Remove the old admin entry and add the new one
         await batch.put(EntryType.ADMIN, newAdminEntry);
         // This updates the admin node entry with the new writer key
-        await batch.put(requesterAdminAddressString, newAdminNodeEntry);
+        await batch.put(requesterAdminAddressString, chargedAdminEntry);
         await batch.put(txHashHexString, node.value);
+
+        // Actually pay the fee
+        await batch.put(validatorAddressString, updatedValidatorNodeEntry);
 
         console.log(`Admin has been recovered addr:wk:tx - ${requesterAdminAddressString}:${op.rao.iw.toString('hex')}:${txHashHexString}`);
     }
@@ -587,6 +612,22 @@ class State extends ReadyResource {
         // Retrieve the node entry to check its current role
         const nodeEntry = await this.#getEntryApply(nodeAddressString, batch);
         if (nodeEntryUtils.isWhitelisted(nodeEntry)) return; // Node is already whitelisted
+
+        if (await this.#isApplyInitalizationDisabled(batch)) {            
+            // Fee
+            const adminNodeEntry = await this.#getEntryApply(adminAddressString, batch);
+            if (null === adminNodeEntry) return;
+            const decodedNodeEntry = nodeEntryUtils.decode(adminNodeEntry)
+            if (null === decodedNodeEntry) return;
+            const adminBalance = toBalance(decodedNodeEntry.balance)
+            if (null === adminBalance) return;
+            if (!adminBalance.greaterThanOrEquals(BALANCE_FEE)) return;
+            const newAdminBalance = adminBalance.sub(BALANCE_FEE) // we burn
+            if (null === newAdminBalance) return;
+            const updatedAdminEntry = newAdminBalance.update(adminNodeEntry)
+            if (null === updatedRequesterEntry) return;
+            await batch.put(adminAddressString, updatedAdminEntry);
+        }
 
         if (!nodeEntry) {
             // If the node entry does not exist, create a new whitelisted node entry
@@ -674,7 +715,7 @@ class State extends ReadyResource {
         if (null !== opEntry) return;
         const writerKeyIsRegistered = await this.#getRegisteredWriterKeyApply(batch, op.rao.iw.toString('hex'))
         if (!!writerKeyIsRegistered) return;
-        await this.#addWriter(op, base, node, batch, txHashHexString, requesterAddressString, requesterAddressBuffer);
+        await this.#addWriter(op, base, node, batch, txHashHexString, requesterAddressString, requesterAddressBuffer, validatorAddressString);
     }
 
     async #isApplyInitalizationDisabled(batch) {
@@ -708,7 +749,7 @@ class State extends ReadyResource {
         await batch.put(EntryType.WRITERS_LENGTH, incrementedLength);
     }
 
-    async #addWriter(op, base, node, batch, txHashHexString, requesterAddressString, requesterAddressBuffer) {
+    async #addWriter(op, base, node, batch, txHashHexString, requesterAddressString, requesterAddressBuffer, validatorAddressString) {
         // Retrieve the node entry for the given address, if null then do not process...
         const nodeEntry = await this.#getEntryApply(requesterAddressString, batch);
         if (nodeEntry === null) return;
@@ -719,13 +760,38 @@ class State extends ReadyResource {
 
         // To become a writer the node must be whitelisted and not already a writer or indexer
         if (isIndexer || isWriter || !isWhitelisted) return;
+
+        // Fee
+        const decodedNodeEntry = nodeEntryUtils.decode(nodeEntry)
+        if (decodedNodeEntry === null) return;
+        const requesterBalance = toBalance(decodedNodeEntry.balance)
+        if (requesterBalance === null) return;
+        if (!requesterBalance.greaterThanOrEquals(BALANCE_FEE)) return;
+        const updatedBalance = requesterBalance.sub(BALANCE_FEE) // Remove the fee
+        if (updatedBalance === null) return;
+        const validatorEntry = await this.#getEntryApply(validatorAddressString, batch);
+        if (validatorEntry === null) return;
+        const decodedValidatorEntry = nodeEntryUtils.decode(validatorEntry)
+        if (decodedValidatorEntry === null) return;
+        const validatorBalance = toBalance(decodedValidatorEntry.balance)
+        if (validatorBalance === null) return;
+        const updatedValidatorBalance = validatorBalance.add(BALANCE_FEE.percentage(PERCENT_75)) // Credit a percentage to validator
+        if (updatedValidatorBalance === null) return;
+        const updatedValidatorEntry = updatedValidatorBalance.update(validatorEntry)
+        if (updatedValidatorEntry === null) return;
+
         // Update the node entry to assign the writer role
         const updatedNodeEntry = nodeEntryUtils.setRoleAndWriterKey(nodeEntry, nodeRoleUtils.NodeRole.WRITER, op.rao.iw);
         if (updatedNodeEntry === null) return;
+        const chargedUpdatedNodeEntry = updatedBalance.update(updatedNodeEntry)
+        if (chargedUpdatedNodeEntry === null) return;
+
+        // Pay the fee
+        await batch.put(validatorAddressString, updatedValidatorEntry);
 
         // Add the writer role to the base and update the batch
         await base.addWriter(op.rao.iw, { isIndexer: false });
-        await batch.put(requesterAddressString, updatedNodeEntry);
+        await batch.put(requesterAddressString, chargedUpdatedNodeEntry);
         await batch.put(EntryType.WRITER_ADDRESS + op.rao.iw.toString('hex'), op.address);
         await this.#updateWritersIndex(requesterAddressBuffer, batch);
 
@@ -775,13 +841,16 @@ class State extends ReadyResource {
         if (null !== opEntry) return;
 
         // Proceed to remove the writer role from the node
-        await this.#removeWriter(op, base, node, batch, txHashHexString, requesterAddressString);
+        await this.#removeWriter(op, base, node, batch, txHashHexString, requesterAddressString, validatorAddressString);
     }
 
-    async #removeWriter(op, base, node, batch, txHashHexString, requesterAddressString) {
+    async #removeWriter(op, base, node, batch, txHashHexString, requesterAddressString, validatorAddressString) {
         // Retrieve the node entry for the given key
         const nodeEntry = await this.#getEntryApply(requesterAddressString, batch);
         if (null === nodeEntry) return;
+        // Retrieve the validator to receive the fee
+        const validatorNodeEntry = await this.#getEntryApply(validatorAddressString, batch);
+        if (null === validatorNodeEntry) return;
 
         // TODO: SHOULD WE somehow compare current wk FROM STATE with op.rao.iw? YES, we can ensure that linked wk to the address is the same as the one provided in the operation.
 
@@ -793,14 +862,36 @@ class State extends ReadyResource {
 
         if (isNodeWriter) {
             // Decode the node entry and downgrade its role to WHITELISTED reader.
+            const decodedValidatorEntry = nodeEntryUtils.decode(validatorEntry);
+            if (decodedValidatorEntry === null) return;
+            const validatorBalance = toBalance(decodedNodeEntry.balance)
+            if (validatorBalance === null) return;
+            const paidBalance = requesterBalance.add(BALANCE_FEE.percentage(PERCENT_75))
+            if (paidBalance === null) return;
+            const updateValidatorEntry = paidBalance.update(validatorEntry)
+            if (updateValidatorEntry === null) return;
+
             const decodedNodeEntry = nodeEntryUtils.decode(nodeEntry);
             if (decodedNodeEntry === null) return;
+
+            // Fee
+            const requesterBalance = toBalance(decodedNodeEntry.balance)
+            if (requesterBalance === null) return;
+            if (!requesterBalance.greaterThanOrEquals(BALANCE_FEE)) return;
+            const updatedBalance = requesterBalance.sub(BALANCE_FEE) // Remove the fee
+            if (updatedBalance === null) return;
+
             // Downgrade role from WRITER to WHITELISTED
             const updatedNodeEntry = nodeEntryUtils.setRole(nodeEntry, nodeRoleUtils.NodeRole.WHITELISTED);
             if (updatedNodeEntry === null) return;
+            const chargedNodeEntry = updatedBalance.update(updatedNodeEntry)
+            if (chargedNodeEntry === null) return;
+
+            // Actually pay the fee
+            await batch.put(validatorAddressString, updateValidatorEntry);
             // Remove the writer role and update the state
             await base.removeWriter(decodedNodeEntry.wk);
-            await batch.put(requesterAddressString, updatedNodeEntry);
+            await batch.put(requesterAddressString, chargedNodeEntry);
             await batch.put(txHashHexString, node.value);
             console.log(`Writer removed: addr:wk:tx - ${requesterAddressString}:${op.rao.iw.toString('hex')}:${txHashHexString}`);
         }
@@ -929,14 +1020,27 @@ class State extends ReadyResource {
         // anti-replay attack
         const opEntry = await this.#getEntryApply(txHashHexString, batch);
         if (null !== opEntry) return;
-        await this.#removeIndexer(op, node, batch, base, txHashHexString, toRemoveAddressString, toRemoveAddressBuffer);
+        await this.#removeIndexer(op, node, batch, base, txHashHexString, toRemoveAddressString, toRemoveAddressBuffer, requesterAddressString);
     }
 
-    async #removeIndexer(op, node, batch, base, txHashHexString, toRemoveAddressString, toRemoveAddressBuffer) {
+    async #removeIndexer(op, node, batch, base, txHashHexString, toRemoveAddressString, toRemoveAddressBuffer, requesterAddressString) {
         const nodeEntry = await this.#getEntryApply(toRemoveAddressString, batch);
         if (null === nodeEntry) return;
         const decodedNodeEntry = nodeEntryUtils.decode(nodeEntry);
         if (null === decodedNodeEntry) return;
+
+        // Fee
+        const requesterEntry = await this.#getEntryApply(requesterAddressString, batch);
+        if (null === requesterEntry) return;
+        const decodedRequesterEntry = nodeEntryUtils.decode(requesterEntry)
+        if (null === decodedRequesterEntry) return;
+        const requesterBalance = toBalance(decodedRequesterEntry.balance)
+        if (null === requesterBalance) return;
+        if (!requesterBalance.greaterThanOrEquals(BALANCE_FEE)) return;
+        const newRequesterBalance = requesterBalance.sub(BALANCE_FEE) // we burn
+        if (null === newRequesterBalance) return;
+        const updatedRequesterEntry = newRequesterBalance.update(requesterEntry)
+        if (null === updatedRequesterEntry) return;
 
         // Check if the node entry is an indexer
         const isNodeIndexer = nodeEntryUtils.isIndexer(nodeEntry);
@@ -959,6 +1063,9 @@ class State extends ReadyResource {
 
         //update node entry and indexers entry
         await batch.put(toRemoveAddressString, updatedNodeEntry);
+
+        // update node entry with the fee
+        await batch.put(requesterAddressString, updatedRequesterEntry);
 
         // store operation hash to avoid replay attack.
         await batch.put(txHashHexString, node.value);
@@ -1288,6 +1395,7 @@ class State extends ReadyResource {
 
         if (null === transferResult) return;
         await batch.put(requesterAddressString, transferResult.senderEntry);
+        await batch.put(validatorAddressString, transferResult.validatorEntry);
 
         if (!isSelfTransfer) {
             await batch.put(recipientAddressString, transferResult.recipientEntry);
@@ -1321,21 +1429,32 @@ class State extends ReadyResource {
         if (totalDeductedAmount === null) return null;
         const senderEntryBuffer = await this.#getEntryApply(senderAddressString, batch);
         if (senderEntryBuffer === null) return null;
+        const validatorEntryBuffer = await this.#getEntryApply(validatorAddressString, batch);
+        if (validatorEntryBuffer === null) return null;
+        const validatorEntry = nodeEntryUtils.decode(validatorEntryBuffer);
+        if (validatorEntry === null) return null;
         const senderEntry = nodeEntryUtils.decode(senderEntryBuffer);
         if (senderEntry === null) return null;
         const senderBalance = toBalance(senderEntry.balance);
         if (senderBalance === null) return null;
         if (!senderBalance.greaterThanOrEquals(totalDeductedAmount)) return null;
+        const validatorBalance = toBalance(senderEntry.balance);
+        if (validatorBalance === null) return null;
+
+
+        const newValidatorBalance = senderBalance.add(feeAmount.percentage(PERCENT_75));
+        if (newValidatorBalance === null) return null;
+        const updatedValidatorEntry = newValidatorBalance.update(validatorEntryBuffer)
 
         const newSenderBalance = senderBalance.sub(totalDeductedAmount);
         if (newSenderBalance === null) return null;
 
-        const updatedSenderEntry = nodeEntryUtils.setBalance(senderEntryBuffer, newSenderBalance.value);
+        const updatedSenderEntry = newSenderBalance.update(senderEntryBuffer);
         if (updatedSenderEntry === null) return null;
         const result = {
             senderEntry: updatedSenderEntry,
             recipientEntry: null,
-            validatorEntry: null,
+            validatorEntry: updatedValidatorEntry,
         };
 
         if (!isSelfTransfer) {

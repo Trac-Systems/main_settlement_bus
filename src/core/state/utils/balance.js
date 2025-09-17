@@ -1,8 +1,28 @@
 import b4a from 'b4a';
-import { setBalance } from './nodeEntry.js';
+import { setBalance, ZERO_BALANCE } from './nodeEntry.js';
 import { isBufferValid, bigIntToBuffer, NULL_BUFFER } from '../../../utils/buffer.js';
 import { BALANCE_BYTE_LENGTH, TOKEN_DECIMALS } from '../../../utils/constants.js';
 import { bufferToBigInt } from '../../../utils/amountSerialization.js';
+import { FEE } from './transaction.js';
+
+const DOUBLE_LENGTH = BALANCE_BYTE_LENGTH * 2
+const PERCENTAGE_TERM = bigIntToBuffer(10_000n, DOUBLE_LENGTH)
+
+/**
+ * Converts a decimal to a buffer that can be used along with Balance#percentage. 
+ * Should be used to define readable constants.
+ * @param {number} value - The % with two decimal digits
+ * @returns {Buffer} - Fixed-length buffer representing the percentage to be applied
+ */
+export const percent = value => {
+    const bigint = BigInt(Math.round(value * 100))
+    return bigIntToBuffer(bigint, BALANCE_BYTE_LENGTH)
+}
+
+/**
+ * Short term for 75% to be used with balance. Extracted to avoid buffer conversions during request time.
+ */
+export const PERCENT_75 = percent(75)
 
 /**
  * Converts a bigint amount of tokens into a fixed-length buffer,
@@ -17,13 +37,29 @@ export const $TNK = bigint => bigIntToBuffer(
 )
 
 /**
- * Adds two buffers of equal length as unsigned integers.
- * Returns a new buffer containing the result.
- * Overflow beyond the buffer length wraps around mod 2^(length*8).
- * @param {Buffer} a 
- * @param {Buffer} b 
- * @returns {Buffer} - Resulting buffer
+ * Converts a bigint into a fixed-length buffer reprenseting a positive number
+ * scaled according to TOKEN_DECIMALS.
+ * @param {bigint} bigint - The number to be converted
+ * @returns {Buffer} - Fixed-length buffer representing token amount
  */
+export const toTerm = bigint => bigIntToBuffer(
+    bigint, 
+    BALANCE_BYTE_LENGTH
+)
+
+const truncate = buf => buf.slice(BALANCE_BYTE_LENGTH * -1)
+
+const shiftLeft1 = buf => {
+    const res = b4a.alloc(BALANCE_BYTE_LENGTH)
+    let carry = 0
+    for (let i = BALANCE_BYTE_LENGTH - 1; i >= 0; i--) {
+        const val = (buf[i] << 1) | carry
+        res[i] = val & 0xff
+        carry = val >> 8
+    }
+    return res
+}
+
 const addBuffers = (a, b) => {
     if (a.length !== b.length) return NULL_BUFFER
     const result = b4a.alloc(a.length);
@@ -38,15 +74,7 @@ const addBuffers = (a, b) => {
     return result;
 }
 
-/**
- * Subtracts buffer b from buffer a as unsigned integers.
- * Returns a new buffer containing the result.
- * Underflow wraps around modulo 2^(length*8).
- * @param {Buffer} a 
- * @param {Buffer} b 
- * @returns {Buffer} - Resulting buffer
- */
-export const subBuffers = (a, b) => {
+const subBuffers = (a, b) => {
     if (a.length !== b.length) return NULL_BUFFER;
 
     const result = b4a.alloc(a.length);
@@ -69,23 +97,67 @@ export const subBuffers = (a, b) => {
     return result;
 }
 
-/**
- * Validates that a buffer has the correct length for balances.
- * Logs an error message if invalid.
- * @param {Buffer} value 
- */
+const divBuffers = (dividend, divisor) => {
+    if (dividend.length !== BALANCE_BYTE_LENGTH || divisor.length !== BALANCE_BYTE_LENGTH) {
+        return NULL_BUFFER
+    }
+    if (divisor.equals(ZERO_BALANCE)) {
+        return NULL_BUFFER
+    }
+
+    let quotient = b4a.alloc(BALANCE_BYTE_LENGTH)
+    let remainder = b4a.alloc(BALANCE_BYTE_LENGTH)
+
+    for (let bit = 0; bit < BALANCE_BYTE_LENGTH * 8; bit++) {
+        remainder = shiftLeft1(remainder)
+        const byteIndex = Math.floor(bit / 8)
+        const bitIndex = 7 - (bit % 8)
+        const bitVal = (dividend[byteIndex] >> bitIndex) & 1
+        remainder[BALANCE_BYTE_LENGTH - 1] |= bitVal
+        if (b4a.compare(remainder, divisor) >= 0) {
+            remainder = subBuffers(remainder, divisor)
+            quotient[byteIndex] |= (1 << bitIndex)
+        }
+    }
+
+    return quotient
+}
+
+const mulBuffers = (a, b) => {
+    if (a.length !== BALANCE_BYTE_LENGTH || b.length !== BALANCE_BYTE_LENGTH) {
+      return NULL_BUFFER
+    }
+  
+    const alen = a.length;
+    const blen = b.length;
+    const result = b4a.alloc(DOUBLE_LENGTH); // up to 32 bytes
+  
+    for (let i = alen - 1; i >= 0; i--) {
+        let carry = 0;
+        for (let j = blen - 1; j >= 0; j--) {
+        const ai = a[i];
+        const bj = b[j];
+
+        const pos = i + j + 1;
+        const mul = ai * bj + result[pos] + carry;
+
+        result[pos] = mul & 0xff;   // low byte
+        carry = mul >>> 8;          // high byte
+        }
+        result[i] += carry;
+    }
+
+    if (!b4a.equals(result.slice(0, BALANCE_BYTE_LENGTH), ZERO_BALANCE)) {
+        return NULL_BUFFER
+    }
+  
+    // Truncate
+    return truncate(result)
+}
+
 const validateValue = value => {
     if (!isBufferValid(value, BALANCE_BYTE_LENGTH)) {
         throw new Error('Invalid balance') // Should be a qualified exception
-    }
-}
-
-export function toBalance(balance) {
-    try{
-        return new Balance(balance)
-    } catch(e) {
-        console.error(e)
-        return null
     }
 }
 
@@ -128,6 +200,39 @@ class Balance {
     }
 
     /**
+     * Multiply a balance for a number in bytes
+     * @param {Buffer} num - to be used along `toTerm`
+     * @returns {Balance} - New Balance instance
+     */
+    mul(num) {
+        if (!isBufferValid(num, BALANCE_BYTE_LENGTH)) return null
+        const result = mulBuffers(this.#value, num)
+        return toBalance(result)
+    }
+
+    /**
+     * Reduce to its percentage
+     * @param {Buffer} percent - the buffer percentage (with two extra decimals). Expected to be used along with percent function.
+     * @returns {Balance} - New Balance instance
+     */
+    percentage(percent) {
+        if (!isBufferValid(percent, BALANCE_BYTE_LENGTH)) return null
+        const dividend = mulBuffers(this.#value, percent)
+        const result = divBuffers(dividend, PERCENTAGE_TERM)
+        return toBalance(result)
+    }
+
+    /**
+     * Divide a balance by a number in bytes
+     * @param {Buffer} b - to be used along `toTerm`
+     * @returns {Balance} - New Balance instance
+     */
+    div(divisor) {
+        if (!isBufferValid(divisor, BALANCE_BYTE_LENGTH)) return null
+        return toBalance(divBuffers(this.#value, divisor))
+    }
+
+    /**
      * Updates a node entry with this balance.
      * @param {Object} nodeEntry 
      */
@@ -137,7 +242,7 @@ class Balance {
 
     /** Compares equality with another balance */
     equals(b) {
-        return b4a.equals(this.#value, b.value)
+        return isBufferValid(b?.value, BALANCE_BYTE_LENGTH) && b4a.equals(this.#value, b.value)
     }
 
     /** Returns true if this balance is greater than another */
@@ -174,3 +279,14 @@ class Balance {
         return bufferToBigInt(this.#value)
     }
 }
+
+export function toBalance(balance) {
+    try{
+        return new Balance(balance)
+    } catch(e) {
+        console.error(e?.message || e)
+        return null
+    }
+}
+
+export const BALANCE_FEE = toBalance(FEE)
