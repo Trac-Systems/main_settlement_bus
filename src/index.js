@@ -26,7 +26,6 @@ import partialStateMessageOperations from "./messages/partialStateMessages/Parti
 import { randomBytes } from "hypercore-crypto";
 import { decimalStringToBigInt, bigIntTo16ByteBuffer, bufferToBigInt, bigIntToDecimalString } from "./utils/amountSerialization.js"
 import { ZERO_WK } from "./utils/buffer.js";
-import deploymentEntryUtils from "./core/state/utils/deploymentEntry.js"
 //TODO create a MODULE which will separate logic responsible for role managment
 
 export class MainSettlementBus extends ReadyResource {
