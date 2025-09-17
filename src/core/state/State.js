@@ -512,22 +512,22 @@ class State extends ReadyResource {
         const isValidatorMessageVerifed = this.#wallet.verify(op.rao.vs, validatorHash, validatorPublicKey);
         if (!isValidatorMessageVerifed) return;
 
-        const writerKeyIsRegistered = await this.#getRegisteredWriterKeyApply(batch, op.rao.iw.toString('hex'))
-        if (!!writerKeyIsRegistered) return; // writer key should NOT have been associated with any address because this is a recovery operation
+        const writerKeyHasBeenRegistered = await this.#getRegisteredWriterKeyApply(batch, op.rao.iw.toString('hex'))
+        if (writerKeyHasBeenRegistered !== null) return; // writer key should NOT have been associated with any address because this is a recovery operation
+        
         // verify tx validity - prevent deferred execution attack
         const indexersSequenceState = await this.#getIndexerSequenceStateApply(base);
         if (indexersSequenceState === null) return;
         if (!b4a.equals(op.rao.txv, indexersSequenceState)) return;
 
-        // Check if the operation has already been applied
-        const opEntry = await this.#getEntryApply(txHashHexString, batch);
-
         // anti-replay attack
-        if (null !== opEntry) return;
+        const opEntry = await this.#getEntryApply(txHashHexString, batch);
+        if (opEntry !== null) return;
+
         const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
         const decodedAdminEntry = adminEntryUtils.decode(adminEntry);
 
-        if (null === decodedAdminEntry) return;
+        if (decodedAdminEntry === null) return;
         const publicKeyAdminEntry = PeerWallet.decodeBech32mSafe(decodedAdminEntry.address);
         if (!b4a.equals(requesterAdminPublicKey, publicKeyAdminEntry)) return;
 
@@ -545,25 +545,32 @@ class State extends ReadyResource {
         const isNewWkInIndexerList = await this.#isWriterKeyInIndexerListApply(op.rao.iw, base);
         if (isNewWkInIndexerList) return; // New admin wk is already in indexers entry
 
-        // Fee
+        // charging fee from the requester (admin)
         const decodedAdminNodeEntry = nodeEntryUtils.decode(newAdminNodeEntry)
         if (decodedAdminNodeEntry === null) return
+
         const adminBalance = toBalance(decodedAdminNodeEntry.balance)
         if (adminBalance === null) return
+
         if (!adminBalance.greaterThanOrEquals(BALANCE_FEE)) return;
         const updatedFee = adminBalance.sub(BALANCE_FEE)
+
         if (updatedFee === null) return
         const chargedAdminEntry = updatedFee.update(newAdminNodeEntry)
 
         // Reward logic
         const validatorNodeEntryBuffer = await this.#getEntryApply(validatorAddressString, batch);
         if (validatorNodeEntryBuffer === null) return;
+
         const validatorNodeEntry = nodeEntryUtils.decode(validatorNodeEntryBuffer);
         if (validatorNodeEntry === null) return;
+
         const validatorBalance = toBalance(validatorNodeEntry.balance);
         if (validatorBalance === null) return;
+
         const newValidatorBalance = validatorBalance.add(feeAmount.percentage(PERCENT_75));
         if (newValidatorBalance === null) return;
+
         const updatedValidatorNodeEntry = newValidatorBalance.update(validatorNodeEntry)
         if (updatedValidatorNodeEntry === null) return;
 
@@ -574,7 +581,7 @@ class State extends ReadyResource {
 
         // Remove the old admin entry and add the new one
         await batch.put(EntryType.ADMIN, newAdminEntry);
-        // This updates the admin node entry with the new writer key
+        // This updates the admin node entry with the new writer key and deducted fee.
         await batch.put(requesterAdminAddressString, chargedAdminEntry);
         await batch.put(txHashHexString, node.value);
 
@@ -1323,7 +1330,7 @@ class State extends ReadyResource {
 
         const updatedValidatorNodeEntry = newValidatorBalance.update(validatorNodeEntryBuffer);
         if (updatedValidatorNodeEntry === null) return;
-        
+
         await batch.put(hashHexString, node.value);
         await batch.put(EntryType.DEPLOYMENT + bootstrapDeploymentHexString, deploymentEntry);
         await batch.put(requesterAddressString, updatedRequesterNodeEntry);
@@ -1432,7 +1439,7 @@ class State extends ReadyResource {
         if (!requesterBalance.greaterThanOrEquals(feeAmount)) return;
         const newRequesterBalance = requesterBalance.sub(feeAmount);
         if (newRequesterBalance === null) return;
-        
+
         const updatedRequesterNodeEntry = newRequesterBalance.update(requesterNodeEntryBuffer);
         if (updatedRequesterNodeEntry === null) return;
 
