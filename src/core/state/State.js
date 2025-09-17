@@ -949,7 +949,7 @@ class State extends ReadyResource {
         const pretendingAddressBuffer = op.aco.ia;
         const pretendingAddressString = addressUtils.bufferToAddress(pretendingAddressBuffer);
         if (pretendingAddressString === null) return;
-        
+
         // Validate pretending indexer public key
         const pretentingPublicKey = PeerWallet.decodeBech32mSafe(pretendingAddressString);
         if (pretentingPublicKey === null) return;
@@ -1175,18 +1175,20 @@ class State extends ReadyResource {
         const requesterAddressBuffer = op.address;
         const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer);
         if (requesterAddressString === null) return;
+        
+        // Validate requester public key
         const requesterPublicKey = PeerWallet.decodeBech32mSafe(requesterAddressString);
         if (requesterPublicKey === null) return;
 
         // ensure that an admin invoked this operation
         const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
-        if (null === adminEntry) return;
+        if (adminEntry === null) return;
 
         const decodedAdminEntry = adminEntryUtils.decode(adminEntry);
-        if (null === decodedAdminEntry) return;
+        if (decodedAdminEntry === null) return;
 
         const adminPublicKey = PeerWallet.decodeBech32mSafe(decodedAdminEntry.address);
-        if (adminPublicKey === null || !b4a.equals(requesterPublicKey, adminPublicKey) || !this.#isAdminApply(decodedAdminEntry, node)) return;
+        if (adminPublicKey === null || !this.#isAdminApply(decodedAdminEntry, node)) return;
 
         // Admin consistency check
         if (!b4a.equals(adminPublicKey, requesterPublicKey)) return;
@@ -1201,7 +1203,8 @@ class State extends ReadyResource {
             OperationType.BAN_VALIDATOR
         );
         if (message.length === 0) return;
-
+        
+        // compare hashes
         const regeneratedHash = await blake3Hash(message);
         if (!b4a.equals(regeneratedHash, op.aco.tx)) return;
 
@@ -1216,28 +1219,29 @@ class State extends ReadyResource {
 
         // check if the operation has already been applied
         const opEntry = await this.#getEntryApply(txHashHexString, batch);
-        if (null !== opEntry) return;
+        if (opEntry !== null) return;
 
         // Extract and validate the node address to be banned
         const nodeToBeBannedAddressBuffer = op.aco.ia;
         const nodeToBeBannedAddressString = addressUtils.bufferToAddress(nodeToBeBannedAddressBuffer);
         if (nodeToBeBannedAddressString === null) return;
 
-        const nodeEntry = await this.#getEntryApply(nodeToBeBannedAddressString, batch);
-        if (null === nodeEntry) return; // Node entry must exist to ban it.
+        const toBanNodeEntry = await this.#getEntryApply(nodeToBeBannedAddressString, batch);
+        if (toBanNodeEntry === null) return; // Node entry must exist to ban it.
 
         // Atleast writer must be whitelisted to ban it.
-        const isWhitelisted = nodeEntryUtils.isWhitelisted(nodeEntry);
-        const isWriter = nodeEntryUtils.isWriter(nodeEntry);
-        const isIndexer = nodeEntryUtils.isIndexer(nodeEntry);
+        const isWhitelisted = nodeEntryUtils.isWhitelisted(toBanNodeEntry);
+        const isWriter = nodeEntryUtils.isWriter(toBanNodeEntry);
+        const isIndexer = nodeEntryUtils.isIndexer(toBanNodeEntry);
 
         // only writer/whitelisted node can be banned.
         if ((!isWhitelisted && !isWriter) || isIndexer) return;
 
-        const updatedNodeEntry = nodeEntryUtils.setRole(nodeEntry, nodeRoleUtils.NodeRole.READER);
-        if (null === updatedNodeEntry) return;
-        const decodedNodeEntry = nodeEntryUtils.decode(updatedNodeEntry);
-        if (null === decodedNodeEntry) return;
+        const updatedToBanNodeEntry = nodeEntryUtils.setRole(toBanNodeEntry, nodeRoleUtils.NodeRole.READER);
+        if (updatedToBanNodeEntry === null) return;
+
+        const decodedToBanNodeEntry = nodeEntryUtils.decode(updatedToBanNodeEntry);
+        if (decodedToBanNodeEntry === null) return;
 
         // charge fee from the admin
         const feeAmount = toBalance(transactionUtils.FEE);
@@ -1253,6 +1257,8 @@ class State extends ReadyResource {
         if (adminBalance === null) return;
 
         if (!adminBalance.greaterThanOrEquals(feeAmount)) return;
+
+        // 100% fee charged from admin will be burned
         const newAdminBalance = adminBalance.sub(feeAmount);
         if (newAdminBalance === null) return;
 
@@ -1261,12 +1267,13 @@ class State extends ReadyResource {
 
         // Remove the writer role and update the state
         if (isWriter) {
-            await base.removeWriter(decodedNodeEntry.wk);
+            await base.removeWriter(decodedToBanNodeEntry.wk);
         }
-        await batch.put(nodeToBeBannedAddressString, updatedNodeEntry);
+        
+        await batch.put(nodeToBeBannedAddressString, updatedToBanNodeEntry);
         await batch.put(requesterAddressString, updatedAdminNodeEntry);
         await batch.put(txHashHexString, node.value);
-        console.log(`Node has been banned: addr:wk:tx - ${nodeToBeBannedAddressString}:${decodedNodeEntry.wk.toString('hex')}:${txHashHexString}`);
+        console.log(`Node has been banned: addr:wk:tx - ${nodeToBeBannedAddressString}:${decodedToBanNodeEntry.wk.toString('hex')}:${txHashHexString}`);
     }
 
     async #handleApplyBootstrapDeploymentOperation(op, view, base, node, batch) {
