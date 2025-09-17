@@ -26,6 +26,9 @@ import partialStateMessageOperations from "./messages/partialStateMessages/Parti
 import { randomBytes } from "hypercore-crypto";
 import { decimalStringToBigInt, bigIntTo16ByteBuffer, bufferToBigInt, bigIntToDecimalString } from "./utils/amountSerialization.js"
 import { ZERO_WK } from "./utils/buffer.js";
+import { normalizeTransferOperation } from "./utils/normalizers.js"
+import PartialTransfer from "./core/network/messaging/validators/PartialTransfer.js";
+
 //TODO create a MODULE which will separate logic responsible for role managment
 
 export class MainSettlementBus extends ReadyResource {
@@ -45,6 +48,7 @@ export class MainSettlementBus extends ReadyResource {
     #state;
     #isClosing = false;
     #is_admin_mode;
+    #partialTransferValidator;
 
     constructor(options = {}) {
         super();
@@ -136,6 +140,8 @@ export class MainSettlementBus extends ReadyResource {
             );
             printWalletInfo(this.#wallet.address, this.#state.writingKey, this.#state, this.#enable_wallet);
         }
+
+        this.#partialTransferValidator = new PartialTransfer(this.state, null, null);
 
         await this.#network.replicate(
             this.#state,
@@ -697,6 +703,7 @@ export class MainSettlementBus extends ReadyResource {
             console.log(`Total: ${bigIntToDecimalString(totalDeductedAmount)}`);
         }
         console.log(`Expected Balance After Transfer: ${bigIntToDecimalString(expectedNewBalance)}`);
+        
     }
 
     async #handleBalanceMigrationOperation() {
@@ -813,7 +820,7 @@ export class MainSettlementBus extends ReadyResource {
         rl.prompt();
     }
 
-    async handleCommand(input, rl = null) {
+    async handleCommand(input, rl = null, payload = null) {
         switch (input) {
             case "/help":
                 printHelp(this.#is_admin_mode);
@@ -980,9 +987,33 @@ export class MainSettlementBus extends ReadyResource {
                     const confirmed_length = this.#state.getSignedLength();
                     console.log('Confirmed_length:', confirmed_length);
                     return confirmed_length
+                }  else if (input.startsWith("/broadcast_transaction")) {
+                    if (payload) {
+                        const normalizedPayload = normalizeTransferOperation(payload);
+                        const isValid = await this.#partialTransferValidator.validate(normalizedPayload);
+                        if (!isValid) throw new Error("Invalid transaction payload.");
+
+                        const signedLength = this.#state.getSignedLength();
+                        const unsignedLength = this.#state.getUnsignedLength();
+                            
+                        await this.broadcastPartialTransaction(payload);
+                        return { message: "Transaction broadcasted successfully.", signedLength, unsignedLength };
+                    } else {
+                        // Handle case where payload is missing if called internally without one.
+                        throw new Error("Transaction payload is required for broadcast_transaction command.");
+                    }
+                } else if(input.startsWith("/get_txs_hashes")) {
+                    const splitted = input.split(' ')
+                    const start = parseInt(splitted[1]);
+                    const end = parseInt(splitted[2]);
+
+                    try {
+                        const hashes = await this.#state.confirmedTransactionsBetween(start, end);    
+                        return { hashes }
+                    } catch (error) {
+                        throw new Error("Invalid params to perform the request.", error.message);
+                    }
                 }
-
-
         }
         if (rl) rl.prompt();
     }
