@@ -155,11 +155,6 @@ const mulBuffers = (a, b) => {
     return truncate(result)
 }
 
-/**
- * Validates that a buffer has the correct length for balances.
- * Logs an error message if invalid.
- * @param {Buffer} value 
- */
 const validateValue = value => {
     if (!isBufferValid(value, BALANCE_BYTE_LENGTH)) {
         throw new Error('Invalid balance') // Should be a qualified exception
@@ -210,6 +205,7 @@ class Balance {
      * @returns {Balance} - New Balance instance
      */
     mul(num) {
+        if (!isBufferValid(num, BALANCE_BYTE_LENGTH)) return null
         const result = mulBuffers(this.#value, num)
         return toBalance(result)
     }
@@ -220,6 +216,7 @@ class Balance {
      * @returns {Balance} - New Balance instance
      */
     percentage(percent) {
+        if (!isBufferValid(percent, BALANCE_BYTE_LENGTH)) return null
         const dividend = mulBuffers(this.#value, percent)
         const result = divBuffers(dividend, PERCENTAGE_TERM)
         return toBalance(result)
@@ -231,6 +228,7 @@ class Balance {
      * @returns {Balance} - New Balance instance
      */
     div(divisor) {
+        if (!isBufferValid(divisor, BALANCE_BYTE_LENGTH)) return null
         return toBalance(divBuffers(this.#value, divisor))
     }
 
