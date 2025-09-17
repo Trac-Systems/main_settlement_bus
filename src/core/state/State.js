@@ -20,7 +20,7 @@ import nodeRoleUtils from './utils/roles.js';
 import lengthEntryUtils from './utils/lengthEntry.js';
 import transactionUtils from './utils/transaction.js';
 import { blake3Hash } from '../../utils/crypto.js';
-import { BALANCE_FEE, toBalance, PERCENT_75, percent } from './utils/balance.js';
+import { BALANCE_FEE, toBalance, PERCENT_75, PERCENT_50, PERCENT_25 } from './utils/balance.js';
 import { safeWriteUInt32BE } from '../../utils/buffer.js';
 import deploymentEntryUtils from './utils/deploymentEntry.js';
 class State extends ReadyResource {
@@ -1311,7 +1311,7 @@ class State extends ReadyResource {
         const validatorBalance = toBalance(validatorNodeEntry.balance);
         if (validatorBalance === null) return;
 
-        const newValidatorBalance = validatorBalance.add(feeAmount.percentage(percent(75)));
+        const newValidatorBalance = validatorBalance.add(feeAmount.percentage(PERCENT_75));
         if (newValidatorBalance === null) return;
 
         const updatedValidatorNodeEntry = newValidatorBalance.update(validatorNodeEntryBuffer);
@@ -1439,7 +1439,7 @@ class State extends ReadyResource {
         const validatorBalance = toBalance(validatorNodeEntry.balance);
         if (validatorBalance === null) return;
 
-        const newValidatorBalance = validatorBalance.add(feeAmount.percentage(percent(50)));
+        const newValidatorBalance = validatorBalance.add(feeAmount.percentage(PERCENT_50));
         if (newValidatorBalance === null) return;
 
         const updatedValidatorNodeEntry = newValidatorBalance.update(validatorNodeEntryBuffer)
@@ -1457,7 +1457,7 @@ class State extends ReadyResource {
         const subnetworkCreatorBalance = toBalance(subnetworkCreatorNodeEntry.balance);
         if (subnetworkCreatorBalance === null) return;
 
-        const newSubnetworkCreatorBalance = subnetworkCreatorBalance.add(feeAmount.percentage(percent(25)));
+        const newSubnetworkCreatorBalance = subnetworkCreatorBalance.add(feeAmount.percentage(PERCENT_25));
         if (newSubnetworkCreatorBalance === null) return;
 
         const updatedSubnetworkCreatorNodeEntry = newSubnetworkCreatorBalance.update(subnetworkCreatorNodeEntryBuffer);
