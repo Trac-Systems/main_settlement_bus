@@ -672,7 +672,7 @@ export class MainSettlementBus extends ReadyResource {
             throw new Error("Sender account not found");
         }
 
-        const fee = await this.#state.getFee();
+        const fee = this.#state.getFee();
         const feeBigInt = bufferToBigInt(fee);
         const senderBalance = bufferToBigInt(senderEntry.balance);
         const isSelfTransfer = address === this.#wallet.address;
