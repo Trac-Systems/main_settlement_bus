@@ -1056,10 +1056,12 @@ class State extends ReadyResource {
     async #handleApplyRemoveIndexerOperation(op, view, base, node, batch) {
         if (!this.check.validateAdminControlOperation(op)) return;
 
-        // Extract and validate the requester address
+        // Extract and validate the requester address (admin)
         const requesterAddressBuffer = op.address;
         const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer);
         if (requesterAddressString === null) return;
+
+        // Validate requester public key (admin)
         const requesterPublicKey = PeerWallet.decodeBech32mSafe(requesterAddressString);
         if (requesterPublicKey === null) return;
 
@@ -1067,20 +1069,32 @@ class State extends ReadyResource {
         const toRemoveAddressBuffer = op.aco.ia;
         const toRemoveAddressString = addressUtils.bufferToAddress(toRemoveAddressBuffer);
         if (toRemoveAddressString === null) return;
+
         const toRemoveAddressPublicKey = PeerWallet.decodeBech32mSafe(toRemoveAddressString);
         if (toRemoveAddressPublicKey === null) return;
 
         // ensure that an admin invoked this operation
         const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
-        if (null === adminEntry) return;
+        if (adminEntry === null) return;
+
         const decodedAdminEntry = adminEntryUtils.decode(adminEntry);
-        if (null === decodedAdminEntry) return;
+        if (decodedAdminEntry === null || !this.#isAdminApply(decodedAdminEntry, node)) return;
+
         const adminPublicKey = PeerWallet.decodeBech32mSafe(decodedAdminEntry.address);
         if (adminPublicKey === null) return;
-        if (!b4a.equals(requesterPublicKey, adminPublicKey) || !this.#isAdminApply(decodedAdminEntry, node)) return;
+
+        if (!b4a.equals(requesterPublicKey, adminPublicKey)) return;
 
         // verify requester signature
-        const message = createMessage(op.address, op.aco.txv, op.aco.ia, op.aco.in, OperationType.REMOVE_INDEXER);
+        const message = createMessage(
+            op.address,
+            op.aco.txv,
+            op.aco.ia,
+            op.aco.in,
+            OperationType.REMOVE_INDEXER
+        );
+        if (message.length === 0) return;
+        // compare hashes
         const hash = await blake3Hash(message);
         if (!b4a.equals(hash, op.aco.tx)) return;
 
@@ -1095,40 +1109,47 @@ class State extends ReadyResource {
 
         // anti-replay attack
         const opEntry = await this.#getEntryApply(txHashHexString, batch);
-        if (null !== opEntry) return;
+        if (opEntry !== null) return;
         await this.#removeIndexer(op, node, batch, base, txHashHexString, toRemoveAddressString, toRemoveAddressBuffer, requesterAddressString);
     }
 
     async #removeIndexer(op, node, batch, base, txHashHexString, toRemoveAddressString, toRemoveAddressBuffer, requesterAddressString) {
-        const nodeEntry = await this.#getEntryApply(toRemoveAddressString, batch);
-        if (null === nodeEntry) return;
-        const decodedNodeEntry = nodeEntryUtils.decode(nodeEntry);
-        if (null === decodedNodeEntry) return;
+        const toRemoveNodeEntry = await this.#getEntryApply(toRemoveAddressString, batch);
+        if (toRemoveNodeEntry === null) return;
 
-        // Fee
-        const requesterEntry = await this.#getEntryApply(requesterAddressString, batch);
-        if (null === requesterEntry) return;
-        const decodedRequesterEntry = nodeEntryUtils.decode(requesterEntry)
-        if (null === decodedRequesterEntry) return;
-        const requesterBalance = toBalance(decodedRequesterEntry.balance)
-        if (null === requesterBalance) return;
-        if (!requesterBalance.greaterThanOrEquals(BALANCE_FEE)) return;
-        const newRequesterBalance = requesterBalance.sub(BALANCE_FEE) // we burn
-        if (null === newRequesterBalance) return;
-        const updatedRequesterEntry = newRequesterBalance.update(requesterEntry)
-        if (null === updatedRequesterEntry) return;
+        const decodedNodeEntry = nodeEntryUtils.decode(toRemoveNodeEntry);
+        if (decodedNodeEntry === null) return;
 
         // Check if the node entry is an indexer
-        const isNodeIndexer = nodeEntryUtils.isIndexer(nodeEntry);
+        const isNodeIndexer = nodeEntryUtils.isIndexer(toRemoveNodeEntry);
         if (!isNodeIndexer) return;
 
         //update node entry to writer
-        const updatedNodeEntry = nodeEntryUtils.setRoleAndWriterKey(nodeEntry, nodeRoleUtils.NodeRole.WRITER, decodedNodeEntry.wk)
-        if (null === updatedNodeEntry) return;
+        const updatedNodeEntry = nodeEntryUtils.setRoleAndWriterKey(toRemoveNodeEntry, nodeRoleUtils.NodeRole.WRITER, decodedNodeEntry.wk)
+        if (updatedNodeEntry === null) return;
 
         // Ensure that the node is an indexer
         const indexerListHasWk = await this.#isWriterKeyInIndexerListApply(decodedNodeEntry.wk, base);
         if (!indexerListHasWk) return; // Node is not an indexer.
+
+        // Charging fee from the admin (requester)
+        const adminNodeEntry = await this.#getEntryApply(requesterAddressString, batch);
+        if (adminNodeEntry === null) return;
+
+        const decodedAdminNodeEntry = nodeEntryUtils.decode(adminNodeEntry)
+        if (decodedAdminNodeEntry === null) return;
+
+        const adminBalance = toBalance(decodedAdminNodeEntry.balance)
+        if (adminBalance === null) return;
+
+        if (!adminBalance.greaterThanOrEquals(BALANCE_FEE)) return;
+
+        // 100% fee will be burned
+        const newAdminBalance = adminBalance.sub(BALANCE_FEE)
+        if (newAdminBalance === null) return;
+
+        const updatedAdminNodeEntry = newAdminBalance.update(adminNodeEntry)
+        if (updatedAdminNodeEntry === null) return;
 
         // downgrade role to writer
         await base.removeWriter(decodedNodeEntry.wk);
@@ -1140,8 +1161,8 @@ class State extends ReadyResource {
         //update node entry and indexers entry
         await batch.put(toRemoveAddressString, updatedNodeEntry);
 
-        // update node entry with the fee
-        await batch.put(requesterAddressString, updatedRequesterEntry);
+        // update requester (admin) entry after fee deduction
+        await batch.put(requesterAddressString, updatedAdminNodeEntry);
 
         // store operation hash to avoid replay attack.
         await batch.put(txHashHexString, node.value);
