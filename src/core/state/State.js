@@ -362,7 +362,7 @@ class State extends ReadyResource {
         if (adminPublicKey === null) return;
 
         // Admin consistency check
-        if (!b4a.equals(adminPublicKey, requesterAdminPublicKey)) return
+        if (!b4a.equals(adminPublicKey, requesterAdminPublicKey)) return;
 
         // Recreate requester message
         const message = createMessage(op.address, op.cao.txv, op.cao.iw, op.cao.in, OperationType.DISABLE_INITIALIZATION);
@@ -402,7 +402,7 @@ class State extends ReadyResource {
         const adminAddressBuffer = op.address;
         const adminAddressString = addressUtils.bufferToAddress(adminAddressBuffer);
         if (adminAddressString === null) return;
-        
+
         // Validate requester admin public key (admin)
         const adminPublicKey = PeerWallet.decodeBech32mSafe(adminAddressString);
         if (adminPublicKey === null) return;
@@ -594,31 +594,45 @@ class State extends ReadyResource {
     async #handleApplyAppendWhitelistOperation(op, view, base, node, batch) {
         if (!this.check.validateAdminControlOperation(op)) return;
 
+        // Validate the recipient address
+        const adminAddressBuffer = op.address;
+        const adminAddressString = addressUtils.bufferToAddress(adminAddressBuffer);
+        if (adminAddressString === null) return;
+        // Validate recipient public key
+        const requesterAdminPublicKey = PeerWallet.decodeBech32mSafe(adminAddressString);
+        if (requesterAdminPublicKey === null) return;
+        
         // Retrieve and decode the admin entry to verify the operation is initiated by an admin
         const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
-        if (null === adminEntry) return;
+        if (adminEntry === null) return;
         const decodedAdminEntry = adminEntryUtils.decode(adminEntry);
-        if (null === decodedAdminEntry || !this.#isAdminApply(decodedAdminEntry, node)) return;
+        if (decodedAdminEntry === null || !this.#isAdminApply(decodedAdminEntry, node)) return;
 
         // Extract admin entry
         const adminAddress = decodedAdminEntry.address;
         const adminPublicKey = PeerWallet.decodeBech32mSafe(adminAddress);
         if (adminPublicKey === null) return;
-        // Extract and validate the network prefix from the node's address
-        const nodeAddressBinnary = op.aco.ia;
+        
+        //admin consistency check
+        if (!b4a.equals(adminPublicKey, requesterAdminPublicKey)) return;
 
-        const nodeAddressString = addressUtils.bufferToAddress(nodeAddressBinnary);
+        // Extract and validate the network prefix from the node's address
+        const nodeAddressBuffer = op.aco.ia;
+
+        const nodeAddressString = addressUtils.bufferToAddress(nodeAddressBuffer);
         if (nodeAddressString === null) return;
         const nodePublicKey = PeerWallet.decodeBech32mSafe(nodeAddressString);
         if (nodePublicKey === null) return;
 
-
         // verify signature createMessage(this.#address, this.#txValidity, this.#incomingAddress, nonce, this.#operationType);
         const message = createMessage(op.address, op.aco.txv, op.aco.ia, op.aco.in, OperationType.APPEND_WHITELIST);
+        if (message.length === 0) return;
+        
+        // verify signature
         const hash = await blake3Hash(message);
         if (!b4a.equals(hash, op.aco.tx)) return;
-        const isMessageVerifed = this.#wallet.verify(op.aco.is, op.aco.tx, adminPublicKey);
-        //txHashHexString
+        const isMessageVerified = this.#wallet.verify(op.aco.is, op.aco.tx, adminPublicKey);
+        if (!isMessageVerified) return;
         const hashHexString = op.aco.tx.toString('hex');
 
         // verify tx validity - prevent deferred execution attack
@@ -628,7 +642,8 @@ class State extends ReadyResource {
 
         // Check if the operation has already been applied
         const opEntry = await this.#getEntryApply(hashHexString, batch);
-        if (!isMessageVerifed || null !== opEntry) return;
+        if (opEntry !== null) return;
+        
         // Retrieve the node entry to check its current role
         const nodeEntry = await this.#getEntryApply(nodeAddressString, batch);
         if (nodeEntryUtils.isWhitelisted(nodeEntry)) return; // Node is already whitelisted
@@ -636,16 +651,21 @@ class State extends ReadyResource {
         if (await this.#isApplyInitalizationDisabled(batch)) {
             // Fee
             const adminNodeEntry = await this.#getEntryApply(adminAddressString, batch);
-            if (null === adminNodeEntry) return;
+            if (adminNodeEntry === null) return;
+
             const decodedNodeEntry = nodeEntryUtils.decode(adminNodeEntry)
-            if (null === decodedNodeEntry) return;
+            if (decodedNodeEntry === null) return;
+
             const adminBalance = toBalance(decodedNodeEntry.balance)
-            if (null === adminBalance) return;
+            if (adminBalance === null) return;
+
             if (!adminBalance.greaterThanOrEquals(BALANCE_FEE)) return;
-            const newAdminBalance = adminBalance.sub(BALANCE_FEE) // we burn
-            if (null === newAdminBalance) return;
+            const newAdminBalance = adminBalance.sub(BALANCE_FEE)
+
+            if (newAdminBalance === null) return;
             const updatedAdminEntry = newAdminBalance.update(adminNodeEntry)
-            if (null === updatedRequesterEntry) return;
+
+            if (updatedAdminEntry === null) return;
             await batch.put(adminAddressString, updatedAdminEntry);
         }
 
