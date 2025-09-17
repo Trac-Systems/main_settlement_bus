@@ -132,29 +132,6 @@ class State extends ReadyResource {
         return nodeEntry ? nodeEntryUtils.decode(nodeEntry) : null;
     }
 
-    // PLACEHOLDER
-    // WARNING: DO NOT USE IN APPLY FUNCTION!!!
-    async incrementBalance(address, toIncrement) {
-        if (isBufferValid(toIncrement, NODE_ENTRY_SIZE) || b4a.equals(toIncrement, ZERO_BALANCE)) return null
-        const nodeEntry = await this.getNodeEntry(address);
-        if (nodeEntry === null) return null;
-        const balance = toBalance(nodeEntry.balance)
-        const result = balance.add(toBalance(toIncrement))
-        return result.update(nodeEntryUtils.encode(nodeEntry))
-    }
-
-    // PLACEHOLDER
-    // WARNING: DO NOT USE IN APPLY FUNCTION!!!
-    async decrementBalance(address, toDecrement) {
-        if (isBufferValid(toDecrement, NODE_ENTRY_SIZE) || b4a.equals(toDecrement, ZERO_BALANCE)) return null
-        const nodeEntry = await this.getNodeEntry(address);
-        if (nodeEntry === null) return null;
-        if (toBalance(nodeEntry.balance).lowerThan(toBalance(toDecrement))) return null;
-        const balance = toBalance(nodeEntry.balance)
-        const result = balance.sub(toBalance(toDecrement))
-        return result.update(nodeEntryUtils.encode(nodeEntry))
-    }
-
     async isAddressWhitelisted(address) {
         const nodeEntry = await this.getNodeEntry(address);
         if (nodeEntry === null) return false;
@@ -771,37 +748,6 @@ class State extends ReadyResource {
         if (writerKeyHasBeenRegistered !== null) return;
 
         await this.#addWriter(op, base, node, batch, txHashHexString, requesterAddressString, requesterAddressBuffer, validatorAddressString);
-    }
-
-    async #isApplyInitalizationDisabled(batch) {
-        // Retrieve the flag to verify if initialization is allowed
-        let initialization = await this.#getEntryApply(EntryType.INITIALIZATION, batch);
-        if (null === initialization) {
-            return false
-        } else {
-            return b4a.equals(initialization, safeWriteUInt32BE(0, 0))
-        }
-    }
-
-    async #updateWritersIndex(validatorAddressBuffer, batch) {
-        // Retrieve and increment the writers length entry
-        let length = await this.#getEntryApply(EntryType.WRITERS_LENGTH, batch);
-        let incrementedLength = null;
-        if (null === length) {
-            // Initialize the writers length entry if it does not exist
-            const bufferedLength = lengthEntryUtils.init(0);
-            length = lengthEntryUtils.decode(bufferedLength);
-            incrementedLength = lengthEntryUtils.increment(length);
-        } else {
-            // Decode and increment the existing writers length entry
-            length = lengthEntryUtils.decode(length);
-            incrementedLength = lengthEntryUtils.increment(length);
-        }
-        if (null === incrementedLength) return;
-
-        // Update the writers index and length entries
-        await batch.put(EntryType.WRITERS_INDEX + length, validatorAddressBuffer);
-        await batch.put(EntryType.WRITERS_LENGTH, incrementedLength);
     }
 
     async #addWriter(op, base, node, batch, txHashHexString, requesterAddressString, requesterAddressBuffer, validatorAddressString) {
@@ -1755,30 +1701,37 @@ class State extends ReadyResource {
         return await batch.get(EntryType.WRITER_ADDRESS + writingKey);
     }
 
-    // PLACEHOLDER
-    // TODO: Check if this is used anywhere
-    async #incrementBalanceApply(address, batch, toIncrement) {
-        if (isBufferValid(toIncrement, NODE_ENTRY_SIZE) || b4a.equals(toIncrement, ZERO_BALANCE)) return null
-        const nodeEntry = await this.#getEntryApply(address, batch);
-        if (nodeEntry === null) return null;
-        const decodedNodeEntry = nodeEntryUtils.decode(nodeEntry);
-        const balance = toBalance(decodedNodeEntry.balance)
-        const result = balance.add(toBalance(toIncrement))
-        return result.update(nodeEntryUtils.encode(decodedNodeEntry))
+    async #isApplyInitalizationDisabled(batch) {
+        // Retrieve the flag to verify if initialization is allowed
+        let initialization = await this.#getEntryApply(EntryType.INITIALIZATION, batch);
+        if (null === initialization) {
+            return false
+        } else {
+            return b4a.equals(initialization, safeWriteUInt32BE(0, 0))
+        }
     }
 
-    // PLACEHOLDER
-    // TODO: Check if this is used anywhere
-    async #decrementBalanceApply(address, batch, toDecrement) {
-        if (isBufferValid(toDecrement, NODE_ENTRY_SIZE) || b4a.equals(toDecrement, ZERO_BALANCE)) return null
-        const nodeEntry = await this.#getEntryApply(address, batch);
-        if (nodeEntry === null) return null;
-        const decodedNodeEntry = nodeEntryUtils.decode(nodeEntry);
-        if (toBalance(decodedNodeEntry.balance).lowerThan(toBalance(toDecrement))) return null;
-        const balance = toBalance(decodedNodeEntry.balance)
-        const result = balance.sub(toBalance(toDecrement))
-        return result.update(nodeEntryUtils.encode(decodedNodeEntry))
+    async #updateWritersIndex(validatorAddressBuffer, batch) {
+        // Retrieve and increment the writers length entry
+        let length = await this.#getEntryApply(EntryType.WRITERS_LENGTH, batch);
+        let incrementedLength = null;
+        if (null === length) {
+            // Initialize the writers length entry if it does not exist
+            const bufferedLength = lengthEntryUtils.init(0);
+            length = lengthEntryUtils.decode(bufferedLength);
+            incrementedLength = lengthEntryUtils.increment(length);
+        } else {
+            // Decode and increment the existing writers length entry
+            length = lengthEntryUtils.decode(length);
+            incrementedLength = lengthEntryUtils.increment(length);
+        }
+        if (null === incrementedLength) return;
+
+        // Update the writers index and length entries
+        await batch.put(EntryType.WRITERS_INDEX + length, validatorAddressBuffer);
+        await batch.put(EntryType.WRITERS_LENGTH, incrementedLength);
     }
+
 }
 
 export default State;
