@@ -398,10 +398,12 @@ class State extends ReadyResource {
 
         if (!this.check.validateCoreAdminOperation(op)) return;
 
-        // Extract and validate the network address
+        // Extract and validate the requester address (admin)
         const adminAddressBuffer = op.address;
         const adminAddressString = addressUtils.bufferToAddress(adminAddressBuffer);
         if (adminAddressString === null) return;
+        
+        // Validate requester admin public key (admin)
         const adminPublicKey = PeerWallet.decodeBech32mSafe(adminAddressString);
         if (adminPublicKey === null) return;
 
@@ -425,24 +427,25 @@ class State extends ReadyResource {
         const isMessageVerifed = this.#wallet.verify(op.cao.is, op.cao.tx, adminPublicKey)
         const txHashHexString = op.cao.tx.toString('hex');
         if (!isMessageVerifed) return;
+
         // verify tx validity - prevent deferred execution attack
         const indexersSequenceState = await this.#getIndexerSequenceStateApply(base);
         if (indexersSequenceState === null) return;
         if (!b4a.equals(op.cao.txv, indexersSequenceState)) return;
 
-        const writerKeyIsRegistered = await this.#getRegisteredWriterKeyApply(batch, op.cao.iw.toString('hex'))
-        if (!!writerKeyIsRegistered) return; // writer key should NOT exists for a brand new admin
+        const writerKeyHasBeenRegistered = await this.#getRegisteredWriterKeyApply(batch, op.cao.iw.toString('hex'))
+        if (writerKeyHasBeenRegistered !== null) return; // writer key should NOT exists for a brand new admin
 
         const adminEntryExists = await this.#getEntryApply(EntryType.ADMIN, batch);
         // if admin entry already exists, cannot perform this operation
-        if (null !== adminEntryExists) return;
+        if (adminEntryExists !== null) return;
 
         // Check if the operation has already been applied
         const opEntry = await this.#getEntryApply(txHashHexString, batch);
-        if (null !== opEntry) return;
+        if (opEntry !== null) return;
 
         const initializedNodeEntry = nodeEntryUtils.init(op.cao.iw, nodeRoleUtils.NodeRole.INDEXER, ADMIN_INITIAL_BALANCE);
-        //const updatedNodeEntry = nodeEntryUtils.setRole(initializedNodeEntry, nodeRoleUtils.NodeRole.INDEXER);
+
         await batch.put(adminAddressString, initializedNodeEntry);
         await batch.put(EntryType.WRITER_ADDRESS + op.cao.iw.toString('hex'), op.address);
         await this.#updateWritersIndex(adminAddressBuffer, batch);
