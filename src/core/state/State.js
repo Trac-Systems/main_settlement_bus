@@ -587,6 +587,19 @@ class State extends ReadyResource {
         const nodeEntry = await this.#getEntryApply(nodeAddressString, batch);
         if (nodeEntryUtils.isWhitelisted(nodeEntry)) return; // Node is already whitelisted
 
+        // Fee
+        const adminNodeEntry = await this.#getEntryApply(adminAddressString, batch);
+        if (null === adminNodeEntry) return;
+        const decodedNodeEntry = nodeEntryUtils.decode(adminNodeEntry)
+        if (null === decodedNodeEntry) return;
+        const adminBalance = toBalance(decodedNodeEntry.balance)
+        if (null === adminBalance) return;
+        const newAdminBalance = adminBalance.sub(transactionUtils.FEE) // we burn
+        if (null === newAdminBalance) return;
+        const updatedAdminEntry = newAdminBalance.update(adminNodeEntry)
+        if (null === updatedRequesterEntry) return;
+        await batch.put(adminAddressString, updatedAdminEntry);
+
         if (!nodeEntry) {
             // If the node entry does not exist, create a new whitelisted node entry
             /*
@@ -942,11 +955,11 @@ class State extends ReadyResource {
         if (null === requesterEntry) return;
         const decodedRequesterEntry = nodeEntryUtils.decode(requesterEntry)
         if (null === decodedRequesterEntry) return;
-        const requesterBalance = toBalance(decodedNodeEntry.balance)
+        const requesterBalance = toBalance(decodedRequesterEntry.balance)
         if (null === requesterBalance) return;
         const newRequesterBalance = requesterBalance.sub(transactionUtils.FEE) // we burn
         if (null === newRequesterBalance) return;
-        const updatedRequesterEntry = newRequesterBalance.update(newRequesterBalance)
+        const updatedRequesterEntry = newRequesterBalance.update(requesterEntry)
         if (null === updatedRequesterEntry) return;
 
         // Check if the node entry is an indexer
