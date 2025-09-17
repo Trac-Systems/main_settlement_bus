@@ -165,6 +165,26 @@ test('Balance#mul', () => {
         // Should return null-like buffer on underflow
         t.ok(result.equals(toBalance($TNK(0n))), 'returns zero');
     })
+
+    test('zero value multiplication', t => {
+        const a = toBalance($TNK(0n));
+        const result = a.mul(toTerm(1000n));
+    
+        // Should return null-like buffer on underflow
+        t.ok(result.equals(toBalance($TNK(0n))), 'returns zero');
+    })
+
+    test('overflow returns NULL_BUFFER', t => {
+        const max = b4a.alloc(BALANCE_BYTE_LENGTH, 0xFF);
+        const balance = toBalance(max);
+       
+        const balance2 = toBalance(max);
+    
+        const result = balance.mul(balance2);
+    
+        // Should return null-like buffer on overflow
+        t.is(result, null, 'overflow returns null');
+    });
 })
 
 test('Balance#div', () => {

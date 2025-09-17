@@ -146,6 +146,10 @@ const mulBuffers = (a, b) => {
         }
         result[i] += carry;
     }
+
+    if (!b4a.equals(result.slice(0, BALANCE_BYTE_LENGTH), ZERO_BALANCE)) {
+        return NULL_BUFFER
+    }
   
     // Truncate
     return truncate(result)
@@ -282,7 +286,7 @@ export function toBalance(balance) {
     try{
         return new Balance(balance)
     } catch(e) {
-        console.error(e)
+        console.error(e?.message || e)
         return null
     }
 }
