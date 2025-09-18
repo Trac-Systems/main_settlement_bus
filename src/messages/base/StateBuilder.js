@@ -19,6 +19,7 @@ class StateBuilder {
     withMsbBootstrap(msbBootstrap) { throw new Error("Method 'withMsbBootstrap()' must be implemented.");}
     withTxHash(txHash) { throw new Error("Method 'withTxHash()' must be implemented.");}
     withTxValidity(txValidity) { throw new Error("Method 'withTxValidity()' must be implemented.");}
+    withAmount(amount) { throw new Error("Method 'withAmount()' must be implemented.");}
 }
 
 export default StateBuilder;

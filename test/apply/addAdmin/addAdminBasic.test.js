@@ -8,6 +8,7 @@ import {randomBytes} from '../../utils/setupApplyTests.js';
 import CompleteStateMessageOperations from '../../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
 import {testKeyPair1, testKeyPair2, testKeyPair3, testKeyPair4} from '../../fixtures/apply.fixtures.js';
 import b4a from 'b4a';
+import { ADMIN_INITIAL_BALANCE } from '../../../src/utils/constants.js';
 
 //TODO: ADD TEST WHEN NON-ADMIN NODE FORGES ADD ADMIN OPERATION AND BROADCASTS IT TO THE STATE -  SHOULD BE REJECTED
 
@@ -53,6 +54,7 @@ test('Apply function addAdmin for the first time - happy path', async (k) => {
         k.ok(b4a.equals(adminEntryAfter.wk, admin.options.bootstrap), 'Admin writing key in base should match bootstrap key');
         k.is(nodeAdminEntry.isWriter, true, 'Admin should be writer');
         k.is(nodeAdminEntry.isIndexer, true, 'Admin should be indexer');
+        k.ok(b4a.equals(nodeAdminEntry.balance, ADMIN_INITIAL_BALANCE), 'Admin should have an initial balance');
         k.is(newWritersLength, writersLength + 1,  'Admin should increase writers length');
 
     } catch (error) {

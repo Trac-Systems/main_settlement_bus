@@ -6,7 +6,7 @@ import fixtures from '../fixtures/protobuf.fixtures.js';
 
 test('Happy path encode/decode roundtrip for protobuf applyOperation payloads', t => {
     const payloadsHashMap = new Map([
-        ["tx", fixtures.validTransactionOperation],
+        ["txComplete", fixtures.validTransactionOperation],
         ["addIndexer", fixtures.validAddIndexer],
         ["removeIndexer", fixtures.validRemoveIndexer],
         ["appendWhitelist", fixtures.validAppendWhitelist],
@@ -18,10 +18,11 @@ test('Happy path encode/decode roundtrip for protobuf applyOperation payloads', 
         ["removeWriterPartial", fixtures.validPartialRemoveWriter],
         ["adminRecoveryComplete", fixtures.validCompleteAdminRecovery],
         ["adminRecoveryPartial", fixtures.validPartialAdminRecovery],
+        ["transferComplete", fixtures.validTransferOperation]
     ]);
 
     for (const [key, value] of payloadsHashMap) {
-        console.log(`Testing payload: ${key}`,value);
+        //console.log(`Testing payload: ${key}`,value);
         const encoded = applyOperations.Operation.encode(value);
         const decoded = applyOperations.Operation.decode(encoded);
         t.ok(JSON.stringify(value) === JSON.stringify(decoded), `Payload ${key} encodes and decodes correctly`);
@@ -97,6 +98,13 @@ test('Protobuf encode/decode is order-independent for all operation types', t =>
     let encoded = applyOperations.Operation.encode(shuffledTx);
     let decoded = applyOperations.Operation.decode(encoded);
     t.ok(JSON.stringify(decoded) === JSON.stringify(fixtures.validTransactionOperation), 'TX operation encodes/decodes correctly with shuffled fields');
+
+    // Test TRANSFER operation
+    const shuffledTro = shuffleObject(fixtures.validTransferOperation.tro);
+    const shuffledTransfer = { ...fixtures.validTransferOperation, tro: shuffledTro };
+    encoded = applyOperations.Operation.encode(shuffledTransfer);
+    decoded = applyOperations.Operation.decode(encoded);
+    t.ok(JSON.stringify(decoded) === JSON.stringify(fixtures.validTransferOperation), 'TRANSFER operation encodes/decodes correctly with shuffled fields');
 
     // Test ADD_INDEXER operation
     const shuffledAco = shuffleObject(fixtures.validAddIndexer.aco);

@@ -1,11 +1,13 @@
 import b4a from 'b4a';
-import Wallet from 'trac-wallet';
+import PeerWallet from 'trac-wallet';
 
 import Check from '../../../../utils/check.js';
 import {OperationType} from "../../../../utils/constants.js";
 import {blake3Hash} from "../../../../utils/crypto.js";
 import {createMessage} from "../../../../utils/buffer.js";
 import {addressToBuffer, bufferToAddress} from "../../../state/utils/address.js";
+
+//TODO: Implement BASE VALIDATOR CLASS AND MOVE COMMON METHODS THERE
 
 class PartialRoleAccess {
     #state;
@@ -34,19 +36,20 @@ class PartialRoleAccess {
 
     async validate(payload) {
         if (!this.#isPayloadSchemaValid(payload)) return false;
-        if (!this.#validateRequestingPublicKey(payload)) return false;
+        if (!this.#validateRequesterAddress(payload)) return false;
         if (!await this.#validateTransactionUniqueness(payload)) return false;
         if (!await this.#validateSignature(payload)) return false;
         if (!await this.#isRequesterAllowedToChangeRole(payload)) return false;
         if (!await this.#validateTransactionValidity(payload)) return false;
+        if (!this.#isRoleAccessOperationNotCompleted(payload)) return false;
         return true;
     }
 
     async #validateTransactionUniqueness(payload) {
         const tx = payload.rao.tx;
         const txHex = tx.toString('hex');
-        if (await this.state.getSigned(txHex) !== null) {
-            console.error(`Transaction with hash ${txHex} already exists in the state. Possible replay attack detected.`);
+        if (await this.state.get(txHex) !== null) {
+            console.error(`Transaction with hash ${txHex} already exists in the state.`);
             return false;
         }
         return true;
@@ -62,18 +65,24 @@ class PartialRoleAccess {
         return true;
     }
 
-    #validateRequestingPublicKey(payload) {
-        const incomingPublicKey = Wallet.decodeBech32mSafe(bufferToAddress(payload.address));
+    #validateRequesterAddress(payload) {
+        const incomingAddress = bufferToAddress(payload.address);
+        if (!incomingAddress) {
+            console.error('Invalid requesting address in role access payload.');
+            return false;
+        }
+
+        const incomingPublicKey = PeerWallet.decodeBech32mSafe(incomingAddress);
 
         if (incomingPublicKey === null) {
-            console.error('Invalid requesting public key in the access operation payload.');
+            console.error('Invalid requesting public key in role access payload.');
             return false;
         }
         return true;
     }
 
     async #validateSignature(payload) {
-        const incomingPublicKey = Wallet.decodeBech32mSafe(bufferToAddress(payload.address));
+        const incomingPublicKey = PeerWallet.decodeBech32mSafe(bufferToAddress(payload.address));
         const incomingSignature = payload.rao.is;
 
         const incomingTx = payload.rao.tx;
@@ -94,7 +103,7 @@ class PartialRoleAccess {
             return false;
         }
 
-        const isSignatureValid = Wallet.verify(incomingSignature, regeneratedTx, incomingPublicKey);
+        const isSignatureValid = PeerWallet.verify(incomingSignature, regeneratedTx, incomingPublicKey);
         if (!isSignatureValid) {
             console.error('Invalid signature in PreTx payload.');
             return false;
@@ -173,7 +182,18 @@ class PartialRoleAccess {
         const currentTxv = await this.state.getIndexerSequenceState()
         const incomingTxv = payload.rao.txv
         if (!b4a.equals(currentTxv, incomingTxv)) {
-            console.error(`Transaction validity: ${incomingTxv.toString('hex')} does not match the current indexer sequence state: ${currentTxv.toString('hex')}`);
+            console.error(`Transaction has expired.`);
+            return false;
+        }
+        return true;
+    }
+
+    #isRoleAccessOperationNotCompleted(payload) {
+        if (!payload || !payload.rao) return false;
+        const { va, vn, vs } = payload.rao;
+        const condition = !!(va === undefined && vn === undefined && vs === undefined);
+        if (!condition) {
+            console.error('Role access operation must not be completed already (va, vn, vs must be undefined).');
             return false;
         }
         return true;

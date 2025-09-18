@@ -1,5 +1,6 @@
 import b4a from 'b4a';
-import {safeDecodeApplyOperation} from "./protobuf/operationHelpers.js";
+import { safeDecodeApplyOperation } from "./protobuf/operationHelpers.js";
+import { bigIntToDecimalString, bufferToBigInt } from "./amountSerialization.js";
 
 export async function verifyDag(state, network, wallet, writerKey) {
     try {
@@ -42,19 +43,26 @@ export async function verifyDag(state, network, wallet, writerKey) {
     }
 }
 
-export function printHelp() {
+export function printHelp(isAdminMode = false) {
+    if (isAdminMode) {
+        console.log('🚨 WARNING: IF YOU ARE NOT AN ADMIN, DO NOT USE THE COMMANDS BELOW! YOU RISK LOSING YOUR FUNDS! 🚨');
+        console.log('\nAdmin commands:');
+        console.log('- /add_admin: register admin entry with bootstrap key (initial setup), or use --recovery flag to recover admin role');
+        console.log('- /balance_migration: perform balance migration with the given initial balances CSV file');
+        console.log('- /add_whitelist: add all specified whitelist addresses');
+        console.log('- /disable_initialization: disable further balance initializations and whitelisting');
+        console.log('- /add_indexer <address>: change a role of the selected writer node to indexer role');
+        console.log('- /remove_indexer <address>: change a role of the selected indexer node to default role');
+        console.log('- /ban_writer <address>: demote a whitelisted writer to default role and remove it from the whitelist');
+    }
     console.log('Available commands:');
     console.log('- /add_writer: add yourself as validator to this MSB once whitelisted.');
     console.log('- /remove_writer: remove yourself from this MSB.');
-    console.log('- /add_admin: register admin entry with bootstrap key (initial setup), or use --recovery flag to recover admin role (admin only).');
-    console.log('- /add_whitelist: add all specified whitelist addresses. (admin only)');
-    console.log('- /add_indexer <address>: change a role of the selected writer node to indexer role. (admin only)');
-    console.log('- /remove_indexer <address>: change a role of the selected indexer node to default role. (admin only)');
-    console.log('- /ban_writer <address>: demote a whitelisted writer to default role and remove it from the whitelist. (admin only)');
     console.log('- /get_node_info <address>: get information about a node with the given address.');
     console.log('- /stats: check system stats such as writing key, DAG, etc.');
     console.log('- /deployment <subnetwork_bootstrap>: deploy a subnetwork with the given bootstrap.');
     console.log('- /get_deployment <subnetwork_bootstrap>: get information about a subnetwork deployment with the given bootstrap.');
+    console.log('- /transfer <to_address> <amount>: transfer the specified amount to the given address.');
     console.log('- /get_tx_info <tx_hash>: get information about a transaction with the given hash.');
     console.log('- /get_validator_addr <writing_key>: get the validator address mapped to the given writing key.');
     console.log('- /exit: Exit the program.');
@@ -67,6 +75,14 @@ export const printWalletInfo = (address, writingKey) => {
     console.log('# MSB Address:   ', address.toString('hex'), ' #');
     console.log('# MSB Writer:    ', writingKey.toString('hex'), '#');
     console.log('#####################################################################################');
+}
+
+export const printBalance = async (address, state, wallet_enabled) => {
+    if (wallet_enabled && state) {
+        const nodeEntry = await state.getNodeEntry(address);
+        const balance = nodeEntry ? bigIntToDecimalString(bufferToBigInt(nodeEntry.balance)) : '0';
+        console.log(`Balance: ${balance}`);
+    }
 }
 
 export const get_tx_info = async (state_instance, txHash) => {

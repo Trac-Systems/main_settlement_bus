@@ -8,6 +8,7 @@ import {
     SIGNATURE_BYTE_LENGTH,
     HASH_BYTE_LENGTH,
     BOOTSTRAP_BYTE_LENGTH,
+    AMOUNT_BYTE_LENGTH
 } from './constants.js';
 import {TRAC_ADDRESS_SIZE} from 'trac-wallet/constants.js';
 
@@ -20,6 +21,8 @@ class Check {
     #validateRoleAccessOperationSchema
     #validateBootstrapDeploymentSchema;
     #validateTransactionOperationSchema
+    #validateTransferOperationSchema
+    #validateBalanceInitializationSchema
 
     constructor() {
 
@@ -63,11 +66,34 @@ class Check {
             };
         });
 
+        this.#validator.add("buffer_amount", function ({schema, messages}, path, context) {
+            return {
+                source:
+                    `
+                        if (!${isBuffer}(value)) {
+                            ${this.makeError({type: "buffer", actual: "value", messages})}
+                        }
+                        if (value.length !== ${schema.length}) {
+                            ${this.makeError({
+                        type: "bufferLength",
+                        expected: schema.length,
+                        actual: "value.length",
+                        messages
+                    })}
+                        }
+                        return value;
+                    `
+            };
+        });
+        
+
         this.#validateCoreAdminOperationSchema = this.#compileCoreAdminOperationSchema();
         this.#validateAdminControlOperationSchema = this.#compileAdminControlOperationSchema();
         this.#validateRoleAccessOperationSchema = this.#compileRoleAccessOperationSchema();
         this.#validateBootstrapDeploymentSchema = this.#compileBootstrapDeploymentSchema();
         this.#validateTransactionOperationSchema = this.#compileTransactionOperationSchema();
+        this.#validateTransferOperationSchema = this.#compileTransferOperationSchema();
+        this.#validateBalanceInitializationSchema = this.#compileBalanceInitializationSchema();
 
     }
 
@@ -79,13 +105,18 @@ class Check {
                 type: 'number',
                 required: true,
                 custom: (value, errors) => {
-                    if (value !== OperationType.ADD_ADMIN) {
+                    const allowedTypes = [
+                        OperationType.ADD_ADMIN,
+                        OperationType.DISABLE_INITIALIZATION,
+                    ];
+
+                    if (!allowedTypes.includes(value)) {
                         errors.push({
                             type: 'valueNotAllowed',
                             actual: value,
-                            expected: OperationType.ADD_ADMIN,
+                            expected: allowedTypes,
                             field: 'type',
-                            message: `Operation type must be ${OperationType.ADD_ADMIN} (ADD_ADMIN)`
+                            message: `Operation type must be one of: ${allowedTypes.join(', ')}`
                         });
                     }
                     return value;
@@ -109,6 +140,48 @@ class Check {
 
     validateCoreAdminOperation(operation) {
         return this.#validateCoreAdminOperationSchema(operation) === true;
+    }
+
+    #compileBalanceInitializationSchema() {
+        const schema = {
+            $$strict: true,
+            type: {
+                type: 'number',
+                required: true,
+                custom: (value, errors) => {
+                    if (value !== OperationType.BALANCE_INITIALIZATION) {
+                        errors.push({
+                            type: 'valueNotAllowed',
+                            actual: value,
+                            expected: OperationType.BALANCE_INITIALIZATION,
+                            field: 'type',
+                            message: `Operation type must be ${OperationType.BALANCE_INITIALIZATION} (BALANCE_INITIALIZATION)`
+                        });
+                    }
+                    return value;
+                }
+            },
+            address: {type: 'buffer', length: TRAC_ADDRESS_SIZE, required: true},
+            bio: {
+                strict: true,
+                type: 'object',
+                props: {
+                    tx: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true}, // tx hash
+                    txv: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true}, // tx validity
+                    in: {type: 'buffer', length: NONCE_BYTE_LENGTH, required: true}, // nonce of the invoker
+                    ia: {type: 'buffer', length: TRAC_ADDRESS_SIZE, required: true}, // selected address to specific operation.
+                    am: {type: 'buffer', length: AMOUNT_BYTE_LENGTH, required: true}, // amount to transfer
+                    is: {type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true}, // signature of the invoker
+                   
+
+                }
+            }
+        };
+        return this.#validator.compile(schema);
+    }
+
+    validateBalanceInitialization(operation) {
+        return this.#validateBalanceInitializationSchema(operation) === true;
     }
 
     // Complete by default - no writer needed
@@ -373,8 +446,75 @@ class Check {
         return this.#validateBootstrapDeploymentSchema(op) === true;
     }
 
-    //TODO: IMPLEMENT InitBalanceOperation see protocol buffer
-    //TODO: IMPLEMENT TokenTransferOperation see protocol buffer
+    #compileTransferOperationSchema() {
+        const schema = {
+            $$strict: true,
+            type: {
+                type: 'number',
+                required: true,
+                custom: (value, errors) => {
+                    if (value !== OperationType.TRANSFER) {
+                        errors.push({
+                            type: 'valueNotAllowed',
+                            actual: value,
+                            expected: OperationType.TRANSFER,
+                            field: 'type',
+                            message: `Operation type must be ${OperationType.TRANSFER} (TRANSFER)`
+                        });
+                    }
+                    return value;
+                }
+            },
+            address: {type: 'buffer', length: TRAC_ADDRESS_SIZE, required: true},
+            tro: {
+                strict: true,
+                type: 'object',
+                props: {
+                    tx: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true}, // tx hash
+                    txv: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true}, // tx validity
+                    in: {type: 'buffer', length: NONCE_BYTE_LENGTH, required: true}, // nonce of the invoker
+                    to: {type: 'buffer', length: TRAC_ADDRESS_SIZE, required: true}, // recipient address
+                    am: {type: 'buffer_amount', length: AMOUNT_BYTE_LENGTH, required: true}, // amount to transfer
+                    is: {type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true}, // signature of the invoker
+                    va: {type: 'buffer', length: TRAC_ADDRESS_SIZE, optional: true},  // validator address
+                    vn: {type: 'buffer', length: NONCE_BYTE_LENGTH, optional: true},  // validator nonce
+                    vs: {type: 'buffer', length: SIGNATURE_BYTE_LENGTH, optional: true} // validator signature
+
+                },
+                custom: (value, errors) => {
+                    if (!value || typeof value !== 'object') return value;
+                    const {vn, vs, va} = value;
+                    const vnPresent = vn !== undefined
+                    const vsPresent = vs !== undefined
+                    const vaPresent = va !== undefined
+
+                    const fieldsPresent = [vnPresent, vsPresent, vaPresent].filter(Boolean).length;
+
+                    if (fieldsPresent > 0 && fieldsPresent < 3) {
+                        errors.push({
+                            type: 'conditionalDependency',
+                            field: 'tro',
+                            message: 'Fields "vn", "vs", and "va" must all be present if any one is provided'
+                        });
+                    }
+                    if (vn === null || vs === null || va === null) {
+                        errors.push({
+                            type: 'buffer',
+                            field: 'tro',
+                            message: 'Validator fields cannot be null, must be a Buffer or undefined'
+                        });
+                    }
+
+                    return value;
+                }
+            }
+        };
+        return this.#validator.compile(schema);
+    }
+
+    validateTransferOperation(op) {
+        return this.#validateTransferOperationSchema(op) === true;
+    }
 }
 
 export default Check;

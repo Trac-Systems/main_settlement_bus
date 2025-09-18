@@ -4,22 +4,23 @@ package apply.operations;
 
 //DO NOT CHANGE THE ORDER AFTER RELEASE - ONLY APPEND NEW ONES
 enum OperationType {
-    UNKNOWN              = 0;
-    ADD_ADMIN            = 1; // complete
-    APPEND_WHITELIST     = 2; // complete
-    ADD_WRITER           = 3; // partial
-    REMOVE_WRITER        = 4; // partial
-    ADMIN_RECOVERY       = 5; // partial
-    ADD_INDEXER          = 6; // complete
-    REMOVE_INDEXER       = 7; // complete
-    BAN_VALIDATOR        = 8; // complete
-    BOOTSTRAP_DEPLOYMENT = 9; // partial
-    TX                   = 10; // partial
-    //INIT_BALANCE         = 11; // complete TODO: UNCOMMENT DURING IMPLEMENTATION
-    //TOKEN_TRANSFER       = 12; // partial TODO: UNCOMMENT DURING IMPLEMENTATION
+    UNKNOWN                = 0;
+    ADD_ADMIN              = 1; // complete
+    DISABLE_INITIALIZATION = 2; // complete
+    BALANCE_INITIALIZATION = 3; // complete
+    APPEND_WHITELIST       = 4; // complete
+    ADD_WRITER             = 5; // partial
+    REMOVE_WRITER          = 6; // partial
+    ADMIN_RECOVERY         = 7; // partial
+    ADD_INDEXER            = 8; // complete
+    REMOVE_INDEXER         = 9; // complete
+    BAN_VALIDATOR          = 10; // complete
+    BOOTSTRAP_DEPLOYMENT   = 11; // partial
+    TX                     = 12; // partial
+    TRANSFER               = 13; // partial
 }
 
-// add admin operation, balance_initialized (complete by default)
+// add admin operation, disable_initialization (complete by default)
 message CoreAdminOperation {
     bytes tx     = 1; // Transaction hash (unique identifier for the transaction)
     bytes txv    = 2; // Transaction expiration
@@ -37,24 +38,23 @@ message AdminControlOperation {
     bytes is     = 5; // Signature of the invoker (admin)
 }
 
-// initialize_balance (complete by default)
-message InitBalanceOperation {
-    bytes tx     = 1; // Transaction hash (unique identifier for the transaction)
-    bytes txv    = 2; // Transaction expiration
-    bytes in     = 3; // Nonce of the invoker (admin)
-    bytes is     = 4; // Signature of the invoker (admin)
-    bytes sa     = 5; // selected address to specific operation.
-    bytes bn     = 6; // Initial balance to be set for the address
-
+// balance_initialization (complete by default)
+message BalanceInitializationOperation {
+    bytes tx   = 1; // Transaction hash (unique identifier for the transaction)
+    bytes txv  = 2; // Transaction expiration
+    bytes in   = 3; // Nonce of the contract invoker (admin)
+    bytes ia   = 4; // selected address to specific operation.
+    bytes am   = 5; // Initial balance to be set for the address
+    bytes is   = 6; // Signature of the contract invoker (admin)
 }
-// token_transfer (partial - need to be signed by another writer to be complete) DRAFT
-message TokenTransferOperation {
+// token_transfer (partial - need to be signed by another writer to be complete)
+message TransferOperation {
     bytes tx      = 1; // Transaction hash (unique identifier for the transaction)
     bytes txv     = 2; // Transaction expiration
     bytes in      = 3; // Nonce of the invoker (any account)
-    bytes is      = 4; // Signature of the invoker (any account)
-    bytes to      = 5; // Address of the recipient (any account)
-    bytes amount  = 6; // Amount of tokens to transfer
+    bytes to      = 4; // Address of the recipient (any account)
+    bytes am      = 5; // Amount of tokens to transfer
+    bytes is      = 6; // Signature of the invoker (any account)
     bytes va      = 7; // Validator's address (optional)
     bytes vn      = 8; // Validator's nonce  (optional)
     bytes vs      = 9; // Validator's signature (optional)
@@ -107,8 +107,8 @@ message Operation {
     oneof value {
         CoreAdminOperation                cao  = 3;
         AdminControlOperation             aco  = 4;
-        InitBalanceOperation              ibo  = 5;
-        TokenTransferOperation            tto  = 6;
+        BalanceInitializationOperation    bio  = 5;
+        TransferOperation                 tro  = 6;
         RoleAccessOperation               rao  = 7;
         BootstrapDeploymentOperation      bdo  = 8;
         TxOperation                       txo  = 9;
