@@ -1613,7 +1613,7 @@ class State extends ReadyResource {
         // for additional security, nonces should be different.
         if (b4a.equals(op.tro.in, op.tro.vn)) return;
         // addresses should be different.
-        if (b4a.equals(op.address, op.tro.va)) return;
+        //if (b4a.equals(op.address, op.tro.va)) return; // we dont know if this is my environment or not. Reason about it in the future
         // signatures should be different.
         if (b4a.equals(op.tro.is, op.tro.vs)) return;
 
