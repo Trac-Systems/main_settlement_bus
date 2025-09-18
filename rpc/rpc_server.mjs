@@ -1,13 +1,10 @@
 // rpc_server.mjs
-import https from 'https'
-import fs from 'bare-fs'
-import {decodeBase64Payload, isBase64, sanitizeTransferPayload, validatePayloadStructure} from "./utils/helpers"
+import https from 'http' // this I had to change because of the certificate
+import fs from 'fs' // This should be kept and bare should work as an abstraction
+import {decodeBase64Payload, isBase64, sanitizeTransferPayload, validatePayloadStructure} from "./utils/helpers.mjs" // This seems to have worked in bare but didnt on node
 
 // SSL Certifications
-const sslOptions = {
-    key: fs.readFileSync('./key.pem'),
-    cert: fs.readFileSync('./cert.pem'),
-}
+const sslOptions = {}
 
 // Called by msb.mjs file
 export function startRpcServer(msbInstance, port) {
