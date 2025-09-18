@@ -1,8 +1,9 @@
-import { OperationType } from "./constants.js";
+import {OperationType} from "./constants.js";
 
 const isCoreAdmin = type => {
     return [
         OperationType.ADD_ADMIN,
+        OperationType.DISABLE_INITIALIZATION,
     ].includes(type);
 }
 
@@ -35,24 +36,48 @@ const isBootstrapDeployment = type => {
     ].includes(type);
 }
 
+const isTransfer = type => {
+    return [
+        OperationType.TRANSFER
+    ].includes(type);
+}
+
+const isBalanceInitialization = type => {
+    return [
+        OperationType.BALANCE_INITIALIZATION
+    ].includes(type);
+}
+
 const operationToPayload = type => {
     const fromTo = [
         {
             condition: isCoreAdmin,
             jsonPath: 'cao'
-        },{
+        },
+        {
             condition: isAdminControl,
             jsonPath: 'aco'
-        },{
+        },
+        {
             condition: isRoleAccess,
             jsonPath: 'rao'
-        },{
+        },
+        {
             condition: isTransaction,
             jsonPath: 'txo'
-        },{
+        },
+        {
             condition: isBootstrapDeployment,
             jsonPath: 'bdo'
         },
+        {
+            condition: isTransfer,
+            jsonPath: 'tro'
+        },
+        {
+            condition: isBalanceInitialization,
+            jsonPath: 'bio'
+        }
     ]
     const match = fromTo.find(entry => !!entry.condition(type))
     return match?.jsonPath
@@ -64,5 +89,7 @@ export {
     isRoleAccess,
     isTransaction,
     isBootstrapDeployment,
-    operationToPayload
+    operationToPayload,
+    isTransfer,
+    isBalanceInitialization
 }

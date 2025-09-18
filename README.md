@@ -20,8 +20,20 @@ While the MSB supports native node-js, it is encouraged to use Pear:
 cd main_settlement_bus
 npm install -g pear
 npm install
+```
+
+You can run the node in two modes:
+1. Regular node (validator/indexer):
+```js
 pear run . store1
 ```
+
+2. Admin node (access to administrative commands):
+```js
+pear run . admin
+```
+
+The admin mode provides access to additional commands such as `/add_admin`, `/add_whitelist`, `/balance_migration`, `/disable_initialization`, `/add_indexer`, `/remove_indexer`, and `/ban_writer`. These commands are only visible and available when running in admin mode.
 
 **Deploy Bootstrap (admin):**
 

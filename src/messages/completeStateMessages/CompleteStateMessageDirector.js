@@ -1,5 +1,5 @@
 import StateBuilder from '../base/StateBuilder.js'
-import {OperationType} from '../../utils/protobuf/applyOperations.cjs'
+import { OperationType } from '../../utils/protobuf/applyOperations.cjs'
 
 class CompleteStateMessageDirector {
     #builder;
@@ -19,6 +19,45 @@ class CompleteStateMessageDirector {
             .withAddress(invokerAddress)
             .withWriterKey(writingKey)
             .withTxValidity(txValidity)
+            .buildValueAndSign();
+
+        return this.#builder.getPayload();
+    }
+
+    async buildDisableInitializationMessage(invokerAddress, writingKey, txValidity) {
+        if (!this.#builder) throw new Error('Builder has not been set.');
+
+        await this.#builder
+            .forOperationType(OperationType.DISABLE_INITIALIZATION)
+            .withAddress(invokerAddress)
+            .withWriterKey(writingKey)
+            .withTxValidity(txValidity)
+            .buildValueAndSign();
+
+        return this.#builder.getPayload();
+    }
+
+    async buildBalanceInitializationMessage(invokerAddress, recipientAddress, amount, txValidity) {
+        if (!this.#builder) throw new Error('Builder has not been set.');
+        await this.#builder
+            .forOperationType(OperationType.BALANCE_INITIALIZATION)
+            .withAddress(invokerAddress)
+            .withIncomingAddress(recipientAddress)
+            .withAmount(amount)
+            .withTxValidity(txValidity)
+            .buildValueAndSign();
+
+        return this.#builder.getPayload();
+    }
+
+    async buildAppendWhitelistMessage(invokerAddress, incomingAddress, txValidity) {
+        if (!this.#builder) throw new Error('Builder has not been set.');
+
+        await this.#builder
+            .forOperationType(OperationType.APPEND_WHITELIST)
+            .withAddress(invokerAddress)
+            .withTxValidity(txValidity)
+            .withIncomingAddress(incomingAddress)
             .buildValueAndSign();
 
         return this.#builder.getPayload();
@@ -118,20 +157,7 @@ class CompleteStateMessageDirector {
         return this.#builder.getPayload();
     }
 
-    async buildAppendWhitelistMessage(invokerAddress, incomingAddress ,txValidity) {
-        if (!this.#builder) throw new Error('Builder has not been set.');
-
-        await this.#builder
-            .forOperationType(OperationType.APPEND_WHITELIST)
-            .withAddress(invokerAddress)
-            .withTxValidity(txValidity)
-            .withIncomingAddress(incomingAddress)
-            .buildValueAndSign();
-
-        return this.#builder.getPayload();
-    }
-
-    async buildBanWriterMessage(invokerAddress ,incomingAddress, txValidity) {
+    async buildBanWriterMessage(invokerAddress, incomingAddress, txValidity) {
         if (!this.#builder) throw new Error('Builder has not been set.');
 
         await this.#builder
@@ -194,6 +220,31 @@ class CompleteStateMessageDirector {
 
         return this.#builder.getPayload();
     }
+
+    async buildTransferOperationMessage(
+        invokerAddress,
+        transactionHash,
+        txValidity,
+        incomingNonce,
+        recipientAddress,
+        amount,
+        incomingSignature
+    ) {
+        if (!this.#builder) throw new Error('Builder has not been set.');
+        await this.#builder
+            .forOperationType(OperationType.TRANSFER)
+            .withAddress(invokerAddress)
+            .withTxHash(transactionHash)
+            .withTxValidity(txValidity)
+            .withIncomingNonce(incomingNonce)
+            .withIncomingAddress(recipientAddress)
+            .withAmount(amount)
+            .withIncomingSignature(incomingSignature)
+            .buildValueAndSign();
+
+        return this.#builder.getPayload();
+    }
+
 }
 
 export default CompleteStateMessageDirector;

@@ -108,6 +108,23 @@ class PartialStateMessageOperations {
         }
     }
 
+    static async assembleTransferOperationMessage(wallet, recipientAddress, amount, txValidity) {
+        try {
+            const builder = new PartialStateMessageBuilder(wallet);
+            const director = new PartialStateMessageDirector();
+            director.builder = builder;
+            return await director.buildTransferOperationMessage(
+                wallet.address,
+                recipientAddress,
+                amount,
+                txValidity
+            );
+        } catch (error) {
+            throw new Error(`Failed to assemble transfer operation message: ${error.message}`);
+        }
+
+    }
+
 }
 
 export default PartialStateMessageOperations;

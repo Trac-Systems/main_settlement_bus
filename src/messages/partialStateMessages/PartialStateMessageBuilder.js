@@ -3,12 +3,12 @@ import b4a from "b4a";
 
 import StateBuilder from '../base/StateBuilder.js'
 import {OperationType} from '../../utils/constants.js';
-import {addressToBuffer, isAddressValid} from '../../core/state/utils/address.js';
+import {addressToBuffer, bufferToAddress, isAddressValid} from '../../core/state/utils/address.js';
 import {TRAC_ADDRESS_SIZE} from "trac-wallet/constants.js";
 import {isHexString} from "../../utils/helpers.js";
 import {blake3Hash} from "../../utils/crypto.js";
 import {createMessage} from "../../utils/buffer.js";
-import { isTransaction, isRoleAccess, isBootstrapDeployment } from "../../utils/operations.js";
+import {isTransaction, isRoleAccess, isBootstrapDeployment, isTransfer} from "../../utils/operations.js";
 
 class PartialStateMessageBuilder extends StateBuilder {
     #wallet;
@@ -21,6 +21,8 @@ class PartialStateMessageBuilder extends StateBuilder {
     #withMsbBootstrap;
     #bootstrapNonce;
     #bootstrapSignature;
+    #incomingAddress;
+    #amount;
     #payload;
 
     constructor(wallet) {
@@ -47,6 +49,8 @@ class PartialStateMessageBuilder extends StateBuilder {
         this.#withMsbBootstrap = false;
         this.#bootstrapNonce = null;
         this.#bootstrapSignature = null;
+        this.#incomingAddress = null;
+        this.#amount = null;
         this.#payload = {};
     }
 
@@ -110,6 +114,24 @@ class PartialStateMessageBuilder extends StateBuilder {
         return this;
     }
 
+    withIncomingAddress(address) {
+        if (!isAddressValid(address)) {
+            throw new Error(`Incoming address field must be a valid TRAC bech32m address with length ${TRAC_ADDRESS_SIZE}.`);
+        }
+
+        this.#incomingAddress = address;
+        return this;
+    }
+
+    withAmount(amount) {
+        if (!isHexString(amount) || amount.length !== 32) {
+            throw new Error('Amount must be a 32-length hexstring.');
+        }
+
+        this.#amount = amount;
+        return this;
+    }
+
     async buildValueAndSign() {
         const nonce = Wallet.generateNonce();
         let txMsg = null;
@@ -156,6 +178,16 @@ class PartialStateMessageBuilder extends StateBuilder {
                     this.#operationType
                 );
                 break;
+            case OperationType.TRANSFER:
+                txMsg = createMessage(
+                    addressToBuffer(this.#address),
+                    b4a.from(this.#txValidity, 'hex'),
+                    nonce,
+                    addressToBuffer(this.#incomingAddress), // we need to sign address of the recipient as well
+                    b4a.from(this.#amount, 'hex'),
+                    this.#operationType
+                )
+                break;
             default:
                 throw new Error(`Unsupported operation type: ${this.#operationType}`);
         }
@@ -192,6 +224,15 @@ class PartialStateMessageBuilder extends StateBuilder {
                 bs: this.#externalBootstrap,
                 mbs: this.#withMsbBootstrap
             };
+        } else if (isTransfer(this.#operationType)) {
+            this.#payload.tro = {
+                tx: tx.toString('hex'),
+                txv: this.#txValidity,
+                in: nonce.toString('hex'),
+                to: this.#incomingAddress,
+                am: this.#amount,
+                is: signature.toString('hex')
+            }
         }
 
         return this;
@@ -204,9 +245,10 @@ class PartialStateMessageBuilder extends StateBuilder {
             (
                 !this.#payload.bdo &&
                 !this.#payload.rao) &&
-            !this.#payload.txo
+                !this.#payload.txo &&
+                !this.#payload.tro
         ) {
-            throw new Error('Product is not fully assembled. Missing type, address, or value bdo/rao/txo.');
+            throw new Error('Product is not fully assembled. Missing type, address, or value bdo/rao/txo/tro.');
         }
         const res = this.#payload;
         this.reset();

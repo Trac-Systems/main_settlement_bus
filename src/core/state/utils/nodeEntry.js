@@ -1,21 +1,23 @@
 import b4a from 'b4a';
 
 import { WRITER_MASK, INDEXER_MASK, WHITELISTED_MASK, calculateNodeRole, isNodeRoleValid } from './roles.js';
-import { WRITER_BYTE_LENGTH } from '../../../utils/constants.js';
+import { WRITER_BYTE_LENGTH, BALANCE_BYTE_LENGTH } from '../../../utils/constants.js';
 import { isBufferValid } from '../../../utils/buffer.js';
 
-export const NODE_ENTRY_SIZE = WRITER_BYTE_LENGTH + 1;
+export const NODE_ENTRY_SIZE = WRITER_BYTE_LENGTH + BALANCE_BYTE_LENGTH + 1;
+export const ZERO_BALANCE = b4a.alloc(BALANCE_BYTE_LENGTH);
 
 /**
- * Initializes a new node entry with given writing key and role.
+ * Initializes a new node entry with given writing key and role and the balance is set to zero.
  * Creates a buffer in format: [NODE_ROLE_MASK(1)][WRITING_KEY(32)]
  *
  * @param {Buffer} writingKey - The writing key for the node (must be 32 bytes)
  * @param {number} role - Initial role from NodeRole enum 
+ * * @param {Buffer} balance - Initial balance from node (must be 16 bytes)
  * @returns {Buffer} The initialized node entry buffer, or empty buffer if invalid input
  */
-export function init(writingKey, role) {
-    if (!isBufferValid(writingKey, WRITER_BYTE_LENGTH) || !isNodeRoleValid(role)) {
+export function init(writingKey, role, balance = ZERO_BALANCE) {
+    if (!isBufferValid(writingKey, WRITER_BYTE_LENGTH) || !isBufferValid(balance, BALANCE_BYTE_LENGTH) || !isNodeRoleValid(role)) {
         console.error('Invalid input for node initialization');
         return b4a.alloc(0);
     }
@@ -24,6 +26,7 @@ export function init(writingKey, role) {
         const nodeEntry = b4a.alloc(NODE_ENTRY_SIZE);
         nodeEntry[0] = role;
         b4a.copy(writingKey, nodeEntry, 1);
+        b4a.copy(balance, nodeEntry, WRITER_BYTE_LENGTH + 1);
         return nodeEntry;
     } catch (error) {
         console.error('Error initializing node entry:', error);
@@ -35,27 +38,30 @@ export function init(writingKey, role) {
  * Encodes a node entry as a buffer containing the node's role mask and writing key.
  *
  * The node entry buffer format is:
- *   [NODE_ROLE_MASK(1)][WRITING_KEY(32)]
+ *   [NODE_ROLE_MASK(1)][WRITING_KEY(32)][BALANCE(16)]
  *   - The first byte is a bitmask representing the node's roles (whitelisted, writer, indexer).
- *   - The remaining 32 bytes are the node's writing key.
+ *   - 32 bytes are the node's writing key.
+ *   - 16 bytes are the node's balance.
  *
  * @param {Object} node - An object representing the node, with properties:
  *   - wk: Buffer containing the node's writing key (must be 32 bytes).
  *   - isWhitelisted: Boolean indicating if the node is whitelisted.
  *   - isWriter: Boolean indicating if the node is a writer.
  *   - isIndexer: Boolean indicating if the node is an indexer.
+ *   - balance: Buffer indicating the node balance.
  * @returns {Buffer} The encoded node entry buffer, or an empty buffer if input is invalid.
  */
 export function encode(node) {
     const nodeRole = calculateNodeRole(node);
-    if (!isBufferValid(node.wk, WRITER_BYTE_LENGTH) || !isNodeRoleValid(nodeRole)) {
+    if (!isBufferValid(node.wk, WRITER_BYTE_LENGTH) || !isBufferValid(node.balance, BALANCE_BYTE_LENGTH) || !isNodeRoleValid(nodeRole)) {
         return b4a.alloc(0); // Return an empty buffer if one of the inputs is invalid
     }
 
     try {
-        const entry = b4a.alloc(1 + node.wk.length);
+        let entry = b4a.alloc(NODE_ENTRY_SIZE);
         entry[0] = nodeRole;
         b4a.copy(node.wk, entry, 1);
+        b4a.copy(node.balance, entry, WRITER_BYTE_LENGTH + 1);
         return entry;
     }
     catch (error) {
@@ -78,6 +84,7 @@ export function encode(node) {
  *   - isWhitelisted: Boolean indicating if the node is whitelisted.
  *   - isWriter: Boolean indicating if the node is a writer.
  *   - isIndexer: Boolean indicating if the node is an indexer.
+ *   - balance: Buffer representing the balance in its atomic unit.
  *   Returns null if the buffer is invalid or an error occurs.
  */
 export function decode(nodeEntry) {
@@ -92,8 +99,10 @@ export function decode(nodeEntry) {
         const isWriter = !!(role & WRITER_MASK);
         const isIndexer = !!(role & INDEXER_MASK);
 
-        const wk = nodeEntry.subarray(1);
-        return { wk, isWhitelisted, isWriter, isIndexer };
+        const wk = nodeEntry.subarray(1, WRITER_BYTE_LENGTH + 1);
+        const balance = nodeEntry.subarray(WRITER_BYTE_LENGTH + 1, NODE_ENTRY_SIZE);
+
+        return { wk, isWhitelisted, isWriter, isIndexer, balance };
     }
     catch (error) {
         console.error('Error decoding node entry:', error);
@@ -177,6 +186,27 @@ export function setWritingKey(nodeEntry, writingKey) {
 }
 
 /**
+ * Sets the balance.
+ * @param {Buffer} nodeEntry - The node entry buffer.
+ * @param {Buffer} balance - The buffer representation of the balance
+ * @returns {Buffer|null} The updated node entry buffer, or null if invalid.
+ */
+export function setBalance(nodeEntry, balance) {
+    try {
+        if (!isBufferValid(nodeEntry, NODE_ENTRY_SIZE) || !isBufferValid(balance, BALANCE_BYTE_LENGTH)) {
+            console.error('Invalid input for setting balance');
+            return null;
+        }
+
+        b4a.copy(balance, nodeEntry, WRITER_BYTE_LENGTH + 1);
+        return nodeEntry;
+    } catch (error) {
+        console.error('Error setting balance in node entry:', error);
+        return null;
+    }
+}
+
+/**
  * Sets both the role and writing key in a node entry buffer.
  * @param {Buffer} nodeEntry - The node entry buffer.
  * @param {number} nodeRole - The new node role byte.
@@ -207,6 +237,7 @@ export default {
     init,
     encode,
     decode,
+    setBalance,
     setRole,
     setWritingKey,
     setRoleAndWriterKey,

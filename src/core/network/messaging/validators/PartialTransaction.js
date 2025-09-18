@@ -1,12 +1,15 @@
 import b4a from 'b4a';
-import Wallet from 'trac-wallet';
+import PeerWallet from 'trac-wallet';
 
 import Check from '../../../../utils/check.js';
-import {safeDecodeApplyOperation} from "../../../../utils/protobuf/operationHelpers.js";
-import {bufferToAddress} from "../../../state/utils/address.js";
-import {createMessage} from "../../../../utils/buffer.js";
-import {OperationType} from "../../../../utils/constants.js";
-import {blake3Hash} from "../../../../utils/crypto.js";
+import { safeDecodeApplyOperation } from "../../../../utils/protobuf/operationHelpers.js";
+import { bufferToAddress } from "../../../state/utils/address.js";
+import { createMessage } from "../../../../utils/buffer.js";
+import { OperationType } from "../../../../utils/constants.js";
+import { blake3Hash } from "../../../../utils/crypto.js";
+import deploymentEntryUtils from "../../../state/utils/deploymentEntry.js";
+//TODO: Implement BASE VALIDATOR CLASS AND MOVE COMMON METHODS THERE
+
 class PartialTransaction {
     #state;
     #wallet;
@@ -34,13 +37,14 @@ class PartialTransaction {
 
     async validate(payload) {
         if (!this.#isPayloadSchemaValid(payload)) return false;
-        if (!this.#validateRequestingPublicKey(payload)) return false;
+        if (!this.#validateRequesterAddress(payload)) return false;
         if (!await this.#validateSignature(payload)) return false;
         if (!await this.#validateTransactionUniqueness(payload)) return false;
         if (!await this.#validateIfMsbBootstrapIsValid(payload)) return false;
         if (!await this.#validateIfExternalBootstrapHasBeenDeployed(payload)) return false;
         if (!await this.#validateIfExternalBoostrapIsMsbBootstrap(payload)) return false;
         if (!await this.#validateTransactionValidity(payload)) return false;
+        if (!this.#isTransactionOperationNotCompleted(payload)) return false;
 
         return true;
     }
@@ -54,8 +58,14 @@ class PartialTransaction {
         return true;
     }
 
-    #validateRequestingPublicKey(payload) {
-        const incomingPublicKey = Wallet.decodeBech32mSafe(bufferToAddress(payload.address));
+    #validateRequesterAddress(payload) {
+        const incomingAddress = bufferToAddress(payload.address);
+        if (!incomingAddress) {
+            console.error('Invalid requesting address in transaction payload.');
+            return false;
+        }
+
+        const incomingPublicKey = PeerWallet.decodeBech32mSafe(incomingAddress);
 
         if (incomingPublicKey === null) {
             console.error('Invalid requesting public key in transaction payload.');
@@ -65,7 +75,7 @@ class PartialTransaction {
     }
 
     async #validateSignature(payload) {
-        const incomingPublicKey = Wallet.decodeBech32mSafe(bufferToAddress(payload.address));
+        const incomingPublicKey = PeerWallet.decodeBech32mSafe(bufferToAddress(payload.address));
         const incomingSignature = payload.txo.is;
 
         const incomingTx = payload.txo.tx;
@@ -83,11 +93,11 @@ class PartialTransaction {
         const regeneratedTx = await blake3Hash(message);
 
         // ensure that regenerated tx matches the incoming tx
-        if ( !b4a.equals(incomingTx, regeneratedTx)) {
+        if (!b4a.equals(incomingTx, regeneratedTx)) {
             return false;
         }
 
-        const isSignatureValid = Wallet.verify(incomingSignature, regeneratedTx, incomingPublicKey);
+        const isSignatureValid = PeerWallet.verify(incomingSignature, regeneratedTx, incomingPublicKey);
         if (!isSignatureValid) {
             console.error('Invalid signature in transaction payload');
             return false;
@@ -98,8 +108,8 @@ class PartialTransaction {
     async #validateTransactionUniqueness(payload) {
         const tx = payload.txo.tx;
         const txHex = tx.toString('hex');
-        if (null !== await this.state.getSigned(txHex)) {
-            console.error(`Transaction with hash ${txHex} already exists in the state. Possible replay attack detected.`);
+        if (null !== await this.state.get(txHex)) {
+            console.error(`Transaction with hash ${txHex} already exists in the state.`);
             return false;
         }
         return true;
@@ -127,9 +137,10 @@ class PartialTransaction {
             console.error("External bootstrap is not registered as deployment/<bootstrap>:", payload.txo.bs.toString('hex'));
             return false;
         }
-
-        const getBootstrapTransactionTxPayload = await this.state.getSigned(externalBootstrapResult.toString('hex'));
-
+        const decodedPayload = deploymentEntryUtils.decode(externalBootstrapResult);
+        const txHash =  decodedPayload.txHash
+        const getBootstrapTransactionTxPayload = await this.state.get(txHash.toString('hex'));
+        console.log('getBootstrapTransactionTxPayload', getBootstrapTransactionTxPayload);
         if (null === getBootstrapTransactionTxPayload) {
             console.error('External bootstrap is not registered as usual tx', externalBootstrapResult.toString('hex'), ':', payload);
             return false;
@@ -150,11 +161,23 @@ class PartialTransaction {
         const currentTxv = await this.state.getIndexerSequenceState()
         const incomingTxv = payload.txo.txv
         if (!b4a.equals(currentTxv, incomingTxv)) {
-            console.error(`Transaction validity: ${incomingTxv.toString('hex')} does not match the current indexer sequence state: ${currentTxv.toString('hex')}`);
+            console.error(`Transaction has expired.`);
             return false;
         }
         return true;
     }
+
+    #isTransactionOperationNotCompleted(payload) {
+        if (!payload || !payload.txo) return false;
+        const { va, vn, vs } = payload.txo;
+        const condition = !!(va === undefined && vn === undefined && vs === undefined);
+        if (!condition) {
+            console.error('Transaction operation must not be completed already (va, vn, vs must be undefined).');
+            return false;
+        }
+        return true;
+    }
+
 }
 
 export default PartialTransaction;

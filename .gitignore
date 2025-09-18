@@ -18,3 +18,13 @@ coverage/
 whitelist/*
 !whitelist/.gitkeep
 .vscode/
+
+# Ignore local certificates and keys
+key.pem
+cert.pem
+
+.prettierrc
+# Migration directory
+migration/*
+!migration/.gitkeep
+.vscode/

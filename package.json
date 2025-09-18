@@ -9,6 +9,7 @@
   "type": "module",
   "scripts": {
     "dev": "pear run -d .",
+    "dev-rpc": "pear run -d . ${npm_config_store} --rpc --port ${npm_config_port}",
     "protobuf": "node scripts/generate-protobufs.js",
     "test:node": "brittle-node -t 120000 test/all.test.js",
     "test:bare": "brittle-bare -t 120000 test/all.test.js",
@@ -20,6 +21,7 @@
     "autobase": "7.16.1",
     "b4a": "1.6.7",
     "bare-fs": "^4.1.6",
+    "bare-https": "^2.0.0",
     "bare-readline": "1.0.7",
     "bare-tty": "5.0.2",
     "bech32": "^2.0.0",
@@ -27,6 +29,7 @@
     "compact-encoding": "^2.16.0",
     "corestore": "^7.4.2",
     "fastest-validator": "1.19.0",
+    "https": "npm:bare-node-https",
     "hyperbee": "^2.24.2",
     "hypercore": "^11.6.3",
     "hypercore-crypto": "^3.4.0",
@@ -43,7 +46,9 @@
   "devDependencies": {
     "bare-os": "^3.6.1",
     "bip39-mnemonic": "^2.4.0",
-    "protocol-buffers": "^4.2.0"
+    "esmock": "^2.7.2",
+    "protocol-buffers": "^4.2.0",
+    "sinon": "^21.0.0"
   },
   "publishConfig": {
     "registry": "https://registry.npmjs.org",

@@ -7,6 +7,7 @@ async function runMsgUtilsTests() {
     await import('./createHash.test.js');
     await import('./isHexString.test.js');
     await import('./normalizeHex.test.js');
+    await import('./amountSerialization.test.js');
     test.resume();
 }
 

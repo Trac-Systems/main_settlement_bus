@@ -1,4 +1,5 @@
 import { OperationType as OP } from './protobuf/applyOperations.cjs';
+import b4a from 'b4a'
 // TODO: We are going to have a lot of contstants. It would be good, to separate them into different files.
 
 //ATTENTION - THIS IS USED IN THE APPLY FUNCTION!
@@ -9,12 +10,14 @@ export const EntryType = Object.freeze({
     WRITERS_INDEX: 'wri/',
     WRITER_ADDRESS: 'wka/',
     DEPLOYMENT: 'deployment/',
+    INITIALIZATION: 'init'
 });
 
 //ATTENTION - THIS IS USED IN THE APPLY FUNCTION!
 export const OperationType = Object.freeze({
-    //TODO: ADD INIT_BALANCE,TOKEN_TRANSFER, BALANCE_INITIALIZED (to discuss),
     ADD_ADMIN: OP.ADD_ADMIN,
+    DISABLE_INITIALIZATION: OP.DISABLE_INITIALIZATION,
+    BALANCE_INITIALIZATION: OP.BALANCE_INITIALIZATION,
     APPEND_WHITELIST: OP.APPEND_WHITELIST,
     ADD_WRITER: OP.ADD_WRITER,
     REMOVE_WRITER: OP.REMOVE_WRITER,
@@ -24,6 +27,7 @@ export const OperationType = Object.freeze({
     BAN_VALIDATOR: OP.BAN_VALIDATOR,
     BOOTSTRAP_DEPLOYMENT: OP.BOOTSTRAP_DEPLOYMENT,
     TX: OP.TX,
+    TRANSFER: OP.TRANSFER,
 });
 
 // Role managment constants
@@ -36,7 +40,12 @@ export const EventType = Object.freeze({
     WARNING: 'warning',
 });
 
+// Token
+export const TOKEN_DECIMALS = 18n
+export const ADMIN_INITIAL_BALANCE = b4a.from([0, 0, 0, 0, 0, 0, 0, 54, 53, 201, 173, 197, 222, 160, 0, 0]) // 1000 in a 18 decimals token
+
 export const WHITELIST_FILEPATH = './whitelist/addresses.csv';
+export const BALANCE_MIGRATION_FILEPATH = './migration/initial_balances.csv';
 export const TRAC_NAMESPACE = 'TracNetwork';
 export const WHITELIST_SLEEP_INTERVAL = 1_000;
 
@@ -47,14 +56,16 @@ export const MAX_SERVER_CONNECTIONS = Infinity;
 export const MAX_CLIENT_CONNECTIONS = Infinity;
 export const ACK_INTERVAL = 1_000;
 export const DHT_BOOTSTRAPS = ['116.202.214.149:10001', '157.180.12.214:10001', 'node1.hyperdht.org:49737', 'node2.hyperdht.org:49737', 'node3.hyperdht.org:49737'];
-
+export const MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION = 25;
 // checkjs
 //ATTENTION - THIS IS USED IN THE APPLY FUNCTION!
 export const WRITER_BYTE_LENGTH = 32;
 export const BOOTSTRAP_BYTE_LENGTH = 32;
 export const NONCE_BYTE_LENGTH = 32;
 export const HASH_BYTE_LENGTH = 32;
+export const BALANCE_BYTE_LENGTH = 16;
 export const SIGNATURE_BYTE_LENGTH = 64;
+export const AMOUNT_BYTE_LENGTH = 16;
 export const MIN_SAFE_VALIDATION_INTEGER = 0x00000001;
 export const MAX_SAFE_VALIDATION_INTEGER = 0xFFFFFFFF;
 
@@ -88,3 +99,4 @@ export const NETWORK_MESSAGE_TYPES = Object.freeze({
         NODE: 'nodeResponse'
     },
 });
+

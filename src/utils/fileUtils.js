@@ -1,6 +1,7 @@
 import fs from 'fs'; // TODO: If we are using bare environment, we should use bare-fs instead
-import {WHITELIST_FILEPATH} from '../utils/constants.js';
-
+import { WHITELIST_FILEPATH, BALANCE_MIGRATION_FILEPATH } from '../utils/constants.js';
+import { isAddressValid } from '../core/state/utils/address.js';
+import { decimalStringToBigInt, bigIntTo16ByteBuffer, bufferToBigInt } from './amountSerialization.js';
 
 /**
  * Reads the contents of the whitelist file and returns an array of strings.
@@ -33,6 +34,63 @@ async function readPublicKeysFromFile(filepath = WHITELIST_FILEPATH) {
     }
 }
 
+async function readBalanceMigrationFile(filepath = BALANCE_MIGRATION_FILEPATH) {
+    try {
+        if (!filepath.toLowerCase().endsWith('.csv')) {
+            throw new Error(`Invalid file format: ${filepath}. Balance migration file must be a CSV file.`);
+        }
+
+        const pairFormatRegex = /^([a-zA-Z0-9]+),(\d+(?:\.\d{1,18})?|\d+)$/;
+        const data = await fs.promises.readFile(filepath, 'utf8');
+        const lines = data
+            .split('\n')
+            .map(line => line.trim())
+            .filter(line => line.length > 0);
+
+        if (lines.length === 0) {
+            throw new Error('Balance migration file is empty. File must contain at least one valid address balance pair.');
+        }
+
+        const addressBalancePair = new Map();
+        let totalBalance = BigInt(0);
+        let totalAddresses = 0;
+        let addresses = []
+
+        for (const line of lines) {
+            const match = line.match(pairFormatRegex);
+            if (!match) {
+                throw new Error(`Invalid line in balance migration file: '${line}'. Each line must be in format: address,xxx.xxx`);
+            }
+            const address = match[1];
+            const balance = match[2];
+            if (addressBalancePair.has(address)) {
+                throw new Error(`Duplicate address found in balance migration file: '${address}'. Each address must be unique.`);
+            }
+            if (!isAddressValid(address)) {
+                throw new Error(`Invalid address found in balance migration file: '${address}'. Please ensure all addresses are valid.`);
+            }
+            const parsedBalance = decimalStringToBigInt(balance);
+            const balanceBuffer = bigIntTo16ByteBuffer(parsedBalance);
+            const reconstructedBalance = bufferToBigInt(balanceBuffer);
+
+            if (parsedBalance !== reconstructedBalance) {
+                throw new Error(`Balance serialization/deserialization mismatch for address '${address}'. Original: ${parsedBalance}, Reconstructed: ${reconstructedBalance}`);
+            }
+            totalBalance += parsedBalance;
+            totalAddresses += 1;
+            addresses.push({ address, parsedBalance })
+            addressBalancePair.set(address, balanceBuffer);
+        }
+        return {addressBalancePair, totalBalance, totalAddresses, addresses};
+    } catch (err) {
+        if (err.code === 'ENOENT') {
+            throw new Error(`Balance migration file not found: ${filepath}`);
+        }
+        throw new Error(`Failed to read balance migration file: ${err.message}`);
+    }
+}
+
 export default {
-    readPublicKeysFromFile
+    readPublicKeysFromFile,
+    readBalanceMigrationFile,
 }
