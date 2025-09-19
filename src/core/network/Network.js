@@ -2,7 +2,6 @@ import ReadyResource from 'ready-resource';
 import Hyperswarm from 'hyperswarm';
 import w from 'protomux-wakeup';
 import b4a from 'b4a';
-import Wallet from 'trac-wallet';
 
 import PoolService from './services/PoolService.js';
 import ValidatorObserverService from './services/ValidatorObserverService.js';

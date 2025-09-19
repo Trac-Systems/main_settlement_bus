@@ -1,5 +1,5 @@
 import b4a from 'b4a';
-import Wallet from 'trac-wallet';
+import PeerWallet from 'trac-wallet';
 import { bufferToAddress } from '../../../../state/utils/address.js';
 import { blake3Hash } from '../../../../../utils/crypto.js';
 
@@ -62,12 +62,12 @@ class BaseResponse {
         switch (type) {
             case 'admin':
                 const adminEntry = await this.state.getAdminEntry();
-                publicKey = Wallet.decodeBech32m(adminEntry.address);
+                publicKey = PeerWallet.decodeBech32m(adminEntry.address);
 
                 break;
             default:
                 const addressString = bufferToAddress(message.address);
-                publicKey = Wallet.decodeBech32m(addressString);
+                publicKey = PeerWallet.decodeBech32m(addressString);
         }
 
         if (!publicKey) {

@@ -1,10 +1,9 @@
-import Wallet from "trac-wallet";
+import PeerWallet from "trac-wallet";
 import b4a from "b4a";
 
 import StateBuilder from '../base/StateBuilder.js'
-import {OperationType} from '../../utils/constants.js';
+import {OperationType, TRAC_ADDRESS_SIZE} from '../../utils/constants.js';
 import {addressToBuffer, bufferToAddress, isAddressValid} from '../../core/state/utils/address.js';
-import {TRAC_ADDRESS_SIZE} from "trac-wallet/constants.js";
 import {isHexString} from "../../utils/helpers.js";
 import {blake3Hash} from "../../utils/crypto.js";
 import {createMessage} from "../../utils/buffer.js";
@@ -133,7 +132,7 @@ class PartialStateMessageBuilder extends StateBuilder {
     }
 
     async buildValueAndSign() {
-        const nonce = Wallet.generateNonce();
+        const nonce = PeerWallet.generateNonce();
         let txMsg = null;
         let tx = null;
         let signature = null;

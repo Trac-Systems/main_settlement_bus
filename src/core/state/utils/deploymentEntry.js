@@ -1,8 +1,8 @@
 import b4a from 'b4a';
 
 import { bufferToAddress, isAddressValid } from './address.js';
-import { TRAC_ADDRESS_SIZE, TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
-import { BOOTSTRAP_BYTE_LENGTH ,HASH_BYTE_LENGTH} from '../../../utils/constants.js';
+import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
+import { BOOTSTRAP_BYTE_LENGTH, HASH_BYTE_LENGTH, TRAC_ADDRESS_SIZE } from '../../../utils/constants.js';
 import { isBufferValid } from '../../../utils/buffer.js';
 
 

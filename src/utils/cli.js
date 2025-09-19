@@ -72,7 +72,7 @@ export function printHelp(isAdminMode = false) {
 export const printWalletInfo = (address, writingKey) => {
     console.log('');
     console.log('#####################################################################################');
-    console.log('# MSB Address:   ', address.toString('hex'), ' #');
+    console.log('# MSB Address:   ', address, ' #');
     console.log('# MSB Writer:    ', writingKey.toString('hex'), '#');
     console.log('#####################################################################################');
 }

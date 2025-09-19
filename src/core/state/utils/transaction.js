@@ -1,7 +1,6 @@
 import b4a from 'b4a';
 
-import { TRAC_ADDRESS_SIZE } from 'trac-wallet/constants.js';
-import { HASH_BYTE_LENGTH, NONCE_BYTE_LENGTH, WRITER_BYTE_LENGTH } from '../../../utils/constants.js';
+import { HASH_BYTE_LENGTH, NONCE_BYTE_LENGTH, WRITER_BYTE_LENGTH, TRAC_ADDRESS_SIZE } from '../../../utils/constants.js';
 import { blake3Hash } from '../../../utils/crypto.js';
 import {safeWriteUInt32BE} from "../../../utils/buffer.js";
 
