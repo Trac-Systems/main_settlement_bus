@@ -1,6 +1,6 @@
 import { test } from 'brittle';
 import b4a from 'b4a';
-import { TRAC_ADDRESS_SIZE } from 'trac-wallet/constants.js';
+import { TRAC_ADDRESS_SIZE } from '../../../src/utils/constants.js';
 import { randomBuffer } from '../stateTestUtils.js';
 import indexerEntryUtils, { append } from '../../../src/core/state/utils/indexerEntry.js';
 

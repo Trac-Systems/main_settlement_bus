@@ -1,13 +1,13 @@
 import b4a from 'b4a';
-import Wallet from 'trac-wallet';
+import PeerWallet from 'trac-wallet';
 
 import StateBuilder from '../base/StateBuilder.js'
-import {createMessage} from '../../utils/buffer.js';
-import {OperationType} from '../../utils/protobuf/applyOperations.cjs'
-import {addressToBuffer, bufferToAddress} from '../../core/state/utils/address.js';
-import {TRAC_ADDRESS_SIZE} from 'trac-wallet/constants.js';
-import {isAddressValid} from "../../core/state/utils/address.js";
-import {blake3Hash} from '../../utils/crypto.js';
+import { createMessage } from '../../utils/buffer.js';
+import { OperationType } from '../../utils/protobuf/applyOperations.cjs'
+import { addressToBuffer, bufferToAddress } from '../../core/state/utils/address.js';
+import { TRAC_ADDRESS_SIZE } from '../../utils/constants.js';
+import { isAddressValid } from "../../core/state/utils/address.js";
+import { blake3Hash } from '../../utils/crypto.js';
 import {
     isCoreAdmin,
     isAdminControl,
@@ -194,7 +194,7 @@ class CompleteStateMessageBuilder extends StateBuilder {
             throw new Error('UNKNOWN is not allowed to construct');
         }
 
-        const nonce = Wallet.generateNonce();
+        const nonce = PeerWallet.generateNonce();
 
         let msg = null;
         let tx = null;
@@ -209,7 +209,7 @@ class CompleteStateMessageBuilder extends StateBuilder {
                 break;
             // Complete by default
             case OperationType.BALANCE_INITIALIZATION:
-                if (!this.#incomingAddress || !this.#amount || !this.#txValidity || !this.#address ) {
+                if (!this.#incomingAddress || !this.#amount || !this.#txValidity || !this.#address) {
                     throw new Error('All balance initialization fields must be set before building the message!');
                 }
                 msg = createMessage(this.#address, this.#txValidity, nonce, this.#incomingAddress, this.#amount, this.#operationType);
@@ -348,7 +348,7 @@ class CompleteStateMessageBuilder extends StateBuilder {
                 vn: nonce,
                 vs: signature
             }
-        } else if(isBalanceInitialization(this.#operationType)) {
+        } else if (isBalanceInitialization(this.#operationType)) {
             this.#payload.bio = {
                 tx: tx,
                 txv: this.#txValidity,

@@ -1,4 +1,3 @@
-import { TRAC_ADDRESS_SIZE } from 'trac-wallet/constants.js';
 import b4a from 'b4a';
 
 import { addressToBuffer } from '../../src/core/state/utils/address.js';
@@ -9,6 +8,7 @@ import {
     BOOTSTRAP_BYTE_LENGTH,
     NONCE_BYTE_LENGTH,
     OperationType, AMOUNT_BYTE_LENGTH,
+    TRAC_ADDRESS_SIZE
 } from '../../src/utils/constants.js';
 
 export const TRO = {

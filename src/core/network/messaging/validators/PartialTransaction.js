@@ -140,7 +140,6 @@ class PartialTransaction {
         const decodedPayload = deploymentEntryUtils.decode(externalBootstrapResult);
         const txHash =  decodedPayload.txHash
         const getBootstrapTransactionTxPayload = await this.state.get(txHash.toString('hex'));
-        console.log('getBootstrapTransactionTxPayload', getBootstrapTransactionTxPayload);
         if (null === getBootstrapTransactionTxPayload) {
             console.error('External bootstrap is not registered as usual tx', externalBootstrapResult.toString('hex'), ':', payload);
             return false;

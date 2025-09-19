@@ -1,6 +1,6 @@
 import b4a from 'b4a';
 import { bech32m } from 'bech32';
-import { TRAC_NETWORK_MSB_MAINNET_PREFIX, TRAC_PUB_KEY_SIZE } from 'trac-wallet/constants.js';
+import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
 import { TOKEN_DECIMALS } from '../../src/utils/constants.js';
 
 export function randomBuffer(size) {
@@ -8,7 +8,7 @@ export function randomBuffer(size) {
 }
 
 export function randomAddress(hrp = TRAC_NETWORK_MSB_MAINNET_PREFIX) {
-    const data = randomBuffer(TRAC_PUB_KEY_SIZE);
+    const data = randomBuffer(32);
     return bech32m.encode(hrp, bech32m.toWords(data));
 }
 

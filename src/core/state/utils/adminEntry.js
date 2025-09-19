@@ -1,8 +1,8 @@
 import b4a from 'b4a';
 
 import { bufferToAddress, isAddressValid } from './address.js';
-import { TRAC_ADDRESS_SIZE, TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
-import { WRITER_BYTE_LENGTH } from '../../../utils/constants.js';
+import {TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
+import { WRITER_BYTE_LENGTH, TRAC_ADDRESS_SIZE} from '../../../utils/constants.js';
 import { isBufferValid } from '../../../utils/buffer.js';
 
 const ADMIN_ENTRY_SIZE = TRAC_ADDRESS_SIZE + WRITER_BYTE_LENGTH;
