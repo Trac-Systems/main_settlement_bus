@@ -1,5 +1,5 @@
 // rpc_server.mjs
-import http from 'bare-http1'
+import http from 'http'
 import { applyCors } from './cors.mjs';
 import { routes } from './router.mjs'; // Import the new routes array
 
