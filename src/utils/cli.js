@@ -65,6 +65,7 @@ export function printHelp(isAdminMode = false) {
     console.log('- /transfer <to_address> <amount>: transfer the specified amount to the given address.');
     console.log('- /get_tx_info <tx_hash>: get information about a transaction with the given hash.');
     console.log('- /get_validator_addr <writing_key>: get the validator address mapped to the given writing key.');
+    console.log('- /get_balance <address> <confirmed>: get the balance of the node with specified address (confirmed = true is default)');
     console.log('- /exit: Exit the program.');
     console.log('- /help: display this help.');
 }
