@@ -983,11 +983,8 @@ export class MainSettlementBus extends ReadyResource {
                     let nodeEntry = unconfirmedBalance ? await this.#state.getUnsignedNodeEntry(address) : await this.#state.getNodeEntry(address)
                     if (nodeEntry) {
                         console.log({
-                            WritingKey: nodeEntry.wk.toString('hex'),
-                            IsWhitelisted: nodeEntry.isWhitelisted,
-                            IsWriter: nodeEntry.isWriter,
-                            IsIndexer: nodeEntry.isIndexer,
-                            balance: bigIntToDecimalString(bufferToBigInt(nodeEntry.balance))
+                            Address: address,
+                            Balance: bigIntToDecimalString(bufferToBigInt(nodeEntry.balance))
                         })
                         return {
                             address: address,
