@@ -985,7 +985,10 @@ export class MainSettlementBus extends ReadyResource {
                 } else if (input.startsWith("/confirmed_length")) {
                     const confirmed_length = this.#state.getSignedLength();
                     console.log('Confirmed_length:', confirmed_length);
-                    return confirmed_length
+                } else if (input.startsWith("/unconfirmed_length")) {
+                    const unconfirmed_length = this.#state.getUnsignedLength();
+                    console.log('Unconfirmed_length:', unconfirmed_length);
+                    return unconfirmed_length
                 }  else if (input.startsWith("/broadcast_transaction")) {
                     if (payload) {
                         const normalizedPayload = normalizeTransferOperation(payload);
