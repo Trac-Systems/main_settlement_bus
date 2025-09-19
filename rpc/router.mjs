@@ -4,7 +4,8 @@ import {
     handleFee,
     handleConfirmedLength,
     handleBroadcastTransaction,
-    handleTxHashes
+    handleTxHashes,
+    handleUnconfirmedLength
 } from './handlers.mjs';
 
 export const routes = [
@@ -14,4 +15,5 @@ export const routes = [
     { method: 'GET', path: '/confirmed-length', handler: handleConfirmedLength },
     { method: 'POST', path: '/broadcast-transaction', handler: handleBroadcastTransaction },
     { method: 'GET', path: '/tx-hashes/', handler: handleTxHashes },
+    { method: 'GET', path: '/unconfirmed-length', handler: handleUnconfirmedLength },
 ];
