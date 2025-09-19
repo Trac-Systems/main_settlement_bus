@@ -144,3 +144,16 @@ export async function handleTxHashes(req, res, msbInstance) {
         res.end(JSON.stringify({ error: error.message || 'An error occurred processing the request.' }));
     }
 }
+
+export async function handleUnconfirmedLength(req, res, msbInstance) {
+    try {
+        const commandString = '/unconfirmed_length';
+        const unconfirmed_length = await msbInstance.handleCommand(commandString);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ unconfirmed_length }));
+    } catch (error) {
+        console.error('Error on retrieving confirmed_length:', error);
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'An error occurred processing the request.' }));
+    }
+}
