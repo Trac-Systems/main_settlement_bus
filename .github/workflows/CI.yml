@@ -36,3 +36,5 @@ jobs:
         run: npm i -g bare
       - name: Run bare tests
         run: npm run test:bare
+      - name: Run bare tests
+        run: npm run test:acceptance

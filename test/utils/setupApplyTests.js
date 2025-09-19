@@ -243,7 +243,7 @@ export async function removeTemporaryDirectory(temporaryDirectory) {
     await fsp.rm(temporaryDirectory, {recursive: true, force: true})
 }
 
-async function initDirectoryStructure(peerName, keyPair, temporaryDirectory) {
+export async function initDirectoryStructure(peerName, keyPair, temporaryDirectory) {
     try {
         await ensureEnvReady();
         const storesDirectory = temporaryDirectory + '/stores/';

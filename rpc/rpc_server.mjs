@@ -1,31 +1,10 @@
-// rpc_server.mjs
-import http from 'http'
-import { applyCors } from './cors.mjs';
-import { routes } from './router.mjs'; // Import the new routes array
+import { createServer } from "./create_server.mjs";
 
 // Called by msb.mjs file
 export function startRpcServer(msbInstance, port) {
-    const server = http.createServer(async (req, res) => {
-        if (applyCors(req, res)) return;
+    const server = createServer(msbInstance)
 
-        // Find the matching route
-        let foundRoute = false;
-        for (const route of routes) {
-            // Simple path matching
-            if (req.method === route.method && req.url.startsWith(route.path)) {
-                foundRoute = true;
-                await route.handler(req, res, msbInstance);
-                break;
-            }
-        }
-
-        if (!foundRoute) {
-            res.writeHead(404, { 'Content-Type': 'text/plain' });
-            res.end('Not Found');
-        }
-    });
-
-    server.listen(port, () => {
+    return server.listen(port, () => {
         console.log(`Running RPC with https at https://localhost:${port}`);
     });
 }
