@@ -1,18 +1,11 @@
 // rpc_server.mjs
-import https from 'https'
-import fs from 'bare-fs'
+import http from 'http'
 import { applyCors } from './cors.mjs';
 import { routes } from './router.mjs'; // Import the new routes array
 
-// SSL Certifications
-const sslOptions = {
-    key: fs.readFileSync('./key.pem'),
-    cert: fs.readFileSync('./cert.pem'),
-}
-
 // Called by msb.mjs file
 export function startRpcServer(msbInstance, port) {
-    const server = https.createServer(sslOptions, async (req, res) => {
+    const server = http.createServer(async (req, res) => {
         if (applyCors(req, res)) return;
 
         // Find the matching route
