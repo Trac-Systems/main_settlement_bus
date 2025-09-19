@@ -11,7 +11,7 @@
     "dev": "pear run -d .",
     "dev-rpc": "pear run -d . ${npm_config_store} --rpc --port ${npm_config_port}",
     "protobuf": "node scripts/generate-protobufs.js",
-    "test:acceptance": "NODE_OPTIONS=--experimental-vm-modules jest --testTimeout=200000 test/acceptance/",
+    "test:acceptance": "node --experimental-vm-modules node_modules/jest/bin/jest.js --testTimeout=200000 test/acceptance/",
     "test:node": "brittle-node -t 120000 test/all.test.js",
     "test:bare": "brittle-bare -t 120000 test/all.test.js",
     "test:node:cov": "brittle-node -c -t 120000 test/all.test.js",
