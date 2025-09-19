@@ -975,6 +975,33 @@ export class MainSettlementBus extends ReadyResource {
                     const address = splitted[1];
                     const amount = splitted[2];
                     await this.#handleTransferOperation(address, amount);
+                } else if (input.startsWith("/get_balance")) {
+                    const splitted = input.split(" ");
+                    const address = splitted[1];
+                    const confirmedFlag = splitted[2];
+                    let unconfirmedBalance = confirmedFlag === 'false'
+                    let nodeEntry = unconfirmedBalance ? await this.#state.getUnsignedNodeEntry(address) : await this.#state.getNodeEntry(address)
+                    if (nodeEntry) {
+                        console.log({
+                            WritingKey: nodeEntry.wk.toString('hex'),
+                            IsWhitelisted: nodeEntry.isWhitelisted,
+                            IsWriter: nodeEntry.isWriter,
+                            IsIndexer: nodeEntry.isIndexer,
+                            balance: bigIntToDecimalString(bufferToBigInt(nodeEntry.balance))
+                        })
+                        return {
+                            address: address,
+                            balance: bigIntToDecimalString(bufferToBigInt(nodeEntry.balance))
+                        }
+                    } else {
+                        console.log('Node Entry:', {
+                            WritingKey: ZERO_WK.toString('hex'),
+                            IsWhitelisted: false,
+                            IsWriter: false,
+                            IsIndexer: false,
+                            balance: bigIntToDecimalString(0n)
+                        })
+                    }
                 } else if (input.startsWith("/get_txv")) {
                     const txv = await this.#state.getIndexerSequenceState();
                     console.log('Current TXV:', txv.toString('hex'));

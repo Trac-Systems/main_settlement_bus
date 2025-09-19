@@ -8,7 +8,27 @@ export async function handleBalance(req, res, msbInstance) {
             res.end(JSON.stringify({ error: 'Wallet address is required' }));
             return;
         }
-        const commandString = `/get_node_info ${address}`;
+        const commandString = `/get_balance ${address}`;
+        const nodeInfo = await msbInstance.handleCommand(commandString);
+        const balance = nodeInfo?.balance || 0;
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ address, balance }));
+    } catch (error) {
+        console.error('Error on searching for balance:', error);
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'An error occurred processing the request.' }));
+    }
+}
+
+export async function handleUnconfirmedBalance(req, res, msbInstance) {
+    try {
+        const address = req.url.split('/')[2];
+        if (!address) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Wallet address is required' }));
+            return;
+        }
+        const commandString = `/get_balance ${address} false`;
         const nodeInfo = await msbInstance.handleCommand(commandString);
         const balance = nodeInfo?.balance || 0;
         res.writeHead(200, { 'Content-Type': 'application/json' });

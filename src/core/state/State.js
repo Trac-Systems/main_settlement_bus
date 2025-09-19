@@ -127,7 +127,6 @@ class State extends ReadyResource {
         return nodeEntry ? nodeEntryUtils.decode(nodeEntry) : null;
     }
 
-    // PLACEHOLDER
     async getUnsignedNodeEntry(address) {
         const nodeEntry = await this.get(address);
         return nodeEntry ? nodeEntryUtils.decode(nodeEntry) : null;
