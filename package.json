@@ -20,6 +20,8 @@
     "@tracsystems/blake3": "^0.0.6",
     "autobase": "7.16.1",
     "b4a": "1.6.7",
+    "bare-crypto": "^1.11.2",
+    "crypto": "npm:bare-node-crypto",
     "bare-fs": "^4.1.6",
     "bare-https": "^2.0.0",
     "bare-readline": "1.0.7",
@@ -40,7 +42,7 @@
     "protomux-wakeup": "2.4.0",
     "readline": "npm:bare-node-readline",
     "ready-resource": "1.1.2",
-    "trac-wallet": "0.0.43-msb-r2.1",
+    "trac-wallet": "0.0.43-msb-r2.3",
     "tty": "npm:bare-node-tty"
   },
   "devDependencies": {

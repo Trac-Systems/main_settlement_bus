@@ -1,6 +1,6 @@
 import { test, hook } from 'brittle';
 import b4a from 'b4a';
-import Wallet from 'trac-wallet';
+import PeerWallet from 'trac-wallet';
 
 import { setupMsbAdmin, initTemporaryDirectory, removeTemporaryDirectory, randomBytes } from '../utils/setupApplyTests.js';
 import { testKeyPair1, testKeyPair2 } from '../fixtures/apply.fixtures.js';
@@ -9,7 +9,7 @@ import CompleteStateMessageOperations from '../../src/messages/completeStateMess
 
 
 let admin, whitelistKeys, tmpDirectory, originalReadPublicKeysFromFile;
-const address = Wallet.encodeBech32m(b4a.from(testKeyPair2.publicKey, 'hex'));
+const address = PeerWallet.encodeBech32m(b4a.from(testKeyPair2.publicKey, 'hex'));
 hook('Initialize admin node for addWhitelist tests', async () => {
     const randomChannel = randomBytes(32).toString('hex');
     const baseOptions = {

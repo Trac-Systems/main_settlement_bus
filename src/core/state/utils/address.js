@@ -1,6 +1,7 @@
 import b4a from 'b4a';
 
-import { TRAC_NETWORK_MSB_MAINNET_PREFIX, TRAC_ADDRESS_SIZE } from 'trac-wallet/constants.js';
+import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
+import { TRAC_ADDRESS_SIZE } from '../../../utils/constants.js';
 
 /**
  * Checks if a given address is a valid TRAC bech32m address.

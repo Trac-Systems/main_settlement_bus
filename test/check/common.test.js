@@ -1,7 +1,6 @@
 import b4a from 'b4a';
 
-import { MIN_SAFE_VALIDATION_INTEGER, MAX_SAFE_VALIDATION_INTEGER } from '../../src/utils/constants.js';
-import { TRAC_ADDRESS_SIZE } from 'trac-wallet/constants.js';
+import { MIN_SAFE_VALIDATION_INTEGER, MAX_SAFE_VALIDATION_INTEGER, TRAC_ADDRESS_SIZE } from '../../src/utils/constants.js';
 import { partial_operation_value_type } from "../fixtures/check.fixtures.js";
 
 export function topLevelValidationTests(

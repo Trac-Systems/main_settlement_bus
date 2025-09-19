@@ -1,6 +1,5 @@
 import b4a from 'b4a';
-import { TRAC_ADDRESS_SIZE } from 'trac-wallet/constants.js';
-
+import { TRAC_ADDRESS_SIZE } from '../../../utils/constants.js';
 import { isBufferValid } from '../../../utils/buffer.js';
 
 /**

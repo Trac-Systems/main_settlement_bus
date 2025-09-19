@@ -1593,7 +1593,7 @@ class State extends ReadyResource {
 
         // 25% of the fee is burned.
 
-        // OBSERVATION: If TX operation will be requested by the subnetwork creator on their own bootstrap, how we should charge the fee? It looks like Bootstrap deployer
+        // TODO: OBSERVATION - If TX operation will be requested by the subnetwork creator on their own bootstrap, how we should charge the fee? It looks like Bootstrap deployer
         // is paying 0.03, however they are receiving 0.0075 back, so the final fee is 0.0225. I think it's fair enough. It this case we should burn reward for Bootstrap deployer.
 
         await batch.put(requesterAddressString, updatedRequesterNodeEntry);

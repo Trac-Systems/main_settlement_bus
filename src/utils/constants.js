@@ -100,3 +100,4 @@ export const NETWORK_MESSAGE_TYPES = Object.freeze({
     },
 });
 
+export const TRAC_ADDRESS_SIZE =  63; // TODO: Change this to config().addressLength || 63

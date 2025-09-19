@@ -882,7 +882,6 @@ export class MainSettlementBus extends ReadyResource {
                     msbBootstrap
                 )
                 await this.broadcastPartialTransaction(assembledTransactionOperation);
-
                 break;
             case '/balance_migration':
                 await this.#handleBalanceMigrationOperation();

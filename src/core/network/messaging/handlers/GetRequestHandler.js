@@ -1,5 +1,5 @@
 import { NETWORK_MESSAGE_TYPES } from '../../../../utils/constants.js';
-import Wallet from 'trac-wallet';
+import PeerWallet from 'trac-wallet';
 import b4a from 'b4a';
 import { blake3Hash } from '../../../../utils/crypto.js';
 
@@ -33,7 +33,7 @@ class GetRequestHandler {
     }
 
     async handleGetValidatorResponse(messageProtomux, connection, channelString) {
-        const nonce = Wallet.generateNonce().toString('hex');
+        const nonce = PeerWallet.generateNonce().toString('hex');
         const payload = {
             op: 'validatorResponse',
             wk: this.state.writingKey.toString('hex'),
@@ -60,13 +60,13 @@ class GetRequestHandler {
             throw new Error("Admin entry is null. This is not possible to create admin stream.");
         }
 
-        const adminPublicKey = Wallet.decodeBech32m(adminEntry.address);
+        const adminPublicKey = PeerWallet.decodeBech32m(adminEntry.address);
 
         if (!b4a.equals(this.#wallet.publicKey, adminPublicKey)) {
             throw new Error("You are not an admin. This is not possible to create admin stream.");
         }
 
-        const nonce = Wallet.generateNonce().toString('hex');
+        const nonce = PeerWallet.generateNonce().toString('hex');
         const payload = {
             op: 'adminResponse',
             wk: this.state.writingKey.toString('hex'),
@@ -87,7 +87,7 @@ class GetRequestHandler {
     }
 
     async handleCustomNodeRequest(messageProtomux, connection, channelString) {
-        const nonce = Wallet.generateNonce().toString('hex');
+        const nonce = PeerWallet.generateNonce().toString('hex');
         const payload = {
             op: 'nodeResponse',
             address: this.#wallet.address,
