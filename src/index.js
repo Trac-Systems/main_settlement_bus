@@ -890,32 +890,31 @@ export class MainSettlementBus extends ReadyResource {
                 await this.#disableInitialization();
                 break;
             default:
-                if (input.startsWith('/get_node_info')) {
+                if (input.startsWith('/node_status')) {
                     const splitted = input.split(' ')
                     const address = splitted[1]
                     const nodeEntry = await this.#state.getNodeEntry(address)
                     if (nodeEntry) {
-                        console.log('Node Entry:', {
+                        console.log('Node Status:', {
+                            Address: address,
                             WritingKey: nodeEntry.wk.toString('hex'),
                             IsWhitelisted: nodeEntry.isWhitelisted,
                             IsWriter: nodeEntry.isWriter,
                             IsIndexer: nodeEntry.isIndexer,
-                            balance: bigIntToDecimalString(bufferToBigInt(nodeEntry.balance))
                         })
                         return {
-                            WritingKey: nodeEntry.wk.toString('hex'),
-                            IsWhitelisted: nodeEntry.isWhitelisted,
-                            IsWriter: nodeEntry.isWriter,
-                            IsIndexer: nodeEntry.isIndexer,
-                            balance: bigIntToDecimalString(bufferToBigInt(nodeEntry.balance))
+                            address: address,
+                            writingKey: nodeEntry.wk.toString('hex'),
+                            isWhitelisted: nodeEntry.isWhitelisted,
+                            isWriter: nodeEntry.isWriter,
+                            isIndexer: nodeEntry.isIndexer,
                         }
                     } else {
-                        console.log('Node Entry:', {
+                        console.log('Node Status:', {
                             WritingKey: ZERO_WK.toString('hex'),
                             IsWhitelisted: false,
                             IsWriter: false,
                             IsIndexer: false,
-                            balance: bigIntToDecimalString(0n)
                         })
                     }
                 } else if (input.startsWith("/add_indexer")) {
