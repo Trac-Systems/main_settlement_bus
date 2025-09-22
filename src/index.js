@@ -987,7 +987,7 @@ export class MainSettlementBus extends ReadyResource {
                         })
                         return {
                             address: address,
-                            balance: bigIntToDecimalString(bufferToBigInt(nodeEntry.balance))
+                            balance: bufferToBigInt(nodeEntry.balance).toString(),
                         }
                     } else {
                         console.log('Node Entry:', {
@@ -1005,7 +1005,7 @@ export class MainSettlementBus extends ReadyResource {
                 } else if (input.startsWith("/get_fee")) {
                     const fee = this.#state.getFee();
                     console.log('Current FEE:', bigIntToDecimalString(bufferToBigInt(fee)));
-                    return bigIntToDecimalString(bufferToBigInt(fee))
+                    return bufferToBigInt(fee).toString();
                 } else if (input.startsWith("/confirmed_length")) {
                     const confirmed_length = this.#state.getSignedLength();
                     console.log('Confirmed_length:', confirmed_length);
