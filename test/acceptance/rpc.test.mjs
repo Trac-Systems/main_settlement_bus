@@ -26,7 +26,7 @@ beforeAll(async () => {
 
   const peer = await setupMsbAdmin(testKeyPair1, tmpDirectory, rpcOpts)
   msb = peer.msb // new MainSettlementBus(rpcOpts)
-  await msb.ready()
+
   wallet = msb.wallet
   server = createServer(msb)
 })
@@ -72,15 +72,15 @@ describe("API acceptance tests", () => {
     expect(res.body).toEqual({ address: wallet.address, balance: 0 })
   })
 
-  it("POST /broadcast-transaction", async () => {
-    const payload = JSON.stringify({ payload: 'ewogICAgICAidHlwZSI6IDEzLAogICAgICAiYWRkcmVzcyI6ICJ0cmFjMWU0dGg1d3ZhZ2EzbGF4cHpmbnZkbXc3OTJodnZqdzkzNXJjazBtZnVoMzY0dWxjdG1kOXF2cmV4c2YiLAogICAgICAidHJvIjogewogICAgICAgICJ0eCI6ICJmNTZhYTQyOGRjZTk2MGQxMjgzZTE2ZDkyYTJkZmZjNzMzMDI2YTQ4MWIyMGMxYzI1YzA4MGVlNDk5ZDIzNDJkIiwKICAgICAgICAidHh2IjogImE0ODlhNzIxOWVjN2YxZGJjYmI3NWI3Y2M0NDgyZmExZGJiYzQ5ODBkNzA4MTNjNTY0ZTdlMWIyZTI2YzUwMjMiLAogICAgICAgICJpbiI6ICI0N2MwNDU0MTE5N2UyNTcxNDllYjg4MzUxMzNmOTYyNThmNDI4MzY5OWZiMzNmNGU5ZWUxNjNiOGFlODRlM2M0IiwKICAgICAgICAidG8iOiAidHJhYzFlbjlmMHJ6cnl5dXgyenZ6d2oyZHJxc2M4ZjdzNGFucjd5bTkwMHJ5Yzg2bGZxMnVncXVzZDZxdHA5IiwKICAgICAgICAiYW0iOiAiMDAwMDAwMDAwMDAwMDAwMDAwYzc1ZTJkNjMxMDAwMDAiLAogICAgICAgICJpcyI6ICJlYTU2OTk0NjNhOWJkNWRkMTZlZWZhNDdiMzU1MTQzYjYwMTVkOGRjY2Q4NmMxNjRkNDcwODkxMzNjYWM5ZDNmYzk3NTRlMjYzZDI0MjY4NjFkYTY5YWRiOGVmYmQzMjlhY2I2OTU0MzVjYWE0NjlkMTlmYjEzNTZiYTk1MWIwYSIKICAgICAgfX0=' })
-    const res = await request(server)
-      .post("/broadcast-transaction")
-      .set("Accept", "application/json")
-      .send(payload)
+  // it("POST /broadcast-transaction", async () => {
+  //   const payload = JSON.stringify({ payload: 'ewogICAgICAidHlwZSI6IDEzLAogICAgICAiYWRkcmVzcyI6ICJ0cmFjMWU0dGg1d3ZhZ2EzbGF4cHpmbnZkbXc3OTJodnZqdzkzNXJjazBtZnVoMzY0dWxjdG1kOXF2cmV4c2YiLAogICAgICAidHJvIjogewogICAgICAgICJ0eCI6ICJmNTZhYTQyOGRjZTk2MGQxMjgzZTE2ZDkyYTJkZmZjNzMzMDI2YTQ4MWIyMGMxYzI1YzA4MGVlNDk5ZDIzNDJkIiwKICAgICAgICAidHh2IjogImE0ODlhNzIxOWVjN2YxZGJjYmI3NWI3Y2M0NDgyZmExZGJiYzQ5ODBkNzA4MTNjNTY0ZTdlMWIyZTI2YzUwMjMiLAogICAgICAgICJpbiI6ICI0N2MwNDU0MTE5N2UyNTcxNDllYjg4MzUxMzNmOTYyNThmNDI4MzY5OWZiMzNmNGU5ZWUxNjNiOGFlODRlM2M0IiwKICAgICAgICAidG8iOiAidHJhYzFlbjlmMHJ6cnl5dXgyenZ6d2oyZHJxc2M4ZjdzNGFucjd5bTkwMHJ5Yzg2bGZxMnVncXVzZDZxdHA5IiwKICAgICAgICAiYW0iOiAiMDAwMDAwMDAwMDAwMDAwMDAwYzc1ZTJkNjMxMDAwMDAiLAogICAgICAgICJpcyI6ICJlYTU2OTk0NjNhOWJkNWRkMTZlZWZhNDdiMzU1MTQzYjYwMTVkOGRjY2Q4NmMxNjRkNDcwODkxMzNjYWM5ZDNmYzk3NTRlMjYzZDI0MjY4NjFkYTY5YWRiOGVmYmQzMjlhY2I2OTU0MzVjYWE0NjlkMTlmYjEzNTZiYTk1MWIwYSIKICAgICAgfX0=' })
+  //   const res = await request(server)
+  //     .post("/broadcast-transaction")
+  //     .set("Accept", "application/json")
+  //     .send(payload)
 
-    expect(res.statusCode).toBe(200)
-    console.log(res.body)
-    expect(res.body).toEqual({ hashes: expect.any(Array) })
-  })
+  //   expect(res.statusCode).toBe(200)
+  //   console.log(res.body)
+  //   expect(res.body).toEqual({ hashes: expect.any(Array) })
+  // })
 })

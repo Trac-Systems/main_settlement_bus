@@ -4,7 +4,6 @@ import b4a from 'b4a'
 import PeerWallet from "trac-wallet"
 import path from 'path';
 import CompleteStateMessageOperations from '../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
-
 import {MainSettlementBus} from '../../src/index.js'
 import fileUtils from '../../src/utils/fileUtils.js'
 import {EntryType} from '../../src/utils/constants.js';
