@@ -70,11 +70,8 @@ export async function initMsbPeer(peerName, peerKeyPair, temporaryDirectory, opt
     peer.options.store_name = peer.storeName;
     const msb = new MainSettlementBus(peer.options);
 
-
-    const wallet = new PeerWallet();
-    await wallet.initKeyPair(peer.keypath);
     peer.msb = msb;
-    peer.wallet = wallet;
+    peer.wallet = msb.wallet;
     peer.name = peerName;
 
     return peer;
@@ -102,7 +99,7 @@ export async function setupMsbAdmin(keyPair, temporaryDirectory, options = {}) {
     const admin = await initMsbAdmin(keyPair, temporaryDirectory, options);
 
     await admin.msb.ready();
-    const addAdminMessage = await CompleteStateMessageOperations.assembleAddAdminMessage(admin.wallet, admin.msb.state.writingKey);
+    const addAdminMessage = await CompleteStateMessageOperations.assembleAddAdminMessage(admin.wallet, admin.msb.state.writingKey, await admin.msb.state.getIndexerSequenceState());
     await admin.msb.state.append(addAdminMessage);
     await tick();
     return admin;
@@ -255,7 +252,9 @@ export async function initDirectoryStructure(peerName, keyPair, temporaryDirecto
         if (!keyPair || !keyPair.publicKey || !keyPair.secretKey) {
             keyPair = await randomKeypair();
         }
-        await fsp.writeFile(keypath, JSON.stringify(keyPair, null, 2));
+        const wallet = new PeerWallet(keyPair)
+        await wallet.ready
+        await wallet.exportToFile(keypath)
         return {
             storesDirectory,
             storeName,
