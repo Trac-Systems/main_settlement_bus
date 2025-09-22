@@ -1,8 +1,8 @@
 import request from "supertest"
-import { createServer } from "../../rpc/create_server.mjs";
+import { createServer } from "../../rpc/create_server.mjs"
 import { initTemporaryDirectory } from '../utils/setupApplyTests.js'
-import { testKeyPair1 } from '../fixtures/apply.fixtures.js';
-import { randomBytes, initDirectoryStructure } from "../utils/setupApplyTests.js";
+import { testKeyPair1 } from '../fixtures/apply.fixtures.js'
+import { randomBytes, initDirectoryStructure } from "../utils/setupApplyTests.js"
 import { MainSettlementBus } from '../../src/index.js'
 
 let msb
@@ -27,8 +27,8 @@ beforeAll(async () => {
 
   msb = new MainSettlementBus(rpcOpts)
   await msb.ready()
-  server = createServer(msb);
-});
+  server = createServer(msb)
+})
 
 afterAll(async () => {
   await msb.close()
@@ -36,16 +36,23 @@ afterAll(async () => {
 
 describe("API acceptance tests", () => {
   it("GET /confirmed-length", async () => {
-    const res = await request(server).get("/confirmed-length");
-    expect(res.statusCode).toBe(200);
+    const res = await request(server).get("/confirmed-length")
+    expect(res.statusCode).toBe(200)
     console.log(res.body)
-    expect(res.body).toEqual({ confirmed_length: 0 });
-  });
+    expect(res.body).toEqual({ confirmed_length: 0 })
+  })
 
   it("GET /unconfirmed-length", async () => {
-    const res = await request(server).get("/unconfirmed-length");
-    expect(res.statusCode).toBe(200);
+    const res = await request(server).get("/unconfirmed-length")
+    expect(res.statusCode).toBe(200)
     console.log(res.body)
-    expect(res.body).toEqual({ unconfirmed_length: 0 });
-  });
-});
+    expect(res.body).toEqual({ unconfirmed_length: 0 })
+  })
+
+  it("GET /txv", async () => {
+    const res = await request(server).get("/txv")
+    expect(res.statusCode).toBe(200)
+    console.log(res.body)
+    expect(res.body).toEqual({ txv: expect.stringMatching(/^[a-z0-9]{64}$/) })
+  })
+})
