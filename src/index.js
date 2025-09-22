@@ -1044,12 +1044,9 @@ export class MainSettlementBus extends ReadyResource {
                     const hash = splitted[1];
 
                     try {
-                        const payload = await get_tx_info(this.#state, hash);
-
-                        // Use the new helper to convert Buffers to hex strings
-                        const normalizedPayload = normalizeDecodedPayloadForJson(payload.decoded);
+                        const rawPayload = await get_tx_info(this.#state, hash);
+                        const normalizedPayload = normalizeDecodedPayloadForJson(rawPayload.decoded);
                         return normalizedPayload
-
                     } catch (error) {
                         throw new Error("Invalid params to perform the request.", error.message);
                     }

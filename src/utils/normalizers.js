@@ -1,7 +1,8 @@
 import { OperationType } from './constants.js';
 import { normalizeHex } from './helpers.js';
-import { addressToBuffer } from '../core/state/utils/address.js';
+import { addressToBuffer, bufferToAddress } from '../core/state/utils/address.js';
 import b4a from 'b4a';
+import { bufferToBigInt } from './amountSerialization.js'
 
 /**
  * Normalizes the payload for a transfer operation.
@@ -50,7 +51,7 @@ export function normalizeTransferOperation(payload) {
  * @returns {Object} A new object with Buffer values converted to hex strings.
  */
 export function normalizeDecodedPayloadForJson(payload) {
-    if (!payload || typeof payload !== 'object') {
+    if (!payload || typeof payload !== "object") {
         return payload;
     }
 
@@ -58,11 +59,23 @@ export function normalizeDecodedPayloadForJson(payload) {
     for (const key in payload) {
         if (payload.hasOwnProperty(key)) {
             const value = payload[key];
+
             if (b4a.isBuffer(value)) {
-                newPayload[key] = b4a.toString(value, 'hex');
-            } else if (typeof value === 'object' && value !== null) {
-                // Recursively handle nested objects like `tro` or `rao`
+                // 👇 intercept address buffers by key name (e.g. `address`)
+                if (key.toLowerCase().includes("address") || key.toLowerCase().includes("to")) {
+                    const addr = bufferToAddress(value);
+                    newPayload[key] = addr ?? b4a.toString(value, "hex");
+                } else if (key.toLowerCase().includes("am")) {
+                    const amount = bufferToBigInt(value)
+                    newPayload[key] = amount.toString();
+                } else {
+                    newPayload[key] = b4a.toString(value, "hex");
+                }
+
+            } else if (typeof value === "object" && value !== null) {
+                // recursively handle nested objects
                 newPayload[key] = normalizeDecodedPayloadForJson(value);
+
             } else {
                 newPayload[key] = value;
             }
