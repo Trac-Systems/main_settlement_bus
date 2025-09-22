@@ -35,6 +35,13 @@ afterAll(async () => {
 })
 
 describe("API acceptance tests", () => {
+  it("GET /confirmed-length", async () => {
+    const res = await request(server).get("/confirmed-length");
+    expect(res.statusCode).toBe(200);
+    console.log(res.body)
+    expect(res.body).toEqual({ confirmed_length: 0 });
+  });
+
   it("GET /unconfirmed-length", async () => {
     const res = await request(server).get("/unconfirmed-length");
     expect(res.statusCode).toBe(200);
