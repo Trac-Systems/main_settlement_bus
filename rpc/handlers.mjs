@@ -169,3 +169,17 @@ export async function handleUnconfirmedLength(req, res, msbInstance) {
         res.end(JSON.stringify({ error: 'An error occurred processing the request.' }));
     }
 }
+
+export async function handleTransactionDetails(req, res, msbInstance) {
+    try {
+        const hash = req.url.split('/')[2];
+        const commandString = `/get_tx_details ${hash}`;
+        const txDetails = await msbInstance.handleCommand(commandString);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ txDetails }));
+    } catch (error) {
+        console.error('Error on retrieving transaction details:', error);
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'An error occurred processing the request.' }));
+    }
+}
