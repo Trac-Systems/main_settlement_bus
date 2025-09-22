@@ -26,7 +26,7 @@ import partialStateMessageOperations from "./messages/partialStateMessages/Parti
 import { randomBytes } from "hypercore-crypto";
 import { decimalStringToBigInt, bigIntTo16ByteBuffer, bufferToBigInt, bigIntToDecimalString } from "./utils/amountSerialization.js"
 import { ZERO_WK } from "./utils/buffer.js";
-import { normalizeTransferOperation } from "./utils/normalizers.js"
+import { normalizeDecodedPayloadForJson, normalizeTransferOperation } from "./utils/normalizers.js"
 import PartialTransfer from "./core/network/messaging/validators/PartialTransfer.js";
 
 //TODO create a MODULE which will separate logic responsible for role managment
@@ -205,6 +205,7 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async broadcastPartialTransaction(partialTransactionPayload) {
+        console.log(partialTransactionPayload)
         await this.#network.validator_stream.messenger.send(partialTransactionPayload);
     }
 
@@ -1038,7 +1039,21 @@ export class MainSettlementBus extends ReadyResource {
                     } catch (error) {
                         throw new Error("Invalid params to perform the request.", error.message);
                     }
-                }
+                } else if(input.startsWith("/get_tx_details")) {
+                    const splitted = input.split(' ')
+                    const hash = splitted[1];
+
+                    try {
+                        const payload = await get_tx_info(this.#state, hash);
+
+                        // Use the new helper to convert Buffers to hex strings
+                        const normalizedPayload = normalizeDecodedPayloadForJson(payload.decoded);
+                        return normalizedPayload
+
+                    } catch (error) {
+                        throw new Error("Invalid params to perform the request.", error.message);
+                    }
+                } 
         }
         if (rl) rl.prompt();
     }
