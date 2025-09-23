@@ -125,12 +125,7 @@ export class MainSettlementBus extends ReadyResource {
 
     get tracPublicKey() {
         if (!this.#wallet) return null;
-        return this.#wallet.address;
-    }
-
-    // This can be null if enable_wallet is set to false
-    get wallet() {
-        return this.#wallet;
+        return this.#wallet.publicKey;
     }
 
     async _open() {
