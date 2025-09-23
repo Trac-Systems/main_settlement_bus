@@ -1753,7 +1753,6 @@ class State extends ReadyResource {
         if (!isSelfTransfer) {
             const recipientEntryBuffer = await this.#getEntryApply(recipientAddressString, batch);
             if (recipientEntryBuffer === null) {
-                if (transferAmount.value === null) return null;
                 const newRecipientEntry = nodeEntryUtils.init(
                     ZERO_WK,
                     nodeRoleUtils.NodeRole.READER,
