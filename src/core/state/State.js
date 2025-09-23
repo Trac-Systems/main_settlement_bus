@@ -23,6 +23,7 @@ import { blake3Hash } from '../../utils/crypto.js';
 import { BALANCE_FEE, toBalance, PERCENT_75, PERCENT_50, PERCENT_25 } from './utils/balance.js';
 import { safeWriteUInt32BE } from '../../utils/buffer.js';
 import deploymentEntryUtils from './utils/deploymentEntry.js';
+import { deepCopyBuffer } from '../../utils/buffer.js';
 
 class State extends ReadyResource {
     //TODO: AFTER createMessage(..args) check if this function did not return NULL
@@ -1804,12 +1805,12 @@ class State extends ReadyResource {
 
     async #getEntryApply(key, batch) {
         const entry = await batch.get(key);
-        return entry !== null ? entry.value : null
+        return entry !== null ? deepCopyBuffer(entry.value) : null
     }
-
+    
     async #getDeploymentEntryApply(key, batch) {
         const entry = await batch.get(EntryType.DEPLOYMENT + key);
-        return entry !== null ? entry.value : null
+        return entry !== null ? deepCopyBuffer(entry.value) : null
     }
 
     async #getIndexerSequenceStateApply(base) {
@@ -1835,7 +1836,8 @@ class State extends ReadyResource {
     }
 
     async #getRegisteredWriterKeyApply(batch, writingKey) {
-        return await batch.get(EntryType.WRITER_ADDRESS + writingKey);
+        const entry =  await batch.get(EntryType.WRITER_ADDRESS + writingKey);
+        return entry !== null ? deepCopyBuffer(entry.value) : null
     }
 
     async #isApplyInitalizationDisabled(batch) {
