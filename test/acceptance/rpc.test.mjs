@@ -2,11 +2,21 @@ import request from "supertest"
 import { createServer } from "../../rpc/create_server.mjs"
 import { initTemporaryDirectory } from '../utils/setupApplyTests.js'
 import { testKeyPair1 } from '../fixtures/apply.fixtures.js'
-import { randomBytes, initMsbPeer, setupMsbAdmin } from "../utils/setupApplyTests.js"
+import { randomBytes, setupMsbAdmin } from "../utils/setupApplyTests.js"
+import { $TNK } from "../../src/core/state/utils/balance.js"
+import { init } from "../../src/core/state/utils/nodeEntry.js"
+import { NodeRole } from "../../src/core/state/utils/roles.js"
+import tracCrypto from 'trac-crypto-api';
+import b4a from 'b4a'
 
 let msb
 let server
 let wallet
+
+const fundAdmin = async (wallet, batch, wk) => {
+  const initializedNodeEntry = init(wk, NodeRole.INDEXER, $TNK(100n));
+  await batch.put(wallet.address, initializedNodeEntry);
+}
 
 beforeAll(async () => {  
   const tmpDirectory = await initTemporaryDirectory()
@@ -15,19 +25,19 @@ beforeAll(async () => {
     enable_role_requester: false,
     enable_auto_transaction_consent: false,
     enable_wallet: true,
-    enable_validator_observer: true,
+    enable_validator_observer: false,
     enable_interactive_mode: false,
     disable_rate_limit: true,
-    enable_txlogs: true,
+    enable_txlogs: false,
     stores_directory: `${tmpDirectory}/stores/`,
-    store_name: '/admin',
-    mnemonic: 'slight wedding permit mention subject mask hawk awkward sniff leopard spider scatter close neutral deny apple wide category sick love sorry pupil then legal'
+    store_name: '/admin'
   }
 
   const peer = await setupMsbAdmin(testKeyPair1, tmpDirectory, rpcOpts)
   msb = peer.msb // new MainSettlementBus(rpcOpts)
-
   wallet = msb.wallet
+  const batch = await peer.msb.state.base.view.batch()
+  await fundAdmin(wallet, batch, peer.msb.state.writingKey)
   server = createServer(msb)
 })
 
@@ -35,17 +45,18 @@ afterAll(async () => {
   await msb.close()
 })
 
+// The order here is important since the OPs change the network state. We wont boot up an instance before each because the tests are to verify rpc structure and the decision is to spare ci resources.
 describe("API acceptance tests", () => {
   it("GET /confirmed-length", async () => {
     const res = await request(server).get("/confirmed-length")
     expect(res.statusCode).toBe(200)
-    expect(res.body).toEqual({ confirmed_length: 0 })
+    expect(res.body).toEqual({ confirmed_length: 8 })
   })
 
   it("GET /unconfirmed-length", async () => {
     const res = await request(server).get("/unconfirmed-length")
     expect(res.statusCode).toBe(200)
-    expect(res.body).toEqual({ unconfirmed_length: 0 })
+    expect(res.body).toEqual({ unconfirmed_length: 8 })
   })
 
   it("GET /txv", async () => {
@@ -69,18 +80,25 @@ describe("API acceptance tests", () => {
   it("GET /balance", async () => {
     const res = await request(server).get(`/balance/${wallet.address}`)
     expect(res.statusCode).toBe(200)
-    expect(res.body).toEqual({ address: wallet.address, balance: 0 })
+    expect(res.body).toEqual({ address: wallet.address, balance: "1000000000000000000000" })
   })
 
-  // it("POST /broadcast-transaction", async () => {
-  //   const payload = JSON.stringify({ payload: 'ewogICAgICAidHlwZSI6IDEzLAogICAgICAiYWRkcmVzcyI6ICJ0cmFjMWU0dGg1d3ZhZ2EzbGF4cHpmbnZkbXc3OTJodnZqdzkzNXJjazBtZnVoMzY0dWxjdG1kOXF2cmV4c2YiLAogICAgICAidHJvIjogewogICAgICAgICJ0eCI6ICJmNTZhYTQyOGRjZTk2MGQxMjgzZTE2ZDkyYTJkZmZjNzMzMDI2YTQ4MWIyMGMxYzI1YzA4MGVlNDk5ZDIzNDJkIiwKICAgICAgICAidHh2IjogImE0ODlhNzIxOWVjN2YxZGJjYmI3NWI3Y2M0NDgyZmExZGJiYzQ5ODBkNzA4MTNjNTY0ZTdlMWIyZTI2YzUwMjMiLAogICAgICAgICJpbiI6ICI0N2MwNDU0MTE5N2UyNTcxNDllYjg4MzUxMzNmOTYyNThmNDI4MzY5OWZiMzNmNGU5ZWUxNjNiOGFlODRlM2M0IiwKICAgICAgICAidG8iOiAidHJhYzFlbjlmMHJ6cnl5dXgyenZ6d2oyZHJxc2M4ZjdzNGFucjd5bTkwMHJ5Yzg2bGZxMnVncXVzZDZxdHA5IiwKICAgICAgICAiYW0iOiAiMDAwMDAwMDAwMDAwMDAwMDAwYzc1ZTJkNjMxMDAwMDAiLAogICAgICAgICJpcyI6ICJlYTU2OTk0NjNhOWJkNWRkMTZlZWZhNDdiMzU1MTQzYjYwMTVkOGRjY2Q4NmMxNjRkNDcwODkxMzNjYWM5ZDNmYzk3NTRlMjYzZDI0MjY4NjFkYTY5YWRiOGVmYmQzMjlhY2I2OTU0MzVjYWE0NjlkMTlmYjEzNTZiYTk1MWIwYSIKICAgICAgfX0=' })
-  //   const res = await request(server)
-  //     .post("/broadcast-transaction")
-  //     .set("Accept", "application/json")
-  //     .send(payload)
+  it("POST /broadcast-transaction", async () => {
+    const txData = await tracCrypto.transaction.preBuild(
+      wallet.address,
+      wallet.address,
+      b4a.toString($TNK(1n), 'hex'),
+      b4a.toString(await msb.state.getIndexerSequenceState(), 'hex')
+    );
 
-  //   expect(res.statusCode).toBe(200)
-  //   console.log(res.body)
-  //   expect(res.body).toEqual({ hashes: expect.any(Array) })
-  // })
+    const payload = tracCrypto.transaction.build(txData, b4a.from(wallet.secretKey, 'hex'));
+    const res = await request(server)
+      .post("/broadcast-transaction")
+      .set("Accept", "application/json")
+      .send(JSON.stringify({ payload }))
+
+    expect(res.statusCode).toBe(200)
+    console.log(res.body)
+    expect(res.body).toEqual({ hashes: expect.any(Array) })
+  })
 })

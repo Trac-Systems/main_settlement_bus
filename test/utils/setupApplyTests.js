@@ -98,7 +98,10 @@ export async function setupMsbAdmin(keyPair, temporaryDirectory, options = {}) {
     const admin = await initMsbAdmin(keyPair, temporaryDirectory, options);
 
     await admin.msb.ready();
-    const addAdminMessage = await CompleteStateMessageOperations.assembleAddAdminMessage(admin.wallet, admin.msb.state.writingKey, await admin.msb.state.getIndexerSequenceState());
+
+    await admin.msb.state.append(null); // before initialization system.indexers is empty, we need to initialize first block to create system.indexers array
+    const txValidity = await admin.msb.state.getIndexerSequenceState();
+    const addAdminMessage = await CompleteStateMessageOperations.assembleAddAdminMessage(admin.wallet, admin.msb.state.writingKey, txValidity);
     await admin.msb.state.append(addAdminMessage);
     await tick();
     return admin;

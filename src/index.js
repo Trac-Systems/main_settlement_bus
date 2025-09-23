@@ -123,6 +123,11 @@ export class MainSettlementBus extends ReadyResource {
         return this.#network;
     }
 
+    // This can be null if enable_wallet is false
+    get wallet() {
+        return this.#wallet;
+    }
+
     get tracPublicKey() {
         if (!this.#wallet) return null;
         return this.#wallet.publicKey;
@@ -205,7 +210,6 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async broadcastPartialTransaction(partialTransactionPayload) {
-        console.log(partialTransactionPayload)
         await this.#network.validator_stream.messenger.send(partialTransactionPayload);
     }
 
