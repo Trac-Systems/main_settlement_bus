@@ -121,10 +121,17 @@ export function decode(nodeEntry) {
         const isWhitelisted = !!(role & WHITELISTED_MASK);
         const isWriter = !!(role & WRITER_MASK);
         const isIndexer = !!(role & INDEXER_MASK);
-        const wk = nodeEntry.subarray(1, WRITER_BYTE_LENGTH + 1);
-        const balance = nodeEntry.subarray(WRITER_BYTE_LENGTH + 1, WRITER_BYTE_LENGTH + BALANCE_BYTE_LENGTH + 1);
-        const license = nodeEntry.subarray(WRITER_BYTE_LENGTH + BALANCE_BYTE_LENGTH + 1, WRITER_BYTE_LENGTH + BALANCE_BYTE_LENGTH + 1 + LICENSE_BYTE_LENGTH);
-        const stakedBalance = nodeEntry.subarray(WRITER_BYTE_LENGTH + BALANCE_BYTE_LENGTH + LICENSE_BYTE_LENGTH + 1, NODE_ENTRY_SIZE);
+        
+        const wkEnd = 1 + WRITER_BYTE_LENGTH;
+        const wk = nodeEntry.subarray(1, wkEnd);
+
+        const balanceEnd = wkEnd + BALANCE_BYTE_LENGTH;
+        const balance = nodeEntry.subarray(wkEnd, balanceEnd);
+
+        const licenseEnd = balanceEnd + LICENSE_BYTE_LENGTH;
+        const license = nodeEntry.subarray(balanceEnd, licenseEnd);
+
+        const stakedBalance = nodeEntry.subarray(licenseEnd, NODE_ENTRY_SIZE);
 
         return { wk, isWhitelisted, isWriter, isIndexer, balance, license, stakedBalance };
     }
