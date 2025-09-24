@@ -2,7 +2,7 @@ import request from "supertest"
 import { createServer } from "../../rpc/create_server.mjs"
 import { initTemporaryDirectory } from '../utils/setupApplyTests.js'
 import { testKeyPair1, testKeyPair2 } from '../fixtures/apply.fixtures.js'
-import { randomBytes, setupMsbAdmin, setupMsbWriter, fundWallet } from "../utils/setupApplyTests.js"
+import { randomBytes, setupMsbAdmin, setupMsbWriter, fundWallet, removeTemporaryDirectory } from "../utils/setupApplyTests.js"
 import { $TNK } from "../../src/core/state/utils/balance.js"
 import tracCrypto from 'trac-crypto-api';
 import b4a from 'b4a'
@@ -11,9 +11,10 @@ let msb
 let server
 let wallet
 let toClose
+let tmpDirectory
 
 const setupNetwork = async () => {
-    const tmpDirectory = await initTemporaryDirectory()
+    tmpDirectory = await initTemporaryDirectory()
     const rpcOpts = {
         channel: randomBytes(32).toString('hex'),
         enable_role_requester: false,
@@ -43,6 +44,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
     await Promise.all([msb?.close(), toClose?.close()])
+    await removeTemporaryDirectory(tmpDirectory)
 })
 
 // The order here is important since the OPs change the network state. We wont boot up an instance before each because the tests are to verify rpc structure and the decision is to spare ci resources.
@@ -50,13 +52,13 @@ describe("API acceptance tests", () => {
     it("GET /confirmed-length", async () => {
         const res = await request(server).get("/confirmed-length")
         expect(res.statusCode).toBe(200)
-        expect(res.body).toEqual({ confirmed_length: 10 })
+        expect(res.body).toEqual({ confirmed_length: 12 })
     })
 
     it("GET /unconfirmed-length", async () => {
         const res = await request(server).get("/unconfirmed-length")
         expect(res.statusCode).toBe(200)
-        expect(res.body).toEqual({ unconfirmed_length: 10 })
+        expect(res.body).toEqual({ unconfirmed_length: 12 })
     })
 
     it("GET /txv", async () => {
@@ -80,7 +82,7 @@ describe("API acceptance tests", () => {
     it("GET /balance", async () => {
         const res = await request(server).get(`/balance/${wallet.address}`)
         expect(res.statusCode).toBe(200)
-        expect(res.body).toEqual({ address: wallet.address, balance: "0" })
+        expect(res.body).toEqual({ address: wallet.address, balance: "100000000000000000000" })
     })
 
     it("POST /broadcast-transaction", async () => {

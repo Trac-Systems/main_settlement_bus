@@ -78,6 +78,7 @@ export async function fundWallet(admin, toFund, amount) {
     );
 
     await admin.msb.state.append(safeEncodeApplyOperation(payload));
+    await admin.msb.state.base.forceFastForward() // required to update the balance on the peer, eliminates the possible racing condition
     await tick()
     return payload
 }
