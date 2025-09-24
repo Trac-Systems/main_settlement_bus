@@ -1,16 +1,19 @@
 import { test } from 'brittle';
 import b4a from 'b4a';
-import { WRITER_BYTE_LENGTH } from '../../../src/utils/constants.js';
+import { WRITER_BYTE_LENGTH, LICENSE_BYTE_LENGTH } from '../../../src/utils/constants.js';
 import { randomBuffer, TEN_THOUSAND_VALUE } from '../stateTestUtils.js';
 import { NodeRole } from '../../../src/core/state/utils/roles.js';
 import {
     ZERO_BALANCE,
+    ZERO_LICENSE,
     NODE_ENTRY_SIZE,
     init as initNodeEntry,
     encode as encodeNodeEntry,
     decode as decodeNodeEntry,
     setRole as setNodeEntryRole,
-    setBalance as setNodeEntryBalance
+    setBalance as setNodeEntryBalance,
+    setLicense as setNodeEntryLicense,
+    setStakedBalance as setNodeEntryStakedBalance,
 } from '../../../src/core/state/utils/nodeEntry.js';
 
 // Test init()
@@ -26,6 +29,8 @@ test('Node Entry - init - Happy Path', t => {
     t.is(decoded.isWriter, false, 'isWriter matches');
     t.is(decoded.isIndexer, false, 'isIndexer matches');
     t.ok(b4a.equals(decoded.balance, ZERO_BALANCE), 'balance matches');
+    t.ok(b4a.equals(decoded.license, ZERO_LICENSE), 'license matches');
+    t.ok(b4a.equals(decoded.stakedBalance, ZERO_BALANCE), 'stakedBalance matches');
 });
 
 test('Node Entry - init - Happy Path with balance', t => {
@@ -42,6 +47,40 @@ test('Node Entry - init - Happy Path with balance', t => {
     t.ok(b4a.equals(decoded.balance, TEN_THOUSAND_VALUE), 'balance matches');
 });
 
+test('Node Entry - init - Happy Path with licesnse', t => {
+    const wk = randomBuffer(WRITER_BYTE_LENGTH)
+    const license = randomBuffer(LICENSE_BYTE_LENGTH)
+    const initialized = initNodeEntry(wk, NodeRole.WHITELISTED, TEN_THOUSAND_VALUE, license)
+
+    t.is(initialized.length, NODE_ENTRY_SIZE, "initialized has valid length");
+    const decoded = decodeNodeEntry(initialized);
+    t.ok(decoded, 'decoded should not be null');
+    t.ok(b4a.equals(decoded.wk, wk), 'wk matches');
+    t.is(decoded.isWhitelisted, true, 'isWhitelisted matches');
+    t.is(decoded.isWriter, false, 'isWriter matches');
+    t.is(decoded.isIndexer, false, 'isIndexer matches');
+    t.ok(b4a.equals(decoded.balance, TEN_THOUSAND_VALUE), 'balance matches');
+    t.ok(b4a.equals(decoded.license, license), 'license matches');
+});
+
+test('Node Entry - init - Happy Path with staked balance', t => {
+    const wk = randomBuffer(WRITER_BYTE_LENGTH)
+    const license = randomBuffer(LICENSE_BYTE_LENGTH)
+    const initialized = initNodeEntry(wk, NodeRole.WHITELISTED, TEN_THOUSAND_VALUE, license, TEN_THOUSAND_VALUE)
+
+    t.is(initialized.length, NODE_ENTRY_SIZE, "initialized has valid length");
+    const decoded = decodeNodeEntry(initialized);
+    t.ok(decoded, 'decoded should not be null');
+    t.ok(b4a.equals(decoded.wk, wk), 'wk matches');
+    t.is(decoded.isWhitelisted, true, 'isWhitelisted matches');
+    t.is(decoded.isWriter, false, 'isWriter matches');
+    t.is(decoded.isIndexer, false, 'isIndexer matches');
+    t.ok(b4a.equals(decoded.balance, TEN_THOUSAND_VALUE), 'balance matches');
+    t.ok(b4a.equals(decoded.license, license), 'license matches');
+    t.ok(b4a.equals(decoded.stakedBalance, TEN_THOUSAND_VALUE), 'stakedBalance matches');
+
+});
+
 // Test encode()
 test('Node Entry - encode and decode - Happy Path', t => {
     const node = {
@@ -49,7 +88,9 @@ test('Node Entry - encode and decode - Happy Path', t => {
         isWhitelisted: true,
         isWriter: true,
         isIndexer: false,
-        balance: ZERO_BALANCE
+        balance: ZERO_BALANCE,
+        license: ZERO_LICENSE,
+        stakedBalance: ZERO_BALANCE
     };
 
     const encoded = encodeNodeEntry(node);
@@ -62,6 +103,8 @@ test('Node Entry - encode and decode - Happy Path', t => {
     t.is(decoded.isWriter, true, 'isWriter matches');
     t.is(decoded.isIndexer, false, 'isIndexer matches');
     t.ok(b4a.equals(decoded.balance, ZERO_BALANCE), 'balance matches');
+    t.ok(b4a.equals(decoded.license, ZERO_LICENSE), 'license matches');
+    t.ok(b4a.equals(decoded.stakedBalance, ZERO_BALANCE), 'stakedBalance matches');
 });
 
 test('Node Entry - encode returns empty buffer on invalid wk', t => {
@@ -69,8 +112,11 @@ test('Node Entry - encode returns empty buffer on invalid wk', t => {
         wk: randomBuffer(10), // invalid size
         isWhitelisted: false,
         isWriter: false,
-        isIndexer: true,
-        balance: ZERO_BALANCE
+        isIndexer: false,
+        balance: ZERO_BALANCE,
+        license: ZERO_LICENSE,
+        stakedBalance: ZERO_BALANCE
+
     };
     const encoded = encodeNodeEntry(node);
     t.is(encoded.length, 0);
@@ -92,9 +138,42 @@ test('Node Entry - encode returns empty buffer on invalid balance', t => {
     const node = {
         wk: randomBuffer(WRITER_BYTE_LENGTH),
         isWhitelisted: true,
-        isWriter: true, // can't be a writer without being whitelisted
+        isWriter: true,
         isIndexer: false,
         balance: b4a.from([
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x27,
+            0x10,
+        ])
+    };
+    const encoded = encodeNodeEntry(node);
+    t.is(encoded.length, 0);
+});
+
+test('Node Entry - encode returns empty buffer on invalid license', t => {
+    const node = {
+        wk: randomBuffer(WRITER_BYTE_LENGTH),
+        isWhitelisted: true,
+        isWriter: true,
+        isIndexer: false,
+        balance: ZERO_BALANCE,
+        license: randomBuffer(10), // invalid size
+        stakedBalance: ZERO_BALANCE
+
+    };
+    const encoded = encodeNodeEntry(node);
+    t.is(encoded.length, 0);
+});
+
+test('Node Entry - encode returns empty buffer on invalid staked balance', t => {
+    const node = {
+        wk: randomBuffer(WRITER_BYTE_LENGTH),
+        isWhitelisted: true,
+        isWriter: true,
+        isIndexer: false,
+        balance: ZERO_BALANCE,
+        license: ZERO_LICENSE,
+        stakedBalance: b4a.from([
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x27,
             0x10,
@@ -124,7 +203,9 @@ test('Node Entry - setRole updates role flags', t => {
         isWhitelisted: false,
         isWriter: false,
         isIndexer: false,
-        balance: TEN_THOUSAND_VALUE
+        balance: TEN_THOUSAND_VALUE,
+        license: ZERO_LICENSE,
+        stakedBalance: ZERO_BALANCE
     });
 
     // Set maximum tier role (0x7)
@@ -150,7 +231,9 @@ test('Node Entry - setBalance updates the balance', t => {
         isWhitelisted: false,
         isWriter: false,
         isIndexer: false,
-        balance: ZERO_BALANCE
+        balance: ZERO_BALANCE,
+        license: ZERO_LICENSE,
+        stakedBalance: ZERO_BALANCE
     });
 
     entry = setNodeEntryBalance(entry, TEN_THOUSAND_VALUE);
@@ -170,4 +253,46 @@ test('Node Entry - setBalance updates the balance', t => {
     entry = setNodeEntryBalance(entry, INVALID_BALANCE);
     const decoded2 = decodeNodeEntry(entry);
     t.is(decoded2, null);
+});
+
+test('Node Entry - setLicense updates the license', t => {
+    let entry = encodeNodeEntry({
+        wk: randomBuffer(WRITER_BYTE_LENGTH),
+        isWhitelisted: false,
+        isWriter: false,
+        isIndexer: false,
+        balance: ZERO_BALANCE,
+        license: ZERO_LICENSE,
+        stakedBalance: ZERO_BALANCE
+    });
+    const randomLicense = randomBuffer(LICENSE_BYTE_LENGTH);
+    entry = setNodeEntryLicense(entry, randomLicense);
+    const decoded = decodeNodeEntry(entry);
+    t.not(decoded.isWhitelisted, 'isWhitelisted should be true');
+    t.not(decoded.isWriter, 'isWriter should be true');
+    t.not(decoded.isIndexer, 'isIndexer should be true');
+    t.ok(b4a.equals(decoded.balance, ZERO_BALANCE), 'balance should be 0');
+    t.ok(b4a.equals(decoded.license, randomLicense), 'license should be set');
+});
+
+// set staked balance
+
+test('Node Entry - setStakedBalance updates the staked balance', t => {
+    let entry = encodeNodeEntry({
+        wk: randomBuffer(WRITER_BYTE_LENGTH),
+        isWhitelisted: false,
+        isWriter: false,
+        isIndexer: false,
+        balance: ZERO_BALANCE,
+        license: ZERO_LICENSE,
+        stakedBalance: ZERO_BALANCE
+    });
+    entry = setNodeEntryStakedBalance(entry, TEN_THOUSAND_VALUE);
+    const decoded = decodeNodeEntry(entry);
+    t.not(decoded.isWhitelisted, 'isWhitelisted should be true');
+    t.not(decoded.isWriter, 'isWriter should be true');
+    t.not(decoded.isIndexer, 'isIndexer should be true');
+    t.ok(b4a.equals(decoded.balance, ZERO_BALANCE), 'balance should be 0');
+    t.ok(b4a.equals(decoded.license, ZERO_LICENSE), 'license should be set');
+    t.ok(b4a.equals(decoded.stakedBalance, TEN_THOUSAND_VALUE), 'staked balance should be 10k');
 });

@@ -69,6 +69,8 @@ export const AMOUNT_BYTE_LENGTH = 16;
 export const MIN_SAFE_VALIDATION_INTEGER = 0x00000001;
 export const MAX_SAFE_VALIDATION_INTEGER = 0xFFFFFFFF;
 
+export const LICENSE_BYTE_LENGTH = 4;
+
 // index
 export const BOOTSTRAP_HEXSTRING_LENGTH = 64;
 

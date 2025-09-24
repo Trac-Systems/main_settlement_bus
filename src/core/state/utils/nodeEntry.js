@@ -1,23 +1,31 @@
 import b4a from 'b4a';
 
 import { WRITER_MASK, INDEXER_MASK, WHITELISTED_MASK, calculateNodeRole, isNodeRoleValid } from './roles.js';
-import { WRITER_BYTE_LENGTH, BALANCE_BYTE_LENGTH } from '../../../utils/constants.js';
+import { WRITER_BYTE_LENGTH, BALANCE_BYTE_LENGTH, LICENSE_BYTE_LENGTH } from '../../../utils/constants.js';
 import { isBufferValid } from '../../../utils/buffer.js';
 
-export const NODE_ENTRY_SIZE = WRITER_BYTE_LENGTH + BALANCE_BYTE_LENGTH + 1;
+export const NODE_ENTRY_SIZE = LICENSE_BYTE_LENGTH + WRITER_BYTE_LENGTH + 2 * BALANCE_BYTE_LENGTH + 1;
 export const ZERO_BALANCE = b4a.alloc(BALANCE_BYTE_LENGTH);
+export const ZERO_LICENSE = b4a.alloc(LICENSE_BYTE_LENGTH);
+
 
 /**
  * Initializes a new node entry with given writing key and role and the balance is set to zero.
- * Creates a buffer in format: [NODE_ROLE_MASK(1)][WRITING_KEY(32)]
+ * Creates a buffer in format: [NODE_ROLE_MASK(1)][WRITING_KEY(32)][BALANCE(16)][LICENSE(4)][STAKED_BALANCE(16)]
  *
  * @param {Buffer} writingKey - The writing key for the node (must be 32 bytes)
  * @param {number} role - Initial role from NodeRole enum 
- * * @param {Buffer} balance - Initial balance from node (must be 16 bytes)
+ * @param {Buffer} balance - Initial balance from node (must be 16 bytes)
+ * @param {Buffer} license - Initial license from node (must be 4 bytes)
+ * @param {Buffer} stakedBalance - Initial staked balance from node (must be 16 bytes)
  * @returns {Buffer} The initialized node entry buffer, or empty buffer if invalid input
  */
-export function init(writingKey, role, balance = ZERO_BALANCE) {
-    if (!isBufferValid(writingKey, WRITER_BYTE_LENGTH) || !isBufferValid(balance, BALANCE_BYTE_LENGTH) || !isNodeRoleValid(role)) {
+export function init(writingKey, role, balance = ZERO_BALANCE, license = ZERO_LICENSE, stakedBalance = ZERO_BALANCE) {
+    if (!isBufferValid(writingKey, WRITER_BYTE_LENGTH) ||
+        !isBufferValid(balance, BALANCE_BYTE_LENGTH) ||
+        !isNodeRoleValid(role) ||
+        !isBufferValid(license, LICENSE_BYTE_LENGTH) ||
+        !isBufferValid(stakedBalance, BALANCE_BYTE_LENGTH)) {
         console.error('Invalid input for node initialization');
         return b4a.alloc(0);
     }
@@ -27,6 +35,9 @@ export function init(writingKey, role, balance = ZERO_BALANCE) {
         nodeEntry[0] = role;
         b4a.copy(writingKey, nodeEntry, 1);
         b4a.copy(balance, nodeEntry, WRITER_BYTE_LENGTH + 1);
+        b4a.copy(license, nodeEntry, WRITER_BYTE_LENGTH + BALANCE_BYTE_LENGTH + 1);
+        b4a.copy(stakedBalance, nodeEntry, WRITER_BYTE_LENGTH + BALANCE_BYTE_LENGTH + LICENSE_BYTE_LENGTH + 1);
+
         return nodeEntry;
     } catch (error) {
         console.error('Error initializing node entry:', error);
@@ -38,10 +49,12 @@ export function init(writingKey, role, balance = ZERO_BALANCE) {
  * Encodes a node entry as a buffer containing the node's role mask and writing key.
  *
  * The node entry buffer format is:
- *   [NODE_ROLE_MASK(1)][WRITING_KEY(32)][BALANCE(16)]
+ *   [NODE_ROLE_MASK(1)][WRITING_KEY(32)][BALANCE(16)][LICENSE(4)][STAKED_BALANCE(16)]
  *   - The first byte is a bitmask representing the node's roles (whitelisted, writer, indexer).
  *   - 32 bytes are the node's writing key.
  *   - 16 bytes are the node's balance.
+ *   - 4 bytes are the node's license.
+ *   - 16 bytes are the node's staked balance.
  *
  * @param {Object} node - An object representing the node, with properties:
  *   - wk: Buffer containing the node's writing key (must be 32 bytes).
@@ -49,11 +62,18 @@ export function init(writingKey, role, balance = ZERO_BALANCE) {
  *   - isWriter: Boolean indicating if the node is a writer.
  *   - isIndexer: Boolean indicating if the node is an indexer.
  *   - balance: Buffer indicating the node balance.
+ *   - license: Buffer indicating the node license.
+ *   - stakedBalance: Buffer indicating the validator staked balance.
  * @returns {Buffer} The encoded node entry buffer, or an empty buffer if input is invalid.
  */
 export function encode(node) {
     const nodeRole = calculateNodeRole(node);
-    if (!isBufferValid(node.wk, WRITER_BYTE_LENGTH) || !isBufferValid(node.balance, BALANCE_BYTE_LENGTH) || !isNodeRoleValid(nodeRole)) {
+    if (!isBufferValid(node.wk, WRITER_BYTE_LENGTH) ||
+        !isBufferValid(node.balance, BALANCE_BYTE_LENGTH) ||
+        !isNodeRoleValid(nodeRole) ||
+        !isBufferValid(node.license, LICENSE_BYTE_LENGTH) ||
+        !isBufferValid(node.stakedBalance, BALANCE_BYTE_LENGTH)
+    ) {
         return b4a.alloc(0); // Return an empty buffer if one of the inputs is invalid
     }
 
@@ -62,6 +82,8 @@ export function encode(node) {
         entry[0] = nodeRole;
         b4a.copy(node.wk, entry, 1);
         b4a.copy(node.balance, entry, WRITER_BYTE_LENGTH + 1);
+        b4a.copy(node.license, entry, WRITER_BYTE_LENGTH + BALANCE_BYTE_LENGTH + 1);
+        b4a.copy(node.stakedBalance, entry, WRITER_BYTE_LENGTH + BALANCE_BYTE_LENGTH + LICENSE_BYTE_LENGTH + 1);
         return entry;
     }
     catch (error) {
@@ -74,7 +96,7 @@ export function encode(node) {
  * Decodes a node entry buffer into an object with its writing key and role flags.
  *
  * The node entry buffer format is:
- *   [NODE_ROLE_MASK(1)][WRITING_KEY(32)]
+ *   [NODE_ROLE_MASK(1)][WRITING_KEY(32)][BALANCE(16)][LICENSE(4)][STAKED_BALANCE(16)]
  *   - The first byte is a bitmask indicating the node's roles (whitelisted, writer, indexer).
  *   - The remaining bytes are the node's writing key.
  *
@@ -93,16 +115,18 @@ export function decode(nodeEntry) {
     }
 
     try {
+        console.log("Decoding node entry:", nodeEntry);
         const role = nodeEntry[0];
 
         const isWhitelisted = !!(role & WHITELISTED_MASK);
         const isWriter = !!(role & WRITER_MASK);
         const isIndexer = !!(role & INDEXER_MASK);
-
         const wk = nodeEntry.subarray(1, WRITER_BYTE_LENGTH + 1);
-        const balance = nodeEntry.subarray(WRITER_BYTE_LENGTH + 1, NODE_ENTRY_SIZE);
+        const balance = nodeEntry.subarray(WRITER_BYTE_LENGTH + 1, WRITER_BYTE_LENGTH + BALANCE_BYTE_LENGTH + 1);
+        const license = nodeEntry.subarray(WRITER_BYTE_LENGTH + BALANCE_BYTE_LENGTH + 1, WRITER_BYTE_LENGTH + BALANCE_BYTE_LENGTH + 1 + LICENSE_BYTE_LENGTH);
+        const stakedBalance = nodeEntry.subarray(WRITER_BYTE_LENGTH + BALANCE_BYTE_LENGTH + LICENSE_BYTE_LENGTH + 1, NODE_ENTRY_SIZE);
 
-        return { wk, isWhitelisted, isWriter, isIndexer, balance };
+        return { wk, isWhitelisted, isWriter, isIndexer, balance, license, stakedBalance };
     }
     catch (error) {
         console.error('Error decoding node entry:', error);
@@ -206,6 +230,34 @@ export function setBalance(nodeEntry, balance) {
     }
 }
 
+export function setLicense(nodeEntry, license) {
+    try {
+        if (!isBufferValid(nodeEntry, NODE_ENTRY_SIZE) || !isBufferValid(license, LICENSE_BYTE_LENGTH)) {
+            console.error('Invalid input for setting license');
+            return null;
+        }
+        b4a.copy(license, nodeEntry, WRITER_BYTE_LENGTH + BALANCE_BYTE_LENGTH + 1);
+        return nodeEntry;
+    } catch (error) {
+        console.error('Error setting license in node entry:', error);
+        return null;
+    }
+}
+
+export function setStakedBalance(nodeEntry, stakedBalance) {
+    try {
+        if (!isBufferValid(nodeEntry, NODE_ENTRY_SIZE) || !isBufferValid(stakedBalance, BALANCE_BYTE_LENGTH)) {
+            console.error('Invalid input for setting staked balance');
+            return null;
+        }
+        b4a.copy(stakedBalance, nodeEntry, WRITER_BYTE_LENGTH + BALANCE_BYTE_LENGTH + LICENSE_BYTE_LENGTH + 1);
+        return nodeEntry;
+    } catch (error) {
+        console.error('Error setting staked balance in node entry:', error);
+        return null;
+    }
+}
+
 /**
  * Sets both the role and writing key in a node entry buffer.
  * @param {Buffer} nodeEntry - The node entry buffer.
@@ -241,6 +293,8 @@ export default {
     setRole,
     setWritingKey,
     setRoleAndWriterKey,
+    setLicense,
+    setStakedBalance,
     isWhitelisted,
     isWriter,
     isIndexer
