@@ -121,7 +121,7 @@ export function decode(nodeEntry) {
         const isWhitelisted = !!(role & WHITELISTED_MASK);
         const isWriter = !!(role & WRITER_MASK);
         const isIndexer = !!(role & INDEXER_MASK);
-        
+
         const wkEnd = 1 + WRITER_BYTE_LENGTH;
         const wk = nodeEntry.subarray(1, wkEnd);
 
@@ -237,6 +237,11 @@ export function setBalance(nodeEntry, balance) {
     }
 }
 
+/** Sets the license ID.
+ * @param {Buffer} nodeEntry - The node entry buffer.
+ * @param {Buffer} license - The buffer representation of the license ID
+ * @returns {Buffer|null} The updated node entry buffer, or null if invalid.
+ */
 export function setLicense(nodeEntry, license) {
     try {
         if (!isBufferValid(nodeEntry, NODE_ENTRY_SIZE) || !isBufferValid(license, LICENSE_BYTE_LENGTH)) {
@@ -250,7 +255,12 @@ export function setLicense(nodeEntry, license) {
         return null;
     }
 }
-
+/**
+ * Sets both the staked balance in a node entry buffer.
+ * @param {Buffer} nodeEntry - The node entry buffer.
+ * @param {Buffer} stakedBalance - The buffer representation of the 16 byte staked balance
+ * @returns {Buffer|null} The updated node entry buffer, or null if invalid.
+ */
 export function setStakedBalance(nodeEntry, stakedBalance) {
     try {
         if (!isBufferValid(nodeEntry, NODE_ENTRY_SIZE) || !isBufferValid(stakedBalance, BALANCE_BYTE_LENGTH)) {
