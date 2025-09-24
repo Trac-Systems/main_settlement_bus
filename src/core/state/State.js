@@ -1804,12 +1804,12 @@ class State extends ReadyResource {
 
     async #getEntryApply(key, batch) {
         const entry = await batch.get(key);
-        return entry !== null ? deepCopyBuffer(entry.value) : null
+        return deepCopyBuffer(entry?.value)
     }
     
     async #getDeploymentEntryApply(key, batch) {
         const entry = await batch.get(EntryType.DEPLOYMENT + key);
-        return entry !== null ? deepCopyBuffer(entry.value) : null
+        return deepCopyBuffer(entry?.value)
     }
 
     async #getIndexerSequenceStateApply(base) {
@@ -1836,7 +1836,7 @@ class State extends ReadyResource {
 
     async #getRegisteredWriterKeyApply(batch, writingKey) {
         const entry =  await batch.get(EntryType.WRITER_ADDRESS + writingKey);
-        return entry !== null ? deepCopyBuffer(entry.value) : null
+        return deepCopyBuffer(entry?.value)
     }
 
     async #isApplyInitalizationDisabled(batch) {
