@@ -4,6 +4,7 @@ import b4a from 'b4a'
 import PeerWallet from "trac-wallet"
 import path from 'path';
 import CompleteStateMessageOperations from '../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
+import PartialStateMessageOperations from '../../src/messages/partialStateMessages/PartialStateMessageOperations.js';
 import {MainSettlementBus} from '../../src/index.js'
 import fileUtils from '../../src/utils/fileUtils.js'
 import {EntryType} from '../../src/utils/constants.js';
@@ -11,6 +12,9 @@ import {sleep} from '../../src/utils/helpers.js'
 import {formatIndexersEntry} from '../../src/utils/helpers.js';
 import {generatePreTx} from '../../src/utils/transactionUtils.js';
 import {blake3Hash} from '../../src/utils/crypto.js';
+import CompleteStateMessageBuilder from '../../src/messages/completeStateMessages/CompleteStateMessageBuilder.js'
+import CompleteStateMessageDirector from '../../src/messages/completeStateMessages/CompleteStateMessageDirector.js'
+import { safeEncodeApplyOperation } from "../../src/utils/protobuf/operationHelpers.js"
 
 let os, fsp;
 
@@ -61,6 +65,22 @@ async function randomKeypair() {
 }
 
 export const tick = () => new Promise(resolve => setImmediate(resolve));
+
+export async function fundWallet(admin, toFund, amount) {
+    const txValidity = await admin.msb.state.getIndexerSequenceState()
+    const director = new CompleteStateMessageDirector();
+    director.builder = new CompleteStateMessageBuilder(admin.wallet);
+    const payload = await director.buildBalanceInitializationMessage(
+        admin.wallet.address,
+        toFund.address,
+        amount,
+        txValidity
+    );
+
+    await admin.msb.state.append(safeEncodeApplyOperation(payload));
+    await tick()
+    return payload
+}
 
 export async function initMsbPeer(peerName, peerKeyPair, temporaryDirectory, options = {}) {
     const peer = await initDirectoryStructure(peerName, peerKeyPair, temporaryDirectory);
@@ -116,11 +136,12 @@ export async function setupNodeAsWriter(admin, writerCandidate) {
             return result && result.isWriter && !result.isIndexer;
         }
 
-        const req = await CompleteStateMessageOperations.assembleAddWriterMessage(writerCandidate.wallet, writerCandidate.msb.state.writingKey);
-        await admin.msb.state.append(req);
+        const validity = await admin.msb.getIndexerSequenceState()
+        const req = await PartialStateMessageOperations.assembleAddWriterMessage(writerCandidate.wallet, writerCandidate.msb.state.writingKey, validity);
+        await admin.msb.broadcastPartialTransaction(req);
         await tick(); // wait for the request to be processed
         let counter;
-        const limit = 10; // maximum number of attempts to verify the role
+        const limit = 20; // maximum number of attempts to verify the role
         for (counter = 0; counter < limit; counter++) {
             if (await isWriter(writerCandidate.wallet.address) && await writerCandidate.msb.state.isWritable()) {
                 break;
@@ -147,8 +168,9 @@ export async function setupMsbWriter(admin, peerName, peerKeyPair, temporaryDire
             return result && result.isWriter && !result.isIndexer;
         }
 
-        const req = await CompleteStateMessageOperations.assembleAddWriterMessage(writerCandidate.wallet, writerCandidate.msb.state.writingKey);
-        await admin.msb.state.append(req);
+        const validity = await admin.msb.state.getIndexerSequenceState()
+        const req = await PartialStateMessageOperations.assembleAddWriterMessage(writerCandidate.wallet, b4a.toString(writerCandidate.msb.state.writingKey, 'hex'), b4a.toString(validity, 'hex'));
+        await writerCandidate.msb.broadcastPartialTransaction(req);
         await tick(); // wait for the request to be processed
         let counter;
         const limit = 10; // maximum number of attempts to verify the role
@@ -220,7 +242,8 @@ export async function setupWhitelist(admin, whitelistAddresses) {
     // set up mock whitelist
     const originalReadPublicKeysFromFile = fileUtils.readPublicKeysFromFile;
     fileUtils.readPublicKeysFromFile = async () => whitelistAddresses;
-    const assembledWhitelistMessages = await CompleteStateMessageOperations.assembleAppendWhitelistMessages(admin.wallet);
+    const validity = await admin.msb.state.getIndexerSequenceState()
+    const assembledWhitelistMessages = await CompleteStateMessageOperations.assembleAppendWhitelistMessages(admin.wallet, validity);
     for (const [_, msg] of assembledWhitelistMessages.entries()) {
         await admin.msb.state.append(msg);
     }
