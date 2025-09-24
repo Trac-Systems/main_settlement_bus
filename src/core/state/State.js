@@ -270,14 +270,16 @@ class State extends ReadyResource {
         const batch = view.batch();
         for (const node of nodes) {
             const op = safeDecodeApplyOperation(node.value);
-            if (op === null) return;
-            if (b4a.byteLength(node.value) > transactionUtils.MAXIMUM_OPERATION_PAYLOAD_SIZE) return;
+            if (b4a.byteLength(node.value) > transactionUtils.MAXIMUM_OPERATION_PAYLOAD_SIZE) {
+                this.#enable_txlogs && this.#safeLogApply("Node payload exceeds the maximum operation payload size.", node.from.key)
+                return;
+            };
 
             const handler = this.#getApplyOperationHandler(op.type);
             if (handler) {
                 await handler(op, view, base, node, batch);
             } else {
-                console.warn(`Unknown operation type: ${op.type}`);
+                this.#enable_txlogs && this.#safeLogApply("Unknown operation type.", node.from.key)
             }
         }
         await batch.flush();
@@ -2429,7 +2431,7 @@ class State extends ReadyResource {
             this.#enable_txlogs && this.#safeLogApply(OperationType.TX, "Insufficient requester balance.", node.from.key)
             return;
         };
-        
+
         const newRequesterBalance = requesterBalance.sub(feeAmount);
         if (newRequesterBalance === null) {
             this.#enable_txlogs && this.#safeLogApply(OperationType.TX, "Failed to apply fee to requester.", node.from.key)
@@ -2935,7 +2937,7 @@ class State extends ReadyResource {
         await batch.put(EntryType.WRITERS_LENGTH, incrementedLength);
     }
 
-    #safeLogApply(operationType, errorMessage, writingKey) {
+    #safeLogApply(operationType = "Common", errorMessage, writingKey) {
         try {
             const date = new Date().toISOString();
             const wk = writingKey ? writingKey : 'N/A';
