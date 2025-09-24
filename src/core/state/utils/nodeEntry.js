@@ -115,7 +115,6 @@ export function decode(nodeEntry) {
     }
 
     try {
-        console.log("Decoding node entry:", nodeEntry);
         const role = nodeEntry[0];
 
         const isWhitelisted = !!(role & WHITELISTED_MASK);
