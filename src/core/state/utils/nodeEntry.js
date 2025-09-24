@@ -33,10 +33,18 @@ export function init(writingKey, role, balance = ZERO_BALANCE, license = ZERO_LI
     try {
         const nodeEntry = b4a.alloc(NODE_ENTRY_SIZE);
         nodeEntry[0] = role;
-        b4a.copy(writingKey, nodeEntry, 1);
-        b4a.copy(balance, nodeEntry, WRITER_BYTE_LENGTH + 1);
-        b4a.copy(license, nodeEntry, WRITER_BYTE_LENGTH + BALANCE_BYTE_LENGTH + 1);
-        b4a.copy(stakedBalance, nodeEntry, WRITER_BYTE_LENGTH + BALANCE_BYTE_LENGTH + LICENSE_BYTE_LENGTH + 1);
+        let offset = 1;
+
+        b4a.copy(writingKey, nodeEntry, offset);
+        offset += WRITER_BYTE_LENGTH;
+
+        b4a.copy(balance, nodeEntry, offset);
+        offset += BALANCE_BYTE_LENGTH;
+
+        b4a.copy(license, nodeEntry, offset);
+        offset += LICENSE_BYTE_LENGTH;
+
+        b4a.copy(stakedBalance, nodeEntry, offset);
 
         return nodeEntry;
     } catch (error) {
@@ -80,10 +88,18 @@ export function encode(node) {
     try {
         let entry = b4a.alloc(NODE_ENTRY_SIZE);
         entry[0] = nodeRole;
-        b4a.copy(node.wk, entry, 1);
-        b4a.copy(node.balance, entry, WRITER_BYTE_LENGTH + 1);
-        b4a.copy(node.license, entry, WRITER_BYTE_LENGTH + BALANCE_BYTE_LENGTH + 1);
-        b4a.copy(node.stakedBalance, entry, WRITER_BYTE_LENGTH + BALANCE_BYTE_LENGTH + LICENSE_BYTE_LENGTH + 1);
+        let offset = 1;
+
+        b4a.copy(node.wk, entry, offset);
+        offset += WRITER_BYTE_LENGTH;
+
+        b4a.copy(node.balance, entry, offset);
+        offset += BALANCE_BYTE_LENGTH;
+
+        b4a.copy(node.license, entry, offset);
+        offset += LICENSE_BYTE_LENGTH;
+
+        b4a.copy(node.stakedBalance, entry, offset);
         return entry;
     }
     catch (error) {
@@ -116,21 +132,22 @@ export function decode(nodeEntry) {
 
     try {
         const role = nodeEntry[0];
+        let offset = 1;
 
         const isWhitelisted = !!(role & WHITELISTED_MASK);
         const isWriter = !!(role & WRITER_MASK);
         const isIndexer = !!(role & INDEXER_MASK);
 
-        const wkEnd = 1 + WRITER_BYTE_LENGTH;
-        const wk = nodeEntry.subarray(1, wkEnd);
+        const wk = nodeEntry.subarray(offset, offset + WRITER_BYTE_LENGTH);
+        offset += WRITER_BYTE_LENGTH;
 
-        const balanceEnd = wkEnd + BALANCE_BYTE_LENGTH;
-        const balance = nodeEntry.subarray(wkEnd, balanceEnd);
+        const balance = nodeEntry.subarray(offset, offset + BALANCE_BYTE_LENGTH);
+        offset += BALANCE_BYTE_LENGTH;
 
-        const licenseEnd = balanceEnd + LICENSE_BYTE_LENGTH;
-        const license = nodeEntry.subarray(balanceEnd, licenseEnd);
+        const license = nodeEntry.subarray(offset, offset + LICENSE_BYTE_LENGTH);
+        offset += LICENSE_BYTE_LENGTH;
 
-        const stakedBalance = nodeEntry.subarray(licenseEnd, NODE_ENTRY_SIZE);
+        const stakedBalance = nodeEntry.subarray(offset, NODE_ENTRY_SIZE);
 
         return { wk, isWhitelisted, isWriter, isIndexer, balance, license, stakedBalance };
     }
