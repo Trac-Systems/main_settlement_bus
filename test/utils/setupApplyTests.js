@@ -182,7 +182,7 @@ export async function setupMsbWriter(admin, peerName, peerKeyPair, temporaryDire
             if (await isWriter(writerCandidate.wallet.address) && await writerCandidate.msb.state.isWritable()) {
                 break;
             }
-            await writerCandidate.msb.state.base.update();
+            await writerCandidate.msb.state.base.forceFastForward(); // This performs an update after the core sync
             await writerCandidate.msb.state.base.view.update();
             await writerCandidate.msb.network.swarm.flush()
             await sleep(1000); // wait for the peer to sync state
