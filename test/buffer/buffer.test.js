@@ -1,6 +1,6 @@
 import test from 'brittle';
 import b4a from 'b4a';
-import {createMessage, isBufferValid, safeWriteUInt32BE} from '../../src/utils/buffer.js';
+import {createMessage, isBufferValid, safeWriteUInt32BE, deepCopyBuffer} from '../../src/utils/buffer.js';
 
 const invalidDataTypes = [
     null,
@@ -153,4 +153,38 @@ test('safeWriteUInt32BE - negative case', t => {
     t.ok(b4a.isBuffer(negOffset), 'returns buffer for negative offset');
     t.is(negOffset.length, 4, 'buffer is 4 bytes');
     t.is(negOffset.readUInt32BE(0), 0, 'buffer is zeroed for negative offset');
+});
+
+test('deepCopyBuffer - returns null for falsy inputs', t => {
+    t.is(deepCopyBuffer(null), null, 'null input returns null');
+    t.is(deepCopyBuffer(undefined), null, 'undefined input returns null');
+});
+
+test('deepCopyBuffer - copies non-empty buffer', t => {
+    const buf = b4a.from([1, 2, 3, 4]);
+    const copy = deepCopyBuffer(buf);
+
+    t.ok(b4a.isBuffer(copy), 'returns a buffer');
+    t.is(copy.length, buf.length, 'same length');
+    t.ok(b4a.equals(copy, buf), 'contents match');
+    t.not(copy, buf, 'is a different buffer object');
+});
+
+test('deepCopyBuffer - copies empty buffer', t => {
+    const buf = b4a.alloc(0);
+    const copy = deepCopyBuffer(buf);
+
+    t.ok(b4a.isBuffer(copy), 'returns a buffer');
+    t.is(copy.length, 0, 'length is zero');
+    t.not(copy, buf, 'is a different buffer object');
+});
+
+test('deepCopyBuffer - modifying copy does not affect original (is not a reference)', t => {
+    const buf = b4a.from([9, 9, 9]);
+    const copy = deepCopyBuffer(buf);
+
+    copy[0] = 1;
+
+    t.is(buf[0], 9, 'original unchanged');
+    t.is(copy[0], 1, 'copy modified independently');
 });
