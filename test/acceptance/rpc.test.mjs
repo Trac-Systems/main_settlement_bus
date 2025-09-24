@@ -2,7 +2,7 @@ import request from "supertest"
 import { createServer } from "../../rpc/create_server.mjs"
 import { initTemporaryDirectory } from '../utils/setupApplyTests.js'
 import { testKeyPair1, testKeyPair2 } from '../fixtures/apply.fixtures.js'
-import { randomBytes, setupMsbAdmin, setupMsbWriter, fundWallet, removeTemporaryDirectory } from "../utils/setupApplyTests.js"
+import { randomBytes, setupMsbAdmin, setupMsbWriter, fundPeer, removeTemporaryDirectory } from "../utils/setupApplyTests.js"
 import { $TNK } from "../../src/core/state/utils/balance.js"
 import tracCrypto from 'trac-crypto-api';
 import b4a from 'b4a'
@@ -30,7 +30,7 @@ const setupNetwork = async () => {
 
     const peer = await setupMsbAdmin(testKeyPair1, tmpDirectory, rpcOpts)
     const writer = await setupMsbWriter(peer, 'writer', testKeyPair2, tmpDirectory, rpcOpts);
-    await fundWallet(peer, writer.wallet, $TNK(100n))
+    await fundPeer(peer, writer, $TNK(100n))
     return { writer, peer }
 }
 

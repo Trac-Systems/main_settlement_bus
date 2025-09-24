@@ -66,19 +66,22 @@ async function randomKeypair() {
 
 export const tick = () => new Promise(resolve => setImmediate(resolve));
 
-export async function fundWallet(admin, toFund, amount) {
+export async function fundPeer(admin, toFund, amount) {
     const txValidity = await admin.msb.state.getIndexerSequenceState()
     const director = new CompleteStateMessageDirector();
     director.builder = new CompleteStateMessageBuilder(admin.wallet);
     const payload = await director.buildBalanceInitializationMessage(
         admin.wallet.address,
-        toFund.address,
+        toFund.wallet.address,
         amount,
         txValidity
     );
 
     await admin.msb.state.append(safeEncodeApplyOperation(payload));
+    await tick()
     await admin.msb.state.base.forceFastForward() // required to update the balance on the peer, eliminates the possible racing condition
+    await tick()
+    await toFund.msb.state.base.forceFastForward()
     await tick()
     return payload
 }
