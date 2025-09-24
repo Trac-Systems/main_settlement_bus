@@ -155,7 +155,7 @@ export async function setupNodeAsWriter(admin, writerCandidate) {
 
         return writerCandidate;
     } catch (error) {
-        throw new Error('Error setting up MSB writer: ', error.message);
+        throw new Error('Error setting up MSB writer: ', error.message || error);
     }
 }
 
@@ -187,7 +187,7 @@ export async function setupMsbWriter(admin, peerName, peerKeyPair, temporaryDire
 
         return writerCandidate;
     } catch (error) {
-        throw new Error('Error setting up MSB writer: ', error.message);
+        throw new Error('Error setting up MSB writer: ', error.message || error);
     }
 }
 
@@ -223,7 +223,7 @@ export async function setupMsbIndexer(indexerCandidate, admin) {
 
         return indexerCandidate;
     } catch (error) {
-        throw new Error('Error setting up MSB indexer: ', error.message);
+        throw new Error('Error setting up MSB indexer: ', error.message || error);
     }
 }
 
@@ -369,7 +369,7 @@ export const tryToSyncWriters = async (...args) => {
             attempts++;
         }
     } catch (error) {
-        throw new Error("Error synchronizing writers: " + error.message);
+        throw new Error("Error synchronizing writers: " + error.message || error);
     }
 }
 
@@ -401,7 +401,7 @@ export async function waitForNotIndexer(indexer) {
             attempts++;
         }
     } catch (error) {
-        throw new Error("Error waiting for indexer to not be an indexer: " + error.message);
+        throw new Error("Error waiting for indexer to not be an indexer: " + error.message || error);
     }
 }
 
@@ -443,7 +443,7 @@ export async function waitForNodeState(node, address, expected) {
             attempts++;
         }
     } catch (error) {
-        throw new Error("Error synchronizing node state: " + error.message);
+        throw new Error("Error synchronizing node state: " + error.message || error);
     }
 }
 
@@ -465,7 +465,7 @@ export async function waitForAdminEntry(node, expected) {
             attempts++;
         }
     } catch (error) {
-        throw new Error('Error waiting for admin entry: ' + error.message);
+        throw new Error('Error waiting for admin entry: ' + error.message || error);
     }
 }
 
@@ -488,7 +488,6 @@ export async function waitForIndexersEntry(node, expected) {
             attempts++;
         }
     } catch (error) {
-        throw new Error("Error waiting for indexers entry: " + error.message);
+        throw new Error("Error waiting for indexers entry: " + error.message || error);
     }
-
 }
