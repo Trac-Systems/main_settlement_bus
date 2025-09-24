@@ -1679,6 +1679,7 @@ class State extends ReadyResource {
         if (recipientPublicKey === null) return;
 
         const isSelfTransfer = b4a.equals(requesterAddressBuffer, recipientAddressBuffer);
+        const isRecipientValidator = b4a.equals(recipientAddressBuffer, validatorAddressBuffer);
 
         const transferResult = await this.#transfer(
             requesterAddressString,
@@ -1687,19 +1688,21 @@ class State extends ReadyResource {
             op.tro.am,
             transactionUtils.FEE,
             isSelfTransfer,
+            isRecipientValidator,
             batch
         );
 
         if (null === transferResult) return;
         if (null === transferResult.senderEntry) return;
         if (null === transferResult.validatorEntry) return;
-        if (!isSelfTransfer) {
-            if (null === transferResult.recipientEntry) return;
-            await batch.put(recipientAddressString, transferResult.recipientEntry);
-        }
 
         await batch.put(requesterAddressString, transferResult.senderEntry);
         await batch.put(validatorAddressString, transferResult.validatorEntry);
+
+        if (!isSelfTransfer && !isRecipientValidator && transferResult.recipientEntry !== null) {
+            await batch.put(recipientAddressString, transferResult.recipientEntry);
+        }
+
         await batch.put(hashHexString, node.value);
 
         if (this.#enable_txlogs === true) {
@@ -1708,7 +1711,7 @@ class State extends ReadyResource {
 
     }
 
-    async #transfer(senderAddressString, recipientAddressString, validatorAddressString, transferAmountBuffer, feeAmountBuffer, isSelfTransfer, batch) {
+    async #transfer(senderAddressString, recipientAddressString, validatorAddressString, transferAmountBuffer, feeAmountBuffer, isSelfTransfer, isRecipientValidator, batch) {
         if (senderAddressString === null ||
             recipientAddressString === null ||
             validatorAddressString === null ||
@@ -1750,7 +1753,7 @@ class State extends ReadyResource {
             validatorEntry: null,
         };
 
-        if (!isSelfTransfer) {
+        if (!isSelfTransfer && !isRecipientValidator) {
             const recipientEntryBuffer = await this.#getEntryApply(recipientAddressString, batch);
             if (recipientEntryBuffer === null) {
                 const newRecipientEntry = nodeEntryUtils.init(
@@ -1770,7 +1773,7 @@ class State extends ReadyResource {
                 const newRecipientBalance = recipientBalance.add(transferAmount);
                 if (newRecipientBalance === null) return null;
 
-                const updatedRecipientEntry = nodeEntryUtils.setBalance(recipientEntryBuffer, newRecipientBalance.value);
+                const updatedRecipientEntry = newRecipientBalance.update(recipientEntryBuffer);
                 if (updatedRecipientEntry === null) return null;
                 result.recipientEntry = updatedRecipientEntry;
             }
@@ -1785,16 +1788,25 @@ class State extends ReadyResource {
         const validatorBalance = toBalance(validatorEntry.balance);
         if (validatorBalance === null) return null;
 
-        const newValidatorBalance = validatorBalance.add(feeAmount.percentage(PERCENT_75));
+        const validatorReward = feeAmount.percentage(PERCENT_75);
+        if (validatorReward === null) return null;
+
+        const newValidatorBalance = isRecipientValidator
+            ? validatorBalance.add(transferAmount).add(validatorReward)
+            : validatorBalance.add(validatorReward);
+
         if (newValidatorBalance === null) return null;
 
-        const updatedValidatorEntry = newValidatorBalance.update(validatorEntryBuffer)
+        const updatedValidatorEntry = newValidatorBalance.update(validatorEntryBuffer);
         if (updatedValidatorEntry === null) return null;
 
         result.validatorEntry = updatedValidatorEntry;
 
-        return result;
+        if (isRecipientValidator) {
+            result.recipientEntry = updatedValidatorEntry;
+        }
 
+        return result;
     }
 
     #isAdminApply(adminEntry, node) {
@@ -1806,7 +1818,7 @@ class State extends ReadyResource {
         const entry = await batch.get(key);
         return deepCopyBuffer(entry?.value)
     }
-    
+
     async #getDeploymentEntryApply(key, batch) {
         const entry = await batch.get(EntryType.DEPLOYMENT + key);
         return deepCopyBuffer(entry?.value)
