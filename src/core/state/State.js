@@ -814,13 +814,13 @@ class State extends ReadyResource {
             return;
         };
 
-        const newValidatorBalance = validatorBalance.add(feeAmount.percentage(PERCENT_75));
+        const newValidatorBalance = validatorBalance.add(BALANCE_FEE.percentage(PERCENT_75));
         if (newValidatorBalance === null) {
             this.#enable_txlogs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Failed to transfer fee to validator.", node.from.key)
             return;
         };
 
-        const updatedValidatorNodeEntry = newValidatorBalance.update(validatorNodeEntry)
+        const updatedValidatorNodeEntry = newValidatorBalance.update(validatorNodeEntryBuffer)
         if (updatedValidatorNodeEntry === null) {
             this.#enable_txlogs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Failed to update validator balance.", node.from.key)
             return;
