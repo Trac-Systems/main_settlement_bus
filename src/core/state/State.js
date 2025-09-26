@@ -592,11 +592,13 @@ class State extends ReadyResource {
             return;
         };
 
+        // Operation will be performed only once, for consistency check verify that the writer key does not exist
+        // writer key should NOT exists for a brand new admin
         const writerKeyHasBeenRegistered = await this.#getRegisteredWriterKeyApply(batch, op.cao.iw.toString('hex'))
         if (writerKeyHasBeenRegistered !== null) {
             this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_ADMIN, "Writer key already exists.", node.from.key)
             return;
-        }; // writer key should NOT exists for a brand new admin
+        };
 
         const adminEntryExists = await this.#getEntryApply(EntryType.ADMIN, batch);
         // if admin entry already exists, cannot perform this operation
@@ -717,11 +719,13 @@ class State extends ReadyResource {
             return;
         };
 
+        // The writer key must NOT be linked to any address since this is an ADMIN recovery.
+        // Until the next release with indexer rotation, we simply enforce the new writer key.
         const writerKeyHasBeenRegistered = await this.#getRegisteredWriterKeyApply(batch, op.rao.iw.toString('hex'))
         if (writerKeyHasBeenRegistered !== null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Writer key aready exists.", node.from.key)
+            this.#enable_txlogs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Writer key already exists.", node.from.key)
             return;
-        }; // writer key should NOT have been associated with any address because this is a recovery operation
+        };
 
         // verify tx validity - prevent deferred execution attack
         const indexersSequenceState = await this.#getIndexerSequenceStateApply(base);
@@ -1148,12 +1152,6 @@ class State extends ReadyResource {
             return;
         };
 
-        const writerKeyHasBeenRegistered = await this.#getRegisteredWriterKeyApply(batch, op.rao.iw.toString('hex'))
-        if (writerKeyHasBeenRegistered !== null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_WRITER, "Writer key has already been registered.", node.from.key)
-            return;
-        };
-
         await this.#addWriter(op, base, node, batch, txHashHexString, requesterAddressString, requesterAddressBuffer, validatorAddressString);
     }
 
@@ -1165,9 +1163,51 @@ class State extends ReadyResource {
             return;
         };
 
-        const isWhitelisted = nodeEntryUtils.isWhitelisted(requesterNodeEntry);
-        const isWriter = nodeEntryUtils.isWriter(requesterNodeEntry);
-        const isIndexer = nodeEntryUtils.isIndexer(requesterNodeEntry);
+        const decodedRequesterNodeEntry = nodeEntryUtils.decode(requesterNodeEntry)
+        if (decodedRequesterNodeEntry === null) {
+            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_WRITER, "Failed to decode node entry.", node.from.key)
+            return;
+        };
+
+        /*
+         * Writer Key Validation Cases:
+         * 
+         * Case 1: New Writing Key (writerKeyHasBeenRegistered === null)
+         * - If the key has never been registered before
+         * - System will register this new key and link it to the requester's address
+         * - Always allowed as long as other conditions are met (whitelisting, balance, etc.)
+         * 
+         * Case 2: Previously Used Key (writerKeyHasBeenRegistered !== null)
+         * Two conditions must be met:
+         * a) Key Match (isCurrentWk):
+         *    - The key must be the same as currently assigned in node's entry
+         *    - Prevents using different keys than what's assigned
+         * 
+         * b) Ownership (isOwner):
+         *    - The requester must be the original owner of this key
+         *    - Enables re-staking after being downgraded to reader
+         *    - Prevents key usage by non-owners
+         * 
+         * This validation ensures:
+         * 1. Only legitimate new keys are registered
+         * 2. Downgraded nodes can re-stake using their original keys
+         * 3. Keys cannot be reused by different addresses
+         */
+
+        const writerKeyHasBeenRegistered = await this.#getRegisteredWriterKeyApply(batch, op.rao.iw.toString('hex'))
+        if (writerKeyHasBeenRegistered !== null) {
+            const isCurrentWk = b4a.equals(decodedRequesterNodeEntry.wk, op.rao.iw);
+            const isOwner = b4a.equals(writerKeyHasBeenRegistered, requesterAddressBuffer);
+
+            if (!isCurrentWk || !isOwner) {
+                this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_WRITER, "Invalid writer key: either not owned by requester or different from assigned key.", node.from.key)
+                return;
+            }
+        }
+
+        const isWhitelisted = decodedRequesterNodeEntry.isWhitelisted
+        const isWriter = decodedRequesterNodeEntry.isWriter;
+        const isIndexer = decodedRequesterNodeEntry.isIndexer;
 
         // To become a writer the node must be whitelisted and not already a writer or indexer
         if (isIndexer || isWriter || !isWhitelisted) {
@@ -1176,13 +1216,7 @@ class State extends ReadyResource {
         };
 
         // Charging fee from the requester
-        const decodedNodeEntry = nodeEntryUtils.decode(requesterNodeEntry)
-        if (decodedNodeEntry === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_WRITER, "Failed to decode node entry.", node.from.key)
-            return;
-        };
-
-        const requesterBalance = toBalance(decodedNodeEntry.balance)
+        const requesterBalance = toBalance(decodedRequesterNodeEntry.balance)
         if (requesterBalance === null) {
             this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_WRITER, "Failed to verify requester balance.", node.from.key)
             return;
@@ -1249,7 +1283,9 @@ class State extends ReadyResource {
         // Add the writer role to the base and update the batch
         await base.addWriter(op.rao.iw, { isIndexer: false });
         await batch.put(requesterAddressString, chargedUpdatedNodeEntry);
-        await batch.put(EntryType.WRITER_ADDRESS + op.rao.iw.toString('hex'), op.address);
+        if (writerKeyHasBeenRegistered === null) {
+            await batch.put(EntryType.WRITER_ADDRESS + op.rao.iw.toString('hex'), op.address);
+        }
         await this.#updateWritersIndex(requesterAddressBuffer, batch);
 
         await batch.put(txHashHexString, node.value);
@@ -1357,10 +1393,10 @@ class State extends ReadyResource {
         };
 
         // Proceed to remove the writer role from the node
-        await this.#removeWriter(op, base, node, batch, txHashHexString, requesterAddressString, validatorAddressString);
+        await this.#removeWriter(op, base, node, batch, txHashHexString, requesterAddressString, requesterAddress, validatorAddressString);
     }
 
-    async #removeWriter(op, base, node, batch, txHashHexString, requesterAddressString, validatorAddressString) {
+    async #removeWriter(op, base, node, batch, txHashHexString, requesterAddressString, requesterAddress, validatorAddressString) {
         // Retrieve the node entry for the given key
         const requesterNodeEntry = await this.#getEntryApply(requesterAddressString, batch);
         if (requesterNodeEntry === null) {
@@ -1374,8 +1410,6 @@ class State extends ReadyResource {
             this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Failed to verify validator node entry.", node.from.key)
             return;
         };
-
-        // TODO: SHOULD WE somehow compare current wk FROM STATE with op.rao.iw? YES, we can ensure that linked wk to the address is the same as the one provided in the operation.
 
         // Check if the node is a writer or an indexer
         const isNodeWriter = nodeEntryUtils.isWriter(requesterNodeEntry);
@@ -1392,6 +1426,21 @@ class State extends ReadyResource {
             this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Failed to decode requester node entry.", node.from.key)
             return;
         };
+
+        /**
+         * Ensure that: 
+         * 1) writer key exists in registry (we can not unregister something that was not registered), 
+         * 2) matches the one in node entry , 
+         * 3) belongs to the requester - this prevents unauthorized key removal
+         */
+        const writerKeyHasBeenRegistered = await this.#getRegisteredWriterKeyApply(batch, op.rao.iw.toString('hex'))
+        if (writerKeyHasBeenRegistered === null ||
+            !b4a.equals(op.rao.iw, decodedNodeEntry.wk) ||
+            !b4a.equals(writerKeyHasBeenRegistered, requesterAddress)
+        ) {
+            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Writer key must be registered, match node's current key, and belong to the requester.", node.from.key)
+            return;
+        }
 
         const requesterBalance = toBalance(decodedNodeEntry.balance);
         if (requesterBalance === null) {
@@ -2031,7 +2080,7 @@ class State extends ReadyResource {
         if (isWriter) {
             await base.removeWriter(decodedToBanNodeEntry.wk);
         }
-        
+
         await batch.put(nodeToBeBannedAddressString, updatedToBanNodeEntry);
         await batch.put(requesterAddressString, updatedAdminNodeEntry);
         await batch.put(txHashHexString, node.value);
@@ -2951,7 +3000,7 @@ class State extends ReadyResource {
     #safeLogApply(operationType = "Common", errorMessage, writingKey) {
         try {
             const date = new Date().toISOString();
-            const wk = writingKey ? writingKey : 'N/A';
+            const wk = writingKey ? writingKey.toString('hex') : 'N/A';
             console.error(`[${date}][${operationType}][${errorMessage}][${wk}]`);
         } catch (e) {
             console.error(`[LOG_ERROR][Failed to log error][${e}]`);

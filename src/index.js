@@ -425,7 +425,7 @@ export class MainSettlementBus extends ReadyResource {
         const txValidity = await this.#state.getIndexerSequenceState();
         const assembledMessage = await PartialStateMessageOperations.assembleRemoveWriterMessage(
             this.#wallet,
-            this.#state.writingKey.toString('hex'),
+            nodeEntry.wk.toString('hex'),
             txValidity.toString('hex')
         )
 
