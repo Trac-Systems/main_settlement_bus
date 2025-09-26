@@ -205,7 +205,6 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async broadcastPartialTransaction(partialTransactionPayload) {
-        console.log(partialTransactionPayload)
         await this.#network.validator_stream.messenger.send(partialTransactionPayload);
     }
 
