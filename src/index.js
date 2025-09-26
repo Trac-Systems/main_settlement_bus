@@ -891,12 +891,16 @@ export class MainSettlementBus extends ReadyResource {
                     const address = splitted[1]
                     const nodeEntry = await this.#state.getNodeEntry(address)
                     if (nodeEntry) {
+                        const licenseValue = nodeEntry.license.readUInt32BE(0);
+                        const licenseDisplay = licenseValue === 0 ? 'N/A' : licenseValue.toString();
                         console.log('Node Status:', {
                             Address: address,
                             WritingKey: nodeEntry.wk.toString('hex'),
                             IsWhitelisted: nodeEntry.isWhitelisted,
                             IsWriter: nodeEntry.isWriter,
                             IsIndexer: nodeEntry.isIndexer,
+                            License: licenseDisplay,
+                            StakedBalance: bufferToBigInt(nodeEntry.stakedBalance).toString()
                         })
                         return {
                             address: address,
@@ -904,6 +908,8 @@ export class MainSettlementBus extends ReadyResource {
                             isWhitelisted: nodeEntry.isWhitelisted,
                             isWriter: nodeEntry.isWriter,
                             isIndexer: nodeEntry.isIndexer,
+                            license: licenseDisplay,
+                            stakedBalance: bufferToBigInt(nodeEntry.stakedBalance).toString()
                         }
                     } else {
                         console.log('Node Status:', {
@@ -911,6 +917,8 @@ export class MainSettlementBus extends ReadyResource {
                             IsWhitelisted: false,
                             IsWriter: false,
                             IsIndexer: false,
+                            license: 'N/A',
+                            stakedBalance: bufferToBigInt(nodeEntry.stakedBalance).toString()
                         })
                     }
                 } else if (input.startsWith("/add_indexer")) {
@@ -934,7 +942,11 @@ export class MainSettlementBus extends ReadyResource {
                     const splitted = input.split(" ");
                     const wkHexString = splitted[1];
                     const payload = await this.#state.getSigned(EntryType.WRITER_ADDRESS + wkHexString);
-                    console.log(`Address assigned to the writer key: ${wkHexString} - ${bufferToAddress(payload)}`)
+                    if (payload === null) {
+                        console.log(`No address assigned to the writer key: ${wkHexString}`);
+                    } else {
+                        console.log(`Address assigned to the writer key: ${wkHexString} - ${bufferToAddress(payload)}`)
+                    }
                 }
                 else if (input.startsWith("/get_deployment")) {
                     const splitted = input.split(" ");
