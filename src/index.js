@@ -900,7 +900,7 @@ export class MainSettlementBus extends ReadyResource {
                             IsWriter: nodeEntry.isWriter,
                             IsIndexer: nodeEntry.isIndexer,
                             License: licenseDisplay,
-                            StakedBalance: bufferToBigInt(nodeEntry.stakedBalance).toString()
+                            StakedBalance: bigIntToDecimalString(bufferToBigInt(nodeEntry.stakedBalance))
                         })
                         return {
                             address: address,
@@ -909,7 +909,7 @@ export class MainSettlementBus extends ReadyResource {
                             isWriter: nodeEntry.isWriter,
                             isIndexer: nodeEntry.isIndexer,
                             license: licenseDisplay,
-                            stakedBalance: bufferToBigInt(nodeEntry.stakedBalance).toString()
+                            stakedBalance: bigIntToDecimalString(bufferToBigInt(nodeEntry.stakedBalance))
                         }
                     } else {
                         console.log('Node Status:', {
@@ -918,7 +918,7 @@ export class MainSettlementBus extends ReadyResource {
                             IsWriter: false,
                             IsIndexer: false,
                             license: 'N/A',
-                            stakedBalance: bufferToBigInt(nodeEntry.stakedBalance).toString()
+                            stakedBalance: '0'
                         })
                     }
                 } else if (input.startsWith("/add_indexer")) {
