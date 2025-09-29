@@ -1244,14 +1244,14 @@ class State extends ReadyResource {
         };
 
         // Update the node entry to assign the writer role and deduct the fee from the requester's balance
-        const updatedNodeEntry = nodeEntryUtils.setRoleAndWriterKey(requesterNodeEntry, nodeRoleUtils.NodeRole.WRITER, op.rao.iw);
-        if (updatedNodeEntry === null) {
+        const updatedRoleRequesterNodeEntry = nodeEntryUtils.setRoleAndWriterKey(requesterNodeEntry, nodeRoleUtils.NodeRole.WRITER, op.rao.iw);
+        if (updatedRoleRequesterNodeEntry === null) {
             this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_WRITER, "Failed to update node entry with a writer role.", node.from.key)
             return;
         };
 
-        const chargedUpdatedNodeEntry = updatedBalance.update(updatedNodeEntry)
-        if (chargedUpdatedNodeEntry === null) {
+        const chargedFeeRequesterNodeEntry = updatedBalance.update(updatedRoleRequesterNodeEntry)
+        if (chargedFeeRequesterNodeEntry === null) {
             this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_WRITER, "Failed to update node balance.", node.from.key)
             return;
         };
@@ -1287,18 +1287,25 @@ class State extends ReadyResource {
             return;
         };
 
-        // Pay the fee to the validator
-        await batch.put(validatorAddressString, updatedValidatorEntry);
+        const finalRequesterNodeEntry = this.#stakeBalanceApply(chargedFeeRequesterNodeEntry, node);
+        if (finalRequesterNodeEntry === null) {
+            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_WRITER, "Failed to stake balance for writer.", node.from.key)
+            return;
+        };
 
         // Add the writer role to the base and update the batch
         await base.addWriter(op.rao.iw, { isIndexer: false });
-        await batch.put(requesterAddressString, chargedUpdatedNodeEntry);
+        await batch.put(requesterAddressString, finalRequesterNodeEntry);
+
         if (writerKeyHasBeenRegistered === null) {
             await batch.put(EntryType.WRITER_ADDRESS + op.rao.iw.toString('hex'), op.address);
         }
-        await this.#updateWritersIndex(requesterAddressBuffer, batch);
 
+        await this.#updateWritersIndex(requesterAddressBuffer, batch);
         await batch.put(txHashHexString, node.value);
+
+        // Pay the fee to the validator
+        await batch.put(validatorAddressString, updatedValidatorEntry);
         console.log(`Writer added addr:wk:tx - ${requesterAddressString}:${op.rao.iw.toString('hex')}:${txHashHexString}`);
     }
 
@@ -1407,33 +1414,33 @@ class State extends ReadyResource {
     }
 
     async #removeWriter(op, base, node, batch, txHashHexString, requesterAddressString, requesterAddress, validatorAddressString) {
-        // Retrieve the node entry for the given key
+
+        // Fetch the node entry for the given address
         const requesterNodeEntry = await this.#getEntryApply(requesterAddressString, batch);
         if (requesterNodeEntry === null) {
             this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Failed to verify requester node entry.", node.from.key)
             return;
         };
 
-        // Retrieve the validator to receive the fee
+        // Fetch the validator node entry to reward it later
         const validatorNodeEntry = await this.#getEntryApply(validatorAddressString, batch);
         if (validatorNodeEntry === null) {
             this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Failed to verify validator node entry.", node.from.key)
             return;
         };
 
-        // Check if the node is a writer or an indexer
-        const isNodeWriter = nodeEntryUtils.isWriter(requesterNodeEntry);
-        const isNodeIndexer = nodeEntryUtils.isIndexer(requesterNodeEntry);
-
-        if (isNodeIndexer || !isNodeWriter) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Node has to be a writer, and cannot be an indexer.", node.from.key)
-            return;
-        };
-
-        // Charging fee from the requester
         const decodedNodeEntry = nodeEntryUtils.decode(requesterNodeEntry);
         if (decodedNodeEntry === null) {
             this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Failed to decode requester node entry.", node.from.key)
+            return;
+        };
+
+        // Check if the node is a writer or an indexer
+        const isNodeWriter = decodedNodeEntry.isWriter;
+        const isNodeIndexer = decodedNodeEntry.isIndexer;
+
+        if (isNodeIndexer || !isNodeWriter) {
+            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Node has to be a writer, and cannot be an indexer.", node.from.key)
             return;
         };
 
@@ -1452,6 +1459,7 @@ class State extends ReadyResource {
             return;
         }
 
+        // Charging fee from the requester
         const requesterBalance = toBalance(decodedNodeEntry.balance);
         if (requesterBalance === null) {
             this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Invalid requester balance.", node.from.key)
@@ -1506,12 +1514,19 @@ class State extends ReadyResource {
             return;
         };
 
+        const finalRequesterNodeEntry = this.#withdrawStakedBalanceApply(chargedNodeEntry, node);
+        if (finalRequesterNodeEntry === null) {
+            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Failed to unstake balance for writer.", node.from.key)
+            return;
+        };
+
         // Remove the writer role and update the state
         await base.removeWriter(decodedNodeEntry.wk);
-        await batch.put(requesterAddressString, chargedNodeEntry);
-        // Actually pay the fee
-        await batch.put(validatorAddressString, updateValidatorEntry);
+        await batch.put(requesterAddressString, finalRequesterNodeEntry);
+
         await batch.put(txHashHexString, node.value);
+        // Reward the validator
+        await batch.put(validatorAddressString, updateValidatorEntry);
         console.log(`Writer removed: addr:wk:tx - ${requesterAddressString}:${op.rao.iw.toString('hex')}:${txHashHexString}`);
     }
 
@@ -2824,6 +2839,7 @@ class State extends ReadyResource {
             this.#enable_txlogs && this.#safeLogApply(OperationType.TRANSFER, "Invalid sender balance.", node.from.key)
             return null;
         }
+
         if (!senderBalance.greaterThanOrEquals(totalDeductedAmount)) {
             this.#enable_txlogs && this.#safeLogApply(OperationType.TRANSFER, "Insufficient sender balance.", node.from.key)
             return null;
