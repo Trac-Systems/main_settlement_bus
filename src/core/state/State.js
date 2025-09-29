@@ -2982,7 +2982,7 @@ class State extends ReadyResource {
         try {
             return Object.values(base.system.indexers).some(entry => b4a.equals(entry.key, wk));
         } catch (error) {
-            console.log(error);
+            console.error(error);
             return null
         }
     }
