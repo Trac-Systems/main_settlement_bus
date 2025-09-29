@@ -2998,7 +2998,102 @@ class State extends ReadyResource {
         await batch.put(EntryType.WRITERS_LENGTH, incrementedLength);
     }
 
-    #safeLogApply(operationType = "Common", errorMessage, writingKey) {
+    #stakeBalanceApply(nodeEntryBuffer, node) {
+        if (!nodeEntryBuffer || nodeEntryBuffer.length === 0 || nodeEntryBuffer.length !== NODE_ENTRY_SIZE) {
+            this.#safeLogApply("StakeBalance", "Invalid node entry buffer", node.from.key);
+            return null;
+        }
+
+        const decodedNodeEntry = nodeEntryUtils.decode(nodeEntryBuffer);
+        if (decodedNodeEntry === null) {
+            this.#safeLogApply("StakeBalance", "Failed to decode node entry", node.from.key);
+            return null;
+        }
+
+        const currentNodeBalance = toBalance(decodedNodeEntry.balance);
+        if (currentNodeBalance === null) {
+            this.#safeLogApply("StakeBalance", "Invalid node balance", node.from.key);
+            return null;
+        }
+
+        if (!currentNodeBalance.greaterThanOrEquals(BALANCE_TO_STAKE)) {
+            this.#safeLogApply("StakeBalance", "Insufficient balance to stake", node.from.key);
+            return null;
+        }
+
+        const newNodeBalance = currentNodeBalance.sub(BALANCE_TO_STAKE);
+        if (newNodeBalance === null) {
+            this.#safeLogApply("StakeBalance", "Failed to subtract stake balance", node.from.key);
+            return null;
+        }
+
+        const updatedNodeEntryWithBalance = newNodeBalance.update(nodeEntryBuffer);
+        if (updatedNodeEntryWithBalance === null) {
+            this.#safeLogApply("StakeBalance", "Failed to update node entry with new balance", node.from.key);
+            return null;
+        }
+
+        const updatedNodeEntryWithAllBalances = nodeEntryUtils.setStakedBalance(updatedNodeEntryWithBalance, BALANCE_TO_STAKE.value);
+        if (updatedNodeEntryWithAllBalances === null) {
+            this.#safeLogApply("StakeBalance", "Failed to set staked balance in node entry", node.from.key);
+            return null;
+        }
+
+        return updatedNodeEntryWithAllBalances;
+    }
+
+    #withdrawStakedBalanceApply(nodeEntryBuffer, node) {
+        if (!nodeEntryBuffer || nodeEntryBuffer.length === 0 || nodeEntryBuffer.length !== NODE_ENTRY_SIZE) {
+            this.#safeLogApply("withdrawStakedBalanceApply", "Invalid node entry buffer", node.from.key);
+            return null;
+        }
+
+        const decodedNodeEntry = nodeEntryUtils.decode(nodeEntryBuffer);
+        if (decodedNodeEntry === null) {
+            this.#safeLogApply("withdrawStakedBalanceApply", "Failed to decode node entry", node.from.key);
+            return null;
+        }
+
+        const stakedBalance = toBalance(decodedNodeEntry.stakedBalance);
+        if (stakedBalance === null) {
+            this.#safeLogApply("withdrawStakedBalanceApply", "Invalid staked balance", node.from.key);
+            return null;
+        }
+
+        if (!stakedBalance.greaterThan(BALANCE_ZERO)) {
+            this.#safeLogApply("withdrawStakedBalanceApply", "No staked balance to unstake", node.from.key);
+            return null;
+        }
+
+        const currentNodeBalance = toBalance(decodedNodeEntry.balance);
+        if (currentNodeBalance === null) {
+            this.#safeLogApply("withdrawStakedBalanceApply", "Invalid current balance", node.from.key);
+            return null;
+        }
+
+        const newNodeBalance = currentNodeBalance.add(stakedBalance);
+        if (newNodeBalance === null) {
+            this.#safeLogApply("withdrawStakedBalanceApply", "Failed to add staked balance to current balance", node.from.key);
+            return null;
+        }
+
+        const updatedNodeEntryWithBalance = newNodeBalance.update(nodeEntryBuffer);
+        if (updatedNodeEntryWithBalance === null) {
+            this.#safeLogApply("withdrawStakedBalanceApply", "Failed to update node entry with new balance", node.from.key);
+            return null;
+        }
+
+        const updatedNodeEntryWithAllBalances = nodeEntryUtils.setStakedBalance(updatedNodeEntryWithBalance, BALANCE_ZERO.value);
+        if (updatedNodeEntryWithAllBalances === null) {
+            this.#safeLogApply("withdrawStakedBalanceApply", "Failed to set staked balance in node entry", node.from.key);
+            return null;
+        }
+
+        return updatedNodeEntryWithAllBalances;
+
+    }
+
+    #safeLogApply(operationType = "Common", errorMessage, writingKey = null) {
         try {
             const date = new Date().toISOString();
             const wk = writingKey ? writingKey.toString('hex') : 'N/A';
