@@ -205,11 +205,18 @@ export function isIndexer(nodeEntry) {
  * @returns {Buffer | null} The updated node entry buffer or null if the input is invalid.
  */
 export function setRole(nodeEntry, nodeRole) {
-    if (!isNodeRoleValid(nodeRole)) return null;
-    if (isBufferValid(nodeEntry, NODE_ENTRY_SIZE)) {
-        nodeEntry[0] = nodeRole;
+    if (!isNodeRoleValid(nodeRole)) {
+        console.error('Invalid node role provided');
+        return null;
     }
-    return nodeEntry;
+    if (!isBufferValid(nodeEntry, NODE_ENTRY_SIZE)) {
+        console.error('Invalid node entry buffer size');
+        return null;
+    }
+    const newNodeEntry = b4a.alloc(NODE_ENTRY_SIZE);
+    b4a.copy(nodeEntry, newNodeEntry);
+    newNodeEntry[0] = nodeRole;
+    return newNodeEntry;
 }
 
 /**
@@ -283,8 +290,10 @@ export function setStakedBalance(nodeEntry, stakedBalance) {
             console.error('Invalid input for setting staked balance');
             return null;
         }
-        b4a.copy(stakedBalance, nodeEntry, WRITER_BYTE_LENGTH + BALANCE_BYTE_LENGTH + LICENSE_BYTE_LENGTH + 1);
-        return nodeEntry;
+        const newNodeEntry = b4a.alloc(NODE_ENTRY_SIZE);
+        b4a.copy(nodeEntry, newNodeEntry);
+        b4a.copy(stakedBalance, newNodeEntry, WRITER_BYTE_LENGTH + BALANCE_BYTE_LENGTH + LICENSE_BYTE_LENGTH + 1);
+        return newNodeEntry;
     } catch (error) {
         console.error('Error setting staked balance in node entry:', error);
         return null;
