@@ -3023,85 +3023,15 @@ class State extends ReadyResource {
         await batch.put(EntryType.WRITERS_LENGTH, incrementedLength);
     }
 
-    async #validatorPenaltyApply(writingKeyBuffer, batch, base) {
-        // In theory, none of the negative cases in the if-statements should occur. They are added only for safety reasons.
-
-        // 1. find validator using writingKey
-        const validatorWk = writingKeyBuffer.toString('hex');
-
-        const validatorAddressBuffer = await this.#getRegisteredWriterKeyApply(batch, validatorWk);
-        if (validatorAddressBuffer === null) {
-            this.#safeLogApply("ValidatorPenalty", `No validator found for writing key: ${validatorWk}`, writingKeyBuffer);
-            return;
+    #safeLogApply(operationType = "Common", errorMessage, writingKey = null) {
+        try {
+            const date = new Date().toISOString();
+            const wk = writingKey ? writingKey.toString('hex') : 'N/A';
+            console.error(`[${date}][${operationType}][${errorMessage}][${wk}]`);
+        } catch (e) {
+            console.error(`[LOG_ERROR][Failed to log error][${e}]`);
         }
-
-        // 2. get it's address and convert it to string format, validate everything
-        const validatorAddressString = addressUtils.bufferToAddress(validatorAddressBuffer);
-        if (validatorAddressString === null) {
-            this.#safeLogApply("ValidatorPenalty", `Invalid validator address: ${validatorAddressString}`, writingKeyBuffer);
-            return;
-        }
-        const validatorPublicKey = PeerWallet.decodeBech32mSafe(validatorAddressString);
-        if (validatorPublicKey === null) {
-            this.#safeLogApply("ValidatorPenalty", `Failed to decode validator public key: ${validatorAddressString}`, writingKeyBuffer);
-            return;
-        }
-
-        // 3. get it's entry using the address
-        const validatorNodeEntryBuffer = await this.#getEntryApply(validatorAddressString, batch);
-        if (validatorNodeEntryBuffer === null) {
-            this.#safeLogApply("ValidatorPenalty", `No node entry found for validator address: ${validatorAddressString}`, writingKeyBuffer);
-            return;
-        }
-
-        const decodedValidatorNodeEntry = nodeEntryUtils.decode(validatorNodeEntryBuffer);
-        if (decodedValidatorNodeEntry === null) {
-            this.#safeLogApply("ValidatorPenalty", `Failed to decode validator node entry for address: ${validatorAddressString}`, writingKeyBuffer);
-            return;
-        }
-
-        // 4. get it's StakedBalance and convert to Balance
-        const stakedBalance = toBalance(decodedValidatorNodeEntry.stakedBalance);
-        if (stakedBalance === null) {
-            this.#safeLogApply("ValidatorPenalty", `Invalid staked balance for validator address: ${validatorAddressString}`, writingKeyBuffer);
-            return;
-        }
-
-        if (stakedBalance.greaterThanOrEquals(BALANCE_PENEALTY)) {
-            const newStakedBalance = stakedBalance.sub(BALANCE_PENEALTY);
-            if (newStakedBalance === null) {
-                this.#safeLogApply("ValidatorPenalty", `Failed to subtract penalty from staked balance for validator address: ${validatorAddressString}`, writingKeyBuffer);
-                return;
-            }
-
-            const updatedNodeEntryWithBalance = nodeEntryUtils.setStakedBalance(validatorNodeEntryBuffer, newStakedBalance.value);
-            if (updatedNodeEntryWithBalance === null) {
-                this.#safeLogApply("ValidatorPenalty", `Failed to update staked balance in node entry for validator address: ${validatorAddressString}`, writingKeyBuffer);
-                return;
-            }
-            if (newStakedBalance.equals(BALANCE_ZERO)) {
-
-                const downgradedNodeEntry = nodeEntryUtils.setRole(updatedNodeEntryWithBalance, nodeRoleUtils.NodeRole.WHITELISTED);
-                if (downgradedNodeEntry === null) {
-                    this.#safeLogApply("ValidatorPenalty", `Failed to downgrade validator to whitelisted for address: ${validatorAddressString}`, writingKeyBuffer);
-                    return;
-                }
-                await base.removeWriter(writingKeyBuffer);
-                await batch.put(validatorAddressString, downgradedNodeEntry);
-                return;
-            } else {
-                await batch.put(validatorAddressString, updatedNodeEntryWithBalance);
-                return;
-            }
-
-        } else {
-            // should never enter into this scope
-            this.#safeLogApply("ValidatorPenalty", `Staked balance too low to penalize for validator address: ${validatorAddressString}`, writingKeyBuffer);
-            return;
-        }
-
     }
-
 
     #stakeBalanceApply(nodeEntryBuffer, node) {
         if (!nodeEntryBuffer || nodeEntryBuffer.length === 0 || nodeEntryBuffer.length !== NODE_ENTRY_SIZE) {
@@ -3198,14 +3128,84 @@ class State extends ReadyResource {
 
     }
 
-    #safeLogApply(operationType = "Common", errorMessage, writingKey = null) {
-        try {
-            const date = new Date().toISOString();
-            const wk = writingKey ? writingKey.toString('hex') : 'N/A';
-            console.error(`[${date}][${operationType}][${errorMessage}][${wk}]`);
-        } catch (e) {
-            console.error(`[LOG_ERROR][Failed to log error][${e}]`);
+    async #validatorPenaltyApply(writingKeyBuffer, batch, base) {
+        // In theory, none of the negative cases in the if-statements should occur. They are added only for safety reasons.
+
+        // 1. find validator using writingKey
+        const validatorWk = writingKeyBuffer.toString('hex');
+
+        const validatorAddressBuffer = await this.#getRegisteredWriterKeyApply(batch, validatorWk);
+        if (validatorAddressBuffer === null) {
+            this.#safeLogApply("ValidatorPenalty", `No validator found for writing key: ${validatorWk}`, writingKeyBuffer);
+            return;
         }
+
+        // 2. get it's address and convert it to string format, validate everything
+        const validatorAddressString = addressUtils.bufferToAddress(validatorAddressBuffer);
+        if (validatorAddressString === null) {
+            this.#safeLogApply("ValidatorPenalty", `Invalid validator address: ${validatorAddressString}`, writingKeyBuffer);
+            return;
+        }
+
+        const validatorPublicKey = PeerWallet.decodeBech32mSafe(validatorAddressString);
+        if (validatorPublicKey === null) {
+            this.#safeLogApply("ValidatorPenalty", `Failed to decode validator public key: ${validatorAddressString}`, writingKeyBuffer);
+            return;
+        }
+
+        // 3. get it's entry using the address
+        const validatorNodeEntryBuffer = await this.#getEntryApply(validatorAddressString, batch);
+        if (validatorNodeEntryBuffer === null) {
+            this.#safeLogApply("ValidatorPenalty", `No node entry found for validator address: ${validatorAddressString}`, writingKeyBuffer);
+            return;
+        }
+
+        const decodedValidatorNodeEntry = nodeEntryUtils.decode(validatorNodeEntryBuffer);
+        if (decodedValidatorNodeEntry === null) {
+            this.#safeLogApply("ValidatorPenalty", `Failed to decode validator node entry for address: ${validatorAddressString}`, writingKeyBuffer);
+            return;
+        }
+
+        // 4. get it's StakedBalance and convert to Balance
+        const stakedBalance = toBalance(decodedValidatorNodeEntry.stakedBalance);
+        if (stakedBalance === null) {
+            this.#safeLogApply("ValidatorPenalty", `Invalid staked balance for validator address: ${validatorAddressString}`, writingKeyBuffer);
+            return;
+        }
+
+        if (stakedBalance.greaterThanOrEquals(BALANCE_PENEALTY)) {
+            const newStakedBalance = stakedBalance.sub(BALANCE_PENEALTY);
+            if (newStakedBalance === null) {
+                this.#safeLogApply("ValidatorPenalty", `Failed to subtract penalty from staked balance for validator address: ${validatorAddressString}`, writingKeyBuffer);
+                return;
+            }
+
+            const updatedNodeEntryWithBalance = nodeEntryUtils.setStakedBalance(validatorNodeEntryBuffer, newStakedBalance.value);
+            if (updatedNodeEntryWithBalance === null) {
+                this.#safeLogApply("ValidatorPenalty", `Failed to update staked balance in node entry for validator address: ${validatorAddressString}`, writingKeyBuffer);
+                return;
+            }
+            if (newStakedBalance.equals(BALANCE_ZERO)) {
+
+                const downgradedNodeEntry = nodeEntryUtils.setRole(updatedNodeEntryWithBalance, nodeRoleUtils.NodeRole.WHITELISTED);
+                if (downgradedNodeEntry === null) {
+                    this.#safeLogApply("ValidatorPenalty", `Failed to downgrade validator to whitelisted for address: ${validatorAddressString}`, writingKeyBuffer);
+                    return;
+                }
+                await base.removeWriter(writingKeyBuffer);
+                await batch.put(validatorAddressString, downgradedNodeEntry);
+                return;
+            } else {
+                await batch.put(validatorAddressString, updatedNodeEntryWithBalance);
+                return;
+            }
+
+        } else {
+            // should never enter into this scope
+            this.#safeLogApply("ValidatorPenalty", `Staked balance too low to penalize for validator address: ${validatorAddressString}`, writingKeyBuffer);
+            return;
+        }
+
     }
     async #applyGetLicenseCount(batch){
         return await this.#getEntryApply(EntryType.LICENSE_COUNT, batch) 
