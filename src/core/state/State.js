@@ -9,7 +9,9 @@ import {
     OperationType,
     AUTOBASE_VALUE_ENCODING,
     HYPERBEE_KEY_ENCODING,
-    HYPERBEE_VALUE_ENCODING
+    HYPERBEE_VALUE_ENCODING,
+    BATCH_SIZE,
+    ADMIN_INITIAL_STAKED_BALANCE
 } from '../../utils/constants.js';
 import { isHexString, sleep } from '../../utils/helpers.js';
 import PeerWallet from 'trac-wallet';
@@ -623,13 +625,13 @@ class State extends ReadyResource {
             this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_ADMIN, "Operation has already been applied.", node.from.key)
             return;
         };
-
+                
         const newLicense = await this.#applyAssignNewLicense(batch, adminAddressBuffer);
-        const initializedNodeEntry = nodeEntryUtils.init(op.cao.iw, nodeRoleUtils.NodeRole.INDEXER, ADMIN_INITIAL_BALANCE, newLicense);
-
-        await batch.put(adminAddressString, initializedNodeEntry);
-        await batch.put(EntryType.WRITER_ADDRESS + op.cao.iw.toString('hex'), op.address);
-        await this.#updateWritersIndex(adminAddressBuffer, batch);
+        const initializedNodeEntry = nodeEntryUtils.init(op.cao.iw, nodeRoleUtils.NodeRole.INDEXER, ADMIN_INITIAL_BALANCE, newLicense, ADMIN_INITIAL_STAKED_BALANCE);
+        if (initializedNodeEntry.length === 0) {
+            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_ADMIN, "Failed to initialize node entry.", node.from.key)
+            return;
+        }
 
         // Create a new admin entry
         const newAdminEntry = adminEntryUtils.encode(adminAddressBuffer, op.cao.iw);
@@ -638,7 +640,11 @@ class State extends ReadyResource {
             return;
         };
 
-        // initialize admin entry and indexers entry
+        await batch.put(adminAddressString, initializedNodeEntry);
+        await batch.put(EntryType.WRITER_ADDRESS + op.cao.iw.toString('hex'), op.address);
+        await this.#updateWritersIndex(adminAddressBuffer, batch);
+
+        // initialize admin entry and initialization flag
         await batch.put(EntryType.ADMIN, newAdminEntry);
         await batch.put(txHashHexString, node.value);
         await batch.put(EntryType.INITIALIZATION, safeWriteUInt32BE(1, 0));
@@ -825,13 +831,13 @@ class State extends ReadyResource {
 
         const validatorNodeEntry = nodeEntryUtils.decode(validatorNodeEntryBuffer);
         if (validatorNodeEntry === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Invalid node entry.", node.from.key)
+            this.#enable_txlogs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Invalid validator node entry.", node.from.key)
             return;
         };
 
         const validatorBalance = toBalance(validatorNodeEntry.balance);
         if (validatorBalance === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Invalid validate balance.", node.from.key)
+            this.#enable_txlogs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Invalid validator balance.", node.from.key)
             return;
         };
 
@@ -2986,6 +2992,14 @@ class State extends ReadyResource {
             return null
         }
     }
+
+    /**
+     * Retrieves the address assigned to a given writing key from the registry.
+     * 
+     * @param {Object} batch - The current Hyperbee batch instance used for reading state.
+     * @param {string} writingKey - The writing key in hex string format.
+     * @returns {Buffer|null} The address buffer assigned to the writing key, or null if not registered.
+     */
 
     async #getRegisteredWriterKeyApply(batch, writingKey) {
         const entry = await batch.get(EntryType.WRITER_ADDRESS + writingKey);
