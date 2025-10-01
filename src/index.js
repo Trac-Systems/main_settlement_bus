@@ -281,8 +281,7 @@ export class MainSettlementBus extends ReadyResource {
             );
         }
 
-        await this.#state.append(null); // before initialization system.indexers is empty, we need to initialize first block to create system.indexers array
-        const txValidity = await this.#state.getIndexerSequenceState();
+        const txValidity = await blake3Hash(this.bootstrap);
         const addAdminMessage = await CompleteStateMessageOperations.assembleAddAdminMessage(
             this.#wallet,
             this.#state.writingKey,
