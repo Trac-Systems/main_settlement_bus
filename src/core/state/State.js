@@ -658,6 +658,30 @@ class State extends ReadyResource {
             return;
         };
 
+        // if transaction is not complete, do not process it.
+        if (!Object.hasOwn(op.rao, "vs") || !Object.hasOwn(op.rao, "va") || !Object.hasOwn(op.rao, "vn")) {
+            this.#enable_txlogs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Tx is not complete.", node.from.key)
+            return;
+        };
+
+        // for additional security, nonces should be different.
+        if (b4a.equals(op.rao.in, op.rao.vn)) {
+            this.#enable_txlogs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Nonces should not be the same.", node.from.key)
+            return;
+        };
+
+        // addresses should be different.
+        if (b4a.equals(op.address, op.rao.va)) {
+            this.#enable_txlogs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Addresses should be different.", node.from.key)
+            return;
+        };
+
+        // signatures should be different.
+        if (b4a.equals(op.rao.is, op.rao.vs)) {
+            this.#enable_txlogs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Signatures should be different.", node.from.key)
+            return;
+        };
+
         // Extract and validate the requester address and pubkey
         const requesterAdminAddressBuffer = op.address;
         const requesterAdminAddressString = addressUtils.bufferToAddress(requesterAdminAddressBuffer);
@@ -1068,6 +1092,30 @@ class State extends ReadyResource {
             return;
         };
 
+        // if transaction is not complete, do not process it.
+        if (!Object.hasOwn(op.rao, "vs") || !Object.hasOwn(op.rao, "va") || !Object.hasOwn(op.rao, "vn")) {
+            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_WRITER, "Tx is not complete.", node.from.key)
+            return;
+        };
+
+        // for additional security, nonces should be different.
+        if (b4a.equals(op.rao.in, op.rao.vn)) {
+            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_WRITER, "Nonces should not be the same.", node.from.key)
+            return;
+        };
+
+        // addresses should be different.
+        if (b4a.equals(op.address, op.rao.va)) {
+            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_WRITER, "Addresses should be different.", node.from.key)
+            return;
+        };
+
+        // signatures should be different.
+        if (b4a.equals(op.rao.is, op.rao.vs)) {
+            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_WRITER, "Signatures should be different.", node.from.key)
+            return;
+        };
+
         // Extract and validate the requester address
         const requesterAddressBuffer = op.address;
         const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer);
@@ -1318,6 +1366,30 @@ class State extends ReadyResource {
     async #handleApplyRemoveWriterOperation(op, view, base, node, batch) {
         if (!this.check.validateRoleAccessOperation(op)) {
             this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Contract schema validation failed.", node.from.key)
+            return;
+        };
+
+        // if transaction is not complete, do not process it.
+        if (!Object.hasOwn(op.rao, "vs") || !Object.hasOwn(op.rao, "va") || !Object.hasOwn(op.rao, "vn")) {
+            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Tx is not complete.", node.from.key)
+            return;
+        };
+
+        // for additional security, nonces should be different.
+        if (b4a.equals(op.rao.in, op.rao.vn)) {
+            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Nonces should not be the same.", node.from.key)
+            return;
+        };
+
+        // addresses should be different.
+        if (b4a.equals(op.address, op.rao.va)) {
+            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Addresses should be different.", node.from.key)
+            return;
+        };
+
+        // signatures should be different.
+        if (b4a.equals(op.rao.is, op.rao.vs)) {
+            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Signatures should be different.", node.from.key)
             return;
         };
 
