@@ -24,7 +24,7 @@ import {
 } from "./utils/constants.js";
 import partialStateMessageOperations from "./messages/partialStateMessages/PartialStateMessageOperations.js";
 import { randomBytes } from "hypercore-crypto";
-import { decimalStringToBigInt, bigIntTo16ByteBuffer, bufferToBigInt, bigIntToDecimalString } from "./utils/amountSerialization.js"
+import { decimalStringToBigInt, bigIntTo16ByteBuffer, bufferToBigInt, bigIntToDecimalString, licenseBufferToBigInt } from "./utils/amountSerialization.js"
 import { ZERO_WK } from "./utils/buffer.js";
 import { normalizeDecodedPayloadForJson, normalizeTransferOperation } from "./utils/normalizers.js"
 import PartialTransfer from "./core/network/messaging/validators/PartialTransfer.js";
@@ -363,10 +363,10 @@ export class MainSettlementBus extends ReadyResource {
             await this.#state.append(encodedPayload);
             // timesleep and validate if it becomes whitelisted
             // if node is not active we should not wait to long...
-            await this.#network.sendMessageToNode(
-                correspondingPublicKey,
-                convertAdminCoreOperationPayloadToHex(safeDecodeApplyOperation(encodedPayload))
-            )
+            // await this.#network.sendMessageToNode(
+            //     correspondingPublicKey,
+            //     convertAdminCoreOperationPayloadToHex(safeDecodeApplyOperation(encodedPayload))
+            // )
             await sleep(WHITELIST_SLEEP_INTERVAL);
             console.log(
                 `Whitelist message processed (${processedCount}/${totalElements})`
@@ -998,6 +998,34 @@ export class MainSettlementBus extends ReadyResource {
                             balance: bigIntToDecimalString(0n)
                         })
                     }
+                
+                } else if(input.startsWith("/get_license_number")){
+                    const splitted = input.split(" ");
+                    const address = splitted[1];
+                    let nodeEntry = await this.#state.getNodeEntry(address)
+                    if (nodeEntry){
+                        console.log({
+                            Address: address,
+                            License: licenseBufferToBigInt(nodeEntry.license).toString()
+                        })
+                    }
+
+                } else if(input.startsWith("/get_license_count")){
+                    const adminEntry = await this.#state.getAdminEntry();
+
+                    if (!adminEntry) {
+                        throw new Error("Cannot read license count. Admin does not exist");
+                    }
+
+                    if (!this.#isAdmin(adminEntry)) {
+                        throw new Error('Cannot perform this operation - you are not the admin!.');
+                    }          
+
+                    let licenseCount = await this.#state.getLicenseLength()
+
+                    console.log({
+                        LicensesCount: licenseCount
+                    })
                 } else if (input.startsWith("/get_txv")) {
                     const txv = await this.#state.getIndexerSequenceState();
                     console.log('Current TXV:', txv.toString('hex'));

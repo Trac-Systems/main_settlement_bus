@@ -1,4 +1,5 @@
 import b4a from "b4a";
+import { LICENSE_BYTE_LENGTH } from "./constants.js";
 
 // FUNCTUIONS TO SERIALIZE AND DESERIALIZE AMOUNTS ONLY ON CLI LEVEL. ATTENTION DO NOT USE IT ON PROTOCOL LEVEL
 export function decimalStringToBigInt(inputString, decimals = 18) {
@@ -69,6 +70,19 @@ export function bufferToBigInt(buff) {
     }
 
     return res;
+}
+
+export function licenseBufferToBigInt(buff) {
+    if (!b4a.isBuffer(buff) || buff.length !== LICENSE_BYTE_LENGTH) {
+        throw new TypeError('Input must be a 4-byte Buffer');
+    }
+
+    let result = 0n;
+    for (let i = 0; i < buff.length; i++) {
+        result += BigInt(buff[i]) << (8n * BigInt(i));
+    }
+
+    return result;
 }
 
 export function bigIntToDecimalString(bigIntValue, decimals = 18) {
