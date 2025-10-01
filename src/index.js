@@ -351,7 +351,6 @@ export class MainSettlementBus extends ReadyResource {
         for (const [address, encodedPayload] of assembledWhitelistMessages) {
             processedCount++;
             const isWhitelisted = await this.#state.isAddressWhitelisted(address);
-            const correspondingPublicKey = PeerWallet.decodeBech32m(address).toString("hex");
             if (isWhitelisted) {
                 console.error(`Public key ${address} is already whitelisted.`);
                 console.log(
@@ -363,10 +362,7 @@ export class MainSettlementBus extends ReadyResource {
             await this.#state.append(encodedPayload);
             // timesleep and validate if it becomes whitelisted
             // if node is not active we should not wait to long...
-            // await this.#network.sendMessageToNode(
-            //     correspondingPublicKey,
-            //     convertAdminCoreOperationPayloadToHex(safeDecodeApplyOperation(encodedPayload))
-            // )
+           
             await sleep(WHITELIST_SLEEP_INTERVAL);
             console.log(
                 `Whitelist message processed (${processedCount}/${totalElements})`
