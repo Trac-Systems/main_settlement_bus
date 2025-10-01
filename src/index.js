@@ -28,6 +28,7 @@ import { decimalStringToBigInt, bigIntTo16ByteBuffer, bufferToBigInt, bigIntToDe
 import { ZERO_WK } from "./utils/buffer.js";
 import { normalizeDecodedPayloadForJson, normalizeTransferOperation } from "./utils/normalizers.js"
 import PartialTransfer from "./core/network/messaging/validators/PartialTransfer.js";
+import { blake3Hash } from "./utils/crypto.js";
 
 //TODO create a MODULE which will separate logic responsible for role managment
 
@@ -699,7 +700,6 @@ export class MainSettlementBus extends ReadyResource {
             console.log(`Total: ${bigIntToDecimalString(totalDeductedAmount)}`);
         }
         console.log(`Expected Balance After Transfer: ${bigIntToDecimalString(expectedNewBalance)}`);
-        
     }
 
     async #handleBalanceMigrationOperation() {
@@ -853,6 +853,9 @@ export class MainSettlementBus extends ReadyResource {
                     console.log("Indexers:", formattedIndexers);
                 }
                 break;
+            case "/indexers_list":
+                console.log(await this.#state.getIndexersEntry());
+                break;
             case "/stats":
                 await verifyDag(
                     this.#state,
@@ -861,7 +864,7 @@ export class MainSettlementBus extends ReadyResource {
                     this.#state.writingKey,
                 );
                 break;
-            
+
             // DELETE BEFORE DEPLOYMENT /TEST
             case '/test':
                 const contentHash = randomBytes(32).toString('hex');

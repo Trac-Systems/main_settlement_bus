@@ -12,6 +12,7 @@ import {safeWriteUInt32BE} from "../../../utils/buffer.js";
 export const TRANSACTION_TOTAL_SIZE = 3 * WRITER_BYTE_LENGTH + 2 * TRAC_ADDRESS_SIZE + HASH_BYTE_LENGTH + NONCE_BYTE_LENGTH;
 export const BOOTSTRAP_DEPLOYMENT_SIZE = WRITER_BYTE_LENGTH + NONCE_BYTE_LENGTH + 4; // 4 bytes for OperationType because it is a UInt32BE
 export const MAXIMUM_OPERATION_PAYLOAD_SIZE = 4096; // Maximum size of a transaction buffer in bytes
+
 // 0.03 $TNK IS THE FEE FOR EACH TRANSACTION
 export const FEE = b4a.from([
     0x00, 0x00, 0x00, 0x00,
@@ -19,6 +20,11 @@ export const FEE = b4a.from([
     0x00, 0x6a, 0x94, 0xd7,
     0x4f, 0x43, 0x00, 0x00,
 ]);
+
+export const Status = Object.freeze({
+    SUCCESS: 0,
+    FAILURE: 1,
+});
 
 // TODO: This function receives too many arguments. It would be better to encapsulate them in an object.
 /**
