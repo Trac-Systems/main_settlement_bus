@@ -276,6 +276,11 @@ class State extends ReadyResource {
         return hashes;
     }
 
+    async getRegisteredWriterKey(writingKey) {
+        const entry = await this.get(EntryType.WRITER_ADDRESS + writingKey);
+        return entry ? addressUtils.addressToBuffer(entry) : null;
+    }
+
     #setupHyperbee(store) {
         this.#bee = new Hyperbee(store.get('view'), {
             extension: false,

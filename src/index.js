@@ -685,6 +685,7 @@ export class MainSettlementBus extends ReadyResource {
             amountBuffer.toString('hex'),
             txValidity.toString('hex'),
         )
+        
         await this.broadcastPartialTransaction(payload);
 
         const expectedNewBalance = senderBalance - totalDeductedAmount;
