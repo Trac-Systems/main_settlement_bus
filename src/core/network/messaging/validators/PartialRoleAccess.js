@@ -2,10 +2,10 @@ import b4a from 'b4a';
 import PeerWallet from 'trac-wallet';
 
 import Check from '../../../../utils/check.js';
-import {OperationType} from "../../../../utils/constants.js";
-import {blake3Hash} from "../../../../utils/crypto.js";
-import {createMessage} from "../../../../utils/buffer.js";
-import {addressToBuffer, bufferToAddress} from "../../../state/utils/address.js";
+import { OperationType } from "../../../../utils/constants.js";
+import { blake3Hash } from "../../../../utils/crypto.js";
+import { createMessage } from "../../../../utils/buffer.js";
+import { addressToBuffer, bufferToAddress } from "../../../state/utils/address.js";
 
 //TODO: Implement BASE VALIDATOR CLASS AND MOVE COMMON METHODS THERE
 
@@ -42,6 +42,7 @@ class PartialRoleAccess {
         if (!await this.#isRequesterAllowedToChangeRole(payload)) return false;
         if (!await this.#validateTransactionValidity(payload)) return false;
         if (!this.#isRoleAccessOperationNotCompleted(payload)) return false;
+        if (payload.type === OperationType.ADD_WRITER && !await this.#validateWriterKey(payload)) return false;
         return true;
     }
 
@@ -111,7 +112,7 @@ class PartialRoleAccess {
         return true;
     }
     async #isRequesterAllowedToChangeRole(payload) {
-        const {type} = payload;
+        const { type } = payload;
 
         if (type === OperationType.ADD_WRITER) {
             const nodeAddress = bufferToAddress(payload.address);
@@ -134,6 +135,7 @@ class PartialRoleAccess {
             }
 
             return true;
+
         } else if (type === OperationType.REMOVE_WRITER) {
             const nodeAddress = bufferToAddress(payload.address);
             const nodeEntry = await this.state.getNodeEntry(nodeAddress);
@@ -196,6 +198,30 @@ class PartialRoleAccess {
             console.error('Role access operation must not be completed already (va, vn, vs must be undefined).');
             return false;
         }
+        return true;
+    }
+
+    async #validateWriterKey(payload) {
+        const requesterAddress = bufferToAddress(payload.address);
+        const nodeEntry = await this.state.getNodeEntry(requesterAddress);
+        if (!nodeEntry) {
+            console.error(`Node entry not found for address ${requesterAddress}`);
+            return false;
+        }
+
+        const writerKey = payload.rao.iw.toString('hex');
+        const addressFromRegisteredWritingKey = await this.state.getRegisteredWriterKey(writerKey);
+
+        if (addressFromRegisteredWritingKey !== null) {
+            const isCurrentWk = b4a.equals(nodeEntry.wk, payload.rao.iw);
+            const isOwner = b4a.equals(addressFromRegisteredWritingKey, payload.address);
+
+            if (!isCurrentWk || !isOwner) {
+                console.error('Invalid writer key: either not owned by requester or different from assigned key');
+                return false;
+            }
+        }
+
         return true;
     }
 }

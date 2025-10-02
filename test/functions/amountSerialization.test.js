@@ -1,7 +1,8 @@
 import test from 'brittle';
 import b4a from 'b4a';
-import { decimalStringToBigInt, bigIntTo16ByteBuffer, bufferToBigInt, bigIntToDecimalString } from '../../src/utils/amountSerialization.js';
+import { decimalStringToBigInt, bigIntTo16ByteBuffer, bufferToBigInt, bigIntToDecimalString, licenseBufferToBigInt } from '../../src/utils/amountSerialization.js';
 import { errorMessageIncludes } from "../utils/regexHelper.js";
+import lengthEntryUtils from '../../src/core/state/utils/lengthEntry.js';
 
 test('decimalStringToBigInt', async t => {
     // Zero cases - all valid
@@ -122,6 +123,46 @@ test('bufferToBigInt', async t => {
             errorMessageIncludes('Input must be a 16-byte Buffer'))
     ]);
 });
+
+test('licenseBufferToBigInt', async t => {
+    // Basic conversion tests
+    const zeroBuffer = b4a.from('00000000', 'hex'); 
+    t.is(licenseBufferToBigInt(zeroBuffer), 0n, 'Should convert buffer of zeros to 0');
+
+    const oneBuffer = b4a.from('00000001', 'hex'); 
+    t.is(licenseBufferToBigInt(oneBuffer), 1n, 'Should convert BE buffer with 1 at end to 1');
+
+    const number256Buffer = b4a.from('00000100', 'hex'); 
+    t.is(licenseBufferToBigInt(number256Buffer), 256n, 'Should convert BE buffer representing 256');
+
+    const maxValueBuffer = b4a.from('ffffffff', 'hex'); 
+    t.is(licenseBufferToBigInt(maxValueBuffer), (2n ** 32n - 1n), 'Should convert buffer of all f\'s to max 32-bit value');
+
+    const specificNumberBuffer = b4a.from('075bcd15', 'hex');
+    t.is(licenseBufferToBigInt(specificNumberBuffer), 123456789n, 'Should convert BE buffer to specific number (123456789)');
+
+    // Roundtrip test
+    const originalValue = 987654321n;
+    const buffer = lengthEntryUtils.encodeBE(Number(originalValue));
+    const roundtripped = licenseBufferToBigInt(buffer);
+    t.is(roundtripped, originalValue, 'Should preserve value through buffer conversion roundtrip');
+
+    // Error cases tests
+    await Promise.all([
+        t.exception.all(() => licenseBufferToBigInt(b4a.alloc(15)),
+            errorMessageIncludes('Input must be a 4-byte Buffer')),
+        t.exception.all(() => licenseBufferToBigInt(b4a.alloc(17)),
+            errorMessageIncludes('Input must be a 4-byte Buffer')),
+        t.exception.all(() => licenseBufferToBigInt(null),
+            errorMessageIncludes('Input must be a 4-byte Buffer')),
+        t.exception.all(() => licenseBufferToBigInt(undefined),
+            errorMessageIncludes('Input must be a 4-byte Buffer')),
+        t.exception.all(() => licenseBufferToBigInt('not a buffer'),
+            errorMessageIncludes('Input must be a 4-byte Buffer')),
+        t.exception.all(() => licenseBufferToBigInt([1, 2, 3, 4]),
+            errorMessageIncludes('Input must be a 4-byte Buffer'))
+    ]);
+})
 
 test('Integration: amount serialization roundtrip', async t => {
     // Test regular integer value

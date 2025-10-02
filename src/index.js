@@ -24,10 +24,11 @@ import {
 } from "./utils/constants.js";
 import partialStateMessageOperations from "./messages/partialStateMessages/PartialStateMessageOperations.js";
 import { randomBytes } from "hypercore-crypto";
-import { decimalStringToBigInt, bigIntTo16ByteBuffer, bufferToBigInt, bigIntToDecimalString } from "./utils/amountSerialization.js"
+import { decimalStringToBigInt, bigIntTo16ByteBuffer, bufferToBigInt, bigIntToDecimalString, licenseBufferToBigInt } from "./utils/amountSerialization.js"
 import { ZERO_WK } from "./utils/buffer.js";
 import { normalizeDecodedPayloadForJson, normalizeTransferOperation } from "./utils/normalizers.js"
 import PartialTransfer from "./core/network/messaging/validators/PartialTransfer.js";
+import { blake3Hash } from "./utils/crypto.js";
 
 //TODO create a MODULE which will separate logic responsible for role managment
 
@@ -205,7 +206,6 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async broadcastPartialTransaction(partialTransactionPayload) {
-        console.log(partialTransactionPayload)
         await this.#network.validator_stream.messenger.send(partialTransactionPayload);
     }
 
@@ -281,8 +281,7 @@ export class MainSettlementBus extends ReadyResource {
             );
         }
 
-        await this.#state.append(null); // before initialization system.indexers is empty, we need to initialize first block to create system.indexers array
-        const txValidity = await this.#state.getIndexerSequenceState();
+        const txValidity = await blake3Hash(this.bootstrap);
         const addAdminMessage = await CompleteStateMessageOperations.assembleAddAdminMessage(
             this.#wallet,
             this.#state.writingKey,
@@ -351,7 +350,6 @@ export class MainSettlementBus extends ReadyResource {
         for (const [address, encodedPayload] of assembledWhitelistMessages) {
             processedCount++;
             const isWhitelisted = await this.#state.isAddressWhitelisted(address);
-            const correspondingPublicKey = PeerWallet.decodeBech32m(address).toString("hex");
             if (isWhitelisted) {
                 console.error(`Public key ${address} is already whitelisted.`);
                 console.log(
@@ -363,10 +361,7 @@ export class MainSettlementBus extends ReadyResource {
             await this.#state.append(encodedPayload);
             // timesleep and validate if it becomes whitelisted
             // if node is not active we should not wait to long...
-            await this.#network.sendMessageToNode(
-                correspondingPublicKey,
-                convertAdminCoreOperationPayloadToHex(safeDecodeApplyOperation(encodedPayload))
-            )
+           
             await sleep(WHITELIST_SLEEP_INTERVAL);
             console.log(
                 `Whitelist message processed (${processedCount}/${totalElements})`
@@ -429,7 +424,7 @@ export class MainSettlementBus extends ReadyResource {
         const txValidity = await this.#state.getIndexerSequenceState();
         const assembledMessage = await PartialStateMessageOperations.assembleRemoveWriterMessage(
             this.#wallet,
-            this.#state.writingKey.toString('hex'),
+            nodeEntry.wk.toString('hex'),
             txValidity.toString('hex')
         )
 
@@ -690,6 +685,7 @@ export class MainSettlementBus extends ReadyResource {
             amountBuffer.toString('hex'),
             txValidity.toString('hex'),
         )
+        
         await this.broadcastPartialTransaction(payload);
 
         const expectedNewBalance = senderBalance - totalDeductedAmount;
@@ -704,7 +700,6 @@ export class MainSettlementBus extends ReadyResource {
             console.log(`Total: ${bigIntToDecimalString(totalDeductedAmount)}`);
         }
         console.log(`Expected Balance After Transfer: ${bigIntToDecimalString(expectedNewBalance)}`);
-        
     }
 
     async #handleBalanceMigrationOperation() {
@@ -858,6 +853,9 @@ export class MainSettlementBus extends ReadyResource {
                     console.log("Indexers:", formattedIndexers);
                 }
                 break;
+            case "/indexers_list":
+                console.log(await this.#state.getIndexersEntry());
+                break;
             case "/stats":
                 await verifyDag(
                     this.#state,
@@ -866,7 +864,7 @@ export class MainSettlementBus extends ReadyResource {
                     this.#state.writingKey,
                 );
                 break;
-            
+
             // DELETE BEFORE DEPLOYMENT /TEST
             case '/test':
                 const contentHash = randomBytes(32).toString('hex');
@@ -896,12 +894,16 @@ export class MainSettlementBus extends ReadyResource {
                     const address = splitted[1]
                     const nodeEntry = await this.#state.getNodeEntry(address)
                     if (nodeEntry) {
+                        const licenseValue = nodeEntry.license.readUInt32BE(0);
+                        const licenseDisplay = licenseValue === 0 ? 'N/A' : licenseValue.toString();
                         console.log('Node Status:', {
                             Address: address,
                             WritingKey: nodeEntry.wk.toString('hex'),
                             IsWhitelisted: nodeEntry.isWhitelisted,
                             IsWriter: nodeEntry.isWriter,
                             IsIndexer: nodeEntry.isIndexer,
+                            License: licenseDisplay,
+                            StakedBalance: bigIntToDecimalString(bufferToBigInt(nodeEntry.stakedBalance))
                         })
                         return {
                             address: address,
@@ -909,6 +911,8 @@ export class MainSettlementBus extends ReadyResource {
                             isWhitelisted: nodeEntry.isWhitelisted,
                             isWriter: nodeEntry.isWriter,
                             isIndexer: nodeEntry.isIndexer,
+                            license: licenseDisplay,
+                            stakedBalance: bigIntToDecimalString(bufferToBigInt(nodeEntry.stakedBalance))
                         }
                     } else {
                         console.log('Node Status:', {
@@ -916,6 +920,8 @@ export class MainSettlementBus extends ReadyResource {
                             IsWhitelisted: false,
                             IsWriter: false,
                             IsIndexer: false,
+                            license: 'N/A',
+                            stakedBalance: '0'
                         })
                     }
                 } else if (input.startsWith("/add_indexer")) {
@@ -939,7 +945,11 @@ export class MainSettlementBus extends ReadyResource {
                     const splitted = input.split(" ");
                     const wkHexString = splitted[1];
                     const payload = await this.#state.getSigned(EntryType.WRITER_ADDRESS + wkHexString);
-                    console.log(`Address assigned to the writer key: ${wkHexString} - ${bufferToAddress(payload)}`)
+                    if (payload === null) {
+                        console.log(`No address assigned to the writer key: ${wkHexString}`);
+                    } else {
+                        console.log(`Address assigned to the writer key: ${wkHexString} - ${bufferToAddress(payload)}`)
+                    }
                 }
                 else if (input.startsWith("/get_deployment")) {
                     const splitted = input.split(" ");
@@ -998,6 +1008,53 @@ export class MainSettlementBus extends ReadyResource {
                             balance: bigIntToDecimalString(0n)
                         })
                     }
+                
+                } else if(input.startsWith("/get_license_number")){
+                    const splitted = input.split(" ");
+                    const address = splitted[1];
+                    let nodeEntry = await this.#state.getNodeEntry(address)
+                    if (nodeEntry){
+                        console.log({
+                            Address: address,
+                            License: licenseBufferToBigInt(nodeEntry.license).toString()
+                        })
+                    }
+
+                } else if(input.startsWith("/get_license_address")) {
+                    const splitted = input.split(" ");
+                    const licenseId = parseInt(splitted[1]);
+                    
+                    if (isNaN(licenseId) || licenseId < 0) {
+                        console.log('Invalid license ID. Please provide a valid non-negative number.');
+                        return;
+                    }
+
+                    const address = await this.#state.getAddressByLicenseId(licenseId);
+                    if (address) {
+                        console.log({
+                            LicenseId: licenseId,
+                            Address: address
+                        });
+                    } else {
+                        console.log(`No address found for license ID: ${licenseId}`);
+                    }
+                    
+                } else if(input.startsWith("/get_license_count")){
+                    const adminEntry = await this.#state.getAdminEntry();
+
+                    if (!adminEntry) {
+                        throw new Error("Cannot read license count. Admin does not exist");
+                    }
+
+                    if (!this.#isAdmin(adminEntry)) {
+                        throw new Error('Cannot perform this operation - you are not the admin!.');
+                    }          
+
+                    let licenseCount = await this.#state.getLicenseCount()
+
+                    console.log({
+                        LicensesCount: licenseCount
+                    })
                 } else if (input.startsWith("/get_txv")) {
                     const txv = await this.#state.getIndexerSequenceState();
                     console.log('Current TXV:', txv.toString('hex'));

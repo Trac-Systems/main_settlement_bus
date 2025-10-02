@@ -25,6 +25,17 @@ export function decode(bufferData) {
 }
 
 /**
+ * Decodes a length entry buffer into an integer.
+ * Assumes the buffer is 4 bytes long and uses big-endian encoding.
+ *
+ * @param {Buffer} bufferData - The buffer containing the length entry.
+ * @returns {number} The decoded integer value.
+ */
+export function decodeBE(bufferData) {
+    return bufferData.readUInt32BE();
+}
+
+/**
  * Encodes an integer length into a 4-byte buffer.
  * Uses little-endian encoding.
  *
@@ -35,6 +46,30 @@ export function encode(length) {
     const buf = b4a.alloc(4);
     buf.writeUInt32LE(length);
     return buf;
+}
+
+/**
+ * Encodes an integer length into a 4-byte buffer.
+ * Uses big-endian encoding.
+ *
+ * @param {number} length - The integer length to encode.
+ * @returns {Buffer} A buffer containing the encoded length.
+ */
+export function encodeBE(length) {
+    const buf = b4a.alloc(4);
+    buf.writeUInt32BE(length);
+    return buf;
+}
+
+/**
+ * Increments a given length by 1 and encodes it into a buffer.
+ * Uses big-endian encoding.
+ *
+ * @param {number} length - The current length to increment.
+ * @returns {Buffer} A buffer containing the incremented length.
+ */
+export function incrementBE(length) {
+    return encodeBE(length + 1);
 }
 
 /**
@@ -51,6 +86,9 @@ export function increment(length) {
 export default {
     init,
     decode,
+    decodeBE,
     encode,
-    increment
+    encodeBE,
+    increment,
+    incrementBE
 };
