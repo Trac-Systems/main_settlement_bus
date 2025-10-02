@@ -612,7 +612,8 @@ class State extends ReadyResource {
             return;
         };
 
-        const initializedNodeEntry = nodeEntryUtils.init(op.cao.iw, nodeRoleUtils.NodeRole.INDEXER, ADMIN_INITIAL_BALANCE, await this.#applyAssignNewLicense(batch, adminAddressBuffer));
+        const newLicense = await this.#applyAssignNewLicense(batch, adminAddressBuffer);
+        const initializedNodeEntry = nodeEntryUtils.init(op.cao.iw, nodeRoleUtils.NodeRole.INDEXER, ADMIN_INITIAL_BALANCE, newLicense);
 
         await batch.put(adminAddressString, initializedNodeEntry);
         await batch.put(EntryType.WRITER_ADDRESS + op.cao.iw.toString('hex'), op.address);
@@ -997,6 +998,8 @@ class State extends ReadyResource {
             await batch.put(adminAddressString, updatedAdminEntry);
         }
 
+        const newLicense = await this.#applyAssignNewLicense(batch, nodeAddressBuffer);
+
         if (!nodeEntry) {
             // If the node entry does not exist, create a new whitelisted node entry
             /*
@@ -1024,14 +1027,14 @@ class State extends ReadyResource {
                 in the network if you possess a valid wk. As an indirect user, this characteristic doesn't affect you.
 
             */
-            const initializedNodeEntry = nodeEntryUtils.init(ZERO_WK, nodeRoleUtils.NodeRole.WHITELISTED, ZERO_BALANCE, await this.#applyAssignNewLicense(batch, nodeAddressBuffer));
+            const initializedNodeEntry = nodeEntryUtils.init(ZERO_WK, nodeRoleUtils.NodeRole.WHITELISTED, ZERO_BALANCE, newLicense);
             await batch.put(nodeAddressString, initializedNodeEntry);
             await batch.put(hashHexString, node.value);
         } else {
             // If the node entry exists, update its role to WHITELISTED. Case if account will buy license from market but it existed before - for example it had balance.
             // I assume since we dont have a marketplace now, that we by default assign a new license to any whitelisted node.
             const editedNodeEntry = nodeEntryUtils.setRole(nodeEntry, nodeRoleUtils.NodeRole.WHITELISTED);
-            const nodeEntryWithNewLicense = nodeEntryUtils.setLicense(editedNodeEntry, await this.#applyAssignNewLicense(batch, nodeAddressBuffer))
+            const nodeEntryWithNewLicense = nodeEntryUtils.setLicense(editedNodeEntry, newLicense)
             await batch.put(nodeAddressString, nodeEntryWithNewLicense);
             await batch.put(hashHexString, node.value);
         }
