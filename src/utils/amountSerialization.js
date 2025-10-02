@@ -79,7 +79,8 @@ export function licenseBufferToBigInt(buff) {
 
     let result = 0n;
     for (let i = 0; i < buff.length; i++) {
-        result += BigInt(buff[i]) << (8n * BigInt(i));
+        const shift = 8n * BigInt(buff.length - 1 - i); 
+        result += BigInt(buff[i]) << shift;
     }
 
     return result;

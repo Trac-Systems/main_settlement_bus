@@ -1017,7 +1017,7 @@ export class MainSettlementBus extends ReadyResource {
                         throw new Error('Cannot perform this operation - you are not the admin!.');
                     }          
 
-                    let licenseCount = await this.#state.getLicenseLength()
+                    let licenseCount = await this.#state.getLicenseCount()
 
                     console.log({
                         LicensesCount: licenseCount
