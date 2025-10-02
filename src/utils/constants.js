@@ -45,6 +45,7 @@ export const EventType = Object.freeze({
 // Token
 export const TOKEN_DECIMALS = 18n
 export const ADMIN_INITIAL_BALANCE = b4a.from([0, 0, 0, 0, 0, 0, 0, 54, 53, 201, 173, 197, 222, 160, 0, 0]) // 1000 in a 18 decimals token
+export const ADMIN_INITIAL_STAKED_BALANCE = b4a.from([0, 0, 0, 0, 0, 0, 0, 0,4, 41, 208, 105, 24, 158, 0, 0]) // 0.3 in a 18 decimals token
 
 export const WHITELIST_FILEPATH = './whitelist/addresses.csv';
 export const BALANCE_MIGRATION_FILEPATH = './migration/initial_balances.csv';
@@ -56,10 +57,15 @@ export const MAX_PEERS = 64;
 export const MAX_PARALLEL = 64;
 export const MAX_SERVER_CONNECTIONS = Infinity;
 export const MAX_CLIENT_CONNECTIONS = Infinity;
-export const ACK_INTERVAL = 1_000;
 export const DHT_BOOTSTRAPS = ['116.202.214.149:10001', '157.180.12.214:10001', 'node1.hyperdht.org:49737', 'node2.hyperdht.org:49737', 'node3.hyperdht.org:49737'];
-export const MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION = 25;
-// checkjs
+export const MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION = 10;
+// State
+export const ACK_INTERVAL = 1_000;
+export const AUTOBASE_VALUE_ENCODING = 'binary';
+export const HYPERBEE_KEY_ENCODING = 'ascii';
+export const HYPERBEE_VALUE_ENCODING = 'binary';
+// check.js
+
 //ATTENTION - THIS IS USED IN THE APPLY FUNCTION!
 export const WRITER_BYTE_LENGTH = 32;
 export const BOOTSTRAP_BYTE_LENGTH = 32;
@@ -73,7 +79,7 @@ export const MAX_SAFE_VALIDATION_INTEGER = 0xFFFFFFFF;
 
 export const LICENSE_BYTE_LENGTH = 4;
 
-// index
+// index.js
 export const BOOTSTRAP_HEXSTRING_LENGTH = 64;
 
 // Pool constants
