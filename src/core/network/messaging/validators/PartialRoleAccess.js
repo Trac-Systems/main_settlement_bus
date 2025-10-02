@@ -42,7 +42,7 @@ class PartialRoleAccess {
         if (!await this.#isRequesterAllowedToChangeRole(payload)) return false;
         if (!await this.#validateTransactionValidity(payload)) return false;
         if (!this.#isRoleAccessOperationNotCompleted(payload)) return false;
-        if (!await this.#validateWriterKey(payload)) return false;
+        if (payload.type === OperationType.ADD_WRITER && !await this.#validateWriterKey(payload)) return false;
         return true;
     }
 
@@ -202,8 +202,6 @@ class PartialRoleAccess {
     }
 
     async #validateWriterKey(payload) {
-        if (payload.type !== OperationType.ADD_WRITER) return true;
-
         const requesterAddress = bufferToAddress(payload.address);
         const nodeEntry = await this.state.getNodeEntry(requesterAddress);
         if (!nodeEntry) {
