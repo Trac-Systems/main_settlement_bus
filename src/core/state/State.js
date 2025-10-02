@@ -2273,10 +2273,18 @@ class State extends ReadyResource {
 
         // Remove the writer role and update the state
         if (isWriter) {
+            const finalNodeEntry = this.#withdrawStakedBalanceApply(updatedToBanNodeEntry, node);
+            if (finalNodeEntry === null) {
+                this.#enable_txlogs && this.#safeLogApply(OperationType.BAN_VALIDATOR, "Failed to withdraw staked balance.", node.from.key)
+                return Status.FAILURE;
+            }
             await base.removeWriter(decodedToBanNodeEntry.wk);
+            await batch.put(nodeToBeBannedAddressString, finalNodeEntry);
+
+        } else {
+            await batch.put(nodeToBeBannedAddressString, updatedToBanNodeEntry);
         }
 
-        await batch.put(nodeToBeBannedAddressString, updatedToBanNodeEntry);
         await batch.put(requesterAddressString, updatedAdminNodeEntry);
         await batch.put(txHashHexString, node.value);
         console.log(`Node has been banned: addr:wk:tx - ${nodeToBeBannedAddressString}:${decodedToBanNodeEntry.wk.toString('hex')}:${txHashHexString}`);
