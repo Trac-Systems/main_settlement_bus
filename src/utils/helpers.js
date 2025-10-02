@@ -53,9 +53,7 @@ export async function getFormattedIndexersWithAddresses(state) {
     }));
 
     const results = await Promise.all(
-        formatted.map(async (entry) => {
-            console.log(EntryType.WRITER_ADDRESS + entry.writingKey);
-            
+        formatted.map(async (entry) => {            
             const address = bufferToAddress(await state.getSigned(EntryType.WRITER_ADDRESS + entry.writingKey));
 
             return {
