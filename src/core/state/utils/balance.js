@@ -296,8 +296,7 @@ export function toBalance(balance) {
         return null
     }
 }
-// 
+
 export const BALANCE_FEE = toBalance(FEE);
 export const BALANCE_TO_STAKE = BALANCE_FEE.mul(toTerm(10n));
 export const BALANCE_ZERO = toBalance(ZERO_BALANCE);
-export const BALANCE_PENEALTY = BALANCE_FEE;
