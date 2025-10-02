@@ -165,7 +165,7 @@ class State extends ReadyResource {
 
     async getWriterLength() {
         const writersLength = await this.getSigned(EntryType.WRITERS_LENGTH);
-        return writersLength ? lengthEntryUtils.decode(writersLength) : null;
+        return writersLength ? lengthEntryUtils.decodeBE(writersLength) : null;
     }
 
     // Not using it, but figured it might spark an idea for a cli command for licenses count or some util.
@@ -2934,12 +2934,12 @@ class State extends ReadyResource {
         if (null === length) {
             // Initialize the writers length entry if it does not exist
             const bufferedLength = lengthEntryUtils.init(0);
-            length = lengthEntryUtils.decode(bufferedLength);
-            incrementedLength = lengthEntryUtils.increment(length);
+            length = lengthEntryUtils.decodeBE(bufferedLength);
+            incrementedLength = lengthEntryUtils.incrementBE(length);
         } else {
             // Decode and increment the existing writers length entry
-            length = lengthEntryUtils.decode(length);
-            incrementedLength = lengthEntryUtils.increment(length);
+            length = lengthEntryUtils.decodeBE(length);
+            incrementedLength = lengthEntryUtils.incrementBE(length);
         }
         if (null === incrementedLength) return;
 
