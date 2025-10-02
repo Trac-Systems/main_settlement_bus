@@ -12,10 +12,10 @@ import { isHexString, sleep } from '../../utils/helpers.js';
 import PeerWallet from 'trac-wallet';
 import Check from '../../utils/check.js';
 import { safeDecodeApplyOperation } from '../../utils/protobuf/operationHelpers.js';
-import { createMessage, ZERO_WK, isBufferValid } from '../../utils/buffer.js';
+import { createMessage, ZERO_WK } from '../../utils/buffer.js';
 import addressUtils from './utils/address.js';
 import adminEntryUtils from './utils/adminEntry.js';
-import nodeEntryUtils, { setWritingKey, ZERO_BALANCE, NODE_ENTRY_SIZE } from './utils/nodeEntry.js';
+import nodeEntryUtils, { setWritingKey, ZERO_BALANCE } from './utils/nodeEntry.js';
 import nodeRoleUtils from './utils/roles.js';
 import lengthEntryUtils from './utils/lengthEntry.js';
 import transactionUtils from './utils/transaction.js';
@@ -165,7 +165,13 @@ class State extends ReadyResource {
 
     async getWriterLength() {
         const writersLength = await this.getSigned(EntryType.WRITERS_LENGTH);
-        return writersLength ? lengthEntryUtils.decode(writersLength) : null;
+        return writersLength ? lengthEntryUtils.decodeBE(writersLength) : null;
+    }
+
+    // Not using it, but figured it might spark an idea for a cli command for licenses count or some util.
+    async getLicenseCount() {
+        const licenseLength = await this.getSigned(EntryType.LICENSE_COUNT);
+        return licenseLength ? lengthEntryUtils.decodeBE(licenseLength) : null;
     }
 
     async getWriterIndex(index) {
@@ -606,7 +612,8 @@ class State extends ReadyResource {
             return;
         };
 
-        const initializedNodeEntry = nodeEntryUtils.init(op.cao.iw, nodeRoleUtils.NodeRole.INDEXER, ADMIN_INITIAL_BALANCE);
+        const newLicense = await this.#applyAssignNewLicense(batch, adminAddressBuffer);
+        const initializedNodeEntry = nodeEntryUtils.init(op.cao.iw, nodeRoleUtils.NodeRole.INDEXER, ADMIN_INITIAL_BALANCE, newLicense);
 
         await batch.put(adminAddressString, initializedNodeEntry);
         await batch.put(EntryType.WRITER_ADDRESS + op.cao.iw.toString('hex'), op.address);
@@ -991,6 +998,8 @@ class State extends ReadyResource {
             await batch.put(adminAddressString, updatedAdminEntry);
         }
 
+        const newLicense = await this.#applyAssignNewLicense(batch, nodeAddressBuffer);
+
         if (!nodeEntry) {
             // If the node entry does not exist, create a new whitelisted node entry
             /*
@@ -1018,13 +1027,15 @@ class State extends ReadyResource {
                 in the network if you possess a valid wk. As an indirect user, this characteristic doesn't affect you.
 
             */
-            const initializedNodeEntry = nodeEntryUtils.init(ZERO_WK, nodeRoleUtils.NodeRole.WHITELISTED);
+            const initializedNodeEntry = nodeEntryUtils.init(ZERO_WK, nodeRoleUtils.NodeRole.WHITELISTED, ZERO_BALANCE, newLicense);
             await batch.put(nodeAddressString, initializedNodeEntry);
             await batch.put(hashHexString, node.value);
         } else {
             // If the node entry exists, update its role to WHITELISTED. Case if account will buy license from market but it existed before - for example it had balance.
+            // I assume since we dont have a marketplace now, that we by default assign a new license to any whitelisted node.
             const editedNodeEntry = nodeEntryUtils.setRole(nodeEntry, nodeRoleUtils.NodeRole.WHITELISTED);
-            await batch.put(nodeAddressString, editedNodeEntry);
+            const nodeEntryWithNewLicense = nodeEntryUtils.setLicense(editedNodeEntry, newLicense)
+            await batch.put(nodeAddressString, nodeEntryWithNewLicense);
             await batch.put(hashHexString, node.value);
         }
         // Only whitelisted node will be able to become a writer/indexer.
@@ -2923,12 +2934,12 @@ class State extends ReadyResource {
         if (null === length) {
             // Initialize the writers length entry if it does not exist
             const bufferedLength = lengthEntryUtils.init(0);
-            length = lengthEntryUtils.decode(bufferedLength);
-            incrementedLength = lengthEntryUtils.increment(length);
+            length = lengthEntryUtils.decodeBE(bufferedLength);
+            incrementedLength = lengthEntryUtils.incrementBE(length);
         } else {
             // Decode and increment the existing writers length entry
-            length = lengthEntryUtils.decode(length);
-            incrementedLength = lengthEntryUtils.increment(length);
+            length = lengthEntryUtils.decodeBE(length);
+            incrementedLength = lengthEntryUtils.incrementBE(length);
         }
         if (null === incrementedLength) return;
 
@@ -2945,6 +2956,32 @@ class State extends ReadyResource {
         } catch (e) {
             console.error(`[LOG_ERROR][Failed to log error][${e}]`);
         }
+    }
+    async #applyGetLicenseCount(batch){
+        return await this.#getEntryApply(EntryType.LICENSE_COUNT, batch) 
+    }
+
+    async #applyAssignNewLicense(batch, validatorAddressBuffer){
+        let licenseCount = await this.#applyGetLicenseCount(batch)
+        let newLicenseLength;
+        if (null === licenseCount) {
+            // Initialize the writers length entry if it does not exist
+            const bufferedLength = lengthEntryUtils.init(0);
+            licenseCount = lengthEntryUtils.decodeBE(bufferedLength);
+            newLicenseLength = lengthEntryUtils.incrementBE(licenseCount);
+        } else {
+            // Decode and increment the existing writers length entry
+            licenseCount = lengthEntryUtils.decodeBE(licenseCount);
+            newLicenseLength = lengthEntryUtils.incrementBE(licenseCount);
+        }
+
+        if (null === newLicenseLength) return;
+        if (null === validatorAddressBuffer) return;
+
+        await batch.put(EntryType.LICENSE_COUNT, newLicenseLength)
+        await batch.put(EntryType.LICENSE_INDEX + licenseCount, validatorAddressBuffer)
+
+        return newLicenseLength;
     }
 }
 

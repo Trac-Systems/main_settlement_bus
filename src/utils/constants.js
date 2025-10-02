@@ -10,7 +10,9 @@ export const EntryType = Object.freeze({
     WRITERS_INDEX: 'wri/',
     WRITER_ADDRESS: 'wka/',
     DEPLOYMENT: 'deployment/',
-    INITIALIZATION: 'init'
+    INITIALIZATION: 'init',
+    LICENSE_COUNT: 'lc',
+    LICENSE_INDEX: 'li/',
 });
 
 //ATTENTION - THIS IS USED IN THE APPLY FUNCTION!
