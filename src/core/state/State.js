@@ -668,7 +668,7 @@ class State extends ReadyResource {
             this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_ADMIN, "Operation has already been applied.", node.from.key)
             return Status.FAILURE;
         };
-                
+
         const newLicense = await this.#applyAssignNewLicense(batch, adminAddressBuffer);
         const initializedNodeEntry = nodeEntryUtils.init(op.cao.iw, nodeRoleUtils.NodeRole.INDEXER, ADMIN_INITIAL_BALANCE, newLicense, ADMIN_INITIAL_STAKED_BALANCE);
         if (initializedNodeEntry.length === 0) {
@@ -685,7 +685,7 @@ class State extends ReadyResource {
 
         await batch.put(adminAddressString, initializedNodeEntry);
         await batch.put(EntryType.WRITER_ADDRESS + op.cao.iw.toString('hex'), op.address);
-        await this.#updateWritersIndex(adminAddressBuffer, batch);
+        await this.#updateWritersIndex(adminAddressBuffer, batch); //TODO: should be splited into a separated atomic operation
 
         // initialize admin entry and initialization flag
         await batch.put(EntryType.ADMIN, newAdminEntry);
@@ -1087,8 +1087,6 @@ class State extends ReadyResource {
             await batch.put(adminAddressString, updatedAdminEntry);
         }
 
-        const newLicense = await this.#applyAssignNewLicense(batch, nodeAddressBuffer);
-
         if (!nodeEntry) {
             // If the node entry does not exist, create a new whitelisted node entry
             /*
@@ -1116,15 +1114,47 @@ class State extends ReadyResource {
                 in the network if you possess a valid wk. As an indirect user, this characteristic doesn't affect you.
 
             */
-            const initializedNodeEntry = nodeEntryUtils.init(ZERO_WK, nodeRoleUtils.NodeRole.WHITELISTED, ZERO_BALANCE, newLicense);
+            // If node does not exist, then create a new licence. 
+            const newLicense = await this.#applyAssignNewLicense(batch, nodeAddressBuffer); // TODO: Should be splited into atomic operation
+
+            const initializedNodeEntry = nodeEntryUtils.init(ZERO_WK, nodeRoleUtils.NodeRole.WHITELISTED, nodeRoleUtils.ZERO_BALANCE, newLicense);
+            if (initializedNodeEntry.length === 0) {
+                this.#enable_txlogs && this.#safeLogApply(OperationType.APPEND_WHITELIST, "Failed to initialize node entry.", node.from.key)
+                return Status.FAILURE;
+            }
+            
             await batch.put(nodeAddressString, initializedNodeEntry);
             await batch.put(hashHexString, node.value);
         } else {
             // If the node entry exists, update its role to WHITELISTED. Case if account will buy license from market but it existed before - for example it had balance.
             // I assume since we dont have a marketplace now, that we by default assign a new license to any whitelisted node.
+
+            const decodedNodeEntry = nodeEntryUtils.decode(nodeEntry);
+            if (decodedNodeEntry === null) {
+                this.#enable_txlogs && this.#safeLogApply(OperationType.APPEND_WHITELIST, "Failed to decode node entry.", node.from.key)
+                return Status.FAILURE;
+            };
             const editedNodeEntry = nodeEntryUtils.setRole(nodeEntry, nodeRoleUtils.NodeRole.WHITELISTED);
-            const nodeEntryWithNewLicense = nodeEntryUtils.setLicense(editedNodeEntry, newLicense)
-            await batch.put(nodeAddressString, nodeEntryWithNewLicense);
+
+            if (editedNodeEntry === null) {
+                this.#enable_txlogs && this.#safeLogApply(OperationType.APPEND_WHITELIST, "Failed to edit node entry.", node.from.key)
+                return Status.FAILURE;
+            }
+
+            // Edge case: if the user license is not ZERO_LICENSE, then we do not assign a new license. 
+            // This means the admin has decided to unban the node. 
+            // This is important because if the admin mistakenly whitelists a node that already has a license, 
+            // the previous license could be overwritten and lost permanently. 
+            // Therefore, in this case we do not overwrite the license — we only change the role.
+            if (!b4a.equals(decodedNodeEntry.license, nodeEntryUtils.ZERO_LICENSE)) {
+                await batch.put(nodeAddressString, editedNodeEntry);
+
+            } else {
+                const newLicense = await this.#applyAssignNewLicense(batch, nodeAddressBuffer); // TODO: Should be splited into atomic operation
+                const nodeEntryWithNewLicense = nodeEntryUtils.setLicense(editedNodeEntry, newLicense)
+                await batch.put(nodeAddressString, nodeEntryWithNewLicense);
+            }
+
             await batch.put(hashHexString, node.value);
         }
         // Only whitelisted node will be able to become a writer/indexer.
@@ -1404,7 +1434,7 @@ class State extends ReadyResource {
             await batch.put(EntryType.WRITER_ADDRESS + op.rao.iw.toString('hex'), op.address);
         }
 
-        await this.#updateWritersIndex(requesterAddressBuffer, batch);
+        await this.#updateWritersIndex(requesterAddressBuffer, batch); //TODO: should be splited into a separated atomic operation
         await batch.put(txHashHexString, node.value);
 
         // Pay the fee to the validator
@@ -1972,6 +2002,7 @@ class State extends ReadyResource {
             this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_INDEXER, "Operation has already been applied.", node.from.key)
             return Status.FAILURE;
         };
+        
         const removeIndexerResult = await this.#removeIndexer(op, node, batch, base, txHashHexString, toRemoveAddressString, toRemoveAddressBuffer, requesterAddressString);
         if (removeIndexerResult === null) {
             return Status.FAILURE;
@@ -2055,7 +2086,7 @@ class State extends ReadyResource {
         await base.addWriter(decodedNodeEntry.wk, { isIndexer: false });
 
         // update writers index and length
-        await this.#updateWritersIndex(toRemoveAddressBuffer, batch);
+        await this.#updateWritersIndex(toRemoveAddressBuffer, batch); //TODO: should be splited into a separated atomic operation
 
         //update node entry and indexers entry
         await batch.put(toRemoveAddressString, updatedNodeEntry);
@@ -3284,7 +3315,6 @@ class State extends ReadyResource {
         if (adminEntryBuffer === null) {
             this.#safeLogApply("ValidatorPenalty", "Admin entry not found", writingKeyBuffer);
             return;
-        
         }
         const adminEntry = adminEntryUtils.decode(adminEntryBuffer);
         if (adminEntry === null) {

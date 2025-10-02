@@ -123,6 +123,8 @@ export function encode(node) {
  *   - isWriter: Boolean indicating if the node is a writer.
  *   - isIndexer: Boolean indicating if the node is an indexer.
  *   - balance: Buffer representing the balance in its atomic unit.
+ *   - license: Buffer representing the license ID
+ *   - stakedBalance: Buffer representing the staked balance in its atomic unit.
  *   Returns null if the buffer is invalid or an error occurs.
  */
 export function decode(nodeEntry) {
@@ -328,6 +330,7 @@ export function setRoleAndWriterKey(nodeEntry, nodeRole, writingKey) {
 
 export default {
     NODE_ENTRY_SIZE,
+    ZERO_LICENSE,
     init,
     encode,
     decode,
