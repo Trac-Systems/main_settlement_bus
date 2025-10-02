@@ -45,7 +45,7 @@ export const EventType = Object.freeze({
 // Token
 export const TOKEN_DECIMALS = 18n
 export const ADMIN_INITIAL_BALANCE = b4a.from([0, 0, 0, 0, 0, 0, 0, 54, 53, 201, 173, 197, 222, 160, 0, 0]) // 1000 in a 18 decimals token
-export const ADMIN_INITIAL_STAKED_BALANCE = b4a.from([0, 0, 0, 0, 0, 0, 0, 0, 2, 20, 232, 52, 140, 79, 0, 0]) // 0.15 in a 18 decimals token
+export const ADMIN_INITIAL_STAKED_BALANCE = b4a.from([0, 0, 0, 0, 0, 0, 0, 0,4, 41, 208, 105, 24, 158, 0, 0]) // 0.3 in a 18 decimals token
 
 export const WHITELIST_FILEPATH = './whitelist/addresses.csv';
 export const BALANCE_MIGRATION_FILEPATH = './migration/initial_balances.csv';
