@@ -190,6 +190,11 @@ class State extends ReadyResource {
         return licenseLength ? lengthEntryUtils.decodeBE(licenseLength) : null;
     }
 
+    async getAddressByLicenseId(licenseId) {
+        const address = await this.getSigned(EntryType.LICENSE_INDEX + licenseId);
+        return address ? addressUtils.bufferToAddress(address) : null;
+    }
+
     async getWriterIndex(index) {
         if (index < 0 || index > Number.MAX_SAFE_INTEGER) return null;
         const writerPublicKey = await this.getSigned(EntryType.WRITERS_INDEX + index);
@@ -2002,7 +2007,7 @@ class State extends ReadyResource {
             this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_INDEXER, "Operation has already been applied.", node.from.key)
             return Status.FAILURE;
         };
-        
+
         const removeIndexerResult = await this.#removeIndexer(op, node, batch, base, txHashHexString, toRemoveAddressString, toRemoveAddressBuffer, requesterAddressString);
         if (removeIndexerResult === null) {
             return Status.FAILURE;

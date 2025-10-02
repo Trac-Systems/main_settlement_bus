@@ -1020,6 +1020,25 @@ export class MainSettlementBus extends ReadyResource {
                         })
                     }
 
+                } else if(input.startsWith("/get_license_address")) {
+                    const splitted = input.split(" ");
+                    const licenseId = parseInt(splitted[1]);
+                    
+                    if (isNaN(licenseId) || licenseId < 0) {
+                        console.log('Invalid license ID. Please provide a valid non-negative number.');
+                        return;
+                    }
+
+                    const address = await this.#state.getAddressByLicenseId(licenseId);
+                    if (address) {
+                        console.log({
+                            LicenseId: licenseId,
+                            Address: address
+                        });
+                    } else {
+                        console.log(`No address found for license ID: ${licenseId}`);
+                    }
+                    
                 } else if(input.startsWith("/get_license_count")){
                     const adminEntry = await this.#state.getAdminEntry();
 
