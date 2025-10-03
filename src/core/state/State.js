@@ -3468,12 +3468,13 @@ class State extends ReadyResource {
             licenseCount = lengthEntryUtils.decodeBE(licenseCount);
             newLicenseLength = lengthEntryUtils.incrementBE(licenseCount);
         }
-
+        const decodedNewLicenseLength = lengthEntryUtils.decodeBE(newLicenseLength);
         if (null === newLicenseLength) return;
         if (null === validatorAddressBuffer) return;
+        if (null === decodedNewLicenseLength) return;
 
         await batch.put(EntryType.LICENSE_COUNT, newLicenseLength)
-        await batch.put(EntryType.LICENSE_INDEX + licenseCount, validatorAddressBuffer)
+        await batch.put(EntryType.LICENSE_INDEX + decodedNewLicenseLength, validatorAddressBuffer)
 
         return newLicenseLength;
     }
