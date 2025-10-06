@@ -3443,7 +3443,7 @@ class State extends ReadyResource {
             return null;
         }
 
-        // Validator always gets 50% of the fee
+        // Validator always gets 50% of the fee by the base
         const validatorNodeEntryBuffer = await this.#getEntryApply(validatorAddressString, batch);
         if (validatorNodeEntryBuffer === null) {
             return null;
@@ -3486,12 +3486,7 @@ class State extends ReadyResource {
         // 2. 25% is burned
         if (validatorAddressString === subnetworkCreatorAddressString) {
             // We already added 50% as validator fee, now add only the additional 25%
-            const additionalDeployerFee = feeAmount.percentage(PERCENT_25);
-            if (additionalDeployerFee === null) {
-                return null;
-            }
-
-            const newValidatorBalanceWithBonus = newValidatorBalance.add(additionalDeployerFee);
+            const newValidatorBalanceWithBonus = newValidatorBalance.add(feeAmount.percentage(PERCENT_25));
             if (newValidatorBalanceWithBonus === null) {
                 return null;
             }
