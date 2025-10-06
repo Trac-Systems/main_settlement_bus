@@ -1127,7 +1127,7 @@ class State extends ReadyResource {
                 this.#enable_txlogs && this.#safeLogApply(OperationType.APPEND_WHITELIST, "Failed to initialize node entry.", node.from.key)
                 return Status.FAILURE;
             }
-            
+
             await batch.put(nodeAddressString, initializedNodeEntry);
             await batch.put(hashHexString, node.value);
         } else {
@@ -2678,114 +2678,37 @@ class State extends ReadyResource {
             this.#enable_txlogs && this.#safeLogApply(OperationType.TX, "Invalid fee amount.", node.from.key)
             return Status.FAILURE;
         };
-        // charge fee from the requester
-        const requesterNodeEntryBuffer = await this.#getEntryApply(requesterAddressString, batch);
-        if (requesterNodeEntryBuffer === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TX, "Invalid requester node entry buffer.", node.from.key)
+
+        const transferFeeTxOperationResult = await this.#transferFeeTxOperation(
+            requesterAddressString,
+            validatorAddressString,
+            subnetworkCreatorAddressString,
+            feeAmount,
+            batch
+        );
+
+        if (transferFeeTxOperationResult === null) {
+            this.#enable_txlogs && this.#safeLogApply(OperationType.TX, "Fee transfer operation failed completely.", node.from.key)
             return Status.FAILURE;
-        };
+        }
 
-        const requesterNodeEntry = nodeEntryUtils.decode(requesterNodeEntryBuffer);
-        if (requesterNodeEntry === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TX, "Failed to decode requester public key.", node.from.key)
+        if (transferFeeTxOperationResult.requesterEntry === null) {
+            this.#enable_txlogs && this.#safeLogApply(OperationType.TX, "Failed to process requester fee deduction.", node.from.key)
             return Status.FAILURE;
-        };
+        }
 
-        const requesterBalance = toBalance(requesterNodeEntry.balance);
-        if (requesterBalance === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TX, "Invalid requester balance.", node.from.key)
+        if (transferFeeTxOperationResult.validatorEntry === null) {
+            this.#enable_txlogs && this.#safeLogApply(OperationType.TX, "Failed to process validator fee reward.", node.from.key)
             return Status.FAILURE;
-        };
+        }
 
-        if (!requesterBalance.greaterThanOrEquals(feeAmount)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TX, "Insufficient requester balance.", node.from.key)
-            return Status.FAILURE;
-        };
+        await batch.put(requesterAddressString, transferFeeTxOperationResult.requesterEntry);
+        await batch.put(validatorAddressString, transferFeeTxOperationResult.validatorEntry);
 
-        const newRequesterBalance = requesterBalance.sub(feeAmount);
-        if (newRequesterBalance === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TX, "Failed to apply fee to requester.", node.from.key)
-            return Status.FAILURE;
-        };
-
-        const updatedRequesterNodeEntry = newRequesterBalance.update(requesterNodeEntryBuffer);
-        if (updatedRequesterNodeEntry === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TX, "Failed to update requester node balance.", node.from.key)
-            return Status.FAILURE;
-        };
-
-        // reward validator for processing this transaction. 50% of the fee goes to the validator
-        const validatorNodeEntryBuffer = await this.#getEntryApply(validatorAddressString, batch);
-        if (validatorNodeEntryBuffer === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TX, "Invalid validator node entry buffer.", node.from.key)
-            return Status.FAILURE;
-        };
-
-        const validatorNodeEntry = nodeEntryUtils.decode(validatorNodeEntryBuffer);
-        if (validatorNodeEntry === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TX, "Failed to decode validator public key.", node.from.key)
-            return Status.FAILURE;
-        };
-
-        const validatorBalance = toBalance(validatorNodeEntry.balance);
-        if (validatorBalance === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TX, "Invalid validator balance.", node.from.key)
-            return Status.FAILURE;
-        };
-
-        const newValidatorBalance = validatorBalance.add(feeAmount.percentage(PERCENT_50));
-        if (newValidatorBalance === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TX, "Failed to transfer fee to validator.", node.from.key)
-            return Status.FAILURE;
-        };
-
-        const updatedValidatorNodeEntry = newValidatorBalance.update(validatorNodeEntryBuffer)
-        if (updatedValidatorNodeEntry === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TX, "Failed to update validator node balance.", node.from.key)
-            return Status.FAILURE;
-        };
-
-        // reward subnetwork creator for allowing this transaction to be executed on their bootstrap.
-        // 25% of the fee goes to the subnetwork creator.
-
-        const subnetworkCreatorNodeEntryBuffer = await this.#getEntryApply(subnetworkCreatorAddressString, batch);
-        if (subnetworkCreatorNodeEntryBuffer === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TX, "Invalid subnet creator node entry buffer.", node.from.key)
-            return Status.FAILURE;
-        };
-
-        const subnetworkCreatorNodeEntry = nodeEntryUtils.decode(subnetworkCreatorNodeEntryBuffer);
-        if (subnetworkCreatorNodeEntry === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TX, "Failed to decode subnet creator node entry.", node.from.key)
-            return Status.FAILURE;
-        };
-
-        const subnetworkCreatorBalance = toBalance(subnetworkCreatorNodeEntry.balance);
-        if (subnetworkCreatorBalance === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TX, "Invalid subnet creator balance.", node.from.key)
-            return Status.FAILURE;
-        };
-
-        const newSubnetworkCreatorBalance = subnetworkCreatorBalance.add(feeAmount.percentage(PERCENT_25));
-        if (newSubnetworkCreatorBalance === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TX, "Failed to apply fee to subnet creator balance.", node.from.key)
-            return Status.FAILURE;
-        };
-
-        const updatedSubnetworkCreatorNodeEntry = newSubnetworkCreatorBalance.update(subnetworkCreatorNodeEntryBuffer);
-        if (updatedSubnetworkCreatorNodeEntry === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TX, "Failed to update subnet creator node balance.", node.from.key)
-            return Status.FAILURE;
-        };
-
-        // 25% of the fee is burned.
-
-        // TODO: OBSERVATION - If TX operation will be requested by the subnetwork creator on their own bootstrap, how we should charge the fee? It looks like Bootstrap deployer
-        // is paying 0.03, however they are receiving 0.0075 back, so the final fee is 0.0225. I think it's fair enough. It this case we should burn reward for Bootstrap deployer.
-
-        await batch.put(requesterAddressString, updatedRequesterNodeEntry);
-        await batch.put(subnetworkCreatorAddressString, updatedSubnetworkCreatorNodeEntry);
-        await batch.put(validatorAddressString, updatedValidatorNodeEntry);
+        // Handle optional subnetwork creator fee - may be null if creator is requester or validator
+        if (transferFeeTxOperationResult.subnetworkCreatorEntry !== null) {
+            await batch.put(subnetworkCreatorAddressString, transferFeeTxOperationResult.subnetworkCreatorEntry);
+        }
         await batch.put(hashHexString, node.value);
 
         if (this.#enable_txlogs === true) {
@@ -3451,11 +3374,11 @@ class State extends ReadyResource {
             return;
         }
     }
-    async #applyGetLicenseCount(batch){
-        return await this.#getEntryApply(EntryType.LICENSE_COUNT, batch) 
+    async #applyGetLicenseCount(batch) {
+        return await this.#getEntryApply(EntryType.LICENSE_COUNT, batch)
     }
 
-    async #applyAssignNewLicense(batch, validatorAddressBuffer){
+    async #applyAssignNewLicense(batch, validatorAddressBuffer) {
         let licenseCount = await this.#applyGetLicenseCount(batch)
         let newLicenseLength;
         if (null === licenseCount) {
@@ -3477,6 +3400,148 @@ class State extends ReadyResource {
         await batch.put(EntryType.LICENSE_INDEX + decodedNewLicenseLength, validatorAddressBuffer)
 
         return newLicenseLength;
+    }
+    
+    async #transferFeeTxOperation(requesterAddressString, validatorAddressString, subnetworkCreatorAddressString, feeAmount, batch) {
+        if (!requesterAddressString ||
+            !validatorAddressString ||
+            !subnetworkCreatorAddressString ||
+            !feeAmount ||
+            !batch
+        ) {
+            return null;
+        }
+
+        // case when requester is also the validator is not possible.
+        // charge fee from the requester
+        const requesterNodeEntryBuffer = await this.#getEntryApply(requesterAddressString, batch);
+        if (requesterNodeEntryBuffer === null) {
+            return null;
+        }
+
+        const requesterNodeEntry = nodeEntryUtils.decode(requesterNodeEntryBuffer);
+        if (requesterNodeEntry === null) {
+            return null;
+        }
+
+        const requesterBalance = toBalance(requesterNodeEntry.balance);
+        if (requesterBalance === null) {
+            return null;
+        }
+
+        if (!requesterBalance.greaterThanOrEquals(feeAmount)) {
+            return null;
+        }
+
+        const newRequesterBalance = requesterBalance.sub(feeAmount);
+        if (newRequesterBalance === null) {
+            return null;
+        }
+
+        const updatedRequesterNodeEntry = newRequesterBalance.update(requesterNodeEntryBuffer);
+        if (updatedRequesterNodeEntry === null) {
+            return null;
+        }
+
+        // Validator always gets 50% of the fee
+        const validatorNodeEntryBuffer = await this.#getEntryApply(validatorAddressString, batch);
+        if (validatorNodeEntryBuffer === null) {
+            return null;
+        }
+
+        const validatorNodeEntry = nodeEntryUtils.decode(validatorNodeEntryBuffer);
+        if (validatorNodeEntry === null) {
+            return null;
+        }
+
+        const validatorBalance = toBalance(validatorNodeEntry.balance);
+        if (validatorBalance === null) {
+            return null;
+        }
+
+        const newValidatorBalance = validatorBalance.add(feeAmount.percentage(PERCENT_50));
+        if (newValidatorBalance === null) {
+            return null;
+        }
+
+        const updatedValidatorNodeEntry = newValidatorBalance.update(validatorNodeEntryBuffer);
+        if (updatedValidatorNodeEntry === null) {
+            return null;
+        }
+
+        // If requester is the subnetwork creator:
+        // 1. Validator got 50%
+        // 2. Other 50% is burned
+        // 3. No additional reward for bootstrap deployer
+        if (requesterAddressString === subnetworkCreatorAddressString) {
+            return {
+                requesterEntry: updatedRequesterNodeEntry,
+                validatorEntry: updatedValidatorNodeEntry,
+                subnetworkCreatorEntry: null
+            };
+        }
+
+        // If validator is also the bootstrap deployer:
+        // 1. Gets 75% total (50% as validator + 25% as bootstrap deployer)
+        // 2. 25% is burned
+        if (validatorAddressString === subnetworkCreatorAddressString) {
+            // We already added 50% as validator fee, now add only the additional 25%
+            const additionalDeployerFee = feeAmount.percentage(PERCENT_25);
+            if (additionalDeployerFee === null) {
+                return null;
+            }
+
+            const newValidatorBalanceWithBonus = newValidatorBalance.add(additionalDeployerFee);
+            if (newValidatorBalanceWithBonus === null) {
+                return null;
+            }
+
+            const updatedValidatorNodeEntryWithBonus = newValidatorBalanceWithBonus.update(validatorNodeEntryBuffer);
+            if (updatedValidatorNodeEntryWithBonus === null) {
+                return null;
+            }
+
+            return {
+                requesterEntry: updatedRequesterNodeEntry,
+                validatorEntry: updatedValidatorNodeEntryWithBonus,
+                subnetworkCreatorEntry: null
+            };
+        }
+
+        // Normal case (validator is not the bootstrap deployer):
+        // 1. Validator got 50%
+        // 2. Bootstrap deployer gets 25%
+        // 3. 25% is burned
+        const subnetworkCreatorNodeEntryBuffer = await this.#getEntryApply(subnetworkCreatorAddressString, batch);
+        if (subnetworkCreatorNodeEntryBuffer === null) {
+            return null;
+        }
+
+        const subnetworkCreatorNodeEntry = nodeEntryUtils.decode(subnetworkCreatorNodeEntryBuffer);
+        if (subnetworkCreatorNodeEntry === null) {
+            return null;
+        }
+
+        const subnetworkCreatorBalance = toBalance(subnetworkCreatorNodeEntry.balance);
+        if (subnetworkCreatorBalance === null) {
+            return null;
+        }
+
+        const newSubnetworkCreatorBalance = subnetworkCreatorBalance.add(feeAmount.percentage(PERCENT_25));
+        if (newSubnetworkCreatorBalance === null) {
+            return null;
+        }
+
+        const updatedSubnetworkCreatorNodeEntry = newSubnetworkCreatorBalance.update(subnetworkCreatorNodeEntryBuffer);
+        if (updatedSubnetworkCreatorNodeEntry === null) {
+            return null;
+        }
+
+        return {
+            requesterEntry: updatedRequesterNodeEntry,
+            validatorEntry: updatedValidatorNodeEntry,
+            subnetworkCreatorEntry: updatedSubnetworkCreatorNodeEntry
+        };
     }
 }
 
