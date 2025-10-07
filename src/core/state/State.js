@@ -827,6 +827,13 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
+        // Validator consistency checks
+        const isValidatorValid = await this.#isValidatorValidApply(validatorAddress, node, op, batch);
+        if (!isValidatorValid) {
+            this.#enable_txlogs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Validator consistency check failed.", node.from.key)
+            return Status.FAILURE;
+        }
+
         // anti-replay attack
         const opEntry = await this.#getEntryApply(txHashHexString, batch);
         if (opEntry !== null) {
@@ -1289,6 +1296,13 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
+        // Validator consistency checks
+        const isValidatorValid = await this.#isValidatorValidApply(validatorAddress, node, op, batch);
+        if (!isValidatorValid) {
+            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_WRITER, "Validator consistency check failed.", node.from.key)
+            return Status.FAILURE;
+        }
+
         // anti-replay attack
         const opEntry = await this.#getEntryApply(txHashHexString, batch);
         if (opEntry !== null) {
@@ -1563,6 +1577,13 @@ class State extends ReadyResource {
             this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Transaction was not executed.", node.from.key)
             return Status.FAILURE;
         };
+
+        // Validator consistency checks
+        const isValidatorValid = await this.#isValidatorValidApply(validatorAddress, node, op, batch);
+        if (!isValidatorValid) {
+            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Validator consistency check failed.", node.from.key)
+            return Status.FAILURE;
+        }
 
         // anti-replay attack
         const opEntry = await this.#getEntryApply(txHashHexString, batch);
@@ -2419,6 +2440,13 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
+        // Validator consistency checks
+        const isValidatorValid = await this.#isValidatorValidApply(validatorAddress, node, op, batch);
+        if (!isValidatorValid) {
+            this.#enable_txlogs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Validator consistency check failed.", node.from.key)
+            return Status.FAILURE;
+        }
+
         // anti-replay attack
         const hashHexString = op.bdo.tx.toString('hex');
         const opEntry = await this.#getEntryApply(hashHexString, batch);
@@ -2643,6 +2671,13 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
+        // Validator consistency checks
+        const isValidatorValid = await this.#isValidatorValidApply(validatorAddress, node, op, batch);
+        if (!isValidatorValid) {
+            this.#enable_txlogs && this.#safeLogApply(OperationType.TX, "Validator consistency check failed.", node.from.key)
+            return Status.FAILURE;
+        }
+
         // anti-replay attack
         const hashHexString = op.txo.tx.toString('hex');
         const opEntry = await this.#getEntryApply(hashHexString, batch);
@@ -2829,6 +2864,13 @@ class State extends ReadyResource {
             this.#enable_txlogs && this.#safeLogApply(OperationType.TRANSFER, "Transaction was not executed.", node.from.key)
             return Status.FAILURE;
         };
+
+        // Validator consistency checks
+        const isValidatorValid = await this.#isValidatorValidApply(validatorAddress, node, op, batch);
+        if (!isValidatorValid) {
+            this.#enable_txlogs && this.#safeLogApply(OperationType.TRANSFER, "Validator consistency check failed.", node.from.key)
+            return Status.FAILURE;
+        }
 
         // anti-replay attack
         const hashHexString = op.tro.tx.toString('hex');
@@ -3097,6 +3139,37 @@ class State extends ReadyResource {
         }
     }
 
+    async #isValidatorValidApply(validatorAddressString, node, op, batch) {
+        // TODO: Maybe we should transfer all validator checks to this function (address, pubKey, signature, etc)
+        // TODO: It would be better to pass validatorEntry directly as an argument, so we could send it to the
+        // functions like #addWriter, #removeWriter, #transfer, etc. 
+        // Right now, we are fetching validator entry twice per operation unnecessarily.
+        const validatorEntry = await this.#getEntryApply(validatorAddressString, batch);
+        if (validatorEntry === null) {
+            this.#enable_txlogs && this.#safeLogApply(op.type, "Failed to verify validator entry.", node.from.key)
+            return false;
+        };
+        const decodedValidatorEntry = nodeEntryUtils.decode(validatorEntry);
+        if (decodedValidatorEntry === null) {
+            this.#enable_txlogs && this.#safeLogApply(op.type, "Failed to decode validator entry.", node.from.key)
+            return false;
+        };
+
+        // validator must be active writer
+        if (!decodedValidatorEntry.isWriter) {
+            this.#enable_txlogs && this.#safeLogApply(op.type, "Operation validator is not active", node.from.key)
+            return false;
+        };
+
+        // The autobase payload should be appended by the node that signed the partial operation.
+        const validatorWk = decodedValidatorEntry.wk;
+        if (!b4a.equals(validatorWk, node.from.key)) {
+            this.#enable_txlogs && this.#safeLogApply(op.type, "Validator cannot be the same as requester.", node.from.key)
+            return false;
+        }
+
+        return true;
+    }
     /**
      * Retrieves the address assigned to a given writing key from the registry.
      * 
@@ -3104,7 +3177,6 @@ class State extends ReadyResource {
      * @param {string} writingKey - The writing key in hex string format.
      * @returns {Buffer|null} The address buffer assigned to the writing key, or null if not registered.
      */
-
     async #getRegisteredWriterKeyApply(batch, writingKey) {
         const entry = await batch.get(EntryType.WRITER_ADDRESS + writingKey);
         return deepCopyBuffer(entry?.value)
@@ -3401,7 +3473,7 @@ class State extends ReadyResource {
 
         return newLicenseLength;
     }
-    
+
     async #transferFeeTxOperation(requesterAddressString, validatorAddressString, subnetworkCreatorAddressString, feeAmount, batch) {
         if (!requesterAddressString ||
             !validatorAddressString ||
