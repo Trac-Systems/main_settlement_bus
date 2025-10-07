@@ -828,7 +828,7 @@ class State extends ReadyResource {
         };
 
         // Validator consistency checks
-        const isValidatorValid = await this.#isValidatorValidApply(validatorAddress, node, op, batch);
+        const isValidatorValid = await this.#isValidatorValidApply(validatorAddressString, node, op, batch);
         if (!isValidatorValid) {
             this.#enable_txlogs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Validator consistency check failed.", node.from.key)
             return Status.FAILURE;
@@ -1297,7 +1297,7 @@ class State extends ReadyResource {
         };
 
         // Validator consistency checks
-        const isValidatorValid = await this.#isValidatorValidApply(validatorAddress, node, op, batch);
+        const isValidatorValid = await this.#isValidatorValidApply(validatorAddressString, node, op, batch);
         if (!isValidatorValid) {
             this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_WRITER, "Validator consistency check failed.", node.from.key)
             return Status.FAILURE;
@@ -1579,7 +1579,7 @@ class State extends ReadyResource {
         };
 
         // Validator consistency checks
-        const isValidatorValid = await this.#isValidatorValidApply(validatorAddress, node, op, batch);
+        const isValidatorValid = await this.#isValidatorValidApply(validatorAddressString, node, op, batch);
         if (!isValidatorValid) {
             this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Validator consistency check failed.", node.from.key)
             return Status.FAILURE;
@@ -2441,7 +2441,7 @@ class State extends ReadyResource {
         };
 
         // Validator consistency checks
-        const isValidatorValid = await this.#isValidatorValidApply(validatorAddress, node, op, batch);
+        const isValidatorValid = await this.#isValidatorValidApply(validatorAddressString, node, op, batch);
         if (!isValidatorValid) {
             this.#enable_txlogs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Validator consistency check failed.", node.from.key)
             return Status.FAILURE;
@@ -2672,7 +2672,7 @@ class State extends ReadyResource {
         };
 
         // Validator consistency checks
-        const isValidatorValid = await this.#isValidatorValidApply(validatorAddress, node, op, batch);
+        const isValidatorValid = await this.#isValidatorValidApply(validatorAddressString, node, op, batch);
         if (!isValidatorValid) {
             this.#enable_txlogs && this.#safeLogApply(OperationType.TX, "Validator consistency check failed.", node.from.key)
             return Status.FAILURE;
@@ -2866,7 +2866,7 @@ class State extends ReadyResource {
         };
 
         // Validator consistency checks
-        const isValidatorValid = await this.#isValidatorValidApply(validatorAddress, node, op, batch);
+        const isValidatorValid = await this.#isValidatorValidApply(validatorAddressString, node, op, batch);
         if (!isValidatorValid) {
             this.#enable_txlogs && this.#safeLogApply(OperationType.TRANSFER, "Validator consistency check failed.", node.from.key)
             return Status.FAILURE;
