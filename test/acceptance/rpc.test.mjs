@@ -76,7 +76,14 @@ describe("API acceptance tests", () => {
     it("GET /tx-hashes", async () => {
         const res = await request(server).get("/tx-hashes/0/1")
         expect(res.statusCode).toBe(200)
-        expect(res.body).toEqual({ hashes: expect.any(Array) })
+        expect(res.body).toEqual({ 
+            hashes: expect.arrayContaining([
+                expect.objectContaining({
+                    hash: expect.any(String),
+                    signedLength: expect.any(Number),
+                })
+            ])
+        })
     })
 
     it("GET /balance", async () => {

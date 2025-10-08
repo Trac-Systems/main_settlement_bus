@@ -1,5 +1,5 @@
 import {decodeBase64Payload, isBase64, sanitizeTransferPayload, validatePayloadStructure} from "./utils/helpers.mjs"
-import { MAX_SIGNED_LENGTH } from "./constants.mjs";
+import { MAX_SIGNED_LENGTH, SIGNED_LENGTH_OFFSET } from "./constants.mjs";
 
 export async function handleBalance({ req, respond, msbInstance }) {
     const [path, queryString] = req.url.split("?");
@@ -100,7 +100,7 @@ export async function handleTxHashes({ msbInstance, respond, req }) {
     const currentConfirmedLength = await msbInstance.handleCommand('/confirmed_length');
 
     // 5. Adjust the end index to not exceed the confirmed length.
-    const adjustedEndLength = Math.min(endSignedLength, currentConfirmedLength);
+    const adjustedEndLength = Math.min(endSignedLength, currentConfirmedLength) + SIGNED_LENGTH_OFFSET // apply an offset to include in the end
     
     // 6. Fetch txs hashes for the adjusted range, assuming the command takes start and end index.
     const commandString = `/get_txs_hashes ${startSignedLength} ${adjustedEndLength}`;
