@@ -7,13 +7,24 @@ export const createServer = (msbInstance) => {
   const server = http.createServer({}, async (req, res) => {
     if (applyCors(req, res)) return;
 
+    const respond = (code, paylaod) => {
+      res.writeHead(code, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(paylaod));
+    }
+
     // Find the matching route
     let foundRoute = false;
     for (const route of routes) {
         // Simple path matching
         if (req.method === route.method && req.url.startsWith(route.path)) {
             foundRoute = true;
-            await route.handler(req, res, msbInstance);
+            try {
+                await route.handler({ req, res, respond, msbInstance });
+            } catch {
+                console.error(`Error on ${route.path}:`, error);
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'An error occurred processing the request.' }));
+            }
             break;
         }
     }
