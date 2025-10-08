@@ -3152,6 +3152,7 @@ class State extends ReadyResource {
         }
     }
     async #isValidatorValidApply(validatorEntryBuffer, node, op) {
+        // TODO: Maybe we should transfer all validator checks to this function (address, pubKey, signature, etc)
         const decodedValidatorEntry = nodeEntryUtils.decode(validatorEntryBuffer);
         if (decodedValidatorEntry === null) {
             this.#enable_txlogs && this.#safeLogApply(op.type, "Failed to decode validator entry.", node.from.key)
