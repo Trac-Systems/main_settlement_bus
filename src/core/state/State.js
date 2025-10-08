@@ -828,14 +828,10 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const validatorNodeEntryBuffer = await this.#getEntryApply(validatorAddressString, batch);
-        if (validatorNodeEntryBuffer === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Invalid node entry buffer.", node.from.key)
-            return Status.FAILURE;
-        };
+        const validatorEntryBuffer = await this.#getEntryApply(validatorAddressString, batch);
 
         // Validator consistency checks
-        const isValidatorValid = await this.#isValidatorValidApply(validatorNodeEntryBuffer, node, op);
+        const isValidatorValid = await this.#isValidatorValidApply(validatorEntryBuffer, node, op);
         if (!isValidatorValid) {
             this.#enable_txlogs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Validator consistency check failed.", node.from.key)
             return Status.FAILURE;
@@ -910,7 +906,7 @@ class State extends ReadyResource {
         const chargedAdminEntry = updatedFee.update(newAdminNodeEntry)
 
         // Reward logic
-        const validatorNodeEntry = nodeEntryUtils.decode(validatorNodeEntryBuffer);
+        const validatorNodeEntry = nodeEntryUtils.decode(validatorEntryBuffer);
         if (validatorNodeEntry === null) {
             this.#enable_txlogs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Invalid validator node entry.", node.from.key)
             return Status.FAILURE;
@@ -928,7 +924,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const updatedValidatorNodeEntry = newValidatorBalance.update(validatorNodeEntryBuffer)
+        const updatedValidatorNodeEntry = newValidatorBalance.update(validatorEntryBuffer)
         if (updatedValidatorNodeEntry === null) {
             this.#enable_txlogs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Failed to update validator balance.", node.from.key)
             return Status.FAILURE;
@@ -1298,10 +1294,6 @@ class State extends ReadyResource {
         };
 
         const validatorEntryBuffer = await this.#getEntryApply(validatorAddressString, batch);
-        if (validatorEntryBuffer === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_WRITER, "Failed to fetch validator entry.", node.from.key)
-            return Status.FAILURE;
-        };
 
         // Validator consistency checks
         const isValidatorValid = await this.#isValidatorValidApply(validatorEntryBuffer, node, op);
@@ -1581,10 +1573,6 @@ class State extends ReadyResource {
         };
 
         const validatorEntryBuffer = await this.#getEntryApply(validatorAddressString, batch);
-        if (validatorEntryBuffer === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Failed to verify validator node entry.", node.from.key)
-            return null;
-        };
 
         // Validator consistency checks
         const isValidatorValid = await this.#isValidatorValidApply(validatorEntryBuffer, node, op);
@@ -2442,14 +2430,10 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const validatorNodeEntryBuffer = await this.#getEntryApply(validatorAddressString, batch);
-        if (validatorNodeEntryBuffer === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Invalid validator node entry buffer..", node.from.key)
-            return Status.FAILURE;
-        };
+        const validatorEntryBuffer = await this.#getEntryApply(validatorAddressString, batch);
 
         // Validator consistency checks
-        const isValidatorValid = await this.#isValidatorValidApply(validatorNodeEntryBuffer, node, op);
+        const isValidatorValid = await this.#isValidatorValidApply(validatorEntryBuffer, node, op);
         if (!isValidatorValid) {
             this.#enable_txlogs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Validator consistency check failed.", node.from.key)
             return Status.FAILURE;
@@ -2519,7 +2503,7 @@ class State extends ReadyResource {
         };
 
         // reward validator for processing this transaction.
-        const validatorNodeEntry = nodeEntryUtils.decode(validatorNodeEntryBuffer);
+        const validatorNodeEntry = nodeEntryUtils.decode(validatorEntryBuffer);
         if (validatorNodeEntry === null) {
             this.#enable_txlogs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Invalid validator node entry.", node.from.key)
             return Status.FAILURE;
@@ -2537,7 +2521,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const updatedValidatorNodeEntry = newValidatorBalance.update(validatorNodeEntryBuffer);
+        const updatedValidatorNodeEntry = newValidatorBalance.update(validatorEntryBuffer);
         if (updatedValidatorNodeEntry === null) {
             this.#enable_txlogs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Failed to update validator node balance.", node.from.key)
             return Status.FAILURE;
@@ -2674,10 +2658,6 @@ class State extends ReadyResource {
         };
 
         const validatorEntryBuffer = await this.#getEntryApply(validatorAddressString, batch);
-        if (validatorEntryBuffer === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TX, "Invalid validator node entry buffer.", node.from.key)
-            return Status.FAILURE;
-        }
 
         // Validator consistency checks
         const isValidatorValid = await this.#isValidatorValidApply(validatorEntryBuffer, node, op);
@@ -2875,10 +2855,6 @@ class State extends ReadyResource {
         };
 
         const validatorEntryBuffer = await this.#getEntryApply(validatorAddressString, batch);
-        if (validatorEntryBuffer === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TRANSFER, "Invalid validator entry buffer.", node.from.key)
-            return Status.FAILURE;
-        }
 
         // Validator consistency checks
         const isValidatorValid = await this.#isValidatorValidApply(validatorEntryBuffer, node, op);
@@ -3153,6 +3129,11 @@ class State extends ReadyResource {
     }
     async #isValidatorValidApply(validatorEntryBuffer, node, op) {
         // TODO: Maybe we should transfer all validator checks to this function (address, pubKey, signature, etc)
+        if (validatorEntryBuffer === null) {
+            this.#enable_txlogs && this.#safeLogApply(op.type, "Incoming validator entry is null.", node.from.key)
+            return false;
+        };
+
         const decodedValidatorEntry = nodeEntryUtils.decode(validatorEntryBuffer);
         if (decodedValidatorEntry === null) {
             this.#enable_txlogs && this.#safeLogApply(op.type, "Failed to decode validator entry.", node.from.key)
