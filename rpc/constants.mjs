@@ -1,0 +1,2 @@
+export const MAX_SIGNED_LENGTH = 1000
+export const SIGNED_LENGTH_OFFSET = 20
