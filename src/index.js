@@ -1099,8 +1099,6 @@ export class MainSettlementBus extends ReadyResource {
                             throw new Error("Missing hash list.");
                         }
 
-                        console.log(hashes);
-
                         let res = { results: [], missing: [] }
 
                         if(hashes.length > 1500){

@@ -113,8 +113,6 @@ describe("API acceptance tests", () => {
             .set("Accept", "application/json")
             .send(JSON.stringify({ payload }))
 
-        console.log(res);
-
         expect(res.statusCode).toBe(200)
         expect(res.body).toMatchObject({
             result: {
