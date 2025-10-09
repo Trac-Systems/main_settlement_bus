@@ -52,13 +52,13 @@ describe("API acceptance tests", () => {
     it("GET /confirmed-length", async () => {
         const res = await request(server).get("/confirmed-length")
         expect(res.statusCode).toBe(200)
-        expect(res.body).toEqual({ confirmed_length: 12 })
+        expect(res.body).toEqual({ confirmed_length: 16 })
     })
 
     it("GET /unconfirmed-length", async () => {
         const res = await request(server).get("/unconfirmed-length")
         expect(res.statusCode).toBe(200)
-        expect(res.body).toEqual({ unconfirmed_length: 12 })
+        expect(res.body).toEqual({ unconfirmed_length: 16 })
     })
 
     it("GET /txv", async () => {
@@ -73,10 +73,24 @@ describe("API acceptance tests", () => {
         expect(res.body).toEqual({ fee: expect.stringMatching(/^-?\d+(\.\d+)?$/) })
     })
 
-    it("GET /tx-hashes", async () => {
-        const res = await request(server).get("/tx-hashes/0/1")
-        expect(res.statusCode).toBe(200)
-        expect(res.body).toEqual({ hashes: expect.any(Array) })
+    describe('GET /tx-hashes', () => {
+        it("< 1000", async () => {
+            const res = await request(server).get("/tx-hashes/1/1001")
+            expect(res.statusCode).toBe(200)
+            expect(res.body).toEqual({ 
+                hashes: expect.arrayContaining([
+                    expect.objectContaining({
+                        hash: expect.any(String),
+                        signedLength: expect.any(Number),
+                    })
+                ])
+            })
+        })
+
+        it("> 1000", async () => {
+            const res = await request(server).get("/tx-hashes/1/1002")
+            expect(res.statusCode).toBe(400)
+        })
     })
 
     it("GET /balance", async () => {

@@ -274,7 +274,7 @@ class State extends ReadyResource {
         let hashes = [];
         for await (const entry of historyStream) {
             if (filters(entry)) {
-                hashes.push(entry.key);
+                hashes.push({ hash: entry.key , signedLength: entry.seq });
             }
         }
 
