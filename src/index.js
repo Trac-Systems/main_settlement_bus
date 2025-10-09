@@ -1091,6 +1091,41 @@ export class MainSettlementBus extends ReadyResource {
                         // Handle case where payload is missing if called internally without one.
                         throw new Error("Transaction payload is required for broadcast_transaction command.");
                     }
+                } else if (input.startsWith("/get_tx_payloads_bulk")) {
+                    if(payload){
+                        const hashes = payload;
+
+                        if (!Array.isArray(hashes) || hashes.length === 0){
+                            throw new Error("Missing hash list.");
+                        }
+
+                        console.log(hashes);
+
+                        let res = { results: [], missing: [] }
+
+                        if(hashes.length > 1500){
+                            throw new Error("Length of input tx hashes exceeded.");
+                        }
+
+                        const promises = hashes.map(hash =>  get_tx_info(this.#state, hash));
+                        const results = await Promise.all(promises);
+
+                        // Iterate and categorize
+                        results.forEach((result, index) => {
+                            const hash = hashes[index];
+                            if (result === null || result === undefined) {
+                                res.missing.push(hash);
+                            } else {
+                                const decodedResult = normalizeDecodedPayloadForJson(result.decoded)
+                                res.results.push({hash: hash, payload: decodedResult});
+                            }
+                        });    
+                        
+                        return res;
+                       
+                    } else {
+                        throw new Error("Missing payload for fetching tx payloads.")
+                    }
                 } else if(input.startsWith("/get_txs_hashes")) {
                     const splitted = input.split(' ')
                     const start = parseInt(splitted[1]);
