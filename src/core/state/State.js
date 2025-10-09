@@ -674,8 +674,16 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const newLicense = await this.#applyAssignNewLicense(batch, adminAddressBuffer);
-        const initializedNodeEntry = nodeEntryUtils.init(op.cao.iw, nodeRoleUtils.NodeRole.INDEXER, ADMIN_INITIAL_BALANCE, newLicense, ADMIN_INITIAL_STAKED_BALANCE);
+        const { newLicenseLength, decodedNewLicenseLength} = await this.#applyAssignNewLicense(batch);
+        if (newLicenseLength !== null && decodedNewLicenseLength) {
+            await batch.put(EntryType.LICENSE_COUNT, newLicenseLength)
+            await batch.put(EntryType.LICENSE_INDEX + decodedNewLicenseLength, adminAddressBuffer)
+        } else {
+            // This log should (if this error ever happend) ALWAYS log.
+            this.#safeLogApply("SYSTEM ERROR", "Something went wrong while updating license index.", node.from.key)
+        }
+
+        const initializedNodeEntry = nodeEntryUtils.init(op.cao.iw, nodeRoleUtils.NodeRole.INDEXER, ADMIN_INITIAL_BALANCE, newLicenseLength, ADMIN_INITIAL_STAKED_BALANCE);
         if (initializedNodeEntry.length === 0) {
             this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_ADMIN, "Failed to initialize node entry.", node.from.key)
             return Status.FAILURE;
@@ -690,7 +698,17 @@ class State extends ReadyResource {
 
         await batch.put(adminAddressString, initializedNodeEntry);
         await batch.put(EntryType.WRITER_ADDRESS + op.cao.iw.toString('hex'), op.address);
-        await this.#updateWritersIndex(adminAddressBuffer, batch); //TODO: should be splited into a separated atomic operation
+
+        const { length, incrementedLength } = await this.#updateWritersIndex(batch); 
+
+        if (length !== null && incrementedLength !== null) {
+            // Update the writers index and length entries  
+            await batch.put(EntryType.WRITERS_INDEX + length, adminAddressBuffer);
+            await batch.put(EntryType.WRITERS_LENGTH, incrementedLength);
+        } else {
+            // This log should (if this error ever happend) ALWAYS log.
+            this.#safeLogApply("SYSTEM ERROR", "Something went wrong while updating writers index.", node.from.key)
+        }
 
         // initialize admin entry and initialization flag
         await batch.put(EntryType.ADMIN, newAdminEntry);
@@ -1120,9 +1138,16 @@ class State extends ReadyResource {
 
             */
             // If node does not exist, then create a new licence. 
-            const newLicense = await this.#applyAssignNewLicense(batch, nodeAddressBuffer); // TODO: Should be splited into atomic operation
+            const { newLicenseLength, decodedNewLicenseLength } = await this.#applyAssignNewLicense(batch);
+            if (newLicenseLength !== null && decodedNewLicenseLength) {
+                await batch.put(EntryType.LICENSE_COUNT, newLicenseLength)
+                await batch.put(EntryType.LICENSE_INDEX + decodedNewLicenseLength, nodeAddressBuffer)
+            } else {
+                // This log should (if this error ever happend) ALWAYS log.
+                this.#safeLogApply("SYSTEM ERROR", "Something went wrong while updating license index.", node.from.key)
+            }
 
-            const initializedNodeEntry = nodeEntryUtils.init(ZERO_WK, nodeRoleUtils.NodeRole.WHITELISTED, nodeRoleUtils.ZERO_BALANCE, newLicense);
+            const initializedNodeEntry = nodeEntryUtils.init(ZERO_WK, nodeRoleUtils.NodeRole.WHITELISTED, nodeRoleUtils.ZERO_BALANCE, newLicenseLength);
             if (initializedNodeEntry.length === 0) {
                 this.#enable_txlogs && this.#safeLogApply(OperationType.APPEND_WHITELIST, "Failed to initialize node entry.", node.from.key)
                 return Status.FAILURE;
@@ -1155,8 +1180,16 @@ class State extends ReadyResource {
                 await batch.put(nodeAddressString, editedNodeEntry);
 
             } else {
-                const newLicense = await this.#applyAssignNewLicense(batch, nodeAddressBuffer); // TODO: Should be splited into atomic operation
-                const nodeEntryWithNewLicense = nodeEntryUtils.setLicense(editedNodeEntry, newLicense)
+                const { newLicenseLength, decodedNewLicenseLength } = await this.#applyAssignNewLicense(batch); 
+                if (newLicenseLength !== null && decodedNewLicenseLength) {
+                    await batch.put(EntryType.LICENSE_COUNT, newLicenseLength)
+                    await batch.put(EntryType.LICENSE_INDEX + decodedNewLicenseLength, nodeAddressBuffer)
+                } else {
+                    // This log should (if this error ever happend) ALWAYS log.
+                    this.#safeLogApply("SYSTEM ERROR", "Something went wrong while updating license index.", node.from.key)
+                }
+                
+                const nodeEntryWithNewLicense = nodeEntryUtils.setLicense(editedNodeEntry, newLicenseLength)
                 await batch.put(nodeAddressString, nodeEntryWithNewLicense);
             }
 
@@ -1439,7 +1472,17 @@ class State extends ReadyResource {
             await batch.put(EntryType.WRITER_ADDRESS + op.rao.iw.toString('hex'), op.address);
         }
 
-        await this.#updateWritersIndex(requesterAddressBuffer, batch); //TODO: should be splited into a separated atomic operation
+        const { length, incrementedLength } = await this.#updateWritersIndex(batch);
+
+        if (length !== null && incrementedLength !== null) {
+            // Update the writers index and length entries
+            await batch.put(EntryType.WRITERS_INDEX + length, requesterAddressBuffer);
+            await batch.put(EntryType.WRITERS_LENGTH, incrementedLength);
+        } else {
+            // This log should (if this error ever happend) ALWAYS log.
+            this.#safeLogApply("SYSTEM ERROR", "Something went wrong while updating writers index.", node.from.key)
+        }
+
         await batch.put(txHashHexString, node.value);
 
         // Pay the fee to the validator
@@ -2091,7 +2134,16 @@ class State extends ReadyResource {
         await base.addWriter(decodedNodeEntry.wk, { isIndexer: false });
 
         // update writers index and length
-        await this.#updateWritersIndex(toRemoveAddressBuffer, batch); //TODO: should be splited into a separated atomic operation
+        const { length, incrementedLength } = await this.#updateWritersIndex(batch); 
+
+        if (length !== null && incrementedLength !== null) {
+            // Update the writers index and length entries 
+            await batch.put(EntryType.WRITERS_INDEX + length, toRemoveAddressBuffer);
+            await batch.put(EntryType.WRITERS_LENGTH, incrementedLength);
+        } else {
+            // This log should (if this error ever happend) ALWAYS log.
+            this.#safeLogApply("SYSTEM ERROR", "Something went wrong while updating writers index.", node.from.key)
+        }
 
         //update node entry and indexers entry
         await batch.put(toRemoveAddressString, updatedNodeEntry);
@@ -3120,7 +3172,7 @@ class State extends ReadyResource {
         }
     }
 
-    async #updateWritersIndex(validatorAddressBuffer, batch) {
+    async #updateWritersIndex(batch) {
         // Retrieve and increment the writers length entry
         let length = await this.#getEntryApply(EntryType.WRITERS_LENGTH, batch);
         let incrementedLength = null;
@@ -3134,11 +3186,8 @@ class State extends ReadyResource {
             length = lengthEntryUtils.decodeBE(length);
             incrementedLength = lengthEntryUtils.incrementBE(length);
         }
-        if (null === incrementedLength) return;
-
-        // Update the writers index and length entries
-        await batch.put(EntryType.WRITERS_INDEX + length, validatorAddressBuffer);
-        await batch.put(EntryType.WRITERS_LENGTH, incrementedLength);
+        
+        return { length, incrementedLength }
     }
 
     #safeLogApply(operationType = "Common", errorMessage, writingKey = null) {
@@ -3378,7 +3427,7 @@ class State extends ReadyResource {
         return await this.#getEntryApply(EntryType.LICENSE_COUNT, batch)
     }
 
-    async #applyAssignNewLicense(batch, validatorAddressBuffer) {
+    async #applyAssignNewLicense(batch){
         let licenseCount = await this.#applyGetLicenseCount(batch)
         let newLicenseLength;
         if (null === licenseCount) {
@@ -3392,14 +3441,8 @@ class State extends ReadyResource {
             newLicenseLength = lengthEntryUtils.incrementBE(licenseCount);
         }
         const decodedNewLicenseLength = lengthEntryUtils.decodeBE(newLicenseLength);
-        if (null === newLicenseLength) return;
-        if (null === validatorAddressBuffer) return;
-        if (null === decodedNewLicenseLength) return;
 
-        await batch.put(EntryType.LICENSE_COUNT, newLicenseLength)
-        await batch.put(EntryType.LICENSE_INDEX + decodedNewLicenseLength, validatorAddressBuffer)
-
-        return newLicenseLength;
+        return { newLicenseLength, decodedNewLicenseLength };
     }
     
     async #transferFeeTxOperation(requesterAddressString, validatorAddressString, subnetworkCreatorAddressString, feeAmount, batch) {
