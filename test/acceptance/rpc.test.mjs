@@ -73,16 +73,23 @@ describe("API acceptance tests", () => {
         expect(res.body).toEqual({ fee: expect.stringMatching(/^-?\d+(\.\d+)?$/) })
     })
 
-    it("GET /tx-hashes", async () => {
-        const res = await request(server).get("/tx-hashes/0/1")
-        expect(res.statusCode).toBe(200)
-        expect(res.body).toEqual({ 
-            hashes: expect.arrayContaining([
-                expect.objectContaining({
-                    hash: expect.any(String),
-                    signedLength: expect.any(Number),
-                })
-            ])
+    describe('GET /tx-hashes', () => {
+        it("< 1000", async () => {
+            const res = await request(server).get("/tx-hashes/1/1001")
+            expect(res.statusCode).toBe(200)
+            expect(res.body).toEqual({ 
+                hashes: expect.arrayContaining([
+                    expect.objectContaining({
+                        hash: expect.any(String),
+                        signedLength: expect.any(Number),
+                    })
+                ])
+            })
+        })
+
+        it("> 1000", async () => {
+            const res = await request(server).get("/tx-hashes/1/1002")
+            expect(res.statusCode).toBe(400)
         })
     })
 
