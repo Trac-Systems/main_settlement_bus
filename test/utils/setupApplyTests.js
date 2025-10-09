@@ -10,11 +10,12 @@ import fileUtils from '../../src/utils/fileUtils.js'
 import {EntryType} from '../../src/utils/constants.js';
 import {sleep} from '../../src/utils/helpers.js'
 import {formatIndexersEntry} from '../../src/utils/helpers.js';
-import {generatePreTx} from '../../src/utils/transactionUtils.js';
 import {blake3Hash} from '../../src/utils/crypto.js';
 import CompleteStateMessageBuilder from '../../src/messages/completeStateMessages/CompleteStateMessageBuilder.js'
 import CompleteStateMessageDirector from '../../src/messages/completeStateMessages/CompleteStateMessageDirector.js'
 import { safeEncodeApplyOperation } from "../../src/utils/protobuf/operationHelpers.js"
+import { $TNK } from '../../src/core/state/utils/balance.js';
+import { operation } from 'trac-crypto-api'
 
 let os, fsp;
 
@@ -115,15 +116,13 @@ export async function initMsbAdmin(keyPair, temporaryDirectory, options = {}) {
     await admin.msb.close();
 
     admin.msb = new MainSettlementBus(admin.options);
+    await admin.msb.ready();
+    await admin.msb.state.append(null); // before initialization system.indexers is empty, we need to initialize first block to create system.indexers array
     return admin;
 }
 
 export async function setupMsbAdmin(keyPair, temporaryDirectory, options = {}) {
     const admin = await initMsbAdmin(keyPair, temporaryDirectory, options);
-
-    await admin.msb.ready();
-
-    await admin.msb.state.append(null); // before initialization system.indexers is empty, we need to initialize first block to create system.indexers array
     const txValidity = await admin.msb.state.getIndexerSequenceState();
     const addAdminMessage = await CompleteStateMessageOperations.assembleAddAdminMessage(admin.wallet, admin.msb.state.writingKey, txValidity);
     await admin.msb.state.append(addAdminMessage);
@@ -137,7 +136,7 @@ export async function setupNodeAsWriter(admin, writerCandidate) {
 
         const isWriter = async (address) => {
             const result = await admin.msb.state.getNodeEntry(address);
-            return result && result.isWriter && !result.isIndexer;
+            return result?.isWriter && !result?.isIndexer;
         }
 
         const validity = await admin.msb.getIndexerSequenceState()
@@ -165,13 +164,21 @@ export async function setupNodeAsWriter(admin, writerCandidate) {
 export async function setupMsbWriter(admin, peerName, peerKeyPair, temporaryDirectory, options = {}) {
     try {
         const writerCandidate = await setupMsbPeer(peerName, peerKeyPair, temporaryDirectory, options);
+        await fundPeer(admin, writerCandidate, $TNK(1n)) // It is assumed that a writer will write and therefore, will need money to process stuff
         await setupWhitelist(admin, [writerCandidate.wallet.address]);
-
+        await waitForNodeState(writerCandidate,
+            writerCandidate.wallet.address,
+            {
+                wk: writerCandidate.msb.state.writingKey,
+                isWhitelisted: true,
+                isWriter: false,
+                isIndexer: false,
+            })
         const isWriter = async (address) => {
             const result = await admin.msb.state.getNodeEntry(address);
             return result && result.isWriter && !result.isIndexer;
         }
-
+        
         const validity = await admin.msb.state.getIndexerSequenceState()
         const req = await PartialStateMessageOperations.assembleAddWriterMessage(writerCandidate.wallet, b4a.toString(writerCandidate.msb.state.writingKey, 'hex'), b4a.toString(validity, 'hex'));
         await writerCandidate.msb.broadcastPartialTransaction(req);
@@ -184,6 +191,7 @@ export async function setupMsbWriter(admin, peerName, peerKeyPair, temporaryDire
             }
             await writerCandidate.msb.state.base.forceFastForward(); // This performs an update after the core sync
             await writerCandidate.msb.state.base.view.update();
+            await admin.msb.state.base.update()
             await writerCandidate.msb.network.swarm.flush()
             await sleep(1000); // wait for the peer to sync state
         }
@@ -197,7 +205,8 @@ export async function setupMsbWriter(admin, peerName, peerKeyPair, temporaryDire
 
 export async function setupMsbIndexer(indexerCandidate, admin) {
     try {
-        const req = await CompleteStateMessageOperations.assembleAddIndexerMessage(admin.wallet, indexerCandidate.wallet.address);
+        const validity = await admin.msb.state.getIndexerSequenceState()
+        const req = await CompleteStateMessageOperations.assembleAddIndexerMessage(admin.wallet, indexerCandidate.wallet.address, validity);
         await admin.msb.state.append(req);
         await tick(); // wait for the request to be processed
 
@@ -218,9 +227,10 @@ export async function setupMsbIndexer(indexerCandidate, admin) {
                 break;
             }
             await indexerCandidate.msb.state.append(null);
-            await indexerCandidate.msb.state.base.update();
+            await indexerCandidate.msb.state.base.forceFastForward();
             await indexerCandidate.msb.state.base.view.update();
             await indexerCandidate.msb.network.swarm.flush()
+            await admin.msb.state.base.update()
             await sleep(1000); // wait for the peer to sync state
         }
 
@@ -250,6 +260,8 @@ export async function setupWhitelist(admin, whitelistAddresses) {
     const assembledWhitelistMessages = await CompleteStateMessageOperations.assembleAppendWhitelistMessages(admin.wallet, validity);
     for (const [_, msg] of assembledWhitelistMessages.entries()) {
         await admin.msb.state.append(msg);
+        await sleep(100)
+        await admin.msb.state.base.forceFastForward()
     }
     fileUtils.readPublicKeysFromFile = originalReadPublicKeysFromFile;
 }
@@ -295,12 +307,9 @@ export async function initDirectoryStructure(peerName, keyPair, temporaryDirecto
     }
 }
 
-export const generatePostTx = async (writer, externalNode) => {
-    const externalContractBootstrap = randomBytes(32).toString('hex');
-    const validatorAddress = writer.wallet.address;
-
+export const generatePostTx = async (writer, externalNode, externalContractBootstrap) => {
     const peerWriterKey = randomBytes(32).toString('hex');
-    const peerAddress = externalNode.wallet.address;
+    // const peerAddress = externalNode.wallet.address;
 
     const testObj = {
         type: 'deployTest',
@@ -314,32 +323,33 @@ export const generatePostTx = async (writer, externalNode) => {
     };
 
     const contentHash = await blake3Hash(JSON.stringify(testObj));
-    const preTx = await generatePreTx(
-        externalNode.wallet,
-        validatorAddress,
+    const validity = await writer.msb.state.getIndexerSequenceState()
+    const operationData = await operation.preBuild(
+        externalNode.wallet.address,
         peerWriterKey,
-        peerAddress,
-        contentHash,
+        b4a.toString(contentHash, 'hex'),
         externalContractBootstrap,
-        writer.msb.bootstrap
-    );
+        b4a.toString(writer.msb.bootstrap, 'hex'),
+        b4a.toString(validity, 'hex')
+    )
 
-    const postTx = await CompleteStateMessageOperations.assembleCompleteTransactionOperationMessage(
-        writer.wallet,
-        preTx.va,
-        b4a.from(preTx.tx, 'hex'),
-        preTx.ia,
-        b4a.from(preTx.iw, 'hex'),
-        b4a.from(preTx.in, 'hex'),
-        b4a.from(preTx.ch, 'hex'),
-        b4a.from(preTx.is, 'hex'),
-        b4a.from(preTx.bs, 'hex'),
-        b4a.from(preTx.mbs, 'hex')
-    );
+    const sig = externalNode.wallet.sign(operationData.hash)
+    const postTx = {
+        type: operation.OP_TYPE_TX,
+        address: externalNode.wallet.address,
+        txo: {
+            tx: operationData.hash.toString('hex'),
+            txv: operationData.validity,
+            iw: operationData.validator.toString('hex'),
+            in: operationData.nonce.toString('hex'),
+            ch: operationData.contentHash.toString('hex'),
+            is: sig.toString('hex'),
+            bs: operationData.originBootstrap,
+            mbs: operationData.destinationBootstrap,
+        }
+    }
 
-    const txHash = preTx.tx;
-
-    return {postTx, txHash};
+    return { postTx, txHash: operationData.hash.toString('hex') };
 
 }
 
@@ -360,8 +370,7 @@ export const tryToSyncWriters = async (...args) => {
             for (const node of args) {
                 let signedLength = node.msb.state.getSignedLength();
                 if (signedLength < maxLength) {
-                    //await node.msb.state.append(null);
-                    await node.msb.state.base.update();
+                    await node.msb.state.base.forceFastForward();
                     await node.msb.state.base.view.update();
                     await node.msb.network.swarm.flush()
                     await sleep(1000);

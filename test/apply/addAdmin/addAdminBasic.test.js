@@ -36,9 +36,11 @@ test('Apply function addAdmin for the first time - happy path', async (k) => {
         const adminEntryBefore = await admin.msb.state.getAdminEntry();
         k.is(adminEntryBefore, null, 'Admin entry should be null before adding a new admin');
 
+        const validity = b4a.from(await admin.msb.state.getIndexerSequenceState(), 'hex')
         const addAdminMessage = await CompleteStateMessageOperations.assembleAddAdminMessage(
             admin.wallet,
-            admin.msb.state.writingKey
+            admin.msb.state.writingKey,
+            validity
         );
 
         // add admin to base

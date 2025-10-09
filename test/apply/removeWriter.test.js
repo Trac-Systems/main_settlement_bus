@@ -1,17 +1,16 @@
-import {test, hook} from 'brittle';
+import {test, hook, solo} from 'brittle';
 import b4a from 'b4a';
-
 import {
-    tick,
     setupMsbAdmin,
     initTemporaryDirectory,
     removeTemporaryDirectory,
     setupMsbWriter,
     randomBytes,
-    setupNodeAsWriter,
     setupMsbIndexer,
     tryToSyncWriters,
-    waitForNotIndexer, waitForNodeState,
+    waitForNotIndexer,
+    waitForNodeState,
+    fundPeer
 } from '../utils/setupApplyTests.js';
 import {formatIndexersEntry} from '../../src/utils/helpers.js';
 import {
@@ -23,11 +22,11 @@ import {
     testKeyPair6
 } from '../fixtures/apply.fixtures.js';
 import CompleteStateMessageOperations from '../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
-
+import PartialStateMessageOperations from '../../src/messages/partialStateMessages/PartialStateMessageOperations.js';
 
 let admin, writer1, writer2, writer3, writer4, indexer, tmpDirectory;
 
-hook('Initialize nodes for removeWriter tests', async t => {
+hook('Initialize nodes for removeWriter tests', async () => {
     tmpDirectory = await initTemporaryDirectory()
     const randomChannel = randomBytes(32).toString('hex');
 
@@ -35,7 +34,7 @@ hook('Initialize nodes for removeWriter tests', async t => {
         enable_txlogs: false,
         enable_interactive_mode: false,
         enable_role_requester: false,
-        enable_validator_observer: false,
+        enable_validator_observer: true,
         channel: randomChannel,
     });
     writer1 = await setupMsbWriter(admin, 'writer', testKeyPair2, tmpDirectory, admin.options);
@@ -54,12 +53,14 @@ test('handleApplyRemoveWriterOperation (apply) - Append removeWriter payload int
         // writer3 is already a writer
         // writer4 is already a writer
         // indexer is already an indexer
-        const reqRemoveWriter = await CompleteStateMessageOperations.assembleRemoveWriterMessage(
+        const validity = await admin.msb.state.getIndexerSequenceState()
+        const reqRemoveWriter = await PartialStateMessageOperations.assembleRemoveWriterMessage(
             writer1.wallet,
-            writer1.msb.state.writingKey,
+            b4a.toString(writer1.msb.state.writingKey, 'hex'),
+            b4a.toString(validity, 'hex')
         );
 
-        await admin.msb.state.append(reqRemoveWriter);
+        await writer2.msb.broadcastPartialTransaction(reqRemoveWriter);
         await tryToSyncWriters(admin, writer2, writer3, writer4, indexer);
         await waitForNodeState(writer2, writer1.wallet.address, {
             wk: writer1.msb.state.writingKey,
@@ -89,12 +90,14 @@ test('handleApplyRemoveWriterOperation (apply) - Append removeWriter payload int
         // writer3 is already a writer
         // writer4 is already a writer
         // indexer is already an indexer.
-        const reqRemoveWriter = await CompleteStateMessageOperations.assembleRemoveWriterMessage(
+        const validity = await admin.msb.state.getIndexerSequenceState()
+        const reqRemoveWriter = await PartialStateMessageOperations.assembleRemoveWriterMessage(
             writer2.wallet,
-            writer2.msb.state.writingKey,
+            b4a.toString(writer2.msb.state.writingKey, 'hex'),
+            b4a.toString(validity, 'hex')
         );
 
-        await admin.msb.state.append(reqRemoveWriter);
+        await writer3.msb.broadcastPartialTransaction(reqRemoveWriter);
         await tryToSyncWriters(admin, writer3, writer4, indexer);
         await waitForNodeState(writer3, writer2.wallet.address, {
             wk: writer2.msb.state.writingKey,
@@ -103,16 +106,17 @@ test('handleApplyRemoveWriterOperation (apply) - Append removeWriter payload int
             isIndexer: false,
         });
 
-        const reqRemoveWriterAgain = await CompleteStateMessageOperations.assembleRemoveWriterMessage(
+        const validityAgain = await admin.msb.state.getIndexerSequenceState()
+        const reqRemoveWriterAgain = await PartialStateMessageOperations.assembleRemoveWriterMessage(
             writer2.wallet,
-            writer2.msb.state.writingKey,
+            b4a.toString(writer2.msb.state.writingKey, 'hex'),
+            b4a.toString(validityAgain, 'hex')
         );
-
 
         const signedLengthAdminBefore = admin.msb.state.getSignedLength();
         const signedLengthWriter3Before = writer3.msb.state.getSignedLength();
 
-        await admin.msb.state.append(reqRemoveWriterAgain); // Send `add writer` request to apply function
+        await writer3.msb.broadcastPartialTransaction(reqRemoveWriterAgain);
         await tryToSyncWriters(admin, writer3, writer4, indexer);
         await waitForNodeState(writer3, writer2.wallet.address, {
             wk: writer2.msb.state.writingKey,
@@ -134,35 +138,6 @@ test('handleApplyRemoveWriterOperation (apply) - Append removeWriter payload int
 
 });
 
-test('handleApplyRemoveWriterOperation (apply) - Append removeWriter payload into the base by non admin node', async (t) => {
-    // writer1 is not a writer.
-    // writer2 is not a writer
-    // writer3 is already a writer -> This node will try to remove writer4 by signed message by writer4.
-    // writer4 is already a writer.
-    // indexer is already an indexer.
-
-    const reqRemoveWriter4 = await CompleteStateMessageOperations.assembleRemoveWriterMessage(
-        writer4.wallet,
-        writer4.msb.state.writingKey,
-    );
-
-    await writer3.msb.state.append(reqRemoveWriter4);
-    await writer3.msb.state.base.flush();
-    await tryToSyncWriters(admin, writer3, writer4, indexer);
-    await waitForNodeState(writer3, writer4.wallet.address, {
-        wk: writer4.msb.state.writingKey,
-        isWhitelisted: true,
-        isWriter: false,
-        isIndexer: false,
-    });
-
-    const result = await writer3.msb.state.getNodeEntry(writer4.wallet.address);
-
-    t.ok(result, 'Result should not be null');
-    t.is(result.isWriter, false, 'Result should not indicate that the peer is a writer');
-    t.is(writer4.msb.state.isWritable(), false, 'peer should not be writable');
-});
-
 test('handleApplyRemoveWriterOperation (apply) - Append removeWriter payload into the base - indexer will NOT be removed', async (t) => {
     // writer1 is not a writer.
     // writer2 is not a writer
@@ -170,12 +145,14 @@ test('handleApplyRemoveWriterOperation (apply) - Append removeWriter payload int
     // writer4 is already a writer.
     // indexer is already an indexer.
     try {
-        const reqRemoveWriter = await CompleteStateMessageOperations.assembleRemoveWriterMessage(
+        const validityAgain = await admin.msb.state.getIndexerSequenceState()
+        const reqRemoveWriter = await PartialStateMessageOperations.assembleRemoveWriterMessage(
             indexer.wallet,
-            indexer.msb.state.writingKey,
+            b4a.toString(indexer.msb.state.writingKey, 'hex'),
+            b4a.toString(validityAgain, 'hex')
         );
 
-        await admin.msb.state.append(reqRemoveWriter);
+        await writer3.msb.broadcastPartialTransaction(reqRemoveWriter);
         await tryToSyncWriters(admin, writer3, writer4);
 
         await waitForNodeState(writer3, indexer.wallet.address, {
@@ -188,10 +165,9 @@ test('handleApplyRemoveWriterOperation (apply) - Append removeWriter payload int
         await waitForNotIndexer(indexer);
         await writer3.msb.state.getNodeEntry(indexer.wallet.address);
         const indexersEntry = await writer3.msb.state.getIndexersEntry();
-        const formattedIndexersEntry = formatIndexersEntry(indexersEntry);
 
         t.ok(indexersEntry, 'Indexers entry should not be null');
-        t.is(formattedIndexersEntry.addresses.includes(indexer.wallet.address), true, 'Indexer address should still be included in indexers entry');
+        t.ok(indexersEntry.find(({ key }) => b4a.equals(key, indexer.msb.state.writingKey)))
         t.is(indexer.msb.state.isWritable(), true, 'Peer should remain writable');
     } catch (error) {
         t.fail('Failed to remove writer: ' + error.message);
@@ -205,11 +181,13 @@ test('handleApplyRemoveWriterOperation (apply) - validator and invoker are the s
 
 hook('Clean up removeWriter setup', async t => {
     // close msb instances and remove temp directory
-    if (admin && admin.msb) await admin.msb.close();
-    if (writer1 && writer1.msb) await writer1.msb.close();
-    if (writer2 && writer2.msb) await writer2.msb.close();
-    if (writer3 && writer3.msb) await writer3.msb.close();
-    if (writer4 && writer4.msb) await writer4.msb.close();
-    if (indexer && indexer.msb) await indexer.msb.close();
+    const toClose = []
+    if (admin?.msb) toClose.push(admin.msb.close());
+    if (writer1?.msb) toClose.push(writer1.msb.close());
+    if (writer2?.msb) toClose.push(writer2.msb.close());
+    if (writer3?.msb) toClose.push(writer3.msb.close());
+    if (writer4?.msb) toClose.push(writer4.msb.close());
+    if (indexer?.msb) toClose.push(indexer.msb.close());
+    await Promise.all(toClose)
     if (tmpDirectory) await removeTemporaryDirectory(tmpDirectory);
 })

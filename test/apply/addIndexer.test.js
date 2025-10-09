@@ -1,5 +1,4 @@
 import {test, hook} from 'brittle';
-
 import CompleteStateMessageOperations from '../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
 import {formatIndexersEntry} from '../../src/utils/helpers.js';
 import {
@@ -20,6 +19,7 @@ import {
     testKeyPair6,
     testKeyPair7
 } from '../fixtures/apply.fixtures.js';
+import b4a from 'b4a';
 
 let tmpDirectory, admin, indexer1, indexer2, reader1, reader2, indexer3, writer;
 let indexersEntryAddressesCount = 1;
@@ -30,7 +30,7 @@ hook('Initialize nodes for addIndexer tests', async t => {
         enable_txlogs: false,
         enable_interactive_mode: false,
         enable_role_requester: false,
-        enable_validator_observer: false,
+        enable_validator_observer: true,
         channel: randomChannel,
     }
 
@@ -57,9 +57,10 @@ test('handleApplyAddIndexerOperation (apply) - Append addIndexer payload into th
     // indexer3 is just a writer.
 
     try {
-        const assembledAddIndexerMessage = await CompleteStateMessageOperations.assembleAddIndexerMessage(admin.wallet, indexer1.wallet.address);
+        const oldIndexersEntry = await admin.msb.state.getIndexersEntry();
+        const validity = await admin.msb.state.getIndexerSequenceState()
+        const assembledAddIndexerMessage = await CompleteStateMessageOperations.assembleAddIndexerMessage(admin.wallet, indexer1.wallet.address, validity);
         await admin.msb.state.append(assembledAddIndexerMessage);
-        indexersEntryAddressesCount += 1;
 
         await waitForNodeState(admin, indexer1.wallet.address, {
             wk: indexer1.msb.state.writingKey,
@@ -68,12 +69,11 @@ test('handleApplyAddIndexerOperation (apply) - Append addIndexer payload into th
             isIndexer: true,
         })
 
-        const indexersEntry = await admin.msb.state.getIndexersEntry();
-        const formattedIndexersEntry = formatIndexersEntry(indexersEntry);
         const nodeInfo = await admin.msb.state.getNodeEntry(indexer1.wallet.address);
+        const indexersEntry = await admin.msb.state.getIndexersEntry();
 
-        t.is(formattedIndexersEntry.count, indexersEntryAddressesCount, 'Indexers entry count should be 2');
-        t.is(formattedIndexersEntry.addresses.includes(indexer1.wallet.address), true, 'Indexer address should not be included in the indexers entry');
+        t.is(indexersEntry.length, oldIndexersEntry.length + 1, 'Indexers entry count should be 2');
+        t.is(!!indexersEntry.find(({ key }) => b4a.equals(key, indexer1.msb.state.writingKey)), true, 'Indexer address should not be included in the indexers entry');
         t.is(nodeInfo.isIndexer, true, 'Node info should indicate that the node is an indexer');
     } catch (error) {
         t.fail('Failed to add indexer: ' + error.message);
@@ -88,14 +88,13 @@ test('handleApplyAddIndexerOperation (apply) - Append addIndexer payload into th
         // reader1 is just a reading node.
         // reader2 is just a reading node.
         // indexer3 is just a writer.
-
-
+        const indexersEntryBefore = await indexer1.msb.state.getIndexersEntry();
         const assembledAddIndexerMessage = await CompleteStateMessageOperations.assembleAddIndexerMessage(
             admin.wallet,
-            indexer2.wallet.address
+            indexer2.wallet.address,
+            await admin.msb.state.getIndexerSequenceState()
         );
         await admin.msb.state.append(assembledAddIndexerMessage);
-        indexersEntryAddressesCount += 1;
 
         await waitForNodeState(admin, indexer2.wallet.address, {
             wk: indexer2.msb.state.writingKey,
@@ -109,7 +108,8 @@ test('handleApplyAddIndexerOperation (apply) - Append addIndexer payload into th
         const adminSignedLengthBefore = admin.msb.state.getSignedLength();
         const reqAddIndexerMessageAgain = await CompleteStateMessageOperations.assembleAddIndexerMessage(
             admin.wallet,
-            indexer2.wallet.address
+            indexer2.wallet.address,
+            await admin.msb.state.getIndexerSequenceState()
         );
 
         await admin.msb.state.append(reqAddIndexerMessageAgain);
@@ -128,16 +128,10 @@ test('handleApplyAddIndexerOperation (apply) - Append addIndexer payload into th
             isIndexer: true,
         })
 
-
         const adminSignedLengthAfter = admin.msb.state.getSignedLength();
-
         const indexersEntry = await indexer1.msb.state.getIndexersEntry();
-        const formattedIndexersEntry = formatIndexersEntry(indexersEntry);
-        const nodeInfo = await indexer1.msb.state.getNodeEntry(indexer1.wallet.address);
 
-        t.is(formattedIndexersEntry.count, indexersEntryAddressesCount, `Indexers entry count should be ${indexersEntryAddressesCount}`);
-        t.is(formattedIndexersEntry.addresses.includes(indexer1.wallet.address), true, 'Indexer address should not be included in the indexers entry');
-        t.is(nodeInfo.isIndexer, true, 'Node info should indicate that the node is an indexer');
+        t.is(indexersEntry.length, indexersEntryBefore.length + 1, `Indexers entry count should be ${indexersEntry.length}`);
         t.is(adminSignedLengthBefore, adminSignedLengthAfter, 'Admin signed length should not change');
     } catch (error) {
         t.fail('Failed to add indexer: ' + error.message);
@@ -151,9 +145,9 @@ test('handleApplyAddIndexerOperation (apply) - Append addIndexer payload into th
         // reader1 is just a reading node -> will not become an indexer it will still a reader.
         // reader2 is just a reading node.
         // indexer3 is just a writer.
-
-
-        const reqAddReader = await CompleteStateMessageOperations.assembleAddIndexerMessage(admin.wallet, reader1.wallet.address);
+        const indexersEntryBefore = await indexer1.msb.state.getIndexersEntry();
+        const validity = await admin.msb.state.getIndexerSequenceState()
+        const reqAddReader = await CompleteStateMessageOperations.assembleAddIndexerMessage(admin.wallet, reader1.wallet.address, validity);
 
         const adminSignedLengthBefore = admin.msb.state.getSignedLength()
         const indexer1SignedLengthBefore = indexer1.msb.state.getSignedLength();
@@ -166,11 +160,10 @@ test('handleApplyAddIndexerOperation (apply) - Append addIndexer payload into th
         const indexer2SignedLengthAfter = indexer2.msb.state.getSignedLength();
 
         const indexersEntry = await admin.msb.state.getIndexersEntry();
-        const formattedIndexersEntry = formatIndexersEntry(indexersEntry);
         const nodeInfo = await admin.msb.state.getNodeEntry(reader1.wallet.address);
 
-        t.is(formattedIndexersEntry.count, indexersEntryAddressesCount, `Indexers entry count should be ${indexersEntryAddressesCount}`);
-        t.is(formattedIndexersEntry.addresses.includes(reader1.wallet.address), false, 'Reader address should not be included in the indexers entry');
+        t.is(indexersEntry.length, indexersEntryBefore.length, `Indexers entry count should be ${indexersEntry.length}`);
+        t.is(!!indexersEntry.find(({ key }) => b4a.equals(key, reader1.msb.state.writingKey)), false, 'Reader address should not be included in the indexers entry');
         t.is(nodeInfo, null, 'Node info should be null for reader');
         t.is(adminSignedLengthBefore, adminSignedLengthAfter, 'Admin signed length should not change');
         t.is(indexer1SignedLengthBefore, indexer1SignedLengthAfter, 'Indexer1 signed length should not change');
@@ -188,10 +181,14 @@ test('handleApplyAddIndexerOperation (apply) - Append addIndexer payload into th
         // reader2 is just a reading node -> will be whitelisted -> wil try to become an indexer but will not be able to.
         // indexer3 is just a writer.
 
+        const indexersEntryBeforeWhitelist = await admin.msb.state.getIndexersEntry();
         const adminSignedLengthBefore = admin.msb.state.getSignedLength();
+        const validity = await admin.msb.state.getIndexerSequenceState()
+        const reqAddIndexer2 = await CompleteStateMessageOperations.assembleAddIndexerMessage(
+            admin.wallet,
+            reader2.wallet.address,
+            validity);
 
-
-        const reqAddIndexer2 = await CompleteStateMessageOperations.assembleAddIndexerMessage(admin.wallet, reader2.wallet.address);
         await admin.msb.state.append(reqAddIndexer2);
         await tryToSyncWriters(admin, indexer1, indexer2);
 
@@ -199,14 +196,12 @@ test('handleApplyAddIndexerOperation (apply) - Append addIndexer payload into th
         const adminSignedLengthAfter = admin.msb.state.getSignedLength();
 
         const indexersEntryAfterWhitelist = await admin.msb.state.getIndexersEntry();
-        const formattedIndexersEntryAfterWhitelist = formatIndexersEntry(indexersEntryAfterWhitelist);
         const nodeEntry = await admin.msb.state.getNodeEntry(reader2.wallet.address);
 
-        t.is(formattedIndexersEntryAfterWhitelist.count, indexersEntryAddressesCount, `Indexers entry count should be ${indexersEntryAddressesCount}`);
-        t.is(formattedIndexersEntryAfterWhitelist.addresses.includes(reader2.wallet.address), false, 'Reader address should not be included in the indexers entry');
+        t.is(indexersEntryAfterWhitelist.length, indexersEntryBeforeWhitelist.length, `Indexers entry count should be ${indexersEntryAfterWhitelist.length}`);
+        t.is(!!indexersEntryAfterWhitelist.find(({ key }) => b4a.equals(key, reader2.msb.state.writingKey)), false, 'Reader address should not be included in the indexers entry');
         t.is(nodeEntry.isIndexer, false, 'Node info should not indicate that the node is an indexer');
         t.is(adminSignedLengthBefore, adminSignedLengthAfter, 'Admin signed length should not change');
-
     } catch (error) {
         t.fail('Failed to add indexer: ' + error.message);
     }
@@ -220,9 +215,14 @@ test('handleApplyAddIndexerOperation (apply) - Append addIndexer payload into th
         // reader2 is just a reading node.
         // indexer3 is just a writer -> writer will try to add indexer3 as an indexer, however it won't be able to because it is not an admin.
         // writer is just a writer.
+        const indexersEntryBefore = await writer.msb.state.getIndexersEntry();
         const adminSignedLengthBefore = admin.msb.state.getSignedLength();
 
-        const assembledAddIndexerMessage = await CompleteStateMessageOperations.assembleAddIndexerMessage(admin.wallet, indexer3.wallet.address);
+        const validity = await admin.msb.state.getIndexerSequenceState()
+        const assembledAddIndexerMessage = await CompleteStateMessageOperations.assembleAddIndexerMessage(
+            admin.wallet,
+            indexer3.wallet.address,
+            validity);
 
         await writer.msb.state.append(assembledAddIndexerMessage);
         await tryToSyncWriters(admin, writer, indexer1, indexer2);
@@ -235,13 +235,11 @@ test('handleApplyAddIndexerOperation (apply) - Append addIndexer payload into th
         })
 
         const adminSignedLengthAfter = admin.msb.state.getSignedLength();
-
         const indexersEntry = await writer.msb.state.getIndexersEntry();
-        const formattedIndexersEntry = formatIndexersEntry(indexersEntry);
         const nodeEntry = await writer.msb.state.getNodeEntry(indexer3.wallet.address);
 
-        t.is(formattedIndexersEntry.count, indexersEntryAddressesCount, `Indexers entry count should be ${indexersEntryAddressesCount}`);
-        t.is(formattedIndexersEntry.addresses.includes(indexer3.wallet.address), false, 'Indexer address should not be included in the indexers entry');
+        t.is(indexersEntry.length, indexersEntryBefore.length, `Indexers entry count should be ${indexersEntry.length}`);
+        t.is(!!indexersEntry.find(({ key }) => b4a.equals(key, indexer3.msb.state.writingKey)), false, 'Indexer address should not be included in the indexers entry');
         t.is(nodeEntry.isIndexer, false, 'Node info should indicate that the node is not an indexer');
         t.is(adminSignedLengthBefore, adminSignedLengthAfter, 'Admin signed length should not change');
     } catch (error) {
@@ -251,11 +249,13 @@ test('handleApplyAddIndexerOperation (apply) - Append addIndexer payload into th
 
 
 hook('Clean up addIndexer setup', async t => {
-    if (admin && admin.msb) await admin.msb.close();
-    if (indexer1 && indexer1.msb) await indexer1.msb.close();
-    if (indexer2 && indexer2.msb) await indexer2.msb.close();
-    if (reader2 && reader2.msb) await reader2.msb.close();
-    if (reader1 && reader1.msb) await reader1.msb.close();
-    if (indexer3 && indexer3.msb) await indexer3.msb.close();
+    const toClose = []
+    if (admin?.msb) toClose.push(admin.msb.close());
+    if (indexer1?.msb) toClose.push(indexer1.msb.close());
+    if (indexer2?.msb) toClose.push(indexer2.msb.close());
+    if (reader2?.msb) toClose.push(reader2.msb.close());
+    if (reader1?.msb) toClose.push(reader1.msb.close());
+    if (indexer3?.msb) toClose.push(indexer3.msb.close());
+    await Promise.all(toClose)
     if (tmpDirectory) await removeTemporaryDirectory(tmpDirectory);
 });

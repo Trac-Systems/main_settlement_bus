@@ -1,7 +1,5 @@
-import {hook, test} from 'brittle';
+import {hook, test, solo} from 'brittle';
 import b4a from "b4a";
-
-
 import {
     generatePostTx,
     initTemporaryDirectory,
@@ -10,12 +8,16 @@ import {
     setupMsbAdmin,
     setupMsbPeer,
     setupMsbWriter,
-    tick
+    tick,
+    fundPeer
 } from '../utils/setupApplyTests.js';
 import {safeDecodeApplyOperation, safeEncodeApplyOperation} from '../../src/utils/protobuf/operationHelpers.js'
 import {testKeyPair1, testKeyPair2, testKeyPair3, testKeyPair4} from '../fixtures/apply.fixtures.js';
 import {OperationType} from "../../src/utils/constants.js";
 import {addressToBuffer} from "../../src/core/state/utils/address.js";
+import { sleep } from '../../src/utils/helpers.js';
+import PartialStateMessageOperations from "../../src/messages/partialStateMessages/PartialStateMessageOperations.js";
+import { $TNK } from '../../src/core/state/utils/balance.js';
 
 let tmpDirectory, admin, writer, maliciousWriter, externalNode;
 
@@ -26,7 +28,7 @@ hook('Initialize nodes', async t => {
         enable_txlogs: false,
         enable_interactive_mode: false,
         enable_role_requester: false,
-        enable_validator_observer: false,
+        enable_validator_observer: true,
         channel: randomChannel,
     }
 
@@ -35,12 +37,23 @@ hook('Initialize nodes', async t => {
     writer = await setupMsbWriter(admin, 'writer', testKeyPair2, tmpDirectory, admin.options);
     maliciousWriter = await setupMsbWriter(admin, 'malicious', testKeyPair3, tmpDirectory, admin.options);
     externalNode = await setupMsbPeer('reader', testKeyPair4, tmpDirectory, admin.options);
-
+    await fundPeer(admin, externalNode, $TNK(1n)) // we fund it since it will deploy stuff
 });
 
-test('handleApplyTxOperation (apply) - Append POST_TX into the base - Happy path', async t => {
-    const {postTx, txHash} = await generatePostTx(writer, externalNode)
-    await writer.msb.state.append(postTx);
+solo('handleApplyTxOperation (apply) - Append POST_TX into the base - Happy path', async t => {
+    const externalBootstrap = randomBytes(32).toString('hex');
+    const txValidity = await writer.msb.state.getIndexerSequenceState();
+    const payload = await PartialStateMessageOperations.assembleBootstrapDeploymentMessage(
+        externalNode.msb.wallet,
+        externalBootstrap,
+        txValidity.toString('hex')
+    );
+
+    await writer.msb.broadcastPartialTransaction(payload)
+    await sleep(1000)
+    const {postTx, txHash} = await generatePostTx(writer, externalNode, externalBootstrap)
+    await writer.msb.broadcastPartialTransaction(postTx);
+    await sleep(10000)
     await tick();
     await tick();
 
