@@ -246,9 +246,11 @@ class CompleteStateMessageOperations {
         transactionHash,
         txValidity,
         externalBootstrap,
+        channel,
         incomingNonce,
         incomingSignature
     ) {
+        console.log("channel in assembleCompleteBootstrapDeployment: ", channel);
         try {
             const builder = new CompleteStateMessageBuilder(wallet);
             const director = new CompleteStateMessageDirector();
@@ -259,13 +261,14 @@ class CompleteStateMessageOperations {
                 transactionHash,
                 txValidity,
                 externalBootstrap,
+                channel,
                 incomingNonce,
                 incomingSignature,
             );
             return safeEncodeApplyOperation(payload);
 
         } catch (error) {
-            throw new Error(`Failed to assemble ban writer message: ${error.message}`);
+            throw new Error(`Failed to assemble bootstrap deployment message: ${error.message}`);
         }
     }
 

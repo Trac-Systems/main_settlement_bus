@@ -60,7 +60,7 @@ export function printHelp(isAdminMode = false) {
     console.log('- /remove_writer: remove yourself from this MSB.');
     console.log('- /node_status <address>: get network information about a node with the given address.');
     console.log('- /stats: check system stats such as writing key, DAG, etc.');
-    console.log('- /deployment <subnetwork_bootstrap>: deploy a subnetwork with the given bootstrap.');
+    console.log('- /deployment <subnetwork_bootstrap> <channel>: deploy a subnetwork with the given bootstrap. If channel is not provided, a random one will be generated.');
     console.log('- /get_deployment <subnetwork_bootstrap>: get information about a subnetwork deployment with the given bootstrap.');
     console.log('- /transfer <to_address> <amount>: transfer the specified amount to the given address.');
     console.log('- /get_tx_info <tx_hash>: get information about a transaction with the given hash.');

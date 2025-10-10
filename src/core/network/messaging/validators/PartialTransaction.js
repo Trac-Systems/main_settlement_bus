@@ -8,7 +8,12 @@ import { createMessage } from "../../../../utils/buffer.js";
 import { OperationType } from "../../../../utils/constants.js";
 import { blake3Hash } from "../../../../utils/crypto.js";
 import deploymentEntryUtils from "../../../state/utils/deploymentEntry.js";
+import { bufferToBigInt } from "../../../../utils/amountSerialization.js";
+import { FEE } from "../../../state/utils/transaction.js";
+
 //TODO: Implement BASE VALIDATOR CLASS AND MOVE COMMON METHODS THERE
+
+const FEE_BIGINT = bufferToBigInt(FEE);
 
 class PartialTransaction {
     #state;
@@ -44,6 +49,7 @@ class PartialTransaction {
         if (!await this.#validateIfExternalBootstrapHasBeenDeployed(payload)) return false;
         if (!await this.#validateIfExternalBoostrapIsMsbBootstrap(payload)) return false;
         if (!await this.#validateTransactionValidity(payload)) return false;
+        if (!await this.#validateRequesterBalance(payload)) return false;
         if (!this.#isTransactionOperationNotCompleted(payload)) return false;
 
         return true;
@@ -138,7 +144,7 @@ class PartialTransaction {
             return false;
         }
         const decodedPayload = deploymentEntryUtils.decode(externalBootstrapResult);
-        const txHash =  decodedPayload.txHash
+        const txHash = decodedPayload.txHash
         const getBootstrapTransactionTxPayload = await this.state.get(txHash.toString('hex'));
         if (null === getBootstrapTransactionTxPayload) {
             console.error('External bootstrap is not registered as usual tx', externalBootstrapResult.toString('hex'), ':', payload);
@@ -174,6 +180,24 @@ class PartialTransaction {
             console.error('Transaction operation must not be completed already (va, vn, vs must be undefined).');
             return false;
         }
+        return true;
+    }
+
+    async #validateRequesterBalance(payload) {
+        const requesterAddress = bufferToAddress(payload.address);
+        const requesterEntry = await this.state.getNodeEntry(requesterAddress);
+
+        if (!requesterEntry) {
+            console.error('Requester account not found');
+            return false;
+        }
+
+        const requesterBalance = bufferToBigInt(requesterEntry.balance);
+        if (requesterBalance < FEE_BIGINT) {
+            console.error('Insufficient balance to cover transaction fee');
+            return false;
+        }
+
         return true;
     }
 

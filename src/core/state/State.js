@@ -2400,9 +2400,11 @@ class State extends ReadyResource {
             op.address,
             op.bdo.txv,
             op.bdo.bs,
+            op.bdo.ic,
             op.bdo.in,
             OperationType.BOOTSTRAP_DEPLOYMENT
         );
+        
         if (requesterMessage.length === 0) {
             this.#enable_txlogs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Invalid requester message.", node.from.key)
             return Status.FAILURE;

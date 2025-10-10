@@ -203,6 +203,7 @@ class CompleteStateMessageDirector {
         transactionHash,
         txValidity,
         externalBootstrap,
+        channel,
         incomingNonce,
         incomingSignature
     ) {
@@ -214,6 +215,7 @@ class CompleteStateMessageDirector {
             .withTxHash(transactionHash)
             .withTxValidity(txValidity)
             .withExternalBootstrap(externalBootstrap)
+            .withChannel(channel)
             .withIncomingNonce(incomingNonce)
             .withIncomingSignature(incomingSignature)
             .buildValueAndSign();
