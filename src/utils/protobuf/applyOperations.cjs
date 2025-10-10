@@ -974,6 +974,10 @@ function defineBootstrapDeploymentOperation () {
       var len = encodings.bytes.encodingLength(obj.bs)
       length += 1 + len
     }
+    if (defined(obj.ic)) {
+      var len = encodings.bytes.encodingLength(obj.ic)
+      length += 1 + len
+    }
     if (defined(obj.in)) {
       var len = encodings.bytes.encodingLength(obj.in)
       length += 1 + len
@@ -1016,28 +1020,33 @@ function defineBootstrapDeploymentOperation () {
       encodings.bytes.encode(obj.bs, buf, offset)
       offset += encodings.bytes.encode.bytes
     }
-    if (defined(obj.in)) {
+    if (defined(obj.ic)) {
       buf[offset++] = 34
+      encodings.bytes.encode(obj.ic, buf, offset)
+      offset += encodings.bytes.encode.bytes
+    }
+    if (defined(obj.in)) {
+      buf[offset++] = 42
       encodings.bytes.encode(obj.in, buf, offset)
       offset += encodings.bytes.encode.bytes
     }
     if (defined(obj.is)) {
-      buf[offset++] = 42
+      buf[offset++] = 50
       encodings.bytes.encode(obj.is, buf, offset)
       offset += encodings.bytes.encode.bytes
     }
     if (defined(obj.va)) {
-      buf[offset++] = 50
+      buf[offset++] = 58
       encodings.bytes.encode(obj.va, buf, offset)
       offset += encodings.bytes.encode.bytes
     }
     if (defined(obj.vn)) {
-      buf[offset++] = 58
+      buf[offset++] = 66
       encodings.bytes.encode(obj.vn, buf, offset)
       offset += encodings.bytes.encode.bytes
     }
     if (defined(obj.vs)) {
-      buf[offset++] = 66
+      buf[offset++] = 74
       encodings.bytes.encode(obj.vs, buf, offset)
       offset += encodings.bytes.encode.bytes
     }
@@ -1054,6 +1063,7 @@ function defineBootstrapDeploymentOperation () {
       tx: null,
       txv: null,
       bs: null,
+      ic: null,
       in: null,
       is: null,
       va: null,
@@ -1082,22 +1092,26 @@ function defineBootstrapDeploymentOperation () {
         offset += encodings.bytes.decode.bytes
         break
         case 4:
-        obj.in = encodings.bytes.decode(buf, offset)
+        obj.ic = encodings.bytes.decode(buf, offset)
         offset += encodings.bytes.decode.bytes
         break
         case 5:
-        obj.is = encodings.bytes.decode(buf, offset)
+        obj.in = encodings.bytes.decode(buf, offset)
         offset += encodings.bytes.decode.bytes
         break
         case 6:
-        obj.va = encodings.bytes.decode(buf, offset)
+        obj.is = encodings.bytes.decode(buf, offset)
         offset += encodings.bytes.decode.bytes
         break
         case 7:
-        obj.vn = encodings.bytes.decode(buf, offset)
+        obj.va = encodings.bytes.decode(buf, offset)
         offset += encodings.bytes.decode.bytes
         break
         case 8:
+        obj.vn = encodings.bytes.decode(buf, offset)
+        offset += encodings.bytes.decode.bytes
+        break
+        case 9:
         obj.vs = encodings.bytes.decode(buf, offset)
         offset += encodings.bytes.decode.bytes
         break

@@ -554,7 +554,7 @@ export class MainSettlementBus extends ReadyResource {
         await this.#state.append(assembledBanValidatorMessage);
     }
 
-    async #deployBootstrap(externalBootstrap) {
+    async #deployBootstrap(externalBootstrap, channel) {
         if (this.#enable_wallet === false) {
             throw new Error(
                 "Can not perform bootstrap deployment - wallet is not enabled."
@@ -581,13 +581,17 @@ export class MainSettlementBus extends ReadyResource {
             );
         }
 
-        if (!isHexString(externalBootstrap)) {
+        if (!channel) {
             throw new Error(
-                `Can not perform bootstrap deployment - bootstrap is not a hex: ${externalBootstrap}`
+                `Can not perform bootstrap deployment - channel is not provided.`
             );
         }
 
-        if (externalBootstrap.length !== BOOTSTRAP_HEXSTRING_LENGTH) {
+        if (channel.length !== 64 || !isHexString(channel)) {
+            throw new Error(`Can not perform bootstrap deployment - channel is not a hex: ${channel}`);
+        }
+
+        if (externalBootstrap.length !== BOOTSTRAP_HEXSTRING_LENGTH || !isHexString(externalBootstrap)) {
             throw new Error(
                 `Can not perform bootstrap deployment - bootstrap is not a hex: ${externalBootstrap}`
             );
@@ -604,13 +608,35 @@ export class MainSettlementBus extends ReadyResource {
                 `Can not perform bootstrap deployment - bootstrap ${externalBootstrap} is equal to MSB bootstrap!`
             );
         }
+
+        // Check if we have enough balance for the fee
+        const senderEntry = await this.#state.getNodeEntry(this.#wallet.address);
+        if (!senderEntry) {
+            throw new Error("Sender account not found");
+        }
+
+        const fee = this.#state.getFee();
+        const feeBigInt = bufferToBigInt(fee);
+        const senderBalance = bufferToBigInt(senderEntry.balance);
+
+        if (senderBalance < feeBigInt) {
+            throw new Error(`Insufficient balance to cover deployment fee. Required: ${bigIntToDecimalString(feeBigInt)}, Available: ${bigIntToDecimalString(senderBalance)}`);
+        }
+
         const txValidity = await this.#state.getIndexerSequenceState();
         const payload = await PartialStateMessageOperations.assembleBootstrapDeploymentMessage(
             this.#wallet,
             externalBootstrap,
+            channel,
             txValidity.toString('hex')
         );
+
         await this.broadcastPartialTransaction(payload);
+        
+        console.log(`Bootstrap ${externalBootstrap} deployment requested on channel ${channel}`);
+        console.log('Bootstrap Deployment Fee Details:');
+        console.log(`Fee: ${bigIntToDecimalString(feeBigInt)}`);
+        console.log(`Expected Balance After Deployment: ${bigIntToDecimalString(senderBalance - feeBigInt)}`);
 
     }
 
@@ -634,8 +660,8 @@ export class MainSettlementBus extends ReadyResource {
         await this.#banValidator(address);
     }
 
-    async #handleBootstrapDeploymentOperation(bootstrapHex) {
-        await this.#deployBootstrap(bootstrapHex);
+    async #handleBootstrapDeploymentOperation(bootstrapHex, channel) {
+        await this.#deployBootstrap(bootstrapHex, channel);
     }
 
     async #handleTransferOperation(address, amount) {
@@ -908,7 +934,8 @@ export class MainSettlementBus extends ReadyResource {
                             IsWriter: nodeEntry.isWriter,
                             IsIndexer: nodeEntry.isIndexer,
                             License: licenseDisplay,
-                            StakedBalance: bigIntToDecimalString(bufferToBigInt(nodeEntry.stakedBalance))
+                            StakedBalance: bigIntToDecimalString(bufferToBigInt(nodeEntry.stakedBalance)),
+                            Balance: bigIntToDecimalString(bufferToBigInt(nodeEntry.balance))
                         })
                         return {
                             address: address,
@@ -944,7 +971,11 @@ export class MainSettlementBus extends ReadyResource {
                 } else if (input.startsWith("/deployment")) {
                     const splitted = input.split(" ");
                     const bootstrap_to_deploy = splitted[1];
-                    await this.#handleBootstrapDeploymentOperation(bootstrap_to_deploy);
+                    const channel = splitted[2] || randomBytes(32).toString('hex');
+                    if (channel.length !== 64 || !isHexString(channel)) {
+                        throw new Error("Channel must be a 32-byte hex string");
+                    }
+                    await this.#handleBootstrapDeploymentOperation(bootstrap_to_deploy, channel);
                 }
                 else if (input.startsWith("/get_validator_addr")) {
                     const splitted = input.split(" ");

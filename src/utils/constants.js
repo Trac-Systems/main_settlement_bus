@@ -69,6 +69,7 @@ export const HYPERBEE_VALUE_ENCODING = 'binary';
 //ATTENTION - THIS IS USED IN THE APPLY FUNCTION!
 export const WRITER_BYTE_LENGTH = 32;
 export const BOOTSTRAP_BYTE_LENGTH = 32;
+export const CHANNEL_BYTE_LENGTH = 32;
 export const NONCE_BYTE_LENGTH = 32;
 export const HASH_BYTE_LENGTH = 32;
 export const BALANCE_BYTE_LENGTH = 16;

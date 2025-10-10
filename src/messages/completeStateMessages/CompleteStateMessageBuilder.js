@@ -31,6 +31,7 @@ class CompleteStateMessageBuilder extends StateBuilder {
     #contentHash;
     #incomingSignature;
     #externalBootstrap;
+    #channel;
     #msbBootstrap;
     #validatorNonce;
     #txValidity;
@@ -62,6 +63,7 @@ class CompleteStateMessageBuilder extends StateBuilder {
         this.#contentHash = null;
         this.#incomingSignature = null;
         this.#externalBootstrap = null;
+        this.#channel = null;
         this.#msbBootstrap = null;
         this.#validatorNonce = null;
         this.#txValidity = null;
@@ -168,6 +170,14 @@ class CompleteStateMessageBuilder extends StateBuilder {
         return this;
     }
 
+    withChannel(channel) {
+        if (!b4a.isBuffer(channel) || channel.length !== 32) {
+            throw new Error('Channel must be a 32-byte buffer.');
+        }
+        this.#channel = channel;
+        return this;
+    }
+
     withTxValidity(txValidity) {
         if (!b4a.isBuffer(txValidity) || txValidity.length !== 32) {
             throw new Error('Transaction validity must be a 32-byte buffer.');
@@ -252,7 +262,7 @@ class CompleteStateMessageBuilder extends StateBuilder {
                 break;
             // Partial need to be signed
             case OperationType.BOOTSTRAP_DEPLOYMENT:
-                if (!this.#txHash || !this.#externalBootstrap || !this.#incomingNonce || !this.#incomingSignature) {
+                if (!this.#txHash || !this.#externalBootstrap || !this.#channel || !this.#incomingNonce || !this.#incomingSignature) {
                     throw new Error('All bootstrap deployment fields must be set before building the message!');
                 }
                 msg = createMessage(
@@ -330,6 +340,7 @@ class CompleteStateMessageBuilder extends StateBuilder {
                 tx: this.#txHash,
                 txv: this.#txValidity,
                 bs: this.#externalBootstrap,
+                ic: this.#channel,
                 in: this.#incomingNonce,
                 is: this.#incomingSignature,
                 va: addressToBuffer(this.#wallet.address),

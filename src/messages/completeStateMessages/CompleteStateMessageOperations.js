@@ -246,6 +246,7 @@ class CompleteStateMessageOperations {
         transactionHash,
         txValidity,
         externalBootstrap,
+        channel,
         incomingNonce,
         incomingSignature
     ) {
@@ -259,13 +260,14 @@ class CompleteStateMessageOperations {
                 transactionHash,
                 txValidity,
                 externalBootstrap,
+                channel,
                 incomingNonce,
                 incomingSignature,
             );
             return safeEncodeApplyOperation(payload);
 
         } catch (error) {
-            throw new Error(`Failed to assemble ban writer message: ${error.message}`);
+            throw new Error(`Failed to assemble bootstrap deployment message: ${error.message}`);
         }
     }
 
