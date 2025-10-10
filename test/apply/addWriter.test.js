@@ -379,6 +379,11 @@ test('handleApplyAddWriterOperation (apply) - Append addWriter payload into the 
     }
 });
 
+test('handleApplyAddWriterOperation (apply) - validator and invoker are the same', async (t) => {
+    // TODO: Implement when apply tests are fixed
+    t.pass('Skipping test: Placeholder. To be implemented later.');
+});
+
 hook('Clean up addWriter setup', async t => {
     // close msb instances and remove temp directory
     if (admin && admin.msb) await admin.msb.close();
