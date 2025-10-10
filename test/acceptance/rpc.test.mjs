@@ -121,5 +121,25 @@ describe("API acceptance tests", () => {
                 unsignedLength: expect.any(Number),
             }
         })
-  })
+    })
+
+    // TODO: not sure why but test runner does not work, so this will require more attention.
+    // We can map some of the tx hashes from previous OPs and fetch and assert payload here
+    it("POST /tx-payloads-bulk", async () => {
+        
+        const payload = { hashes: [
+            "test"
+        ]}
+
+        const res = await request(server)
+            .post("/tx-payloads-bulk")
+            .set("Accept", "application/json")
+            .send(JSON.stringify( payload ))
+        
+        expect(res.statusCode).toBe(200)
+        expect(res.body).toMatchObject({
+            results: [],
+            missing:["test"]
+        })
+    })
 })
