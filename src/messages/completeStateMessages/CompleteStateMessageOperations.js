@@ -250,7 +250,6 @@ class CompleteStateMessageOperations {
         incomingNonce,
         incomingSignature
     ) {
-        console.log("channel in assembleCompleteBootstrapDeployment: ", channel);
         try {
             const builder = new CompleteStateMessageBuilder(wallet);
             const director = new CompleteStateMessageDirector();
