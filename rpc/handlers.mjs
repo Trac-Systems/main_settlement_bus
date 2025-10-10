@@ -1,4 +1,4 @@
-import {decodeBase64Payload, isBase64, sanitizeTransferPayload, validatePayloadStructure} from "./utils/helpers.mjs"
+import {decodeBase64Payload, isBase64, sanitizeBulkPayloadsRequestBody, sanitizeTransferPayload, validatePayloadStructure} from "./utils/helpers.mjs"
 import { MAX_SIGNED_LENGTH, SIGNED_LENGTH_OFFSET } from "./constants.mjs";
 
 export async function handleBalance({ req, respond, msbInstance }) {
@@ -119,4 +119,49 @@ export async function handleTransactionDetails({ msbInstance, respond, req }) {
     const commandString = `/get_tx_details ${hash}`;
     const txDetails = await msbInstance.handleCommand(commandString);
     respond(200, { txDetails });
+}
+
+export async function handleFetchBulkTxPayloads(req, res, msbInstance) {
+    try {
+        const sanitizedPayload = await sanitizeBulkPayloadsRequestBody(req);
+
+        if (sanitizedPayload === null){
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Missing payload.' }));
+            return;
+        }
+
+        const { hashes } = sanitizedPayload;
+
+        if (!Array.isArray(hashes) || hashes.length === 0) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Missing hash list.' }));
+            return;
+        }
+
+        if (hashes.length > 1500) {
+            res.writeHead(413, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Too many hashes. Max 1500 allowed per request.' }));
+            return;
+        }
+
+        const uniqueHashes = [...new Set(hashes)];
+
+        const commandResult = await msbInstance.handleCommand( `/get_tx_payloads_bulk`, null, uniqueHashes)
+
+        const responseString = JSON.stringify(commandResult);
+        if (Buffer.byteLength(responseString, 'utf8') > 2_000_000) {
+            const err = new Error('Response too large. Reduce number of hashes.');
+            err.statusCode = 413;
+            throw err;
+        }
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(responseString);
+    } catch (error) {
+        console.error('Error on retrieving transaction payloads:', error);
+        const status = error.statusCode || 500;
+        res.writeHead(status, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: error.message || 'An error occurred processing the request.' }));
+    }
 }

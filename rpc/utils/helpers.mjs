@@ -55,3 +55,31 @@ export function sanitizeTransferPayload(payload) {
 
   return payload
 }
+
+export async function sanitizeBulkPayloadsRequestBody(req, limitBytes = 1_000_000) { // 1 MB limit
+  let body = '';
+  let bytesRead = 0;
+
+  for await (const chunk of req) {
+    bytesRead += chunk.length;
+    if (bytesRead > limitBytes) {
+      const err = new Error('Request body too large');
+      err.statusCode = 413;
+      throw err;
+    }
+    body += chunk;
+  }
+
+  if (body === ''){
+    return null;
+  }
+
+  // Clean up invisible characters
+  const cleanBody = body
+    .replace(/^\uFEFF/, '')
+    .replace(/\r/g, '')
+    .replace(/\0/g, '')
+    .trim();
+
+  return JSON.parse(cleanBody);
+}
