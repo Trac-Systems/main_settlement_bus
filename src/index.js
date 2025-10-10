@@ -581,12 +581,6 @@ export class MainSettlementBus extends ReadyResource {
             );
         }
 
-        if (externalBootstrap.length !== 64 || !isHexString(externalBootstrap)) {
-            throw new Error(
-                `Can not perform bootstrap deployment - bootstrap is not a hex: ${externalBootstrap}`
-            );
-        }
-
         if (!channel) {
             throw new Error(
                 `Can not perform bootstrap deployment - channel is not provided.`
@@ -597,7 +591,7 @@ export class MainSettlementBus extends ReadyResource {
             throw new Error(`Can not perform bootstrap deployment - channel is not a hex: ${channel}`);
         }
 
-        if (externalBootstrap.length !== BOOTSTRAP_HEXSTRING_LENGTH) {
+        if (externalBootstrap.length !== BOOTSTRAP_HEXSTRING_LENGTH || !isHexString(externalBootstrap)) {
             throw new Error(
                 `Can not perform bootstrap deployment - bootstrap is not a hex: ${externalBootstrap}`
             );
