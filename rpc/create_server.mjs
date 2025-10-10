@@ -20,7 +20,7 @@ export const createServer = (msbInstance) => {
             foundRoute = true;
             try {
                 await route.handler({ req, res, respond, msbInstance });
-            } catch {
+            } catch (error) {
                 console.error(`Error on ${route.path}:`, error);
                 res.writeHead(500, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ error: 'An error occurred processing the request.' }));
