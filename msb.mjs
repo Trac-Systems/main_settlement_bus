@@ -31,8 +31,11 @@ msb.ready().then(async () => {
         console.log('Starting RPC server...');
         const portIndex = args.indexOf('--port');
         const port = (portIndex !== -1 && args[portIndex + 1]) ? parseInt(args[portIndex + 1], 10) : 5000;
+        const hostIndex = args.indexOf('--host');
+        const host = (hostIndex !== -1 && args[hostIndex + 1]) ? args[hostIndex + 1] : 'localhost';
+
         const {startRpcServer} = await import('./rpc/rpc_server.mjs');
-        startRpcServer(msb, port);
+        startRpcServer(msb, host, port);
     } else {
         console.log('RPC server will not be started.');
     }
