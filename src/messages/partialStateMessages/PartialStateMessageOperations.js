@@ -20,7 +20,7 @@ class PartialStateMessageOperations {
      * @returns {Promise<Object>} The assembled bootstrap deployment operation message
      * @throws {Error} If assembly of the bootstrap deployment operation message fails
      */
-    static async assembleBootstrapDeploymentMessage(wallet, externalBootstrap, txValidity) {
+    static async assembleBootstrapDeploymentMessage(wallet, externalBootstrap, channel, txValidity) {
         try {
             const builder = new PartialStateMessageBuilder(wallet);
             const director = new PartialStateMessageDirector();
@@ -28,6 +28,7 @@ class PartialStateMessageOperations {
             return await director.buildPartialBootstrapDeploymentMessage(
                 wallet.address,
                 externalBootstrap,
+                channel,
                 txValidity
             );
         } catch (error) {

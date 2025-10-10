@@ -20,6 +20,7 @@ class PartialStateMessageBuilder extends StateBuilder {
     #withMsbBootstrap;
     #bootstrapNonce;
     #bootstrapSignature;
+    #channel;
     #incomingAddress;
     #amount;
     #payload;
@@ -50,6 +51,7 @@ class PartialStateMessageBuilder extends StateBuilder {
         this.#bootstrapSignature = null;
         this.#incomingAddress = null;
         this.#amount = null;
+        this.#channel = null;
         this.#payload = {};
     }
 
@@ -131,6 +133,15 @@ class PartialStateMessageBuilder extends StateBuilder {
         return this;
     }
 
+    withChannel(channel) {
+        if (!isHexString(channel) || channel.length !== 64) {
+            throw new Error('Channel must be a 64-length hexstring.');
+        }
+
+        this.#channel = channel;
+        return this;
+    }
+
     async buildValueAndSign() {
         const nonce = PeerWallet.generateNonce();
         let txMsg = null;
@@ -148,6 +159,7 @@ class PartialStateMessageBuilder extends StateBuilder {
                     addressToBuffer(this.#address),
                     b4a.from(this.#txValidity, 'hex'),
                     b4a.from(this.#externalBootstrap, 'hex'),
+                    b4a.from(this.#channel, 'hex'),
                     nonce,
                     OperationType.BOOTSTRAP_DEPLOYMENT
                 );
@@ -201,6 +213,7 @@ class PartialStateMessageBuilder extends StateBuilder {
                 tx: tx.toString('hex'),
                 txv: this.#txValidity,
                 bs: this.#externalBootstrap,
+                ic: this.#channel,
                 in: nonce.toString('hex'),
                 is: signature.toString('hex')
             };

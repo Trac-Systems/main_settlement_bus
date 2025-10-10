@@ -29,7 +29,7 @@ class PartialStateMessageDirector {
      * @returns {Promise<Object>} The built bootstrap deployment operation message.
      * @throws {Error} If the builder has not been set or message building fails.
      */
-    async buildPartialBootstrapDeploymentMessage(address, bootstrap, txValidity) {
+    async buildPartialBootstrapDeploymentMessage(address, bootstrap, channel, txValidity) {
         if (!this.#builder) throw new Error('Builder has not been set.');
 
         await this.#builder
@@ -37,6 +37,7 @@ class PartialStateMessageDirector {
             .withAddress(address)
             .withTxValidity(txValidity)
             .withExternalBootstrap(bootstrap)
+            .withChannel(channel)
             .buildValueAndSign();
 
         return this.#builder.getPayload();

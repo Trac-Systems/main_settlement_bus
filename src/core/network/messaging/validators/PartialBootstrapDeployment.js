@@ -2,12 +2,16 @@ import b4a from 'b4a';
 import PeerWallet from 'trac-wallet';
 
 import Check from '../../../../utils/check.js';
-import {bufferToAddress} from "../../../state/utils/address.js";
-import {OperationType} from "../../../../utils/constants.js";
-import {blake3Hash} from "../../../../utils/crypto.js";
-import {createMessage} from "../../../../utils/buffer.js";
+import { bufferToAddress } from "../../../state/utils/address.js";
+import { OperationType } from "../../../../utils/constants.js";
+import { blake3Hash } from "../../../../utils/crypto.js";
+import { createMessage } from "../../../../utils/buffer.js";
+import { bufferToBigInt } from "../../../../utils/amountSerialization.js";
+import { FEE } from "../../../state/utils/transaction.js";
 
 //TODO: Implement BASE VALIDATOR CLASS AND MOVE COMMON METHODS THERE
+
+const FEE_BIGINT = bufferToBigInt(FEE);
 
 class PartialBootstrapDeployment {
     #state;
@@ -42,6 +46,7 @@ class PartialBootstrapDeployment {
         if (!this.#isBootstrapDeploymentAlreadyNotCompleted(payload)) return false;
         if (!this.#isExternalBootstrapDifferentFromMSB(payload)) return false;
         if (!await this.#validateTransactionValidity(payload)) return false;
+        if (!await this.#validateRequesterBalance(payload)) return false;
         return true;
     }
 
@@ -77,10 +82,11 @@ class PartialBootstrapDeployment {
 
         const incomingTx = payload.bdo.tx;
 
-        const message =  createMessage(
+        const message = createMessage(
             payload.address,
             payload.bdo.txv,
             payload.bdo.bs,
+            payload.bdo.ic,
             payload.bdo.in,
             OperationType.BOOTSTRAP_DEPLOYMENT
         );
@@ -88,7 +94,7 @@ class PartialBootstrapDeployment {
         const regeneratedTx = await blake3Hash(message);
 
         // ensure that regenerated tx matches the incoming tx
-        if ( !b4a.equals(incomingTx, regeneratedTx)) {
+        if (!b4a.equals(incomingTx, regeneratedTx)) {
             return false;
         }
 
@@ -127,7 +133,7 @@ class PartialBootstrapDeployment {
     }
 
     #isExternalBootstrapDifferentFromMSB(payload) {
-        const msbBootstrap =  this.state.bootstrap;
+        const msbBootstrap = this.state.bootstrap;
         if (b4a.equals(msbBootstrap, payload.bdo.bs)) {
             console.error('External bootstrap must be different from MSB bootstrap.');
             return false;
@@ -142,6 +148,24 @@ class PartialBootstrapDeployment {
             console.error(`Transaction has expired.`);
             return false;
         }
+        return true;
+    }
+
+    async #validateRequesterBalance(payload) {
+        const requesterAddress = bufferToAddress(payload.address);
+        const requesterEntry = await this.state.getNodeEntry(requesterAddress);
+
+        if (!requesterEntry) {
+            console.error('Requester account not found');
+            return false;
+        }
+
+        const requesterBalance = bufferToBigInt(requesterEntry.balance);
+        if (requesterBalance < FEE_BIGINT) {
+            console.error('Insufficient balance to cover deployment fee');
+            return false;
+        }
+
         return true;
     }
 

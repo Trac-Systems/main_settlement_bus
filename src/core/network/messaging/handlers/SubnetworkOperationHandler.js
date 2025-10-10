@@ -70,6 +70,7 @@ class SubnetworkOperationHandler extends BaseOperationHandler {
             normalizedPayload.bdo.tx,
             normalizedPayload.bdo.txv,
             normalizedPayload.bdo.bs,
+            normalizedPayload.bdo.ic,
             normalizedPayload.bdo.in,
             normalizedPayload.bdo.is,
         )
@@ -91,11 +92,12 @@ class SubnetworkOperationHandler extends BaseOperationHandler {
         }
 
         const normalizedBdo = {
-            tx: normalizeHex(bdo.tx),
-            txv: normalizeHex(bdo.txv),
-            bs: normalizeHex(bdo.bs),
-            in: normalizeHex(bdo.in),
-            is: normalizeHex(bdo.is)
+            tx: normalizeHex(bdo.tx),   // Transaction hash
+            txv: normalizeHex(bdo.txv), // Transaction validity
+            bs: normalizeHex(bdo.bs),   // External bootstrap
+            ic: normalizeHex(bdo.ic),   // Channel
+            in: normalizeHex(bdo.in),   // Nonce
+            is: normalizeHex(bdo.is)    // Signature
         };
 
         return {

@@ -8,6 +8,7 @@ import {
     SIGNATURE_BYTE_LENGTH,
     HASH_BYTE_LENGTH,
     BOOTSTRAP_BYTE_LENGTH,
+    CHANNEL_BYTE_LENGTH,
     AMOUNT_BYTE_LENGTH,
     TRAC_ADDRESS_SIZE,
 } from './constants.js';
@@ -406,6 +407,7 @@ class Check {
                     tx: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true},
                     txv: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true},
                     bs: {type: 'buffer', length: BOOTSTRAP_BYTE_LENGTH, required: true},
+                    ic: {type: 'buffer', length: CHANNEL_BYTE_LENGTH, required: true},
                     in: {type: 'buffer', length: NONCE_BYTE_LENGTH, required: true},
                     is: {type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true},
                     va: {type: 'buffer', length: TRAC_ADDRESS_SIZE, optional: true},
