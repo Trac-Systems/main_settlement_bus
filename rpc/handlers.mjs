@@ -121,28 +121,36 @@ export async function handleTransactionDetails({ msbInstance, respond, req }) {
     respond(200, { txDetails });
 }
 
-export async function handleFetchBulkTxPayloads(req, res, msbInstance) {
-    try {
-        const sanitizedPayload = await sanitizeBulkPayloadsRequestBody(req);
+export async function handleFetchBulkTxPayloads({ msbInstance, respond, req }) {
+    let body = ''
+    let bytesRead = 0;
+    let limitBytes = 1_000_000;
 
-        if (sanitizedPayload === null){
-            res.writeHead(400, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ error: 'Missing payload.' }));
-            return;
+    req.on('data', chunk => {
+        bytesRead += chunk.length;
+        if (bytesRead > limitBytes) { respond(413, { error: 'Request body too large.' }) }
+        body += chunk.toString();
+    });
+
+    req.on('end', async () => {
+        if (body === null || body === ''){
+            return respond(400, { error: 'Missing payload.' });
         }
 
+        const sanitizedPayload = sanitizeBulkPayloadsRequestBody(body);
+
+        if (sanitizedPayload === null){
+            return respond(400, { error: 'Invalid payload.' });
+        }
+        
         const { hashes } = sanitizedPayload;
 
         if (!Array.isArray(hashes) || hashes.length === 0) {
-            res.writeHead(400, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ error: 'Missing hash list.' }));
-            return;
+            return respond(400, { error: 'Missing hash list.' });
         }
 
         if (hashes.length > 1500) {
-            res.writeHead(413, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ error: 'Too many hashes. Max 1500 allowed per request.' }));
-            return;
+            return respond(413, { error: 'Too many hashes. Max 1500 allowed per request.' });
         }
 
         const uniqueHashes = [...new Set(hashes)];
@@ -151,17 +159,9 @@ export async function handleFetchBulkTxPayloads(req, res, msbInstance) {
 
         const responseString = JSON.stringify(commandResult);
         if (Buffer.byteLength(responseString, 'utf8') > 2_000_000) {
-            const err = new Error('Response too large. Reduce number of hashes.');
-            err.statusCode = 413;
-            throw err;
+            return respond(413, { error: 'Response too large. Reduce number of hashes.'});
         }
 
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(responseString);
-    } catch (error) {
-        console.error('Error on retrieving transaction payloads:', error);
-        const status = error.statusCode || 500;
-        res.writeHead(status, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: error.message || 'An error occurred processing the request.' }));
-    }
+        return respond(200, commandResult);
+    })
 }
