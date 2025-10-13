@@ -55,7 +55,7 @@ describe("API acceptance tests", () => {
         expect(res.body).toEqual({ confirmed_length: 16 })
     })
 
-    it("GET /v1unconfirmed-length", async () => {
+    it("GET /v1/unconfirmed-length", async () => {
         const res = await request(server).get("/v1/unconfirmed-length")
         expect(res.statusCode).toBe(200)
         expect(res.body).toEqual({ unconfirmed_length: 16 })
