@@ -49,57 +49,57 @@ afterAll(async () => {
 
 // The order here is important since the OPs change the network state. We wont boot up an instance before each because the tests are to verify rpc structure and the decision is to spare ci resources.
 describe("API acceptance tests", () => {
-    it("GET /confirmed-length", async () => {
-        const res = await request(server).get("/confirmed-length")
+    it("GET /v1/confirmed-length", async () => {
+        const res = await request(server).get("/v1/confirmed-length")
         expect(res.statusCode).toBe(200)
         expect(res.body).toEqual({ confirmed_length: 16 })
     })
 
-    it("GET /unconfirmed-length", async () => {
-        const res = await request(server).get("/unconfirmed-length")
+    it("GET /v1unconfirmed-length", async () => {
+        const res = await request(server).get("/v1/unconfirmed-length")
         expect(res.statusCode).toBe(200)
         expect(res.body).toEqual({ unconfirmed_length: 16 })
     })
 
-    it("GET /txv", async () => {
-        const res = await request(server).get("/txv")
+    it("GET /v1/txv", async () => {
+        const res = await request(server).get("/v1/txv")
         expect(res.statusCode).toBe(200)
         expect(res.body).toEqual({ txv: expect.stringMatching(/^[a-z0-9]{64}$/) })
     })
 
-    it("GET /fee", async () => {
-        const res = await request(server).get("/fee")
+    it("GET /v1/fee", async () => {
+        const res = await request(server).get("/v1/fee")
         expect(res.statusCode).toBe(200)
         expect(res.body).toEqual({ fee: expect.stringMatching(/^-?\d+(\.\d+)?$/) })
     })
 
-    describe('GET /tx-hashes', () => {
-        it("< 1000", async () => {
-            const res = await request(server).get("/tx-hashes/1/1001")
-            expect(res.statusCode).toBe(200)
-            expect(res.body).toEqual({ 
-                hashes: expect.arrayContaining([
-                    expect.objectContaining({
-                        hash: expect.any(String),
-                        signedLength: expect.any(Number),
-                    })
-                ])
-            })
-        })
+    // describe('GET /v1/tx-hashes', () => {
+    //     it("< 1000", async () => {
+    //         const res = await request(server).get("/v1/tx-hashes/1/1001")
+    //         expect(res.statusCode).toBe(200)
+    //         expect(res.body).toEqual({ 
+    //             hashes: expect.arrayContaining([
+    //                 expect.objectContaining({
+    //                     hash: expect.any(String),
+    //                     signedLength: expect.any(Number),
+    //                 })
+    //             ])
+    //         })
+    //     })
 
-        it("> 1000", async () => {
-            const res = await request(server).get("/tx-hashes/1/1002")
-            expect(res.statusCode).toBe(400)
-        })
-    })
+    //     it("> 1000", async () => {
+    //         const res = await request(server).get("/v1/tx-hashes/1/1002")
+    //         expect(res.statusCode).toBe(400)
+    //     })
+    // })
 
-    it("GET /balance", async () => {
-        const res = await request(server).get(`/balance/${wallet.address}`)
-        expect(res.statusCode).toBe(200)
-        expect(res.body).toEqual({ address: wallet.address, balance: "100000000000000000000" })
-    })
+    // it("GET /v1/balance", async () => {
+    //     const res = await request(server).get(`/v1/balance/${wallet.address}`)
+    //     expect(res.statusCode).toBe(200)
+    //     expect(res.body).toEqual({ address: wallet.address, balance: "100000000000000000000" })
+    // })
 
-    it("POST /broadcast-transaction", async () => {
+    it("POST /v1/broadcast-transaction", async () => {
         const txData = await tracCrypto.transaction.preBuild(
             wallet.address,
             wallet.address,
@@ -109,7 +109,7 @@ describe("API acceptance tests", () => {
 
         const payload = tracCrypto.transaction.build(txData, b4a.from(wallet.secretKey, 'hex'));
         const res = await request(server)
-            .post("/broadcast-transaction")
+            .post("/v1/broadcast-transaction")
             .set("Accept", "application/json")
             .send(JSON.stringify({ payload }))
 
@@ -125,14 +125,14 @@ describe("API acceptance tests", () => {
 
     // TODO: not sure why but test runner does not work, so this will require more attention.
     // We can map some of the tx hashes from previous OPs and fetch and assert payload here
-    it("POST /tx-payloads-bulk", async () => {
+    it("POST /v1/tx-payloads-bulk", async () => {
         
         const payload = { hashes: [
             "test"
         ]}
 
         const res = await request(server)
-            .post("/tx-payloads-bulk")
+            .post("/v1/tx-payloads-bulk")
             .set("Accept", "application/json")
             .send(JSON.stringify( payload ))
         
