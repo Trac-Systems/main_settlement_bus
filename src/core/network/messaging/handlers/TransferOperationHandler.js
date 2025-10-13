@@ -17,7 +17,7 @@ class TransferOperationHandler extends BaseOperationHandler {
 
     constructor(network, state, wallet, rateLimiter, options = {}) {
         super(network, state, wallet, rateLimiter, options);
-        this.#partialTransferValidator = new PartialTransfer(this.state, this.wallet, this.network);
+        this.#partialTransferValidator = new PartialTransfer(this.state);
     }
 
     async handleOperation(payload) {

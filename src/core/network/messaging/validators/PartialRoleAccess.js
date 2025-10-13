@@ -1,167 +1,75 @@
 import b4a from 'b4a';
-import PeerWallet from 'trac-wallet';
 
-import Check from '../../../../utils/check.js';
 import { OperationType } from "../../../../utils/constants.js";
-import { blake3Hash } from "../../../../utils/crypto.js";
-import { createMessage } from "../../../../utils/buffer.js";
-import { addressToBuffer, bufferToAddress } from "../../../state/utils/address.js";
+import { bufferToAddress } from "../../../state/utils/address.js";
+import PartialOperation from './base/PartialOperation.js';
 
-//TODO: Implement BASE VALIDATOR CLASS AND MOVE COMMON METHODS THERE
-
-class PartialRoleAccess {
-    #state;
-    #wallet;
-    #network;
-    #check;
-
-    constructor(state, wallet, network) {
-        this.#state = state;
-        this.#wallet = wallet;
-        this.#network = network;
-        this.#check = new Check();
-    }
-
-    get state() {
-        return this.#state;
-    }
-
-    get network() {
-        return this.#network;
-    }
-
-    get check() {
-        return this.#check;
+class PartialRoleAccess extends PartialOperation {
+    constructor(state) {
+        super(state);
     }
 
     async validate(payload) {
-        if (!this.#isPayloadSchemaValid(payload)) return false;
-        if (!this.#validateRequesterAddress(payload)) return false;
-        if (!await this.#validateTransactionUniqueness(payload)) return false;
-        if (!await this.#validateSignature(payload)) return false;
-        if (!await this.#isRequesterAllowedToChangeRole(payload)) return false;
-        if (!await this.#validateTransactionValidity(payload)) return false;
-        if (!this.#isRoleAccessOperationNotCompleted(payload)) return false;
-        if (payload.type === OperationType.ADD_WRITER && !await this.#validateWriterKey(payload)) return false;
+        this.isPayloadSchemaValid(payload);
+        this.validateRequesterAddress(payload);
+        await this.validateTransactionUniqueness(payload);
+        await this.validateSignature(payload);
+        await this.validateTransactionValidity(payload);
+        this.isOperationNotCompleted(payload);
+        await this.validateRequesterBalance(payload);
+
+        // non common validations below
+        if (payload.type === OperationType.ADD_WRITER) {
+            await this.validateWriterKey(payload)
+        }
+        await this.isRequesterAllowedToChangeRole(payload);
+
         return true;
     }
 
-    async #validateTransactionUniqueness(payload) {
-        const tx = payload.rao.tx;
-        const txHex = tx.toString('hex');
-        if (await this.state.get(txHex) !== null) {
-            console.error(`Transaction with hash ${txHex} already exists in the state.`);
-            return false;
-        }
-        return true;
-    }
-
-    #isPayloadSchemaValid(payload) {
-        const isPayloadValid = this.check.validateRoleAccessOperation(payload);
-
-        if (!isPayloadValid) {
-            console.error('Role access payload is invalid.');
-            return false;
-        }
-        return true;
-    }
-
-    #validateRequesterAddress(payload) {
-        const incomingAddress = bufferToAddress(payload.address);
-        if (!incomingAddress) {
-            console.error('Invalid requesting address in role access payload.');
-            return false;
-        }
-
-        const incomingPublicKey = PeerWallet.decodeBech32mSafe(incomingAddress);
-
-        if (incomingPublicKey === null) {
-            console.error('Invalid requesting public key in role access payload.');
-            return false;
-        }
-        return true;
-    }
-
-    async #validateSignature(payload) {
-        const incomingPublicKey = PeerWallet.decodeBech32mSafe(bufferToAddress(payload.address));
-        const incomingSignature = payload.rao.is;
-
-        const incomingTx = payload.rao.tx;
-
-        const message = createMessage(
-            payload.address,
-            payload.rao.txv,
-            payload.rao.iw,
-            payload.rao.in,
-            payload.type
-        );
-
-        const regeneratedTx = await blake3Hash(message);
-
-        // ensure that regenerated tx matches the incoming tx
-        if (!b4a.equals(incomingTx, regeneratedTx)) {
-            console.error('Regenerated transaction does not match incoming transaction in Role Access payload.');
-            return false;
-        }
-
-        const isSignatureValid = PeerWallet.verify(incomingSignature, regeneratedTx, incomingPublicKey);
-        if (!isSignatureValid) {
-            console.error('Invalid signature in PreTx payload.');
-            return false;
-        }
-        return true;
-    }
-    async #isRequesterAllowedToChangeRole(payload) {
+    async isRequesterAllowedToChangeRole(payload) {
         const { type } = payload;
 
         if (type === OperationType.ADD_WRITER) {
             const nodeAddress = bufferToAddress(payload.address);
             const nodeEntry = await this.state.getNodeEntry(nodeAddress);
             if (!nodeEntry) {
-                console.error(`Node with address ${nodeAddress} entry does not exist.`);
-                return false;
+                throw new Error(`Node with address ${nodeAddress} entry does not exist.`);
             }
 
             const isNodeAlreadyWriter = nodeEntry.isWriter;
             if (isNodeAlreadyWriter) {
-                console.error(`Node with address ${nodeAddress} is already a writer.`);
-                return false;
+                throw new Error(`Node with address ${nodeAddress} is already a writer.`);
             }
 
             const isNodeWhitelisted = nodeEntry.isWhitelisted;
             if (!isNodeWhitelisted) {
-                console.error(`Node with address ${nodeAddress} is not whitelisted.`);
-                return false;
+                throw new Error(`Node with address ${nodeAddress} is not whitelisted.`);
             }
 
-            return true;
-
+            return;
         } else if (type === OperationType.REMOVE_WRITER) {
             const nodeAddress = bufferToAddress(payload.address);
             const nodeEntry = await this.state.getNodeEntry(nodeAddress);
             if (!nodeEntry) {
-                console.error(`Node with address ${nodeAddress} entry does not exist.`);
-                return false;
+                throw new Error(`Node with address ${nodeAddress} entry does not exist.`);
             }
 
             const isAlreadyWriter = nodeEntry.isWriter;
             if (!isAlreadyWriter) {
-                console.error(`Node with address ${nodeAddress} is not a writer.`);
-                return false;
+                throw new Error(`Node with address ${nodeAddress} is not a writer.`);
             }
 
             const isAlreadyIndexer = nodeEntry.isIndexer;
             if (isAlreadyIndexer) {
-                console.error(`Node with address ${nodeAddress} is an indexer.`);
-                return false;
+                throw new Error(`Node with address ${nodeAddress} is an indexer.`);
             }
 
-            return true;
+            return;
         } else if (type === OperationType.ADMIN_RECOVERY) {
             const adminEntry = await this.state.getAdminEntry();
             if (!adminEntry) {
-                console.error('Admin entry does not exist.');
-                return false;
+                throw new Error('Admin entry does not exist.');
             }
 
             const adminAddressBuffer = payload.address;
@@ -171,42 +79,20 @@ class PartialRoleAccess {
                 !b4a.equals(payload.rao.iw, adminEntry.wk)
             );
             if (!isRecoveryCase) {
-                console.error(`Node with address ${adminAddress} is not a valid recovery case.`);
-                return false;
+                throw new Error(`Node with address ${adminAddress} is not a valid recovery case.`);
             }
 
-            return true;
+            return;
         }
-        return false;
+
+        throw new Error(`Unknown role access operation type: ${type}`);
     }
 
-    async #validateTransactionValidity(payload) {
-        const currentTxv = await this.state.getIndexerSequenceState()
-        const incomingTxv = payload.rao.txv
-        if (!b4a.equals(currentTxv, incomingTxv)) {
-            console.error(`Transaction has expired.`);
-            return false;
-        }
-        return true;
-    }
-
-    #isRoleAccessOperationNotCompleted(payload) {
-        if (!payload || !payload.rao) return false;
-        const { va, vn, vs } = payload.rao;
-        const condition = !!(va === undefined && vn === undefined && vs === undefined);
-        if (!condition) {
-            console.error('Role access operation must not be completed already (va, vn, vs must be undefined).');
-            return false;
-        }
-        return true;
-    }
-
-    async #validateWriterKey(payload) {
+    async validateWriterKey(payload) {
         const requesterAddress = bufferToAddress(payload.address);
         const nodeEntry = await this.state.getNodeEntry(requesterAddress);
         if (!nodeEntry) {
-            console.error(`Node entry not found for address ${requesterAddress}`);
-            return false;
+            throw new Error(`Node entry not found for address ${requesterAddress}`);
         }
 
         const writerKey = payload.rao.iw.toString('hex');
@@ -217,12 +103,9 @@ class PartialRoleAccess {
             const isOwner = b4a.equals(addressFromRegisteredWritingKey, payload.address);
 
             if (!isCurrentWk || !isOwner) {
-                console.error('Invalid writer key: either not owned by requester or different from assigned key');
-                return false;
+                throw new Error('Invalid writer key: either not owned by requester or different from assigned key');
             }
         }
-
-        return true;
     }
 }
 

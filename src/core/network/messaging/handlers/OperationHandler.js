@@ -1,6 +1,6 @@
 import {OperationType} from '../../../../utils/constants.js';
 import PartialRoleAccess from "../validators/PartialRoleAccess.js";
-import {addressToBuffer, bufferToAddress} from "../../../state/utils/address.js";
+import {addressToBuffer} from "../../../state/utils/address.js";
 import CompleteStateMessageOperations
     from "../../../../messages/completeStateMessages/CompleteStateMessageOperations.js";
 import {normalizeHex} from "../../../../utils/helpers.js";
@@ -13,7 +13,7 @@ class OperationHandler {
     constructor(state, wallet, network) {
         this.#wallet = wallet;
         this.#network = network;
-        this.#partialRoleAccessValidator = new PartialRoleAccess(state, wallet, network)
+        this.#partialRoleAccessValidator = new PartialRoleAccess(state)
     }
 
     get wallet() {

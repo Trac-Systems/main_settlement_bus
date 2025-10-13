@@ -3,7 +3,7 @@ import { BATCH_SIZE, PROCESS_INTERVAL_MS } from '../../../utils/constants.js';
 import { sleep } from '../../../utils/helpers.js';
 class PoolService {
     #shouldStopPool = false;
-    #tx_pool = [];
+    #tx_pool = []; // TODO: Probably it is a good idea to limit the size of the pool in the future.
 
     constructor(state) {
         this.state = state;

@@ -145,7 +145,7 @@ class State extends ReadyResource {
         return nodeEntry ? nodeEntryUtils.decode(nodeEntry) : null;
     }
 
-    async getUnsignedNodeEntry(address) {
+    async getNodeEntryUsigned(address) {
         const nodeEntry = await this.get(address);
         return nodeEntry ? nodeEntryUtils.decode(nodeEntry) : null;
     }
@@ -608,7 +608,7 @@ class State extends ReadyResource {
         };
 
         // Check if the operation is being performed by the bootstrap node - the original deployer of the Trac Network
-        if (!b4a.equals(node.from.key, this.#bootstrap) || !b4a.equals(op.cao.iw, this.#bootstrap)) {
+        if (!b4a.equals(node.from.key, this.bootstrap) || !b4a.equals(op.cao.iw, this.bootstrap)) {
             this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_ADMIN, "Node is not a bootstrap node.", node.from.key)
             return Status.FAILURE;
         };
@@ -2624,6 +2624,11 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
+        if (!b4a.equals(op.txo.mbs, this.bootstrap)) {
+            this.#enable_txlogs && this.#safeLogApply(OperationType.TX, "Declared MSB bootstrap is different than real MSB bootstrap.", node.from.key)
+            return Status.FAILURE;
+        };   
+
         // validate invoker signature
         const requesterAddressBuffer = op.address;
         const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer);
@@ -2645,7 +2650,7 @@ class State extends ReadyResource {
             op.txo.ch,
             op.txo.in,
             op.txo.bs,
-            this.#bootstrap,
+            this.bootstrap,
             OperationType.TX
         );
         if (requesterMessage.length === 0) {

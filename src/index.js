@@ -384,27 +384,27 @@ export class MainSettlementBus extends ReadyResource {
         const isAlreadyWriter = !!(nodeEntry && nodeEntry.isWriter === true);
 
         if (toAdd) {
-            if (isAlreadyWriter) {
-                throw new Error(
-                    "Cannot request writer role - state indicates you are already a writer"
-                );
-            }
+            // if (isAlreadyWriter) {
+            //     throw new Error(
+            //         "Cannot request writer role - state indicates you are already a writer"
+            //     );
+            // }
 
-            const isAllowedToRequestRole = await this.#isAllowedToRequestRole(
-                adminEntry,
-                nodeEntry
-            );
-            if (!isAllowedToRequestRole) {
-                throw new Error(
-                    "Cannot request writer role - node is not allowed to request this role"
-                );
-            }
+            // const isAllowedToRequestRole = await this.#isAllowedToRequestRole(
+            //     adminEntry,
+            //     nodeEntry
+            // );
+            // if (!isAllowedToRequestRole) {
+            //     throw new Error(
+            //         "Cannot request writer role - node is not allowed to request this role"
+            //     );
+            // }
 
-            if (this.#state.isWritable()) {
-                throw new Error(
-                    "Cannot request writer role - internal state is already writable"
-                );
-            }
+            // if (this.#state.isWritable()) {
+            //     throw new Error(
+            //         "Cannot request writer role - internal state is already writable"
+            //     );
+            // }
             const txValidity = await this.#state.getIndexerSequenceState();
             const assembledMessage = await PartialStateMessageOperations.assembleAddWriterMessage(
                 this.#wallet,

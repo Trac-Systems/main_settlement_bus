@@ -48,7 +48,7 @@ class NetworkMessages {
                         throw new Error('NetworkMessages: Received message is undefined');
                     }
                 } catch (error) {
-                    throw new Error(`NetworkMessages: Failed to handle incoming message: ${error.message}`);
+                    console.error(`NetworkMessages: Failed to handle incoming message: ${error.message}`);
                 } finally {
                     this.network.swarm.leavePeer(connection.remotePublicKey);
                 }
