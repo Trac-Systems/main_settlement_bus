@@ -4,13 +4,15 @@ import {addressToBuffer} from "../../../state/utils/address.js";
 import CompleteStateMessageOperations
     from "../../../../messages/completeStateMessages/CompleteStateMessageOperations.js";
 import {normalizeHex} from "../../../../utils/helpers.js";
+import BaseOperationHandler from './base/BaseOperationHandler.js';
 
-class OperationHandler {
+class RoleOperationHandler extends BaseOperationHandler {
     #partialRoleAccessValidator;
     #wallet;
     #network;
 
-    constructor(state, wallet, network) {
+    constructor(network, state, wallet, rateLimiter, options = {}) {
+        super(network, state, wallet, rateLimiter, options);
         this.#wallet = wallet;
         this.#network = network;
         this.#partialRoleAccessValidator = new PartialRoleAccess(state)
@@ -28,14 +30,14 @@ class OperationHandler {
         return this.#partialRoleAccessValidator;
     }
 
-    async handle(message, connection) {
+    async handleOperation(message, connection) {
         const normalizedPartialRoleAccessPayload = this.#normalizePartialRoleAccess(message)
         const isValid = await this.partialRoleAccessValidator.validate(normalizedPartialRoleAccessPayload)
         let completePayload = null
         if (!isValid) {
             throw new Error("OperationHandler: partial role access payload validation failed.");
         }
-
+        
         switch (normalizedPartialRoleAccessPayload.type) {
             case OperationType.ADD_WRITER:
                 completePayload = await CompleteStateMessageOperations.assembleAddWriterMessage(
@@ -111,4 +113,4 @@ class OperationHandler {
     }
 }
 
-export default OperationHandler;
+export default RoleOperationHandler;

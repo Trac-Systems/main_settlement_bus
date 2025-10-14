@@ -34,6 +34,7 @@ import { blake3Hash } from "./utils/crypto.js";
 
 export class MainSettlementBus extends ReadyResource {
     // internal attributes
+    #options;
     #stores_directory;
     #key_pair_path;
     #bootstrap;
@@ -53,6 +54,7 @@ export class MainSettlementBus extends ReadyResource {
 
     constructor(options = {}) {
         super();
+        this.#options = options;
         this.#stores_directory = options.stores_directory;
         this.#key_pair_path = `${this.#stores_directory}${options.store_name}/db/keypair.json`;
         this.#enable_wallet = options.enable_wallet !== false;
@@ -96,8 +98,10 @@ export class MainSettlementBus extends ReadyResource {
         }
 
         this.check = new Check();
-        this.#state = new State(this.#store, this.bootstrap, this.#wallet, options);
-        this.#network = new Network(this.#state, this.#channel, options);
+    }
+
+    get options() {
+        return this.#options;
     }
 
     get stores_directory() {
@@ -135,15 +139,20 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async _open() {
-        await this.#state.ready();
-        await this.#network.ready();
-        this.#stateEventsListener();
-
         if (this.#enable_wallet) {
             await this.#wallet.initKeyPair(
                 this.key_pair_path,
                 this.#readline_instance
             );
+        }
+        this.#state = new State(this.#store, this.bootstrap, this.#wallet, this.options);
+        this.#network = new Network(this.#state, this.#channel, this.#wallet.address, this.options);
+
+        await this.#state.ready();
+        await this.#network.ready();
+        this.#stateEventsListener();
+
+        if (this.#enable_wallet) {
             printWalletInfo(this.#wallet.address, this.#state.writingKey, this.#state, this.#enable_wallet);
         }
 
@@ -366,7 +375,7 @@ export class MainSettlementBus extends ReadyResource {
             await this.#state.append(encodedPayload);
             // timesleep and validate if it becomes whitelisted
             // if node is not active we should not wait to long...
-           
+
             await sleep(WHITELIST_SLEEP_INTERVAL);
             console.log(
                 `Whitelist message processed (${processedCount}/${totalElements})`
@@ -384,27 +393,27 @@ export class MainSettlementBus extends ReadyResource {
         const isAlreadyWriter = !!(nodeEntry && nodeEntry.isWriter === true);
 
         if (toAdd) {
-            // if (isAlreadyWriter) {
-            //     throw new Error(
-            //         "Cannot request writer role - state indicates you are already a writer"
-            //     );
-            // }
+            if (isAlreadyWriter) {
+                throw new Error(
+                    "Cannot request writer role - state indicates you are already a writer"
+                );
+            }
 
-            // const isAllowedToRequestRole = await this.#isAllowedToRequestRole(
-            //     adminEntry,
-            //     nodeEntry
-            // );
-            // if (!isAllowedToRequestRole) {
-            //     throw new Error(
-            //         "Cannot request writer role - node is not allowed to request this role"
-            //     );
-            // }
+            const isAllowedToRequestRole = await this.#isAllowedToRequestRole(
+                adminEntry,
+                nodeEntry
+            );
+            if (!isAllowedToRequestRole) {
+                throw new Error(
+                    "Cannot request writer role - node is not allowed to request this role"
+                );
+            }
 
-            // if (this.#state.isWritable()) {
-            //     throw new Error(
-            //         "Cannot request writer role - internal state is already writable"
-            //     );
-            // }
+            if (this.#state.isWritable()) {
+                throw new Error(
+                    "Cannot request writer role - internal state is already writable"
+                );
+            }
             const txValidity = await this.#state.getIndexerSequenceState();
             const assembledMessage = await PartialStateMessageOperations.assembleAddWriterMessage(
                 this.#wallet,
@@ -632,7 +641,7 @@ export class MainSettlementBus extends ReadyResource {
         );
 
         await this.broadcastPartialTransaction(payload);
-        
+
         console.log(`Bootstrap ${externalBootstrap} deployment requested on channel ${channel}`);
         console.log('Bootstrap Deployment Fee Details:');
         console.log(`Fee: ${bigIntToDecimalString(feeBigInt)}`);
@@ -716,7 +725,7 @@ export class MainSettlementBus extends ReadyResource {
             amountBuffer.toString('hex'),
             txValidity.toString('hex'),
         )
-        
+
         await this.broadcastPartialTransaction(payload);
 
         const expectedNewBalance = senderBalance - totalDeductedAmount;
@@ -1044,22 +1053,22 @@ export class MainSettlementBus extends ReadyResource {
                             balance: bigIntToDecimalString(0n)
                         })
                     }
-                
-                } else if(input.startsWith("/get_license_number")){
+
+                } else if (input.startsWith("/get_license_number")) {
                     const splitted = input.split(" ");
                     const address = splitted[1];
                     let nodeEntry = await this.#state.getNodeEntry(address)
-                    if (nodeEntry){
+                    if (nodeEntry) {
                         console.log({
                             Address: address,
                             License: licenseBufferToBigInt(nodeEntry.license).toString()
                         })
                     }
 
-                } else if(input.startsWith("/get_license_address")) {
+                } else if (input.startsWith("/get_license_address")) {
                     const splitted = input.split(" ");
                     const licenseId = parseInt(splitted[1]);
-                    
+
                     if (isNaN(licenseId) || licenseId < 0) {
                         console.log('Invalid license ID. Please provide a valid non-negative number.');
                         return;
@@ -1074,8 +1083,8 @@ export class MainSettlementBus extends ReadyResource {
                     } else {
                         console.log(`No address found for license ID: ${licenseId}`);
                     }
-                    
-                } else if(input.startsWith("/get_license_count")){
+
+                } else if (input.startsWith("/get_license_count")) {
                     const adminEntry = await this.#state.getAdminEntry();
 
                     if (!adminEntry) {
@@ -1084,7 +1093,7 @@ export class MainSettlementBus extends ReadyResource {
 
                     if (!this.#isAdmin(adminEntry)) {
                         throw new Error('Cannot perform this operation - you are not the admin!.');
-                    }          
+                    }
 
                     let licenseCount = await this.#state.getLicenseCount()
 
@@ -1107,7 +1116,7 @@ export class MainSettlementBus extends ReadyResource {
                     const unconfirmed_length = this.#state.getUnsignedLength();
                     console.log('Unconfirmed_length:', unconfirmed_length);
                     return unconfirmed_length;
-                }  else if (input.startsWith("/broadcast_transaction")) {
+                } else if (input.startsWith("/broadcast_transaction")) {
                     if (payload) {
                         const normalizedPayload = normalizeTransferOperation(payload);
                         const isValid = await this.#partialTransferValidator.validate(normalizedPayload);
@@ -1115,7 +1124,7 @@ export class MainSettlementBus extends ReadyResource {
 
                         const signedLength = this.#state.getSignedLength();
                         const unsignedLength = this.#state.getUnsignedLength();
-                            
+
                         await this.broadcastPartialTransaction(payload);
                         return { message: "Transaction broadcasted successfully.", signedLength, unsignedLength };
                     } else {
@@ -1123,20 +1132,20 @@ export class MainSettlementBus extends ReadyResource {
                         throw new Error("Transaction payload is required for broadcast_transaction command.");
                     }
                 } else if (input.startsWith("/get_tx_payloads_bulk")) {
-                    if(payload){
+                    if (payload) {
                         const hashes = payload;
 
-                        if (!Array.isArray(hashes) || hashes.length === 0){
+                        if (!Array.isArray(hashes) || hashes.length === 0) {
                             throw new Error("Missing hash list.");
                         }
 
                         let res = { results: [], missing: [] }
 
-                        if(hashes.length > 1500){
+                        if (hashes.length > 1500) {
                             throw new Error("Length of input tx hashes exceeded.");
                         }
 
-                        const promises = hashes.map(hash =>  get_tx_info(this.#state, hash));
+                        const promises = hashes.map(hash => get_tx_info(this.#state, hash));
                         const results = await Promise.all(promises);
 
                         // Iterate and categorize
@@ -1146,27 +1155,27 @@ export class MainSettlementBus extends ReadyResource {
                                 res.missing.push(hash);
                             } else {
                                 const decodedResult = normalizeDecodedPayloadForJson(result.decoded)
-                                res.results.push({hash: hash, payload: decodedResult});
+                                res.results.push({ hash: hash, payload: decodedResult });
                             }
-                        });    
-                        
+                        });
+
                         return res;
-                       
+
                     } else {
                         throw new Error("Missing payload for fetching tx payloads.")
                     }
-                } else if(input.startsWith("/get_txs_hashes")) {
+                } else if (input.startsWith("/get_txs_hashes")) {
                     const splitted = input.split(' ')
                     const start = parseInt(splitted[1]);
                     const end = parseInt(splitted[2]);
 
                     try {
-                        const hashes = await this.#state.confirmedTransactionsBetween(start, end);    
+                        const hashes = await this.#state.confirmedTransactionsBetween(start, end);
                         return { hashes }
                     } catch (error) {
                         throw new Error("Invalid params to perform the request.", error.message);
                     }
-                } else if(input.startsWith("/get_tx_details")) {
+                } else if (input.startsWith("/get_tx_details")) {
                     const splitted = input.split(' ')
                     const hash = splitted[1];
 
@@ -1177,7 +1186,7 @@ export class MainSettlementBus extends ReadyResource {
                     } catch (error) {
                         throw new Error("Invalid params to perform the request.", error.message);
                     }
-                } 
+                }
         }
         if (rl) rl.prompt();
     }

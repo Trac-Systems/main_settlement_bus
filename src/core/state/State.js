@@ -11,7 +11,8 @@ import {
     HYPERBEE_KEY_ENCODING,
     HYPERBEE_VALUE_ENCODING,
     BATCH_SIZE,
-    ADMIN_INITIAL_STAKED_BALANCE
+    ADMIN_INITIAL_STAKED_BALANCE,
+    MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION
 } from '../../utils/constants.js';
 import { isHexString, sleep } from '../../utils/helpers.js';
 import PeerWallet from 'trac-wallet';
@@ -150,6 +151,26 @@ class State extends ReadyResource {
         return nodeEntry ? nodeEntryUtils.decode(nodeEntry) : null;
     }
 
+    async allowedToValidate(address) {
+        const localWritable = this.isWritable(); // signed
+        const localIndexer = this.isIndexer(); // signed
+
+        const unsignedNodeEntry = await this.getNodeEntryUsigned(address);
+        if (!unsignedNodeEntry) return false;
+
+        const unsignedIsWriter = unsignedNodeEntry.isWriter;
+        const unsignedIsIndexer = unsignedNodeEntry.isIndexer;
+
+        return !!(localWritable && !localIndexer) && (unsignedIsWriter && !unsignedIsIndexer)
+    }
+
+    async isAdminAllowedToValidate() {
+        const isAdmin = this.writingKey.toString('hex') === this.bootstrap.toString('hex');
+        const isIndexer = this.isIndexer();
+        const lengthCondition = await this.getWriterLength() <= MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION;
+        return !!(isAdmin && isIndexer && lengthCondition);
+    }
+
     async isAddressWhitelisted(address) {
         const nodeEntry = await this.getNodeEntry(address);
         if (nodeEntry === null) return false;
@@ -275,7 +296,7 @@ class State extends ReadyResource {
         let hashes = [];
         for await (const entry of historyStream) {
             if (filters(entry)) {
-                hashes.push({ hash: entry.key , confirmed_length: entry.seq });
+                hashes.push({ hash: entry.key, confirmed_length: entry.seq });
             }
         }
 
@@ -675,7 +696,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const { newLicenseLength, decodedNewLicenseLength} = await this.#applyAssignNewLicense(batch);
+        const { newLicenseLength, decodedNewLicenseLength } = await this.#applyAssignNewLicense(batch);
         if (newLicenseLength !== null && decodedNewLicenseLength) {
             await batch.put(EntryType.LICENSE_COUNT, newLicenseLength)
             await batch.put(EntryType.LICENSE_INDEX + decodedNewLicenseLength, adminAddressBuffer)
@@ -700,7 +721,7 @@ class State extends ReadyResource {
         await batch.put(adminAddressString, initializedNodeEntry);
         await batch.put(EntryType.WRITER_ADDRESS + op.cao.iw.toString('hex'), op.address);
 
-        const { length, incrementedLength } = await this.#updateWritersIndex(batch); 
+        const { length, incrementedLength } = await this.#updateWritersIndex(batch);
 
         if (length !== null && incrementedLength !== null) {
             // Update the writers index and length entries  
@@ -1184,7 +1205,7 @@ class State extends ReadyResource {
                 await batch.put(nodeAddressString, editedNodeEntry);
 
             } else {
-                const { newLicenseLength, decodedNewLicenseLength } = await this.#applyAssignNewLicense(batch); 
+                const { newLicenseLength, decodedNewLicenseLength } = await this.#applyAssignNewLicense(batch);
                 if (newLicenseLength !== null && decodedNewLicenseLength) {
                     await batch.put(EntryType.LICENSE_COUNT, newLicenseLength)
                     await batch.put(EntryType.LICENSE_INDEX + decodedNewLicenseLength, nodeAddressBuffer)
@@ -1192,7 +1213,7 @@ class State extends ReadyResource {
                     // This log should (if this error ever happend) ALWAYS log.
                     this.#safeLogApply("SYSTEM ERROR", "Something went wrong while updating license index.", node.from.key)
                 }
-                
+
                 const nodeEntryWithNewLicense = nodeEntryUtils.setLicense(editedNodeEntry, newLicenseLength)
                 await batch.put(nodeAddressString, nodeEntryWithNewLicense);
             }
@@ -2145,7 +2166,7 @@ class State extends ReadyResource {
         await base.addWriter(decodedNodeEntry.wk, { isIndexer: false });
 
         // update writers index and length
-        const { length, incrementedLength } = await this.#updateWritersIndex(batch); 
+        const { length, incrementedLength } = await this.#updateWritersIndex(batch);
 
         if (length !== null && incrementedLength !== null) {
             // Update the writers index and length entries 
@@ -2415,7 +2436,7 @@ class State extends ReadyResource {
             op.bdo.in,
             OperationType.BOOTSTRAP_DEPLOYMENT
         );
-        
+
         if (requesterMessage.length === 0) {
             this.#enable_txlogs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Invalid requester message.", node.from.key)
             return Status.FAILURE;
@@ -2627,7 +2648,7 @@ class State extends ReadyResource {
         if (!b4a.equals(op.txo.mbs, this.bootstrap)) {
             this.#enable_txlogs && this.#safeLogApply(OperationType.TX, "Declared MSB bootstrap is different than real MSB bootstrap.", node.from.key)
             return Status.FAILURE;
-        };   
+        };
 
         // validate invoker signature
         const requesterAddressBuffer = op.address;
@@ -3250,7 +3271,7 @@ class State extends ReadyResource {
             length = lengthEntryUtils.decodeBE(length);
             incrementedLength = lengthEntryUtils.incrementBE(length);
         }
-        
+
         return { length, incrementedLength }
     }
 
@@ -3492,7 +3513,7 @@ class State extends ReadyResource {
         return await this.#getEntryApply(EntryType.LICENSE_COUNT, batch)
     }
 
-    async #applyAssignNewLicense(batch){
+    async #applyAssignNewLicense(batch) {
         let licenseCount = await this.#applyGetLicenseCount(batch)
         let newLicenseLength;
         if (null === licenseCount) {

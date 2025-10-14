@@ -46,8 +46,8 @@ class PartialRoleAccess extends PartialOperation {
             if (!isNodeWhitelisted) {
                 throw new Error(`Node with address ${nodeAddress} is not whitelisted.`);
             }
-
             return;
+
         } else if (type === OperationType.REMOVE_WRITER) {
             const nodeAddress = bufferToAddress(payload.address);
             const nodeEntry = await this.state.getNodeEntry(nodeAddress);
@@ -63,9 +63,9 @@ class PartialRoleAccess extends PartialOperation {
             const isAlreadyIndexer = nodeEntry.isIndexer;
             if (isAlreadyIndexer) {
                 throw new Error(`Node with address ${nodeAddress} is an indexer.`);
-            }
-
+            }   
             return;
+            
         } else if (type === OperationType.ADMIN_RECOVERY) {
             const adminEntry = await this.state.getAdminEntry();
             if (!adminEntry) {

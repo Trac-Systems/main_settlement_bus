@@ -30,15 +30,19 @@ class BaseOperationHandler {
     get options() {
         return this.#options;
     }
+    
     async validateBasicRequirements(payload, connection) {
         // Validate if operation can be processed:
         // - Non-writable nodes cannot process operations
         // - Regular indexers cannot process operations
         // - Admin-indexer can process operations only when network has less than MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION writers
-        if (!this.state.isWritable() ||
-            (this.state.isIndexer() && (!this.options.store_name === 'admin' || await this.state.getWriterLength() >= MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION))) {
+        const isAllowedToValidate = await this.state.allowedToValidate(this.wallet.address);
+        const isAdminAllowedToValidate = await this.state.isAdminAllowedToValidate();
+        const canValidate = isAllowedToValidate || isAdminAllowedToValidate;
+        if (!canValidate) {
             throw new Error('OperationHandler: State is not writable or is an indexer without admin privileges.');
         }
+
         if (this.network.poolService.tx_pool.length >= TRANSACTION_POOL_SIZE) {
             throw new Error("OperationHandler: Transaction pool is full, ignoring incoming transaction.");
         }
@@ -52,12 +56,15 @@ class BaseOperationHandler {
             }
         }
     }
+
     async handle(payload, connection) {
         await this.validateBasicRequirements(payload, connection);
         await this.handleOperation(payload, connection);
     }
+
     async handleOperation(payload, connection) {
         throw new Error('handleOperation must be implemented by child class');
     }
+
 }
 export default BaseOperationHandler;
