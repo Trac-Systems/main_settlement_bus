@@ -16,6 +16,7 @@ import CompleteStateMessageDirector from '../../src/messages/completeStateMessag
 import { safeEncodeApplyOperation } from "../../src/utils/protobuf/operationHelpers.js"
 import { $TNK } from '../../src/core/state/utils/balance.js';
 import { operation } from 'trac-crypto-api'
+import { EventType } from '../../src/utils/constants.js';
 let os, fsp;
 
 /**
@@ -173,34 +174,26 @@ export async function setupMsbWriter(admin, peerName, peerKeyPair, temporaryDire
                 isWriter: false,
                 isIndexer: false,
             })
-        const isWriter = async (address) => {
-            const result = await admin.msb.state.getNodeEntry(address);
-            return result && result.isWriter && !result.isIndexer;
-        }
-        
         const validity = await admin.msb.state.getIndexerSequenceState()
         const req = await PartialStateMessageOperations.assembleAddWriterMessage(writerCandidate.wallet, b4a.toString(writerCandidate.msb.state.writingKey, 'hex'), b4a.toString(validity, 'hex'));
-        await writerCandidate.msb.broadcastPartialTransaction(req);
-        await tick(); // wait for the request to be processed
-        let counter;
-        const limit = 10; // maximum number of attempts to verify the role
-        for (counter = 0; counter < limit; counter++) {
-            if (await isWriter(writerCandidate.wallet.address) && await writerCandidate.msb.state.isWritable()) {
-                break;
-            }
-            await writerCandidate.msb.state.base.forceFastForward(); // This performs an update after the core sync
-            await writerCandidate.msb.state.base.view.update();
-            await admin.msb.state.base.update()
-            await writerCandidate.msb.network.swarm.flush()
-            await sleep(1000); // wait for the peer to sync state
-        }
+        await waitWritable(admin, writerCandidate, async () => {
+            const raw = await CompleteStateMessageOperations.assembleAddWriterMessage(
+                admin.wallet,
+                req.address,
+                b4a.from(req.rao.tx, 'hex'),
+                b4a.from(req.rao.txv, 'hex'),
+                b4a.from(req.rao.iw, 'hex'),
+                b4a.from(req.rao.in, 'hex'),
+                b4a.from(req.rao.is, 'hex')
+            )
+            await admin.msb.state.append(raw)
+        })
 
         return writerCandidate;
     } catch (error) {
         throw new Error('Error setting up MSB writer: ', error.message || error);
     }
 }
-
 
 export async function setupMsbIndexer(indexerCandidate, admin) {
     try {
@@ -432,6 +425,30 @@ export async function waitForNotIndexer(indexer) {
     }
 }
 
+export async function waitWritable(admin, node, operation) {
+    const waiter = new Promise(resolve => {
+        node.msb.state.base.once(EventType.WRITABLE, (...args) => {
+            resolve(args)
+        })
+    })
+    await operation()
+    await node.msb.state.base.forceFastForward(); // This performs an update after the core sync
+    await node.msb.state.base.view.update();
+    await admin.msb.state.base.update()
+    await node.msb.network.swarm.flush()
+    return waiter
+}
+
+export async function waitDemotion(node, operation) {
+    const waiter = new Promise(resolve => {
+        node.msb.state.base.once(EventType.UNWRITABLE, (...args) => {
+            resolve(args)
+        })
+    })
+    await operation()
+    return waiter
+}
+
 /**
  * Waits until the given node sees the expected state for a target address.
  *
@@ -453,7 +470,7 @@ export async function waitForNodeState(node, address, expected) {
     try {
         await node.msb.state.base.flush()
         let attempts = 0;
-        const maxAttempts = 20;
+        const maxAttempts = 50;
         while (attempts < maxAttempts) {
             const state = await node.msb.state.getNodeEntry(address);
             if (
@@ -466,7 +483,7 @@ export async function waitForNodeState(node, address, expected) {
                 return;
             }
             await node.msb.network.swarm.flush()
-            await sleep(1000);
+            await sleep(400);
             attempts++;
         }
     } catch (error) {
