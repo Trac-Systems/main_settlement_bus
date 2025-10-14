@@ -253,22 +253,18 @@ class State extends ReadyResource {
     }
 
     async confirmedTransactionsBetween(startSignedLength, endSignedLength) {
-        // 1. Check for integer numbers
         if (!Number.isInteger(startSignedLength) || !Number.isInteger(endSignedLength)) {
             throw new Error("Params must be integer");
         }
 
-        // 2. Ensure non-negative numbers
         if (startSignedLength < 0 || endSignedLength < 0) {
             throw new Error("Params must be non-negative");
         }
 
-        // 3. Handle invalid range and the case where start and end are the same
         if (startSignedLength > endSignedLength) {
             throw new Error("endSignedLength must be greater than or equal to startSignedLength");
         }
 
-        // 4. If the range is empty (start and end are the same), return an empty array
         if (startSignedLength === endSignedLength) return [];
 
         const currentSignedLength = this.getSignedLength();

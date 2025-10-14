@@ -17,7 +17,7 @@ class PartialTransfer extends PartialOperation {
         await this.validateSignature(payload);
         await this.validateTransactionValidity(payload);
         this.isOperationNotCompleted(payload);
-        
+
         // uncommon validations below
         this.#validateRecipientAddress(payload)
         await this.#validateStateBalances(payload)
