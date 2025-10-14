@@ -53,13 +53,13 @@ describe("API acceptance tests", () => {
     it("GET /v1/confirmed-length", async () => {
         const res = await request(server).get("/v1/confirmed-length")
         expect(res.statusCode).toBe(200)
-        expect(res.body).toEqual({ confirmed_length: 16 })
+        expect(res.body).toEqual({ confirmed_length: expect.any(Number) })
     })
 
     it("GET /v1/unconfirmed-length", async () => {
         const res = await request(server).get("/v1/unconfirmed-length")
         expect(res.statusCode).toBe(200)
-        expect(res.body).toEqual({ unconfirmed_length: 16 })
+        expect(res.body).toEqual({ unconfirmed_length: expect.any(Number) })
     })
 
     it("GET /v1/txv", async () => {

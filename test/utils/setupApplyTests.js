@@ -312,12 +312,13 @@ export const deployExternalBootstrap = async (writer, externalNode) => {
     const payload = await PartialStateMessageOperations.assembleBootstrapDeploymentMessage(
         externalNode.msb.wallet,
         externalBootstrap,
+        randomBytes(32).toString('hex'),
         txValidity.toString('hex')
     );
 
     await writer.msb.broadcastPartialTransaction(payload)
     await tick()
-    await sleep(1000)
+    await waitForHash(writer, payload.bdo.tx)
     return externalBootstrap
 }
 
@@ -470,6 +471,26 @@ export async function waitForNodeState(node, address, expected) {
         }
     } catch (error) {
         throw new Error("Error synchronizing node state: " + error.message || error);
+    }
+}
+
+export async function waitForHash(node, expected) {
+    try {
+        let attempts = 0;
+        const maxAttempts = 20;
+        while (attempts < maxAttempts) {
+            const entry = await node.msb.state.get(expected);
+            if (
+                !!entry
+            ) {
+                break;
+            }
+            await node.msb.network.swarm.flush()
+            await sleep(1000);
+            attempts++;
+        }
+    } catch (error) {
+        throw new Error('Error waiting for admin entry: ' + error.message || error);
     }
 }
 
