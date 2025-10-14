@@ -4,7 +4,7 @@ import { MAX_SIGNED_LENGTH, SIGNED_LENGTH_OFFSET } from "./constants.mjs";
 export async function handleBalance({ req, respond, msbInstance }) {
     const [path, queryString] = req.url.split("?");
     const parts = path.split("/").filter(Boolean);
-    const address = parts[1];  
+    const address = parts[2];
 
     let confirmed = true; // default
     if (queryString) {
@@ -70,8 +70,8 @@ export async function handleBroadcastTransaction({ msbInstance, respond, req }) 
 }
 
 export async function handleTxHashes({ msbInstance, respond, req }) {
-    const startSignedLengthStr = req.url.split('/')[2];
-    const endSignedLengthStr = req.url.split('/')[3];
+    const startSignedLengthStr = req.url.split('/')[3];
+    const endSignedLengthStr = req.url.split('/')[4];
 
     const startSignedLength = parseInt(startSignedLengthStr);
     const endSignedLength = parseInt(endSignedLengthStr);
