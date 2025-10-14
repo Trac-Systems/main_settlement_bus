@@ -3,7 +3,7 @@ import {generateMnemonic, mnemonicToSeed} from 'bip39-mnemonic';
 import b4a from 'b4a'
 import PeerWallet from "trac-wallet"
 import path from 'path';
-import CompleteStateMessageOperations from '../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
+import CompleteStateMessageOperations from '../../src/messages/completeStateMessages/CompleteStateMessageOperations.js'
 import PartialStateMessageOperations from '../../src/messages/partialStateMessages/PartialStateMessageOperations.js';
 import {MainSettlementBus} from '../../src/index.js'
 import fileUtils from '../../src/utils/fileUtils.js'
@@ -16,7 +16,6 @@ import CompleteStateMessageDirector from '../../src/messages/completeStateMessag
 import { safeEncodeApplyOperation } from "../../src/utils/protobuf/operationHelpers.js"
 import { $TNK } from '../../src/core/state/utils/balance.js';
 import { operation } from 'trac-crypto-api'
-
 let os, fsp;
 
 /**
@@ -305,6 +304,21 @@ export async function initDirectoryStructure(peerName, keyPair, temporaryDirecto
     } catch (error) {
         throw new Error('Error creating directory structure: ' + error)
     }
+}
+
+export const deployExternalBootstrap = async (writer, externalNode) => {
+    const externalBootstrap = randomBytes(32).toString('hex');
+    const txValidity = await writer.msb.state.getIndexerSequenceState();
+    const payload = await PartialStateMessageOperations.assembleBootstrapDeploymentMessage(
+        externalNode.msb.wallet,
+        externalBootstrap,
+        txValidity.toString('hex')
+    );
+
+    await writer.msb.broadcastPartialTransaction(payload)
+    await tick()
+    await sleep(1000)
+    return externalBootstrap
 }
 
 export const generatePostTx = async (writer, externalNode, externalContractBootstrap) => {
