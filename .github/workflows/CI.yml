@@ -36,5 +36,7 @@ jobs:
         run: npm i -g bare
       - name: Run bare tests
         run: npm run test:bare
-      - name: Run rpc acceptance tests
-        run: npm run test:acceptance
+# For now acceptance tests should be disable due to instability of the running MSB instance in the github actions environment
+# Github machines are not powerful enough to run MSB, and we won't ever finish our tests.
+#      - name: Run rpc acceptance tests
+#        run: npm run test:acceptance
