@@ -2,14 +2,13 @@ import b4a from 'b4a';
 import PeerWallet from 'trac-wallet';
 
 import Check from '../../../../../utils/check.js';
-import { addressToBuffer, bufferToAddress } from "../../../../state/utils/address.js";
+import { bufferToAddress } from "../../../../state/utils/address.js";
 import { createMessage } from "../../../../../utils/buffer.js";
 import { OperationType } from "../../../../../utils/constants.js";
 import { blake3Hash } from "../../../../../utils/crypto.js";
 import { bufferToBigInt } from "../../../../../utils/amountSerialization.js";
 import { FEE } from "../../../../state/utils/transaction.js";
 import * as operationsUtils from '../../../../../utils/operations.js';
-//TODO: Implement BASE VALIDATOR CLASS AND MOVE COMMON METHODS THERE
 
 const MAX_AMOUNT = BigInt('0xffffffffffffffffffffffffffffffff');
 const FEE_BIGINT = bufferToBigInt(FEE);
@@ -43,7 +42,7 @@ class PartialOperation {
         const selectedValidator = this.#selectCheckSchemaValidator(payload.type);
         const isPayloadValid = selectedValidator(payload);
         if (!isPayloadValid) {
-            throw new Error(`${operationPayloadValue} payload is invalid.`);
+            throw new Error(`Payload is invalid.`);
         }
     }
 
