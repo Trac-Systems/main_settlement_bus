@@ -14,6 +14,7 @@ class PartialBootstrapDeployment extends PartialOperation {
         await this.validateTransactionValidity(payload);
         this.isOperationNotCompleted(payload);
         await this.validateRequesterBalance(payload);
+        await this.validateRequesterBalance(payload, true);
         this.validateSubnetworkBootstrapEquality(payload);
 
         // non common validations below

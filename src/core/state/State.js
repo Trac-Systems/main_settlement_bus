@@ -146,7 +146,7 @@ class State extends ReadyResource {
         return nodeEntry ? nodeEntryUtils.decode(nodeEntry) : null;
     }
 
-    async getNodeEntryUsigned(address) {
+    async getNodeEntryUnsigned(address) {
         const nodeEntry = await this.get(address);
         return nodeEntry ? nodeEntryUtils.decode(nodeEntry) : null;
     }
@@ -155,7 +155,7 @@ class State extends ReadyResource {
         const localWritable = this.isWritable(); // signed
         const localIndexer = this.isIndexer(); // signed
 
-        const unsignedNodeEntry = await this.getNodeEntryUsigned(address);
+        const unsignedNodeEntry = await this.getNodeEntryUnsigned(address);
         if (!unsignedNodeEntry) return false;
 
         const unsignedIsWriter = unsignedNodeEntry.isWriter;

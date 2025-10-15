@@ -17,6 +17,7 @@ class PartialRoleAccess extends PartialOperation {
         await this.validateTransactionValidity(payload);
         this.isOperationNotCompleted(payload);
         await this.validateRequesterBalance(payload);
+        await this.validateRequesterBalance(payload, true);
 
         // non common validations below
         if (payload.type === OperationType.ADD_WRITER) {

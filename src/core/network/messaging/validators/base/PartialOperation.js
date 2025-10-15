@@ -181,9 +181,14 @@ class PartialOperation {
         }
     }
 
-    async validateRequesterBalance(payload) {
+    async validateRequesterBalance(payload, signed = false) {
         const requesterAddress = bufferToAddress(payload.address);
-        const requesterEntry = await this.state.getNodeEntry(requesterAddress);
+        let requesterEntry;
+        if (signed) {
+            requesterEntry = await this.state.getNodeEntry(requesterAddress);
+        } else {
+            requesterEntry = await this.state.getNodeEntryUnsigned(requesterAddress);
+        }
 
         if (!requesterEntry) {
             throw new Error('Requester address not found in state');

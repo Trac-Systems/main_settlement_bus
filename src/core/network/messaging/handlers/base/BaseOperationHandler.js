@@ -46,9 +46,11 @@ class BaseOperationHandler {
         if (this.network.poolService.tx_pool.length >= TRANSACTION_POOL_SIZE) {
             throw new Error("OperationHandler: Transaction pool is full, ignoring incoming transaction.");
         }
+
         if (b4a.byteLength(JSON.stringify(payload)) > MAX_PARTIAL_TX_PAYLOAD_BYTE_SIZE) {
             throw new Error(`OperationHandler: Payload size exceeds maximum limit of ${MAX_PARTIAL_TX_PAYLOAD_BYTE_SIZE} bytes by ${b4a.byteLength(JSON.stringify(payload)) - MAX_PARTIAL_TX_PAYLOAD_BYTE_SIZE} bytes.`);
         }
+        
         if (this.#disable_rate_limit !== true) {
             const shouldDisconnect = this.#rateLimiter.handleRateLimit(connection, this.network);
             if (shouldDisconnect) {

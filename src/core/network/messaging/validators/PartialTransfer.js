@@ -50,7 +50,7 @@ class PartialTransfer extends PartialOperation {
         const isSelfTransfer = senderAddress === recipientAddress;
         const totalDeductedAmount = isSelfTransfer ? this.fee : (transferAmount + this.fee);
 
-        const senderEntry = await this.state.getNodeEntry(senderAddress);
+        const senderEntry = await this.state.getNodeEntryUnsigned(senderAddress);
         if (!senderEntry) {
             throw new Error('Sender account not found');
         }
@@ -61,7 +61,7 @@ class PartialTransfer extends PartialOperation {
         }
 
         if (!isSelfTransfer) {
-            const recipientEntry = await this.state.getNodeEntry(recipientAddress);
+            const recipientEntry = await this.state.getNodeEntryUnsigned(recipientAddress);
             if (recipientEntry) {
                 const recipientBalance = bufferToBigInt(recipientEntry.balance);
                 const newRecipientBalance = recipientBalance + transferAmount;
