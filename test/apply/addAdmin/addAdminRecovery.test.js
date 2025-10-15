@@ -9,7 +9,8 @@ import CompleteStateMessageOperations from '../../../src/messages/completeStateM
 import PartialStateMessageOperations from '../../../src/messages/partialStateMessages/PartialStateMessageOperations.js'
 import {testKeyPair1, testKeyPair2, testKeyPair3, testKeyPair4} from '../../fixtures/apply.fixtures.js';
 import b4a from 'b4a';
-import { sleep } from '../../../src/utils/helpers.js';
+import { decode as decodeAdmin } from '../../../src/core/state/utils/adminEntry.js';
+import { EntryType } from '../../../src/utils/constants.js';
 //TODO: ADD TEST WHEN NON-ADMIN NODE FORGES ADD ADMIN OPERATION AND BROADCASTS IT TO THE STATE -  SHOULD BE REJECTED
 
 let admin, newAdmin;
@@ -86,21 +87,25 @@ test('Apply function addAdmin for recovery - happy path', async (k) => {
         await admin.msb.close(); // close the admin instance to simulate recovery
         await newAdmin.msb.ready();
         await newAdmin.msb.state.append(null);
-        await sleep(3000); // This is to wait the connection stream for the newly created msb instance.
         const validity = b4a.toString(await newAdmin.msb.state.getIndexerSequenceState(), 'hex')
         const addAdminMessage = await PartialStateMessageOperations.assembleAdminRecoveryMessage(
             newAdmin.wallet,
             b4a.toString(newAdmin.msb.state.writingKey, 'hex'),
             validity
         );
-        await newAdmin.msb.broadcastPartialTransaction(addAdminMessage)
-        await tryToSyncWriters(newAdmin, writer, indexer1, indexer2);
-        await waitForAdminEntry(newAdmin, {
-            address: newAdmin.wallet.address,
-            wk: newAdmin.msb.state.writingKey
-        })
 
-        const adminEntryAfter = await newAdmin.msb.state.getAdminEntry(); // check if the admin entry was added successfully in the base
+        const rawTx = await CompleteStateMessageOperations.assembleAdminRecoveryMessage(
+            writer.wallet,
+            addAdminMessage.address,
+            b4a.from(addAdminMessage.rao.tx, 'hex'),
+            b4a.from(addAdminMessage.rao.txv, 'hex'),
+            b4a.from(addAdminMessage.rao.iw, 'hex'),
+            b4a.from(addAdminMessage.rao.in, 'hex'),
+            b4a.from(addAdminMessage.rao.is, 'hex')
+        )
+        await writer.msb.state.append(rawTx)
+        await tryToSyncWriters(writer, indexer1, indexer2, newAdmin);
+        const adminEntryAfter = decodeAdmin(await writer.msb.state.get(EntryType.ADMIN)); // check if the admin entry was added successfully in the base
         k.ok(adminEntryAfter, 'Result should not be null');
         k.ok(adminEntryAfter.address === newAdmin.wallet.address, 'New Admin address in base should match new admin wallet address');
         k.ok(adminAddressBeforeRecovery === newAdmin.wallet.address, 'New Admin wallet address should be the same as old admin wallet address');

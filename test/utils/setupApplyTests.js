@@ -370,6 +370,9 @@ export const generatePostTx = async (writer, externalNode, externalContractBoots
  */
 export const tryToSyncWriters = async (...args) => {
     try {
+        const [first, ..._] = args
+        await first.msb.state.base.forceFastForward()
+        await first.msb.state.base.view.update()
         let attempts = 0;
         const maxAttempts = 10;
         while (attempts < maxAttempts) {
