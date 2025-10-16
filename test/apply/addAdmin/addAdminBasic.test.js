@@ -1,12 +1,11 @@
 import {test, hook} from 'brittle';
 import {
     initMsbAdmin, initTemporaryDirectory, removeTemporaryDirectory, setupMsbPeer, setupMsbWriter, setupMsbIndexer,
-    tryToSyncWriters, waitForAdminEntry
+    tryToSyncWriters
 } from '../../utils/setupApplyTests.js';
-
 import {randomBytes} from '../../utils/setupApplyTests.js';
 import CompleteStateMessageOperations from '../../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
-import {testKeyPair1, testKeyPair2, testKeyPair3, testKeyPair4} from '../../fixtures/apply.fixtures.js';
+import {testKeyPair1} from '../../fixtures/apply.fixtures.js';
 import b4a from 'b4a';
 import { ADMIN_INITIAL_BALANCE } from '../../../src/utils/constants.js';
 
@@ -15,6 +14,18 @@ import { ADMIN_INITIAL_BALANCE } from '../../../src/utils/constants.js';
 let admin;
 let tmpDirectory;
 let randomChannel;
+
+const sendAddAdmin = async (invoker) => {
+    const validity = b4a.from(await admin.msb.state.getIndexerSequenceState(), 'hex')
+    const addAdminMessage = await CompleteStateMessageOperations.assembleAddAdminMessage(
+        admin.wallet,
+        admin.msb.state.writingKey,
+        validity
+    );
+
+    // add admin to base
+    await invoker.msb.state.append(addAdminMessage); // Send `add admin` request to apply function
+}
 
 hook('Initialize admin for addAdmin tests', async () => {
     randomChannel = randomBytes(32).toString('hex');
@@ -36,15 +47,7 @@ test('Apply function addAdmin for the first time - happy path', async (k) => {
         const adminEntryBefore = await admin.msb.state.getAdminEntry();
         k.is(adminEntryBefore, null, 'Admin entry should be null before adding a new admin');
 
-        const validity = b4a.from(await admin.msb.state.getIndexerSequenceState(), 'hex')
-        const addAdminMessage = await CompleteStateMessageOperations.assembleAddAdminMessage(
-            admin.wallet,
-            admin.msb.state.writingKey,
-            validity
-        );
-
-        // add admin to base
-        await admin.msb.state.append(addAdminMessage); // Send `add admin` request to apply function
+        await sendAddAdmin(admin)
         await tryToSyncWriters(admin);
         const adminEntryAfter = await admin.msb.state.getAdminEntry(); // check if the admin entry was added successfully in the base
         const nodeAdminEntry = await admin.msb.state.getNodeEntry(adminEntryAfter.address)

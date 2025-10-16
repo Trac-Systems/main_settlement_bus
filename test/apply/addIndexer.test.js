@@ -1,4 +1,4 @@
-import {test, hook} from 'brittle';
+import {test, hook, solo} from 'brittle';
 import CompleteStateMessageOperations from '../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
 import {formatIndexersEntry} from '../../src/utils/helpers.js';
 import {
@@ -8,7 +8,7 @@ import {
     setupMsbWriter,
     randomBytes,
     setupMsbPeer,
-    setupWhitelist, waitForNodeState, tryToSyncWriters, setupNodeAsWriter
+    setupWhitelist, waitForNodeState, tryToSyncWriters, waitIndexer
 } from '../utils/setupApplyTests.js';
 import {
     testKeyPair1,
@@ -22,7 +22,6 @@ import {
 import b4a from 'b4a';
 
 let tmpDirectory, admin, indexer1, indexer2, reader1, reader2, indexer3, writer;
-let indexersEntryAddressesCount = 1;
 
 hook('Initialize nodes for addIndexer tests', async t => {
     const randomChannel = randomBytes(32).toString('hex');
@@ -60,7 +59,7 @@ test('handleApplyAddIndexerOperation (apply) - Append addIndexer payload into th
         const oldIndexersEntry = await admin.msb.state.getIndexersEntry();
         const validity = await admin.msb.state.getIndexerSequenceState()
         const assembledAddIndexerMessage = await CompleteStateMessageOperations.assembleAddIndexerMessage(admin.wallet, indexer1.wallet.address, validity);
-        await admin.msb.state.append(assembledAddIndexerMessage);
+        await waitIndexer(indexer1, async () => await admin.msb.state.append(assembledAddIndexerMessage))
 
         await waitForNodeState(admin, indexer1.wallet.address, {
             wk: indexer1.msb.state.writingKey,
@@ -88,13 +87,13 @@ test('handleApplyAddIndexerOperation (apply) - Append addIndexer payload into th
         // reader1 is just a reading node.
         // reader2 is just a reading node.
         // indexer3 is just a writer.
-        const indexersEntryBefore = await indexer1.msb.state.getIndexersEntry();
+        const indexersEntryBefore = await admin.msb.state.getIndexersEntry();
         const assembledAddIndexerMessage = await CompleteStateMessageOperations.assembleAddIndexerMessage(
             admin.wallet,
             indexer2.wallet.address,
             await admin.msb.state.getIndexerSequenceState()
         );
-        await admin.msb.state.append(assembledAddIndexerMessage);
+        await waitIndexer(indexer2, async () => await admin.msb.state.append(assembledAddIndexerMessage))
 
         await waitForNodeState(admin, indexer2.wallet.address, {
             wk: indexer2.msb.state.writingKey,
@@ -129,7 +128,7 @@ test('handleApplyAddIndexerOperation (apply) - Append addIndexer payload into th
         })
 
         const adminSignedLengthAfter = admin.msb.state.getSignedLength();
-        const indexersEntry = await indexer1.msb.state.getIndexersEntry();
+        const indexersEntry = await admin.msb.state.getIndexersEntry();
 
         t.is(indexersEntry.length, indexersEntryBefore.length + 1, `Indexers entry count should be ${indexersEntry.length}`);
         t.is(adminSignedLengthBefore, adminSignedLengthAfter, 'Admin signed length should not change');

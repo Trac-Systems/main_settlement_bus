@@ -134,26 +134,24 @@ export async function setupNodeAsWriter(admin, writerCandidate) {
     try {
         await setupWhitelist(admin, [writerCandidate.wallet.address]); // ensure if is whitelisted
 
-        const isWriter = async (address) => {
-            const result = await admin.msb.state.getNodeEntry(address);
-            return result?.isWriter && !result?.isIndexer;
-        }
-
         const validity = await admin.msb.getIndexerSequenceState()
-        const req = await PartialStateMessageOperations.assembleAddWriterMessage(writerCandidate.wallet, writerCandidate.msb.state.writingKey, validity);
-        await admin.msb.broadcastPartialTransaction(req);
-        await tick(); // wait for the request to be processed
-        let counter;
-        const limit = 20; // maximum number of attempts to verify the role
-        for (counter = 0; counter < limit; counter++) {
-            if (await isWriter(writerCandidate.wallet.address) && await writerCandidate.msb.state.isWritable()) {
-                break;
-            }
-            await writerCandidate.msb.state.base.update();
-            await writerCandidate.msb.state.base.view.update();
-            await writerCandidate.msb.network.swarm.flush()
-            await sleep(1000); // wait for the peer to sync state
-        }
+        const req = await PartialStateMessageOperations.assembleAddWriterMessage(
+            writerCandidate.wallet,
+            writerCandidate.msb.state.writingKey,
+            validity);
+
+        await waitWritable(admin, writerCandidate, async () => {
+            const raw = await CompleteStateMessageOperations.assembleAddWriterMessage(
+                admin.wallet,
+                req.address,
+                b4a.from(req.rao.tx, 'hex'),
+                b4a.from(req.rao.txv, 'hex'),
+                b4a.from(req.rao.iw, 'hex'),
+                b4a.from(req.rao.in, 'hex'),
+                b4a.from(req.rao.is, 'hex')
+            )
+            await admin.msb.state.append(raw)
+        })
 
         return writerCandidate;
     } catch (error) {
@@ -175,7 +173,11 @@ export async function setupMsbWriter(admin, peerName, peerKeyPair, temporaryDire
                 isIndexer: false,
             })
         const validity = await admin.msb.state.getIndexerSequenceState()
-        const req = await PartialStateMessageOperations.assembleAddWriterMessage(writerCandidate.wallet, b4a.toString(writerCandidate.msb.state.writingKey, 'hex'), b4a.toString(validity, 'hex'));
+        const req = await PartialStateMessageOperations.assembleAddWriterMessage(
+            writerCandidate.wallet,
+            b4a.toString(writerCandidate.msb.state.writingKey, 'hex'),
+            b4a.toString(validity, 'hex'));
+
         await waitWritable(admin, writerCandidate, async () => {
             const raw = await CompleteStateMessageOperations.assembleAddWriterMessage(
                 admin.wallet,
@@ -426,6 +428,16 @@ export async function waitForNotIndexer(indexer) {
     } catch (error) {
         throw new Error("Error waiting for indexer to not be an indexer: " + error.message || error);
     }
+}
+
+export async function waitIndexer(node, operation) {
+    const waiter = new Promise(resolve => {
+        node.msb.state.base.once(EventType.IS_INDEXER, (...args) => {
+            resolve(args)
+        })
+    })
+    await operation()
+    return waiter
 }
 
 export async function waitWritable(admin, node, operation) {
