@@ -1,204 +1,62 @@
 import b4a from 'b4a';
-import PeerWallet from 'trac-wallet';
 
-import Check from '../../../../utils/check.js';
 import { safeDecodeApplyOperation } from "../../../../utils/protobuf/operationHelpers.js";
-import { bufferToAddress } from "../../../state/utils/address.js";
-import { createMessage } from "../../../../utils/buffer.js";
-import { OperationType } from "../../../../utils/constants.js";
-import { blake3Hash } from "../../../../utils/crypto.js";
 import deploymentEntryUtils from "../../../state/utils/deploymentEntry.js";
-import { bufferToBigInt } from "../../../../utils/amountSerialization.js";
-import { FEE } from "../../../state/utils/transaction.js";
+import PartialOperation from './base/PartialOperation.js';
 
-//TODO: Implement BASE VALIDATOR CLASS AND MOVE COMMON METHODS THERE
+class PartialTransaction extends PartialOperation {
 
-const FEE_BIGINT = bufferToBigInt(FEE);
 
-class PartialTransaction {
-    #state;
-    #wallet;
-    #network;
-    #check;
-
-    constructor(state, wallet, network) {
-        this.#state = state;
-        this.#wallet = wallet;
-        this.#network = network;
-        this.#check = new Check();
-    }
-
-    get state() {
-        return this.#state;
-    }
-
-    get network() {
-        return this.#network;
-    }
-
-    get check() {
-        return this.#check;
+    constructor(state) {
+        super(state);
     }
 
     async validate(payload) {
-        if (!this.#isPayloadSchemaValid(payload)) return false;
-        if (!this.#validateRequesterAddress(payload)) return false;
-        if (!await this.#validateSignature(payload)) return false;
-        if (!await this.#validateTransactionUniqueness(payload)) return false;
-        if (!await this.#validateIfMsbBootstrapIsValid(payload)) return false;
-        if (!await this.#validateIfExternalBootstrapHasBeenDeployed(payload)) return false;
-        if (!await this.#validateIfExternalBoostrapIsMsbBootstrap(payload)) return false;
-        if (!await this.#validateTransactionValidity(payload)) return false;
-        if (!await this.#validateRequesterBalance(payload)) return false;
-        if (!this.#isTransactionOperationNotCompleted(payload)) return false;
+        this.isPayloadSchemaValid(payload);
+        this.validateRequesterAddress(payload);
+        await this.validateTransactionUniqueness(payload);
+        await this.validateSignature(payload);
+        await this.validateTransactionValidity(payload);
+        this.isOperationNotCompleted(payload);
+        await this.validateRequesterBalance(payload);
+        await this.validateRequesterBalance(payload, true);
+        this.validateSubnetworkBootstrapEquality(payload);
+        
+
+
+        // non common validations below
+        this.validateMsbBootstrap(payload);
+        await this.validateIfExternalBootstrapHasBeenDeployed(payload);
 
         return true;
     }
 
-    #isPayloadSchemaValid(payload) {
-        const isPayloadValid = this.check.validateTransactionOperation(payload);
-        if (!isPayloadValid) {
-            console.error('Transaction payload is invalid.');
-            return false;
-        }
-        return true;
-    }
-
-    #validateRequesterAddress(payload) {
-        const incomingAddress = bufferToAddress(payload.address);
-        if (!incomingAddress) {
-            console.error('Invalid requesting address in transaction payload.');
-            return false;
-        }
-
-        const incomingPublicKey = PeerWallet.decodeBech32mSafe(incomingAddress);
-
-        if (incomingPublicKey === null) {
-            console.error('Invalid requesting public key in transaction payload.');
-            return false;
-        }
-        return true;
-    }
-
-    async #validateSignature(payload) {
-        const incomingPublicKey = PeerWallet.decodeBech32mSafe(bufferToAddress(payload.address));
-        const incomingSignature = payload.txo.is;
-
-        const incomingTx = payload.txo.tx;
-        const message = createMessage(
-            payload.address,
-            payload.txo.txv,
-            payload.txo.iw,
-            payload.txo.ch,
-            payload.txo.in,
-            payload.txo.bs,
-            payload.txo.mbs,
-            OperationType.TX
-        );
-
-        const regeneratedTx = await blake3Hash(message);
-
-        // ensure that regenerated tx matches the incoming tx
-        if (!b4a.equals(incomingTx, regeneratedTx)) {
-            return false;
-        }
-
-        const isSignatureValid = PeerWallet.verify(incomingSignature, regeneratedTx, incomingPublicKey);
-        if (!isSignatureValid) {
-            console.error('Invalid signature in transaction payload');
-            return false;
-        }
-        return true;
-    }
-
-    async #validateTransactionUniqueness(payload) {
-        const tx = payload.txo.tx;
-        const txHex = tx.toString('hex');
-        if (null !== await this.state.get(txHex)) {
-            console.error(`Transaction with hash ${txHex} already exists in the state.`);
-            return false;
-        }
-        return true;
-    }
-
-    async #validateIfExternalBoostrapIsMsbBootstrap(payload) {
-        if (b4a.equals(this.state.bootstrap, payload.txo.bs)) {
-            console.error('External bootstrap is the same as the current MSB bootstrap in transaction operation:', payload.txo.bs);
-            return false;
-        }
-        return true;
-    }
-
-    async #validateIfMsbBootstrapIsValid(payload) {
+    validateMsbBootstrap(payload) {
         if (!b4a.equals(this.state.bootstrap, payload.txo.mbs)) {
-            console.error('Declared MSB bootstrap is different than network bootstrap in transaction operation:', payload.txo.bs);
-            return false;
+            throw new Error(`Declared MSB bootstrap is different than network bootstrap in transaction operation: ${payload.txo.mbs.toString('hex')}`);
         }
-        return true;
     }
 
-    async #validateIfExternalBootstrapHasBeenDeployed(payload) {
+    async validateIfExternalBootstrapHasBeenDeployed(payload) {
         const externalBootstrapResult = await this.state.getRegisteredBootstrapEntry(payload.txo.bs.toString('hex'));
-        if (null === externalBootstrapResult) {
-            console.error("External bootstrap is not registered as deployment/<bootstrap>:", payload.txo.bs.toString('hex'));
-            return false;
+        if (externalBootstrapResult === null) {
+            throw new Error(`External bootstrap with hash ${payload.txo.bs.toString('hex')} is not registered as deployment entry.`);
         }
+
         const decodedPayload = deploymentEntryUtils.decode(externalBootstrapResult);
         const txHash = decodedPayload.txHash
         const getBootstrapTransactionTxPayload = await this.state.get(txHash.toString('hex'));
-        if (null === getBootstrapTransactionTxPayload) {
-            console.error('External bootstrap is not registered as usual tx', externalBootstrapResult.toString('hex'), ':', payload);
-            return false;
+        
+        if (getBootstrapTransactionTxPayload === null) {
+            throw new Error(`External bootstrap is not registered as usual tx ${externalBootstrapResult.toString('hex')}: ${payload}`);
         }
 
         const decodedBootstrapDeployment = safeDecodeApplyOperation(getBootstrapTransactionTxPayload)
 
-        // probably not possible case, however are going to cover it just in case.
+        // edge case
         if (!b4a.equals(decodedBootstrapDeployment.bdo.bs, payload.txo.bs)) {
-            console.error('External bootstrap does not match the one in the transaction payload:', decodedBootstrapDeployment.bdo.bs.toString('hex'), payload.txo.bs);
-            return false;
+            throw new Error(`External bootstrap does not match the one in the transaction payload: ${decodedBootstrapDeployment.bdo.bs.toString('hex')} !== ${payload.txo.bs.toString('hex')}`);
         }
-
-        return true;
-    }
-
-    async #validateTransactionValidity(payload) {
-        const currentTxv = await this.state.getIndexerSequenceState()
-        const incomingTxv = payload.txo.txv
-        if (!b4a.equals(currentTxv, incomingTxv)) {
-            console.error(`Transaction has expired.`);
-            return false;
-        }
-        return true;
-    }
-
-    #isTransactionOperationNotCompleted(payload) {
-        if (!payload || !payload.txo) return false;
-        const { va, vn, vs } = payload.txo;
-        const condition = !!(va === undefined && vn === undefined && vs === undefined);
-        if (!condition) {
-            console.error('Transaction operation must not be completed already (va, vn, vs must be undefined).');
-            return false;
-        }
-        return true;
-    }
-
-    async #validateRequesterBalance(payload) {
-        const requesterAddress = bufferToAddress(payload.address);
-        const requesterEntry = await this.state.getNodeEntry(requesterAddress);
-
-        if (!requesterEntry) {
-            console.error('Requester account not found');
-            return false;
-        }
-
-        const requesterBalance = bufferToBigInt(requesterEntry.balance);
-        if (requesterBalance < FEE_BIGINT) {
-            console.error('Insufficient balance to cover transaction fee');
-            return false;
-        }
-
-        return true;
     }
 
 }
