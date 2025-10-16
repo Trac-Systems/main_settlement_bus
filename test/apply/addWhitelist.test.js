@@ -1,4 +1,4 @@
-import { test, hook } from 'brittle';
+import { test, hook } from '../utils/wrapper.js';
 import b4a from 'b4a';
 import { setupMsbAdmin, initTemporaryDirectory, removeTemporaryDirectory, randomBytes } from '../utils/setupApplyTests.js';
 import { testKeyPair1, testKeyPair2 } from '../fixtures/apply.fixtures.js';

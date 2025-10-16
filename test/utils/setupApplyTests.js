@@ -311,7 +311,17 @@ export const deployExternalBootstrap = async (writer, externalNode) => {
         txValidity.toString('hex')
     );
 
-    await writer.msb.broadcastPartialTransaction(payload)
+    const raw = await CompleteStateMessageOperations.assembleCompleteBootstrapDeployment(
+        writer.msb.wallet,
+        payload.address,
+        b4a.from(payload.bdo.tx, 'hex'),
+        b4a.from(payload.bdo.txv, 'hex'),
+        b4a.from(payload.bdo.bs, 'hex'),
+        b4a.from(payload.bdo.ic, 'hex'),
+        b4a.from(payload.bdo.in, 'hex'),
+        b4a.from(payload.bdo.is, 'hex'),
+    )
+    await writer.msb.state.base.append(raw)
     await tick()
     await waitForHash(writer, payload.bdo.tx)
     return externalBootstrap

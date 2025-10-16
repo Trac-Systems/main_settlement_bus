@@ -1,4 +1,4 @@
-import {test, hook} from 'brittle';
+import {test, hook} from '../utils/wrapper.js';
 
 import CompleteStateMessageOperations from '../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
 import {
@@ -20,7 +20,7 @@ hook('Initialize nodes for addIndexer tests', async t => {
         enable_txlogs: false,
         enable_interactive_mode: false,
         enable_role_requester: false,
-        enable_validator_observer: true,
+        enable_validator_observer: false,
         channel: randomChannel,
     }
     tmpDirectory = await initTemporaryDirectory();
@@ -36,99 +36,85 @@ hook('Initialize nodes for addIndexer tests', async t => {
 });
 
 test('handleApplyRemoveIndexerOperation (apply) - Append removeIndexer payload into the base - happy path', async t => {
-    try {
-        // indexer1 is already an indexer -> this indexer will lose its indexer status and will become a writer.
-        // indexer2 is already an indexer
-        // writer is already a writer
-        const indexersEntryBefore = await writer.msb.state.getIndexersEntry();
-        const validity = await admin.msb.state.getIndexerSequenceState()
-        const assembledRemoveIndexerMessage = await CompleteStateMessageOperations.assembleRemoveIndexerMessage(admin.wallet, indexer1.wallet.address, validity);
-        await admin.msb.state.append(assembledRemoveIndexerMessage);
-        await tryToSyncWriters(admin, indexer1, indexer2);
-        await waitForNodeState(indexer1, indexer1.wallet.address, {
-            wk: indexer1.msb.state.writingKey,
-            isWhitelisted: true,
-            isWriter: true,
-            isIndexer: false,
-        })
+    // indexer1 is already an indexer -> this indexer will lose its indexer status and will become a writer.
+    // indexer2 is already an indexer
+    // writer is already a writer
+    const indexersEntryBefore = await writer.msb.state.getIndexersEntry();
+    const validity = await admin.msb.state.getIndexerSequenceState()
+    const assembledRemoveIndexerMessage = await CompleteStateMessageOperations.assembleRemoveIndexerMessage(admin.wallet, indexer1.wallet.address, validity);
+    await admin.msb.state.append(assembledRemoveIndexerMessage);
+    await tryToSyncWriters(admin, indexer1, indexer2);
+    await waitForNodeState(indexer1, indexer1.wallet.address, {
+        wk: indexer1.msb.state.writingKey,
+        isWhitelisted: true,
+        isWriter: true,
+        isIndexer: false,
+    })
 
-        const indexersEntry = await indexer1.msb.state.getIndexersEntry();
-        const nodeEntryIndexer1 = await indexer1.msb.state.getNodeEntry(indexer1.wallet.address);
+    const indexersEntry = await indexer1.msb.state.getIndexersEntry();
+    const nodeEntryIndexer1 = await indexer1.msb.state.getNodeEntry(indexer1.wallet.address);
 
-        t.is(indexersEntry.length, indexersEntryBefore.length - 1, `Indexers entry count should be still ${indexersEntryBefore.length - 1}`);
-        t.is(!!indexersEntry.find(({ key }) => b4a.equals(key, indexer1.msb.state.writingKey)), false, 'Indexer address should not be included in the indexers entry');
-        t.is(nodeEntryIndexer1.isWriter, true, 'Node info should indicate that the node is a writer');
-        t.is(nodeEntryIndexer1.isIndexer, false, 'Node info should indicate that the node is not an indexer');
-    } catch (error) {
-        t.fail('Failed to remove indexer: ' + error.message);
-    }
+    t.is(indexersEntry.length, indexersEntryBefore.length - 1, `Indexers entry count should be still ${indexersEntryBefore.length - 1}`);
+    t.is(!!indexersEntry.find(({ key }) => b4a.equals(key, indexer1.msb.state.writingKey)), false, 'Indexer address should not be included in the indexers entry');
+    t.is(nodeEntryIndexer1.isWriter, true, 'Node info should indicate that the node is a writer');
+    t.is(nodeEntryIndexer1.isIndexer, false, 'Node info should indicate that the node is not an indexer');
 });
 
 
 test('handleApplyRemoveIndexerOperation (apply) - Append removeIndexer payload into the base - idempotence', async t => {
-    try {
-        // indexer1 is already a writer (after the previous test) -> let's test idempotence on this node.
-        // indexer2 is already an indexer
-        // writer is already a writer
-        const adminSignedLengthBefore = admin.msb.state.getSignedLength();
-        const indexer2SignedLengthBefore = indexer2.msb.state.getSignedLength();
-        const writerSignedLengthBefore = writer.msb.state.getSignedLength();
+    // indexer1 is already a writer (after the previous test) -> let's test idempotence on this node.
+    // indexer2 is already an indexer
+    // writer is already a writer
+    const adminSignedLengthBefore = admin.msb.state.getSignedLength();
+    const indexer2SignedLengthBefore = indexer2.msb.state.getSignedLength();
+    const writerSignedLengthBefore = writer.msb.state.getSignedLength();
 
-        const indexersEntryBefore = await indexer1.msb.state.getIndexersEntry();
-        const validity = await admin.msb.state.getIndexerSequenceState()
-        const assembledRemoveIndexerMessage = await CompleteStateMessageOperations.assembleRemoveIndexerMessage(admin.wallet, indexer1.wallet.address, validity);
-        await admin.msb.state.append(assembledRemoveIndexerMessage);
-        await tryToSyncWriters(admin, indexer2, writer);
+    const indexersEntryBefore = await indexer1.msb.state.getIndexersEntry();
+    const validity = await admin.msb.state.getIndexerSequenceState()
+    const assembledRemoveIndexerMessage = await CompleteStateMessageOperations.assembleRemoveIndexerMessage(admin.wallet, indexer1.wallet.address, validity);
+    await admin.msb.state.append(assembledRemoveIndexerMessage);
+    await tryToSyncWriters(admin, indexer2, writer);
 
-        const adminSignedLengthAfter = admin.msb.state.getSignedLength();
-        const indexer2SignedLengthAfter = indexer2.msb.state.getSignedLength();
-        const writerSignedLengthAfter = writer.msb.state.getSignedLength();
+    const adminSignedLengthAfter = admin.msb.state.getSignedLength();
+    const indexer2SignedLengthAfter = indexer2.msb.state.getSignedLength();
+    const writerSignedLengthAfter = writer.msb.state.getSignedLength();
 
-        const indexersEntry = await indexer1.msb.state.getIndexersEntry();
-        const nodeInfo = await indexer1.msb.state.getNodeEntry(indexer1.wallet.address);
+    const indexersEntry = await indexer1.msb.state.getIndexersEntry();
+    const nodeInfo = await indexer1.msb.state.getNodeEntry(indexer1.wallet.address);
 
-        t.is(indexersEntry.length, indexersEntryBefore.length, `Indexers entry count should remain ${indexersEntryBefore.length}`);
-        t.is(!!indexersEntry.find(({ key }) => b4a.equals(key, indexer1.msb.state.writingKey)), false, 'Indexer address should not be included in the indexers entry');
-        t.is(nodeInfo.isWriter, true, 'Node info should indicate that the node is a writer');
-        t.is(nodeInfo.isIndexer, false, 'Node info should indicate that the node is not an indexer');
-        t.is(adminSignedLengthBefore, adminSignedLengthAfter, 'Admin signed length should not change');
-        t.is(indexer2SignedLengthBefore, indexer2SignedLengthAfter, 'Indexer2 signed length should not change');
-        t.is(writerSignedLengthBefore, writerSignedLengthAfter, 'Writer signed length should not change');
-    }
-    catch (error) {
-        t.fail('Failed to remove indexer (idempotence): ' + error.message);
-    }
+    t.is(indexersEntry.length, indexersEntryBefore.length, `Indexers entry count should remain ${indexersEntryBefore.length}`);
+    t.is(!!indexersEntry.find(({ key }) => b4a.equals(key, indexer1.msb.state.writingKey)), false, 'Indexer address should not be included in the indexers entry');
+    t.is(nodeInfo.isWriter, true, 'Node info should indicate that the node is a writer');
+    t.is(nodeInfo.isIndexer, false, 'Node info should indicate that the node is not an indexer');
+    t.is(adminSignedLengthBefore, adminSignedLengthAfter, 'Admin signed length should not change');
+    t.is(indexer2SignedLengthBefore, indexer2SignedLengthAfter, 'Indexer2 signed length should not change');
+    t.is(writerSignedLengthBefore, writerSignedLengthAfter, 'Writer signed length should not change');
 });
 
 test('handleApplyAddIndexerOperation (apply) - Append removeIndexer payload into the base by non-admin node', async t => {
-    try {
-        // indexer1 is already a writer.
-        // indexer2 is already an indexer -> should still be an indexer after the operation.
-        // writer is already a writer -> will try to remove indexer2 as a non-admin node, however it should not be allowed.
-        const indexersEntryBefore = await indexer2.msb.state.getIndexersEntry();
-        const writerSignedLengthBefore = admin.msb.state.getSignedLength();
-        const indexer2SignedLengthBefore = indexer2.msb.state.getSignedLength();
+    // indexer1 is already a writer.
+    // indexer2 is already an indexer -> should still be an indexer after the operation.
+    // writer is already a writer -> will try to remove indexer2 as a non-admin node, however it should not be allowed.
+    const indexersEntryBefore = await indexer2.msb.state.getIndexersEntry();
+    const writerSignedLengthBefore = admin.msb.state.getSignedLength();
+    const indexer2SignedLengthBefore = indexer2.msb.state.getSignedLength();
 
-        const validity = await admin.msb.state.getIndexerSequenceState()
-        const assembledRemoveIndexerMessage = await CompleteStateMessageOperations.assembleRemoveIndexerMessage(admin.wallet, indexer2.wallet.address, validity);
-        await writer.msb.state.append(assembledRemoveIndexerMessage);
-        await tryToSyncWriters(admin, indexer2, writer);
+    const validity = await admin.msb.state.getIndexerSequenceState()
+    const assembledRemoveIndexerMessage = await CompleteStateMessageOperations.assembleRemoveIndexerMessage(admin.wallet, indexer2.wallet.address, validity);
+    await writer.msb.state.append(assembledRemoveIndexerMessage);
+    await tryToSyncWriters(admin, indexer2, writer);
 
-        const writerSignedLengthAfter = writer.msb.state.getSignedLength();
-        const indexer2SignedLengthAfter = indexer2.msb.state.getSignedLength();
+    const writerSignedLengthAfter = writer.msb.state.getSignedLength();
+    const indexer2SignedLengthAfter = indexer2.msb.state.getSignedLength();
 
-        const indexersEntry = await indexer2.msb.state.getIndexersEntry();
-        const nodeInfo = await indexer2.msb.state.getNodeEntry(indexer2.wallet.address);
+    const indexersEntry = await indexer2.msb.state.getIndexersEntry();
+    const nodeInfo = await indexer2.msb.state.getNodeEntry(indexer2.wallet.address);
 
-        t.is(indexersEntry.length, indexersEntryBefore.length, `Indexers entry count should be still ${indexersEntryBefore.length}`);
-        t.is(!!indexersEntry.find(({ key }) => b4a.equals(key, indexer2.msb.state.writingKey)), true, 'Indexer address should not be included in the indexers entry');
-        t.is(nodeInfo.isIndexer, true, 'Node info should indicate that the node is an indexer');
-        t.is(writerSignedLengthBefore, writerSignedLengthAfter, 'Writer signed length should not change');
-        t.is(indexer2SignedLengthBefore, indexer2SignedLengthAfter, 'Indexer2 signed length should not change');
-    }
-    catch (error) {
-        t.fail('Failed to add indexer: ' + error.message);
-    }
+    t.is(indexersEntry.length, indexersEntryBefore.length, `Indexers entry count should be still ${indexersEntryBefore.length}`);
+    t.is(!!indexersEntry.find(({ key }) => b4a.equals(key, indexer2.msb.state.writingKey)), true, 'Indexer address should not be included in the indexers entry');
+    t.is(nodeInfo.isIndexer, true, 'Node info should indicate that the node is an indexer');
+    t.is(writerSignedLengthBefore, writerSignedLengthAfter, 'Writer signed length should not change');
+    t.is(indexer2SignedLengthBefore, indexer2SignedLengthAfter, 'Indexer2 signed length should not change');
 });
 
 hook('Clean up removeIndexer setup', async t => {

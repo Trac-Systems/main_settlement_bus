@@ -56,7 +56,7 @@ hook('Initialize nodes for addWriter tests', async t => {
         enable_interactive_mode: false,
         enable_role_requester: false,
         channel: randomChannel,
-        enable_validator_observer: true
+        enable_validator_observer: false
     }
     tmpDirectory = await initTemporaryDirectory();
     admin = await setupMsbAdmin(testKeyPair1, tmpDirectory, baseOptions);

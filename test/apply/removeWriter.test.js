@@ -1,4 +1,4 @@
-import {test, hook} from 'brittle';
+import {test, hook} from '../utils/wrapper.js';
 import b4a from 'b4a';
 import {
     setupMsbAdmin,
@@ -53,7 +53,7 @@ hook('Initialize nodes for removeWriter tests', async () => {
         enable_txlogs: false,
         enable_interactive_mode: false,
         enable_role_requester: false,
-        enable_validator_observer: true,
+        enable_validator_observer: false,
         channel: randomChannel,
     });
     writer1 = await setupMsbWriter(admin, 'writer', testKeyPair2, tmpDirectory, admin.options);
@@ -66,71 +66,61 @@ hook('Initialize nodes for removeWriter tests', async () => {
 })
 
 test('handleApplyRemoveWriterOperation (apply) - Append removeWriter payload into the base - happy path', async (t) => {
-    try {
-        // writer1 is already a writer ->  this writer will lose its writer status
-        // writer2 is already a writer
-        // writer3 is already a writer
-        // writer4 is already a writer
-        // indexer is already an indexer
-        await sendRemoveWriter(writer1, writer2)
-        await tryToSyncWriters(admin, writer2, writer3, writer4, indexer);
-        await waitForNodeState(writer2, writer1.wallet.address, {
-            wk: writer1.msb.state.writingKey,
-            isWhitelisted: true,
-            isWriter: false,
-            isIndexer: false,
-        })
+    // writer1 is already a writer ->  this writer will lose its writer status
+    // writer2 is already a writer
+    // writer3 is already a writer
+    // writer4 is already a writer
+    // indexer is already an indexer
+    await sendRemoveWriter(writer1, writer2)
+    await tryToSyncWriters(admin, writer2, writer3, writer4, indexer);
+    await waitForNodeState(writer2, writer1.wallet.address, {
+        wk: writer1.msb.state.writingKey,
+        isWhitelisted: true,
+        isWriter: false,
+        isIndexer: false,
+    })
 
-        const resultRemoveWriter = await writer2.msb.state.getNodeEntry(writer1.wallet.address); // check if the writer entry was removed successfully in the base
+    const resultRemoveWriter = await writer2.msb.state.getNodeEntry(writer1.wallet.address); // check if the writer entry was removed successfully in the base
 
-        t.ok(resultRemoveWriter, 'Result should not be null');
-        t.ok(b4a.equals(resultRemoveWriter.wk, writer1.msb.state.writingKey), 'Result writing key should match writer writing key');
-        t.is(resultRemoveWriter.isWriter, false, 'Node should not be a writer anymore');
-        t.is(resultRemoveWriter.isIndexer, false, 'Result should not indicate that the peer is an indexer');
-        t.is(writer1.msb.state.isWritable(), false, 'peer should not be writable');
-    } catch (error) {
-        t.fail('Failed to remove writer: ' + error.message);
-    }
+    t.ok(resultRemoveWriter, 'Result should not be null');
+    t.ok(b4a.equals(resultRemoveWriter.wk, writer1.msb.state.writingKey), 'Result writing key should match writer writing key');
+    t.is(resultRemoveWriter.isWriter, false, 'Node should not be a writer anymore');
+    t.is(resultRemoveWriter.isIndexer, false, 'Result should not indicate that the peer is an indexer');
+    t.is(writer1.msb.state.isWritable(), false, 'peer should not be writable');
 });
 
 test('handleApplyRemoveWriterOperation (apply) - Append removeWriter payload into the base - idempotency', async (t) => {
-    try {
-        // writer1 is not a writer.
-        // writer2 is already a writer -> this writer will lose its writer status
-        // writer3 is already a writer
-        // writer4 is already a writer
-        // indexer is already an indexer.
-        await sendRemoveWriter(writer2, writer3)
-        await tryToSyncWriters(admin, writer3, writer4, indexer);
-        await waitForNodeState(writer3, writer2.wallet.address, {
-            wk: writer2.msb.state.writingKey,
-            isWhitelisted: true,
-            isWriter: false,
-            isIndexer: false,
-        });
+    // writer1 is not a writer.
+    // writer2 is already a writer -> this writer will lose its writer status
+    // writer3 is already a writer
+    // writer4 is already a writer
+    // indexer is already an indexer.
+    await sendRemoveWriter(writer2, writer3)
+    await tryToSyncWriters(admin, writer3, writer4, indexer);
+    await waitForNodeState(writer3, writer2.wallet.address, {
+        wk: writer2.msb.state.writingKey,
+        isWhitelisted: true,
+        isWriter: false,
+        isIndexer: false,
+    });
 
-        const signedLengthAdminBefore = admin.msb.state.getSignedLength();
-        const signedLengthWriter3Before = writer3.msb.state.getSignedLength();
-        await sendRemoveWriter(writer2, writer3)
-        await tryToSyncWriters(admin, writer3, writer4, indexer);
-        await waitForNodeState(writer3, writer2.wallet.address, {
-            wk: writer2.msb.state.writingKey,
-            isWhitelisted: true,
-            isWriter: false,
-            isIndexer: false,
-        });
+    const signedLengthAdminBefore = admin.msb.state.getSignedLength();
+    const signedLengthWriter3Before = writer3.msb.state.getSignedLength();
+    await sendRemoveWriter(writer2, writer3)
+    await tryToSyncWriters(admin, writer3, writer4, indexer);
+    await waitForNodeState(writer3, writer2.wallet.address, {
+        wk: writer2.msb.state.writingKey,
+        isWhitelisted: true,
+        isWriter: false,
+        isIndexer: false,
+    });
 
 
-        const signedLengthAdminAfter = admin.msb.state.getSignedLength();
-        const signedLengthWriter3After = writer3.msb.state.getSignedLength();
+    const signedLengthAdminAfter = admin.msb.state.getSignedLength();
+    const signedLengthWriter3After = writer3.msb.state.getSignedLength();
 
-        t.is(signedLengthAdminBefore, signedLengthAdminAfter, 'Admin signed length should not change');
-        t.is(signedLengthWriter3Before, signedLengthWriter3After, 'Writer3 signed length should not change');
-
-    } catch (error) {
-        t.fail('Failed to remove writer: ' + error.message);
-    }
-
+    t.is(signedLengthAdminBefore, signedLengthAdminAfter, 'Admin signed length should not change');
+    t.is(signedLengthWriter3Before, signedLengthWriter3After, 'Writer3 signed length should not change');
 });
 
 test('handleApplyRemoveWriterOperation (apply) - Append removeWriter payload into the base - indexer will NOT be removed', async (t) => {
@@ -139,27 +129,23 @@ test('handleApplyRemoveWriterOperation (apply) - Append removeWriter payload int
     // writer3 is already a writer.
     // writer4 is already a writer.
     // indexer is already an indexer.
-    try {
-        await sendRemoveWriter(indexer, writer3)
-        await tryToSyncWriters(admin, writer3, writer4);
+    await sendRemoveWriter(indexer, admin)
+    await tryToSyncWriters(admin, writer3, writer4);
 
-        await waitForNodeState(writer3, indexer.wallet.address, {
-            wk: indexer.msb.state.writingKey,
-            isWhitelisted: true,
-            isWriter: false,
-            isIndexer: false,
-        })
+    await waitForNodeState(writer3, indexer.wallet.address, {
+        wk: indexer.msb.state.writingKey,
+        isWhitelisted: true,
+        isWriter: false,
+        isIndexer: false,
+    })
 
-        await waitForNotIndexer(indexer);
-        await writer3.msb.state.getNodeEntry(indexer.wallet.address);
-        const indexersEntry = await writer3.msb.state.getIndexersEntry();
+    await waitForNotIndexer(indexer);
+    await writer3.msb.state.getNodeEntry(indexer.wallet.address);
+    const indexersEntry = await writer3.msb.state.getIndexersEntry();
 
-        t.ok(indexersEntry, 'Indexers entry should not be null');
-        t.ok(indexersEntry.find(({ key }) => b4a.equals(key, indexer.msb.state.writingKey)))
-        t.is(indexer.msb.state.isWritable(), true, 'Peer should remain writable');
-    } catch (error) {
-        t.fail('Failed to remove writer: ' + error.message);
-    }
+    t.ok(indexersEntry, 'Indexers entry should not be null');
+    t.ok(indexersEntry.find(({ key }) => b4a.equals(key, indexer.msb.state.writingKey)))
+    t.is(indexer.msb.state.isWritable(), true, 'Peer should remain writable');
 })
 
 test('handleApplyRemoveWriterOperation (apply) - validator and invoker are the same', async (t) => {

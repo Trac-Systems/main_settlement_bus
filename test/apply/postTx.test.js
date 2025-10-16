@@ -1,4 +1,4 @@
-import {hook, test, solo} from 'brittle';
+import {hook, test} from '../utils/wrapper.js';
 import b4a from "b4a";
 import {
     generatePostTx,
@@ -25,6 +25,11 @@ import CompleteStateMessageOperations from '../../src/messages/completeStateMess
 
 let tmpDirectory, admin, writer, externalNode, externalBootstrap;
 
+const close = async node => {
+    // await node.msb.state.base.flush()
+    await node.msb.close()
+}
+
 hook('Initialize nodes', async t => {
     const randomChannel = randomBytes(32).toString('hex');
 
@@ -32,7 +37,7 @@ hook('Initialize nodes', async t => {
         enable_txlogs: false,
         enable_interactive_mode: false,
         enable_role_requester: false,
-        enable_validator_observer: true,
+        enable_validator_observer: false,
         channel: randomChannel,
     }
 
@@ -123,8 +128,8 @@ test('handleApplyTxOperation (apply) - negative', t => {
         })
         await tick();
 
+        await close(maliciousWriter)
         t.absent(await writer.msb.state.get(txHash), 'post tx with incorrect operation type should not be added to the base');
-        await maliciousWriter.msb.close()
     })
 
     // t.test('handleApplyTxOperation (apply) - replay attack', async t => {
@@ -181,8 +186,8 @@ test('handleApplyTxOperation (apply) - negative', t => {
         await tick();
 
         const result = await admin.msb.state.get(txHash);
+        await close(maliciousWriter)
         t.absent(result, 'adversary\'s fake signature should not be added to the base');
-        await maliciousWriter.msb.close()
     });
 
 
@@ -213,8 +218,8 @@ test('handleApplyTxOperation (apply) - negative', t => {
         await tick();
 
         const result = await writer.msb.state.get(txHash);
+        await close(maliciousWriter)
         t.absent(result, 'adversary prepared fake postTx signature (third key pair) should not be added to the base');
-        await maliciousWriter.msb.close()
     });
 
     t.test('handleApplyTxOperation (apply) - invalid txo sub-values', async t => {
@@ -271,10 +276,10 @@ test('handleApplyTxOperation (apply) - negative', t => {
 
             // should be penalized
             const node = await maliciousWriter.msb.state.getUnsignedNodeEntry(maliciousWriter.wallet.address)
+            await close(maliciousWriter)
             t.ok(node, 'Result should not be null');
             t.is(node.isWriter, false, 'Result should indicate that the peer is not a writer');
             // clean up after
-            await maliciousWriter.msb.close()
         }
     });
 
@@ -302,8 +307,8 @@ test('handleApplyTxOperation (apply) - negative', t => {
         await tick();
         await sleep(500)
         const result = await admin.msb.state.get(txHash);
+        await close(maliciousWriter)
         t.absent(result, 'oversized post tx should not be added to the base');
-        await maliciousWriter.msb.close()
     });
 
     t.test('handleApplyTxOperation (apply) - invalid postTx address (malicious node replaces address)', async t => {
@@ -328,8 +333,8 @@ test('handleApplyTxOperation (apply) - negative', t => {
         await tick();
         await sleep(500)
         const result = await admin.msb.state.get(txHash);
+        await close(maliciousWriter)
         t.absent(result, 'post tx with malicious address should not be added to the base');
-        await maliciousWriter.msb.close()
     });
 
     t.test('handleApplyTxOperation (apply) - invalid postTx txo.ia (malicious node replaces ia)', async t => {
@@ -353,15 +358,15 @@ test('handleApplyTxOperation (apply) - negative', t => {
         await writer.msb.state.append(encodedMaliciousPostTx);
         await tick();
         const result = await admin.msb.state.get(txHash);
+        await close(maliciousWriter)
         t.absent(result, 'post tx with malicious txo.ia should not be added to the base');
-        await maliciousWriter.msb.close()
     });
 })
 
 hook('Clean up postTx setup', async t => {
     // close msbBoostrap and remove temp directory
-    if (admin && admin.msb) await admin.msb.close();
-    if (writer && writer.msb) await writer.msb.close();
-    if (externalNode && externalNode.msb) await externalNode.msb.close();
+    if (writer?.msb) await close(writer)
+    if (externalNode?.msb) await close(externalNode)
+    if (admin?.msb) await close(admin)
     if (tmpDirectory) await removeTemporaryDirectory(tmpDirectory);
 });
