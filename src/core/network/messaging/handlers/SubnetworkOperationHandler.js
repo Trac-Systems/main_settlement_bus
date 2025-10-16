@@ -21,8 +21,8 @@ class SubnetworkOperationHandler extends BaseOperationHandler {
 
     constructor(network, state, wallet, rateLimiter, options = {}) {
         super(network, state, wallet, rateLimiter, options);
-        this.#partialBootstrapDeploymentValidator = new PartialBootstrapDeployment(this.state, this.wallet, this.network);
-        this.#partialTransactionValidator = new PartialTransaction(this.state, this.wallet, this.network);
+        this.#partialBootstrapDeploymentValidator = new PartialBootstrapDeployment(this.state);
+        this.#partialTransactionValidator = new PartialTransaction(this.state);
     }
 
     async handleOperation(payload) {

@@ -16,6 +16,7 @@ let tmpDirectory
 const setupNetwork = async () => {
     tmpDirectory = await initTemporaryDirectory()
     const rpcOpts = {
+        bootstrap: randomBytes(32).toString('hex'),
         channel: randomBytes(32).toString('hex'),
         enable_role_requester: false,
         enable_auto_transaction_consent: false,

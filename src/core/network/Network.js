@@ -28,11 +28,11 @@ class Network extends ReadyResource {
     #poolService;
     #validatorObserverService;
 
-    constructor(state, channel, options = {}) {
+    constructor(state, channel, address = null, options = {}) {
         super();
         this.#enable_wallet = options.enable_wallet !== false;
         this.#channel = channel;
-        this.#poolService = new PoolService(state)
+        this.#poolService = new PoolService(state, address, options);
         this.#validatorObserverService = new ValidatorObserverService(this, state, options)
         this.#networkMessages = new NetworkMessages(this, options);
         //TODO: move streams maybe to HASHMAP? To discuss because this change will affect the whole network module and it's usage. It is not a priority right now

@@ -2,11 +2,10 @@ import b4a from "b4a";
 
 import GetRequestHandler from "../handlers/GetRequestHandler.js";
 import ResponseHandler from "../handlers/ResponseHandler.js";
-import OperationHandler from "../handlers/OperationHandler.js";
+import RoleOperationHandler from "../handlers/RoleOperationHandler.js";
 import SubnetworkOperationHandler from "../handlers/SubnetworkOperationHandler.js";
 import TransferOperationHandler from "../handlers/TransferOperationHandler.js";
 import {NETWORK_MESSAGE_TYPES, OperationType} from '../../../../utils/constants.js';
-import WhitelistedEventHandler from "../handlers/WhitelistedEventHandler.js";
 import * as operation from '../../../../utils/operations.js';
 import TransactionRateLimiterService from "../../services/TransactionRateLimiterService.js";
 
@@ -21,10 +20,9 @@ class NetworkMessageRouter {
         this.#handlers = {
             get: new GetRequestHandler(wallet, state),
             response: new ResponseHandler(network, state, wallet),
-            roleAccessOperation: new OperationHandler(state, wallet, network),
+            RoleTransaction: new RoleOperationHandler(network, state, wallet, this.#rateLimiter, options),
             subNetworkTransaction: new SubnetworkOperationHandler(network, state, wallet, this.#rateLimiter, options),
             tracNetworkTransaction: new TransferOperationHandler(network, state, wallet, this.#rateLimiter, options),
-            whitelistedEvent: new WhitelistedEventHandler(network, state, wallet, options)
         }
         this.#options = options;
     }
@@ -32,8 +30,6 @@ class NetworkMessageRouter {
     get network() {
         return this.#network;
     }
-
-
 
     async route(incomingMessage, connection, messageProtomux) {
         try {
@@ -48,10 +44,9 @@ class NetworkMessageRouter {
             else if (this.#isResponse(incomingMessage)) {
                 await this.#handlers.response.handle(incomingMessage, connection, channelString);
                 this.network.swarm.leavePeer(connection.remotePublicKey);
-
             }
             else if (this.#isRoleAccessOperation(incomingMessage)) {
-                await this.#handlers.roleAccessOperation.handle(incomingMessage, connection);
+                await this.#handlers.RoleTransaction.handle(incomingMessage, connection);
                 this.network.swarm.leavePeer(connection.remotePublicKey);
 
             }
@@ -63,17 +58,12 @@ class NetworkMessageRouter {
                 await this.#handlers.tracNetworkTransaction.handle(incomingMessage, connection);
                 this.network.swarm.leavePeer(connection.remotePublicKey);
             }
-            else if (incomingMessage.type === OperationType.APPEND_WHITELIST
-                && this.#options.enable_auto_transaction_consent === true) {
-                    await this.#handlers.whitelistedEvent.handle(incomingMessage, connection);
-                this.network.swarm.leavePeer(connection.remotePublicKey);
-            }
             else {
                 this.network.swarm.leavePeer(connection.remotePublicKey);
             }
             
         } catch (error) {
-            throw new Error(`Failed to route message: ${error.message}`);
+            throw new Error(`Failed to route message: ${error.message}. Pubkey of requester is ${connection.remotePublicKey ? b4a.toString(connection.remotePublicKey, 'hex') : 'unknown'}`);
         }
     }
 
