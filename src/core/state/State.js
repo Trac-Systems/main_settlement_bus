@@ -12,7 +12,8 @@ import {
     HYPERBEE_VALUE_ENCODING,
     BATCH_SIZE,
     ADMIN_INITIAL_STAKED_BALANCE,
-    MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION
+    MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION,
+    CHAIN_ID,
 } from '../../utils/constants.js';
 import { isHexString, sleep } from '../../utils/helpers.js';
 import PeerWallet from 'trac-wallet';
@@ -369,9 +370,9 @@ class State extends ReadyResource {
 
     #getApplyOperationHandler(type) {
         const handlers = {
+            [OperationType.ADD_ADMIN]: this.#handleApplyAddAdminOperation.bind(this),
             [OperationType.BALANCE_INITIALIZATION]: this.#handleApplyInitializeBalanceOperation.bind(this),
             [OperationType.DISABLE_INITIALIZATION]: this.#handleApplyDisableBalanceInitializationOperation.bind(this),
-            [OperationType.ADD_ADMIN]: this.#handleApplyAddAdminOperation.bind(this),
             [OperationType.APPEND_WHITELIST]: this.#handleApplyAppendWhitelistOperation.bind(this),
             [OperationType.ADD_WRITER]: this.#handleApplyAddWriterOperation.bind(this),
             [OperationType.REMOVE_WRITER]: this.#handleApplyRemoveWriterOperation.bind(this),
@@ -458,7 +459,14 @@ class State extends ReadyResource {
         }
 
         // Recreate requester message
-        const message = createMessage(op.address, op.bio.txv, op.bio.in, op.bio.ia, amount.value, OperationType.BALANCE_INITIALIZATION);
+        const message = createMessage(
+            CHAIN_ID,
+            op.bio.txv,
+            op.bio.ia,
+            amount.value,
+            op.bio.in,
+            OperationType.BALANCE_INITIALIZATION
+        );
         if (message.length === 0) {
             this.#enable_txlogs && this.#safeLogApply(OperationType.BALANCE_INITIALIZATION, "Invalid requester message.", node.from.key)
             return Status.FAILURE;
@@ -552,7 +560,13 @@ class State extends ReadyResource {
         };
 
         // Recreate requester message
-        const message = createMessage(op.address, op.cao.txv, op.cao.iw, op.cao.in, OperationType.DISABLE_INITIALIZATION);
+        const message = createMessage(
+            CHAIN_ID,
+            op.cao.txv,
+            op.cao.iw,
+            op.cao.in,
+            OperationType.DISABLE_INITIALIZATION
+        );
         if (message.length === 0) {
             this.#enable_txlogs && this.#safeLogApply(OperationType.DISABLE_INITIALIZATION, "Invalid requester message.", node.from.key)
             return Status.FAILURE;
@@ -632,7 +646,7 @@ class State extends ReadyResource {
 
         // recreate requester message
         const requesterMessage = createMessage(
-            adminAddressBuffer,
+            CHAIN_ID,
             op.cao.txv,
             op.cao.iw,
             op.cao.in,
@@ -783,7 +797,7 @@ class State extends ReadyResource {
 
         // recreate requester message
         const requesterMessage = createMessage(
-            op.address,
+            CHAIN_ID,
             op.rao.txv,
             op.rao.iw,
             op.rao.in,
@@ -825,8 +839,8 @@ class State extends ReadyResource {
 
         // recreate validator message
         const validatorMessage = createMessage(
+            CHAIN_ID,
             op.rao.tx,
-            op.rao.va,
             op.rao.vn,
             OperationType.ADMIN_RECOVERY
         );
@@ -886,6 +900,7 @@ class State extends ReadyResource {
             this.#enable_txlogs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Failed to decode admin entry.", node.from.key)
             return Status.FAILURE;
         };
+
         const publicKeyAdminEntry = PeerWallet.decodeBech32mSafe(decodedAdminEntry.address);
         if (!b4a.equals(requesterAdminPublicKey, publicKeyAdminEntry)) {
             this.#enable_txlogs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Admin public key does not match the node public key.", node.from.key)
@@ -1043,8 +1058,14 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        // verify signature createMessage(this.#address, this.#txValidity, this.#incomingAddress, nonce, this.#operationType);
-        const message = createMessage(op.address, op.aco.txv, op.aco.ia, op.aco.in, OperationType.APPEND_WHITELIST);
+        // verify signature
+        const message = createMessage(
+            CHAIN_ID,
+            op.aco.txv,
+            op.aco.ia,
+            op.aco.in,
+            OperationType.APPEND_WHITELIST
+        );
         if (message.length === 0) {
             this.#enable_txlogs && this.#safeLogApply(OperationType.APPEND_WHITELIST, "Invalid requester message.", node.from.key)
             return Status.FAILURE;
@@ -1272,7 +1293,7 @@ class State extends ReadyResource {
 
         // verify requester signature
         const requesterMessage = createMessage(
-            op.address,
+            CHAIN_ID,
             op.rao.txv,
             op.rao.iw,
             op.rao.in,
@@ -1312,9 +1333,10 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
+        // recreate validator message
         const validatorMessage = createMessage(
+            CHAIN_ID,
             op.rao.tx,
-            op.rao.va,
             op.rao.vn,
             OperationType.ADD_WRITER
         );
@@ -1562,7 +1584,7 @@ class State extends ReadyResource {
 
         // verify requester signature
         const requesterMessage = createMessage(
-            op.address,
+            CHAIN_ID,
             op.rao.txv,
             op.rao.iw,
             op.rao.in,
@@ -1602,9 +1624,10 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
+        // recreate validator message
         const validatorMessage = createMessage(
+            CHAIN_ID,
             op.rao.tx,
-            op.rao.va,
             op.rao.vn,
             OperationType.REMOVE_WRITER
         );
@@ -1831,12 +1854,13 @@ class State extends ReadyResource {
 
         // verify requester signature
         const message = createMessage(
-            op.address,
+            CHAIN_ID,
             op.aco.txv,
             op.aco.ia,
             op.aco.in,
             OperationType.ADD_INDEXER
         );
+
         if (message.length === 0) {
             this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_INDEXER, "Invalid requester message.", node.from.key)
             return Status.FAILURE;
@@ -2035,7 +2059,7 @@ class State extends ReadyResource {
 
         // verify requester signature
         const message = createMessage(
-            op.address,
+            CHAIN_ID,
             op.aco.txv,
             op.aco.ia,
             op.aco.in,
@@ -2231,11 +2255,10 @@ class State extends ReadyResource {
 
         // recreate requester message
         const message = createMessage(
-            op.address,
+            CHAIN_ID,
             op.aco.txv,
             op.aco.ia,
             op.aco.in,
-            op.aco.nonce,
             OperationType.BAN_VALIDATOR
         );
         if (message.length === 0) {
@@ -2425,7 +2448,7 @@ class State extends ReadyResource {
 
         // recreate requester message
         const requesterMessage = createMessage(
-            op.address,
+            CHAIN_ID,
             op.bdo.txv,
             op.bdo.bs,
             op.bdo.ic,
@@ -2470,8 +2493,8 @@ class State extends ReadyResource {
 
         // recreate validator message
         const validatorMessage = createMessage(
+            CHAIN_ID,
             op.bdo.tx,
-            op.bdo.va,
             op.bdo.vn,
             OperationType.BOOTSTRAP_DEPLOYMENT
         );
@@ -2661,13 +2684,13 @@ class State extends ReadyResource {
         };
 
         const requesterMessage = createMessage(
-            op.address,
+            CHAIN_ID,
             op.txo.txv,
             op.txo.iw,
             op.txo.ch,
-            op.txo.in,
             op.txo.bs,
             this.bootstrap,
+            op.txo.in,
             OperationType.TX
         );
         if (requesterMessage.length === 0) {
@@ -2703,8 +2726,8 @@ class State extends ReadyResource {
 
         // recreate validator message
         const validatorMessage = createMessage(
+            CHAIN_ID,
             op.txo.tx,
-            op.txo.va,
             op.txo.vn,
             OperationType.TX
         );
@@ -2859,11 +2882,11 @@ class State extends ReadyResource {
 
         // recreate requester message
         const requesterMessage = createMessage(
-            op.address,
+            CHAIN_ID,
             op.tro.txv,
-            op.tro.in,
             op.tro.to,
             op.tro.am,
+            op.tro.in,
             OperationType.TRANSFER
         );
 
@@ -2900,8 +2923,8 @@ class State extends ReadyResource {
         };
 
         const validatorMessage = createMessage(
+            CHAIN_ID,
             op.tro.tx,
-            op.tro.va,
             op.tro.vn,
             OperationType.TRANSFER
         );
