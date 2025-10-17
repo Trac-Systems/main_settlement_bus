@@ -18,7 +18,8 @@ test('Happy path encode/decode roundtrip for protobuf applyOperation payloads', 
         ["removeWriterPartial", fixtures.validPartialRemoveWriter],
         ["adminRecoveryComplete", fixtures.validCompleteAdminRecovery],
         ["adminRecoveryPartial", fixtures.validPartialAdminRecovery],
-        ["transferComplete", fixtures.validTransferOperation]
+        ["transferComplete", fixtures.validTransferOperation],
+        ["balanceInitialization", fixtures.validBalanceInitOperation]
     ]);
 
     for (const [key, value] of payloadsHashMap) {

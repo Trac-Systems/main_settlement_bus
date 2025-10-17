@@ -112,3 +112,4 @@ export const NETWORK_MESSAGE_TYPES = Object.freeze({
 });
 
 export const TRAC_ADDRESS_SIZE =  63; // TODO: Change this to config().addressLength || 63
+export const CHAIN_ID = 1; // TODO: Change this to config().chainId || 1
