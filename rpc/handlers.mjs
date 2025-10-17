@@ -126,7 +126,7 @@ export async function handleUnconfirmedLength({ msbInstance, respond }) {
 }
 
 export async function handleTransactionDetails({ msbInstance, respond, req }) {
-    const hash = req.url.split('/')[2];
+    const hash = req.url.split('/')[3];
     const commandString = `/get_tx_details ${hash}`;
     const txDetails = await msbInstance.handleCommand(commandString);
     respond(200, { txDetails });
