@@ -15,8 +15,7 @@ export async function handleBalance({ req, respond, msbInstance }) {
     }
 
     if (!address) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'Wallet address is required' }));
+        respond(400, { error: 'Wallet address is required' });
         return;
     }
     
@@ -73,6 +72,11 @@ export async function handleBroadcastTransaction({ msbInstance, respond, req }) 
             const code = error instanceof SyntaxError ? 400 : 500;
             respond(code, { error: code === 400 ? 'Invalid JSON payload.' : 'An error occurred processing the transaction.' });
         }
+    });
+
+    req.on('error', (err) => {
+        console.error('Stream error in handleBroadcastTransaction:', err);
+        respond(500, { error: 'Request stream failed during body transfer.' });
     });
 }
 
@@ -189,4 +193,9 @@ export async function handleFetchBulkTxPayloads({ msbInstance, respond, req }) {
             respond(code, { error: code === 400 ? 'Invalid request body format.' : 'An internal error occurred.' });
         }
     })
+
+    req.on('error', (err) => {
+        console.error('Stream error in handleFetchBulkTxPayloads:', err);
+        respond(500, { error: 'Request stream failed during body transfer.' });
+    });
 }
