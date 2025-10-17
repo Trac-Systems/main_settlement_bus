@@ -5,7 +5,7 @@ import StateBuilder from '../base/StateBuilder.js'
 import { createMessage } from '../../utils/buffer.js';
 import { OperationType } from '../../utils/protobuf/applyOperations.cjs'
 import { addressToBuffer, bufferToAddress } from '../../core/state/utils/address.js';
-import { TRAC_ADDRESS_SIZE } from '../../utils/constants.js';
+import { TRAC_ADDRESS_SIZE, CHAIN_ID } from '../../utils/constants.js';
 import { isAddressValid } from "../../core/state/utils/address.js";
 import { blake3Hash } from '../../utils/crypto.js';
 import {
@@ -215,22 +215,34 @@ class CompleteStateMessageBuilder extends StateBuilder {
             // Complete by default
             case OperationType.ADD_ADMIN:
             case OperationType.DISABLE_INITIALIZATION:
-                msg = createMessage(this.#address, this.#txValidity, this.#writingKey, nonce, this.#operationType);
+                msg = createMessage(
+                    CHAIN_ID,
+                    this.#txValidity,
+                    this.#writingKey,
+                    nonce,
+                    this.#operationType);
                 break;
             // Complete by default
             case OperationType.BALANCE_INITIALIZATION:
                 if (!this.#incomingAddress || !this.#amount || !this.#txValidity || !this.#address) {
                     throw new Error('All balance initialization fields must be set before building the message!');
                 }
-                msg = createMessage(this.#address, this.#txValidity, nonce, this.#incomingAddress, this.#amount, this.#operationType);
+                msg = createMessage(
+                    CHAIN_ID,
+                    this.#txValidity,
+                    this.#incomingAddress,
+                    this.#amount,
+                    nonce,
+                    this.#operationType
+                );
                 break;
             // Partial need to be signed
             case OperationType.ADD_WRITER:
             case OperationType.REMOVE_WRITER:
             case OperationType.ADMIN_RECOVERY:
                 msg = createMessage(
+                    CHAIN_ID,
                     this.#txHash,
-                    addressToBuffer(this.#wallet.address),
                     nonce,
                     this.#operationType
                 );
@@ -244,8 +256,28 @@ class CompleteStateMessageBuilder extends StateBuilder {
                     throw new Error('Address must not be the same as the wallet address for basic operations.');
                 }
 
-                msg = createMessage(this.#address, this.#txValidity, this.#incomingAddress, nonce, this.#operationType);
+                msg = createMessage(
+                    CHAIN_ID,
+                    this.#txValidity,
+                    this.#incomingAddress,
+                    nonce,
+                    this.#operationType
+                );
+
                 break;
+            // Partial need to be signed
+            case OperationType.BOOTSTRAP_DEPLOYMENT:
+                if (!this.#txHash || !this.#externalBootstrap || !this.#channel || !this.#incomingNonce || !this.#incomingSignature) {
+                    throw new Error('All bootstrap deployment fields must be set before building the message!');
+                }
+                msg = createMessage(
+                    CHAIN_ID,
+                    this.#txHash,
+                    nonce,
+                    this.#operationType
+                );
+                break;
+
             // Partial need to be signed
             case OperationType.TX:
                 if (!this.#txHash || !this.#txValidity || !this.#address || !this.#incomingWriterKey ||
@@ -254,24 +286,12 @@ class CompleteStateMessageBuilder extends StateBuilder {
                     throw new Error('All postTx fields must be set before building the message!');
                 }
                 msg = createMessage(
+                    CHAIN_ID,
                     this.#txHash,
-                    addressToBuffer(this.#wallet.address),
                     nonce,
                     this.#operationType
                 );
                 break;
-            // Partial need to be signed
-            case OperationType.BOOTSTRAP_DEPLOYMENT:
-                if (!this.#txHash || !this.#externalBootstrap || !this.#channel || !this.#incomingNonce || !this.#incomingSignature) {
-                    throw new Error('All bootstrap deployment fields must be set before building the message!');
-                }
-                msg = createMessage(
-                    this.#txHash,
-                    addressToBuffer(this.#wallet.address),
-                    nonce,
-                    this.#operationType
-                );
-                break
 
             case OperationType.TRANSFER:
                 if (!this.#txHash || !this.#txValidity || !this.#address || !this.#incomingNonce ||
@@ -279,8 +299,8 @@ class CompleteStateMessageBuilder extends StateBuilder {
                     throw new Error('All transfer fields must be set before building the message!');
                 }
                 msg = createMessage(
+                    CHAIN_ID,
                     this.#txHash,
-                    addressToBuffer(this.#wallet.address),
                     nonce,
                     this.#operationType
                 );
@@ -305,8 +325,8 @@ class CompleteStateMessageBuilder extends StateBuilder {
             this.#payload.aco = {
                 tx: tx,
                 txv: this.#txValidity,
-                in: nonce,
                 ia: this.#incomingAddress,
+                in: nonce,
                 is: signature
             };
         }
@@ -326,11 +346,11 @@ class CompleteStateMessageBuilder extends StateBuilder {
                 tx: this.#txHash,
                 txv: this.#txValidity,
                 iw: this.#incomingWriterKey,
-                in: this.#incomingNonce,
                 ch: this.#contentHash,
-                is: this.#incomingSignature,
                 bs: this.#externalBootstrap,
                 mbs: this.#msbBootstrap,
+                in: this.#incomingNonce,
+                is: this.#incomingSignature,
                 va: addressToBuffer(this.#wallet.address),
                 vn: nonce,
                 vs: signature,
@@ -351,9 +371,9 @@ class CompleteStateMessageBuilder extends StateBuilder {
             this.#payload.tro = {
                 tx: this.#txHash,
                 txv: this.#txValidity,
-                in: this.#incomingNonce,
                 to: this.#incomingAddress,
                 am: this.#amount,
+                in: this.#incomingNonce,
                 is: this.#incomingSignature,
                 va: addressToBuffer(this.#wallet.address),
                 vn: nonce,
@@ -363,9 +383,9 @@ class CompleteStateMessageBuilder extends StateBuilder {
             this.#payload.bio = {
                 tx: tx,
                 txv: this.#txValidity,
-                in: nonce,
                 ia: this.#incomingAddress,
                 am: this.#amount,
+                in: nonce,
                 is: signature
             }
         }

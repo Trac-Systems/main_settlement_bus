@@ -33,8 +33,8 @@ message CoreAdminOperation {
 message AdminControlOperation {
     bytes tx     = 1; // Transaction hash (unique identifier for the transaction)
     bytes txv    = 2; // Transaction expiration
-    bytes in     = 3; // Nonce of the invoker (admin)
-    bytes ia     = 4; // selected address to specific operation.
+    bytes ia     = 3; // selected address to specific operation.
+    bytes in     = 4; // Nonce of the invoker (admin)
     bytes is     = 5; // Signature of the invoker (admin)
 }
 
@@ -42,18 +42,18 @@ message AdminControlOperation {
 message BalanceInitializationOperation {
     bytes tx   = 1; // Transaction hash (unique identifier for the transaction)
     bytes txv  = 2; // Transaction expiration
-    bytes in   = 3; // Nonce of the contract invoker (admin)
-    bytes ia   = 4; // selected address to specific operation.
-    bytes am   = 5; // Initial balance to be set for the address
+    bytes ia   = 3; // selected address to specific operation.
+    bytes am   = 4; // Initial balance to be set for the address
+    bytes in   = 5; // Nonce of the contract invoker (admin)
     bytes is   = 6; // Signature of the contract invoker (admin)
 }
 // token_transfer (partial - need to be signed by another writer to be complete)
 message TransferOperation {
     bytes tx      = 1; // Transaction hash (unique identifier for the transaction)
     bytes txv     = 2; // Transaction expiration
-    bytes in      = 3; // Nonce of the invoker (any account)
-    bytes to      = 4; // Address of the recipient (any account)
-    bytes am      = 5; // Amount of tokens to transfer
+    bytes to      = 3; // Address of the recipient (any account)
+    bytes am      = 4; // Amount of tokens to transfer
+    bytes in      = 5; // Nonce of the invoker (any account)
     bytes is      = 6; // Signature of the invoker (any account)
     bytes va      = 7; // Validator's address (optional)
     bytes vn      = 8; // Validator's nonce  (optional)
@@ -75,14 +75,14 @@ message RoleAccessOperation  {
 // transaction - (partial - need to be signed by another writer to be complete)
 message TxOperation {
     bytes tx   = 1;  // Transaction hash (unique identifier for the transaction)
-    bytes txv  = 2;   // Transaction expiration
+    bytes txv  = 2;  // Transaction expiration
     bytes iw   = 3;  // Writing key of the requesting node (external subnetwork)
-    bytes in   = 4;  // Nonce of the requesting node
-    bytes ch   = 5;  // Content hash (hash of the transaction's data)
-    bytes is   = 6;  // Requester's signature
-    bytes bs   = 7;  // External bootstrap contract
-    bytes mbs  = 8;  // MSB bootstrap key
-    bytes va   = 9; // Validator's address (optional)
+    bytes ch   = 4;  // Content hash (hash of the transaction's data)
+    bytes bs   = 5;  // External bootstrap contract
+    bytes mbs  = 6;  // MSB bootstrap key
+    bytes in   = 7;  // Nonce of the requesting node
+    bytes is   = 8;  // Requester's signature
+    bytes va   = 9;  // Validator's address (optional)
     bytes vn   = 10; // Validator's nonce  (optional)
     bytes vs   = 11; // Validator's signature (optional)
 }

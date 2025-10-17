@@ -219,12 +219,12 @@ function defineAdminControlOperation () {
       var len = encodings.bytes.encodingLength(obj.txv)
       length += 1 + len
     }
-    if (defined(obj.in)) {
-      var len = encodings.bytes.encodingLength(obj.in)
-      length += 1 + len
-    }
     if (defined(obj.ia)) {
       var len = encodings.bytes.encodingLength(obj.ia)
+      length += 1 + len
+    }
+    if (defined(obj.in)) {
+      var len = encodings.bytes.encodingLength(obj.in)
       length += 1 + len
     }
     if (defined(obj.is)) {
@@ -248,14 +248,14 @@ function defineAdminControlOperation () {
       encodings.bytes.encode(obj.txv, buf, offset)
       offset += encodings.bytes.encode.bytes
     }
-    if (defined(obj.in)) {
+    if (defined(obj.ia)) {
       buf[offset++] = 26
-      encodings.bytes.encode(obj.in, buf, offset)
+      encodings.bytes.encode(obj.ia, buf, offset)
       offset += encodings.bytes.encode.bytes
     }
-    if (defined(obj.ia)) {
+    if (defined(obj.in)) {
       buf[offset++] = 34
-      encodings.bytes.encode(obj.ia, buf, offset)
+      encodings.bytes.encode(obj.in, buf, offset)
       offset += encodings.bytes.encode.bytes
     }
     if (defined(obj.is)) {
@@ -275,8 +275,8 @@ function defineAdminControlOperation () {
     var obj = {
       tx: null,
       txv: null,
-      in: null,
       ia: null,
+      in: null,
       is: null
     }
     while (true) {
@@ -297,11 +297,11 @@ function defineAdminControlOperation () {
         offset += encodings.bytes.decode.bytes
         break
         case 3:
-        obj.in = encodings.bytes.decode(buf, offset)
+        obj.ia = encodings.bytes.decode(buf, offset)
         offset += encodings.bytes.decode.bytes
         break
         case 4:
-        obj.ia = encodings.bytes.decode(buf, offset)
+        obj.in = encodings.bytes.decode(buf, offset)
         offset += encodings.bytes.decode.bytes
         break
         case 5:
@@ -330,16 +330,16 @@ function defineBalanceInitializationOperation () {
       var len = encodings.bytes.encodingLength(obj.txv)
       length += 1 + len
     }
-    if (defined(obj.in)) {
-      var len = encodings.bytes.encodingLength(obj.in)
-      length += 1 + len
-    }
     if (defined(obj.ia)) {
       var len = encodings.bytes.encodingLength(obj.ia)
       length += 1 + len
     }
     if (defined(obj.am)) {
       var len = encodings.bytes.encodingLength(obj.am)
+      length += 1 + len
+    }
+    if (defined(obj.in)) {
+      var len = encodings.bytes.encodingLength(obj.in)
       length += 1 + len
     }
     if (defined(obj.is)) {
@@ -363,19 +363,19 @@ function defineBalanceInitializationOperation () {
       encodings.bytes.encode(obj.txv, buf, offset)
       offset += encodings.bytes.encode.bytes
     }
-    if (defined(obj.in)) {
-      buf[offset++] = 26
-      encodings.bytes.encode(obj.in, buf, offset)
-      offset += encodings.bytes.encode.bytes
-    }
     if (defined(obj.ia)) {
-      buf[offset++] = 34
+      buf[offset++] = 26
       encodings.bytes.encode(obj.ia, buf, offset)
       offset += encodings.bytes.encode.bytes
     }
     if (defined(obj.am)) {
-      buf[offset++] = 42
+      buf[offset++] = 34
       encodings.bytes.encode(obj.am, buf, offset)
+      offset += encodings.bytes.encode.bytes
+    }
+    if (defined(obj.in)) {
+      buf[offset++] = 42
+      encodings.bytes.encode(obj.in, buf, offset)
       offset += encodings.bytes.encode.bytes
     }
     if (defined(obj.is)) {
@@ -395,9 +395,9 @@ function defineBalanceInitializationOperation () {
     var obj = {
       tx: null,
       txv: null,
-      in: null,
       ia: null,
       am: null,
+      in: null,
       is: null
     }
     while (true) {
@@ -418,15 +418,15 @@ function defineBalanceInitializationOperation () {
         offset += encodings.bytes.decode.bytes
         break
         case 3:
-        obj.in = encodings.bytes.decode(buf, offset)
-        offset += encodings.bytes.decode.bytes
-        break
-        case 4:
         obj.ia = encodings.bytes.decode(buf, offset)
         offset += encodings.bytes.decode.bytes
         break
-        case 5:
+        case 4:
         obj.am = encodings.bytes.decode(buf, offset)
+        offset += encodings.bytes.decode.bytes
+        break
+        case 5:
+        obj.in = encodings.bytes.decode(buf, offset)
         offset += encodings.bytes.decode.bytes
         break
         case 6:
@@ -455,16 +455,16 @@ function defineTransferOperation () {
       var len = encodings.bytes.encodingLength(obj.txv)
       length += 1 + len
     }
-    if (defined(obj.in)) {
-      var len = encodings.bytes.encodingLength(obj.in)
-      length += 1 + len
-    }
     if (defined(obj.to)) {
       var len = encodings.bytes.encodingLength(obj.to)
       length += 1 + len
     }
     if (defined(obj.am)) {
       var len = encodings.bytes.encodingLength(obj.am)
+      length += 1 + len
+    }
+    if (defined(obj.in)) {
+      var len = encodings.bytes.encodingLength(obj.in)
       length += 1 + len
     }
     if (defined(obj.is)) {
@@ -500,19 +500,19 @@ function defineTransferOperation () {
       encodings.bytes.encode(obj.txv, buf, offset)
       offset += encodings.bytes.encode.bytes
     }
-    if (defined(obj.in)) {
-      buf[offset++] = 26
-      encodings.bytes.encode(obj.in, buf, offset)
-      offset += encodings.bytes.encode.bytes
-    }
     if (defined(obj.to)) {
-      buf[offset++] = 34
+      buf[offset++] = 26
       encodings.bytes.encode(obj.to, buf, offset)
       offset += encodings.bytes.encode.bytes
     }
     if (defined(obj.am)) {
-      buf[offset++] = 42
+      buf[offset++] = 34
       encodings.bytes.encode(obj.am, buf, offset)
+      offset += encodings.bytes.encode.bytes
+    }
+    if (defined(obj.in)) {
+      buf[offset++] = 42
+      encodings.bytes.encode(obj.in, buf, offset)
       offset += encodings.bytes.encode.bytes
     }
     if (defined(obj.is)) {
@@ -547,9 +547,9 @@ function defineTransferOperation () {
     var obj = {
       tx: null,
       txv: null,
-      in: null,
       to: null,
       am: null,
+      in: null,
       is: null,
       va: null,
       vn: null,
@@ -573,15 +573,15 @@ function defineTransferOperation () {
         offset += encodings.bytes.decode.bytes
         break
         case 3:
-        obj.in = encodings.bytes.decode(buf, offset)
-        offset += encodings.bytes.decode.bytes
-        break
-        case 4:
         obj.to = encodings.bytes.decode(buf, offset)
         offset += encodings.bytes.decode.bytes
         break
-        case 5:
+        case 4:
         obj.am = encodings.bytes.decode(buf, offset)
+        offset += encodings.bytes.decode.bytes
+        break
+        case 5:
+        obj.in = encodings.bytes.decode(buf, offset)
         offset += encodings.bytes.decode.bytes
         break
         case 6:
@@ -779,16 +779,8 @@ function defineTxOperation () {
       var len = encodings.bytes.encodingLength(obj.iw)
       length += 1 + len
     }
-    if (defined(obj.in)) {
-      var len = encodings.bytes.encodingLength(obj.in)
-      length += 1 + len
-    }
     if (defined(obj.ch)) {
       var len = encodings.bytes.encodingLength(obj.ch)
-      length += 1 + len
-    }
-    if (defined(obj.is)) {
-      var len = encodings.bytes.encodingLength(obj.is)
       length += 1 + len
     }
     if (defined(obj.bs)) {
@@ -797,6 +789,14 @@ function defineTxOperation () {
     }
     if (defined(obj.mbs)) {
       var len = encodings.bytes.encodingLength(obj.mbs)
+      length += 1 + len
+    }
+    if (defined(obj.in)) {
+      var len = encodings.bytes.encodingLength(obj.in)
+      length += 1 + len
+    }
+    if (defined(obj.is)) {
+      var len = encodings.bytes.encodingLength(obj.is)
       length += 1 + len
     }
     if (defined(obj.va)) {
@@ -833,29 +833,29 @@ function defineTxOperation () {
       encodings.bytes.encode(obj.iw, buf, offset)
       offset += encodings.bytes.encode.bytes
     }
-    if (defined(obj.in)) {
-      buf[offset++] = 34
-      encodings.bytes.encode(obj.in, buf, offset)
-      offset += encodings.bytes.encode.bytes
-    }
     if (defined(obj.ch)) {
-      buf[offset++] = 42
+      buf[offset++] = 34
       encodings.bytes.encode(obj.ch, buf, offset)
       offset += encodings.bytes.encode.bytes
     }
-    if (defined(obj.is)) {
-      buf[offset++] = 50
-      encodings.bytes.encode(obj.is, buf, offset)
-      offset += encodings.bytes.encode.bytes
-    }
     if (defined(obj.bs)) {
-      buf[offset++] = 58
+      buf[offset++] = 42
       encodings.bytes.encode(obj.bs, buf, offset)
       offset += encodings.bytes.encode.bytes
     }
     if (defined(obj.mbs)) {
-      buf[offset++] = 66
+      buf[offset++] = 50
       encodings.bytes.encode(obj.mbs, buf, offset)
+      offset += encodings.bytes.encode.bytes
+    }
+    if (defined(obj.in)) {
+      buf[offset++] = 58
+      encodings.bytes.encode(obj.in, buf, offset)
+      offset += encodings.bytes.encode.bytes
+    }
+    if (defined(obj.is)) {
+      buf[offset++] = 66
+      encodings.bytes.encode(obj.is, buf, offset)
       offset += encodings.bytes.encode.bytes
     }
     if (defined(obj.va)) {
@@ -886,11 +886,11 @@ function defineTxOperation () {
       tx: null,
       txv: null,
       iw: null,
-      in: null,
       ch: null,
-      is: null,
       bs: null,
       mbs: null,
+      in: null,
+      is: null,
       va: null,
       vn: null,
       vs: null
@@ -917,23 +917,23 @@ function defineTxOperation () {
         offset += encodings.bytes.decode.bytes
         break
         case 4:
-        obj.in = encodings.bytes.decode(buf, offset)
-        offset += encodings.bytes.decode.bytes
-        break
-        case 5:
         obj.ch = encodings.bytes.decode(buf, offset)
         offset += encodings.bytes.decode.bytes
         break
-        case 6:
-        obj.is = encodings.bytes.decode(buf, offset)
-        offset += encodings.bytes.decode.bytes
-        break
-        case 7:
+        case 5:
         obj.bs = encodings.bytes.decode(buf, offset)
         offset += encodings.bytes.decode.bytes
         break
-        case 8:
+        case 6:
         obj.mbs = encodings.bytes.decode(buf, offset)
+        offset += encodings.bytes.decode.bytes
+        break
+        case 7:
+        obj.in = encodings.bytes.decode(buf, offset)
+        offset += encodings.bytes.decode.bytes
+        break
+        case 8:
+        obj.is = encodings.bytes.decode(buf, offset)
         offset += encodings.bytes.decode.bytes
         break
         case 9:

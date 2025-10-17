@@ -2,12 +2,12 @@ import PeerWallet from "trac-wallet";
 import b4a from "b4a";
 
 import StateBuilder from '../base/StateBuilder.js'
-import {OperationType, TRAC_ADDRESS_SIZE} from '../../utils/constants.js';
-import {addressToBuffer, bufferToAddress, isAddressValid} from '../../core/state/utils/address.js';
-import {isHexString} from "../../utils/helpers.js";
-import {blake3Hash} from "../../utils/crypto.js";
-import {createMessage} from "../../utils/buffer.js";
-import {isTransaction, isRoleAccess, isBootstrapDeployment, isTransfer} from "../../utils/operations.js";
+import { OperationType, TRAC_ADDRESS_SIZE, CHAIN_ID } from '../../utils/constants.js';
+import { addressToBuffer, bufferToAddress, isAddressValid } from '../../core/state/utils/address.js';
+import { isHexString } from "../../utils/helpers.js";
+import { blake3Hash } from "../../utils/crypto.js";
+import { createMessage } from "../../utils/buffer.js";
+import { isTransaction, isRoleAccess, isBootstrapDeployment, isTransfer } from "../../utils/operations.js";
 
 class PartialStateMessageBuilder extends StateBuilder {
     #wallet;
@@ -151,12 +151,24 @@ class PartialStateMessageBuilder extends StateBuilder {
         // Creating a message for signing based on operation type
         // ATTENTION REMEMBER THAT createMessage accept only BUFFER arguments and uint32
         switch (this.#operationType) {
+            case OperationType.ADD_WRITER:
+            case OperationType.REMOVE_WRITER:
+            case OperationType.ADMIN_RECOVERY:
+                txMsg = createMessage(
+                    CHAIN_ID,
+                    b4a.from(this.#txValidity, 'hex'),
+                    b4a.from(this.#writingKey, 'hex'),
+                    nonce,
+                    this.#operationType
+                );
+                break;
+
             case OperationType.BOOTSTRAP_DEPLOYMENT:
                 if (!this.#externalBootstrap) {
                     throw new Error('External bootstrap key must be set for BOOTSTRAP DEPLOYMENT operation.');
                 }
                 txMsg = createMessage(
-                    addressToBuffer(this.#address),
+                    CHAIN_ID,
                     b4a.from(this.#txValidity, 'hex'),
                     b4a.from(this.#externalBootstrap, 'hex'),
                     b4a.from(this.#channel, 'hex'),
@@ -165,39 +177,27 @@ class PartialStateMessageBuilder extends StateBuilder {
                 );
                 break;
 
-            case OperationType.ADD_WRITER:
-            case OperationType.REMOVE_WRITER:
-            case OperationType.ADMIN_RECOVERY:
-                txMsg = createMessage(
-                    addressToBuffer(this.#address),
-                    b4a.from(this.#txValidity, 'hex'),
-                    b4a.from(this.#writingKey, 'hex'),
-                    nonce,
-                    this.#operationType
-                );
-                break;
-
             case OperationType.TX:
                 txMsg = createMessage(
-                    addressToBuffer(this.#address),
+                    CHAIN_ID,
                     b4a.from(this.#txValidity, 'hex'),
                     b4a.from(this.#writingKey, 'hex'),
                     b4a.from(this.#contentHash, 'hex'),
-                    nonce,
                     b4a.from(this.#externalBootstrap, 'hex'),
                     b4a.from(this.#withMsbBootstrap, 'hex'),
-                    this.#operationType
+                    nonce,
+                    OperationType.TX
                 );
                 break;
             case OperationType.TRANSFER:
                 txMsg = createMessage(
-                    addressToBuffer(this.#address),
+                    CHAIN_ID,
                     b4a.from(this.#txValidity, 'hex'),
-                    nonce,
                     addressToBuffer(this.#incomingAddress), // we need to sign address of the recipient as well
                     b4a.from(this.#amount, 'hex'),
-                    this.#operationType
-                )
+                    nonce,
+                    OperationType.TRANSFER
+                );
                 break;
             default:
                 throw new Error(`Unsupported operation type: ${this.#operationType}`);
@@ -230,19 +230,19 @@ class PartialStateMessageBuilder extends StateBuilder {
                 tx: tx.toString('hex'),
                 txv: this.#txValidity,
                 iw: this.#writingKey,
-                in: nonce.toString('hex'),
                 ch: this.#contentHash,
-                is: signature.toString('hex'),
                 bs: this.#externalBootstrap,
-                mbs: this.#withMsbBootstrap
+                mbs: this.#withMsbBootstrap,
+                in: nonce.toString('hex'),
+                is: signature.toString('hex'),
             };
         } else if (isTransfer(this.#operationType)) {
             this.#payload.tro = {
                 tx: tx.toString('hex'),
                 txv: this.#txValidity,
-                in: nonce.toString('hex'),
                 to: this.#incomingAddress,
                 am: this.#amount,
+                in: nonce.toString('hex'),
                 is: signature.toString('hex')
             }
         }
@@ -256,9 +256,10 @@ class PartialStateMessageBuilder extends StateBuilder {
             !this.#payload.address ||
             (
                 !this.#payload.bdo &&
-                !this.#payload.rao) &&
+                !this.#payload.rao &&
                 !this.#payload.txo &&
                 !this.#payload.tro
+            )
         ) {
             throw new Error('Product is not fully assembled. Missing type, address, or value bdo/rao/txo/tro.');
         }

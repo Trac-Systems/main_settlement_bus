@@ -4,7 +4,7 @@ import PeerWallet from 'trac-wallet';
 import Check from '../../../../../utils/check.js';
 import { bufferToAddress } from "../../../../state/utils/address.js";
 import { createMessage } from "../../../../../utils/buffer.js";
-import { OperationType } from "../../../../../utils/constants.js";
+import { OperationType, CHAIN_ID } from "../../../../../utils/constants.js";
 import { blake3Hash } from "../../../../../utils/crypto.js";
 import { bufferToBigInt } from "../../../../../utils/amountSerialization.js";
 import { FEE } from "../../../../state/utils/transaction.js";
@@ -13,6 +13,7 @@ import * as operationsUtils from '../../../../../utils/operations.js';
 const MAX_AMOUNT = BigInt('0xffffffffffffffffffffffffffffffff');
 const FEE_BIGINT = bufferToBigInt(FEE);
 const PUBLIC_KEY_LENGTH = 32;
+
 class PartialOperation {
     #state;
     #check;
@@ -86,7 +87,7 @@ class PartialOperation {
             case OperationType.REMOVE_WRITER:
             case OperationType.ADMIN_RECOVERY:
                 return [
-                    payload.address,
+                    CHAIN_ID,
                     operation.txv,
                     operation.iw,
                     operation.in,
@@ -94,7 +95,7 @@ class PartialOperation {
                 ];
             case OperationType.BOOTSTRAP_DEPLOYMENT:
                 return [
-                    payload.address,
+                    CHAIN_ID,
                     operation.txv,
                     operation.bs,
                     operation.ic,
@@ -103,22 +104,22 @@ class PartialOperation {
                 ];
             case OperationType.TX:
                 return [
-                    payload.address,
+                    CHAIN_ID,
                     operation.txv,
                     operation.iw,
                     operation.ch,
-                    operation.in,
                     operation.bs,
                     operation.mbs,
+                    operation.in,
                     OperationType.TX
                 ];
             case OperationType.TRANSFER:
                 return [
-                    payload.address,
+                    CHAIN_ID,
                     operation.txv,
-                    operation.in,
                     operation.to,
                     operation.am,
+                    operation.in,
                     OperationType.TRANSFER
                 ];
             default:
