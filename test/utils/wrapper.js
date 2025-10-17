@@ -1,29 +1,4 @@
-import {test as brittleTest, hook as brittleHook, solo as brittleSolo} from 'brittle';
-
-const hook = (label, callback) => {
-  brittleHook(label, async (t) => {
-    try{
-      await callback(t)
-      t.end()
-    } catch (error) {
-      t.fail(`FAIL: ${label}`, error?.message || error);
-    }
-  })
-}
-
-const overwrite = t => {
-  const exec = t.test // brittleTest wouldnt work due to syncronicity, had to do this.
-  return Object.assign({}, t, { 
-    test: (label, callback) => exec(label, async (t) => {
-      try{
-        await callback(t)
-        t.end()
-      } catch (error) {
-        t.fail(`FAIL: ${label}`, error?.message || error);
-      }
-    })
-  })
-}
+import {test as brittleTest, hook, solo as brittleSolo} from 'brittle';
 
 const solo = (label, callback) => {
   brittleSolo(label, async (t) => {
@@ -38,9 +13,12 @@ const solo = (label, callback) => {
 const test = (label, callback) => {
   brittleTest(label, async (t) => {
     try{
-      await callback(overwrite(t))
-      t.end()
+      await callback(t)
+      // t._active = false
+      // t._wait = false
+      // t._isEnded = true
     } catch (error) {
+      console.log(error?.message)
       t.fail(`FAIL: ${label}`, error?.message || error);
     }
   })

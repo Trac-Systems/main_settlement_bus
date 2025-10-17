@@ -1,4 +1,4 @@
-import {hook, test} from '../utils/wrapper.js';
+import {hook, test} from '../../utils/wrapper.js';
 import b4a from "b4a";
 import {
     generatePostTx,
@@ -13,17 +13,18 @@ import {
     deployExternalBootstrap,
     tryToSyncWriters,
     waitForHash,
-    waitDemotion
-} from '../utils/setupApplyTests.js';
-import {safeDecodeApplyOperation, safeEncodeApplyOperation} from '../../src/utils/protobuf/operationHelpers.js'
-import {testKeyPair1, testKeyPair2, testKeyPair3, testKeyPair4, testKeyPair5, testKeyPair6, testKeyPair7, testKeyPair8, testKeyPair9, testKeyPair10, testKeyPair11} from '../fixtures/apply.fixtures.js';
-import {OperationType} from "../../src/utils/constants.js";
-import {addressToBuffer} from "../../src/core/state/utils/address.js";
-import { sleep } from '../../src/utils/helpers.js';
-import { $TNK } from '../../src/core/state/utils/balance.js';
-import CompleteStateMessageOperations from '../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
+    waitDemotion,
+    promoteToWriter
+} from '../../utils/setupApplyTests.js';
+import {safeDecodeApplyOperation, safeEncodeApplyOperation} from '../../../src/utils/protobuf/operationHelpers.js'
+import {testKeyPair1, testKeyPair2, testKeyPair3, testKeyPair4, testKeyPair5} from '../../fixtures/apply.fixtures.js';
+import {OperationType} from "../../../src/utils/constants.js";
+import {addressToBuffer} from "../../../src/core/state/utils/address.js";
+import { sleep } from '../../../src/utils/helpers.js';
+import { $TNK } from '../../../src/core/state/utils/balance.js';
+import CompleteStateMessageOperations from '../../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
 
-let tmpDirectory, admin, writer, externalNode, externalBootstrap;
+let tmpDirectory, admin, writer, externalNode, externalBootstrap, maliciousPeer;
 
 const close = async node => {
     // await node.msb.state.base.flush()
@@ -48,6 +49,8 @@ hook('Initialize nodes', async t => {
     await fundPeer(admin, externalNode, $TNK(1n)) // we fund it since it will deploy stuff
     externalBootstrap = await deployExternalBootstrap(writer, externalNode)
     await tryToSyncWriters(writer, admin)
+    maliciousPeer = await setupMsbPeer('maliciousWriter', testKeyPair5, tmpDirectory, admin.options);
+    await fundPeer(admin, maliciousPeer, $TNK(10n))
 });
 
 test('handleApplyTxOperation (apply) - Append POST_TX into the base - Happy path', async t => {
@@ -100,7 +103,7 @@ test('handleApplyTxOperation (apply) - negative', t => {
     // })
 
     t.test('handleApplyTxOperation (apply) - different operation type', async t => {
-        const maliciousWriter = await setupMsbWriter(admin, 'malicious1', testKeyPair3, tmpDirectory, admin.options);
+        const maliciousWriter = await promoteToWriter(admin, maliciousPeer)
         const {postTx, txHash} = await generatePostTx(writer, externalNode, externalBootstrap)
         const rawTx = await CompleteStateMessageOperations.assembleCompleteTransactionOperationMessage(
             writer.msb.wallet,
@@ -128,7 +131,6 @@ test('handleApplyTxOperation (apply) - negative', t => {
         })
         await tick();
 
-        await close(maliciousWriter)
         t.absent(await writer.msb.state.get(txHash), 'post tx with incorrect operation type should not be added to the base');
     })
 
@@ -160,7 +162,7 @@ test('handleApplyTxOperation (apply) - negative', t => {
     // })
 
     t.test('handleApplyTxOperation (apply) - invalid postTx signature (adversary signature - writer signature)', async t => {
-        const maliciousWriter = await setupMsbWriter(admin, 'malicious2', testKeyPair5, tmpDirectory, admin.options);
+        const maliciousWriter = await promoteToWriter(admin, maliciousPeer)
         const {postTx, txHash} = await generatePostTx(writer, externalNode, externalBootstrap)
         const rawTx = await CompleteStateMessageOperations.assembleCompleteTransactionOperationMessage(
             writer.msb.wallet,
@@ -186,13 +188,12 @@ test('handleApplyTxOperation (apply) - negative', t => {
         await tick();
 
         const result = await admin.msb.state.get(txHash);
-        await close(maliciousWriter)
         t.absent(result, 'adversary\'s fake signature should not be added to the base');
     });
 
 
     t.test('handleApplyTxOperation (apply) - invalid postTx signature (adversary signature - peer signature)', async t => {
-        const maliciousWriter = await setupMsbWriter(admin, 'malicious3', testKeyPair6, tmpDirectory, admin.options);
+        const maliciousWriter = await promoteToWriter(admin, maliciousPeer)
         const {postTx, txHash} = await generatePostTx(writer, externalNode, externalBootstrap)
         const rawTx = await CompleteStateMessageOperations.assembleCompleteTransactionOperationMessage(
             writer.msb.wallet,
@@ -218,73 +219,11 @@ test('handleApplyTxOperation (apply) - negative', t => {
         await tick();
 
         const result = await writer.msb.state.get(txHash);
-        await close(maliciousWriter)
         t.absent(result, 'adversary prepared fake postTx signature (third key pair) should not be added to the base');
     });
 
-    t.test('handleApplyTxOperation (apply) - invalid txo sub-values', async t => {
-        const {postTx, txHash} = await generatePostTx(writer, externalNode, externalBootstrap)
-        const rawTx = await CompleteStateMessageOperations.assembleCompleteTransactionOperationMessage(
-            writer.msb.wallet,
-            postTx.address,
-            b4a.from(postTx.txo.tx, 'hex'),
-            b4a.from(postTx.txo.txv, 'hex'),
-            b4a.from(postTx.txo.iw, 'hex'),
-            b4a.from(postTx.txo.in, 'hex'),
-            b4a.from(postTx.txo.ch, 'hex'),
-            b4a.from(postTx.txo.is, 'hex'),
-            b4a.from(postTx.txo.bs, 'hex'),
-            b4a.from(postTx.txo.mbs, 'hex')
-        );
-
-        const decodedPostTx = safeDecodeApplyOperation(rawTx);
-        // is and vs is already covered
-        const testCases = [
-            { writer: testKeyPair5, name: 'modified tx', mod: (txPayload, maliciousValue) => { return { ...txPayload.txo, tx: maliciousValue }; } },
-            { writer: testKeyPair6, name: 'modified incoming writingKey', mod: (txPayload, maliciousValue) => { return { ...txPayload.txo, iw: maliciousValue }; } },
-            { writer: testKeyPair7, name: 'modified incoming nonce', mod: (txPayload, maliciousValue) => { return { ...txPayload.txo, in: maliciousValue }; } },
-            { writer: testKeyPair8, name: 'modified content hash', mod: (txPayload, maliciousValue) => { return { ...txPayload.txo, ch: maliciousValue }; } },
-            { writer: testKeyPair9, name: 'modified external bootstrap', mod: (txPayload, maliciousValue) => { return { ...txPayload.txo, bs: maliciousValue }; } },
-            { writer: testKeyPair10, name: 'modified MSB bootstrap', mod: (txPayload, maliciousValue) => { return { ...txPayload.txo, mbs: maliciousValue }; } },
-            { writer: testKeyPair11, name: 'modified validator nonce', mod: (txPayload, maliciousValue) => { return { ...txPayload.txo, vn: maliciousValue }; } },
-        ];
-
-        for (let i = 0; i < testCases.length; i++) {
-            const testCase = testCases[i]
-            const maliciousWriter = await setupMsbWriter(admin, `subMaliciousWriter${i}`, testCase.writer, tmpDirectory, admin.options);
-            // all of these values are buffers 32 bytes long
-            const maliciousValue = randomBytes(32);
-
-            const modifiedTxo = testCase.mod(decodedPostTx, maliciousValue);
-            const modifiedPostTx = {
-                ...decodedPostTx,
-                txo: modifiedTxo
-            };
-            const encodedMaliciousPostTx = safeEncodeApplyOperation(modifiedPostTx);
-
-            await waitDemotion(maliciousWriter, async () => {
-                await maliciousWriter.msb.state.append(encodedMaliciousPostTx);
-            })
-
-            if (testCase.name === 'modified tx') {
-                const result = await admin.msb.state.get(maliciousValue.toString('hex'));
-                t.absent(result, `post tx with ${testCase.name} should not be added to the base`);
-            } else {
-                const result = await admin.msb.state.get(txHash);
-                t.absent(result, `post tx with ${testCase.name} should not be added to the base`);
-            }
-
-            // should be penalized
-            const node = await maliciousWriter.msb.state.getUnsignedNodeEntry(maliciousWriter.wallet.address)
-            await close(maliciousWriter)
-            t.ok(node, 'Result should not be null');
-            t.is(node.isWriter, false, 'Result should indicate that the peer is not a writer');
-            // clean up after
-        }
-    });
-
     t.test('handleApplyTxOperation (apply) - oversized transaction', async t => {
-        const maliciousWriter = await setupMsbWriter(admin, 'malicious4', testKeyPair3, tmpDirectory, admin.options);
+        const maliciousWriter = await promoteToWriter(admin, maliciousPeer)
         const {postTx, txHash} = await generatePostTx(writer, externalNode, externalBootstrap)
         const rawTx = await CompleteStateMessageOperations.assembleCompleteTransactionOperationMessage(
             writer.msb.wallet,
@@ -307,12 +246,11 @@ test('handleApplyTxOperation (apply) - negative', t => {
         await tick();
         await sleep(500)
         const result = await admin.msb.state.get(txHash);
-        await close(maliciousWriter)
         t.absent(result, 'oversized post tx should not be added to the base');
     });
 
     t.test('handleApplyTxOperation (apply) - invalid postTx address (malicious node replaces address)', async t => {
-        const maliciousWriter = await setupMsbWriter(admin, 'malicious5', testKeyPair3, tmpDirectory, admin.options);
+        const maliciousWriter = await promoteToWriter(admin, maliciousPeer)
         const {postTx, txHash} = await generatePostTx(writer, externalNode, externalBootstrap)
         const rawTx = await CompleteStateMessageOperations.assembleCompleteTransactionOperationMessage(
             writer.msb.wallet,
@@ -333,12 +271,11 @@ test('handleApplyTxOperation (apply) - negative', t => {
         await tick();
         await sleep(500)
         const result = await admin.msb.state.get(txHash);
-        await close(maliciousWriter)
         t.absent(result, 'post tx with malicious address should not be added to the base');
     });
 
     t.test('handleApplyTxOperation (apply) - invalid postTx txo.ia (malicious node replaces ia)', async t => {
-        const maliciousWriter = await setupMsbWriter(admin, 'malicious6', testKeyPair3, tmpDirectory, admin.options);
+        const maliciousWriter = await promoteToWriter(admin, maliciousPeer)
         const {postTx, txHash} = await generatePostTx(writer, externalNode, externalBootstrap)
         const rawTx = await CompleteStateMessageOperations.assembleCompleteTransactionOperationMessage(
             writer.msb.wallet,
@@ -358,7 +295,6 @@ test('handleApplyTxOperation (apply) - negative', t => {
         await writer.msb.state.append(encodedMaliciousPostTx);
         await tick();
         const result = await admin.msb.state.get(txHash);
-        await close(maliciousWriter)
         t.absent(result, 'post tx with malicious txo.ia should not be added to the base');
     });
 })
@@ -368,5 +304,6 @@ hook('Clean up postTx setup', async t => {
     if (writer?.msb) await close(writer)
     if (externalNode?.msb) await close(externalNode)
     if (admin?.msb) await close(admin)
+    if (maliciousPeer?.msb) await close(maliciousPeer)
     if (tmpDirectory) await removeTemporaryDirectory(tmpDirectory);
 });

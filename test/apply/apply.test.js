@@ -9,7 +9,9 @@ async function runCheckTests() {
     await import('./removeWriter.test.js');
     await import('./addIndexer.test.js');
     await import('./removeIndexer.test.js');
-    await import('./postTx.test.js');
+    await import('./postTx/postTx.test.js');
+    await import('./transfer.test.js');
+    await import('./postTx/invalidSubValues.test.js');
     await import('./banValidator.test.js')
     test.resume();
 }

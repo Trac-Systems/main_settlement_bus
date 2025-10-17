@@ -13,7 +13,7 @@ async function runTests() {
   await import('./fileUtils/readBalanceMigrationFile.test.js');
   // await import('./messageOperations/stateMessageOperations.test.js');
   await import('./buffer/buffer.test.js')
-  //await import('./apply/apply.test.js'); Do not work. Unstable.
+  // await import('./apply/apply.test.js'); // Do not work. Unstable.
   test.resume();
 }
 

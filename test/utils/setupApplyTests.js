@@ -159,39 +159,43 @@ export async function setupNodeAsWriter(admin, writerCandidate) {
     }
 }
 
+export async function promoteToWriter(admin, writerCandidate) {
+    await setupWhitelist(admin, [writerCandidate.wallet.address]);
+    await waitForNodeState(writerCandidate,
+        writerCandidate.wallet.address,
+        {
+            wk: writerCandidate.msb.state.writingKey,
+            isWhitelisted: true,
+            isWriter: false,
+            isIndexer: false,
+        })
+    const validity = await admin.msb.state.getIndexerSequenceState()
+    const req = await PartialStateMessageOperations.assembleAddWriterMessage(
+        writerCandidate.wallet,
+        b4a.toString(writerCandidate.msb.state.writingKey, 'hex'),
+        b4a.toString(validity, 'hex'));
+
+    await waitWritable(admin, writerCandidate, async () => {
+        const raw = await CompleteStateMessageOperations.assembleAddWriterMessage(
+            admin.wallet,
+            req.address,
+            b4a.from(req.rao.tx, 'hex'),
+            b4a.from(req.rao.txv, 'hex'),
+            b4a.from(req.rao.iw, 'hex'),
+            b4a.from(req.rao.in, 'hex'),
+            b4a.from(req.rao.is, 'hex')
+        )
+        await admin.msb.state.append(raw)
+    })
+
+    return writerCandidate;
+}
+
 export async function setupMsbWriter(admin, peerName, peerKeyPair, temporaryDirectory, options = {}) {
     try {
         const writerCandidate = await setupMsbPeer(peerName, peerKeyPair, temporaryDirectory, options);
-        await fundPeer(admin, writerCandidate, $TNK(1n)) // It is assumed that a writer will write and therefore, will need money to process stuff
-        await setupWhitelist(admin, [writerCandidate.wallet.address]);
-        await waitForNodeState(writerCandidate,
-            writerCandidate.wallet.address,
-            {
-                wk: writerCandidate.msb.state.writingKey,
-                isWhitelisted: true,
-                isWriter: false,
-                isIndexer: false,
-            })
-        const validity = await admin.msb.state.getIndexerSequenceState()
-        const req = await PartialStateMessageOperations.assembleAddWriterMessage(
-            writerCandidate.wallet,
-            b4a.toString(writerCandidate.msb.state.writingKey, 'hex'),
-            b4a.toString(validity, 'hex'));
-
-        await waitWritable(admin, writerCandidate, async () => {
-            const raw = await CompleteStateMessageOperations.assembleAddWriterMessage(
-                admin.wallet,
-                req.address,
-                b4a.from(req.rao.tx, 'hex'),
-                b4a.from(req.rao.txv, 'hex'),
-                b4a.from(req.rao.iw, 'hex'),
-                b4a.from(req.rao.in, 'hex'),
-                b4a.from(req.rao.is, 'hex')
-            )
-            await admin.msb.state.append(raw)
-        })
-
-        return writerCandidate;
+        await fundPeer(admin, writerCandidate, $TNK(10n)) // It is assumed that a writer will write and therefore, will need money to process stuff
+        return await promoteToWriter(admin, writerCandidate)
     } catch (error) {
         throw new Error('Error setting up MSB writer: ', error.message || error);
     }

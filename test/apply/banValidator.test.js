@@ -58,7 +58,6 @@ test('handleApplyBanValidatorOperation (apply) - Append banValidator payload int
     await sleep(5000); // wait for both peers to sync state
     await tryToSyncWriters(admin);
 
-
     const nodeInfo = await writer2.msb.state.getNodeEntry(writer2.wallet.address);
 
     t.is(nodeInfo.isWriter, true, 'Node info should indicate that the node is still a writer');
