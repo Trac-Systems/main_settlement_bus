@@ -13,7 +13,7 @@ import {
     BATCH_SIZE,
     ADMIN_INITIAL_STAKED_BALANCE,
     MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION,
-    CHAIN_ID,
+    NETWORK_ID,
 } from '../../utils/constants.js';
 import { isHexString, sleep } from '../../utils/helpers.js';
 import PeerWallet from 'trac-wallet';
@@ -460,7 +460,7 @@ class State extends ReadyResource {
 
         // Recreate requester message
         const message = createMessage(
-            CHAIN_ID,
+            NETWORK_ID,
             op.bio.txv,
             op.bio.ia,
             amount.value,
@@ -561,7 +561,7 @@ class State extends ReadyResource {
 
         // Recreate requester message
         const message = createMessage(
-            CHAIN_ID,
+            NETWORK_ID,
             op.cao.txv,
             op.cao.iw,
             op.cao.in,
@@ -646,7 +646,7 @@ class State extends ReadyResource {
 
         // recreate requester message
         const requesterMessage = createMessage(
-            CHAIN_ID,
+            NETWORK_ID,
             op.cao.txv,
             op.cao.iw,
             op.cao.in,
@@ -797,7 +797,7 @@ class State extends ReadyResource {
 
         // recreate requester message
         const requesterMessage = createMessage(
-            CHAIN_ID,
+            NETWORK_ID,
             op.rao.txv,
             op.rao.iw,
             op.rao.in,
@@ -839,7 +839,7 @@ class State extends ReadyResource {
 
         // recreate validator message
         const validatorMessage = createMessage(
-            CHAIN_ID,
+            NETWORK_ID,
             op.rao.tx,
             op.rao.vn,
             OperationType.ADMIN_RECOVERY
@@ -1060,7 +1060,7 @@ class State extends ReadyResource {
 
         // verify signature
         const message = createMessage(
-            CHAIN_ID,
+            NETWORK_ID,
             op.aco.txv,
             op.aco.ia,
             op.aco.in,
@@ -1293,7 +1293,7 @@ class State extends ReadyResource {
 
         // verify requester signature
         const requesterMessage = createMessage(
-            CHAIN_ID,
+            NETWORK_ID,
             op.rao.txv,
             op.rao.iw,
             op.rao.in,
@@ -1335,7 +1335,7 @@ class State extends ReadyResource {
 
         // recreate validator message
         const validatorMessage = createMessage(
-            CHAIN_ID,
+            NETWORK_ID,
             op.rao.tx,
             op.rao.vn,
             OperationType.ADD_WRITER
@@ -1583,7 +1583,7 @@ class State extends ReadyResource {
 
         // verify requester signature
         const requesterMessage = createMessage(
-            CHAIN_ID,
+            NETWORK_ID,
             op.rao.txv,
             op.rao.iw,
             op.rao.in,
@@ -1625,7 +1625,7 @@ class State extends ReadyResource {
 
         // recreate validator message
         const validatorMessage = createMessage(
-            CHAIN_ID,
+            NETWORK_ID,
             op.rao.tx,
             op.rao.vn,
             OperationType.REMOVE_WRITER
@@ -1853,7 +1853,7 @@ class State extends ReadyResource {
 
         // verify requester signature
         const message = createMessage(
-            CHAIN_ID,
+            NETWORK_ID,
             op.aco.txv,
             op.aco.ia,
             op.aco.in,
@@ -2058,7 +2058,7 @@ class State extends ReadyResource {
 
         // verify requester signature
         const message = createMessage(
-            CHAIN_ID,
+            NETWORK_ID,
             op.aco.txv,
             op.aco.ia,
             op.aco.in,
@@ -2254,7 +2254,7 @@ class State extends ReadyResource {
 
         // recreate requester message
         const message = createMessage(
-            CHAIN_ID,
+            NETWORK_ID,
             op.aco.txv,
             op.aco.ia,
             op.aco.in,
@@ -2447,7 +2447,7 @@ class State extends ReadyResource {
 
         // recreate requester message
         const requesterMessage = createMessage(
-            CHAIN_ID,
+            NETWORK_ID,
             op.bdo.txv,
             op.bdo.bs,
             op.bdo.ic,
@@ -2492,7 +2492,7 @@ class State extends ReadyResource {
 
         // recreate validator message
         const validatorMessage = createMessage(
-            CHAIN_ID,
+            NETWORK_ID,
             op.bdo.tx,
             op.bdo.vn,
             OperationType.BOOTSTRAP_DEPLOYMENT
@@ -2683,7 +2683,7 @@ class State extends ReadyResource {
         };
 
         const requesterMessage = createMessage(
-            CHAIN_ID,
+            NETWORK_ID,
             op.txo.txv,
             op.txo.iw,
             op.txo.ch,
@@ -2725,7 +2725,7 @@ class State extends ReadyResource {
 
         // recreate validator message
         const validatorMessage = createMessage(
-            CHAIN_ID,
+            NETWORK_ID,
             op.txo.tx,
             op.txo.vn,
             OperationType.TX
@@ -2881,7 +2881,7 @@ class State extends ReadyResource {
 
         // recreate requester message
         const requesterMessage = createMessage(
-            CHAIN_ID,
+            NETWORK_ID,
             op.tro.txv,
             op.tro.to,
             op.tro.am,
@@ -2922,7 +2922,7 @@ class State extends ReadyResource {
         };
 
         const validatorMessage = createMessage(
-            CHAIN_ID,
+            NETWORK_ID,
             op.tro.tx,
             op.tro.vn,
             OperationType.TRANSFER

@@ -4,7 +4,7 @@ import PeerWallet from 'trac-wallet';
 import Check from '../../../../../utils/check.js';
 import { bufferToAddress } from "../../../../state/utils/address.js";
 import { createMessage } from "../../../../../utils/buffer.js";
-import { OperationType, CHAIN_ID } from "../../../../../utils/constants.js";
+import { OperationType, NETWORK_ID } from "../../../../../utils/constants.js";
 import { blake3Hash } from "../../../../../utils/crypto.js";
 import { bufferToBigInt } from "../../../../../utils/amountSerialization.js";
 import { FEE } from "../../../../state/utils/transaction.js";
@@ -87,7 +87,7 @@ class PartialOperation {
             case OperationType.REMOVE_WRITER:
             case OperationType.ADMIN_RECOVERY:
                 return [
-                    CHAIN_ID,
+                    NETWORK_ID,
                     operation.txv,
                     operation.iw,
                     operation.in,
@@ -95,7 +95,7 @@ class PartialOperation {
                 ];
             case OperationType.BOOTSTRAP_DEPLOYMENT:
                 return [
-                    CHAIN_ID,
+                    NETWORK_ID,
                     operation.txv,
                     operation.bs,
                     operation.ic,
@@ -104,7 +104,7 @@ class PartialOperation {
                 ];
             case OperationType.TX:
                 return [
-                    CHAIN_ID,
+                    NETWORK_ID,
                     operation.txv,
                     operation.iw,
                     operation.ch,
@@ -115,7 +115,7 @@ class PartialOperation {
                 ];
             case OperationType.TRANSFER:
                 return [
-                    CHAIN_ID,
+                    NETWORK_ID,
                     operation.txv,
                     operation.to,
                     operation.am,
@@ -136,7 +136,6 @@ class PartialOperation {
         const messageComponents = this.#getMessageComponents(payload);
 
         const message = createMessage(...messageComponents);
-
         const messageHash = await blake3Hash(message);
         const payloadHash = operation.tx;
         if (!b4a.equals(payloadHash, messageHash)) {

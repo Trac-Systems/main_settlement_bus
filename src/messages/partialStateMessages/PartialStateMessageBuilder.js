@@ -2,7 +2,7 @@ import PeerWallet from "trac-wallet";
 import b4a from "b4a";
 
 import StateBuilder from '../base/StateBuilder.js'
-import { OperationType, TRAC_ADDRESS_SIZE, CHAIN_ID } from '../../utils/constants.js';
+import { OperationType, TRAC_ADDRESS_SIZE, NETWORK_ID } from '../../utils/constants.js';
 import { addressToBuffer, bufferToAddress, isAddressValid } from '../../core/state/utils/address.js';
 import { isHexString } from "../../utils/helpers.js";
 import { blake3Hash } from "../../utils/crypto.js";
@@ -155,7 +155,7 @@ class PartialStateMessageBuilder extends StateBuilder {
             case OperationType.REMOVE_WRITER:
             case OperationType.ADMIN_RECOVERY:
                 txMsg = createMessage(
-                    CHAIN_ID,
+                    NETWORK_ID,
                     b4a.from(this.#txValidity, 'hex'),
                     b4a.from(this.#writingKey, 'hex'),
                     nonce,
@@ -168,7 +168,7 @@ class PartialStateMessageBuilder extends StateBuilder {
                     throw new Error('External bootstrap key must be set for BOOTSTRAP DEPLOYMENT operation.');
                 }
                 txMsg = createMessage(
-                    CHAIN_ID,
+                    NETWORK_ID,
                     b4a.from(this.#txValidity, 'hex'),
                     b4a.from(this.#externalBootstrap, 'hex'),
                     b4a.from(this.#channel, 'hex'),
@@ -179,7 +179,7 @@ class PartialStateMessageBuilder extends StateBuilder {
 
             case OperationType.TX:
                 txMsg = createMessage(
-                    CHAIN_ID,
+                    NETWORK_ID,
                     b4a.from(this.#txValidity, 'hex'),
                     b4a.from(this.#writingKey, 'hex'),
                     b4a.from(this.#contentHash, 'hex'),
@@ -191,7 +191,7 @@ class PartialStateMessageBuilder extends StateBuilder {
                 break;
             case OperationType.TRANSFER:
                 txMsg = createMessage(
-                    CHAIN_ID,
+                    NETWORK_ID,
                     b4a.from(this.#txValidity, 'hex'),
                     addressToBuffer(this.#incomingAddress), // we need to sign address of the recipient as well
                     b4a.from(this.#amount, 'hex'),
