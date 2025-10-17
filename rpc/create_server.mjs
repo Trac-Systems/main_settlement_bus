@@ -7,10 +7,10 @@ export const createServer = (msbInstance) => {
   const server = http.createServer({}, async (req, res) => {
     
     // --- 1. Define safe 'respond' utility (Payload MUST be an object) ---
-    const respond = (code, paylaod) => {
+    const respond = (code, payload) => {
       // FIX: Prevent attempts to write headers if a response has already started
       if (res.headersSent) {
-          console.warn(`Attempted to send response (Code: ${code}) after headers were already sent. Paylaod:`, paylaod);
+          console.warn(`Attempted to send response (Code: ${code}) after headers were already sent. payload:`, payload);
           return;
       }
       
@@ -18,7 +18,7 @@ export const createServer = (msbInstance) => {
       res.writeHead(code, { 'Content-Type': 'application/json' });
       
       // CRITICAL: Always JSON.stringify the input object
-      res.end(JSON.stringify(paylaod)); 
+      res.end(JSON.stringify(payload)); 
     }
 
     // --- 2. Catch low-level request stream errors ---
