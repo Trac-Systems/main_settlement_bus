@@ -5,7 +5,7 @@ import StateBuilder from '../base/StateBuilder.js'
 import { createMessage } from '../../utils/buffer.js';
 import { OperationType } from '../../utils/protobuf/applyOperations.cjs'
 import { addressToBuffer, bufferToAddress } from '../../core/state/utils/address.js';
-import { TRAC_ADDRESS_SIZE, CHAIN_ID } from '../../utils/constants.js';
+import { TRAC_ADDRESS_SIZE, NETWORK_ID } from '../../utils/constants.js';
 import { isAddressValid } from "../../core/state/utils/address.js";
 import { blake3Hash } from '../../utils/crypto.js';
 import {
@@ -216,7 +216,7 @@ class CompleteStateMessageBuilder extends StateBuilder {
             case OperationType.ADD_ADMIN:
             case OperationType.DISABLE_INITIALIZATION:
                 msg = createMessage(
-                    CHAIN_ID,
+                    NETWORK_ID,
                     this.#txValidity,
                     this.#writingKey,
                     nonce,
@@ -228,7 +228,7 @@ class CompleteStateMessageBuilder extends StateBuilder {
                     throw new Error('All balance initialization fields must be set before building the message!');
                 }
                 msg = createMessage(
-                    CHAIN_ID,
+                    NETWORK_ID,
                     this.#txValidity,
                     this.#incomingAddress,
                     this.#amount,
@@ -241,7 +241,7 @@ class CompleteStateMessageBuilder extends StateBuilder {
             case OperationType.REMOVE_WRITER:
             case OperationType.ADMIN_RECOVERY:
                 msg = createMessage(
-                    CHAIN_ID,
+                    NETWORK_ID,
                     this.#txHash,
                     nonce,
                     this.#operationType
@@ -257,7 +257,7 @@ class CompleteStateMessageBuilder extends StateBuilder {
                 }
 
                 msg = createMessage(
-                    CHAIN_ID,
+                    NETWORK_ID,
                     this.#txValidity,
                     this.#incomingAddress,
                     nonce,
@@ -271,7 +271,7 @@ class CompleteStateMessageBuilder extends StateBuilder {
                     throw new Error('All bootstrap deployment fields must be set before building the message!');
                 }
                 msg = createMessage(
-                    CHAIN_ID,
+                    NETWORK_ID,
                     this.#txHash,
                     nonce,
                     this.#operationType
@@ -286,7 +286,7 @@ class CompleteStateMessageBuilder extends StateBuilder {
                     throw new Error('All postTx fields must be set before building the message!');
                 }
                 msg = createMessage(
-                    CHAIN_ID,
+                    NETWORK_ID,
                     this.#txHash,
                     nonce,
                     this.#operationType
@@ -299,7 +299,7 @@ class CompleteStateMessageBuilder extends StateBuilder {
                     throw new Error('All transfer fields must be set before building the message!');
                 }
                 msg = createMessage(
-                    CHAIN_ID,
+                    NETWORK_ID,
                     this.#txHash,
                     nonce,
                     this.#operationType
