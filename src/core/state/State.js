@@ -370,9 +370,9 @@ class State extends ReadyResource {
 
     #getApplyOperationHandler(type) {
         const handlers = {
-            [OperationType.ADD_ADMIN]: this.#handleApplyAddAdminOperation.bind(this),
             [OperationType.BALANCE_INITIALIZATION]: this.#handleApplyInitializeBalanceOperation.bind(this),
             [OperationType.DISABLE_INITIALIZATION]: this.#handleApplyDisableBalanceInitializationOperation.bind(this),
+            [OperationType.ADD_ADMIN]: this.#handleApplyAddAdminOperation.bind(this),
             [OperationType.APPEND_WHITELIST]: this.#handleApplyAppendWhitelistOperation.bind(this),
             [OperationType.ADD_WRITER]: this.#handleApplyAddWriterOperation.bind(this),
             [OperationType.REMOVE_WRITER]: this.#handleApplyRemoveWriterOperation.bind(this),
@@ -744,9 +744,9 @@ class State extends ReadyResource {
 
         // initialize admin entry and initialization flag
         await batch.put(EntryType.ADMIN, newAdminEntry);
-        await batch.put(txHashHexString, node.value);
         await batch.put(EntryType.INITIALIZATION, safeWriteUInt32BE(1, 0));
-
+        await batch.put(txHashHexString, node.value);
+        
         console.log(`Admin added addr:wk:tx - ${adminAddressString}:${op.cao.iw.toString('hex')}:${txHashHexString}`);
         return Status.SUCCESS;
     }
@@ -989,10 +989,10 @@ class State extends ReadyResource {
         await batch.put(EntryType.ADMIN, newAdminEntry);
         // This updates the admin node entry with the new writer key and deducted fee.
         await batch.put(requesterAdminAddressString, chargedAdminEntry);
-        await batch.put(txHashHexString, node.value);
-
+        
         // Actually pay the fee
         await batch.put(validatorAddressString, updatedValidatorNodeEntry);
+        await batch.put(txHashHexString, node.value);
 
         console.log(`Admin has been recovered addr:wk:tx - ${requesterAdminAddressString}:${op.rao.iw.toString('hex')}:${txHashHexString}`);
         return Status.SUCCESS;
@@ -1530,10 +1530,9 @@ class State extends ReadyResource {
             this.#safeLogApply("SYSTEM ERROR", "Something went wrong while updating writers index.", node.from.key)
         }
 
-        await batch.put(txHashHexString, node.value);
-
         // Pay the fee to the validator
         await batch.put(validatorAddressString, updatedValidatorEntry);
+        await batch.put(txHashHexString, node.value);
         console.log(`Writer added addr:wk:tx - ${requesterAddressString}:${op.rao.iw.toString('hex')}:${txHashHexString}`);
     }
 
@@ -1784,9 +1783,9 @@ class State extends ReadyResource {
         await base.removeWriter(decodedNodeEntry.wk);
         await batch.put(requesterAddressString, finalRequesterNodeEntry);
 
-        await batch.put(txHashHexString, node.value);
         // Reward the validator
         await batch.put(validatorAddressString, updateValidatorEntry);
+        await batch.put(txHashHexString, node.value);
         console.log(`Writer removed: addr:wk:tx - ${requesterAddressString}:${op.rao.iw.toString('hex')}:${txHashHexString}`);
     }
 
@@ -2621,13 +2620,13 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        await batch.put(hashHexString, node.value);
         await batch.put(EntryType.DEPLOYMENT + bootstrapDeploymentHexString, deploymentEntry);
         await batch.put(requesterAddressString, updatedRequesterNodeEntry);
         await batch.put(validatorAddressString, updatedValidatorNodeEntry);
+        await batch.put(hashHexString, node.value);
 
         if (this.#enable_txlogs === true) {
-            console.log(`TX: ${hashHexString} and deployment/${bootstrapDeploymentHexString} have been appended. Signed length: `, this.#base.view.core.signedLength);
+            console.log(`Deployment operation: ${hashHexString} and deployment/${bootstrapDeploymentHexString} have been appended.`);
         }
         return Status.SUCCESS;
     }
@@ -2835,7 +2834,7 @@ class State extends ReadyResource {
         await batch.put(hashHexString, node.value);
 
         if (this.#enable_txlogs === true) {
-            console.log(`TX: ${hashHexString} appended. Signed length: `, this.#base.view.core.signedLength);
+            console.log(`Subnetwork TX operation: ${hashHexString} has been appended.`);
         }
         return Status.SUCCESS;
     }
@@ -3034,7 +3033,7 @@ class State extends ReadyResource {
         await batch.put(hashHexString, node.value);
 
         if (this.#enable_txlogs === true) {
-            console.log(`TRANSFER: ${hashHexString} appended. Signed length: `, this.#base.view.core.signedLength);
+            console.log(`Transfer operation: ${hashHexString} has been appended.`);
         }
         return Status.SUCCESS;
     }
