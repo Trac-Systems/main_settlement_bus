@@ -223,6 +223,53 @@ export class MainSettlementBus extends ReadyResource {
         await this.#network.validator_stream.messenger.send(partialTransactionPayload);
     }
 
+    async broadcastRandomPartialTransaction(partialTransactionPayload) {
+        try {
+            if (this.#network.validator_stream) {
+                await this.#network.validator_stream.messenger.send(partialTransactionPayload);
+                this.#network.validator_stream = null;
+                this.#network.validator = null;
+                return;
+            }
+
+            const lengthEntry = await this.state.getWriterLength();
+            const length = Number.isInteger(lengthEntry) && lengthEntry > 0 ? lengthEntry : 0;
+
+            if (length === 0) {
+                throw new Error('No validators available');
+            }
+
+            const rndIndex = Math.floor(Math.random() * length);
+            const validatorAddressBuffer = await this.state.getWriterIndex(rndIndex);
+            const validatorAddress = bufferToAddress(validatorAddressBuffer);
+
+            let findValidator = await this.#network.validatorObserverService.findValidator(validatorAddress, length)
+            let counter = 0;
+
+            while (!findValidator) {
+                findValidator = await this.#network.validatorObserverService.findValidator(validatorAddress, length)
+                counter++;
+                if (counter > 15) {
+                    break;
+                }
+            }
+            
+            if (!findValidator) {
+                throw new Error('Failed to find validator');
+            }
+
+            if (this.#network.validator_stream) {
+                await this.#network.validator_stream.messenger.send(partialTransactionPayload);
+                this.#network.validator_stream = null;
+                this.#network.validator = null;
+            } else {
+                throw new Error('Failed to establish validator connection');
+            }
+        } catch (error) {
+            throw new Error(`Failed to broadcast transaction: ${error.message}`);
+        }
+    }
+
     async #setUpRoleAutomatically() {
         if (!this.#state.isWritable() && this.#enable_role_requester) {
             console.log("Requesting writer role... This may take a moment.");
@@ -920,7 +967,7 @@ export class MainSettlementBus extends ReadyResource {
                     randomExternalBootstrap,
                     msbBootstrap
                 )
-                await this.broadcastPartialTransaction(assembledTransactionOperation);
+                await this.broadcastRandomPartialTransaction(assembledTransactionOperation);
                 break;
             case '/balance_migration':
                 await this.#handleBalanceMigrationOperation();
@@ -1125,7 +1172,7 @@ export class MainSettlementBus extends ReadyResource {
                         const signedLength = this.#state.getSignedLength();
                         const unsignedLength = this.#state.getUnsignedLength();
 
-                        await this.broadcastPartialTransaction(payload);
+                        await this.broadcastRandomPartialTransaction(payload);
                         return { message: "Transaction broadcasted successfully.", signedLength, unsignedLength };
                     } else {
                         // Handle case where payload is missing if called internally without one.

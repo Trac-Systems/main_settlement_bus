@@ -41,7 +41,7 @@ class ValidatorObserverService {
 
                 const promises = [];
                 for (let i = 0; i < 10; i++) {
-                    promises.push(this.#findValidator(address, length));
+                    promises.push(this.findValidator(address, length));
                     await sleep(250);
                 }
                 await Promise.all(promises);
@@ -52,16 +52,16 @@ class ValidatorObserverService {
         }
     }
 
-    async #findValidator(address, length) {
-        if (this.#network.validator_stream !== null) return;
+    async findValidator(address, length) {
+        if (this.#network.validator_stream !== null) return false;
 
         const rndIndex = Math.floor(Math.random() * length);
         const validatorAddressBuffer = await this.state.getWriterIndex(rndIndex);
 
-        if (validatorAddressBuffer === null || b4a.byteLength(validatorAddressBuffer) !== TRAC_ADDRESS_SIZE) return;
+        if (validatorAddressBuffer === null || b4a.byteLength(validatorAddressBuffer) !== TRAC_ADDRESS_SIZE) return false;
 
         const validatorAddress = bufferToAddress(validatorAddressBuffer);
-        if (validatorAddress === address) return;
+        if (validatorAddress === address) return false;
 
         const validatorPubKey = PeerWallet.decodeBech32m(validatorAddress).toString('hex');
         const validatorEntry = await this.state.getNodeEntry(validatorAddress);
@@ -79,10 +79,11 @@ class ValidatorObserverService {
             !validatorEntry.isWriter ||
             (validatorEntry.isIndexer && (adminEntry === null || validatorAddress !== adminEntry.address || length >= MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION))
         ) {
-            return;
+            return false;
         }
 
         await this.#network.tryConnect(validatorPubKey, 'validator');
+        return true;
     };
 
     startValidatorObserver() {
