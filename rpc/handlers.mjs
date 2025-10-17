@@ -52,20 +52,27 @@ export async function handleBroadcastTransaction({ msbInstance, respond, req }) 
     });
 
     req.on('end', async () => {
-        const { payload } = JSON.parse(body);
-        if (!payload) {
-            return respond(400, { error: 'Payload is missing.' });
-        }
+        try {
+            const { payload } = JSON.parse(body);
+            if (!payload) {
+                return respond(400, { error: 'Payload is missing.' });
+            }
 
-        if (!isBase64(payload)) {
-            return respond(400, { error: 'Payload must be a valid base64 string.' });
-        }
+            if (!isBase64(payload)) {
+                return respond(400, { error: 'Payload must be a valid base64 string.' });
+            }
 
-        const decodedPayload = decodeBase64Payload(payload);
-        validatePayloadStructure(decodedPayload);
-        const sanitizedPayload = sanitizeTransferPayload(decodedPayload);
-        const result = await msbInstance.handleCommand('/broadcast_transaction', null, sanitizedPayload);
-        respond(200, { result });
+            const decodedPayload = decodeBase64Payload(payload);
+            validatePayloadStructure(decodedPayload);
+            const sanitizedPayload = sanitizeTransferPayload(decodedPayload);
+            const result = await msbInstance.handleCommand('/broadcast_transaction', null, sanitizedPayload);
+            respond(200, { result });
+        } catch (error) {
+            console.error('Error in handleBroadcastTransaction:', error);
+            // Use 400 for client errors (like bad JSON), 500 for server/command errors
+            const code = error instanceof SyntaxError ? 400 : 500;
+            respond(code, { error: code === 400 ? 'Invalid JSON payload.' : 'An error occurred processing the transaction.' });
+        }
     });
 }
 
@@ -125,43 +132,61 @@ export async function handleFetchBulkTxPayloads({ msbInstance, respond, req }) {
     let body = ''
     let bytesRead = 0;
     let limitBytes = 1_000_000;
+    let headersSent = false; // Add a flag to prevent double response
 
     req.on('data', chunk => {
+        if (headersSent) return; // Stop processing if response has started/errored
+
         bytesRead += chunk.length;
-        if (bytesRead > limitBytes) { respond(413, { error: 'Request body too large.' }) }
+        if (bytesRead > limitBytes) { 
+            respond(413, { error: 'Request body too large.' });
+            headersSent = true; 
+            req.destroy(); // Stop receiving data (GOOD PRACTICE)
+            return;
+        }
         body += chunk.toString();
     });
 
     req.on('end', async () => {
-        if (body === null || body === ''){
-            return respond(400, { error: 'Missing payload.' });
+        if (headersSent) return; // Don't process if an error already occurred
+
+
+        try {
+            if (body === null || body === ''){
+                return respond(400, { error: 'Missing payload.' });
+            }
+
+            const sanitizedPayload = sanitizeBulkPayloadsRequestBody(body);
+
+            if (sanitizedPayload === null){
+                return respond(400, { error: 'Invalid payload.' });
+            }
+            
+            const { hashes } = sanitizedPayload;
+
+            if (!Array.isArray(hashes) || hashes.length === 0) {
+                return respond(400, { error: 'Missing hash list.' });
+            }
+
+            if (hashes.length > 1500) {
+                return respond(413, { error: 'Too many hashes. Max 1500 allowed per request.' });
+            }
+
+            const uniqueHashes = [...new Set(hashes)];
+
+            const commandResult = await msbInstance.handleCommand( `/get_tx_payloads_bulk`, null, uniqueHashes)
+
+            const responseString = JSON.stringify(commandResult);
+            if (Buffer.byteLength(responseString, 'utf8') > 2_000_000) {
+                return respond(413, { error: 'Response too large. Reduce number of hashes.'});
+            }
+
+            return respond(200, commandResult);
+        } catch (error) {
+            console.error('Error in handleFetchBulkTxPayloads:', error);
+            // Use 400 for JSON errors, 500 otherwise
+            const code = error instanceof SyntaxError ? 400 : 500;
+            respond(code, { error: code === 400 ? 'Invalid request body format.' : 'An internal error occurred.' });
         }
-
-        const sanitizedPayload = sanitizeBulkPayloadsRequestBody(body);
-
-        if (sanitizedPayload === null){
-            return respond(400, { error: 'Invalid payload.' });
-        }
-        
-        const { hashes } = sanitizedPayload;
-
-        if (!Array.isArray(hashes) || hashes.length === 0) {
-            return respond(400, { error: 'Missing hash list.' });
-        }
-
-        if (hashes.length > 1500) {
-            return respond(413, { error: 'Too many hashes. Max 1500 allowed per request.' });
-        }
-
-        const uniqueHashes = [...new Set(hashes)];
-
-        const commandResult = await msbInstance.handleCommand( `/get_tx_payloads_bulk`, null, uniqueHashes)
-
-        const responseString = JSON.stringify(commandResult);
-        if (Buffer.byteLength(responseString, 'utf8') > 2_000_000) {
-            return respond(413, { error: 'Response too large. Reduce number of hashes.'});
-        }
-
-        return respond(200, commandResult);
     })
 }
