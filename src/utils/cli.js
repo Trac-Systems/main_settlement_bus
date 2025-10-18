@@ -5,24 +5,37 @@ import { bigIntToDecimalString, bufferToBigInt } from "./amountSerialization.js"
 export async function verifyDag(state, network, wallet, writerKey) {
     try {
         console.log('---------- node & network stats ----------');
-        const dagView = await state.base.view.core.treeHash();
-        const lengthdagView = state.base.view.core.length;
-        const dagSystem = await state.base.system.core.treeHash();
-        const lengthdagSystem = state.base.system.core.length;
+        let dagView, lengthdagView, dagSystem, lengthdagSystem;
+        
+        if (state?.base?.view?.core && state?.base?.system?.core) {
+            try {
+                dagView = await state.base.view.core.treeHash();
+                lengthdagView = state.base.view.core.length;
+                dagSystem = await state.base.system.core.treeHash();
+                lengthdagSystem = state.base.system.core.length;
+            } catch (e) {
+                console.log('Error getting DAG info:', e.message);
+            }
+        }
 
-        console.log('wallet.publicKey:', wallet !== null ? wallet.publicKey.toString('hex') : 'unset');
-        console.log('wallet.address:', wallet !== null ? wallet.address : 'unset');
-        console.log('msb.writerKey:', writerKey.toString('hex'));
-        console.log('swarm.connections.size:', network.swarm.connections.size);
-        console.log('base.view.core.signedLength:', state.base.view.core.signedLength);
-        console.log('base.view.core.length:', state.base.view.core.length);
-        console.log("base.signedLength", state.base.signedLength);
-        console.log("base.indexedLength", state.base.indexedLength);
-        console.log("base.linearizer.indexers.length", state.base.linearizer.indexers.length);
-        console.log(`base.key: ${state.base.key.toString('hex')}`);
-        console.log('discoveryKey:', b4a.toString(state.base.discoveryKey, 'hex'));
-        console.log(`VIEW Dag: ${dagView.toString('hex')} (length: ${lengthdagView})`);
-        console.log(`SYSTEM Dag: ${dagSystem.toString('hex')} (length: ${lengthdagSystem})`);
+        console.log('wallet.publicKey:', (wallet && wallet.publicKey) ? wallet.publicKey.toString('hex') : 'unset');
+        console.log('wallet.address:', (wallet && wallet.address) ? wallet.address : 'unset');
+        console.log('msb.writerKey:', writerKey ? writerKey.toString('hex') : 'unset');
+        console.log('swarm.connections.size:', network?.swarm?.connections?.size || 0);
+        if (state?.base?.view?.core) {
+            console.log('base.view.core.signedLength:', state.base.view.core.signedLength ?? 'unset');
+            console.log('base.view.core.length:', state.base.view.core.length ?? 'unset');
+        }
+        
+        if (state?.base) {
+            console.log("base.signedLength", state.base.signedLength ?? 'unset');
+            console.log("base.indexedLength", state.base.indexedLength ?? 'unset');
+            console.log("base.linearizer.indexers.length", state.base.linearizer?.indexers?.length ?? 'unset');
+            console.log(`base.key: ${state.base.key ? state.base.key.toString('hex') : 'unset'}`);
+            console.log('discoveryKey:', state.base.discoveryKey ? b4a.toString(state.base.discoveryKey, 'hex') : 'unset');
+        }
+        console.log(`VIEW Dag: ${dagView ? dagView.toString('hex') : 'unset'} (length: ${lengthdagView || 0})`);
+        console.log(`SYSTEM Dag: ${dagSystem ? dagSystem.toString('hex') : 'unset'} (length: ${lengthdagSystem || 0})`);
         const wl = await state.getWriterLength();
         console.log('Total Registered Writers:', wl !== null ? wl : 0);
 
@@ -35,8 +48,12 @@ export async function verifyDag(state, network, wallet, writerKey) {
         console.log("Custom Node Address:", network.custom_node ? network.custom_node.toString('hex') : "None");
 
         console.log("---------- flags ----------");
-        console.log(`isIndexer: ${state.isIndexer()}`);
-        console.log(`isWriter: ${state.isWritable()}`);
+        try {
+            console.log(`isIndexer: ${state?.isIndexer?.() ?? 'unset'}`);
+            console.log(`isWriter: ${state?.isWritable?.() ?? 'unset'}`);
+        } catch (e) {
+            console.log('Error getting flags:', e.message);
+        }
 
     } catch (error) {
         console.error('Error during DAG monitoring:', error.message);

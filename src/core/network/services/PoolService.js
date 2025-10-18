@@ -2,7 +2,7 @@
 import { BATCH_SIZE, PROCESS_INTERVAL_MS } from '../../../utils/constants.js';
 import { sleep } from '../../../utils/helpers.js';
 class PoolService {
-    #shouldStopPool = false;
+    #processInterval = null;
     #state;
     #address;
     #options;
@@ -13,7 +13,7 @@ class PoolService {
         this.#address = address;
         this.#options = options;
     }
-    
+
     get tx_pool() {
         return this.#tx_pool;
     }
@@ -31,22 +31,43 @@ class PoolService {
     }
 
     async start() {
-        while (!this.#shouldStopPool) {
-            const isAdminAllowedToValidate = await this.state.isAdminAllowedToValidate();
-            const isNodeAllowedToValidate = await this.state.allowedToValidate(this.address);
-            const canValidate = isNodeAllowedToValidate || isAdminAllowedToValidate;
-            if (canValidate && this.tx_pool.length > 0) {
-                const length = this.tx_pool.length;
-                const batch = [];
-                for (let i = 0; i < length; i++) {
-                    if (i >= BATCH_SIZE) break;
-                    batch.push(this.tx_pool[i]);
-                }
-                await this.state.append(batch);
-                this.tx_pool.splice(0, batch.length);
-            }
-            await sleep(PROCESS_INTERVAL_MS);
+        if (!this.options.enable_wallet) {
+            console.log('PoolService can not start. Wallet is not enabled');
+            return;
         }
+
+        const interval = setInterval(async () => {
+            try {
+                await this.#processTransactions();
+            } catch (error) {
+                console.error('error in the PoolService:', error);
+                this.stopPool();
+            }
+        }, PROCESS_INTERVAL_MS);
+
+        this.#processInterval = interval;
+    }
+
+    async #processTransactions() {
+        const canValidate = await this.#checkValidationPermissions();
+
+        if (canValidate && this.tx_pool.length > 0) {
+            const batch = this.#prepareBatch();
+            await this.state.append(batch);
+        }
+    }
+
+    async #checkValidationPermissions() {
+        const isAdminAllowedToValidate = await this.state.isAdminAllowedToValidate();
+        const isNodeAllowedToValidate = await this.state.allowedToValidate(this.address);
+        return isNodeAllowedToValidate || isAdminAllowedToValidate;
+    }
+
+    #prepareBatch() {
+        const length = Math.min(this.tx_pool.length, BATCH_SIZE);
+        const batch = this.tx_pool.slice(0,length);
+        this.tx_pool.splice(0, length);
+        return batch;
     }
 
     addTransaction(tx) {
@@ -54,7 +75,10 @@ class PoolService {
     }
 
     stopPool() {
-        this.#shouldStopPool = true;
+        if (this.#processInterval) {
+            clearInterval(this.#processInterval);
+            this.#processInterval = null;
+        }
     }
 
 }
