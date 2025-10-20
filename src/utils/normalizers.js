@@ -43,6 +43,38 @@ export function normalizeTransferOperation(payload) {
     };
 }
 
+export function normalizeTransactionOperation(payload) {
+    if (!payload || typeof payload !== 'object' || !payload.txo) {
+        throw new Error('Invalid payload for transaction operation normalization.');
+    }
+    const { type, address, txo } = payload;
+    if (
+        type !== OperationType.TX ||
+        !address ||
+        !txo.tx || !txo.txv || !txo.iw ||
+        !txo.ch || !txo.bs || !txo.mbs ||
+        !txo.in || !txo.is
+    ) {
+        throw new Error('Missing required fields in transaction operation payload.');
+    }
+    const normalizedTxo = {
+        tx: normalizeHex(txo.tx),     // Transaction hash
+        txv: normalizeHex(txo.txv),   // Transaction validity
+        iw: normalizeHex(txo.iw),     // Writing key
+        ch: normalizeHex(txo.ch),     // Content hash
+        bs: normalizeHex(txo.bs),     // Bootstrap
+        mbs: normalizeHex(txo.mbs),   // MSB Bootstrap
+        in: normalizeHex(txo.in),     // Nonce
+        is: normalizeHex(txo.is)      // Signature
+    };
+
+    return {
+        type,
+        address: addressToBuffer(address),
+        txo: normalizedTxo
+    };
+}
+
 /**
  * Normalizes an operation payload by converting any Buffer values to hex strings.
  * This is useful for preparing a payload to be returned as a JSON response.

@@ -21,14 +21,16 @@ import {
     WHITELIST_SLEEP_INTERVAL,
     BOOTSTRAP_HEXSTRING_LENGTH,
     EntryType,
+    OperationType,
 } from "./utils/constants.js";
 import partialStateMessageOperations from "./messages/partialStateMessages/PartialStateMessageOperations.js";
 import { randomBytes } from "hypercore-crypto";
 import { decimalStringToBigInt, bigIntTo16ByteBuffer, bufferToBigInt, bigIntToDecimalString, licenseBufferToBigInt } from "./utils/amountSerialization.js"
 import { ZERO_WK } from "./utils/buffer.js";
-import { normalizeDecodedPayloadForJson, normalizeTransferOperation } from "./utils/normalizers.js"
+import { normalizeDecodedPayloadForJson, normalizeTransferOperation, normalizeTransactionOperation } from "./utils/normalizers.js"
 import PartialTransfer from "./core/network/messaging/validators/PartialTransfer.js";
 import { blake3Hash } from "./utils/crypto.js";
+import PartialTransaction from "./core/network/messaging/validators/PartialTransaction.js";
 
 //TODO create a MODULE which will separate logic responsible for role managment
 
@@ -51,6 +53,7 @@ export class MainSettlementBus extends ReadyResource {
     #isClosing = false;
     #is_admin_mode;
     #partialTransferValidator;
+    #partialTransactionValidator;
 
     constructor(options = {}) {
         super();
@@ -156,7 +159,8 @@ export class MainSettlementBus extends ReadyResource {
             printWalletInfo(this.#wallet.address, this.#state.writingKey, this.#state, this.#enable_wallet);
         }
 
-        this.#partialTransferValidator = new PartialTransfer(this.state, null, null);
+        this.#partialTransferValidator = new PartialTransfer(this.state);
+        this.#partialTransactionValidator = new PartialTransaction(this.state);
 
         await this.#network.replicate(
             this.#state,
@@ -1018,9 +1022,10 @@ export class MainSettlementBus extends ReadyResource {
                 } else if (input.startsWith("/get_tx_info")) {
                     const splitted = input.split(" ");
                     const txHash = splitted[1];
-                    const payload = await get_tx_info(this.#state, txHash);
+                    const {payload , decoded}  = await get_tx_info(this.#state, txHash);
                     if (payload) {
-                        console.log(`Payload for transaction hash ${txHash}:`, payload);
+                        console.log(`Payload for transaction hash ${txHash}:`);
+                        console.log(decoded);
                     } else {
                         console.log(`No information found for transaction hash: ${txHash}`);
                     }
@@ -1118,8 +1123,16 @@ export class MainSettlementBus extends ReadyResource {
                     return unconfirmed_length;
                 } else if (input.startsWith("/broadcast_transaction")) {
                     if (payload) {
-                        const normalizedPayload = normalizeTransferOperation(payload);
-                        const isValid = await this.#partialTransferValidator.validate(normalizedPayload);
+                        let normalizedPayload;
+                        let isValid = false;
+                        if (payload.type === OperationType.TRANSFER) {
+                            normalizedPayload = normalizeTransferOperation(payload);
+                            isValid = await this.#partialTransferValidator.validate(normalizedPayload);
+                        } else if (payload.type === OperationType.TX) {
+                            normalizedPayload = normalizeTransactionOperation(payload);
+                            isValid = await this.#partialTransactionValidator.validate(normalizedPayload);
+                        }
+                        
                         if (!isValid) throw new Error("Invalid transaction payload.");
 
                         const signedLength = this.#state.getSignedLength();
