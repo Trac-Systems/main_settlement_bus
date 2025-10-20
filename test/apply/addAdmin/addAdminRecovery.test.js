@@ -31,9 +31,9 @@ hook('Initialize admin for addAdmin tests', async () => {
     admin = await setupMsbAdmin(testKeyPair1, tmpDirectory, baseOptions);
 
     // Setup nodes
-    writer = await setupMsbWriter(admin, 'writer', testKeyPair2, tmpDirectory, baseOptions);
-    indexer1 = await setupMsbWriter(admin, 'indexer1', testKeyPair3, tmpDirectory, baseOptions);
-    indexer2 = await setupMsbWriter(admin, 'indexer2', testKeyPair4, tmpDirectory, baseOptions);
+    writer = await setupMsbWriter(admin, 'writer', testKeyPair2, tmpDirectory, admin.options);
+    indexer1 = await setupMsbWriter(admin, 'indexer1', testKeyPair3, tmpDirectory, admin.options);
+    indexer2 = await setupMsbWriter(admin, 'indexer2', testKeyPair4, tmpDirectory, admin.options);
 
     // Setup indexers after network is stable
     indexer1 = await setupMsbIndexer(indexer1, admin);

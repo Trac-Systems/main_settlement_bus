@@ -118,14 +118,7 @@ test('handleApplyAddWriterOperation (apply) - Append addWriter payload into the 
     const signedLengthAdminBefore = admin.msb.state.getSignedLength();
     const signedLengthWriter2Before = writer2.msb.state.getSignedLength();
 
-    const validity2 = await writer2.msb.state.getIndexerSequenceState()
-    const reqAddWriterAgain = await PartialStateMessageOperations.assembleAddWriterMessage(
-        writer2.wallet,
-        b4a.toString(writer2.msb.state.writingKey, 'hex'),
-        b4a.toString(validity2, 'hex')
-    );
-
-    await writer2.msb.broadcastPartialTransaction(reqAddWriterAgain);
+    await sendAddWriter(writer2, admin)
 
     await tryToSyncWriters(admin, writer2, indexer1);
     await waitForNodeState(writer2, writer2.wallet.address, {

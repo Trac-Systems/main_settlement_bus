@@ -55,19 +55,7 @@ hook('Initialize nodes', async t => {
 
 test('handleApplyTxOperation (apply) - Append POST_TX into the base - Happy path', async t => {
     const {postTx, txHash} = await generatePostTx(writer, externalNode, externalBootstrap)
-    const rawTx = await CompleteStateMessageOperations.assembleCompleteTransactionOperationMessage(
-        writer.msb.wallet,
-        postTx.address,
-        b4a.from(postTx.txo.tx, 'hex'),
-        b4a.from(postTx.txo.txv, 'hex'),
-        b4a.from(postTx.txo.iw, 'hex'),
-        b4a.from(postTx.txo.in, 'hex'),
-        b4a.from(postTx.txo.ch, 'hex'),
-        b4a.from(postTx.txo.is, 'hex'),
-        b4a.from(postTx.txo.bs, 'hex'),
-        b4a.from(postTx.txo.mbs, 'hex')
-    );
-    await writer.msb.state.append(rawTx)
+    await writer.msb.state.append(postTx)
     await waitForHash(writer, txHash)
     await tick();
 
@@ -105,26 +93,13 @@ test('handleApplyTxOperation (apply) - negative', t => {
     t.test('handleApplyTxOperation (apply) - different operation type', async t => {
         const maliciousWriter = await promoteToWriter(admin, maliciousPeer)
         const {postTx, txHash} = await generatePostTx(writer, externalNode, externalBootstrap)
-        const rawTx = await CompleteStateMessageOperations.assembleCompleteTransactionOperationMessage(
-            writer.msb.wallet,
-            postTx.address,
-            b4a.from(postTx.txo.tx, 'hex'),
-            b4a.from(postTx.txo.txv, 'hex'),
-            b4a.from(postTx.txo.iw, 'hex'),
-            b4a.from(postTx.txo.in, 'hex'),
-            b4a.from(postTx.txo.ch, 'hex'),
-            b4a.from(postTx.txo.is, 'hex'),
-            b4a.from(postTx.txo.bs, 'hex'),
-            b4a.from(postTx.txo.mbs, 'hex')
-        );
-
         const replaceByte = (input, index, replacement) => {
             const bufferHex = b4a.from(input, 'hex');
             bufferHex[index] = replacement;
             return b4a.from(bufferHex, 'hex');
         }
 
-        const replacedPostTx = replaceByte(b4a.toString(rawTx, 'hex'), 1, OperationType.ADD_ADMIN);
+        const replacedPostTx = replaceByte(b4a.toString(postTx, 'hex'), 1, OperationType.ADD_ADMIN);
 
         await waitDemotion(maliciousWriter, async () => {
             await maliciousWriter.msb.state.append(replacedPostTx);
@@ -164,20 +139,7 @@ test('handleApplyTxOperation (apply) - negative', t => {
     t.test('handleApplyTxOperation (apply) - invalid postTx signature (adversary signature - writer signature)', async t => {
         const maliciousWriter = await promoteToWriter(admin, maliciousPeer)
         const {postTx, txHash} = await generatePostTx(writer, externalNode, externalBootstrap)
-        const rawTx = await CompleteStateMessageOperations.assembleCompleteTransactionOperationMessage(
-            writer.msb.wallet,
-            postTx.address,
-            b4a.from(postTx.txo.tx, 'hex'),
-            b4a.from(postTx.txo.txv, 'hex'),
-            b4a.from(postTx.txo.iw, 'hex'),
-            b4a.from(postTx.txo.in, 'hex'),
-            b4a.from(postTx.txo.ch, 'hex'),
-            b4a.from(postTx.txo.is, 'hex'),
-            b4a.from(postTx.txo.bs, 'hex'),
-            b4a.from(postTx.txo.mbs, 'hex')
-        );
-
-        let decodedPostTx = safeDecodeApplyOperation(rawTx);
+        let decodedPostTx = safeDecodeApplyOperation(postTx);
 
         decodedPostTx.txo.vs = maliciousWriter.wallet.sign(
             b4a.concat([decodedPostTx.txo.tx, decodedPostTx.txo.vn])
@@ -195,20 +157,8 @@ test('handleApplyTxOperation (apply) - negative', t => {
     t.test('handleApplyTxOperation (apply) - invalid postTx signature (adversary signature - peer signature)', async t => {
         const maliciousWriter = await promoteToWriter(admin, maliciousPeer)
         const {postTx, txHash} = await generatePostTx(writer, externalNode, externalBootstrap)
-        const rawTx = await CompleteStateMessageOperations.assembleCompleteTransactionOperationMessage(
-            writer.msb.wallet,
-            postTx.address,
-            b4a.from(postTx.txo.tx, 'hex'),
-            b4a.from(postTx.txo.txv, 'hex'),
-            b4a.from(postTx.txo.iw, 'hex'),
-            b4a.from(postTx.txo.in, 'hex'),
-            b4a.from(postTx.txo.ch, 'hex'),
-            b4a.from(postTx.txo.is, 'hex'),
-            b4a.from(postTx.txo.bs, 'hex'),
-            b4a.from(postTx.txo.mbs, 'hex')
-        );
 
-        let decodedPostTx = safeDecodeApplyOperation(rawTx);
+        let decodedPostTx = safeDecodeApplyOperation(postTx);
 
         decodedPostTx.txo.is = maliciousWriter.wallet.sign(
             decodedPostTx.txo.tx
@@ -225,19 +175,7 @@ test('handleApplyTxOperation (apply) - negative', t => {
     t.test('handleApplyTxOperation (apply) - oversized transaction', async t => {
         const maliciousWriter = await promoteToWriter(admin, maliciousPeer)
         const {postTx, txHash} = await generatePostTx(writer, externalNode, externalBootstrap)
-        const rawTx = await CompleteStateMessageOperations.assembleCompleteTransactionOperationMessage(
-            writer.msb.wallet,
-            postTx.address,
-            b4a.from(postTx.txo.tx, 'hex'),
-            b4a.from(postTx.txo.txv, 'hex'),
-            b4a.from(postTx.txo.iw, 'hex'),
-            b4a.from(postTx.txo.in, 'hex'),
-            b4a.from(postTx.txo.ch, 'hex'),
-            b4a.from(postTx.txo.is, 'hex'),
-            b4a.from(postTx.txo.bs, 'hex'),
-            b4a.from(postTx.txo.mbs, 'hex')
-        );
-        let decodedPostTx = safeDecodeApplyOperation(rawTx);
+        let decodedPostTx = safeDecodeApplyOperation(postTx);
 
         decodedPostTx.txo.vn = randomBytes(5000);
         const encodedMaliciousPostTx = safeEncodeApplyOperation(decodedPostTx);
@@ -252,19 +190,7 @@ test('handleApplyTxOperation (apply) - negative', t => {
     t.test('handleApplyTxOperation (apply) - invalid postTx address (malicious node replaces address)', async t => {
         const maliciousWriter = await promoteToWriter(admin, maliciousPeer)
         const {postTx, txHash} = await generatePostTx(writer, externalNode, externalBootstrap)
-        const rawTx = await CompleteStateMessageOperations.assembleCompleteTransactionOperationMessage(
-            writer.msb.wallet,
-            postTx.address,
-            b4a.from(postTx.txo.tx, 'hex'),
-            b4a.from(postTx.txo.txv, 'hex'),
-            b4a.from(postTx.txo.iw, 'hex'),
-            b4a.from(postTx.txo.in, 'hex'),
-            b4a.from(postTx.txo.ch, 'hex'),
-            b4a.from(postTx.txo.is, 'hex'),
-            b4a.from(postTx.txo.bs, 'hex'),
-            b4a.from(postTx.txo.mbs, 'hex')
-        );
-        let decodedPostTx = safeDecodeApplyOperation(rawTx);
+        let decodedPostTx = safeDecodeApplyOperation(postTx);
         decodedPostTx.address = addressToBuffer(maliciousWriter.wallet.address);
         const encodedMaliciousPostTx = safeEncodeApplyOperation(decodedPostTx);
         await maliciousWriter.msb.state.append(encodedMaliciousPostTx);
@@ -277,19 +203,7 @@ test('handleApplyTxOperation (apply) - negative', t => {
     t.test('handleApplyTxOperation (apply) - invalid postTx txo.ia (malicious node replaces ia)', async t => {
         const maliciousWriter = await promoteToWriter(admin, maliciousPeer)
         const {postTx, txHash} = await generatePostTx(writer, externalNode, externalBootstrap)
-        const rawTx = await CompleteStateMessageOperations.assembleCompleteTransactionOperationMessage(
-            writer.msb.wallet,
-            postTx.address,
-            b4a.from(postTx.txo.tx, 'hex'),
-            b4a.from(postTx.txo.txv, 'hex'),
-            b4a.from(postTx.txo.iw, 'hex'),
-            b4a.from(postTx.txo.in, 'hex'),
-            b4a.from(postTx.txo.ch, 'hex'),
-            b4a.from(postTx.txo.is, 'hex'),
-            b4a.from(postTx.txo.bs, 'hex'),
-            b4a.from(postTx.txo.mbs, 'hex')
-        );
-        let decodedPostTx = safeDecodeApplyOperation(rawTx);
+        let decodedPostTx = safeDecodeApplyOperation(postTx);
         decodedPostTx.txo.ia = addressToBuffer(maliciousWriter.wallet.address);
         const encodedMaliciousPostTx = safeEncodeApplyOperation(decodedPostTx);
         await writer.msb.state.append(encodedMaliciousPostTx);

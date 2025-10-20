@@ -109,7 +109,7 @@ export async function setupMsbPeer(peerName, peerKeyPair, temporaryDirectory, op
 
 export async function initMsbAdmin(keyPair, temporaryDirectory, options = {}) {
     const peerName = 'admin';
-    const admin = await initMsbPeer(peerName, keyPair, temporaryDirectory, options);
+    const admin = await initMsbPeer(peerName, keyPair, temporaryDirectory, { ...options, bootstrap: randomBytes(32).toString('hex') });
 
     await admin.msb.ready();
     admin.options.bootstrap = admin.msb.state.writingKey;
@@ -348,33 +348,29 @@ export const generatePostTx = async (writer, externalNode, externalContractBoots
 
     const contentHash = await blake3Hash(JSON.stringify(testObj));
     const validity = await writer.msb.state.getIndexerSequenceState()
-    const operationData = await operation.preBuild(
-        externalNode.wallet.address,
+    const tx = await PartialStateMessageOperations.assembleTransactionOperationMessage(
+        externalNode.wallet,
         peerWriterKey,
+        b4a.toString(validity, 'hex'),
         b4a.toString(contentHash, 'hex'),
         externalContractBootstrap,
-        b4a.toString(writer.msb.bootstrap, 'hex'),
-        b4a.toString(validity, 'hex')
+        b4a.toString(writer.msb.bootstrap, 'hex')
     )
 
-    const sig = externalNode.wallet.sign(operationData.hash)
-    const postTx = {
-        type: operation.OP_TYPE_TX,
-        address: externalNode.wallet.address,
-        txo: {
-            tx: operationData.hash.toString('hex'),
-            txv: operationData.validity,
-            iw: operationData.validator.toString('hex'),
-            in: operationData.nonce.toString('hex'),
-            ch: operationData.contentHash.toString('hex'),
-            is: sig.toString('hex'),
-            bs: operationData.originBootstrap,
-            mbs: operationData.destinationBootstrap,
-        }
-    }
+    const postTx = await CompleteStateMessageOperations.assembleCompleteTransactionOperationMessage(
+        writer.wallet,
+        tx.address,
+        b4a.from(tx.txo.tx, 'hex'),
+        b4a.from(tx.txo.txv, 'hex'),
+        b4a.from(tx.txo.iw, 'hex'),
+        b4a.from(tx.txo.in, 'hex'),
+        b4a.from(tx.txo.ch, 'hex'),
+        b4a.from(tx.txo.is, 'hex'),
+        b4a.from(tx.txo.bs, 'hex'),
+        b4a.from(tx.txo.mbs, 'hex')
+    );
 
-    return { postTx, txHash: operationData.hash.toString('hex') };
-
+    return { postTx, txHash: tx.txo.tx };
 }
 
 /**

@@ -17,7 +17,7 @@ import {
 import {safeDecodeApplyOperation, safeEncodeApplyOperation} from '../../../src/utils/protobuf/operationHelpers.js'
 import {testKeyPair1, testKeyPair2, testKeyPair4, testKeyPair5} from '../../fixtures/apply.fixtures.js';
 import { $TNK } from '../../../src/core/state/utils/balance.js';
-import CompleteStateMessageOperations from '../../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
+import { decode as decodeNodeEntry } from '../../../src/core/state/utils/nodeEntry.js';
 
 let tmpDirectory, admin, writer, externalNode, externalBootstrap, maliciousPeer;
 // is and vs is already covered
@@ -60,20 +60,7 @@ hook('Initialize nodes', async t => {
 
 test('handleApplyTxOperation (apply) - invalid txo sub-values', async t => {
   const {postTx, txHash} = await generatePostTx(writer, externalNode, externalBootstrap)
-  const rawTx = await CompleteStateMessageOperations.assembleCompleteTransactionOperationMessage(
-      writer.msb.wallet,
-      postTx.address,
-      b4a.from(postTx.txo.tx, 'hex'),
-      b4a.from(postTx.txo.txv, 'hex'),
-      b4a.from(postTx.txo.iw, 'hex'),
-      b4a.from(postTx.txo.in, 'hex'),
-      b4a.from(postTx.txo.ch, 'hex'),
-      b4a.from(postTx.txo.is, 'hex'),
-      b4a.from(postTx.txo.bs, 'hex'),
-      b4a.from(postTx.txo.mbs, 'hex')
-  );
-
-  const decodedPostTx = safeDecodeApplyOperation(rawTx);
+  const decodedPostTx = safeDecodeApplyOperation(postTx);
   
   for (let i = 0; i < testCases.length; i++) {
     const testCase = testCases[i]
@@ -102,7 +89,7 @@ test('handleApplyTxOperation (apply) - invalid txo sub-values', async t => {
     }
 
     // should be penalized
-    const node = await maliciousWriter.msb.state.getUnsignedNodeEntry(maliciousWriter.wallet.address)
+    const node = decodeNodeEntry(await maliciousWriter.msb.state.get(maliciousWriter.wallet.address))
     t.ok(node, 'Result should not be null');
     t.is(node.isWriter, false, 'Result should indicate that the peer is not a writer');
   }
