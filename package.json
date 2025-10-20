@@ -44,7 +44,7 @@
     "protomux-wakeup": "2.4.0",
     "readline": "npm:bare-node-readline",
     "ready-resource": "1.1.2",
-    "trac-wallet": "0.0.43-msb-r2.5",
+    "trac-wallet": "0.0.43-msb-r2.6",
     "tty": "npm:bare-node-tty"
   },
   "devDependencies": {
@@ -55,7 +55,7 @@
     "protocol-buffers": "^4.2.0",
     "sinon": "^21.0.0",
     "supertest": "^7.1.4",
-    "trac-crypto-api": "^0.0.10"
+    "trac-crypto-api": "^0.1.1"
   },
   "publishConfig": {
     "registry": "https://registry.npmjs.org",
