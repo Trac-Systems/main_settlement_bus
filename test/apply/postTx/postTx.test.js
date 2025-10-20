@@ -63,155 +63,157 @@ test('handleApplyTxOperation (apply) - Append POST_TX into the base - Happy path
     t.ok(result, 'post tx added to the base');
 })
 
-test('handleApplyTxOperation (apply) - negative', t => {
-    // TODO: This test has been disabled because we got rid of JSON schema validation in favor of protobuf validation. To enable this test again, we need to write a fake protobuf schema for postTx (maybe also for other operations) and forge an invalid payload.
+// Negative cases
 
-    // t.test('nested object in postTx', async t => {
-    //     //is already tested in /test/check/postTx.test.js
-    //     let { postTx, preTxHash: txHash } = await generatePostTx(admin.msb, admin.wallet, legitWallet)
-    //     postTx = {
-    //         ...postTx,
-    //         foo: 'bar',
-    //     }
-    //     await admin.msb.state.append(postTx);
-    //     await tick();
-    
-    //     t.absent(await admin.msb.state.get(txHash), 'post tx with nested object should not be added to the base');
-    //     postTx = {
-    //         ...postTx,
-    //         value: {
-    //             ...postTx.value,
-    //             foo: 'bar',
-    //         }
-    //     }
-    //     await admin.msb.state.append(postTx);
-    //     await tick();
-    //     t.absent(await admin.msb.state.get(txHash), 'post tx with nested object in value property should not be added to the base');
-    
-    // })
+// TODO: This test has been disabled because we got rid of JSON schema validation in favor of protobuf validation. To enable this test again, we need to write a fake protobuf schema for postTx (maybe also for other operations) and forge an invalid payload.
 
-    t.test('handleApplyTxOperation (apply) - different operation type', async t => {
-        const maliciousWriter = await promoteToWriter(admin, maliciousPeer)
-        const {postTx, txHash} = await generatePostTx(writer, externalNode, externalBootstrap)
-        const replaceByte = (input, index, replacement) => {
-            const bufferHex = b4a.from(input, 'hex');
-            bufferHex[index] = replacement;
-            return b4a.from(bufferHex, 'hex');
-        }
+// test('nested object in postTx', async t => {
+//     //is already tested in /test/check/postTx.test.js
+//     let { postTx, preTxHash: txHash } = await generatePostTx(admin.msb, admin.wallet, legitWallet)
+//     postTx = {
+//         ...postTx,
+//         foo: 'bar',
+//     }
+//     await admin.msb.state.append(postTx);
+//     await tick();
 
-        const replacedPostTx = replaceByte(b4a.toString(postTx, 'hex'), 1, OperationType.ADD_ADMIN);
+//     t.absent(await admin.msb.state.get(txHash), 'post tx with nested object should not be added to the base');
+//     postTx = {
+//         ...postTx,
+//         value: {
+//             ...postTx.value,
+//             foo: 'bar',
+//         }
+//     }
+//     await admin.msb.state.append(postTx);
+//     await tick();
+//     t.absent(await admin.msb.state.get(txHash), 'post tx with nested object in value property should not be added to the base');
 
-        await waitDemotion(maliciousWriter, async () => {
-            await maliciousWriter.msb.state.append(replacedPostTx);
-        })
-        await tick();
+// })
 
-        t.absent(await writer.msb.state.get(txHash), 'post tx with incorrect operation type should not be added to the base');
+test('handleApplyTxOperation (apply) - different operation type', async t => {
+    const maliciousWriter = await promoteToWriter(admin, maliciousPeer)
+    const {postTx, txHash} = await generatePostTx(writer, externalNode, externalBootstrap)
+    const replaceByte = (input, index, replacement) => {
+        const bufferHex = b4a.from(input, 'hex');
+        bufferHex[index] = replacement;
+        return b4a.from(bufferHex, 'hex');
+    }
+
+    const replacedPostTx = replaceByte(b4a.toString(postTx, 'hex'), 1, OperationType.ADD_ADMIN);
+
+    await waitDemotion(maliciousWriter, async () => {
+        await maliciousWriter.msb.state.append(replacedPostTx);
+    })
+    await tick();
+
+    t.absent(await writer.msb.state.get(txHash), 'post tx with incorrect operation type should not be added to the base');
+})
+
+// test('handleApplyTxOperation (apply) - replay attack', async t => {
+//     const {postTx, txHash} = await generatePostTx(writer, externalNode, externalBootstrap)
+//     const rawTx = await CompleteStateMessageOperations.assembleCompleteTransactionOperationMessage(
+//         writer.msb.wallet,
+//         postTx.address,
+//         b4a.from(postTx.txo.tx, 'hex'),
+//         b4a.from(postTx.txo.txv, 'hex'),
+//         b4a.from(postTx.txo.iw, 'hex'),
+//         b4a.from(postTx.txo.in, 'hex'),
+//         b4a.from(postTx.txo.ch, 'hex'),
+//         b4a.from(postTx.txo.is, 'hex'),
+//         b4a.from(postTx.txo.bs, 'hex'),
+//         b4a.from(postTx.txo.mbs, 'hex')
+//     );
+//     await writer.msb.state.append(rawTx);
+//     await tick();
+//     await sleep(500)
+//     const firstRes = await writer.msb.state.base.view.get(txHash);
+
+//     await writer.msb.state.append(rawTx);
+//     await sleep(500)
+//     await tick();
+//     const secondRes = await writer.msb.state.base.view.get(txHash);
+
+//     t.is(firstRes.seq, secondRes.seq, 'post tx should not be added to the base twice');
+// })
+
+test('handleApplyTxOperation (apply) - invalid postTx signature (adversary signature - writer signature)', async t => {
+    const maliciousWriter = await promoteToWriter(admin, maliciousPeer)
+    const {postTx, txHash} = await generatePostTx(writer, externalNode, externalBootstrap)
+    let decodedPostTx = safeDecodeApplyOperation(postTx);
+
+    decodedPostTx.txo.vs = maliciousWriter.wallet.sign(
+        b4a.concat([decodedPostTx.txo.tx, decodedPostTx.txo.vn])
+    );
+    const encodedMaliciousPostTx = safeEncodeApplyOperation(decodedPostTx);
+    await waitDemotion(maliciousWriter, async () => {
+        await maliciousWriter.msb.state.append(encodedMaliciousPostTx);
     })
 
-    // t.test('handleApplyTxOperation (apply) - replay attack', async t => {
-    //     const {postTx, txHash} = await generatePostTx(writer, externalNode, externalBootstrap)
-    //     const rawTx = await CompleteStateMessageOperations.assembleCompleteTransactionOperationMessage(
-    //         writer.msb.wallet,
-    //         postTx.address,
-    //         b4a.from(postTx.txo.tx, 'hex'),
-    //         b4a.from(postTx.txo.txv, 'hex'),
-    //         b4a.from(postTx.txo.iw, 'hex'),
-    //         b4a.from(postTx.txo.in, 'hex'),
-    //         b4a.from(postTx.txo.ch, 'hex'),
-    //         b4a.from(postTx.txo.is, 'hex'),
-    //         b4a.from(postTx.txo.bs, 'hex'),
-    //         b4a.from(postTx.txo.mbs, 'hex')
-    //     );
-    //     await writer.msb.state.append(rawTx);
-    //     await tick();
-    //     await sleep(500)
-    //     const firstRes = await writer.msb.state.base.view.get(txHash);
+    const result = await admin.msb.state.get(txHash);
+    t.absent(result, 'adversary\'s fake signature should not be added to the base');
+});
 
-    //     await writer.msb.state.append(rawTx);
-    //     await sleep(500)
-    //     await tick();
-    //     const secondRes = await writer.msb.state.base.view.get(txHash);
 
-    //     t.is(firstRes.seq, secondRes.seq, 'post tx should not be added to the base twice');
-    // })
+test('handleApplyTxOperation (apply) - invalid postTx signature (adversary signature - peer signature)', async t => {
+    const maliciousWriter = await promoteToWriter(admin, maliciousPeer)
+    const {postTx, txHash} = await generatePostTx(writer, externalNode, externalBootstrap)
 
-    t.test('handleApplyTxOperation (apply) - invalid postTx signature (adversary signature - writer signature)', async t => {
-        const maliciousWriter = await promoteToWriter(admin, maliciousPeer)
-        const {postTx, txHash} = await generatePostTx(writer, externalNode, externalBootstrap)
-        let decodedPostTx = safeDecodeApplyOperation(postTx);
+    let decodedPostTx = safeDecodeApplyOperation(postTx);
 
-        decodedPostTx.txo.vs = maliciousWriter.wallet.sign(
-            b4a.concat([decodedPostTx.txo.tx, decodedPostTx.txo.vn])
-        );
-        const encodedMaliciousPostTx = safeEncodeApplyOperation(decodedPostTx);
-
+    decodedPostTx.txo.is = maliciousWriter.wallet.sign(
+        decodedPostTx.txo.tx
+    );
+    const encodedMaliciousPostTx = safeEncodeApplyOperation(decodedPostTx);
+    await waitDemotion(maliciousWriter, async () => {
         await maliciousWriter.msb.state.append(encodedMaliciousPostTx);
-        await tick();
+    })
 
-        const result = await admin.msb.state.get(txHash);
-        t.absent(result, 'adversary\'s fake signature should not be added to the base');
-    });
+    const result = await writer.msb.state.get(txHash);
+    t.absent(result, 'adversary prepared fake postTx signature (third key pair) should not be added to the base');
+});
 
+test('handleApplyTxOperation (apply) - oversized transaction', async t => {
+    const maliciousWriter = await promoteToWriter(admin, maliciousPeer)
+    const {postTx, txHash} = await generatePostTx(writer, externalNode, externalBootstrap)
+    let decodedPostTx = safeDecodeApplyOperation(postTx);
 
-    t.test('handleApplyTxOperation (apply) - invalid postTx signature (adversary signature - peer signature)', async t => {
-        const maliciousWriter = await promoteToWriter(admin, maliciousPeer)
-        const {postTx, txHash} = await generatePostTx(writer, externalNode, externalBootstrap)
+    decodedPostTx.txo.vn = randomBytes(5000);
+    const encodedMaliciousPostTx = safeEncodeApplyOperation(decodedPostTx);
 
-        let decodedPostTx = safeDecodeApplyOperation(postTx);
-
-        decodedPostTx.txo.is = maliciousWriter.wallet.sign(
-            decodedPostTx.txo.tx
-        );
-        const encodedMaliciousPostTx = safeEncodeApplyOperation(decodedPostTx);
+    await waitDemotion(maliciousWriter, async () => {
         await maliciousWriter.msb.state.append(encodedMaliciousPostTx);
-        await sleep(500)
-        await tick();
+    })
+    const result = await admin.msb.state.get(txHash);
+    t.absent(result, 'oversized post tx should not be added to the base');
+});
 
-        const result = await writer.msb.state.get(txHash);
-        t.absent(result, 'adversary prepared fake postTx signature (third key pair) should not be added to the base');
-    });
-
-    t.test('handleApplyTxOperation (apply) - oversized transaction', async t => {
-        const maliciousWriter = await promoteToWriter(admin, maliciousPeer)
-        const {postTx, txHash} = await generatePostTx(writer, externalNode, externalBootstrap)
-        let decodedPostTx = safeDecodeApplyOperation(postTx);
-
-        decodedPostTx.txo.vn = randomBytes(5000);
-        const encodedMaliciousPostTx = safeEncodeApplyOperation(decodedPostTx);
-
+test('handleApplyTxOperation (apply) - invalid postTx address (malicious node replaces address)', async t => {
+    const maliciousWriter = await promoteToWriter(admin, maliciousPeer)
+    const {postTx, txHash} = await generatePostTx(writer, externalNode, externalBootstrap)
+    let decodedPostTx = safeDecodeApplyOperation(postTx);
+    decodedPostTx.address = addressToBuffer(maliciousWriter.wallet.address);
+    const encodedMaliciousPostTx = safeEncodeApplyOperation(decodedPostTx);
+    await maliciousWriter.msb.state.append(encodedMaliciousPostTx);
+    await waitDemotion(maliciousWriter, async () => {
         await maliciousWriter.msb.state.append(encodedMaliciousPostTx);
-        await tick();
-        await sleep(500)
-        const result = await admin.msb.state.get(txHash);
-        t.absent(result, 'oversized post tx should not be added to the base');
-    });
+    })
+    const result = await admin.msb.state.get(txHash);
+    t.absent(result, 'post tx with malicious address should not be added to the base');
+});
 
-    t.test('handleApplyTxOperation (apply) - invalid postTx address (malicious node replaces address)', async t => {
-        const maliciousWriter = await promoteToWriter(admin, maliciousPeer)
-        const {postTx, txHash} = await generatePostTx(writer, externalNode, externalBootstrap)
-        let decodedPostTx = safeDecodeApplyOperation(postTx);
-        decodedPostTx.address = addressToBuffer(maliciousWriter.wallet.address);
-        const encodedMaliciousPostTx = safeEncodeApplyOperation(decodedPostTx);
+test('handleApplyTxOperation (apply) - invalid postTx txo.ia (malicious node replaces ia)', async t => {
+    const maliciousWriter = await promoteToWriter(admin, maliciousPeer)
+    const {postTx, txHash} = await generatePostTx(writer, externalNode, externalBootstrap)
+    let decodedPostTx = safeDecodeApplyOperation(postTx);
+    decodedPostTx.txo.ia = addressToBuffer(maliciousWriter.wallet.address);
+    const encodedMaliciousPostTx = safeEncodeApplyOperation(decodedPostTx);
+    await waitDemotion(maliciousWriter, async () => {
         await maliciousWriter.msb.state.append(encodedMaliciousPostTx);
-        await tick();
-        await sleep(500)
-        const result = await admin.msb.state.get(txHash);
-        t.absent(result, 'post tx with malicious address should not be added to the base');
-    });
-
-    t.test('handleApplyTxOperation (apply) - invalid postTx txo.ia (malicious node replaces ia)', async t => {
-        const maliciousWriter = await promoteToWriter(admin, maliciousPeer)
-        const {postTx, txHash} = await generatePostTx(writer, externalNode, externalBootstrap)
-        let decodedPostTx = safeDecodeApplyOperation(postTx);
-        decodedPostTx.txo.ia = addressToBuffer(maliciousWriter.wallet.address);
-        const encodedMaliciousPostTx = safeEncodeApplyOperation(decodedPostTx);
-        await writer.msb.state.append(encodedMaliciousPostTx);
-        await tick();
-        const result = await admin.msb.state.get(txHash);
-        t.absent(result, 'post tx with malicious txo.ia should not be added to the base');
-    });
-})
+    })
+    const result = await admin.msb.state.get(txHash);
+    t.absent(result, 'post tx with malicious txo.ia should not be added to the base');
+});
 
 hook('Clean up postTx setup', async t => {
     // close msbBoostrap and remove temp directory

@@ -175,7 +175,7 @@ export async function promoteToWriter(admin, writerCandidate) {
         b4a.toString(writerCandidate.msb.state.writingKey, 'hex'),
         b4a.toString(validity, 'hex'));
 
-    await waitWritable(admin, writerCandidate, async () => {
+    await waitWritable(writerCandidate, writerCandidate, async () => {
         const raw = await CompleteStateMessageOperations.assembleAddWriterMessage(
             admin.wallet,
             req.address,
