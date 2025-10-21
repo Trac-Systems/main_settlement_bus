@@ -1,4 +1,4 @@
-import {test, hook} from 'brittle';
+import {test, hook} from '../utils/wrapper.js';
 
 import {
     initTemporaryDirectory,
@@ -11,7 +11,8 @@ import {
 import {randomBytes} from '../utils/setupApplyTests.js';
 import CompleteStateMessageOperations from '../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
 import {testKeyPair1, testKeyPair2, testKeyPair3, testKeyPair4} from '../fixtures/apply.fixtures.js';
-import {formatIndexersEntry, sleep} from '../../src/utils/helpers.js';
+import {sleep} from '../../src/utils/helpers.js';
+import b4a from 'b4a'
 
 let admin;
 let indexer, writer1, writer2;
@@ -25,7 +26,6 @@ hook('Initialize nodes for banValidator tests', async () => {
         enable_role_requester: false,
         channel: randomChannel,
         enable_validator_observer: false,
-
     }
     tmpDirectory = await initTemporaryDirectory();
     admin = await setupMsbAdmin(testKeyPair1, tmpDirectory, baseOptions);
@@ -38,85 +38,73 @@ hook('Initialize nodes for banValidator tests', async () => {
 });
 
 test('handleApplyBanValidatorOperation (apply) - Append banValidator payload - ban indexer', async t => {
-    try {
+    const validity = await admin.msb.state.getIndexerSequenceState()
+    const assembledBanWriter = await CompleteStateMessageOperations.assembleBanWriterMessage(admin.wallet, indexer.wallet.address, validity);
+    await admin.msb.state.append(assembledBanWriter);
+    await tryToSyncWriters(admin, indexer, writer1, writer2);
 
-        const assembledBanWriter = await CompleteStateMessageOperations.assembleBanWriterMessage(admin.wallet, indexer.wallet.address);
-        await admin.msb.state.append(assembledBanWriter);
-        await tryToSyncWriters(admin, indexer, writer1, writer2);
+    const indexersEntry = await indexer.msb.state.getIndexersEntry();
+    const nodeInfo = await indexer.msb.state.getNodeEntry(indexer.wallet.address);
 
-        const indexersEntry = await indexer.msb.state.getIndexersEntry();
-        const formattedIndexersEntry = formatIndexersEntry(indexersEntry);
-        const nodeInfo = await indexer.msb.state.getNodeEntry(indexer.wallet.address);
-
-        t.is(formattedIndexersEntry.count, 2, 'Indexers entry count should be 2');
-        t.is(formattedIndexersEntry.addresses.includes(indexer.wallet.address), true, 'Indexer address should be still included in the indexers entry');
-        t.is(nodeInfo.isIndexer, true, 'Node info should indicate that the node is still an indexer');
-    } catch (error) {
-        t.fail('Failed to ban indexer: ' + error.message);
-    }
+    t.is(indexersEntry.length, 2, 'Indexers entry count should be 2');
+    t.is(!!indexersEntry.find(({ key }) => b4a.equals(key, indexer.msb.state.writingKey)), true, 'Indexer address should be still included in the indexers entry');
+    t.is(nodeInfo.isIndexer, true, 'Node info should indicate that the node is still an indexer');
 });
 
 test('handleApplyBanValidatorOperation (apply) - Append banValidator payload into the base by non-admin node', async t => {
-    try {
-        const assembledBanWriter = await CompleteStateMessageOperations.assembleBanWriterMessage(writer1.wallet, writer2.wallet.address);
-        await writer1.msb.state.append(assembledBanWriter);
-        await sleep(5000); // wait for both peers to sync state
-        await tryToSyncWriters(admin);
+    const validity = await admin.msb.state.getIndexerSequenceState()
+    const assembledBanWriter = await CompleteStateMessageOperations.assembleBanWriterMessage(writer1.wallet, writer2.wallet.address, validity);
+    await writer1.msb.state.append(assembledBanWriter);
+    await sleep(5000); // wait for both peers to sync state
+    await tryToSyncWriters(admin);
 
+    const nodeInfo = await writer2.msb.state.getNodeEntry(writer2.wallet.address);
 
-        const nodeInfo = await writer2.msb.state.getNodeEntry(writer2.wallet.address);
-
-        t.is(nodeInfo.isWriter, true, 'Node info should indicate that the node is still a writer');
-        t.is(nodeInfo.isWhitelisted, true, 'Node info should indicate that the node is still whitelisted');
-    } catch (error) {
-        t.fail('Failed to add indexer: ' + error.message);
-    }
+    t.is(nodeInfo.isWriter, true, 'Node info should indicate that the node is still a writer');
+    t.is(nodeInfo.isWhitelisted, true, 'Node info should indicate that the node is still whitelisted');
 });
 
 
 test('handleApplyBanValidatorOperation (apply) - Append banValidator payload into the base - happy path', async t => {
-    try {
-        const assembledBanWriter = await CompleteStateMessageOperations.assembleBanWriterMessage(admin.wallet, writer1.wallet.address);
-        await admin.msb.state.append(assembledBanWriter);
-        await sleep(5000); // wait for both peers to sync state
+    const validity = await admin.msb.state.getIndexerSequenceState()
+    const assembledBanWriter = await CompleteStateMessageOperations.assembleBanWriterMessage(admin.wallet, writer1.wallet.address, validity);
+    await admin.msb.state.append(assembledBanWriter);
+    await sleep(5000); // wait for both peers to sync state
 
-        const nodeInfo = await writer1.msb.state.getNodeEntry(writer1.wallet.address);
+    const nodeInfo = await writer1.msb.state.getNodeEntry(writer1.wallet.address);
 
-        t.is(nodeInfo.isWriter, false, 'Node info should indicate that the node is not a writer anymore');
-        t.is(nodeInfo.isWhitelisted, false, 'Node info should indicate that the node is not whitelisted anymore');
-        t.is(writer1.msb.state.isWritable(), false, 'Writer1 should not be a writer anymore');
-    } catch (error) {
-        t.fail('Failed to add indexer: ' + error.message);
-    }
+    t.is(nodeInfo.isWriter, false, 'Node info should indicate that the node is not a writer anymore');
+    t.is(nodeInfo.isWhitelisted, false, 'Node info should indicate that the node is not whitelisted anymore');
+    t.is(writer1.msb.state.isWritable(), false, 'Writer1 should not be a writer anymore');
 });
 
 test('handleApplyBanValidatorOperation (apply) - Append banValidator payload into the base - idempotence', async t => {
-    try {
-        const assembledBanWriter = await CompleteStateMessageOperations.assembleBanWriterMessage(admin.wallet, writer2.wallet.address);
-        await admin.msb.state.append(assembledBanWriter);
-        await sleep(5000); // wait for both peers to sync state
+    const validity = await admin.msb.state.getIndexerSequenceState()
+    const assembledBanWriter = await CompleteStateMessageOperations.assembleBanWriterMessage(admin.wallet, writer2.wallet.address, validity);
+    await admin.msb.state.append(assembledBanWriter);
+    await sleep(5000); // wait for both peers to sync state
 
-        const nodeInfo = await writer2.msb.state.getNodeEntry(writer2.wallet.address);
+    const nodeInfo = await writer2.msb.state.getNodeEntry(writer2.wallet.address);
 
-        const assembledBanWriter2 = await CompleteStateMessageOperations.assembleBanWriterMessage(admin.wallet, writer2.wallet.address);
-        await admin.msb.state.append(assembledBanWriter2);
-        await sleep(5000); // wait for both peers to sync state
+    const validity2 = await admin.msb.state.getIndexerSequenceState()
+    const assembledBanWriter2 = await CompleteStateMessageOperations.assembleBanWriterMessage(admin.wallet, writer2.wallet.address, validity2);
+    await admin.msb.state.append(assembledBanWriter2);
+    await sleep(5000); // wait for both peers to sync state
 
-        t.is(nodeInfo.isIndexer, false, 'Node info should indicate that the node is not a writer anymore');
-        t.is(nodeInfo.isWriter, false, 'Node info should indicate that the node is not a writer anymore');
-        t.is(nodeInfo.isWhitelisted, false, 'Node info should indicate that the node is not whitelisted anymore');
-        t.is(writer1.msb.state.isWritable(), false, 'Writer2 should not be a writer anymore');
-        t.is(writer1.msb.state.isIndexer(), false, 'Writer2 should not be a writer anymore');
-    } catch (error) {
-        t.fail('Failed to add indexer: ' + error.message);
-    }
+    t.is(nodeInfo.isIndexer, false, 'Node info should indicate that the node is not a writer anymore');
+    t.is(nodeInfo.isWriter, false, 'Node info should indicate that the node is not a writer anymore');
+    t.is(nodeInfo.isWhitelisted, false, 'Node info should indicate that the node is not whitelisted anymore');
+    t.is(writer1.msb.state.isWritable(), false, 'Writer2 should not be a writer anymore');
+    t.is(writer1.msb.state.isIndexer(), false, 'Writer2 should not be a writer anymore');
 });
 
 hook('Clean up banValidator setup', async t => {
     // close msb instances and remove temp directory
-    if (admin && admin.msb) await admin.msb.close();
-    if (indexer && indexer.msb) await indexer.msb.close();
-    if (writer1 && writer1.msb) await writer1.msb.close();
-    if (writer2 && writer2.msb) await writer2.msb.close();
+    const toClose = []
+    if (indexer.msb) toClose.push(indexer.msb.close());
+    if (writer1.msb) toClose.push(writer1.msb.close());
+    if (writer2.msb) toClose.push(writer2.msb.close());
+    if (admin.msb) toClose.push(admin.msb.close());
+    await Promise.all(toClose)
     if (tmpDirectory) await removeTemporaryDirectory(tmpDirectory);
 })

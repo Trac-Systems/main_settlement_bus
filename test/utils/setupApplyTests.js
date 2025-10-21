@@ -3,19 +3,20 @@ import {generateMnemonic, mnemonicToSeed} from 'bip39-mnemonic';
 import b4a from 'b4a'
 import PeerWallet from "trac-wallet"
 import path from 'path';
-import CompleteStateMessageOperations from '../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
+import CompleteStateMessageOperations from '../../src/messages/completeStateMessages/CompleteStateMessageOperations.js'
 import PartialStateMessageOperations from '../../src/messages/partialStateMessages/PartialStateMessageOperations.js';
 import {MainSettlementBus} from '../../src/index.js'
 import fileUtils from '../../src/utils/fileUtils.js'
 import {EntryType} from '../../src/utils/constants.js';
 import {sleep} from '../../src/utils/helpers.js'
 import {formatIndexersEntry} from '../../src/utils/helpers.js';
-import {generatePreTx} from '../../src/utils/transactionUtils.js';
 import {blake3Hash} from '../../src/utils/crypto.js';
 import CompleteStateMessageBuilder from '../../src/messages/completeStateMessages/CompleteStateMessageBuilder.js'
 import CompleteStateMessageDirector from '../../src/messages/completeStateMessages/CompleteStateMessageDirector.js'
 import { safeEncodeApplyOperation } from "../../src/utils/protobuf/operationHelpers.js"
-
+import { $TNK } from '../../src/core/state/utils/balance.js';
+import { operation } from 'trac-crypto-api'
+import { EventType } from '../../src/utils/constants.js';
 let os, fsp;
 
 /**
@@ -108,22 +109,20 @@ export async function setupMsbPeer(peerName, peerKeyPair, temporaryDirectory, op
 
 export async function initMsbAdmin(keyPair, temporaryDirectory, options = {}) {
     const peerName = 'admin';
-    const admin = await initMsbPeer(peerName, keyPair, temporaryDirectory, options);
+    const admin = await initMsbPeer(peerName, keyPair, temporaryDirectory, { ...options, bootstrap: randomBytes(32).toString('hex') });
 
     await admin.msb.ready();
     admin.options.bootstrap = admin.msb.state.writingKey;
     await admin.msb.close();
 
     admin.msb = new MainSettlementBus(admin.options);
+    await admin.msb.ready();
+    await admin.msb.state.append(null); // before initialization system.indexers is empty, we need to initialize first block to create system.indexers array
     return admin;
 }
 
 export async function setupMsbAdmin(keyPair, temporaryDirectory, options = {}) {
     const admin = await initMsbAdmin(keyPair, temporaryDirectory, options);
-
-    await admin.msb.ready();
-
-    await admin.msb.state.append(null); // before initialization system.indexers is empty, we need to initialize first block to create system.indexers array
     const txValidity = await admin.msb.state.getIndexerSequenceState();
     const addAdminMessage = await CompleteStateMessageOperations.assembleAddAdminMessage(admin.wallet, admin.msb.state.writingKey, txValidity);
     await admin.msb.state.append(addAdminMessage);
@@ -135,69 +134,77 @@ export async function setupNodeAsWriter(admin, writerCandidate) {
     try {
         await setupWhitelist(admin, [writerCandidate.wallet.address]); // ensure if is whitelisted
 
-        const isWriter = async (address) => {
-            const result = await admin.msb.state.getNodeEntry(address);
-            return result && result.isWriter && !result.isIndexer;
-        }
-
         const validity = await admin.msb.getIndexerSequenceState()
-        const req = await PartialStateMessageOperations.assembleAddWriterMessage(writerCandidate.wallet, writerCandidate.msb.state.writingKey, validity);
-        await admin.msb.broadcastPartialTransaction(req);
-        await tick(); // wait for the request to be processed
-        let counter;
-        const limit = 20; // maximum number of attempts to verify the role
-        for (counter = 0; counter < limit; counter++) {
-            if (await isWriter(writerCandidate.wallet.address) && await writerCandidate.msb.state.isWritable()) {
-                break;
-            }
-            await writerCandidate.msb.state.base.update();
-            await writerCandidate.msb.state.base.view.update();
-            await writerCandidate.msb.network.swarm.flush()
-            await sleep(1000); // wait for the peer to sync state
-        }
+        const req = await PartialStateMessageOperations.assembleAddWriterMessage(
+            writerCandidate.wallet,
+            writerCandidate.msb.state.writingKey,
+            validity);
+
+        await waitWritable(admin, writerCandidate, async () => {
+            const raw = await CompleteStateMessageOperations.assembleAddWriterMessage(
+                admin.wallet,
+                req.address,
+                b4a.from(req.rao.tx, 'hex'),
+                b4a.from(req.rao.txv, 'hex'),
+                b4a.from(req.rao.iw, 'hex'),
+                b4a.from(req.rao.in, 'hex'),
+                b4a.from(req.rao.is, 'hex')
+            )
+            await admin.msb.state.append(raw)
+        })
 
         return writerCandidate;
     } catch (error) {
         throw new Error('Error setting up MSB writer: ', error.message || error);
     }
+}
+
+export async function promoteToWriter(admin, writerCandidate) {
+    await setupWhitelist(admin, [writerCandidate.wallet.address]);
+    await waitForNodeState(writerCandidate,
+        writerCandidate.wallet.address,
+        {
+            wk: writerCandidate.msb.state.writingKey,
+            isWhitelisted: true,
+            isWriter: false,
+            isIndexer: false,
+        })
+    const validity = await admin.msb.state.getIndexerSequenceState()
+    const req = await PartialStateMessageOperations.assembleAddWriterMessage(
+        writerCandidate.wallet,
+        b4a.toString(writerCandidate.msb.state.writingKey, 'hex'),
+        b4a.toString(validity, 'hex'));
+
+    await waitWritable(writerCandidate, writerCandidate, async () => {
+        const raw = await CompleteStateMessageOperations.assembleAddWriterMessage(
+            admin.wallet,
+            req.address,
+            b4a.from(req.rao.tx, 'hex'),
+            b4a.from(req.rao.txv, 'hex'),
+            b4a.from(req.rao.iw, 'hex'),
+            b4a.from(req.rao.in, 'hex'),
+            b4a.from(req.rao.is, 'hex')
+        )
+        await admin.msb.state.append(raw)
+    })
+
+    return writerCandidate;
 }
 
 export async function setupMsbWriter(admin, peerName, peerKeyPair, temporaryDirectory, options = {}) {
     try {
         const writerCandidate = await setupMsbPeer(peerName, peerKeyPair, temporaryDirectory, options);
-        await setupWhitelist(admin, [writerCandidate.wallet.address]);
-
-        const isWriter = async (address) => {
-            const result = await admin.msb.state.getNodeEntry(address);
-            return result && result.isWriter && !result.isIndexer;
-        }
-
-        const validity = await admin.msb.state.getIndexerSequenceState()
-        const req = await PartialStateMessageOperations.assembleAddWriterMessage(writerCandidate.wallet, b4a.toString(writerCandidate.msb.state.writingKey, 'hex'), b4a.toString(validity, 'hex'));
-        await writerCandidate.msb.broadcastPartialTransaction(req);
-        await tick(); // wait for the request to be processed
-        let counter;
-        const limit = 10; // maximum number of attempts to verify the role
-        for (counter = 0; counter < limit; counter++) {
-            if (await isWriter(writerCandidate.wallet.address) && await writerCandidate.msb.state.isWritable()) {
-                break;
-            }
-            await writerCandidate.msb.state.base.forceFastForward(); // This performs an update after the core sync
-            await writerCandidate.msb.state.base.view.update();
-            await writerCandidate.msb.network.swarm.flush()
-            await sleep(1000); // wait for the peer to sync state
-        }
-
-        return writerCandidate;
+        await fundPeer(admin, writerCandidate, $TNK(10n)) // It is assumed that a writer will write and therefore, will need money to process stuff
+        return await promoteToWriter(admin, writerCandidate)
     } catch (error) {
         throw new Error('Error setting up MSB writer: ', error.message || error);
     }
 }
 
-
 export async function setupMsbIndexer(indexerCandidate, admin) {
     try {
-        const req = await CompleteStateMessageOperations.assembleAddIndexerMessage(admin.wallet, indexerCandidate.wallet.address);
+        const validity = await admin.msb.state.getIndexerSequenceState()
+        const req = await CompleteStateMessageOperations.assembleAddIndexerMessage(admin.wallet, indexerCandidate.wallet.address, validity);
         await admin.msb.state.append(req);
         await tick(); // wait for the request to be processed
 
@@ -218,9 +225,10 @@ export async function setupMsbIndexer(indexerCandidate, admin) {
                 break;
             }
             await indexerCandidate.msb.state.append(null);
-            await indexerCandidate.msb.state.base.update();
+            await indexerCandidate.msb.state.base.forceFastForward();
             await indexerCandidate.msb.state.base.view.update();
             await indexerCandidate.msb.network.swarm.flush()
+            await admin.msb.state.base.update()
             await sleep(1000); // wait for the peer to sync state
         }
 
@@ -250,6 +258,8 @@ export async function setupWhitelist(admin, whitelistAddresses) {
     const assembledWhitelistMessages = await CompleteStateMessageOperations.assembleAppendWhitelistMessages(admin.wallet, validity);
     for (const [_, msg] of assembledWhitelistMessages.entries()) {
         await admin.msb.state.append(msg);
+        await sleep(100)
+        await admin.msb.state.base.forceFastForward()
     }
     fileUtils.readPublicKeysFromFile = originalReadPublicKeysFromFile;
 }
@@ -295,12 +305,34 @@ export async function initDirectoryStructure(peerName, keyPair, temporaryDirecto
     }
 }
 
-export const generatePostTx = async (writer, externalNode) => {
-    const externalContractBootstrap = randomBytes(32).toString('hex');
-    const validatorAddress = writer.wallet.address;
+export const deployExternalBootstrap = async (writer, externalNode) => {
+    const externalBootstrap = randomBytes(32).toString('hex');
+    const txValidity = await writer.msb.state.getIndexerSequenceState();
+    const payload = await PartialStateMessageOperations.assembleBootstrapDeploymentMessage(
+        externalNode.msb.wallet,
+        externalBootstrap,
+        randomBytes(32).toString('hex'),
+        txValidity.toString('hex')
+    );
 
+    const raw = await CompleteStateMessageOperations.assembleCompleteBootstrapDeployment(
+        writer.msb.wallet,
+        payload.address,
+        b4a.from(payload.bdo.tx, 'hex'),
+        b4a.from(payload.bdo.txv, 'hex'),
+        b4a.from(payload.bdo.bs, 'hex'),
+        b4a.from(payload.bdo.ic, 'hex'),
+        b4a.from(payload.bdo.in, 'hex'),
+        b4a.from(payload.bdo.is, 'hex'),
+    )
+    await writer.msb.state.base.append(raw)
+    await tick()
+    await waitForHash(writer, payload.bdo.tx)
+    return externalBootstrap
+}
+
+export const generatePostTx = async (writer, externalNode, externalContractBootstrap) => {
     const peerWriterKey = randomBytes(32).toString('hex');
-    const peerAddress = externalNode.wallet.address;
 
     const testObj = {
         type: 'deployTest',
@@ -314,33 +346,30 @@ export const generatePostTx = async (writer, externalNode) => {
     };
 
     const contentHash = await blake3Hash(JSON.stringify(testObj));
-    const preTx = await generatePreTx(
+    const validity = await writer.msb.state.getIndexerSequenceState()
+    const tx = await PartialStateMessageOperations.assembleTransactionOperationMessage(
         externalNode.wallet,
-        validatorAddress,
         peerWriterKey,
-        peerAddress,
-        contentHash,
+        b4a.toString(validity, 'hex'),
+        b4a.toString(contentHash, 'hex'),
         externalContractBootstrap,
-        writer.msb.bootstrap
-    );
+        b4a.toString(writer.msb.bootstrap, 'hex')
+    )
 
     const postTx = await CompleteStateMessageOperations.assembleCompleteTransactionOperationMessage(
         writer.wallet,
-        preTx.va,
-        b4a.from(preTx.tx, 'hex'),
-        preTx.ia,
-        b4a.from(preTx.iw, 'hex'),
-        b4a.from(preTx.in, 'hex'),
-        b4a.from(preTx.ch, 'hex'),
-        b4a.from(preTx.is, 'hex'),
-        b4a.from(preTx.bs, 'hex'),
-        b4a.from(preTx.mbs, 'hex')
+        tx.address,
+        b4a.from(tx.txo.tx, 'hex'),
+        b4a.from(tx.txo.txv, 'hex'),
+        b4a.from(tx.txo.iw, 'hex'),
+        b4a.from(tx.txo.in, 'hex'),
+        b4a.from(tx.txo.ch, 'hex'),
+        b4a.from(tx.txo.is, 'hex'),
+        b4a.from(tx.txo.bs, 'hex'),
+        b4a.from(tx.txo.mbs, 'hex')
     );
 
-    const txHash = preTx.tx;
-
-    return {postTx, txHash};
-
+    return { postTx, txHash: tx.txo.tx };
 }
 
 /**
@@ -352,6 +381,9 @@ export const generatePostTx = async (writer, externalNode) => {
  */
 export const tryToSyncWriters = async (...args) => {
     try {
+        const [first, ..._] = args
+        await first.msb.state.base.forceFastForward()
+        await first.msb.state.base.view.update()
         let attempts = 0;
         const maxAttempts = 10;
         while (attempts < maxAttempts) {
@@ -360,8 +392,7 @@ export const tryToSyncWriters = async (...args) => {
             for (const node of args) {
                 let signedLength = node.msb.state.getSignedLength();
                 if (signedLength < maxLength) {
-                    //await node.msb.state.append(null);
-                    await node.msb.state.base.update();
+                    await node.msb.state.base.forceFastForward();
                     await node.msb.state.base.view.update();
                     await node.msb.network.swarm.flush()
                     await sleep(1000);
@@ -408,6 +439,40 @@ export async function waitForNotIndexer(indexer) {
     }
 }
 
+export async function waitIndexer(node, operation) {
+    const waiter = new Promise(resolve => {
+        node.msb.state.base.once(EventType.IS_INDEXER, (...args) => {
+            resolve(args)
+        })
+    })
+    await operation()
+    return waiter
+}
+
+export async function waitWritable(admin, node, operation) {
+    const waiter = new Promise(resolve => {
+        node.msb.state.base.once(EventType.WRITABLE, (...args) => {
+            resolve(args)
+        })
+    })
+    await operation()
+    await node.msb.state.base.forceFastForward(); // This performs an update after the core sync
+    await node.msb.state.base.view.update();
+    await admin.msb.state.base.update()
+    await node.msb.network.swarm.flush()
+    return waiter
+}
+
+export async function waitDemotion(node, operation) {
+    const waiter = new Promise(resolve => {
+        node.msb.state.base.once(EventType.UNWRITABLE, (...args) => {
+            resolve(args)
+        })
+    })
+    await operation()
+    return waiter
+}
+
 /**
  * Waits until the given node sees the expected state for a target address.
  *
@@ -429,7 +494,7 @@ export async function waitForNodeState(node, address, expected) {
     try {
         await node.msb.state.base.flush()
         let attempts = 0;
-        const maxAttempts = 20;
+        const maxAttempts = 50;
         while (attempts < maxAttempts) {
             const state = await node.msb.state.getNodeEntry(address);
             if (
@@ -442,11 +507,31 @@ export async function waitForNodeState(node, address, expected) {
                 return;
             }
             await node.msb.network.swarm.flush()
-            await sleep(1000);
+            await sleep(400);
             attempts++;
         }
     } catch (error) {
         throw new Error("Error synchronizing node state: " + error.message || error);
+    }
+}
+
+export async function waitForHash(node, expected) {
+    try {
+        let attempts = 0;
+        const maxAttempts = 20;
+        while (attempts < maxAttempts) {
+            const entry = await node.msb.state.get(expected);
+            if (
+                !!entry
+            ) {
+                break;
+            }
+            await node.msb.network.swarm.flush()
+            await sleep(1000);
+            attempts++;
+        }
+    } catch (error) {
+        throw new Error('Error waiting for admin entry: ' + error.message || error);
     }
 }
 

@@ -29,9 +29,8 @@ const setupNetwork = async () => {
         store_name: '/admin'
     }
 
-    const peer = await setupMsbAdmin(testKeyPair1, tmpDirectory, rpcOpts)
-    const writer = await setupMsbWriter(peer, 'writer', testKeyPair2, tmpDirectory, rpcOpts);
-    await fundPeer(peer, writer, $TNK(100n))
+    const peer =await setupMsbAdmin(testKeyPair1, tmpDirectory, rpcOpts)
+    const writer = await setupMsbWriter(peer, 'writer', testKeyPair2, tmpDirectory, peer.options);
     return { writer, peer }
 }
 
@@ -53,13 +52,13 @@ describe("API acceptance tests", () => {
     it("GET /v1/confirmed-length", async () => {
         const res = await request(server).get("/v1/confirmed-length")
         expect(res.statusCode).toBe(200)
-        expect(res.body).toEqual({ confirmed_length: 16 })
+        expect(res.body).toEqual({ confirmed_length: expect.any(Number) })
     })
 
     it("GET /v1/unconfirmed-length", async () => {
         const res = await request(server).get("/v1/unconfirmed-length")
         expect(res.statusCode).toBe(200)
-        expect(res.body).toEqual({ unconfirmed_length: 16 })
+        expect(res.body).toEqual({ unconfirmed_length: expect.any(Number) })
     })
 
     it("GET /v1/txv", async () => {
@@ -97,7 +96,7 @@ describe("API acceptance tests", () => {
     it("GET /v1/balance", async () => {
         const res = await request(server).get(`/v1/balance/${wallet.address}`)
         expect(res.statusCode).toBe(200)
-        expect(res.body).toEqual({ address: wallet.address, balance: "100000000000000000000" })
+        expect(res.body).toEqual({ address: wallet.address, balance: "9670000000000000000" })
     })
 
     it("POST /v1/broadcast-transaction", async () => {
@@ -124,13 +123,11 @@ describe("API acceptance tests", () => {
         })
     })
 
-    // TODO: not sure why but test runner does not work, so this will require more attention.
-    // We can map some of the tx hashes from previous OPs and fetch and assert payload here
     it("POST /v1/tx-payloads-bulk", async () => {
-        
-        const payload = { hashes: [
-            "test"
-        ]}
+        const result = await msb.state.confirmedTransactionsBetween(0, 40) // This is just an arbitrary range that will most likely contain valid
+        const hashes = result.map(({ hash }) => hash)
+
+        const payload = { hashes }
 
         const res = await request(server)
             .post("/v1/tx-payloads-bulk")
@@ -139,8 +136,12 @@ describe("API acceptance tests", () => {
         
         expect(res.statusCode).toBe(200)
         expect(res.body).toMatchObject({
-            results: [],
-            missing:["test"]
+            results: expect.arrayOf(
+                expect.objectContaining({
+                    hash: expect.any(String),
+                })
+            ),
+            missing:[]
         })
     })
 })

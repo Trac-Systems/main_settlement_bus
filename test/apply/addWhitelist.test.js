@@ -1,15 +1,14 @@
-import { test, hook } from 'brittle';
+import { test, hook } from '../utils/wrapper.js';
 import b4a from 'b4a';
-import PeerWallet from 'trac-wallet';
-
 import { setupMsbAdmin, initTemporaryDirectory, removeTemporaryDirectory, randomBytes } from '../utils/setupApplyTests.js';
 import { testKeyPair1, testKeyPair2 } from '../fixtures/apply.fixtures.js';
 import fileUtils from '../../src/utils/fileUtils.js';
 import CompleteStateMessageOperations from '../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
-
+import { address as addressApi } from 'trac-crypto-api';
+import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
 
 let admin, whitelistKeys, tmpDirectory, originalReadPublicKeysFromFile;
-const address = PeerWallet.encodeBech32m(b4a.from(testKeyPair2.publicKey, 'hex'));
+const address = addressApi.encode(TRAC_NETWORK_MSB_MAINNET_PREFIX, b4a.from(testKeyPair2.publicKey, 'hex'))
 hook('Initialize admin node for addWhitelist tests', async () => {
     const randomChannel = randomBytes(32).toString('hex');
     const baseOptions = {
@@ -32,7 +31,8 @@ hook('Initialize admin node for addWhitelist tests', async () => {
 });
 
 test('Apply function addWhitelist - happy path', async (t) => {
-    const assembledWhitelistMessages = await CompleteStateMessageOperations.assembleAppendWhitelistMessages(admin.wallet);
+    const validity = b4a.from(await admin.msb.state.getIndexerSequenceState(), 'hex')
+    const assembledWhitelistMessages = await CompleteStateMessageOperations.assembleAppendWhitelistMessages(admin.wallet, validity);
     const payload = assembledWhitelistMessages.get(address);
 
     await admin.msb.state.append(payload);
