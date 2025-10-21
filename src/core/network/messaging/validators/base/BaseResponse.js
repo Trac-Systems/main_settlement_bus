@@ -23,8 +23,7 @@ class BaseResponse {
     validateIssuerPublicKey(message) {
         const issuerPublicKey = b4a.from(message.issuer, 'hex');
         if (!b4a.equals(issuerPublicKey, this.#wallet.publicKey)) {
-            console.error("Issuer public key does not match wallet public key.");
-            return false;
+            throw new Error("Issuer public key does not match the wallet's public key.");
         }
         return true;
     }
@@ -35,16 +34,14 @@ class BaseResponse {
         const fiveSeconds = 5000;
 
         if (now - timestamp > fiveSeconds) {
-            console.error("Validator response is too old, ignoring.");
-            return false;
+            throw new Error("Validator response is too old, ignoring.");
         }
         return true;
     }
 
     validateChannel(message, channelString) {
         if (message.channel !== channelString) {
-            console.error("Channel mismatch in validator response.");
-            return false;
+            throw new Error("Channel mismatch in validator response.");
         }
         return true;
     }
@@ -71,8 +68,7 @@ class BaseResponse {
         }
 
         if (!publicKey) {
-            console.error("Failed to derive public key from message.");
-            return false;
+            throw new Error("Failed to derive public key from message.");
         }
 
         const messageWithoutSig = { ...message };
@@ -82,8 +78,7 @@ class BaseResponse {
         const verified = this.#wallet.verify(signature, hash, publicKey);
 
         if (!verified) {
-            console.error("Signature in the response verification failed.");
-            return false;
+            throw new Error("Signature in the response verification failed.");
         }
         return true;
     }

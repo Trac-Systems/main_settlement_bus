@@ -15,8 +15,7 @@ class CustomNodeResponse extends BaseResponse {
             !await this.validateSignature(message) ||
             !this.validateChannel(message, channelString)
         ) {
-            console.error("Custom node response validation failed");
-            return false;
+            throw new Error("Custom node response validation failed");
         }
 
         return true;
@@ -30,8 +29,7 @@ class CustomNodeResponse extends BaseResponse {
             !message.channel ||
             !message.issuer ||
             !message.timestamp) {
-            console.error("Custom node response is missing required fields.");
-            return false;
+            throw new Error("Custom node response is missing required fields.");
         }
         return true;
     }
@@ -40,8 +38,7 @@ class CustomNodeResponse extends BaseResponse {
         const customNodeAddressString = message.address;
         const customNodeEntry = await this.state.getNodeEntry(customNodeAddressString);
         if (customNodeEntry === null) {
-            console.error("Custom node entry is null - entry is not initialized.");
-            return false;
+            throw new Error("Custom node entry is null - entry is not initialized.");
         }
         return true;
     }
