@@ -333,7 +333,6 @@ export const deployExternalBootstrap = async (writer, externalNode) => {
 
 export const generatePostTx = async (writer, externalNode, externalContractBootstrap) => {
     const peerWriterKey = randomBytes(32).toString('hex');
-    // const peerAddress = externalNode.wallet.address;
 
     const testObj = {
         type: 'deployTest',

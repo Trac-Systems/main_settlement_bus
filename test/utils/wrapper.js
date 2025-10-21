@@ -14,9 +14,6 @@ const test = (label, callback) => {
   brittleTest(label, async (t) => {
     try{
       await callback(t)
-      // t._active = false
-      // t._wait = false
-      // t._isEnded = true
     } catch (error) {
       console.log(error?.message)
       t.fail(`FAIL: ${label}`, error?.message || error);

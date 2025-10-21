@@ -32,7 +32,6 @@ const testCases = [
 ];
 
 const close = async node => {
-    // await node.msb.state.base.flush()
     await node.msb.close()
 }
 

@@ -27,7 +27,6 @@ import CompleteStateMessageOperations from '../../../src/messages/completeStateM
 let tmpDirectory, admin, writer, externalNode, externalBootstrap, maliciousPeer;
 
 const close = async node => {
-    // await node.msb.state.base.flush()
     await node.msb.close()
 }
 
