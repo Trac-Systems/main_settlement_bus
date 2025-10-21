@@ -9,7 +9,7 @@
   "type": "module",
   "scripts": {
     "dev": "pear run -d .",
-    "prod": "pear run . ${npm_config_store}",
+    "prod": "NODE_OPTIONS='--max-old-space-size=4096' pear run . ${npm_config_store}",
     "dev-rpc": "pear run -d . ${npm_config_store} --rpc --port ${npm_config_port}",
     "prod-rpc": "pear run . ${npm_config_store} --rpc --host ${npm_config_host} --port ${npm_config_port}",
     "protobuf": "node scripts/generate-protobufs.js",
