@@ -123,12 +123,11 @@ describe("API acceptance tests", () => {
         })
     })
 
-    // TODO: not sure why but test runner does not work, so this will require more attention.
-    // We can map some of the tx hashes from previous OPs and fetch and assert payload here
     it("POST /v1/tx-payloads-bulk", async () => {
-        const payload = { hashes: [
-            "test"
-        ]}
+        const result = await msb.state.confirmedTransactionsBetween(0, 40) // This is just an arbitrary range that will most likely contain valid
+        const hashes = result.map(({ hash }) => hash)
+
+        const payload = { hashes }
 
         const res = await request(server)
             .post("/v1/tx-payloads-bulk")
@@ -137,8 +136,12 @@ describe("API acceptance tests", () => {
         
         expect(res.statusCode).toBe(200)
         expect(res.body).toMatchObject({
-            results: [],
-            missing:["test"]
+            results: expect.arrayOf(
+                expect.objectContaining({
+                    hash: expect.any(String),
+                })
+            ),
+            missing:[]
         })
     })
 })
