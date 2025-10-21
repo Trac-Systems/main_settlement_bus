@@ -53,9 +53,14 @@ class Scheduler {
         };
 
         this.#currentWorkerRun = this.#worker(scheduleNext);
-
-        await this.#currentWorkerRun; // this await is needed here because #worker can be async
-        this.#currentWorkerRun = null;
+        try {
+            await this.#currentWorkerRun; // this await is needed here because #worker can be async
+        } catch (error) {
+            console.error('Worker error:', error);
+            return this.defaultInterval;
+        } finally {
+            this.#currentWorkerRun = null;
+        }
 
         return scheduleCalled ? nextDelay : this.defaultInterval;
     }
