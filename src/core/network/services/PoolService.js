@@ -1,12 +1,13 @@
-
+// PoolService.js
 import { BATCH_SIZE, PROCESS_INTERVAL_MS } from '../../../utils/constants.js';
-import { sleep } from '../../../utils/helpers.js';
+import Scheduler from '../../../utils/Scheduler.js';
+
 class PoolService {
-    #processInterval = null;
     #state;
     #address;
     #options;
-    #tx_pool = []; // TODO: Probably it is a good idea to limit the size of the pool in the future.
+    #tx_pool = [];
+    #scheduler = null;
 
     constructor(state, address, options = {}) {
         this.#state = state;
@@ -32,28 +33,41 @@ class PoolService {
 
     async start() {
         if (!this.options.enable_wallet) {
-            console.log('PoolService can not start. Wallet is not enabled');
+            console.info('PoolService can not start. Wallet is not enabled');
+            return;
+        }
+        if (this.scheduler && this.scheduler.isRunning) {
+            console.info('PoolService is already started');
             return;
         }
 
-        const interval = setInterval(async () => {
-            try {
-                await this.#processTransactions();
-            } catch (error) {
-                console.error('error in the PoolService:', error);
-                this.stopPool();
-            }
-        }, PROCESS_INTERVAL_MS);
+        this.#scheduler = this.#createScheduler();
+        this.#scheduler.start();
+    }
 
-        this.#processInterval = interval;
+    async #worker(next) {
+        try {
+            await this.#processTransactions();
+            if (this.#tx_pool.length > 0) {
+                next(0);
+            } else {
+                next(PROCESS_INTERVAL_MS);
+            }
+        } catch (error) {
+            throw new Error(`PoolService worker error: ${error.message}`);
+        }
+    }
+
+    #createScheduler() {
+        return new Scheduler(this.#worker.bind(this), PROCESS_INTERVAL_MS);
     }
 
     async #processTransactions() {
         const canValidate = await this.#checkValidationPermissions();
 
-        if (canValidate && this.tx_pool.length > 0) {
+        if (canValidate && this.#tx_pool.length > 0) {
             const batch = this.#prepareBatch();
-            await this.state.append(batch);
+            await this.#state.append(batch);
         }
     }
 
@@ -65,7 +79,7 @@ class PoolService {
 
     #prepareBatch() {
         const length = Math.min(this.tx_pool.length, BATCH_SIZE);
-        const batch = this.tx_pool.slice(0,length);
+        const batch = this.tx_pool.slice(0, length);
         this.tx_pool.splice(0, length);
         return batch;
     }
@@ -74,13 +88,12 @@ class PoolService {
         this.tx_pool.push(tx);
     }
 
-    stopPool() {
-        if (this.#processInterval) {
-            clearInterval(this.#processInterval);
-            this.#processInterval = null;
-        }
+    async stopPool(waitForCurrent = true) {
+        if (!this.#scheduler) return;
+        await this.#scheduler.stop(waitForCurrent);
+        this.#scheduler = null;
+        console.info('PoolService: closing gracefully...');
     }
-
 }
 
 export default PoolService;
