@@ -20,7 +20,6 @@ import {safeDecodeApplyOperation, safeEncodeApplyOperation} from '../../../src/u
 import {testKeyPair1, testKeyPair2, testKeyPair3, testKeyPair4, testKeyPair5} from '../../fixtures/apply.fixtures.js';
 import {OperationType} from "../../../src/utils/constants.js";
 import {addressToBuffer} from "../../../src/core/state/utils/address.js";
-import { sleep } from '../../../src/utils/helpers.js';
 import { $TNK } from '../../../src/core/state/utils/balance.js';
 import CompleteStateMessageOperations from '../../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
 

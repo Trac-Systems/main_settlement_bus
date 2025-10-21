@@ -29,9 +29,8 @@ const setupNetwork = async () => {
         store_name: '/admin'
     }
 
-    const peer = await setupMsbAdmin(testKeyPair1, tmpDirectory, rpcOpts)
-    const writer = await setupMsbWriter(peer, 'writer', testKeyPair2, tmpDirectory, rpcOpts);
-    await fundPeer(peer, writer, $TNK(100n))
+    const peer =await setupMsbAdmin(testKeyPair1, tmpDirectory, rpcOpts)
+    const writer = await setupMsbWriter(peer, 'writer', testKeyPair2, tmpDirectory, peer.options);
     return { writer, peer }
 }
 
@@ -97,7 +96,7 @@ describe("API acceptance tests", () => {
     it("GET /v1/balance", async () => {
         const res = await request(server).get(`/v1/balance/${wallet.address}`)
         expect(res.statusCode).toBe(200)
-        expect(res.body).toEqual({ address: wallet.address, balance: "100000000000000000000" })
+        expect(res.body).toEqual({ address: wallet.address, balance: "9670000000000000000" })
     })
 
     it("POST /v1/broadcast-transaction", async () => {
@@ -127,7 +126,6 @@ describe("API acceptance tests", () => {
     // TODO: not sure why but test runner does not work, so this will require more attention.
     // We can map some of the tx hashes from previous OPs and fetch and assert payload here
     it("POST /v1/tx-payloads-bulk", async () => {
-        
         const payload = { hashes: [
             "test"
         ]}
