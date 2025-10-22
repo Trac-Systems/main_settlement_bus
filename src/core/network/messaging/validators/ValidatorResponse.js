@@ -16,8 +16,7 @@ class ValidatorResponse extends BaseResponse {
             !await this.validateSignature(message) ||
             !this.validateChannel(message, channelString)
         ) {
-            console.error("Validator response validation failed");
-            return false;
+            throw new Error("Validator response validation failed");
         }
         return true;
     }
@@ -31,8 +30,7 @@ class ValidatorResponse extends BaseResponse {
             !message.channel ||
             !message.issuer ||
             !message.timestamp) {
-            console.error("Validator response is missing required fields.");
-            return false;
+            throw new Error("Validator response is missing required fields.");
         }
         return true;
     }
@@ -42,8 +40,7 @@ class ValidatorResponse extends BaseResponse {
         const adminEntry = await this.state.getAdminEntry();
 
         if (validatorEntry === null || !validatorEntry.isWriter) {
-            console.error("Validator entry not found in state or is not a writer.");
-            return false;
+            throw new Error("Validator entry not found in state or is not a writer.");
         }
 
         if (adminEntry && message.address === adminEntry.address) {
@@ -51,8 +48,7 @@ class ValidatorResponse extends BaseResponse {
         }
 
         if (validatorEntry.isIndexer) {
-            console.error("Validator is an indexer.");
-            return false;
+            throw new Error("Validator is an indexer.");
         }
         return true;
     }
@@ -62,8 +58,7 @@ class ValidatorResponse extends BaseResponse {
         const validatorEntry = await this.state.getNodeEntry(message.address);
         
         if (!validatorEntry || !b4a.equals(validatorEntry.wk, writingKey)) {
-            console.error("Writing key does not match validator entry.");
-            return false;
+            throw new Error("Writing key does not match validator entry.");
         }
         return true;
     }

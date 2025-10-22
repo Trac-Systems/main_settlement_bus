@@ -31,8 +31,7 @@ import { normalizeDecodedPayloadForJson, normalizeTransferOperation, normalizeTr
 import PartialTransfer from "./core/network/messaging/validators/PartialTransfer.js";
 import { blake3Hash } from "./utils/crypto.js";
 import PartialTransaction from "./core/network/messaging/validators/PartialTransaction.js";
-
-//TODO create a MODULE which will separate logic responsible for role managment
+import deploymentEntryUtils from "./core/state/utils/deploymentEntry.js";
 
 export class MainSettlementBus extends ReadyResource {
     // internal attributes
@@ -925,6 +924,36 @@ export class MainSettlementBus extends ReadyResource {
                     msbBootstrap
                 )
                 await this.broadcastPartialTransaction(assembledTransactionOperation);
+                break;
+            case '/test2':
+                let messageCount = 0;
+                const duration = 60000;
+                const interval = setInterval(async () => {
+                    try {
+                        const contentHash = randomBytes(32).toString('hex');
+                        const randomExternalBootstrap = "5adb970a73e20e8e2e896cd0c30cf025a0b32ec6fe026b98c6714115239607ac";
+                        const randomWk = randomBytes(32).toString('hex');
+                        const txValidity = await this.#state.getIndexerSequenceState();
+                        const msbBootstrap = this.bootstrap.toString('hex');
+                        const assembledTransactionOperation = await PartialStateMessageOperations.assembleTransactionOperationMessage(
+                            this.#wallet,
+                            randomWk,
+                            txValidity.toString('hex'),
+                            contentHash,
+                            randomExternalBootstrap,
+                            msbBootstrap
+                        );
+                        await this.broadcastPartialTransaction(assembledTransactionOperation);
+                        messageCount++;
+                        console.log(`Sent message ${messageCount} at ${new Date().toISOString()}`);
+                    } catch (error) {
+                        console.error('Error sending message:', error);
+                    }
+                }, 50); // Send a message every 50ms
+
+                setTimeout(() => {
+                    clearInterval(interval);
+                }, duration);
                 break;
             case '/balance_migration':
                 await this.#handleBalanceMigrationOperation();
