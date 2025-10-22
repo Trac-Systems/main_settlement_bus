@@ -9,8 +9,9 @@ class Scheduler {
         if (typeof worker !== 'function') {
             throw new TypeError('Worker must be a function');
         }
+        const interval = Scheduler.#validateDelay(defaultInterval ?? 100, 'defaultInterval');
         this.#worker = worker;
-        this.#defaultInterval = defaultInterval ?? 100;
+        this.#defaultInterval = interval;
     }
 
     get isRunning() {
@@ -29,10 +30,19 @@ class Scheduler {
         return this.#currentWorkerRun;
     }
 
+    static #validateDelay(delayMs, scope = 'delayMs') {
+        const ms = Number(delayMs);
+        if (!Number.isFinite(ms) || ms < 0) {
+            throw new RangeError(`Invalid ${scope} value: ${delayMs}`);
+        }
+        return ms;
+    }
+
     start(initialDelayMs = 0) {
         if (this.isRunning) return;
+        const delayMs = Scheduler.#validateDelay(initialDelayMs, 'start delayMs');
         this.#isRunning = true;
-        this.#next(initialDelayMs);
+        this.#next(delayMs);
     }
 
     async run() {
@@ -42,14 +52,8 @@ class Scheduler {
         let nextDelay = null;
 
         const scheduleNext = (ms) => {
-            const delayMs = Number(ms);
-
-            if (!Number.isFinite(delayMs) || delayMs < 0) {
-                throw new RangeError(`Invalid scheduleNext value: ${ms}`);
-            }
-
             scheduleCalled = true;
-            nextDelay = delayMs;
+            nextDelay = Scheduler.#validateDelay(ms, 'scheduleNext delayMs');
         };
 
         this.#currentWorkerRun = this.#worker(scheduleNext);
@@ -67,13 +71,13 @@ class Scheduler {
 
     #next(delayMs) {
         if (!this.isRunning) return;
-
+        const ms = Scheduler.#validateDelay(delayMs, 'next delayMs');
         this.#timer = setTimeout(async () => {
             const nextDelay = await this.run();
             if (this.isRunning) {
                 this.#next(nextDelay);
             }
-        }, delayMs);
+        }, ms);
     }
 
     async stop(waitForCurrent = true) {
