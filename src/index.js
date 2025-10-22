@@ -32,7 +32,6 @@ import PartialTransfer from "./core/network/messaging/validators/PartialTransfer
 import { blake3Hash } from "./utils/crypto.js";
 import deploymentEntryUtils from "./core/state/utils/deploymentEntry.js";
 import PartialTransaction from "./core/network/messaging/validators/PartialTransaction.js";
-import deploymentEntryUtils from "./core/state/utils/deploymentEntry.js";
 
 export class MainSettlementBus extends ReadyResource {
     // internal attributes
