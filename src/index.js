@@ -1051,10 +1051,10 @@ export class MainSettlementBus extends ReadyResource {
                 } else if (input.startsWith("/get_tx_info")) {
                     const splitted = input.split(" ");
                     const txHash = splitted[1];
-                    const {payload , decoded}  = await get_tx_info(this.#state, txHash);
-                    if (payload) {
+                    const txInfo  = await get_tx_info(this.#state, txHash);
+                    if (txInfo) {
                         console.log(`Payload for transaction hash ${txHash}:`);
-                        console.log(decoded);
+                        console.log(txInfo.decoded);
                     } else {
                         console.log(`No information found for transaction hash: ${txHash}`);
                     }
@@ -1223,6 +1223,10 @@ export class MainSettlementBus extends ReadyResource {
 
                     try {
                         const rawPayload = await get_tx_info(this.#state, hash);
+                        if(!rawPayload){
+                            console.log(`No payload found for tx hash: ${hash}`)
+                            return null
+                        } 
                         const normalizedPayload = normalizeDecodedPayloadForJson(rawPayload.decoded);
                         return normalizedPayload
                     } catch (error) {
