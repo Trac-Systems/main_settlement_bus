@@ -17,8 +17,7 @@ class AdminResponse extends BaseResponse {
             !await this.validateSignature(message) ||
             !this.validateChannel(message, channelString)
         ) {
-            console.error("Admin response validation failed");
-            return false;
+            throw new Error("Admin response validation failed");
         }
 
         return true;
@@ -33,8 +32,7 @@ class AdminResponse extends BaseResponse {
             !message.channel ||
             !message.issuer ||
             !message.timestamp) {
-            console.error("Admin response is missing required fields.");
-            return false;
+            throw new Error("Admin response is missing required fields.");
         }
         return true;
     }
@@ -42,8 +40,7 @@ class AdminResponse extends BaseResponse {
     async validateAdminData(message) {
         const adminEntry = await this.state.getAdminEntry();
         if (!adminEntry) {
-            console.error("Admin entry is null");
-            return false;
+            throw new Error("Admin entry is null"); 
         }
 
         const adminPublicKey = PeerWallet.decodeBech32m(adminEntry.address);
@@ -51,8 +48,7 @@ class AdminResponse extends BaseResponse {
         const adminWritingKey = b4a.from(message.wk, 'hex');
 
         if (!b4a.equals(adminPublicKey, receivedAdminPublicKey) || !b4a.equals(adminEntry.wk, adminWritingKey)) {
-            console.error("Admin public key or writing key mismatch in response.");
-            return false;
+            throw new Error("Admin public key or writing key mismatch in response.");
         }
 
         return true;
