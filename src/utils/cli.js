@@ -6,7 +6,7 @@ export async function verifyDag(state, network, wallet, writerKey) {
     try {
         console.log('---------- node & network stats ----------');
         let dagView, lengthdagView, dagSystem, lengthdagSystem;
-        
+
         if (state?.base?.view?.core && state?.base?.system?.core) {
             try {
                 dagView = await state.base.view.core.treeHash();
@@ -18,7 +18,7 @@ export async function verifyDag(state, network, wallet, writerKey) {
             }
         }
 
-        console.log('wallet.publicKey:', (wallet && wallet.publicKey) ? wallet.publicKey.toString('hex') : 'unset');
+        console.log('wallet.publicKey:', wallet?.publicKey?.toString('hex') ?? 'unset');
         console.log('wallet.address:', (wallet && wallet.address) ? wallet.address : 'unset');
         console.log('msb.writerKey:', writerKey ? writerKey.toString('hex') : 'unset');
         console.log('swarm.connections.size:', network?.swarm?.connections?.size || 0);
@@ -26,7 +26,7 @@ export async function verifyDag(state, network, wallet, writerKey) {
             console.log('base.view.core.signedLength:', state.base.view.core.signedLength ?? 'unset');
             console.log('base.view.core.length:', state.base.view.core.length ?? 'unset');
         }
-        
+
         if (state?.base) {
             console.log("base.signedLength", state.base.signedLength ?? 'unset');
             console.log("base.indexedLength", state.base.indexedLength ?? 'unset');
