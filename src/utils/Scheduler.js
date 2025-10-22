@@ -1,3 +1,23 @@
+/**
+ * Scheduler is a utility for running a worker function on a recurring schedule with flexible timing.
+ *
+ * There are three time-related entities:
+ *
+ * 1. initialDelayMs (start):
+ *    - Used to delay the very first execution after Scheduler is started.
+ *    - Useful for resource initialization, startup backoff, or staged launches.
+ *
+ * 2. defaultInterval (constructor):
+ *    - The fallback interval used between worker runs if no custom delay is scheduled.
+ *    - Represents the "heartbeat" or normal cadence of the scheduler.
+ *
+ * 3. scheduleNext (runtime):
+ *    - Allows the worker to dynamically adjust the next run's delay at runtime.
+ *    - Enables backoff, fast retry, or adaptive scheduling based on workload or errors.
+ *
+ * This design allows for robust, adaptive scheduling: you can start with a delay, run at a default interval,
+ * and dynamically adjust timing as needed for backoff or responsiveness.
+ */
 class Scheduler {
     #worker;
     #defaultInterval;
