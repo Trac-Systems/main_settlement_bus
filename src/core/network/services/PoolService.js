@@ -59,7 +59,7 @@ class PoolService {
     }
 
     #createScheduler() {
-        return new Scheduler(() => this.#worker(), PROCESS_INTERVAL_MS);
+        return new Scheduler((next) => this.#worker(next), PROCESS_INTERVAL_MS);
     }
 
     async #processTransactions() {
