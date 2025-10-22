@@ -81,7 +81,7 @@ class RoleOperationHandler extends BaseOperationHandler {
             throw new Error("OperationHandler: Assembling complete role access operation failed.");
         }
 
-        this.network.poolService.addTransaction(completePayload)
+        this.network.transactionPoolService.addTransaction(completePayload)
     }
 
     #normalizePartialRoleAccess(payload) {

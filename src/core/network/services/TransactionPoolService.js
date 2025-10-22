@@ -2,7 +2,7 @@
 import { BATCH_SIZE, PROCESS_INTERVAL_MS } from '../../../utils/constants.js';
 import Scheduler from '../../../utils/Scheduler.js';
 
-class PoolService {
+class TransactionPoolService {
     #state;
     #address;
     #options;
@@ -96,4 +96,4 @@ class PoolService {
     }
 }
 
-export default PoolService;
+export default TransactionPoolService;

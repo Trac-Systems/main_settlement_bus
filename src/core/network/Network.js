@@ -3,7 +3,7 @@ import Hyperswarm from 'hyperswarm';
 import w from 'protomux-wakeup';
 import b4a from 'b4a';
 
-import PoolService from './services/PoolService.js';
+import TransactionPoolService from './services/TransactionPoolService.js';
 import ValidatorObserverService from './services/ValidatorObserverService.js';
 import NetworkMessages from './messaging/NetworkMessages.js';
 import { sleep } from '../../utils/helpers.js';
@@ -25,14 +25,14 @@ class Network extends ReadyResource {
     #enable_wallet;
     #channel;
     #networkMessages;
-    #poolService;
+    #transactionPoolService;
     #validatorObserverService;
 
     constructor(state, channel, address = null, options = {}) {
         super();
         this.#enable_wallet = options.enable_wallet !== false;
         this.#channel = channel;
-        this.#poolService = new PoolService(state, address, options);
+        this.#transactionPoolService = new TransactionPoolService(state, address, options);
         this.#validatorObserverService = new ValidatorObserverService(this, state, options)
         this.#networkMessages = new NetworkMessages(this, options);
         //TODO: move streams maybe to HASHMAP? To discuss because this change will affect the whole network module and it's usage. It is not a priority right now
@@ -53,8 +53,8 @@ class Network extends ReadyResource {
         return this.#channel;
     }
 
-    get poolService() {
-        return this.#poolService;
+    get transactionPoolService() {
+        return this.#transactionPoolService;
     }
 
     get validatorObserverService() {
@@ -63,12 +63,12 @@ class Network extends ReadyResource {
 
     async _open() {
         console.log('Network initialization...');
-        this.poolService.start();
+        this.transactionPoolService.start();
     }
 
     async _close() {
         console.log('Network: closing gracefully...');
-        this.poolService.stopPool();
+        this.transactionPoolService.stopPool();
         await sleep(100);
 
         if (this.#validatorObserverService.enable_validator_observer) {

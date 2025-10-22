@@ -45,7 +45,7 @@ class TransferOperationHandler extends BaseOperationHandler {
             normalizedPayload.tro.is
         );
 
-        this.network.poolService.addTransaction(completeTransferOperation);
+        this.network.transactionPoolService.addTransaction(completeTransferOperation);
     }
 }
 
