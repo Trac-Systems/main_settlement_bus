@@ -88,13 +88,14 @@ export function normalizeDecodedPayloadForJson(payload) {
     }
 
     const newPayload = {};
+    const addressKeys = ["address", "to", "va", "ia"];
     for (const key in payload) {
         if (payload.hasOwnProperty(key)) {
             const value = payload[key];
 
             if (b4a.isBuffer(value)) {
                 // 👇 intercept address buffers by key name (e.g. `address`)
-                if (key.toLowerCase().includes("address") || key.toLowerCase().includes("to") || key.toLowerCase().includes("va")) {
+                if (addressKeys.some(k => key.toLowerCase().includes(k))) {
                     const addr = bufferToAddress(value);
                     newPayload[key] = addr ?? b4a.toString(value, "hex");
                 } else if (key.toLowerCase().includes("am")) {
