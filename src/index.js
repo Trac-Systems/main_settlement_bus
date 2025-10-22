@@ -30,6 +30,7 @@ import { ZERO_WK } from "./utils/buffer.js";
 import { normalizeDecodedPayloadForJson, normalizeTransferOperation, normalizeTransactionOperation } from "./utils/normalizers.js"
 import PartialTransfer from "./core/network/messaging/validators/PartialTransfer.js";
 import { blake3Hash } from "./utils/crypto.js";
+import deploymentEntryUtils from "./core/state/utils/deploymentEntry.js";
 import PartialTransaction from "./core/network/messaging/validators/PartialTransaction.js";
 import deploymentEntryUtils from "./core/state/utils/deploymentEntry.js";
 
@@ -47,7 +48,6 @@ export class MainSettlementBus extends ReadyResource {
     #readline_instance;
     #enable_validator_observer;
     #enable_role_requester;
-    #enable_auto_transaction_consent
     #state;
     #isClosing = false;
     #is_admin_mode;
@@ -70,10 +70,6 @@ export class MainSettlementBus extends ReadyResource {
             options.enable_validator_observer !== undefined
                 ? options.enable_validator_observer
                 : true;
-        this.#enable_auto_transaction_consent =
-            options.enable_auto_transaction_consent !== undefined
-                ? options.enable_auto_transaction_consent
-                : false;
         this.#bootstrap = options.bootstrap
             ? b4a.from(options.bootstrap, "hex")
             : null;
@@ -338,6 +334,7 @@ export class MainSettlementBus extends ReadyResource {
         );
 
         await this.broadcastPartialTransaction(adminRecoveryMessage);
+        console.info(`Transaction hash: ${adminRecoveryMessage.rao.tx}`);
     }
 
     async #handleWhitelistOperations() {
@@ -425,6 +422,7 @@ export class MainSettlementBus extends ReadyResource {
             )
 
             await this.broadcastPartialTransaction(assembledMessage);
+            console.info(`Transaction hash: ${assembledMessage.rao.tx}`);
             return;
         }
 
@@ -446,6 +444,7 @@ export class MainSettlementBus extends ReadyResource {
         )
 
         await this.broadcastPartialTransaction(assembledMessage);
+        console.info(`Transaction hash: ${assembledMessage.rao.tx}`);
         return;
     }
 
@@ -644,7 +643,7 @@ export class MainSettlementBus extends ReadyResource {
         );
 
         await this.broadcastPartialTransaction(payload);
-
+        console.info(`Transaction hash: ${payload.bdo.tx}`);
         console.log(`Bootstrap ${externalBootstrap} deployment requested on channel ${channel}`);
         console.log('Bootstrap Deployment Fee Details:');
         console.log(`Fee: ${bigIntToDecimalString(feeBigInt)}`);
@@ -732,15 +731,16 @@ export class MainSettlementBus extends ReadyResource {
         await this.broadcastPartialTransaction(payload);
 
         const expectedNewBalance = senderBalance - totalDeductedAmount;
-        console.log('Transfer Details:');
+        console.info('Transfer Details:');
+        console.info(`Transaction hash ${payload.tro.tx}`)
         if (isSelfTransfer) {
-            console.log('Self transfer - only fee will be deducted');
-            console.log(`Fee: ${bigIntToDecimalString(feeBigInt)}`);
-            console.log(`Total amount to send: ${bigIntToDecimalString(totalDeductedAmount)}`);
+            console.info('Self transfer - only fee will be deducted');
+            console.info(`Fee: ${bigIntToDecimalString(feeBigInt)}`);
+            console.info(`Total amount to send: ${bigIntToDecimalString(totalDeductedAmount)}`);
         } else {
-            console.log(`Amount: ${bigIntToDecimalString(amountBigInt)}`);
-            console.log(`Fee: ${bigIntToDecimalString(feeBigInt)}`);
-            console.log(`Total: ${bigIntToDecimalString(totalDeductedAmount)}`);
+            console.info(`Amount: ${bigIntToDecimalString(amountBigInt)}`);
+            console.info(`Fee: ${bigIntToDecimalString(feeBigInt)}`);
+            console.info(`Total: ${bigIntToDecimalString(totalDeductedAmount)}`);
         }
         console.log(`Expected Balance After Transfer: ${bigIntToDecimalString(expectedNewBalance)}`);
     }
@@ -924,6 +924,7 @@ export class MainSettlementBus extends ReadyResource {
                     msbBootstrap
                 )
                 await this.broadcastPartialTransaction(assembledTransactionOperation);
+
                 break;
             case '/test2':
                 let messageCount = 0;
@@ -1033,7 +1034,7 @@ export class MainSettlementBus extends ReadyResource {
                     const splitted = input.split(" ");
                     const bootstrapHex = splitted[1];
                     const deploymentEntry = await this.#state.getRegisteredBootstrapEntry(bootstrapHex);
-
+                    console.log(`Searching deployment for bootstrap: ${bootstrapHex}`);
                     if (deploymentEntry) {
                         const decodedDeploymentEntry = deploymentEntryUtils.decode(deploymentEntry)
                         const txhash = decodedDeploymentEntry.txHash.toString('hex');
@@ -1161,7 +1162,7 @@ export class MainSettlementBus extends ReadyResource {
                             normalizedPayload = normalizeTransactionOperation(payload);
                             isValid = await this.#partialTransactionValidator.validate(normalizedPayload);
                         }
-                        
+
                         if (!isValid) throw new Error("Invalid transaction payload.");
 
                         const signedLength = this.#state.getSignedLength();
