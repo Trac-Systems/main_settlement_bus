@@ -50,7 +50,7 @@ hook('Initialize nodes for removeWriter tests', async () => {
     const randomChannel = randomBytes(32).toString('hex');
 
     admin = await setupMsbAdmin(testKeyPair1, tmpDirectory, {
-        enable_txlogs: false,
+        enable_tx_apply_logs: false,
         enable_interactive_mode: false,
         enable_role_requester: false,
         enable_validator_observer: false,

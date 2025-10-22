@@ -52,7 +52,8 @@ class State extends ReadyResource {
     #bootstrap;
     #store;
     #wallet;
-    #enable_txlogs;
+    #enable_tx_apply_logs;
+    #enable_error_apply_logs;
     #writingKey;
 
     constructor(store, bootstrap, wallet, options = {}) {
@@ -61,7 +62,8 @@ class State extends ReadyResource {
         this.#store = store;
         this.#bootstrap = bootstrap;
         this.#wallet = wallet;
-        this.#enable_txlogs = options.enable_txlogs === true;
+        this.#enable_tx_apply_logs = options.enable_tx_apply_logs !== undefined ? options.enable_tx_apply_logs : true;
+        this.#enable_error_apply_logs = options.enable_error_apply_logs !== undefined ? options.enable_error_apply_logs : true;
 
         this.check = new Check();
         this.#base = new Autobase(this.#store, this.#bootstrap, {
@@ -226,8 +228,12 @@ class State extends ReadyResource {
 
     async getRegisteredBootstrapEntry(bootstrap) {
         if (!bootstrap || !isHexString(bootstrap) || bootstrap.length !== 64) return null;
-        return await this.get(EntryType.DEPLOYMENT + bootstrap);
+        return await this.getSigned(EntryType.DEPLOYMENT + bootstrap);
+    }
 
+    async getRegisteredBootstrapEntryUnsigned(bootstrap) {
+        if (!bootstrap || !isHexString(bootstrap) || bootstrap.length !== 64) return null;
+        return await this.get(EntryType.DEPLOYMENT + bootstrap);
     }
 
     async append(payload) {
@@ -334,7 +340,7 @@ class State extends ReadyResource {
         for (const node of nodes) {
 
             if (b4a.byteLength(node.value) > transactionUtils.MAXIMUM_OPERATION_PAYLOAD_SIZE) {
-                this.#enable_txlogs && this.#safeLogApply("Node payload exceeds the maximum operation payload size.", node.from.key)
+                this.#enable_error_apply_logs && this.#safeLogApply("Node payload exceeds the maximum operation payload size.", node.from.key)
                 invalidOperations++;
                 continue;
             };
@@ -342,7 +348,7 @@ class State extends ReadyResource {
             const op = safeDecodeApplyOperation(node.value);
 
             if (!op) {
-                this.#enable_txlogs && this.#safeLogApply("Failed to decode operation.", node.from.key)
+                this.#enable_error_apply_logs && this.#safeLogApply("Failed to decode operation.", node.from.key)
                 invalidOperations++;
                 continue;
             }
@@ -355,13 +361,13 @@ class State extends ReadyResource {
                     invalidOperations++;
                 }
             } else {
-                this.#enable_txlogs && this.#safeLogApply(`Unknown operation type: ${op.type}`, node.from.key)
+                this.#enable_error_apply_logs && this.#safeLogApply(`Unknown operation type: ${op.type}`, node.from.key)
                 invalidOperations++;
             }
         }
         if (invalidOperations > 0) {
             await this.#validatorPenaltyApply(batchInvoker, batch, base, invalidOperations);
-            console.log(`Applied with ${invalidOperations} invalid operations.`);
+            console.info(`Applied with ${invalidOperations} invalid operations.`);
         }
 
         await batch.flush();
@@ -389,7 +395,7 @@ class State extends ReadyResource {
 
     async #handleApplyInitializeBalanceOperation(op, view, base, node, batch) {
         if (!this.check.validateBalanceInitialization(op)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BALANCE_INITIALIZATION, "Contract schema validation failed.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BALANCE_INITIALIZATION, "Contract schema validation failed.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -397,14 +403,14 @@ class State extends ReadyResource {
         const adminAddressBuffer = op.address;
         const adminAddressString = addressUtils.bufferToAddress(adminAddressBuffer);
         if (adminAddressString === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BALANCE_INITIALIZATION, "Requester address is invalid.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BALANCE_INITIALIZATION, "Requester address is invalid.", node.from.key)
             return Status.FAILURE;
         }
 
         // Verify requester admin public key
         const requesterAdminPublicKey = PeerWallet.decodeBech32mSafe(adminAddressString);
         if (requesterAdminPublicKey === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BALANCE_INITIALIZATION, "Error while decoding requester public key.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BALANCE_INITIALIZATION, "Error while decoding requester public key.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -412,27 +418,27 @@ class State extends ReadyResource {
         const recipientAddress = op.bio.ia;
         const recipientAddressString = addressUtils.bufferToAddress(recipientAddress);
         if (recipientAddressString === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BALANCE_INITIALIZATION, "Recipient address is invalid.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BALANCE_INITIALIZATION, "Recipient address is invalid.", node.from.key)
             return Status.FAILURE;
         };
 
         // Validate recipient public key
         const recipientPublicKey = PeerWallet.decodeBech32mSafe(recipientAddressString);
         if (recipientPublicKey === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BALANCE_INITIALIZATION, "Failed to decode recipient public key.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BALANCE_INITIALIZATION, "Failed to decode recipient public key.", node.from.key)
             return Status.FAILURE;
         };
 
         // Verify that the amount is not zero
         const amount = toBalance(op.bio.am);
         if (amount === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BALANCE_INITIALIZATION, "Invalid balance.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BALANCE_INITIALIZATION, "Invalid balance.", node.from.key)
             return Status.FAILURE;
         };
 
         // Entry has been disabled so there is nothing to do
         if (await this.#isApplyInitalizationDisabled(batch)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BALANCE_INITIALIZATION, "Balance initialization is disabled.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BALANCE_INITIALIZATION, "Balance initialization is disabled.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -442,19 +448,19 @@ class State extends ReadyResource {
 
         // NOTE: Would it make sense to extract null === decodedAdminEntry and log the error?
         if (decodedAdminEntry === null || !this.#isAdminApply(decodedAdminEntry, node)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BALANCE_INITIALIZATION, "Node is not allowed to perform this operation. (ADMIN ONLY)", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BALANCE_INITIALIZATION, "Node is not allowed to perform this operation. (ADMIN ONLY)", node.from.key)
             return Status.FAILURE;
         };
 
         const adminPublicKey = PeerWallet.decodeBech32mSafe(decodedAdminEntry.address);
         if (adminPublicKey === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BALANCE_INITIALIZATION, "Failed to decode admin public key.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BALANCE_INITIALIZATION, "Failed to decode admin public key.", node.from.key)
             return Status.FAILURE;
         };
 
         // Admin consistency check
         if (!b4a.equals(adminPublicKey, requesterAdminPublicKey)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BALANCE_INITIALIZATION, "System admin and node public keys do not match.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BALANCE_INITIALIZATION, "System admin and node public keys do not match.", node.from.key)
             return Status.FAILURE;
         }
 
@@ -468,40 +474,40 @@ class State extends ReadyResource {
             OperationType.BALANCE_INITIALIZATION
         );
         if (message.length === 0) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BALANCE_INITIALIZATION, "Invalid requester message.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BALANCE_INITIALIZATION, "Invalid requester message.", node.from.key)
             return Status.FAILURE;
         };
 
         const hash = await blake3Hash(message);
         const txHashHexString = op.bio.tx.toString('hex');
         if (!b4a.equals(hash, op.bio.tx)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BALANCE_INITIALIZATION, "Message hash does not match the tx_hash.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BALANCE_INITIALIZATION, "Message hash does not match the tx_hash.", node.from.key)
             return Status.FAILURE;
         };
 
         // Verify signature
         const isMessageVerifed = this.#wallet.verify(op.bio.is, hash, adminPublicKey);
         if (!isMessageVerifed) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BALANCE_INITIALIZATION, "Failed to verify message signature.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BALANCE_INITIALIZATION, "Failed to verify message signature.", node.from.key)
             return Status.FAILURE;
         };
 
         // Verify tx validity - prevent deferred execution attack
         const indexersSequenceState = await this.#getIndexerSequenceStateApply(base);
         if (indexersSequenceState === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BALANCE_INITIALIZATION, "Indexer sequence state is invalid.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BALANCE_INITIALIZATION, "Indexer sequence state is invalid.", node.from.key)
             return Status.FAILURE;
         };
 
         if (!b4a.equals(op.bio.txv, indexersSequenceState)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BALANCE_INITIALIZATION, "Transaction was not executed.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BALANCE_INITIALIZATION, "Transaction was not executed.", node.from.key)
             return Status.FAILURE;
         };
 
         // Check if the operation has already been applied
         const opEntry = await this.#getEntryApply(txHashHexString, batch);
         if (null !== opEntry) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BALANCE_INITIALIZATION, "Operation has already been applied.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BALANCE_INITIALIZATION, "Operation has already been applied.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -513,13 +519,13 @@ class State extends ReadyResource {
 
     async #handleApplyDisableBalanceInitializationOperation(op, view, base, node, batch) {
         if (!this.check.validateCoreAdminOperation(op)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.DISABLE_INITIALIZATION, "Schema validation failed.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.DISABLE_INITIALIZATION, "Schema validation failed.", node.from.key)
             return Status.FAILURE;
         };
 
         // Entry has been disabled so there is nothing to do
         if (await this.#isApplyInitalizationDisabled(batch)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.DISABLE_INITIALIZATION, "Balance initialization already disabled.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.DISABLE_INITIALIZATION, "Balance initialization already disabled.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -527,14 +533,14 @@ class State extends ReadyResource {
         const adminAddressBuffer = op.address;
         const adminAddressString = addressUtils.bufferToAddress(adminAddressBuffer);
         if (adminAddressString === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.DISABLE_INITIALIZATION, "Failed to validate requester address.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.DISABLE_INITIALIZATION, "Failed to validate requester address.", node.from.key)
             return Status.FAILURE;
         };
 
         // Validate requester admin public key
         const requesterAdminPublicKey = PeerWallet.decodeBech32mSafe(adminAddressString);
         if (requesterAdminPublicKey === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.DISABLE_INITIALIZATION, "Failed to decode requester public key.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.DISABLE_INITIALIZATION, "Failed to decode requester public key.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -543,19 +549,19 @@ class State extends ReadyResource {
         const decodedAdminEntry = adminEntryUtils.decode(adminEntry);
 
         if (null === decodedAdminEntry || !this.#isAdminApply(decodedAdminEntry, node)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.DISABLE_INITIALIZATION, "Node is not allowed to perform this operation. (ADMIN ONLY)", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.DISABLE_INITIALIZATION, "Node is not allowed to perform this operation. (ADMIN ONLY)", node.from.key)
             return Status.FAILURE;
         };
 
         const adminPublicKey = PeerWallet.decodeBech32mSafe(decodedAdminEntry.address);
         if (adminPublicKey === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.DISABLE_INITIALIZATION, "Failed to decode admin public key.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.DISABLE_INITIALIZATION, "Failed to decode admin public key.", node.from.key)
             return Status.FAILURE;
         };
 
         // Admin consistency check
         if (!b4a.equals(adminPublicKey, requesterAdminPublicKey)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.DISABLE_INITIALIZATION, "System admin and node public keys do not match.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.DISABLE_INITIALIZATION, "System admin and node public keys do not match.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -568,40 +574,40 @@ class State extends ReadyResource {
             OperationType.DISABLE_INITIALIZATION
         );
         if (message.length === 0) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.DISABLE_INITIALIZATION, "Invalid requester message.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.DISABLE_INITIALIZATION, "Invalid requester message.", node.from.key)
             return Status.FAILURE;
         };
 
         const hash = await blake3Hash(message);
         const txHashHexString = op.cao.tx.toString('hex');
         if (!b4a.equals(hash, op.cao.tx)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.DISABLE_INITIALIZATION, "Message hash does not match the tx_hash.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.DISABLE_INITIALIZATION, "Message hash does not match the tx_hash.", node.from.key)
             return Status.FAILURE;
         };
 
         // Verify signature
         const isMessageVerifed = this.#wallet.verify(op.cao.is, hash, adminPublicKey);
         if (!isMessageVerifed) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.DISABLE_INITIALIZATION, "Failed to verify message signature.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.DISABLE_INITIALIZATION, "Failed to verify message signature.", node.from.key)
             return Status.FAILURE;
         };
 
         // Verify tx validity - prevent deferred execution attack
         const indexersSequenceState = await this.#getIndexerSequenceStateApply(base);
         if (indexersSequenceState === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.DISABLE_INITIALIZATION, "Indexer sequence state is invalid.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.DISABLE_INITIALIZATION, "Indexer sequence state is invalid.", node.from.key)
             return Status.FAILURE;
         };
 
         if (!b4a.equals(op.cao.txv, indexersSequenceState)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.DISABLE_INITIALIZATION, "Transaction was not executed.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.DISABLE_INITIALIZATION, "Transaction was not executed.", node.from.key)
             return Status.FAILURE;
         };
 
         // Check if the operation has already been applied
         const opEntry = await this.#getEntryApply(txHashHexString, batch);
         if (null !== opEntry) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.DISABLE_INITIALIZATION, "Operation has already been applied.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.DISABLE_INITIALIZATION, "Operation has already been applied.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -619,7 +625,7 @@ class State extends ReadyResource {
         */
 
         if (!this.check.validateCoreAdminOperation(op)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_ADMIN, "Contract schema validation failed.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_ADMIN, "Contract schema validation failed.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -627,20 +633,20 @@ class State extends ReadyResource {
         const adminAddressBuffer = op.address;
         const adminAddressString = addressUtils.bufferToAddress(adminAddressBuffer);
         if (adminAddressString === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_ADMIN, "Requester address is invalid.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_ADMIN, "Requester address is invalid.", node.from.key)
             return Status.FAILURE;
         };
 
         // Validate requester admin public key (admin)
         const adminPublicKey = PeerWallet.decodeBech32mSafe(adminAddressString);
         if (adminPublicKey === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_ADMIN, "Error while decoding requester public key.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_ADMIN, "Error while decoding requester public key.", node.from.key)
             return Status.FAILURE;
         };
 
         // Check if the operation is being performed by the bootstrap node - the original deployer of the Trac Network
         if (!b4a.equals(node.from.key, this.bootstrap) || !b4a.equals(op.cao.iw, this.bootstrap)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_ADMIN, "Node is not a bootstrap node.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_ADMIN, "Node is not a bootstrap node.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -654,13 +660,13 @@ class State extends ReadyResource {
         );
 
         if (requesterMessage.length === 0) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_ADMIN, "Invalid requester message.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_ADMIN, "Invalid requester message.", node.from.key)
             return Status.FAILURE;
         };
 
         const hash = await blake3Hash(requesterMessage);
         if (!b4a.equals(hash, op.cao.tx)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_ADMIN, "Message hash does not match the tx_hash.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_ADMIN, "Message hash does not match the tx_hash.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -668,19 +674,19 @@ class State extends ReadyResource {
         const isMessageVerifed = this.#wallet.verify(op.cao.is, op.cao.tx, adminPublicKey)
         const txHashHexString = op.cao.tx.toString('hex');
         if (!isMessageVerifed) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_ADMIN, "Failed to verify message signature.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_ADMIN, "Failed to verify message signature.", node.from.key)
             return Status.FAILURE;
         };
 
         // verify tx validity - prevent deferred execution attack
         const indexersSequenceState = await this.#getIndexerSequenceStateApply(base);
         if (indexersSequenceState === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_ADMIN, "Indexer sequence state is invalid.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_ADMIN, "Indexer sequence state is invalid.", node.from.key)
             return Status.FAILURE;
         };
 
         if (!b4a.equals(op.cao.txv, indexersSequenceState)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_ADMIN, "Transaction was not executed.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_ADMIN, "Transaction was not executed.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -688,21 +694,21 @@ class State extends ReadyResource {
         // writer key should NOT exists for a brand new admin
         const writerKeyHasBeenRegistered = await this.#getRegisteredWriterKeyApply(batch, op.cao.iw.toString('hex'))
         if (writerKeyHasBeenRegistered !== null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_ADMIN, "Writer key already exists.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_ADMIN, "Writer key already exists.", node.from.key)
             return Status.FAILURE;
         };
 
         const adminEntryExists = await this.#getEntryApply(EntryType.ADMIN, batch);
         // if admin entry already exists, cannot perform this operation
         if (adminEntryExists !== null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_ADMIN, "Admin entry already exists.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_ADMIN, "Admin entry already exists.", node.from.key)
             return Status.FAILURE;
         };
 
         // Check if the operation has already been applied
         const opEntry = await this.#getEntryApply(txHashHexString, batch);
         if (opEntry !== null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_ADMIN, "Operation has already been applied.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_ADMIN, "Operation has already been applied.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -717,14 +723,14 @@ class State extends ReadyResource {
 
         const initializedNodeEntry = nodeEntryUtils.init(op.cao.iw, nodeRoleUtils.NodeRole.INDEXER, ADMIN_INITIAL_BALANCE, newLicenseLength, ADMIN_INITIAL_STAKED_BALANCE);
         if (initializedNodeEntry.length === 0) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_ADMIN, "Failed to initialize node entry.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_ADMIN, "Failed to initialize node entry.", node.from.key)
             return Status.FAILURE;
         }
 
         // Create a new admin entry
         const newAdminEntry = adminEntryUtils.encode(adminAddressBuffer, op.cao.iw);
         if (newAdminEntry.length === 0) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_ADMIN, "Failed to verify message signature.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_ADMIN, "Failed to verify message signature.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -746,38 +752,41 @@ class State extends ReadyResource {
         await batch.put(EntryType.ADMIN, newAdminEntry);
         await batch.put(EntryType.INITIALIZATION, safeWriteUInt32BE(1, 0));
         await batch.put(txHashHexString, node.value);
-        
-        console.log(`Admin added addr:wk:tx - ${adminAddressString}:${op.cao.iw.toString('hex')}:${txHashHexString}`);
+
+        if (this.#enable_tx_apply_logs) {
+            console.info(`Admin added addr:wk:tx - ${adminAddressString}:${op.cao.iw.toString('hex')}:${txHashHexString}`);
+        }
+
         return Status.SUCCESS;
     }
 
     async #handleApplyAdminRecoveryOperation(op, view, base, node, batch) {
         if (!this.check.validateRoleAccessOperation(op)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Contract schema validation failed.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Contract schema validation failed.", node.from.key)
             return Status.FAILURE;
         };
 
         // if transaction is not complete, do not process it.
         if (!Object.hasOwn(op.rao, "vs") || !Object.hasOwn(op.rao, "va") || !Object.hasOwn(op.rao, "vn")) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Operation is not complete.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Operation is not complete.", node.from.key)
             return Status.FAILURE;
         };
 
         // for additional security, nonces should be different.
         if (b4a.equals(op.rao.in, op.rao.vn)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Nonces should not be the same.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Nonces should not be the same.", node.from.key)
             return Status.FAILURE;
         };
 
         // addresses should be different.
         if (b4a.equals(op.address, op.rao.va)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Addresses should be different.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Addresses should be different.", node.from.key)
             return Status.FAILURE;
         };
 
         // signatures should be different.
         if (b4a.equals(op.rao.is, op.rao.vs)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Signatures should be different.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Signatures should be different.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -785,13 +794,13 @@ class State extends ReadyResource {
         const requesterAdminAddressBuffer = op.address;
         const requesterAdminAddressString = addressUtils.bufferToAddress(requesterAdminAddressBuffer);
         if (requesterAdminAddressString === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Requester address is invalid.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Requester address is invalid.", node.from.key)
             return Status.FAILURE;
         };
 
         const requesterAdminPublicKey = PeerWallet.decodeBech32mSafe(requesterAdminAddressString);
         if (requesterAdminPublicKey === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Error while decoding requester public key.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Error while decoding requester public key.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -805,13 +814,13 @@ class State extends ReadyResource {
         );
 
         if (requesterMessage.length === 0) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Invalid requester message.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Invalid requester message.", node.from.key)
             return Status.FAILURE;
         };
 
         const hash = await blake3Hash(requesterMessage);
         if (!b4a.equals(hash, op.rao.tx)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Message hash does not match the tx_hash.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Message hash does not match the tx_hash.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -819,7 +828,7 @@ class State extends ReadyResource {
         const isRequesterMessageVerifed = this.#wallet.verify(op.rao.is, op.rao.tx, requesterAdminPublicKey);
         const txHashHexString = op.rao.tx.toString('hex');
         if (!isRequesterMessageVerifed) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Failed to verify requester message signature.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Failed to verify requester message signature.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -827,13 +836,13 @@ class State extends ReadyResource {
         const validatorAddress = op.rao.va;
         const validatorAddressString = addressUtils.bufferToAddress(validatorAddress);
         if (validatorAddressString === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Failed to validate validator address.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Failed to validate validator address.", node.from.key)
             return Status.FAILURE;
         };
 
         const validatorPublicKey = PeerWallet.decodeBech32mSafe(validatorAddressString);
         if (validatorPublicKey === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Failed to decode validator public key.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Failed to decode validator public key.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -846,7 +855,7 @@ class State extends ReadyResource {
         );
 
         if (validatorMessage.length === 0) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Failed to verify validator message signature.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Failed to verify validator message signature.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -854,7 +863,7 @@ class State extends ReadyResource {
         const validatorHash = await blake3Hash(validatorMessage);
         const isValidatorMessageVerifed = this.#wallet.verify(op.rao.vs, validatorHash, validatorPublicKey);
         if (!isValidatorMessageVerifed) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Failed to verify message signature.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Failed to verify message signature.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -862,18 +871,18 @@ class State extends ReadyResource {
         // Until the next release with indexer rotation, we simply enforce the new writer key.
         const writerKeyHasBeenRegistered = await this.#getRegisteredWriterKeyApply(batch, op.rao.iw.toString('hex'))
         if (writerKeyHasBeenRegistered !== null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Writer key already exists.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Writer key already exists.", node.from.key)
             return Status.FAILURE;
         };
 
         // verify tx validity - prevent deferred execution attack
         const indexersSequenceState = await this.#getIndexerSequenceStateApply(base);
         if (indexersSequenceState === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Indexer sequence state is invalid.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Indexer sequence state is invalid.", node.from.key)
             return Status.FAILURE;
         };
         if (!b4a.equals(op.rao.txv, indexersSequenceState)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Transaction was not executed.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Transaction was not executed.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -882,14 +891,14 @@ class State extends ReadyResource {
         // Validator consistency checks
         const isValidatorValid = await this.#isValidatorValidApply(validatorEntryBuffer, node, op);
         if (!isValidatorValid) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Validator consistency check failed.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Validator consistency check failed.", node.from.key)
             return Status.FAILURE;
         }
 
         // anti-replay attack
         const opEntry = await this.#getEntryApply(txHashHexString, batch);
         if (opEntry !== null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Operation has already been applied.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Operation has already been applied.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -897,26 +906,26 @@ class State extends ReadyResource {
         const decodedAdminEntry = adminEntryUtils.decode(adminEntry);
 
         if (decodedAdminEntry === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Failed to decode admin entry.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Failed to decode admin entry.", node.from.key)
             return Status.FAILURE;
         };
 
         const publicKeyAdminEntry = PeerWallet.decodeBech32mSafe(decodedAdminEntry.address);
         if (!b4a.equals(requesterAdminPublicKey, publicKeyAdminEntry)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Admin public key does not match the node public key.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Admin public key does not match the node public key.", node.from.key)
             return Status.FAILURE;
         };
 
         const isOldWkInIndexerList = await this.#isWriterKeyInIndexerListApply(decodedAdminEntry.wk, base);
         if (!isOldWkInIndexerList) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Old writer key is not in indexer list.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Old writer key is not in indexer list.", node.from.key)
             return Status.FAILURE;
         }; // Old admin wk is not in indexers entry
 
         // Update admin entry with new writing key
         const newAdminEntry = adminEntryUtils.encode(requesterAdminAddressBuffer, op.rao.iw);
         if (newAdminEntry.length === 0) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Invalid admin entry.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Invalid admin entry.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -926,31 +935,31 @@ class State extends ReadyResource {
 
         const isNewWkInIndexerList = await this.#isWriterKeyInIndexerListApply(op.rao.iw, base);
         if (isNewWkInIndexerList) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "New writer key is already in indexer list.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "New writer key is already in indexer list.", node.from.key)
             return Status.FAILURE;
         }; // New admin wk is already in indexers entry
 
         // charging fee from the requester (admin)
         const decodedAdminNodeEntry = nodeEntryUtils.decode(newAdminNodeEntry)
         if (decodedAdminNodeEntry === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Failed to decode admin entry.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Failed to decode admin entry.", node.from.key)
             return Status.FAILURE;
         }
 
         const adminBalance = toBalance(decodedAdminNodeEntry.balance)
         if (adminBalance === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Invalid admin balance.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Invalid admin balance.", node.from.key)
             return Status.FAILURE;
         }
 
         if (!adminBalance.greaterThanOrEquals(BALANCE_FEE)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Insufficient admin balance.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Insufficient admin balance.", node.from.key)
             return Status.FAILURE;
         };
         const updatedFee = adminBalance.sub(BALANCE_FEE)
 
         if (updatedFee === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Failed to apply fee.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Failed to apply fee.", node.from.key)
             return Status.FAILURE;
         }
         const chargedAdminEntry = updatedFee.update(newAdminNodeEntry)
@@ -958,25 +967,25 @@ class State extends ReadyResource {
         // Reward logic
         const validatorNodeEntry = nodeEntryUtils.decode(validatorEntryBuffer);
         if (validatorNodeEntry === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Invalid validator node entry.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Invalid validator node entry.", node.from.key)
             return Status.FAILURE;
         };
 
         const validatorBalance = toBalance(validatorNodeEntry.balance);
         if (validatorBalance === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Invalid validator balance.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Invalid validator balance.", node.from.key)
             return Status.FAILURE;
         };
 
         const newValidatorBalance = validatorBalance.add(BALANCE_FEE.percentage(PERCENT_75));
         if (newValidatorBalance === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Failed to transfer fee to validator.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Failed to transfer fee to validator.", node.from.key)
             return Status.FAILURE;
         };
 
         const updatedValidatorNodeEntry = newValidatorBalance.update(validatorEntryBuffer)
         if (updatedValidatorNodeEntry === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Failed to update validator balance.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Failed to update validator balance.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -989,18 +998,21 @@ class State extends ReadyResource {
         await batch.put(EntryType.ADMIN, newAdminEntry);
         // This updates the admin node entry with the new writer key and deducted fee.
         await batch.put(requesterAdminAddressString, chargedAdminEntry);
-        
+
         // Actually pay the fee
         await batch.put(validatorAddressString, updatedValidatorNodeEntry);
         await batch.put(txHashHexString, node.value);
 
-        console.log(`Admin has been recovered addr:wk:tx - ${requesterAdminAddressString}:${op.rao.iw.toString('hex')}:${txHashHexString}`);
+        if (this.#enable_tx_apply_logs) {
+            console.info(`Admin has been recovered addr:wk:tx - ${requesterAdminAddressString}:${op.rao.iw.toString('hex')}:${txHashHexString}`);
+        }
+
         return Status.SUCCESS;
     }
 
     async #handleApplyAppendWhitelistOperation(op, view, base, node, batch) {
         if (!this.check.validateAdminControlOperation(op)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.APPEND_WHITELIST, "Contract schema validation failed.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.APPEND_WHITELIST, "Contract schema validation failed.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -1008,25 +1020,25 @@ class State extends ReadyResource {
         const adminAddressBuffer = op.address;
         const adminAddressString = addressUtils.bufferToAddress(adminAddressBuffer);
         if (adminAddressString === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.APPEND_WHITELIST, "Recipient address is invalid.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.APPEND_WHITELIST, "Recipient address is invalid.", node.from.key)
             return Status.FAILURE;
         };
         // Validate recipient public key
         const requesterAdminPublicKey = PeerWallet.decodeBech32mSafe(adminAddressString);
         if (requesterAdminPublicKey === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.APPEND_WHITELIST, "Failed to decode recipient public key.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.APPEND_WHITELIST, "Failed to decode recipient public key.", node.from.key)
             return Status.FAILURE;
         };
 
         // Retrieve and decode the admin entry to verify the operation is initiated by an admin
         const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
         if (adminEntry === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.APPEND_WHITELIST, "Failed to verify admin entry.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.APPEND_WHITELIST, "Failed to verify admin entry.", node.from.key)
             return Status.FAILURE;
         };
         const decodedAdminEntry = adminEntryUtils.decode(adminEntry);
         if (decodedAdminEntry === null || !this.#isAdminApply(decodedAdminEntry, node)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.APPEND_WHITELIST, "Failed to decode admin entry.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.APPEND_WHITELIST, "Failed to decode admin entry.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -1034,13 +1046,13 @@ class State extends ReadyResource {
         const adminAddress = decodedAdminEntry.address;
         const adminPublicKey = PeerWallet.decodeBech32mSafe(adminAddress);
         if (adminPublicKey === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.APPEND_WHITELIST, "Failed to decode admin public key.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.APPEND_WHITELIST, "Failed to decode admin public key.", node.from.key)
             return Status.FAILURE;
         };
 
         //admin consistency check
         if (!b4a.equals(adminPublicKey, requesterAdminPublicKey)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.APPEND_WHITELIST, "System admin and node public keys do not match.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.APPEND_WHITELIST, "System admin and node public keys do not match.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -1049,12 +1061,12 @@ class State extends ReadyResource {
 
         const nodeAddressString = addressUtils.bufferToAddress(nodeAddressBuffer);
         if (nodeAddressString === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.APPEND_WHITELIST, "Failed to verify node address.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.APPEND_WHITELIST, "Failed to verify node address.", node.from.key)
             return Status.FAILURE;
         };
         const nodePublicKey = PeerWallet.decodeBech32mSafe(nodeAddressString);
         if (nodePublicKey === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.APPEND_WHITELIST, "Failed to decode node public key.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.APPEND_WHITELIST, "Failed to decode node public key.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -1067,20 +1079,20 @@ class State extends ReadyResource {
             OperationType.APPEND_WHITELIST
         );
         if (message.length === 0) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.APPEND_WHITELIST, "Invalid requester message.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.APPEND_WHITELIST, "Invalid requester message.", node.from.key)
             return Status.FAILURE;
         };
 
         // verify signature
         const hash = await blake3Hash(message);
         if (!b4a.equals(hash, op.aco.tx)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.APPEND_WHITELIST, "Message hash does not match the tx_hash.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.APPEND_WHITELIST, "Message hash does not match the tx_hash.", node.from.key)
             return Status.FAILURE;
         };
 
         const isMessageVerified = this.#wallet.verify(op.aco.is, op.aco.tx, adminPublicKey);
         if (!isMessageVerified) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.APPEND_WHITELIST, "Failed to verify message signature.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.APPEND_WHITELIST, "Failed to verify message signature.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -1089,26 +1101,26 @@ class State extends ReadyResource {
         // verify tx validity - prevent deferred execution attack
         const indexersSequenceState = await this.#getIndexerSequenceStateApply(base);
         if (indexersSequenceState === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.APPEND_WHITELIST, "Indexer sequence state is invalid.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.APPEND_WHITELIST, "Indexer sequence state is invalid.", node.from.key)
             return Status.FAILURE;
         };
 
         if (!b4a.equals(op.aco.txv, indexersSequenceState)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.APPEND_WHITELIST, "Transaction was not executed.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.APPEND_WHITELIST, "Transaction was not executed.", node.from.key)
             return Status.FAILURE;
         };
 
         // Check if the operation has already been applied
         const opEntry = await this.#getEntryApply(hashHexString, batch);
         if (opEntry !== null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.APPEND_WHITELIST, "Operation has already been applied.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.APPEND_WHITELIST, "Operation has already been applied.", node.from.key)
             return Status.FAILURE;
         };
 
         // Retrieve the node entry to check its current role
         const nodeEntry = await this.#getEntryApply(nodeAddressString, batch);
         if (nodeEntryUtils.isWhitelisted(nodeEntry)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.APPEND_WHITELIST, "Node already whitelisted.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.APPEND_WHITELIST, "Node already whitelisted.", node.from.key)
             return Status.FAILURE;
         }; // Node is already whitelisted
 
@@ -1116,36 +1128,36 @@ class State extends ReadyResource {
             // Fee
             const adminNodeEntry = await this.#getEntryApply(adminAddressString, batch);
             if (adminNodeEntry === null) {
-                this.#enable_txlogs && this.#safeLogApply(OperationType.APPEND_WHITELIST, "Failed to validate admin entry.", node.from.key)
+                this.#enable_error_apply_logs && this.#safeLogApply(OperationType.APPEND_WHITELIST, "Failed to validate admin entry.", node.from.key)
                 return Status.FAILURE;
             };
 
             const decodedNodeEntry = nodeEntryUtils.decode(adminNodeEntry)
             if (decodedNodeEntry === null) {
-                this.#enable_txlogs && this.#safeLogApply(OperationType.APPEND_WHITELIST, "Failed to decode admin entry.", node.from.key)
+                this.#enable_error_apply_logs && this.#safeLogApply(OperationType.APPEND_WHITELIST, "Failed to decode admin entry.", node.from.key)
                 return Status.FAILURE;
             };
 
             const adminBalance = toBalance(decodedNodeEntry.balance)
             if (adminBalance === null) {
-                this.#enable_txlogs && this.#safeLogApply(OperationType.APPEND_WHITELIST, "Invalid admin balance.", node.from.key)
+                this.#enable_error_apply_logs && this.#safeLogApply(OperationType.APPEND_WHITELIST, "Invalid admin balance.", node.from.key)
                 return Status.FAILURE;
             };
 
             if (!adminBalance.greaterThanOrEquals(BALANCE_FEE)) {
-                this.#enable_txlogs && this.#safeLogApply(OperationType.APPEND_WHITELIST, "Insufficient admin balance.", node.from.key)
+                this.#enable_error_apply_logs && this.#safeLogApply(OperationType.APPEND_WHITELIST, "Insufficient admin balance.", node.from.key)
                 return Status.FAILURE;
             };
             const newAdminBalance = adminBalance.sub(BALANCE_FEE)
 
             if (newAdminBalance === null) {
-                this.#enable_txlogs && this.#safeLogApply(OperationType.APPEND_WHITELIST, "Failed to apply fee to admin balance.", node.from.key)
+                this.#enable_error_apply_logs && this.#safeLogApply(OperationType.APPEND_WHITELIST, "Failed to apply fee to admin balance.", node.from.key)
                 return Status.FAILURE;
             };
             const updatedAdminEntry = newAdminBalance.update(adminNodeEntry)
 
             if (updatedAdminEntry === null) {
-                this.#enable_txlogs && this.#safeLogApply(OperationType.APPEND_WHITELIST, "Failed to update admin entry.", node.from.key)
+                this.#enable_error_apply_logs && this.#safeLogApply(OperationType.APPEND_WHITELIST, "Failed to update admin entry.", node.from.key)
                 return Status.FAILURE;
             };
 
@@ -1191,7 +1203,7 @@ class State extends ReadyResource {
 
             const initializedNodeEntry = nodeEntryUtils.init(ZERO_WK, nodeRoleUtils.NodeRole.WHITELISTED, nodeRoleUtils.ZERO_BALANCE, newLicenseLength);
             if (initializedNodeEntry.length === 0) {
-                this.#enable_txlogs && this.#safeLogApply(OperationType.APPEND_WHITELIST, "Failed to initialize node entry.", node.from.key)
+                this.#enable_error_apply_logs && this.#safeLogApply(OperationType.APPEND_WHITELIST, "Failed to initialize node entry.", node.from.key)
                 return Status.FAILURE;
             }
 
@@ -1203,13 +1215,13 @@ class State extends ReadyResource {
 
             const decodedNodeEntry = nodeEntryUtils.decode(nodeEntry);
             if (decodedNodeEntry === null) {
-                this.#enable_txlogs && this.#safeLogApply(OperationType.APPEND_WHITELIST, "Failed to decode node entry.", node.from.key)
+                this.#enable_error_apply_logs && this.#safeLogApply(OperationType.APPEND_WHITELIST, "Failed to decode node entry.", node.from.key)
                 return Status.FAILURE;
             };
             const editedNodeEntry = nodeEntryUtils.setRole(nodeEntry, nodeRoleUtils.NodeRole.WHITELISTED);
 
             if (editedNodeEntry === null) {
-                this.#enable_txlogs && this.#safeLogApply(OperationType.APPEND_WHITELIST, "Failed to edit node entry.", node.from.key)
+                this.#enable_error_apply_logs && this.#safeLogApply(OperationType.APPEND_WHITELIST, "Failed to edit node entry.", node.from.key)
                 return Status.FAILURE;
             }
 
@@ -1243,31 +1255,31 @@ class State extends ReadyResource {
 
     async #handleApplyAddWriterOperation(op, view, base, node, batch) {
         if (!this.check.validateRoleAccessOperation(op)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_WRITER, "Contract schema validation failed.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_WRITER, "Contract schema validation failed.", node.from.key)
             return Status.FAILURE;
         };
 
         // if transaction is not complete, do not process it.
         if (!Object.hasOwn(op.rao, "vs") || !Object.hasOwn(op.rao, "va") || !Object.hasOwn(op.rao, "vn")) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_WRITER, "Operation is not complete.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_WRITER, "Operation is not complete.", node.from.key)
             return Status.FAILURE;
         };
 
         // for additional security, nonces should be different.
         if (b4a.equals(op.rao.in, op.rao.vn)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_WRITER, "Nonces should not be the same.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_WRITER, "Nonces should not be the same.", node.from.key)
             return Status.FAILURE;
         };
 
         // addresses should be different.
         if (b4a.equals(op.address, op.rao.va)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_WRITER, "Addresses should be different.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_WRITER, "Addresses should be different.", node.from.key)
             return Status.FAILURE;
         };
 
         // signatures should be different.
         if (b4a.equals(op.rao.is, op.rao.vs)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_WRITER, "Signatures should be different.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_WRITER, "Signatures should be different.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -1275,19 +1287,19 @@ class State extends ReadyResource {
         const requesterAddressBuffer = op.address;
         const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer);
         if (requesterAddressString === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_WRITER, "Requester address is invalid.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_WRITER, "Requester address is invalid.", node.from.key)
             return Status.FAILURE;
         };
 
         const requesterPublicKey = PeerWallet.decodeBech32mSafe(requesterAddressString);
         if (requesterPublicKey === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_WRITER, "Error while decoding requester public key.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_WRITER, "Error while decoding requester public key.", node.from.key)
             return Status.FAILURE;
         };
 
         // if node want to register ZERO_WK, then this is NOT ALLOWED
         if (b4a.equals(op.rao.iw, ZERO_WK)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_WRITER, "Writer cannot initialize with zero-writer-key.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_WRITER, "Writer cannot initialize with zero-writer-key.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -1301,20 +1313,20 @@ class State extends ReadyResource {
         );
 
         if (requesterMessage.length === 0) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_WRITER, "Invalid requester message.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_WRITER, "Invalid requester message.", node.from.key)
             return Status.FAILURE;
         };
 
         const hash = await blake3Hash(requesterMessage);
         if (!b4a.equals(hash, op.rao.tx)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_WRITER, "Message hash does not match the tx_hash.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_WRITER, "Message hash does not match the tx_hash.", node.from.key)
             return Status.FAILURE;
         };
 
         const isRequesterMessageVerifed = this.#wallet.verify(op.rao.is, op.rao.tx, requesterPublicKey);
         const txHashHexString = op.rao.tx.toString('hex');
         if (!isRequesterMessageVerifed) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_WRITER, "Failed to verify message signature.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_WRITER, "Failed to verify message signature.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -1322,14 +1334,14 @@ class State extends ReadyResource {
         const validatorAddress = op.rao.va;
         const validatorAddressString = addressUtils.bufferToAddress(validatorAddress);
         if (validatorAddressString === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_WRITER, "Failed to validate validator address.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_WRITER, "Failed to validate validator address.", node.from.key)
             return Status.FAILURE;
         };
 
         // validate validator public key
         const validatorPublicKey = PeerWallet.decodeBech32mSafe(validatorAddressString);
         if (validatorPublicKey === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_WRITER, "Failed to decode validator public key.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_WRITER, "Failed to decode validator public key.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -1342,26 +1354,26 @@ class State extends ReadyResource {
         );
 
         if (validatorMessage.length === 0) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_WRITER, "Invalid validator message.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_WRITER, "Invalid validator message.", node.from.key)
             return Status.FAILURE;
         };
 
         const validatorHash = await blake3Hash(validatorMessage);
         const isValidatorMessageVerifed = this.#wallet.verify(op.rao.vs, validatorHash, validatorPublicKey);
         if (!isValidatorMessageVerifed) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_WRITER, "Failed to verify validator message signature.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_WRITER, "Failed to verify validator message signature.", node.from.key)
             return Status.FAILURE;
         };
 
         // verify tx validity - prevent deferred execution attack
         const indexersSequenceState = await this.#getIndexerSequenceStateApply(base);
         if (indexersSequenceState === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_WRITER, "Indexer sequence state is invalid.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_WRITER, "Indexer sequence state is invalid.", node.from.key)
             return Status.FAILURE;
         };
 
         if (!b4a.equals(op.rao.txv, indexersSequenceState)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_WRITER, "Transaction was not executed.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_WRITER, "Transaction was not executed.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -1370,14 +1382,14 @@ class State extends ReadyResource {
         // Validator consistency checks
         const isValidatorValid = await this.#isValidatorValidApply(validatorEntryBuffer, node, op);
         if (!isValidatorValid) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_WRITER, "Validator consistency check failed.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_WRITER, "Validator consistency check failed.", node.from.key)
             return Status.FAILURE;
         }
 
         // anti-replay attack
         const opEntry = await this.#getEntryApply(txHashHexString, batch);
         if (opEntry !== null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_WRITER, "Operation has already been applied.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_WRITER, "Operation has already been applied.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -1392,13 +1404,13 @@ class State extends ReadyResource {
         // Retrieve the node entry for the given address, if null then do not process...
         const requesterNodeEntry = await this.#getEntryApply(requesterAddressString, batch);
         if (requesterNodeEntry === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_WRITER, "Failed to verify requester node address.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_WRITER, "Failed to verify requester node address.", node.from.key)
             return null;
         };
 
         const decodedRequesterNodeEntry = nodeEntryUtils.decode(requesterNodeEntry)
         if (decodedRequesterNodeEntry === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_WRITER, "Failed to decode node entry.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_WRITER, "Failed to decode node entry.", node.from.key)
             return null;
         };
 
@@ -1433,7 +1445,7 @@ class State extends ReadyResource {
             const isOwner = b4a.equals(writerKeyHasBeenRegistered, requesterAddressBuffer);
 
             if (!isCurrentWk || !isOwner) {
-                this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_WRITER, "Invalid writer key: either not owned by requester or different from assigned key.", node.from.key)
+                this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_WRITER, "Invalid writer key: either not owned by requester or different from assigned key.", node.from.key)
                 return null;
             }
         }
@@ -1444,38 +1456,38 @@ class State extends ReadyResource {
 
         // To become a writer the node must be whitelisted and not already a writer or indexer
         if (isIndexer || isWriter || !isWhitelisted) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_WRITER, "Node must be whitelisted, and cannot be a writer or an indexer.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_WRITER, "Node must be whitelisted, and cannot be a writer or an indexer.", node.from.key)
             return null;
         };
 
         // Charging fee from the requester
         const requesterBalance = toBalance(decodedRequesterNodeEntry.balance)
         if (requesterBalance === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_WRITER, "Failed to verify requester balance.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_WRITER, "Failed to verify requester balance.", node.from.key)
             return null;
         };
 
         if (!requesterBalance.greaterThanOrEquals(BALANCE_FEE)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_WRITER, "Insufficient requester balance.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_WRITER, "Insufficient requester balance.", node.from.key)
             return null;
         };
 
         const updatedBalance = requesterBalance.sub(BALANCE_FEE) // Remove the fee
         if (updatedBalance === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_WRITER, "Failed to apply fee to node.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_WRITER, "Failed to apply fee to node.", node.from.key)
             return null;
         };
 
         // Update the node entry to assign the writer role and deduct the fee from the requester's balance
         const updatedRoleRequesterNodeEntry = nodeEntryUtils.setRoleAndWriterKey(requesterNodeEntry, nodeRoleUtils.NodeRole.WRITER, op.rao.iw);
         if (updatedRoleRequesterNodeEntry === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_WRITER, "Failed to update node entry with a writer role.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_WRITER, "Failed to update node entry with a writer role.", node.from.key)
             return null;
         };
 
         const chargedFeeRequesterNodeEntry = updatedBalance.update(updatedRoleRequesterNodeEntry)
         if (chargedFeeRequesterNodeEntry === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_WRITER, "Failed to update node balance.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_WRITER, "Failed to update node balance.", node.from.key)
             return null;
         };
 
@@ -1483,31 +1495,31 @@ class State extends ReadyResource {
 
         const decodedValidatorEntry = nodeEntryUtils.decode(validatorEntryBuffer)
         if (decodedValidatorEntry === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_WRITER, "Failed to decode validator entry.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_WRITER, "Failed to decode validator entry.", node.from.key)
             return null;
         };
 
         const validatorBalance = toBalance(decodedValidatorEntry.balance)
         if (validatorBalance === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_WRITER, "Invalid validator balance.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_WRITER, "Invalid validator balance.", node.from.key)
             return null;
         };
 
         const updatedValidatorBalance = validatorBalance.add(BALANCE_FEE.percentage(PERCENT_75))
         if (updatedValidatorBalance === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_WRITER, "Failed to transfer fee to validator.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_WRITER, "Failed to transfer fee to validator.", node.from.key)
             return null;
         };
 
         const updatedValidatorEntry = updatedValidatorBalance.update(validatorEntryBuffer)
         if (updatedValidatorEntry === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_WRITER, "Failed to update validator entry.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_WRITER, "Failed to update validator entry.", node.from.key)
             return null;
         };
 
         const finalRequesterNodeEntry = this.#stakeBalanceApply(chargedFeeRequesterNodeEntry, node);
         if (finalRequesterNodeEntry === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_WRITER, "Failed to stake balance for writer.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_WRITER, "Failed to stake balance for writer.", node.from.key)
             return null;
         };
 
@@ -1533,36 +1545,39 @@ class State extends ReadyResource {
         // Pay the fee to the validator
         await batch.put(validatorAddressString, updatedValidatorEntry);
         await batch.put(txHashHexString, node.value);
-        console.log(`Writer added addr:wk:tx - ${requesterAddressString}:${op.rao.iw.toString('hex')}:${txHashHexString}`);
+
+        if (this.#enable_tx_apply_logs) {
+            console.info(`Writer has been added addr:wk:tx - ${requesterAddressString}:${op.rao.iw.toString('hex')}:${txHashHexString}`);
+        }
     }
 
     async #handleApplyRemoveWriterOperation(op, view, base, node, batch) {
         if (!this.check.validateRoleAccessOperation(op)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Contract schema validation failed.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Contract schema validation failed.", node.from.key)
             return Status.FAILURE;
         };
 
         // if transaction is not complete, do not process it.
         if (!Object.hasOwn(op.rao, "vs") || !Object.hasOwn(op.rao, "va") || !Object.hasOwn(op.rao, "vn")) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Operation is not complete.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Operation is not complete.", node.from.key)
             return Status.FAILURE;
         };
 
         // for additional security, nonces should be different.
         if (b4a.equals(op.rao.in, op.rao.vn)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Nonces should not be the same.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Nonces should not be the same.", node.from.key)
             return Status.FAILURE;
         };
 
         // addresses should be different.
         if (b4a.equals(op.address, op.rao.va)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Addresses should be different.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Addresses should be different.", node.from.key)
             return Status.FAILURE;
         };
 
         // signatures should be different.
         if (b4a.equals(op.rao.is, op.rao.vs)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Signatures should be different.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Signatures should be different.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -1570,14 +1585,14 @@ class State extends ReadyResource {
         const requesterAddress = op.address;
         const requesterAddressString = addressUtils.bufferToAddress(requesterAddress);
         if (requesterAddressString === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Requester address is invalid.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Requester address is invalid.", node.from.key)
             return Status.FAILURE;
         };
 
         // Validate requester public key
         const requesterPublicKey = PeerWallet.decodeBech32mSafe(requesterAddressString);
         if (requesterPublicKey === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Error while decoding requester public key.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Error while decoding requester public key.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -1590,21 +1605,21 @@ class State extends ReadyResource {
             OperationType.REMOVE_WRITER
         );
         if (requesterMessage.length === 0) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Invalid requester message.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Invalid requester message.", node.from.key)
             return Status.FAILURE;
         };
 
         // compare hashes
         const hash = await blake3Hash(requesterMessage);
         if (!b4a.equals(hash, op.rao.tx)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Message hash does not match the tx_hash.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Message hash does not match the tx_hash.", node.from.key)
             return Status.FAILURE;
         };
 
         const isRequesterMessageVerifed = this.#wallet.verify(op.rao.is, op.rao.tx, requesterPublicKey);
         const txHashHexString = op.rao.tx.toString('hex');
         if (!isRequesterMessageVerifed) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Failed to verify message signature.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Failed to verify message signature.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -1612,14 +1627,14 @@ class State extends ReadyResource {
         const validatorAddress = op.rao.va;
         const validatorAddressString = addressUtils.bufferToAddress(validatorAddress);
         if (validatorAddressString === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Failed to verify validator address.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Failed to verify validator address.", node.from.key)
             return Status.FAILURE;
         };
 
         // validate validator public key
         const validatorPublicKey = PeerWallet.decodeBech32mSafe(validatorAddressString);
         if (validatorPublicKey === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Failed to decode validator public key.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Failed to decode validator public key.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -1631,26 +1646,26 @@ class State extends ReadyResource {
             OperationType.REMOVE_WRITER
         );
         if (validatorMessage.length === 0) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Invalid validator message.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Invalid validator message.", node.from.key)
             return Status.FAILURE;
         };
 
         const validatorHash = await blake3Hash(validatorMessage);
         const isValidatorMessageVerifed = this.#wallet.verify(op.rao.vs, validatorHash, validatorPublicKey);
         if (!isValidatorMessageVerifed) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Failed to verify validator message signature.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Failed to verify validator message signature.", node.from.key)
             return Status.FAILURE;
         };
 
         // verify tx validity - prevent deferred execution attack
         const indexersSequenceState = await this.#getIndexerSequenceStateApply(base);
         if (indexersSequenceState === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Indexer sequence state is invalid.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Indexer sequence state is invalid.", node.from.key)
             return Status.FAILURE;
         };
 
         if (!b4a.equals(op.rao.txv, indexersSequenceState)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Transaction was not executed.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Transaction was not executed.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -1659,14 +1674,14 @@ class State extends ReadyResource {
         // Validator consistency checks
         const isValidatorValid = await this.#isValidatorValidApply(validatorEntryBuffer, node, op);
         if (!isValidatorValid) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Validator consistency check failed.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Validator consistency check failed.", node.from.key)
             return Status.FAILURE;
         };
 
         // anti-replay attack
         const opEntry = await this.#getEntryApply(txHashHexString, batch);
         if (opEntry !== null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Operation has already been applied.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Operation has already been applied.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -1684,13 +1699,13 @@ class State extends ReadyResource {
         // Fetch the node entry for the given address
         const requesterNodeEntry = await this.#getEntryApply(requesterAddressString, batch);
         if (requesterNodeEntry === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Failed to verify requester node entry.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Failed to verify requester node entry.", node.from.key)
             return null;
         };
 
         const decodedNodeEntry = nodeEntryUtils.decode(requesterNodeEntry);
         if (decodedNodeEntry === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Failed to decode requester node entry.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Failed to decode requester node entry.", node.from.key)
             return null;
         };
 
@@ -1699,7 +1714,7 @@ class State extends ReadyResource {
         const isNodeIndexer = decodedNodeEntry.isIndexer;
 
         if (isNodeIndexer || !isNodeWriter) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Node has to be a writer, and cannot be an indexer.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Node has to be a writer, and cannot be an indexer.", node.from.key)
             return null;
         };
 
@@ -1714,68 +1729,68 @@ class State extends ReadyResource {
             !b4a.equals(op.rao.iw, decodedNodeEntry.wk) ||
             !b4a.equals(writerKeyHasBeenRegistered, requesterAddress)
         ) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Writer key must be registered, match node's current key, and belong to the requester.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Writer key must be registered, match node's current key, and belong to the requester.", node.from.key)
             return null;
         }
 
         // Charging fee from the requester
         const requesterBalance = toBalance(decodedNodeEntry.balance);
         if (requesterBalance === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Invalid requester balance.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Invalid requester balance.", node.from.key)
             return null;
         };
 
         if (!requesterBalance.greaterThanOrEquals(BALANCE_FEE)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Insufficient requester balance.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Insufficient requester balance.", node.from.key)
             return null;
         };
 
         const updatedBalance = requesterBalance.sub(BALANCE_FEE);
         if (updatedBalance === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Failed to apply fee to requester balance.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Failed to apply fee to requester balance.", node.from.key)
             return null;
         };
 
         // Downgrade role from WRITER to WHITELISTED and deduct the fee from the requester's balance
         const updatedNodeEntry = nodeEntryUtils.setRole(requesterNodeEntry, nodeRoleUtils.NodeRole.WHITELISTED);
         if (updatedNodeEntry === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Failed to update node entry role.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Failed to update node entry role.", node.from.key)
             return null;
         };
         const chargedNodeEntry = updatedBalance.update(updatedNodeEntry);
         if (chargedNodeEntry === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Failed to update node entry.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Failed to update node entry.", node.from.key)
             return null;
         };
 
         // Validator reward logic 
         const decodedValidatorEntry = nodeEntryUtils.decode(validatorEntryBuffer);
         if (decodedValidatorEntry === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Failed to decode valdiator node entry.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Failed to decode valdiator node entry.", node.from.key)
             return null;
         };
 
         const validatorBalance = toBalance(decodedValidatorEntry.balance)
         if (validatorBalance === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Invalid validator balance.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Invalid validator balance.", node.from.key)
             return null;
         };
 
         const validatorNewBalance = validatorBalance.add(BALANCE_FEE.percentage(PERCENT_75))
         if (validatorNewBalance === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Failed to transfer fee to validator balance.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Failed to transfer fee to validator balance.", node.from.key)
             return null;
         };
 
         const updateValidatorEntry = validatorNewBalance.update(validatorEntryBuffer)
         if (updateValidatorEntry === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Failed to update validator balance.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Failed to update validator balance.", node.from.key)
             return null;
         };
 
         const finalRequesterNodeEntry = this.#withdrawStakedBalanceApply(chargedNodeEntry, node);
         if (finalRequesterNodeEntry === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Failed to unstake balance for writer.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.REMOVE_WRITER, "Failed to unstake balance for writer.", node.from.key)
             return null;
         };
 
@@ -1786,12 +1801,15 @@ class State extends ReadyResource {
         // Reward the validator
         await batch.put(validatorAddressString, updateValidatorEntry);
         await batch.put(txHashHexString, node.value);
-        console.log(`Writer removed: addr:wk:tx - ${requesterAddressString}:${op.rao.iw.toString('hex')}:${txHashHexString}`);
+
+        if (this.#enable_tx_apply_logs) {
+            console.info(`Writer removed: addr:wk:tx - ${requesterAddressString}:${op.rao.iw.toString('hex')}:${txHashHexString}`);
+        }
     }
 
     async #handleApplyAddIndexerOperation(op, view, base, node, batch) {
         if (!this.check.validateAdminControlOperation(op)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_INDEXER, "Contract schema validation failed.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_INDEXER, "Contract schema validation failed.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -1799,14 +1817,14 @@ class State extends ReadyResource {
         const requesterAddressBuffer = op.address;
         const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer);
         if (requesterAddressString === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_INDEXER, "Requester address is invalid.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_INDEXER, "Requester address is invalid.", node.from.key)
             return Status.FAILURE;
         };
 
         // Validate requester public key
         const requesterPublicKey = PeerWallet.decodeBech32mSafe(requesterAddressString);
         if (requesterPublicKey === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_INDEXER, "Error while decoding requester public key.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_INDEXER, "Error while decoding requester public key.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -1814,40 +1832,40 @@ class State extends ReadyResource {
         const pretendingAddressBuffer = op.aco.ia;
         const pretendingAddressString = addressUtils.bufferToAddress(pretendingAddressBuffer);
         if (pretendingAddressString === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_INDEXER, "Pretending indexer address is invalid.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_INDEXER, "Pretending indexer address is invalid.", node.from.key)
             return Status.FAILURE;
         };
 
         // Validate pretending indexer public key
         const pretentingPublicKey = PeerWallet.decodeBech32mSafe(pretendingAddressString);
         if (pretentingPublicKey === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_INDEXER, "Failed to decode pretending indexer public key.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_INDEXER, "Failed to decode pretending indexer public key.", node.from.key)
             return Status.FAILURE;
         };
 
         // ensure that an admin invoked this operation
         const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
         if (adminEntry === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_INDEXER, "Invalid admin entry.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_INDEXER, "Invalid admin entry.", node.from.key)
             return Status.FAILURE;
         };
 
         const decodedAdminEntry = adminEntryUtils.decode(adminEntry);
         if (decodedAdminEntry === null || !this.#isAdminApply(decodedAdminEntry, node)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_INDEXER, "Node is not allowed to perform this operation. (ADMIN ONLY)", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_INDEXER, "Node is not allowed to perform this operation. (ADMIN ONLY)", node.from.key)
             return Status.FAILURE;
         };
 
         // Extract admin public key 
         const adminPublicKey = PeerWallet.decodeBech32mSafe(decodedAdminEntry.address);
         if (adminPublicKey === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_INDEXER, "Failed to decode admin public key.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_INDEXER, "Failed to decode admin public key.", node.from.key)
             return Status.FAILURE;
         };
 
         // Admin consistency check
         if (!b4a.equals(adminPublicKey, requesterPublicKey)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_INDEXER, "System admin and node public keys do not match.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_INDEXER, "System admin and node public keys do not match.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -1861,39 +1879,39 @@ class State extends ReadyResource {
         );
 
         if (message.length === 0) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_INDEXER, "Invalid requester message.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_INDEXER, "Invalid requester message.", node.from.key)
             return Status.FAILURE;
         };
 
         const hash = await blake3Hash(message);
         if (!b4a.equals(hash, op.aco.tx)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_INDEXER, "Message hash does not match the tx_hash.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_INDEXER, "Message hash does not match the tx_hash.", node.from.key)
             return Status.FAILURE;
         };
 
         const isMessageVerifed = this.#wallet.verify(op.aco.is, hash, adminPublicKey);
         const txHashHexString = hash.toString('hex');
         if (!isMessageVerifed) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_INDEXER, "Failed to verify message signature.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_INDEXER, "Failed to verify message signature.", node.from.key)
             return Status.FAILURE;
         };
 
         // verify tx validity - prevent deferred execution attack
         const indexersSequenceState = await this.#getIndexerSequenceStateApply(base);
         if (indexersSequenceState === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_INDEXER, "Indexer sequence state is invalid.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_INDEXER, "Indexer sequence state is invalid.", node.from.key)
             return Status.FAILURE;
         };
 
         if (!b4a.equals(op.aco.txv, indexersSequenceState)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_INDEXER, "Transaction was not executed.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_INDEXER, "Transaction was not executed.", node.from.key)
             return Status.FAILURE;
         };
 
         // anti-replay attack
         const opEntry = await this.#getEntryApply(txHashHexString, batch);
         if (opEntry !== null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_INDEXER, "Operation has already been applied.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_INDEXER, "Operation has already been applied.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -1901,6 +1919,7 @@ class State extends ReadyResource {
         if (addIndexerResult === null) {
             return Status.FAILURE;
         }
+
         return Status.SUCCESS;
     }
 
@@ -1908,13 +1927,13 @@ class State extends ReadyResource {
 
         const pretenderNodeEntry = await this.#getEntryApply(pretendingAddressString, batch);
         if (pretenderNodeEntry === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_INDEXER, "Failed to verify pretender indexer entry.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_INDEXER, "Failed to verify pretender indexer entry.", node.from.key)
             return null;
         };
 
         const decodedPretenderNodeEntry = nodeEntryUtils.decode(pretenderNodeEntry);
         if (decodedPretenderNodeEntry === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_INDEXER, "Failed to decode pretender indexer node entry.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_INDEXER, "Failed to decode pretender indexer node entry.", node.from.key)
             return null;
         };
 
@@ -1922,64 +1941,64 @@ class State extends ReadyResource {
         const isNodeWriter = nodeEntryUtils.isWriter(pretenderNodeEntry);
         const isNodeIndexer = nodeEntryUtils.isIndexer(pretenderNodeEntry);
         if (!isNodeWriter || isNodeIndexer) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_INDEXER, "Node must be a writer, and cannot already be an indexer.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_INDEXER, "Node must be a writer, and cannot already be an indexer.", node.from.key)
             return null;
         };
 
         //update node entry to indexer
         const updatedNodeEntry = nodeEntryUtils.setRole(pretenderNodeEntry, nodeRoleUtils.NodeRole.INDEXER)
         if (updatedNodeEntry === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_INDEXER, "Failed to update node role.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_INDEXER, "Failed to update node role.", node.from.key)
             return null;
         };
 
         // ensure that the node wk does not exist in the indexer list
         const indexerListHasWk = await this.#isWriterKeyInIndexerListApply(decodedPretenderNodeEntry.wk, base);
         if (indexerListHasWk) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_INDEXER, "Writer key already exists in indexer list.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_INDEXER, "Writer key already exists in indexer list.", node.from.key)
             return null;
         }; // Wk is already in indexer list (Node already indexer)
 
         // charge fee from the admin (requester)
         const feeAmount = toBalance(transactionUtils.FEE);
         if (feeAmount === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_INDEXER, "Invalid fee amount.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_INDEXER, "Invalid fee amount.", node.from.key)
             return null;
         };
 
         const adminNodeEntryBuffer = await this.#getEntryApply(requesterAddressString, batch);
         if (adminNodeEntryBuffer === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_INDEXER, "Invalid requester node entry buffer.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_INDEXER, "Invalid requester node entry buffer.", node.from.key)
             return null;
         };
 
         const adminNodeEntry = nodeEntryUtils.decode(adminNodeEntryBuffer);
         if (adminNodeEntry === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_INDEXER, "Failed to decode requester node entry.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_INDEXER, "Failed to decode requester node entry.", node.from.key)
             return null;
         };
 
         const adminBalance = toBalance(adminNodeEntry.balance);
         if (adminBalance === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_INDEXER, "Invalid admin balance.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_INDEXER, "Invalid admin balance.", node.from.key)
             return null;
         };
 
         if (!adminBalance.greaterThanOrEquals(feeAmount)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_INDEXER, "Insufficient requester balance.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_INDEXER, "Insufficient requester balance.", node.from.key)
             return null;
         };
 
         // 100% fee charged from admin will be burned
         const newAdminBalance = adminBalance.sub(feeAmount);
         if (newAdminBalance === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_INDEXER, "Failed to apply fee to requester balance", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_INDEXER, "Failed to apply fee to requester balance", node.from.key)
             return null;
         };
 
         const updatedAdminNodeEntry = newAdminBalance.update(adminNodeEntryBuffer);
         if (updatedAdminNodeEntry === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.ADD_INDEXER, "Failed to update requester node.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.ADD_INDEXER, "Failed to update requester node.", node.from.key)
             return null;
         };
 
@@ -1994,12 +2013,15 @@ class State extends ReadyResource {
         // store operation hash to avoid replay attack.
         await batch.put(txHashHexString, node.value);
 
-        console.log(`Indexer added addr:wk:tx - ${pretendingAddressString}:${decodedPretenderNodeEntry.wk.toString('hex')}:${txHashHexString}`);
+        if (this.#enable_tx_apply_logs) {
+            console.info(`Indexer added addr:wk:tx - ${pretendingAddressString}:${decodedPretenderNodeEntry.wk.toString('hex')}:${txHashHexString}`);
+
+        }
     }
 
     async #handleApplyRemoveIndexerOperation(op, view, base, node, batch) {
         if (!this.check.validateAdminControlOperation(op)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_INDEXER, "Contract schema validation failed.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.REMOVE_INDEXER, "Contract schema validation failed.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -2007,14 +2029,14 @@ class State extends ReadyResource {
         const requesterAddressBuffer = op.address;
         const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer);
         if (requesterAddressString === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_INDEXER, "Requester address is invalid.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.REMOVE_INDEXER, "Requester address is invalid.", node.from.key)
             return Status.FAILURE;
         };
 
         // Validate requester public key (admin)
         const requesterPublicKey = PeerWallet.decodeBech32mSafe(requesterAddressString);
         if (requesterPublicKey === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_INDEXER, "Error while decoding requester public key.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.REMOVE_INDEXER, "Error while decoding requester public key.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -2022,37 +2044,37 @@ class State extends ReadyResource {
         const toRemoveAddressBuffer = op.aco.ia;
         const toRemoveAddressString = addressUtils.bufferToAddress(toRemoveAddressBuffer);
         if (toRemoveAddressString === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_INDEXER, "Target indexer address is invalid.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.REMOVE_INDEXER, "Target indexer address is invalid.", node.from.key)
             return Status.FAILURE;
         };
 
         const toRemoveAddressPublicKey = PeerWallet.decodeBech32mSafe(toRemoveAddressString);
         if (toRemoveAddressPublicKey === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_INDEXER, "Failed to decode target indexer public key.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.REMOVE_INDEXER, "Failed to decode target indexer public key.", node.from.key)
             return Status.FAILURE;
         };
 
         // ensure that an admin invoked this operation
         const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
         if (adminEntry === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_INDEXER, "Invalid admin entry.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.REMOVE_INDEXER, "Invalid admin entry.", node.from.key)
             return Status.FAILURE;
         };
 
         const decodedAdminEntry = adminEntryUtils.decode(adminEntry);
         if (decodedAdminEntry === null || !this.#isAdminApply(decodedAdminEntry, node)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_INDEXER, "Node is not allowed to perform this operation. (ADMIN ONLY)", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.REMOVE_INDEXER, "Node is not allowed to perform this operation. (ADMIN ONLY)", node.from.key)
             return Status.FAILURE;
         };
 
         const adminPublicKey = PeerWallet.decodeBech32mSafe(decodedAdminEntry.address);
         if (adminPublicKey === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_INDEXER, "Failed to decode admin public key.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.REMOVE_INDEXER, "Failed to decode admin public key.", node.from.key)
             return Status.FAILURE;
         };
 
         if (!b4a.equals(requesterPublicKey, adminPublicKey)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_INDEXER, "System admin and node public keys do not match.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.REMOVE_INDEXER, "System admin and node public keys do not match.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -2066,39 +2088,39 @@ class State extends ReadyResource {
         );
 
         if (message.length === 0) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_INDEXER, "Invalid requester message.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.REMOVE_INDEXER, "Invalid requester message.", node.from.key)
             return Status.FAILURE;
         };
         // compare hashes
         const hash = await blake3Hash(message);
         if (!b4a.equals(hash, op.aco.tx)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_INDEXER, "Message hash does not match the tx_hash.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.REMOVE_INDEXER, "Message hash does not match the tx_hash.", node.from.key)
             return Status.FAILURE;
         };
 
         const isMessageVerifed = this.#wallet.verify(op.aco.is, hash, adminPublicKey);
         const txHashHexString = hash.toString('hex');
         if (!isMessageVerifed) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_INDEXER, "Failed to verify message signature.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.REMOVE_INDEXER, "Failed to verify message signature.", node.from.key)
             return Status.FAILURE;
         };
 
         // verify tx validity - prevent deferred execution attack
         const indexersSequenceState = await this.#getIndexerSequenceStateApply(base);
         if (indexersSequenceState === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_INDEXER, "Indexer sequence state is invalid.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.REMOVE_INDEXER, "Indexer sequence state is invalid.", node.from.key)
             return Status.FAILURE;
         };
 
         if (!b4a.equals(op.aco.txv, indexersSequenceState)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_INDEXER, "Transaction was not executed.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.REMOVE_INDEXER, "Transaction was not executed.", node.from.key)
             return Status.FAILURE;
         };
 
         // anti-replay attack
         const opEntry = await this.#getEntryApply(txHashHexString, batch);
         if (opEntry !== null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_INDEXER, "Operation has already been applied.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.REMOVE_INDEXER, "Operation has already been applied.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -2112,71 +2134,71 @@ class State extends ReadyResource {
     async #removeIndexer(op, node, batch, base, txHashHexString, toRemoveAddressString, toRemoveAddressBuffer, requesterAddressString) {
         const toRemoveNodeEntry = await this.#getEntryApply(toRemoveAddressString, batch);
         if (toRemoveNodeEntry === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_INDEXER, "Failed to verify target indexer entry.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.REMOVE_INDEXER, "Failed to verify target indexer entry.", node.from.key)
             return null;
         };
 
         const decodedNodeEntry = nodeEntryUtils.decode(toRemoveNodeEntry);
         if (decodedNodeEntry === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_INDEXER, "Failed to decode target indexer node entry.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.REMOVE_INDEXER, "Failed to decode target indexer node entry.", node.from.key)
             return null;
         };
 
         // Check if the node entry is an indexer
         const isNodeIndexer = nodeEntryUtils.isIndexer(toRemoveNodeEntry);
         if (!isNodeIndexer) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_INDEXER, "Node must be an indexer.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.REMOVE_INDEXER, "Node must be an indexer.", node.from.key)
             return null;
         };
 
         //update node entry to writer
         const updatedNodeEntry = nodeEntryUtils.setRoleAndWriterKey(toRemoveNodeEntry, nodeRoleUtils.NodeRole.WRITER, decodedNodeEntry.wk)
         if (updatedNodeEntry === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_INDEXER, "Failed to update node role.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.REMOVE_INDEXER, "Failed to update node role.", node.from.key)
             return null;
         };
 
         // Ensure that the node is an indexer
         const indexerListHasWk = await this.#isWriterKeyInIndexerListApply(decodedNodeEntry.wk, base);
         if (!indexerListHasWk) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_INDEXER, "Writer key does not exist in indexer list.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.REMOVE_INDEXER, "Writer key does not exist in indexer list.", node.from.key)
             return null;
         }; // Node is not an indexer.
 
         // Charging fee from the admin (requester)
         const adminNodeEntry = await this.#getEntryApply(requesterAddressString, batch);
         if (adminNodeEntry === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_INDEXER, "Invalid requester node entry.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.REMOVE_INDEXER, "Invalid requester node entry.", node.from.key)
             return null;
         };
 
         const decodedAdminNodeEntry = nodeEntryUtils.decode(adminNodeEntry)
         if (decodedAdminNodeEntry === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_INDEXER, "Failed to decode requester node entry.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.REMOVE_INDEXER, "Failed to decode requester node entry.", node.from.key)
             return null;
         };
 
         const adminBalance = toBalance(decodedAdminNodeEntry.balance)
         if (adminBalance === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_INDEXER, "Invalid admin balance.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.REMOVE_INDEXER, "Invalid admin balance.", node.from.key)
             return null;
         };
 
         if (!adminBalance.greaterThanOrEquals(BALANCE_FEE)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_INDEXER, "Insufficient requester balance.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.REMOVE_INDEXER, "Insufficient requester balance.", node.from.key)
             return null;
         };
 
         // 100% fee will be burned
         const newAdminBalance = adminBalance.sub(BALANCE_FEE)
         if (newAdminBalance === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_INDEXER, "Failed to apply fee to requester balance", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.REMOVE_INDEXER, "Failed to apply fee to requester balance", node.from.key)
             return null;
         };
 
         const updatedAdminNodeEntry = newAdminBalance.update(adminNodeEntry)
         if (updatedAdminNodeEntry === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.REMOVE_INDEXER, "Failed to update requester node.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.REMOVE_INDEXER, "Failed to update requester node.", node.from.key)
             return null;
         };
 
@@ -2204,51 +2226,53 @@ class State extends ReadyResource {
 
         // store operation hash to avoid replay attack.
         await batch.put(txHashHexString, node.value);
-        console.log(`Indexer has been removed addr:wk:tx - ${toRemoveAddressString}:${decodedNodeEntry.wk.toString('hex')}:${txHashHexString}`);
+        if (this.#enable_tx_apply_logs) {
+            console.info(`Indexer has been removed addr:wk:tx - ${toRemoveAddressString}:${decodedNodeEntry.wk.toString('hex')}:${txHashHexString}`);
+        }
     }
 
     async #handleApplyBanValidatorOperation(op, view, base, node, batch) {
         if (!this.check.validateAdminControlOperation(op)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BAN_VALIDATOR, "Contract schema validation failed.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BAN_VALIDATOR, "Contract schema validation failed.", node.from.key)
             return Status.FAILURE;
         };
         // Extract and validate the network prefix from the node's address
         const requesterAddressBuffer = op.address;
         const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer);
         if (requesterAddressString === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BAN_VALIDATOR, "Requester address is invalid.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BAN_VALIDATOR, "Requester address is invalid.", node.from.key)
             return Status.FAILURE;
         };
 
         // Validate requester public key
         const requesterPublicKey = PeerWallet.decodeBech32mSafe(requesterAddressString);
         if (requesterPublicKey === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BAN_VALIDATOR, "Error while decoding requester public key.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BAN_VALIDATOR, "Error while decoding requester public key.", node.from.key)
             return Status.FAILURE;
         };
 
         // ensure that an admin invoked this operation
         const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
         if (adminEntry === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BAN_VALIDATOR, "Invalid admin entry.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BAN_VALIDATOR, "Invalid admin entry.", node.from.key)
             return Status.FAILURE;
         };
 
         const decodedAdminEntry = adminEntryUtils.decode(adminEntry);
         if (decodedAdminEntry === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BAN_VALIDATOR, "Failed to decode admin node entry.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BAN_VALIDATOR, "Failed to decode admin node entry.", node.from.key)
             return Status.FAILURE;
         };
 
         const adminPublicKey = PeerWallet.decodeBech32mSafe(decodedAdminEntry.address);
         if (adminPublicKey === null || !this.#isAdminApply(decodedAdminEntry, node)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BAN_VALIDATOR, "Node is not allowed to perform this operation. (ADMIN ONLY)", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BAN_VALIDATOR, "Node is not allowed to perform this operation. (ADMIN ONLY)", node.from.key)
             return Status.FAILURE;
         };
 
         // Admin consistency check
         if (!b4a.equals(adminPublicKey, requesterPublicKey)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BAN_VALIDATOR, "System admin and node public keys do not match.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BAN_VALIDATOR, "System admin and node public keys do not match.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -2261,40 +2285,40 @@ class State extends ReadyResource {
             OperationType.BAN_VALIDATOR
         );
         if (message.length === 0) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BAN_VALIDATOR, "Invalid requester message.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BAN_VALIDATOR, "Invalid requester message.", node.from.key)
             return Status.FAILURE;
         };
 
         // compare hashes
         const regeneratedHash = await blake3Hash(message);
         if (!b4a.equals(regeneratedHash, op.aco.tx)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BAN_VALIDATOR, "Message hash does not match the tx_hash.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BAN_VALIDATOR, "Message hash does not match the tx_hash.", node.from.key)
             return Status.FAILURE;
         };
 
         const isMessageVerifed = this.#wallet.verify(op.aco.is, regeneratedHash, adminPublicKey);
         const txHashHexString = regeneratedHash.toString('hex');
         if (!isMessageVerifed) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BAN_VALIDATOR, "Failed to verify message signature.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BAN_VALIDATOR, "Failed to verify message signature.", node.from.key)
             return Status.FAILURE;
         }
 
         // verify tx validity - prevent deferred execution attack
         const indexersSequenceState = await this.#getIndexerSequenceStateApply(base);
         if (indexersSequenceState === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BAN_VALIDATOR, "Indexer sequence state is invalid.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BAN_VALIDATOR, "Indexer sequence state is invalid.", node.from.key)
             return Status.FAILURE;
         }
 
         if (!b4a.equals(op.aco.txv, indexersSequenceState)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BAN_VALIDATOR, "Transaction was not executed.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BAN_VALIDATOR, "Transaction was not executed.", node.from.key)
             return Status.FAILURE;
         };
 
         // check if the operation has already been applied
         const opEntry = await this.#getEntryApply(txHashHexString, batch);
         if (opEntry !== null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BAN_VALIDATOR, "Operation has already been applied.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BAN_VALIDATOR, "Operation has already been applied.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -2302,13 +2326,13 @@ class State extends ReadyResource {
         const nodeToBeBannedAddressBuffer = op.aco.ia;
         const nodeToBeBannedAddressString = addressUtils.bufferToAddress(nodeToBeBannedAddressBuffer);
         if (nodeToBeBannedAddressString === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BAN_VALIDATOR, "Failed to verify target node address.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BAN_VALIDATOR, "Failed to verify target node address.", node.from.key)
             return Status.FAILURE;
         };
 
         const toBanNodeEntry = await this.#getEntryApply(nodeToBeBannedAddressString, batch);
         if (toBanNodeEntry === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BAN_VALIDATOR, "Failed to verify target node entry.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BAN_VALIDATOR, "Failed to verify target node entry.", node.from.key)
             return Status.FAILURE;
         }; // Node entry must exist to ban it.
 
@@ -2319,62 +2343,62 @@ class State extends ReadyResource {
 
         // only writer/whitelisted node can be banned.
         if ((!isWhitelisted && !isWriter) || isIndexer) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BAN_VALIDATOR, "Only writer/whitelisted node can be banned.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BAN_VALIDATOR, "Only writer/whitelisted node can be banned.", node.from.key)
             return Status.FAILURE;
         };
 
         const updatedToBanNodeEntry = nodeEntryUtils.setRole(toBanNodeEntry, nodeRoleUtils.NodeRole.READER);
         if (updatedToBanNodeEntry === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BAN_VALIDATOR, "Failed to update target node role.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BAN_VALIDATOR, "Failed to update target node role.", node.from.key)
             return Status.FAILURE;
         };
 
         const decodedToBanNodeEntry = nodeEntryUtils.decode(updatedToBanNodeEntry);
         if (decodedToBanNodeEntry === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BAN_VALIDATOR, "Failed to decode target node entry.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BAN_VALIDATOR, "Failed to decode target node entry.", node.from.key)
             return Status.FAILURE;
         };
 
         // charge fee from the admin
         const feeAmount = toBalance(transactionUtils.FEE);
         if (feeAmount === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BAN_VALIDATOR, "Invalid fee amount.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BAN_VALIDATOR, "Invalid fee amount.", node.from.key)
             return Status.FAILURE;
         };
 
         const adminNodeEntryBuffer = await this.#getEntryApply(requesterAddressString, batch);
         if (adminNodeEntryBuffer === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BAN_VALIDATOR, "Invalid admin node entry buffer.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BAN_VALIDATOR, "Invalid admin node entry buffer.", node.from.key)
             return Status.FAILURE;
         };
 
         const adminNodeEntry = nodeEntryUtils.decode(adminNodeEntryBuffer);
         if (adminNodeEntry === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BAN_VALIDATOR, "Failed to verify admin node entry.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BAN_VALIDATOR, "Failed to verify admin node entry.", node.from.key)
             return Status.FAILURE;
         };
 
         const adminBalance = toBalance(adminNodeEntry.balance);
         if (adminBalance === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BAN_VALIDATOR, "Invalid admin balance", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BAN_VALIDATOR, "Invalid admin balance", node.from.key)
             return Status.FAILURE;
         };
 
         if (!adminBalance.greaterThanOrEquals(feeAmount)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BAN_VALIDATOR, "Insufficient admin balance.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BAN_VALIDATOR, "Insufficient admin balance.", node.from.key)
             return Status.FAILURE;
         };
 
         // 100% fee charged from admin will be burned
         const newAdminBalance = adminBalance.sub(feeAmount);
         if (newAdminBalance === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BAN_VALIDATOR, "Failed to apply fee to admin balance.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BAN_VALIDATOR, "Failed to apply fee to admin balance.", node.from.key)
             return Status.FAILURE;
         };
 
         const updatedAdminNodeEntry = newAdminBalance.update(adminNodeEntryBuffer);
         if (updatedAdminNodeEntry === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BAN_VALIDATOR, "Failed to update admin node balance.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BAN_VALIDATOR, "Failed to update admin node balance.", node.from.key)
             return Status.FAILURE;
         }
 
@@ -2382,7 +2406,7 @@ class State extends ReadyResource {
         if (isWriter) {
             const finalNodeEntry = this.#withdrawStakedBalanceApply(updatedToBanNodeEntry, node);
             if (finalNodeEntry === null) {
-                this.#enable_txlogs && this.#safeLogApply(OperationType.BAN_VALIDATOR, "Failed to withdraw staked balance.", node.from.key)
+                this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BAN_VALIDATOR, "Failed to withdraw staked balance.", node.from.key)
                 return Status.FAILURE;
             }
             await base.removeWriter(decodedToBanNodeEntry.wk);
@@ -2394,38 +2418,40 @@ class State extends ReadyResource {
 
         await batch.put(requesterAddressString, updatedAdminNodeEntry);
         await batch.put(txHashHexString, node.value);
-        console.log(`Node has been banned: addr:wk:tx - ${nodeToBeBannedAddressString}:${decodedToBanNodeEntry.wk.toString('hex')}:${txHashHexString}`);
+        if (this.#enable_tx_apply_logs) {
+            console.info(`Node has been banned: addr:wk:tx - ${nodeToBeBannedAddressString}:${decodedToBanNodeEntry.wk.toString('hex')}:${txHashHexString}`);
+        }
         return Status.SUCCESS;
     }
 
     async #handleApplyBootstrapDeploymentOperation(op, view, base, node, batch) {
         if (!this.check.validateBootstrapDeploymentOperation(op)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Contract schema validation failed.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Contract schema validation failed.", node.from.key)
             return Status.FAILURE;
         };
         // if transaction is not complete, do not process it.
         if (!Object.hasOwn(op.bdo, "vs") || !Object.hasOwn(op.bdo, "va") || !Object.hasOwn(op.bdo, "vn")) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Operation is not complete.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Operation is not complete.", node.from.key)
             return Status.FAILURE;
         };
         // do not allow to deploy bootstrap deployment on the same bootstrap.
         if (b4a.equals(op.bdo.bs, this.bootstrap)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Cannot deploy bootstrap on existing same bootstrap.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Cannot deploy bootstrap on existing same bootstrap.", node.from.key)
             return Status.FAILURE;
         };
         // for additional security, nonces should be different.
         if (b4a.equals(op.bdo.in, op.bdo.vn)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Nonces should not be the same.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Nonces should not be the same.", node.from.key)
             return Status.FAILURE;
         };
         // addresses should be different.
         if (b4a.equals(op.address, op.bdo.va)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Addresses should be different.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Addresses should be different.", node.from.key)
             return Status.FAILURE;
         };
         // signatures should be different.
         if (b4a.equals(op.bdo.is, op.bdo.vs)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Signatures should be different.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Signatures should be different.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -2434,14 +2460,14 @@ class State extends ReadyResource {
         const requesterAddressBuffer = op.address;
         const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer);
         if (requesterAddressString === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Requester address is invalid.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Requester address is invalid.", node.from.key)
             return Status.FAILURE;
         };
 
         // validate requester public key
         const requesterPublicKey = PeerWallet.decodeBech32mSafe(requesterAddressString);
         if (requesterPublicKey === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Failed to decode requester public key.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Failed to decode requester public key.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -2456,20 +2482,20 @@ class State extends ReadyResource {
         );
 
         if (requesterMessage.length === 0) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Invalid requester message.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Invalid requester message.", node.from.key)
             return Status.FAILURE;
         };
 
         // ensure that tx is valid
         const regeneratedTxHash = await blake3Hash(requesterMessage);
         if (!b4a.equals(regeneratedTxHash, op.bdo.tx)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Message hash does not match the tx_hash.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Message hash does not match the tx_hash.", node.from.key)
             return Status.FAILURE;
         };
 
         const isRequesterSignatureValid = this.#wallet.verify(op.bdo.is, regeneratedTxHash, requesterPublicKey);
         if (!isRequesterSignatureValid) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Failed to verify message signature.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Failed to verify message signature.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -2479,14 +2505,14 @@ class State extends ReadyResource {
         const validatorAddressBuffer = op.bdo.va;
         const validatorAddressString = addressUtils.bufferToAddress(validatorAddressBuffer);
         if (validatorAddressString === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Invalid validator address.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Invalid validator address.", node.from.key)
             return Status.FAILURE;
         };
 
         // validate validator public key
         const validatorPublicKey = PeerWallet.decodeBech32mSafe(validatorAddressString);
         if (validatorPublicKey === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Failed to decode validator public key.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Failed to decode validator public key.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -2499,7 +2525,7 @@ class State extends ReadyResource {
         );
 
         if (validatorMessage.length === 0) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Invalid validator message.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Invalid validator message.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -2507,19 +2533,19 @@ class State extends ReadyResource {
 
         const isValidatorSignatureValid = this.#wallet.verify(op.bdo.vs, validatorMessageHash, validatorPublicKey);
         if (!isValidatorSignatureValid) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Failed to verify validator message signature.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Failed to verify validator message signature.", node.from.key)
             return Status.FAILURE;
         };
 
         // verify tx validity - prevent deferred execution attack
         const indexersSequenceState = await this.#getIndexerSequenceStateApply(base);
         if (indexersSequenceState === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Indexer sequence state is invalid.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Indexer sequence state is invalid.", node.from.key)
             return Status.FAILURE;
         };
 
         if (!b4a.equals(op.bdo.txv, indexersSequenceState)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Transaction was not executed.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Transaction was not executed.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -2528,7 +2554,7 @@ class State extends ReadyResource {
         // Validator consistency checks
         const isValidatorValid = await this.#isValidatorValidApply(validatorEntryBuffer, node, op);
         if (!isValidatorValid) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Validator consistency check failed.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Validator consistency check failed.", node.from.key)
             return Status.FAILURE;
         }
 
@@ -2536,87 +2562,87 @@ class State extends ReadyResource {
         const hashHexString = op.bdo.tx.toString('hex');
         const opEntry = await this.#getEntryApply(hashHexString, batch);
         if (opEntry !== null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Operation has already been applied.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Operation has already been applied.", node.from.key)
             return Status.FAILURE;
         }; // Operation has already been applied.
 
         // If deployment already exists, do not process it again.
         const alreadyRegisteredBootstrap = await this.#getDeploymentEntryApply(bootstrapDeploymentHexString, batch);
         if (alreadyRegisteredBootstrap !== null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Bootstrap already registered.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Bootstrap already registered.", node.from.key)
             return Status.FAILURE;
         };
 
         const deploymentEntry = deploymentEntryUtils.encode(op.bdo.tx, requesterAddressBuffer);
         if (deploymentEntry.length === 0) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Invalid deployment entry.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Invalid deployment entry.", node.from.key)
             return Status.FAILURE;
         };
 
         const feeAmount = toBalance(transactionUtils.FEE);
         if (feeAmount === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Invalid fee amount.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Invalid fee amount.", node.from.key)
             return Status.FAILURE;
         };
 
         // charge fee from the invoker
         const requesterNodeEntryBuffer = await this.#getEntryApply(requesterAddressString, batch);
         if (requesterNodeEntryBuffer === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Invalid requester node entry buffer.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Invalid requester node entry buffer.", node.from.key)
             return Status.FAILURE;
         };
 
         const requesterNodeEntry = nodeEntryUtils.decode(requesterNodeEntryBuffer);
         if (requesterNodeEntry === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Invalid requester node entry.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Invalid requester node entry.", node.from.key)
             return Status.FAILURE;
         };
 
         const requesterBalance = toBalance(requesterNodeEntry.balance);
         if (requesterBalance === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Invalid requester balance.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Invalid requester balance.", node.from.key)
             return Status.FAILURE;
         };
 
         if (!requesterBalance.greaterThanOrEquals(feeAmount)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Insufficient requester balance.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Insufficient requester balance.", node.from.key)
             return Status.FAILURE;
         };
 
         const newRequesterBalance = requesterBalance.sub(feeAmount);
         if (newRequesterBalance === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Failed to apply fee to requester.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Failed to apply fee to requester.", node.from.key)
             return Status.FAILURE;
         };
 
         const updatedRequesterNodeEntry = newRequesterBalance.update(requesterNodeEntryBuffer);
         if (updatedRequesterNodeEntry === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Failed to update requester node balance.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Failed to update requester node balance.", node.from.key)
             return Status.FAILURE;
         };
 
         // reward validator for processing this transaction.
         const validatorNodeEntry = nodeEntryUtils.decode(validatorEntryBuffer);
         if (validatorNodeEntry === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Invalid validator node entry.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Invalid validator node entry.", node.from.key)
             return Status.FAILURE;
         };
 
         const validatorBalance = toBalance(validatorNodeEntry.balance);
         if (validatorBalance === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Invalid validator balance.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Invalid validator balance.", node.from.key)
             return Status.FAILURE;
         };
 
         const newValidatorBalance = validatorBalance.add(feeAmount.percentage(PERCENT_75));
         if (newValidatorBalance === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Failed to transfer fee to validator.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Failed to transfer fee to validator.", node.from.key)
             return Status.FAILURE;
         };
 
         const updatedValidatorNodeEntry = newValidatorBalance.update(validatorEntryBuffer);
         if (updatedValidatorNodeEntry === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Failed to update validator node balance.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Failed to update validator node balance.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -2625,8 +2651,8 @@ class State extends ReadyResource {
         await batch.put(validatorAddressString, updatedValidatorNodeEntry);
         await batch.put(hashHexString, node.value);
 
-        if (this.#enable_txlogs === true) {
-            console.log(`Deployment operation: ${hashHexString} and deployment/${bootstrapDeploymentHexString} have been appended.`);
+        if (this.#enable_tx_apply_logs) {
+            console.info(`Deployment operation: ${hashHexString} and deployment/${bootstrapDeploymentHexString} have been appended.`);
         }
         return Status.SUCCESS;
     }
@@ -2634,37 +2660,37 @@ class State extends ReadyResource {
     async #handleApplyTxOperation(op, view, base, node, batch) {
         // ATTENTION: The sanitization should be done before ANY other check, otherwise we risk crashing
         if (!this.check.validateTransactionOperation(op)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TX, "Contract schema validation failed.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TX, "Contract schema validation failed.", node.from.key)
             return Status.FAILURE;
         };
         // reject transaction which is not complete
         if (!Object.hasOwn(op.txo, "vs") || !Object.hasOwn(op.txo, "va") || !Object.hasOwn(op.txo, "vn")) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TX, "Operation is not complete.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TX, "Operation is not complete.", node.from.key)
             return Status.FAILURE;
         };
         // reject if the validator signed their own transaction
         if (b4a.equals(op.address, op.txo.va)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TX, "Validator cannot sign its own transaction.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TX, "Validator cannot sign its own transaction.", node.from.key)
             return Status.FAILURE;
         };
         // reject if the nonces are the same
         if (b4a.equals(op.txo.in, op.txo.vn)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TX, "Nonces should not be the same.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TX, "Nonces should not be the same.", node.from.key)
             return Status.FAILURE;
         };
         // reject if the signatures are the same
         if (b4a.equals(op.txo.is, op.txo.vs)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TX, "Signatures should not be the same.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TX, "Signatures should not be the same.", node.from.key)
             return Status.FAILURE;
         };
         // reject if the external bootstrap is the same as the network bootstrap
         if (b4a.equals(op.txo.bs, op.txo.mbs)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TX, "Network and external bootstrap cannot be the same.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TX, "Network and external bootstrap cannot be the same.", node.from.key)
             return Status.FAILURE;
         };
 
         if (!b4a.equals(op.txo.mbs, this.bootstrap)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TX, "Declared MSB bootstrap is different than real MSB bootstrap.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TX, "Declared MSB bootstrap is different than real MSB bootstrap.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -2672,13 +2698,13 @@ class State extends ReadyResource {
         const requesterAddressBuffer = op.address;
         const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer);
         if (null === requesterAddressString) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TX, "Invalid requester address.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TX, "Invalid requester address.", node.from.key)
             return Status.FAILURE;
         };
 
         const requesterPublicKey = PeerWallet.decodeBech32mSafe(requesterAddressString);
         if (null === requesterPublicKey) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TX, "Failed to decode requester public key.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TX, "Failed to decode requester public key.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -2693,19 +2719,19 @@ class State extends ReadyResource {
             OperationType.TX
         );
         if (requesterMessage.length === 0) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TX, "Invalid requester message.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TX, "Invalid requester message.", node.from.key)
             return Status.FAILURE;
         };
 
         const regeneratedTxHash = await blake3Hash(requesterMessage);
         if (!b4a.equals(regeneratedTxHash, op.txo.tx)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TX, "Message hash does not match the tx_hash.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TX, "Message hash does not match the tx_hash.", node.from.key)
             return Status.FAILURE;
         };
 
         const isRequesterSignatureValid = this.#wallet.verify(op.txo.is, op.txo.tx, requesterPublicKey); // tx contains already a nonce.
         if (!isRequesterSignatureValid) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TX, "Failed to verify message signature.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TX, "Failed to verify message signature.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -2713,13 +2739,13 @@ class State extends ReadyResource {
         const validatorAddressBuffer = op.txo.va;
         const validatorAddressString = addressUtils.bufferToAddress(validatorAddressBuffer);
         if (null === validatorAddressString) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TX, "Invalid validator address.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TX, "Invalid validator address.", node.from.key)
             return Status.FAILURE;
         };
 
         const validatorPublicKey = PeerWallet.decodeBech32mSafe(validatorAddressString);
         if (null === validatorPublicKey) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TX, "Failed to decode validator public key.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TX, "Failed to decode validator public key.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -2732,26 +2758,26 @@ class State extends ReadyResource {
         );
 
         if (validatorMessage.length === 0) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TX, "Invalid validator message.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TX, "Invalid validator message.", node.from.key)
             return Status.FAILURE;
         };
 
         const validatorMessageHash = await blake3Hash(validatorMessage);
         const isValidatorSignatureValid = this.#wallet.verify(op.txo.vs, validatorMessageHash, validatorPublicKey);
         if (!isValidatorSignatureValid) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TX, "Failed to verify validator message signature.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TX, "Failed to verify validator message signature.", node.from.key)
             return Status.FAILURE;
         };
 
         // verify tx validity - prevent deferred execution attack
         const indexersSequenceState = await this.#getIndexerSequenceStateApply(base);
         if (indexersSequenceState === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TX, "Indexer sequence state is invalid.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TX, "Indexer sequence state is invalid.", node.from.key)
             return Status.FAILURE;
         };
 
         if (!b4a.equals(op.txo.txv, indexersSequenceState)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TX, "Transaction was not executed.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TX, "Transaction was not executed.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -2760,7 +2786,7 @@ class State extends ReadyResource {
         // Validator consistency checks
         const isValidatorValid = await this.#isValidatorValidApply(validatorEntryBuffer, node, op);
         if (!isValidatorValid) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TX, "Validator consistency check failed.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TX, "Validator consistency check failed.", node.from.key)
             return Status.FAILURE;
         }
 
@@ -2768,7 +2794,7 @@ class State extends ReadyResource {
         const hashHexString = op.txo.tx.toString('hex');
         const opEntry = await this.#getEntryApply(hashHexString, batch);
         if (opEntry !== null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TX, "Operation has already been applied.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TX, "Operation has already been applied.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -2777,26 +2803,26 @@ class State extends ReadyResource {
         // point to payload, which is pointing to the txHash.
         const bootstrapHasBeenRegistered = await this.#getDeploymentEntryApply(op.txo.bs.toString('hex'), batch);
         if (bootstrapHasBeenRegistered === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TX, "Bootstrap already registered.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TX, "Bootstrap already registered.", node.from.key)
             return Status.FAILURE;
         };
 
         // check the subnetwork creator address
         const deploymentEntry = deploymentEntryUtils.decode(bootstrapHasBeenRegistered);
         if (deploymentEntry === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TX, "Invalid deployment entry.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TX, "Invalid deployment entry.", node.from.key)
             return Status.FAILURE;
         };
 
         const subnetworkCreatorAddressString = addressUtils.bufferToAddress(deploymentEntry.address);
         if (subnetworkCreatorAddressString === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TX, "Invalid subnet creator address.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TX, "Invalid subnet creator address.", node.from.key)
             return Status.FAILURE;
         };
 
         const feeAmount = toBalance(transactionUtils.FEE);
         if (feeAmount === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TX, "Invalid fee amount.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TX, "Invalid fee amount.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -2810,17 +2836,17 @@ class State extends ReadyResource {
         );
 
         if (transferFeeTxOperationResult === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TX, "Fee transfer operation failed completely.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TX, "Fee transfer operation failed completely.", node.from.key)
             return Status.FAILURE;
         }
 
         if (transferFeeTxOperationResult.requesterEntry === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TX, "Failed to process requester fee deduction.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TX, "Failed to process requester fee deduction.", node.from.key)
             return Status.FAILURE;
         }
 
         if (transferFeeTxOperationResult.validatorEntry === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TX, "Failed to process validator fee reward.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TX, "Failed to process validator fee reward.", node.from.key)
             return Status.FAILURE;
         }
 
@@ -2833,35 +2859,35 @@ class State extends ReadyResource {
         }
         await batch.put(hashHexString, node.value);
 
-        if (this.#enable_txlogs === true) {
-            console.log(`Subnetwork TX operation: ${hashHexString} has been appended.`);
+        if (this.#enable_tx_apply_logs) {
+            console.info(`Subnetwork TX operation: ${hashHexString} has been appended.`);
         }
         return Status.SUCCESS;
     }
 
     async #handleApplyTransferOperation(op, view, base, node, batch) {
         if (!this.check.validateTransferOperation(op)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TRANSFER, "Contract schema validation failed.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TRANSFER, "Contract schema validation failed.", node.from.key)
             return Status.FAILURE;
         };
         // if transaction is not complete, do not process it.
         if (!Object.hasOwn(op.tro, "vs") || !Object.hasOwn(op.tro, "va") || !Object.hasOwn(op.tro, "vn")) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TRANSFER, "Operation is not complete.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TRANSFER, "Operation is not complete.", node.from.key)
             return Status.FAILURE;
         };
         // for additional security, nonces should be different.
         if (b4a.equals(op.tro.in, op.tro.vn)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TRANSFER, "Nonces should not be the same.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TRANSFER, "Nonces should not be the same.", node.from.key)
             return Status.FAILURE;
         };
         // addresses should be different.
         if (b4a.equals(op.address, op.tro.va)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TRANSFER, "Addresses should not be the same.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TRANSFER, "Addresses should not be the same.", node.from.key)
             return Status.FAILURE;
         };
         // signatures should be different.
         if (b4a.equals(op.tro.is, op.tro.vs)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TRANSFER, "Signatures should not be the same.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TRANSFER, "Signatures should not be the same.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -2869,13 +2895,13 @@ class State extends ReadyResource {
         const requesterAddressBuffer = op.address;
         const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer);
         if (requesterAddressString === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TRANSFER, "Requester address is invalid.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TRANSFER, "Requester address is invalid.", node.from.key)
             return Status.FAILURE;
         };
 
         const requesterPublicKey = PeerWallet.decodeBech32mSafe(requesterAddressString);
         if (requesterPublicKey === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TRANSFER, "Error while decoding requester public key.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TRANSFER, "Error while decoding requester public key.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -2890,20 +2916,20 @@ class State extends ReadyResource {
         );
 
         if (requesterMessage.length === 0) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TRANSFER, "Invalid requester message.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TRANSFER, "Invalid requester message.", node.from.key)
             return Status.FAILURE;
         };
 
         // ensure that tx is valid
         const regeneratedTxHash = await blake3Hash(requesterMessage);
         if (!b4a.equals(regeneratedTxHash, op.tro.tx)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TRANSFER, "Message hash does not match the tx_hash.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TRANSFER, "Message hash does not match the tx_hash.", node.from.key)
             return Status.FAILURE;
         };
 
         const isRequesterSignatureValid = this.#wallet.verify(op.tro.is, regeneratedTxHash, requesterPublicKey);
         if (!isRequesterSignatureValid) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TRANSFER, "Failed to verify message signature.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TRANSFER, "Failed to verify message signature.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -2911,13 +2937,13 @@ class State extends ReadyResource {
         const validatorAddressBuffer = op.tro.va;
         const validatorAddressString = addressUtils.bufferToAddress(validatorAddressBuffer);
         if (validatorAddressString === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TRANSFER, "Validator address is invalid.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TRANSFER, "Validator address is invalid.", node.from.key)
             return Status.FAILURE;
         };
 
         const validatorPublicKey = PeerWallet.decodeBech32mSafe(validatorAddressString);
         if (validatorPublicKey === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TRANSFER, "Failed to decode validator public key.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TRANSFER, "Failed to decode validator public key.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -2929,26 +2955,26 @@ class State extends ReadyResource {
         );
 
         if (validatorMessage.length === 0) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TRANSFER, "Invalid validator message.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TRANSFER, "Invalid validator message.", node.from.key)
             return Status.FAILURE;
         };
 
         const validatorMessageHash = await blake3Hash(validatorMessage);
         const isValidatorSignatureValid = this.#wallet.verify(op.tro.vs, validatorMessageHash, validatorPublicKey);
         if (!isValidatorSignatureValid) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TRANSFER, "Failed to verify message signature.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TRANSFER, "Failed to verify message signature.", node.from.key)
             return Status.FAILURE;
         };
 
         // verify tx validity - prevent deferred execution attack
         const indexersSequenceState = await this.#getIndexerSequenceStateApply(base);
         if (indexersSequenceState === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TRANSFER, "Indexer sequence state is invalid.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TRANSFER, "Indexer sequence state is invalid.", node.from.key)
             return Status.FAILURE;
         };
 
         if (!b4a.equals(op.tro.txv, indexersSequenceState)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TRANSFER, "Transaction was not executed.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TRANSFER, "Transaction was not executed.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -2957,7 +2983,7 @@ class State extends ReadyResource {
         // Validator consistency checks
         const isValidatorValid = await this.#isValidatorValidApply(validatorEntryBuffer, node, op);
         if (!isValidatorValid) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TRANSFER, "Validator consistency check failed.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TRANSFER, "Validator consistency check failed.", node.from.key)
             return Status.FAILURE;
         }
 
@@ -2965,7 +2991,7 @@ class State extends ReadyResource {
         const hashHexString = op.tro.tx.toString('hex');
         const opEntry = await this.#getEntryApply(hashHexString, batch);
         if (opEntry !== null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TRANSFER, "Operation has already been applied.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TRANSFER, "Operation has already been applied.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -2973,13 +2999,13 @@ class State extends ReadyResource {
         const recipientAddressBuffer = op.tro.to;
         const recipientAddressString = addressUtils.bufferToAddress(recipientAddressBuffer);
         if (recipientAddressString === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TRANSFER, "Invalid recipient address.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TRANSFER, "Invalid recipient address.", node.from.key)
             return Status.FAILURE;
         };
 
         const recipientPublicKey = PeerWallet.decodeBech32mSafe(recipientAddressString);
         if (recipientPublicKey === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TRANSFER, "Failed to decode recipient public key.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TRANSFER, "Failed to decode recipient public key.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -3000,23 +3026,23 @@ class State extends ReadyResource {
         );
 
         if (transferResult === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TRANSFER, "Invalid transfer result.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TRANSFER, "Invalid transfer result.", node.from.key)
             return Status.FAILURE;
         };
 
         if (transferResult.senderEntry === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TRANSFER, "Invalid sender entry.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TRANSFER, "Invalid sender entry.", node.from.key)
             return Status.FAILURE;
         };
 
         if (transferResult.validatorEntry === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TRANSFER, "Invalid validator entry.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TRANSFER, "Invalid validator entry.", node.from.key)
             return Status.FAILURE;
         };
 
         if (!isSelfTransfer) {
             if (null === transferResult.recipientEntry) {
-                this.#enable_txlogs && this.#safeLogApply(OperationType.TRANSFER, "Invalid recipient entry.", node.from.key)
+                this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TRANSFER, "Invalid recipient entry.", node.from.key)
                 return Status.FAILURE;
             };
 
@@ -3032,8 +3058,8 @@ class State extends ReadyResource {
 
         await batch.put(hashHexString, node.value);
 
-        if (this.#enable_txlogs === true) {
-            console.log(`Transfer operation: ${hashHexString} has been appended.`);
+        if (this.#enable_tx_apply_logs) {
+            console.info(`Transfer operation: ${hashHexString} has been appended.`);
         }
         return Status.SUCCESS;
     }
@@ -3049,56 +3075,56 @@ class State extends ReadyResource {
             !batch ||
             !node
         ) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TRANSFER, "Invalid transfer incoming data.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TRANSFER, "Invalid transfer incoming data.", node.from.key)
             return null;
         }
 
         const transferAmount = toBalance(transferAmountBuffer);
         const feeAmount = toBalance(feeAmountBuffer);
         if (transferAmount === null || feeAmount === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TRANSFER, "Invalid fee/transfer amount.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TRANSFER, "Invalid fee/transfer amount.", node.from.key)
             return null;
         }
 
         // totalDeductedAmount = transferAmount + fee. When transferamount is 0, then totalDeductedAmount = fee. Because 0 + fee = fee.
         const totalDeductedAmount = isSelfTransfer ? feeAmount : transferAmount.add(feeAmount);
         if (totalDeductedAmount === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TRANSFER, "Invalid total deducted amount.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TRANSFER, "Invalid total deducted amount.", node.from.key)
             return null;
         }
 
         const senderEntryBuffer = await this.#getEntryApply(senderAddressString, batch);
         if (senderEntryBuffer === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TRANSFER, "Invalid sender node entry buffer.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TRANSFER, "Invalid sender node entry buffer.", node.from.key)
             return null;
         }
 
         const senderEntry = nodeEntryUtils.decode(senderEntryBuffer);
         if (senderEntry === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TRANSFER, "Invalid sender node entry.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TRANSFER, "Invalid sender node entry.", node.from.key)
             return null;
         }
 
         const senderBalance = toBalance(senderEntry.balance);
         if (senderBalance === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TRANSFER, "Invalid sender balance.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TRANSFER, "Invalid sender balance.", node.from.key)
             return null;
         }
 
         if (!senderBalance.greaterThanOrEquals(totalDeductedAmount)) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TRANSFER, "Insufficient sender balance.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TRANSFER, "Insufficient sender balance.", node.from.key)
             return null;
         }
 
         const newSenderBalance = senderBalance.sub(totalDeductedAmount);
         if (newSenderBalance === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TRANSFER, "Failed to apply fee to sender node balance.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TRANSFER, "Failed to apply fee to sender node balance.", node.from.key)
             return null;
         }
 
         const updatedSenderEntry = newSenderBalance.update(senderEntryBuffer);
         if (updatedSenderEntry === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TRANSFER, "Failed to update sender node balance.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TRANSFER, "Failed to update sender node balance.", node.from.key)
             return null;
         }
 
@@ -3112,7 +3138,7 @@ class State extends ReadyResource {
             const recipientEntryBuffer = await this.#getEntryApply(recipientAddressString, batch);
             if (recipientEntryBuffer === null) {
                 if (transferAmount.value === null) {
-                    this.#enable_txlogs && this.#safeLogApply(OperationType.TRANSFER, "Invalid transfer amount.", node.from.key)
+                    this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TRANSFER, "Invalid transfer amount.", node.from.key)
                     return null;
                 };
                 const newRecipientEntry = nodeEntryUtils.init(
@@ -3121,32 +3147,32 @@ class State extends ReadyResource {
                     transferAmount.value
                 );
                 if (newRecipientEntry.length === 0) {
-                    this.#enable_txlogs && this.#safeLogApply(OperationType.TRANSFER, "Invalid recipient entry.", node.from.key)
+                    this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TRANSFER, "Invalid recipient entry.", node.from.key)
                     return null;
                 };
                 result.recipientEntry = newRecipientEntry;
             } else {
                 const recipientEntry = nodeEntryUtils.decode(recipientEntryBuffer);
                 if (recipientEntry === null) {
-                    this.#enable_txlogs && this.#safeLogApply(OperationType.TRANSFER, "Invalid recipient entry.", node.from.key)
+                    this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TRANSFER, "Invalid recipient entry.", node.from.key)
                     return null;
                 };
 
                 const recipientBalance = toBalance(recipientEntry.balance);
                 if (recipientBalance === null) {
-                    this.#enable_txlogs && this.#safeLogApply(OperationType.TRANSFER, "Invalid recipient balance.", node.from.key)
+                    this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TRANSFER, "Invalid recipient balance.", node.from.key)
                     return null;
                 };
 
                 const newRecipientBalance = recipientBalance.add(transferAmount);
                 if (newRecipientBalance === null) {
-                    this.#enable_txlogs && this.#safeLogApply(OperationType.TRANSFER, "Failed to transfer amount to recipient balance.", node.from.key)
+                    this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TRANSFER, "Failed to transfer amount to recipient balance.", node.from.key)
                     return null;
                 };
 
                 const updatedRecipientEntry = newRecipientBalance.update(recipientEntryBuffer);
                 if (updatedRecipientEntry === null) {
-                    this.#enable_txlogs && this.#safeLogApply(OperationType.TRANSFER, "Failed to update recipient node balance.", node.from.key)
+                    this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TRANSFER, "Failed to update recipient node balance.", node.from.key)
                     return null;
                 };
                 result.recipientEntry = updatedRecipientEntry;
@@ -3155,7 +3181,7 @@ class State extends ReadyResource {
 
         const validatorEntry = nodeEntryUtils.decode(validatorEntryBuffer);
         if (validatorEntry === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TRANSFER, "Invalid validator entry.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TRANSFER, "Invalid validator entry.", node.from.key)
             return null;
         }
 
@@ -3170,13 +3196,13 @@ class State extends ReadyResource {
             : validatorBalance.add(validatorReward);
 
         if (newValidatorBalance === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TRANSFER, "Failed to transfer fee to validator balance.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TRANSFER, "Failed to transfer fee to validator balance.", node.from.key)
             return null;
         }
 
         const updatedValidatorEntry = newValidatorBalance.update(validatorEntryBuffer);
         if (updatedValidatorEntry === null) {
-            this.#enable_txlogs && this.#safeLogApply(OperationType.TRANSFER, "Failed to update validator node balance.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(OperationType.TRANSFER, "Failed to update validator node balance.", node.from.key)
             return null;
         }
 
@@ -3228,26 +3254,26 @@ class State extends ReadyResource {
     async #isValidatorValidApply(validatorEntryBuffer, node, op) {
         // TODO: Maybe we should transfer all validator checks to this function (address, pubKey, signature, etc)
         if (validatorEntryBuffer === null) {
-            this.#enable_txlogs && this.#safeLogApply(op.type, "Incoming validator entry is null.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(op.type, "Incoming validator entry is null.", node.from.key)
             return false;
         };
 
         const decodedValidatorEntry = nodeEntryUtils.decode(validatorEntryBuffer);
         if (decodedValidatorEntry === null) {
-            this.#enable_txlogs && this.#safeLogApply(op.type, "Failed to decode validator entry.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(op.type, "Failed to decode validator entry.", node.from.key)
             return false;
         };
 
         // validator must be active writer
         if (!decodedValidatorEntry.isWriter) {
-            this.#enable_txlogs && this.#safeLogApply(op.type, "Operation validator is not active", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(op.type, "Operation validator is not active", node.from.key)
             return false;
         };
 
         // The autobase payload should be appended by the node that signed the partial operation.
         const validatorWk = decodedValidatorEntry.wk;
         if (!b4a.equals(validatorWk, node.from.key)) {
-            this.#enable_txlogs && this.#safeLogApply(op.type, "Validator cannot be the same as requester.", node.from.key)
+            this.#enable_error_apply_logs && this.#safeLogApply(op.type, "Validator cannot be the same as requester.", node.from.key)
             return false;
         }
         return true;

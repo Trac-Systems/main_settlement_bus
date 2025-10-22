@@ -26,7 +26,7 @@ let tmpDirectory, admin, indexer1, indexer2, reader1, reader2, indexer3, writer;
 hook('Initialize nodes for addIndexer tests', async t => {
     const randomChannel = randomBytes(32).toString('hex');
     const baseOptions = {
-        enable_txlogs: false,
+        enable_tx_apply_logs: false,
         enable_interactive_mode: false,
         enable_role_requester: false,
         enable_validator_observer: false,
