@@ -106,7 +106,7 @@ export const printBalance = async (address, state, wallet_enabled) => {
 export const get_tx_info = async (state_instance, txHash) => {
     const payload = await state_instance.getSigned(txHash);
     if (!payload) {
-        throw new Error(`No payload found for transaction hash: ${txHash}`);
+        return null
     }
 
     const decoded = safeDecodeApplyOperation(payload);
