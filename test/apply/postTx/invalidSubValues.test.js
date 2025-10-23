@@ -39,7 +39,7 @@ hook('Initialize nodes', async t => {
     const randomChannel = randomBytes(32).toString('hex');
 
     const baseOptions = {
-        enable_txlogs: false,
+        enable_tx_apply_logs: false,
         enable_interactive_mode: false,
         enable_role_requester: false,
         enable_validator_observer: false,
