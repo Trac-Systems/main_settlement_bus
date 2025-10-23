@@ -5,7 +5,7 @@ import { bufferToAddress } from '../../state/utils/address.js';
 import { sleep } from '../../../utils/helpers.js';
 import Scheduler from "../../../utils/Scheduler.js";
 
-const POLL_INTERVAL = 1000
+const POLL_INTERVAL = 3500 // This was increase since the iterations dont wait for the execution its about 10 * DELAY_INTERVAL
 const DELAY_INTERVAL = 250
 
 class ValidatorObserverService {
@@ -15,12 +15,14 @@ class ValidatorObserverService {
     #network;
     #scheduler;
     #address;
+    #isInterrupted
 
     constructor(network, state, address, options = {}) {
         this.#enable_wallet = options.enable_wallet !== false;
         this.#network = network;
         this.#state = state;
         this.#address = address;
+        this.#isInterrupted = false;
     }
 
     get state() {
@@ -32,23 +34,25 @@ class ValidatorObserverService {
     // OS CALLS, ACCUMULATORS, MAYBE THIS IS POSSIBLE TO CHECK I/O QUEUE IF IT COINTAIN IT. FOR NOW WE ARE USING SLEEP.
     async start() {
         if (!this.#shouldRun()) {
-            console.info('PoolService can not start. Wallet is not enabled');
+            console.info('ValidatorObserverService can not start. Wallet is not enabled');
             return;
         }
         if (this.#scheduler && this.#scheduler.isRunning) {
-            console.info('PoolService is already started');
+            console.info('ValidatorObserverService is already started');
             return;
         }
 
+        this.#isInterrupted = false;
         this.#scheduler = new Scheduler(next => this.#worker(next), POLL_INTERVAL);
         this.#scheduler.start();
     }
 
     async stopValidatorObserver(waitForCurrent = true) {
         if (!this.#scheduler) return;
+        this.#isInterrupted = true;
         await this.#scheduler.stop(waitForCurrent);
         this.#scheduler = null;
-        console.info('PoolService: closing gracefully...');
+        console.info('ValidatorObserverService: closing gracefully...');
     }
 
 
@@ -67,7 +71,7 @@ class ValidatorObserverService {
     }
 
     async #findValidator(address, length) {
-        if (this.#network.validator_stream !== null) return;
+        if (this.#network.validator_stream !== null || !this.#shouldRun()) return;
 
         const rndIndex = Math.floor(Math.random() * length);
         const validatorAddressBuffer = await this.state.getWriterIndex(rndIndex);
@@ -100,7 +104,7 @@ class ValidatorObserverService {
     };
 
     #shouldRun() {
-        return this.#enable_wallet
+        return this.#enable_wallet && !this.#isInterrupted
     }
 
     async #lengthEntry() {
