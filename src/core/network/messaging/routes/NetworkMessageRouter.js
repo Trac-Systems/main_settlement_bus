@@ -5,7 +5,7 @@ import ResponseHandler from "../handlers/ResponseHandler.js";
 import RoleOperationHandler from "../handlers/RoleOperationHandler.js";
 import SubnetworkOperationHandler from "../handlers/SubnetworkOperationHandler.js";
 import TransferOperationHandler from "../handlers/TransferOperationHandler.js";
-import {NETWORK_MESSAGE_TYPES, OperationType} from '../../../../utils/constants.js';
+import {NETWORK_MESSAGE_TYPES} from '../../../../utils/constants.js';
 import * as operation from '../../../../utils/operations.js';
 import TransactionRateLimiterService from "../../services/TransactionRateLimiterService.js";
 
