@@ -402,6 +402,7 @@ export class MainSettlementBus extends ReadyResource {
                 adminEntry,
                 nodeEntry
             );
+            
             if (!isAllowedToRequestRole) {
                 throw new Error(
                     "Cannot request writer role - node is not allowed to request this role"
