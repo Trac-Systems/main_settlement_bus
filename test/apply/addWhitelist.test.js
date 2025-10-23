@@ -13,7 +13,7 @@ hook('Initialize admin node for addWhitelist tests', async () => {
     const randomChannel = randomBytes(32).toString('hex');
     const baseOptions = {
         enable_txchannels: false,
-        enable_txlogs: false,
+        enable_tx_apply_logs: false,
         enable_interactive_mode: false,
         enable_role_requester: false,
         channel: randomChannel,

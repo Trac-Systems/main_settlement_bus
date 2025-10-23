@@ -23,15 +23,12 @@ class PartialBootstrapDeployment extends PartialOperation {
         return true;
     }
 
-
     async validateBootstrapRegistration(payload) {
         const bootstrapString = payload.bdo.bs.toString('hex');
-        if (null !== await this.state.getRegisteredBootstrapEntry(bootstrapString)) {
+        if (null !== await this.state.getRegisteredBootstrapEntryUnsigned(bootstrapString)) {
             throw new Error(`Bootstrap with hash ${bootstrapString} already exists in the state. Bootstrap must be unique.`);
         }
     }
-
-
 }
 
 export default PartialBootstrapDeployment;

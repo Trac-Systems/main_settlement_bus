@@ -19,12 +19,11 @@ const setupNetwork = async () => {
         bootstrap: randomBytes(32).toString('hex'),
         channel: randomBytes(32).toString('hex'),
         enable_role_requester: false,
-        enable_auto_transaction_consent: false,
         enable_wallet: true,
         enable_validator_observer: true,
         enable_interactive_mode: false,
         disable_rate_limit: true,
-        enable_txlogs: false,
+        enable_tx_apply_logs: false,
         stores_directory: `${tmpDirectory}/stores/`,
         store_name: '/admin'
     }

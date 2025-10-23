@@ -30,7 +30,7 @@ const sendAddAdmin = async (invoker) => {
 hook('Initialize admin for addAdmin tests', async () => {
     randomChannel = randomBytes(32).toString('hex');
     const baseOptions = {
-        enable_txlogs: false,
+        enable_tx_apply_logs: false,
         enable_interactive_mode: false,
         enable_role_requester: false,
         channel: randomChannel,
