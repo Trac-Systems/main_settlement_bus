@@ -20,8 +20,8 @@ class PartialRoleAccess extends PartialOperation {
 
         // non common validations below
         if (payload.type === OperationType.ADD_WRITER) {
-            await this.validateRequesterBalanceForAddWriterOperation(payload, true);
             await this.validateRequesterBalanceForAddWriterOperation(payload);
+            await this.validateRequesterBalanceForAddWriterOperation(payload, true);
             await this.validateWriterKey(payload)
         } else {
             await this.validateRequesterBalance(payload, true);
