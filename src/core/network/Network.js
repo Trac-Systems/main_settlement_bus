@@ -33,7 +33,7 @@ class Network extends ReadyResource {
         this.#enable_wallet = options.enable_wallet !== false;
         this.#channel = channel;
         this.#transactionPoolService = new TransactionPoolService(state, address, options);
-        this.#validatorObserverService = new ValidatorObserverService(this, state, options)
+        this.#validatorObserverService = new ValidatorObserverService(this, state, address, options)
         this.#networkMessages = new NetworkMessages(this, options);
         //TODO: move streams maybe to HASHMAP? To discuss because this change will affect the whole network module and it's usage. It is not a priority right now
         //However, it gives us more flexibility in the future, because we can create set of streams. Maybe in this case exist better data structure?
@@ -64,27 +64,19 @@ class Network extends ReadyResource {
     async _open() {
         console.log('Network initialization...');
         this.transactionPoolService.start();
+        this.validatorObserverService.start();
     }
 
     async _close() {
         console.log('Network: closing gracefully...');
         this.transactionPoolService.stopPool();
         await sleep(100);
-
-        if (this.#validatorObserverService.enable_validator_observer) {
-            this.#validatorObserverService.stopValidatorObserver();
-        }
-
+        this.#validatorObserverService.stopValidatorObserver();
         await sleep(5_000);
 
         if (this.#swarm !== null) {
             this.#swarm.destroy();
         }
-    }
-
-    startValidatorObserver(address) {
-        this.#validatorObserverService.startValidatorObserver();
-        this.#validatorObserverService.validatorObserver(address);
     }
 
     async replicate(

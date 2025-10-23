@@ -162,11 +162,6 @@ export class MainSettlementBus extends ReadyResource {
             this.#wallet,
         );
 
-        //TODO: validator observer can't be awaited. In the future change logic to process events instead of loop?
-        if (this.#enable_validator_observer) {
-            this.#network.startValidatorObserver(this.#wallet.address);
-        }
-
         const adminEntry = await this.#state.getAdminEntry();
         await this.#setUpRoleAutomatically(adminEntry);
 
