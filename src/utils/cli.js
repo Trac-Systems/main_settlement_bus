@@ -64,27 +64,27 @@ export function printHelp(isAdminMode = false) {
     if (isAdminMode) {
         console.log('🚨 WARNING: IF YOU ARE NOT AN ADMIN, DO NOT USE THE COMMANDS BELOW! YOU RISK LOSING YOUR FUNDS! 🚨');
         console.log('\nAdmin commands:');
-        console.log('- /add_admin: register admin entry with bootstrap key (initial setup), or use --recovery flag to recover admin role');
-        console.log('- /balance_migration: perform balance migration with the given initial balances CSV file');
-        console.log('- /add_whitelist: add all specified whitelist addresses');
-        console.log('- /disable_initialization: disable further balance initializations and whitelisting');
-        console.log('- /add_indexer <address>: change a role of the selected writer node to indexer role');
-        console.log('- /remove_indexer <address>: change a role of the selected indexer node to default role');
-        console.log('- /ban_writer <address>: demote a whitelisted writer to default role and remove it from the whitelist');
+        console.log('- /add_admin: Register admin entry with bootstrap key (initial setup), or use --recovery flag to recover admin role');
+        console.log('- /balance_migration: Perform balance migration with the given initial balances CSV file');
+        console.log('- /add_whitelist: Add all specified whitelist addresses. If initialization is enabled, no fee is required.');
+        console.log('- /disable_initialization: Disable further balance initializations and whitelisting');
+        console.log('- /add_indexer <address>: Change a role of the selected writer node to indexer role. Charges a fee.');
+        console.log('- /remove_indexer <address>: Change a role of the selected indexer node to default role. Charges a fee.');
+        console.log('- /ban_writer <address>: Demote a whitelisted writer to default role and remove it from the whitelist. Charges a fee.');
     }
     console.log('Available commands:');
-    console.log('- /add_writer: add yourself as validator to this MSB once whitelisted.');
-    console.log('- /remove_writer: remove yourself from this MSB.');
-    console.log('- /node_status <address>: get network information about a node with the given address.');
-    console.log('- /stats: check system stats such as writing key, DAG, etc.');
-    console.log('- /deployment <subnetwork_bootstrap> <channel>: deploy a subnetwork with the given bootstrap. If channel is not provided, a random one will be generated.');
-    console.log('- /get_deployment <subnetwork_bootstrap>: get information about a subnetwork deployment with the given bootstrap.');
-    console.log('- /transfer <to_address> <amount>: transfer the specified amount to the given address.');
-    console.log('- /get_tx_info <tx_hash>: get information about a transaction with the given hash.');
-    console.log('- /get_validator_addr <writing_key>: get the validator address mapped to the given writing key.');
-    console.log('- /get_balance <address> <confirmed>: get the balance of the node with specified address (confirmed = true is default)');
+    console.log('- /add_writer: Add yourself as a validator to this MSB once whitelisted. Requires a fee + 10x the fee as a stake in $TNK.');
+    console.log('- /remove_writer: Remove yourself from this MSB. Requires a fee, and the stake will be refunded.');
+    console.log('- /node_status <address>: Get network information about a node with the given address.');
+    console.log('- /stats: Check system stats such as writing key, DAG, etc.');
+    console.log('- /deployment <subnetwork_bootstrap> <channel>: Deploy a subnetwork with the given bootstrap. If channel is not provided, a random one will be generated. Requires a fee.');
+    console.log('- /get_deployment <subnetwork_bootstrap>: Get information about a subnetwork deployment with the given bootstrap.');
+    console.log('- /transfer <to_address> <amount>: Transfer the specified amount to the given address. Requires a fee.');
+    console.log('- /get_tx_info <tx_hash>: Get information about a transaction with the given hash.');
+    console.log('- /get_validator_addr <writing_key>: Get the validator address mapped to the given writing key.');
+    console.log('- /get_balance <address> <confirmed>: Get the balance of the node with specified address (confirmed = true is default)');
     console.log('- /exit: Exit the program.');
-    console.log('- /help: display this help.');
+    console.log('- /help: Display this help.');
 }
 
 export const printWalletInfo = (address, writingKey) => {
