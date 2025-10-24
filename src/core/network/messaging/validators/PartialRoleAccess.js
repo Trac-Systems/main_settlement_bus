@@ -3,6 +3,7 @@ import b4a from 'b4a';
 import { OperationType } from "../../../../utils/constants.js";
 import { bufferToAddress } from "../../../state/utils/address.js";
 import PartialOperation from './base/PartialOperation.js';
+import { bufferToBigInt } from "../../../../utils/amountSerialization.js";
 
 class PartialRoleAccess extends PartialOperation {
     constructor(state) {
@@ -16,12 +17,15 @@ class PartialRoleAccess extends PartialOperation {
         await this.validateSignature(payload);
         await this.validateTransactionValidity(payload);
         this.isOperationNotCompleted(payload);
-        await this.validateRequesterBalance(payload);
-        await this.validateRequesterBalance(payload, true);
 
         // non common validations below
         if (payload.type === OperationType.ADD_WRITER) {
+            await this.validateRequesterBalanceForAddWriterOperation(payload);
+            await this.validateRequesterBalanceForAddWriterOperation(payload, true);
             await this.validateWriterKey(payload)
+        } else {
+            await this.validateRequesterBalance(payload, true);
+            await this.validateRequesterBalance(payload)
         }
         await this.isRequesterAllowedToChangeRole(payload);
 
@@ -64,9 +68,9 @@ class PartialRoleAccess extends PartialOperation {
             const isAlreadyIndexer = nodeEntry.isIndexer;
             if (isAlreadyIndexer) {
                 throw new Error(`Node with address ${nodeAddress} is an indexer.`);
-            }   
+            }
             return;
-            
+
         } else if (type === OperationType.ADMIN_RECOVERY) {
             const adminEntry = await this.state.getAdminEntry();
             if (!adminEntry) {
@@ -106,6 +110,26 @@ class PartialRoleAccess extends PartialOperation {
             if (!isCurrentWk || !isOwner) {
                 throw new Error('Invalid writer key: either not owned by requester or different from assigned key');
             }
+        }
+    }
+
+    async validateRequesterBalanceForAddWriterOperation(payload, signed = false) {
+        const requesterAddress = bufferToAddress(payload.address);
+        let requesterEntry;
+        if (signed) {
+            requesterEntry = await this.state.getNodeEntry(requesterAddress);
+        } else {
+            requesterEntry = await this.state.getNodeEntryUnsigned(requesterAddress);
+        }
+
+        if (!requesterEntry) {
+            throw new Error('Requester address not found in state');
+        }
+        const requesterBalance = bufferToBigInt(requesterEntry.balance);
+
+        const requiredBalance = this.fee * 11n;
+        if (requesterBalance < requiredBalance) {
+            throw new Error('Insufficient requester balance to cover role access operation FEE.');
         }
     }
 }

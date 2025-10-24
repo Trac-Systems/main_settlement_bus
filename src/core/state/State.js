@@ -446,8 +446,12 @@ class State extends ReadyResource {
         const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
         const decodedAdminEntry = adminEntryUtils.decode(adminEntry);
 
-        // NOTE: Would it make sense to extract null === decodedAdminEntry and log the error?
-        if (decodedAdminEntry === null || !this.#isAdminApply(decodedAdminEntry, node)) {
+        if (decodedAdminEntry === null) {
+            this.#safeLogApply(OperationType.BALANCE_INITIALIZATION, "Failed to decode admin entry.", node.from.key)
+            return Status.FAILURE;
+        }
+        
+        if (!this.#isAdminApply(decodedAdminEntry, node)) {
             this.#safeLogApply(OperationType.BALANCE_INITIALIZATION, "Node is not allowed to perform this operation. (ADMIN ONLY)", node.from.key)
             return Status.FAILURE;
         };
@@ -548,7 +552,12 @@ class State extends ReadyResource {
         const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
         const decodedAdminEntry = adminEntryUtils.decode(adminEntry);
 
-        if (null === decodedAdminEntry || !this.#isAdminApply(decodedAdminEntry, node)) {
+        if (decodedAdminEntry === null) {
+            this.#safeLogApply(OperationType.DISABLE_INITIALIZATION, "Failed to decode admin entry.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        if (!this.#isAdminApply(decodedAdminEntry, node)) {
             this.#safeLogApply(OperationType.DISABLE_INITIALIZATION, "Node is not allowed to perform this operation. (ADMIN ONLY)", node.from.key)
             return Status.FAILURE;
         };
@@ -1036,9 +1045,15 @@ class State extends ReadyResource {
             this.#safeLogApply(OperationType.APPEND_WHITELIST, "Failed to verify admin entry.", node.from.key)
             return Status.FAILURE;
         };
+
         const decodedAdminEntry = adminEntryUtils.decode(adminEntry);
-        if (decodedAdminEntry === null || !this.#isAdminApply(decodedAdminEntry, node)) {
+        if (decodedAdminEntry === null) {
             this.#safeLogApply(OperationType.APPEND_WHITELIST, "Failed to decode admin entry.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        if (!this.#isAdminApply(decodedAdminEntry, node)) {
+            this.#safeLogApply(OperationType.APPEND_WHITELIST, "Node is not allowed to perform this operation. (ADMIN ONLY)", node.from.key)
             return Status.FAILURE;
         };
 
@@ -1851,7 +1866,12 @@ class State extends ReadyResource {
         };
 
         const decodedAdminEntry = adminEntryUtils.decode(adminEntry);
-        if (decodedAdminEntry === null || !this.#isAdminApply(decodedAdminEntry, node)) {
+        if (decodedAdminEntry === null) {
+            this.#safeLogApply(OperationType.ADD_INDEXER, "Failed to decode admin entry.", node.from.key)
+            return Status.FAILURE;
+        };
+
+        if (!this.#isAdminApply(decodedAdminEntry, node)) {
             this.#safeLogApply(OperationType.ADD_INDEXER, "Node is not allowed to perform this operation. (ADMIN ONLY)", node.from.key)
             return Status.FAILURE;
         };
@@ -2062,7 +2082,12 @@ class State extends ReadyResource {
         };
 
         const decodedAdminEntry = adminEntryUtils.decode(adminEntry);
-        if (decodedAdminEntry === null || !this.#isAdminApply(decodedAdminEntry, node)) {
+        if (decodedAdminEntry === null) {
+            this.#safeLogApply(OperationType.REMOVE_INDEXER, "Failed to decode admin entry.", node.from.key)
+            return Status.FAILURE;
+        };
+
+        if (!this.#isAdminApply(decodedAdminEntry, node)) {
             this.#safeLogApply(OperationType.REMOVE_INDEXER, "Node is not allowed to perform this operation. (ADMIN ONLY)", node.from.key)
             return Status.FAILURE;
         };
@@ -2265,7 +2290,12 @@ class State extends ReadyResource {
         };
 
         const adminPublicKey = PeerWallet.decodeBech32mSafe(decodedAdminEntry.address);
-        if (adminPublicKey === null || !this.#isAdminApply(decodedAdminEntry, node)) {
+        if (adminPublicKey === null) {
+            this.#safeLogApply(OperationType.BAN_VALIDATOR, "Failed to decode admin public key.", node.from.key)
+            return Status.FAILURE;
+        };
+
+        if (!this.#isAdminApply(decodedAdminEntry, node)) {
             this.#safeLogApply(OperationType.BAN_VALIDATOR, "Node is not allowed to perform this operation. (ADMIN ONLY)", node.from.key)
             return Status.FAILURE;
         };

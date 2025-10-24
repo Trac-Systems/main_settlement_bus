@@ -386,7 +386,6 @@ export class MainSettlementBus extends ReadyResource {
         if (this.#enable_wallet === false) {
             throw new Error("Cannot request writer role - wallet is not enabled");
         }
-
         const adminEntry = await this.#state.getAdminEntry();
         const nodeEntry = await this.#state.getNodeEntry(this.#wallet.address);
         const isAlreadyWriter = !!(nodeEntry && nodeEntry.isWriter === true);
@@ -402,7 +401,7 @@ export class MainSettlementBus extends ReadyResource {
                 adminEntry,
                 nodeEntry
             );
-            
+
             if (!isAllowedToRequestRole) {
                 throw new Error(
                     "Cannot request writer role - node is not allowed to request this role"
@@ -414,6 +413,14 @@ export class MainSettlementBus extends ReadyResource {
                     "Cannot request writer role - internal state is already writable"
                 );
             }
+
+            const requiredBalance = bufferToBigInt(this.#state.getFee()) * 11n;
+            const nodeBalance = bufferToBigInt(nodeEntry.balance);
+
+            if (nodeBalance < requiredBalance) {
+                throw new Error(`Cannot add writer role - insufficient balance. Required: ${bigIntToDecimalString(requiredBalance)}, Available: ${bigIntToDecimalString(nodeBalance)}`);
+            }
+
             const txValidity = await this.#state.getIndexerSequenceState();
             const assembledMessage = await PartialStateMessageOperations.assembleAddWriterMessage(
                 this.#wallet,
@@ -434,7 +441,12 @@ export class MainSettlementBus extends ReadyResource {
             throw new Error("Cannot remove writer role - node is an indexer");
         }
 
+        const requiredBalance = bufferToBigInt(this.#state.getFee());
+        const nodeBalance = bufferToBigInt(nodeEntry.balance);
 
+        if (nodeBalance < requiredBalance) {
+            throw new Error(`Cannot remove writer role - insufficient balance. Required: ${bigIntToDecimalString(requiredBalance)}, Available: ${bigIntToDecimalString(nodeBalance)}`);
+        }
 
         const txValidity = await this.#state.getIndexerSequenceState();
         const assembledMessage = await PartialStateMessageOperations.assembleRemoveWriterMessage(
@@ -1052,7 +1064,7 @@ export class MainSettlementBus extends ReadyResource {
                 } else if (input.startsWith("/get_tx_info")) {
                     const splitted = input.split(" ");
                     const txHash = splitted[1];
-                    const txInfo  = await get_tx_info(this.#state, txHash);
+                    const txInfo = await get_tx_info(this.#state, txHash);
                     if (txInfo) {
                         console.log(`Payload for transaction hash ${txHash}:`);
                         console.log(txInfo.decoded);
@@ -1224,7 +1236,7 @@ export class MainSettlementBus extends ReadyResource {
 
                     try {
                         const rawPayload = await get_tx_info(this.#state, hash);
-                        if(!rawPayload){
+                        if (!rawPayload) {
                             console.log(`No payload found for tx hash: ${hash}`)
                             return null
                         } 
