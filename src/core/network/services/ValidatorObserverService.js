@@ -91,8 +91,7 @@ class ValidatorObserverService {
         // - Cannot connect to indexers, except for admin-indexer
         // - Admin-indexer connection is allowed only when writers length has less than 25 writers
         if (
-            this.#network.validator_stream !== null ||
-            this.#network.validator !== null ||
+            this.#network.validatorConnectionManager.isConnected(validatorPubKey) ||
             validatorEntry === null ||
             !validatorEntry.isWriter ||
             (validatorEntry.isIndexer && (adminEntry === null || validatorAddress !== adminEntry.address || length >= MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION))

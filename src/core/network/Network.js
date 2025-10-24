@@ -16,6 +16,7 @@ import {
     NETWORK_MESSAGE_TYPES,
     DHT_BOOTSTRAPS
 } from '../../utils/constants.js';
+import ConnectionManager from './services/ConnectionManager.js';
 
 const wakeup = new w();
 
@@ -27,6 +28,7 @@ class Network extends ReadyResource {
     #networkMessages;
     #transactionPoolService;
     #validatorObserverService;
+    #validatorConnectionManager;
 
     constructor(state, channel, address = null, options = {}) {
         super();
@@ -35,11 +37,11 @@ class Network extends ReadyResource {
         this.#transactionPoolService = new TransactionPoolService(state, address, options);
         this.#validatorObserverService = new ValidatorObserverService(this, state, address, options)
         this.#networkMessages = new NetworkMessages(this, options);
+        this.#validatorConnectionManager = new ConnectionManager()
         //TODO: move streams maybe to HASHMAP? To discuss because this change will affect the whole network module and it's usage. It is not a priority right now
         //However, it gives us more flexibility in the future, because we can create set of streams. Maybe in this case exist better data structure?
         this.admin_stream = null;
         this.admin = null;
-        this.validator_stream = null;
         this.validator = null;
         this.custom_stream = null;
         this.custom_node = null;
@@ -59,6 +61,10 @@ class Network extends ReadyResource {
 
     get validatorObserverService() {
         return this.#validatorObserverService;
+    }
+
+    get validatorConnectionManager() {
+        return this.#validatorConnectionManager;
     }
 
     async _open() {
@@ -101,6 +107,8 @@ class Network extends ReadyResource {
             this.#swarm.on('connection', async (connection) => {
                 const { message_channel, message } = this.#networkMessages.setupProtomuxMessages(connection);
                 connection.messenger = message;
+
+                this.#validatorConnectionManager.addValidator(connection.remotePublicKey, connection)
 
                 connection.on('close', () => {
                     if (this.validator_stream === connection) {
@@ -161,14 +169,17 @@ class Network extends ReadyResource {
         
         if (null === this.#swarm) throw new Error('Network swarm is not initialized');
 
-        if (this.validator_stream !== null && publicKey !== b4a.toString(this.validator_stream.remotePublicKey, 'hex')) {
-            this.#swarm.leavePeer(this.validator_stream.remotePublicKey);
-            this.validator_stream = null;
-            this.validator = null;
-        }
+        // if (this.validator_stream !== null && publicKey !== b4a.toString(this.validator_stream.remotePublicKey, 'hex')) {
+        //     this.#swarm.leavePeer(this.validator_stream.remotePublicKey);
+        //     this.validator_stream = null;
+        //     this.validator = null;
+        // }
         // trying to join a peer from the global swarm
 
         if (false === this.#swarm.peers.has(publicKey)) {
+            if (type === 'validator') {
+                this.#validatorConnectionManager.whiteList(publicKey)
+            }
             this.#swarm.joinPeer(b4a.from(publicKey, 'hex'));
             let cnt = 0;
             while (false === this.#swarm.peers.has(publicKey)) {
