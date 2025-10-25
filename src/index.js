@@ -1081,7 +1081,7 @@ export class MainSettlementBus extends ReadyResource {
                     const address = splitted[1];
                     const confirmedFlag = splitted[2];
                     let unconfirmedBalance = confirmedFlag === 'false'
-                    let nodeEntry = unconfirmedBalance ? await this.#state.getUnsignedNodeEntry(address) : await this.#state.getNodeEntry(address)
+                    let nodeEntry = unconfirmedBalance ? await this.#state.getNodeEntryUnsigned(address) : await this.#state.getNodeEntry(address)
                     if (nodeEntry) {
                         console.log({
                             Address: address,
