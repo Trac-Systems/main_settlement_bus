@@ -98,6 +98,12 @@ describe("API acceptance tests", () => {
         expect(res.body).toEqual({ address: wallet.address, balance: "9670000000000000000" })
     })
 
+    it("GET /v1/balance unconfirmed", async () => {
+        const res = await request(server).get(`/v1/balance/${wallet.address}?confirmed=false`)
+        expect(res.statusCode).toBe(200)
+        expect(res.body).toEqual({ address: wallet.address, balance: "9670000000000000000" })
+    })
+
     it("POST /v1/broadcast-transaction", async () => {
         const txData = await tracCrypto.transaction.preBuild(
             wallet.address,
