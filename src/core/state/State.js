@@ -455,7 +455,7 @@ class State extends ReadyResource {
             this.#safeLogApply(OperationType.BALANCE_INITIALIZATION, "Failed to decode admin entry.", node.from.key)
             return Status.FAILURE;
         }
-        
+
         if (!this.#isAdminApply(decodedAdminEntry, node)) {
             this.#safeLogApply(OperationType.BALANCE_INITIALIZATION, "Node is not allowed to perform this operation. (ADMIN ONLY)", node.from.key)
             return Status.FAILURE;
@@ -909,14 +909,6 @@ class State extends ReadyResource {
             return Status.FAILURE;
         }
 
-        // anti-replay attack
-        // NOTE: We would honestly keep this failure because in theory this should never happen.
-        const opEntry = await this.#getEntryApply(txHashHexString, batch);
-        if (opEntry !== null) {
-            this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Operation has already been applied.", node.from.key)
-            return Status.FAILURE;
-        };
-
         const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
         const decodedAdminEntry = adminEntryUtils.decode(adminEntry);
 
@@ -928,6 +920,14 @@ class State extends ReadyResource {
         const publicKeyAdminEntry = PeerWallet.decodeBech32mSafe(decodedAdminEntry.address);
         if (!b4a.equals(requesterAdminPublicKey, publicKeyAdminEntry)) {
             this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Admin public key does not match the node public key.", node.from.key)
+            return Status.FAILURE;
+        };
+
+        // anti-replay attack
+        // NOTE: We would honestly keep this failure because in theory this should never happen.
+        const opEntry = await this.#getEntryApply(txHashHexString, batch);
+        if (opEntry !== null) {
+            this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Operation has already been applied.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -1224,7 +1224,7 @@ class State extends ReadyResource {
 
             const initializedNodeEntry = nodeEntryUtils.init(ZERO_WK, nodeRoleUtils.NodeRole.WHITELISTED, nodeRoleUtils.ZERO_BALANCE, newLicenseLength);
             if (initializedNodeEntry.length === 0) {
-               this.#safeLogApply(OperationType.APPEND_WHITELIST, "Failed to initialize node entry.", node.from.key)
+                this.#safeLogApply(OperationType.APPEND_WHITELIST, "Failed to initialize node entry.", node.from.key)
                 return Status.FAILURE;
             }
 
@@ -3064,7 +3064,7 @@ class State extends ReadyResource {
             node
         );
 
-        if (transferResult === null || transferResult === Status.IGNORE) {
+        if (transferResult === null || transferResult === Status.IGNORE) {
             this.#safeLogApply(OperationType.TRANSFER, "Invalid transfer result.", node.from.key)
             return transferResult === null ? Status.FAILURE : Status.IGNORE;
         };
