@@ -905,6 +905,7 @@ class State extends ReadyResource {
         }
 
         // anti-replay attack
+        // NOTE: We would honestly keep this failure because in theory this should never happen.
         const opEntry = await this.#getEntryApply(txHashHexString, batch);
         if (opEntry !== null) {
             this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Operation has already been applied.", node.from.key)
@@ -963,7 +964,7 @@ class State extends ReadyResource {
 
         if (!adminBalance.greaterThanOrEquals(BALANCE_FEE)) {
             this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Insufficient admin balance.", node.from.key)
-            return Status.FAILURE;
+            return Status.IGNORE;
         };
         const updatedFee = adminBalance.sub(BALANCE_FEE)
 
@@ -1405,7 +1406,7 @@ class State extends ReadyResource {
         const opEntry = await this.#getEntryApply(txHashHexString, batch);
         if (opEntry !== null) {
             this.#safeLogApply(OperationType.ADD_WRITER, "Operation has already been applied.", node.from.key)
-            return Status.FAILURE;
+            return Status.IGNORE;
         };
 
         const addWriterResult = await this.#addWriter(op, base, node, batch, txHashHexString, requesterAddressString, requesterAddressBuffer, validatorAddressString, validatorEntryBuffer);
@@ -1484,7 +1485,7 @@ class State extends ReadyResource {
 
         if (!requesterBalance.greaterThanOrEquals(BALANCE_FEE)) {
             this.#safeLogApply(OperationType.ADD_WRITER, "Insufficient requester balance.", node.from.key)
-            return null;
+            return Status.IGNORE;
         };
 
         const updatedBalance = requesterBalance.sub(BALANCE_FEE) // Remove the fee
@@ -1697,7 +1698,7 @@ class State extends ReadyResource {
         const opEntry = await this.#getEntryApply(txHashHexString, batch);
         if (opEntry !== null) {
             this.#safeLogApply(OperationType.REMOVE_WRITER, "Operation has already been applied.", node.from.key)
-            return Status.FAILURE;
+            return Status.IGNORE;
         };
 
         // Proceed to remove the writer role from the node
@@ -1757,7 +1758,7 @@ class State extends ReadyResource {
 
         if (!requesterBalance.greaterThanOrEquals(BALANCE_FEE)) {
             this.#safeLogApply(OperationType.REMOVE_WRITER, "Insufficient requester balance.", node.from.key)
-            return null;
+            return Status.IGNORE;
         };
 
         const updatedBalance = requesterBalance.sub(BALANCE_FEE);
@@ -2589,6 +2590,8 @@ class State extends ReadyResource {
         }
 
         // anti-replay attack
+        // NOTE: Also here, attempt at bootstrap deployment with the same payload is suspicious so we should punish the second attempt in the same batch. 
+        // Does this make sense?
         const hashHexString = op.bdo.tx.toString('hex');
         const opEntry = await this.#getEntryApply(hashHexString, batch);
         if (opEntry !== null) {
@@ -2636,7 +2639,7 @@ class State extends ReadyResource {
 
         if (!requesterBalance.greaterThanOrEquals(feeAmount)) {
             this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Insufficient requester balance.", node.from.key)
-            return Status.FAILURE;
+            return Status.IGNORE;
         };
 
         const newRequesterBalance = requesterBalance.sub(feeAmount);
@@ -2825,7 +2828,7 @@ class State extends ReadyResource {
         const opEntry = await this.#getEntryApply(hashHexString, batch);
         if (opEntry !== null) {
             this.#safeLogApply(OperationType.TX, "Operation has already been applied.", node.from.key)
-            return Status.FAILURE;
+            return Status.IGNORE;
         };
 
         // if user is performing a transaction on non-deployed bootstrap, then we need to reject it.
@@ -2865,9 +2868,10 @@ class State extends ReadyResource {
             batch
         );
 
-        if (transferFeeTxOperationResult === null) {
-            this.#safeLogApply(OperationType.TX, "Fee transfer operation failed completely.", node.from.key)
-            return Status.FAILURE;
+        // So the logic is: If this fails because of insufficient balance, it will be ignored. Everything else is punished.
+        if (transferFeeTxOperationResult === null || transferFeeTxOperationResult === Status.IGNORE) {
+            this.#safeLogApply(OperationType.TX, "Fee transfer operation failed completely.", node.from.key);
+            return transferFeeTxOperationResult === null ? Status.FAILURE : Status.IGNORE;
         }
 
         if (transferFeeTxOperationResult.requesterEntry === null) {
@@ -3022,7 +3026,7 @@ class State extends ReadyResource {
         const opEntry = await this.#getEntryApply(hashHexString, batch);
         if (opEntry !== null) {
             this.#safeLogApply(OperationType.TRANSFER, "Operation has already been applied.", node.from.key)
-            return Status.FAILURE;
+            return Status.IGNORE;
         };
 
         // Check if recipient address is valid.
@@ -3055,9 +3059,9 @@ class State extends ReadyResource {
             node
         );
 
-        if (transferResult === null) {
+        if (transferResult === null || transferResult === Status.IGNORE) {
             this.#safeLogApply(OperationType.TRANSFER, "Invalid transfer result.", node.from.key)
-            return Status.FAILURE;
+            return transferResult === null ? Status.FAILURE : Status.IGNORE;
         };
 
         if (transferResult.senderEntry === null) {
@@ -3143,7 +3147,7 @@ class State extends ReadyResource {
 
         if (!senderBalance.greaterThanOrEquals(totalDeductedAmount)) {
             this.#safeLogApply(OperationType.TRANSFER, "Insufficient sender balance.", node.from.key)
-            return null;
+            return Status.IGNORE;
         }
 
         const newSenderBalance = senderBalance.sub(totalDeductedAmount);
@@ -3635,7 +3639,7 @@ class State extends ReadyResource {
         }
 
         if (!requesterBalance.greaterThanOrEquals(feeAmount)) {
-            return null;
+            return Status.IGNORE;
         }
 
         const newRequesterBalance = requesterBalance.sub(feeAmount);
