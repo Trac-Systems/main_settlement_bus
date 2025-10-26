@@ -359,6 +359,11 @@ class State extends ReadyResource {
                 const result = await handler(op, view, base, node, batch);
                 if (result === Status.FAILURE) {
                     invalidOperations++;
+                } else if (result === Status.IGNORE) {
+                    continue;
+                } else if (result !== Status.SUCCESS) {
+                    this.#safeLogApply(`Unknown operation status: ${result}`, node.from.key);
+                    invalidOperations++;
                 }
             } else {
                 this.#safeLogApply(`Unknown operation type: ${op.type}`, node.from.key)
@@ -510,7 +515,7 @@ class State extends ReadyResource {
 
         // Check if the operation has already been applied
         const opEntry = await this.#getEntryApply(txHashHexString, batch);
-        if (null !== opEntry) {
+        if (opEntry !== null) {
             this.#safeLogApply(OperationType.BALANCE_INITIALIZATION, "Operation has already been applied.", node.from.key)
             return Status.FAILURE;
         };
@@ -615,7 +620,7 @@ class State extends ReadyResource {
 
         // Check if the operation has already been applied
         const opEntry = await this.#getEntryApply(txHashHexString, batch);
-        if (null !== opEntry) {
+        if (opEntry !== null) {
             this.#safeLogApply(OperationType.DISABLE_INITIALIZATION, "Operation has already been applied.", node.from.key)
             return Status.FAILURE;
         };
@@ -1410,8 +1415,8 @@ class State extends ReadyResource {
         };
 
         const addWriterResult = await this.#addWriter(op, base, node, batch, txHashHexString, requesterAddressString, requesterAddressBuffer, validatorAddressString, validatorEntryBuffer);
-        if (addWriterResult === null) {
-            return Status.FAILURE;
+        if (addWriterResult === null || addWriterResult === Status.IGNORE) {
+            return addWriterResult === null ? Status.FAILURE : Status.IGNORE;
         }
         return Status.SUCCESS;
     }
@@ -1703,8 +1708,8 @@ class State extends ReadyResource {
 
         // Proceed to remove the writer role from the node
         const removeWriterResult = await this.#removeWriter(op, base, node, batch, txHashHexString, requesterAddressString, requesterAddress, validatorAddressString, validatorEntryBuffer);
-        if (removeWriterResult === null) {
-            return Status.FAILURE;
+        if (removeWriterResult === null || removeWriterResult === Status.IGNORE) {
+            return removeWriterResult === null ? Status.FAILURE : Status.IGNORE;
         }
 
         return Status.SUCCESS;
@@ -2596,7 +2601,7 @@ class State extends ReadyResource {
         const opEntry = await this.#getEntryApply(hashHexString, batch);
         if (opEntry !== null) {
             this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Operation has already been applied.", node.from.key)
-            return Status.FAILURE;
+            return Status.IGNORE;
         }; // Operation has already been applied.
 
         // If deployment already exists, do not process it again.
