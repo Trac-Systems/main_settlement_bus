@@ -2594,6 +2594,13 @@ class State extends ReadyResource {
             return Status.FAILURE;
         }
 
+        // If deployment already exists, do not process it again.
+        const alreadyRegisteredBootstrap = await this.#getDeploymentEntryApply(bootstrapDeploymentHexString, batch);
+        if (alreadyRegisteredBootstrap !== null) {
+            this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Bootstrap already registered.", node.from.key)
+            return Status.FAILURE;
+        };
+
         // anti-replay attack
         // NOTE: Also here, attempt at bootstrap deployment with the same payload is suspicious so we should punish the second attempt in the same batch. 
         // Does this make sense?
@@ -2603,13 +2610,6 @@ class State extends ReadyResource {
             this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Operation has already been applied.", node.from.key)
             return Status.IGNORE;
         }; // Operation has already been applied.
-
-        // If deployment already exists, do not process it again.
-        const alreadyRegisteredBootstrap = await this.#getDeploymentEntryApply(bootstrapDeploymentHexString, batch);
-        if (alreadyRegisteredBootstrap !== null) {
-            this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Bootstrap already registered.", node.from.key)
-            return Status.FAILURE;
-        };
 
         const deploymentEntry = deploymentEntryUtils.encode(op.bdo.tx, requesterAddressBuffer);
         if (deploymentEntry.length === 0) {
