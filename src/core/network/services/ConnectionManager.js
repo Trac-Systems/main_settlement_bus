@@ -16,11 +16,10 @@ class ConnectionManager {
     }
 
     send(message) {
-        if (this.#requestCount > 10) {
+        if (this.#requestCount >= 10) {
             this.#requestCount = 0
             this.#updateNext()
         }
-
         this.#requestCount++
         this.#getConnection().messenger.send(message)
     }

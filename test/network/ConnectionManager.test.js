@@ -3,6 +3,7 @@ import { hook, test } from 'brittle'
 import { default as EventEmitter } from "bare-events"
 import { testKeyPair1, testKeyPair2, testKeyPair3, testKeyPair4, testKeyPair5 } from "../fixtures/apply.fixtures.js";
 import ConnectionManager from "../../src/core/network/services/ConnectionManager.js";
+import { tick } from "../utils/setupApplyTests.js";
 
 const createConnection = (key) => {
     const emitter = new EventEmitter()
@@ -14,7 +15,18 @@ const createConnection = (key) => {
     return { key, connection: emitter }
 }
 
-let connections, connectionManager
+const makeManager = () => {
+    const connectionManager = new ConnectionManager({ maxValidators: 6 })
+
+    connections.forEach(({ key, connection }) => {
+        connectionManager.whiteList(key)
+        connectionManager.addValidator(key, connection)
+    });
+
+    return connectionManager
+}
+
+let connections
 hook('Initialize state', async () => {
     connections = [
         createConnection(testKeyPair1.publicKey),
@@ -22,31 +34,80 @@ hook('Initialize state', async () => {
         createConnection(testKeyPair3.publicKey),
         createConnection(testKeyPair4.publicKey),
     ]
-
-    connectionManager = new ConnectionManager({ maxValidators: 6 })
-
-    connections.forEach(({ key, connection }) => {
-        connectionManager.whiteList(key)
-        connectionManager.addValidator(key, connection)
-    });
-
 });
 
 test('ConnectionManager', () => {
     test('addValidator', async t => {
-        sinon.restore()
-        t.is(connectionManager.connectionCount(), connections.length, 'should have the same length')
+        test('adds a validator', async t => {
+            sinon.restore()
+            const connectionManager = makeManager()
+            t.is(connectionManager.connectionCount(), connections.length, 'should have the same length')
 
-        const data = createConnection(testKeyPair5.publicKey)
-        connectionManager.whiteList(data.key)
-        connectionManager.addValidator(data.key, data.connection)
-        t.is(connectionManager.connectionCount(), connections.length + 1, 'should have the same length')
+            const data = createConnection(testKeyPair5.publicKey)
+            connectionManager.whiteList(data.key)
+            connectionManager.addValidator(data.key, data.connection)
+            t.is(connectionManager.connectionCount(), connections.length + 1, 'should have the same length')
+        })
     })
 
     test('send', async t => {
-        sinon.restore()
+        test('triggers send on messenger', async t => {
+            sinon.restore()
+            const connectionManager = makeManager()
 
-        connectionManager.send([1,2,3,4])
-        t.ok(connections[0].connection.messenger.send.calledWith([1,2,3,4]), 'first on the list should have been called')
+            connectionManager.send([1,2,3,4])
+            t.ok(connections[0].connection.messenger.send.calledWith([1,2,3,4]), 'first on the list should have been called')
+        })
+
+        test('rotate the messenger', async t => {
+            sinon.restore()
+            const connectionManager = makeManager()
+
+            for (let i = 0; i < 10; i++) {
+                connectionManager.send([1,2,3,4])
+                t.ok(connections[0].connection.messenger.send.calledWith([1,2,3,4]), 'first on the list should have been called')
+            }
+
+            for (let i = 0; i < 10; i++) {
+                connectionManager.send([1,2,3,4])
+                t.ok(connections[1].connection.messenger.send.calledWith([1,2,3,4]), 'first on the list should have been called')
+            }
+
+            for (let i = 0; i < 10; i++) {
+                connectionManager.send([1,2,3,4])
+                t.ok(connections[2].connection.messenger.send.calledWith([1,2,3,4]), 'first on the list should have been called')
+            }
+
+            for (let i = 0; i < 10; i++) {
+                connectionManager.send([1,2,3,4])
+                t.ok(connections[3].connection.messenger.send.calledWith([1,2,3,4]), 'first on the list should have been called')
+            }
+        })
+    })
+
+    test('rotate', async t => {
+        test('resets the rotation', async t => {
+            sinon.restore()
+            const connectionManager = makeManager()
+
+            connectionManager.send([1,2,3,4]) // this shouldnt trigger rotation
+            t.ok(connections[0].connection.messenger.send.calledWith([1,2,3,4]), 'first on the list should have been called')
+            connectionManager.rotate() // rotate
+            connectionManager.send([1,2,3,4])
+            t.ok(connections[1].connection.messenger.send.calledWith([1,2,3,4]), 'first on the list should have been called')
+        })
+    })
+
+    test('on close', async t => {
+        test('removes from list', async t => {
+            sinon.restore()
+            const connectionManager = makeManager()
+
+            const connectionCount = connectionManager.connectionCount()
+
+            connections[1].connection.emit('close')
+            await tick()
+            t.is(connectionCount, connectionManager.connectionCount() + 1, 'first on the list should have been called')
+        })
     })
 })
