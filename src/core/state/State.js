@@ -1415,8 +1415,14 @@ class State extends ReadyResource {
         };
 
         const addWriterResult = await this.#addWriter(op, base, node, batch, txHashHexString, requesterAddressString, requesterAddressBuffer, validatorAddressString, validatorEntryBuffer);
-        if (addWriterResult === null || addWriterResult === Status.IGNORE) {
-            return addWriterResult === null ? Status.FAILURE : Status.IGNORE;
+        if (addWriterResult === null) {
+            this.#safeLogApply(OperationType.ADD_WRITER, "Failed to add writer.", node.from.key)
+            return Status.FAILURE;
+        }
+        
+        if (addWriterResult === Status.IGNORE) {
+            this.#safeLogApply(OperationType.ADD_WRITER, "Add writer operation ignored.", node.from.key)
+            return Status.IGNORE;
         }
         return Status.SUCCESS;
     }
@@ -1708,10 +1714,16 @@ class State extends ReadyResource {
 
         // Proceed to remove the writer role from the node
         const removeWriterResult = await this.#removeWriter(op, base, node, batch, txHashHexString, requesterAddressString, requesterAddress, validatorAddressString, validatorEntryBuffer);
-        if (removeWriterResult === null || removeWriterResult === Status.IGNORE) {
-            return removeWriterResult === null ? Status.FAILURE : Status.IGNORE;
+        if (removeWriterResult === null) {
+            this.#safeLogApply(OperationType.REMOVE_WRITER, "Failed to remove writer.", node.from.key)
+            return Status.FAILURE;
         }
-
+        
+        if (removeWriterResult === Status.IGNORE) {
+            this.#safeLogApply(OperationType.REMOVE_WRITER, "Remove writer operation ignored.", node.from.key)
+            return Status.IGNORE;
+        }
+        
         return Status.SUCCESS;
     }
 
@@ -2872,10 +2884,14 @@ class State extends ReadyResource {
             node
         );
 
-        // So the logic is: If this fails because of insufficient balance, it will be ignored. Everything else is punished.
-        if (transferFeeTxOperationResult === null || transferFeeTxOperationResult === Status.IGNORE) {
+        if (transferFeeTxOperationResult === null) {
             this.#safeLogApply(OperationType.TX, "Fee transfer operation failed completely.", node.from.key);
-            return transferFeeTxOperationResult === null ? Status.FAILURE : Status.IGNORE;
+            return Status.FAILURE;
+        }
+
+        if (transferFeeTxOperationResult === Status.IGNORE) {
+            this.#safeLogApply(OperationType.TX, "Fee transfer operation skipped.", node.from.key);
+            return Status.IGNORE;
         }
 
         if (transferFeeTxOperationResult.requesterEntry === null) {
@@ -3063,9 +3079,14 @@ class State extends ReadyResource {
             node
         );
 
-        if (transferResult === null || transferResult === Status.IGNORE) {
-            this.#safeLogApply(OperationType.TRANSFER, "Invalid transfer result.", node.from.key)
-            return transferResult === null ? Status.FAILURE : Status.IGNORE;
+        if (transferResult === null) {
+            this.#safeLogApply(OperationType.TRANSFER, "Invalid transfer result.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        if (transferResult === Status.IGNORE) {
+            this.#safeLogApply(OperationType.TRANSFER, "Transfer operation skipped.", node.from.key);
+            return Status.IGNORE;
         };
 
         if (transferResult.senderEntry === null) {
