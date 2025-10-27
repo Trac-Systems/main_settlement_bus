@@ -359,6 +359,11 @@ class State extends ReadyResource {
                 const result = await handler(op, view, base, node, batch);
                 if (result === Status.FAILURE) {
                     invalidOperations++;
+                } else if (result === Status.IGNORE) {
+                    continue;
+                } else if (result !== Status.SUCCESS) {
+                    this.#safeLogApply(`Unknown operation status: ${result}`, node.from.key);
+                    invalidOperations++;
                 }
             } else {
                 this.#safeLogApply(`Unknown operation type: ${op.type}`, node.from.key)
@@ -450,7 +455,7 @@ class State extends ReadyResource {
             this.#safeLogApply(OperationType.BALANCE_INITIALIZATION, "Failed to decode admin entry.", node.from.key)
             return Status.FAILURE;
         }
-        
+
         if (!this.#isAdminApply(decodedAdminEntry, node)) {
             this.#safeLogApply(OperationType.BALANCE_INITIALIZATION, "Node is not allowed to perform this operation. (ADMIN ONLY)", node.from.key)
             return Status.FAILURE;
@@ -510,7 +515,7 @@ class State extends ReadyResource {
 
         // Check if the operation has already been applied
         const opEntry = await this.#getEntryApply(txHashHexString, batch);
-        if (null !== opEntry) {
+        if (opEntry !== null) {
             this.#safeLogApply(OperationType.BALANCE_INITIALIZATION, "Operation has already been applied.", node.from.key)
             return Status.FAILURE;
         };
@@ -615,7 +620,7 @@ class State extends ReadyResource {
 
         // Check if the operation has already been applied
         const opEntry = await this.#getEntryApply(txHashHexString, batch);
-        if (null !== opEntry) {
+        if (opEntry !== null) {
             this.#safeLogApply(OperationType.DISABLE_INITIALIZATION, "Operation has already been applied.", node.from.key)
             return Status.FAILURE;
         };
@@ -904,13 +909,6 @@ class State extends ReadyResource {
             return Status.FAILURE;
         }
 
-        // anti-replay attack
-        const opEntry = await this.#getEntryApply(txHashHexString, batch);
-        if (opEntry !== null) {
-            this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Operation has already been applied.", node.from.key)
-            return Status.FAILURE;
-        };
-
         const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
         const decodedAdminEntry = adminEntryUtils.decode(adminEntry);
 
@@ -922,6 +920,14 @@ class State extends ReadyResource {
         const publicKeyAdminEntry = PeerWallet.decodeBech32mSafe(decodedAdminEntry.address);
         if (!b4a.equals(requesterAdminPublicKey, publicKeyAdminEntry)) {
             this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Admin public key does not match the node public key.", node.from.key)
+            return Status.FAILURE;
+        };
+
+        // anti-replay attack
+        // NOTE: We would honestly keep this failure because in theory this should never happen.
+        const opEntry = await this.#getEntryApply(txHashHexString, batch);
+        if (opEntry !== null) {
+            this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Operation has already been applied.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -963,7 +969,7 @@ class State extends ReadyResource {
 
         if (!adminBalance.greaterThanOrEquals(BALANCE_FEE)) {
             this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Insufficient admin balance.", node.from.key)
-            return Status.FAILURE;
+            return Status.IGNORE;
         };
         const updatedFee = adminBalance.sub(BALANCE_FEE)
 
@@ -1218,7 +1224,7 @@ class State extends ReadyResource {
 
             const initializedNodeEntry = nodeEntryUtils.init(ZERO_WK, nodeRoleUtils.NodeRole.WHITELISTED, nodeRoleUtils.ZERO_BALANCE, newLicenseLength);
             if (initializedNodeEntry.length === 0) {
-               this.#safeLogApply(OperationType.APPEND_WHITELIST, "Failed to initialize node entry.", node.from.key)
+                this.#safeLogApply(OperationType.APPEND_WHITELIST, "Failed to initialize node entry.", node.from.key)
                 return Status.FAILURE;
             }
 
@@ -1405,12 +1411,18 @@ class State extends ReadyResource {
         const opEntry = await this.#getEntryApply(txHashHexString, batch);
         if (opEntry !== null) {
             this.#safeLogApply(OperationType.ADD_WRITER, "Operation has already been applied.", node.from.key)
-            return Status.FAILURE;
+            return Status.IGNORE;
         };
 
         const addWriterResult = await this.#addWriter(op, base, node, batch, txHashHexString, requesterAddressString, requesterAddressBuffer, validatorAddressString, validatorEntryBuffer);
         if (addWriterResult === null) {
+            this.#safeLogApply(OperationType.ADD_WRITER, "Failed to add writer.", node.from.key)
             return Status.FAILURE;
+        }
+        
+        if (addWriterResult === Status.IGNORE) {
+            this.#safeLogApply(OperationType.ADD_WRITER, "Add writer operation ignored.", node.from.key)
+            return Status.IGNORE;
         }
         return Status.SUCCESS;
     }
@@ -1484,7 +1496,7 @@ class State extends ReadyResource {
 
         if (!requesterBalance.greaterThanOrEquals(BALANCE_FEE)) {
             this.#safeLogApply(OperationType.ADD_WRITER, "Insufficient requester balance.", node.from.key)
-            return null;
+            return Status.IGNORE;
         };
 
         const updatedBalance = requesterBalance.sub(BALANCE_FEE) // Remove the fee
@@ -1697,15 +1709,21 @@ class State extends ReadyResource {
         const opEntry = await this.#getEntryApply(txHashHexString, batch);
         if (opEntry !== null) {
             this.#safeLogApply(OperationType.REMOVE_WRITER, "Operation has already been applied.", node.from.key)
-            return Status.FAILURE;
+            return Status.IGNORE;
         };
 
         // Proceed to remove the writer role from the node
         const removeWriterResult = await this.#removeWriter(op, base, node, batch, txHashHexString, requesterAddressString, requesterAddress, validatorAddressString, validatorEntryBuffer);
         if (removeWriterResult === null) {
+            this.#safeLogApply(OperationType.REMOVE_WRITER, "Failed to remove writer.", node.from.key)
             return Status.FAILURE;
         }
-
+        
+        if (removeWriterResult === Status.IGNORE) {
+            this.#safeLogApply(OperationType.REMOVE_WRITER, "Remove writer operation ignored.", node.from.key)
+            return Status.IGNORE;
+        }
+        
         return Status.SUCCESS;
     }
 
@@ -1757,7 +1775,7 @@ class State extends ReadyResource {
 
         if (!requesterBalance.greaterThanOrEquals(BALANCE_FEE)) {
             this.#safeLogApply(OperationType.REMOVE_WRITER, "Insufficient requester balance.", node.from.key)
-            return null;
+            return Status.IGNORE;
         };
 
         const updatedBalance = requesterBalance.sub(BALANCE_FEE);
@@ -2593,14 +2611,14 @@ class State extends ReadyResource {
         const opEntry = await this.#getEntryApply(hashHexString, batch);
         if (opEntry !== null) {
             this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Operation has already been applied.", node.from.key)
-            return Status.FAILURE;
+            return Status.IGNORE;
         }; // Operation has already been applied.
 
         // If deployment already exists, do not process it again.
         const alreadyRegisteredBootstrap = await this.#getDeploymentEntryApply(bootstrapDeploymentHexString, batch);
         if (alreadyRegisteredBootstrap !== null) {
             this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Bootstrap already registered.", node.from.key)
-            return Status.FAILURE;
+            return Status.IGNORE;
         };
 
         const deploymentEntry = deploymentEntryUtils.encode(op.bdo.tx, requesterAddressBuffer);
@@ -2636,7 +2654,7 @@ class State extends ReadyResource {
 
         if (!requesterBalance.greaterThanOrEquals(feeAmount)) {
             this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Insufficient requester balance.", node.from.key)
-            return Status.FAILURE;
+            return Status.IGNORE;
         };
 
         const newRequesterBalance = requesterBalance.sub(feeAmount);
@@ -2825,7 +2843,7 @@ class State extends ReadyResource {
         const opEntry = await this.#getEntryApply(hashHexString, batch);
         if (opEntry !== null) {
             this.#safeLogApply(OperationType.TX, "Operation has already been applied.", node.from.key)
-            return Status.FAILURE;
+            return Status.IGNORE;
         };
 
         // if user is performing a transaction on non-deployed bootstrap, then we need to reject it.
@@ -2862,12 +2880,18 @@ class State extends ReadyResource {
             validatorEntryBuffer,
             subnetworkCreatorAddressString,
             feeAmount,
-            batch
+            batch,
+            node
         );
 
         if (transferFeeTxOperationResult === null) {
-            this.#safeLogApply(OperationType.TX, "Fee transfer operation failed completely.", node.from.key)
+            this.#safeLogApply(OperationType.TX, "Fee transfer operation failed completely.", node.from.key);
             return Status.FAILURE;
+        }
+
+        if (transferFeeTxOperationResult === Status.IGNORE) {
+            this.#safeLogApply(OperationType.TX, "Fee transfer operation skipped.", node.from.key);
+            return Status.IGNORE;
         }
 
         if (transferFeeTxOperationResult.requesterEntry === null) {
@@ -3022,7 +3046,7 @@ class State extends ReadyResource {
         const opEntry = await this.#getEntryApply(hashHexString, batch);
         if (opEntry !== null) {
             this.#safeLogApply(OperationType.TRANSFER, "Operation has already been applied.", node.from.key)
-            return Status.FAILURE;
+            return Status.IGNORE;
         };
 
         // Check if recipient address is valid.
@@ -3056,8 +3080,13 @@ class State extends ReadyResource {
         );
 
         if (transferResult === null) {
-            this.#safeLogApply(OperationType.TRANSFER, "Invalid transfer result.", node.from.key)
+            this.#safeLogApply(OperationType.TRANSFER, "Invalid transfer result.", node.from.key);
             return Status.FAILURE;
+        }
+
+        if (transferResult === Status.IGNORE) {
+            this.#safeLogApply(OperationType.TRANSFER, "Transfer operation skipped.", node.from.key);
+            return Status.IGNORE;
         };
 
         if (transferResult.senderEntry === null) {
@@ -3143,7 +3172,7 @@ class State extends ReadyResource {
 
         if (!senderBalance.greaterThanOrEquals(totalDeductedAmount)) {
             this.#safeLogApply(OperationType.TRANSFER, "Insufficient sender balance.", node.from.key)
-            return null;
+            return Status.IGNORE;
         }
 
         const newSenderBalance = senderBalance.sub(totalDeductedAmount);
@@ -3606,14 +3635,16 @@ class State extends ReadyResource {
         return { newLicenseLength, decodedNewLicenseLength };
     }
 
-    async #transferFeeTxOperation(requesterAddressString, validatorAddressString, validatorEntryBuffer, subnetworkCreatorAddressString, feeAmount, batch) {
+    async #transferFeeTxOperation(requesterAddressString, validatorAddressString, validatorEntryBuffer, subnetworkCreatorAddressString, feeAmount, batch, node) {
         if (!requesterAddressString ||
             !validatorAddressString ||
             !validatorEntryBuffer ||
             !subnetworkCreatorAddressString ||
             !feeAmount ||
-            !batch
+            !batch ||
+            !node
         ) {
+            this.#safeLogApply("transferFeeTxOperation", "Invalid incoming data.", node.from.key)
             return null;
         }
 
@@ -3621,30 +3652,36 @@ class State extends ReadyResource {
         // charge fee from the requester
         const requesterNodeEntryBuffer = await this.#getEntryApply(requesterAddressString, batch);
         if (requesterNodeEntryBuffer === null) {
+            this.#safeLogApply("transferFeeTxOperation", "Invalid requester node entry buffer.", node.from.key)
             return null;
         }
 
         const requesterNodeEntry = nodeEntryUtils.decode(requesterNodeEntryBuffer);
         if (requesterNodeEntry === null) {
+            this.#safeLogApply("transferFeeTxOperation", "Invalid requester node entry, can not to decode.", node.from.key)
             return null;
         }
 
         const requesterBalance = toBalance(requesterNodeEntry.balance);
         if (requesterBalance === null) {
+            this.#safeLogApply("transferFeeTxOperation", "Invalid requester balance.", node.from.key)
             return null;
         }
 
         if (!requesterBalance.greaterThanOrEquals(feeAmount)) {
-            return null;
+            this.#safeLogApply("transferFeeTxOperation", "Insufficient requester balance to pay fee.", node.from.key)
+            return Status.IGNORE;
         }
 
         const newRequesterBalance = requesterBalance.sub(feeAmount);
         if (newRequesterBalance === null) {
+            this.#safeLogApply("transferFeeTxOperation", "Failed to deduct fee from requester balance.", node.from.key)
             return null;
         }
 
         const updatedRequesterNodeEntry = newRequesterBalance.update(requesterNodeEntryBuffer);
         if (updatedRequesterNodeEntry === null) {
+            this.#safeLogApply("transferFeeTxOperation", "Failed to update requester node balance.", node.from.key)
             return null;
         }
 
@@ -3652,21 +3689,25 @@ class State extends ReadyResource {
 
         const validatorNodeEntry = nodeEntryUtils.decode(validatorEntryBuffer);
         if (validatorNodeEntry === null) {
+            this.#safeLogApply("transferFeeTxOperation", "Invalid validator node entry, can not to decode.", node.from.key)
             return null;
         }
 
         const validatorBalance = toBalance(validatorNodeEntry.balance);
         if (validatorBalance === null) {
+            this.#safeLogApply("transferFeeTxOperation", "Invalid validator balance.", node.from.key)
             return null;
         }
 
         const newValidatorBalance = validatorBalance.add(feeAmount.percentage(PERCENT_50));
         if (newValidatorBalance === null) {
+            this.#safeLogApply("transferFeeTxOperation", "Failed to add fee to validator balance.", node.from.key)
             return null;
         }
 
         const updatedValidatorNodeEntry = newValidatorBalance.update(validatorEntryBuffer);
         if (updatedValidatorNodeEntry === null) {
+            this.#safeLogApply("transferFeeTxOperation", "Failed to update validator node balance.", node.from.key)
             return null;
         }
 
@@ -3689,11 +3730,13 @@ class State extends ReadyResource {
             // We already added 50% as validator fee, now add only the additional 25%
             const newValidatorBalanceWithBonus = newValidatorBalance.add(feeAmount.percentage(PERCENT_25));
             if (newValidatorBalanceWithBonus === null) {
+                this.#safeLogApply("transferFeeTxOperation", "Failed to add bonus fee to validator balance.", node.from.key)
                 return null;
             }
 
             const updatedValidatorNodeEntryWithBonus = newValidatorBalanceWithBonus.update(validatorEntryBuffer);
             if (updatedValidatorNodeEntryWithBonus === null) {
+                this.#safeLogApply("transferFeeTxOperation", "Failed to update validator node balance with bonus.", node.from.key)
                 return null;
             }
 
@@ -3710,26 +3753,31 @@ class State extends ReadyResource {
         // 3. 25% is burned
         const subnetworkCreatorNodeEntryBuffer = await this.#getEntryApply(subnetworkCreatorAddressString, batch);
         if (subnetworkCreatorNodeEntryBuffer === null) {
+            this.#safeLogApply("transferFeeTxOperation", "Invalid subnetwork creator -  it does not exists", node.from.key)
             return null;
         }
 
         const subnetworkCreatorNodeEntry = nodeEntryUtils.decode(subnetworkCreatorNodeEntryBuffer);
         if (subnetworkCreatorNodeEntry === null) {
+            this.#safeLogApply("transferFeeTxOperation", "Invalid subnetwork creator node entry, can not to decode.", node.from.key)
             return null;
         }
 
         const subnetworkCreatorBalance = toBalance(subnetworkCreatorNodeEntry.balance);
         if (subnetworkCreatorBalance === null) {
+            this.#safeLogApply("transferFeeTxOperation", "Invalid subnetwork creator balance.", node.from.key)
             return null;
         }
 
         const newSubnetworkCreatorBalance = subnetworkCreatorBalance.add(feeAmount.percentage(PERCENT_25));
         if (newSubnetworkCreatorBalance === null) {
+            this.#safeLogApply("transferFeeTxOperation", "Failed to add fee to subnetwork creator balance.", node.from.key)
             return null;
         }
 
         const updatedSubnetworkCreatorNodeEntry = newSubnetworkCreatorBalance.update(subnetworkCreatorNodeEntryBuffer);
         if (updatedSubnetworkCreatorNodeEntry === null) {
+            this.#safeLogApply("transferFeeTxOperation", "Failed to update subnetwork creator node balance.", node.from.key)
             return null;
         }
 
