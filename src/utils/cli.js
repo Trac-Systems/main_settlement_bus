@@ -42,7 +42,7 @@ export async function verifyDag(state, network, wallet, writerKey) {
         console.log("---------- connections stats ----------");
         console.log("Admin Stream:", network.admin_stream ? "Connected" : "Not Connected");
         console.log("Admin Public Key:", network.admin ? network.admin.toString('hex') : "None");
-        console.log("Validator Stream:", network.validator_stream ? "Connected" : "Not Connected");
+        console.log("Validator Stream:", network.validatorConnectionManager.connectionCount() > 0 ? "Connected" : "Not Connected");
         console.log("Validator Public Key:", network.validator ? network.validator.toString('hex') : "None");
         console.log("Custom Stream:", network.custom_stream ? "Connected" : "Not Connected");
         console.log("Custom Node Address:", network.custom_node ? network.custom_node.toString('hex') : "None");

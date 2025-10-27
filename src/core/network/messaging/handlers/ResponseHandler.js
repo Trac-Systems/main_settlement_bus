@@ -64,8 +64,7 @@ class ResponseHandler {
             const validatorPublicKey = PeerWallet.decodeBech32m(validatorAddressString);
 
             console.log('Validator stream established', validatorAddressString);
-            this.network.validator_stream = connection;
-            this.network.validator = validatorPublicKey;
+            this.network.validatorConnectionManager.addValidator(validatorPublicKey, connection)
         } else {
             throw new Error("Validator response verification failed");
         }
