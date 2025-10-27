@@ -113,3 +113,5 @@ export const NETWORK_MESSAGE_TYPES = Object.freeze({
 
 export const TRAC_ADDRESS_SIZE =  63; // TODO: Change this to config().addressLength || 63
 export const NETWORK_ID = 918; // TODO: Change this to config().network_id || 918
+
+export const MAX_VALIDATORS = 50

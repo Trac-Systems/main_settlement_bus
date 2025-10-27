@@ -63,13 +63,6 @@ class ResponseHandler {
             const validatorAddressString = message.address;
             const validatorPublicKey = PeerWallet.decodeBech32m(validatorAddressString);
 
-
-            if (this.network.validator_stream !== null &&
-                this.network.validator !== null &&
-                b4a.equals(this.network.validator, validatorPublicKey) === 0) {
-                return;
-            }
-
             console.log('Validator stream established', validatorAddressString);
             this.network.validator_stream = connection;
             this.network.validator = validatorPublicKey;

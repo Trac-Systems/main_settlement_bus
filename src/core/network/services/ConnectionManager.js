@@ -9,9 +9,14 @@ class ConnectionManager {
         this.currentValidator = 0
     }
 
+    send(message) {
+        
+    }
+
     whiteList(publicKey) {
         this.#validators[publicKey] = null
     }
+
     addValidator(publicKey, connection) {
         if (!this.#exists(publicKey) && this.#isSet(publicKey)) {
             return this.#append(publicKey, connection)
