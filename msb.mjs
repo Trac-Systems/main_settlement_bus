@@ -14,7 +14,7 @@ const opts = {
     enable_interactive_mode: true,
     disable_rate_limit: false,
     enable_tx_apply_logs: false,
-    enable_error_apply_logs: true,
+    enable_error_apply_logs: false,
 };
 
 const rpc_opts = {

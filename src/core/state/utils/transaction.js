@@ -24,6 +24,7 @@ export const FEE = b4a.from([
 export const Status = Object.freeze({
     SUCCESS: 0,
     FAILURE: 1,
+    IGNORE: 2
 });
 
 // TODO: This function receives too many arguments. It would be better to encapsulate them in an object.
