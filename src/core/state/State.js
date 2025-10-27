@@ -2870,7 +2870,8 @@ class State extends ReadyResource {
             validatorEntryBuffer,
             subnetworkCreatorAddressString,
             feeAmount,
-            batch
+            batch,
+            node
         );
 
         // So the logic is: If this fails because of insufficient balance, it will be ignored. Everything else is punished.
@@ -3615,14 +3616,16 @@ class State extends ReadyResource {
         return { newLicenseLength, decodedNewLicenseLength };
     }
 
-    async #transferFeeTxOperation(requesterAddressString, validatorAddressString, validatorEntryBuffer, subnetworkCreatorAddressString, feeAmount, batch) {
+    async #transferFeeTxOperation(requesterAddressString, validatorAddressString, validatorEntryBuffer, subnetworkCreatorAddressString, feeAmount, batch, node) {
         if (!requesterAddressString ||
             !validatorAddressString ||
             !validatorEntryBuffer ||
             !subnetworkCreatorAddressString ||
             !feeAmount ||
-            !batch
+            !batch ||
+            !node
         ) {
+            this.#safeLogApply("transferFeeTxOperation", "Invalid incoming data.", node.from.key)
             return null;
         }
 
@@ -3630,30 +3633,36 @@ class State extends ReadyResource {
         // charge fee from the requester
         const requesterNodeEntryBuffer = await this.#getEntryApply(requesterAddressString, batch);
         if (requesterNodeEntryBuffer === null) {
+            this.#safeLogApply("transferFeeTxOperation", "Invalid requester node entry buffer.", node.from.key)
             return null;
         }
 
         const requesterNodeEntry = nodeEntryUtils.decode(requesterNodeEntryBuffer);
         if (requesterNodeEntry === null) {
+            this.#safeLogApply("transferFeeTxOperation", "Invalid requester node entry, can not to decode.", node.from.key)
             return null;
         }
 
         const requesterBalance = toBalance(requesterNodeEntry.balance);
         if (requesterBalance === null) {
+            this.#safeLogApply("transferFeeTxOperation", "Invalid requester balance.", node.from.key)
             return null;
         }
 
         if (!requesterBalance.greaterThanOrEquals(feeAmount)) {
+            this.#safeLogApply("transferFeeTxOperation", "Insufficient requester balance to pay fee.", node.from.key)
             return Status.IGNORE;
         }
 
         const newRequesterBalance = requesterBalance.sub(feeAmount);
         if (newRequesterBalance === null) {
+            this.#safeLogApply("transferFeeTxOperation", "Failed to deduct fee from requester balance.", node.from.key)
             return null;
         }
 
         const updatedRequesterNodeEntry = newRequesterBalance.update(requesterNodeEntryBuffer);
         if (updatedRequesterNodeEntry === null) {
+            this.#safeLogApply("transferFeeTxOperation", "Failed to update requester node balance.", node.from.key)
             return null;
         }
 
@@ -3661,21 +3670,25 @@ class State extends ReadyResource {
 
         const validatorNodeEntry = nodeEntryUtils.decode(validatorEntryBuffer);
         if (validatorNodeEntry === null) {
+            this.#safeLogApply("transferFeeTxOperation", "Invalid validator node entry, can not to decode.", node.from.key)
             return null;
         }
 
         const validatorBalance = toBalance(validatorNodeEntry.balance);
         if (validatorBalance === null) {
+            this.#safeLogApply("transferFeeTxOperation", "Invalid validator balance.", node.from.key)
             return null;
         }
 
         const newValidatorBalance = validatorBalance.add(feeAmount.percentage(PERCENT_50));
         if (newValidatorBalance === null) {
+            this.#safeLogApply("transferFeeTxOperation", "Failed to add fee to validator balance.", node.from.key)
             return null;
         }
 
         const updatedValidatorNodeEntry = newValidatorBalance.update(validatorEntryBuffer);
         if (updatedValidatorNodeEntry === null) {
+            this.#safeLogApply("transferFeeTxOperation", "Failed to update validator node balance.", node.from.key)
             return null;
         }
 
@@ -3698,11 +3711,13 @@ class State extends ReadyResource {
             // We already added 50% as validator fee, now add only the additional 25%
             const newValidatorBalanceWithBonus = newValidatorBalance.add(feeAmount.percentage(PERCENT_25));
             if (newValidatorBalanceWithBonus === null) {
+                this.#safeLogApply("transferFeeTxOperation", "Failed to add bonus fee to validator balance.", node.from.key)
                 return null;
             }
 
             const updatedValidatorNodeEntryWithBonus = newValidatorBalanceWithBonus.update(validatorEntryBuffer);
             if (updatedValidatorNodeEntryWithBonus === null) {
+                this.#safeLogApply("transferFeeTxOperation", "Failed to update validator node balance with bonus.", node.from.key)
                 return null;
             }
 
@@ -3719,26 +3734,31 @@ class State extends ReadyResource {
         // 3. 25% is burned
         const subnetworkCreatorNodeEntryBuffer = await this.#getEntryApply(subnetworkCreatorAddressString, batch);
         if (subnetworkCreatorNodeEntryBuffer === null) {
+            this.#safeLogApply("transferFeeTxOperation", "Invalid subnetwork creator -  it does not exists", node.from.key)
             return null;
         }
 
         const subnetworkCreatorNodeEntry = nodeEntryUtils.decode(subnetworkCreatorNodeEntryBuffer);
         if (subnetworkCreatorNodeEntry === null) {
+            this.#safeLogApply("transferFeeTxOperation", "Invalid subnetwork creator node entry, can not to decode.", node.from.key)
             return null;
         }
 
         const subnetworkCreatorBalance = toBalance(subnetworkCreatorNodeEntry.balance);
         if (subnetworkCreatorBalance === null) {
+            this.#safeLogApply("transferFeeTxOperation", "Invalid subnetwork creator balance.", node.from.key)
             return null;
         }
 
         const newSubnetworkCreatorBalance = subnetworkCreatorBalance.add(feeAmount.percentage(PERCENT_25));
         if (newSubnetworkCreatorBalance === null) {
+            this.#safeLogApply("transferFeeTxOperation", "Failed to add fee to subnetwork creator balance.", node.from.key)
             return null;
         }
 
         const updatedSubnetworkCreatorNodeEntry = newSubnetworkCreatorBalance.update(subnetworkCreatorNodeEntryBuffer);
         if (updatedSubnetworkCreatorNodeEntry === null) {
+            this.#safeLogApply("transferFeeTxOperation", "Failed to update subnetwork creator node balance.", node.from.key)
             return null;
         }
 
