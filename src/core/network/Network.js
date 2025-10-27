@@ -37,7 +37,7 @@ class Network extends ReadyResource {
         this.#transactionPoolService = new TransactionPoolService(state, address, options);
         this.#validatorObserverService = new ValidatorObserverService(this, state, address, options)
         this.#networkMessages = new NetworkMessages(this, options);
-        this.#validatorConnectionManager = new ConnectionManager()
+        this.#validatorConnectionManager = new ConnectionManager({ maxValidators: options.max_validators })
         //TODO: move streams maybe to HASHMAP? To discuss because this change will affect the whole network module and it's usage. It is not a priority right now
         //However, it gives us more flexibility in the future, because we can create set of streams. Maybe in this case exist better data structure?
         this.admin_stream = null;

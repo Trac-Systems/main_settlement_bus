@@ -1,16 +1,18 @@
-import { MAX_VALIDATORS } from "../../../utils/constants"
+import { MAX_VALIDATORS } from "../../../utils/constants.js"
 
 class ConnectionManager {
     #validators
     #validatorsIndex
     #currentValidator
     #requestCount
+    #maxValidators
 
-    constructor()  {
+    constructor({ maxValidators })  {
         this.#validators = {}
         this.#validatorsIndex = []
         this.#currentValidator = 0
         this.#requestCount = 0
+        this.#maxValidators = maxValidators || MAX_VALIDATORS
     }
 
     send(message) {
@@ -38,7 +40,7 @@ class ConnectionManager {
     }
 
     #getConnection() {
-        this.#validatorsIndex[this.#currentValidator]
+        return this.#validators[this.#validatorsIndex[this.#currentValidator]]
     }
 
     #append(publicKey, connection) {
@@ -60,7 +62,7 @@ class ConnectionManager {
     }
 
     maxConnections() {
-        return this.connectionCount() >= MAX_VALIDATORS
+        return this.connectionCount() >= this.#maxValidators
     }
 
     connectionCount() {
@@ -71,6 +73,10 @@ class ConnectionManager {
         return this.#exists(publicKey) && this.#validators[publicKey]?.isConnected
     }
 
+    rotate() {
+        this.#updateNext()
+        this.#requestCount = 0
+    }
     #updateNext() {
         this.#currentValidator = this.#currentValidator <= this.#validatorsIndex.length ? this.#currentValidator + 1 : 0
     }
