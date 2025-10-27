@@ -213,7 +213,7 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async broadcastPartialTransaction(partialTransactionPayload) {
-        await this.#network.validator_stream.messenger.send(partialTransactionPayload);
+        await this.#network.validatorConnectionManager.send(partialTransactionPayload);
     }
 
     async #setUpRoleAutomatically() {

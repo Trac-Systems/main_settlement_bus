@@ -111,11 +111,6 @@ class Network extends ReadyResource {
                 this.#validatorConnectionManager.addValidator(connection.remotePublicKey, connection)
 
                 connection.on('close', () => {
-                    if (this.validator_stream === connection) {
-                        this.validator_stream = null;
-                        this.validator = null;
-                    }
-
                     if (this.admin_stream === connection) {
                         this.admin_stream = null;
                         this.admin = null;
@@ -207,7 +202,7 @@ class Network extends ReadyResource {
 
     async #sendRequestByType(stream, type) {
         const waitFor = {
-            validator: () => this.validator_stream,
+            validator: () => this.validatorConnectionManager.connectionCount(),
             admin: () => this.admin_stream,
             node: () => this.custom_stream
         }[type];

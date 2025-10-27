@@ -1,16 +1,26 @@
+import { MAX_VALIDATORS } from "../../../utils/constants"
+
 class ConnectionManager {
     #validators
     #validatorsIndex
     #currentValidator
+    #requestCount
 
     constructor()  {
         this.#validators = {}
         this.#validatorsIndex = []
-        this.currentValidator = 0
+        this.#currentValidator = 0
+        this.#requestCount = 0
     }
 
     send(message) {
-        
+        if (this.#requestCount > 10) {
+            this.#requestCount = 0
+            this.#updateNext()
+        }
+
+        this.#requestCount++
+        this.#getConnection().messenger.send(message)
     }
 
     whiteList(publicKey) {
@@ -27,18 +37,30 @@ class ConnectionManager {
         return false
     }
 
-    getConnection() {
+    #getConnection() {
         this.#validatorsIndex[this.#currentValidator]
-        this.#updateNext()
     }
 
     #append(publicKey, connection) {
         this.#validatorsIndex.push(publicKey)
         this.#validators[publicKey] = connection
+        connection.on('close', () => this.#remove(publicKey))
+    }
+
+    #remove(publicKey) {
+        const index = this.#validatorsIndex.indexOf(publicKey);
+        if (index !== -1) {
+            this.#validatorsIndex.splice(index, 1);
+            delete this.#validators[publicKey]
+        }
     }
 
     #update(publicKey, connection) {
         this.#validators[publicKey] = connection
+    }
+
+    maxConnections() {
+        return this.connectionCount() >= MAX_VALIDATORS
     }
 
     connectionCount() {

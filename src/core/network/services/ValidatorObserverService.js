@@ -4,7 +4,6 @@ import { MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION, TRAC_ADDRESS_SIZE } from '../
 import { bufferToAddress } from '../../state/utils/address.js';
 import { sleep } from '../../../utils/helpers.js';
 import Scheduler from "../../../utils/Scheduler.js";
-import { MAX_VALIDATORS } from "../../../utils/constants.js";
 
 const POLL_INTERVAL = 3500 // This was increase since the iterations dont wait for the execution its about 10 * DELAY_INTERVAL
 const DELAY_INTERVAL = 250
@@ -56,12 +55,8 @@ class ValidatorObserverService {
         console.info('ValidatorObserverService: closing gracefully...');
     }
 
-    maxConnections() {
-        return this.#network.validatorConnectionManager.connectionCount() < MAX_VALIDATORS
-    }
-
     async #worker(next) {
-        if (!this.maxConnections()) {
+        if (!this.#network.validatorConnectionManager.maxConnections()) {
             const length = await this.#lengthEntry()
 
             const promises = [];
