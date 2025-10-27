@@ -2595,8 +2595,6 @@ class State extends ReadyResource {
         }
 
         // anti-replay attack
-        // NOTE: Also here, attempt at bootstrap deployment with the same payload is suspicious so we should punish the second attempt in the same batch. 
-        // Does this make sense?
         const hashHexString = op.bdo.tx.toString('hex');
         const opEntry = await this.#getEntryApply(hashHexString, batch);
         if (opEntry !== null) {
