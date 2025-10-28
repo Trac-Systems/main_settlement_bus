@@ -115,3 +115,4 @@ export const TRAC_ADDRESS_SIZE =  63; // TODO: Change this to config().addressLe
 export const NETWORK_ID = 918; // TODO: Change this to config().network_id || 918
 
 export const MAX_VALIDATORS = 50
+export const MAX_RETRIES = 3

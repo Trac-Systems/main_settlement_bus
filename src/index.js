@@ -22,6 +22,7 @@ import {
     BOOTSTRAP_HEXSTRING_LENGTH,
     EntryType,
     OperationType,
+    MAX_RETRIES
 } from "./utils/constants.js";
 import partialStateMessageOperations from "./messages/partialStateMessages/PartialStateMessageOperations.js";
 import { randomBytes } from "hypercore-crypto";
@@ -52,6 +53,7 @@ export class MainSettlementBus extends ReadyResource {
     #is_admin_mode;
     #partialTransferValidator;
     #partialTransactionValidator;
+    #maxRetries
 
     constructor(options = {}) {
         super();
@@ -83,6 +85,7 @@ export class MainSettlementBus extends ReadyResource {
         this.#store = new Corestore(this.#stores_directory + options.store_name);
         this.#wallet = new PeerWallet(options);
         this.#readline_instance = null;
+        this.#maxRetries = Number(options.maxRetries) ? options.maxRetries : MAX_RETRIES
 
         if (this.enable_interactive_mode !== false) {
             try {
@@ -1175,7 +1178,16 @@ export class MainSettlementBus extends ReadyResource {
                         const signedLength = this.#state.getSignedLength();
                         const unsignedLength = this.#state.getUnsignedLength();
 
-                        await this.broadcastPartialTransaction(payload);
+                        for (let retry = 0; retry <= this.#maxRetries; retry++) { // should iterate once if maxRetries === 0
+                            await this.broadcastPartialTransaction(payload);
+                            await sleep(1000)
+                            const tx = this.#state.get(payload.txo.tx)
+                            if (tx !== null) {
+                                break
+                            } 
+                            this.network.validatorConnectionManager.rotate() // force change connection rotation for the next retry
+                        }
+
                         return { message: "Transaction broadcasted successfully.", signedLength, unsignedLength };
                     } else {
                         // Handle case where payload is missing if called internally without one.
