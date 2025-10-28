@@ -10,7 +10,7 @@ const createConnection = (key) => {
     emitter.messenger = {
         send: sinon.stub().resolves(),
     }
-    emitter.isConnected = true
+    emitter.connected = true
 
     return { key, connection: emitter }
 }
@@ -74,19 +74,19 @@ test('ConnectionManager', () => {
         })
     })
 
-    test('isConnected', async t => {
+    test('connected', async t => {
         test('true', async t => {
             reset()
             const connectionManager = makeManager()
             connections.forEach(con => {
-                t.ok(connectionManager.isConnected(con.key), 'should respond true')
+                t.ok(connectionManager.connected(con.key), 'should respond true')
             })
         })
 
         test('false', async t => {
             reset()
             const connectionManager = makeManager()
-            t.ok(!connectionManager.isConnected(testKeyPair6.publicKey), 'should respond false')
+            t.ok(!connectionManager.connected(testKeyPair6.publicKey), 'should respond false')
         })
     })
 

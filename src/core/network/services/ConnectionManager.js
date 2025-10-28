@@ -31,7 +31,7 @@ class ConnectionManager {
     addValidator(publicKey, connection) {
         if (!this.#exists(publicKey) && this.#isSet(publicKey) && !this.maxConnections()) {
             return this.#append(publicKey, connection)
-        } else if (!this.isConnected(publicKey)) {
+        } else if (!this.connected(publicKey)) {
             return this.#update(publicKey, connection)
         }
 
@@ -65,11 +65,11 @@ class ConnectionManager {
     }
 
     connectionCount() {
-        return this.#validatorsIndex.filter(_ => this.isConnected(_)).length
+        return this.#validatorsIndex.filter(_ => this.connected(_)).length
     }
 
-    isConnected(publicKey) {
-        return this.#exists(publicKey) && this.#validators[publicKey]?.isConnected
+    connected(publicKey) {
+        return this.#exists(publicKey) && this.#validators[publicKey]?.connected
     }
 
     rotate() {

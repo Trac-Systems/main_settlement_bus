@@ -63,7 +63,7 @@ class ResponseHandler {
             const validatorAddressString = message.address;
             const validatorPublicKey = PeerWallet.decodeBech32m(validatorAddressString);
 
-            if (this.network.validatorConnectionManager.isConnected(validatorPublicKey)) {
+            if (this.network.validatorConnectionManager.connected(validatorPublicKey)) {
                 return;
             }
 
