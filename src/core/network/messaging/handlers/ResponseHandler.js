@@ -68,8 +68,6 @@ class ResponseHandler {
             }
 
             console.log('Validator stream established', validatorAddressString);
-            
-            this.network.validatorConnectionManager.whiteList(validatorPublicKey)
             this.network.validatorConnectionManager.addValidator(validatorPublicKey, connection)
         } else {
             throw new Error("Validator response verification failed");

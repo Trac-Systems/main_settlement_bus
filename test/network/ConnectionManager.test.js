@@ -19,7 +19,6 @@ const makeManager = (maxValidators = 6) => {
     const connectionManager = new ConnectionManager({ maxValidators })
 
     connections.forEach(({ key, connection }) => {
-        connectionManager.whiteList(key)
         connectionManager.addValidator(key, connection)
     });
 
@@ -51,7 +50,6 @@ test('ConnectionManager', () => {
             t.is(connectionManager.connectionCount(), connections.length, 'should have the same length')
 
             const data = createConnection(testKeyPair5.publicKey)
-            connectionManager.whiteList(data.key)
             connectionManager.addValidator(data.key, data.connection)
             t.is(connectionManager.connectionCount(), connections.length + 1, 'should have the same length')
         })
@@ -63,12 +61,10 @@ test('ConnectionManager', () => {
             t.is(connectionManager.connectionCount(), connections.length, 'should have the same length')
 
             const toAdd = createConnection(testKeyPair5.publicKey)
-            connectionManager.whiteList(toAdd.key)
             connectionManager.addValidator(toAdd.key, toAdd.connection)
             t.is(connectionManager.connectionCount(), maxConnections, 'should match the max connections')
 
             const toNotAdd = createConnection(testKeyPair6.publicKey)
-            connectionManager.whiteList(toNotAdd.key)
             connectionManager.addValidator(toNotAdd.key, toNotAdd.connection)
             t.is(connectionManager.connectionCount(), maxConnections, 'should not increase length')
         })

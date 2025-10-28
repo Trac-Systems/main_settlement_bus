@@ -3,14 +3,14 @@ import { MAX_VALIDATORS } from "../../../utils/constants.js"
 class ConnectionManager {
     #validators
     #validatorsIndex
-    #currentValidator
+    #currentValidatorIndex
     #requestCount
     #maxValidators
 
     constructor({ maxValidators })  {
         this.#validators = {}
         this.#validatorsIndex = []
-        this.#currentValidator = 0
+        this.#currentValidatorIndex = 0
         this.#requestCount = 0
         this.#maxValidators = maxValidators || MAX_VALIDATORS
     }
@@ -29,7 +29,7 @@ class ConnectionManager {
     }
 
     addValidator(publicKey, connection) {
-        if (!this.#exists(publicKey) && this.#isSet(publicKey) && !this.maxConnections()) {
+        if (!this.#exists(publicKey) && !this.maxConnections()) {
             return this.#append(publicKey, connection)
         } else if (!this.connected(publicKey)) {
             return this.#update(publicKey, connection)
@@ -38,8 +38,12 @@ class ConnectionManager {
         return false
     }
 
+    #currentValidator() {
+        return this.#validatorsIndex[this.#currentValidatorIndex]
+    }
+
     #getConnection() {
-        return this.#validators[this.#validatorsIndex[this.#currentValidator]]
+        return this.#validators[this.#currentValidator()]
     }
 
     #append(publicKey, connection) {
@@ -77,16 +81,18 @@ class ConnectionManager {
         this.#requestCount = 0
     }
     #updateNext() {
-        const next = this.#currentValidator + 1
-        this.#currentValidator = next < this.#validatorsIndex.length ? next : 0
+        const next = this.#currentValidatorIndex + 1
+        this.#currentValidatorIndex = next < this.#validatorsIndex.length ? next : 0
     }
 
     #exists(publicKey) {
         return !!this.#validators[publicKey]
     }
 
-    #isSet(publicKey) {
-        return publicKey in this.#validators
+    prettyPrint() {
+        console.log('Connection count: ', this.connectionCount())
+        console.log('Current connection: ', this.#currentValidator())
+        console.log('Validators: ', this.#validatorsIndex)
     }
 }
 

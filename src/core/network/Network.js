@@ -172,9 +172,6 @@ class Network extends ReadyResource {
         // trying to join a peer from the global swarm
 
         if (false === this.#swarm.peers.has(publicKey)) {
-            if (type === 'validator') {
-                this.#validatorConnectionManager.whiteList(publicKey)
-            }
             this.#swarm.joinPeer(b4a.from(publicKey, 'hex'));
             let cnt = 0;
             while (false === this.#swarm.peers.has(publicKey)) {
@@ -183,13 +180,15 @@ class Network extends ReadyResource {
                 cnt += 1;
             }
         }
-
+        
         if (this.#swarm.peers.has(publicKey)) {
             let stream;
             const peerInfo = this.#swarm.peers.get(publicKey)
-            stream = this.#swarm._allConnections.get(peerInfo.publicKey)
-
+            stream = this.#swarm._allConnections.get(peerInfo.publicKey)            
             if (stream !== undefined && stream.messenger !== undefined) {
+                if (type === 'validator') {
+                    this.#validatorConnectionManager.addValidator(publicKey, stream)
+                }
                 await this.#sendRequestByType(stream, type);
             }
         }
