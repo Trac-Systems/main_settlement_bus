@@ -23,7 +23,15 @@ class TransactionRateLimiterService {
     */
     #hasExceededRateLimit(peer) {
         const peerData = this.#connectionsStatistics.get(peer);
-        return peerData.lastActivityTime - peerData.sessionStartTime >= 1000 && peerData.transactionCount >= MAX_TRANSACTIONS_PER_SECOND;
+        const currentSecond = Math.floor((peerData.lastActivityTime - peerData.sessionStartTime) / 1000);
+        
+        if (currentSecond > Math.floor((peerData.lastCounterReset - peerData.sessionStartTime) / 1000)) {
+            peerData.transactionCount = 0;
+            peerData.lastCounterReset = peerData.lastActivityTime;
+            this.#connectionsStatistics.set(peer, peerData);
+        }
+        
+        return peerData.transactionCount >= MAX_TRANSACTIONS_PER_SECOND;
     }
 
     /*
@@ -93,6 +101,7 @@ class TransactionRateLimiterService {
             this.#connectionsStatistics.set(peer, {
                 sessionStartTime: timestamp,
                 lastActivityTime: 0,
+                lastCounterReset: timestamp,
                 transactionCount: 0
             });
         }
