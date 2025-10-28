@@ -77,7 +77,8 @@ class ConnectionManager {
         this.#requestCount = 0
     }
     #updateNext() {
-        this.#currentValidator = this.#currentValidator <= this.#validatorsIndex.length ? this.#currentValidator + 1 : 0
+        const next = this.#currentValidator + 1
+        this.#currentValidator = next < this.#validatorsIndex.length ? next : 0
     }
 
     #exists(publicKey) {

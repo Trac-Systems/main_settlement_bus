@@ -26,6 +26,13 @@ const makeManager = () => {
     return connectionManager
 }
 
+const reset = () => {
+    sinon.restore()
+    connections.forEach(connection => {
+        connection.connection.messenger.send.resetHistory()
+    })
+}
+
 let connections
 hook('Initialize state', async () => {
     connections = [
@@ -39,7 +46,7 @@ hook('Initialize state', async () => {
 test('ConnectionManager', () => {
     test('addValidator', async t => {
         test('adds a validator', async t => {
-            sinon.restore()
+            reset()
             const connectionManager = makeManager()
             t.is(connectionManager.connectionCount(), connections.length, 'should have the same length')
 
@@ -52,7 +59,7 @@ test('ConnectionManager', () => {
 
     test('send', async t => {
         test('triggers send on messenger', async t => {
-            sinon.restore()
+            reset()
             const connectionManager = makeManager()
 
             connectionManager.send([1,2,3,4])
@@ -60,7 +67,17 @@ test('ConnectionManager', () => {
         })
 
         test('rotate the messenger', async t => {
-            sinon.restore()
+            reset()
+            const connectionManager = makeManager()
+
+            for (let i = 0; i < 10; i++) {
+                connectionManager.send([1,2,3,4])
+                t.ok(connections[0].connection.messenger.send.calledWith([1,2,3,4]), 'first on the list should have been called')
+            }
+        })
+
+        test('resets rotation', async t => {
+            reset()
             const connectionManager = makeManager()
 
             for (let i = 0; i < 10; i++) {
@@ -82,12 +99,21 @@ test('ConnectionManager', () => {
                 connectionManager.send([1,2,3,4])
                 t.ok(connections[3].connection.messenger.send.calledWith([1,2,3,4]), 'first on the list should have been called')
             }
+
+            t.is(connections[0].connection.messenger.send.callCount, 10, 'first should have been called 10 times')
+            t.is(connections[1].connection.messenger.send.callCount, 10, 'second should have been called 10 times')
+            t.is(connections[2].connection.messenger.send.callCount, 10, 'third should have been called 10 times')
+            t.is(connections[3].connection.messenger.send.callCount, 10, 'fourth should have been called 10 times')
+
+            connectionManager.send([1,2,3,4])
+            t.ok(connections[0].connection.messenger.send.calledWith([1,2,3,4]), 'first on the list should have been called')
+            t.is(connections[0].connection.messenger.send.callCount, 11, 'first should have been called 11 times')
         })
     })
 
     test('rotate', async t => {
         test('resets the rotation', async t => {
-            sinon.restore()
+            reset()
             const connectionManager = makeManager()
 
             connectionManager.send([1,2,3,4]) // this shouldnt trigger rotation
@@ -100,7 +126,7 @@ test('ConnectionManager', () => {
 
     test('on close', async t => {
         test('removes from list', async t => {
-            sinon.restore()
+            reset()
             const connectionManager = makeManager()
 
             const connectionCount = connectionManager.connectionCount()
