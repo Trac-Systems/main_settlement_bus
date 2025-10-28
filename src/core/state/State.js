@@ -69,6 +69,8 @@ class State extends ReadyResource {
         this.#base = new Autobase(this.#store, this.#bootstrap, {
             ackInterval: ACK_INTERVAL,
             valueEncoding: AUTOBASE_VALUE_ENCODING,
+            bigBatches: false,
+            optimistic: false,
             open: this.#setupHyperbee.bind(this),
             apply: this.#apply.bind(this),
         })
@@ -315,7 +317,7 @@ class State extends ReadyResource {
         this.#bee = new Hyperbee(store.get('view'), {
             extension: false,
             keyEncoding: HYPERBEE_KEY_ENCODING,
-            valueEncoding: HYPERBEE_VALUE_ENCODING
+            valueEncoding: HYPERBEE_VALUE_ENCODING,
         })
         return this.#bee;
     }
@@ -1006,7 +1008,7 @@ class State extends ReadyResource {
 
         // Revoke old wk and add new one as an indexer
         await base.removeWriter(decodedAdminEntry.wk);
-        await base.addWriter(op.rao.iw, { isIndexer: true });
+        await base.addWriter(op.rao.iw, { indexer: true });
         await batch.put(EntryType.WRITER_ADDRESS + op.rao.iw.toString('hex'), op.address);
 
         // Remove the old admin entry and add the new one
@@ -1419,7 +1421,7 @@ class State extends ReadyResource {
             this.#safeLogApply(OperationType.ADD_WRITER, "Failed to add writer.", node.from.key)
             return Status.FAILURE;
         }
-        
+
         if (addWriterResult === Status.IGNORE) {
             this.#safeLogApply(OperationType.ADD_WRITER, "Add writer operation ignored.", node.from.key)
             return Status.IGNORE;
@@ -1718,12 +1720,12 @@ class State extends ReadyResource {
             this.#safeLogApply(OperationType.REMOVE_WRITER, "Failed to remove writer.", node.from.key)
             return Status.FAILURE;
         }
-        
+
         if (removeWriterResult === Status.IGNORE) {
             this.#safeLogApply(OperationType.REMOVE_WRITER, "Remove writer operation ignored.", node.from.key)
             return Status.IGNORE;
         }
-        
+
         return Status.SUCCESS;
     }
 
@@ -2042,7 +2044,7 @@ class State extends ReadyResource {
 
         // set indexer role
         await base.removeWriter(decodedPretenderNodeEntry.wk);
-        await base.addWriter(decodedPretenderNodeEntry.wk, { isIndexer: true })
+        await base.addWriter(decodedPretenderNodeEntry.wk, { indexer: true })
 
         // change node entry to indexer and update admin balance after fee deduction
         await batch.put(pretendingAddressString, updatedNodeEntry);
