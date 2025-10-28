@@ -85,7 +85,7 @@ export class MainSettlementBus extends ReadyResource {
         this.#store = new Corestore(this.#stores_directory + options.store_name);
         this.#wallet = new PeerWallet(options);
         this.#readline_instance = null;
-        this.#maxRetries = Number(options.maxRetries) ? options.maxRetries : MAX_RETRIES
+        this.#maxRetries = Number(options.max_retries) ? options.max_retries : MAX_RETRIES
 
         if (this.enable_interactive_mode !== false) {
             try {

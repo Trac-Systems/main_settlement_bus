@@ -208,7 +208,7 @@ class Network extends ReadyResource {
         }[type];
 
         if (type === 'validator') {
-            await this.validatorConnectionManager.send(NETWORK_MESSAGE_TYPES.GET.VALIDATOR);
+            await stream.messenger.send(NETWORK_MESSAGE_TYPES.GET.VALIDATOR);
         } else if (type === 'admin') {
             await stream.messenger.send(NETWORK_MESSAGE_TYPES.GET.ADMIN);
         } else if (type === 'node') {

@@ -74,6 +74,22 @@ test('ConnectionManager', () => {
         })
     })
 
+    test('isConnected', async t => {
+        test('true', async t => {
+            reset()
+            const connectionManager = makeManager()
+            connections.forEach(con => {
+                t.ok(connectionManager.isConnected(con.key), 'should respond true')
+            })
+        })
+
+        test('false', async t => {
+            reset()
+            const connectionManager = makeManager()
+            t.ok(!connectionManager.isConnected(testKeyPair6.publicKey), 'should respond false')
+        })
+    })
+
     test('send', async t => {
         test('triggers send on messenger', async t => {
             reset()
