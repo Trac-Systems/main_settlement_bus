@@ -909,6 +909,9 @@ export class MainSettlementBus extends ReadyResource {
             case "/indexers_list":
                 console.log(await this.#state.getIndexersEntry());
                 break;
+            case "/validator_pool":
+                this.network.validatorConnectionManager.prettyPrint()
+                break;
             case "/stats":
                 await verifyDag(
                     this.#state,
@@ -1165,12 +1168,15 @@ export class MainSettlementBus extends ReadyResource {
                     if (payload) {
                         let normalizedPayload;
                         let isValid = false;
+                        let hash
                         if (payload.type === OperationType.TRANSFER) {
                             normalizedPayload = normalizeTransferOperation(payload);
                             isValid = await this.#partialTransferValidator.validate(normalizedPayload);
+                            hash = b4a.toString(normalizedPayload.tro.tx, 'hex')
                         } else if (payload.type === OperationType.TX) {
                             normalizedPayload = normalizeTransactionOperation(payload);
                             isValid = await this.#partialTransactionValidator.validate(normalizedPayload);
+                            hash = b4a.toString(normalizedPayload.txo.tx, 'hex')
                         }
 
                         if (!isValid) throw new Error("Invalid transaction payload.");
@@ -1181,7 +1187,7 @@ export class MainSettlementBus extends ReadyResource {
                         for (let retry = 0; retry <= this.#maxRetries; retry++) { // should iterate once if maxRetries === 0
                             await this.broadcastPartialTransaction(payload);
                             await sleep(1000)
-                            const tx = this.#state.get(payload.txo.tx)
+                            const tx = await this.#state.get(hash)
                             if (tx !== null) {
                                 break
                             } 

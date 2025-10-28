@@ -108,7 +108,7 @@ class Network extends ReadyResource {
                 const { message_channel, message } = this.#networkMessages.setupProtomuxMessages(connection);
                 connection.messenger = message;
 
-                this.#validatorConnectionManager.addValidator(connection.remotePublicKey, connection)
+                this.#validatorConnectionManager.addValidator(b4a.from(connection.remotePublicKey, 'hex'), connection)
 
                 connection.on('close', () => {
                     if (this.admin_stream === connection) {
@@ -187,7 +187,7 @@ class Network extends ReadyResource {
             stream = this.#swarm._allConnections.get(peerInfo.publicKey)            
             if (stream !== undefined && stream.messenger !== undefined) {
                 if (type === 'validator') {
-                    this.#validatorConnectionManager.addValidator(publicKey, stream)
+                    this.#validatorConnectionManager.addValidator(b4a.from(publicKey, 'hex'), stream)
                 }
                 await this.#sendRequestByType(stream, type);
             }
