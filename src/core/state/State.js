@@ -14,6 +14,7 @@ import {
     ADMIN_INITIAL_STAKED_BALANCE,
     MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION,
     NETWORK_ID,
+    TRAC_NAMESPACE
 } from '../../utils/constants.js';
 import { isHexString, sleep } from '../../utils/helpers.js';
 import PeerWallet from 'trac-wallet';
@@ -314,7 +315,7 @@ class State extends ReadyResource {
     }
 
     #setupHyperbee(store) {
-        this.#bee = new Hyperbee(store.get('view'), {
+        this.#bee = new Hyperbee(store.get(TRAC_NAMESPACE), {
             extension: false,
             keyEncoding: HYPERBEE_KEY_ENCODING,
             valueEncoding: HYPERBEE_VALUE_ENCODING,
