@@ -1,7 +1,7 @@
 import sinon from "sinon";
 import { hook, test } from 'brittle'
 import { default as EventEmitter } from "bare-events"
-import { testKeyPair1, testKeyPair2, testKeyPair3, testKeyPair4, testKeyPair5 } from "../fixtures/apply.fixtures.js";
+import { testKeyPair1, testKeyPair2, testKeyPair3, testKeyPair4, testKeyPair5, testKeyPair6 } from "../fixtures/apply.fixtures.js";
 import ConnectionManager from "../../src/core/network/services/ConnectionManager.js";
 import { tick } from "../utils/setupApplyTests.js";
 
@@ -15,8 +15,8 @@ const createConnection = (key) => {
     return { key, connection: emitter }
 }
 
-const makeManager = () => {
-    const connectionManager = new ConnectionManager({ maxValidators: 6 })
+const makeManager = (maxValidators = 6) => {
+    const connectionManager = new ConnectionManager({ maxValidators })
 
     connections.forEach(({ key, connection }) => {
         connectionManager.whiteList(key)
@@ -54,6 +54,23 @@ test('ConnectionManager', () => {
             connectionManager.whiteList(data.key)
             connectionManager.addValidator(data.key, data.connection)
             t.is(connectionManager.connectionCount(), connections.length + 1, 'should have the same length')
+        })
+
+        test('dont surpass maxConnections', async t => {
+            reset()
+            const maxConnections = 5
+            const connectionManager = makeManager(maxConnections)
+            t.is(connectionManager.connectionCount(), connections.length, 'should have the same length')
+
+            const toAdd = createConnection(testKeyPair5.publicKey)
+            connectionManager.whiteList(toAdd.key)
+            connectionManager.addValidator(toAdd.key, toAdd.connection)
+            t.is(connectionManager.connectionCount(), maxConnections, 'should match the max connections')
+
+            const toNotAdd = createConnection(testKeyPair6.publicKey)
+            connectionManager.whiteList(toNotAdd.key)
+            connectionManager.addValidator(toNotAdd.key, toNotAdd.connection)
+            t.is(connectionManager.connectionCount(), maxConnections, 'should not increase length')
         })
     })
 

@@ -29,7 +29,7 @@ class ConnectionManager {
     }
 
     addValidator(publicKey, connection) {
-        if (!this.#exists(publicKey) && this.#isSet(publicKey)) {
+        if (!this.#exists(publicKey) && this.#isSet(publicKey) && !this.maxConnections()) {
             return this.#append(publicKey, connection)
         } else if (!this.isConnected(publicKey)) {
             return this.#update(publicKey, connection)
