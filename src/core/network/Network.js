@@ -145,7 +145,7 @@ class Network extends ReadyResource {
             });
 
             this.#swarm.join(this.#channel, { server: true, client: true });
-            await this.#swarm.flush();
+            this.#swarm.flush();
         }
     }
 

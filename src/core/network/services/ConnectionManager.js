@@ -15,13 +15,21 @@ class ConnectionManager {
         this.#maxValidators = maxValidators || MAX_VALIDATORS
     }
 
-    send(message) {
+    send(message, retries = 3) {
         if (this.#requestCount >= 10) {
             this.#requestCount = 0
             this.#updateNext()
         }
         this.#requestCount++
-        this.#getConnection().messenger.send(message)
+
+        try {
+            this.#getConnection().messenger.send(message)
+        } catch (e) { // Some retrying mechanism before reacting to close
+            if (retries > 0) {
+                this.rotate()
+                this.send(message, retries - 1)
+            }
+        }
     }
 
     whiteList(publicKey) {
@@ -51,7 +59,7 @@ class ConnectionManager {
         this.#validators[publicKey] = connection
 
         connection.on('close', () => {
-            if (this.connected(publicKey))
+            if (!this.connected(publicKey))
                 this.#remove(publicKey)
         })
     }

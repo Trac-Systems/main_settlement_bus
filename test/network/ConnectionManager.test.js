@@ -1,7 +1,7 @@
 import sinon from "sinon";
 import { hook, test } from 'brittle'
 import { default as EventEmitter } from "bare-events"
-import { testKeyPair1, testKeyPair2, testKeyPair3, testKeyPair4, testKeyPair5, testKeyPair6 } from "../fixtures/apply.fixtures.js";
+import { testKeyPair1, testKeyPair2, testKeyPair3, testKeyPair4, testKeyPair5, testKeyPair6, testKeyPair7, testKeyPair8, testKeyPair9 } from "../fixtures/apply.fixtures.js";
 import ConnectionManager from "../../src/core/network/services/ConnectionManager.js";
 import { tick } from "../utils/setupApplyTests.js";
 
@@ -15,10 +15,10 @@ const createConnection = (key) => {
     return { key, connection: emitter }
 }
 
-const makeManager = (maxValidators = 6) => {
+const makeManager = (maxValidators = 6, conns = connections) => {
     const connectionManager = new ConnectionManager({ maxValidators })
 
-    connections.forEach(({ key, connection }) => {
+    conns.forEach(({ key, connection }) => {
         connectionManager.addValidator(key, connection)
     });
 
@@ -138,6 +138,25 @@ test('ConnectionManager', () => {
             t.ok(connections[0].connection.messenger.send.calledWith([1,2,3,4]), 'first on the list should have been called')
             t.is(connections[0].connection.messenger.send.callCount, 11, 'first should have been called 11 times')
         })
+
+        test('rotates on exception', async t => {
+            reset()
+            const conns = [
+                createConnection(testKeyPair7.publicKey),
+                createConnection(testKeyPair8.publicKey),
+                createConnection(testKeyPair9.publicKey),
+            ]
+
+            conns[0].connection.messenger.send = sinon.stub().throws(new Error())
+            conns[1].connection.messenger.send = sinon.stub().throws(new Error())
+
+            const connectionManager = makeManager(5, conns)
+            connectionManager.send([1,2,3,4])
+
+            t.is(conns[0].connection.messenger.send.callCount, 1, 'first should have been called 10 times')
+            t.is(conns[1].connection.messenger.send.callCount, 1, 'second should have been called 10 times')
+            t.is(conns[2].connection.messenger.send.callCount, 1, 'third should have been called 10 times')
+        })
     })
 
     test('rotate', async t => {
@@ -160,6 +179,7 @@ test('ConnectionManager', () => {
 
             const connectionCount = connectionManager.connectionCount()
 
+            connections[1].connection.connected = false
             connections[1].connection.emit('close')
             await tick()
             t.is(connectionCount, connectionManager.connectionCount() + 1, 'first on the list should have been called')
