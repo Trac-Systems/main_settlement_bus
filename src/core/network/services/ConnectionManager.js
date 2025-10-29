@@ -49,7 +49,11 @@ class ConnectionManager {
     #append(publicKey, connection) {
         this.#validatorsIndex.push(publicKey)
         this.#validators[publicKey] = connection
-        connection.on('close', () => this.#remove(publicKey))
+
+        connection.on('close', () => {
+            if (this.connected(publicKey))
+                this.#remove(publicKey)
+        })
     }
 
     #remove(publicKey) {

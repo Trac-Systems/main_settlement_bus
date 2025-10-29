@@ -108,7 +108,7 @@ class Network extends ReadyResource {
                 const { message_channel, message } = this.#networkMessages.setupProtomuxMessages(connection);
                 connection.messenger = message;
 
-                this.#validatorConnectionManager.addValidator(b4a.from(connection.remotePublicKey, 'hex'), connection)
+                // this.#validatorConnectionManager.addValidator(b4a.from(connection.remotePublicKey, 'hex'), connection)
 
                 connection.on('close', () => {
                     if (this.admin_stream === connection) {
