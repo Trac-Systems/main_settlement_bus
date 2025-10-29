@@ -2059,7 +2059,7 @@ class State extends ReadyResource {
             console.info(`Indexer added addr:wk:tx - ${pretendingAddressString}:${decodedPretenderNodeEntry.wk.toString('hex')}:${txHashHexString}`);
         }
 
-        this.emit(CustomEventType.IS_INDEXER, PeerWallet.decodeBech32mSafe(pretendingAddressString))
+        this.#emitEvent(CustomEventType.IS_INDEXER, PeerWallet.decodeBech32mSafe(pretendingAddressString))
     }
 
     async #handleApplyRemoveIndexerOperation(op, view, base, node, batch) {
@@ -3638,6 +3638,12 @@ class State extends ReadyResource {
         const decodedNewLicenseLength = lengthEntryUtils.decodeBE(newLicenseLength);
 
         return { newLicenseLength, decodedNewLicenseLength };
+    }
+
+    #emitEvent(event, ...args) {
+        try {
+            this.emit(event, ...args)
+        } catch (_ignored) {}
     }
 
     async #transferFeeTxOperation(requesterAddressString, validatorAddressString, validatorEntryBuffer, subnetworkCreatorAddressString, feeAmount, batch, node) {
