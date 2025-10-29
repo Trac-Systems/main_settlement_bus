@@ -1843,7 +1843,7 @@ class State extends ReadyResource {
             console.info(`Writer removed: addr:wk:tx - ${requesterAddressString}:${op.rao.iw.toString('hex')}:${txHashHexString}`);
         }
 
-        this.#emitEvent(CustomEventType.UNWRITABLE, PeerWallet.decodeBech32mSafe(validatorAddressString))
+        this.#emitEvent(CustomEventType.UNWRITABLE, PeerWallet.decodeBech32mSafe(requesterAddressString))
     }
 
     async #handleApplyAddIndexerOperation(op, view, base, node, batch) {

@@ -84,21 +84,30 @@ class ValidatorObserverService {
         const validatorEntry = await this.state.getNodeEntry(validatorAddress);
         const adminEntry = await this.state.getAdminEntry();
 
+        if (validatorAddress === adminEntry?.address && length >= MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION) {
+            const validatorPubKeyBuffer = b4a.from(validatorPubKey, 'hex')
+            if (this.#network.validatorConnectionManager.exists(validatorPubKeyBuffer)) {
+                this.#network.validatorConnectionManager.remove(validatorPubKeyBuffer)
+            }
+        }
+
         // Connection validation rules:
         // - Cannot connect if already connected to a validator
         // - Validator must exist and be a writer
         // - Cannot connect to indexers, except for admin-indexer
-        // - Admin-indexer connection is allowed only when writers length has less than 25 writers
+        // - Admin-indexer connection is allowed only when writers length has less than 10 writers
         if (
             this.#network.validatorConnectionManager.connected(validatorPubKey) ||
             validatorEntry === null ||
             !validatorEntry.isWriter ||
-            (validatorEntry.isIndexer && (adminEntry === null || validatorAddress !== adminEntry.address || length >= MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION))
+            (validatorEntry.isIndexer && (validatorAddress !== adminEntry?.address || length >= MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION))
         ) {
             return;
         }
 
-        await this.#network.tryConnect(validatorPubKey, 'validator');
+        if (validatorAddress !== adminEntry?.address || length < MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION) {
+            await this.#network.tryConnect(validatorPubKey, 'validator');
+        }
     };
 
     #shouldRun() {
