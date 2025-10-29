@@ -42,6 +42,11 @@ export const EventType = Object.freeze({
     WARNING: 'warning',
 });
 
+// Role managment constants
+export const CustomEventType = Object.freeze({
+    IS_INDEXER: 'msb:is-indexer'
+});
+
 // Token
 export const TOKEN_DECIMALS = 18n
 export const ADMIN_INITIAL_BALANCE = b4a.from([0, 0, 0, 0, 0, 0, 0, 54, 53, 201, 173, 197, 222, 160, 0, 0]) // 1000 in a 18 decimals token

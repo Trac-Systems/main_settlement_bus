@@ -22,7 +22,8 @@ import {
     BOOTSTRAP_HEXSTRING_LENGTH,
     EntryType,
     OperationType,
-    MAX_RETRIES
+    MAX_RETRIES,
+    CustomEventType
 } from "./utils/constants.js";
 import partialStateMessageOperations from "./messages/partialStateMessages/PartialStateMessageOperations.js";
 import { randomBytes } from "hypercore-crypto";
@@ -243,6 +244,11 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async #stateEventsListener() {
+        this.#state.on(CustomEventType.IS_INDEXER, (publicKey) => {
+            if (this.#network.validatorConnectionManager.exists(publicKey)) {
+                this.#network.validatorConnectionManager.remove(publicKey)
+            }
+        })
         this.#state.base.on(EventType.IS_INDEXER, () => {
             console.log("Current node is an indexer");
         });

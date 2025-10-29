@@ -40,7 +40,7 @@ class ConnectionManager {
     }
 
     addValidator(publicKey, connection) {
-        if (!this.#exists(publicKey) && !this.maxConnections()) {
+        if (!this.exists(publicKey) && !this.maxConnections()) {
             return this.#append(publicKey, connection)
         } else if (!this.connected(publicKey)) {
             return this.#update(publicKey, connection)
@@ -69,7 +69,7 @@ class ConnectionManager {
     }
 
     remove(publicKey) {
-        const index = this.#validatorsIndex.indexOf(publicKey);
+        const index = this.#validatorsIndex.findIndex(current => b4a.equals(publicKey, current));
         if (index !== -1) {
             this.#validatorsIndex.splice(index, 1);
             delete this.#validators[publicKey]
@@ -89,7 +89,7 @@ class ConnectionManager {
     }
 
     connected(publicKey) {
-        return this.#exists(publicKey) && this.#validators[publicKey]?.connected
+        return this.exists(publicKey) && this.#validators[publicKey]?.connected
     }
 
     rotate() {
@@ -101,12 +101,12 @@ class ConnectionManager {
         this.#currentValidatorIndex = next < this.#validatorsIndex.length ? next : 0
     }
 
-    #exists(publicKey) {
+    exists(publicKey) {
         return !!this.#validators[publicKey]
     }
 
     #isRemoteEqual(publicKey) {
-        return !!publicKey && b4a.equals(this.#validators[publicKey]?.remotePublicKey, publicKey)
+        return !!publicKey && !!this.#validators[publicKey]?.remotePublicKey && b4a.equals(this.#validators[publicKey]?.remotePublicKey, publicKey)
     }
 
     prettyPrint() {
