@@ -6,8 +6,8 @@ const args = isPear ? Pear.config.args : process.argv.slice(2);
 const opts = {
     stores_directory : 'stores/',
     store_name : typeof process !== "undefined" ? process.argv[2] : Pear.config.args[0],
-    bootstrap: '602d5443c19014e36a01254923afb1df56099d559f282761d70370a0da5d1d8a',
-    channel: '0002tracnetworkmainsettlementbus',
+    bootstrap: '3bba9ebdd5fe2104d3bc7ae0464834980a7d6195acb399f95dfe9a110e4d1da2',
+    channel: '00000000000tracnetworkmsbmainnet',
     enable_role_requester: false,
     enable_wallet: true,
     enable_validator_observer: true,
@@ -19,7 +19,9 @@ const opts = {
 
 const rpc_opts = {
     ...opts,
-    enable_txlogs: false,
+    enable_tx_apply_logs: false,
+    enable_error_apply_logs: false,
+
 }
 
 const msb = new MainSettlementBus(args.includes('--rpc') ? rpc_opts : opts);
