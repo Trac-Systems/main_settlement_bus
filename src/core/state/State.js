@@ -2056,7 +2056,6 @@ class State extends ReadyResource {
 
         if (this.#enable_tx_apply_logs) {
             console.info(`Indexer added addr:wk:tx - ${pretendingAddressString}:${decodedPretenderNodeEntry.wk.toString('hex')}:${txHashHexString}`);
-
         }
     }
 

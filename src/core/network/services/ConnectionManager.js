@@ -1,4 +1,7 @@
 import { MAX_VALIDATORS } from "../../../utils/constants.js"
+import b4a from 'b4a'
+import PeerWallet from "trac-wallet"
+import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
 
 class ConnectionManager {
     #validators
@@ -59,12 +62,13 @@ class ConnectionManager {
         this.#validators[publicKey] = connection
 
         connection.on('close', () => {
-            if (!this.connected(publicKey))
-                this.#remove(publicKey)
+            if (this.#isRemoteEqual(publicKey)) {
+                this.remove(publicKey)
+            }
         })
     }
 
-    #remove(publicKey) {
+    remove(publicKey) {
         const index = this.#validatorsIndex.indexOf(publicKey);
         if (index !== -1) {
             this.#validatorsIndex.splice(index, 1);
@@ -101,10 +105,14 @@ class ConnectionManager {
         return !!this.#validators[publicKey]
     }
 
+    #isRemoteEqual(publicKey) {
+        return !!publicKey && b4a.equals(this.#validators[publicKey]?.remotePublicKey, publicKey)
+    }
+
     prettyPrint() {
         console.log('Connection count: ', this.connectionCount())
         console.log('Current connection: ', this.#currentValidator())
-        console.log('Validators: ', this.#validatorsIndex)
+        console.log('Validators: ', this.#validatorsIndex.map(val => PeerWallet.encodeBech32m(TRAC_NETWORK_MSB_MAINNET_PREFIX, val)))
     }
 }
 

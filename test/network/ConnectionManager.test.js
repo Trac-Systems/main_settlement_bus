@@ -4,6 +4,7 @@ import { default as EventEmitter } from "bare-events"
 import { testKeyPair1, testKeyPair2, testKeyPair3, testKeyPair4, testKeyPair5, testKeyPair6, testKeyPair7, testKeyPair8, testKeyPair9 } from "../fixtures/apply.fixtures.js";
 import ConnectionManager from "../../src/core/network/services/ConnectionManager.js";
 import { tick } from "../utils/setupApplyTests.js";
+import b4a from 'b4a'
 
 const createConnection = (key) => {
     const emitter = new EventEmitter()
@@ -11,8 +12,9 @@ const createConnection = (key) => {
         send: sinon.stub().resolves(),
     }
     emitter.connected = true
+    emitter.remotePublicKey = b4a.from(key, 'hex')
 
-    return { key, connection: emitter }
+    return { key: b4a.from(key, 'hex'), connection: emitter }
 }
 
 const makeManager = (maxValidators = 6, conns = connections) => {
@@ -169,6 +171,35 @@ test('ConnectionManager', () => {
             connectionManager.rotate() // rotate
             connectionManager.send([1,2,3,4])
             t.ok(connections[1].connection.messenger.send.calledWith([1,2,3,4]), 'first on the list should have been called')
+        })
+    })
+
+    test('on close', async t => {
+        test('removes from list', async t => {
+            reset()
+            const connectionManager = makeManager()
+
+            const connectionCount = connectionManager.connectionCount()
+
+            connections[1].connection.connected = false
+            connections[1].connection.emit('close')
+            await tick()
+            t.is(connectionCount, connectionManager.connectionCount() + 1, 'first on the list should have been called')
+        })
+    })
+
+    test('remove', async t => {
+        test('removes a validator by public key', async t => {
+            reset()
+            const connectionManager = makeManager()
+            const previousCount = connectionManager.connectionCount()
+            const lastValidator = connections.shift()
+            
+            t.ok(connectionManager.connected(lastValidator.key), 'should be connected')
+            connectionManager.remove(lastValidator.key)
+
+            t.is(connectionManager.connectionCount(), previousCount - 1, 'should reduce the connection count')
+            t.ok(!connectionManager.connected(lastValidator.key), 'should be connected')
         })
     })
 
