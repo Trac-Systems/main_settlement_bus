@@ -2776,6 +2776,8 @@ class State extends ReadyResource {
 
         const regeneratedTxHash = await blake3Hash(requesterMessage);
         if (!b4a.equals(regeneratedTxHash, op.txo.tx)) {
+            console.log("regeneratedTxHash:", regeneratedTxHash.toString('hex'));
+            console.log("op.txo.tx:", op.txo.tx.toString('hex'));
             this.#safeLogApply(OperationType.TX, "Message hash does not match the tx_hash.", node.from.key)
             return Status.FAILURE;
         };

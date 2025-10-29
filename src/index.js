@@ -938,14 +938,35 @@ export class MainSettlementBus extends ReadyResource {
                 await this.broadcastPartialTransaction(assembledTransactionOperation);
 
                 break;
+            case '/txh':
+                const map = this.network.poolService.tx_history;
+                for (const [key, value] of map) {
+                    console.log(`Key: ${key}`);
+                }
+                break;
             case '/test2':
                 let messageCount = 0;
                 const duration = 60000;
+                let buf = b4a.alloc(32);
+
+                function incrementBuffer(buffer) {
+                    for (let i = buffer.length - 1; i >= 0; i--) {
+                        if (buffer[i] < 0xff) {
+                            buffer[i]++;
+                            break;
+                        }
+                        buffer[i] = 0x00;
+                    }
+                    return buffer;
+                }
+                
                 const interval = setInterval(async () => {
+                    
                     try {
-                        const contentHash = randomBytes(32).toString('hex');
+                        console.log("counter:", buf.toString('hex'));
+                        const contentHash = buf.toString('hex');
                         const randomExternalBootstrap = "5adb970a73e20e8e2e896cd0c30cf025a0b32ec6fe026b98c6714115239607ac";
-                        const randomWk = randomBytes(32).toString('hex');
+                        const randomWk = buf.toString('hex');
                         const txValidity = await this.#state.getIndexerSequenceState();
                         const msbBootstrap = this.bootstrap.toString('hex');
                         const assembledTransactionOperation = await PartialStateMessageOperations.assembleTransactionOperationMessage(
@@ -956,8 +977,12 @@ export class MainSettlementBus extends ReadyResource {
                             randomExternalBootstrap,
                             msbBootstrap
                         );
-                        await this.broadcastPartialTransaction(assembledTransactionOperation);
+                        const stringified = JSON.stringify(assembledTransactionOperation)
+                        await this.broadcastPartialTransaction(stringified);
                         messageCount++;
+                        incrementBuffer(buf);
+
+                        //console.log("assembledTransactionOperation", assembledTransactionOperation);
                         console.log(`Sent message ${messageCount} at ${new Date().toISOString()}`);
                     } catch (error) {
                         console.error('Error sending message:', error);
@@ -967,6 +992,7 @@ export class MainSettlementBus extends ReadyResource {
                 setTimeout(() => {
                     clearInterval(interval);
                 }, duration);
+
                 break;
             case '/balance_migration':
                 await this.#handleBalanceMigrationOperation();

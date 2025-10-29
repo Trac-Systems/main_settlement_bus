@@ -1,20 +1,20 @@
-import {MainSettlementBus} from './src/index.js';
+import { MainSettlementBus } from './src/index.js';
 
 const isPear = typeof Pear !== 'undefined';
 const args = isPear ? Pear.config.args : process.argv.slice(2);
 
 const opts = {
-    stores_directory : 'stores/',
-    store_name : typeof process !== "undefined" ? process.argv[2] : Pear.config.args[0],
-    bootstrap: '3bba9ebdd5fe2104d3bc7ae0464834980a7d6195acb399f95dfe9a110e4d1da2',
-    channel: '00000000000tracnetworkmsbmainnet',
+    stores_directory: 'stores/',
+    store_name: typeof process !== "undefined" ? process.argv[2] : Pear.config.args[0],
+    bootstrap: '80dcc9a2311409f8adbea74dcee571b30ad8d4aa3df31f2c78a1df8b04376102',
+    channel: 'testestestem',
     enable_role_requester: false,
     enable_wallet: true,
     enable_validator_observer: true,
     enable_interactive_mode: true,
-    disable_rate_limit: false,
-    enable_tx_apply_logs: false,
-    enable_error_apply_logs: false,
+    disable_rate_limit: true,
+    enable_tx_apply_logs: true,
+    enable_error_apply_logs: true,
 };
 
 const rpc_opts = {
@@ -36,7 +36,7 @@ msb.ready().then(async () => {
         const hostIndex = args.indexOf('--host');
         const host = (hostIndex !== -1 && args[hostIndex + 1]) ? args[hostIndex + 1] : 'localhost';
 
-        const {startRpcServer} = await import('./rpc/rpc_server.mjs');
+        const { startRpcServer } = await import('./rpc/rpc_server.mjs');
         startRpcServer(msb, host, port);
     } else {
         console.log('RPC server will not be started.');

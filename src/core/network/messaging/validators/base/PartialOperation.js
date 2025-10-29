@@ -18,7 +18,7 @@ class PartialOperation {
     #state;
     #check;
 
-    constructor(state) {
+    constructor(state, network) {
         this.#state = state;
         this.#check = new Check();
         this.max_amount = MAX_AMOUNT;

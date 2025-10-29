@@ -4,10 +4,10 @@ import {
     OperationType
 } from '../../../../utils/constants.js';
 import PartialBootstrapDeployment from "../validators/PartialBootstrapDeployment.js";
-import {addressToBuffer, bufferToAddress} from "../../../state/utils/address.js";
+import { addressToBuffer, bufferToAddress } from "../../../state/utils/address.js";
 import PartialTransaction from "../validators/PartialTransaction.js";
-import {normalizeHex} from "../../../../utils/helpers.js";
-
+import { normalizeHex } from "../../../../utils/helpers.js";
+import { sleep } from "../../../../utils/helpers.js";
 /**
  * THIS CLASS IS ULTRA IMPORTANT BECAUSE IF SOMEONE WILL SEND A TRASH TO VALIDATOR AND IT WON'T BE HANDLED PROPERTLY -
  * FOR EXAMPLE VALIDATOR WILL BROADCAST IT TO THE INDEXER LAYER THEN IT WILL BE BANNED. SO EVERYTHING WHAT IS TRASH
@@ -36,25 +36,44 @@ class SubnetworkOperationHandler extends BaseOperationHandler {
     }
 
     async #partialTransactionSubHandler(payload) {
-        const normalizedPayload = this.#normalizeTransactionOperation(payload);
-        const isValid = await this.#partialTransactionValidator.validate(normalizedPayload);
-        if (!isValid) {
-            throw new Error("SubnetworkHandler: Transaction validation failed.");
+        let completeTransactionOperation = null;
+        let normalizedPayload = null;
+        try {
+            normalizedPayload = this.#normalizeTransactionOperation(payload);
+            await sleep(100);
+            console.log("this.network.poolService.tx_history:", this.network.poolService.tx_history.size);
+
+            const isValid = await this.#partialTransactionValidator.validate(normalizedPayload);
+            if (!isValid) {
+                throw new Error("SubnetworkHandler: Transaction validation failed.");
+            }
+
+            completeTransactionOperation = await CompleteStateMessageOperations.assembleCompleteTransactionOperationMessage(
+                this.wallet,
+                normalizedPayload.address,
+                normalizedPayload.txo.tx,
+                normalizedPayload.txo.txv,
+                normalizedPayload.txo.iw,
+                normalizedPayload.txo.in,
+                normalizedPayload.txo.ch,
+                normalizedPayload.txo.is,
+                normalizedPayload.txo.bs,
+                normalizedPayload.txo.mbs
+            );
+
+            if (!!this.network.poolService.tx_history.has(normalizedPayload.txo.tx.toString('hex'))) {
+                throw new Error("SubnetworkHandler: Duplicate transaction detected in pool service.");
+            }
+
+            this.network.poolService.tx_history.set(payload.txo.tx, completeTransactionOperation);
+            this.network.poolService.addTransaction(completeTransactionOperation);
+        } catch (error) {
+            if (normalizedPayload !== null) {
+                this.network.poolService.remove_tx_from_tx_pool(normalizedPayload.txo.tx);
+            }
+            throw error;
         }
 
-        const completeTransactionOperation = await CompleteStateMessageOperations.assembleCompleteTransactionOperationMessage(
-            this.wallet,
-            normalizedPayload.address,
-            normalizedPayload.txo.tx,
-            normalizedPayload.txo.txv,
-            normalizedPayload.txo.iw,
-            normalizedPayload.txo.in,
-            normalizedPayload.txo.ch,
-            normalizedPayload.txo.is,
-            normalizedPayload.txo.bs,
-            normalizedPayload.txo.mbs
-        );
-        this.network.poolService.addTransaction(completeTransactionOperation);
     }
 
     async #partialBootstrapDeploymentSubHandler(payload) {
@@ -82,7 +101,7 @@ class SubnetworkOperationHandler extends BaseOperationHandler {
         if (!payload || typeof payload !== 'object' || !payload.bdo) {
             throw new Error('Invalid payload for bootstrap deployment normalization.');
         }
-        const {type, address, bdo} = payload;
+        const { type, address, bdo } = payload;
         if (
             type !== OperationType.BOOTSTRAP_DEPLOYMENT ||
             !address ||
@@ -111,7 +130,7 @@ class SubnetworkOperationHandler extends BaseOperationHandler {
         if (!payload || typeof payload !== 'object' || !payload.txo) {
             throw new Error('Invalid payload for transaction operation normalization.');
         }
-        const {type, address, txo} = payload;
+        const { type, address, txo } = payload;
         if (
             type !== OperationType.TX ||
             !address ||
