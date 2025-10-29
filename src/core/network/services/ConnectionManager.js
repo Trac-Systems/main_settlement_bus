@@ -49,6 +49,41 @@ class ConnectionManager {
         return false
     }
 
+    remove(publicKey) {
+        const index = this.#validatorsIndex.findIndex(current => b4a.equals(publicKey, current));
+        if (index !== -1) {
+            this.#validatorsIndex.splice(index, 1);
+            delete this.#validators[publicKey]
+        }
+    }
+
+    maxConnections() {
+        return this.connectionCount() >= this.#maxValidators
+    }
+
+    connectionCount() {
+        return this.#validatorsIndex.filter(_ => this.connected(_)).length
+    }
+
+    connected(publicKey) {
+        return this.exists(publicKey) && this.#validators[publicKey]?.connected
+    }
+
+    rotate() {
+        this.#updateNext()
+        this.#requestCount = 0
+    }
+
+    exists(publicKey) {
+        return !!this.#validators[publicKey]
+    }
+
+    prettyPrint() {
+        console.log('Connection count: ', this.connectionCount())
+        console.log('Current connection: ', this.#currentValidator())
+        console.log('Validators: ', this.#validatorsIndex.map(val => PeerWallet.encodeBech32m(TRAC_NETWORK_MSB_MAINNET_PREFIX, val)))
+    }
+
     #currentValidator() {
         return this.#validatorsIndex[this.#currentValidatorIndex]
     }
@@ -68,51 +103,18 @@ class ConnectionManager {
         })
     }
 
-    remove(publicKey) {
-        const index = this.#validatorsIndex.findIndex(current => b4a.equals(publicKey, current));
-        if (index !== -1) {
-            this.#validatorsIndex.splice(index, 1);
-            delete this.#validators[publicKey]
-        }
-    }
-
     #update(publicKey, connection) {
         this.#validators[publicKey] = connection
     }
 
-    maxConnections() {
-        return this.connectionCount() >= this.#maxValidators
-    }
-
-    connectionCount() {
-        return this.#validatorsIndex.filter(_ => this.connected(_)).length
-    }
-
-    connected(publicKey) {
-        return this.exists(publicKey) && this.#validators[publicKey]?.connected
-    }
-
-    rotate() {
-        this.#updateNext()
-        this.#requestCount = 0
-    }
     #updateNext() {
         const next = this.#currentValidatorIndex + 1
         this.#currentValidatorIndex = next < this.#validatorsIndex.length ? next : 0
     }
 
-    exists(publicKey) {
-        return !!this.#validators[publicKey]
-    }
 
     #isRemoteEqual(publicKey) {
         return !!publicKey && !!this.#validators[publicKey]?.remotePublicKey && b4a.equals(this.#validators[publicKey]?.remotePublicKey, publicKey)
-    }
-
-    prettyPrint() {
-        console.log('Connection count: ', this.connectionCount())
-        console.log('Current connection: ', this.#currentValidator())
-        console.log('Validators: ', this.#validatorsIndex.map(val => PeerWallet.encodeBech32m(TRAC_NETWORK_MSB_MAINNET_PREFIX, val)))
     }
 }
 
