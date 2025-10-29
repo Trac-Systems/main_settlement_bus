@@ -249,6 +249,12 @@ export class MainSettlementBus extends ReadyResource {
                 this.#network.validatorConnectionManager.remove(publicKey)
             }
         })
+
+        this.#state.on(CustomEventType.UNWRITABLE, (publicKey) => {
+            if (this.#network.validatorConnectionManager.exists(publicKey)) {
+                this.#network.validatorConnectionManager.remove(publicKey)
+            }
+        })
         this.#state.base.on(EventType.IS_INDEXER, () => {
             console.log("Current node is an indexer");
         });

@@ -1842,6 +1842,8 @@ class State extends ReadyResource {
         if (this.#enable_tx_apply_logs) {
             console.info(`Writer removed: addr:wk:tx - ${requesterAddressString}:${op.rao.iw.toString('hex')}:${txHashHexString}`);
         }
+
+        this.#emitEvent(CustomEventType.UNWRITABLE, PeerWallet.decodeBech32mSafe(validatorAddressString))
     }
 
     async #handleApplyAddIndexerOperation(op, view, base, node, batch) {
@@ -2474,6 +2476,9 @@ class State extends ReadyResource {
         if (this.#enable_tx_apply_logs) {
             console.info(`Node has been banned: addr:wk:tx - ${nodeToBeBannedAddressString}:${decodedToBanNodeEntry.wk.toString('hex')}:${txHashHexString}`);
         }
+
+        this.#emitEvent(CustomEventType.UNWRITABLE, PeerWallet.decodeBech32mSafe(nodeToBeBannedAddressString))
+
         return Status.SUCCESS;
     }
 
