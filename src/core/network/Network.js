@@ -132,8 +132,8 @@ class Network extends ReadyResource {
                     if (
                         error && error.message && (
                             error.message.includes('connection reset by peer') ||
-                            error.message.includes('Duplicate connection')
-                        )
+                            error.message.includes('Duplicate connection') ||
+                            error.message.includes('connection timed out')                        )
                     ) {
                         // TODO: decide if we want to handle this error in a specific way. It generates a lot of logs.
                         return;
