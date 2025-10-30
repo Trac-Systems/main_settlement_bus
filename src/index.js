@@ -1198,7 +1198,7 @@ export class MainSettlementBus extends ReadyResource {
 
                         for (let retry = 0; retry <= this.#maxRetries; retry++) { // should iterate once if maxRetries === 0
                             await this.broadcastPartialTransaction(payload);
-                            await sleep(1000 * (retry + 1)); // exponential backoff wait time
+                            await sleep(1000 * (retry + 1)); // linear backoff wait time
                             const tx = await this.#state.get(hash)
                             if (tx !== null) {
                                 break;
