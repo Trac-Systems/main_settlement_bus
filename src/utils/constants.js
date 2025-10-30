@@ -42,6 +42,12 @@ export const EventType = Object.freeze({
     WARNING: 'warning',
 });
 
+// Role managment constants
+export const CustomEventType = Object.freeze({
+    IS_INDEXER: 'msb:is-indexer',
+    UNWRITABLE: 'msb:unwritable'
+});
+
 // Token
 export const TOKEN_DECIMALS = 18n
 export const ADMIN_INITIAL_BALANCE = b4a.from([0, 0, 0, 0, 0, 0, 0, 54, 53, 201, 173, 197, 222, 160, 0, 0]) // 1000 in a 18 decimals token
@@ -113,3 +119,6 @@ export const NETWORK_MESSAGE_TYPES = Object.freeze({
 
 export const TRAC_ADDRESS_SIZE =  63; // TODO: Change this to config().addressLength || 63
 export const NETWORK_ID = 918; // TODO: Change this to config().network_id || 918
+
+export const MAX_VALIDATORS = 50
+export const MAX_RETRIES = 3

@@ -13,6 +13,7 @@ async function runTests() {
   await import('./fileUtils/readBalanceMigrationFile.test.js');
   // await import('./messageOperations/stateMessageOperations.test.js');
   await import('./buffer/buffer.test.js')
+  await import('./network/connectionManagerTests.test.js')
   // await import('./apply/apply.test.js'); // This test has been disabled because Github CI fails due to lack of resources. This test can still be run locally but sometimes it hangs when destroying resources.
   test.resume();
 }

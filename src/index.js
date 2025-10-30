@@ -22,6 +22,8 @@ import {
     BOOTSTRAP_HEXSTRING_LENGTH,
     EntryType,
     OperationType,
+    MAX_RETRIES,
+    CustomEventType
 } from "./utils/constants.js";
 import partialStateMessageOperations from "./messages/partialStateMessages/PartialStateMessageOperations.js";
 import { randomBytes } from "hypercore-crypto";
@@ -52,6 +54,7 @@ export class MainSettlementBus extends ReadyResource {
     #is_admin_mode;
     #partialTransferValidator;
     #partialTransactionValidator;
+    #maxRetries
 
     constructor(options = {}) {
         super();
@@ -83,6 +86,7 @@ export class MainSettlementBus extends ReadyResource {
         this.#store = new Corestore(this.#stores_directory + options.store_name);
         this.#wallet = new PeerWallet(options);
         this.#readline_instance = null;
+        this.#maxRetries = Number(options.max_retries) ? options.max_retries : MAX_RETRIES
 
         if (this.enable_interactive_mode !== false) {
             try {
@@ -162,11 +166,6 @@ export class MainSettlementBus extends ReadyResource {
             this.#wallet,
         );
 
-        //TODO: validator observer can't be awaited. In the future change logic to process events instead of loop?
-        if (this.#enable_validator_observer) {
-            this.#network.startValidatorObserver(this.#wallet.address);
-        }
-
         const adminEntry = await this.#state.getAdminEntry();
         await this.#setUpRoleAutomatically(adminEntry);
 
@@ -218,7 +217,7 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async broadcastPartialTransaction(partialTransactionPayload) {
-        await this.#network.validator_stream.messenger.send(partialTransactionPayload);
+        await this.#network.validatorConnectionManager.send(partialTransactionPayload);
     }
 
     async #setUpRoleAutomatically() {
@@ -245,6 +244,17 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async #stateEventsListener() {
+        this.#state.on(CustomEventType.IS_INDEXER, (publicKey) => {
+            if (this.#network.validatorConnectionManager.exists(publicKey)) {
+                this.#network.validatorConnectionManager.remove(publicKey)
+            }
+        })
+
+        this.#state.on(CustomEventType.UNWRITABLE, (publicKey) => {
+            if (this.#network.validatorConnectionManager.exists(publicKey)) {
+                this.#network.validatorConnectionManager.remove(publicKey)
+            }
+        })
         this.#state.base.on(EventType.IS_INDEXER, () => {
             console.log("Current node is an indexer");
         });
@@ -911,6 +921,9 @@ export class MainSettlementBus extends ReadyResource {
             case "/indexers_list":
                 console.log(await this.#state.getIndexersEntry());
                 break;
+            case "/validator_pool":
+                this.network.validatorConnectionManager.prettyPrint()
+                break;
             case "/stats":
                 await verifyDag(
                     this.#state,
@@ -1167,12 +1180,15 @@ export class MainSettlementBus extends ReadyResource {
                     if (payload) {
                         let normalizedPayload;
                         let isValid = false;
+                        let hash
                         if (payload.type === OperationType.TRANSFER) {
                             normalizedPayload = normalizeTransferOperation(payload);
                             isValid = await this.#partialTransferValidator.validate(normalizedPayload);
+                            hash = b4a.toString(normalizedPayload.tro.tx, 'hex')
                         } else if (payload.type === OperationType.TX) {
                             normalizedPayload = normalizeTransactionOperation(payload);
                             isValid = await this.#partialTransactionValidator.validate(normalizedPayload);
+                            hash = b4a.toString(normalizedPayload.txo.tx, 'hex')
                         }
 
                         if (!isValid) throw new Error("Invalid transaction payload.");
@@ -1180,7 +1196,16 @@ export class MainSettlementBus extends ReadyResource {
                         const signedLength = this.#state.getSignedLength();
                         const unsignedLength = this.#state.getUnsignedLength();
 
-                        await this.broadcastPartialTransaction(payload);
+                        for (let retry = 0; retry <= this.#maxRetries; retry++) { // should iterate once if maxRetries === 0
+                            await this.broadcastPartialTransaction(payload);
+                            await sleep(1000 * (retry + 1)); // linear backoff wait time
+                            const tx = await this.#state.get(hash)
+                            if (tx !== null) {
+                                break;
+                            } 
+                            this.network.validatorConnectionManager.rotate() // force change connection rotation for the next retry
+                        }
+
                         return { message: "Transaction broadcasted successfully.", signedLength, unsignedLength };
                     } else {
                         // Handle case where payload is missing if called internally without one.

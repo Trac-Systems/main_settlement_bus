@@ -54,7 +54,7 @@ class SubnetworkOperationHandler extends BaseOperationHandler {
             normalizedPayload.txo.bs,
             normalizedPayload.txo.mbs
         );
-        this.network.poolService.addTransaction(completeTransactionOperation);
+        this.network.transactionPoolService.addTransaction(completeTransactionOperation);
     }
 
     async #partialBootstrapDeploymentSubHandler(payload) {
@@ -74,7 +74,7 @@ class SubnetworkOperationHandler extends BaseOperationHandler {
             normalizedPayload.bdo.in,
             normalizedPayload.bdo.is,
         )
-        this.network.poolService.addTransaction(completeBootstrapDeploymentOperation);
+        this.network.transactionPoolService.addTransaction(completeBootstrapDeploymentOperation);
 
     }
 

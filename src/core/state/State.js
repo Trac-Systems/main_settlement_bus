@@ -14,7 +14,8 @@ import {
     ADMIN_INITIAL_STAKED_BALANCE,
     MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION,
     NETWORK_ID,
-    TRAC_NAMESPACE
+    TRAC_NAMESPACE, 
+    CustomEventType
 } from '../../utils/constants.js';
 import { isHexString, sleep } from '../../utils/helpers.js';
 import PeerWallet from 'trac-wallet';
@@ -1841,6 +1842,8 @@ class State extends ReadyResource {
         if (this.#enable_tx_apply_logs) {
             console.info(`Writer removed: addr:wk:tx - ${requesterAddressString}:${op.rao.iw.toString('hex')}:${txHashHexString}`);
         }
+
+        this.#emitEvent(CustomEventType.UNWRITABLE, PeerWallet.decodeBech32mSafe(requesterAddressString))
     }
 
     async #handleApplyAddIndexerOperation(op, view, base, node, batch) {
@@ -2056,8 +2059,9 @@ class State extends ReadyResource {
 
         if (this.#enable_tx_apply_logs) {
             console.info(`Indexer added addr:wk:tx - ${pretendingAddressString}:${decodedPretenderNodeEntry.wk.toString('hex')}:${txHashHexString}`);
-
         }
+
+        this.#emitEvent(CustomEventType.IS_INDEXER, PeerWallet.decodeBech32mSafe(pretendingAddressString))
     }
 
     async #handleApplyRemoveIndexerOperation(op, view, base, node, batch) {
@@ -2472,6 +2476,9 @@ class State extends ReadyResource {
         if (this.#enable_tx_apply_logs) {
             console.info(`Node has been banned: addr:wk:tx - ${nodeToBeBannedAddressString}:${decodedToBanNodeEntry.wk.toString('hex')}:${txHashHexString}`);
         }
+
+        this.#emitEvent(CustomEventType.UNWRITABLE, PeerWallet.decodeBech32mSafe(nodeToBeBannedAddressString))
+
         return Status.SUCCESS;
     }
 
@@ -3636,6 +3643,12 @@ class State extends ReadyResource {
         const decodedNewLicenseLength = lengthEntryUtils.decodeBE(newLicenseLength);
 
         return { newLicenseLength, decodedNewLicenseLength };
+    }
+
+    #emitEvent(event, ...args) {
+        try {
+            this.emit(event, ...args)
+        } catch (_ignored) {}
     }
 
     async #transferFeeTxOperation(requesterAddressString, validatorAddressString, validatorEntryBuffer, subnetworkCreatorAddressString, feeAmount, batch, node) {

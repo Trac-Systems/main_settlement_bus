@@ -82,8 +82,6 @@ export async function fundPeer(admin, toFund, amount) {
     await tick()
     await admin.msb.state.base.forceFastForward() // required to update the balance on the peer, eliminates the possible racing condition
     await tick()
-    await toFund.msb.state.base.forceFastForward()
-    await tick()
     return payload
 }
 
@@ -392,7 +390,6 @@ export const tryToSyncWriters = async (...args) => {
             for (const node of args) {
                 let signedLength = node.msb.state.getSignedLength();
                 if (signedLength < maxLength) {
-                    await node.msb.state.base.forceFastForward();
                     await node.msb.state.base.view.update();
                     await node.msb.network.swarm.flush()
                     await sleep(1000);
@@ -456,7 +453,6 @@ export async function waitWritable(admin, node, operation) {
         })
     })
     await operation()
-    await node.msb.state.base.forceFastForward(); // This performs an update after the core sync
     await node.msb.state.base.view.update();
     await admin.msb.state.base.update()
     await node.msb.network.swarm.flush()

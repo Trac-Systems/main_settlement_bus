@@ -33,7 +33,7 @@ class PartialOperation {
         return this.#check;
     }
 
-    validate(payload) { throw new Error("Method 'validate()' must be implemented."); }
+    async validate(payload) { throw new Error("Method 'validate()' must be implemented."); }
 
     isPayloadSchemaValid(payload) {
         if (!payload || !payload.type) {
