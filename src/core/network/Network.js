@@ -161,13 +161,6 @@ class Network extends ReadyResource {
     async tryConnect(publicKey, type = null) {
         if (null === this.#swarm) throw new Error('Network swarm is not initialized');
 
-        // if (this.validator_stream !== null && publicKey !== b4a.toString(this.validator_stream.remotePublicKey, 'hex')) {
-        //     this.#swarm.leavePeer(this.validator_stream.remotePublicKey);
-        //     this.validator_stream = null;
-        //     this.validator = null;
-        // }
-        // trying to join a peer from the global swarm
-
         if (false === this.#swarm.peers.has(publicKey)) {
             this.#swarm.joinPeer(b4a.from(publicKey, 'hex'));
             let cnt = 0;
