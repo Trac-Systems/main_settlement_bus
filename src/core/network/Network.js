@@ -105,7 +105,7 @@ class Network extends ReadyResource {
             this.#networkMessages.initializeMessageRouter(state, wallet);
 
             this.#swarm.on('connection', async (connection) => {
-                const { message_channel, message } = this.#networkMessages.setupProtomuxMessages(connection);
+                const { message_channel, message } = await this.#networkMessages.setupProtomuxMessages(connection);
                 connection.messenger = message;
 
                 connection.on('close', () => {
