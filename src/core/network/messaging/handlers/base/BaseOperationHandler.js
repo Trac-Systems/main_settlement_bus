@@ -43,7 +43,7 @@ class BaseOperationHandler {
             throw new Error('OperationHandler: State is not writable or is an indexer without admin privileges.');
         }
 
-        if (this.network.poolService.tx_pool.length >= TRANSACTION_POOL_SIZE) {
+        if (this.network.transactionPoolService.tx_pool.length >= TRANSACTION_POOL_SIZE) {
             throw new Error("OperationHandler: Transaction pool is full, ignoring incoming transaction.");
         }
 

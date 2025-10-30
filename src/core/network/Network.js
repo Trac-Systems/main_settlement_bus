@@ -3,7 +3,7 @@ import Hyperswarm from 'hyperswarm';
 import w from 'protomux-wakeup';
 import b4a from 'b4a';
 
-import PoolService from './services/PoolService.js';
+import TransactionPoolService from './services/TransactionPoolService.js';
 import ValidatorObserverService from './services/ValidatorObserverService.js';
 import NetworkMessages from './messaging/NetworkMessages.js';
 import { sleep } from '../../utils/helpers.js';
@@ -16,6 +16,7 @@ import {
     NETWORK_MESSAGE_TYPES,
     DHT_BOOTSTRAPS
 } from '../../utils/constants.js';
+import ConnectionManager from './services/ConnectionManager.js';
 
 const wakeup = new w();
 
@@ -25,21 +26,22 @@ class Network extends ReadyResource {
     #enable_wallet;
     #channel;
     #networkMessages;
-    #poolService;
+    #transactionPoolService;
     #validatorObserverService;
+    #validatorConnectionManager;
 
     constructor(state, channel, address = null, options = {}) {
         super();
         this.#enable_wallet = options.enable_wallet !== false;
         this.#channel = channel;
-        this.#poolService = new PoolService(state, address, options);
-        this.#validatorObserverService = new ValidatorObserverService(this, state, options)
+        this.#transactionPoolService = new TransactionPoolService(state, address, options);
+        this.#validatorObserverService = new ValidatorObserverService(this, state, address, options)
         this.#networkMessages = new NetworkMessages(this, options);
+        this.#validatorConnectionManager = new ConnectionManager({ maxValidators: options.max_validators })
         //TODO: move streams maybe to HASHMAP? To discuss because this change will affect the whole network module and it's usage. It is not a priority right now
         //However, it gives us more flexibility in the future, because we can create set of streams. Maybe in this case exist better data structure?
         this.admin_stream = null;
         this.admin = null;
-        this.validator_stream = null;
         this.validator = null;
         this.custom_stream = null;
         this.custom_node = null;
@@ -53,38 +55,34 @@ class Network extends ReadyResource {
         return this.#channel;
     }
 
-    get poolService() {
-        return this.#poolService;
+    get transactionPoolService() {
+        return this.#transactionPoolService;
     }
 
     get validatorObserverService() {
         return this.#validatorObserverService;
     }
 
+    get validatorConnectionManager() {
+        return this.#validatorConnectionManager;
+    }
+
     async _open() {
         console.log('Network initialization...');
-        this.poolService.start();
+        this.transactionPoolService.start();
+        this.validatorObserverService.start();
     }
 
     async _close() {
         console.log('Network: closing gracefully...');
-        this.poolService.stopPool();
+        this.transactionPoolService.stopPool();
         await sleep(100);
-
-        if (this.#validatorObserverService.enable_validator_observer) {
-            this.#validatorObserverService.stopValidatorObserver();
-        }
-
+        this.#validatorObserverService.stopValidatorObserver();
         await sleep(5_000);
 
         if (this.#swarm !== null) {
             this.#swarm.destroy();
         }
-    }
-
-    startValidatorObserver(address) {
-        this.#validatorObserverService.startValidatorObserver();
-        this.#validatorObserverService.validatorObserver(address);
     }
 
     async replicate(
@@ -107,15 +105,10 @@ class Network extends ReadyResource {
             this.#networkMessages.initializeMessageRouter(state, wallet);
 
             this.#swarm.on('connection', async (connection) => {
-                const { message_channel, message } = this.#networkMessages.setupProtomuxMessages(connection);
+                const { message_channel, message } = await this.#networkMessages.setupProtomuxMessages(connection);
                 connection.messenger = message;
 
                 connection.on('close', () => {
-                    if (this.validator_stream === connection) {
-                        this.validator_stream = null;
-                        this.validator = null;
-                    }
-
                     if (this.admin_stream === connection) {
                         this.admin_stream = null;
                         this.admin = null;
@@ -137,8 +130,8 @@ class Network extends ReadyResource {
                     if (
                         error && error.message && (
                             error.message.includes('connection reset by peer') ||
-                            error.message.includes('Duplicate connection')
-                        )
+                            error.message.includes('Duplicate connection') ||
+                            error.message.includes('connection timed out')                        )
                     ) {
                         // TODO: decide if we want to handle this error in a specific way. It generates a lot of logs.
                         return;
@@ -150,7 +143,7 @@ class Network extends ReadyResource {
             });
 
             this.#swarm.join(this.#channel, { server: true, client: true });
-            await this.#swarm.flush();
+            this.#swarm.flush();
         }
     }
 
@@ -166,15 +159,7 @@ class Network extends ReadyResource {
     }
 
     async tryConnect(publicKey, type = null) {
-        
         if (null === this.#swarm) throw new Error('Network swarm is not initialized');
-
-        if (this.validator_stream !== null && publicKey !== b4a.toString(this.validator_stream.remotePublicKey, 'hex')) {
-            this.#swarm.leavePeer(this.validator_stream.remotePublicKey);
-            this.validator_stream = null;
-            this.validator = null;
-        }
-        // trying to join a peer from the global swarm
 
         if (false === this.#swarm.peers.has(publicKey)) {
             this.#swarm.joinPeer(b4a.from(publicKey, 'hex'));
@@ -185,13 +170,15 @@ class Network extends ReadyResource {
                 cnt += 1;
             }
         }
-
+        
         if (this.#swarm.peers.has(publicKey)) {
             let stream;
             const peerInfo = this.#swarm.peers.get(publicKey)
-            stream = this.#swarm._allConnections.get(peerInfo.publicKey)
-
+            stream = this.#swarm._allConnections.get(peerInfo.publicKey)            
             if (stream !== undefined && stream.messenger !== undefined) {
+                if (type === 'validator') {
+                    this.#validatorConnectionManager.addValidator(b4a.from(publicKey, 'hex'), stream)
+                }
                 await this.#sendRequestByType(stream, type);
             }
         }
@@ -204,7 +191,7 @@ class Network extends ReadyResource {
 
     async #sendRequestByType(stream, type) {
         const waitFor = {
-            validator: () => this.validator_stream,
+            validator: () => this.validatorConnectionManager.connectionCount(),
             admin: () => this.admin_stream,
             node: () => this.custom_stream
         }[type];

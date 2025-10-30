@@ -2,7 +2,7 @@
 import { BATCH_SIZE, PROCESS_INTERVAL_MS } from '../../../utils/constants.js';
 import Scheduler from '../../../utils/Scheduler.js';
 
-class PoolService {
+class TransactionPoolService {
     #state;
     #address;
     #options;
@@ -33,11 +33,11 @@ class PoolService {
 
     async start() {
         if (!this.options.enable_wallet) {
-            console.info('PoolService can not start. Wallet is not enabled');
+            console.info('TransactionPoolService can not start. Wallet is not enabled');
             return;
         }
         if (this.scheduler && this.scheduler.isRunning) {
-            console.info('PoolService is already started');
+            console.info('TransactionPoolService is already started');
             return;
         }
 
@@ -54,7 +54,7 @@ class PoolService {
                 next(PROCESS_INTERVAL_MS);
             }
         } catch (error) {
-            throw new Error(`PoolService worker error: ${error.message}`);
+            throw new Error(`TransactionPoolService worker error: ${error.message}`);
         }
     }
 
@@ -92,8 +92,8 @@ class PoolService {
         if (!this.#scheduler) return;
         await this.#scheduler.stop(waitForCurrent);
         this.#scheduler = null;
-        console.info('PoolService: closing gracefully...');
+        console.info('TransactionPoolService: closing gracefully...');
     }
 }
 
-export default PoolService;
+export default TransactionPoolService;
