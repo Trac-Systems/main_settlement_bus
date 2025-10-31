@@ -31,9 +31,9 @@ class BaseResponse {
     validateTimestamp(message) {
         const timestamp = message.timestamp;
         const now = Date.now();
-        const fiveSeconds = 5000;
+        const treshhold = 10000;
 
-        if (now - timestamp > fiveSeconds) {
+        if (now - timestamp > treshhold) {
             throw new Error("Validator response is too old, ignoring.");
         }
         return true;
