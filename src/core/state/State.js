@@ -138,9 +138,12 @@ class State extends ReadyResource {
 
     async getSigned(key) {
         const view_session = this.#base.view.checkout(this.#base.view.core.signedLength);
-        const result = await view_session.get(key);
-        if (result === null) return null;
-        return result.value;
+        try {
+            const result = await view_session.get(key);
+            return result ? result.value : null;
+        } finally {
+            await view_session.close();
+        }
     }
 
     async getAdminEntry() {
