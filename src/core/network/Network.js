@@ -108,7 +108,6 @@ class Network extends ReadyResource {
                 const { message_channel, message } = await this.#networkMessages.setupProtomuxMessages(connection);
                 connection.messenger = message;
 
-                // ATTENTION: Must be called AFTER the protomux init above
                 wakeup.addStream(connection);
                 store.replicate(connection);
 
