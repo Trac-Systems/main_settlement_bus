@@ -108,9 +108,6 @@ class Network extends ReadyResource {
                 const { message_channel, message } = await this.#networkMessages.setupProtomuxMessages(connection);
                 connection.messenger = message;
 
-                wakeup.addStream(connection);
-                store.replicate(connection);
-
                 connection.on('close', () => {
                     if (this.admin_stream === connection) {
                         this.admin_stream = null;
@@ -124,6 +121,11 @@ class Network extends ReadyResource {
 
                     message_channel.close()
                 });
+
+                // ATTENTION: Must be called AFTER the protomux init above
+                const stream = store.replicate(connection);
+                wakeup.addStream(stream);
+
                 connection.on('error', (error) => {
                     if (
                         error && error.message && (
