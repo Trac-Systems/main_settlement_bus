@@ -529,6 +529,7 @@ class State extends ReadyResource {
 
         let nodeEntry = null;
         const incomingAddressNodeEntryBuffer = await this.#getEntryApply(recipientAddressString, batch);
+
         if (incomingAddressNodeEntryBuffer === null) {
             nodeEntry = nodeEntryUtils.init(ZERO_WK, nodeRoleUtils.NodeRole.READER, amount.value)
             if (nodeEntry.length === 0) {
@@ -537,7 +538,7 @@ class State extends ReadyResource {
             }
 
         } else {
-            nodeEntry = nodeEntryUtils.setBalance(incomingAddressNodeEntryBuffer, amount.value);
+            nodeEntry = amount.update(incomingAddressNodeEntryBuffer)
             if (nodeEntry === null) {
                 this.#safeLogApply(OperationType.BALANCE_INITIALIZATION, "Failed to set node entry balance.", node.from.key)
                 return Status.FAILURE;
