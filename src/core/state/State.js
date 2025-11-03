@@ -3554,19 +3554,19 @@ class State extends ReadyResource {
             return;
         }
 
-        const penality = BALANCE_FEE.mul(toTerm(BigInt(invalidOperations)));
+        const penalty = BALANCE_FEE.mul(toTerm(BigInt(invalidOperations)));
 
-        if (penality === null) {
+        if (penalty === null) {
             this.#safeLogApply("ValidatorPenalty", `Failed to calculate penalty for validator address: ${validatorAddressString}`, writingKeyBuffer);
             return;
         }
 
-        const deductedStakedBalance = stakedBalance.sub(penality);
+        const deductedStakedBalance = penalty.greaterThanOrEquals(stakedBalance) ? BALANCE_ZERO : stakedBalance.sub(penalty);        
+        
         if (deductedStakedBalance === null) {
             this.#safeLogApply("ValidatorPenalty", `Failed to subtract penalty from staked balance for validator address: ${validatorAddressString}`, writingKeyBuffer);
             return;
         }
-
 
         if (deductedStakedBalance.greaterThan(BALANCE_ZERO)) {
 
