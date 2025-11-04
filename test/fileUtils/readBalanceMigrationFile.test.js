@@ -1,7 +1,20 @@
 
-import { test, hook } from 'brittle';import fileUtils from '../../src/utils/fileUtils.js';
+import { test, hook } from 'brittle';
+import fileUtils from '../../src/utils/fileUtils.js';
 import { errorMessageIncludes } from "../utils/regexHelper.js";
 import fs from 'fs';
+
+let stateInstance;
+stateInstance = {
+    getAdminEntry: async () => ({
+        address: 'trac1yva2pduhz5yst8jgzmrc9ve0as5mx7tcw6le9srj6xcwqkx9hacqxxhsf9',
+    }),
+    getNodeEntryUnsigned: async (address) => {
+        return {
+            isWhitelisted: false
+        };
+    }
+};
 
 const DUMMY_PATH_OK = './dummy_balance_ok.csv';
 const DUMMY_PATH_DUP = './dummy_balance_dup.csv';
@@ -19,7 +32,7 @@ hook('Initialize dummy balance files', async t => {
 });
 
 test('readBalanceMigrationFile - valid file', async (t) => {
-    const { addressBalancePair, totalBalance, totalAddresses } = await fileUtils.readBalanceMigrationFile(DUMMY_PATH_OK);
+    const { addressBalancePair, totalBalance, totalAddresses } = await fileUtils.readBalanceMigrationFile(stateInstance, DUMMY_PATH_OK);
     t.is(typeof addressBalancePair, 'object');
     t.is(addressBalancePair.size, 2);
     t.is(totalAddresses, 2);
@@ -29,29 +42,29 @@ test('readBalanceMigrationFile - valid file', async (t) => {
 });
 
 test('readBalanceMigrationFile - duplicate address', async (t) => {
-    await t.exception(() => fileUtils.readBalanceMigrationFile(DUMMY_PATH_DUP),
+    await t.exception(() => fileUtils.readBalanceMigrationFile(stateInstance, DUMMY_PATH_DUP),
         errorMessageIncludes(`Duplicate address found in balance migration file: '${ADDR1}'. Each address must be unique.`))
 });
 
 test('readBalanceMigrationFile - invalid address', async (t) => {
-    await t.exception(() => fileUtils.readBalanceMigrationFile(DUMMY_PATH_INVALID_ADDRESS),
+    await t.exception(() => fileUtils.readBalanceMigrationFile(stateInstance, DUMMY_PATH_INVALID_ADDRESS),
         errorMessageIncludes('Invalid address found in balance migration file: \'notanaddr\'. Please ensure all addresses are valid.'))
 });
 
 test('readBalanceMigrationFile - empty file', async (t) => {
-    await t.exception(() => fileUtils.readBalanceMigrationFile(DUMMY_PATH_EMPTY),
+    await t.exception(() => fileUtils.readBalanceMigrationFile(stateInstance, DUMMY_PATH_EMPTY),
         errorMessageIncludes('Balance migration file is empty. File must contain at least one valid address balance pair.'))
 });
 
 test('readBalanceMigrationFile - file does not exist', async (t) => {
     const nonExistentPath = './non_existent_balance.csv';
-    await t.exception(() => fileUtils.readBalanceMigrationFile(nonExistentPath),
+    await t.exception(() => fileUtils.readBalanceMigrationFile(stateInstance, nonExistentPath),
         errorMessageIncludes(`Balance migration file not found: ${nonExistentPath}`))
 });
 
 test('readBalanceMigrationFile - invalid file extension', async (t) => {
     const invalidExtensionPath = './dummy_balance.txt';
-    await t.exception(() => fileUtils.readBalanceMigrationFile(invalidExtensionPath),
+    await t.exception(() => fileUtils.readBalanceMigrationFile(stateInstance,invalidExtensionPath),
         errorMessageIncludes(`Invalid file format: ${invalidExtensionPath}. Balance migration file must be a CSV file.`))
 });
 
