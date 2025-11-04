@@ -14,7 +14,7 @@ import {
     ADMIN_INITIAL_STAKED_BALANCE,
     MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION,
     NETWORK_ID,
-    TRAC_NAMESPACE, 
+    TRAC_NAMESPACE,
     CustomEventType
 } from '../../utils/constants.js';
 import { isHexString, sleep } from '../../utils/helpers.js';
@@ -527,8 +527,25 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const initializedNodeEntry = nodeEntryUtils.init(ZERO_WK, nodeRoleUtils.NodeRole.READER, amount.value)
-        await batch.put(recipientAddressString, initializedNodeEntry);
+        let nodeEntry = null;
+        const incomingAddressNodeEntryBuffer = await this.#getEntryApply(recipientAddressString, batch);
+
+        if (incomingAddressNodeEntryBuffer === null) {
+            nodeEntry = nodeEntryUtils.init(ZERO_WK, nodeRoleUtils.NodeRole.READER, amount.value)
+            if (nodeEntry.length === 0) {
+                this.#safeLogApply(OperationType.BALANCE_INITIALIZATION, "Failed to initialize node entry.", node.from.key)
+                return Status.FAILURE;
+            }
+
+        } else {
+            nodeEntry = amount.update(incomingAddressNodeEntryBuffer)
+            if (nodeEntry === null) {
+                this.#safeLogApply(OperationType.BALANCE_INITIALIZATION, "Failed to set node entry balance.", node.from.key)
+                return Status.FAILURE;
+            }
+        };
+
+        await batch.put(recipientAddressString, nodeEntry);
         await batch.put(txHashHexString, node.value);
         return Status.SUCCESS;
     }
@@ -3651,7 +3668,7 @@ class State extends ReadyResource {
     #emitEvent(event, ...args) {
         try {
             this.emit(event, ...args)
-        } catch (_ignored) {}
+        } catch (_ignored) { }
     }
 
     async #transferFeeTxOperation(requesterAddressString, validatorAddressString, validatorEntryBuffer, subnetworkCreatorAddressString, feeAmount, batch, node) {
