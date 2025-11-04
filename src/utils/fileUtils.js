@@ -89,7 +89,7 @@ async function readBalanceMigrationFile(stateInstance, filepath = BALANCE_MIGRAT
             const nodeEntry = await stateInstance.getNodeEntryUnsigned(address);
 
             if (nodeEntry && nodeEntry.isWhitelisted) {
-                throw new Error(`Validator node address '${address}' cannot be included in the balance migration file.`);
+                throw new Error(`Whitelisted node address '${address}' cannot be included in the balance migration file.`);
             }
 
             const parsedBalance = decimalStringToBigInt(balance);
