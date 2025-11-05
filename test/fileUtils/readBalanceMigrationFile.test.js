@@ -21,43 +21,12 @@ const DUMMY_PATH_LARGE = './dummy_balance_large.csv';
 
 const ADDR1 = 'trac1dguwzsvcsehslh6dgj2mqlsxdn7s5t5vhem56yd0xlg47aq6exzqymhr6u';
 const ADDR2 = 'trac123z3gfpr2epjwww7ntm3m6ud2fhmq0tvts27p2f5mx3qkecsutlqfys769';
-const ADDR_ADMIN = 'trac1yva2pduhz5yst8jgzmrc9ve0as5mx7tcw6le9srj6xcwqkx9hacqxxhsf9';
-
-const stateInstancePositiveCases = {
-    getAdminEntry: async () => ({
-        address: ADDR_ADMIN,
-    }),
-    getNodeEntryUnsigned: async (address) => {
-        return {
-            isWhitelisted: false
-        };
-    }
-};
-
-const stateInstanceWhitelisted = {
-    getAdminEntry: async () => ({
-        address: ADDR_ADMIN,
-    }),
-    getNodeEntryUnsigned: async (address) => {
-        return {
-            isWhitelisted: true
-        };
-    }
-};
-
-let stateInstance;
-
 
 hook('Initialize dummy balance files', async t => {
-    stateInstance = stateInstancePositiveCases;
     // Happy path
     fs.writeFileSync(DUMMY_PATH_OK, `${ADDR1},1.000000000000000001\n${ADDR2},2.000000000000000000\n`);
     // Edge: duplicated address
     fs.writeFileSync(DUMMY_PATH_DUP, `${ADDR1},1.0\n${ADDR1},2.0\n`);
-    // Edge: invalid address
-    fs.writeFileSync(DUMMY_PATH_INVALID_ADDRESS, `notanaddr,1.0\n`);
-    // Edge: address is admin
-    fs.writeFileSync(DUMMY_PATH_ADMIN_ADDRESS, `${ADDR_ADMIN},2.000000000000000000\n`);
     // Edge: Empty file
     fs.writeFileSync(DUMMY_PATH_EMPTY, '');
     // Edge: address with whitespace
@@ -91,7 +60,7 @@ hook('Initialize dummy balance files', async t => {
 
 
 test('readBalanceMigrationFile - valid file', async (t) => {
-    const { addressBalancePair, totalBalance, totalAddresses } = await fileUtils.readBalanceMigrationFile(stateInstance, DUMMY_PATH_OK);
+    const { addressBalancePair, totalBalance, totalAddresses } = await fileUtils.readBalanceMigrationFile(DUMMY_PATH_OK);
     t.is(typeof addressBalancePair, 'object');
     t.is(addressBalancePair.size, 2);
     t.is(totalAddresses, 2);
@@ -101,44 +70,39 @@ test('readBalanceMigrationFile - valid file', async (t) => {
 });
 
 test('readBalanceMigrationFile - address with whitespace', async (t) => {
-    await t.exception(() => fileUtils.readBalanceMigrationFile(stateInstance, DUMMY_PATH_WHITESPACE),
+    await t.exception(() => fileUtils.readBalanceMigrationFile( DUMMY_PATH_WHITESPACE),
         errorMessageIncludes('Failed to read balance migration file: Invalid line in balance migration file:'))
 });
 
 test('readBalanceMigrationFile - duplicate address', async (t) => {
-    await t.exception(() => fileUtils.readBalanceMigrationFile(stateInstance, DUMMY_PATH_DUP),
+    await t.exception(() => fileUtils.readBalanceMigrationFile(DUMMY_PATH_DUP),
         errorMessageIncludes(`Duplicate address found in balance migration file: '${ADDR1}'. Each address must be unique.`))
 });
 
-test('readBalanceMigrationFile - invalid address', async (t) => {
-    await t.exception(() => fileUtils.readBalanceMigrationFile(stateInstance, DUMMY_PATH_INVALID_ADDRESS),
-        errorMessageIncludes('Invalid address format: \'notanaddr\'. Please ensure all addresses are valid.'))
-});
-
 test('readBalanceMigrationFile - invalid balance format', async (t) => {
-    await t.exception(() => fileUtils.readBalanceMigrationFile(stateInstance, DUMMY_PATH_INVALID_BALANCE),
+    await t.exception(() => fileUtils.readBalanceMigrationFile(DUMMY_PATH_INVALID_BALANCE),
         errorMessageIncludes(`Failed to read balance migration file: Invalid line in balance migration file: `))
 });
 
 test('readBalanceMigrationFile - negative balance', async (t) => {
-    await t.exception(() => fileUtils.readBalanceMigrationFile(stateInstance, DUMMY_PATH_NEGATIVE),
+    await t.exception(() => fileUtils.readBalanceMigrationFile(DUMMY_PATH_NEGATIVE),
         errorMessageIncludes(`Failed to read balance migration file: Invalid line in balance migration file: `))
 });
 
 test('readBalanceMigrationFile - malformed line', async (t) => {
-    await t.exception(() => fileUtils.readBalanceMigrationFile(stateInstance, DUMMY_PATH_MALFORMED),
+    await t.exception(() => fileUtils.readBalanceMigrationFile( DUMMY_PATH_MALFORMED),
         errorMessageIncludes(`Failed to read balance migration file: Invalid line in balance migration file: `))
 });
 
 test('readBalanceMigrationFile - blank lines and whitespace', async (t) => {
-    const { addressBalancePair, totalBalance, totalAddresses } = await fileUtils.readBalanceMigrationFile(stateInstance, DUMMY_PATH_BLANK);
+    const { addressBalancePair, totalBalance, totalAddresses } = await fileUtils.readBalanceMigrationFile(DUMMY_PATH_BLANK);
     t.is(addressBalancePair.size, 1);
     t.is(totalAddresses, 1);
     t.ok(addressBalancePair.has(ADDR1));
 });
 
 test('readBalanceMigrationFile - zero balance', async (t) => {
-    const { addressBalancePair, totalBalance, totalAddresses } = await fileUtils.readBalanceMigrationFile(stateInstance, DUMMY_PATH_ZERO);
+    const { addressBalancePair, totalBalance, totalAddresses } = await fileUtils.readBalanceMigrationFile( DUMMY_PATH_ZERO);
     t.is(addressBalancePair.size, 1);
     t.is(totalBalance, 0n);
     t.is(totalAddresses, 1);
@@ -146,56 +110,37 @@ test('readBalanceMigrationFile - zero balance', async (t) => {
 });
 
 test('readBalanceMigrationFile - BOM at start', async (t) => {
-    const { addressBalancePair, totalBalance, totalAddresses } = await fileUtils.readBalanceMigrationFile(stateInstance, DUMMY_PATH_BOM);
+    const { addressBalancePair, totalBalance, totalAddresses } = await fileUtils.readBalanceMigrationFile(DUMMY_PATH_BOM);
     t.is(addressBalancePair.size, 1);
     t.is(totalAddresses, 1);
     t.ok(addressBalancePair.has(ADDR1));
 });
 
 test('readBalanceMigrationFile - large file', async (t) => {
-    const { addressBalancePair, totalBalance, totalAddresses } = await fileUtils.readBalanceMigrationFile(stateInstance, DUMMY_PATH_LARGE);
+    const { addressBalancePair, totalBalance, totalAddresses } = await fileUtils.readBalanceMigrationFile(DUMMY_PATH_LARGE);
     t.is(addressBalancePair.size, 1000);
     t.is(totalAddresses, 1000);
 });
 
-test('readBalanceMigrationFile - admin address', async (t) => {
-    await t.exception(() => fileUtils.readBalanceMigrationFile(stateInstance, DUMMY_PATH_ADMIN_ADDRESS),
-        errorMessageIncludes(`The admin address '${ADDR_ADMIN}' cannot be included in the current operation.`))
-});
-
 test('readBalanceMigrationFile - empty file', async (t) => {
-    await t.exception(() => fileUtils.readBalanceMigrationFile(stateInstance, DUMMY_PATH_EMPTY),
+    await t.exception(() => fileUtils.readBalanceMigrationFile(DUMMY_PATH_EMPTY),
         errorMessageIncludes('Balance migration file is empty. File must contain at least one valid address balance pair.'))
 });
 
 test('readBalanceMigrationFile - file does not exist', async (t) => {
     const nonExistentPath = './non_existent_balance.csv';
-    await t.exception(() => fileUtils.readBalanceMigrationFile(stateInstance, nonExistentPath),
+    await t.exception(() => fileUtils.readBalanceMigrationFile(nonExistentPath),
         errorMessageIncludes(`Balance migration file not found: ${nonExistentPath}`))
 });
 
 test('readBalanceMigrationFile - invalid file extension', async (t) => {
     const invalidExtensionPath = './dummy_balance.txt';
-    await t.exception(() => fileUtils.readBalanceMigrationFile(stateInstance, invalidExtensionPath),
+    await t.exception(() => fileUtils.readBalanceMigrationFile(invalidExtensionPath),
         errorMessageIncludes(`Invalid file format: ${invalidExtensionPath}. Balance migration file must be a CSV file.`))
 });
 
-hook('Update dummy state instance', async t => {
-    stateInstance = stateInstanceWhitelisted;
-});
-
-test('readBalanceMigrationFile - whitelisted address', async (t) => {
-    await t.exception(() => fileUtils.readBalanceMigrationFile(stateInstance, DUMMY_PATH_OK),
-        errorMessageIncludes(`Whitelisted node address '${ADDR1}' cannot be included in the current operation.`))
-});
-
-test('readBalanceMigrationFile - whitelisted admin address', async (t) => {
-    await t.exception(() => fileUtils.readBalanceMigrationFile(stateInstance, DUMMY_PATH_ADMIN_ADDRESS),
-        errorMessageIncludes(`The admin address '${ADDR_ADMIN}' cannot be included in the current operation.`))
-});
-
 hook('Cleanup dummy balance files', async t => {
-    [DUMMY_PATH_OK, DUMMY_PATH_DUP, DUMMY_PATH_ADMIN_ADDRESS, DUMMY_PATH_INVALID_ADDRESS, DUMMY_PATH_EMPTY,
+    [DUMMY_PATH_OK, DUMMY_PATH_DUP, DUMMY_PATH_EMPTY,
      DUMMY_PATH_WHITESPACE, DUMMY_PATH_INVALID_BALANCE, DUMMY_PATH_NEGATIVE, DUMMY_PATH_MALFORMED, DUMMY_PATH_BLANK,
      DUMMY_PATH_ZERO, DUMMY_PATH_BOM, DUMMY_PATH_LARGE].forEach(path => {
         if (fs.existsSync(path)) fs.unlinkSync(path);

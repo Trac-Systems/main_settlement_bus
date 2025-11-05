@@ -24,7 +24,8 @@ import {
     OperationType,
     MAX_RETRIES,
     CustomEventType,
-    BALANCE_MIGRATION_SLEEP_INTERVAL
+    BALANCE_MIGRATION_SLEEP_INTERVAL,
+    WHITELIST_MIGRATION_DIR
 } from "./utils/constants.js";
 import partialStateMessageOperations from "./messages/partialStateMessages/PartialStateMessageOperations.js";
 import { randomBytes } from "hypercore-crypto";
@@ -279,6 +280,7 @@ export class MainSettlementBus extends ReadyResource {
             console.log("Current node is unwritable");
         });
     }
+
     async #handleAdminCreation() {
         if (this.#enable_wallet === false) {
             throw new Error("Can not initialize an admin - wallet is not enabled.");
@@ -360,7 +362,15 @@ export class MainSettlementBus extends ReadyResource {
         }
 
         const messages = new Map();
-        const addresses = await fileUtils.readAddressesFromWhitelistFile(this.#state);
+        const addresses = await fileUtils.readAddressesFromWhitelistFile();
+
+        for (const address of addresses) {
+            await fileUtils.validateAddressFromIncomingFile(this.#state, address, adminEntry);
+        }
+
+        await fileUtils.validateMigrationData(addresses, WHITELIST_MIGRATION_DIR);
+        const migrationNumber = await fileUtils.getNextMigrationNumber(WHITELIST_MIGRATION_DIR);
+        await fileUtils.createWhitelistEntryFile(addresses, migrationNumber, WHITELIST_MIGRATION_DIR);
 
         for (const addressToWhitelist of addresses) {
             const txValidity = await this.#state.getIndexerSequenceState();
@@ -787,6 +797,7 @@ export class MainSettlementBus extends ReadyResource {
         if (this.#enable_wallet === false) {
             throw new Error("Can not initialize an admin - wallet is not enabled.");
         }
+
         const adminEntry = await this.#state.getAdminEntry();
 
         if (!adminEntry) {
@@ -809,7 +820,12 @@ export class MainSettlementBus extends ReadyResource {
             throw new Error("Can not initialize an admin - bootstrap is not equal to writing key.");
         }
 
-        const { addressBalancePair, totalBalance, totalAddresses, addresses } = await fileUtils.readBalanceMigrationFile(this.#state);
+        const { addressBalancePair, totalBalance, totalAddresses, addresses } = await fileUtils.readBalanceMigrationFile();
+        
+        for (let i = 0; i < addresses.length; i++) {
+            await fileUtils.validateAddressFromIncomingFile(this.#state, addresses[i].address, adminEntry);
+        }
+        
         await fileUtils.validateMigrationData(addresses);
         const migrationNumber = await fileUtils.getNextMigrationNumber();
         await fileUtils.createMigrationEntryFile(addressBalancePair, migrationNumber);

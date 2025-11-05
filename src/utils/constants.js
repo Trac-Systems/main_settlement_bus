@@ -55,7 +55,8 @@ export const ADMIN_INITIAL_STAKED_BALANCE = b4a.from([0, 0, 0, 0, 0, 0, 0, 0,4, 
 
 export const WHITELIST_FILEPATH = './whitelist/addresses.csv';
 export const BALANCE_MIGRATION_FILEPATH = './migration/initial_balances.csv';
-export const MIGRATED_DIR = './migration/migrated/';
+export const BALANCE_MIGRATED_DIR = './migration/migrated/';
+export const WHITELIST_MIGRATION_DIR = './whitelist/migrated/';
 export const TRAC_NAMESPACE = 'TracNetwork';
 export const WHITELIST_SLEEP_INTERVAL = 1_000;
 export const BALANCE_MIGRATION_SLEEP_INTERVAL = 500;
