@@ -17,8 +17,12 @@ const MIGRATED_FILE_REGEX = /^migrated(\d+)\.csv$/;
  * @throws {Error} If the file does not exist or cannot be read.
  */
 // TODO: We should generalize this function in the future, so we can improve the reusability of the code.
-async function readAddressesFromWhitelistFile(filepath = WHITELIST_FILEPATH) {
+async function readAddressesFromWhitelistFile(stateInstance, filepath = WHITELIST_FILEPATH) {
     try {
+        if (!filepath.toLowerCase().endsWith('.csv')) {
+            throw new Error(`Invalid file format: ${filepath}. Balance migration file must be a CSV file.`);
+        }
+
         const data = await fs.promises.readFile(filepath, 'utf8');
         const addresses = data
             .split('\n')
@@ -26,7 +30,13 @@ async function readAddressesFromWhitelistFile(filepath = WHITELIST_FILEPATH) {
             .filter(line => line.length > 0);
 
         if (addresses.length === 0) {
-            console.log('The file does not contain any public keys');
+            throw new Error('The whitelist file is empty. File must contain at least one valid address.');
+        }
+
+        const adminEntry = await stateInstance.getAdminEntry();
+        
+        for (const address of addresses) {
+            await validateAddress(stateInstance, address, adminEntry);
         }
 
         return addresses;
@@ -72,25 +82,8 @@ async function readBalanceMigrationFile(stateInstance, filepath = BALANCE_MIGRAT
             if (addressBalancePair.has(address)) {
                 throw new Error(`Duplicate address found in balance migration file: '${address}'. Each address must be unique.`);
             }
-            if (!isAddressValid(address)) {
-                throw new Error(`Invalid address found in balance migration file: '${address}'. Please ensure all addresses are valid.`);
-            }
 
-            const publicKey = PeerWallet.decodeBech32m(address);
-
-            if (!publicKey || publicKey.length !== 32) {
-                throw new Error(`Invalid public key found in balance migration file: '${address}'. Please ensure all addresses are valid.`);
-            }
-
-            if (address === adminEntry.address) {
-                throw new Error(`The admin address '${address}' cannot be included in the balance migration file.`);
-            }
-
-            const nodeEntry = await stateInstance.getNodeEntryUnsigned(address);
-
-            if (nodeEntry && nodeEntry.isWhitelisted) {
-                throw new Error(`Whitelisted node address '${address}' cannot be included in the balance migration file.`);
-            }
+            await validateAddress(stateInstance, address, adminEntry);
 
             const parsedBalance = decimalStringToBigInt(balance);
             const balanceBuffer = bigIntTo16ByteBuffer(parsedBalance);
@@ -104,13 +97,35 @@ async function readBalanceMigrationFile(stateInstance, filepath = BALANCE_MIGRAT
             addresses.push({ address, parsedBalance })
             addressBalancePair.set(address, balanceBuffer);
         }
-        
+
         return { addressBalancePair, totalBalance, totalAddresses, addresses };
     } catch (err) {
         if (err.code === 'ENOENT') {
             throw new Error(`Balance migration file not found: ${filepath}`);
         }
         throw new Error(`Failed to read balance migration file: ${err.message}`);
+    }
+}
+
+export async function validateAddress(stateInstance, address, adminEntry) {
+    if (!isAddressValid(address)) {
+        throw new Error(`Invalid address format: '${address}'. Please ensure all addresses are valid.`);
+    }
+
+    const publicKey = PeerWallet.decodeBech32m(address);
+
+    if (!publicKey || publicKey.length !== 32) {
+        throw new Error(`Invalid public key: '${address}'. Please ensure all addresses are valid.`);
+    }
+
+    if (address === adminEntry.address) {
+        throw new Error(`The admin address '${address}' cannot be included in the current operation.`);
+    }
+
+    const nodeEntry = await stateInstance.getNodeEntryUnsigned(address);
+
+    if (nodeEntry && nodeEntry.isWhitelisted) {
+        throw new Error(`Whitelisted node address '${address}' cannot be included in the current operation.`);
     }
 }
 
@@ -143,7 +158,7 @@ export async function validateMigrationData(addresses, migrationDirectory = MIGR
 export async function getNextMigrationNumber(migrationDirectory = MIGRATED_DIR) {
     const migrationFiles = await getAllMigrationFiles(migrationDirectory);
     if (migrationFiles.length === 0) return 1;
-    
+
     const numbers = migrationFiles.map(filePath => {
         const fileName = path.basename(filePath);
         const match = fileName.match(MIGRATED_FILE_REGEX);

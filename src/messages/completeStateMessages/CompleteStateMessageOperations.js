@@ -145,23 +145,16 @@ class CompleteStateMessageOperations {
         }
     }
 
-    static async assembleAppendWhitelistMessages(wallet, txValidity) {
+    static async assembleAppendWhitelistMessages(wallet, txValidity, addressToWhitelist) {
         try {
 
             const builder = new CompleteStateMessageBuilder(wallet);
             const director = new CompleteStateMessageDirector();
             director.builder = builder;
 
-            const messages = new Map();
-            const addresses = await fileUtils.readAddressesFromWhitelistFile();
-
-            for (const addressToWhitelist of addresses) {
-                const payload = await director.buildAppendWhitelistMessage(wallet.address, addressToWhitelist, txValidity);
-                const encodedPayload = safeEncodeApplyOperation(payload);
-                messages.set(addressToWhitelist, encodedPayload);
-            }
-
-            return messages;
+            const payload = await director.buildAppendWhitelistMessage(wallet.address, addressToWhitelist, txValidity);
+            
+            return safeEncodeApplyOperation(payload);;
         } catch (error) {
             throw new Error(`Failed to assemble appendWhitelistMessages: ${error.message}`);
         }

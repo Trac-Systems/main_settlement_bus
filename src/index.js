@@ -359,19 +359,27 @@ export class MainSettlementBus extends ReadyResource {
             throw new Error('Cannot perform whitelisting - you are not the admin!.');
         }
 
-        const txValidity = await this.#state.getIndexerSequenceState();
-        const assembledWhitelistMessages = await CompleteStateMessageOperations.assembleAppendWhitelistMessages(
-            this.#wallet,
-            txValidity
-        );
-        if (!assembledWhitelistMessages) {
+        const messages = new Map();
+        const addresses = await fileUtils.readAddressesFromWhitelistFile(this.#state);
+
+        for (const addressToWhitelist of addresses) {
+            const txValidity = await this.#state.getIndexerSequenceState();
+            const encodedPayload = await CompleteStateMessageOperations.assembleAppendWhitelistMessages(
+                this.#wallet,
+                txValidity,
+                addressToWhitelist
+            );
+            messages.set(addressToWhitelist, encodedPayload);
+        }
+
+        if (!messages || messages.size === 0) {
             throw new Error("No whitelisted messages to process.");
         }
 
-        const totalElements = assembledWhitelistMessages.size;
+        const totalElements = messages.size;
         let processedCount = 0;
 
-        for (const [address, encodedPayload] of assembledWhitelistMessages) {
+        for (const [address, encodedPayload] of messages) {
             processedCount++;
             const isWhitelisted = await this.#state.isAddressWhitelisted(address);
             if (isWhitelisted) {
@@ -818,7 +826,7 @@ export class MainSettlementBus extends ReadyResource {
         if (messages.length === 0) {
             throw new Error("No balance migration messages to process.");
         }
-        
+
         console.log("Starting BRC20 $TRAC TO $TNK native migration...");
         for (let i = 0; i < messages.length; i++) {
             const message = messages[i];
@@ -830,7 +838,7 @@ export class MainSettlementBus extends ReadyResource {
 
         await sleep(5000);
         let allBalancesMigrated = true;
-         
+
         console.log("Verifying migrated balances for unsigned length...");
         for (let i = 0; i < addresses.length; i++) {
             const entry = await this.#state.getNodeEntryUnsigned(addresses[i].address);

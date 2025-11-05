@@ -112,7 +112,7 @@ test('readBalanceMigrationFile - duplicate address', async (t) => {
 
 test('readBalanceMigrationFile - invalid address', async (t) => {
     await t.exception(() => fileUtils.readBalanceMigrationFile(stateInstance, DUMMY_PATH_INVALID_ADDRESS),
-        errorMessageIncludes('Invalid address found in balance migration file: \'notanaddr\'. Please ensure all addresses are valid.'))
+        errorMessageIncludes('Invalid address format: \'notanaddr\'. Please ensure all addresses are valid.'))
 });
 
 test('readBalanceMigrationFile - invalid balance format', async (t) => {
@@ -160,7 +160,7 @@ test('readBalanceMigrationFile - large file', async (t) => {
 
 test('readBalanceMigrationFile - admin address', async (t) => {
     await t.exception(() => fileUtils.readBalanceMigrationFile(stateInstance, DUMMY_PATH_ADMIN_ADDRESS),
-        errorMessageIncludes(`The admin address '${ADDR_ADMIN}' cannot be included in the balance migration file.`))
+        errorMessageIncludes(`The admin address '${ADDR_ADMIN}' cannot be included in the current operation.`))
 });
 
 test('readBalanceMigrationFile - empty file', async (t) => {
@@ -186,12 +186,12 @@ hook('Update dummy state instance', async t => {
 
 test('readBalanceMigrationFile - whitelisted address', async (t) => {
     await t.exception(() => fileUtils.readBalanceMigrationFile(stateInstance, DUMMY_PATH_OK),
-        errorMessageIncludes(`Whitelisted node address '${ADDR1}' cannot be included in the balance migration file.`))
+        errorMessageIncludes(`Whitelisted node address '${ADDR1}' cannot be included in the current operation.`))
 });
 
 test('readBalanceMigrationFile - whitelisted admin address', async (t) => {
     await t.exception(() => fileUtils.readBalanceMigrationFile(stateInstance, DUMMY_PATH_ADMIN_ADDRESS),
-        errorMessageIncludes(`The admin address '${ADDR_ADMIN}' cannot be included in the balance migration file.`))
+        errorMessageIncludes(`The admin address '${ADDR_ADMIN}' cannot be included in the current operation.`))
 });
 
 hook('Cleanup dummy balance files', async t => {
