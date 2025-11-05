@@ -23,7 +23,9 @@ import {
     EntryType,
     OperationType,
     MAX_RETRIES,
-    CustomEventType
+    CustomEventType,
+    BALANCE_MIGRATION_SLEEP_INTERVAL,
+    WHITELIST_MIGRATION_DIR
 } from "./utils/constants.js";
 import partialStateMessageOperations from "./messages/partialStateMessages/PartialStateMessageOperations.js";
 import { randomBytes } from "hypercore-crypto";
@@ -34,7 +36,8 @@ import PartialTransfer from "./core/network/messaging/validators/PartialTransfer
 import { blake3Hash } from "./utils/crypto.js";
 import deploymentEntryUtils from "./core/state/utils/deploymentEntry.js";
 import PartialTransaction from "./core/network/messaging/validators/PartialTransaction.js";
-
+import fileUtils from './utils/fileUtils.js';
+import migrationUtils from './utils/migrationUtils.js';
 export class MainSettlementBus extends ReadyResource {
     // internal attributes
     #options;
@@ -278,6 +281,7 @@ export class MainSettlementBus extends ReadyResource {
             console.log("Current node is unwritable");
         });
     }
+
     async #handleAdminCreation() {
         if (this.#enable_wallet === false) {
             throw new Error("Can not initialize an admin - wallet is not enabled.");
@@ -358,19 +362,34 @@ export class MainSettlementBus extends ReadyResource {
             throw new Error('Cannot perform whitelisting - you are not the admin!.');
         }
 
-        const txValidity = await this.#state.getIndexerSequenceState();
-        const assembledWhitelistMessages = await CompleteStateMessageOperations.assembleAppendWhitelistMessages(
-            this.#wallet,
-            txValidity
-        );
-        if (!assembledWhitelistMessages) {
+        const messages = new Map();
+        const addresses = await fileUtils.readAddressesFromWhitelistFile();
+
+        for (const address of addresses) {
+            await migrationUtils.validateAddressFromIncomingFile(this.#state, address, adminEntry);
+        }
+        await fileUtils.validateWhitelistMigrationData(addresses, WHITELIST_MIGRATION_DIR);
+        const migrationNumber = await fileUtils.getNextMigrationNumber(WHITELIST_MIGRATION_DIR);
+        await fileUtils.createWhitelistEntryFile(addresses, migrationNumber, WHITELIST_MIGRATION_DIR);
+
+        for (const addressToWhitelist of addresses) {
+            const txValidity = await this.#state.getIndexerSequenceState();
+            const encodedPayload = await CompleteStateMessageOperations.assembleAppendWhitelistMessages(
+                this.#wallet,
+                txValidity,
+                addressToWhitelist
+            );
+            messages.set(addressToWhitelist, encodedPayload);
+        }
+
+        if (!messages || messages.size === 0) {
             throw new Error("No whitelisted messages to process.");
         }
 
-        const totalElements = assembledWhitelistMessages.size;
+        const totalElements = messages.size;
         let processedCount = 0;
 
-        for (const [address, encodedPayload] of assembledWhitelistMessages) {
+        for (const [address, encodedPayload] of messages) {
             processedCount++;
             const isWhitelisted = await this.#state.isAddressWhitelisted(address);
             if (isWhitelisted) {
@@ -778,6 +797,7 @@ export class MainSettlementBus extends ReadyResource {
         if (this.#enable_wallet === false) {
             throw new Error("Can not initialize an admin - wallet is not enabled.");
         }
+
         const adminEntry = await this.#state.getAdminEntry();
 
         if (!adminEntry) {
@@ -785,58 +805,80 @@ export class MainSettlementBus extends ReadyResource {
         }
 
         if (!this.#isAdmin(adminEntry)) {
-            throw new Error('Cannot perform whitelisting - you are not the admin!.');
+            throw new Error('Cannot perform balance migration - you are not the admin!.');
         }
 
         if (!this.#wallet) {
-            throw new Error(
-                "Can not initialize an admin - wallet is not initialized."
-            );
-        }
-        if (!this.#state.writingKey) {
-            throw new Error(
-                "Can not initialize an admin - writing key is not initialized."
-            );
-        }
-        if (!b4a.equals(this.#state.writingKey, this.#bootstrap)) {
-            throw new Error(
-                "Can not initialize an admin - bootstrap is not equal to writing key."
-            );
+            throw new Error("Can not initialize an admin - wallet is not initialized.");
         }
 
+        if (!this.#state.writingKey) {
+            throw new Error("Can not initialize an admin - writing key is not initialized.");
+        }
+
+        if (!b4a.equals(this.#state.writingKey, this.#bootstrap)) {
+            throw new Error("Can not initialize an admin - bootstrap is not equal to writing key.");
+        }
+
+        const { addressBalancePair, totalBalance, totalAddresses, addresses } = await fileUtils.readBalanceMigrationFile();
+        
+        for (let i = 0; i < addresses.length; i++) {
+            await migrationUtils.validateAddressFromIncomingFile(this.#state, addresses[i].address, adminEntry);
+        }
+        
+        await fileUtils.validateBalanceMigrationData(addresses);
+        const migrationNumber = await fileUtils.getNextMigrationNumber();
+        await fileUtils.createMigrationEntryFile(addressBalancePair, migrationNumber);
+
         const txValidity = await this.#state.getIndexerSequenceState();
-        const { messages, totalBalance, totalAddresses, addresses } = await CompleteStateMessageOperations.assembleBalanceInitializationMessages(
+        const messages = await CompleteStateMessageOperations.assembleBalanceInitializationMessages(
             this.#wallet,
-            txValidity
+            txValidity,
+            addressBalancePair,
         );
+
         console.log(`Total balance to migrate: ${bigIntToDecimalString(totalBalance)} across ${totalAddresses} addresses.`);
 
         if (messages.length === 0) {
             throw new Error("No balance migration messages to process.");
         }
+
         console.log("Starting BRC20 $TRAC TO $TNK native migration...");
         for (let i = 0; i < messages.length; i++) {
             const message = messages[i];
             console.log(`Processing message ${i + 1} of ${messages.length}...`);
             await this.#state.append(message);
-            await sleep(WHITELIST_SLEEP_INTERVAL);
+            await sleep(BALANCE_MIGRATION_SLEEP_INTERVAL);
+
         }
 
-        await sleep(WHITELIST_SLEEP_INTERVAL);
-
+        await sleep(5000);
         let allBalancesMigrated = true;
+
+        console.log("Verifying migrated balances for unsigned length...");
+        for (let i = 0; i < addresses.length; i++) {
+            const entry = await this.#state.getNodeEntryUnsigned(addresses[i].address);
+            const expectedBalance = addresses[i].parsedBalance;
+            const amountBigInt = bufferToBigInt(entry.balance);
+            if (amountBigInt !== expectedBalance) {
+                allBalancesMigrated = false
+                console.log(`Balance of ${addresses[i].address} failed to migrate. Expected: ${expectedBalance}, Found: ${amountBigInt} for unsigned length`);
+            }
+        }
+
+        console.log("Verifying migrated balances for signed length...");
         for (let i = 0; i < addresses.length; i++) {
             const entry = await this.#state.getNodeEntry(addresses[i].address);
             const expectedBalance = addresses[i].parsedBalance;
             const amountBigInt = bufferToBigInt(entry.balance);
             if (amountBigInt !== expectedBalance) {
                 allBalancesMigrated = false
-                console.log(`Balance of ${expectedBalance} failed to migrate to address: ${addresses[i].address}, ${addresses[i].parsedBalance}`);
-                break
+                console.log(`Balance of ${addresses[i].address} failed to migrate. Expected: ${expectedBalance}, Found: ${amountBigInt} for signed length`);
             }
         }
 
         console.log("Balance migration successful: ", allBalancesMigrated);
+        console.log(`${bigIntToDecimalString(totalBalance)} $TNK have been migrated across ${totalAddresses} addresses.`);
     }
 
     async #disableInitialization() {
@@ -1202,7 +1244,7 @@ export class MainSettlementBus extends ReadyResource {
                             const tx = await this.#state.get(hash)
                             if (tx !== null) {
                                 break;
-                            } 
+                            }
                             this.network.validatorConnectionManager.rotate() // force change connection rotation for the next retry
                         }
 
@@ -1264,7 +1306,7 @@ export class MainSettlementBus extends ReadyResource {
                         if (!rawPayload) {
                             console.log(`No payload found for tx hash: ${hash}`)
                             return null
-                        } 
+                        }
                         const normalizedPayload = normalizeDecodedPayloadForJson(rawPayload.decoded);
                         return normalizedPayload
                     } catch (error) {
