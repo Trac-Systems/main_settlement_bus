@@ -1,5 +1,5 @@
 import { test, hook } from 'brittle';
-import fileUtils from '../../src/utils/fileUtils.js';
+import migrationUtils from '../../src/utils/migrationUtils.js';
 import { errorMessageIncludes } from "../utils/regexHelper.js";
 import { ZERO_LICENSE } from '../../src/core/state/utils/nodeEntry.js';
 import b4a from 'b4a';
@@ -39,7 +39,7 @@ const mockStateInstanceBanned = {
 };
 
 test('validateAddressFromIncomingFile - valid address', async (t) => {
-    await fileUtils.validateAddressFromIncomingFile(
+    await migrationUtils.validateAddressFromIncomingFile(
         mockStateInstance,
         VALID_ADDRESS,
         { address: ADMIN_ADDRESS }
@@ -49,7 +49,7 @@ test('validateAddressFromIncomingFile - valid address', async (t) => {
 
 test('validateAddressFromIncomingFile - invalid address format', async (t) => {
     await t.exception(
-        () => fileUtils.validateAddressFromIncomingFile(
+        () => migrationUtils.validateAddressFromIncomingFile(
             mockStateInstance,
             INVALID_ADDRESS,
             { address: ADMIN_ADDRESS }
@@ -60,7 +60,7 @@ test('validateAddressFromIncomingFile - invalid address format', async (t) => {
 
 test('validateAddressFromIncomingFile - admin address', async (t) => {
     await t.exception(
-        () => fileUtils.validateAddressFromIncomingFile(
+        () => migrationUtils.validateAddressFromIncomingFile(
             mockStateInstance,
             ADMIN_ADDRESS,
             { address: ADMIN_ADDRESS }
@@ -71,7 +71,7 @@ test('validateAddressFromIncomingFile - admin address', async (t) => {
 
 test('validateAddressFromIncomingFile - whitelisted node', async (t) => {
     await t.exception(
-        () => fileUtils.validateAddressFromIncomingFile(
+        () => migrationUtils.validateAddressFromIncomingFile(
             mockStateInstanceWhitelisted,
             VALID_ADDRESS,
             { address: ADMIN_ADDRESS }
@@ -82,7 +82,7 @@ test('validateAddressFromIncomingFile - whitelisted node', async (t) => {
 
 test('validateAddressFromIncomingFile - banned/previously whitelisted address', async (t) => {
     await t.exception(
-        () => fileUtils.validateAddressFromIncomingFile(
+        () => migrationUtils.validateAddressFromIncomingFile(
             mockStateInstanceBanned,
             VALID_ADDRESS,
             { address: ADMIN_ADDRESS }

@@ -23,9 +23,9 @@ export async function readAddressesFromWhitelistFile(filepath = WHITELIST_FILEPA
         if (!filepath.toLowerCase().endsWith('.csv')) {
             throw new Error(`Invalid file format: ${filepath}. Balance migration file must be a CSV file.`);
         }
-        
+
         const data = await fs.promises.readFile(filepath, 'utf8');
-        
+
         const addresses = data
             .split('\n')
             .map(line => line.trim())
@@ -116,32 +116,6 @@ export async function readBalanceMigrationFile(filepath = BALANCE_MIGRATION_FILE
     }
 }
 
-export async function validateAddressFromIncomingFile(stateInstance, address, adminEntry) {
-    if (!isAddressValid(address)) {
-        throw new Error(`Invalid address format: '${address}'. Please ensure all addresses are valid.`);
-    }
-
-    const publicKey = PeerWallet.decodeBech32m(address);
-
-    if (!publicKey || publicKey.length !== 32) {
-        throw new Error(`Invalid public key: '${address}'. Please ensure all addresses are valid.`);
-    }
-
-    if (address === adminEntry.address) {
-        throw new Error(`The admin address '${address}' cannot be included in the current operation.`);
-    }
-
-    const nodeEntry = await stateInstance.getNodeEntryUnsigned(address);
-
-    if (nodeEntry && nodeEntry.isWhitelisted) {
-        throw new Error(`Whitelisted node address '${address}' cannot be included in the current operation.`);
-    }
-
-    if (nodeEntry && !b4a.equals(nodeEntry.license, ZERO_LICENSE)) {
-        throw new Error(`Address '${address}' has been banned/whitelisted in the past and cannot be included in the current operation.`);
-    }
-}
-
 export async function getAllMigrationFiles(migrationDirectory = BALANCE_MIGRATED_DIR) {
     try {
         const files = await fs.promises.readdir(migrationDirectory);
@@ -152,34 +126,40 @@ export async function getAllMigrationFiles(migrationDirectory = BALANCE_MIGRATED
     }
 }
 
-export async function validateMigrationData(addresses, migrationDirectory = BALANCE_MIGRATED_DIR) {
-    const migrationFiles = await getAllMigrationFiles(migrationDirectory);
-    if (migrationDirectory === BALANCE_MIGRATED_DIR) {
-        for (let i = 0; i < addresses.length; i++) {
-            const address = addresses[i].address;
-            for (const filePath of migrationFiles) {
-                const content = await fs.promises.readFile(filePath, 'utf8');
-                const hasMigratedAddress = content
-                    .split('\n')
-                    .some(line => line.trim() && line.split(',')[0] === address);
+export async function validateBalanceMigrationData(addresses) {
+    const migrationFiles = await getAllMigrationFiles(BALANCE_MIGRATED_DIR);
+    const addressSet = new Set(addresses.map(a => a.address));
 
-                if (hasMigratedAddress) {
-                    throw new Error(`Address '${address}' has already been migrated in file: ${filePath}`);
-                }
+    for (const filePath of migrationFiles) {
+        const content = await fs.promises.readFile(filePath, 'utf8');
+        const lines = content.split('\n');
+
+        for (const line of lines) {
+            const trimmedLine = line.trim();
+            if (!trimmedLine) continue;
+
+            const migratedAddress = trimmedLine.split(',')[0];
+            if (addressSet.has(migratedAddress)) {
+                throw new Error(`Address '${migratedAddress}' has already been migrated in file: ${filePath}`);
             }
         }
-    } else if (migrationDirectory === WHITELIST_MIGRATION_DIR) {
-        for (let i = 0; i < addresses.length; i++) {
-            const address = addresses[i];
-            for (const filePath of migrationFiles) {
-                const content = await fs.promises.readFile(filePath, 'utf8');
-                const hasMigratedAddress = content
-                    .split('\n')
-                    .some(line => line.trim() === address);
+    }
+}
 
-                if (hasMigratedAddress) {
-                    throw new Error(`Address '${address}' has already been migrated in file: ${filePath}`);
-                }
+export async function validateWhitelistMigrationData(addresses) {
+    const migrationFiles = await getAllMigrationFiles(WHITELIST_MIGRATION_DIR);
+    const addressSet = new Set(addresses);
+
+    for (const filePath of migrationFiles) {
+        const content = await fs.promises.readFile(filePath, 'utf8');
+        const lines = content.split('\n');
+
+        for (const line of lines) {
+            const trimmedLine = line.trim();
+            if (!trimmedLine) continue;
+
+            if (addressSet.has(trimmedLine)) {
+                throw new Error(`Address '${trimmedLine}' has already been migrated in file: ${filePath}`);
             }
         }
     }
@@ -220,9 +200,9 @@ export default {
     readAddressesFromWhitelistFile,
     readBalanceMigrationFile,
     getAllMigrationFiles,
-    validateMigrationData,
+    validateBalanceMigrationData,
+    validateWhitelistMigrationData,
     getNextMigrationNumber,
     createMigrationEntryFile,
     createWhitelistEntryFile,
-    validateAddressFromIncomingFile
 }

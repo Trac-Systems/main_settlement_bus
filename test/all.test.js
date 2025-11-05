@@ -11,7 +11,7 @@ async function runTests() {
   await import('./functions/functions.test.js');
   await import('./fileUtils/readAddressesFromWhitelistFile.test.js');
   await import('./fileUtils/readBalanceMigrationFile.test.js');
-  await import('./fileUtils/validateAddressFromIncomingFile.test.js');
+  await import('./migrationUtils/validateAddressFromIncomingFile.test.js');
   // await import('./messageOperations/stateMessageOperations.test.js');
   await import('./buffer/buffer.test.js')
   await import('./network/connectionManagerTests.test.js')

@@ -37,6 +37,7 @@ import { blake3Hash } from "./utils/crypto.js";
 import deploymentEntryUtils from "./core/state/utils/deploymentEntry.js";
 import PartialTransaction from "./core/network/messaging/validators/PartialTransaction.js";
 import fileUtils from './utils/fileUtils.js';
+import migrationUtils from './utils/migrationUtils.js';
 export class MainSettlementBus extends ReadyResource {
     // internal attributes
     #options;
@@ -365,10 +366,9 @@ export class MainSettlementBus extends ReadyResource {
         const addresses = await fileUtils.readAddressesFromWhitelistFile();
 
         for (const address of addresses) {
-            await fileUtils.validateAddressFromIncomingFile(this.#state, address, adminEntry);
+            await migrationUtils.validateAddressFromIncomingFile(this.#state, address, adminEntry);
         }
-
-        await fileUtils.validateMigrationData(addresses, WHITELIST_MIGRATION_DIR);
+        await fileUtils.validateWhitelistMigrationData(addresses, WHITELIST_MIGRATION_DIR);
         const migrationNumber = await fileUtils.getNextMigrationNumber(WHITELIST_MIGRATION_DIR);
         await fileUtils.createWhitelistEntryFile(addresses, migrationNumber, WHITELIST_MIGRATION_DIR);
 
@@ -823,10 +823,10 @@ export class MainSettlementBus extends ReadyResource {
         const { addressBalancePair, totalBalance, totalAddresses, addresses } = await fileUtils.readBalanceMigrationFile();
         
         for (let i = 0; i < addresses.length; i++) {
-            await fileUtils.validateAddressFromIncomingFile(this.#state, addresses[i].address, adminEntry);
+            await migrationUtils.validateAddressFromIncomingFile(this.#state, addresses[i].address, adminEntry);
         }
         
-        await fileUtils.validateMigrationData(addresses);
+        await fileUtils.validateBalanceMigrationData(addresses);
         const migrationNumber = await fileUtils.getNextMigrationNumber();
         await fileUtils.createMigrationEntryFile(addressBalancePair, migrationNumber);
 
