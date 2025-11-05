@@ -253,12 +253,12 @@ export async function setupWhitelist(admin, whitelistAddresses) {
     const originalReadAddressesFromWhitelistFile = fileUtils.readAddressesFromWhitelistFile;
     fileUtils.readAddressesFromWhitelistFile = async () => whitelistAddresses;
     const validity = await admin.msb.state.getIndexerSequenceState()
-    const assembledWhitelistMessages = await CompleteStateMessageOperations.assembleAppendWhitelistMessages(admin.wallet, validity);
-    for (const [_, msg] of assembledWhitelistMessages.entries()) {
+    for (const address of whitelistAddresses) {
+        const msg = await CompleteStateMessageOperations.assembleAppendWhitelistMessages(admin.wallet, validity, address);
         await admin.msb.state.append(msg);
         await sleep(100)
-        await admin.msb.state.base.forceFastForward()
     }
+    await admin.msb.state.base.forceFastForward()
     fileUtils.readAddressesFromWhitelistFile = originalReadAddressesFromWhitelistFile;
 }
 
