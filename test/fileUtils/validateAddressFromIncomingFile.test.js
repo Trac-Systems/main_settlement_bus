@@ -1,16 +1,17 @@
 import { test, hook } from 'brittle';
 import fileUtils from '../../src/utils/fileUtils.js';
 import { errorMessageIncludes } from "../utils/regexHelper.js";
+import { ZERO_LICENSE } from '../../src/core/state/utils/nodeEntry.js';
 import b4a from 'b4a';
-
 const VALID_ADDRESS = 'trac1dguwzsvcsehslh6dgj2mqlsxdn7s5t5vhem56yd0xlg47aq6exzqymhr6u';
 const ADMIN_ADDRESS = 'trac1yva2pduhz5yst8jgzmrc9ve0as5mx7tcw6le9srj6xcwqkx9hacqxxhsf9';
 const INVALID_ADDRESS = 'notanaddress';
+const LICENSE_NUMBER_ONE = b4a.alloc(4, 1);
 
 const mockStateInstance = {
     getNodeEntryUnsigned: async () => ({
         isWhitelisted: false,
-        license: b4a.alloc(4, 0)
+        license: ZERO_LICENSE
     }),
     getAdminEntry: async () => ({
         address: ADMIN_ADDRESS
@@ -20,7 +21,7 @@ const mockStateInstance = {
 const mockStateInstanceWhitelisted = {
     getNodeEntryUnsigned: async () => ({
         isWhitelisted: true,
-        license: b4a.alloc(4, 0)
+        license: ZERO_LICENSE
     }),
     getAdminEntry: async () => ({
         address: ADMIN_ADDRESS
@@ -30,7 +31,7 @@ const mockStateInstanceWhitelisted = {
 const mockStateInstanceBanned = {
     getNodeEntryUnsigned: async () => ({
         isWhitelisted: false,
-        license: b4a.alloc(4, 1)
+        license: LICENSE_NUMBER_ONE
     }),
     getAdminEntry: async () => ({
         address: ADMIN_ADDRESS

@@ -5,6 +5,7 @@ import { isAddressValid } from '../core/state/utils/address.js';
 import { decimalStringToBigInt, bigIntTo16ByteBuffer, bufferToBigInt, bigIntToDecimalString } from './amountSerialization.js';
 import PeerWallet from 'trac-wallet';
 import b4a from 'b4a';
+import { ZERO_LICENSE } from '../core/state/utils/nodeEntry.js';
 const MIGRATED_FILE_REGEX = /^migrated(\d+)\.csv$/;
 
 /**
@@ -136,7 +137,7 @@ export async function validateAddressFromIncomingFile(stateInstance, address, ad
         throw new Error(`Whitelisted node address '${address}' cannot be included in the current operation.`);
     }
 
-    if (nodeEntry && !b4a.equals(nodeEntry.license, b4a.alloc(4,0))) {
+    if (nodeEntry && !b4a.equals(nodeEntry.license, ZERO_LICENSE)) {
         throw new Error(`Address '${address}' has been banned/whitelisted in the past and cannot be included in the current operation.`);
     }
 }
