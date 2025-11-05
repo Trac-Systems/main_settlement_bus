@@ -19,8 +19,13 @@ import {
 import {safeDecodeApplyOperation, safeEncodeApplyOperation} from '../../../../src/utils/protobuf/operationHelpers.js'
 import {testKeyPair1, testKeyPair2, testKeyPair3, testKeyPair4, testKeyPair5} from '../../../fixtures/apply.fixtures.js';
 import {OperationType} from "../../../../src/utils/constants.js";
-import {addressToBuffer} from "../../../../src/core/state/utils/address.js";
+import addressUtils from '../../../../src/core/state/utils/address.js';;
 import { $TNK } from '../../../../src/core/state/utils/balance.js';
+import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
+
+const config = createConfig(ENV.TESTNET1, {})
+
+const addressToBuffer = address => addressUtils.addressToBuffer(address, config.addressPrefix);
 
 let tmpDirectory, admin, writer, externalNode, externalBootstrap, maliciousPeer;
 
@@ -189,9 +194,9 @@ test('handleApplyTxOperation (apply) - invalid postTx address (malicious node re
     const maliciousWriter = await promoteToWriter(admin, maliciousPeer)
     const {postTx, txHash} = await generatePostTx(writer, externalNode, externalBootstrap)
     let decodedPostTx = safeDecodeApplyOperation(postTx);
-    decodedPostTx.address = addressToBuffer(maliciousWriter.wallet.address);
+    decodedPostTx.address = addressToBuffer(maliciousWriter.wallet.address, TRAC_NETWORK_MSB_MAINNET_PREFIX);
     const encodedMaliciousPostTx = safeEncodeApplyOperation(decodedPostTx);
-    await maliciousWriter.msb.state.append(encodedMaliciousPostTx);
+
     await waitDemotion(maliciousWriter, async () => {
         await maliciousWriter.msb.state.append(encodedMaliciousPostTx);
     })
@@ -203,7 +208,7 @@ test('handleApplyTxOperation (apply) - invalid postTx txo.ia (malicious node rep
     const maliciousWriter = await promoteToWriter(admin, maliciousPeer)
     const {postTx, txHash} = await generatePostTx(writer, externalNode, externalBootstrap)
     let decodedPostTx = safeDecodeApplyOperation(postTx);
-    decodedPostTx.txo.ia = addressToBuffer(maliciousWriter.wallet.address);
+    decodedPostTx.txo.ia = addressToBuffer(maliciousWriter.wallet.address, TRAC_NETWORK_MSB_MAINNET_PREFIX);
     const encodedMaliciousPostTx = safeEncodeApplyOperation(decodedPostTx);
     await waitDemotion(maliciousWriter, async () => {
         await maliciousWriter.msb.state.append(encodedMaliciousPostTx);

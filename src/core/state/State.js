@@ -13,7 +13,6 @@ import {
     BATCH_SIZE,
     ADMIN_INITIAL_STAKED_BALANCE,
     MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION,
-    NETWORK_ID,
     TRAC_NAMESPACE,
     CustomEventType
 } from '../../utils/constants.js';
@@ -24,7 +23,7 @@ import { safeDecodeApplyOperation } from '../../utils/protobuf/operationHelpers.
 import { createMessage, ZERO_WK } from '../../utils/buffer.js';
 import addressUtils from './utils/address.js';
 import adminEntryUtils from './utils/adminEntry.js';
-import nodeEntryUtils, { setWritingKey, ZERO_BALANCE, NODE_ENTRY_SIZE } from './utils/nodeEntry.js';
+import nodeEntryUtils, { setWritingKey, NODE_ENTRY_SIZE } from './utils/nodeEntry.js';
 import nodeRoleUtils from './utils/roles.js';
 import lengthEntryUtils from './utils/lengthEntry.js';
 import transactionUtils from './utils/transaction.js';
@@ -43,6 +42,8 @@ import { safeWriteUInt32BE } from '../../utils/buffer.js';
 import deploymentEntryUtils from './utils/deploymentEntry.js';
 import { deepCopyBuffer } from '../../utils/buffer.js';
 import { Status } from './utils/transaction.js';
+import Corestore from 'corestore';
+import { Config } from '../../config/config.js';
 
 const OVERSIZED_BATCH_PENALTY_MULTIPLIER = BATCH_SIZE;
 
@@ -51,24 +52,25 @@ const OVERSIZED_BATCH_PENALTY_MULTIPLIER = BATCH_SIZE;
 class State extends ReadyResource {
     #base;
     #bee;
-    #bootstrap;
     #store;
     #wallet;
-    #enable_tx_apply_logs;
-    #enable_error_apply_logs;
     #writingKey;
+    #config
 
-    constructor(store, bootstrap, wallet, options = {}) {
+    /**
+     * @param {Corestore} store
+     * @param {PeerWallet} wallet
+     * @param {Config} config
+     **/
+    constructor(store, wallet, config) {
         super();
 
+        this.#config = config
         this.#store = store;
-        this.#bootstrap = bootstrap;
         this.#wallet = wallet;
-        this.#enable_tx_apply_logs = options.enable_tx_apply_logs !== undefined ? options.enable_tx_apply_logs : true;
-        this.#enable_error_apply_logs = options.enable_error_apply_logs !== undefined ? options.enable_error_apply_logs : true;
 
         this.check = new Check();
-        this.#base = new Autobase(this.#store, this.#bootstrap, {
+        this.#base = new Autobase(this.#store, this.#config.bootstrap, {
             ackInterval: ACK_INTERVAL,
             valueEncoding: AUTOBASE_VALUE_ENCODING,
             bigBatches: false,
@@ -84,10 +86,6 @@ class State extends ReadyResource {
 
     get writingKey() {
         return this.#writingKey;
-    }
-
-    get bootstrap() {
-        return this.#bootstrap;
     }
 
     get applyHandler() {
@@ -337,7 +335,7 @@ class State extends ReadyResource {
 
     async getRegisteredWriterKey(writingKey) {
         const entry = await this.get(EntryType.WRITER_ADDRESS + writingKey);
-        return entry ? addressUtils.addressToBuffer(entry) : null;
+        return entry ? addressUtils.addressToBuffer(entry, this.#config.addressPrefix) : null;
     }
 
     #setupHyperbee(store) {
@@ -504,7 +502,7 @@ class State extends ReadyResource {
 
         // Recreate requester message
         const message = createMessage(
-            NETWORK_ID,
+            config.networkId,
             op.bio.txv,
             op.bio.ia,
             amount.value,
@@ -627,7 +625,7 @@ class State extends ReadyResource {
 
         // Recreate requester message
         const message = createMessage(
-            NETWORK_ID,
+            config.networkId,
             op.cao.txv,
             op.cao.iw,
             op.cao.in,
@@ -712,7 +710,7 @@ class State extends ReadyResource {
 
         // recreate requester message
         const requesterMessage = createMessage(
-            NETWORK_ID,
+            config.networkId,
             op.cao.txv,
             op.cao.iw,
             op.cao.in,
@@ -813,7 +811,7 @@ class State extends ReadyResource {
         await batch.put(EntryType.INITIALIZATION, safeWriteUInt32BE(1, 0));
         await batch.put(txHashHexString, node.value);
 
-        if (this.#enable_tx_apply_logs) {
+        if (this.#config.enableTxApplyLogs) {
             console.info(`Admin added addr:wk:tx - ${adminAddressString}:${op.cao.iw.toString('hex')}:${txHashHexString}`);
         }
 
@@ -866,7 +864,7 @@ class State extends ReadyResource {
 
         // recreate requester message
         const requesterMessage = createMessage(
-            NETWORK_ID,
+            config.networkId,
             op.rao.txv,
             op.rao.iw,
             op.rao.in,
@@ -908,7 +906,7 @@ class State extends ReadyResource {
 
         // recreate validator message
         const validatorMessage = createMessage(
-            NETWORK_ID,
+            config.networkId,
             op.rao.tx,
             op.rao.vn,
             OperationType.ADMIN_RECOVERY
@@ -1064,7 +1062,7 @@ class State extends ReadyResource {
         await batch.put(validatorAddressString, updatedValidatorNodeEntry);
         await batch.put(txHashHexString, node.value);
 
-        if (this.#enable_tx_apply_logs) {
+        if (this.#config.enableTxApplyLogs) {
             console.info(`Admin has been recovered addr:wk:tx - ${requesterAdminAddressString}:${op.rao.iw.toString('hex')}:${txHashHexString}`);
         }
 
@@ -1139,7 +1137,7 @@ class State extends ReadyResource {
 
         // verify signature
         const message = createMessage(
-            NETWORK_ID,
+            config.networkId,
             op.aco.txv,
             op.aco.ia,
             op.aco.in,
@@ -1372,7 +1370,7 @@ class State extends ReadyResource {
 
         // verify requester signature
         const requesterMessage = createMessage(
-            NETWORK_ID,
+            config.networkId,
             op.rao.txv,
             op.rao.iw,
             op.rao.in,
@@ -1414,7 +1412,7 @@ class State extends ReadyResource {
 
         // recreate validator message
         const validatorMessage = createMessage(
-            NETWORK_ID,
+            config.networkId,
             op.rao.tx,
             op.rao.vn,
             OperationType.ADD_WRITER
@@ -1619,7 +1617,7 @@ class State extends ReadyResource {
         await batch.put(validatorAddressString, updatedValidatorEntry);
         await batch.put(txHashHexString, node.value);
 
-        if (this.#enable_tx_apply_logs) {
+        if (this.#config.enableTxApplyLogs) {
             console.info(`Writer has been added addr:wk:tx - ${requesterAddressString}:${op.rao.iw.toString('hex')}:${txHashHexString}`);
         }
     }
@@ -1671,7 +1669,7 @@ class State extends ReadyResource {
 
         // verify requester signature
         const requesterMessage = createMessage(
-            NETWORK_ID,
+            config.networkId,
             op.rao.txv,
             op.rao.iw,
             op.rao.in,
@@ -1713,7 +1711,7 @@ class State extends ReadyResource {
 
         // recreate validator message
         const validatorMessage = createMessage(
-            NETWORK_ID,
+            config.networkId,
             op.rao.tx,
             op.rao.vn,
             OperationType.REMOVE_WRITER
@@ -1881,7 +1879,7 @@ class State extends ReadyResource {
         await batch.put(validatorAddressString, updateValidatorEntry);
         await batch.put(txHashHexString, node.value);
 
-        if (this.#enable_tx_apply_logs) {
+        if (this.#config.enableTxApplyLogs) {
             console.info(`Writer removed: addr:wk:tx - ${requesterAddressString}:${op.rao.iw.toString('hex')}:${txHashHexString}`);
         }
 
@@ -1957,7 +1955,7 @@ class State extends ReadyResource {
 
         // verify requester signature
         const message = createMessage(
-            NETWORK_ID,
+            config.networkId,
             op.aco.txv,
             op.aco.ia,
             op.aco.in,
@@ -2099,7 +2097,7 @@ class State extends ReadyResource {
         // store operation hash to avoid replay attack.
         await batch.put(txHashHexString, node.value);
 
-        if (this.#enable_tx_apply_logs) {
+        if (this.#config.enableTxApplyLogs) {
             console.info(`Indexer added addr:wk:tx - ${pretendingAddressString}:${decodedPretenderNodeEntry.wk.toString('hex')}:${txHashHexString}`);
         }
 
@@ -2172,7 +2170,7 @@ class State extends ReadyResource {
 
         // verify requester signature
         const message = createMessage(
-            NETWORK_ID,
+            config.networkId,
             op.aco.txv,
             op.aco.ia,
             op.aco.in,
@@ -2318,7 +2316,7 @@ class State extends ReadyResource {
 
         // store operation hash to avoid replay attack.
         await batch.put(txHashHexString, node.value);
-        if (this.#enable_tx_apply_logs) {
+        if (this.#config.enableTxApplyLogs) {
             console.info(`Indexer has been removed addr:wk:tx - ${toRemoveAddressString}:${decodedNodeEntry.wk.toString('hex')}:${txHashHexString}`);
         }
     }
@@ -2375,7 +2373,7 @@ class State extends ReadyResource {
 
         // recreate requester message
         const message = createMessage(
-            NETWORK_ID,
+            config.networkId,
             op.aco.txv,
             op.aco.ia,
             op.aco.in,
@@ -2515,7 +2513,7 @@ class State extends ReadyResource {
 
         await batch.put(requesterAddressString, updatedAdminNodeEntry);
         await batch.put(txHashHexString, node.value);
-        if (this.#enable_tx_apply_logs) {
+        if (this.#config.enableTxApplyLogs) {
             console.info(`Node has been banned: addr:wk:tx - ${nodeToBeBannedAddressString}:${decodedToBanNodeEntry.wk.toString('hex')}:${txHashHexString}`);
         }
 
@@ -2573,7 +2571,7 @@ class State extends ReadyResource {
 
         // recreate requester message
         const requesterMessage = createMessage(
-            NETWORK_ID,
+            config.networkId,
             op.bdo.txv,
             op.bdo.bs,
             op.bdo.ic,
@@ -2618,7 +2616,7 @@ class State extends ReadyResource {
 
         // recreate validator message
         const validatorMessage = createMessage(
-            NETWORK_ID,
+            config.networkId,
             op.bdo.tx,
             op.bdo.vn,
             OperationType.BOOTSTRAP_DEPLOYMENT
@@ -2751,7 +2749,7 @@ class State extends ReadyResource {
         await batch.put(validatorAddressString, updatedValidatorNodeEntry);
         await batch.put(hashHexString, node.value);
 
-        if (this.#enable_tx_apply_logs) {
+        if (this.#config.enableTxApplyLogs) {
             console.info(`Deployment operation: ${hashHexString} and deployment/${bootstrapDeploymentHexString} have been appended.`);
         }
         return Status.SUCCESS;
@@ -2809,7 +2807,7 @@ class State extends ReadyResource {
         };
 
         const requesterMessage = createMessage(
-            NETWORK_ID,
+            config.networkId,
             op.txo.txv,
             op.txo.iw,
             op.txo.ch,
@@ -2851,7 +2849,7 @@ class State extends ReadyResource {
 
         // recreate validator message
         const validatorMessage = createMessage(
-            NETWORK_ID,
+            config.networkId,
             op.txo.tx,
             op.txo.vn,
             OperationType.TX
@@ -2966,7 +2964,7 @@ class State extends ReadyResource {
         }
         await batch.put(hashHexString, node.value);
 
-        if (this.#enable_tx_apply_logs) {
+        if (this.#config.enableTxApplyLogs) {
             console.info(`Subnetwork TX operation: ${hashHexString} has been appended.`);
         }
         return Status.SUCCESS;
@@ -3014,7 +3012,7 @@ class State extends ReadyResource {
 
         // recreate requester message
         const requesterMessage = createMessage(
-            NETWORK_ID,
+            config.networkId,
             op.tro.txv,
             op.tro.to,
             op.tro.am,
@@ -3055,7 +3053,7 @@ class State extends ReadyResource {
         };
 
         const validatorMessage = createMessage(
-            NETWORK_ID,
+            config.networkId,
             op.tro.tx,
             op.tro.vn,
             OperationType.TRANSFER
@@ -3170,7 +3168,7 @@ class State extends ReadyResource {
 
         await batch.put(hashHexString, node.value);
 
-        if (this.#enable_tx_apply_logs) {
+        if (this.#config.enableTxApplyLogs) {
             console.info(`Transfer operation: ${hashHexString} has been appended.`);
         }
         return Status.SUCCESS;
@@ -3432,7 +3430,7 @@ class State extends ReadyResource {
     }
 
     #safeLogApply(operationType = "Common", errorMessage, writingKey = null) {
-        if (!this.#enable_error_apply_logs) return;
+        if (!this.#config.enableErrorApplyLogs) return;
         try {
             const date = new Date().toISOString();
             const wk = writingKey ? writingKey.toString('hex') : 'N/A';

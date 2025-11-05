@@ -1,18 +1,20 @@
 import { test } from 'brittle';
 import b4a from 'b4a';
-import { WRITER_BYTE_LENGTH, TRAC_ADDRESS_SIZE } from '../../../../src/utils/constants.js';
+import { WRITER_BYTE_LENGTH } from '../../../../src/utils/constants.js';
 import { randomAddress, randomBuffer } from '../stateTestUtils.js';
 import addressUtils from '../../../../src/core/state/utils/address.js';
 import adminEntryUtils from '../../../../src/core/state/utils/adminEntry.js';
+import { ENV, createConfig } from '../../../../src/config/env.js';
 
+const config = createConfig(ENV.TESTNET1, {})
 const isAddressValid = addressUtils.isAddressValid;
-const addressToBuffer = addressUtils.addressToBuffer;
+const addressToBuffer = address => addressUtils.addressToBuffer(address, config.addressPrefix);
 const encodeAdminEntry = adminEntryUtils.encode;
 const decodeAdminEntry = adminEntryUtils.decode;
-const ADMIN_ENTRY_SIZE = TRAC_ADDRESS_SIZE + WRITER_BYTE_LENGTH;
+const ADMIN_ENTRY_SIZE = config.addressLength + WRITER_BYTE_LENGTH;
 
 test('Admin Entry - Encode and Decode - Happy Path', t => {
-    const address = randomAddress();
+    const address = randomAddress(config.addressPrefix);
     const wk = randomBuffer(WRITER_BYTE_LENGTH);
 
     const encoded = encodeAdminEntry(addressToBuffer(address), wk);
@@ -26,7 +28,7 @@ test('Admin Entry - Encode and Decode - Happy Path', t => {
 });
 
 test('Admin Entry - Encode returns empty buffer on invalid input', t => {
-    const addrString = randomAddress();
+    const addrString = randomAddress(config.addressPrefix);
     const validAddress = addressToBuffer(addrString);
     const separatorIndex = addrString.indexOf('1');
     const invalidAddress = validAddress.subarray(separatorIndex); // missing HRP

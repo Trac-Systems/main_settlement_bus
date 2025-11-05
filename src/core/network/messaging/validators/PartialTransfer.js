@@ -6,8 +6,8 @@ import PartialOperation from './base/PartialOperation.js';
 
 class PartialTransfer extends PartialOperation {
 
-    constructor(state) {
-        super(state);
+    constructor(state, config) {
+        super(state, config);
     }
 
     async validate(payload) {

@@ -12,19 +12,19 @@ import TransactionRateLimiterService from "../../services/TransactionRateLimiter
 class NetworkMessageRouter {
     #network;
     #handlers;
-    #options;
+    #config;
     #rateLimiter;
-    constructor(network, state, wallet, options = {}) {
+    constructor(network, state, wallet, config) {
         this.#network = network;
+        this.#config = config;
         this.#rateLimiter = new TransactionRateLimiterService();
         this.#handlers = {
             get: new GetRequestHandler(wallet, state),
             response: new ResponseHandler(network, state, wallet),
-            RoleTransaction: new RoleOperationHandler(network, state, wallet, this.#rateLimiter, options),
-            subNetworkTransaction: new SubnetworkOperationHandler(network, state, wallet, this.#rateLimiter, options),
-            tracNetworkTransaction: new TransferOperationHandler(network, state, wallet, this.#rateLimiter, options),
+            roleTransaction: new RoleOperationHandler(network, state, wallet, this.#rateLimiter, this.#config),
+            subNetworkTransaction: new SubnetworkOperationHandler(network, state, wallet, this.#rateLimiter, this.#config),
+            tracNetworkTransaction: new TransferOperationHandler(network, state, wallet, this.#rateLimiter, this.#config),
         }
-        this.#options = options;
     }
 
     get network() {
@@ -36,7 +36,7 @@ class NetworkMessageRouter {
             // TODO: Add a check here — only a writer should be able to process the handlers isRoleAccessOperation,isSubnetworkOperation
             // and admin nodes until the writers' index is less than 25. OperationType.APPEND_WHITELIST can be processed by only READERS
 
-            const channelString = b4a.toString(this.network.channel, 'utf8');
+            const channelString = b4a.toString(this.#config.channel, 'utf8');
             if (this.#isGetRequest(incomingMessage)) {
                 await this.#handlers.get.handle(incomingMessage, messageProtomux, connection, channelString);
                 this.network.swarm.leavePeer(connection.remotePublicKey);
@@ -46,7 +46,7 @@ class NetworkMessageRouter {
                 this.network.swarm.leavePeer(connection.remotePublicKey);
             }
             else if (this.#isRoleAccessOperation(incomingMessage)) {
-                await this.#handlers.RoleTransaction.handle(incomingMessage, connection);
+                await this.#handlers.roleTransaction.handle(incomingMessage, connection);
                 this.network.swarm.leavePeer(connection.remotePublicKey);
 
             }

@@ -7,11 +7,11 @@ import NetworkMessageRouter from './routes/NetworkMessageRouter.js';
 class NetworkMessages {
     #messageRouter;
     #network;
-    #options;
+    #config;
 
-    constructor(network, options = {}) {
+    constructor(network, config) {
         this.#network = network;
-        this.#options = options;
+        this.#config = config;
     }
 
     get network() {
@@ -20,10 +20,10 @@ class NetworkMessages {
 
     initializeMessageRouter(state, wallet) {
         this.#messageRouter = new NetworkMessageRouter(
-            this.network,
+            this.#network,
             state,
             wallet,
-            this.#options
+            this.#config
         );
     }
 
@@ -31,7 +31,7 @@ class NetworkMessages {
         const mux = Protomux.from(connection);
         connection.userData = mux;
         const message_channel = mux.createChannel({
-            protocol: b4a.toString(this.network.channel, 'utf8'),
+            protocol: b4a.toString(this.#config.channel, 'utf8'),
             onopen() { },
             onclose() { }
         });

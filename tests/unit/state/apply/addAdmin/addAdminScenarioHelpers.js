@@ -17,12 +17,12 @@ import {
 	ADMIN_INITIAL_BALANCE,
 	ADMIN_INITIAL_STAKED_BALANCE
 } from '../../../../../src/utils/constants.js';
-import { createSignature } from '../../../../helpers/createTestSignature.js';
 import adminEntryUtils from '../../../../../src/core/state/utils/adminEntry.js';
 import nodeEntryUtils from '../../../../../src/core/state/utils/nodeEntry.js';
 import lengthEntryUtils from '../../../../../src/core/state/utils/lengthEntry.js';
 import addressUtils from '../../../../../src/core/state/utils/address.js';
 import { safeWriteUInt32BE } from '../../../../../src/utils/buffer.js';
+import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
 
 export async function setupAddAdminScenario(t) {
 	const context = await setupStateNetwork({
@@ -126,7 +126,7 @@ export async function assertAdminState(t, base, wallet, writingKey, payload) {
 		'admin license id assigned'
 	);
 
-	const adminAddressBuffer = addressUtils.addressToBuffer(wallet.address);
+	const adminAddressBuffer = addressUtils.addressToBuffer(wallet.address, TRAC_NETWORK_MSB_MAINNET_PREFIX);
 	t.ok(adminAddressBuffer.length > 0, 'admin address encoded as buffer');
 	const writerRegistry = await base.view.get(EntryType.WRITER_ADDRESS + writingKey.toString('hex'));
 	t.ok(writerRegistry, 'writer registry entry exists');

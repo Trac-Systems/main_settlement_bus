@@ -19,10 +19,10 @@ class SubnetworkOperationHandler extends BaseOperationHandler {
     #partialBootstrapDeploymentValidator;
     #partialTransactionValidator;
 
-    constructor(network, state, wallet, rateLimiter, options = {}) {
-        super(network, state, wallet, rateLimiter, options);
-        this.#partialBootstrapDeploymentValidator = new PartialBootstrapDeployment(this.state);
-        this.#partialTransactionValidator = new PartialTransaction(this.state);
+    constructor(network, state, wallet, rateLimiter, config) {
+        super(network, state, wallet, rateLimiter, config);
+        this.#partialBootstrapDeploymentValidator = new PartialBootstrapDeployment(this.state, config);
+        this.#partialTransactionValidator = new PartialTransaction(this.state, config);
     }
 
     async handleOperation(payload) {
@@ -42,18 +42,18 @@ class SubnetworkOperationHandler extends BaseOperationHandler {
             throw new Error("SubnetworkHandler: Transaction validation failed.");
         }
 
-        const completeTransactionOperation = await CompleteStateMessageOperations.assembleCompleteTransactionOperationMessage(
-            this.wallet,
-            normalizedPayload.address,
-            normalizedPayload.txo.tx,
-            normalizedPayload.txo.txv,
-            normalizedPayload.txo.iw,
-            normalizedPayload.txo.in,
-            normalizedPayload.txo.ch,
-            normalizedPayload.txo.is,
-            normalizedPayload.txo.bs,
-            normalizedPayload.txo.mbs
-        );
+        const completeTransactionOperation = await new CompleteStateMessageOperations(this.wallet, this.config)
+            .assembleCompleteTransactionOperationMessage(
+                normalizedPayload.address,
+                normalizedPayload.txo.tx,
+                normalizedPayload.txo.txv,
+                normalizedPayload.txo.iw,
+                normalizedPayload.txo.in,
+                normalizedPayload.txo.ch,
+                normalizedPayload.txo.is,
+                normalizedPayload.txo.bs,
+                normalizedPayload.txo.mbs
+            );
         this.network.transactionPoolService.addTransaction(completeTransactionOperation);
     }
 
@@ -64,16 +64,16 @@ class SubnetworkOperationHandler extends BaseOperationHandler {
             throw new Error("SubnetworkHandler: Bootstrap deployment validation failed.");
         }
 
-        const completeBootstrapDeploymentOperation = await CompleteStateMessageOperations.assembleCompleteBootstrapDeployment(
-            this.wallet,
-            normalizedPayload.address,
-            normalizedPayload.bdo.tx,
-            normalizedPayload.bdo.txv,
-            normalizedPayload.bdo.bs,
-            normalizedPayload.bdo.ic,
-            normalizedPayload.bdo.in,
-            normalizedPayload.bdo.is,
-        )
+        const completeBootstrapDeploymentOperation = await new CompleteStateMessageOperations(this.wallet, this.config)
+            .assembleCompleteBootstrapDeployment(
+                normalizedPayload.address,
+                normalizedPayload.bdo.tx,
+                normalizedPayload.bdo.txv,
+                normalizedPayload.bdo.bs,
+                normalizedPayload.bdo.ic,
+                normalizedPayload.bdo.in,
+                normalizedPayload.bdo.is,
+            )
         this.network.transactionPoolService.addTransaction(completeBootstrapDeploymentOperation);
 
     }
@@ -102,7 +102,7 @@ class SubnetworkOperationHandler extends BaseOperationHandler {
 
         return {
             type,
-            address: addressToBuffer(address),
+            address: addressToBuffer(address, this.config.addressPrefix),
             bdo: normalizedBdo
         };
     }
@@ -134,7 +134,7 @@ class SubnetworkOperationHandler extends BaseOperationHandler {
 
         return {
             type,
-            address: addressToBuffer(address),
+            address: addressToBuffer(address, this.config.addressPrefix),
             txo: normalizedTxo
         };
     }

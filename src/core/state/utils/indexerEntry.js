@@ -1,5 +1,5 @@
 import b4a from 'b4a';
-import { TRAC_ADDRESS_SIZE } from '../../../utils/constants.js';
+import config from '../../../config/config.js';
 import { isBufferValid } from '../../../utils/buffer.js';
 
 /**
@@ -9,18 +9,18 @@ import { isBufferValid } from '../../../utils/buffer.js';
  * If indexersEntry is null or invalid, a new buffer is created.
  * If indexerAddr is invalid, the original entry is returned unchanged.
  *
- * @param {Buffer} indexerAddr - The indexer address to append (must be TRAC_ADDRESS_SIZE bytes).
+ * @param {Buffer} indexerAddr - The indexer address to append (must be config.addressLength bytes).
  * @param {Buffer|null} indexersEntry - The current indexers entry buffer, or null to create a new one.
  * @returns {Buffer} The updated indexers entry buffer or an empty buffer in case something goes wrong.
  */
 export function append(indexerAddr, indexersEntry = null) {
-    if (!isBufferValid(indexerAddr, TRAC_ADDRESS_SIZE)) {
+    if (!isBufferValid(indexerAddr, config.addressLength)) {
         return b4a.alloc(0);
     }
     // Append the indexer address to the IndexersEntry buffer
     try {
         let newIndexersEntry;
-        if (!b4a.isBuffer(indexersEntry) || indexersEntry.length < TRAC_ADDRESS_SIZE + 1) {
+        if (!b4a.isBuffer(indexersEntry) || indexersEntry.length < config.addressLength + 1) {
             newIndexersEntry = b4a.concat([b4a.from([1]), indexerAddr]);
         }
         else {
@@ -41,20 +41,20 @@ export function append(indexerAddr, indexersEntry = null) {
  * Returns the zero-based index of the address if found, or -1 if not found.
  *
  * @param {Buffer} indexersEntry - The current indexers entry buffer.
- * @param {Buffer} indexerAddr - The indexer address to search for (must be TRAC_ADDRESS_SIZE bytes).
+ * @param {Buffer} indexerAddr - The indexer address to search for (must be config.addressLength bytes).
  * @returns {number} The index of the address if found, or -1 if not found.
  */
 export function getIndex(indexersEntry, indexerAddr) {
     if (
         !b4a.isBuffer(indexersEntry) ||
-        !isBufferValid(indexerAddr, TRAC_ADDRESS_SIZE) ||
-        indexersEntry.length < TRAC_ADDRESS_SIZE + 1 // it should ensure minimal length of the indexersEntry
+        !isBufferValid(indexerAddr, config.addressLength) ||
+        indexersEntry.length < config.addressLength + 1 // it should ensure minimal length of the indexersEntry
     ) {
         return -1;
     }
     // step through the indexersEntry until we find indexerAddr
     for (let i = 0; i < indexersEntry[0]; i++) {
-        if (b4a.equals(indexersEntry.subarray(1 + i * TRAC_ADDRESS_SIZE, 1 + (i + 1) * TRAC_ADDRESS_SIZE), indexerAddr)) {
+        if (b4a.equals(indexersEntry.subarray(1 + i * config.addressLength, 1 + (i + 1) * config.addressLength), indexerAddr)) {
             return i;
         }
     }
@@ -66,15 +66,15 @@ export function getIndex(indexersEntry, indexerAddr) {
  * The buffer format is: [count(1)][indexerAddr1][indexerAddr2]...[indexerAddrN]
  * If the indexer address is not found or input is invalid, returns an empty buffer.
  *
- * @param {Buffer} indexerAddr - The indexer address to remove (must be TRAC_ADDRESS_SIZE bytes).
+ * @param {Buffer} indexerAddr - The indexer address to remove (must be config.addressLength bytes).
  * @param {Buffer} indexersEntry - The current indexers entry buffer.
  * @returns {Buffer} The updated indexers entry buffer with the address removed,
  *                   or an empty buffer if the address is not found or input is invalid.
  */
 export function remove(indexerAddr, indexersEntry) {
     if (!b4a.isBuffer(indexersEntry) ||
-        indexersEntry.length < TRAC_ADDRESS_SIZE + 1 ||
-        !isBufferValid(indexerAddr, TRAC_ADDRESS_SIZE)) {
+        indexersEntry.length < config.addressLength + 1 ||
+        !isBufferValid(indexerAddr, config.addressLength)) {
         return b4a.alloc(0); // If the indexer address is invalid, do nothing
     }
 
@@ -85,8 +85,8 @@ export function remove(indexerAddr, indexersEntry) {
         }
         // Remove the indexer address from the entry
         const newIndexersEntry = b4a.concat([
-            indexersEntry.subarray(0, 1 + index * TRAC_ADDRESS_SIZE),
-            indexersEntry.subarray(1 + (index + 1) * TRAC_ADDRESS_SIZE)
+            indexersEntry.subarray(0, 1 + index * config.addressLength),
+            indexersEntry.subarray(1 + (index + 1) * config.addressLength)
         ]);
 
         newIndexersEntry[0]--; // Decrease the count of indexers

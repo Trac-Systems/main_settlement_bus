@@ -6,8 +6,8 @@ import PartialOperation from './base/PartialOperation.js';
 import { bufferToBigInt } from "../../../../utils/amountSerialization.js";
 
 class PartialRoleAccess extends PartialOperation {
-    constructor(state) {
-        super(state);
+    constructor(state, config) {
+        super(state, config);
     }
 
     async validate(payload) {
