@@ -1,6 +1,7 @@
 import PeerWallet from "trac-wallet";
+import { config } from "../../../config/env.js";
 import b4a from "b4a";
-import { MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION, TRAC_ADDRESS_SIZE } from '../../../utils/constants.js';
+import { MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION } from '../../../utils/constants.js';
 import { bufferToAddress } from '../../state/utils/address.js';
 import { sleep } from '../../../utils/helpers.js';
 import Scheduler from "../../../utils/Scheduler.js";
@@ -75,7 +76,7 @@ class ValidatorObserverService {
         const rndIndex = Math.floor(Math.random() * length);
         const validatorAddressBuffer = await this.state.getWriterIndex(rndIndex);
 
-        if (validatorAddressBuffer === null || b4a.byteLength(validatorAddressBuffer) !== TRAC_ADDRESS_SIZE) return;
+        if (validatorAddressBuffer === null || b4a.byteLength(validatorAddressBuffer) !== config().addressLength) return;
 
         const validatorAddress = bufferToAddress(validatorAddressBuffer);
         if (validatorAddress === address) return;

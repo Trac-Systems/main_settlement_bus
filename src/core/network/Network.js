@@ -13,15 +13,15 @@ import {
     MAX_PARALLEL,
     MAX_SERVER_CONNECTIONS,
     MAX_CLIENT_CONNECTIONS,
-    NETWORK_MESSAGE_TYPES,
-    DHT_BOOTSTRAPS
+    NETWORK_MESSAGE_TYPES
 } from '../../utils/constants.js';
 import ConnectionManager from './services/ConnectionManager.js';
+import { config } from '../../config/env.js';
 
 const wakeup = new w();
 
 class Network extends ReadyResource {
-    #dht_bootstrap = DHT_BOOTSTRAPS;
+    #dht_bootstrap = config().dhtBootstrap;
     #swarm = null;
     #enable_wallet;
     #channel;

@@ -1,9 +1,9 @@
 import b4a from 'b4a';
 
-import { bufferToAddress, isAddressValid } from './address.js';
-import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
-import { BOOTSTRAP_BYTE_LENGTH, HASH_BYTE_LENGTH, TRAC_ADDRESS_SIZE } from '../../../utils/constants.js';
+import { isAddressValid } from './address.js';
+import { HASH_BYTE_LENGTH } from '../../../utils/constants.js';
 import { isBufferValid } from '../../../utils/buffer.js';
+import { config } from '../../../config/env.js';
 
 
 /**
@@ -23,12 +23,12 @@ import { isBufferValid } from '../../../utils/buffer.js';
 export function encode(txHash, address) {
     try {
         if (!isBufferValid(txHash, HASH_BYTE_LENGTH) ||
-            !isAddressValid(address, TRAC_NETWORK_MSB_MAINNET_PREFIX)) {
+            !isAddressValid(address, config().addressPrefix)) {
             console.error('Invalid txHash or address buffer');
             return b4a.alloc(0);
         }
 
-        const entry = b4a.alloc(HASH_BYTE_LENGTH + TRAC_ADDRESS_SIZE);
+        const entry = b4a.alloc(HASH_BYTE_LENGTH + config().addressLength);
 
         b4a.copy(txHash, entry, 0);
         b4a.copy(address, entry, HASH_BYTE_LENGTH);
@@ -57,13 +57,13 @@ export function encode(txHash, address) {
  */
 export function decode(entry) {
     try {
-        if (!isBufferValid(entry, HASH_BYTE_LENGTH + TRAC_ADDRESS_SIZE)) {
+        if (!isBufferValid(entry, HASH_BYTE_LENGTH + config().addressLength)) {
             console.error('Invalid transaction entry buffer');
             return b4a.alloc(0);
         }
 
         const txHash = entry.subarray(0, HASH_BYTE_LENGTH);
-        const address = entry.subarray(HASH_BYTE_LENGTH, HASH_BYTE_LENGTH + TRAC_ADDRESS_SIZE);
+        const address = entry.subarray(HASH_BYTE_LENGTH, HASH_BYTE_LENGTH + config().addressLength);
 
         return { txHash, address };
     } catch (error) {

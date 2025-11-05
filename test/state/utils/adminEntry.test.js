@@ -1,15 +1,16 @@
 import { test } from 'brittle';
 import b4a from 'b4a';
-import { WRITER_BYTE_LENGTH, TRAC_ADDRESS_SIZE } from '../../../src/utils/constants.js';
+import { WRITER_BYTE_LENGTH } from '../../../src/utils/constants.js';
 import { randomAddress, randomBuffer } from '../stateTestUtils.js';
 import addressUtils from '../../../src/core/state/utils/address.js';
 import adminEntryUtils from '../../../src/core/state/utils/adminEntry.js';
+import { config } from '../../../src/config/env.js';
 
 const isAddressValid = addressUtils.isAddressValid;
 const addressToBuffer = addressUtils.addressToBuffer;
 const encodeAdminEntry = adminEntryUtils.encode;
 const decodeAdminEntry = adminEntryUtils.decode;
-const ADMIN_ENTRY_SIZE = TRAC_ADDRESS_SIZE + WRITER_BYTE_LENGTH;
+const ADMIN_ENTRY_SIZE = config().addressLength + WRITER_BYTE_LENGTH;
 
 test('Admin Entry - Encode and Decode - Happy Path', t => {
     const address = randomAddress();

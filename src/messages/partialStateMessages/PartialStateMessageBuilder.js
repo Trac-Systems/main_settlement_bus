@@ -2,12 +2,13 @@ import PeerWallet from "trac-wallet";
 import b4a from "b4a";
 
 import StateBuilder from '../base/StateBuilder.js'
-import { OperationType, TRAC_ADDRESS_SIZE, NETWORK_ID } from '../../utils/constants.js';
-import { addressToBuffer, bufferToAddress, isAddressValid } from '../../core/state/utils/address.js';
-import { isHexString } from "../../utils/helpers.js";
-import { blake3Hash } from "../../utils/crypto.js";
-import { createMessage } from "../../utils/buffer.js";
-import { isTransaction, isRoleAccess, isBootstrapDeployment, isTransfer } from "../../utils/operations.js";
+import {OperationType, NETWORK_ID } from '../../utils/constants.js';
+import {addressToBuffer, isAddressValid} from '../../core/state/utils/address.js';
+import {isHexString} from "../../utils/helpers.js";
+import {blake3Hash} from "../../utils/crypto.js";
+import {createMessage} from "../../utils/buffer.js";
+import {isTransaction, isRoleAccess, isBootstrapDeployment, isTransfer} from "../../utils/operations.js";
+import { config } from "../../config/env.js";
 
 class PartialStateMessageBuilder extends StateBuilder {
     #wallet;
@@ -67,7 +68,7 @@ class PartialStateMessageBuilder extends StateBuilder {
 
     withAddress(address) {
         if (!isAddressValid(address)) {
-            throw new Error(`Address field must be a valid TRAC bech32m address with length ${TRAC_ADDRESS_SIZE}.`);
+            throw new Error(`Address field must be a valid TRAC bech32m address with length ${config().addressLength}.`);
         }
 
         this.#address = address;
@@ -117,7 +118,7 @@ class PartialStateMessageBuilder extends StateBuilder {
 
     withIncomingAddress(address) {
         if (!isAddressValid(address)) {
-            throw new Error(`Incoming address field must be a valid TRAC bech32m address with length ${TRAC_ADDRESS_SIZE}.`);
+            throw new Error(`Incoming address field must be a valid TRAC bech32m address with length ${config().addressLength}.`);
         }
 
         this.#incomingAddress = address;

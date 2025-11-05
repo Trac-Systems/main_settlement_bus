@@ -1,4 +1,7 @@
 import {MainSettlementBus} from './src/index.js';
+import { setConfig } from './src/config/env.js';
+
+setConfig()
 
 const isPear = typeof Pear !== 'undefined';
 const args = isPear ? Pear.config.args : process.argv.slice(2);
