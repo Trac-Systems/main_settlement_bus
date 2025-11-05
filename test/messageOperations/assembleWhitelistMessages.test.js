@@ -12,10 +12,10 @@ import {errorMessageIncludes} from "../utils/regexHelper.js";
 const whitelistAddresses = [
     'trac1y6kkq48fgu3urrhg0gm7h8zdyxl3gnaazd2u7568lfl5zxqs285q6kuljk',
 ];
-const originalReadPublicKeysFromFile = fileUtils.readPublicKeysFromFile;
+const originalReadAddressesFromWhitelistFile = fileUtils.readAddressesFromWhitelistFile;
 
 test('assembleWhitelistMessages', async (t) => {
-    fileUtils.readPublicKeysFromFile = async () => whitelistAddresses;
+    fileUtils.readAddressesFromWhitelistFile = async () => whitelistAddresses;
 
     await fixtures.initAll();
     const walletAdmin = fixtures.walletAdmin;
@@ -54,5 +54,5 @@ test('assembleWhitelistMessages', async (t) => {
 
     });
 
-    fileUtils.readPublicKeysFromFile = originalReadPublicKeysFromFile;
+    fileUtils.readAddressesFromWhitelistFile = originalReadAddressesFromWhitelistFile;
 });

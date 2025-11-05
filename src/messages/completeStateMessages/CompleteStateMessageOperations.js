@@ -145,36 +145,28 @@ class CompleteStateMessageOperations {
         }
     }
 
-    static async assembleAppendWhitelistMessages(wallet, txValidity) {
+    static async assembleAppendWhitelistMessages(wallet, txValidity, addressToWhitelist) {
         try {
 
             const builder = new CompleteStateMessageBuilder(wallet);
             const director = new CompleteStateMessageDirector();
             director.builder = builder;
 
-            const messages = new Map();
-            const addresses = await fileUtils.readPublicKeysFromFile();
-
-            for (const addressToWhitelist of addresses) {
-                const payload = await director.buildAppendWhitelistMessage(wallet.address, addressToWhitelist, txValidity);
-                const encodedPayload = safeEncodeApplyOperation(payload);
-                messages.set(addressToWhitelist, encodedPayload);
-            }
-
-            return messages;
+            const payload = await director.buildAppendWhitelistMessage(wallet.address, addressToWhitelist, txValidity);
+            
+            return safeEncodeApplyOperation(payload);;
         } catch (error) {
             throw new Error(`Failed to assemble appendWhitelistMessages: ${error.message}`);
         }
     }
 
-    static async assembleBalanceInitializationMessages(wallet, txValidity) {
+    static async assembleBalanceInitializationMessages(wallet, txValidity, addressBalancePair) {
         try {
             const builder = new CompleteStateMessageBuilder(wallet);
             const director = new CompleteStateMessageDirector();
             director.builder = builder;
 
             const messages = [];
-            const { addressBalancePair, totalBalance, totalAddresses, addresses } = await fileUtils.readBalanceMigrationFile();
 
             for (const [recipientAddress, balanceBuffer] of addressBalancePair) {
                 const payload = await director.buildBalanceInitializationMessage(
@@ -185,7 +177,7 @@ class CompleteStateMessageOperations {
                 );
                 messages.push(safeEncodeApplyOperation(payload));
             }
-            return { messages, totalBalance, totalAddresses, addresses };
+            return messages;
 
         } catch (error) {
             throw new Error(`Failed to assemble balance initialization messages: ${error.message}`);
