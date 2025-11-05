@@ -153,7 +153,7 @@ class CompleteStateMessageOperations {
             director.builder = builder;
 
             const messages = new Map();
-            const addresses = await fileUtils.readPublicKeysFromFile();
+            const addresses = await fileUtils.readAddressesFromWhitelistFile();
 
             for (const addressToWhitelist of addresses) {
                 const payload = await director.buildAppendWhitelistMessage(wallet.address, addressToWhitelist, txValidity);

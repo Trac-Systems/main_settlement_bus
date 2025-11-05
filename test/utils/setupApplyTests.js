@@ -250,8 +250,8 @@ export async function setupWhitelist(admin, whitelistAddresses) {
         throw new Error('Admin is not initialized. Execute /add_admin command first.');
     }
     // set up mock whitelist
-    const originalReadPublicKeysFromFile = fileUtils.readPublicKeysFromFile;
-    fileUtils.readPublicKeysFromFile = async () => whitelistAddresses;
+    const originalReadAddressesFromWhitelistFile = fileUtils.readAddressesFromWhitelistFile;
+    fileUtils.readAddressesFromWhitelistFile = async () => whitelistAddresses;
     const validity = await admin.msb.state.getIndexerSequenceState()
     const assembledWhitelistMessages = await CompleteStateMessageOperations.assembleAppendWhitelistMessages(admin.wallet, validity);
     for (const [_, msg] of assembledWhitelistMessages.entries()) {
@@ -259,7 +259,7 @@ export async function setupWhitelist(admin, whitelistAddresses) {
         await sleep(100)
         await admin.msb.state.base.forceFastForward()
     }
-    fileUtils.readPublicKeysFromFile = originalReadPublicKeysFromFile;
+    fileUtils.readAddressesFromWhitelistFile = originalReadAddressesFromWhitelistFile;
 }
 
 export async function initTemporaryDirectory() {

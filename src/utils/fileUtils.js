@@ -17,7 +17,7 @@ const MIGRATED_FILE_REGEX = /^migrated(\d+)\.csv$/;
  * @throws {Error} If the file does not exist or cannot be read.
  */
 // TODO: We should generalize this function in the future, so we can improve the reusability of the code.
-async function readPublicKeysFromFile(filepath = WHITELIST_FILEPATH) {
+async function readAddressesFromWhitelistFile(filepath = WHITELIST_FILEPATH) {
     try {
         const data = await fs.promises.readFile(filepath, 'utf8');
         const addresses = data
@@ -163,7 +163,7 @@ export async function createMigrationEntryFile(addressBalancePair, migrationNumb
 }
 
 export default {
-    readPublicKeysFromFile,
+    readAddressesFromWhitelistFile,
     readBalanceMigrationFile,
     getAllMigrationFiles,
     validateMigrationData,

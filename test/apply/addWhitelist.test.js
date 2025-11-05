@@ -7,7 +7,7 @@ import CompleteStateMessageOperations from '../../src/messages/completeStateMess
 import { address as addressApi } from 'trac-crypto-api';
 import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
 
-let admin, whitelistKeys, tmpDirectory, originalReadPublicKeysFromFile;
+let admin, whitelistKeys, tmpDirectory, originalReadAddressesFromWhitelistFile;
 const address = addressApi.encode(TRAC_NETWORK_MSB_MAINNET_PREFIX, b4a.from(testKeyPair2.publicKey, 'hex'))
 hook('Initialize admin node for addWhitelist tests', async () => {
     const randomChannel = randomBytes(32).toString('hex');
@@ -26,8 +26,8 @@ hook('Initialize admin node for addWhitelist tests', async () => {
 
     // Configure whitelist
     whitelistKeys = [address];
-    originalReadPublicKeysFromFile = fileUtils.readPublicKeysFromFile;
-    fileUtils.readPublicKeysFromFile = async () => whitelistKeys;
+    originalReadAddressesFromWhitelistFile = fileUtils.readAddressesFromWhitelistFile;
+    fileUtils.readAddressesFromWhitelistFile = async () => whitelistKeys;
 });
 
 test('Apply function addWhitelist - happy path', async (t) => {
@@ -49,5 +49,5 @@ hook('Cleanup after addWhitelist tests', async () => {
     if (tmpDirectory) {
         await removeTemporaryDirectory(tmpDirectory);
     }
-    fileUtils.readPublicKeysFromFile = originalReadPublicKeysFromFile;
+    fileUtils.readAddressesFromWhitelistFile = originalReadAddressesFromWhitelistFile;
 });

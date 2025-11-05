@@ -13,8 +13,8 @@ hook('Initialize dummy whitelist', async t => {
     fs.writeFileSync(DUMMY_PATH_EMPTY, '');
 });
 
-test('readPublicKeysFromFile - File contains addresses', async (t) => {
-    const addresses = await fileUtils.readPublicKeysFromFile(DUMMY_PATH_FILLED);
+test('readAddressesFromWhitelistFile - File contains addresses', async (t) => {
+    const addresses = await fileUtils.readAddressesFromWhitelistFile(DUMMY_PATH_FILLED);
 
     t.ok(Array.isArray(addresses), 'Should return an array');
     t.is(addresses.length, 2, 'Array should contain all addresses');
@@ -25,17 +25,17 @@ test('readPublicKeysFromFile - File contains addresses', async (t) => {
     t.is(addresses[1], ADDR2, 'Second public key should match the dummy file content');
 });
 
-test('readPublicKeysFromFile - File is empty', async (t) => {
-    const addresses = await fileUtils.readPublicKeysFromFile(DUMMY_PATH_EMPTY);
+test('readAddressesFromWhitelistFile - File is empty', async (t) => {
+    const addresses = await fileUtils.readAddressesFromWhitelistFile(DUMMY_PATH_EMPTY);
 
     t.ok(Array.isArray(addresses), 'Should return an array');
     t.is(addresses.length, 0, 'Should return an empty array when the file is empty');
 });
 
-test('readPublicKeysFromFile - File does not exist', async (t) => {
+test('readAddressesFromWhitelistFile - File does not exist', async (t) => {
     const nonExistentPath = './non_existent_file.txt';
     try {
-        await fileUtils.readPublicKeysFromFile(nonExistentPath);
+        await fileUtils.readAddressesFromWhitelistFile(nonExistentPath);
         t.fail('Should throw an error when the file does not exist');
     } catch (err) {
         t.ok(err instanceof Error, 'Should throw an Error');
