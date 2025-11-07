@@ -974,26 +974,6 @@ export class MainSettlementBus extends ReadyResource {
                     this.#state.writingKey,
                 );
                 break;
-
-            // DELETE BEFORE DEPLOYMENT /TEST
-            case '/test':
-                const contentHash = randomBytes(32).toString('hex');
-                const randomExternalBootstrap = "5adb970a73e20e8e2e896cd0c30cf025a0b32ec6fe026b98c6714115239607ac"
-                const randomWk = randomBytes(32).toString('hex');
-                const txValidity = await this.#state.getIndexerSequenceState();
-                const msbBootstrap = this.bootstrap.toString('hex');
-                const assembledTransactionOperation = await PartialStateMessageOperations.assembleTransactionOperationMessage(
-                    this.#wallet,
-                    randomWk,
-                    txValidity.toString('hex'),
-                    contentHash,
-                    randomExternalBootstrap,
-                    msbBootstrap
-                )
-                await this.broadcastPartialTransaction(assembledTransactionOperation);
-
-                break;
-            case '/test2':
                 let messageCount = 0;
                 const duration = 60000;
                 const interval = setInterval(async () => {
