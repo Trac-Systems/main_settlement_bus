@@ -1,11 +1,11 @@
 import b4a from 'b4a';
 
 import { bufferToAddress, isAddressValid } from './address.js';
-import {TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
-import { WRITER_BYTE_LENGTH, TRAC_ADDRESS_SIZE} from '../../../utils/constants.js';
+import { WRITER_BYTE_LENGTH } from '../../../utils/constants.js';
 import { isBufferValid } from '../../../utils/buffer.js';
+import { config } from '../../../config/env.js';
 
-const ADMIN_ENTRY_SIZE = TRAC_ADDRESS_SIZE + WRITER_BYTE_LENGTH;
+const ADMIN_ENTRY_SIZE = config().addressLength + WRITER_BYTE_LENGTH;
 
 /**
  * Encodes an admin entry as a buffer containing the TRAC address and writing key.
@@ -19,13 +19,13 @@ const ADMIN_ENTRY_SIZE = TRAC_ADDRESS_SIZE + WRITER_BYTE_LENGTH;
  */
 export function encode(address, wk) {
     try {
-        if (!isAddressValid(address, TRAC_NETWORK_MSB_MAINNET_PREFIX) ||
+        if (!isAddressValid(address, config().addressPrefix) ||
             !isBufferValid(wk, WRITER_BYTE_LENGTH)) {
             throw new Error('Invalid address or writing key buffer');
         }
-        const adminEntry = b4a.alloc(TRAC_ADDRESS_SIZE + WRITER_BYTE_LENGTH);
+        const adminEntry = b4a.alloc(config().addressLength + WRITER_BYTE_LENGTH);
         b4a.copy(address, adminEntry, 0);
-        b4a.copy(wk, adminEntry, TRAC_ADDRESS_SIZE);
+        b4a.copy(wk, adminEntry, config().addressLength);
         return adminEntry;
     } catch (error) {
         console.error('Error when encoding admin entry:', error);
@@ -50,9 +50,9 @@ export function decode(adminEntry) {
     }
 
     try {
-        const addressPart = adminEntry.subarray(0, TRAC_ADDRESS_SIZE);
-        const address = bufferToAddress(addressPart, TRAC_NETWORK_MSB_MAINNET_PREFIX);
-        const wk = adminEntry.subarray(TRAC_ADDRESS_SIZE);
+        const addressPart = adminEntry.subarray(0, config().addressLength);
+        const address = bufferToAddress(addressPart, config().addressPrefix);
+        const wk = adminEntry.subarray(config().addressLength);
         return { address, wk };
     }
     catch (error) {

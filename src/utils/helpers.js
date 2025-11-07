@@ -1,6 +1,7 @@
 import b4a from "b4a";
 import {bufferToAddress} from "../core/state/utils/address.js";
-import { EntryType, TRAC_ADDRESS_SIZE } from "./constants.js";
+import { EntryType } from "./constants.js";
+import { config } from '../config/env.js';
 
 export function isHexString(string) {
     return typeof string === 'string' && string.length > 1 && /^[0-9a-fA-F]+$/.test(string) && string.length % 2 === 0;
@@ -72,8 +73,8 @@ export function formatIndexersEntry(indexersEntry) {
     const indexers = [];
 
     for (let i = 0; i < count; i++) {
-        const start = 1 + (i * TRAC_ADDRESS_SIZE);
-        const end = start + TRAC_ADDRESS_SIZE;
+        const start = 1 + (i * config().addressLength);
+        const end = start + config().addressLength;
         const indexerAddr = indexersEntry.subarray(start, end);
         indexers.push(indexerAddr.toString('ascii'));
     }

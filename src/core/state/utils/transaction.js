@@ -1,15 +1,16 @@
 import b4a from 'b4a';
 
-import { HASH_BYTE_LENGTH, NONCE_BYTE_LENGTH, WRITER_BYTE_LENGTH, TRAC_ADDRESS_SIZE } from '../../../utils/constants.js';
+import { HASH_BYTE_LENGTH, NONCE_BYTE_LENGTH, WRITER_BYTE_LENGTH } from '../../../utils/constants.js';
 import { blake3Hash } from '../../../utils/crypto.js';
 import {safeWriteUInt32BE} from "../../../utils/buffer.js";
+import { config } from '../../../config/env.js';
 
 /**
  * Total size of a transaction buffer in bytes.
  * Format: bootstrap + validator_address + msb_bootstrap + local_address + local_writer_key + content_hash + nonce
  * @type {number}
  */
-export const TRANSACTION_TOTAL_SIZE = 3 * WRITER_BYTE_LENGTH + 2 * TRAC_ADDRESS_SIZE + HASH_BYTE_LENGTH + NONCE_BYTE_LENGTH;
+export const TRANSACTION_TOTAL_SIZE = 3 * WRITER_BYTE_LENGTH + 2 * config().addressLength + HASH_BYTE_LENGTH + NONCE_BYTE_LENGTH;
 export const BOOTSTRAP_DEPLOYMENT_SIZE = WRITER_BYTE_LENGTH + NONCE_BYTE_LENGTH + 4; // 4 bytes for OperationType because it is a UInt32BE
 export const MAXIMUM_OPERATION_PAYLOAD_SIZE = 4096; // Maximum size of a transaction buffer in bytes
 

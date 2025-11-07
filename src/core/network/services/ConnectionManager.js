@@ -1,7 +1,7 @@
 import { MAX_VALIDATORS } from "../../../utils/constants.js"
 import b4a from 'b4a'
 import PeerWallet from "trac-wallet"
-import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
+import { config } from "../../../config/env.js";
 
 class ConnectionManager {
     #validators
@@ -81,7 +81,7 @@ class ConnectionManager {
     prettyPrint() {
         console.log('Connection count: ', this.connectionCount())
         console.log('Current connection: ', this.#currentValidator())
-        console.log('Validators: ', this.#validatorsIndex.map(val => PeerWallet.encodeBech32m(TRAC_NETWORK_MSB_MAINNET_PREFIX, val)))
+        console.log('Validators: ', this.#validatorsIndex.map(val => PeerWallet.encodeBech32m(config().addressPrefix, val)))
     }
 
     #currentValidator() {

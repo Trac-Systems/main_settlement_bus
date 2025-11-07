@@ -38,6 +38,10 @@ import deploymentEntryUtils from "./core/state/utils/deploymentEntry.js";
 import PartialTransaction from "./core/network/messaging/validators/PartialTransaction.js";
 import fileUtils from './utils/fileUtils.js';
 import migrationUtils from './utils/migrationUtils.js';
+import { config } from "./config/env.js";
+
+//TODO create a MODULE which will separate logic responsible for role managment
+
 export class MainSettlementBus extends ReadyResource {
     // internal attributes
     #options;
@@ -63,6 +67,9 @@ export class MainSettlementBus extends ReadyResource {
         super();
         this.#options = options;
         this.#stores_directory = options.stores_directory;
+        const bootstrap = options.bootstrap || config().bootstrap
+        const channel = options.channel || config().channel
+        this.#stores_directory = options.stores_directory || config().storesDirectory;
         this.#key_pair_path = `${this.#stores_directory}${options.store_name}/db/keypair.json`;
         this.#enable_wallet = options.enable_wallet !== false;
         this.enable_interactive_mode = options.enable_interactive_mode !== false;
@@ -78,14 +85,15 @@ export class MainSettlementBus extends ReadyResource {
         this.#bootstrap = options.bootstrap
             ? b4a.from(options.bootstrap, "hex")
             : null;
+        this.#bootstrap = bootstrap ?? b4a.from(bootstrap, "hex")
 
-        if (!options.channel) {
+        if (!channel) {
             throw new Error(
                 "MainSettlementBus: Channel is required. Application cannot start without channel."
             );
         }
 
-        this.#channel = b4a.alloc(32).fill(options.channel);
+        this.#channel = b4a.alloc(32).fill(channel);
         this.#store = new Corestore(this.#stores_directory + options.store_name);
         this.#wallet = new PeerWallet(options);
         this.#readline_instance = null;

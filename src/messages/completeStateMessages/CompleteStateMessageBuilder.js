@@ -2,12 +2,11 @@ import b4a from 'b4a';
 import PeerWallet from 'trac-wallet';
 
 import StateBuilder from '../base/StateBuilder.js'
-import { createMessage } from '../../utils/buffer.js';
-import { OperationType } from '../../utils/protobuf/applyOperations.cjs'
-import { addressToBuffer, bufferToAddress } from '../../core/state/utils/address.js';
-import { TRAC_ADDRESS_SIZE, NETWORK_ID } from '../../utils/constants.js';
-import { isAddressValid } from "../../core/state/utils/address.js";
-import { blake3Hash } from '../../utils/crypto.js';
+import {createMessage} from '../../utils/buffer.js';
+import {OperationType} from '../../utils/protobuf/applyOperations.cjs'
+import {addressToBuffer, bufferToAddress} from '../../core/state/utils/address.js';
+import {isAddressValid} from "../../core/state/utils/address.js";
+import {blake3Hash} from '../../utils/crypto.js';
 import {
     isCoreAdmin,
     isAdminControl,
@@ -17,6 +16,8 @@ import {
     isTransfer,
     isBalanceInitialization
 } from '../../utils/operations.js';
+import { NETWORK_ID } from '../../utils/constants.js';
+import { config } from '../../config/env.js';
 
 class CompleteStateMessageBuilder extends StateBuilder {
     #wallet;
@@ -80,12 +81,12 @@ class CompleteStateMessageBuilder extends StateBuilder {
     }
 
     withAddress(address) {
-        if (b4a.isBuffer(address) && address.length === TRAC_ADDRESS_SIZE) {
+        if (b4a.isBuffer(address) && address.length === config().addressLength) {
             address = bufferToAddress(address);
         }
 
         if (!isAddressValid(address)) {
-            throw new Error(`Address field must be a valid TRAC bech32m address with length ${TRAC_ADDRESS_SIZE}.`);
+            throw new Error(`Address field must be a valid TRAC bech32m address with length ${config().addressLength}.`);
         }
 
         this.#address = addressToBuffer(address);
@@ -110,12 +111,12 @@ class CompleteStateMessageBuilder extends StateBuilder {
     }
 
     withIncomingAddress(address) {
-        if (b4a.isBuffer(address) && address.length === TRAC_ADDRESS_SIZE) {
+        if (b4a.isBuffer(address) && address.length === config().addressLength) {
             address = bufferToAddress(address);
         }
 
         if (!isAddressValid(address)) {
-            throw new Error(`Address field must be a valid TRAC bech32m address with length ${TRAC_ADDRESS_SIZE}.`);
+            throw new Error(`Address field must be a valid TRAC bech32m address with length ${config().addressLength}.`);
         }
 
         this.#incomingAddress = addressToBuffer(address);

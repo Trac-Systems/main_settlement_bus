@@ -5,10 +5,10 @@ import { testKeyPair1, testKeyPair2 } from '../fixtures/apply.fixtures.js';
 import fileUtils from '../../src/utils/fileUtils.js';
 import CompleteStateMessageOperations from '../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
 import { address as addressApi } from 'trac-crypto-api';
-import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
+import { config } from '../../src/config/env.js';
 
-let admin, whitelistKeys, tmpDirectory, originalReadAddressesFromWhitelistFile;
-const address = addressApi.encode(TRAC_NETWORK_MSB_MAINNET_PREFIX, b4a.from(testKeyPair2.publicKey, 'hex'))
+let admin, whitelistKeys, tmpDirectory;
+const address = addressApi.encode(config().addressPrefix, b4a.from(testKeyPair2.publicKey, 'hex'))
 hook('Initialize admin node for addWhitelist tests', async () => {
     const randomChannel = randomBytes(32).toString('hex');
     const baseOptions = {
