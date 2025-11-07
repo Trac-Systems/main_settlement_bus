@@ -6,8 +6,8 @@ const args = isPear ? Pear.config.args : process.argv.slice(2);
 const opts = {
     stores_directory : 'stores/',
     store_name : typeof process !== "undefined" ? process.argv[2] : Pear.config.args[0],
-    bootstrap: '3bba9ebdd5fe2104d3bc7ae0464834980a7d6195acb399f95dfe9a110e4d1da2',
-    channel: '00000000000tracnetworkmsbmainnet',
+    bootstrap: '2f7fa6495675ea26e2c12c9e9b5809c0fffe5bad697b87204020db038f0de245',
+    channel: '0000trac0network0msb0mainnet0000',
     enable_role_requester: false,
     enable_wallet: true,
     enable_validator_observer: true,
