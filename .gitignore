@@ -1,8 +1,30 @@
+# IDE configuration files
 .idea
-/stores/
-/node_modules/
-.idea
+
+# Node modules (dependencies)
+node_modules/
+
+# Local store directories (application-specific)
+stores/
+stores_/
+
+# NPM configuration and lock file
 .npmrc
-/stores_/
-/package-lock.json
-/stores2/
+
+# Coverage reports
+coverage/
+
+# Whitelist directory 
+whitelist/*
+!whitelist/.gitkeep
+.vscode/
+
+# Ignore local certificates and keys
+key.pem
+cert.pem
+
+.prettierrc
+# Migration directory
+migration/*
+!migration/.gitkeep
+.vscode/
