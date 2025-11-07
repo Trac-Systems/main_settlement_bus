@@ -17,7 +17,7 @@ const configData = {
         addressPrefix: TRAC_NETWORK_MSB_MAINNET_PREFIX,
         addressPrefixLength: TRAC_NETWORK_MSB_MAINNET_PREFIX.length,
         bech32mHrpLength: TRAC_NETWORK_MSB_MAINNET_PREFIX.length + 1, // len(addressPrefix + separator)
-        addressLength: TRAC_NETWORK_MSB_MAINNET_PREFIX.length + 1 + TRAC_PUB_KEY_SIZE,
+        addressLength: 63,
         networkId: 918
     },
     [ENV.DEVELOPMENT]: {
@@ -28,7 +28,7 @@ const configData = {
         addressPrefix: TRAC_NETWORK_MSB_MAINNET_PREFIX,
         addressPrefixLength: TRAC_NETWORK_MSB_MAINNET_PREFIX.length,
         bech32mHrpLength: TRAC_NETWORK_MSB_MAINNET_PREFIX.length + 1, // len(addressPrefix + separator)
-        addressLength: TRAC_NETWORK_MSB_MAINNET_PREFIX.length + 1 + TRAC_PUB_KEY_SIZE,
+        addressLength: 63,
         networkId: 920
     },
     [ENV.TEST]: {
@@ -39,7 +39,7 @@ const configData = {
         addressPrefix: TRAC_NETWORK_MSB_MAINNET_PREFIX,
         addressPrefixLength: TRAC_NETWORK_MSB_MAINNET_PREFIX.length,
         bech32mHrpLength: TRAC_NETWORK_MSB_MAINNET_PREFIX.length + 1, // len(addressPrefix + separator)
-        addressLength: TRAC_NETWORK_MSB_MAINNET_PREFIX.length + 1 + TRAC_PUB_KEY_SIZE,
+        addressLength: 63,
         networkId: 919
     }
 }
