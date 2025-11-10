@@ -150,7 +150,7 @@ describe("API acceptance tests", () => {
         })
     })
 
-    describe('GET /v1/tx/detailed', () => {
+    describe('GET /v1/tx/details', () => {
 
         it("positive case - should return 200 for valid already broadcasted hash confirmedn and unconfirmed", async () => {
             const txData = await tracCrypto.transaction.preBuild(
@@ -168,7 +168,7 @@ describe("API acceptance tests", () => {
             expect(broadcastRes.statusCode).toBe(200);
 
             const resConfirmed = await request(server)
-                .get(`/v1/tx/detailed/${txData.hash.toString('hex')}?confirmed=true`);
+                .get(`/v1/tx/details/${txData.hash.toString('hex')}?confirmed=true`);
             expect(resConfirmed.statusCode).toBe(200);
 
             expect(resConfirmed.body).toMatchObject({
@@ -178,7 +178,7 @@ describe("API acceptance tests", () => {
             })
 
             const restUncofirmed = await request(server)
-                .get(`/v1/tx/detailed/${txData.hash.toString('hex')}?confirmed=false`);
+                .get(`/v1/tx/details/${txData.hash.toString('hex')}?confirmed=false`);
             expect(restUncofirmed.statusCode).toBe(200);
 
             expect(restUncofirmed.body).toMatchObject({
@@ -191,7 +191,7 @@ describe("API acceptance tests", () => {
         it("should return 404 for non-existent transaction hash", async () => {
             const nonExistentHash = "0b4d1c1dac48af13212f616601d7399457476a0b644850875b7f4b79df6ff89c";
             const res = await request(server)
-                .get(`/v1/tx/detailed/${nonExistentHash}`);
+                .get(`/v1/tx/details/${nonExistentHash}`);
 
             expect(res.statusCode).toBe(404);
             expect(res.body).toEqual({
@@ -202,7 +202,7 @@ describe("API acceptance tests", () => {
         it("should return 400 for invalid hash format (too short)", async () => {
             const invalidHash = '0'.repeat(63);
             const res = await request(server)
-                .get(`/v1/tx/detailed/${invalidHash}`);
+                .get(`/v1/tx/details/${invalidHash}`);
 
             expect(res.statusCode).toBe(400);
             expect(res.body).toEqual({
@@ -213,7 +213,7 @@ describe("API acceptance tests", () => {
         it("should return 400 for invalid hash format (non-hex)", async () => {
             const invalidHash = 'Z'.repeat(64);
             const res = await request(server)
-                .get(`/v1/tx/detailed/${invalidHash}`);
+                .get(`/v1/tx/details/${invalidHash}`);
 
             expect(res.statusCode).toBe(400);
             expect(res.body).toEqual({
@@ -225,7 +225,7 @@ describe("API acceptance tests", () => {
             const hash = "0b4d1c1dac48af13212f616601d7399457476a0b644850875b7f4b79df6ff89c";
 
             const res = await request(server)
-                .get(`/v1/tx/detailed/${hash}?confirmed=invalid`);
+                .get(`/v1/tx/details/${hash}?confirmed=invalid`);
 
             expect(res.statusCode).toBe(400);
             expect(res.body).toEqual({
@@ -235,7 +235,7 @@ describe("API acceptance tests", () => {
 
         it("should return 400 for invalid confirmed parameter case (UPPERCASE)", async () => {
             const hash = "0b4d1c1dac48af13212f616601d7399457476a0b644850875b7f4b79df6ff89c";
-            const res = await request(server).get(`/v1/tx/detailed/${hash}?confirmed=TRUE`);
+            const res = await request(server).get(`/v1/tx/details/${hash}?confirmed=TRUE`);
             expect(res.statusCode).toBe(400);
             expect(res.body).toEqual({
                 error: 'Parameter "confirmed" must be exactly "true" or "false"'
@@ -244,7 +244,7 @@ describe("API acceptance tests", () => {
 
         it("should return 400 when no hash provided", async () => {
             const res = await request(server)
-                .get('/v1/tx/detailed');
+                .get('/v1/tx/details');
 
             expect(res.statusCode).toBe(400);
             expect(res.body).toEqual({
@@ -255,7 +255,7 @@ describe("API acceptance tests", () => {
         it("should return 400 for hash with invalid characters", async () => {
             const invalidHash = '0b4d1c1dac48$af13212f6166017399457476a0b644850875b7f4b79df6ff89c';
             const res = await request(server)
-                .get(`/v1/tx/detailed/${invalidHash}`);
+                .get(`/v1/tx/details/${invalidHash}`);
 
             expect(res.statusCode).toBe(400);
             expect(res.body).toEqual({
@@ -266,7 +266,7 @@ describe("API acceptance tests", () => {
         it("should return 400 for hash with special characters", async () => {
             const invalidHash = '!@#$%^&*'.repeat(8);
             const res = await request(server)
-                .get(`/v1/tx/detailed/${invalidHash}`);
+                .get(`/v1/tx/details/${invalidHash}`);
 
             expect(res.statusCode).toBe(400);
             expect(res.body).toEqual({
@@ -277,7 +277,7 @@ describe("API acceptance tests", () => {
         it("should return 400 for hash with spaces", async () => {
             const invalidHash = '0b4d1c1dac48af13212f616601d7399457476a0b644850875b7 4b79df6ff89c';
             const res = await request(server)
-                .get(`/v1/tx/detailed/${invalidHash}`);
+                .get(`/v1/tx/details/${invalidHash}`);
 
             expect(res.statusCode).toBe(400);
             expect(res.body).toEqual({
