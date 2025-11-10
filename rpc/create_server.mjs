@@ -32,9 +32,23 @@ export const createServer = (msbInstance) => {
 
     // Find the matching route
     let foundRoute = false;
-    for (const route of routes) {
-        // Simple path matching
-        if (req.method === route.method && req.url.startsWith(route.path)) {
+    
+    // Extract the path without query parameters
+    const requestPath = req.url.split('?')[0];
+    
+    // Sort routes by path length (longest first) to ensure more specific routes match first
+    const sortedRoutes = [...routes].sort((a, b) => b.path.length - a.path.length);
+    
+    for (const route of sortedRoutes) {
+        // Exact path matching for base route, allow parameters after base path
+        const routeBase = route.path.endsWith('/') ? route.path.slice(0, -1) : route.path;
+        const requestParts = requestPath.split('/');
+        const routeParts = routeBase.split('/');
+        
+        if (req.method === route.method && 
+            requestParts.length >= routeParts.length &&
+            routeParts.every((part, i) => part === requestParts[i])) {
+            
             foundRoute = true;
             try {
                 // This try/catch covers synchronous errors and errors from awaited promises
@@ -43,8 +57,6 @@ export const createServer = (msbInstance) => {
             } catch (error) {
                 // Catch errors thrown directly from the handler (or its awaited parts)
                 console.error(`Error on ${route.path}:`, error);
-                
-                // FIX: Pass an object payload
                 respond(500, { error: 'An error occurred processing the request.' });
             }
             break;

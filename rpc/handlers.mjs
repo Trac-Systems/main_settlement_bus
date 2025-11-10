@@ -1,5 +1,6 @@
-import {decodeBase64Payload, isBase64, sanitizeBulkPayloadsRequestBody, sanitizeTransferPayload, validatePayloadStructure} from "./utils/helpers.mjs"
+import { decodeBase64Payload, isBase64, sanitizeBulkPayloadsRequestBody, sanitizeTransferPayload, validatePayloadStructure } from "./utils/helpers.mjs"
 import { MAX_SIGNED_LENGTH } from "./constants.mjs";
+import { isHexString } from "../src/utils/helpers";
 
 export async function handleBalance({ req, respond, msbInstance }) {
     const [path, queryString] = req.url.split("?");
@@ -198,4 +199,47 @@ export async function handleFetchBulkTxPayloads({ msbInstance, respond, req }) {
         console.error('Stream error in handleFetchBulkTxPayloads:', err);
         respond(500, { error: 'Request stream failed during body transfer.' });
     });
+}
+
+export async function handleTransactionExtendedDetails({ msbInstance, respond, req }) {
+    const [path, queryString] = req.url.split("?");
+    const pathParts = path.split('/');
+    const hash = pathParts[4];
+    
+    if (!hash) {
+        return respond(400, { error: "Transaction hash is required" });
+    }
+    
+    if (isHexString(hash) === false || hash.length !== 64) {
+        return respond(400, { error: "Invalid transaction hash format" });
+    }
+    let confirmed = true; // default
+    if (queryString) {
+        const params = new URLSearchParams(queryString);
+        if (params.has("confirmed")) {
+            const confirmedParam = params.get("confirmed");
+            if (confirmedParam !== "true" && confirmedParam !== "false") {
+                return respond(400, { error: 'Parameter "confirmed" must be exactly "true" or "false"' });
+            }
+            confirmed = confirmedParam === "true";
+        }
+    }
+    
+    try {
+        let txDetails;
+        const commandString = `/get_extended_tx_details ${hash} ${confirmed}`;
+        txDetails = await msbInstance.handleCommand(commandString);
+        if (txDetails === null) {
+            respond(404, { error: `No payload found for tx hash: ${hash}` });
+        } else {
+            respond(200, txDetails);
+        }
+    } catch (error) {
+        if (error.message?.includes('No payload found for tx hash')) {
+            respond(404, { error: error.message });
+        } else {
+            console.error('Error in handleTransactionDetails:', error);
+            respond(500, { error: 'An error occurred processing the request.' });
+        }
+    }
 }

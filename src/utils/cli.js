@@ -103,8 +103,25 @@ export const printBalance = async (address, state, wallet_enabled) => {
     }
 }
 
-export const get_tx_info = async (state_instance, txHash) => {
+export const get_confirmed_tx_info = async (state_instance, txHash) => {
     const payload = await state_instance.getSigned(txHash);
+    if (!payload) {
+        return null
+    }
+
+    const decoded = safeDecodeApplyOperation(payload);
+    if (!decoded) {
+        throw new Error(`Failed to decode payload for transaction hash: ${txHash}`);
+    }
+
+    return {
+        payload,
+        decoded
+    }
+}
+
+export const get_unconfirmed_tx_info = async (state_instance, txHash) => {
+    const payload = await state_instance.get(txHash);
     if (!payload) {
         return null
     }

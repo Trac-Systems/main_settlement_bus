@@ -17,7 +17,7 @@ import {
     TRAC_NAMESPACE,
     CustomEventType
 } from '../../utils/constants.js';
-import { isHexString, sleep } from '../../utils/helpers.js';
+import { isHexString, sleep, isTransactionRecordPut } from '../../utils/helpers.js';
 import PeerWallet from 'trac-wallet';
 import Check from '../../utils/check.js';
 import { safeDecodeApplyOperation } from '../../utils/protobuf/operationHelpers.js';
@@ -264,6 +264,24 @@ class State extends ReadyResource {
         } else {
             return b4a.equals(initialization, safeWriteUInt32BE(0, 0))
         }
+    }
+    async getTransactionConfirmedLength(hash) {
+        if (!isHexString(hash) || hash.length !== 64) {
+            throw new Error("Invalid hash format");
+        }
+
+        const confirmedLength = this.getSignedLength();
+        const historyStream = this.#base.view.createHistoryStream({
+            gte: 0,
+            lte: confirmedLength
+        });
+
+        for await (const entry of historyStream) {
+            if (isTransactionRecordPut(entry) && entry.key === hash) {
+                return entry.seq;
+            }
+        }
+        return null;
     }
 
     async confirmedTransactionsBetween(startSignedLength, endSignedLength) {

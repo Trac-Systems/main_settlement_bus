@@ -5,6 +5,6 @@ export function startRpcServer(msbInstance, host, port) {
     const server = createServer(msbInstance)
 
     return server.listen(port, host, () => {
-        console.log(`Running RPC with https at https://${host}:${port}`);
+        console.log(`Running RPC with http at http://${host}:${port}`);
     });
 }
