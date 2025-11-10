@@ -152,7 +152,7 @@ describe("API acceptance tests", () => {
 
     describe('GET /v1/tx/details', () => {
 
-        it("positive case - should return 200 for valid already broadcasted hash confirmedn and unconfirmed", async () => {
+        it("positive case - should return 200 for valid already broadcasted hash confirmed and unconfirmed", async () => {
             const txData = await tracCrypto.transaction.preBuild(
                 wallet.address,
                 wallet.address,
