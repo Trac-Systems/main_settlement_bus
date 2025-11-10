@@ -188,6 +188,40 @@ describe("API acceptance tests", () => {
             })
         });
 
+        it("should handle null confirmed_length for unconfirmed transaction", async () => {
+            const txData = await tracCrypto.transaction.preBuild(
+                wallet.address,
+                wallet.address,
+                b4a.toString($TNK(1n), 'hex'),
+                b4a.toString(await msb.state.getIndexerSequenceState(), 'hex')
+            );
+
+            const payload = tracCrypto.transaction.build(txData, b4a.from(wallet.secretKey, 'hex'));
+            
+            const originalGetConfirmedLength = msb.state.getTransactionConfirmedLength;
+            msb.state.getTransactionConfirmedLength = async () => null;
+
+            try {
+                const broadcastRes = await request(server)
+                    .post("/v1/broadcast-transaction")
+                    .set("Accept", "application/json")
+                    .send(JSON.stringify({ payload }));
+                expect(broadcastRes.statusCode).toBe(200);
+
+                const res = await request(server)
+                    .get(`/v1/tx/details/${txData.hash.toString('hex')}?confirmed=false`);
+                expect(res.statusCode).toBe(200);
+
+                expect(res.body).toMatchObject({
+                    txDetails: expect.any(Object),
+                    confirmed_length: 0,
+                    fee: '0'
+                });
+            } finally {
+                msb.state.getTransactionConfirmedLength = originalGetConfirmedLength;
+            }
+        });
+
         it("should return 404 for non-existent transaction hash", async () => {
             const nonExistentHash = "0b4d1c1dac48af13212f616601d7399457476a0b644850875b7f4b79df6ff89c";
             const res = await request(server)
