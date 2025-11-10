@@ -177,11 +177,11 @@ describe("API acceptance tests", () => {
                 fee: expect.any(String)
             })
 
-            const restUncofirmed = await request(server)
+            const resUnconfirmed = await request(server)
                 .get(`/v1/tx/details/${txData.hash.toString('hex')}?confirmed=false`);
-            expect(restUncofirmed.statusCode).toBe(200);
+            expect(resUnconfirmed.statusCode).toBe(200);
 
-            expect(restUncofirmed.body).toMatchObject({
+            expect(resUnconfirmed.body).toMatchObject({
                 txDetails: expect.any(Object),
                 confirmed_length: expect.any(Number),
                 fee: expect.any(String)
