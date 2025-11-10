@@ -1296,7 +1296,7 @@ export class MainSettlementBus extends ReadyResource {
                             return {
                                 txDetails: normalizedPayload,
                                 confirmed_length: 0,
-                                fee: 0
+                                fee: '0'
                             }
                         }
 
