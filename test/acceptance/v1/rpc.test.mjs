@@ -28,7 +28,7 @@ const setupNetwork = async () => {
         store_name: '/admin'
     }
 
-    const peer =await setupMsbAdmin(testKeyPair1, tmpDirectory, rpcOpts)
+    const peer = await setupMsbAdmin(testKeyPair1, tmpDirectory, rpcOpts)
     const writer = await setupMsbWriter(peer, 'writer', testKeyPair2, tmpDirectory, peer.options);
     return { writer, peer }
 }
@@ -76,7 +76,7 @@ describe("API acceptance tests", () => {
         it("< 1000", async () => {
             const res = await request(server).get("/v1/tx-hashes/1/1001")
             expect(res.statusCode).toBe(200)
-            expect(res.body).toEqual({ 
+            expect(res.body).toEqual({
                 hashes: expect.arrayContaining([
                     expect.objectContaining({
                         hash: expect.any(String),
@@ -137,8 +137,8 @@ describe("API acceptance tests", () => {
         const res = await request(server)
             .post("/v1/tx-payloads-bulk")
             .set("Accept", "application/json")
-            .send(JSON.stringify( payload ))
-        
+            .send(JSON.stringify(payload))
+
         expect(res.statusCode).toBe(200)
         expect(res.body).toMatchObject({
             results: expect.arrayOf(
@@ -146,7 +146,143 @@ describe("API acceptance tests", () => {
                     hash: expect.any(String),
                 })
             ),
-            missing:[]
+            missing: []
         })
+    })
+
+    describe('GET /v1/tx/detailed', () => {
+
+        it("positive case - should return 200 for valid already broadcasted hash confirmedn and unconfirmed", async () => {
+            const txData = await tracCrypto.transaction.preBuild(
+                wallet.address,
+                wallet.address,
+                b4a.toString($TNK(1n), 'hex'),
+                b4a.toString(await msb.state.getIndexerSequenceState(), 'hex')
+            );
+
+            const payload = tracCrypto.transaction.build(txData, b4a.from(wallet.secretKey, 'hex'));
+            const broadcastRes = await request(server)
+                .post("/v1/broadcast-transaction")
+                .set("Accept", "application/json")
+                .send(JSON.stringify({ payload }));
+            expect(broadcastRes.statusCode).toBe(200);
+
+            const resConfirmed = await request(server)
+                .get(`/v1/tx/detailed/${txData.hash.toString('hex')}?confirmed=true`);
+            expect(resConfirmed.statusCode).toBe(200);
+
+            expect(resConfirmed.body).toMatchObject({
+                txDetails: expect.any(Object),
+                confirmed_length: expect.any(Number),
+                fee: expect.any(String)
+            })
+
+            const restUncofirmed = await request(server)
+                .get(`/v1/tx/detailed/${txData.hash.toString('hex')}?confirmed=false`);
+            expect(restUncofirmed.statusCode).toBe(200);
+
+            expect(restUncofirmed.body).toMatchObject({
+                txDetails: expect.any(Object),
+                confirmed_length: expect.any(Number),
+                fee: expect.any(String)
+            })
+        });
+
+        it("should return 404 for non-existent transaction hash", async () => {
+            const nonExistentHash = "0b4d1c1dac48af13212f616601d7399457476a0b644850875b7f4b79df6ff89c";
+            const res = await request(server)
+                .get(`/v1/tx/detailed/${nonExistentHash}`);
+
+            expect(res.statusCode).toBe(404);
+            expect(res.body).toEqual({
+                error: `No payload found for tx hash: ${nonExistentHash}`
+            });
+        });
+
+        it("should return 400 for invalid hash format (too short)", async () => {
+            const invalidHash = '0'.repeat(63);
+            const res = await request(server)
+                .get(`/v1/tx/detailed/${invalidHash}`);
+
+            expect(res.statusCode).toBe(400);
+            expect(res.body).toEqual({
+                error: "Invalid transaction hash format"
+            });
+        });
+
+        it("should return 400 for invalid hash format (non-hex)", async () => {
+            const invalidHash = 'Z'.repeat(64);
+            const res = await request(server)
+                .get(`/v1/tx/detailed/${invalidHash}`);
+
+            expect(res.statusCode).toBe(400);
+            expect(res.body).toEqual({
+                error: "Invalid transaction hash format"
+            });
+        });
+
+        it("should return 400 for invalid confirmed parameter", async () => {
+            const hash = "0b4d1c1dac48af13212f616601d7399457476a0b644850875b7f4b79df6ff89c";
+
+            const res = await request(server)
+                .get(`/v1/tx/detailed/${hash}?confirmed=invalid`);
+
+            expect(res.statusCode).toBe(400);
+            expect(res.body).toEqual({
+                error: 'Parameter "confirmed" must be exactly "true" or "false"'
+            });
+        });
+
+        it("should return 400 for invalid confirmed parameter case (UPPERCASE)", async () => {
+            const hash = "0b4d1c1dac48af13212f616601d7399457476a0b644850875b7f4b79df6ff89c";
+            const res = await request(server).get(`/v1/tx/detailed/${hash}?confirmed=TRUE`);
+            expect(res.statusCode).toBe(400);
+            expect(res.body).toEqual({
+                error: 'Parameter "confirmed" must be exactly "true" or "false"'
+            });
+        });
+
+        it("should return 400 when no hash provided", async () => {
+            const res = await request(server)
+                .get('/v1/tx/detailed');
+
+            expect(res.statusCode).toBe(400);
+            expect(res.body).toEqual({
+                error: "Transaction hash is required"
+            });
+        });
+
+        it("should return 400 for hash with invalid characters", async () => {
+            const invalidHash = '0b4d1c1dac48$af13212f6166017399457476a0b644850875b7f4b79df6ff89c';
+            const res = await request(server)
+                .get(`/v1/tx/detailed/${invalidHash}`);
+
+            expect(res.statusCode).toBe(400);
+            expect(res.body).toEqual({
+                error: "Invalid transaction hash format"
+            });
+        });
+
+        it("should return 400 for hash with special characters", async () => {
+            const invalidHash = '!@#$%^&*'.repeat(8);
+            const res = await request(server)
+                .get(`/v1/tx/detailed/${invalidHash}`);
+
+            expect(res.statusCode).toBe(400);
+            expect(res.body).toEqual({
+                error: "Invalid transaction hash format"
+            });
+        });
+
+        it("should return 400 for hash with spaces", async () => {
+            const invalidHash = '0b4d1c1dac48af13212f616601d7399457476a0b644850875b7 4b79df6ff89c';
+            const res = await request(server)
+                .get(`/v1/tx/detailed/${invalidHash}`);
+
+            expect(res.statusCode).toBe(400);
+            expect(res.body).toEqual({
+                error: "Invalid transaction hash format"
+            });
+        });
     })
 })

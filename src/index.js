@@ -8,7 +8,7 @@ import readline from "readline";
 import tty from "tty";
 
 import { sleep, getFormattedIndexersWithAddresses, isHexString, convertAdminCoreOperationPayloadToHex } from "./utils/helpers.js";
-import { verifyDag, printHelp, printWalletInfo, get_tx_info, printBalance } from "./utils/cli.js";
+import { verifyDag, printHelp, printWalletInfo, get_confirmed_tx_info, printBalance, get_unconfirmed_tx_info } from "./utils/cli.js";
 import CompleteStateMessageOperations from "./messages/completeStateMessages/CompleteStateMessageOperations.js";
 import { safeDecodeApplyOperation } from "./utils/protobuf/operationHelpers.js";
 import { bufferToAddress, isAddressValid } from "./core/state/utils/address.js";
@@ -821,11 +821,11 @@ export class MainSettlementBus extends ReadyResource {
         }
 
         const { addressBalancePair, totalBalance, totalAddresses, addresses } = await fileUtils.readBalanceMigrationFile();
-        
+
         for (let i = 0; i < addresses.length; i++) {
             await migrationUtils.validateAddressFromIncomingFile(this.#state, addresses[i].address, adminEntry);
         }
-        
+
         await fileUtils.validateBalanceMigrationData(addresses);
         const migrationNumber = await fileUtils.getNextMigrationNumber();
         await fileUtils.createMigrationEntryFile(addressBalancePair, migrationNumber);
@@ -1070,7 +1070,7 @@ export class MainSettlementBus extends ReadyResource {
                 } else if (input.startsWith("/get_tx_info")) {
                     const splitted = input.split(" ");
                     const txHash = splitted[1];
-                    const txInfo = await get_tx_info(this.#state, txHash);
+                    const txInfo = await get_confirmed_tx_info(this.#state, txHash);
                     if (txInfo) {
                         console.log(`Payload for transaction hash ${txHash}:`);
                         console.log(txInfo.decoded);
@@ -1218,7 +1218,7 @@ export class MainSettlementBus extends ReadyResource {
                             throw new Error("Length of input tx hashes exceeded.");
                         }
 
-                        const promises = hashes.map(hash => get_tx_info(this.#state, hash));
+                        const promises = hashes.map(hash => get_confirmed_tx_info(this.#state, hash));
                         const results = await Promise.all(promises);
 
                         // Iterate and categorize
@@ -1251,9 +1251,8 @@ export class MainSettlementBus extends ReadyResource {
                 } else if (input.startsWith("/get_tx_details")) {
                     const splitted = input.split(' ')
                     const hash = splitted[1];
-
                     try {
-                        const rawPayload = await get_tx_info(this.#state, hash);
+                        const rawPayload = await get_confirmed_tx_info(this.#state, hash);
                         if (!rawPayload) {
                             console.log(`No payload found for tx hash: ${hash}`)
                             return null
@@ -1262,6 +1261,52 @@ export class MainSettlementBus extends ReadyResource {
                         return normalizedPayload
                     } catch (error) {
                         throw new Error("Invalid params to perform the request.", error.message);
+                    }
+                }
+                else if (input.startsWith("/get_extended_tx_details")) {
+                    const splitted = input.split(' ');
+                    const hash = splitted[1];
+                    const confirmed = splitted[2] === 'true';
+
+                    if (confirmed) {
+                        const rawPayload = await get_confirmed_tx_info(this.#state, hash);
+                        if (!rawPayload) {
+                            throw new Error(`No payload found for tx hash: ${hash}`);
+                        }
+                        const confirmedLength = await this.#state.getTransactionConfirmedLength(hash);
+                        const normalizedPayload = normalizeDecodedPayloadForJson(rawPayload.decoded, true);
+                        if (confirmedLength === null) {
+                            throw new Error(`No confirmed length found for tx hash: ${hash} in confirmed mode`);
+                        }
+                        const fee = this.#state.getFee();
+                        return {
+                            txDetails: normalizedPayload,
+                            confirmed_length: confirmedLength,
+                            fee: bufferToBigInt(fee).toString()
+                        }
+                    }
+                    else {
+                        const rawPayload = await get_unconfirmed_tx_info(this.#state, hash);
+                        if (!rawPayload) {
+                            throw new Error(`No payload found for tx hash: ${hash}`);
+                        }
+                        const normalizedPayload = normalizeDecodedPayloadForJson(rawPayload.decoded, true);
+                        const length = await this.#state.getTransactionConfirmedLength(hash)
+                        if (length === null) {
+                            return {
+                                txDetails: normalizedPayload,
+                                confirmed_length: 0,
+                                fee: 0
+                            }
+                        }
+
+                        const fee = this.#state.getFee();
+                        return {
+                            txDetails: normalizedPayload,
+                            confirmed_length: length,
+                            fee: bufferToBigInt(fee).toString()
+                        }
+
                     }
                 }
         }

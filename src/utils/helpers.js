@@ -97,3 +97,10 @@ export function convertAdminCoreOperationPayloadToHex(payload) {
         },
     };
 }
+
+export function isTransactionRecordPut(entry) {
+    const isPut = entry.type === "put";
+    const isHex = isHexString(entry.key);
+    const is64 = entry.key.length === 64;
+    return isPut && isHex && is64;
+}
