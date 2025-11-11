@@ -1,7 +1,6 @@
-
 import { test, hook } from 'brittle';
 import fileUtils from '../../src/utils/fileUtils.js';
-import { errorMessageIncludes } from "../utils/regexHelper.js";
+import { errorMessageIncludes } from "../testUtils/regexHelper.js";
 import fs from 'fs';
 import PeerWallet from 'trac-wallet';
 
