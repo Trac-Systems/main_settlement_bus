@@ -1199,7 +1199,7 @@ export class MainSettlementBus extends ReadyResource {
                             this.network.validatorConnectionManager.rotate() // force change connection rotation for the next retry
                         }
 
-                        return { message: "Transaction broadcasted successfully.", signedLength, unsignedLength };
+                        return { message: "Transaction broadcasted successfully.", signedLength, unsignedLength, tx: hash };
                     } else {
                         // Handle case where payload is missing if called internally without one.
                         throw new Error("Transaction payload is required for broadcast_transaction command.");

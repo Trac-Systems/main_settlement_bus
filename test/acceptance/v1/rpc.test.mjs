@@ -124,6 +124,7 @@ describe("API acceptance tests", () => {
                 message: "Transaction broadcasted successfully.",
                 signedLength: expect.any(Number),
                 unsignedLength: expect.any(Number),
+                tx: expect.any(String)
             }
         })
     })
