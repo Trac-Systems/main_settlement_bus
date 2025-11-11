@@ -1,7 +1,7 @@
 import test from 'brittle';
 import b4a from 'b4a';
 import { decimalStringToBigInt, bigIntTo16ByteBuffer, bufferToBigInt, bigIntToDecimalString, licenseBufferToBigInt } from '../../src/utils/amountSerialization.js';
-import { errorMessageIncludes } from "../utils/regexHelper.js";
+import { errorMessageIncludes } from "../testUtils/regexHelper.js";
 import lengthEntryUtils from '../../src/core/state/utils/lengthEntry.js';
 
 test('decimalStringToBigInt', async t => {

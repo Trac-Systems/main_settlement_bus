@@ -1,6 +1,6 @@
 import { test, hook } from 'brittle';
 import migrationUtils from '../../src/utils/migrationUtils.js';
-import { errorMessageIncludes } from "../utils/regexHelper.js";
+import { errorMessageIncludes } from "../testUtils/regexHelper.js";
 import { ZERO_LICENSE } from '../../src/core/state/utils/nodeEntry.js';
 import b4a from 'b4a';
 const VALID_ADDRESS = 'trac1dguwzsvcsehslh6dgj2mqlsxdn7s5t5vhem56yd0xlg47aq6exzqymhr6u';

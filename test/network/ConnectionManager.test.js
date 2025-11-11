@@ -3,7 +3,7 @@ import { hook, test } from 'brittle'
 import { default as EventEmitter } from "bare-events"
 import { testKeyPair1, testKeyPair2, testKeyPair3, testKeyPair4, testKeyPair5, testKeyPair6, testKeyPair7, testKeyPair8, testKeyPair9 } from "../fixtures/apply.fixtures.js";
 import ConnectionManager from "../../src/core/network/services/ConnectionManager.js";
-import { tick } from "../utils/setupApplyTests.js";
+import { tick } from "../testUtils/setupApplyTests.js";
 import b4a from 'b4a'
 
 const createConnection = (key) => {
