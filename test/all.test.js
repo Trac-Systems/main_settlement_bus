@@ -6,16 +6,15 @@ async function runTests() {
   test.pause();
 
   await import('./state/stateTests.test.js');
-  // await import('./state/apply.addAdmin.basic.test.js');
-  // await import('./check/check.test.js');
-  // await import('./protobuf/protobuf.test.js');
-  // await import('./functions/functions.test.js');
-  // await import('./fileUtils/readAddressesFromWhitelistFile.test.js');
-  // await import('./fileUtils/readBalanceMigrationFile.test.js');
-  // await import('./migrationUtils/validateAddressFromIncomingFile.test.js');
+  await import('./check/check.test.js');
+  await import('./protobuf/protobuf.test.js');
+  await import('./functions/functions.test.js');
+  await import('./fileUtils/readAddressesFromWhitelistFile.test.js');
+  await import('./fileUtils/readBalanceMigrationFile.test.js');
+  await import('./migrationUtils/validateAddressFromIncomingFile.test.js');
   // await import('./messageOperations/stateMessageOperations.test.js');
-  // await import('./buffer/buffer.test.js')
-  // await import('./network/connectionManagerTests.test.js')
+  await import('./buffer/buffer.test.js')
+  await import('./network/connectionManagerTests.test.js')
   // await import('./apply/apply.test.js'); // This test has been disabled because Github CI fails due to lack of resources. This test can still be run locally but sometimes it hangs when destroying resources.
   test.resume();
 }
