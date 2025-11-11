@@ -74,7 +74,7 @@ class State extends ReadyResource {
             bigBatches: false,
             optimistic: false,
             open: this.#setupHyperbee.bind(this),
-            apply: this.apply.bind(this),
+            apply: this.#apply.bind(this),
         })
     }
 
@@ -348,7 +348,7 @@ class State extends ReadyResource {
     // ATTENTION: DO NOT USE METHODS ABOVE IN APPLY PART!
     ///////////////////////////////APPLY////////////////////////////////////
 
-    async apply(nodes, view, base) {
+    async #apply(nodes, view, base) {
         const batch = view.batch();
         const batchInvoker = nodes[0].from.key;
 
