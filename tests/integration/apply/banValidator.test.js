@@ -1,4 +1,4 @@
-import {test, hook} from '../../helpers/wrapper.js';
+import { test, hook } from '../../helpers/wrapper.js';
 
 import {
     initTemporaryDirectory,
@@ -8,10 +8,10 @@ import {
     setupMsbAdmin,
     tryToSyncWriters
 } from '../../helpers/setupApplyTests.js';
-import {randomBytes} from '../../helpers/setupApplyTests.js';
+import { randomBytes } from '../../helpers/setupApplyTests.js';
 import CompleteStateMessageOperations from '../../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
-import {testKeyPair1, testKeyPair2, testKeyPair3, testKeyPair4} from '../../fixtures/apply.fixtures.js';
-import {sleep} from '../../../src/utils/helpers.js';
+import { testKeyPair1, testKeyPair2, testKeyPair3, testKeyPair4 } from '../../fixtures/apply.fixtures.js';
+import { sleep } from '../../../src/utils/helpers.js';
 import b4a from 'b4a'
 
 let admin;
@@ -99,12 +99,11 @@ test('handleApplyBanValidatorOperation (apply) - Append banValidator payload int
 });
 
 hook('Clean up banValidator setup', async t => {
-    // close msb instances and remove temp directory
-    const toClose = []
-    if (indexer.msb) toClose.push(indexer.msb.close());
-    if (writer1.msb) toClose.push(writer1.msb.close());
-    if (writer2.msb) toClose.push(writer2.msb.close());
-    if (admin.msb) toClose.push(admin.msb.close());
-    await Promise.all(toClose)
+    const toClose = [];
+    if (admin?.msb) toClose.push(admin.msb.close());
+    if (indexer?.msb) toClose.push(indexer.msb.close());
+    if (writer1?.msb) toClose.push(writer1.msb.close());
+    if (writer2?.msb) toClose.push(writer2.msb.close());
+    await Promise.all(toClose);
     if (tmpDirectory) await removeTemporaryDirectory(tmpDirectory);
-})
+});
