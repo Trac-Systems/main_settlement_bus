@@ -50,6 +50,7 @@ test('ConnectionManager', () => {
             reset()
             const connectionManager = makeManager()
             t.is(connectionManager.connectionCount(), connections.length, 'should have the same length')
+            
             const data = createConnection(testKeyPair5.publicKey)
             connectionManager.addValidator(data.key, data.connection)
             t.is(connectionManager.connectionCount(), connections.length + 1, 'should have the same length')
