@@ -18,8 +18,8 @@
     "test:unit:node": "brittle-node -t 60000 tests/unit/unit.test.js",
     "test:unit:bare": "brittle-bare -t 60000 tests/unit/unit.test.js",
     "test:unit:all": "(npm run test:unit:node && npm run test:unit:bare) || exit 1",
-    "test:node:cov": "brittle-node -c -t 60000 tests/unit/unit.test.js",
-    "test:bare:cov": "brittle-bare -c -t 60000  tests/unit/unit.test.js"
+    "test:unit:node:cov": "brittle-node -c -t 60000 tests/unit/unit.test.js",
+    "test:unit:bare:cov": "brittle-bare -c -t 60000  tests/unit/unit.test.js"
   },
   "dependencies": {
     "@tracsystems/blake3": "0.0.13",
