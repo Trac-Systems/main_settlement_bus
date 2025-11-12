@@ -7,7 +7,7 @@ import b4a from 'b4a';
 import {safeDecodeApplyOperation} from '../../src/utils/protobuf/operationHelpers.js';
 import {isAddressValid} from "../../src/core/state/utils/address.js";
 import {errorMessageIncludes} from "../utils/regexHelper.js";
-import {generatePostTx, randomBytes} from "../utils/setupApplyTests.js";
+import {generatePostTx, randomBytes} from "../../helpers/setupApplyTests.js";
 
 const msgTxoLength = 10;
 const opType = OperationType.TX;

@@ -1,4 +1,4 @@
-name: MSB-Integration-Tests
+name: MSB-Acceptance-Tests
 
 on:
   workflow_dispatch:
@@ -9,7 +9,7 @@ concurrency:
 
 jobs:
   integration-tests:
-    name: Integration Tests
+    name: Acceptance Tests
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -32,4 +32,4 @@ jobs:
         run: npm i -g bare
 
       - name: Run Integration Tests
-        run: npm run test:integration
+        run: npm run test:acceptance

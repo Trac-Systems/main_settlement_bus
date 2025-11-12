@@ -1,16 +1,16 @@
-import {test, hook} from '../../utils/wrapper.js';
+import {test, hook} from '../../../helpers/wrapper.js';
 import {
     initTemporaryDirectory, removeTemporaryDirectory, setupMsbPeer, setupMsbWriter, setupMsbIndexer,
     tryToSyncWriters, waitForAdminEntry, setupMsbAdmin
-} from '../../utils/setupApplyTests.js';
+} from '../../../helpers/setupApplyTests.js';
 
-import {randomBytes} from '../../utils/setupApplyTests.js';
-import CompleteStateMessageOperations from '../../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
-import PartialStateMessageOperations from '../../../src/messages/partialStateMessages/PartialStateMessageOperations.js'
-import {testKeyPair1, testKeyPair2, testKeyPair3, testKeyPair4} from '../../fixtures/apply.fixtures.js';
+import {randomBytes} from '../../../helpers/setupApplyTests.js';
+import CompleteStateMessageOperations from '../../../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
+import PartialStateMessageOperations from '../../../../src/messages/partialStateMessages/PartialStateMessageOperations.js'
+import {testKeyPair1, testKeyPair2, testKeyPair3, testKeyPair4} from '../../../fixtures/apply.fixtures.js';
 import b4a from 'b4a';
-import { decode as decodeAdmin } from '../../../src/core/state/utils/adminEntry.js';
-import { EntryType } from '../../../src/utils/constants.js';
+import { decode as decodeAdmin } from '../../../../src/core/state/utils/adminEntry.js';
+import { EntryType } from '../../../../src/utils/constants.js';
 //TODO: ADD TEST WHEN NON-ADMIN NODE FORGES ADD ADMIN OPERATION AND BROADCASTS IT TO THE STATE -  SHOULD BE REJECTED
 
 let admin, newAdmin;

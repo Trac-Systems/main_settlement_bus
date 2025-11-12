@@ -1,9 +1,9 @@
-import { test, hook } from '../utils/wrapper.js';
+import { test, hook } from '../../helpers/wrapper.js';
 import b4a from 'b4a';
-import { setupMsbAdmin, initTemporaryDirectory, removeTemporaryDirectory, randomBytes } from '../utils/setupApplyTests.js';
-import { testKeyPair1, testKeyPair2 } from '../fixtures/apply.fixtures.js';
-import fileUtils from '../../src/utils/fileUtils.js';
-import CompleteStateMessageOperations from '../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
+import { setupMsbAdmin, initTemporaryDirectory, removeTemporaryDirectory, randomBytes } from '../../helpers/setupApplyTests.js';
+import { testKeyPair1, testKeyPair2 } from '../../fixtures/apply.fixtures.js';
+import fileUtils from '../../../src/utils/fileUtils.js';
+import CompleteStateMessageOperations from '../../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
 import { address as addressApi } from 'trac-crypto-api';
 import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
 

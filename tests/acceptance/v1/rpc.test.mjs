@@ -1,8 +1,8 @@
 import request from "supertest"
 import { createServer } from "../../../rpc/create_server.mjs"
-import { initTemporaryDirectory } from '../../utils/setupApplyTests.js'
+import { initTemporaryDirectory } from '../../helpers/setupApplyTests.js'
 import { testKeyPair1, testKeyPair2 } from '../../fixtures/apply.fixtures.js'
-import { randomBytes, setupMsbAdmin, setupMsbWriter, fundPeer, removeTemporaryDirectory } from "../../utils/setupApplyTests.js"
+import { randomBytes, setupMsbAdmin, setupMsbWriter, fundPeer, removeTemporaryDirectory } from "../../helpers/setupApplyTests.js"
 import { $TNK } from "../../../src/core/state/utils/balance.js"
 import tracCrypto from 'trac-crypto-api';
 import b4a from 'b4a'

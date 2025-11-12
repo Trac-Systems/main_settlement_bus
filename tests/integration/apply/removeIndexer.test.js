@@ -1,6 +1,6 @@
-import {test, hook} from '../utils/wrapper.js';
+import {test, hook} from '../../helpers/wrapper.js';
 
-import CompleteStateMessageOperations from '../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
+import CompleteStateMessageOperations from '../../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
 import {
     initTemporaryDirectory,
     removeTemporaryDirectory,
@@ -8,8 +8,8 @@ import {
     setupMsbWriter,
     randomBytes,
     setupMsbIndexer, waitForNodeState, tryToSyncWriters
-} from '../utils/setupApplyTests.js';
-import {testKeyPair1, testKeyPair2, testKeyPair3, testKeyPair4} from '../fixtures/apply.fixtures.js';
+} from '../../helpers/setupApplyTests.js';
+import {testKeyPair1, testKeyPair2, testKeyPair3, testKeyPair4} from '../../fixtures/apply.fixtures.js';
 import b4a from 'b4a'
 
 let tmpDirectory, admin, indexer1, indexer2, writer;

@@ -1,4 +1,4 @@
-import {test, hook} from '../utils/wrapper.js';
+import {test, hook} from '../../helpers/wrapper.js';
 
 import {
     initTemporaryDirectory,
@@ -7,11 +7,11 @@ import {
     setupMsbIndexer,
     setupMsbAdmin,
     tryToSyncWriters
-} from '../utils/setupApplyTests.js';
-import {randomBytes} from '../utils/setupApplyTests.js';
-import CompleteStateMessageOperations from '../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
-import {testKeyPair1, testKeyPair2, testKeyPair3, testKeyPair4} from '../fixtures/apply.fixtures.js';
-import {sleep} from '../../src/utils/helpers.js';
+} from '../../helpers/setupApplyTests.js';
+import {randomBytes} from '../../helpers/setupApplyTests.js';
+import CompleteStateMessageOperations from '../../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
+import {testKeyPair1, testKeyPair2, testKeyPair3, testKeyPair4} from '../../fixtures/apply.fixtures.js';
+import {sleep} from '../../../src/utils/helpers.js';
 import b4a from 'b4a'
 
 let admin;

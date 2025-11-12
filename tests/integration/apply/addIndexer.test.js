@@ -1,6 +1,5 @@
 import {test, hook, solo} from 'brittle';
-import CompleteStateMessageOperations from '../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
-import {formatIndexersEntry} from '../../src/utils/helpers.js';
+import CompleteStateMessageOperations from '../../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
 import {
     initTemporaryDirectory,
     removeTemporaryDirectory,
@@ -9,7 +8,7 @@ import {
     randomBytes,
     setupMsbPeer,
     setupWhitelist, waitForNodeState, tryToSyncWriters, waitIndexer
-} from '../utils/setupApplyTests.js';
+} from '../../helpers/setupApplyTests.js';
 import {
     testKeyPair1,
     testKeyPair2,
@@ -18,7 +17,7 @@ import {
     testKeyPair5,
     testKeyPair6,
     testKeyPair7
-} from '../fixtures/apply.fixtures.js';
+} from '../../fixtures/apply.fixtures.js';
 import b4a from 'b4a';
 
 let tmpDirectory, admin, indexer1, indexer2, reader1, reader2, indexer3, writer;

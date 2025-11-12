@@ -1,5 +1,5 @@
 import b4a from 'b4a';
-import { test, hook } from '../utils/wrapper.js';
+import { test, hook } from '../../helpers/wrapper.js';
 import {
     setupMsbAdmin,
     initTemporaryDirectory,
@@ -7,16 +7,16 @@ import {
     setupMsbWriter,
     waitForHash,
     removeTemporaryDirectory
-} from '../utils/setupApplyTests.js';
+} from '../../helpers/setupApplyTests.js';
 import {
     testKeyPair1,
     testKeyPair2,
     testKeyPair3,
     testKeyPair4
-} from '../fixtures/apply.fixtures.js';
-import PartialStateMessageOperations from "../../src/messages/partialStateMessages/PartialStateMessageOperations.js";
-import CompleteStateMessageOperations from '../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
-import { $TNK } from '../../src/core/state/utils/balance.js';
+} from '../../fixtures/apply.fixtures.js';
+import PartialStateMessageOperations from "../../../src/messages/partialStateMessages/PartialStateMessageOperations.js";
+import CompleteStateMessageOperations from '../../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
+import { $TNK } from '../../../src/core/state/utils/balance.js';
 
 const buildTransfer = async (admin, from, to, amount) => {
     const txValidity = await from.msb.state.getIndexerSequenceState()

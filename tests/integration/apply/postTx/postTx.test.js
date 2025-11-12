@@ -1,4 +1,4 @@
-import {hook, test} from '../../utils/wrapper.js';
+import {hook, test} from '../../../helpers/wrapper.js';
 import b4a from "b4a";
 import {
     generatePostTx,
@@ -15,13 +15,12 @@ import {
     waitForHash,
     waitDemotion,
     promoteToWriter
-} from '../../utils/setupApplyTests.js';
-import {safeDecodeApplyOperation, safeEncodeApplyOperation} from '../../../src/utils/protobuf/operationHelpers.js'
-import {testKeyPair1, testKeyPair2, testKeyPair3, testKeyPair4, testKeyPair5} from '../../fixtures/apply.fixtures.js';
-import {OperationType} from "../../../src/utils/constants.js";
-import {addressToBuffer} from "../../../src/core/state/utils/address.js";
-import { $TNK } from '../../../src/core/state/utils/balance.js';
-import CompleteStateMessageOperations from '../../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
+} from '../../../helpers/setupApplyTests.js';
+import {safeDecodeApplyOperation, safeEncodeApplyOperation} from '../../../../src/utils/protobuf/operationHelpers.js'
+import {testKeyPair1, testKeyPair2, testKeyPair3, testKeyPair4, testKeyPair5} from '../../../fixtures/apply.fixtures.js';
+import {OperationType} from "../../../../src/utils/constants.js";
+import {addressToBuffer} from "../../../../src/core/state/utils/address.js";
+import { $TNK } from '../../../../src/core/state/utils/balance.js';
 
 let tmpDirectory, admin, writer, externalNode, externalBootstrap, maliciousPeer;
 
