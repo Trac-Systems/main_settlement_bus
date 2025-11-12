@@ -1,12 +1,6 @@
-name: MSB-CI
+name: MSB-Integration-Tests
 
 on:
-  push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - '*'
   workflow_dispatch:
 
 concurrency:
@@ -14,27 +8,28 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  tests:
+  integration-tests:
+    name: Integration Tests
     runs-on: ${{ matrix.os }}
-
     strategy:
       matrix:
         node-version: [lts/*]
         os: [ubuntu-latest, macos-latest, windows-latest]
+
     steps:
       - uses: actions/checkout@v4
+
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v3
         with:
           node-version: ${{ matrix.node-version }}
           cache: 'npm'
+
       - name: Install dependencies
         run: npm ci
+
       - name: Install bare
         run: npm i -g bare
-      - name: Run all tests
-        run: npm run test:unit:all
-# For now acceptance tests should be disable due to instability of the running MSB instance in the github actions environment
-# Github machines are not powerful enough to run MSB, and we won't ever finish our tests.
-#      - name: Run rpc acceptance tests
-#        run: npm run test:acceptance
+
+      - name: Run Integration Tests
+        run: npm run test:integration

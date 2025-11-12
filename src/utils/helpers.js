@@ -2,6 +2,8 @@ import b4a from "b4a";
 import {bufferToAddress} from "../core/state/utils/address.js";
 import { EntryType, TRAC_ADDRESS_SIZE } from "./constants.js";
 
+//TODO: change file name or split functions below into multiple files (Remember to update imports and tests accordingly)
+
 export function isHexString(string) {
     return typeof string === 'string' && string.length > 1 && /^[0-9a-fA-F]+$/.test(string) && string.length % 2 === 0;
 }
