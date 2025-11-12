@@ -1,5 +1,5 @@
 import b4a from 'b4a';
-import { test, hook } from '../utils/wrapper.js';
+import { test, hook } from '../../helpers/wrapper.js';
 
 import {
     setupMsbAdmin,
@@ -14,7 +14,7 @@ import {
     tryToSyncWriters,
     waitForNodeState,
     waitWritable
-} from '../utils/setupApplyTests.js';
+} from '../../helpers/setupApplyTests.js';
 import {
     testKeyPair1,
     testKeyPair2,
@@ -22,11 +22,11 @@ import {
     testKeyPair4,
     testKeyPair5,
     testKeyPair6
-} from '../fixtures/apply.fixtures.js';
-import PartialStateMessageOperations from "../../src/messages/partialStateMessages/PartialStateMessageOperations.js";
-import CompleteStateMessageOperations from '../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
-import {ZERO_WK} from '../../src/utils/buffer.js';
-import { $TNK } from '../../src/core/state/utils/balance.js';
+} from '../../fixtures/apply.fixtures.js';
+import PartialStateMessageOperations from "../../../src/messages/partialStateMessages/PartialStateMessageOperations.js";
+import CompleteStateMessageOperations from '../../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
+import {ZERO_WK} from '../../../src/utils/buffer.js';
+import { $TNK } from '../../../src/core/state/utils/balance.js';
 
 const sendAddWriter = async (invoker, broadcaster) => {
     const validity = await invoker.msb.state.getIndexerSequenceState()

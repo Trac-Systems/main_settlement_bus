@@ -1,5 +1,4 @@
-import {hook, test} from '../../utils/wrapper.js';
-import b4a from "b4a";
+import {hook, test} from '../../../helpers/wrapper.js';
 import {
     generatePostTx,
     initTemporaryDirectory,
@@ -13,11 +12,11 @@ import {
     tryToSyncWriters,
     waitDemotion,
     promoteToWriter
-} from '../../utils/setupApplyTests.js';
-import {safeDecodeApplyOperation, safeEncodeApplyOperation} from '../../../src/utils/protobuf/operationHelpers.js'
-import {testKeyPair1, testKeyPair2, testKeyPair4, testKeyPair5} from '../../fixtures/apply.fixtures.js';
-import { $TNK } from '../../../src/core/state/utils/balance.js';
-import { decode as decodeNodeEntry } from '../../../src/core/state/utils/nodeEntry.js';
+} from '../../../helpers/setupApplyTests.js';
+import {safeDecodeApplyOperation, safeEncodeApplyOperation} from '../../../../src/utils/protobuf/operationHelpers.js'
+import {testKeyPair1, testKeyPair2, testKeyPair4, testKeyPair5} from '../../../fixtures/apply.fixtures.js';
+import { $TNK } from '../../../../src/core/state/utils/balance.js';
+import { decode as decodeNodeEntry } from '../../../../src/core/state/utils/nodeEntry.js';
 
 let tmpDirectory, admin, writer, externalNode, externalBootstrap, maliciousPeer;
 // is and vs is already covered

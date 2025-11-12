@@ -1,4 +1,4 @@
-import {test, hook} from '../utils/wrapper.js';
+import {test, hook} from '../../helpers/wrapper.js';
 import b4a from 'b4a';
 import {
     setupMsbAdmin,
@@ -10,7 +10,7 @@ import {
     tryToSyncWriters,
     waitForNotIndexer,
     waitForNodeState,
-} from '../utils/setupApplyTests.js';
+} from '../../helpers/setupApplyTests.js';
 import {
     testKeyPair1,
     testKeyPair2,
@@ -18,9 +18,9 @@ import {
     testKeyPair4,
     testKeyPair5,
     testKeyPair6
-} from '../fixtures/apply.fixtures.js';
-import CompleteStateMessageOperations from '../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
-import PartialStateMessageOperations from '../../src/messages/partialStateMessages/PartialStateMessageOperations.js';
+} from '../../fixtures/apply.fixtures.js';
+import CompleteStateMessageOperations from '../../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
+import PartialStateMessageOperations from '../../../src/messages/partialStateMessages/PartialStateMessageOperations.js';
 
 let admin, writer1, writer2, writer3, writer4, indexer, tmpDirectory;
 

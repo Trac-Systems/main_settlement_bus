@@ -1,13 +1,13 @@
-import {test, hook} from '../../utils/wrapper.js';
+import {test, hook} from '../../../helpers/wrapper.js';
 import {
     initMsbAdmin, initTemporaryDirectory, removeTemporaryDirectory, setupMsbPeer, setupMsbWriter, setupMsbIndexer,
     tryToSyncWriters
-} from '../../utils/setupApplyTests.js';
-import {randomBytes} from '../../utils/setupApplyTests.js';
-import CompleteStateMessageOperations from '../../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
-import {testKeyPair1} from '../../fixtures/apply.fixtures.js';
+} from '../../../helpers/setupApplyTests.js';
+import {randomBytes} from '../../../helpers/setupApplyTests.js';
+import CompleteStateMessageOperations from '../../../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
+import {testKeyPair1} from '../../../fixtures/apply.fixtures.js';
 import b4a from 'b4a';
-import { ADMIN_INITIAL_BALANCE } from '../../../src/utils/constants.js';
+import { ADMIN_INITIAL_BALANCE } from '../../../../src/utils/constants.js';
 
 //TODO: ADD TEST WHEN NON-ADMIN NODE FORGES ADD ADMIN OPERATION AND BROADCASTS IT TO THE STATE -  SHOULD BE REJECTED
 
