@@ -72,7 +72,7 @@ export async function handleBroadcastTransaction({ msbInstance, respond, req }) 
             let errorMsg = code === 400 ? 'Invalid JSON payload.' : 'An error occurred processing the transaction.'
 
             if(error.message.includes("Failed to broadcast transaction after multiple attempts.")){
-                code = 408;
+                code = 429;
                 errorMsg = "Failed to broadcast transaction after multiple attempts."
             }
             
