@@ -1199,6 +1199,10 @@ export class MainSettlementBus extends ReadyResource {
                             this.network.validatorConnectionManager.rotate() // force change connection rotation for the next retry
                         }
 
+                        if (await this.#state.get(hash) === null) {
+                            throw new Error("Failed to broadcast transaction after multiple attempts.");
+                        }
+
                         return { message: "Transaction broadcasted successfully.", signedLength, unsignedLength, tx: hash };
                     } else {
                         // Handle case where payload is missing if called internally without one.
