@@ -68,10 +68,17 @@ export async function handleBroadcastTransaction({ msbInstance, respond, req }) 
             const result = await msbInstance.handleCommand('/broadcast_transaction', null, sanitizedPayload);
             respond(200, { result });
         } catch (error) {
+            let code = error instanceof SyntaxError ? 400 : 500;
+            let errorMsg = code === 400 ? 'Invalid JSON payload.' : 'An error occurred processing the transaction.'
+
+            if(error.message.includes("Failed to broadcast transaction after multiple attempts.")){
+                code = 429;
+                errorMsg = "Failed to broadcast transaction after multiple attempts."
+            }
+            
             console.error('Error in handleBroadcastTransaction:', error);
             // Use 400 for client errors (like bad JSON), 500 for server/command errors
-            const code = error instanceof SyntaxError ? 400 : 500;
-            respond(code, { error: code === 400 ? 'Invalid JSON payload.' : 'An error occurred processing the transaction.' });
+            respond(code, { error:  errorMsg});
         }
     });
 
