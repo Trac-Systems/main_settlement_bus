@@ -1,6 +1,6 @@
 import { decodeBase64Payload, isBase64, sanitizeBulkPayloadsRequestBody, sanitizeTransferPayload, validatePayloadStructure } from "./utils/helpers.mjs"
 import { MAX_SIGNED_LENGTH } from "./constants.mjs";
-import { isHexString } from "../src/utils/helpers";
+import { isHexString } from "../src/utils/helpers.js";
 
 export async function handleBalance({ req, respond, msbInstance }) {
     const [path, queryString] = req.url.split("?");
