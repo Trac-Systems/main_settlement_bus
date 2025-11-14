@@ -21,6 +21,8 @@ const rpc_opts = {
     ...opts,
     enable_tx_apply_logs: false,
     enable_error_apply_logs: false,
+    enable_wallet: false,
+    enable_interactive_mode: true,
 
 }
 
@@ -44,4 +46,3 @@ msb.ready().then(async () => {
 
     msb.interactiveMode();
 });
-
