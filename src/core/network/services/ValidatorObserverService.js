@@ -10,7 +10,6 @@ const DELAY_INTERVAL = 250
 
 class ValidatorObserverService {
     #enable_validator_observer;
-    #enable_wallet;
     #state;
     #network;
     #scheduler;
@@ -18,7 +17,7 @@ class ValidatorObserverService {
     #isInterrupted
 
     constructor(network, state, address, options = {}) {
-        this.#enable_wallet = options.enable_wallet !== false;
+        this.#enable_validator_observer = options.enable_validator_observer !== false;
         this.#network = network;
         this.#state = state;
         this.#address = address;
@@ -34,7 +33,7 @@ class ValidatorObserverService {
     // OS CALLS, ACCUMULATORS, MAYBE THIS IS POSSIBLE TO CHECK I/O QUEUE IF IT COINTAIN IT. FOR NOW WE ARE USING SLEEP.
     async start() {
         if (!this.#shouldRun()) {
-            console.info('ValidatorObserverService can not start. Wallet is not enabled');
+            console.info('ValidatorObserverService can not start. Disabled by configuration.');
             return;
         }
         if (this.#scheduler && this.#scheduler.isRunning) {
@@ -111,7 +110,11 @@ class ValidatorObserverService {
     };
 
     #shouldRun() {
-        return this.#enable_wallet && !this.#isInterrupted
+        if (!this.#enable_validator_observer || this.#isInterrupted) {
+            return false;
+        }
+
+        return true;
     }
 
     async #lengthEntry() {
