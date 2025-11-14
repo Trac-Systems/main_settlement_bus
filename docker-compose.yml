@@ -1,0 +1,32 @@
+services:
+
+# For now we won't support msb-node in docker-compose because docker stdin/out handling is problematic
+# and it could make really bad user experience.
+#  msb-node:
+#    build:
+#      context: .
+#      dockerfile: dockerfile
+#    container_name: msb-node
+#    stdin_open: true
+#    tty: true
+#    restart: unless-stopped
+#    command: ["prod"]
+#    environment:
+#      MSB_STORE: ${MSB_STORE:-node-store}
+#    volumes:
+#      - ./stores:/app/stores
+
+  msb-rpc:
+    build:
+      context: .
+      dockerfile: dockerfile
+    container_name: msb-rpc
+    restart: always
+    environment:
+      MSB_STORE: ${MSB_STORE:-rpc-node-store}
+      MSB_HOST: ${MSB_HOST:-0.0.0.0}
+      MSB_PORT: ${MSB_PORT:-5000}
+    volumes:
+      - ./stores:/app/stores
+    ports:
+      - "${MSB_PORT:-5000}:${MSB_PORT:-5000}"
