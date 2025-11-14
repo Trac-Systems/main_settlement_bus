@@ -1,4 +1,4 @@
-import { MAX_VALIDATORS } from "../../../utils/constants.js"
+import { MAX_VALIDATORS, MAX_REQUEST_COUNT } from "../../../utils/constants.js"
 import b4a from 'b4a'
 import PeerWallet from "trac-wallet"
 import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
@@ -19,7 +19,7 @@ class ConnectionManager {
     }
 
     send(message, retries = 3) {
-        if (this.#requestCount >= 10) {
+        if (this.#requestCount >= MAX_REQUEST_COUNT) {
             this.#requestCount = 0
             this.#updateNext()
         }
