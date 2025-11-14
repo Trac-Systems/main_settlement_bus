@@ -397,7 +397,7 @@ class State extends ReadyResource {
         }
         if (invalidOperations > 0) {
             await this.#validatorPenaltyApply(batchInvoker, batch, base, invalidOperations);
-            console.info(`Applied with ${invalidOperations} invalid operations.`);
+            this.#safeLogApply(`Applied with ${invalidOperations} invalid operations.`)
         }
 
         await batch.flush();
