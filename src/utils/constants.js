@@ -125,3 +125,5 @@ export const NETWORK_ID = 918; // TODO: Change this to config().network_id || 91
 
 export const MAX_VALIDATORS = 50
 export const MAX_RETRIES = 3
+
+export const MAX_REQUEST_COUNT = 5;
