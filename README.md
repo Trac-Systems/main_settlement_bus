@@ -143,4 +143,3 @@ Stop the service with `docker compose stop msb-rpc`, remove the stack entirely w
 - **Dependency install failures** – confirm you are on Node.js v24.11.0 (LTS) and npm ≥ 11.6.1. If packages still fail to build, clear artifacts (`rm -rf node_modules package-lock.json && npm install`) and rerun `npm run test:unit:all`.
 - **Unit tests fail only in one runtime** – run the targeted commands (`npm run test:unit:node` or `npm run test:unit:bare`) to isolate regressions, then inspect `tests/unit/unit.test.js` for the failing cases.
 - **RPC port already in use** – set `MSB_PORT` to a free value (for example `MSB_PORT=5050 npm run prod-rpc --port=5050`) or free the port with `lsof -i :<port>` as needed.
-- **Docker container exits immediately** – check `docker compose logs -f msb-rpc` for missing volume permissions or environment variables; the service requires the mounted `./stores` directory to be writable by the container user.
