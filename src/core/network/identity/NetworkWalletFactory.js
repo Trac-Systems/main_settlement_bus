@@ -26,6 +26,9 @@ export class NetworkWalletFactory {
     }
 }
 
+// TODO: Once Wallet class in trac-wallet exposes a constructor/factory that accepts an existing keyPair
+// (e.g. Wallet.fromKeyPair({ publicKey, secretKey }, networkPrefix)), replace EphemeralWallet
+// with a thin wrapper around that functionality instead of duplicating signing/verification logic.
 class EphemeralWallet {
     #publicKey;
     #secretKey;
@@ -73,4 +76,3 @@ class EphemeralWallet {
 }
 
 export default NetworkWalletFactory;
-
