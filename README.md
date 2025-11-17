@@ -32,9 +32,10 @@ npm install
 ## Post-install checklist
 
 Before running tests, install bare globally:
- ```sh
- npm install -g bare
- ```
+
+```sh
+npm install -g bare
+```
 
 - ✅ `npm run test:unit:all` – confirms the codebase builds and runs under both supported runtimes.
 - 📋 `npm run test:acceptance` – optional but recommended before upgrades. This suite spins up in-process nodes and may take a few minutes.
@@ -54,14 +55,16 @@ This variant reads configuration from `.env`:
 # .env
 MSB_STORE=<store_name>
 ```
-then 
+
+then
+
 ```
 npm run env-prod
 ```
 
 The script sources `.env` before invoking program and falls back to `node-store` when `MSB_STORE` is not defined.
 
-#### Inline environment variables ####
+#### Inline environment variables
 
 ```sh
 MSB_STORE=<store_name> npm run env-prod
@@ -78,10 +81,11 @@ npm run prod --store=<store_name>
 ### RPC-enabled node
 
 #### RPC with .env file
+
 ```
 # .env
 MSB_STORE=<store_name>
-MSB_HOST=0.0.0.0
+MSB_HOST=127.0.0.1
 MSB_PORT=5000
 ```
 
@@ -89,12 +93,12 @@ MSB_PORT=5000
 npm run env-prod-rpc
 ```
 
-This entry point sources `.env` automatically and defaults to `rpc-node-store`, `0.0.0.0`, and `5000` when variables are not present.
+This entry point sources `.env` automatically and defaults to `rpc-node-store`, `127.0.0.1`, and `5000` when variables are not present.
 
 #### Inline environment variables
 
 ```sh
-MSB_STORE=<store_name> MSB_HOST=<host> MSB_PORT=<port> npm run prod-rpc
+MSB_STORE=<store_name> MSB_HOST=<host> MSB_PORT=<port> npm run env-prod-rpc
 ```
 
 Override any combination of `MSB_STORE`, `MSB_HOST`, or `MSB_PORT`. Data is persisted under `./stores/${MSB_STORE}` (default `rpc-node-store` for this script).
@@ -107,37 +111,87 @@ npm run prod-rpc --store=<store_name> --host=<host> --port=<port>
 
 ## Docker usage
 
-You can run the RPC node in a containerized environment using the provided `docker-compose.yml` file.
+You can run the RPC node in a containerized environment using the provided `docker-compose.yml` file. The `msb-rpc` service is already wired up. You usually only need to tweak these variables:
+
+- `MSB_STORE`: name of the store directory under `./stores`.
+- `MSB_HOST`: host interface to bind (defaults to `127.0.0.1` to avoid exposing everything).
+- `MSB_PORT`: port the RPC server listens on **inside** the container (defaults to `5000`).
+- `MSB_PUBLISH_PORT`: host port to expose (defaults to `MSB_PORT`, so set it only when the host port should differ).
+
+Leave `MSB_PORT=5000` if you just want to publish the default RPC port and only bump `MSB_PUBLISH_PORT` when the host side must change. Set both to the same value if you want the RPC server itself to listen on another port.
+
+Example (keep container port 5000, expose host port 6000):
+
+```sh
+MSB_STORE=rpc-node-store \
+MSB_HOST=127.0.0.1 \
+MSB_PORT=5000 \
+MSB_PUBLISH_PORT=6000 \
+docker compose up -d msb-rpc
+```
 
 ### Running `msb-rpc` with Docker Compose
 
-The `msb-rpc` service uses the local `./stores` folder (mounted into `/msb/stores`) and the environment variables `MSB_STORE`, `MSB_HOST`, and `MSB_PORT`. Any of the following launch methods can be applied:
+Any of the following launch methods can be applied:
 
 1. **Using a `.env` file** – populate `.env`, then start the service:
+
+   ```sh
+   docker compose up -d msb-rpc
+   ```
+
+   or
 
    ```sh
    docker compose --env-file .env up -d msb-rpc
    ```
 
+   Add any of the variables listed above to `.env`. When the host port needs to differ from the container port, set `MSB_PUBLISH_PORT` without touching `MSB_PORT`.
+
+   Example `.env` (publishes host port 1337, keeps the container on 5000):
+
+   ```dotenv
+   MSB_STORE=rpc-node-store
+   MSB_HOST=127.0.0.1
+   MSB_PORT=5000
+   MSB_PUBLISH_PORT=1337
+   ```
+
 2. **Passing variables inline** – use this method when environment variables should be provided directly in the command line, without modifying the `.env` file:
 
    ```sh
-   MSB_STORE=<store_name> MSB_HOST=<host> MSB_PORT=<port> docker compose up -d msb-rpc
+   MSB_STORE=<store_name> MSB_HOST=<host> MSB_PORT=<container_port> MSB_PUBLISH_PORT=<host_port> docker compose up -d msb-rpc
    ```
 
-3. **Reusing an existing store directory** – mount the path that already holds your store:
+   Skip `MSB_PORT` when you just want to keep the container on `5000` and expose a different host port.
+
+3. **Reusing an existing store directory** – mount the path that already holds your store and pin the host binding you need:
 
    ```sh
    docker compose run -d --name msb-rpc \
       -e MSB_STORE=<store_name> \
       -e MSB_HOST=<host> \
-      -e MSB_PORT=<port> \
-      -p <port>:<port> \
-      -v /absolute/path/to/your/stores:/app/stores \
+      -e MSB_PORT=<container_port> \
+      -e MSB_PUBLISH_PORT=<host_port> \
+      -p <host_address>:<host_port>:<container_port> \
+      -v /absolute/path/to/your/store_directory:/msb/stores \
       msb-rpc
    ```
 
-   Adjust `/absolute/path/to/your/stores` to the directory that already contains the persisted store. Once the container exists, bring it back with `docker compose start msb-rpc`.
+   Adjust `/absolute/path/to/your/store_directory` to the directory that already contains the persisted store. Once the container exists, bring it back with `docker compose start msb-rpc`. If the container should stay on `5000`, omit `-e MSB_PORT=<container_port>` and just set `MSB_PUBLISH_PORT` plus the matching `-p` flag.
+
+   Example with specific values:
+
+   ```sh
+   docker compose run -d --name msb-rpc \
+       -e MSB_STORE=rpc-node-store \
+       -e MSB_HOST=127.0.0.1 \
+       -e MSB_PORT=5000 \
+       -e MSB_PUBLISH_PORT=6000 \
+       -p 127.0.0.1:6000:5000 \
+       -v /absolute/path/to/your/store_directory:/msb/stores \
+       msb-rpc
+   ```
 
 Stop the service with `docker compose stop msb-rpc`, remove the stack entirely with `docker compose down` when you are finished.
 
@@ -147,4 +201,3 @@ Stop the service with `docker compose stop msb-rpc`, remove the stack entirely w
 
 - **Dependency install failures** – confirm you are on Node.js v24.11.0 (LTS) and npm ≥ 11.6.1. If packages still fail to build, clear artifacts (`rm -rf node_modules package-lock.json && npm install`) and rerun `npm run test:unit:all`.
 - **Unit tests fail only in one runtime** – run the targeted commands (`npm run test:unit:node` or `npm run test:unit:bare`) to isolate regressions, then inspect `tests/unit/unit.test.js` for the failing cases.
-- **RPC port already in use** – set `MSB_PORT` to a free value (for example `MSB_PORT=5050 npm run prod-rpc --port=5050`) or free the port with `lsof -i :<port>` as needed.
