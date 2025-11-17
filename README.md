@@ -31,6 +31,11 @@ npm install
 
 ## Post-install checklist
 
+Before running tests, install bare globally:
+ ```sh
+ npm install -g bare
+ ```
+
 - ✅ `npm run test:unit:all` – confirms the codebase builds and runs under both supported runtimes.
 - 📋 `npm run test:acceptance` – optional but recommended before upgrades. This suite spins up in-process nodes and may take a few minutes.
 - 🌐 RPC smoke test – start `MSB_STORE=smoke-store MSB_HOST=127.0.0.1 MSB_PORT=5000 npm run env-prod-rpc` in one terminal, then execute `curl -s http://127.0.0.1:5000/v1/fee` from another terminal to verify `/v1` routes respond. Stop the node with `Ctrl+C` once finished.

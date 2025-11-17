@@ -17,7 +17,7 @@ import {
     DHT_BOOTSTRAPS
 } from '../../utils/constants.js';
 import ConnectionManager from './services/ConnectionManager.js';
-import IdentityProvider from './identity/IdentityProvider.js';
+import NetworkWalletFactory from './identity/NetworkWalletFactory.js';
 const wakeup = new w();
 
 class Network extends ReadyResource {
@@ -93,7 +93,7 @@ class Network extends ReadyResource {
     ) {
         if (!this.#swarm) {
             const keyPair = await this.initializeNetworkingKeyPair(store, wallet);
-            const identityProvider = this.#resolveIdentityProvider(keyPair, wallet);
+            const wrappedWallet = this.#getNetworkWalletWrapper(wallet, keyPair);
             this.#swarm = new Hyperswarm({
                 keyPair,
                 bootstrap: this.#dht_bootstrap,
@@ -104,7 +104,7 @@ class Network extends ReadyResource {
             });
 
             console.log(`Channel: ${b4a.toString(this.#channel)}`);
-            this.#networkMessages.initializeMessageRouter(state, identityProvider);
+            this.#networkMessages.initializeMessageRouter(state, wrappedWallet);
 
             this.#swarm.on('connection', async (connection) => {
                 const { message_channel, message } = await this.#networkMessages.setupProtomuxMessages(connection);
@@ -244,11 +244,14 @@ class Network extends ReadyResource {
         }
     }
 
-    #resolveIdentityProvider(keyPair, wallet) {
+    #getNetworkWalletWrapper(wallet, keyPair) {
         if (!this.#identityProvider) {
-            this.#identityProvider = this.#enable_wallet
-                ? IdentityProvider.fromWallet(wallet)
-                : IdentityProvider.fromNetworkKeyPair(keyPair, this.#options?.networkPrefix);
+            this.#identityProvider = NetworkWalletFactory.provide({
+                enableWallet: this.#enable_wallet,
+                wallet,
+                keyPair,
+                networkPrefix: this.#options?.networkPrefix
+            });
         }
         return this.#identityProvider;
     }
