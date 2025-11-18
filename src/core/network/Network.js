@@ -17,7 +17,7 @@ import {
     DHT_BOOTSTRAPS
 } from '../../utils/constants.js';
 import ConnectionManager from './services/ConnectionManager.js';
-
+import NetworkWalletFactory from './identity/NetworkWalletFactory.js';
 const wakeup = new w();
 
 class Network extends ReadyResource {
@@ -29,15 +29,18 @@ class Network extends ReadyResource {
     #transactionPoolService;
     #validatorObserverService;
     #validatorConnectionManager;
+    #options;
+    #identityProvider = null;
 
     constructor(state, channel, address = null, options = {}) {
         super();
+        this.#options = options;
         this.#enable_wallet = options.enable_wallet !== false;
         this.#channel = channel;
         this.#transactionPoolService = new TransactionPoolService(state, address, options);
-        this.#validatorObserverService = new ValidatorObserverService(this, state, address, options)
+        this.#validatorObserverService = new ValidatorObserverService(this, state, address, options);
         this.#networkMessages = new NetworkMessages(this, options);
-        this.#validatorConnectionManager = new ConnectionManager({ maxValidators: options.max_validators })
+        this.#validatorConnectionManager = new ConnectionManager({ maxValidators: options.max_validators });
         this.admin_stream = null;
         this.admin = null;
         this.validator = null;
@@ -90,6 +93,7 @@ class Network extends ReadyResource {
     ) {
         if (!this.#swarm) {
             const keyPair = await this.initializeNetworkingKeyPair(store, wallet);
+            const wrappedWallet = this.#getNetworkWalletWrapper(wallet, keyPair);
             this.#swarm = new Hyperswarm({
                 keyPair,
                 bootstrap: this.#dht_bootstrap,
@@ -100,7 +104,7 @@ class Network extends ReadyResource {
             });
 
             console.log(`Channel: ${b4a.toString(this.#channel)}`);
-            this.#networkMessages.initializeMessageRouter(state, wallet);
+            this.#networkMessages.initializeMessageRouter(state, wrappedWallet);
 
             this.#swarm.on('connection', async (connection) => {
                 const { message_channel, message } = await this.#networkMessages.setupProtomuxMessages(connection);
@@ -120,7 +124,7 @@ class Network extends ReadyResource {
                         this.custom_stream = null;
                         this.custom_node = null;
                     }
-                    try{ message_channel.close() }catch(e){}
+                    try { message_channel.close() } catch (e) { }
 
                 });
 
@@ -129,7 +133,7 @@ class Network extends ReadyResource {
                         error && error.message && (
                             error.message.includes('connection reset by peer') ||
                             error.message.includes('Duplicate connection') ||
-                            error.message.includes('connection timed out')                        )
+                            error.message.includes('connection timed out'))
                     ) {
                         // TODO: decide if we want to handle this error in a specific way. It generates a lot of logs.
                         return;
@@ -168,11 +172,11 @@ class Network extends ReadyResource {
                 cnt += 1;
             }
         }
-        
+
         if (this.#swarm.peers.has(publicKey)) {
             let stream;
             const peerInfo = this.#swarm.peers.get(publicKey)
-            stream = this.#swarm._allConnections.get(peerInfo.publicKey)            
+            stream = this.#swarm._allConnections.get(peerInfo.publicKey)
             if (stream !== undefined && stream.messenger !== undefined) {
                 if (type === 'validator') {
                     this.#validatorConnectionManager.addValidator(b4a.from(publicKey, 'hex'), stream)
@@ -183,8 +187,8 @@ class Network extends ReadyResource {
     }
 
     async isConnected(publicKey) {
-        return this.#swarm.peers.has(publicKey) && 
-                this.#swarm.peers.get(publicKey).connectedTime != -1
+        return this.#swarm.peers.has(publicKey) &&
+            this.#swarm.peers.get(publicKey).connectedTime != -1
     }
 
     async #sendRequestByType(stream, type) {
@@ -239,6 +243,19 @@ class Network extends ReadyResource {
             console.log(e)
         }
     }
+
+    #getNetworkWalletWrapper(wallet, keyPair) {
+        if (!this.#identityProvider) {
+            this.#identityProvider = NetworkWalletFactory.provide({
+                enableWallet: this.#enable_wallet,
+                wallet,
+                keyPair,
+                networkPrefix: this.#options?.networkPrefix
+            });
+        }
+        return this.#identityProvider;
+    }
+
 }
 
 export default Network;

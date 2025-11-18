@@ -1,17 +1,19 @@
 import request from "supertest"
 import { createServer } from "../../../rpc/create_server.mjs"
 import { initTemporaryDirectory } from '../../helpers/setupApplyTests.js'
-import { testKeyPair1, testKeyPair2 } from '../../fixtures/apply.fixtures.js'
-import { randomBytes, setupMsbAdmin, setupMsbWriter, fundPeer, removeTemporaryDirectory } from "../../helpers/setupApplyTests.js"
+import { testKeyPair1, testKeyPair2, testKeyPair3 } from '../../fixtures/apply.fixtures.js'
+import { randomBytes, setupMsbAdmin, setupMsbWriter, fundPeer, removeTemporaryDirectory, setupMsbPeer, tryToSyncWriters, waitForNodeState } from "../../helpers/setupApplyTests.js"
 import { $TNK } from "../../../src/core/state/utils/balance.js"
 import tracCrypto from 'trac-crypto-api';
 import b4a from 'b4a'
 
-let msb
+let writerMsb
+let rpcMsb
 let server
 let wallet
 let toClose
 let tmpDirectory
+let additionalPeers = []
 
 const setupNetwork = async () => {
     tmpDirectory = await initTemporaryDirectory()
@@ -28,21 +30,36 @@ const setupNetwork = async () => {
         store_name: '/admin'
     }
 
-    const peer = await setupMsbAdmin(testKeyPair1, tmpDirectory, rpcOpts)
-    const writer = await setupMsbWriter(peer, 'writer', testKeyPair2, tmpDirectory, peer.options);
-    return { writer, peer }
+    const admin = await setupMsbAdmin(testKeyPair1, tmpDirectory, rpcOpts)
+    const writer = await setupMsbWriter(admin, 'writer', testKeyPair2, tmpDirectory, admin.options);
+    additionalPeers.push(writer)
+    const reader = await setupMsbPeer('peer-2', testKeyPair3, tmpDirectory, { ...admin.options, enable_wallet: false });
+    additionalPeers.push(reader)
+    await tryToSyncWriters(admin, writer, reader)
+    await waitForNodeState(reader, writer.wallet.address, {
+        wk: writer.msb.state.writingKey,
+        isWhitelisted: true,
+        isWriter: true,
+        isIndexer: false,
+    })
+    return { writer, admin, reader }
 }
 
 beforeAll(async () => {
-    const { peer, writer } = await setupNetwork()
-    msb = writer.msb
-    wallet = msb.wallet
-    server = createServer(msb)
-    toClose = peer.msb
+    const { admin, writer, reader } = await setupNetwork()
+    writerMsb = writer.msb
+    rpcMsb = reader.msb
+    wallet = writerMsb.wallet
+    server = createServer(rpcMsb)
+    toClose = admin.msb
 })
 
 afterAll(async () => {
-    await Promise.all([msb?.close(), toClose?.close()])
+    const peersToClose = [...new Set(additionalPeers.map(peer => peer?.msb).filter(Boolean))]
+    await Promise.all([
+        toClose?.close(),
+        ...peersToClose.map(instance => instance.close())
+    ])
     await removeTemporaryDirectory(tmpDirectory)
 })
 
@@ -109,7 +126,7 @@ describe("API acceptance tests", () => {
             wallet.address,
             wallet.address,
             b4a.toString($TNK(1n), 'hex'),
-            b4a.toString(await msb.state.getIndexerSequenceState(), 'hex')
+            b4a.toString(await rpcMsb.state.getIndexerSequenceState(), 'hex')
         );
 
         const payload = tracCrypto.transaction.build(txData, b4a.from(wallet.secretKey, 'hex'));
@@ -130,7 +147,7 @@ describe("API acceptance tests", () => {
     })
 
     it("POST /v1/tx-payloads-bulk", async () => {
-        const result = await msb.state.confirmedTransactionsBetween(0, 40) // This is just an arbitrary range that will most likely contain valid
+        const result = await rpcMsb.state.confirmedTransactionsBetween(0, 40) // This is just an arbitrary range that will most likely contain valid
         const hashes = result.map(({ hash }) => hash)
 
         const payload = { hashes }
@@ -158,7 +175,7 @@ describe("API acceptance tests", () => {
                 wallet.address,
                 wallet.address,
                 b4a.toString($TNK(1n), 'hex'),
-                b4a.toString(await msb.state.getIndexerSequenceState(), 'hex')
+                b4a.toString(await rpcMsb.state.getIndexerSequenceState(), 'hex')
             );
 
             const payload = tracCrypto.transaction.build(txData, b4a.from(wallet.secretKey, 'hex'));
@@ -194,13 +211,13 @@ describe("API acceptance tests", () => {
                 wallet.address,
                 wallet.address,
                 b4a.toString($TNK(1n), 'hex'),
-                b4a.toString(await msb.state.getIndexerSequenceState(), 'hex')
+                b4a.toString(await rpcMsb.state.getIndexerSequenceState(), 'hex')
             );
 
             const payload = tracCrypto.transaction.build(txData, b4a.from(wallet.secretKey, 'hex'));
-            
-            const originalGetConfirmedLength = msb.state.getTransactionConfirmedLength;
-            msb.state.getTransactionConfirmedLength = async () => null;
+
+            const originalGetConfirmedLength = rpcMsb.state.getTransactionConfirmedLength;
+            rpcMsb.state.getTransactionConfirmedLength = async () => null;
 
             try {
                 const broadcastRes = await request(server)
@@ -219,7 +236,7 @@ describe("API acceptance tests", () => {
                     fee: '0'
                 });
             } finally {
-                msb.state.getTransactionConfirmedLength = originalGetConfirmedLength;
+                rpcMsb.state.getTransactionConfirmedLength = originalGetConfirmedLength;
             }
         });
 

@@ -28,3 +28,6 @@ cert.pem
 migration/*
 !migration/.gitkeep
 .vscode/
+
+# Environment files
+.env
