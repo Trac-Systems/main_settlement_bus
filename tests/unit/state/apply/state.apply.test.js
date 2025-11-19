@@ -7,6 +7,7 @@ async function runStateTests() {
     test.pause();
     await import('./addAdmin/state.apply.addAdmin.test.js');
     await import('./balanceInitialization/state.apply.balanceInitialization.test.js');
+    await import('./disableInitialization/state.apply.disableInitialization.test.js');
     test.resume();
 }
 
