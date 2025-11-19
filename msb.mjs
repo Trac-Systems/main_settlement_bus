@@ -1,7 +1,5 @@
-import {MainSettlementBus} from './src/index.js';
-
-const isPear = typeof Pear !== 'undefined';
-const args = isPear ? Pear.config.args : process.argv.slice(2);
+import { MainSettlementBus } from './src/index.js';
+import { startRpcServer } from './rpc/rpc_server.js'
 
 const opts = {
     stores_directory : 'stores/',
@@ -38,8 +36,7 @@ msb.ready().then(async () => {
         const hostIndex = args.indexOf('--host');
         const host = (hostIndex !== -1 && args[hostIndex + 1]) ? args[hostIndex + 1] : 'localhost';
 
-        const {startRpcServer} = await import('./rpc/rpc_server.mjs');
-        startRpcServer(msb, host, port);
+        return startRpcServer(msb, host, port);
     } else {
         console.log('RPC server will not be started.');
     }
