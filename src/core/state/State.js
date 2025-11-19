@@ -74,7 +74,7 @@ class State extends ReadyResource {
             bigBatches: false,
             optimistic: false,
             open: this.#setupHyperbee.bind(this),
-            apply: this.#apply.bind(this),
+            apply: this.applyHandler,
         })
     }
 
@@ -88,6 +88,10 @@ class State extends ReadyResource {
 
     get bootstrap() {
         return this.#bootstrap;
+    }
+
+    get applyHandler() {
+        return this.#apply.bind(this);
     }
 
     async _open() {
@@ -3596,8 +3600,8 @@ class State extends ReadyResource {
             return;
         }
 
-        const deductedStakedBalance = penalty.greaterThanOrEquals(stakedBalance) ? BALANCE_ZERO : stakedBalance.sub(penalty);        
-        
+        const deductedStakedBalance = penalty.greaterThanOrEquals(stakedBalance) ? BALANCE_ZERO : stakedBalance.sub(penalty);
+
         if (deductedStakedBalance === null) {
             this.#safeLogApply("ValidatorPenalty", `Failed to subtract penalty from staked balance for validator address: ${validatorAddressString}`, writingKeyBuffer);
             return;
