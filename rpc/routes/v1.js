@@ -9,7 +9,7 @@ import {
     handleTransactionDetails,
     handleFetchBulkTxPayloads,
     handleTransactionExtendedDetails
-} from '../handlers.mjs';
+} from '../handlers.js';
 
 export const v1Routes = [
     { method: 'GET', path: '/balance', handler: handleBalance },

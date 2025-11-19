@@ -1,4 +1,4 @@
-import { createServer } from "./create_server.mjs";
+import { createServer } from "./create_server.js";
 
 // Called by msb.mjs file
 export function startRpcServer(msbInstance, host, port) {

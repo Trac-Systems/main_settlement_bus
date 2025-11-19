@@ -1,5 +1,5 @@
 import request from "supertest"
-import { createServer } from "../../../rpc/create_server.mjs"
+import { createServer } from "../../../rpc/create_server.js"
 import { initTemporaryDirectory } from '../../helpers/setupApplyTests.js'
 import { testKeyPair1, testKeyPair2, testKeyPair3 } from '../../fixtures/apply.fixtures.js'
 import { randomBytes, setupMsbAdmin, setupMsbWriter, fundPeer, removeTemporaryDirectory, setupMsbPeer, tryToSyncWriters, waitForNodeState } from "../../helpers/setupApplyTests.js"
