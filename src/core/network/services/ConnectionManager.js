@@ -1,4 +1,4 @@
-import { MAX_VALIDATORS, MAX_REQUEST_COUNT } from "../../../utils/constants.js"
+import { MAX_VALIDATORS } from "../../../utils/constants.js"
 import b4a from 'b4a'
 import PeerWallet from "trac-wallet"
 import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
@@ -6,33 +6,37 @@ import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
 class ConnectionManager {
     #validators
     #validatorsIndex
-    #currentValidatorIndex
-    #requestCount
     #maxValidators
 
     constructor({ maxValidators })  {
         this.#validators = {}
         this.#validatorsIndex = []
-        this.#currentValidatorIndex = 0
-        this.#requestCount = 0
         this.#maxValidators = maxValidators || MAX_VALIDATORS
     }
 
-    send(message, retries = 3) {
-        if (this.#requestCount >= MAX_REQUEST_COUNT) {
-            this.#requestCount = 0
-            this.#updateNext()
+    /**
+     * Sends a message to a single randomly selected connected validator.
+     * Returns the public key (buffer) of the validator used, or throws
+     * if no connected validators are available.
+     */
+    send(message) {
+        const connectedValidators = this.#validatorsIndex.filter(_ => this.connected(_));
+
+        if (connectedValidators.length === 0) {
+            throw new Error('ConnectionManager: no connected validators available to send message');
         }
-        this.#requestCount++
+
+        const target = this.#pickRandomSubset(connectedValidators, 1)[0];
+        const connection = this.#validators[target];
+        if (!connection || !connection.messenger) return;
 
         try {
-            this.#getConnection().messenger.send(message)
-        } catch (e) { // Some retrying mechanism before reacting to close
-            if (retries > 0) {
-                this.rotate()
-                this.send(message, retries - 1)
-            }
+            connection.messenger.send(message);
+        } catch (e) {
+            // Swallow individual send errors. 
         }
+
+        return target;
     }
 
     whiteList(publicKey) {
@@ -40,7 +44,20 @@ class ConnectionManager {
     }
 
     addValidator(publicKey, connection) {
-        if (!this.exists(publicKey) && !this.maxConnections()) {
+
+         const validatorAddress = PeerWallet.encodeBech32m(
+                TRAC_NETWORK_MSB_MAINNET_PREFIX,
+                publicKey
+            );
+
+        if (!this.exists(publicKey)) {
+            if (this.maxConnections()) {
+                console.log("evicting validator", validatorAddress);
+                this.#evictOneValidator();
+            }
+
+            console.log("Adding ", validatorAddress);
+
             return this.#append(publicKey, connection)
         } else if (!this.connected(publicKey)) {
             return this.#update(publicKey, connection)
@@ -69,27 +86,13 @@ class ConnectionManager {
         return this.exists(publicKey) && this.#validators[publicKey]?.connected
     }
 
-    rotate() {
-        this.#updateNext()
-        this.#requestCount = 0
-    }
-
     exists(publicKey) {
         return !!this.#validators[publicKey]
     }
 
     prettyPrint() {
         console.log('Connection count: ', this.connectionCount())
-        console.log('Current connection: ', this.#currentValidator())
         console.log('Validators: ', this.#validatorsIndex.map(val => PeerWallet.encodeBech32m(TRAC_NETWORK_MSB_MAINNET_PREFIX, val)))
-    }
-
-    #currentValidator() {
-        return this.#validatorsIndex[this.#currentValidatorIndex]
-    }
-
-    #getConnection() {
-        return this.#validators[this.#currentValidator()]
     }
 
     #append(publicKey, connection) {
@@ -107,14 +110,29 @@ class ConnectionManager {
         this.#validators[publicKey] = connection
     }
 
-    #updateNext() {
-        const next = this.#currentValidatorIndex + 1
-        this.#currentValidatorIndex = next < this.#validatorsIndex.length ? next : 0
-    }
-
-
     #isRemoteEqual(publicKey) {
         return !!publicKey && !!this.#validators[publicKey]?.remotePublicKey && b4a.equals(this.#validators[publicKey]?.remotePublicKey, publicKey)
+    }
+
+    #pickRandomSubset(validators, maxTargets) {
+        const copy = validators.slice();
+        const count = Math.min(maxTargets, copy.length);
+
+        for (let i = copy.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [copy[i], copy[j]] = [copy[j], copy[i]];
+        }
+
+        return copy.slice(0, count);
+    }
+
+    #evictOneValidator() {
+        const connected = this.#validatorsIndex.filter(pk => this.connected(pk));
+        if (connected.length === 0) return;
+
+        const idx = Math.floor(Math.random() * connected.length);
+        const toRemove = connected[idx];
+        this.remove(toRemove);
     }
 }
 
