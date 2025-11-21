@@ -5,10 +5,10 @@ import { default as test } from 'brittle';
  */
 async function runStateTests() {
     test.pause();
-    // await import('./addAdmin/state.apply.addAdmin.test.js');
-	// await import('./balanceInitialization/state.apply.balanceInitialization.test.js');
-	// await import('./disableInitialization/state.apply.disableInitialization.test.js');
-	// await import('./appendWhitelist/state.apply.appendWhitelist.test.js');
+    await import('./addAdmin/state.apply.addAdmin.test.js');
+	await import('./balanceInitialization/state.apply.balanceInitialization.test.js');
+	await import('./disableInitialization/state.apply.disableInitialization.test.js');
+	await import('./appendWhitelist/state.apply.appendWhitelist.test.js');
 	await import('./addWriter/state.apply.addWriter.test.js');
 	test.resume();
 }
