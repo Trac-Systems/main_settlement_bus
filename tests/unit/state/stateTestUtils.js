@@ -21,4 +21,8 @@ export const TEN_THOUSAND_VALUE = b4a.from([
 
 export const tokenUnits = units => units * 10n ** TOKEN_DECIMALS
 
-export const isBare = () => (global.Pear !== undefined && global.Pear.config.options.type === 'terminal') || global.Pear === undefined
+export const isBare = () => {
+    if (global.Pear === undefined) return true;
+    const pearApp = global.Pear.app ?? global.Pear.config;
+    return pearApp?.options?.type === 'terminal';
+}
