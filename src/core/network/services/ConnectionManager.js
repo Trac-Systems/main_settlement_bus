@@ -44,13 +44,14 @@ class ConnectionManager {
     }
 
     addValidator(publicKey, connection) {
+        const validatorAddress = PeerWallet.encodeBech32m(
+            TRAC_NETWORK_MSB_MAINNET_PREFIX,
+            publicKey
+        );
 
-         const validatorAddress = PeerWallet.encodeBech32m(
-                TRAC_NETWORK_MSB_MAINNET_PREFIX,
-                publicKey
-            );
+        const inPool = !!this.#validators[publicKey];
 
-        if (!this.exists(publicKey)) {
+        if (!inPool) {
             if (this.maxConnections()) {
                 console.log("evicting validator", validatorAddress);
                 this.#evictOneValidator();
@@ -59,7 +60,7 @@ class ConnectionManager {
             console.log("Adding ", validatorAddress);
 
             return this.#append(publicKey, connection)
-        } else if (!this.connected(publicKey)) {
+        } else {
             return this.#update(publicKey, connection)
         }
 
@@ -79,11 +80,11 @@ class ConnectionManager {
     }
 
     connectionCount() {
-        return this.#validatorsIndex.filter(_ => this.connected(_)).length
+        return this.#validatorsIndex.length
     }
 
     connected(publicKey) {
-        return this.exists(publicKey) && this.#validators[publicKey]?.connected
+        return !!this.#validators[publicKey]
     }
 
     exists(publicKey) {
@@ -100,18 +101,12 @@ class ConnectionManager {
         this.#validators[publicKey] = connection
 
         connection.on('close', () => {
-            if (this.#isRemoteEqual(publicKey)) {
-                this.remove(publicKey)
-            }
+            this.remove(publicKey)
         })
     }
 
     #update(publicKey, connection) {
         this.#validators[publicKey] = connection
-    }
-
-    #isRemoteEqual(publicKey) {
-        return !!publicKey && !!this.#validators[publicKey]?.remotePublicKey && b4a.equals(this.#validators[publicKey]?.remotePublicKey, publicKey)
     }
 
     #pickRandomSubset(validators, maxTargets) {

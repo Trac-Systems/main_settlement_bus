@@ -55,21 +55,20 @@ class ValidatorObserverService {
     }
 
     async #worker(next) {
-        if (!this.#network.validatorConnectionManager.maxConnections()) {
-            const length = await this.#lengthEntry()
+        const length = await this.#lengthEntry()
 
-            const promises = [];
-            for (let i = 0; i < 10; i++) {
-                promises.push(this.#findValidator(this.#address, length));
-                await sleep(DELAY_INTERVAL); // Low key dangerous as the network progresses
-            }
-            await Promise.all(promises);
+        const promises = [];
+        for (let i = 0; i < 10; i++) {
+            promises.push(this.#findValidator(this.#address, length));
+            await sleep(DELAY_INTERVAL); // Low key dangerous as the network progresses
         }
+        await Promise.all(promises);
+
         next(POLL_INTERVAL)
     }
 
     async #findValidator(address, length) {
-        if (this.#network.validatorConnectionManager.maxConnections() || !this.#shouldRun()) return;
+        if (!this.#shouldRun()) return;
 
         const rndIndex = Math.floor(Math.random() * length);
         const validatorAddressBuffer = await this.state.getWriterIndex(rndIndex);
@@ -79,12 +78,12 @@ class ValidatorObserverService {
         const validatorAddress = bufferToAddress(validatorAddressBuffer);
         if (validatorAddress === address) return;
 
-        const validatorPubKey = PeerWallet.decodeBech32m(validatorAddress).toString('hex');
+        const validatorPubKeyBuffer = PeerWallet.decodeBech32m(validatorAddress);
+        const validatorPubKeyHex = validatorPubKeyBuffer.toString('hex');
         const validatorEntry = await this.state.getNodeEntry(validatorAddress);
         const adminEntry = await this.state.getAdminEntry();
 
         if (validatorAddress === adminEntry?.address && length >= MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION) {
-            const validatorPubKeyBuffer = b4a.from(validatorPubKey, 'hex')
             if (this.#network.validatorConnectionManager.exists(validatorPubKeyBuffer)) {
                 this.#network.validatorConnectionManager.remove(validatorPubKeyBuffer)
             }
@@ -96,7 +95,7 @@ class ValidatorObserverService {
         // - Cannot connect to indexers, except for admin-indexer
         // - Admin-indexer connection is allowed only when writers length has less than 10 writers
         if (
-            this.#network.validatorConnectionManager.connected(validatorPubKey) ||
+            this.#network.validatorConnectionManager.connected(validatorPubKeyBuffer) ||
             validatorEntry === null ||
             !validatorEntry.isWriter ||
             (validatorEntry.isIndexer && (validatorAddress !== adminEntry?.address || length >= MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION))
@@ -105,7 +104,7 @@ class ValidatorObserverService {
         }
 
         if (validatorAddress !== adminEntry?.address || length < MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION) {
-            await this.#network.tryConnect(validatorPubKey, 'validator');
+            await this.#network.tryConnect(validatorPubKeyHex, 'validator');
         }
     };
 
