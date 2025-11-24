@@ -9,7 +9,7 @@ export default class RequesterBalanceDecodeFailureScenario extends RequesterBala
 				...decoded,
 				balance: b4a.alloc(1)
 			}),
-			expectedLogs: ['Failed to verify requester balance.']
+			expectedLogs: ['Invalid requester balance.']
 		});
 	}
 }

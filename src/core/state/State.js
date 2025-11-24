@@ -1536,7 +1536,7 @@ class State extends ReadyResource {
         // Charging fee from the requester
         const requesterBalance = toBalance(decodedRequesterNodeEntry.balance)
         if (requesterBalance === null) {
-            this.#safeLogApply(OperationType.ADD_WRITER, "Failed to verify requester balance.", node.from.key)
+            this.#safeLogApply(OperationType.ADD_WRITER, "Invalid requester balance.", node.from.key)
             return null;
         };
 
@@ -1547,7 +1547,7 @@ class State extends ReadyResource {
 
         const updatedBalance = requesterBalance.sub(BALANCE_FEE) // Remove the fee
         if (updatedBalance === null) {
-            this.#safeLogApply(OperationType.ADD_WRITER, "Failed to apply fee to node.", node.from.key)
+            this.#safeLogApply(OperationType.ADD_WRITER, "Failed to apply fee to requester balance.", node.from.key)
             return null;
         };
 
@@ -1838,7 +1838,7 @@ class State extends ReadyResource {
         };
         const chargedNodeEntry = updatedBalance.update(updatedNodeEntry);
         if (chargedNodeEntry === null) {
-            this.#safeLogApply(OperationType.REMOVE_WRITER, "Failed to update node entry.", node.from.key)
+            this.#safeLogApply(OperationType.REMOVE_WRITER, "Failed to update node balance.", node.from.key)
             return null;
         };
 

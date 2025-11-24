@@ -278,7 +278,7 @@ async function assertWriterRegistry(t, base, addressBuffer, writingKeyHex, expec
 	t.ok(b4a.equals(indexEntry.value, addressBuffer), 'writer index stores node address');
 }
 
-async function assertValidatorReward(t, validatorPeer, validatorBalanceBefore) {
+export async function assertValidatorReward(t, validatorPeer, validatorBalanceBefore) {
 	const validatorEntry = await validatorPeer.base.view.get(validatorPeer.wallet.address);
 	t.ok(validatorEntry, 'validator entry exists');
 	const decodedValidator = nodeEntryUtils.decode(validatorEntry.value);
@@ -310,6 +310,7 @@ export async function assertWriterRemovalState(
 		validatorPeer = context.adminBootstrap,
 		writerKeyBuffer = null,
 		expectedBalanceBuffer = null,
+		expectedLicenseBuffer = null,
 		payload = null,
 		skipSync = false
 	} = {}
@@ -321,7 +322,8 @@ export async function assertWriterRemovalState(
 		validatorPeer.base,
 		writerAddress,
 		writingKey,
-		expectedBalanceBuffer
+		expectedBalanceBuffer,
+		expectedLicenseBuffer
 	);
 
 	if (payload) {
@@ -335,7 +337,8 @@ export async function assertWriterRemovalState(
 			readerPeer.base,
 			writerAddress,
 			writingKey,
-			expectedBalanceBuffer
+			expectedBalanceBuffer,
+			expectedLicenseBuffer
 		);
 	}
 }
@@ -510,7 +513,8 @@ async function assertWriterDowngradedEntry(
 	base,
 	address,
 	writingKey,
-	expectedBalanceBuffer
+	expectedBalanceBuffer,
+	expectedLicenseBuffer
 ) {
 	const entry = await base.view.get(address);
 	t.ok(entry, 'writer node entry exists');
@@ -525,6 +529,12 @@ async function assertWriterDowngradedEntry(
 		'writer staked balance cleared'
 	);
 	t.ok(!b4a.equals(decoded.license, ZERO_LICENSE), 'license retained after downgrade');
+	if (expectedLicenseBuffer) {
+		t.ok(
+			b4a.equals(decoded.license, expectedLicenseBuffer),
+			'writer license remains unchanged after downgrade'
+		);
+	}
 	if (expectedBalanceBuffer) {
 		t.ok(
 			b4a.equals(decoded.balance, expectedBalanceBuffer),
@@ -554,6 +564,7 @@ export default {
 	assertAddWriterSuccessState,
 	assertAddWriterFailureState,
 	assertWriterRemovalState,
+	assertValidatorReward,
 	applyWithRoleAccessBypass,
 	applyWithMissingComponentBypass,
 	applyWithRequesterEntryRemoval,
