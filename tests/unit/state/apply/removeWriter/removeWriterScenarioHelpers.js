@@ -2,11 +2,10 @@ import b4a from 'b4a';
 import {
 	setupAddWriterScenario,
 	selectWriterPeer,
-	buildAddWriterPayload,
 	buildRemoveWriterPayload,
-	assertAddWriterSuccessState,
 	assertWriterRemovalState,
-	assertValidatorReward
+	assertValidatorReward,
+	promotePeerToWriter
 } from '../addWriter/addWriterScenarioHelpers.js';
 import PartialStateMessageOperations from '../../../../../src/messages/partialStateMessages/PartialStateMessageOperations.js';
 import CompleteStateMessageOperations from '../../../../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
@@ -20,26 +19,8 @@ import { EntryType } from '../../../../../src/utils/constants.js';
 export async function setupRemoveWriterScenario(t, options = {}) {
 	const context = await setupAddWriterScenario(t, options);
 	const writerPeer = selectWriterPeer(context);
-	await promotePeerToWriter(t, context, writerPeer);
+	await promotePeerToWriter(t, context, { readerPeer: writerPeer });
 	return context;
-}
-
-async function promotePeerToWriter(t, context, writerPeer) {
-	const validatorPeer = context.adminBootstrap;
-	const payload = await buildAddWriterPayload(context, {
-		readerPeer: writerPeer,
-		validatorPeer
-	});
-
-	await validatorPeer.base.append(payload);
-	await validatorPeer.base.update();
-	await eventFlush();
-
-	await assertAddWriterSuccessState(t, context, {
-		readerPeer: writerPeer,
-		validatorPeer,
-		payload
-	});
 }
 
 export async function assertRemoveWriterSuccessState(

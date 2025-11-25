@@ -11,6 +11,7 @@ async function runStateTests() {
 	await import('./appendWhitelist/state.apply.appendWhitelist.test.js');
 	await import('./addWriter/state.apply.addWriter.test.js');
 	await import('./removeWriter/state.apply.removeWriter.test.js');
+	await import('./addIndexer/state.apply.addIndexer.test.js');
 	test.resume();
 }
 

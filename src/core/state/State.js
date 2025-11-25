@@ -2013,7 +2013,7 @@ class State extends ReadyResource {
 
         const pretenderNodeEntry = await this.#getEntryApply(pretendingAddressString, batch);
         if (pretenderNodeEntry === null) {
-            this.#safeLogApply(OperationType.ADD_INDEXER, "Failed to verify pretender indexer entry.", node.from.key)
+            this.#safeLogApply(OperationType.ADD_INDEXER, "Failed to verify target indexer entry.", node.from.key)
             return null;
         };
 
@@ -2078,7 +2078,7 @@ class State extends ReadyResource {
         // 100% fee charged from admin will be burned
         const newAdminBalance = adminBalance.sub(feeAmount);
         if (newAdminBalance === null) {
-            this.#safeLogApply(OperationType.ADD_INDEXER, "Failed to apply fee to requester balance", node.from.key)
+            this.#safeLogApply(OperationType.ADD_INDEXER, "Failed to apply fee to requester balance.", node.from.key)
             return null;
         };
 
@@ -2284,7 +2284,7 @@ class State extends ReadyResource {
         // 100% fee will be burned
         const newAdminBalance = adminBalance.sub(BALANCE_FEE)
         if (newAdminBalance === null) {
-            this.#safeLogApply(OperationType.REMOVE_INDEXER, "Failed to apply fee to requester balance", node.from.key)
+            this.#safeLogApply(OperationType.REMOVE_INDEXER, "Failed to apply fee to requester balance.", node.from.key)
             return null;
         };
 

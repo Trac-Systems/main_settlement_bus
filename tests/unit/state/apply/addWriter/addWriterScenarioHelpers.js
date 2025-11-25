@@ -52,6 +52,49 @@ export function selectValidatorPeerWithoutEntry(context) {
 	);
 }
 
+export async function promotePeerToWriter(
+	t,
+	context,
+	{
+		readerPeer = selectWriterPeer(context),
+		validatorPeer = context.adminBootstrap,
+		writerKeyBuffer = null,
+		expectedWriterIndex = null
+	} = {}
+) {
+	if (!readerPeer) {
+		throw new Error('promotePeerToWriter requires a reader peer.');
+	}
+	if (!validatorPeer) {
+		throw new Error('promotePeerToWriter requires a validator peer.');
+	}
+
+	const payload = await buildAddWriterPayload(context, {
+		readerPeer,
+		validatorPeer,
+		writerKeyBuffer
+	});
+
+	await validatorPeer.base.append(payload);
+	await validatorPeer.base.update();
+	await eventFlush();
+
+	const assertOptions = {
+		readerPeer,
+		validatorPeer,
+		writerKeyBuffer,
+		payload
+	};
+
+	if (typeof expectedWriterIndex === 'number') {
+		assertOptions.expectedWriterIndex = expectedWriterIndex;
+	}
+
+	await assertAddWriterSuccessState(t, context, assertOptions);
+
+	return payload;
+}
+
 export async function buildAddWriterPayload(
 	context,
 	{
@@ -377,8 +420,8 @@ export async function applyWithMissingComponentBypass(context, invalidPayload) {
 	}
 }
 
-export async function applyWithRequesterEntryRemoval(context, invalidPayload) {
-	const writerPeer = selectWriterPeer(context);
+export async function applyWithRequesterEntryRemoval(context, invalidPayload, { peer = null } = {}) {
+	const writerPeer = peer ?? selectWriterPeer(context);
 	await withPeerEntryOverrideOnApply({
 		context,
 		peer: writerPeer,
@@ -391,8 +434,12 @@ export async function applyWithRequesterEntryRemoval(context, invalidPayload) {
 	});
 }
 
-export async function applyWithRequesterEntryCorruption(context, invalidPayload) {
-	const writerPeer = selectWriterPeer(context);
+export async function applyWithRequesterEntryCorruption(
+	context,
+	invalidPayload,
+	{ peer = null } = {}
+) {
+	const writerPeer = peer ?? selectWriterPeer(context);
 	await withPeerEntryOverrideOnApply({
 		context,
 		peer: writerPeer,
