@@ -3,15 +3,22 @@ import b4a from 'b4a'
 import PeerWallet from "trac-wallet"
 import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
 
+// TODO: This class is flooding console with logs. Implement a verbosity flag to control this behavior
 class ConnectionManager {
     #validators
     #validatorsIndex
     #maxValidators
+    #messageThreshold // How many messages can be sent to a validator before removing from pool
 
-    constructor({ maxValidators })  {
+    // Note: #validators is using publicKey (Buffer) as key
+    // As Buffers are objects, we will rely on internal conversions done by JS to compare them.
+    // It would be better to handle these conversions manually by using hex strings as keys to avoid issues
+
+    constructor({ maxValidators }) {
         this.#validators = {}
         this.#validatorsIndex = []
         this.#maxValidators = maxValidators || MAX_VALIDATORS
+        this.#messageThreshold = 1
     }
 
     /**
@@ -26,26 +33,37 @@ class ConnectionManager {
             throw new Error('ConnectionManager: no connected validators available to send message');
         }
 
-        const target = this.#pickRandomSubset(connectedValidators, 1)[0];
-        const connection = this.#validators[target];
-        if (!connection || !connection.messenger) return;
+        const target = this.#pickRandomValidator(connectedValidators);
+        const entry = this.#validators[target];
+        if (!entry || !entry.connection || !entry.connection.messenger) return;
 
         try {
-            connection.messenger.send(message);
+            entry.connection.messenger.send(message);
+            entry.sent = (entry.sent || 0) + 1;
+            if (entry.sent >= this.#messageThreshold) {
+                const validatorAddress = PeerWallet.encodeBech32m(
+                    TRAC_NETWORK_MSB_MAINNET_PREFIX, // TODO: This won't work for other networks. Make it dynamic.
+                    target
+                );
+                console.log("Removing validator after reaching message threshold:", validatorAddress);
+                this.remove(target); // TODO: In the future, only "flag for removal" and remove in a separate callback
+                // TODO: Ideally, we should add a replacement immediately after removal, otherwise, we risk running out
+                // of validators to send requests to.
+            }
         } catch (e) {
-            // Swallow individual send errors. 
+            // Swallow individual send errors.
         }
 
         return target;
     }
 
     whiteList(publicKey) {
-        this.#validators[publicKey] = null
+        this.#validators[publicKey] = { connection: null, sent: 0 };
     }
 
     addValidator(publicKey, connection) {
         const validatorAddress = PeerWallet.encodeBech32m(
-            TRAC_NETWORK_MSB_MAINNET_PREFIX,
+            TRAC_NETWORK_MSB_MAINNET_PREFIX, // TODO: This won't work for other networks. Make it dynamic.
             publicKey
         );
 
@@ -58,23 +76,21 @@ class ConnectionManager {
             }
 
             console.log("Adding ", validatorAddress);
-
             return this.#append(publicKey, connection)
         } else {
             return this.#update(publicKey, connection)
         }
-
-        return false
     }
 
     remove(publicKey) {
         const index = this.#validatorsIndex.findIndex(current => b4a.equals(publicKey, current));
         if (index !== -1) {
             this.#validatorsIndex.splice(index, 1);
-            delete this.#validators[publicKey]
+            delete this.#validators[publicKey];
         }
     }
 
+    // Note: this function name is a bit misleading. It checks if we have reached max connections.
     maxConnections() {
         return this.connectionCount() >= this.#maxValidators
     }
@@ -84,11 +100,12 @@ class ConnectionManager {
     }
 
     connected(publicKey) {
-        return !!this.#validators[publicKey]
+        const entry = this.#validators[publicKey];
+        return !!entry && !!entry.connection;
     }
 
     exists(publicKey) {
-        return !!this.#validators[publicKey]
+        return !!this.#validators[publicKey];
     }
 
     prettyPrint() {
@@ -97,18 +114,26 @@ class ConnectionManager {
     }
 
     #append(publicKey, connection) {
-        this.#validatorsIndex.push(publicKey)
-        this.#validators[publicKey] = connection
+        this.#validatorsIndex.push(publicKey);
+        this.#validators[publicKey] = { connection, sent: 0 };
 
         connection.on('close', () => {
-            this.remove(publicKey)
-        })
+            this.remove(publicKey);
+        });
     }
 
     #update(publicKey, connection) {
-        this.#validators[publicKey] = connection
+        if (this.#validators[publicKey]) {
+            this.#validators[publicKey].connection = connection;
+        } else {
+            this.#validators[publicKey] = { connection, sent: 0 };
+        }
     }
 
+    // Node 1: This method shuffles the whole array (in practice, probably around 50 elements)
+    //      just to fetch a small subset of it (most times, 1 element).
+    //      There are more efficient ways to pick a small subset of validators. Consider optimizing.
+    // Note 2: This method is unused now, but will be kept here for future reference
     #pickRandomSubset(validators, maxTargets) {
         const copy = validators.slice();
         const count = Math.min(maxTargets, copy.length);
@@ -119,6 +144,11 @@ class ConnectionManager {
         }
 
         return copy.slice(0, count);
+    }
+
+    #pickRandomValidator(validators) {
+        const index = Math.floor(Math.random() * validators.length);
+        return validators[index];
     }
 
     #evictOneValidator() {
