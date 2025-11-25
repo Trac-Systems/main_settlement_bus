@@ -153,6 +153,28 @@ export async function buildRemoveIndexerPayload(
 	);
 }
 
+export async function buildRemoveIndexerPayloadWithTxValidity(
+	context,
+	mutatedTxValidity,
+	{ indexerPeer = selectIndexerCandidatePeer(context), adminPeer = context.adminBootstrap } = {}
+) {
+	if (!b4a.isBuffer(mutatedTxValidity)) {
+		throw new Error('buildRemoveIndexerPayloadWithTxValidity requires a tx validity buffer.');
+	}
+	if (!indexerPeer) {
+		throw new Error('buildRemoveIndexerPayloadWithTxValidity requires an indexer peer.');
+	}
+	if (!adminPeer) {
+		throw new Error('buildRemoveIndexerPayloadWithTxValidity requires an admin peer.');
+	}
+
+	return CompleteStateMessageOperations.assembleRemoveIndexerMessage(
+		adminPeer.wallet,
+		indexerPeer.wallet.address,
+		mutatedTxValidity
+	);
+}
+
 export async function assertAddIndexerSuccessState(
 	t,
 	context,

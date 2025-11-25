@@ -12,6 +12,7 @@ async function runStateTests() {
 	await import('./addWriter/state.apply.addWriter.test.js');
 	await import('./removeWriter/state.apply.removeWriter.test.js');
 	await import('./addIndexer/state.apply.addIndexer.test.js');
+	await import('./removeIndexer/state.apply.removeIndexer.test.js');
 	test.resume();
 }
 
