@@ -7,14 +7,14 @@ import {
 	assertBanValidatorSuccessState
 } from './banValidatorScenarioHelpers.js';
 
-export default function banValidatorHappyPathScenario() {
-	test('State.apply banValidator removes validator privileges - happy path', async t => {
-		const context = await setupBanValidatorScenario(t);
+export default function banValidatorWhitelistedNonWriterScenario() {
+	test('State.apply banValidator removes privileges for whitelisted non-writer - happy path', async t => {
+		const context = await setupBanValidatorScenario(t, { promoteToWriter: false });
 		const adminPeer = context.adminBootstrap;
 		const validatorPeer = context.banValidatorScenario?.validatorPeer ?? selectWriterPeer(context);
 
 		const validatorEntryBefore = await adminPeer.base.view.get(validatorPeer.wallet.address);
-		t.ok(validatorEntryBefore, 'validator entry exists before banValidator');
+		t.ok(validatorEntryBefore, 'whitelisted node entry exists before banValidator');
 
 		const adminEntryBefore = await adminPeer.base.view.get(adminPeer.wallet.address);
 		t.ok(adminEntryBefore, 'admin entry exists before banValidator');
@@ -30,7 +30,9 @@ export default function banValidatorHappyPathScenario() {
 			adminPeer,
 			validatorEntryBefore,
 			adminEntryBefore,
-			payload
+			payload,
+			expectedInitialRoles: { isWhitelisted: true, isWriter: false, isIndexer: false },
+			expectWriterRegistry: false
 		});
 	});
 }
