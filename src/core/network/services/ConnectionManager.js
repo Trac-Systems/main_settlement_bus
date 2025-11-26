@@ -85,6 +85,16 @@ class ConnectionManager {
     remove(publicKey) {
         const index = this.#validatorsIndex.findIndex(current => b4a.equals(publicKey, current));
         if (index !== -1) {
+            // Close the connection socket if it exists
+            const entry = this.#validators[publicKey];
+            if (entry && entry.connection && typeof entry.connection.end === 'function') {
+                try {
+                    entry.connection.end();
+                } catch (e) {
+                    // Ignore errors on connection end
+                    // TODO: Consider logging these errors here in verbose mode
+                }
+            }
             this.#validatorsIndex.splice(index, 1);
             delete this.#validators[publicKey];
         }
