@@ -6,21 +6,21 @@ import removeIndexerWriterKeyMissingScenario from './removeIndexerWriterKeyMissi
 import AdminControlOperationValidationScenario from '../common/adminControlOperationValidationScenario.js';
 import RequesterAddressValidationScenario from '../common/requesterAddressValidationScenario.js';
 import createRequesterPublicKeyValidationScenario from '../common/requesterPublicKeyValidationScenario.js';
-import InvalidAddressValidationScenario from '../common/invalidAddressValidationScenario.js';
-import createAddressWithInvalidPublicKeyScenario from '../common/addressWithInvalidPublicKeyScenario.js';
-import AdminEntryMissingScenario from '../common/adminEntryMissingScenario.js';
-import AdminEntryDecodeFailureScenario from '../common/adminEntryDecodeFailureScenario.js';
-import AdminOnlyGuardScenario from '../common/adminOnlyGuardScenario.js';
-import AdminPublicKeyDecodeFailureScenario from '../common/adminPublicKeyDecodeFailureScenario.js';
-import AdminConsistencyMismatchScenario from '../common/adminConsistencyMismatchScenario.js';
-import InvalidHashValidationScenario from '../common/invalidHashValidationScenario.js';
-import InvalidSignatureValidationScenario, { SignatureMutationStrategy } from '../common/invalidSignatureValidationScenario.js';
+import InvalidAddressValidationScenario from '../common/payload-structure/invalidAddressValidationScenario.js';
+import createAddressWithInvalidPublicKeyScenario from '../common/payload-structure/addressWithInvalidPublicKeyScenario.js';
+import AdminEntryMissingScenario from '../common/access-control/adminEntryMissingScenario.js';
+import AdminEntryDecodeFailureScenario from '../common/access-control/adminEntryDecodeFailureScenario.js';
+import AdminOnlyGuardScenario from '../common/access-control/adminOnlyGuardScenario.js';
+import AdminPublicKeyDecodeFailureScenario from '../common/access-control/adminPublicKeyDecodeFailureScenario.js';
+import AdminConsistencyMismatchScenario from '../common/access-control/adminConsistencyMismatchScenario.js';
+import InvalidHashValidationScenario from '../common/payload-structure/invalidHashValidationScenario.js';
+import InvalidSignatureValidationScenario, { SignatureMutationStrategy } from '../common/payload-structure/invalidSignatureValidationScenario.js';
 import TransactionValidityMismatchScenario from '../common/transactionValidityMismatchScenario.js';
 import OperationAlreadyAppliedScenario from '../common/operationAlreadyAppliedScenario.js';
 import RequesterNodeEntryMissingScenario from '../common/requester/requesterNodeEntryMissingScenario.js';
-import RequesterBalanceScenarioBase from '../common/balanceValidation/base/requesterBalanceScenarioBase.js';
-import RequesterBalanceInsufficientScenario from '../common/balanceValidation/requesterBalanceInsufficientScenario.js';
-import RequesterBalanceFeeApplicationFailureScenario from '../common/balanceValidation/requesterBalanceFeeApplicationFailureScenario.js';
+import RequesterBalanceScenarioBase from '../common/balances/base/requesterBalanceScenarioBase.js';
+import RequesterBalanceInsufficientScenario from '../common/balances/requesterBalanceInsufficientScenario.js';
+import RequesterBalanceFeeApplicationFailureScenario from '../common/balances/requesterBalanceFeeApplicationFailureScenario.js';
 import {
 	selectIndexerCandidatePeer,
 	ensureIndexerRegistration
@@ -39,6 +39,7 @@ import {
 	assertRemoveIndexerFailureState,
 	assertRemoveIndexerGuardFailureState
 } from './removeIndexerScenarioHelpers.js';
+import IndexerSequenceStateInvalidScenario from '../common/indexer/indexerSequenceStateInvalidScenario.js';
 
 removeIndexerHappyPathScenario();
 removeIndexerReAddAndRemoveAgainScenario();
@@ -159,6 +160,14 @@ new InvalidSignatureValidationScenario({
 	assertStateUnchanged: (t, context) => assertRemoveIndexerFailureState(t, context, { skipSync: true }),
 	strategy: SignatureMutationStrategy.TYPE_MISMATCH,
 	expectedLogs: ['Failed to verify message signature.']
+}).performScenario();
+
+new IndexerSequenceStateInvalidScenario({
+	title: 'State.apply removeIndexer rejects payloads when indexer sequence state is invalid',
+	setupScenario: setupRemoveIndexerScenario,
+	buildValidPayload: context => buildRemoveIndexerPayload(context),
+	assertStateUnchanged: (t, context) => assertRemoveIndexerGuardFailureState(t, context, { skipSync: true }),
+	expectedLogs: ['Indexer sequence state is invalid.']
 }).performScenario();
 
 new TransactionValidityMismatchScenario({

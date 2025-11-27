@@ -49,6 +49,25 @@ export async function buildBalanceInitializationPayload(context, recipientAddres
 	return messages[0];
 }
 
+export async function buildBalanceInitializationPayloadWithTxValidity({
+	context,
+	validPayload,
+	mutatedTxValidity
+}) {
+	const decoded = safeDecodeApplyOperation(validPayload);
+	if (!decoded?.bio?.ia || !decoded?.bio?.am) {
+		return validPayload;
+	}
+
+	const adminNode = context.adminBootstrap;
+	const messages = await CompleteStateMessageOperations.assembleBalanceInitializationMessages(
+		adminNode.wallet,
+		mutatedTxValidity,
+		[[decoded.bio.ia, decoded.bio.am]]
+	);
+	return messages[0];
+}
+
 export async function buildDefaultBalanceInitializationPayload(context) {
 	const recipientPeer = selectRecipientPeer(context);
 	return buildBalanceInitializationPayload(context, recipientPeer.wallet.address, toTerm(25n));

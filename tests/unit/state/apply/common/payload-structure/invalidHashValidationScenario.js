@@ -1,7 +1,10 @@
-import { eventFlush } from '../../../../helpers/autobaseTestHelpers.js';
-import { safeDecodeApplyOperation, safeEncodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
-import { blake3Hash } from '../../../../../src/utils/crypto.js';
-import OperationValidationScenarioBase from './base/OperationValidationScenarioBase.js';
+import { eventFlush } from '../../../../../helpers/autobaseTestHelpers.js';
+import {
+	safeDecodeApplyOperation,
+	safeEncodeApplyOperation
+} from '../../../../../../src/utils/protobuf/operationHelpers.js';
+import { blake3Hash } from '../../../../../../src/utils/crypto.js';
+import OperationValidationScenarioBase from '../base/OperationValidationScenarioBase.js';
 
 export default class InvalidHashValidationScenario extends OperationValidationScenarioBase {
 	constructor({

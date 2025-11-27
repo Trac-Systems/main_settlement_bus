@@ -1,6 +1,9 @@
 import b4a from 'b4a';
 import InvalidAddressValidationScenario from './invalidAddressValidationScenario.js';
-import { safeDecodeApplyOperation, safeEncodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
+import {
+	safeDecodeApplyOperation,
+	safeEncodeApplyOperation
+} from '../../../../../../src/utils/protobuf/operationHelpers.js';
 
 export default function createAddressWithInvalidPublicKeyScenario(config, pathOverride) {
 	const { addressPath, ...rest } = config ?? {};

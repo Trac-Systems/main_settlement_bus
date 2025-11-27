@@ -7,22 +7,23 @@ import b4a from 'b4a';
 import AdminControlOperationValidationScenario from '../common/adminControlOperationValidationScenario.js';
 import RequesterAddressValidationScenario from '../common/requesterAddressValidationScenario.js';
 import createRequesterPublicKeyValidationScenario from '../common/requesterPublicKeyValidationScenario.js';
-import AdminEntryMissingScenario from '../common/adminEntryMissingScenario.js';
-import AdminEntryDecodeFailureScenario from '../common/adminEntryDecodeFailureScenario.js';
-import AdminOnlyGuardScenario from '../common/adminOnlyGuardScenario.js';
-import AdminPublicKeyDecodeFailureScenario from '../common/adminPublicKeyDecodeFailureScenario.js';
-import AdminConsistencyMismatchScenario from '../common/adminConsistencyMismatchScenario.js';
-import InvalidHashValidationScenario from '../common/invalidHashValidationScenario.js';
-import InvalidAddressValidationScenario from '../common/invalidAddressValidationScenario.js';
+import AdminEntryMissingScenario from '../common/access-control/adminEntryMissingScenario.js';
+import AdminEntryDecodeFailureScenario from '../common/access-control/adminEntryDecodeFailureScenario.js';
+import AdminOnlyGuardScenario from '../common/access-control/adminOnlyGuardScenario.js';
+import AdminPublicKeyDecodeFailureScenario from '../common/access-control/adminPublicKeyDecodeFailureScenario.js';
+import AdminConsistencyMismatchScenario from '../common/access-control/adminConsistencyMismatchScenario.js';
+import InvalidHashValidationScenario from '../common/payload-structure/invalidHashValidationScenario.js';
+import InvalidAddressValidationScenario from '../common/payload-structure/invalidAddressValidationScenario.js';
 import InvalidSignatureValidationScenario, {
 	SignatureMutationStrategy
-} from '../common/invalidSignatureValidationScenario.js';
+} from '../common/payload-structure/invalidSignatureValidationScenario.js';
+import IndexerSequenceStateInvalidScenario from '../common/indexer/indexerSequenceStateInvalidScenario.js';
 import TransactionValidityMismatchScenario from '../common/transactionValidityMismatchScenario.js';
 import OperationAlreadyAppliedScenario from '../common/operationAlreadyAppliedScenario.js';
 import OperationValidationScenarioBase from '../common/base/OperationValidationScenarioBase.js';
-import FeeDecodeFailureScenario from '../common/fee/feeDecodeFailureScenario.js';
+import FeeDecodeFailureScenario from '../common/balances/feeDecodeFailureScenario.js';
 import RequesterNodeEntryMissingScenario from '../common/requester/requesterNodeEntryMissingScenario.js';
-import RequesterBalanceScenarioBase from '../common/balanceValidation/base/requesterBalanceScenarioBase.js';
+import RequesterBalanceScenarioBase from '../common/balances/base/requesterBalanceScenarioBase.js';
 import {
 	setupBanValidatorScenario,
 	buildBanValidatorPayload,
@@ -145,6 +146,14 @@ new InvalidSignatureValidationScenario({
 	assertStateUnchanged: assertBanValidatorFailureState,
 	strategy: SignatureMutationStrategy.TYPE_MISMATCH,
 	expectedLogs: ['Failed to verify message signature.']
+}).performScenario();
+
+new IndexerSequenceStateInvalidScenario({
+	title: 'State.apply banValidator rejects payloads when indexer sequence state is invalid',
+	setupScenario: setupBanValidatorScenario,
+	buildValidPayload: context => buildBanValidatorPayload(context),
+	assertStateUnchanged: (t, context) => assertBanValidatorFailureState(t, context, { skipSync: true }),
+	expectedLogs: ['Indexer sequence state is invalid.']
 }).performScenario();
 
 new TransactionValidityMismatchScenario({

@@ -27,26 +27,27 @@ import {
 	selectValidatorPeerWithoutEntry,
 	selectWriterPeer
 } from './addWriterScenarioHelpers.js';
-import PartialOperationValidationScenario, { PartialOperationMutationStrategy } from '../common/partialOperationValidationScenario.js';
+import PartialOperationValidationScenario, { PartialOperationMutationStrategy } from '../common/payload-structure/partialOperationValidationScenario.js';
 import RequesterAddressValidationScenario from '../common/requesterAddressValidationScenario.js';
 import createRequesterPublicKeyValidationScenario from '../common/requesterPublicKeyValidationScenario.js';
-import InvalidAddressValidationScenario from '../common/invalidAddressValidationScenario.js';
-import createAddressWithInvalidPublicKeyScenario from '../common/addressWithInvalidPublicKeyScenario.js';
-import InvalidHashValidationScenario from '../common/invalidHashValidationScenario.js';
-import InvalidSignatureValidationScenario, { SignatureMutationStrategy } from '../common/invalidSignatureValidationScenario.js';
+import InvalidAddressValidationScenario from '../common/payload-structure/invalidAddressValidationScenario.js';
+import createAddressWithInvalidPublicKeyScenario from '../common/payload-structure/addressWithInvalidPublicKeyScenario.js';
+import InvalidHashValidationScenario from '../common/payload-structure/invalidHashValidationScenario.js';
+import InvalidSignatureValidationScenario, { SignatureMutationStrategy } from '../common/payload-structure/invalidSignatureValidationScenario.js';
 import TransactionValidityMismatchScenario from '../common/transactionValidityMismatchScenario.js';
+import IndexerSequenceStateInvalidScenario from '../common/indexer/indexerSequenceStateInvalidScenario.js';
 import OperationAlreadyAppliedScenario from '../common/operationAlreadyAppliedScenario.js';
 import ValidatorEntryMissingScenario from '../common/validatorConsistency/validatorEntryMissingScenario.js';
 import ValidatorEntryDecodeFailureScenario from '../common/validatorConsistency/validatorEntryDecodeFailureScenario.js';
 import ValidatorEntryInvalidBalanceScenario from '../common/validatorEntryValidation/validatorEntryInvalidBalanceScenario.js';
-import ValidatorEntryRewardFailureScenario from '../common/validatorEntryValidation/validatorEntryRewardFailureScenario.js';
-import ValidatorEntryUpdateFailureScenario from '../common/validatorEntryValidation/validatorEntryUpdateFailureScenario.js';
+import ValidatorEntryRewardFailureScenario from '../common/balances/validatorEntryRewardFailureScenario.js';
+import ValidatorEntryUpdateFailureScenario from '../common/balances/validatorEntryUpdateFailureScenario.js';
 import ValidatorInactiveScenario from '../common/validatorConsistency/validatorInactiveScenario.js';
 import ValidatorWriterKeyMismatchScenario from '../common/validatorConsistency/validatorWriterKeyMismatchScenario.js';
-import RequesterBalanceDecodeFailureScenario from '../common/balanceValidation/requesterBalanceDecodeFailureScenario.js';
-import RequesterBalanceInsufficientScenario from '../common/balanceValidation/requesterBalanceInsufficientScenario.js';
-import RequesterBalanceFeeApplicationFailureScenario from '../common/balanceValidation/requesterBalanceFeeApplicationFailureScenario.js';
-import RequesterBalanceUpdateFailureScenario from '../common/balanceValidation/requesterBalanceUpdateFailureScenario.js';
+import RequesterBalanceDecodeFailureScenario from '../common/balances/requesterBalanceDecodeFailureScenario.js';
+import RequesterBalanceInsufficientScenario from '../common/balances/requesterBalanceInsufficientScenario.js';
+import RequesterBalanceFeeApplicationFailureScenario from '../common/balances/requesterBalanceFeeApplicationFailureScenario.js';
+import RequesterBalanceUpdateFailureScenario from '../common/balances/requesterBalanceUpdateFailureScenario.js';
 
 addWriterHappyPathScenario();
 addWriterNewWkScenario();
@@ -169,6 +170,15 @@ createAddressWithInvalidPublicKeyScenario({
 }).performScenario();
 
 addWriterInvalidValidatorSignatureScenario();
+
+new IndexerSequenceStateInvalidScenario({
+	title: 'State.apply addWriter rejects payloads when indexer sequence state is invalid',
+	setupScenario: setupAddWriterScenario,
+	buildValidPayload: buildAddWriterPayload,
+	assertStateUnchanged: (t, context) =>
+		assertAddWriterFailureState(t, context, { skipSync: true }),
+	expectedLogs: ['Indexer sequence state is invalid.']
+}).performScenario();
 
 new TransactionValidityMismatchScenario({
 	title: 'State.apply addWriter rejects payloads when tx validity mismatches indexer state',

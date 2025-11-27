@@ -1,8 +1,8 @@
 import b4a from 'b4a';
-import OperationValidationScenarioBase from './base/OperationValidationScenarioBase.js';
-import { eventFlush } from '../../../../helpers/autobaseTestHelpers.js';
-import { EntryType, TRAC_ADDRESS_SIZE } from '../../../../../src/utils/constants.js';
-import addressUtils from '../../../../../src/core/state/utils/address.js';
+import OperationValidationScenarioBase from '../base/OperationValidationScenarioBase.js';
+import { eventFlush } from '../../../../../helpers/autobaseTestHelpers.js';
+import { EntryType, TRAC_ADDRESS_SIZE } from '../../../../../../src/utils/constants.js';
+import addressUtils from '../../../../../../src/core/state/utils/address.js';
 
 export default class AdminConsistencyMismatchScenario extends OperationValidationScenarioBase {
 	constructor({

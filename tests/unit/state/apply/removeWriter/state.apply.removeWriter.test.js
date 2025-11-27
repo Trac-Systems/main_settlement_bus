@@ -11,31 +11,32 @@ import removeWriterWriterKeyRegistryMissingScenario from './removeWriterWriterKe
 import removeWriterWriterKeyMismatchScenario from './removeWriterWriterKeyMismatchScenario.js';
 import removeWriterWriterKeyOwnershipScenario from './removeWriterWriterKeyOwnershipScenario.js';
 import removeWriterUnstakeFailureScenario from './removeWriterUnstakeFailureScenario.js';
-import RoleAccessOperationValidationScenario from '../common/roleAccessOperationValidationScenario.js';
+import RoleAccessOperationValidationScenario from '../common/access-control/roleAccessOperationValidationScenario.js';
 import RequesterAddressValidationScenario from '../common/requesterAddressValidationScenario.js';
 import createRequesterPublicKeyValidationScenario from '../common/requesterPublicKeyValidationScenario.js';
 import PartialOperationValidationScenario, {
 	PartialOperationMutationStrategy
-} from '../common/partialOperationValidationScenario.js';
-import InvalidHashValidationScenario from '../common/invalidHashValidationScenario.js';
+} from '../common/payload-structure/partialOperationValidationScenario.js';
+import InvalidHashValidationScenario from '../common/payload-structure/invalidHashValidationScenario.js';
 import InvalidSignatureValidationScenario, {
 	SignatureMutationStrategy
-} from '../common/invalidSignatureValidationScenario.js';
-import InvalidAddressValidationScenario from '../common/invalidAddressValidationScenario.js';
-import createAddressWithInvalidPublicKeyScenario from '../common/addressWithInvalidPublicKeyScenario.js';
+} from '../common/payload-structure/invalidSignatureValidationScenario.js';
+import InvalidAddressValidationScenario from '../common/payload-structure/invalidAddressValidationScenario.js';
+import createAddressWithInvalidPublicKeyScenario from '../common/payload-structure/addressWithInvalidPublicKeyScenario.js';
 import TransactionValidityMismatchScenario from '../common/transactionValidityMismatchScenario.js';
+import IndexerSequenceStateInvalidScenario from '../common/indexer/indexerSequenceStateInvalidScenario.js';
 import OperationAlreadyAppliedScenario from '../common/operationAlreadyAppliedScenario.js';
-import RequesterBalanceDecodeFailureScenario from '../common/balanceValidation/requesterBalanceDecodeFailureScenario.js';
-import RequesterBalanceInsufficientScenario from '../common/balanceValidation/requesterBalanceInsufficientScenario.js';
-import RequesterBalanceFeeApplicationFailureScenario from '../common/balanceValidation/requesterBalanceFeeApplicationFailureScenario.js';
-import RequesterBalanceUpdateFailureScenario from '../common/balanceValidation/requesterBalanceUpdateFailureScenario.js';
+import RequesterBalanceDecodeFailureScenario from '../common/balances/requesterBalanceDecodeFailureScenario.js';
+import RequesterBalanceInsufficientScenario from '../common/balances/requesterBalanceInsufficientScenario.js';
+import RequesterBalanceFeeApplicationFailureScenario from '../common/balances/requesterBalanceFeeApplicationFailureScenario.js';
+import RequesterBalanceUpdateFailureScenario from '../common/balances/requesterBalanceUpdateFailureScenario.js';
 import ValidatorEntryMissingScenario from '../common/validatorConsistency/validatorEntryMissingScenario.js';
 import ValidatorEntryDecodeFailureScenario from '../common/validatorConsistency/validatorEntryDecodeFailureScenario.js';
 import ValidatorInactiveScenario from '../common/validatorConsistency/validatorInactiveScenario.js';
 import ValidatorWriterKeyMismatchScenario from '../common/validatorConsistency/validatorWriterKeyMismatchScenario.js';
 import ValidatorEntryInvalidBalanceScenario from '../common/validatorEntryValidation/validatorEntryInvalidBalanceScenario.js';
-import ValidatorEntryRewardFailureScenario from '../common/validatorEntryValidation/validatorEntryRewardFailureScenario.js';
-import ValidatorEntryUpdateFailureScenario from '../common/validatorEntryValidation/validatorEntryUpdateFailureScenario.js';
+import ValidatorEntryRewardFailureScenario from '../common/balances/validatorEntryRewardFailureScenario.js';
+import ValidatorEntryUpdateFailureScenario from '../common/balances/validatorEntryUpdateFailureScenario.js';
 import {
 	setupRemoveWriterScenario,
 	buildRemoveWriterPayload,
@@ -173,6 +174,14 @@ createAddressWithInvalidPublicKeyScenario({
 
 removeWriterInvalidValidatorSignatureScenario();
 
+new IndexerSequenceStateInvalidScenario({
+	title: 'State.apply removeWriter rejects payloads when indexer sequence state is invalid',
+	setupScenario: setupRemoveWriterScenario,
+	buildValidPayload: context => buildRemoveWriterPayload(context),
+	assertStateUnchanged: (t, context) => assertRemoveWriterFailureState(t, context, { skipSync: true }),
+	expectedLogs: ['Indexer sequence state is invalid.']
+}).performScenario();
+
 new TransactionValidityMismatchScenario({
 	title: 'State.apply removeWriter rejects payloads when tx validity mismatches indexer state',
 	setupScenario: setupRemoveWriterScenario,
@@ -277,7 +286,7 @@ new RequesterBalanceUpdateFailureScenario({
 	buildValidPayload: context => buildRemoveWriterPayload(context),
 	assertStateUnchanged: (t, context) => assertRemoveWriterFailureState(t, context, { skipSync: true }),
 	selectPeer: selectWriterPeer,
-	expectedLogs: ['Failed to update node entry.']
+	expectedLogs: ['Failed to update node balance.']
 }).performScenario();
 
 new ValidatorEntryInvalidBalanceScenario({

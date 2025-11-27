@@ -1,5 +1,5 @@
-import { eventFlush } from '../../../../helpers/autobaseTestHelpers.js';
-import OperationValidationScenarioBase from './base/OperationValidationScenarioBase.js';
+import { eventFlush } from '../../../../../helpers/autobaseTestHelpers.js';
+import OperationValidationScenarioBase from '../base/OperationValidationScenarioBase.js';
 
 export default class AdminOnlyGuardScenario extends OperationValidationScenarioBase {
 	constructor({

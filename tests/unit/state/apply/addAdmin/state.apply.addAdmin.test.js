@@ -2,6 +2,7 @@ import {
 	setupAddAdminScenario,
 	buildAddAdminRequesterPayload,
 	assertAddAdminRequesterFailureState,
+	assertAddAdminRequesterFailureStateLocal,
 	mutateAddAdminPayloadForInvalidSchema,
 	assertAdminStatePersists,
 	bypassAddAdminReplayGuardsOnce
@@ -9,13 +10,14 @@ import {
 import addAdminHappyPathScenario from './addAdminHappyPathScenario.js';
 import RequesterAddressValidationScenario from '../common/requesterAddressValidationScenario.js';
 import createRequesterPublicKeyValidationScenario from '../common/requesterPublicKeyValidationScenario.js';
-import InvalidHashValidationScenario from '../common/invalidHashValidationScenario.js';
-import InvalidSignatureValidationScenario, { SignatureMutationStrategy } from '../common/invalidSignatureValidationScenario.js';
+import InvalidHashValidationScenario from '../common/payload-structure/invalidHashValidationScenario.js';
+import InvalidSignatureValidationScenario, { SignatureMutationStrategy } from '../common/payload-structure/invalidSignatureValidationScenario.js';
 import InvalidMessageComponentValidationScenario, { MessageComponentStrategy } from '../common/invalidMessageComponentValidationScenario.js';
-import InvalidPayloadValidationScenario from '../common/invalidPayloadValidationScenario.js';
+import InvalidPayloadValidationScenario from '../common/payload-structure/invalidPayloadValidationScenario.js';
 import WriterKeyExistsValidationScenario from '../common/writerKeyExistsValidationScenario.js';
 import OperationAlreadyAppliedScenario from '../common/operationAlreadyAppliedScenario.js';
 import TransactionValidityMismatchScenario from '../common/transactionValidityMismatchScenario.js';
+import IndexerSequenceStateInvalidScenario from '../common/indexer/indexerSequenceStateInvalidScenario.js';
 import CompleteStateMessageOperations from '../../../../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
 import addAdminEntryExistsScenario from './adminEntryExistsScenario.js';
 import addAdminNonBootstrapNodeScenario from './nonBootstrapNodeScenario.js';
@@ -109,6 +111,14 @@ new InvalidSignatureValidationScenario({
 	assertStateUnchanged: assertAddAdminRequesterFailureState,
 	strategy: SignatureMutationStrategy.TYPE_MISMATCH,
 	expectedLogs: ['Failed to verify message signature.']
+}).performScenario();
+
+new IndexerSequenceStateInvalidScenario({
+	title: 'State.apply addAdmin rejects payload when indexer sequence state is invalid',
+	setupScenario: setupAddAdminScenario,
+	buildValidPayload: buildAddAdminRequesterPayload,
+	assertStateUnchanged: (t, context) => assertAddAdminRequesterFailureStateLocal(t, context),
+	expectedLogs: ['Indexer sequence state is invalid.']
 }).performScenario();
 
 new TransactionValidityMismatchScenario({

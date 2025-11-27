@@ -1,10 +1,10 @@
 import b4a from 'b4a';
-import { eventFlush } from '../../../../helpers/autobaseTestHelpers.js';
+import { eventFlush } from '../../../../../helpers/autobaseTestHelpers.js';
 import {
 	safeDecodeApplyOperation,
 	safeEncodeApplyOperation
-} from '../../../../../src/utils/protobuf/operationHelpers.js';
-import OperationValidationScenarioBase from './base/OperationValidationScenarioBase.js';
+} from '../../../../../../src/utils/protobuf/operationHelpers.js';
+import OperationValidationScenarioBase from '../base/OperationValidationScenarioBase.js';
 
 export default class InvalidAddressValidationScenario extends OperationValidationScenarioBase {
 	constructor({

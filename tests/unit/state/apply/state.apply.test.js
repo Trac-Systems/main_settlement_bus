@@ -14,6 +14,7 @@ async function runStateTests() {
 	await import('./addIndexer/state.apply.addIndexer.test.js');
 	await import('./removeIndexer/state.apply.removeIndexer.test.js');
 	await import('./banValidator/state.apply.banValidator.test.js');
+	await import('./bootstrapDeployment/state.apply.bootstrapDeployment.test.js')
 	test.resume();
 }
 

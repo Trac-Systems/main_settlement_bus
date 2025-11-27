@@ -1,14 +1,15 @@
-import InvalidPayloadValidationScenario from '../common/invalidPayloadValidationScenario.js';
-import AdminEntryDecodeFailureScenario from '../common/adminEntryDecodeFailureScenario.js';
-import AdminPublicKeyDecodeFailureScenario from '../common/adminPublicKeyDecodeFailureScenario.js';
-import AdminOnlyGuardScenario from '../common/adminOnlyGuardScenario.js';
-import AdminConsistencyMismatchScenario from '../common/adminConsistencyMismatchScenario.js';
-import InvalidHashValidationScenario from '../common/invalidHashValidationScenario.js';
-import InvalidSignatureValidationScenario, { SignatureMutationStrategy } from '../common/invalidSignatureValidationScenario.js';
+import InvalidPayloadValidationScenario from '../common/payload-structure/invalidPayloadValidationScenario.js';
+import AdminEntryDecodeFailureScenario from '../common/access-control/adminEntryDecodeFailureScenario.js';
+import AdminPublicKeyDecodeFailureScenario from '../common/access-control/adminPublicKeyDecodeFailureScenario.js';
+import AdminOnlyGuardScenario from '../common/access-control/adminOnlyGuardScenario.js';
+import AdminConsistencyMismatchScenario from '../common/access-control/adminConsistencyMismatchScenario.js';
+import InvalidHashValidationScenario from '../common/payload-structure/invalidHashValidationScenario.js';
+import InvalidSignatureValidationScenario, { SignatureMutationStrategy } from '../common/payload-structure/invalidSignatureValidationScenario.js';
 import TransactionValidityMismatchScenario from '../common/transactionValidityMismatchScenario.js';
 import OperationAlreadyAppliedScenario from '../common/operationAlreadyAppliedScenario.js';
 import RequesterAddressValidationScenario from '../common/requesterAddressValidationScenario.js';
 import createRequesterPublicKeyValidationScenario from '../common/requesterPublicKeyValidationScenario.js';
+import IndexerSequenceStateInvalidScenario from '../common/indexer/indexerSequenceStateInvalidScenario.js';
 import disableInitializationHappyPathScenario from './disableInitializationHappyPathScenario.js';
 import disableInitializationAlreadyDisabledScenario from './disableInitializationAlreadyDisabledScenario.js';
 import {
@@ -118,6 +119,18 @@ new InvalidSignatureValidationScenario({
 	assertStateUnchanged: assertDisableInitializationFailureState,
 	strategy: SignatureMutationStrategy.TYPE_MISMATCH,
 	expectedLogs: ['Failed to verify message signature.']
+}).performScenario();
+
+new IndexerSequenceStateInvalidScenario({
+	title: 'State.apply disableInitialization rejects payload when indexer sequence state is invalid',
+	setupScenario: setupDisableInitializationScenario,
+	buildValidPayload: buildDisableInitializationPayload,
+	assertStateUnchanged: (t, context, validPayload, invalidPayload) =>
+		assertDisableInitializationFailureState(t, context, {
+			skipSync: true,
+			validPayload: invalidPayload ?? validPayload
+		}),
+	expectedLogs: ['Indexer sequence state is invalid.']
 }).performScenario();
 
 new TransactionValidityMismatchScenario({

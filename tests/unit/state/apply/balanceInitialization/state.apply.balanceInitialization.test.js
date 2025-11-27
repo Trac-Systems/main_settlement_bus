@@ -1,22 +1,25 @@
 import setupBalanceInitializationScenario, {
 	buildDefaultBalanceInitializationPayload,
 	assertBalanceInitializationFailureState,
-	mutateBalanceInitializationPayloadForInvalidSchema
+	mutateBalanceInitializationPayloadForInvalidSchema,
+	buildBalanceInitializationPayloadWithTxValidity
 } from './balanceInitializationScenarioHelpers.js';
 import balanceInitializationHappyPathScenario from './balanceInitializationHappyPathScenario.js';
 import balanceInitializationInvalidAmountScenario from './invalidAmountScenario.js';
 import RequesterAddressValidationScenario from '../common/requesterAddressValidationScenario.js';
-import InvalidPayloadValidationScenario from '../common/invalidPayloadValidationScenario.js';
-import InvalidAddressValidationScenario from '../common/invalidAddressValidationScenario.js';
-import createAddressWithInvalidPublicKeyScenario from '../common/addressWithInvalidPublicKeyScenario.js';
+import InvalidPayloadValidationScenario from '../common/payload-structure/invalidPayloadValidationScenario.js';
+import InvalidAddressValidationScenario from '../common/payload-structure/invalidAddressValidationScenario.js';
+import createAddressWithInvalidPublicKeyScenario from '../common/payload-structure/addressWithInvalidPublicKeyScenario.js';
 import createRequesterPublicKeyValidationScenario from '../common/requesterPublicKeyValidationScenario.js';
-import InvalidHashValidationScenario from '../common/invalidHashValidationScenario.js';
-import InvalidSignatureValidationScenario, { SignatureMutationStrategy } from '../common/invalidSignatureValidationScenario.js';
+import InvalidHashValidationScenario from '../common/payload-structure/invalidHashValidationScenario.js';
+import InvalidSignatureValidationScenario, { SignatureMutationStrategy } from '../common/payload-structure/invalidSignatureValidationScenario.js';
 import InvalidMessageComponentValidationScenario, { MessageComponentStrategy } from '../common/invalidMessageComponentValidationScenario.js';
-import InitializationDisabledScenario from '../common/initializationDisabledScenario.js';
-import AdminEntryDecodeFailureScenario from '../common/adminEntryDecodeFailureScenario.js';
-import AdminOnlyGuardScenario from '../common/adminOnlyGuardScenario.js';
-import AdminConsistencyMismatchScenario from '../common/adminConsistencyMismatchScenario.js';
+import InitializationDisabledScenario from '../common/payload-structure/initializationDisabledScenario.js';
+import AdminEntryDecodeFailureScenario from '../common/access-control/adminEntryDecodeFailureScenario.js';
+import AdminOnlyGuardScenario from '../common/access-control/adminOnlyGuardScenario.js';
+import AdminConsistencyMismatchScenario from '../common/access-control/adminConsistencyMismatchScenario.js';
+import IndexerSequenceStateInvalidScenario from '../common/indexer/indexerSequenceStateInvalidScenario.js';
+import TransactionValidityMismatchScenario from '../common/transactionValidityMismatchScenario.js';
 
 balanceInitializationHappyPathScenario();
 
@@ -142,6 +145,26 @@ new InvalidSignatureValidationScenario({
 	assertStateUnchanged: assertBalanceInitializationFailureState,
 	strategy: SignatureMutationStrategy.AMOUNT_SIGNATURE,
 	expectedLogs: ['Message hash does not match the tx_hash.']
+}).performScenario();
+
+new IndexerSequenceStateInvalidScenario({
+	title: 'State.apply balanceInitialization rejects payloads when indexer sequence state is invalid',
+	setupScenario: setupBalanceInitializationScenario,
+	buildValidPayload: buildDefaultBalanceInitializationPayload,
+	assertStateUnchanged: (t, context) =>
+		assertBalanceInitializationFailureState(t, context, { skipSync: true }),
+	expectedLogs: ['Indexer sequence state is invalid.']
+}).performScenario();
+
+new TransactionValidityMismatchScenario({
+	title: 'State.apply balanceInitialization rejects payload when tx validity mismatches indexer state',
+	setupScenario: setupBalanceInitializationScenario,
+	buildValidPayload: buildDefaultBalanceInitializationPayload,
+	assertStateUnchanged: assertBalanceInitializationFailureState,
+	txValidityPath: ['bio', 'txv'],
+	rebuildPayloadWithTxValidity: ({ context, validPayload, mutatedTxValidity }) =>
+		buildBalanceInitializationPayloadWithTxValidity({ context, validPayload, mutatedTxValidity }),
+	expectedLogs: ['Transaction was not executed.']
 }).performScenario();
 
 new InvalidMessageComponentValidationScenario({

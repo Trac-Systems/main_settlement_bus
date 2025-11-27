@@ -5,7 +5,7 @@ export default class RequesterBalanceFeeApplicationFailureScenario extends Reque
 		super({
 			...options,
 			failNextBalanceSub: true,
-			expectedLogs: ['Failed to apply fee to requester balance.']
+			expectedLogs: options?.expectedLogs ?? ['Failed to apply fee to requester balance.']
 		});
 	}
 }

@@ -1,11 +1,11 @@
 import b4a from 'b4a';
-import { eventFlush } from '../../../../helpers/autobaseTestHelpers.js';
-import OperationValidationScenarioBase from './base/OperationValidationScenarioBase.js';
-import { EntryType } from '../../../../../src/utils/constants.js';
+import { eventFlush } from '../../../../../helpers/autobaseTestHelpers.js';
+import OperationValidationScenarioBase from '../base/OperationValidationScenarioBase.js';
+import { EntryType } from '../../../../../../src/utils/constants.js';
 
 const ADMIN_KEY_BUFFER = b4a.from(EntryType.ADMIN);
 
-export default class AdminEntryMissingScenario extends OperationValidationScenarioBase {
+export default class AdminEntryDecodeFailureScenario extends OperationValidationScenarioBase {
 	constructor({
 		title,
 		setupScenario,
@@ -38,19 +38,19 @@ function createApplyInvalidPayload(selectNode) {
 	return async (context, payload) => {
 		const node = selectNode(context);
 		if (!node?.base) {
-			throw new Error('Admin entry missing scenario requires a writable node.');
+			throw new Error('Admin entry decode failure scenario requires a writable node.');
 		}
 
-		const cleanup = patchAdminEntryAbsent(node.base);
+		const cleanup = patchAdminEntryDecode(node.base);
 		try {
 			await applyPayload(node, payload);
 		} finally {
-			await cleanup?.();
+			await cleanup();
 		}
 	};
 }
 
-function patchAdminEntryAbsent(base) {
+function patchAdminEntryDecode(base) {
 	const originalApply = base._handlers.apply;
 	let shouldPatchNextApply = true;
 
@@ -67,13 +67,26 @@ function patchAdminEntryAbsent(base) {
 			const batch = boundBatch(...args);
 			const originalGet = batch.get?.bind(batch);
 			if (typeof originalGet === 'function') {
-				let suppressed = false;
+				let shouldCorruptEntry = true;
 				batch.get = async key => {
-					if (!isAdminEntryKey(key) || suppressed) {
+					if (!isAdminEntryKey(key)) {
 						return originalGet(key);
 					}
-					suppressed = true;
-					return null;
+
+					const adminEntry = await originalGet(key);
+					if (!adminEntry?.value) {
+						return adminEntry;
+					}
+
+					if (shouldCorruptEntry) {
+						shouldCorruptEntry = false;
+						return {
+							...adminEntry,
+							value: corruptEntry(adminEntry.value)
+						};
+					}
+
+					return adminEntry;
 				};
 			}
 			return batch;
@@ -99,6 +112,15 @@ function isAdminEntryKey(key) {
 		return b4a.equals(key, ADMIN_KEY_BUFFER);
 	}
 	return false;
+}
+
+function corruptEntry(value) {
+	if (!b4a.isBuffer(value) || value.length === 0) {
+		return b4a.alloc(1);
+	}
+	const corrupted = b4a.alloc(1);
+	corrupted[0] = value[0] ^ 0xff;
+	return corrupted;
 }
 
 async function applyPayload(node, payload) {

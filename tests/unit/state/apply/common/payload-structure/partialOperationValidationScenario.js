@@ -1,7 +1,10 @@
 import b4a from 'b4a';
-import OperationValidationScenarioBase from './base/OperationValidationScenarioBase.js';
-import { safeDecodeApplyOperation, safeEncodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
-import { eventFlush } from '../../../../helpers/autobaseTestHelpers.js';
+import OperationValidationScenarioBase from '../base/OperationValidationScenarioBase.js';
+import {
+	safeDecodeApplyOperation,
+	safeEncodeApplyOperation
+} from '../../../../../../src/utils/protobuf/operationHelpers.js';
+import { eventFlush } from '../../../../../helpers/autobaseTestHelpers.js';
 
 export const PartialOperationMutationStrategy = {
 	MISSING_COMPONENT: 'missing-component',

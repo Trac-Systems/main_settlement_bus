@@ -1,14 +1,15 @@
-import InvalidPayloadValidationScenario from '../common/invalidPayloadValidationScenario.js';
-import InvalidAddressValidationScenario from '../common/invalidAddressValidationScenario.js';
-import createAddressWithInvalidPublicKeyScenario from '../common/addressWithInvalidPublicKeyScenario.js';
-import AdminEntryMissingScenario from '../common/adminEntryMissingScenario.js';
-import AdminEntryDecodeFailureScenario from '../common/adminEntryDecodeFailureScenario.js';
-import AdminOnlyGuardScenario from '../common/adminOnlyGuardScenario.js';
-import AdminPublicKeyDecodeFailureScenario from '../common/adminPublicKeyDecodeFailureScenario.js';
-import AdminConsistencyMismatchScenario from '../common/adminConsistencyMismatchScenario.js';
-import InvalidHashValidationScenario from '../common/invalidHashValidationScenario.js';
-import InvalidSignatureValidationScenario, { SignatureMutationStrategy } from '../common/invalidSignatureValidationScenario.js';
+import InvalidPayloadValidationScenario from '../common/payload-structure/invalidPayloadValidationScenario.js';
+import InvalidAddressValidationScenario from '../common/payload-structure/invalidAddressValidationScenario.js';
+import createAddressWithInvalidPublicKeyScenario from '../common/payload-structure/addressWithInvalidPublicKeyScenario.js';
+import AdminEntryMissingScenario from '../common/access-control/adminEntryMissingScenario.js';
+import AdminEntryDecodeFailureScenario from '../common/access-control/adminEntryDecodeFailureScenario.js';
+import AdminOnlyGuardScenario from '../common/access-control/adminOnlyGuardScenario.js';
+import AdminPublicKeyDecodeFailureScenario from '../common/access-control/adminPublicKeyDecodeFailureScenario.js';
+import AdminConsistencyMismatchScenario from '../common/access-control/adminConsistencyMismatchScenario.js';
+import InvalidHashValidationScenario from '../common/payload-structure/invalidHashValidationScenario.js';
+import InvalidSignatureValidationScenario, { SignatureMutationStrategy } from '../common/payload-structure/invalidSignatureValidationScenario.js';
 import TransactionValidityMismatchScenario from '../common/transactionValidityMismatchScenario.js';
+import IndexerSequenceStateInvalidScenario from '../common/indexer/indexerSequenceStateInvalidScenario.js';
 import OperationAlreadyAppliedScenario from '../common/operationAlreadyAppliedScenario.js';
 import appendWhitelistHappyPathScenario from './appendWhitelistHappyPathScenario.js';
 import appendWhitelistExistingReaderHappyPathScenario from './appendWhitelistExistingReaderHappyPathScenario.js';
@@ -154,6 +155,18 @@ new InvalidSignatureValidationScenario({
 	expectedLogs: ['Failed to verify message signature.']
 }).performScenario();
 
+new IndexerSequenceStateInvalidScenario({
+	title: 'State.apply appendWhitelist rejects payloads when indexer sequence state is invalid',
+	setupScenario: setupAppendWhitelistScenario,
+	buildValidPayload: context => buildAppendWhitelistPayload(context),
+	assertStateUnchanged: (t, context, validPayload, invalidPayload) =>
+		assertAppendWhitelistFailureState(t, context, {
+			skipSync: true,
+			readerAddress: invalidPayload?.address
+		}),
+	expectedLogs: ['Indexer sequence state is invalid.']
+}).performScenario();
+
 new TransactionValidityMismatchScenario({
 	title: 'State.apply appendWhitelist rejects payload when tx validity mismatches indexer state',
 	setupScenario: setupAppendWhitelistScenario,
@@ -177,4 +190,3 @@ new OperationAlreadyAppliedScenario({
 appendWhitelistNodeAlreadyWhitelistedScenario();
 
 appendWhitelistInsufficientAdminBalanceScenario();
-

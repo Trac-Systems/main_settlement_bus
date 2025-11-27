@@ -1,8 +1,11 @@
 import b4a from 'b4a';
-import { eventFlush } from '../../../../helpers/autobaseTestHelpers.js';
-import { safeDecodeApplyOperation, safeEncodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
-import OperationValidationScenarioBase from './base/OperationValidationScenarioBase.js';
-import { createSignature } from '../../../../helpers/createTestSignature.js';
+import { eventFlush } from '../../../../../helpers/autobaseTestHelpers.js';
+import {
+	safeDecodeApplyOperation,
+	safeEncodeApplyOperation
+} from '../../../../../../src/utils/protobuf/operationHelpers.js';
+import OperationValidationScenarioBase from '../base/OperationValidationScenarioBase.js';
+import { createSignature } from '../../../../../helpers/createTestSignature.js';
 
 export const SignatureMutationStrategy = {
 	ZERO_FILL: 0,

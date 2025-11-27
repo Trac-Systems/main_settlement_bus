@@ -1,7 +1,6 @@
-import { eventFlush } from '../../../../helpers/autobaseTestHelpers.js';
-import OperationValidationScenarioBase from './base/OperationValidationScenarioBase.js';
-import { deriveIndexerSequenceState } from '../../../../helpers/autobaseTestHelpers.js';
-import CompleteStateMessageOperations from '../../../../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
+import { eventFlush, deriveIndexerSequenceState } from '../../../../../helpers/autobaseTestHelpers.js';
+import OperationValidationScenarioBase from '../base/OperationValidationScenarioBase.js';
+import CompleteStateMessageOperations from '../../../../../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
 
 export default class InitializationDisabledScenario extends OperationValidationScenarioBase {
 	constructor({

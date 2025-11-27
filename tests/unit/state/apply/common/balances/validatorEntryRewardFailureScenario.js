@@ -1,4 +1,4 @@
-import ValidatorEntryValidationScenarioBase from './base/validatorEntryValidationScenarioBase.js';
+import ValidatorEntryValidationScenarioBase from '../validatorEntryValidation/base/validatorEntryValidationScenarioBase.js';
 
 export default class ValidatorEntryRewardFailureScenario extends ValidatorEntryValidationScenarioBase {
 	constructor(options) {

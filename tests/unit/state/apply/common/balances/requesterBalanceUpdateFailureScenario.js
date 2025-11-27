@@ -5,7 +5,7 @@ export default class RequesterBalanceUpdateFailureScenario extends RequesterBala
 		super({
 			...options,
 			failNextBalanceUpdate: true,
-			expectedLogs: ['Failed to update node balance.']
+			expectedLogs: options?.expectedLogs ?? ['Failed to update node balance.']
 		});
 	}
 }
