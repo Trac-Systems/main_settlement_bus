@@ -17,6 +17,7 @@ import {
     DHT_BOOTSTRAPS
 } from '../../utils/constants.js';
 import ConnectionManager from './services/ConnectionManager.js';
+import MessageOrchestrator from './services/MessageOrchestrator.js';
 import NetworkWalletFactory from './identity/NetworkWalletFactory.js';
 const wakeup = new w();
 
@@ -29,6 +30,7 @@ class Network extends ReadyResource {
     #transactionPoolService;
     #validatorObserverService;
     #validatorConnectionManager;
+    #validatorMessageOrchestrator;
     #options;
     #identityProvider = null;
 
@@ -41,6 +43,7 @@ class Network extends ReadyResource {
         this.#validatorObserverService = new ValidatorObserverService(this, state, address, options);
         this.#networkMessages = new NetworkMessages(this, options);
         this.#validatorConnectionManager = new ConnectionManager({ maxValidators: options.max_validators });
+        this.#validatorMessageOrchestrator = new MessageOrchestrator(this.#validatorConnectionManager, state);
         this.admin_stream = null;
         this.admin = null;
         this.validator = null;
@@ -66,6 +69,10 @@ class Network extends ReadyResource {
 
     get validatorConnectionManager() {
         return this.#validatorConnectionManager;
+    }
+
+    get validatorMessageOrchestrator() {
+        return this.#validatorMessageOrchestrator;
     }
 
     async _open() {
