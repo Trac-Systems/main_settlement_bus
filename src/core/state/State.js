@@ -2903,7 +2903,7 @@ class State extends ReadyResource {
         // point to payload, which is pointing to the txHash.
         const bootstrapHasBeenRegistered = await this.#getDeploymentEntryApply(op.txo.bs.toString('hex'), batch);
         if (bootstrapHasBeenRegistered === null) {
-            this.#safeLogApply(OperationType.TX, "Bootstrap already registered.", node.from.key)
+            this.#safeLogApply(OperationType.TX, "Bootstrap has not been registered.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -2935,7 +2935,8 @@ class State extends ReadyResource {
             batch,
             node
         );
-
+        
+        // TODO: cover next 4 guards below with tests
         if (transferFeeTxOperationResult === null) {
             this.#safeLogApply(OperationType.TX, "Fee transfer operation failed completely.", node.from.key);
             return Status.FAILURE;
@@ -3845,6 +3846,7 @@ class State extends ReadyResource {
             subnetworkCreatorEntry: updatedSubnetworkCreatorNodeEntry
         };
     }
+
 }
 
 export default State;
