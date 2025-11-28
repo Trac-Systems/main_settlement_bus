@@ -45,9 +45,9 @@ import ValidatorEntryUpdateFailureScenario from '../common/balances/validatorEnt
 import ValidatorInactiveScenario from '../common/validatorConsistency/validatorInactiveScenario.js';
 import ValidatorWriterKeyMismatchScenario from '../common/validatorConsistency/validatorWriterKeyMismatchScenario.js';
 import RequesterBalanceDecodeFailureScenario from '../common/balances/requesterBalanceDecodeFailureScenario.js';
-import RequesterBalanceInsufficientScenario from '../common/balances/requesterBalanceInsufficientScenario.js';
 import RequesterBalanceFeeApplicationFailureScenario from '../common/balances/requesterBalanceFeeApplicationFailureScenario.js';
 import RequesterBalanceUpdateFailureScenario from '../common/balances/requesterBalanceUpdateFailureScenario.js';
+import addWriterRequesterBalanceInsufficientScenario from './addWriterRequesterBalanceInsufficientScenario.js';
 
 addWriterHappyPathScenario();
 addWriterNewWkScenario();
@@ -259,13 +259,7 @@ new RequesterBalanceDecodeFailureScenario({
 	selectPeer: selectWriterPeer
 }).performScenario();
 
-new RequesterBalanceInsufficientScenario({
-	title: 'State.apply addWriter rejects payloads when requester balance is insufficient',
-	setupScenario: setupAddWriterScenario,
-	buildValidPayload: buildAddWriterPayload,
-	assertStateUnchanged: (t, context) => assertAddWriterFailureState(t, context, { skipSync: true }),
-	selectPeer: selectWriterPeer
-}).performScenario();
+addWriterRequesterBalanceInsufficientScenario();
 
 new RequesterBalanceFeeApplicationFailureScenario({
 	title: 'State.apply addWriter rejects payloads when requester fee cannot be applied',

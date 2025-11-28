@@ -1003,7 +1003,7 @@ class State extends ReadyResource {
         // charging fee from the requester (admin)
         const decodedAdminNodeEntry = nodeEntryUtils.decode(newAdminNodeEntry)
         if (decodedAdminNodeEntry === null) {
-            this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Failed to decode admin entry.", node.from.key)
+            this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Failed to decode node entry.", node.from.key)
             return Status.FAILURE;
         }
 

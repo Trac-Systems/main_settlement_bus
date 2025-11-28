@@ -11,6 +11,7 @@ import removeWriterWriterKeyRegistryMissingScenario from './removeWriterWriterKe
 import removeWriterWriterKeyMismatchScenario from './removeWriterWriterKeyMismatchScenario.js';
 import removeWriterWriterKeyOwnershipScenario from './removeWriterWriterKeyOwnershipScenario.js';
 import removeWriterUnstakeFailureScenario from './removeWriterUnstakeFailureScenario.js';
+import removeWriterRequesterBalanceInsufficientScenario from './removeWriterRequesterBalanceInsufficientScenario.js';
 import RoleAccessOperationValidationScenario from '../common/access-control/roleAccessOperationValidationScenario.js';
 import RequesterAddressValidationScenario from '../common/requesterAddressValidationScenario.js';
 import createRequesterPublicKeyValidationScenario from '../common/requesterPublicKeyValidationScenario.js';
@@ -27,7 +28,6 @@ import TransactionValidityMismatchScenario from '../common/transactionValidityMi
 import IndexerSequenceStateInvalidScenario from '../common/indexer/indexerSequenceStateInvalidScenario.js';
 import OperationAlreadyAppliedScenario from '../common/operationAlreadyAppliedScenario.js';
 import RequesterBalanceDecodeFailureScenario from '../common/balances/requesterBalanceDecodeFailureScenario.js';
-import RequesterBalanceInsufficientScenario from '../common/balances/requesterBalanceInsufficientScenario.js';
 import RequesterBalanceFeeApplicationFailureScenario from '../common/balances/requesterBalanceFeeApplicationFailureScenario.js';
 import RequesterBalanceUpdateFailureScenario from '../common/balances/requesterBalanceUpdateFailureScenario.js';
 import ValidatorEntryMissingScenario from '../common/validatorConsistency/validatorEntryMissingScenario.js';
@@ -261,13 +261,7 @@ new RequesterBalanceDecodeFailureScenario({
 	expectedLogs: ['Invalid requester balance.']
 }).performScenario();
 
-new RequesterBalanceInsufficientScenario({
-	title: 'State.apply removeWriter rejects payloads when requester balance is insufficient',
-	setupScenario: setupRemoveWriterScenario,
-	buildValidPayload: context => buildRemoveWriterPayload(context),
-	assertStateUnchanged: (t, context) => assertRemoveWriterFailureState(t, context, { skipSync: true }),
-	selectPeer: selectWriterPeer
-}).performScenario();
+removeWriterRequesterBalanceInsufficientScenario();
 
 new RequesterBalanceFeeApplicationFailureScenario({
 	title: 'State.apply removeWriter rejects payloads when fee cannot be applied to requester balance',

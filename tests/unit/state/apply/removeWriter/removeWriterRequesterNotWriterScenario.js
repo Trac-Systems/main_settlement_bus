@@ -16,6 +16,6 @@ export default function removeWriterRequesterNotWriterScenario() {
 		applyInvalidPayload: (context, invalidPayload) =>
 			applyWithRequesterRoleOverride(context, invalidPayload, nodeRoleUtils.NodeRole.READER),
 		assertStateUnchanged: (t, context) => assertRemoveWriterFailureState(t, context, { skipSync: true }),
-		expectedLogs: ['Node has to be a writer, and cannot be an indexer.']
+		expectedLogs: ['Node has to be a writer, and cannot be an indexer.', 'Failed to remove writer.']
 	}).performScenario();
 }
