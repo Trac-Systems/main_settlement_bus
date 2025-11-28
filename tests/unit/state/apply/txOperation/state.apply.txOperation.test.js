@@ -58,6 +58,12 @@ import txOperationTransferFeeDecodeCreatorEntryScenario from './txOperationTrans
 import txOperationTransferFeeInvalidCreatorBalanceScenario from './txOperationTransferFeeInvalidCreatorBalanceScenario.js';
 import txOperationTransferFeeAddCreatorBalanceFailureScenario from './txOperationTransferFeeAddCreatorBalanceFailureScenario.js';
 import txOperationTransferFeeUpdateCreatorBalanceFailureScenario from './txOperationTransferFeeUpdateCreatorBalanceFailureScenario.js';
+import {
+	txOperationTransferFeeResultNullScenario,
+	txOperationTransferFeeResultIgnoredScenario,
+	txOperationTransferFeeRequesterEntryMissingScenario,
+	txOperationTransferFeeValidatorEntryMissingScenario
+} from './txOperationTransferFeeGuardBypassScenario.js';
 
 txOperationStandardHappyPathScenario();
 txOperationValidatorCreatorHappyPathScenario();
@@ -304,5 +310,9 @@ txOperationTransferFeeDecodeCreatorEntryScenario();
 txOperationTransferFeeInvalidCreatorBalanceScenario();
 txOperationTransferFeeAddCreatorBalanceFailureScenario();
 txOperationTransferFeeUpdateCreatorBalanceFailureScenario();
+txOperationTransferFeeResultNullScenario().performScenario();
+txOperationTransferFeeResultIgnoredScenario().performScenario();
+txOperationTransferFeeRequesterEntryMissingScenario().performScenario();
+txOperationTransferFeeValidatorEntryMissingScenario().performScenario();
 // Post-transferFee guards for null requester/validator entries are unreachable with current transferFeeTxOperation
 // (it returns null/IGNORE on earlier failures), so no dedicated scenarios exist yet.

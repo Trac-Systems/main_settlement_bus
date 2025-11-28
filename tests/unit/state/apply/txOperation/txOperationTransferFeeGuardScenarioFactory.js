@@ -36,12 +36,16 @@ export function createTransferFeeGuardScenario({
 		const decoded = safeDecodeApplyOperation(invalidPayload);
 		const requesterAddressString = addressUtils.bufferToAddress(decoded?.address);
 
-		const cleanup = await applyPatch({ context, node, decoded, requesterAddressString });
+		const patchResult = await applyPatch({ context, node, decoded, requesterAddressString });
+		const cleanup = typeof patchResult === 'function' ? patchResult : patchResult?.cleanup;
+		const skipAppend = !!patchResult?.skipAppend;
 
 		try {
-			await node.base.append(invalidPayload);
-			await node.base.update();
-			await eventFlush();
+			if (!skipAppend) {
+				await node.base.append(invalidPayload);
+				await node.base.update();
+				await eventFlush();
+			}
 		} finally {
 			if (typeof cleanup === 'function') {
 				await cleanup();

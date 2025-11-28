@@ -15,7 +15,8 @@ async function runStateTests() {
 	// await import('./removeIndexer/state.apply.removeIndexer.test.js');
 	// await import('./banValidator/state.apply.banValidator.test.js');
 	// await import('./bootstrapDeployment/state.apply.bootstrapDeployment.test.js')
-	await import('./txOperation/state.apply.txOperation.test.js');
+	// await import('./txOperation/state.apply.txOperation.test.js');
+	await import('./transfer/state.apply.transfer.test.js');
 	test.resume();
 }
 

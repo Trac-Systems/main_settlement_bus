@@ -263,7 +263,7 @@ class State extends ReadyResource {
         // Retrieve the flag to verify if initialization is allowed
         let initialization = await this.getSigned(EntryType.INITIALIZATION);
 
-        if (null === initialization) {
+        if (initialization === null) {
             return false
         } else {
             return b4a.equals(initialization, safeWriteUInt32BE(0, 0))
@@ -2797,13 +2797,13 @@ class State extends ReadyResource {
         // validate invoker signature
         const requesterAddressBuffer = op.address;
         const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer);
-        if (null === requesterAddressString) {
+        if (requesterAddressString === null) {
             this.#safeLogApply(OperationType.TX, "Invalid requester address.", node.from.key)
             return Status.FAILURE;
         };
 
         const requesterPublicKey = PeerWallet.decodeBech32mSafe(requesterAddressString);
-        if (null === requesterPublicKey) {
+        if (requesterPublicKey === null) {
             this.#safeLogApply(OperationType.TX, "Failed to decode requester public key.", node.from.key)
             return Status.FAILURE;
         };
@@ -2838,13 +2838,13 @@ class State extends ReadyResource {
         //second signature
         const validatorAddressBuffer = op.txo.va;
         const validatorAddressString = addressUtils.bufferToAddress(validatorAddressBuffer);
-        if (null === validatorAddressString) {
+        if (validatorAddressString === null) {
             this.#safeLogApply(OperationType.TX, "Invalid validator address.", node.from.key)
             return Status.FAILURE;
         };
 
         const validatorPublicKey = PeerWallet.decodeBech32mSafe(validatorAddressString);
-        if (null === validatorPublicKey) {
+        if (validatorPublicKey === null) {
             this.#safeLogApply(OperationType.TX, "Failed to decode validator public key.", node.from.key)
             return Status.FAILURE;
         };
@@ -3153,7 +3153,7 @@ class State extends ReadyResource {
         };
 
         if (!isSelfTransfer) {
-            if (null === transferResult.recipientEntry) {
+            if (transferResult.recipientEntry === null) {
                 this.#safeLogApply(OperationType.TRANSFER, "Invalid recipient entry.", node.from.key)
                 return Status.FAILURE;
             };
@@ -3406,7 +3406,7 @@ class State extends ReadyResource {
     async #isApplyInitalizationDisabled(batch) {
         // Retrieve the flag to verify if initialization is allowed
         let initialization = await this.#getEntryApply(EntryType.INITIALIZATION, batch);
-        if (null === initialization) {
+        if (initialization === null) {
             return false
         } else {
             return b4a.equals(initialization, safeWriteUInt32BE(0, 0))
@@ -3417,7 +3417,7 @@ class State extends ReadyResource {
         // Retrieve and increment the writers length entry
         let length = await this.#getEntryApply(EntryType.WRITERS_LENGTH, batch);
         let incrementedLength = null;
-        if (null === length) {
+        if (length === null) {
             // Initialize the writers length entry if it does not exist
             const bufferedLength = lengthEntryUtils.init(0);
             length = lengthEntryUtils.decodeBE(bufferedLength);
@@ -3673,7 +3673,7 @@ class State extends ReadyResource {
     async #applyAssignNewLicense(batch) {
         let licenseCount = await this.#applyGetLicenseCount(batch)
         let newLicenseLength;
-        if (null === licenseCount) {
+        if (licenseCount === null) {
             // Initialize the writers length entry if it does not exist
             const bufferedLength = lengthEntryUtils.init(0);
             licenseCount = lengthEntryUtils.decodeBE(bufferedLength);
