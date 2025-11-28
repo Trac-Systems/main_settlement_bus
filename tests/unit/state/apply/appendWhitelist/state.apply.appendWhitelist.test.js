@@ -11,12 +11,16 @@ import InvalidSignatureValidationScenario, { SignatureMutationStrategy } from '.
 import TransactionValidityMismatchScenario from '../common/transactionValidityMismatchScenario.js';
 import IndexerSequenceStateInvalidScenario from '../common/indexer/indexerSequenceStateInvalidScenario.js';
 import OperationAlreadyAppliedScenario from '../common/operationAlreadyAppliedScenario.js';
+import { eventFlush } from '../../../../helpers/autobaseTestHelpers.js';
+import createAdminEntryUpdateFailureScenario from '../common/balances/adminEntryUpdateFailureScenario.js';
+import createNodeEntryInitializationFailureScenario from '../common/nodeEntryInitializationFailureScenario.js';
 import appendWhitelistHappyPathScenario from './appendWhitelistHappyPathScenario.js';
 import appendWhitelistExistingReaderHappyPathScenario from './appendWhitelistExistingReaderHappyPathScenario.js';
 import appendWhitelistBanAndReapplyScenario from './appendWhitelistBanAndReapplyScenario.js';
 import appendWhitelistFeeAfterDisableScenario from './appendWhitelistFeeAfterDisableScenario.js';
 import appendWhitelistNodeAlreadyWhitelistedScenario from './appendWhitelistNodeAlreadyWhitelistedScenario.js';
 import appendWhitelistInsufficientAdminBalanceScenario from './appendWhitelistInsufficientAdminBalanceScenario.js';
+import { buildDisableInitializationPayload } from '../disableInitialization/disableInitializationScenarioHelpers.js';
 import setupAppendWhitelistScenario, {
 	buildAppendWhitelistPayload,
 	buildAppendWhitelistPayloadWithTxValidity,
@@ -190,3 +194,27 @@ new OperationAlreadyAppliedScenario({
 appendWhitelistNodeAlreadyWhitelistedScenario();
 
 appendWhitelistInsufficientAdminBalanceScenario();
+
+createAdminEntryUpdateFailureScenario({
+	title: 'State.apply appendWhitelist rejects when admin entry update fails',
+	setupScenario: setupAppendWhitelistScenario,
+	buildValidPayload: context => buildAppendWhitelistPayload(context),
+	beforeApply: async context => {
+		const adminNode = context.adminBootstrap;
+		const disablePayload = await buildDisableInitializationPayload(context);
+		await adminNode.base.append(disablePayload);
+		await adminNode.base.update();
+		await eventFlush();
+	},
+	assertStateUnchanged: (t, context) =>
+		assertAppendWhitelistFailureState(t, context, { skipSync: true })
+}).performScenario();
+
+createNodeEntryInitializationFailureScenario({
+	title: 'State.apply appendWhitelist rejects when node entry initialization fails',
+	setupScenario: setupAppendWhitelistScenario,
+	buildValidPayload: context => buildAppendWhitelistPayload(context),
+	assertStateUnchanged: (t, context) =>
+		assertAppendWhitelistFailureState(t, context, { expectedLicenseCount: 2, skipSync: true }),
+	selectNode: context => context.adminBootstrap
+}).performScenario();
