@@ -35,7 +35,15 @@ export async function createStores(n, t, opts = {}) {
 		stores.push(new Corestore(dir, { primaryKey, encryptionKey, globalCache }));
 	}
 
-	t.teardown(() => Promise.all(stores.map(s => s.close())), { order: 2 });
+	t.teardown(async () => {
+		for (const store of stores) {
+			try {
+				await store.close();
+			} catch (err) {
+				console.error('corestore close failed', err);
+			}
+		}
+	}, { order: 2 });
 	return stores;
 }
 
@@ -84,7 +92,13 @@ export function createBase(store, key, t, opts = {}) {
 		base.maxSupportedVersion = opts.maxSupportedVersion;
 	}
 
-	t.teardown(async () => base.close(), { order: 1 });
+	t.teardown(async () => {
+		try {
+			await base.close();
+		} catch (err) {
+			console.error('base close failed', err);
+		}
+	}, { order: 1 });
 	return base;
 }
 
@@ -314,7 +328,10 @@ async function cleanupTempDir(dir) {
 			await removeRecursively(dir);
 		}
 	} catch (err) {
-		if (err?.code !== 'ENOENT') throw err;
+		if (err?.code === 'ENOENT') return;
+		// Windows sometimes keeps LOCK files open briefly. Ignore busy/permission errors during teardown.
+		if (err?.code === 'EBUSY' || err?.code === 'EPERM') return;
+		throw err;
 	}
 }
 
