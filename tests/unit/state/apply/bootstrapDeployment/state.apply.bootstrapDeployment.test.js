@@ -46,6 +46,7 @@ import {
 	mutateToNetworkBootstrap,
 	appendInvalidPayload
 } from './bootstrapDeploymentScenarioHelpers.js';
+import bootstrapDeploymentInvalidValidatorNodeEntryScenario from './invalidValidatorNodeEntryScenario.js';
 import { safeDecodeApplyOperation, safeEncodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
 
 bootstrapDeploymentHappyPathScenario();
@@ -382,6 +383,8 @@ new RequesterBalanceFeeApplicationFailureScenario({
 	selectNode: context => context.bootstrapDeployment?.validatorPeer ?? context.bootstrap ?? context.peers?.[0],
 	expectedLogs: ['Failed to apply fee to requester.']
 }).performScenario();
+
+bootstrapDeploymentInvalidValidatorNodeEntryScenario();
 
 new ValidatorEntryInvalidBalanceScenario({
 	title: 'State.apply bootstrapDeployment rejects payloads when validator balance is invalid',

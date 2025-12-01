@@ -6,6 +6,7 @@ import setupBalanceInitializationScenario, {
 } from './balanceInitializationScenarioHelpers.js';
 import balanceInitializationHappyPathScenario from './balanceInitializationHappyPathScenario.js';
 import balanceInitializationInvalidAmountScenario from './invalidAmountScenario.js';
+import balanceInitializationNodeEntryBalanceUpdateFailureScenario from './nodeEntryBalanceUpdateFailureScenario.js';
 import RequesterAddressValidationScenario from '../common/requesterAddressValidationScenario.js';
 import InvalidPayloadValidationScenario from '../common/payload-structure/invalidPayloadValidationScenario.js';
 import InvalidAddressValidationScenario from '../common/payload-structure/invalidAddressValidationScenario.js';
@@ -184,3 +185,5 @@ new InvalidMessageComponentValidationScenario({
 	strategy: MessageComponentStrategy.NONCE,
 	expectedLogs: ['Message hash does not match the tx_hash.']
 }).performScenario();
+
+balanceInitializationNodeEntryBalanceUpdateFailureScenario();
