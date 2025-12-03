@@ -1,19 +1,29 @@
-import request from "supertest"
 import { createServer } from "../../../rpc/create_server.mjs"
 import { initTemporaryDirectory } from '../../helpers/setupApplyTests.js'
 import { testKeyPair1, testKeyPair2, testKeyPair3 } from '../../fixtures/apply.fixtures.js'
-import { randomBytes, setupMsbAdmin, setupMsbWriter, fundPeer, removeTemporaryDirectory, setupMsbPeer, tryToSyncWriters, waitForNodeState } from "../../helpers/setupApplyTests.js"
-import { $TNK } from "../../../src/core/state/utils/balance.js"
-import tracCrypto from 'trac-crypto-api';
-import b4a from 'b4a'
+import { randomBytes, setupMsbAdmin, setupMsbWriter, removeTemporaryDirectory, setupMsbPeer, tryToSyncWriters, waitForNodeState } from "../../helpers/setupApplyTests.js"
+import { registerAccountTests } from "./account/account.test.mjs"
+import { registerBalanceTests } from "./balance/balance.test.mjs"
+import { registerBroadcastTransactionTests } from "./broadcast-transaction/broadcast-transaction.test.mjs"
+import { registerConfirmedLengthTests } from "./confirmed-length/confirmed-length.test.mjs"
+import { registerFeeTests } from "./fee/fee.test.mjs"
+import { registerTxHashesTests } from "./tx-hashes/tx-hashes.test.mjs"
+import { registerTxPayloadsBulkTests } from "./tx-payloads-bulk/tx-payloads-bulk.test.mjs"
+import { registerTxDetailsTests } from "./tx-details/tx-details.test.mjs"
+import { registerTxvTests } from "./txv/txv.test.mjs"
+import { registerUnconfirmedLengthTests } from "./unconfirmed-length/unconfirmed-length.test.mjs"
 
-let writerMsb
-let rpcMsb
-let server
-let wallet
 let toClose
 let tmpDirectory
-let additionalPeers = []
+const additionalPeers = []
+
+const testContext = {
+    writerMsb: null,
+    rpcMsb: null,
+    server: null,
+    wallet: null,
+    adminWallet: null,
+}
 
 const setupNetwork = async () => {
     tmpDirectory = await initTemporaryDirectory()
@@ -47,11 +57,15 @@ const setupNetwork = async () => {
 
 beforeAll(async () => {
     const { admin, writer, reader } = await setupNetwork()
-    writerMsb = writer.msb
-    rpcMsb = reader.msb
-    wallet = writerMsb.wallet
-    server = createServer(rpcMsb)
+    const server = createServer(reader.msb)
     toClose = admin.msb
+    Object.assign(testContext, {
+        writerMsb: writer.msb,
+        rpcMsb: reader.msb,
+        server,
+        wallet: writer.msb.wallet,
+        adminWallet: admin.wallet,
+    })
 })
 
 afterAll(async () => {
@@ -65,276 +79,14 @@ afterAll(async () => {
 
 // The order here is important since the OPs change the network state. We wont boot up an instance before each because the tests are to verify rpc structure and the decision is to spare ci resources.
 describe("API acceptance tests", () => {
-    it("GET /v1/confirmed-length", async () => {
-        const res = await request(server).get("/v1/confirmed-length")
-        expect(res.statusCode).toBe(200)
-        expect(res.body).toEqual({ confirmed_length: expect.any(Number) })
-    })
-
-    it("GET /v1/unconfirmed-length", async () => {
-        const res = await request(server).get("/v1/unconfirmed-length")
-        expect(res.statusCode).toBe(200)
-        expect(res.body).toEqual({ unconfirmed_length: expect.any(Number) })
-    })
-
-    it("GET /v1/txv", async () => {
-        const res = await request(server).get("/v1/txv")
-        expect(res.statusCode).toBe(200)
-        expect(res.body).toEqual({ txv: expect.stringMatching(/^[a-z0-9]{64}$/) })
-    })
-
-    it("GET /v1/fee", async () => {
-        const res = await request(server).get("/v1/fee")
-        expect(res.statusCode).toBe(200)
-        expect(res.body).toEqual({ fee: expect.stringMatching(/^-?\d+(\.\d+)?$/) })
-    })
-
-    describe('GET /v1/tx-hashes', () => {
-        it("< 1000", async () => {
-            const res = await request(server).get("/v1/tx-hashes/1/1001")
-            expect(res.statusCode).toBe(200)
-            expect(res.body).toEqual({
-                hashes: expect.arrayContaining([
-                    expect.objectContaining({
-                        hash: expect.any(String),
-                        confirmed_length: expect.any(Number),
-                    })
-                ])
-            })
-        })
-
-        it("> 1000", async () => {
-            const res = await request(server).get("/v1/tx-hashes/1/1002")
-            expect(res.statusCode).toBe(400)
-        })
-    })
-
-    it("GET /v1/balance", async () => {
-        const res = await request(server).get(`/v1/balance/${wallet.address}`)
-        expect(res.statusCode).toBe(200)
-        expect(res.body).toEqual({ address: wallet.address, balance: "9670000000000000000" })
-    })
-
-    it("GET /v1/balance unconfirmed", async () => {
-        const res = await request(server).get(`/v1/balance/${wallet.address}?confirmed=false`)
-        expect(res.statusCode).toBe(200)
-        expect(res.body).toEqual({ address: wallet.address, balance: "9670000000000000000" })
-    })
-
-    it("POST /v1/broadcast-transaction", async () => {
-        const txData = await tracCrypto.transaction.preBuild(
-            wallet.address,
-            wallet.address,
-            b4a.toString($TNK(1n), 'hex'),
-            b4a.toString(await rpcMsb.state.getIndexerSequenceState(), 'hex')
-        );
-
-        const payload = tracCrypto.transaction.build(txData, b4a.from(wallet.secretKey, 'hex'));
-        const res = await request(server)
-            .post("/v1/broadcast-transaction")
-            .set("Accept", "application/json")
-            .send(JSON.stringify({ payload }))
-
-        expect(res.statusCode).toBe(200)
-        expect(res.body).toMatchObject({
-            result: {
-                message: "Transaction broadcasted successfully.",
-                signedLength: expect.any(Number),
-                unsignedLength: expect.any(Number),
-                tx: expect.any(String)
-            }
-        })
-    })
-
-    it("POST /v1/tx-payloads-bulk", async () => {
-        const result = await rpcMsb.state.confirmedTransactionsBetween(0, 40) // This is just an arbitrary range that will most likely contain valid
-        const hashes = result.map(({ hash }) => hash)
-
-        const payload = { hashes }
-
-        const res = await request(server)
-            .post("/v1/tx-payloads-bulk")
-            .set("Accept", "application/json")
-            .send(JSON.stringify(payload))
-
-        expect(res.statusCode).toBe(200)
-        expect(res.body).toMatchObject({
-            results: expect.arrayOf(
-                expect.objectContaining({
-                    hash: expect.any(String),
-                })
-            ),
-            missing: []
-        })
-    })
-
-    describe('GET /v1/tx/details', () => {
-
-        it("positive case - should return 200 for valid already broadcasted hash confirmed and unconfirmed", async () => {
-            const txData = await tracCrypto.transaction.preBuild(
-                wallet.address,
-                wallet.address,
-                b4a.toString($TNK(1n), 'hex'),
-                b4a.toString(await rpcMsb.state.getIndexerSequenceState(), 'hex')
-            );
-
-            const payload = tracCrypto.transaction.build(txData, b4a.from(wallet.secretKey, 'hex'));
-            const broadcastRes = await request(server)
-                .post("/v1/broadcast-transaction")
-                .set("Accept", "application/json")
-                .send(JSON.stringify({ payload }));
-            expect(broadcastRes.statusCode).toBe(200);
-
-            const resConfirmed = await request(server)
-                .get(`/v1/tx/details/${txData.hash.toString('hex')}?confirmed=true`);
-            expect(resConfirmed.statusCode).toBe(200);
-
-            expect(resConfirmed.body).toMatchObject({
-                txDetails: expect.any(Object),
-                confirmed_length: expect.any(Number),
-                fee: expect.any(String)
-            })
-
-            const resUnconfirmed = await request(server)
-                .get(`/v1/tx/details/${txData.hash.toString('hex')}?confirmed=false`);
-            expect(resUnconfirmed.statusCode).toBe(200);
-
-            expect(resUnconfirmed.body).toMatchObject({
-                txDetails: expect.any(Object),
-                confirmed_length: expect.any(Number),
-                fee: expect.any(String)
-            })
-        });
-
-        it("should handle null confirmed_length for unconfirmed transaction", async () => {
-            const txData = await tracCrypto.transaction.preBuild(
-                wallet.address,
-                wallet.address,
-                b4a.toString($TNK(1n), 'hex'),
-                b4a.toString(await rpcMsb.state.getIndexerSequenceState(), 'hex')
-            );
-
-            const payload = tracCrypto.transaction.build(txData, b4a.from(wallet.secretKey, 'hex'));
-
-            const originalGetConfirmedLength = rpcMsb.state.getTransactionConfirmedLength;
-            rpcMsb.state.getTransactionConfirmedLength = async () => null;
-
-            try {
-                const broadcastRes = await request(server)
-                    .post("/v1/broadcast-transaction")
-                    .set("Accept", "application/json")
-                    .send(JSON.stringify({ payload }));
-                expect(broadcastRes.statusCode).toBe(200);
-
-                const res = await request(server)
-                    .get(`/v1/tx/details/${txData.hash.toString('hex')}?confirmed=false`);
-                expect(res.statusCode).toBe(200);
-
-                expect(res.body).toMatchObject({
-                    txDetails: expect.any(Object),
-                    confirmed_length: 0,
-                    fee: '0'
-                });
-            } finally {
-                rpcMsb.state.getTransactionConfirmedLength = originalGetConfirmedLength;
-            }
-        });
-
-        it("should return 404 for non-existent transaction hash", async () => {
-            const nonExistentHash = "0b4d1c1dac48af13212f616601d7399457476a0b644850875b7f4b79df6ff89c";
-            const res = await request(server)
-                .get(`/v1/tx/details/${nonExistentHash}`);
-
-            expect(res.statusCode).toBe(404);
-            expect(res.body).toEqual({
-                error: `No payload found for tx hash: ${nonExistentHash}`
-            });
-        });
-
-        it("should return 400 for invalid hash format (too short)", async () => {
-            const invalidHash = '0'.repeat(63);
-            const res = await request(server)
-                .get(`/v1/tx/details/${invalidHash}`);
-
-            expect(res.statusCode).toBe(400);
-            expect(res.body).toEqual({
-                error: "Invalid transaction hash format"
-            });
-        });
-
-        it("should return 400 for invalid hash format (non-hex)", async () => {
-            const invalidHash = 'Z'.repeat(64);
-            const res = await request(server)
-                .get(`/v1/tx/details/${invalidHash}`);
-
-            expect(res.statusCode).toBe(400);
-            expect(res.body).toEqual({
-                error: "Invalid transaction hash format"
-            });
-        });
-
-        it("should return 400 for invalid confirmed parameter", async () => {
-            const hash = "0b4d1c1dac48af13212f616601d7399457476a0b644850875b7f4b79df6ff89c";
-
-            const res = await request(server)
-                .get(`/v1/tx/details/${hash}?confirmed=invalid`);
-
-            expect(res.statusCode).toBe(400);
-            expect(res.body).toEqual({
-                error: 'Parameter "confirmed" must be exactly "true" or "false"'
-            });
-        });
-
-        it("should return 400 for invalid confirmed parameter case (UPPERCASE)", async () => {
-            const hash = "0b4d1c1dac48af13212f616601d7399457476a0b644850875b7f4b79df6ff89c";
-            const res = await request(server).get(`/v1/tx/details/${hash}?confirmed=TRUE`);
-            expect(res.statusCode).toBe(400);
-            expect(res.body).toEqual({
-                error: 'Parameter "confirmed" must be exactly "true" or "false"'
-            });
-        });
-
-        it("should return 400 when no hash provided", async () => {
-            const res = await request(server)
-                .get('/v1/tx/details');
-
-            expect(res.statusCode).toBe(400);
-            expect(res.body).toEqual({
-                error: "Transaction hash is required"
-            });
-        });
-
-        it("should return 400 for hash with invalid characters", async () => {
-            const invalidHash = '0b4d1c1dac48$af13212f6166017399457476a0b644850875b7f4b79df6ff89c';
-            const res = await request(server)
-                .get(`/v1/tx/details/${invalidHash}`);
-
-            expect(res.statusCode).toBe(400);
-            expect(res.body).toEqual({
-                error: "Invalid transaction hash format"
-            });
-        });
-
-        it("should return 400 for hash with special characters", async () => {
-            const invalidHash = '!@#$%^&*'.repeat(8);
-            const res = await request(server)
-                .get(`/v1/tx/details/${invalidHash}`);
-
-            expect(res.statusCode).toBe(400);
-            expect(res.body).toEqual({
-                error: "Invalid transaction hash format"
-            });
-        });
-
-        it("should return 400 for hash with spaces", async () => {
-            const invalidHash = '0b4d1c1dac48af13212f616601d7399457476a0b644850875b7 4b79df6ff89c';
-            const res = await request(server)
-                .get(`/v1/tx/details/${invalidHash}`);
-
-            expect(res.statusCode).toBe(400);
-            expect(res.body).toEqual({
-                error: "Invalid transaction hash format"
-            });
-        });
-    })
+    registerConfirmedLengthTests(testContext)
+    registerUnconfirmedLengthTests(testContext)
+    registerTxvTests(testContext)
+    registerFeeTests(testContext)
+    registerTxHashesTests(testContext)
+    registerBalanceTests(testContext)
+    registerBroadcastTransactionTests(testContext)
+    registerTxPayloadsBulkTests(testContext)
+    registerTxDetailsTests(testContext)
+    registerAccountTests(testContext)
 })
