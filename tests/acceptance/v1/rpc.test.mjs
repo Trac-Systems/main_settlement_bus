@@ -10,6 +10,7 @@ import { registerFeeTests } from "./fee/fee.test.mjs"
 import { registerTxHashesTests } from "./tx-hashes/tx-hashes.test.mjs"
 import { registerTxPayloadsBulkTests } from "./tx-payloads-bulk/tx-payloads-bulk.test.mjs"
 import { registerTxDetailsTests } from "./tx-details/tx-details.test.mjs"
+import { registerTxTests } from "./tx/tx.test.mjs"
 import { registerTxvTests } from "./txv/txv.test.mjs"
 import { registerUnconfirmedLengthTests } from "./unconfirmed-length/unconfirmed-length.test.mjs"
 
@@ -84,6 +85,7 @@ describe("API acceptance tests", () => {
     registerTxvTests(testContext)
     registerFeeTests(testContext)
     registerTxHashesTests(testContext)
+    registerTxTests(testContext)
     registerBalanceTests(testContext)
     registerBroadcastTransactionTests(testContext)
     registerTxPayloadsBulkTests(testContext)
