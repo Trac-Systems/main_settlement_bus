@@ -67,10 +67,10 @@ class ValidatorObserverService {
         next(POLL_INTERVAL)
     }
 
-    async #findValidator(address, length) {
+    async #findValidator(address, validatorListLength) {
         if (!this.#shouldRun()) return;
 
-        const rndIndex = Math.floor(Math.random() * length);
+        const rndIndex = Math.floor(Math.random() * validatorListLength);
         const validatorAddressBuffer = await this.state.getWriterIndex(rndIndex);
 
         if (validatorAddressBuffer === null || b4a.byteLength(validatorAddressBuffer) !== TRAC_ADDRESS_SIZE) return;
@@ -83,7 +83,7 @@ class ValidatorObserverService {
         const validatorEntry = await this.state.getNodeEntry(validatorAddress);
         const adminEntry = await this.state.getAdminEntry();
 
-        if (validatorAddress === adminEntry?.address && length >= MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION) {
+        if (validatorAddress === adminEntry?.address && validatorListLength >= MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION) {
             if (this.#network.validatorConnectionManager.exists(validatorPubKeyBuffer)) {
                 this.#network.validatorConnectionManager.remove(validatorPubKeyBuffer)
             }
@@ -96,14 +96,15 @@ class ValidatorObserverService {
         // - Admin-indexer connection is allowed only when writers length has less than 10 writers
         if (
             this.#network.validatorConnectionManager.connected(validatorPubKeyBuffer) ||
+            this.#network.validatorConnectionManager.maxConnectionsReached() ||
             validatorEntry === null ||
             !validatorEntry.isWriter ||
-            (validatorEntry.isIndexer && (validatorAddress !== adminEntry?.address || length >= MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION))
+            (validatorEntry.isIndexer && (validatorAddress !== adminEntry?.address || validatorListLength >= MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION))
         ) {
             return;
         }
 
-        if (validatorAddress !== adminEntry?.address || length < MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION) {
+        if (validatorAddress !== adminEntry?.address || validatorListLength < MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION) {
             await this.#network.tryConnect(validatorPubKeyHex, 'validator');
         }
     };

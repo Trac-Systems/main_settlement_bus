@@ -1,4 +1,10 @@
 import { sleep } from '../../../utils/helpers.js';
+import {
+    MAX_MESSAGE_SEND_ATTEMPTS,
+    MAX_SUCCESSIVE_MESSAGES_PER_VALIDATOR,
+    MESSAGE_VALIDATOR_RESPONSE_TIMEOUT_MS,
+    MESSAGE_VALIDATOR_RETRY_DELAY_MS
+} from '../../../utils/constants.js';
 
 /**
  * MessageOrchestrator coordinates message submission, retry, and validator management.
@@ -19,10 +25,10 @@ class MessageOrchestrator {
         this.connectionManager = connectionManager;
         this.state = state;
         // TODO: Adjust these default values or fetch them from config
-        this.messageThreshold = options.messageThreshold || 1;
-        this.maxRetries = options.maxRetries || 3; // Amount of retries for a single validator
-        this.retryDelay = options.retryDelay || 1000; // How long to wait before retrying (ms)
-        this.timeout = options.timeout || 3 * this.maxRetries * this.retryDelay;
+        this.messageThreshold = options.messageThreshold || MAX_SUCCESSIVE_MESSAGES_PER_VALIDATOR;
+        this.maxRetries = options.maxRetries || MAX_MESSAGE_SEND_ATTEMPTS; // Amount of retries for a single validator
+        this.retryDelay = options.retryDelay || MESSAGE_VALIDATOR_RETRY_DELAY_MS; // How long to wait before retrying (ms)
+        this.timeout = options.timeout || MESSAGE_VALIDATOR_RESPONSE_TIMEOUT_MS; // Overall timeout for sending a message (ms)
     }
 
     /**

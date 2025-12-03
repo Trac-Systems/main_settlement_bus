@@ -1,4 +1,4 @@
-import { MAX_VALIDATORS } from "../../../utils/constants.js"
+import { MAX_VALIDATORS_IN_CONNECTION_POOL } from "../../../utils/constants.js"
 import b4a from 'b4a'
 import PeerWallet from "trac-wallet"
 import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
@@ -15,7 +15,7 @@ class ConnectionManager {
 
     constructor({ maxValidators }) {
         this.#validators = new Map();
-        this.#maxValidators = maxValidators || MAX_VALIDATORS
+        this.#maxValidators = maxValidators || MAX_VALIDATORS_IN_CONNECTION_POOL
     }
 
     /**
@@ -84,7 +84,7 @@ class ConnectionManager {
      */
     addValidator(publicKey, connection) {
         let publicKeyHex = this.#toHexString(publicKey);
-        if (this.maxConnections()) {
+        if (this.maxConnectionsReached()) {
             console.log(`>>>>>>>>>>>>>>>>> ConnectionManager: max connections reached.`);
             return false;
         }
@@ -132,7 +132,7 @@ class ConnectionManager {
      */
     // Note: this function name is a bit misleading. It checks if we have reached max connections and returns boolean
     // The name leads to think it returns the number of max connections
-    maxConnections() {
+    maxConnectionsReached() {
         return this.connectionCount() >= this.#maxValidators
     }
 
