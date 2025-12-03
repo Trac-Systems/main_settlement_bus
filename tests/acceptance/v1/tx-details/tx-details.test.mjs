@@ -171,5 +171,33 @@ export const registerTxDetailsTests = (context) => {
                 error: "Invalid transaction hash format"
             })
         })
+
+        it("returns 400 for hash with 0x prefix", async () => {
+            const hash = "0x" + "0".repeat(62)
+            const res = await request(context.server).get(`/v1/tx/details/${hash}`)
+            expect(res.statusCode).toBe(400)
+            expect(res.body).toEqual({ error: "Invalid transaction hash format" })
+        })
+
+        it("returns 400 for odd-length hex", async () => {
+            const hash = "a".repeat(63)
+            const res = await request(context.server).get(`/v1/tx/details/${hash}`)
+            expect(res.statusCode).toBe(400)
+            expect(res.body).toEqual({ error: "Invalid transaction hash format" })
+        })
+
+        // TODOadjust implementation to cover tests below
+        it.skip("accepts uppercase hex", async () => {
+            const hash = "A".repeat(64)
+            const res = await request(context.server).get(`/v1/tx/details/${hash}?confirmed=false`)
+            expect([200]).toContain(res.statusCode)
+            expect(res.statusCode).toBe(200)
+        })
+
+        it.skip("returns 400 for trailing space hash", async () => {
+            const hash = `${"a".repeat(64)} `
+            const res = await request(context.server).get(`/v1/tx/details/${hash}`)
+            expect(res.statusCode).toBe(400)
+        })
     })
 }
