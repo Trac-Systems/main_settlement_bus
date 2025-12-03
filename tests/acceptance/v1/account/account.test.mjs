@@ -114,7 +114,7 @@ export const registerAccountTests = (context) => {
             try {
                 const res = await request(context.server).get(`/v1/account/${context.wallet.address}`)
                 expect(res.statusCode).toBe(500)
-                expect(res.body).toEqual({ error: 'An error occurred while fetching account details.' })
+                expect(res.body).toEqual({ error: 'An error occurred processing the request.' })
             } finally {
                 context.rpcMsb.state.getNodeEntry = originalGetNodeEntry
             }

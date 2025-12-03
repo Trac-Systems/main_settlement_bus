@@ -1,22 +1,20 @@
 import { decodeBase64Payload, isBase64, sanitizeBulkPayloadsRequestBody, sanitizeTransferPayload, validatePayloadStructure } from "./utils/helpers.mjs"
 import { MAX_SIGNED_LENGTH, ZERO_WK } from "./constants.mjs";
+import { buildRequestUrl } from "./utils/URL.mjs";
 import { isHexString } from "../src/utils/helpers.js";
 import { bufferToBigInt, licenseBufferToBigInt } from "../src/utils/amountSerialization.js";
 import { isAddressValid } from "../src/core/state/utils/address.js";
-import b4a from "b4a";
+import { getConfirmedParameter } from "./utils/confirmedParameter.mjs";
+
 export async function handleBalance({ req, respond, msbInstance }) {
-    const [path, queryString] = req.url.split("?");
-    const parts = path.split("/").filter(Boolean);
+    const url = buildRequestUrl(req);
+    const parts = url.pathname.split("/").filter(Boolean);
     const address = parts[2];
 
-    let confirmed = true; // default
-    if (queryString) {
-        const params = new URLSearchParams(queryString);
-        if (params.has("confirmed")) {
-            confirmed = params.get("confirmed") === "true";
-        }
-    }
+    const confirmedParam = getConfirmedParameter(url);
+    const confirmed = confirmedParam === null ? false : confirmedParam; // invalid -> fallback to unconfirmed
 
+    // TODO: VALIDATION? 
     if (!address) {
         respond(400, { error: 'Wallet address is required' });
         return;
@@ -91,8 +89,10 @@ export async function handleBroadcastTransaction({ msbInstance, respond, req }) 
 }
 
 export async function handleTxHashes({ msbInstance, respond, req }) {
-    const startSignedLengthStr = req.url.split('/')[3];
-    const endSignedLengthStr = req.url.split('/')[4];
+    const url = buildRequestUrl(req);
+    const pathParts = url.pathname.split('/').filter(Boolean);
+    const startSignedLengthStr = pathParts[2];
+    const endSignedLengthStr = pathParts[3];
 
     const startSignedLength = parseInt(startSignedLengthStr);
     const endSignedLength = parseInt(endSignedLengthStr);
@@ -130,13 +130,18 @@ export async function handleTxHashes({ msbInstance, respond, req }) {
 }
 
 export async function handleUnconfirmedLength({ msbInstance, respond }) {
+    // TODO: VALIDATION? 
     const commandString = '/unconfirmed_length';
     const unconfirmed_length = await msbInstance.handleCommand(commandString);
     respond(200, { unconfirmed_length });
 }
 
 export async function handleTransactionDetails({ msbInstance, respond, req }) {
-    const hash = req.url.split('/')[3];
+    // TODO: VALIDATION? 
+    const url = buildRequestUrl(req);
+    const pathParts = url.pathname.split('/').filter(Boolean);
+    const hash = pathParts[2];
+
     const commandString = `/get_tx_details ${hash}`;
     const txDetails = await msbInstance.handleCommand(commandString);
     respond(txDetails === null ? 404 : 200, { txDetails });
@@ -211,9 +216,9 @@ export async function handleFetchBulkTxPayloads({ msbInstance, respond, req }) {
 }
 
 export async function handleTransactionExtendedDetails({ msbInstance, respond, req }) {
-    const [path, queryString] = req.url.split("?");
-    const pathParts = path.split('/');
-    const hash = pathParts[4];
+    const url = buildRequestUrl(req);
+    const pathParts = url.pathname.split('/').filter(Boolean);
+    const hash = pathParts[3];
 
     if (!hash) {
         return respond(400, { error: "Transaction hash is required" });
@@ -222,16 +227,10 @@ export async function handleTransactionExtendedDetails({ msbInstance, respond, r
     if (isHexString(hash) === false || hash.length !== 64) {
         return respond(400, { error: "Invalid transaction hash format" });
     }
-    let confirmed = true; // default
-    if (queryString) {
-        const params = new URLSearchParams(queryString);
-        if (params.has("confirmed")) {
-            const confirmedParam = params.get("confirmed");
-            if (confirmedParam !== "true" && confirmedParam !== "false") {
-                return respond(400, { error: 'Parameter "confirmed" must be exactly "true" or "false"' });
-            }
-            confirmed = confirmedParam === "true";
-        }
+
+    const confirmed = getConfirmedParameter(url);
+    if (confirmed === null) {
+        return respond(400, { error: 'Parameter "confirmed" must be exactly "true" or "false"' });
     }
 
     try {
@@ -254,23 +253,16 @@ export async function handleTransactionExtendedDetails({ msbInstance, respond, r
 }
 
 export async function handleAccountDetails({ msbInstance, respond, req }) {
-    const [path, queryString] = req.url.split('?');
-    const address = path.split('/').filter(Boolean)[2]; // /v1/account/<address>
-
-    let confirmed = true; // default
-    if (queryString) {
-        const params = new URLSearchParams(queryString);
-        if (params.has("confirmed")) {
-            const confirmedParam = params.get("confirmed");
-            if (confirmedParam !== "true" && confirmedParam !== "false") {
-                return respond(400, { error: 'Parameter "confirmed" must be exactly "true" or "false"' });
-            }
-            confirmed = confirmedParam === "true";
-        }
-    }
+    const url = buildRequestUrl(req);
+    const address = url.pathname.split('/').filter(Boolean)[2];
 
     if (!address) {
         return respond(400, { error: "Account address is required" });
+    }
+
+    const confirmed = getConfirmedParameter(url);
+    if (confirmed === null) {
+        return respond(400, { error: 'Parameter "confirmed" must be exactly "true" or "false"' });
     }
 
     if (!isAddressValid(address)) {
@@ -288,29 +280,23 @@ export async function handleAccountDetails({ msbInstance, respond, req }) {
         stakedBalance: '0',
     };
 
-    try {
-        const nodeEntry = confirmed
-            ? await msbInstance.state.getNodeEntry(address)
-            : await msbInstance.state.getNodeEntryUnsigned(address);
-        if (!nodeEntry) {
-            return respond(200, defaultAccountState);
-        }
-
-        const licenseValue = licenseBufferToBigInt(nodeEntry.license);
-
-        return respond(200, {
-            ...defaultAccountState,
-            writingKey: nodeEntry.wk.toString('hex'),
-            isWhitelisted: nodeEntry.isWhitelisted,
-            isValidator: nodeEntry.isWriter,
-            isIndexer: nodeEntry.isIndexer,
-            license: licenseValue === 0n ? null : licenseValue.toString(),
-            balance: bufferToBigInt(nodeEntry.balance).toString(),
-            stakedBalance: bufferToBigInt(nodeEntry.stakedBalance).toString(),
-        });
-
-    } catch (error) {
-        console.error('Error in handleAccountDetails:', error);
-        return respond(500, { error: 'An error occurred while fetching account details.' });
+    const nodeEntry = confirmed
+        ? await msbInstance.state.getNodeEntry(address)
+        : await msbInstance.state.getNodeEntryUnsigned(address);
+    if (!nodeEntry) {
+        return respond(200, defaultAccountState);
     }
+
+    const licenseValue = licenseBufferToBigInt(nodeEntry.license);
+
+    return respond(200, {
+        ...defaultAccountState,
+        writingKey: nodeEntry.wk.toString('hex'),
+        isWhitelisted: nodeEntry.isWhitelisted,
+        isValidator: nodeEntry.isWriter,
+        isIndexer: nodeEntry.isIndexer,
+        license: licenseValue === 0n ? null : licenseValue.toString(),
+        balance: bufferToBigInt(nodeEntry.balance).toString(),
+        stakedBalance: bufferToBigInt(nodeEntry.stakedBalance).toString(),
+    });
 }
