@@ -168,29 +168,35 @@ class Network extends ReadyResource {
     }
 
     async tryConnect(publicKey, type = null) {
-        if (null === this.#swarm) throw new Error('Network swarm is not initialized');
+        if (this.#swarm === null) throw new Error('Network swarm is not initialized');
 
-        if (false === this.#swarm.peers.has(publicKey)) {
-            this.#swarm.joinPeer(b4a.from(publicKey, 'hex'));
+        const target = b4a.from(publicKey, 'hex');
+        if (!this.#swarm.peers.has(publicKey)) {
+            this.#swarm.joinPeer(target);
             let cnt = 0;
-            while (false === this.#swarm.peers.has(publicKey)) {
-                if (cnt >= 1500) break;
+            while (!this.#swarm.peers.has(publicKey) && cnt < 1500) { // TODO: Get rid of the magic number and add a config option for this
                 await sleep(10);
                 cnt += 1;
             }
         }
 
-        if (this.#swarm.peers.has(publicKey)) {
-            let stream;
-            const peerInfo = this.#swarm.peers.get(publicKey)
-            stream = this.#swarm._allConnections.get(peerInfo.publicKey)
-            if (stream !== undefined && stream.messenger !== undefined) {
-                if (type === 'validator') {
-                    this.#validatorConnectionManager.addValidator(b4a.from(publicKey, 'hex'), stream)
-                }
-                await this.#sendRequestByType(stream, type);
-            }
+        const peerInfo = this.#swarm.peers.get(publicKey);
+        if (!peerInfo) return;
+
+        // Wait for the swarm to establish the connection and for protomux to attach
+        let stream = this.#swarm._allConnections.get(peerInfo.publicKey);
+        let attempts = 0;
+        while ((!stream || !stream.messenger) && attempts < 1500) { // TODO: Get rid of the magic number and add a config option
+            await sleep(10);
+            attempts += 1;
+            stream = this.#swarm._allConnections.get(peerInfo.publicKey);
         }
+        if (!stream || !stream.messenger) return;
+
+        if (type === 'validator') {
+            this.#validatorConnectionManager.addValidator(target, stream);
+        }
+        await this.#sendRequestByType(stream, type);
     }
 
     async isConnected(publicKey) {
@@ -214,7 +220,7 @@ class Network extends ReadyResource {
         } else {
             return;
         }
-        await this.spinLock(() => !waitFor)
+        await this.spinLock(() => !waitFor())
     };
 
     async spinLock(conditionFn, maxIterations = 1500, intervalMs = 10) {

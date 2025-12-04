@@ -3,8 +3,15 @@ import b4a from 'b4a'
 import PeerWallet from "trac-wallet"
 import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
 
-// TODO: This class is flooding console with logs. Implement a verbosity flag to control this behavior
-// or remove them after debugging is done.
+// -- Debug Mode --
+// TODO: Implement a better debug system in the future. This is just temporary.
+const DEBUG = false;
+const debugLog = (...args) => {
+    if (DEBUG) {
+        console.log('DEBUG [ConnectionManager] ==> ', ...args);
+    }
+};
+
 class ConnectionManager {
     #validators
     #maxValidators
@@ -85,20 +92,20 @@ class ConnectionManager {
     addValidator(publicKey, connection) {
         let publicKeyHex = this.#toHexString(publicKey);
         if (this.maxConnectionsReached()) {
-            console.log(`>>>>>>>>>>>>>>>>> ConnectionManager: max connections reached.`);
+            debugLog(`addValidator: max connections reached.`);
             return false;
         }
-        console.log(`>>>>>>>>>>>>>>>>> ConnectionManager: adding validator ${this.#toAddress(publicKeyHex)}`);
+        debugLog(`addValidator: adding validator ${this.#toAddress(publicKeyHex)}`);
         if (!this.exists(publicKeyHex)) {
-            console.log(`>>>>>>>>>>>>>>>>> ConnectionManager: appending validator ${this.#toAddress(publicKeyHex)}`);
+            debugLog(`addValidator: appending validator ${this.#toAddress(publicKeyHex)}`);
             this.#append(publicKeyHex, connection);
             return true;
         } else if (!this.connected(publicKeyHex)) {
-            console.log(`>>>>>>>>>>>>>>>>> ConnectionManager: updating validator ${this.#toAddress(publicKeyHex)}`);
+            debugLog(`addValidator: updating validator ${this.#toAddress(publicKeyHex)}`);
             this.#update(publicKeyHex, connection);
             return true;
         }
-        console.log(`>>>>>>>>>>>>>>>>> ConnectionManager: didn't add validator ${this.#toAddress(publicKeyHex)}`);
+        debugLog(`addValidator: didn't add validator ${this.#toAddress(publicKeyHex)}`);
         return false; // TODO: Implement better success/failure reporting
     }
 
@@ -107,7 +114,7 @@ class ConnectionManager {
      * @param {String | Buffer} publicKey - The public key hex string of the validator to remove
      */
     remove(publicKey) {
-        console.log(`>>>>>>>>>>>>>>>>>>>>>> ConnectionManager: removing validator ${this.#toAddress(publicKey)}`);
+        debugLog(`remove: removing validator ${this.#toAddress(publicKey)}`);
         const publicKeyHex = this.#toHexString(publicKey);
         if (this.exists(publicKeyHex)) {
             // Close the connection socket
@@ -120,9 +127,9 @@ class ConnectionManager {
                     // TODO: Consider logging these errors here in verbose mode
                 }
             }
-            console.log(`>>>>>>>>>>>>>>>>>>>>>> ConnectionManager: removing validator from map: ${this.#toAddress(publicKeyHex)}`);
+            debugLog(`remove: removing validator from map: ${this.#toAddress(publicKeyHex)}. Map size before removal: ${this.#validators.size}.`);
             this.#validators.delete(publicKeyHex);
-            console.log(`>>>>>>>>>>>>>>>>>>>>>> ConnectionManager: validator removed successfully. Map size is now ${this.#validators.size}.`);
+            debugLog(`remove: validator removed successfully. Map size is now ${this.#validators.size}.`);
         }
     }
 
@@ -199,7 +206,6 @@ class ConnectionManager {
         console.log('Connection count: ', this.connectionCount())
         console.log('Validator map keys count: ', this.#validators.size)
         console.log('Validator map keys: ', Array.from(this.#validators.keys()).map(val => this.#toAddress(val)).join(', '))
-        // console.log('Validators: ', this.#validatorsIndex.map(val => this.#toAddress(val)).join(', '))
     }
 
     // Node 1: This method shuffles the whole array (in practice, probably around 50 elements)
@@ -248,18 +254,18 @@ class ConnectionManager {
      * @param {Object} connection - The connection object
      */
     #append(publicKey, connection) {
-        console.log(`>>>>>>>>>>>>>>> ConnectionManager: appending validator ${this.#toAddress(publicKey)}`);
+        debugLog(`#append: appending validator ${this.#toAddress(publicKey)}`);
         const publicKeyHex = this.#toHexString(publicKey);
         if (this.#validators.has(publicKeyHex)) {
             // This should never happen, but just in case, we log it
-            console.log(`ConnectionManager: tried to append existing validator: ${this.#toAddress(publicKey)}`);
+            debugLog(`#append: tried to append existing validator: ${this.#toAddress(publicKey)}`);
             return;
         }
         this.#validators.set(publicKeyHex, { connection, sent: 0 });
         connection.on('close', () => {
-            console.log(`>>>>>>>>>>>>>>> ConnectionManager: connection closing for validator ${this.#toAddress(publicKey)}`);
+            debugLog(`#append: connection closing for validator ${this.#toAddress(publicKey)}`);
             this.remove(publicKeyHex);
-            console.log(`>>>>>>>>>>>>>>> ConnectionManager: connection closed for validator ${this.#toAddress(publicKey)}`);
+            debugLog(`#append: connection closed for validator ${this.#toAddress(publicKey)}`);
         });
     }
 
@@ -274,7 +280,7 @@ class ConnectionManager {
         // It would be preferable to keep them separated though, but we would need to review all usages to ensure correctness.
         // Also, we should remove the 'else' branch below if we decide to keep 'update' and 'append' separated.
         const publicKeyHex = this.#toHexString(publicKey);
-        console.log(`>>>>>>>>>>>>>>> ConnectionManager: updating validator ${this.#toAddress(publicKey)}`);
+        debugLog(`#update: updating validator ${this.#toAddress(publicKey)}`);
         if (this.#validators.has(publicKeyHex)) {
             this.#validators.get(publicKeyHex).connection = connection;
         } else {
