@@ -15,7 +15,7 @@ class MessageOrchestrator {
      * Attempts to send a message to validators with retries and state checks.
      * @param {ConnectionManager} connectionManager - The connection manager instance
      * @param {object} state - The state to look for the message outcome
-     * @param {object} options - { messageThreshold: number, maxRetries: number, retryDelay: number (miliseconds), timeout: number (miliseconds) }
+     * @param {object} options - { messageThreshold: number, maxRetries: number, retryDelay: number (milliseconds), timeout: number (milliseconds) }
      * messageThreshold: How many successful sends before removing a validator from the pool
      * maxRetries: How many times to retry sending a message to a single validator
      * retryDelay: How long to wait between retries (ms)

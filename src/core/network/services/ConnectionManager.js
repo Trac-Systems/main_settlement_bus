@@ -57,7 +57,7 @@ class ConnectionManager {
      * Sends a message through a specific validator without increasing sent messages count.
      * @param {Object} message - The message to send to the validator
      * @param {String | Buffer} publicKey - A validator public key hex string to be fetched from the pool.
-     * @returns 
+     * @returns {Boolean} True if the message was sent, false otherwise.
      */
     sendSingleMessage(message, publicKey) {
         let publicKeyHex = this.#toHexString(publicKey);
@@ -208,7 +208,7 @@ class ConnectionManager {
         console.log('Validator map keys: ', Array.from(this.#validators.keys()).map(val => this.#toAddress(val)).join(', '))
     }
 
-    // Node 1: This method shuffles the whole array (in practice, probably around 50 elements)
+    // Note 1: This method shuffles the whole array (in practice, probably around 50 elements)
     //      just to fetch a small subset of it (most times, 1 element).
     //      There are more efficient ways to pick a small subset of validators. Consider optimizing.
     // Note 2: This method is unused now, but will be kept here for future reference
@@ -231,7 +231,7 @@ class ConnectionManager {
      * @returns {String|null} - A randomly selected validator public key
      */
     pickRandomValidator(validatorPubKeys) {
-        if (validatorPubKeys.length === 0 || typeof validatorPubKeys[0] !== 'string') {
+        if (validatorPubKeys.length === 0) {
             return null;
         }
         const index = Math.floor(Math.random() * validatorPubKeys.length);
