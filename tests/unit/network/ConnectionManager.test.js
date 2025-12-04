@@ -70,7 +70,7 @@ test('ConnectionManager', () => {
             t.is(connectionManager.connectionCount(), maxConnections, 'should not increase length')
         })
 
-        test('evicts one validator when pool is full', async t => {
+        test('does not add new validator when pool is full', async t => {
             reset()
             const maxConnections = 2
             const localConnections = [
@@ -89,10 +89,10 @@ test('ConnectionManager', () => {
             connectionManager.addValidator(newConn.key, newConn.connection)
 
             t.is(connectionManager.connectionCount(), maxConnections, 'should stay at max size')
-            t.ok(connectionManager.connected(newConn.key), 'new validator should be in the pool')
+            t.not(connectionManager.connected(newConn.key), 'new validator should not be in the pool')
 
             const remainingOld = localConnections.filter(c => connectionManager.connected(c.key)).length
-            t.is(remainingOld, 1, 'exactly one of the old validators should remain')
+            t.is(remainingOld, 2, 'all of the old validators should remain')
         })
     })
 
