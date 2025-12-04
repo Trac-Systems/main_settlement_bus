@@ -2,10 +2,11 @@ name: MSB-Acceptance-Tests
 
 on:
   workflow_dispatch:
-  workflow_run:
-    workflows: ["MSB-Unit-Tests"]
-    types:
-      - completed
+  # TODO: re-enable when runners handle acceptance reliably outside local
+  # workflow_run:
+  #   workflows: ["MSB-Unit-Tests"]
+  #   types:
+  #     - completed
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -15,7 +16,8 @@ jobs:
   integration-tests:
     name: Acceptance Tests
     runs-on: ${{ matrix.os }}
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    # if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event_name == 'workflow_dispatch' }}
     strategy:
       matrix:
         node-version: [lts/*]
