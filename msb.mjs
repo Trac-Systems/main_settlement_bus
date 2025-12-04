@@ -40,7 +40,6 @@ msb.ready().then(async () => {
         const {startRpcServer} = await import('./rpc/rpc_server.mjs');
         startRpcServer(msb, host, port);
     } else {
-        console.log('RPC server will not be started.');
         msb.interactiveMode();
     }
 });
