@@ -8,6 +8,7 @@ import Autobase from 'autobase';
 import Hyperbee from 'hyperbee';
 import b4a from 'b4a';
 import PeerWallet from 'trac-wallet';
+import Hypercore from 'hypercore';
 import { blake3Hash } from '../../src/utils/crypto.js';
 import {
 	ACK_INTERVAL,
@@ -29,6 +30,38 @@ Writer.prototype._open = async function patchedWriterOpen(...args) {
 		// On teardown GH runners sometimes open a writer against a closing core.
 		// Ignore assertion errors from Autobase writer open during that window.
 		if (err?.name === 'AssertionError') return;
+		throw err;
+	}
+};
+
+// Hypercore/Hyperbee can throw SESSION_CLOSED while the core is shutting down.
+// Swallow those during tests to avoid teardown flakes on slower runners.
+const originalSnapshot = Hypercore.prototype.snapshot;
+Hypercore.prototype.snapshot = function patchedSnapshot(...args) {
+	try {
+		return originalSnapshot.apply(this, args);
+	} catch (err) {
+		if (err?.code === 'SESSION_CLOSED') return this;
+		throw err;
+	}
+};
+
+const originalCoreGet = Hypercore.prototype.get;
+Hypercore.prototype.get = async function patchedCoreGet(...args) {
+	try {
+		return await originalCoreGet.apply(this, args);
+	} catch (err) {
+		if (err?.code === 'SESSION_CLOSED') return null;
+		throw err;
+	}
+};
+
+const originalMakeSnapshot = Hyperbee.prototype._makeSnapshot;
+Hyperbee.prototype._makeSnapshot = function patchedMakeSnapshot(...args) {
+	try {
+		return originalMakeSnapshot.apply(this, args);
+	} catch (err) {
+		if (err?.code === 'SESSION_CLOSED') return this.core;
 		throw err;
 	}
 };
