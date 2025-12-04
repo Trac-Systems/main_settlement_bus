@@ -1,26 +1,26 @@
 import { decodeBase64Payload, isBase64, sanitizeBulkPayloadsRequestBody, sanitizeTransferPayload, validatePayloadStructure } from "./utils/helpers.mjs"
-import { MAX_SIGNED_LENGTH } from "./constants.mjs";
+import { MAX_SIGNED_LENGTH, ZERO_WK } from "./constants.mjs";
+import { buildRequestUrl } from "./utils/URL.mjs";
 import { isHexString } from "../src/utils/helpers.js";
+import { bufferToBigInt, licenseBufferToBigInt } from "../src/utils/amountSerialization.js";
+import { isAddressValid } from "../src/core/state/utils/address.js";
+import { getConfirmedParameter } from "./utils/confirmedParameter.mjs";
 
 export async function handleBalance({ req, respond, msbInstance }) {
-    const [path, queryString] = req.url.split("?");
-    const parts = path.split("/").filter(Boolean);
+    const url = buildRequestUrl(req);
+    const parts = url.pathname.split("/").filter(Boolean);
     const address = parts[2];
 
-    let confirmed = true; // default
-    if (queryString) {
-        const params = new URLSearchParams(queryString);
-        if (params.has("confirmed")) {
-            confirmed = params.get("confirmed") === "true";
-        }
-    }
+    const confirmedParam = getConfirmedParameter(url);
+    const confirmed = confirmedParam === null ? false : confirmedParam; // invalid -> fallback to unconfirmed
 
+    // TODO: VALIDATION? 
     if (!address) {
         respond(400, { error: 'Wallet address is required' });
         return;
     }
-    
-    const commandString =`/get_balance ${address} ${confirmed}`;
+
+    const commandString = `/get_balance ${address} ${confirmed}`;
     const nodeInfo = await msbInstance.handleCommand(commandString);
     const balance = nodeInfo?.balance || 0;
     respond(200, { address, balance });
@@ -71,14 +71,14 @@ export async function handleBroadcastTransaction({ msbInstance, respond, req }) 
             let code = error instanceof SyntaxError ? 400 : 500;
             let errorMsg = code === 400 ? 'Invalid JSON payload.' : 'An error occurred processing the transaction.'
 
-            if(error.message.includes("Failed to broadcast transaction after multiple attempts.")){
+            if (error.message.includes("Failed to broadcast transaction after multiple attempts.")) {
                 code = 429;
                 errorMsg = "Failed to broadcast transaction after multiple attempts."
             }
-            
+
             console.error('Error in handleBroadcastTransaction:', error);
             // Use 400 for client errors (like bad JSON), 500 for server/command errors
-            respond(code, { error:  errorMsg});
+            respond(code, { error: errorMsg });
         }
     });
 
@@ -89,8 +89,10 @@ export async function handleBroadcastTransaction({ msbInstance, respond, req }) 
 }
 
 export async function handleTxHashes({ msbInstance, respond, req }) {
-    const startSignedLengthStr = req.url.split('/')[3];
-    const endSignedLengthStr = req.url.split('/')[4];
+    const url = buildRequestUrl(req);
+    const pathParts = url.pathname.split('/').filter(Boolean);
+    const startSignedLengthStr = pathParts[2];
+    const endSignedLengthStr = pathParts[3];
 
     const startSignedLength = parseInt(startSignedLengthStr);
     const endSignedLength = parseInt(endSignedLengthStr);
@@ -120,7 +122,7 @@ export async function handleTxHashes({ msbInstance, respond, req }) {
 
     // 5. Adjust the end index to not exceed the confirmed length.
     const adjustedEndLength = Math.min(endSignedLength, currentConfirmedLength)
-    
+
     // 6. Fetch txs hashes for the adjusted range, assuming the command takes start and end index.
     const commandString = `/get_txs_hashes ${startSignedLength} ${adjustedEndLength}`;
     const { hashes } = await msbInstance.handleCommand(commandString);
@@ -128,16 +130,21 @@ export async function handleTxHashes({ msbInstance, respond, req }) {
 }
 
 export async function handleUnconfirmedLength({ msbInstance, respond }) {
+    // TODO: VALIDATION? 
     const commandString = '/unconfirmed_length';
     const unconfirmed_length = await msbInstance.handleCommand(commandString);
     respond(200, { unconfirmed_length });
 }
 
 export async function handleTransactionDetails({ msbInstance, respond, req }) {
-    const hash = req.url.split('/')[3];
+    // TODO: VALIDATION? 
+    const url = buildRequestUrl(req);
+    const pathParts = url.pathname.split('/').filter(Boolean);
+    const hash = pathParts[2];
+
     const commandString = `/get_tx_details ${hash}`;
     const txDetails = await msbInstance.handleCommand(commandString);
-    respond(txDetails === null ? 404 : 200 , { txDetails });
+    respond(txDetails === null ? 404 : 200, { txDetails });
 }
 
 export async function handleFetchBulkTxPayloads({ msbInstance, respond, req }) {
@@ -150,9 +157,9 @@ export async function handleFetchBulkTxPayloads({ msbInstance, respond, req }) {
         if (headersSent) return; // Stop processing if response has started/errored
 
         bytesRead += chunk.length;
-        if (bytesRead > limitBytes) { 
+        if (bytesRead > limitBytes) {
             respond(413, { error: 'Request body too large.' });
-            headersSent = true; 
+            headersSent = true;
             req.destroy(); // Stop receiving data (GOOD PRACTICE)
             return;
         }
@@ -164,16 +171,16 @@ export async function handleFetchBulkTxPayloads({ msbInstance, respond, req }) {
 
 
         try {
-            if (body === null || body === ''){
+            if (body === null || body === '') {
                 return respond(400, { error: 'Missing payload.' });
             }
 
             const sanitizedPayload = sanitizeBulkPayloadsRequestBody(body);
 
-            if (sanitizedPayload === null){
+            if (sanitizedPayload === null) {
                 return respond(400, { error: 'Invalid payload.' });
             }
-            
+
             const { hashes } = sanitizedPayload;
 
             if (!Array.isArray(hashes) || hashes.length === 0) {
@@ -186,11 +193,11 @@ export async function handleFetchBulkTxPayloads({ msbInstance, respond, req }) {
 
             const uniqueHashes = [...new Set(hashes)];
 
-            const commandResult = await msbInstance.handleCommand( `/get_tx_payloads_bulk`, null, uniqueHashes)
+            const commandResult = await msbInstance.handleCommand(`/get_tx_payloads_bulk`, null, uniqueHashes)
 
             const responseString = JSON.stringify(commandResult);
             if (Buffer.byteLength(responseString, 'utf8') > 2_000_000) {
-                return respond(413, { error: 'Response too large. Reduce number of hashes.'});
+                return respond(413, { error: 'Response too large. Reduce number of hashes.' });
             }
 
             return respond(200, commandResult);
@@ -209,29 +216,23 @@ export async function handleFetchBulkTxPayloads({ msbInstance, respond, req }) {
 }
 
 export async function handleTransactionExtendedDetails({ msbInstance, respond, req }) {
-    const [path, queryString] = req.url.split("?");
-    const pathParts = path.split('/');
-    const hash = pathParts[4];
-    
+    const url = buildRequestUrl(req);
+    const pathParts = url.pathname.split('/').filter(Boolean);
+    const hash = pathParts[3];
+
     if (!hash) {
         return respond(400, { error: "Transaction hash is required" });
     }
-    
+
     if (isHexString(hash) === false || hash.length !== 64) {
         return respond(400, { error: "Invalid transaction hash format" });
     }
-    let confirmed = true; // default
-    if (queryString) {
-        const params = new URLSearchParams(queryString);
-        if (params.has("confirmed")) {
-            const confirmedParam = params.get("confirmed");
-            if (confirmedParam !== "true" && confirmedParam !== "false") {
-                return respond(400, { error: 'Parameter "confirmed" must be exactly "true" or "false"' });
-            }
-            confirmed = confirmedParam === "true";
-        }
+
+    const confirmed = getConfirmedParameter(url);
+    if (confirmed === null) {
+        return respond(400, { error: 'Parameter "confirmed" must be exactly "true" or "false"' });
     }
-    
+
     try {
         let txDetails;
         const commandString = `/get_extended_tx_details ${hash} ${confirmed}`;
@@ -249,4 +250,53 @@ export async function handleTransactionExtendedDetails({ msbInstance, respond, r
             respond(500, { error: 'An error occurred processing the request.' });
         }
     }
+}
+
+export async function handleAccountDetails({ msbInstance, respond, req }) {
+    const url = buildRequestUrl(req);
+    const address = url.pathname.split('/').filter(Boolean)[2];
+
+    if (!address) {
+        return respond(400, { error: "Account address is required" });
+    }
+
+    const confirmed = getConfirmedParameter(url);
+    if (confirmed === null) {
+        return respond(400, { error: 'Parameter "confirmed" must be exactly "true" or "false"' });
+    }
+
+    if (!isAddressValid(address)) {
+        return respond(400, { error: "Invalid account address format" });
+    }
+
+    const defaultAccountState = {
+        address,
+        writingKey: ZERO_WK.toString('hex'),
+        isWhitelisted: false,
+        isValidator: false,
+        isIndexer: false,
+        license: null,
+        balance: '0',
+        stakedBalance: '0',
+    };
+
+    const nodeEntry = confirmed
+        ? await msbInstance.state.getNodeEntry(address)
+        : await msbInstance.state.getNodeEntryUnsigned(address);
+    if (!nodeEntry) {
+        return respond(200, defaultAccountState);
+    }
+
+    const licenseValue = licenseBufferToBigInt(nodeEntry.license);
+
+    return respond(200, {
+        ...defaultAccountState,
+        writingKey: nodeEntry.wk.toString('hex'),
+        isWhitelisted: nodeEntry.isWhitelisted,
+        isValidator: nodeEntry.isWriter,
+        isIndexer: nodeEntry.isIndexer,
+        license: licenseValue === 0n ? null : licenseValue.toString(),
+        balance: bufferToBigInt(nodeEntry.balance).toString(),
+        stakedBalance: bufferToBigInt(nodeEntry.stakedBalance).toString(),
+    });
 }

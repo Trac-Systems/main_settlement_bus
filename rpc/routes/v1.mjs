@@ -8,7 +8,8 @@ import {
     handleUnconfirmedLength,
     handleTransactionDetails,
     handleFetchBulkTxPayloads,
-    handleTransactionExtendedDetails
+    handleTransactionExtendedDetails,
+    handleAccountDetails
 } from '../handlers.mjs';
 
 export const v1Routes = [
@@ -22,4 +23,5 @@ export const v1Routes = [
     { method: 'GET', path: '/tx', handler: handleTransactionDetails },
     { method: 'POST', path: '/tx-payloads-bulk', handler: handleFetchBulkTxPayloads },
     { method: 'GET', path: '/tx/details', handler: handleTransactionExtendedDetails },
+    { method: 'GET', path: '/account', handler: handleAccountDetails },
 ];

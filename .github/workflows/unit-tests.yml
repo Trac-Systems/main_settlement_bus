@@ -1,4 +1,4 @@
-name: MSB-CI
+name: MSB-Unit-Tests
 
 on:
   push:
