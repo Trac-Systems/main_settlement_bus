@@ -2,6 +2,18 @@ import { decodeBase64Payload, isBase64, sanitizeBulkPayloadsRequestBody, sanitiz
 import { MAX_SIGNED_LENGTH, ZERO_WK } from "./constants.mjs";
 import { buildRequestUrl } from "./utils/url.mjs";
 import { isHexString } from "../src/utils/helpers.js";
+import {
+    getBalance,
+    getTxv,
+    getFee,
+    getConfirmedLength,
+    getUnconfirmedLength,
+    broadcastTransaction,
+    getTxHashes,
+    getTxDetails,
+    fetchBulkTxPayloads,
+    getExtendedTxDetails
+} from "./rpc_services.js";
 import { bufferToBigInt, licenseBufferToBigInt } from "../src/utils/amountSerialization.js";
 import { isAddressValid } from "../src/core/state/utils/address.js";
 import { getConfirmedParameter } from "./utils/confirmedParameter.mjs";
@@ -20,28 +32,23 @@ export async function handleBalance({ req, respond, msbInstance }) {
         return;
     }
 
-    const commandString = `/get_balance ${address} ${confirmed}`;
-    const nodeInfo = await msbInstance.handleCommand(commandString);
+    const nodeInfo = await getBalance(msbInstance, address, confirmed);
     const balance = nodeInfo?.balance || 0;
     respond(200, { address, balance });
 }
 
 export async function handleTxv({ msbInstance, respond }) {
-    const commandString = '/get_txv';
-    const txvRaw = await msbInstance.handleCommand(commandString);
-    const txv = txvRaw.toString('hex');
+    const txv = await getTxv(msbInstance);
     respond(200, { txv });
 }
 
 export async function handleFee({ msbInstance, respond }) {
-    const commandString = '/get_fee';
-    const fee = await msbInstance.handleCommand(commandString);
+    const fee = await getFee(msbInstance);
     respond(200, { fee });
 }
 
 export async function handleConfirmedLength({ msbInstance, respond }) {
-    const commandString = '/confirmed_length';
-    const confirmed_length = await msbInstance.handleCommand(commandString);
+    const confirmed_length = await getConfirmedLength(msbInstance);
     respond(200, { confirmed_length });
 }
 
@@ -65,7 +72,7 @@ export async function handleBroadcastTransaction({ msbInstance, respond, req }) 
             const decodedPayload = decodeBase64Payload(payload);
             validatePayloadStructure(decodedPayload);
             const sanitizedPayload = sanitizeTransferPayload(decodedPayload);
-            const result = await msbInstance.handleCommand('/broadcast_transaction', null, sanitizedPayload);
+            const result = await broadcastTransaction(msbInstance, sanitizedPayload);
             respond(200, { result });
         } catch (error) {
             let code = error instanceof SyntaxError ? 400 : 500;
@@ -118,33 +125,25 @@ export async function handleTxHashes({ msbInstance, respond, req }) {
     }
 
     // 4. Get current confirmed length
-    const currentConfirmedLength = await msbInstance.handleCommand('/confirmed_length');
+    const currentConfirmedLength = await getConfirmedLength(msbInstance);
 
     // 5. Adjust the end index to not exceed the confirmed length.
     const adjustedEndLength = Math.min(endSignedLength, currentConfirmedLength)
 
     // 6. Fetch txs hashes for the adjusted range, assuming the command takes start and end index.
-    const commandString = `/get_txs_hashes ${startSignedLength} ${adjustedEndLength}`;
-    const { hashes } = await msbInstance.handleCommand(commandString);
+    const { hashes } = await getTxHashes(msbInstance, startSignedLength, adjustedEndLength);
     respond(200, { hashes });
 }
 
 export async function handleUnconfirmedLength({ msbInstance, respond }) {
-    // TODO: VALIDATION? 
-    const commandString = '/unconfirmed_length';
-    const unconfirmed_length = await msbInstance.handleCommand(commandString);
+    const unconfirmed_length = await getUnconfirmedLength(msbInstance);
     respond(200, { unconfirmed_length });
 }
 
 export async function handleTransactionDetails({ msbInstance, respond, req }) {
-    // TODO: VALIDATION? 
-    const url = buildRequestUrl(req);
-    const pathParts = url.pathname.split('/').filter(Boolean);
-    const hash = pathParts[2];
-
-    const commandString = `/get_tx_details ${hash}`;
-    const txDetails = await msbInstance.handleCommand(commandString);
-    respond(txDetails === null ? 404 : 200, { txDetails });
+    const hash = req.url.split('/')[3];
+    const txDetails = await getTxDetails(msbInstance, hash);
+    respond(txDetails === null ? 404 : 200 , { txDetails });
 }
 
 export async function handleFetchBulkTxPayloads({ msbInstance, respond, req }) {
@@ -193,7 +192,7 @@ export async function handleFetchBulkTxPayloads({ msbInstance, respond, req }) {
 
             const uniqueHashes = [...new Set(hashes)];
 
-            const commandResult = await msbInstance.handleCommand(`/get_tx_payloads_bulk`, null, uniqueHashes)
+            const commandResult = await fetchBulkTxPayloads(msbInstance, uniqueHashes);
 
             const responseString = JSON.stringify(commandResult);
             if (Buffer.byteLength(responseString, 'utf8') > 2_000_000) {
@@ -234,14 +233,8 @@ export async function handleTransactionExtendedDetails({ msbInstance, respond, r
     }
 
     try {
-        let txDetails;
-        const commandString = `/get_extended_tx_details ${hash} ${confirmed}`;
-        txDetails = await msbInstance.handleCommand(commandString);
-        if (txDetails === null) {
-            respond(404, { error: `No payload found for tx hash: ${hash}` });
-        } else {
-            respond(200, txDetails);
-        }
+        const details = await getExtendedTxDetails(msbInstance, hash, confirmed);
+        respond(200, details);
     } catch (error) {
         if (error.message?.includes('No payload found for tx hash')) {
             respond(404, { error: error.message });
