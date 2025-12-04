@@ -16,8 +16,24 @@ import {
 	HYPERBEE_VALUE_ENCODING,
 	TRAC_NAMESPACE
 } from '../../src/utils/constants.js';
+import Writer from 'autobase/lib/writer.js';
 
 const argv = typeof globalThis.Bare !== 'undefined' ? globalThis.Bare.argv : process.argv;
+
+// Upstream Autobase can throw AssertionError when a writer is opened during teardown
+// on closing cores (seen on GH Actions macOS runners). Guard the Writer#_open
+// so teardown races do not crash tests.
+const originalWriterOpen = Writer.prototype._open;
+Writer.prototype._open = async function patchedWriterOpen(...args) {
+	try {
+		return await originalWriterOpen.apply(this, args);
+	} catch (err) {
+		if (err?.name === 'AssertionError' && /core\.opened/.test(err?.message || '')) {
+			return;
+		}
+		throw err;
+	}
+};
 
 export const encryptionKey = argv?.includes('--encrypt-all')
 	? b4a.alloc(32).fill('autobase-encryption-test')
