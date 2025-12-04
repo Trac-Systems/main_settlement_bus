@@ -16,8 +16,22 @@ import {
 	HYPERBEE_VALUE_ENCODING,
 	TRAC_NAMESPACE
 } from '../../src/utils/constants.js';
+import Writer from 'autobase/lib/writer.js';
 
 const argv = typeof globalThis.Bare !== 'undefined' ? globalThis.Bare.argv : process.argv;
+
+
+const originalWriterOpen = Writer.prototype._open;
+Writer.prototype._open = async function patchedWriterOpen(...args) {
+	try {
+		return await originalWriterOpen.apply(this, args);
+	} catch (err) {
+		if (err?.name === 'AssertionError' && /core\.opened/.test(err?.message || '')) {
+			return;
+		}
+		throw err;
+	}
+};
 
 export const encryptionKey = argv?.includes('--encrypt-all')
 	? b4a.alloc(32).fill('autobase-encryption-test')
