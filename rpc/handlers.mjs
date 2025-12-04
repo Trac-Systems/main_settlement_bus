@@ -1,6 +1,6 @@
 import { decodeBase64Payload, isBase64, sanitizeBulkPayloadsRequestBody, sanitizeTransferPayload, validatePayloadStructure } from "./utils/helpers.mjs"
 import { MAX_SIGNED_LENGTH, ZERO_WK } from "./constants.mjs";
-import { buildRequestUrl } from "./utils/URL.mjs";
+import { buildRequestUrl } from "./utils/url.mjs";
 import { isHexString } from "../src/utils/helpers.js";
 import { bufferToBigInt, licenseBufferToBigInt } from "../src/utils/amountSerialization.js";
 import { isAddressValid } from "../src/core/state/utils/address.js";
