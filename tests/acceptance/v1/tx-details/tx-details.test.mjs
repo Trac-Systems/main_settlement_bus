@@ -1,19 +1,14 @@
 import request from "supertest"
-import tracCrypto from "trac-crypto-api"
-import b4a from "b4a"
-import { $TNK } from "../../../../src/core/state/utils/balance.js"
+import { buildRpcSelfTransferPayload } from "../../../helpers/transactionPayloads.mjs"
 
 export const registerTxDetailsTests = (context) => {
     describe("GET /v1/tx/details", () => {
         it("returns 200 for broadcasted hash (confirmed and unconfirmed)", async () => {
-            const txData = await tracCrypto.transaction.preBuild(
-                context.wallet.address,
-                context.wallet.address,
-                b4a.toString($TNK(1n), 'hex'),
-                b4a.toString(await context.rpcMsb.state.getIndexerSequenceState(), 'hex')
-            )
-
-            const payload = tracCrypto.transaction.build(txData, b4a.from(context.wallet.secretKey, 'hex'))
+            const { payload, txHashHex } = await buildRpcSelfTransferPayload(
+                context.wallet,
+                context.rpcMsb.state,
+                1n
+            );
             const broadcastRes = await request(context.server)
                 .post("/v1/broadcast-transaction")
                 .set("Accept", "application/json")
@@ -21,7 +16,7 @@ export const registerTxDetailsTests = (context) => {
             expect(broadcastRes.statusCode).toBe(200)
 
             const resConfirmed = await request(context.server)
-                .get(`/v1/tx/details/${txData.hash.toString('hex')}?confirmed=true`)
+                .get(`/v1/tx/details/${txHashHex}?confirmed=true`)
             expect(resConfirmed.statusCode).toBe(200)
 
             expect(resConfirmed.body).toMatchObject({
@@ -31,7 +26,7 @@ export const registerTxDetailsTests = (context) => {
             })
 
             const resUnconfirmed = await request(context.server)
-                .get(`/v1/tx/details/${txData.hash.toString('hex')}?confirmed=false`)
+                .get(`/v1/tx/details/${txHashHex}?confirmed=false`)
             expect(resUnconfirmed.statusCode).toBe(200)
 
             expect(resUnconfirmed.body).toMatchObject({
@@ -42,14 +37,11 @@ export const registerTxDetailsTests = (context) => {
         })
 
         it("handles null confirmed_length for unconfirmed transaction", async () => {
-            const txData = await tracCrypto.transaction.preBuild(
-                context.wallet.address,
-                context.wallet.address,
-                b4a.toString($TNK(1n), 'hex'),
-                b4a.toString(await context.rpcMsb.state.getIndexerSequenceState(), 'hex')
-            )
-
-            const payload = tracCrypto.transaction.build(txData, b4a.from(context.wallet.secretKey, 'hex'))
+            const { payload, txHashHex } = await buildRpcSelfTransferPayload(
+                context.wallet,
+                context.rpcMsb.state,
+                1n
+            );
 
             const originalGetConfirmedLength = context.rpcMsb.state.getTransactionConfirmedLength
             context.rpcMsb.state.getTransactionConfirmedLength = async () => null
@@ -62,7 +54,7 @@ export const registerTxDetailsTests = (context) => {
                 expect(broadcastRes.statusCode).toBe(200)
 
                 const res = await request(context.server)
-                    .get(`/v1/tx/details/${txData.hash.toString('hex')}?confirmed=false`)
+                    .get(`/v1/tx/details/${txHashHex}?confirmed=false`)
                 expect(res.statusCode).toBe(200)
 
                 expect(res.body).toMatchObject({

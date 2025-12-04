@@ -1,26 +1,21 @@
 import request from "supertest"
-import tracCrypto from "trac-crypto-api"
-import b4a from "b4a"
-import { $TNK } from "../../../../src/core/state/utils/balance.js"
+import { buildRpcSelfTransferPayload } from "../../../helpers/transactionPayloads.mjs"
 
 export const registerTxTests = (context) => {
     describe("GET /v1/tx/:hash", () => {
         it("returns tx details for a broadcasted transaction", async () => {
-            const txData = await tracCrypto.transaction.preBuild(
-                context.wallet.address,
-                context.wallet.address,
-                b4a.toString($TNK(1n), 'hex'),
-                b4a.toString(await context.rpcMsb.state.getIndexerSequenceState(), 'hex')
-            )
-
-            const payload = tracCrypto.transaction.build(txData, b4a.from(context.wallet.secretKey, 'hex'))
+            const { payload, txHashHex } = await buildRpcSelfTransferPayload(
+                context.wallet,
+                context.rpcMsb.state,
+                1n
+            );
             const broadcastRes = await request(context.server)
                 .post("/v1/broadcast-transaction")
                 .set("Accept", "application/json")
                 .send(JSON.stringify({ payload }))
             expect(broadcastRes.statusCode).toBe(200)
 
-            const res = await request(context.server).get(`/v1/tx/${txData.hash.toString('hex')}`)
+            const res = await request(context.server).get(`/v1/tx/${txHashHex}`)
             expect(res.statusCode).toBe(200)
             expect(res.body).toMatchObject({ txDetails: expect.any(Object) })
         })
