@@ -87,12 +87,24 @@ export function createBase(store, key, t, opts = {}) {
 		fastForward: false,
 		...rest
 	});
+	
+	base.on('error', err => {
+		if (err?.code === 'SESSION_CLOSED') return;
+		console.error('autobase error', err);
+	});
 
 	if (opts.maxSupportedVersion !== undefined) {
 		base.maxSupportedVersion = opts.maxSupportedVersion;
 	}
 
 	t.teardown(async () => {
+		try {
+			await base.advance();
+		} catch (err) {
+			if (err?.code !== 'SESSION_CLOSED') {
+				console.error('base advance failed', err);
+			}
+		}
 		try {
 			await base.close();
 		} catch (err) {
