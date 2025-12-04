@@ -268,14 +268,16 @@ export class MainSettlementBus extends ReadyResource {
         const signedLength = this.#state.getSignedLength();
         const unsignedLength = this.#state.getUnsignedLength();
 
-        for (let attempt = 0; attempt <= this.#maxRetries; attempt++) {
+        for (let attempt = 0; attempt <= this.#maxRetries; attempt++) { // should iterate once if maxRetries === 0
             await this.broadcastPartialTransaction(payload);
-            await sleep(1000 * (attempt + 1));
+            await sleep(1000 * (attempt + 1)); // linear backoff wait time
             const tx = await this.#state.get(hash);
 
             if (tx !== null) {
                 break;
             }
+
+            this.network.validatorConnectionManager.rotate(); // force change connection rotation for the next retry
         }
 
         if (await this.#state.get(hash) === null) {
