@@ -38,6 +38,25 @@ import deploymentEntryUtils from "./core/state/utils/deploymentEntry.js";
 import PartialTransaction from "./core/network/messaging/validators/PartialTransaction.js";
 import fileUtils from './utils/fileUtils.js';
 import migrationUtils from './utils/migrationUtils.js';
+import {
+    getBalanceCommand,
+    getTxvCommand,
+    getFeeCommand,
+    getConfirmedLengthCommand,
+    getUnconfirmedLengthCommand,
+    getTxPayloadsBulkCommand,
+    getTxHashesCommand,
+    getTxDetailsCommand,
+    getExtendedTxDetailsCommand,
+    nodeStatusCommand,
+    coreInfoCommand,
+    getValidatorAddressCommand,
+    getDeploymentCommand,
+    getTxInfoCommand,
+    getLicenseNumberCommand,
+    getLicenseAddressCommand,
+    getLicenseCountCommand
+} from "./utils/cliCommands.js";
 export class MainSettlementBus extends ReadyResource {
     // internal attributes
     #options;
@@ -221,6 +240,49 @@ export class MainSettlementBus extends ReadyResource {
 
     async broadcastPartialTransaction(partialTransactionPayload) {
         await this.#network.validatorConnectionManager.send(partialTransactionPayload);
+    }
+
+    async broadcastTransactionCommand(payload) {
+        if (!payload) {
+            throw new Error("Transaction payload is required for broadcast_transaction command.");
+        }
+
+        let normalizedPayload;
+        let isValid = false;
+        let hash;
+
+        if (payload.type === OperationType.TRANSFER) {
+            normalizedPayload = normalizeTransferOperation(payload);
+            isValid = await this.#partialTransferValidator.validate(normalizedPayload);
+            hash = b4a.toString(normalizedPayload.tro.tx, "hex");
+        } else if (payload.type === OperationType.TX) {
+            normalizedPayload = normalizeTransactionOperation(payload);
+            isValid = await this.#partialTransactionValidator.validate(normalizedPayload);
+            hash = b4a.toString(normalizedPayload.txo.tx, "hex");
+        }
+
+        if (!isValid) {
+            throw new Error("Invalid transaction payload.");
+        }
+
+        const signedLength = this.#state.getSignedLength();
+        const unsignedLength = this.#state.getUnsignedLength();
+
+        for (let attempt = 0; attempt <= this.#maxRetries; attempt++) {
+            await this.broadcastPartialTransaction(payload);
+            await sleep(1000 * (attempt + 1));
+            const tx = await this.#state.get(hash);
+
+            if (tx !== null) {
+                break;
+            }
+        }
+
+        if (await this.#state.get(hash) === null) {
+            throw new Error("Failed to broadcast transaction after multiple attempts.");
+        }
+
+        return { message: "Transaction broadcasted successfully.", signedLength, unsignedLength, tx: hash };
     }
 
     async #setUpRoleAutomatically() {
@@ -924,396 +986,144 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async handleCommand(input, rl = null, payload = null) {
-        switch (input) {
-            case "/help":
+        const [command, ...parts] = input.split(" ");
+
+        const exactHandlers = {
+            "/help": async () => {
                 printHelp(this.#is_admin_mode);
-                break;
-            case "/exit":
+            },
+            "/exit": async () => {
                 if (rl) rl.close();
                 await this.close();
-                break;
-            case "/add_admin":
-                await this.#handleAdminCreation();
-                break;
-            case "/add_admin --recovery":
-                await this.#handleAdminRecovery();
-                break;
-            case "/add_whitelist":
-                await this.#handleWhitelistOperations();
-                break;
-            case "/add_writer":
-                await this.#handleAddWriterOperation();
-                break;
-            case "/remove_writer":
-                await this.#handleRemoveWriterOperation();
-                break;
-            case "/core":
-                const admin = await this.#state.getAdminEntry();
-                console.log("Admin:", admin ? {
-                    address: admin.address,
-                    writingKey: admin.wk.toString("hex")
-                } : null);
-                const formattedIndexers = await getFormattedIndexersWithAddresses(this.#state);
-                if (formattedIndexers.length === 0) {
-                    console.log("Indexers: no indexers");
-                } else {
-                    console.log("Indexers:", formattedIndexers);
-                }
-                break;
-            case "/indexers_list":
+            },
+            "/add_admin": () => this.#handleAdminCreation(),
+            "/add_admin --recovery": () => this.#handleAdminRecovery(),
+            "/add_whitelist": () => this.#handleWhitelistOperations(),
+            "/add_writer": () => this.#handleAddWriterOperation(),
+            "/remove_writer": () => this.#handleRemoveWriterOperation(),
+            "/core": () => coreInfoCommand(this.#state),
+            "/indexers_list": async () => {
                 console.log(await this.#state.getIndexersEntry());
-                break;
-            case "/validator_pool":
-                this.network.validatorConnectionManager.prettyPrint()
-                break;
-            case "/stats":
-                await verifyDag(
-                    this.#state,
-                    this.#network,
-                    this.#wallet,
-                    this.#state.writingKey,
-                );
-                break;
-            case '/balance_migration':
-                await this.#handleBalanceMigrationOperation();
-                break;
-            case '/disable_initialization':
-                await this.#disableInitialization();
-                break;
-            default:
-                if (input.startsWith('/node_status')) {
-                    const splitted = input.split(' ')
-                    const address = splitted[1]
-                    const nodeEntry = await this.#state.getNodeEntry(address)
-                    if (nodeEntry) {
-                        const licenseValue = nodeEntry.license.readUInt32BE(0);
-                        const licenseDisplay = licenseValue === 0 ? 'N/A' : licenseValue.toString();
-                        console.log('Node Status:', {
-                            Address: address,
-                            WritingKey: nodeEntry.wk.toString('hex'),
-                            IsWhitelisted: nodeEntry.isWhitelisted,
-                            IsWriter: nodeEntry.isWriter,
-                            IsIndexer: nodeEntry.isIndexer,
-                            License: licenseDisplay,
-                            StakedBalance: bigIntToDecimalString(bufferToBigInt(nodeEntry.stakedBalance)),
-                            Balance: bigIntToDecimalString(bufferToBigInt(nodeEntry.balance))
-                        })
-                        return {
-                            address: address,
-                            writingKey: nodeEntry.wk.toString('hex'),
-                            isWhitelisted: nodeEntry.isWhitelisted,
-                            isWriter: nodeEntry.isWriter,
-                            isIndexer: nodeEntry.isIndexer,
-                            license: licenseDisplay,
-                            stakedBalance: bigIntToDecimalString(bufferToBigInt(nodeEntry.stakedBalance))
-                        }
-                    } else {
-                        console.log('Node Status:', {
-                            WritingKey: ZERO_WK.toString('hex'),
-                            IsWhitelisted: false,
-                            IsWriter: false,
-                            IsIndexer: false,
-                            license: 'N/A',
-                            stakedBalance: '0'
-                        })
-                    }
-                } else if (input.startsWith("/add_indexer")) {
-                    const splitted = input.split(" ");
-                    const address = splitted[1];
-                    await this.#handleAddIndexerOperation(address);
-                } else if (input.startsWith("/remove_indexer")) {
-                    const splitted = input.split(" ");
-                    const address = splitted[1];
-                    await this.#handleRemoveIndexerOperation(address);
-                } else if (input.startsWith("/ban_writer")) {
-                    const splitted = input.split(" ");
-                    const address = splitted[1];
-                    await this.#handleBanValidatorOperation(address);
-                } else if (input.startsWith("/deployment")) {
-                    const splitted = input.split(" ");
-                    const bootstrap_to_deploy = splitted[1];
-                    const channel = splitted[2] || randomBytes(32).toString('hex');
-                    if (channel.length !== 64 || !isHexString(channel)) {
-                        throw new Error("Channel must be a 32-byte hex string");
-                    }
-                    await this.#handleBootstrapDeploymentOperation(bootstrap_to_deploy, channel);
-                }
-                else if (input.startsWith("/get_validator_addr")) {
-                    const splitted = input.split(" ");
-                    const wkHexString = splitted[1];
-                    const payload = await this.#state.getSigned(EntryType.WRITER_ADDRESS + wkHexString);
-                    if (payload === null) {
-                        console.log(`No address assigned to the writer key: ${wkHexString}`);
-                    } else {
-                        console.log(`Address assigned to the writer key: ${wkHexString} - ${bufferToAddress(payload)}`)
-                    }
-                }
-                else if (input.startsWith("/get_deployment")) {
-                    const splitted = input.split(" ");
-                    const bootstrapHex = splitted[1];
-                    const deploymentEntry = await this.#state.getRegisteredBootstrapEntry(bootstrapHex);
-                    console.log(`Searching deployment for bootstrap: ${bootstrapHex}`);
-                    if (deploymentEntry) {
-                        const decodedDeploymentEntry = deploymentEntryUtils.decode(deploymentEntry)
-                        const txhash = decodedDeploymentEntry.txHash.toString('hex');
-                        console.log(`Bootstrap deployed under transaction hash: ${txhash}`);
-                        const payload = await this.#state.getSigned(txhash);
-                        if (payload) {
-                            const decoded = safeDecodeApplyOperation(payload);
-                            console.log('Decoded Bootstrap Deployment Payload:', decoded);
-                        } else {
-                            console.log(`No payload found for transaction hash: ${txhash}`);
-                        }
-                    } else {
-                        console.log(`No deployment found for bootstrap: ${bootstrapHex}`);
-                    }
-                } else if (input.startsWith("/get_tx_info")) {
-                    const splitted = input.split(" ");
-                    const txHash = splitted[1];
-                    const txInfo = await get_confirmed_tx_info(this.#state, txHash);
-                    if (txInfo) {
-                        console.log(`Payload for transaction hash ${txHash}:`);
-                        console.log(txInfo.decoded);
-                    } else {
-                        console.log(`No information found for transaction hash: ${txHash}`);
-                    }
-                } else if (input.startsWith("/transfer")) {
-                    const splitted = input.split(" ");
-                    const address = splitted[1];
-                    const amount = splitted[2];
-                    await this.#handleTransferOperation(address, amount);
-                } else if (input.startsWith("/get_balance")) {
-                    const splitted = input.split(" ");
-                    const address = splitted[1];
-                    const confirmedFlag = splitted[2];
-                    let unconfirmedBalance = confirmedFlag === 'false'
-                    let nodeEntry = unconfirmedBalance ? await this.#state.getNodeEntryUnsigned(address) : await this.#state.getNodeEntry(address)
-                    if (nodeEntry) {
-                        console.log({
-                            Address: address,
-                            Balance: bigIntToDecimalString(bufferToBigInt(nodeEntry.balance))
-                        })
-                        return {
-                            address: address,
-                            balance: bufferToBigInt(nodeEntry.balance).toString(),
-                        }
-                    } else {
-                        console.log('Node Entry:', {
-                            WritingKey: ZERO_WK.toString('hex'),
-                            IsWhitelisted: false,
-                            IsWriter: false,
-                            IsIndexer: false,
-                            balance: bigIntToDecimalString(0n)
-                        })
-                    }
+            },
+            "/validator_pool": () => {
+                this.network.validatorConnectionManager.prettyPrint();
+            },
+            "/stats": () => verifyDag(
+                this.#state,
+                this.#network,
+                this.#wallet,
+                this.#state.writingKey
+            ),
+            "/balance_migration": () => this.#handleBalanceMigrationOperation(),
+            "/disable_initialization": () => this.#disableInitialization()
+        };
 
-                } else if (input.startsWith("/get_license_number")) {
-                    const splitted = input.split(" ");
-                    const address = splitted[1];
-                    let nodeEntry = await this.#state.getNodeEntry(address)
-                    if (nodeEntry) {
-                        console.log({
-                            Address: address,
-                            License: licenseBufferToBigInt(nodeEntry.license).toString()
-                        })
-                    }
-
-                } else if (input.startsWith("/get_license_address")) {
-                    const splitted = input.split(" ");
-                    const licenseId = parseInt(splitted[1]);
-
-                    if (isNaN(licenseId) || licenseId < 0) {
-                        console.log('Invalid license ID. Please provide a valid non-negative number.');
-                        return;
-                    }
-
-                    const address = await this.#state.getAddressByLicenseId(licenseId);
-                    if (address) {
-                        console.log({
-                            LicenseId: licenseId,
-                            Address: address
-                        });
-                    } else {
-                        console.log(`No address found for license ID: ${licenseId}`);
-                    }
-
-                } else if (input.startsWith("/get_license_count")) {
-                    const adminEntry = await this.#state.getAdminEntry();
-
-                    if (!adminEntry) {
-                        throw new Error("Cannot read license count. Admin does not exist");
-                    }
-
-                    if (!this.#isAdmin(adminEntry)) {
-                        throw new Error('Cannot perform this operation - you are not the admin!.');
-                    }
-
-                    let licenseCount = await this.#state.getLicenseCount()
-
-                    console.log({
-                        LicensesCount: licenseCount
-                    })
-                } else if (input.startsWith("/get_txv")) {
-                    const txv = await this.#state.getIndexerSequenceState();
-                    console.log('Current TXV:', txv.toString('hex'));
-                    return txv
-                } else if (input.startsWith("/get_fee")) {
-                    const fee = this.#state.getFee();
-                    console.log('Current FEE:', bigIntToDecimalString(bufferToBigInt(fee)));
-                    return bufferToBigInt(fee).toString();
-                } else if (input.startsWith("/confirmed_length")) {
-                    const confirmed_length = this.#state.getSignedLength();
-                    console.log('Confirmed_length:', confirmed_length);
-                    return confirmed_length;
-                } else if (input.startsWith("/unconfirmed_length")) {
-                    const unconfirmed_length = this.#state.getUnsignedLength();
-                    console.log('Unconfirmed_length:', unconfirmed_length);
-                    return unconfirmed_length;
-                } else if (input.startsWith("/broadcast_transaction")) {
-                    if (payload) {
-                        let normalizedPayload;
-                        let isValid = false;
-                        let hash
-                        if (payload.type === OperationType.TRANSFER) {
-                            normalizedPayload = normalizeTransferOperation(payload);
-                            isValid = await this.#partialTransferValidator.validate(normalizedPayload);
-                            hash = b4a.toString(normalizedPayload.tro.tx, 'hex')
-                        } else if (payload.type === OperationType.TX) {
-                            normalizedPayload = normalizeTransactionOperation(payload);
-                            isValid = await this.#partialTransactionValidator.validate(normalizedPayload);
-                            hash = b4a.toString(normalizedPayload.txo.tx, 'hex')
-                        }
-
-                        if (!isValid) throw new Error("Invalid transaction payload.");
-
-                        const signedLength = this.#state.getSignedLength();
-                        const unsignedLength = this.#state.getUnsignedLength();
-
-                        for (let retry = 0; retry <= this.#maxRetries; retry++) { // should iterate once if maxRetries === 0
-                            await this.broadcastPartialTransaction(payload);
-                            await sleep(1000 * (retry + 1)); // linear backoff wait time
-                            const tx = await this.#state.get(hash)
-                            if (tx !== null) {
-                                break;
-                            }
-                            this.network.validatorConnectionManager.rotate() // force change connection rotation for the next retry
-                        }
-
-                        if (await this.#state.get(hash) === null) {
-                            throw new Error("Failed to broadcast transaction after multiple attempts.");
-                        }
-
-                        return { message: "Transaction broadcasted successfully.", signedLength, unsignedLength, tx: hash };
-                    } else {
-                        // Handle case where payload is missing if called internally without one.
-                        throw new Error("Transaction payload is required for broadcast_transaction command.");
-                    }
-                } else if (input.startsWith("/get_tx_payloads_bulk")) {
-                    if (payload) {
-                        const hashes = payload;
-
-                        if (!Array.isArray(hashes) || hashes.length === 0) {
-                            throw new Error("Missing hash list.");
-                        }
-
-                        let res = { results: [], missing: [] }
-
-                        if (hashes.length > 1500) {
-                            throw new Error("Length of input tx hashes exceeded.");
-                        }
-
-                        const promises = hashes.map(hash => get_confirmed_tx_info(this.#state, hash));
-                        const results = await Promise.all(promises);
-
-                        // Iterate and categorize
-                        results.forEach((result, index) => {
-                            const hash = hashes[index];
-                            if (result === null || result === undefined) {
-                                res.missing.push(hash);
-                            } else {
-                                const decodedResult = normalizeDecodedPayloadForJson(result.decoded)
-                                res.results.push({ hash: hash, payload: decodedResult });
-                            }
-                        });
-
-                        return res;
-
-                    } else {
-                        throw new Error("Missing payload for fetching tx payloads.")
-                    }
-                } else if (input.startsWith("/get_txs_hashes")) {
-                    const splitted = input.split(' ')
-                    const start = parseInt(splitted[1]);
-                    const end = parseInt(splitted[2]);
-
-                    try {
-                        const hashes = await this.#state.confirmedTransactionsBetween(start, end);
-                        return { hashes }
-                    } catch (error) {
-                        throw new Error("Invalid params to perform the request.", error.message);
-                    }
-                } else if (input.startsWith("/get_tx_details")) {
-                    const splitted = input.split(' ')
-                    const hash = splitted[1];
-                    try {
-                        const rawPayload = await get_confirmed_tx_info(this.#state, hash);
-                        if (!rawPayload) {
-                            console.log(`No payload found for tx hash: ${hash}`)
-                            return null
-                        }
-                        const normalizedPayload = normalizeDecodedPayloadForJson(rawPayload.decoded);
-                        return normalizedPayload
-                    } catch (error) {
-                        throw new Error("Invalid params to perform the request.", error.message);
-                    }
-                }
-                else if (input.startsWith("/get_extended_tx_details")) {
-                    const splitted = input.split(' ');
-                    const hash = splitted[1];
-                    const confirmed = splitted[2] === 'true';
-
-                    if (confirmed) {
-                        const rawPayload = await get_confirmed_tx_info(this.#state, hash);
-                        if (!rawPayload) {
-                            throw new Error(`No payload found for tx hash: ${hash}`);
-                        }
-                        const confirmedLength = await this.#state.getTransactionConfirmedLength(hash);
-                        const normalizedPayload = normalizeDecodedPayloadForJson(rawPayload.decoded, true);
-                        if (confirmedLength === null) {
-                            throw new Error(`No confirmed length found for tx hash: ${hash} in confirmed mode`);
-                        }
-                        const fee = this.#state.getFee();
-                        return {
-                            txDetails: normalizedPayload,
-                            confirmed_length: confirmedLength,
-                            fee: bufferToBigInt(fee).toString()
-                        }
-                    }
-                    else {
-                        const rawPayload = await get_unconfirmed_tx_info(this.#state, hash);
-                        if (!rawPayload) {
-                            throw new Error(`No payload found for tx hash: ${hash}`);
-                        }
-                        const normalizedPayload = normalizeDecodedPayloadForJson(rawPayload.decoded, true);
-                        const length = await this.#state.getTransactionConfirmedLength(hash)
-                        if (length === null) {
-                            return {
-                                txDetails: normalizedPayload,
-                                confirmed_length: 0,
-                                fee: '0'
-                            }
-                        }
-
-                        const fee = this.#state.getFee();
-                        return {
-                            txDetails: normalizedPayload,
-                            confirmed_length: length,
-                            fee: bufferToBigInt(fee).toString()
-                        }
-
-                    }
-                }
+        if (exactHandlers[command]) {
+            const result = await exactHandlers[command]();
+            if (rl) rl.prompt();
+            return result;
         }
+
+        if (input.startsWith("/node_status")) {
+            const address = parts[0];
+            const result = await nodeStatusCommand(this.#state, address);
+            if (rl) rl.prompt();
+            return result;
+        }
+
+        if (input.startsWith("/add_indexer")) {
+            const address = parts[0];
+            await this.#handleAddIndexerOperation(address);
+        } else if (input.startsWith("/remove_indexer")) {
+            const address = parts[0];
+            await this.#handleRemoveIndexerOperation(address);
+        } else if (input.startsWith("/ban_writer")) {
+            const address = parts[0];
+            await this.#handleBanValidatorOperation(address);
+        } else if (input.startsWith("/deployment")) {
+            const bootstrapToDeploy = parts[0];
+            const channel = parts[1] || randomBytes(32).toString("hex");
+            if (channel.length !== 64 || !isHexString(channel)) {
+                throw new Error("Channel must be a 32-byte hex string");
+            }
+            await this.#handleBootstrapDeploymentOperation(bootstrapToDeploy, channel);
+        } else if (input.startsWith("/get_validator_addr")) {
+            const wkHexString = parts[0];
+            await getValidatorAddressCommand(this.#state, wkHexString);
+        } else if (input.startsWith("/get_deployment")) {
+            const bootstrapHex = parts[0];
+            await getDeploymentCommand(this.#state, bootstrapHex);
+        } else if (input.startsWith("/get_tx_info")) {
+            const txHash = parts[0];
+            await getTxInfoCommand(this.#state, txHash);
+        } else if (input.startsWith("/transfer")) {
+            const address = parts[0];
+            const amount = parts[1];
+            await this.#handleTransferOperation(address, amount);
+        } else if (input.startsWith("/get_balance")) {
+            const address = parts[0];
+            const confirmedFlag = parts[1];
+            const result = await getBalanceCommand(this.#state, address, confirmedFlag);
+            if (rl) rl.prompt();
+            return result;
+        } else if (input.startsWith("/get_license_number")) {
+            const address = parts[0];
+            await getLicenseNumberCommand(this.#state, address);
+        } else if (input.startsWith("/get_license_address")) {
+            const licenseId = parseInt(parts[0]);
+            await getLicenseAddressCommand(this.#state, licenseId);
+        } else if (input.startsWith("/get_license_count")) {
+            await getLicenseCountCommand(this.#state, this.#isAdmin.bind(this));
+        } else if (input.startsWith("/get_txv")) {
+            const result = await getTxvCommand(this.#state);
+            if (rl) rl.prompt();
+            return result;
+        } else if (input.startsWith("/get_fee")) {
+            const result = getFeeCommand(this.#state);
+            if (rl) rl.prompt();
+            return result;
+        } else if (input.startsWith("/confirmed_length")) {
+            const result = getConfirmedLengthCommand(this.#state);
+            if (rl) rl.prompt();
+            return result;
+        } else if (input.startsWith("/unconfirmed_length")) {
+            const result = getUnconfirmedLengthCommand(this.#state);
+            if (rl) rl.prompt();
+            return result;
+        } else if (input.startsWith("/broadcast_transaction")) {
+            if (!payload) {
+                throw new Error("Transaction payload is required for broadcast_transaction command.");
+            }
+            const result = await this.broadcastTransactionCommand(payload);
+            if (rl) rl.prompt();
+            return result;
+        } else if (input.startsWith("/get_tx_payloads_bulk")) {
+            if (!payload) {
+                throw new Error("Missing payload for fetching tx payloads.");
+            }
+            const hashes = payload;
+            const result = await getTxPayloadsBulkCommand(this.#state, hashes);
+            if (rl) rl.prompt();
+            return result;
+        } else if (input.startsWith("/get_txs_hashes")) {
+            const start = parseInt(parts[0]);
+            const end = parseInt(parts[1]);
+            const result = await getTxHashesCommand(this.#state, start, end);
+            if (rl) rl.prompt();
+            return result;
+        } else if (input.startsWith("/get_tx_details")) {
+            const hash = parts[0];
+            const result = await getTxDetailsCommand(this.#state, hash);
+            if (rl) rl.prompt();
+            return result;
+        } else if (input.startsWith("/get_extended_tx_details")) {
+            const hash = parts[0];
+            const confirmed = parts[1] === "true";
+            const result = await getExtendedTxDetailsCommand(this.#state, hash, confirmed);
+            if (rl) rl.prompt();
+            return result;
+        }
+
         if (rl) rl.prompt();
     }
 }
