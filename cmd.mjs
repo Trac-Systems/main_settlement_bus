@@ -1,13 +1,12 @@
-import { MainSettlementBus } from './src/index.js';
-import { createConfig, ENV } from './src/config/env.js';
+import {MainSettlementBus} from './src/index.js';
 
 const pearApp = typeof Pear !== 'undefined' ? (Pear.app ?? Pear.config) : undefined;
 const runtimeArgs = typeof process !== 'undefined' ? process.argv.slice(2) : [];
 const args = pearApp?.args ?? runtimeArgs;
 
 const opts = {
-    stores_directory: 'stores/',
-    store_name: pearApp?.args?.[0] ?? runtimeArgs[0],
+    stores_directory : 'stores/',
+    store_name : pearApp?.args?.[0] ?? runtimeArgs[0],
     bootstrap: 'acbc3a4344d3a804101d40e53db1dda82b767646425af73599d4cd6577d69685',
     channel: '0000trac0network0msb0mainnet0000',
     enable_role_requester: false,
@@ -24,16 +23,15 @@ const rpc_opts = {
     enable_tx_apply_logs: false,
     enable_error_apply_logs: false,
     enable_wallet: false,
-    enable_interactive_mode: false,
-};
+    enable_interactive_mode: true,
 
 }
 
-const options = args.includes('--rpc') ? rpc_opts : opts
-
-const msb = new MainSettlementBus(createConfig(ENV.MAINNET, options));
+const msb = new MainSettlementBus(args.includes('--rpc') ? rpc_opts : opts);
 
 msb.ready().then(async () => {
+    const runRpc = args.includes('--rpc');
+
     if (runRpc) {
         console.log('Starting RPC server...');
         const portIndex = args.indexOf('--port');
@@ -44,6 +42,8 @@ msb.ready().then(async () => {
         const {startRpcServer} = await import('./rpc/rpc_server.mjs');
         startRpcServer(msb, host, port);
     } else {
-        msb.interactiveMode();
+        console.log('RPC server will not be started.');
     }
+
+    msb.interactiveMode();
 });

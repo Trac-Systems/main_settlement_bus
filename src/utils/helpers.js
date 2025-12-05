@@ -1,6 +1,7 @@
 import b4a from "b4a";
 import {bufferToAddress} from "../core/state/utils/address.js";
-import { EntryType, TRAC_ADDRESS_SIZE } from "./constants.js";
+import { EntryType } from "./constants.js";
+import config from '../config/config.js';
 
 //TODO: change file name or split functions below into multiple files (Remember to update imports and tests accordingly)
 
@@ -74,8 +75,8 @@ export function formatIndexersEntry(indexersEntry) {
     const indexers = [];
 
     for (let i = 0; i < count; i++) {
-        const start = 1 + (i * TRAC_ADDRESS_SIZE);
-        const end = start + TRAC_ADDRESS_SIZE;
+        const start = 1 + (i * config.addressLength);
+        const end = start + config.addressLength;
         const indexerAddr = indexersEntry.subarray(start, end);
         indexers.push(indexerAddr.toString('ascii'));
     }

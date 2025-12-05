@@ -2,12 +2,11 @@ import b4a from 'b4a';
 import PeerWallet from 'trac-wallet';
 
 import StateBuilder from '../base/StateBuilder.js'
-import { createMessage } from '../../utils/buffer.js';
-import { OperationType } from '../../utils/protobuf/applyOperations.cjs'
-import { addressToBuffer, bufferToAddress } from '../../core/state/utils/address.js';
-import { TRAC_ADDRESS_SIZE, NETWORK_ID } from '../../utils/constants.js';
-import { isAddressValid } from "../../core/state/utils/address.js";
-import { blake3Hash } from '../../utils/crypto.js';
+import {createMessage} from '../../utils/buffer.js';
+import {OperationType} from '../../utils/protobuf/applyOperations.cjs'
+import {addressToBuffer, bufferToAddress} from '../../core/state/utils/address.js';
+import {isAddressValid} from "../../core/state/utils/address.js";
+import {blake3Hash} from '../../utils/crypto.js';
 import {
     isCoreAdmin,
     isAdminControl,
@@ -17,9 +16,11 @@ import {
     isTransfer,
     isBalanceInitialization
 } from '../../utils/operations.js';
+import config, { Config } from '../../config/config.js';
 
 class CompleteStateMessageBuilder extends StateBuilder {
     #wallet;
+    #config
     #operationType;
     #address;
     #writingKey;
@@ -37,17 +38,22 @@ class CompleteStateMessageBuilder extends StateBuilder {
     #txValidity;
     #amount;
 
-    constructor(wallet) {
+    /**
+     * 
+     * @param {PeerWallet} wallet 
+     * @param {Config} config 
+     */
+    constructor(wallet, config) {
         super();
         if (!wallet || typeof wallet !== 'object') {
             throw new Error('Wallet must be a valid wallet object');
         }
-        if (!isAddressValid(wallet.address)) {
+        if (!isAddressValid(wallet.address, config.addressPrefix)) {
             throw new Error('Wallet should have a valid TRAC address.');
         }
 
-
         this.#wallet = wallet;
+        this.#config = config;
         this.reset();
     }
 
@@ -80,15 +86,15 @@ class CompleteStateMessageBuilder extends StateBuilder {
     }
 
     withAddress(address) {
-        if (b4a.isBuffer(address) && address.length === TRAC_ADDRESS_SIZE) {
-            address = bufferToAddress(address);
+        if (b4a.isBuffer(address) && address.length === this.#config.addressLength) {
+            address = bufferToAddress(address, this.#config.addressPrefix);
         }
 
         if (!isAddressValid(address)) {
-            throw new Error(`Address field must be a valid TRAC bech32m address with length ${TRAC_ADDRESS_SIZE}.`);
+            throw new Error(`Address field must be a valid TRAC bech32m address with length ${this.#config.addressLength}.`);
         }
 
-        this.#address = addressToBuffer(address);
+        this.#address = addressToBuffer(address, this.#config.addressPrefix);
         this.#payload.address = this.#address;
         return this;
     }
@@ -110,15 +116,15 @@ class CompleteStateMessageBuilder extends StateBuilder {
     }
 
     withIncomingAddress(address) {
-        if (b4a.isBuffer(address) && address.length === TRAC_ADDRESS_SIZE) {
-            address = bufferToAddress(address);
+        if (b4a.isBuffer(address) && address.length === this.#config.addressLength) {
+            address = bufferToAddress(address, this.#config.addressPrefix);
         }
 
-        if (!isAddressValid(address)) {
-            throw new Error(`Address field must be a valid TRAC bech32m address with length ${TRAC_ADDRESS_SIZE}.`);
+        if (!isAddressValid(address, this.#config.addressPrefix)) {
+            throw new Error(`Address field must be a valid TRAC bech32m address with length ${config.addressLength}.`);
         }
 
-        this.#incomingAddress = addressToBuffer(address);
+        this.#incomingAddress = addressToBuffer(address, this.#config.addressPrefix);
         return this;
     }
 
@@ -216,7 +222,7 @@ class CompleteStateMessageBuilder extends StateBuilder {
             case OperationType.ADD_ADMIN:
             case OperationType.DISABLE_INITIALIZATION:
                 msg = createMessage(
-                    NETWORK_ID,
+                    this.#config.networkId,
                     this.#txValidity,
                     this.#writingKey,
                     nonce,
@@ -228,7 +234,7 @@ class CompleteStateMessageBuilder extends StateBuilder {
                     throw new Error('All balance initialization fields must be set before building the message!');
                 }
                 msg = createMessage(
-                    NETWORK_ID,
+                    this.#config.networkId,
                     this.#txValidity,
                     this.#incomingAddress,
                     this.#amount,
@@ -241,7 +247,7 @@ class CompleteStateMessageBuilder extends StateBuilder {
             case OperationType.REMOVE_WRITER:
             case OperationType.ADMIN_RECOVERY:
                 msg = createMessage(
-                    NETWORK_ID,
+                    this.#config.networkId,
                     this.#txHash,
                     nonce,
                     this.#operationType
@@ -252,12 +258,12 @@ class CompleteStateMessageBuilder extends StateBuilder {
             case OperationType.ADD_INDEXER:
             case OperationType.REMOVE_INDEXER:
             case OperationType.BAN_VALIDATOR:
-                if (this.#wallet.address === bufferToAddress(this.#incomingAddress)) {
+                if (this.#wallet.address === bufferToAddress(this.#incomingAddress, this.#config.addressPrefix)) {
                     throw new Error('Address must not be the same as the wallet address for basic operations.');
                 }
 
                 msg = createMessage(
-                    NETWORK_ID,
+                    this.#config.networkId,
                     this.#txValidity,
                     this.#incomingAddress,
                     nonce,
@@ -271,7 +277,7 @@ class CompleteStateMessageBuilder extends StateBuilder {
                     throw new Error('All bootstrap deployment fields must be set before building the message!');
                 }
                 msg = createMessage(
-                    NETWORK_ID,
+                    this.#config.networkId,
                     this.#txHash,
                     nonce,
                     this.#operationType
@@ -286,7 +292,7 @@ class CompleteStateMessageBuilder extends StateBuilder {
                     throw new Error('All postTx fields must be set before building the message!');
                 }
                 msg = createMessage(
-                    NETWORK_ID,
+                    this.#config.networkId,
                     this.#txHash,
                     nonce,
                     this.#operationType
@@ -299,7 +305,7 @@ class CompleteStateMessageBuilder extends StateBuilder {
                     throw new Error('All transfer fields must be set before building the message!');
                 }
                 msg = createMessage(
-                    NETWORK_ID,
+                    this.#config.networkId,
                     this.#txHash,
                     nonce,
                     this.#operationType
@@ -337,7 +343,7 @@ class CompleteStateMessageBuilder extends StateBuilder {
                 iw: this.#incomingWriterKey,
                 in: this.#incomingNonce,
                 is: this.#incomingSignature,
-                va: addressToBuffer(this.#wallet.address),
+                va: addressToBuffer(this.#wallet.address, this.#config.addressPrefix),
                 vn: nonce,
                 vs: signature,
             };
@@ -351,7 +357,7 @@ class CompleteStateMessageBuilder extends StateBuilder {
                 mbs: this.#msbBootstrap,
                 in: this.#incomingNonce,
                 is: this.#incomingSignature,
-                va: addressToBuffer(this.#wallet.address),
+                va: addressToBuffer(this.#wallet.address, this.#config.addressPrefix),
                 vn: nonce,
                 vs: signature,
             };
@@ -363,7 +369,7 @@ class CompleteStateMessageBuilder extends StateBuilder {
                 ic: this.#channel,
                 in: this.#incomingNonce,
                 is: this.#incomingSignature,
-                va: addressToBuffer(this.#wallet.address),
+                va: addressToBuffer(this.#wallet.address, this.#config.addressPrefix),
                 vn: nonce,
                 vs: signature
             }
@@ -375,7 +381,7 @@ class CompleteStateMessageBuilder extends StateBuilder {
                 am: this.#amount,
                 in: this.#incomingNonce,
                 is: this.#incomingSignature,
-                va: addressToBuffer(this.#wallet.address),
+                va: addressToBuffer(this.#wallet.address, this.#config.addressPrefix),
                 vn: nonce,
                 vs: signature
             }

@@ -133,8 +133,7 @@ export async function setupNodeAsWriter(admin, writerCandidate) {
         await setupWhitelist(admin, [writerCandidate.wallet.address]); // ensure if is whitelisted
 
         const validity = await admin.msb.getIndexerSequenceState()
-        const req = await PartialStateMessageOperations.assembleAddWriterMessage(
-            writerCandidate.wallet,
+        const req = await new PartialStateMessageOperations.assembleAddWriterMessage(
             writerCandidate.msb.state.writingKey,
             validity);
 

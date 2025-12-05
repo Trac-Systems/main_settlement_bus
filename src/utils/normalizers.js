@@ -3,6 +3,7 @@ import { normalizeHex } from './helpers.js';
 import { addressToBuffer, bufferToAddress } from '../core/state/utils/address.js';
 import b4a from 'b4a';
 import { bufferToBigInt } from './amountSerialization.js'
+import { Config } from '../config/config.js';
 
 /**
  * Normalizes the payload for a transfer operation.
@@ -10,10 +11,11 @@ import { bufferToBigInt } from './amountSerialization.js'
  * to the correct buffer or hexadecimal string format for processing.
  *
  * @param {Object} payload The raw payload for the transfer operation.
+ * @param {Config} config The environment configuration object.
  * @returns {Object} A new object with addresses converted to buffers and hex values normalized.
  * @throws {Error} If the payload is invalid or missing required fields.
  */
-export function normalizeTransferOperation(payload) {
+export function normalizeTransferOperation(payload, config) {
     if (!payload || typeof payload !== 'object' || !payload.tro) {
         throw new Error('Invalid payload for transfer operation normalization.');
     }
@@ -31,19 +33,19 @@ export function normalizeTransferOperation(payload) {
         tx: normalizeHex(tro.tx),     // Transaction hash
         txv: normalizeHex(tro.txv),   // Transaction validity
         in: normalizeHex(tro.in),     // Nonce
-        to: addressToBuffer(tro.to),   // Recipient address
+        to: addressToBuffer(tro.to, config.addressPrefix),   // Recipient address
         am: normalizeHex(tro.am),     // Amount
         is: normalizeHex(tro.is)      // Signature
     };
 
     return {
         type,
-        address: addressToBuffer(address),
+        address: addressToBuffer(address, config.addressPrefix),
         tro: normalizedTro
     };
 }
 
-export function normalizeTransactionOperation(payload) {
+export function normalizeTransactionOperation(payload, config) {
     if (!payload || typeof payload !== 'object' || !payload.txo) {
         throw new Error('Invalid payload for transaction operation normalization.');
     }
@@ -70,7 +72,7 @@ export function normalizeTransactionOperation(payload) {
 
     return {
         type,
-        address: addressToBuffer(address),
+        address: addressToBuffer(address, config.addressPrefix),
         txo: normalizedTxo
     };
 }

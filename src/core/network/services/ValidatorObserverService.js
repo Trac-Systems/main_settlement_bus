@@ -1,9 +1,11 @@
 import PeerWallet from "trac-wallet";
+import config from "../../../config/config.js";
 import b4a from "b4a";
-import { MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION, TRAC_ADDRESS_SIZE } from '../../../utils/constants.js';
+import { MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION } from '../../../utils/constants.js';
 import { bufferToAddress } from '../../state/utils/address.js';
 import { sleep } from '../../../utils/helpers.js';
 import Scheduler from "../../../utils/Scheduler.js";
+import Network from "../Network.js";
 
 const POLL_INTERVAL = 3500 // This was increase since the iterations dont wait for the execution its about 10 * DELAY_INTERVAL
 const DELAY_INTERVAL = 250
@@ -18,15 +20,21 @@ const debugLog = (...args) => {
 };
 
 class ValidatorObserverService {
-    #enable_validator_observer;
+    #config;
     #state;
     #network;
     #scheduler;
     #address;
     #isInterrupted
 
-    constructor(network, state, address, options = {}) {
-        this.#enable_validator_observer = options.enable_validator_observer !== false;
+    /**
+     * @param {Network} network
+     * @param {State} state
+     * @param {string} address
+     * @param {Config} config
+     **/
+    constructor(network, state, address, config) {
+        this.#config = config
         this.#network = network;
         this.#state = state;
         this.#address = address;
@@ -146,11 +154,7 @@ class ValidatorObserverService {
     }
 
     #shouldRun() {
-        if (!this.#enable_validator_observer || this.#isInterrupted) {
-            return false;
-        }
-
-        return true;
+        return this.#config.enableValidatorObserver && !this.#isInterrupted
     }
 
     async #lengthEntry() {

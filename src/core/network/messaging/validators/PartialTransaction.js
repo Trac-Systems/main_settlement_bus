@@ -5,10 +5,8 @@ import deploymentEntryUtils from "../../../state/utils/deploymentEntry.js";
 import PartialOperation from './base/PartialOperation.js';
 
 class PartialTransaction extends PartialOperation {
-
-
-    constructor(state) {
-        super(state);
+    constructor(state, config) {
+        super(state, config);
     }
 
     async validate(payload) {
@@ -21,8 +19,6 @@ class PartialTransaction extends PartialOperation {
         await this.validateRequesterBalance(payload);
         await this.validateRequesterBalance(payload, true);
         this.validateSubnetworkBootstrapEquality(payload);
-        
-
 
         // non common validations below
         this.validateMsbBootstrap(payload);

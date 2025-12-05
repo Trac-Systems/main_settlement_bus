@@ -5,25 +5,29 @@ import CompleteStateMessageOperations
     from "../../../../messages/completeStateMessages/CompleteStateMessageOperations.js";
 import {normalizeHex} from "../../../../utils/helpers.js";
 import BaseOperationHandler from './base/BaseOperationHandler.js';
+import Network from '../../Network.js';
+import State from '../../../state/State.js';
+import PeerWallet from 'trac-wallet';
+import TransactionRateLimiterService from '../../services/TransactionRateLimiterService.js';
+import { Config } from '../../../../config/config.js';
 
 class RoleOperationHandler extends BaseOperationHandler {
     #partialRoleAccessValidator;
     #wallet;
     #network;
 
-    constructor(network, state, wallet, rateLimiter, options = {}) {
-        super(network, state, wallet, rateLimiter, options);
+    /**
+     * @param {Network} network
+     * @param {State} network
+     * @param {PeerWallet} state
+     * @param {TransactionRateLimiterService} rateLimiter
+     * @param {Config} config
+     **/
+    constructor(network, state, wallet, rateLimiter, config) {
+        super(network, state, wallet, rateLimiter, config);
         this.#wallet = wallet;
         this.#network = network;
-        this.#partialRoleAccessValidator = new PartialRoleAccess(state)
-    }
-
-    get wallet() {
-        return this.#wallet;
-    }
-
-    get network() {
-        return this.#network;
+        this.#partialRoleAccessValidator = new PartialRoleAccess(state, config)
     }
 
     get partialRoleAccessValidator() {
@@ -107,7 +111,7 @@ class RoleOperationHandler extends BaseOperationHandler {
 
         return {
             type,
-            address: addressToBuffer(address),
+            address: addressToBuffer(address, this.config.addressPrefix),
             rao: normalizedRao
         };
     }

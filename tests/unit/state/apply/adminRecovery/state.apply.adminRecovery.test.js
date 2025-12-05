@@ -51,7 +51,7 @@ import ValidatorConsistencyScenarioBase, {
 } from '../common/validatorConsistency/base/validatorConsistencyScenarioBase.js';
 import adminEntryUtils from '../../../../../src/core/state/utils/adminEntry.js';
 import addressUtils from '../../../../../src/core/state/utils/address.js';
-import nodeEntryUtils from '../../../../../src/core/state/utils/nodeEntry.js';
+import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
 
 adminRecoveryHappyPathScenario();
 
@@ -299,7 +299,7 @@ new OperationValidationScenarioBase({
 	mutatePayload: (_t, payload) => payload,
 	applyInvalidPayload: async (context, invalidPayload) => {
 		const otherAddress = context.adminRecovery.validatorPeer2.wallet.address;
-		const otherAddressBuffer = addressUtils.addressToBuffer(otherAddress);
+		const otherAddressBuffer = addressUtils.addressToBuffer(otherAddress, TRAC_NETWORK_MSB_MAINNET_PREFIX);
 		const mutatedEntry = adminEntryUtils.encode(otherAddressBuffer, context.adminRecovery.oldAdminWriterKey);
 		return applyWithAdminEntryMutation(context, invalidPayload, () => ({ value: mutatedEntry }));
 	},
