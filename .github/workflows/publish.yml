@@ -16,17 +16,10 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Use Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v3
         with:
           node-version: '24'
           registry-url: 'https://registry.npmjs.org'
-
-      - name: Set package.json version from tag
-        run: |
-          TAG="${GITHUB_REF#refs/tags/}"
-          VERSION="${TAG#v}"
-          echo "Version from tag: $VERSION"
-          npm version "$VERSION" --no-git-tag-version
           
       # unit tests are temporarily disabled because they lost stability on GH runners.
       #- name: Install dependencies
@@ -38,4 +31,4 @@ jobs:
       - name: Publish to npm
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_MSB_PUBLISH_TOKEN }}
-        run: npm publish
+        run: npm publish --access public
