@@ -22,7 +22,7 @@ import {
     BOOTSTRAP_HEXSTRING_LENGTH,
     EntryType,
     OperationType,
-    MAX_RETRIES,
+    MAX_MESSAGE_SEND_ATTEMPTS,
     CustomEventType,
     BALANCE_MIGRATION_SLEEP_INTERVAL,
     WHITELIST_MIGRATION_DIR
@@ -108,7 +108,7 @@ export class MainSettlementBus extends ReadyResource {
         this.#store = new Corestore(this.#stores_directory + options.store_name);
         this.#wallet = new PeerWallet(options);
         this.#readline_instance = null;
-        this.#maxRetries = Number(options.max_retries) ? options.max_retries : MAX_RETRIES
+        this.#maxRetries = Number(options.max_retries) ? options.max_retries : MAX_MESSAGE_SEND_ATTEMPTS
 
         if (this.enable_interactive_mode !== false) {
             try {
@@ -239,7 +239,7 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async broadcastPartialTransaction(partialTransactionPayload) {
-        await this.#network.validatorConnectionManager.send(partialTransactionPayload);
+        await this.#network.validatorMessageOrchestrator.send(partialTransactionPayload);
     }
 
     async broadcastTransactionCommand(payload) {

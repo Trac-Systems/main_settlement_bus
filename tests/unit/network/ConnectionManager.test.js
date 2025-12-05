@@ -50,7 +50,6 @@ test('ConnectionManager', () => {
             reset()
             const connectionManager = makeManager()
             t.is(connectionManager.connectionCount(), connections.length, 'should have the same length')
-            
             const data = createConnection(testKeyPair5.publicKey)
             connectionManager.addValidator(data.key, data.connection)
             t.is(connectionManager.connectionCount(), connections.length + 1, 'should have the same length')
@@ -69,6 +68,31 @@ test('ConnectionManager', () => {
             const toNotAdd = createConnection(testKeyPair6.publicKey)
             connectionManager.addValidator(toNotAdd.key, toNotAdd.connection)
             t.is(connectionManager.connectionCount(), maxConnections, 'should not increase length')
+        })
+
+        test('does not add new validator when pool is full', async t => {
+            reset()
+            const maxConnections = 2
+            const localConnections = [
+                createConnection(testKeyPair1.publicKey),
+                createConnection(testKeyPair2.publicKey),
+            ]
+
+            const connectionManager = new ConnectionManager({ maxValidators: maxConnections })
+            localConnections.forEach(({ key, connection }) => {
+                connectionManager.addValidator(key, connection)
+            })
+
+            t.is(connectionManager.connectionCount(), maxConnections, 'pool should be full')
+
+            const newConn = createConnection(testKeyPair3.publicKey)
+            connectionManager.addValidator(newConn.key, newConn.connection)
+
+            t.is(connectionManager.connectionCount(), maxConnections, 'should stay at max size')
+            t.not(connectionManager.connected(newConn.key), 'new validator should not be in the pool')
+
+            const remainingOld = localConnections.filter(c => connectionManager.connected(c.key)).length
+            t.is(remainingOld, 2, 'all of the old validators should remain')
         })
     })
 
@@ -93,84 +117,29 @@ test('ConnectionManager', () => {
             reset()
             const connectionManager = makeManager()
 
-            connectionManager.send([1,2,3,4])
-            t.ok(connections[0].connection.messenger.send.calledWith([1,2,3,4]), 'first on the list should have been called')
+            const target = connectionManager.send([1,2,3,4])
+
+            const totalCalls = connections.reduce((sum, con) => sum + con.connection.messenger.send.callCount, 0)
+            t.is(totalCalls, 1, 'should send to exactly one validator')
+            t.ok(target, 'should return a target public key')
         })
 
-        test('rotate the messenger', async t => {
+        test('does not throw on individual send errors', async t => {
             reset()
-            const connectionManager = makeManager()
-
-            for (let i = 0; i < 10; i++) {
-                connectionManager.send([1,2,3,4])
-                t.ok(connections[0].connection.messenger.send.calledWith([1,2,3,4]), 'first on the list should have been called')
-            }
-        })
-
-        test('resets rotation', async t => {
-            reset()
-            const connectionManager = makeManager()
-
-            for (let i = 0; i < 10; i++) {
-                connectionManager.send([1,2,3,4])
-                t.ok(connections[0].connection.messenger.send.calledWith([1,2,3,4]), 'first on the list should have been called')
-            }
-
-            for (let i = 0; i < 10; i++) {
-                connectionManager.send([1,2,3,4])
-                t.ok(connections[1].connection.messenger.send.calledWith([1,2,3,4]), 'first on the list should have been called')
-            }
-
-            for (let i = 0; i < 10; i++) {
-                connectionManager.send([1,2,3,4])
-                t.ok(connections[2].connection.messenger.send.calledWith([1,2,3,4]), 'first on the list should have been called')
-            }
-
-            for (let i = 0; i < 10; i++) {
-                connectionManager.send([1,2,3,4])
-                t.ok(connections[3].connection.messenger.send.calledWith([1,2,3,4]), 'first on the list should have been called')
-            }
-
-            t.is(connections[0].connection.messenger.send.callCount, 10, 'first should have been called 10 times')
-            t.is(connections[1].connection.messenger.send.callCount, 10, 'second should have been called 10 times')
-            t.is(connections[2].connection.messenger.send.callCount, 10, 'third should have been called 10 times')
-            t.is(connections[3].connection.messenger.send.callCount, 10, 'fourth should have been called 10 times')
-
-            connectionManager.send([1,2,3,4])
-            t.ok(connections[0].connection.messenger.send.calledWith([1,2,3,4]), 'first on the list should have been called')
-            t.is(connections[0].connection.messenger.send.callCount, 11, 'first should have been called 11 times')
-        })
-
-        test('rotates on exception', async t => {
-            reset()
-            const conns = [
+            const errorConnections = [
                 createConnection(testKeyPair7.publicKey),
                 createConnection(testKeyPair8.publicKey),
-                createConnection(testKeyPair9.publicKey),
             ]
 
-            conns[0].connection.messenger.send = sinon.stub().throws(new Error())
-            conns[1].connection.messenger.send = sinon.stub().throws(new Error())
+            errorConnections.forEach(con => {
+                con.connection.messenger.send = sinon.stub().throws(new Error())
+            })
 
-            const connectionManager = makeManager(5, conns)
+            const connectionManager = makeManager(5, errorConnections)
+
+            t.is(errorConnections.length, 2, 'should have two connections')
             connectionManager.send([1,2,3,4])
-
-            t.is(conns[0].connection.messenger.send.callCount, 1, 'first should have been called 10 times')
-            t.is(conns[1].connection.messenger.send.callCount, 1, 'second should have been called 10 times')
-            t.is(conns[2].connection.messenger.send.callCount, 1, 'third should have been called 10 times')
-        })
-    })
-
-    test('rotate', async t => {
-        test('resets the rotation', async t => {
-            reset()
-            const connectionManager = makeManager()
-
-            connectionManager.send([1,2,3,4]) // this shouldnt trigger rotation
-            t.ok(connections[0].connection.messenger.send.calledWith([1,2,3,4]), 'first on the list should have been called')
-            connectionManager.rotate() // rotate
-            connectionManager.send([1,2,3,4])
-            t.ok(connections[1].connection.messenger.send.calledWith([1,2,3,4]), 'first on the list should have been called')
+            t.ok(true, 'send should not throw even if individual sends fail')
         })
     })
 

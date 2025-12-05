@@ -8,6 +8,15 @@ import Scheduler from "../../../utils/Scheduler.js";
 const POLL_INTERVAL = 3500 // This was increase since the iterations dont wait for the execution its about 10 * DELAY_INTERVAL
 const DELAY_INTERVAL = 250
 
+// -- Debug Mode --
+// TODO: Implement a better debug system in the future. This is just temporary.
+const DEBUG = false;
+const debugLog = (...args) => {
+    if (DEBUG) {
+        console.log('DEBUG [ValidatorObserverService] ==> ', ...args);
+    }
+};
+
 class ValidatorObserverService {
     #enable_validator_observer;
     #state;
@@ -55,36 +64,65 @@ class ValidatorObserverService {
     }
 
     async #worker(next) {
-        if (!this.#network.validatorConnectionManager.maxConnections()) {
+        if (!this.#network.validatorConnectionManager.maxConnectionsReached()) {
             const length = await this.#lengthEntry()
 
             const promises = [];
             for (let i = 0; i < 10; i++) {
-                promises.push(this.#findValidator(this.#address, length));
+                promises.push(this.#findValidator(this.#address, length + 1));
                 await sleep(DELAY_INTERVAL); // Low key dangerous as the network progresses
             }
             await Promise.all(promises);
+
+            next(POLL_INTERVAL)
         }
-        next(POLL_INTERVAL)
     }
 
-    async #findValidator(address, length) {
-        if (this.#network.validatorConnectionManager.maxConnections() || !this.#shouldRun()) return;
+    async #findValidator(address, validatorListLength) {
+        if (!this.#shouldRun()) return;
+        const maxAttempts = 50; // TODO: make configurable
+        let attempts = 0;
+        let isValidatorValid = false;
+        let validatorAddressBuffer = b4a.alloc(0);
 
-        const rndIndex = Math.floor(Math.random() * length);
-        const validatorAddressBuffer = await this.state.getWriterIndex(rndIndex);
+        while (attempts < maxAttempts && !isValidatorValid) {
+            const rndIndex = Math.floor(Math.random() * validatorListLength);
+            validatorAddressBuffer = await this.state.getWriterIndex(rndIndex);
+            isValidatorValid = await this.#isValidatorValid(address, validatorAddressBuffer, validatorListLength);
+            attempts++;
+        }
 
-        if (validatorAddressBuffer === null || b4a.byteLength(validatorAddressBuffer) !== TRAC_ADDRESS_SIZE) return;
-
+        if (attempts >= maxAttempts) {
+            debugLog('Max attempts reached without finding a valid validator.');
+        }
+        else {
+            debugLog(`Found valid validator to connect after ${attempts} attempts.`);
+        }
+        
+        if (!isValidatorValid) return;
+        
         const validatorAddress = bufferToAddress(validatorAddressBuffer);
-        if (validatorAddress === address) return;
+        const validatorPubKeyBuffer = PeerWallet.decodeBech32m(validatorAddress);
+        const validatorPubKeyHex = validatorPubKeyBuffer.toString('hex');
+        const adminEntry = await this.state.getAdminEntry();
 
-        const validatorPubKey = PeerWallet.decodeBech32m(validatorAddress).toString('hex');
+
+        if (validatorAddress !== adminEntry?.address || validatorListLength < MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION) {
+            await this.#network.tryConnect(validatorPubKeyHex, 'validator');
+        }
+    };
+
+    async #isValidatorValid(forbiddenAddress, validatorAddressBuffer, validatorListLength) {
+        if (validatorAddressBuffer === null || b4a.byteLength(validatorAddressBuffer) !== TRAC_ADDRESS_SIZE) return false;
+        
+        const validatorAddress = bufferToAddress(validatorAddressBuffer);
+        if (validatorAddress === forbiddenAddress) return false;
+
+        const validatorPubKeyBuffer = PeerWallet.decodeBech32m(validatorAddress);
         const validatorEntry = await this.state.getNodeEntry(validatorAddress);
         const adminEntry = await this.state.getAdminEntry();
 
-        if (validatorAddress === adminEntry?.address && length >= MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION) {
-            const validatorPubKeyBuffer = b4a.from(validatorPubKey, 'hex')
+        if (validatorAddress === adminEntry?.address && validatorListLength >= MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION) {
             if (this.#network.validatorConnectionManager.exists(validatorPubKeyBuffer)) {
                 this.#network.validatorConnectionManager.remove(validatorPubKeyBuffer)
             }
@@ -95,19 +133,17 @@ class ValidatorObserverService {
         // - Validator must exist and be a writer
         // - Cannot connect to indexers, except for admin-indexer
         // - Admin-indexer connection is allowed only when writers length has less than 10 writers
-        if (
-            this.#network.validatorConnectionManager.connected(validatorPubKey) ||
+        if (this.#network.validatorConnectionManager.connected(validatorPubKeyBuffer) ||
+            this.#network.validatorConnectionManager.maxConnectionsReached() ||
             validatorEntry === null ||
             !validatorEntry.isWriter ||
-            (validatorEntry.isIndexer && (validatorAddress !== adminEntry?.address || length >= MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION))
+            (validatorEntry.isIndexer && (validatorAddress !== adminEntry?.address || validatorListLength >= MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION))
         ) {
-            return;
+            return false;
         }
 
-        if (validatorAddress !== adminEntry?.address || length < MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION) {
-            await this.#network.tryConnect(validatorPubKey, 'validator');
-        }
-    };
+        return true;
+    }
 
     #shouldRun() {
         if (!this.#enable_validator_observer || this.#isInterrupted) {

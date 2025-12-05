@@ -123,7 +123,8 @@ export const NETWORK_MESSAGE_TYPES = Object.freeze({
 export const TRAC_ADDRESS_SIZE =  63; // TODO: Change this to config().addressLength || 63
 export const NETWORK_ID = 918; // TODO: Change this to config().network_id || 918
 
-export const MAX_VALIDATORS = 50
-export const MAX_RETRIES = 3
-
-export const MAX_REQUEST_COUNT = 5;
+export const MAX_VALIDATORS_IN_CONNECTION_POOL = 50;
+export const MAX_MESSAGE_SEND_ATTEMPTS = 3;
+export const MESSAGE_VALIDATOR_RETRY_DELAY_MS = 1000;
+export const MESSAGE_VALIDATOR_RESPONSE_TIMEOUT_MS = 3 * MAX_MESSAGE_SEND_ATTEMPTS * MESSAGE_VALIDATOR_RETRY_DELAY_MS;
+export const MAX_SUCCESSIVE_MESSAGES_PER_VALIDATOR = 3;
