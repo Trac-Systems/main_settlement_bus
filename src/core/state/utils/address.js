@@ -1,7 +1,5 @@
 import b4a from 'b4a';
-
-import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
-import { TRAC_ADDRESS_SIZE } from '../../../utils/constants.js';
+import tracCryptoApi from 'trac-crypto-api';
 
 /**
  * Checks if a given address is a valid TRAC bech32m address.
@@ -9,18 +7,19 @@ import { TRAC_ADDRESS_SIZE } from '../../../utils/constants.js';
  * So, it is possible that even if an address is considered valid,
  * it may not be a real address on the network.
  * @param {string | Buffer} address - The address to validate.
- * @param {string} [prefix] - The HRP of the bech32m address. Default is Trac Network mainnet prefix
+ * @param {string} hrp - The HRP of the bech32m address.
  * @returns {boolean} True if the address is valid, false otherwise.
  */
-export function isAddressValid(address, prefix = TRAC_NETWORK_MSB_MAINNET_PREFIX) {
+export function isAddressValid(address, hrp) {
+    const addressLength = hrp.length + 1 + tracCryptoApi.address.PUB_KEY_SIZE * 2
     if (b4a.isBuffer(address)) {
         address = address.toString('ascii');
     }
     const bech32Chars = /^[qpzry9x8gf2tvdw0s3jn54khce6mua7l]+$/;
     if (typeof address === 'string' &&
-        address.length === TRAC_ADDRESS_SIZE &&
-        address.startsWith(prefix + '1') &&
-        bech32Chars.test(address.slice(prefix.length + 1))) {
+        address.length === addressLength &&
+        address.startsWith(hrp + '1') &&
+        bech32Chars.test(address.slice(hrp.length + 1))) {
         return true;
     }
     return false;
@@ -30,10 +29,11 @@ export function isAddressValid(address, prefix = TRAC_NETWORK_MSB_MAINNET_PREFIX
 /**
  * Converts a valid bech32m address string to a buffer.
  * @param {string} bech32mAddress - The bech32m address to convert.
+ * @param {string} hrp - The HRP of the bech32m address.
  * @returns {Buffer} The buffer representation of the address, or an empty buffer if invalid.
  */
 // TODO: Check if a try-catch is really necessary here
-export function addressToBuffer(bech32mAddress, hrp = TRAC_NETWORK_MSB_MAINNET_PREFIX) {
+export function addressToBuffer(bech32mAddress, hrp) {
     try {
         if (!isAddressValid(bech32mAddress, hrp)) {
             return b4a.alloc(0);
@@ -48,10 +48,11 @@ export function addressToBuffer(bech32mAddress, hrp = TRAC_NETWORK_MSB_MAINNET_P
 /**
  * Converts a buffer to a bech32m address string if valid.
  * @param {Buffer} dataBuffer - The buffer to convert.
+ * @param {string} hrp - The HRP of the bech32m address.
  * @returns {string|null} The address string if valid, otherwise null.
  */
 // TODO: Do we really need to try-catch here? Maybe we should only validate the input buffer.
-export function bufferToAddress(dataBuffer, hrp = TRAC_NETWORK_MSB_MAINNET_PREFIX) {
+export function bufferToAddress(dataBuffer, hrp) {
     try {
         const address = dataBuffer.toString('ascii');
         if (!isAddressValid(address, hrp)) return null;
@@ -66,6 +67,4 @@ export default {
     isAddressValid,
     addressToBuffer,
     bufferToAddress,
-    TRAC_ADDRESS_SIZE,
-    TRAC_NETWORK_MSB_MAINNET_PREFIX
 };

@@ -17,6 +17,7 @@ import {
 } from '../../../../../src/core/state/utils/balance.js';
 import { decimalStringToBigInt, bigIntTo16ByteBuffer } from '../../../../../src/utils/amountSerialization.js';
 import { setupAdminAndWhitelistedReaderNetwork } from '../common/commonScenarioHelper.js';
+import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
 
 const DEFAULT_WRITER_FUNDING = bigIntTo16ByteBuffer(decimalStringToBigInt('10'));
 const STAKE_ENTRY_MARK = Symbol('stake-entry-mark');
@@ -207,7 +208,7 @@ export async function assertAddWriterSuccessState(
 	}
 
 	const writerAddress = readerPeer.wallet.address;
-	const writerAddressBuffer = addressUtils.addressToBuffer(writerAddress);
+	const writerAddressBuffer = addressUtils.addressToBuffer(writerAddress, TRAC_NETWORK_MSB_MAINNET_PREFIX);
 	const writingKey = writerKeyBuffer ?? readerPeer.base.local.key;
 	const writingKeyHex = writingKey.toString('hex');
 
@@ -588,7 +589,7 @@ async function assertWriterDowngradedEntry(
 			'writer liquid balance matches expected amount after downgrade'
 		);
 	}
-	const addressBuffer = addressUtils.addressToBuffer(address);
+	const addressBuffer = addressUtils.addressToBuffer(address, TRAC_NETWORK_MSB_MAINNET_PREFIX);
 	const writerRegistryEntry = await base.view.get(
 		EntryType.WRITER_ADDRESS + writingKey.toString('hex')
 	);
@@ -654,7 +655,7 @@ async function withPeerEntryOverrideOnApply({
 	const node = assertWritableNode(selectNode(context));
 	const base = node.base;
 	const targetAddress = targetPeer.wallet.address;
-	const targetBuffer = addressUtils.addressToBuffer(targetAddress);
+	const targetBuffer = addressUtils.addressToBuffer(targetAddress, TRAC_NETWORK_MSB_MAINNET_PREFIX);
 	const originalApply = base._handlers.apply;
 
 	base._handlers.apply = async function patchedApply(nodes, view, baseCtx) {

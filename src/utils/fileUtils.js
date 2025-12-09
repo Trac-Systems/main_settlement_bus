@@ -1,11 +1,8 @@
 import fs from 'fs'; // TODO: If we are using bare environment, we should use bare-fs instead
 import path from 'path';
 import { WHITELIST_FILEPATH, BALANCE_MIGRATION_FILEPATH, BALANCE_MIGRATED_DIR, WHITELIST_MIGRATION_DIR } from '../utils/constants.js';
-import { isAddressValid } from '../core/state/utils/address.js';
 import { decimalStringToBigInt, bigIntTo16ByteBuffer, bufferToBigInt, bigIntToDecimalString } from './amountSerialization.js';
-import PeerWallet from 'trac-wallet';
-import b4a from 'b4a';
-import { ZERO_LICENSE } from '../core/state/utils/nodeEntry.js';
+
 const MIGRATED_FILE_REGEX = /^migrated(\d+)\.csv$/;
 
 /**

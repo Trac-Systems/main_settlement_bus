@@ -7,11 +7,10 @@ import b4a from "b4a";
 import readline from "readline";
 import tty from "tty";
 
-import { sleep, getFormattedIndexersWithAddresses, isHexString, convertAdminCoreOperationPayloadToHex } from "./utils/helpers.js";
-import { verifyDag, printHelp, printWalletInfo, get_confirmed_tx_info, printBalance, get_unconfirmed_tx_info } from "./utils/cli.js";
+import { sleep, isHexString } from "./utils/helpers.js";
+import { verifyDag, printHelp, printWalletInfo, printBalance } from "./utils/cli.js";
 import CompleteStateMessageOperations from "./messages/completeStateMessages/CompleteStateMessageOperations.js";
-import { safeDecodeApplyOperation } from "./utils/protobuf/operationHelpers.js";
-import { bufferToAddress, isAddressValid } from "./core/state/utils/address.js";
+import { isAddressValid } from "./core/state/utils/address.js";
 import Network from "./core/network/Network.js";
 import Check from "./utils/check.js";
 import State from "./core/state/State.js";
@@ -20,7 +19,6 @@ import {
     EventType,
     WHITELIST_SLEEP_INTERVAL,
     BOOTSTRAP_HEXSTRING_LENGTH,
-    EntryType,
     OperationType,
     MAX_MESSAGE_SEND_ATTEMPTS,
     CustomEventType,
@@ -29,12 +27,10 @@ import {
 } from "./utils/constants.js";
 import partialStateMessageOperations from "./messages/partialStateMessages/PartialStateMessageOperations.js";
 import { randomBytes } from "hypercore-crypto";
-import { decimalStringToBigInt, bigIntTo16ByteBuffer, bufferToBigInt, bigIntToDecimalString, licenseBufferToBigInt } from "./utils/amountSerialization.js"
-import { ZERO_WK } from "./utils/buffer.js";
-import { normalizeDecodedPayloadForJson, normalizeTransferOperation, normalizeTransactionOperation } from "./utils/normalizers.js"
+import { decimalStringToBigInt, bigIntTo16ByteBuffer, bufferToBigInt, bigIntToDecimalString } from "./utils/amountSerialization.js"
+import { normalizeTransferOperation, normalizeTransactionOperation } from "./utils/normalizers.js"
 import PartialTransfer from "./core/network/messaging/validators/PartialTransfer.js";
 import { blake3Hash } from "./utils/crypto.js";
-import deploymentEntryUtils from "./core/state/utils/deploymentEntry.js";
 import PartialTransaction from "./core/network/messaging/validators/PartialTransaction.js";
 import fileUtils from './utils/fileUtils.js';
 import migrationUtils from './utils/migrationUtils.js';
@@ -57,6 +53,7 @@ import {
     getLicenseAddressCommand,
     getLicenseCountCommand
 } from "./utils/cliCommands.js";
+import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from "trac-wallet/constants.js";
 export class MainSettlementBus extends ReadyResource {
     // internal attributes
     #options;
@@ -568,7 +565,7 @@ export class MainSettlementBus extends ReadyResource {
             );
         }
 
-        if (!isAddressValid(address)) {
+        if (!isAddressValid(address, TRAC_NETWORK_MSB_MAINNET_PREFIX)) {
             throw new Error(
                 `Can not request indexer role for: ${address} - invalid address.`
             );
@@ -641,7 +638,7 @@ export class MainSettlementBus extends ReadyResource {
             );
         }
 
-        if (!isAddressValid(address)) {
+        if (!isAddressValid(address, TRAC_NETWORK_MSB_MAINNET_PREFIX)) {
             throw new Error(
                 `Can not ban writer with address:  ${address} - invalid address.`
             );
@@ -793,7 +790,7 @@ export class MainSettlementBus extends ReadyResource {
             );
         }
 
-        if (!isAddressValid(address)) {
+        if (!isAddressValid(address, TRAC_NETWORK_MSB_MAINNET_PREFIX)) {
             throw new Error("Invalid recipient address");
         }
 

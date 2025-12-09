@@ -2,6 +2,7 @@ import b4a from 'b4a';
 import {OperationType} from "../../src/utils/constants.js";
 import {bufferToAddress, isAddressValid} from "../../src/core/state/utils/address.js";
 import {errorMessageIncludes} from "../utils/regexHelper.js"
+import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
 
 export async function messageOperationsEkoTest(t, fnName, assembler, wallet, writingKey, opType, msgValueLength, expectedMessageAddress) {
     console.log('address:', expectedMessageAddress)
@@ -17,8 +18,8 @@ export async function messageOperationsEkoTest(t, fnName, assembler, wallet, wri
             k.ok(b4a.equals(msg.eko.wk, writingKey), 'Message wk should be the writing key');
         }
 
-        k.ok(bufferToAddress(msg.address) === expectedMessageAddress, 'Message key should be the the expected one');
-        k.ok(isAddressValid(msg.address), 'Message address should be a valid address');
+        k.ok(bufferToAddress(msg.address, TRAC_NETWORK_MSB_MAINNET_PREFIX) === expectedMessageAddress, 'Message key should be the the expected one');
+        k.ok(isAddressValid(msg.address, TRAC_NETWORK_MSB_MAINNET_PREFIX), 'Message address should be a valid address');
 
         k.is(msg.eko.nonce.length, 32, 'Message nonce should be 32 bytes long');
         k.ok(b4a.isBuffer(msg.eko.nonce), 'Message nonce should be a buffer');
@@ -152,7 +153,7 @@ export async function messageOperationsBkoTest(t, fnName, assembler, wallet, wri
 
         k.is(msg.type, opType, `Message type should be ${opType}`);
 
-        k.ok(bufferToAddress(msg.address) === expectedMessageAddress, 'Message address should be the the expected one');
+        k.ok(bufferToAddress(msg.address, TRAC_NETWORK_MSB_MAINNET_PREFIX) === expectedMessageAddress, 'Message address should be the the expected one');
         k.is(msg.bko.nonce.length, 32, 'Message nonce should be 32 bytes long');
         k.ok(b4a.isBuffer(msg.bko.nonce), 'Message nonce should be a buffer');
         k.is(msg.bko.sig.length, 64, 'Message signature should be 64 bytes long');

@@ -13,6 +13,7 @@ import nodeEntryUtils, { ZERO_LICENSE } from '../../../../../src/core/state/util
 import lengthEntryUtils from '../../../../../src/core/state/utils/lengthEntry.js';
 import addressUtils from '../../../../../src/core/state/utils/address.js';
 import { buildAddAdminRequesterPayload } from '../addAdmin/addAdminScenarioHelpers.js';
+import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
 
 export async function setupAppendWhitelistScenario(t, { nodes = 2 } = {}) {
 	const context = await setupStateNetwork({
@@ -146,7 +147,7 @@ export async function assertReaderWhitelisted(
 	const licenseId = lengthEntryUtils.decodeBE(decodedEntry.license);
 	const licenseIndexEntry = await base.view.get(`${EntryType.LICENSE_INDEX}${licenseId}`);
 	t.ok(licenseIndexEntry, 'license index entry exists for reader');
-	const readerAddressBuffer = addressUtils.addressToBuffer(readerAddress);
+	const readerAddressBuffer = addressUtils.addressToBuffer(readerAddress, TRAC_NETWORK_MSB_MAINNET_PREFIX);
 	t.ok(readerAddressBuffer.length > 0, 'reader address encodes to buffer');
 	t.ok(
 		licenseIndexEntry && b4a.equals(licenseIndexEntry.value, readerAddressBuffer),

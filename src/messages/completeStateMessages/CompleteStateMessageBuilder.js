@@ -17,6 +17,7 @@ import {
     isTransfer,
     isBalanceInitialization
 } from '../../utils/operations.js';
+import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
 
 class CompleteStateMessageBuilder extends StateBuilder {
     #wallet;
@@ -42,7 +43,7 @@ class CompleteStateMessageBuilder extends StateBuilder {
         if (!wallet || typeof wallet !== 'object') {
             throw new Error('Wallet must be a valid wallet object');
         }
-        if (!isAddressValid(wallet.address)) {
+        if (!isAddressValid(wallet.address, TRAC_NETWORK_MSB_MAINNET_PREFIX)) {
             throw new Error('Wallet should have a valid TRAC address.');
         }
 
@@ -81,14 +82,14 @@ class CompleteStateMessageBuilder extends StateBuilder {
 
     withAddress(address) {
         if (b4a.isBuffer(address) && address.length === TRAC_ADDRESS_SIZE) {
-            address = bufferToAddress(address);
+            address = bufferToAddress(address, TRAC_NETWORK_MSB_MAINNET_PREFIX);
         }
 
-        if (!isAddressValid(address)) {
+        if (!isAddressValid(address, TRAC_NETWORK_MSB_MAINNET_PREFIX)) {
             throw new Error(`Address field must be a valid TRAC bech32m address with length ${TRAC_ADDRESS_SIZE}.`);
         }
 
-        this.#address = addressToBuffer(address);
+        this.#address = addressToBuffer(address, TRAC_NETWORK_MSB_MAINNET_PREFIX);
         this.#payload.address = this.#address;
         return this;
     }
@@ -111,10 +112,10 @@ class CompleteStateMessageBuilder extends StateBuilder {
 
     withIncomingAddress(address) {
         if (b4a.isBuffer(address) && address.length === TRAC_ADDRESS_SIZE) {
-            address = bufferToAddress(address);
+            address = bufferToAddress(address, TRAC_NETWORK_MSB_MAINNET_PREFIX);
         }
 
-        if (!isAddressValid(address)) {
+        if (!isAddressValid(address, TRAC_NETWORK_MSB_MAINNET_PREFIX)) {
             throw new Error(`Address field must be a valid TRAC bech32m address with length ${TRAC_ADDRESS_SIZE}.`);
         }
 
@@ -252,7 +253,7 @@ class CompleteStateMessageBuilder extends StateBuilder {
             case OperationType.ADD_INDEXER:
             case OperationType.REMOVE_INDEXER:
             case OperationType.BAN_VALIDATOR:
-                if (this.#wallet.address === bufferToAddress(this.#incomingAddress)) {
+                if (this.#wallet.address === bufferToAddress(this.#incomingAddress, TRAC_NETWORK_MSB_MAINNET_PREFIX)) {
                     throw new Error('Address must not be the same as the wallet address for basic operations.');
                 }
 
@@ -337,7 +338,7 @@ class CompleteStateMessageBuilder extends StateBuilder {
                 iw: this.#incomingWriterKey,
                 in: this.#incomingNonce,
                 is: this.#incomingSignature,
-                va: addressToBuffer(this.#wallet.address),
+                va: addressToBuffer(this.#wallet.address, TRAC_NETWORK_MSB_MAINNET_PREFIX),
                 vn: nonce,
                 vs: signature,
             };
@@ -351,7 +352,7 @@ class CompleteStateMessageBuilder extends StateBuilder {
                 mbs: this.#msbBootstrap,
                 in: this.#incomingNonce,
                 is: this.#incomingSignature,
-                va: addressToBuffer(this.#wallet.address),
+                va: addressToBuffer(this.#wallet.address, TRAC_NETWORK_MSB_MAINNET_PREFIX),
                 vn: nonce,
                 vs: signature,
             };
@@ -363,7 +364,7 @@ class CompleteStateMessageBuilder extends StateBuilder {
                 ic: this.#channel,
                 in: this.#incomingNonce,
                 is: this.#incomingSignature,
-                va: addressToBuffer(this.#wallet.address),
+                va: addressToBuffer(this.#wallet.address, TRAC_NETWORK_MSB_MAINNET_PREFIX),
                 vn: nonce,
                 vs: signature
             }
@@ -375,7 +376,7 @@ class CompleteStateMessageBuilder extends StateBuilder {
                 am: this.#amount,
                 in: this.#incomingNonce,
                 is: this.#incomingSignature,
-                va: addressToBuffer(this.#wallet.address),
+                va: addressToBuffer(this.#wallet.address, TRAC_NETWORK_MSB_MAINNET_PREFIX),
                 vn: nonce,
                 vs: signature
             }

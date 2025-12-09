@@ -3,6 +3,7 @@ import { normalizeHex } from './helpers.js';
 import { addressToBuffer, bufferToAddress } from '../core/state/utils/address.js';
 import b4a from 'b4a';
 import { bufferToBigInt } from './amountSerialization.js'
+import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
 
 /**
  * Normalizes the payload for a transfer operation.
@@ -31,14 +32,14 @@ export function normalizeTransferOperation(payload) {
         tx: normalizeHex(tro.tx),     // Transaction hash
         txv: normalizeHex(tro.txv),   // Transaction validity
         in: normalizeHex(tro.in),     // Nonce
-        to: addressToBuffer(tro.to),   // Recipient address
+        to: addressToBuffer(tro.to, TRAC_NETWORK_MSB_MAINNET_PREFIX),   // Recipient address
         am: normalizeHex(tro.am),     // Amount
         is: normalizeHex(tro.is)      // Signature
     };
 
     return {
         type,
-        address: addressToBuffer(address),
+        address: addressToBuffer(address, TRAC_NETWORK_MSB_MAINNET_PREFIX),
         tro: normalizedTro
     };
 }
@@ -70,7 +71,7 @@ export function normalizeTransactionOperation(payload) {
 
     return {
         type,
-        address: addressToBuffer(address),
+        address: addressToBuffer(address, TRAC_NETWORK_MSB_MAINNET_PREFIX),
         txo: normalizedTxo
     };
 }
@@ -96,7 +97,7 @@ export function normalizeDecodedPayloadForJson(payload) {
             if (b4a.isBuffer(value)) {
                 // 👇 intercept address buffers by key name (e.g. `address`)
                 if (addressKeys.some(k => key.toLowerCase().includes(k))) {
-                    const addr = bufferToAddress(value);
+                    const addr = bufferToAddress(value, TRAC_NETWORK_MSB_MAINNET_PREFIX);
                     newPayload[key] = addr ?? b4a.toString(value, "hex");
                 } else if (key.toLowerCase().includes("am")) {
                     const amount = bufferToBigInt(value)

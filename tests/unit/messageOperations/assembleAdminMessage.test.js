@@ -8,6 +8,7 @@ import {bufferToAddress} from "../../src/core/state/utils/address.js";
 import {safeDecodeApplyOperation} from '../../src/utils/protobuf/operationHelpers.js';
 import {isAddressValid} from "../../src/core/state/utils/address.js";
 import {errorMessageIncludes} from "../utils/regexHelper.js";
+import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
 
 test('assembleAdminMessage', async (t) => {
     await fixtures.initAll();
@@ -25,9 +26,9 @@ test('assembleAdminMessage', async (t) => {
         k.is(Object.keys(msg).length, 3, 'Message should have 3 keys');
         k.is(Object.keys(msg.eko).length, 3, 'Message value have 3 keys');
         k.is(msg.type, OperationType.ADD_ADMIN, 'Message type should be ADD_ADMIN');
-        k.is(bufferToAddress(msg.address), walletAdmin.address, 'Message address should be the public key of the wallet');
+        k.is(bufferToAddress(msg.address, TRAC_NETWORK_MSB_MAINNET_PREFIX), walletAdmin.address, 'Message address should be the public key of the wallet');
 
-        k.ok(isAddressValid(msg.address), 'Message address should be a valid address');
+        k.ok(isAddressValid(msg.address, TRAC_NETWORK_MSB_MAINNET_PREFIX), 'Message address should be a valid address');
 
         k.ok(b4a.equals(msg.eko.wk, writingKeyAdmin), 'Message wk should be the writing key');
         k.is(msg.eko.nonce.length, 32, 'Message nonce should be 32 bytes long');
@@ -44,8 +45,8 @@ test('assembleAdminMessage', async (t) => {
         k.is(Object.keys(msg.eko).length, 3, 'Message value have 3 keys');
         k.is(msg.type, OperationType.ADD_ADMIN, 'Message type should be ADD_ADMIN');
 
-        k.is(bufferToAddress(msg.address), walletAdmin.address, 'Message address should be address of the wallet');
-        k.ok(isAddressValid(msg.address), 'Message address should be a valid address');
+        k.is(bufferToAddress(msg.address, TRAC_NETWORK_MSB_MAINNET_PREFIX), walletAdmin.address, 'Message address should be address of the wallet');
+        k.ok(isAddressValid(msg.address, TRAC_NETWORK_MSB_MAINNET_PREFIX), 'Message address should be a valid address');
 
         k.ok(b4a.equals(msg.eko.wk, writingKeyNonAdmin), 'Message wk should be the writing key');
         k.is(msg.eko.sig.length, 64, 'Message signature should be 64 bytes long')

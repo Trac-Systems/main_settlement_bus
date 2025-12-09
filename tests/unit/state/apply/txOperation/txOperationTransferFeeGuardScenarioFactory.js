@@ -8,6 +8,7 @@ import {
 	assertTxOperationFailureState
 } from './txOperationScenarioHelpers.js';
 import { eventFlush } from '../../../../helpers/autobaseTestHelpers.js';
+import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
 
 /**
  * Builds a transferFeeTxOperation guard scenario that runs through the full apply path.
@@ -34,7 +35,7 @@ export function createTransferFeeGuardScenario({
 	applyInvalidPayload: async (context, invalidPayload) => {
 		const node = context.txOperation?.validatorPeer ?? context.peers?.[1];
 		const decoded = safeDecodeApplyOperation(invalidPayload);
-		const requesterAddressString = addressUtils.bufferToAddress(decoded?.address);
+		const requesterAddressString = addressUtils.bufferToAddress(decoded?.address, TRAC_NETWORK_MSB_MAINNET_PREFIX);
 
 		const patchResult = await applyPatch({ context, node, decoded, requesterAddressString });
 		const cleanup = typeof patchResult === 'function' ? patchResult : patchResult?.cleanup;

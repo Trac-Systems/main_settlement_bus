@@ -14,6 +14,7 @@ import {
 	buildRemoveIndexerPayloadWithTxValidity as buildRemoveIndexerPayloadWithTxValidityFromAddHelper,
 	assertAddIndexerSuccessState
 } from '../addIndexer/addIndexerScenarioHelpers.js';
+import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
 
 export async function setupRemoveIndexerScenario(t, options = {}) {
 	const context = await setupAddIndexerScenario(t, options);
@@ -102,7 +103,7 @@ export async function applyWithoutIndexerMembership(context, invalidPayload) {
 	}
 
 	const targetAddress = indexerPeer.wallet.address;
-	const targetAddressBuffer = addressUtils.addressToBuffer(targetAddress);
+	const targetAddressBuffer = addressUtils.addressToBuffer(targetAddress, TRAC_NETWORK_MSB_MAINNET_PREFIX);
 	if (!targetAddressBuffer) {
 		throw new Error('RemoveIndexer missing indexer membership scenario requires a decodable indexer address.');
 	}
@@ -277,7 +278,7 @@ async function assertWriterRegistry(t, base, writingKey, expectedAddress) {
 	const registryKey = EntryType.WRITER_ADDRESS + writingKey.toString('hex');
 	const entry = await base.view.get(registryKey);
 	t.ok(entry, 'writer registry entry exists after removeIndexer');
-	const addressBuffer = addressUtils.addressToBuffer(expectedAddress);
+	const addressBuffer = addressUtils.addressToBuffer(expectedAddress, TRAC_NETWORK_MSB_MAINNET_PREFIX);
 	t.ok(addressBuffer, 'indexer address encodes to buffer');
 	if (!entry?.value || !addressBuffer) return;
 	t.ok(
@@ -292,7 +293,7 @@ async function assertWriterIndexUpdates(t, base, lengthBefore, expectedAddress) 
 
 	const indexEntry = await base.view.get(EntryType.WRITERS_INDEX + lengthBefore);
 	t.ok(indexEntry, 'writers index entry stored after removeIndexer');
-	const addressBuffer = addressUtils.addressToBuffer(expectedAddress);
+	const addressBuffer = addressUtils.addressToBuffer(expectedAddress, TRAC_NETWORK_MSB_MAINNET_PREFIX);
 	if (!indexEntry?.value || !addressBuffer) return;
 	t.ok(
 		b4a.equals(indexEntry.value, addressBuffer),
@@ -340,7 +341,7 @@ async function assertRemoveIndexerPayloadMetadata(t, base, payload, expectedAdmi
 
 	const requesterAddressBuffer = decodedOperation.address;
 	t.ok(requesterAddressBuffer, 'removeIndexer payload contains requester address');
-	const requesterAddress = addressUtils.bufferToAddress(requesterAddressBuffer);
+	const requesterAddress = addressUtils.bufferToAddress(requesterAddressBuffer, TRAC_NETWORK_MSB_MAINNET_PREFIX);
 	t.ok(requesterAddress, 'removeIndexer requester address decodes');
 	if (requesterAddress) {
 		t.is(requesterAddress, expectedAdmin, 'removeIndexer payload signed by admin');
@@ -348,7 +349,7 @@ async function assertRemoveIndexerPayloadMetadata(t, base, payload, expectedAdmi
 
 	const targetAddressBuffer = decodedOperation?.aco?.ia;
 	t.ok(targetAddressBuffer, 'removeIndexer payload contains target indexer address');
-	const targetAddress = addressUtils.bufferToAddress(targetAddressBuffer);
+	const targetAddress = addressUtils.bufferToAddress(targetAddressBuffer, TRAC_NETWORK_MSB_MAINNET_PREFIX);
 	t.ok(targetAddress, 'removeIndexer target address decodes');
 	if (targetAddress) {
 		t.is(targetAddress, expectedTarget, 'removeIndexer payload nominates expected indexer');

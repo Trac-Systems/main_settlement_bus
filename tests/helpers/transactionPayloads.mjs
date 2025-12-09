@@ -6,6 +6,7 @@ import { createMessage } from "../../src/utils/buffer.js";
 import { blake3Hash } from "../../src/utils/crypto.js";
 import { OperationType, NETWORK_ID } from "../../src/utils/constants.js";
 import { addressToBuffer } from "../../src/core/state/utils/address.js";
+import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from "trac-wallet/constants.js";
 
 /**
  * Build a base64-encoded transfer payload and matching tx hash
@@ -38,7 +39,7 @@ export async function buildRpcSelfTransferPayload(wallet, state, amountTnk = 1n)
     const txvBuf = b4a.from(txData.validity, "hex");
     const nonceBuf = b4a.from(nonceHex, "hex");
     const amountBuf = b4a.from(amountHex, "hex");
-    const toBuf = addressToBuffer(toAddress);
+    const toBuf = addressToBuffer(toAddress, TRAC_NETWORK_MSB_MAINNET_PREFIX);
 
     const message = createMessage(
         NETWORK_ID,

@@ -3,11 +3,12 @@ import b4a from "b4a";
 
 import StateBuilder from '../base/StateBuilder.js'
 import { OperationType, TRAC_ADDRESS_SIZE, NETWORK_ID } from '../../utils/constants.js';
-import { addressToBuffer, bufferToAddress, isAddressValid } from '../../core/state/utils/address.js';
+import { addressToBuffer, isAddressValid } from '../../core/state/utils/address.js';
 import { isHexString } from "../../utils/helpers.js";
 import { blake3Hash } from "../../utils/crypto.js";
 import { createMessage } from "../../utils/buffer.js";
 import { isTransaction, isRoleAccess, isBootstrapDeployment, isTransfer } from "../../utils/operations.js";
+import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from "trac-wallet/constants.js";
 
 class PartialStateMessageBuilder extends StateBuilder {
     #wallet;
@@ -30,7 +31,7 @@ class PartialStateMessageBuilder extends StateBuilder {
         if (!wallet || typeof wallet !== 'object') {
             throw new Error('Wallet must be a valid wallet object');
         }
-        if (!isAddressValid(wallet.address)) {
+        if (!isAddressValid(wallet.address, TRAC_NETWORK_MSB_MAINNET_PREFIX)) {
             throw new Error('Wallet should have a valid TRAC address.');
         }
 
@@ -66,7 +67,7 @@ class PartialStateMessageBuilder extends StateBuilder {
     }
 
     withAddress(address) {
-        if (!isAddressValid(address)) {
+        if (!isAddressValid(address, TRAC_NETWORK_MSB_MAINNET_PREFIX)) {
             throw new Error(`Address field must be a valid TRAC bech32m address with length ${TRAC_ADDRESS_SIZE}.`);
         }
 
@@ -116,7 +117,7 @@ class PartialStateMessageBuilder extends StateBuilder {
     }
 
     withIncomingAddress(address) {
-        if (!isAddressValid(address)) {
+        if (!isAddressValid(address, TRAC_NETWORK_MSB_MAINNET_PREFIX)) {
             throw new Error(`Incoming address field must be a valid TRAC bech32m address with length ${TRAC_ADDRESS_SIZE}.`);
         }
 
@@ -193,7 +194,7 @@ class PartialStateMessageBuilder extends StateBuilder {
                 txMsg = createMessage(
                     NETWORK_ID,
                     b4a.from(this.#txValidity, 'hex'),
-                    addressToBuffer(this.#incomingAddress), // we need to sign address of the recipient as well
+                    addressToBuffer(this.#incomingAddress, TRAC_NETWORK_MSB_MAINNET_PREFIX), // we need to sign address of the recipient as well
                     b4a.from(this.#amount, 'hex'),
                     nonce,
                     OperationType.TRANSFER

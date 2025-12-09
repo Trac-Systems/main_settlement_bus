@@ -19,6 +19,7 @@ import { toBalance } from '../../../../../src/core/state/utils/balance.js';
 import { EntryType } from '../../../../../src/utils/constants.js';
 import { decimalStringToBigInt, bigIntTo16ByteBuffer } from '../../../../../src/utils/amountSerialization.js';
 import { safeDecodeApplyOperation, safeEncodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
+import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
 
 const DEFAULT_FUNDING = bigIntTo16ByteBuffer(decimalStringToBigInt('10'));
 
@@ -173,8 +174,8 @@ export async function assertBootstrapDeploymentSuccessState(
 	t.ok(validatorAddressBuffer, 'payload carries validator address');
 	t.ok(txHashBuffer, 'payload exposes tx hash');
 
-	const requesterAddress = addressUtils.bufferToAddress(requesterAddressBuffer);
-	const validatorAddress = addressUtils.bufferToAddress(validatorAddressBuffer);
+	const requesterAddress = addressUtils.bufferToAddress(requesterAddressBuffer, TRAC_NETWORK_MSB_MAINNET_PREFIX);
+	const validatorAddress = addressUtils.bufferToAddress(validatorAddressBuffer, TRAC_NETWORK_MSB_MAINNET_PREFIX);
 
 	if (requesterAddress) {
 		t.is(requesterAddress, deployerPeer.wallet.address, 'payload signed by expected requester');

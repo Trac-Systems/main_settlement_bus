@@ -31,7 +31,7 @@ test('assembleWhitelistMessages', async (t) => {
         k.is(Object.keys(decodedMsg.bko).length, 2, 'Message value should have 2 keys');
         k.is(decodedMsg.type, OperationType.APPEND_WHITELIST, 'Message type should be APPEND_WHITELIST');
 
-        k.is(bufferToAddress(decodedMsg.address) , whitelistAddresses[0], 'Message address should be the address in the file');
+        k.is(bufferToAddress(decodedMsg.address, TRAC_NETWORK_MSB_MAINNET_PREFIX) , whitelistAddresses[0], 'Message address should be the address in the file');
         k.is(decodedMsg.bko.nonce.length, 32, 'Message nonce should be 32 bytes long');
         k.ok(b4a.isBuffer(decodedMsg.bko.nonce), 'Message nonce should be a buffer');
         k.is(decodedMsg.bko.sig.length, 64, 'Message signature should be 64 bytes long');

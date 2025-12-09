@@ -7,6 +7,7 @@ import PartialBootstrapDeployment from "../validators/PartialBootstrapDeployment
 import {addressToBuffer, bufferToAddress} from "../../../state/utils/address.js";
 import PartialTransaction from "../validators/PartialTransaction.js";
 import {normalizeHex} from "../../../../utils/helpers.js";
+import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
 
 /**
  * THIS CLASS IS ULTRA IMPORTANT BECAUSE IF SOMEONE WILL SEND A TRASH TO VALIDATOR AND IT WON'T BE HANDLED PROPERTLY -
@@ -102,7 +103,7 @@ class SubnetworkOperationHandler extends BaseOperationHandler {
 
         return {
             type,
-            address: addressToBuffer(address),
+            address: addressToBuffer(address, TRAC_NETWORK_MSB_MAINNET_PREFIX),
             bdo: normalizedBdo
         };
     }
@@ -134,7 +135,7 @@ class SubnetworkOperationHandler extends BaseOperationHandler {
 
         return {
             type,
-            address: addressToBuffer(address),
+            address: addressToBuffer(address, TRAC_NETWORK_MSB_MAINNET_PREFIX),
             txo: normalizedTxo
         };
     }

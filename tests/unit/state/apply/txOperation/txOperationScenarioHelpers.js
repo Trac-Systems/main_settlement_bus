@@ -25,6 +25,7 @@ import {
 	safeDecodeApplyOperation,
 	safeEncodeApplyOperation
 } from '../../../../../src/utils/protobuf/operationHelpers.js';
+import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
 
 const DEFAULT_FUNDING = bigIntTo16ByteBuffer(decimalStringToBigInt('10'));
 const DEFAULT_CONTENT_HASH = b4a.alloc(32, 0xab);
@@ -208,8 +209,8 @@ export async function assertTxOperationSuccessState(
 		t.ok(b4a.equals(msbBootstrap, context.txOperation?.msbBootstrap), 'payload MSB bootstrap matches network');
 	}
 
-	const requesterAddress = addressUtils.bufferToAddress(requesterAddressBuffer);
-	const validatorAddress = addressUtils.bufferToAddress(validatorAddressBuffer);
+	const requesterAddress = addressUtils.bufferToAddress(requesterAddressBuffer, TRAC_NETWORK_MSB_MAINNET_PREFIX);
+	const validatorAddress = addressUtils.bufferToAddress(validatorAddressBuffer, TRAC_NETWORK_MSB_MAINNET_PREFIX);
 
 	t.is(requesterAddress, broadcasterPeer.wallet.address, 'requester matches broadcaster');
 	t.is(validatorAddress, validatorPeer.wallet.address, 'validator matches selected peer');
@@ -312,7 +313,7 @@ export async function assertTxOperationSuccessState(
 	const decodedDeployment = deploymentEntryUtils.decode(deploymentEntry?.value);
 	t.ok(decodedDeployment, 'deployment entry decodes after tx');
 	if (decodedDeployment?.address) {
-		const creatorAddress = addressUtils.bufferToAddress(decodedDeployment.address);
+		const creatorAddress = addressUtils.bufferToAddress(decodedDeployment.address, TRAC_NETWORK_MSB_MAINNET_PREFIX);
 		t.is(
 			creatorAddress,
 			creatorPeer.wallet.address,

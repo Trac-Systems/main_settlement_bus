@@ -101,7 +101,7 @@ class ValidatorObserverService {
         
         if (!isValidatorValid) return;
         
-        const validatorAddress = bufferToAddress(validatorAddressBuffer);
+        const validatorAddress = bufferToAddress(validatorAddressBuffer, TRAC_NETWORK_MSB_MAINNET_PREFIX);
         const validatorPubKeyBuffer = PeerWallet.decodeBech32m(validatorAddress);
         const validatorPubKeyHex = validatorPubKeyBuffer.toString('hex');
         const adminEntry = await this.state.getAdminEntry();
@@ -115,7 +115,7 @@ class ValidatorObserverService {
     async #isValidatorValid(forbiddenAddress, validatorAddressBuffer, validatorListLength) {
         if (validatorAddressBuffer === null || b4a.byteLength(validatorAddressBuffer) !== TRAC_ADDRESS_SIZE) return false;
         
-        const validatorAddress = bufferToAddress(validatorAddressBuffer);
+        const validatorAddress = bufferToAddress(validatorAddressBuffer, TRAC_NETWORK_MSB_MAINNET_PREFIX);
         if (validatorAddress === forbiddenAddress) return false;
 
         const validatorPubKeyBuffer = PeerWallet.decodeBech32m(validatorAddress);
