@@ -296,7 +296,7 @@ new OperationValidationScenarioBase({
 	applyInvalidPayload: async (context, invalidPayload) => {
 		const otherAddress = context.adminRecovery.validatorPeer2.wallet.address;
 		const otherAddressBuffer = addressUtils.addressToBuffer(otherAddress, TRAC_NETWORK_MSB_MAINNET_PREFIX);
-		const mutatedEntry = adminEntryUtils.encode(otherAddressBuffer, context.adminRecovery.oldAdminWriterKey);
+		const mutatedEntry = adminEntryUtils.encode(otherAddressBuffer, context.adminRecovery.oldAdminWriterKey, TRAC_NETWORK_MSB_MAINNET_PREFIX);
 		return applyWithAdminEntryMutation(context, invalidPayload, () => ({ value: mutatedEntry }));
 	},
 	expectedLogs: ['Admin public key does not match the node public key.']

@@ -3,7 +3,7 @@ import b4a from 'b4a';
 import { bufferToAddress, isAddressValid } from './address.js';
 import { WRITER_BYTE_LENGTH } from '../../../utils/constants.js';
 import { isBufferValid } from '../../../utils/buffer.js';
-import { TRAC_PUBLIC_KEY_SIZE } from 'trac-wallet/constants.js';
+import { address as addressApi } from 'trac-crypto-api';
 
 /**
  * Encodes an admin entry as a buffer containing the TRAC address and writing key.
@@ -45,7 +45,7 @@ export function encode(address, wk, addressHrp) {
  *   - wk: Buffer containing the writing key.
  */
 export function decode(adminEntry, addressHrp) {
-    const addressLength = addressHrp.length + TRAC_PUBLIC_KEY_SIZE * 2
+    const addressLength = addressApi.size(addressHrp)
     if (!isBufferValid(adminEntry, addressLength + WRITER_BYTE_LENGTH)) {
         return null;
     }

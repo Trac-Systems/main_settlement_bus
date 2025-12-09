@@ -1,5 +1,5 @@
 import b4a from 'b4a';
-import tracCryptoApi from 'trac-crypto-api';
+import { address as addressApi } from 'trac-crypto-api';
 
 /**
  * Checks if a given address is a valid TRAC bech32m address.
@@ -11,18 +11,10 @@ import tracCryptoApi from 'trac-crypto-api';
  * @returns {boolean} True if the address is valid, false otherwise.
  */
 export function isAddressValid(address, hrp) {
-    const addressLength = hrp.length + 1 + tracCryptoApi.address.PUB_KEY_SIZE * 2
     if (b4a.isBuffer(address)) {
         address = address.toString('ascii');
     }
-    const bech32Chars = /^[qpzry9x8gf2tvdw0s3jn54khce6mua7l]+$/;
-    if (typeof address === 'string' &&
-        address.length === addressLength &&
-        address.startsWith(hrp + '1') &&
-        bech32Chars.test(address.slice(hrp.length + 1))) {
-        return true;
-    }
-    return false;
+    return addressApi.size(hrp) === address.length && addressApi.isValid(address)
 }
 
 

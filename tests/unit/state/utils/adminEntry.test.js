@@ -8,8 +8,8 @@ import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
 
 const isAddressValid = address => addressUtils.isAddressValid(address, TRAC_NETWORK_MSB_MAINNET_PREFIX);
 const addressToBuffer = addressUtils.addressToBuffer;
-const encodeAdminEntry = adminEntryUtils.encode;
-const decodeAdminEntry = adminEntryUtils.decode;
+const encodeAdminEntry = (address, wk) => adminEntryUtils.encode(address, wk, TRAC_NETWORK_MSB_MAINNET_PREFIX);
+const decodeAdminEntry = entry => adminEntryUtils.decode(entry, TRAC_NETWORK_MSB_MAINNET_PREFIX);
 const ADMIN_ENTRY_SIZE = TRAC_ADDRESS_SIZE + WRITER_BYTE_LENGTH;
 
 test('Admin Entry - Encode and Decode - Happy Path', t => {

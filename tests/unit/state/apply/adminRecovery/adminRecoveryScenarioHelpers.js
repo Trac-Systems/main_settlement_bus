@@ -2,7 +2,6 @@ import b4a from 'b4a';
 import adminEntryUtils from '../../../../../src/core/state/utils/adminEntry.js';
 import nodeEntryUtils, { setWritingKey } from '../../../../../src/core/state/utils/nodeEntry.js';
 import { EntryType } from '../../../../../src/utils/constants.js';
-import { blake3Hash } from '../../../../../src/utils/crypto.js';
 import { decimalStringToBigInt, bigIntTo16ByteBuffer } from '../../../../../src/utils/amountSerialization.js';
 import { deriveIndexerSequenceState, eventFlush } from '../../../../helpers/autobaseTestHelpers.js';
 import PartialStateMessageOperations from '../../../../../src/messages/partialStateMessages/PartialStateMessageOperations.js';
@@ -16,8 +15,8 @@ import { promotePeerToWriter } from '../addWriter/addWriterScenarioHelpers.js';
 import { buildAddIndexerPayload } from '../addIndexer/addIndexerScenarioHelpers.js';
 import { toBalance, BALANCE_FEE } from '../../../../../src/core/state/utils/balance.js';
 import lengthEntryUtils from '../../../../../src/core/state/utils/lengthEntry.js';
-import * as bufferUtils from '../../../../../src/utils/buffer.js';
 import { safeDecodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
+import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
 
 export const DEFAULT_FUNDING = bigIntTo16ByteBuffer(decimalStringToBigInt('50'));
 export const TRANSFER_AMOUNT = bigIntTo16ByteBuffer(decimalStringToBigInt('1'));
@@ -548,7 +547,7 @@ export async function assertAdminRecoverySuccessState(t, context, { viewBase } =
 	const adminEntry = await base.view.get(EntryType.ADMIN);
 	t.ok(adminEntry, 'admin entry exists');
 
-	const decodedAdminEntry = adminEntryUtils.decode(adminEntry.value);
+	const decodedAdminEntry = adminEntryUtils.decode(adminEntry.value, TRAC_NETWORK_MSB_MAINNET_PREFIX);
 	t.ok(decodedAdminEntry, 'admin entry decodes');
 	t.ok(b4a.equals(decodedAdminEntry.wk, newAdminWriterKey), 'admin writer key updated');
 

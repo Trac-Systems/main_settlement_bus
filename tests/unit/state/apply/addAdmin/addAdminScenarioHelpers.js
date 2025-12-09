@@ -103,7 +103,7 @@ export async function assertAdminState(t, base, wallet, writingKey, payload) {
 	const adminEntryRecord = await base.view.get(EntryType.ADMIN);
 	t.ok(adminEntryRecord, 'admin entry should exist');
 
-	const decodedAdminEntry = adminEntryUtils.decode(adminEntryRecord.value);
+	const decodedAdminEntry = adminEntryUtils.decode(adminEntryRecord.value, TRAC_NETWORK_MSB_MAINNET_PREFIX);
 	t.ok(decodedAdminEntry, 'admin entry decodes');
 	t.is(decodedAdminEntry.address, wallet.address, 'admin entry stores wallet address');
 	t.ok(b4a.equals(decodedAdminEntry.wk, writingKey), 'admin entry stores writing key');
