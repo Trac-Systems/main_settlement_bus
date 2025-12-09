@@ -1,6 +1,14 @@
 import b4a from 'b4a';
 import { address as addressApi } from 'trac-crypto-api';
 
+const boolSafe = condition => {
+    try {
+        return condition()
+    } catch (_ignored) {
+        return false
+    }
+}
+
 /**
  * Checks if a given address is a valid TRAC bech32m address.
  * Note that we only check the format and length, not the checksum.
@@ -14,7 +22,7 @@ export function isAddressValid(address, hrp) {
     if (b4a.isBuffer(address)) {
         address = address.toString('ascii');
     }
-    return addressApi.size(hrp) === address.length && addressApi.isValid(address)
+    return boolSafe(() => addressApi.size(hrp) === address.length && addressApi.isValid(address))
 }
 
 

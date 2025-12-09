@@ -45,12 +45,12 @@ export function encode(address, wk, addressHrp) {
  *   - wk: Buffer containing the writing key.
  */
 export function decode(adminEntry, addressHrp) {
-    const addressLength = addressApi.size(addressHrp)
-    if (!isBufferValid(adminEntry, addressLength + WRITER_BYTE_LENGTH)) {
-        return null;
-    }
-
     try {
+        const addressLength = addressApi.size(addressHrp)
+        if (!isBufferValid(adminEntry, addressLength + WRITER_BYTE_LENGTH)) {
+            return null;
+        }
+
         const addressPart = adminEntry.subarray(0, addressLength);
         const address = bufferToAddress(addressPart, addressHrp);
         const wk = adminEntry.subarray(addressLength);

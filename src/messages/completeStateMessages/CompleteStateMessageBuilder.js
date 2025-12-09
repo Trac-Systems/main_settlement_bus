@@ -119,7 +119,7 @@ class CompleteStateMessageBuilder extends StateBuilder {
             throw new Error(`Address field must be a valid TRAC bech32m address with length ${TRAC_ADDRESS_SIZE}.`);
         }
 
-        this.#incomingAddress = addressToBuffer(address);
+        this.#incomingAddress = addressToBuffer(address, TRAC_NETWORK_MSB_MAINNET_PREFIX);
         return this;
     }
 

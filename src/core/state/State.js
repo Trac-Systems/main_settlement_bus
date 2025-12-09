@@ -15,7 +15,8 @@ import {
     MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION,
     TRAC_NAMESPACE,
     CustomEventType,
-    NETWORK_ID
+    NETWORK_ID,
+    TRAC_ADDRESS_SIZE
 } from '../../utils/constants.js';
 import { isHexString, sleep, isTransactionRecordPut } from '../../utils/helpers.js';
 import PeerWallet from 'trac-wallet';
@@ -70,6 +71,7 @@ class State extends ReadyResource {
         this.#config = {
             networkId: NETWORK_ID,
             bootstrap,
+            addressLength: TRAC_ADDRESS_SIZE,
             addressPrefix: TRAC_NETWORK_MSB_MAINNET_PREFIX,
             enableTxApplyLogs: options.enable_tx_apply_logs !== undefined ? options.enable_tx_apply_logs : true,
             enableErrorApplyLogs: options.enable_error_apply_logs !== undefined ? options.enable_error_apply_logs : true
@@ -186,7 +188,7 @@ class State extends ReadyResource {
     }
 
     async isAdminAllowedToValidate() {
-        const isAdmin = this.writingKey.toString('hex') === this.bootstrap.toString('hex');
+        const isAdmin = this.writingKey.toString('hex') === this.#config.bootstrap.toString('hex');
         const isIndexer = this.isIndexer();
         const lengthCondition = await this.getWriterLength() <= MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION;
         return !!(isAdmin && isIndexer && lengthCondition);
@@ -712,7 +714,7 @@ class State extends ReadyResource {
         };
 
         // Check if the operation is being performed by the bootstrap node - the original deployer of the Trac Network
-        if (!b4a.equals(node.from.key, this.bootstrap) || !b4a.equals(op.cao.iw, this.bootstrap)) {
+        if (!b4a.equals(node.from.key, this.#config.bootstrap) || !b4a.equals(op.cao.iw, this.#config.bootstrap)) {
             this.#safeLogApply(OperationType.ADD_ADMIN, "Node is not a bootstrap node.", node.from.key)
             return Status.FAILURE;
         };
@@ -795,7 +797,7 @@ class State extends ReadyResource {
         }
 
         // Create a new admin entry
-        const newAdminEntry = adminEntryUtils.encode(adminAddressBuffer, op.cao.iw);
+        const newAdminEntry = adminEntryUtils.encode(adminAddressBuffer, op.cao.iw, this.#config.addressPrefix);
         if (newAdminEntry.length === 0) {
             this.#safeLogApply(OperationType.ADD_ADMIN, "Failed to verify message signature.", node.from.key)
             return Status.FAILURE;
@@ -2542,7 +2544,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
         // do not allow to deploy bootstrap deployment on the same bootstrap.
-        if (b4a.equals(op.bdo.bs, this.bootstrap)) {
+        if (b4a.equals(op.bdo.bs, this.#config.bootstrap)) {
             this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Cannot deploy bootstrap on existing same bootstrap.", node.from.key)
             return Status.FAILURE;
         };
@@ -2796,7 +2798,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        if (!b4a.equals(op.txo.mbs, this.bootstrap)) {
+        if (!b4a.equals(op.txo.mbs, this.#config.bootstrap)) {
             this.#safeLogApply(OperationType.TX, "Declared MSB bootstrap is different than real MSB bootstrap.", node.from.key)
             return Status.FAILURE;
         };
@@ -2821,7 +2823,7 @@ class State extends ReadyResource {
             op.txo.iw,
             op.txo.ch,
             op.txo.bs,
-            this.bootstrap,
+            this.#config.bootstrap,
             op.txo.in,
             OperationType.TX
         );
