@@ -16,7 +16,7 @@ import deploymentEntryUtils from '../../../../../src/core/state/utils/deployment
 import transactionUtils from '../../../../../src/core/state/utils/transaction.js';
 import addressUtils from '../../../../../src/core/state/utils/address.js';
 import { toBalance } from '../../../../../src/core/state/utils/balance.js';
-import { EntryType } from '../../../../../src/utils/constants.js';
+import { EntryType, TRAC_ADDRESS_SIZE } from '../../../../../src/utils/constants.js';
 import { decimalStringToBigInt, bigIntTo16ByteBuffer } from '../../../../../src/utils/amountSerialization.js';
 import { safeDecodeApplyOperation, safeEncodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
 import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
@@ -330,7 +330,7 @@ async function assertDeploymentEntry(
 	const deploymentKey = `${EntryType.DEPLOYMENT}${bootstrapBuffer.toString('hex')}`;
 	const deploymentEntry = await base.view.get(deploymentKey);
 	t.ok(deploymentEntry, 'deployment entry stored');
-	const decodedDeployment = deploymentEntryUtils.decode(deploymentEntry?.value);
+	const decodedDeployment = deploymentEntryUtils.decode(deploymentEntry?.value, TRAC_ADDRESS_SIZE);
 	t.ok(decodedDeployment?.txHash, 'deployment entry decodes');
 	if (!decodedDeployment || !decodedDeployment.txHash) return;
 

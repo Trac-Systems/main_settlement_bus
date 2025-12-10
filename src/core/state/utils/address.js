@@ -22,7 +22,10 @@ export function isAddressValid(address, hrp) {
     if (b4a.isBuffer(address)) {
         address = address.toString('ascii');
     }
-    return boolSafe(() => addressApi.size(hrp) === address.length && addressApi.isValid(address))
+
+    return boolSafe(() => 
+        addressApi.size(hrp) === address.length && address.startsWith(`${hrp}1`) && addressApi.isValid(address)
+    );
 }
 
 

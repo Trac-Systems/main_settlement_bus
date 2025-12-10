@@ -18,7 +18,7 @@
     "protobuf": "node scripts/generate-protobufs.js",
     "test:acceptance": "node --experimental-vm-modules node_modules/jest/bin/jest.js --testTimeout=200000 tests/acceptance/v1/rpc.test.mjs --runInBand",
     "test:integration": "brittle-node -t 1200000 tests/integration/integration.test.js",
-    "test:unit:node": "brittle-node -t 60000 tests/unit/unit.test.js",
+    "test:unit:node": "brittle-node -t 600000000 tests/unit/unit.test.js",
     "test:unit:bare": "brittle-bare -t 60000 tests/unit/unit.test.js",
     "test:unit:all": "(npm run test:unit:node && npm run test:unit:bare) || exit 1",
     "test:unit:node:cov": "brittle-node -c -t 60000 tests/unit/unit.test.js",

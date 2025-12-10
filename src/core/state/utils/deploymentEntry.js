@@ -27,7 +27,7 @@ export function encode(txHash, address, hrp) {
             return b4a.alloc(0);
         }
 
-        const entry = b4a.alloc(HASH_BYTE_LENGTH + address.length * 2);
+        const entry = b4a.alloc(HASH_BYTE_LENGTH + address.length);
 
         b4a.copy(txHash, entry, 0);
         b4a.copy(address, entry, HASH_BYTE_LENGTH);

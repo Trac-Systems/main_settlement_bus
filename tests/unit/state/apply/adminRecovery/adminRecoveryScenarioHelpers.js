@@ -596,7 +596,7 @@ export async function assertAdminRecoveryFailureState(t, context, { skipSync } =
 	const adminEntry = await adminPeer.base.view.get(EntryType.ADMIN);
 	t.ok(adminEntry, 'admin entry persists');
 
-	const decodedAdminEntry = adminEntryUtils.decode(adminEntry.value);
+	const decodedAdminEntry = adminEntryUtils.decode(adminEntry.value, TRAC_NETWORK_MSB_MAINNET_PREFIX);
 	t.ok(decodedAdminEntry, 'admin entry decodes');
 	t.ok(b4a.equals(decodedAdminEntry.wk, oldAdminWriterKey), 'admin writer key remains unchanged');
 
