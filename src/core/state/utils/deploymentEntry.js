@@ -59,7 +59,7 @@ export function decode(entry, addressLength) {
     try {
         if (!isBufferValid(entry, HASH_BYTE_LENGTH + addressLength)) {
             console.error('Invalid transaction entry buffer');
-            return b4a.alloc(0);
+            return null;
         }
 
         const txHash = entry.subarray(0, HASH_BYTE_LENGTH);
@@ -68,7 +68,7 @@ export function decode(entry, addressLength) {
         return { txHash, address };
     } catch (error) {
         console.error('Error decoding transaction entry:', error);
-        return b4a.alloc(0);
+        return null;
     }
 }
 

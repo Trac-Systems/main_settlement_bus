@@ -993,7 +993,7 @@ class State extends ReadyResource {
         }; // Old admin wk is not in indexers entry
 
         // Update admin entry with new writing key
-        const newAdminEntry = adminEntryUtils.encode(requesterAdminAddressBuffer, op.rao.iw);
+        const newAdminEntry = adminEntryUtils.encode(requesterAdminAddressBuffer, op.rao.iw, this.#config.addressPrefix);
         if (newAdminEntry.length === 0) {
             this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Invalid admin entry.", node.from.key)
             return Status.FAILURE;

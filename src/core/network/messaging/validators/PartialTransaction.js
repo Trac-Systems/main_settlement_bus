@@ -2,6 +2,7 @@ import b4a from 'b4a';
 
 import { safeDecodeApplyOperation } from "../../../../utils/protobuf/operationHelpers.js";
 import deploymentEntryUtils from "../../../state/utils/deploymentEntry.js";
+import { TRAC_ADDRESS_SIZE } from "../../../../utils/constants.js";
 import PartialOperation from './base/PartialOperation.js';
 
 class PartialTransaction extends PartialOperation {
@@ -43,7 +44,7 @@ class PartialTransaction extends PartialOperation {
             throw new Error(`External bootstrap with hash ${payload.txo.bs.toString('hex')} is not registered as deployment entry.`);
         }
 
-        const decodedPayload = deploymentEntryUtils.decode(externalBootstrapResult);
+        const decodedPayload = deploymentEntryUtils.decode(externalBootstrapResult, TRAC_ADDRESS_SIZE);
         const txHash = decodedPayload.txHash
         const getBootstrapTransactionTxPayload = await this.state.get(txHash.toString('hex'));
         
