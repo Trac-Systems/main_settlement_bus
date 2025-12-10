@@ -8,6 +8,7 @@ import {
 import CompleteStateMessageOperations from '../../../../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
 import { AUTOBASE_VALUE_ENCODING } from '../../../../../src/utils/constants.js';
 import { buildAddAdminRequesterPayload } from '../addAdmin/addAdminScenarioHelpers.js';
+import { config } from '../../../../helpers/config.js';
 
 /**
  * Boots a network with an initialized admin node and returns the shared context.
@@ -58,8 +59,7 @@ export async function initializeBalances(context, recipients) {
 	if (!adminNode || !Array.isArray(recipients) || recipients.length === 0) return;
 
 	const txValidity = await deriveIndexerSequenceState(adminNode.base);
-	const payloads = await CompleteStateMessageOperations.assembleBalanceInitializationMessages(
-		adminNode.wallet,
+	const payloads = await new CompleteStateMessageOperations(adminNode.wallet, config).assembleBalanceInitializationMessages(
 		txValidity,
 		recipients
 	);
@@ -76,8 +76,7 @@ export async function whitelistAddress(context, address) {
 	if (!adminNode || !address) return;
 
 	const txValidity = await deriveIndexerSequenceState(adminNode.base);
-	const payload = await CompleteStateMessageOperations.assembleAppendWhitelistMessages(
-		adminNode.wallet,
+	const payload = await new CompleteStateMessageOperations(adminNode.wallet, config).assembleAppendWhitelistMessages(
 		txValidity,
 		address
 	);

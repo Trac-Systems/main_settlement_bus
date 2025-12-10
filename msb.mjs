@@ -3,7 +3,6 @@ import { MainSettlementBus } from './src/index.js';
 const pearApp = typeof Pear !== 'undefined' ? (Pear.app ?? Pear.config) : undefined;
 const runtimeArgs = typeof process !== 'undefined' ? process.argv.slice(2) : [];
 const args = pearApp?.args ?? runtimeArgs;
-const runRpc = args.includes('--rpc');
 
 const opts = {
     stores_directory: 'stores/',
@@ -24,12 +23,16 @@ const rpc_opts = {
     enable_tx_apply_logs: false,
     enable_error_apply_logs: false,
     enable_wallet: false,
-    enable_interactive_mode: false,
-};
+    enable_interactive_mode: false
+}
 
-const msb = new MainSettlementBus(runRpc ? rpc_opts : opts);
+const options = args.includes('--rpc') ? rpc_opts : opts
+
+const msb = new MainSettlementBus(options);
 
 msb.ready().then(async () => {
+    const runRpc = args.includes('--rpc');
+
     if (runRpc) {
         console.log('Starting RPC server...');
         const portIndex = args.indexOf('--port');
@@ -40,6 +43,7 @@ msb.ready().then(async () => {
         const {startRpcServer} = await import('./rpc/rpc_server.mjs');
         startRpcServer(msb, host, port);
     } else {
+        console.log('RPC server will not be started.');
         msb.interactiveMode();
     }
 });

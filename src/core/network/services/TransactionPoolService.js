@@ -5,14 +5,19 @@ import Scheduler from '../../../utils/Scheduler.js';
 class TransactionPoolService {
     #state;
     #address;
-    #options;
+    #config;
     #tx_pool = [];
     #scheduler = null;
 
-    constructor(state, address, options = {}) {
+    /**
+     * @param {State} state
+     * @param {string} address
+     * @param {object} config
+     **/
+    constructor(state, address, config) {
         this.#state = state;
         this.#address = address;
-        this.#options = options;
+        this.#config = config;
     }
 
     get tx_pool() {
@@ -27,12 +32,8 @@ class TransactionPoolService {
         return this.#address;
     }
 
-    get options() {
-        return this.#options;
-    }
-
     async start() {
-        if (!this.options.enable_wallet) {
+        if (!this.#config.enableWallet) {
             console.info('TransactionPoolService can not start. Wallet is not enabled');
             return;
         }

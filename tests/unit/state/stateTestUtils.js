@@ -1,14 +1,18 @@
 import b4a from 'b4a';
 import { bech32m } from 'bech32';
-import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
+import { address as addressApi } from 'trac-crypto-api';
 import { TOKEN_DECIMALS } from '../../../src/utils/constants.js';
 
 export function randomBuffer(size) {
     return b4a.from(Array.from({ length: size }, () => Math.floor(Math.random() * 256)));
 }
 
-export function randomAddress(hrp = TRAC_NETWORK_MSB_MAINNET_PREFIX) {
-    const data = randomBuffer(32);
+export function randomAddress(hrp) {
+    // Compute payload size so final string length equals addressApi.size(hrp)
+    const totalLen = addressApi.size(hrp); // expected address string length
+    const dataWordLen = totalLen - (hrp.length + 1 + 6); // data chars = total - hrp - sep - checksum
+    const dataBytesLen = Math.floor((dataWordLen * 5) / 8); // bytes that yield that many 5-bit words
+    const data = randomBuffer(dataBytesLen);
     return bech32m.encode(hrp, bech32m.toWords(data));
 }
 

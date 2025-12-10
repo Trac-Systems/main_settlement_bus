@@ -1,15 +1,13 @@
 import b4a from 'b4a';
 import PeerWallet from 'trac-wallet';
-
 import Check from '../../../../../utils/check.js';
 import { bufferToAddress } from "../../../../state/utils/address.js";
 import { createMessage } from "../../../../../utils/buffer.js";
-import { OperationType, NETWORK_ID } from "../../../../../utils/constants.js";
+import { OperationType } from "../../../../../utils/constants.js";
 import { blake3Hash } from "../../../../../utils/crypto.js";
 import { bufferToBigInt } from "../../../../../utils/amountSerialization.js";
 import { FEE } from "../../../../state/utils/transaction.js";
 import * as operationsUtils from '../../../../../utils/operations.js';
-import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
 
 const MAX_AMOUNT = BigInt('0xffffffffffffffffffffffffffffffff');
 const FEE_BIGINT = bufferToBigInt(FEE);
@@ -18,10 +16,12 @@ const PUBLIC_KEY_LENGTH = 32;
 class PartialOperation {
     #state;
     #check;
+    #config
 
-    constructor(state) {
+    constructor(state, config) {
         this.#state = state;
-        this.#check = new Check();
+        this.#config = config;
+        this.#check = new Check(this.#config);
         this.max_amount = MAX_AMOUNT;
         this.fee = FEE_BIGINT;
     }
@@ -66,7 +66,7 @@ class PartialOperation {
     }
 
     validateRequesterAddress(payload) {
-        const incomingAddress = bufferToAddress(payload.address, TRAC_NETWORK_MSB_MAINNET_PREFIX);
+        const incomingAddress = bufferToAddress(payload.address, this.#config.addressPrefix);
         if (!incomingAddress) {
             throw new Error('Invalid requesting address in payload.');
         }
@@ -88,7 +88,7 @@ class PartialOperation {
             case OperationType.REMOVE_WRITER:
             case OperationType.ADMIN_RECOVERY:
                 return [
-                    NETWORK_ID,
+                    this.#config.networkId,
                     operation.txv,
                     operation.iw,
                     operation.in,
@@ -96,7 +96,7 @@ class PartialOperation {
                 ];
             case OperationType.BOOTSTRAP_DEPLOYMENT:
                 return [
-                    NETWORK_ID,
+                    this.#config.networkId,
                     operation.txv,
                     operation.bs,
                     operation.ic,
@@ -105,7 +105,7 @@ class PartialOperation {
                 ];
             case OperationType.TX:
                 return [
-                    NETWORK_ID,
+                    this.#config.networkId,
                     operation.txv,
                     operation.iw,
                     operation.ch,
@@ -116,7 +116,7 @@ class PartialOperation {
                 ];
             case OperationType.TRANSFER:
                 return [
-                    NETWORK_ID,
+                    this.#config.networkId,
                     operation.txv,
                     operation.to,
                     operation.am,
@@ -132,7 +132,7 @@ class PartialOperation {
         const operationKey = operationsUtils.operationToPayload(payload.type);
         const operation = payload[operationKey];
 
-        const incomingPublicKey = PeerWallet.decodeBech32mSafe(bufferToAddress(payload.address, TRAC_NETWORK_MSB_MAINNET_PREFIX));
+        const incomingPublicKey = PeerWallet.decodeBech32mSafe(bufferToAddress(payload.address, this.#config.addressPrefix));
         const incomingSignature = operation.is;
         const messageComponents = this.#getMessageComponents(payload);
 
@@ -175,14 +175,14 @@ class PartialOperation {
         const operation = payload[operationKey];
         const { va, vn, vs } = operation;
 
-        const condition = !!(va === undefined && vn === undefined && vs === undefined);
+        const condition = va === undefined && vn === undefined && vs === undefined
         if (!condition) {
             throw new Error('Transfer operation must not be completed already (va, vn, vs must be undefined).');
         }
     }
 
     async validateRequesterBalance(payload, signed = false) {
-        const requesterAddress = bufferToAddress(payload.address, TRAC_NETWORK_MSB_MAINNET_PREFIX);
+        const requesterAddress = bufferToAddress(payload.address, this.#config.addressPrefix);
         let requesterEntry;
         if (signed) {
             requesterEntry = await this.state.getNodeEntry(requesterAddress);

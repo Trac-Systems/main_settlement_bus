@@ -1,14 +1,14 @@
 import b4a from 'b4a';
-
 import { OperationType } from "../../../../utils/constants.js";
 import { bufferToAddress } from "../../../state/utils/address.js";
 import PartialOperation from './base/PartialOperation.js';
 import { bufferToBigInt } from "../../../../utils/amountSerialization.js";
-import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
 
 class PartialRoleAccess extends PartialOperation {
-    constructor(state) {
-        super(state);
+    #config;
+    constructor(state, config) {
+        super(state, config);
+        this.#config = config
     }
 
     async validate(payload) {
@@ -37,7 +37,7 @@ class PartialRoleAccess extends PartialOperation {
         const { type } = payload;
 
         if (type === OperationType.ADD_WRITER) {
-            const nodeAddress = bufferToAddress(payload.address, TRAC_NETWORK_MSB_MAINNET_PREFIX);
+            const nodeAddress = bufferToAddress(payload.address, this.#config.addressPrefix);
             const nodeEntry = await this.state.getNodeEntry(nodeAddress);
             if (!nodeEntry) {
                 throw new Error(`Node with address ${nodeAddress} entry does not exist.`);
@@ -55,7 +55,7 @@ class PartialRoleAccess extends PartialOperation {
             return;
 
         } else if (type === OperationType.REMOVE_WRITER) {
-            const nodeAddress = bufferToAddress(payload.address, TRAC_NETWORK_MSB_MAINNET_PREFIX);
+            const nodeAddress = bufferToAddress(payload.address, this.#config.addressPrefix);
             const nodeEntry = await this.state.getNodeEntry(nodeAddress);
             if (!nodeEntry) {
                 throw new Error(`Node with address ${nodeAddress} entry does not exist.`);
@@ -79,7 +79,7 @@ class PartialRoleAccess extends PartialOperation {
             }
 
             const adminAddressBuffer = payload.address;
-            const adminAddress = bufferToAddress(adminAddressBuffer, TRAC_NETWORK_MSB_MAINNET_PREFIX);
+            const adminAddress = bufferToAddress(adminAddressBuffer, this.#config.addressPrefix);
             const isRecoveryCase = !!(
                 adminEntry.address === adminAddress &&
                 !b4a.equals(payload.rao.iw, adminEntry.wk)
@@ -95,7 +95,7 @@ class PartialRoleAccess extends PartialOperation {
     }
 
     async validateWriterKey(payload) {
-        const requesterAddress = bufferToAddress(payload.address, TRAC_NETWORK_MSB_MAINNET_PREFIX);
+        const requesterAddress = bufferToAddress(payload.address, this.#config.addressPrefix);
         const nodeEntry = await this.state.getNodeEntry(requesterAddress);
         if (!nodeEntry) {
             throw new Error(`Node entry not found for address ${requesterAddress}`);
@@ -115,7 +115,7 @@ class PartialRoleAccess extends PartialOperation {
     }
 
     async validateRequesterBalanceForAddWriterOperation(payload, signed = false) {
-        const requesterAddress = bufferToAddress(payload.address, TRAC_NETWORK_MSB_MAINNET_PREFIX);
+        const requesterAddress = bufferToAddress(payload.address, this.#config.addressPrefix);
         let requesterEntry;
         if (signed) {
             requesterEntry = await this.state.getNodeEntry(requesterAddress);

@@ -25,7 +25,7 @@ import {
 	safeDecodeApplyOperation,
 	safeEncodeApplyOperation
 } from '../../../../../src/utils/protobuf/operationHelpers.js';
-import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
+import { config } from '../../../../helpers/config.js';
 
 const DEFAULT_FUNDING = bigIntTo16ByteBuffer(decimalStringToBigInt('10'));
 const DEFAULT_CONTENT_HASH = b4a.alloc(32, 0xab);
@@ -141,27 +141,27 @@ export async function buildTxOperationPayload(
 ) {
 	const resolvedTxValidity = txValidity ?? (await deriveIndexerSequenceState(validatorPeer.base));
 
-	const partial = await PartialStateMessageOperations.assembleTransactionOperationMessage(
-		broadcasterPeer.wallet,
-		writerKeyBuffer.toString('hex'),
-		resolvedTxValidity.toString('hex'),
-		contentHash.toString('hex'),
-		externalBootstrap.toString('hex'),
-		msbBootstrap.toString('hex')
-	);
+    const partial = await new PartialStateMessageOperations(broadcasterPeer.wallet, config)
+        .assembleTransactionOperationMessage(
+            writerKeyBuffer.toString('hex'),
+            resolvedTxValidity.toString('hex'),
+            contentHash.toString('hex'),
+            externalBootstrap.toString('hex'),
+            msbBootstrap.toString('hex')
+        );
 
-	return CompleteStateMessageOperations.assembleCompleteTransactionOperationMessage(
-		validatorPeer.wallet,
-		partial.address,
-		b4a.from(partial.txo.tx, 'hex'),
-		b4a.from(partial.txo.txv, 'hex'),
-		b4a.from(partial.txo.iw, 'hex'),
-		b4a.from(partial.txo.in, 'hex'),
-		b4a.from(partial.txo.ch, 'hex'),
-		b4a.from(partial.txo.is, 'hex'),
-		b4a.from(partial.txo.bs, 'hex'),
-		b4a.from(partial.txo.mbs, 'hex')
-	);
+    return new CompleteStateMessageOperations(validatorPeer.wallet, config)
+        .assembleCompleteTransactionOperationMessage(
+						partial.address,
+            b4a.from(partial.txo.tx, 'hex'),
+            b4a.from(partial.txo.txv, 'hex'),
+            b4a.from(partial.txo.iw, 'hex'),
+            b4a.from(partial.txo.in, 'hex'),
+            b4a.from(partial.txo.ch, 'hex'),
+            b4a.from(partial.txo.is, 'hex'),
+            b4a.from(partial.txo.bs, 'hex'),
+            b4a.from(partial.txo.mbs, 'hex')
+        );
 }
 
 export async function buildTxOperationPayloadWithTxValidity(context, txValidity, options = {}) {
@@ -209,8 +209,8 @@ export async function assertTxOperationSuccessState(
 		t.ok(b4a.equals(msbBootstrap, context.txOperation?.msbBootstrap), 'payload MSB bootstrap matches network');
 	}
 
-	const requesterAddress = addressUtils.bufferToAddress(requesterAddressBuffer, TRAC_NETWORK_MSB_MAINNET_PREFIX);
-	const validatorAddress = addressUtils.bufferToAddress(validatorAddressBuffer, TRAC_NETWORK_MSB_MAINNET_PREFIX);
+	const requesterAddress = addressUtils.bufferToAddress(requesterAddressBuffer, config.addressPrefix);
+	const validatorAddress = addressUtils.bufferToAddress(validatorAddressBuffer, config.addressPrefix);
 
 	t.is(requesterAddress, broadcasterPeer.wallet.address, 'requester matches broadcaster');
 	t.is(validatorAddress, validatorPeer.wallet.address, 'validator matches selected peer');
@@ -313,7 +313,7 @@ export async function assertTxOperationSuccessState(
 	const decodedDeployment = deploymentEntryUtils.decode(deploymentEntry?.value, TRAC_ADDRESS_SIZE);
 	t.ok(decodedDeployment, 'deployment entry decodes after tx');
 	if (decodedDeployment?.address) {
-		const creatorAddress = addressUtils.bufferToAddress(decodedDeployment.address, TRAC_NETWORK_MSB_MAINNET_PREFIX);
+		const creatorAddress = addressUtils.bufferToAddress(decodedDeployment.address, config.addressPrefix);
 		t.is(
 			creatorAddress,
 			creatorPeer.wallet.address,

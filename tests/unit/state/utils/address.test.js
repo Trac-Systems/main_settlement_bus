@@ -1,8 +1,8 @@
 import { test } from 'brittle';
 import b4a from 'b4a';
-import { TRAC_ADDRESS_SIZE } from '../../../../src/utils/constants.js';
 import { randomAddress } from '../stateTestUtils.js';
 import addressUtils from '../../../../src/core/state/utils/address.js';
+import { config } from '../../../helpers/config.js';
 
 test('Convert bech32m address to and from buffer - Happy Path', t => {
     const hrp = 'test';
@@ -14,8 +14,8 @@ test('Convert bech32m address to and from buffer - Happy Path', t => {
     t.ok(b4a.isBuffer(addressBuffer), 'Address buffer should be a Buffer instance');
     t.is(typeof reconstructedAddress, 'string', 'Reconstructed address should be a string');
     t.is(address, reconstructedAddress, 'Reconstructed address should match original');
-    t.is(address.length, TRAC_ADDRESS_SIZE, 'Address length should match expected size');
-    t.is(addressBuffer.length, TRAC_ADDRESS_SIZE, 'Address buffer length should match address length');
+    t.is(address.length, config.addressLength, 'Address length should match expected size');
+    t.is(addressBuffer.length, config.addressLength, 'Address buffer length should match address length');
 });
 
 test('isAddressValid returns false for wrong prefix', t => {

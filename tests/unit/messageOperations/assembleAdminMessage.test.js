@@ -1,6 +1,5 @@
 import test from 'brittle';
 import b4a from 'b4a';
-
 import CompleteStateMessageOperations from '../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
 import {default as fixtures} from '../fixtures/assembleMessage.fixtures.js';
 import {OperationType} from "../../src/utils/constants.js";
@@ -8,7 +7,7 @@ import {bufferToAddress} from "../../src/core/state/utils/address.js";
 import {safeDecodeApplyOperation} from '../../src/utils/protobuf/operationHelpers.js';
 import {isAddressValid} from "../../src/core/state/utils/address.js";
 import {errorMessageIncludes} from "../utils/regexHelper.js";
-import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
+import { config } from '../../helpers/config.js';
 
 test('assembleAdminMessage', async (t) => {
     await fixtures.initAll();
@@ -19,16 +18,15 @@ test('assembleAdminMessage', async (t) => {
 
 
     t.test('assembleAdminMessage - setup admin', async (k) => {
-
-        const msg = safeDecodeApplyOperation(await CompleteStateMessageOperations.assembleAddAdminMessage(walletAdmin, writingKeyAdmin));
+        const msg = safeDecodeApplyOperation(await new CompleteStateMessageOperations(walletAdmin, config).assembleAddAdminMessage(writingKeyAdmin));
 
         k.ok(msg, 'Message should be created');
         k.is(Object.keys(msg).length, 3, 'Message should have 3 keys');
         k.is(Object.keys(msg.eko).length, 3, 'Message value have 3 keys');
         k.is(msg.type, OperationType.ADD_ADMIN, 'Message type should be ADD_ADMIN');
-        k.is(bufferToAddress(msg.address, TRAC_NETWORK_MSB_MAINNET_PREFIX), walletAdmin.address, 'Message address should be the public key of the wallet');
+        k.is(bufferToAddress(msg.address, config.addressPrefix), walletAdmin.address, 'Message address should be the public key of the wallet');
 
-        k.ok(isAddressValid(msg.address, TRAC_NETWORK_MSB_MAINNET_PREFIX), 'Message address should be a valid address');
+        k.ok(isAddressValid(msg.address, config.addressPrefix), 'Message address should be a valid address');
 
         k.ok(b4a.equals(msg.eko.wk, writingKeyAdmin), 'Message wk should be the writing key');
         k.is(msg.eko.nonce.length, 32, 'Message nonce should be 32 bytes long');
@@ -38,15 +36,15 @@ test('assembleAdminMessage', async (t) => {
     });
 
     t.test('assembleAdminMessage - admin recovery message', async (k) => {
-        const msg = safeDecodeApplyOperation(await CompleteStateMessageOperations.assembleAddAdminMessage(walletAdmin, writingKeyNonAdmin));
+        const msg = safeDecodeApplyOperation(await new CompleteStateMessageOperations(walletAdmin, config).assembleAddAdminMessage(writingKeyNonAdmin));
 
         k.ok(msg, 'Message should be created');
         k.is(Object.keys(msg).length, 3, 'Message should have 3 keys');
         k.is(Object.keys(msg.eko).length, 3, 'Message value have 3 keys');
         k.is(msg.type, OperationType.ADD_ADMIN, 'Message type should be ADD_ADMIN');
 
-        k.is(bufferToAddress(msg.address, TRAC_NETWORK_MSB_MAINNET_PREFIX), walletAdmin.address, 'Message address should be address of the wallet');
-        k.ok(isAddressValid(msg.address, TRAC_NETWORK_MSB_MAINNET_PREFIX), 'Message address should be a valid address');
+        k.is(bufferToAddress(msg.address, config.addressPrefix), walletAdmin.address, 'Message address should be address of the wallet');
+        k.ok(isAddressValid(msg.address, config.addressPrefix), 'Message address should be a valid address');
 
         k.ok(b4a.equals(msg.eko.wk, writingKeyNonAdmin), 'Message wk should be the writing key');
         k.is(msg.eko.sig.length, 64, 'Message signature should be 64 bytes long')
@@ -56,14 +54,14 @@ test('assembleAdminMessage', async (t) => {
 
     t.test('assembleAdminMessage - writer key is null', async (k) => {
         await k.exception(
-            async () => await CompleteStateMessageOperations.assembleAddAdminMessage(walletAdmin, null),
+            async () => await new CompleteStateMessageOperations(walletAdmin, config).assembleAddAdminMessage(null),
             errorMessageIncludes('Writer key must be a 32 length buffer')
         );
     });
 
     t.test("assembleAdminMessage - admin wallet is null", async (k) => {
         await k.exception(
-            async () => await CompleteStateMessageOperations.assembleAddAdminMessage(null, writingKeyAdmin),
+            async () => await new CompleteStateMessageOperations(null, config).assembleAddAdminMessage(writingKeyAdmin),
             errorMessageIncludes('Wallet must be a valid wallet object')
         );
     });

@@ -3,7 +3,6 @@ import { normalizeHex } from './helpers.js';
 import { addressToBuffer, bufferToAddress } from '../core/state/utils/address.js';
 import b4a from 'b4a';
 import { bufferToBigInt } from './amountSerialization.js'
-import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
 
 /**
  * Normalizes the payload for a transfer operation.
@@ -11,10 +10,11 @@ import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
  * to the correct buffer or hexadecimal string format for processing.
  *
  * @param {Object} payload The raw payload for the transfer operation.
+ * @param {object} config The environment configuration object.
  * @returns {Object} A new object with addresses converted to buffers and hex values normalized.
  * @throws {Error} If the payload is invalid or missing required fields.
  */
-export function normalizeTransferOperation(payload) {
+export function normalizeTransferOperation(payload, config) {
     if (!payload || typeof payload !== 'object' || !payload.tro) {
         throw new Error('Invalid payload for transfer operation normalization.');
     }
@@ -32,19 +32,19 @@ export function normalizeTransferOperation(payload) {
         tx: normalizeHex(tro.tx),     // Transaction hash
         txv: normalizeHex(tro.txv),   // Transaction validity
         in: normalizeHex(tro.in),     // Nonce
-        to: addressToBuffer(tro.to, TRAC_NETWORK_MSB_MAINNET_PREFIX),   // Recipient address
+        to: addressToBuffer(tro.to, config.addressPrefix),   // Recipient address
         am: normalizeHex(tro.am),     // Amount
         is: normalizeHex(tro.is)      // Signature
     };
 
     return {
         type,
-        address: addressToBuffer(address, TRAC_NETWORK_MSB_MAINNET_PREFIX),
+        address: addressToBuffer(address, config.addressPrefix),
         tro: normalizedTro
     };
 }
 
-export function normalizeTransactionOperation(payload) {
+export function normalizeTransactionOperation(payload, config) {
     if (!payload || typeof payload !== 'object' || !payload.txo) {
         throw new Error('Invalid payload for transaction operation normalization.');
     }
@@ -71,7 +71,7 @@ export function normalizeTransactionOperation(payload) {
 
     return {
         type,
-        address: addressToBuffer(address, TRAC_NETWORK_MSB_MAINNET_PREFIX),
+        address: addressToBuffer(address, config.addressPrefix),
         txo: normalizedTxo
     };
 }
@@ -83,7 +83,7 @@ export function normalizeTransactionOperation(payload) {
  * @param {Object} payload The decoded transaction payload.
  * @returns {Object} A new object with Buffer values converted to hex strings.
  */
-export function normalizeDecodedPayloadForJson(payload) {
+export function normalizeDecodedPayloadForJson(payload, config) {
     if (!payload || typeof payload !== "object") {
         return payload;
     }
@@ -97,7 +97,7 @@ export function normalizeDecodedPayloadForJson(payload) {
             if (b4a.isBuffer(value)) {
                 // 👇 intercept address buffers by key name (e.g. `address`)
                 if (addressKeys.some(k => key.toLowerCase().includes(k))) {
-                    const addr = bufferToAddress(value, TRAC_NETWORK_MSB_MAINNET_PREFIX);
+                    const addr = bufferToAddress(value, config.addressPrefix);
                     newPayload[key] = addr ?? b4a.toString(value, "hex");
                 } else if (key.toLowerCase().includes("am")) {
                     const amount = bufferToBigInt(value)
@@ -108,7 +108,7 @@ export function normalizeDecodedPayloadForJson(payload) {
 
             } else if (typeof value === "object" && value !== null) {
                 // recursively handle nested objects
-                newPayload[key] = normalizeDecodedPayloadForJson(value);
+                newPayload[key] = normalizeDecodedPayloadForJson(value, config);
 
             } else {
                 newPayload[key] = value;

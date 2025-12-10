@@ -1,7 +1,8 @@
 import b4a from 'b4a';
 
-import { MIN_SAFE_VALIDATION_INTEGER, MAX_SAFE_VALIDATION_INTEGER, TRAC_ADDRESS_SIZE } from '../../../../src/utils/constants.js';
+import { MIN_SAFE_VALIDATION_INTEGER, MAX_SAFE_VALIDATION_INTEGER } from '../../../../src/utils/constants.js';
 import { partial_operation_value_type } from "../../../fixtures/check.fixtures.js";
+import { config } from '../../../helpers/config.js';
 
 export function topLevelValidationTests(
     t,
@@ -210,11 +211,11 @@ export function addressBufferLengthTest(
     validFixture,
 ) {
     const emptyBuffer = b4a.alloc(0);
-    const oneTooShort = b4a.alloc(TRAC_ADDRESS_SIZE - 1, 0x01);
-    const tooShort = b4a.alloc(TRAC_ADDRESS_SIZE - 2, 0x01);
-    const exact = b4a.alloc(TRAC_ADDRESS_SIZE, 0x01);
-    const oneTooLong = b4a.alloc(TRAC_ADDRESS_SIZE + 1, 0x01);
-    const tooLong = b4a.alloc(TRAC_ADDRESS_SIZE + 2, 0x01);
+    const oneTooShort = b4a.alloc(config.addressLength - 1, 0x01);
+    const tooShort = b4a.alloc(config.addressLength - 2, 0x01);
+    const exact = b4a.alloc(config.addressLength, 0x01);
+    const oneTooLong = b4a.alloc(config.addressLength + 1, 0x01);
+    const tooLong = b4a.alloc(config.addressLength + 2, 0x01);
 
     const inputs = {
         emptyBufferInput: { ...validFixture, address: emptyBuffer },

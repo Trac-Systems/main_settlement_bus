@@ -17,7 +17,6 @@ import {
 import { bufferToBigInt, licenseBufferToBigInt } from "../src/utils/amountSerialization.js";
 import { isAddressValid } from "../src/core/state/utils/address.js";
 import { getConfirmedParameter } from "./utils/confirmedParameter.mjs";
-import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from "trac-wallet/constants.js";
 
 export async function handleBalance({ req, respond, msbInstance }) {
     const url = buildRequestUrl(req);
@@ -259,7 +258,7 @@ export async function handleAccountDetails({ msbInstance, respond, req }) {
         return respond(400, { error: 'Parameter "confirmed" must be exactly "true" or "false"' });
     }
 
-    if (!isAddressValid(address, TRAC_NETWORK_MSB_MAINNET_PREFIX)) {
+    if (!isAddressValid(address, msbInstance.config.addressPrefix)) {
         return respond(400, { error: "Invalid account address format" });
     }
 

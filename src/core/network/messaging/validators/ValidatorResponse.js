@@ -3,7 +3,7 @@ import BaseResponse from './base/BaseResponse.js';
 class ValidatorResponse extends BaseResponse {
 
     constructor(state, wallet) {
-        super(state, wallet);
+        super(state, wallet, config);
     }
 
     async validate(message, channelString) {

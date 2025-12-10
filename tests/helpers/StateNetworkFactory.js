@@ -24,6 +24,7 @@ import {
 	ACK_INTERVAL
 } from '../../src/utils/constants.js';
 import { testKeyPair1 } from '../fixtures/apply.fixtures.js';
+import { config } from './config.js';
 
 export class StateNetworkFactory {
 	
@@ -106,11 +107,8 @@ export class StateNetworkFactory {
 		for (let i = 0; i < nodes; i++) {
 			const mnemonic = i === 0 ? testKeyPair1.mnemonic : null;
 			const wallet = await createWallet(mnemonic);
-			const state = new State(stateStores[i].session(), bootstrapKey, wallet, {
-				enable_tx_apply_logs: false,
-				enable_error_apply_logs: true,
-				...stateOptions
-			});
+			const stateConfig = { ...config, ...stateOptions, bootstrap: bootstrapKey }
+			const state = new State(stateStores[i].session(), wallet, stateConfig);
 
 			bases[i]._handlers.apply = state.applyHandler;
 			descriptors.push({

@@ -4,7 +4,6 @@ import CompleteStateMessageOperations from '../../../../../src/messages/complete
 import { deriveIndexerSequenceState, eventFlush } from '../../../../helpers/autobaseTestHelpers.js';
 import { safeDecodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
 import nodeEntryUtils, { ZERO_LICENSE } from '../../../../../src/core/state/utils/nodeEntry.js';
-import nodeRoleUtils from '../../../../../src/core/state/utils/roles.js';
 import lengthEntryUtils from '../../../../../src/core/state/utils/lengthEntry.js';
 import addressUtils from '../../../../../src/core/state/utils/address.js';
 import { EntryType } from '../../../../../src/utils/constants.js';
@@ -17,7 +16,7 @@ import {
 } from '../../../../../src/core/state/utils/balance.js';
 import { decimalStringToBigInt, bigIntTo16ByteBuffer } from '../../../../../src/utils/amountSerialization.js';
 import { setupAdminAndWhitelistedReaderNetwork } from '../common/commonScenarioHelper.js';
-import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
+import { config } from '../../../../helpers/config.js';
 
 const DEFAULT_WRITER_FUNDING = bigIntTo16ByteBuffer(decimalStringToBigInt('10'));
 const STAKE_ENTRY_MARK = Symbol('stake-entry-mark');
@@ -106,14 +105,12 @@ export async function buildAddWriterPayload(
 ) {
 	const txValidity = await deriveIndexerSequenceState(validatorPeer.base);
 	const writingKey = writerKeyBuffer ?? readerPeer.base.local.key;
-	const partial = await PartialStateMessageOperations.assembleAddWriterMessage(
-		readerPeer.wallet,
+	const partial = await new PartialStateMessageOperations(readerPeer.wallet, config).assembleAddWriterMessage(
 		writingKey.toString('hex'),
 		txValidity.toString('hex')
 	);
 
-	return CompleteStateMessageOperations.assembleAddWriterMessage(
-		validatorPeer.wallet,
+	return new CompleteStateMessageOperations(validatorPeer.wallet, config).assembleAddWriterMessage(
 		partial.address,
 		b4a.from(partial.rao.tx, 'hex'),
 		b4a.from(partial.rao.txv, 'hex'),
@@ -137,14 +134,12 @@ export async function buildAddWriterPayloadWithTxValidity(
 	}
 
 	const writingKey = writerKeyBuffer ?? readerPeer.base.local.key;
-	const partial = await PartialStateMessageOperations.assembleAddWriterMessage(
-		readerPeer.wallet,
+	const partial = await new PartialStateMessageOperations(readerPeer.wallet, config).assembleAddWriterMessage(
 		writingKey.toString('hex'),
 		mutatedTxValidity.toString('hex')
 	);
 
-	return CompleteStateMessageOperations.assembleAddWriterMessage(
-		validatorPeer.wallet,
+	return new CompleteStateMessageOperations(validatorPeer.wallet, config).assembleAddWriterMessage(
 		partial.address,
 		b4a.from(partial.rao.tx, 'hex'),
 		mutatedTxValidity,
@@ -164,14 +159,12 @@ export async function buildRemoveWriterPayload(
 ) {
 	const txValidity = await deriveIndexerSequenceState(validatorPeer.base);
 	const writerKey = writerKeyBuffer ?? readerPeer.base.local.key;
-	const partial = await PartialStateMessageOperations.assembleRemoveWriterMessage(
-		readerPeer.wallet,
+	const partial = await new PartialStateMessageOperations(readerPeer.wallet, config).assembleRemoveWriterMessage(
 		writerKey.toString('hex'),
 		txValidity.toString('hex')
 	);
 
-	return CompleteStateMessageOperations.assembleRemoveWriterMessage(
-		validatorPeer.wallet,
+	return new CompleteStateMessageOperations(validatorPeer.wallet, config).assembleRemoveWriterMessage(
 		partial.address,
 		b4a.from(partial.rao.tx, 'hex'),
 		b4a.from(partial.rao.txv, 'hex'),
@@ -208,7 +201,7 @@ export async function assertAddWriterSuccessState(
 	}
 
 	const writerAddress = readerPeer.wallet.address;
-	const writerAddressBuffer = addressUtils.addressToBuffer(writerAddress, TRAC_NETWORK_MSB_MAINNET_PREFIX);
+    const writerAddressBuffer = addressUtils.addressToBuffer(writerAddress, config.addressPrefix);
 	const writingKey = writerKeyBuffer ?? readerPeer.base.local.key;
 	const writingKeyHex = writingKey.toString('hex');
 
@@ -589,7 +582,7 @@ async function assertWriterDowngradedEntry(
 			'writer liquid balance matches expected amount after downgrade'
 		);
 	}
-	const addressBuffer = addressUtils.addressToBuffer(address, TRAC_NETWORK_MSB_MAINNET_PREFIX);
+    const addressBuffer = addressUtils.addressToBuffer(address, config.addressPrefix);
 	const writerRegistryEntry = await base.view.get(
 		EntryType.WRITER_ADDRESS + writingKey.toString('hex')
 	);
@@ -655,7 +648,7 @@ async function withPeerEntryOverrideOnApply({
 	const node = assertWritableNode(selectNode(context));
 	const base = node.base;
 	const targetAddress = targetPeer.wallet.address;
-	const targetBuffer = addressUtils.addressToBuffer(targetAddress, TRAC_NETWORK_MSB_MAINNET_PREFIX);
+    const targetBuffer = addressUtils.addressToBuffer(targetAddress, config.addressPrefix);
 	const originalApply = base._handlers.apply;
 
 	base._handlers.apply = async function patchedApply(nodes, view, baseCtx) {

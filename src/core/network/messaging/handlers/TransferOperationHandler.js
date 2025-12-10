@@ -14,10 +14,19 @@ import {normalizeTransferOperation} from "../../../../utils/normalizers.js"
 
 class TransferOperationHandler extends BaseOperationHandler {
     #partialTransferValidator;
+    #config;
 
-    constructor(network, state, wallet, rateLimiter, options = {}) {
-        super(network, state, wallet, rateLimiter, options);
-        this.#partialTransferValidator = new PartialTransfer(this.state);
+    /**
+     * @param {Network} network
+     * @param {State} network
+     * @param {PeerWallet} state
+     * @param {TransactionRateLimiterService} rateLimiter
+     * @param {object} config
+     **/
+    constructor(network, state, wallet, rateLimiter, config) {
+        super(network, state, wallet, rateLimiter, config);
+        this.#config = config;
+        this.#partialTransferValidator = new PartialTransfer(state);
     }
 
     async handleOperation(payload) {
@@ -28,22 +37,22 @@ class TransferOperationHandler extends BaseOperationHandler {
     }
 
     async #handleTransfer(payload) {
-        const normalizedPayload = normalizeTransferOperation(payload);
+        const normalizedPayload = normalizeTransferOperation(payload, this.#config);
         const isValid = await this.#partialTransferValidator.validate(normalizedPayload);
         if (!isValid) {
             throw new Error("TransferHandler: Transfer validation failed.");
         }
 
-        const completeTransferOperation = await CompleteStateMessageOperations.assembleCompleteTransferOperationMessage(
-            this.wallet,
-            normalizedPayload.address,
-            normalizedPayload.tro.tx,
-            normalizedPayload.tro.txv,
-            normalizedPayload.tro.in,
-            normalizedPayload.tro.to,
-            normalizedPayload.tro.am,
-            normalizedPayload.tro.is
-        );
+        const completeTransferOperation = await new CompleteStateMessageOperations(this.wallet, this.#config)
+            .assembleCompleteTransferOperationMessage(
+                normalizedPayload.address,
+                normalizedPayload.tro.tx,
+                normalizedPayload.tro.txv,
+                normalizedPayload.tro.in,
+                normalizedPayload.tro.to,
+                normalizedPayload.tro.am,
+                normalizedPayload.tro.is
+            );
 
         this.network.transactionPoolService.addTransaction(completeTransferOperation);
     }

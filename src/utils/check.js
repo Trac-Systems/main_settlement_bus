@@ -10,9 +10,7 @@ import {
     BOOTSTRAP_BYTE_LENGTH,
     CHANNEL_BYTE_LENGTH,
     AMOUNT_BYTE_LENGTH,
-    TRAC_ADDRESS_SIZE,
 } from './constants.js';
-
 //TODO: ATTENTION - CURRENT IMPLEMENTATION UTILIZES `custom` FOR MULTIPLE TIMES IN MANY SCHEMAS. IT SHOULD BE CLEANED UP
 // TO UTILIZE ONLY ONE FUNCTION COMMON FOR ALL THE SCHEMAS. CREATE A TICKED P2/P3.
 
@@ -25,8 +23,13 @@ class Check {
     #validateTransactionOperationSchema
     #validateTransferOperationSchema
     #validateBalanceInitializationSchema
+    #config
 
-    constructor() {
+    /**
+     * @param {object} config
+     **/
+    constructor(config) {
+        this.#config = config
 
         this.#validator = new Validator({
             useNewCustomCheckerFunction: true,
@@ -101,6 +104,7 @@ class Check {
 
     // Complete by default - no writer needed
     #compileCoreAdminOperationSchema() {
+        const addressLength = this.#config.addressLength
         const schema = {
             $$strict: true,
             type: {
@@ -124,7 +128,7 @@ class Check {
                     return value;
                 }
             },
-            address: { type: 'buffer', length: TRAC_ADDRESS_SIZE, required: true }, // invoker adddress (admin)
+            address: {type: 'buffer', length: addressLength, required: true}, // invoker adddress (admin)
             cao: {
                 strict: true,
                 type: 'object',
@@ -163,14 +167,14 @@ class Check {
                     return value;
                 }
             },
-            address: { type: 'buffer', length: TRAC_ADDRESS_SIZE, required: true },
+            address: { type: 'buffer', length: this.#config.addressLength, required: true },
             bio: {
                 strict: true,
                 type: 'object',
                 props: {
                     tx: { type: 'buffer', length: HASH_BYTE_LENGTH, required: true }, // tx hash
                     txv: { type: 'buffer', length: HASH_BYTE_LENGTH, required: true }, // tx validity
-                    ia: { type: 'buffer', length: TRAC_ADDRESS_SIZE, required: true }, // selected address to specific operation.
+                    ia: { type: 'buffer', length: this.#config.addressLength, required: true }, // selected address to specific operation.
                     am: { type: 'buffer', length: AMOUNT_BYTE_LENGTH, required: true }, // amount to transfer
                     in: { type: 'buffer', length: NONCE_BYTE_LENGTH, required: true }, // nonce of the invoker
                     is: { type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true }, // signature of the invoker
@@ -211,14 +215,14 @@ class Check {
                     return value;
                 }
             },
-            address: { type: 'buffer', length: TRAC_ADDRESS_SIZE, required: true }, // invoker adddress (admin)
+            address: {type: 'buffer', length: this.#config.addressLength, required: true}, // invoker adddress (admin)
             aco: {
                 strict: true,
                 type: 'object',
                 props: {
                     tx: { type: 'buffer', length: HASH_BYTE_LENGTH, required: true }, // tx hash
                     txv: { type: 'buffer', length: HASH_BYTE_LENGTH, required: true }, // tx validity
-                    ia: { type: 'buffer', length: TRAC_ADDRESS_SIZE, required: true }, // incoming address - selected address for specific operation
+                    ia: { type: 'buffer', length: this.#config.addressLength, required: true }, // incoming address - selected address for specific operation
                     in: { type: 'buffer', length: NONCE_BYTE_LENGTH, required: true }, // nonce
                     is: { type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true }, // signature
                 }
@@ -256,7 +260,7 @@ class Check {
                     return value;
                 }
             },
-            address: { type: 'buffer', length: TRAC_ADDRESS_SIZE, required: true },
+            address: {type: 'buffer', length: this.#config.addressLength, required: true},
             rao: {
                 strict: true,
                 type: 'object',
@@ -266,7 +270,7 @@ class Check {
                     iw: { type: 'buffer', length: WRITER_BYTE_LENGTH, required: true }, // writing key of the invoker
                     in: { type: 'buffer', length: NONCE_BYTE_LENGTH, required: true }, // nonce of the invoker
                     is: { type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true }, // signature
-                    va: { type: 'buffer', length: TRAC_ADDRESS_SIZE, optional: true },
+                    va: { type: 'buffer', length: this.#config.addressLength, optional: true },
                     vn: { type: 'buffer', length: NONCE_BYTE_LENGTH, optional: true },
                     vs: { type: 'buffer', length: SIGNATURE_BYTE_LENGTH, optional: true }
 
@@ -325,7 +329,7 @@ class Check {
                     return value;
                 }
             },
-            address: { type: 'buffer', length: TRAC_ADDRESS_SIZE, required: true }, // invoker address
+            address: {type: 'buffer', length: this.#config.addressLength, required: true}, // invoker address
             txo: {
                 strict: true,
                 type: 'object',
@@ -338,7 +342,7 @@ class Check {
                     mbs: { type: 'buffer', length: BOOTSTRAP_BYTE_LENGTH, required: true }, // MSB bootstrap key
                     in: { type: 'buffer', length: NONCE_BYTE_LENGTH, required: true }, // Nonce of the requesting node
                     is: { type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true }, // Requester's signature
-                    va: { type: 'buffer', length: TRAC_ADDRESS_SIZE, optional: true }, //validator address
+                    va: { type: 'buffer', length: this.#config.addressLength, optional: true }, //validator address
                     vn: { type: 'buffer', length: NONCE_BYTE_LENGTH, optional: true }, //validator nonce
                     vs: { type: 'buffer', length: SIGNATURE_BYTE_LENGTH, optional: true }, //validator signature
                 },
@@ -396,7 +400,7 @@ class Check {
                     return value;
                 }
             },
-            address: { type: 'buffer', length: TRAC_ADDRESS_SIZE, required: true },
+            address: {type: 'buffer', length: this.#config.addressLength, required: true},
             bdo: {
 
                 strict: true,
@@ -408,7 +412,7 @@ class Check {
                     ic: { type: 'buffer', length: CHANNEL_BYTE_LENGTH, required: true },
                     in: { type: 'buffer', length: NONCE_BYTE_LENGTH, required: true },
                     is: { type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true },
-                    va: { type: 'buffer', length: TRAC_ADDRESS_SIZE, optional: true },
+                    va: { type: 'buffer', length: this.#config.addressLength, optional: true },
                     vn: { type: 'buffer', length: NONCE_BYTE_LENGTH, optional: true },
                     vs: { type: 'buffer', length: SIGNATURE_BYTE_LENGTH, optional: true },
                 },
@@ -466,18 +470,18 @@ class Check {
                     return value;
                 }
             },
-            address: { type: 'buffer', length: TRAC_ADDRESS_SIZE, required: true },
+            address: {type: 'buffer', length: this.#config.addressLength, required: true},
             tro: {
                 strict: true,
                 type: 'object',
                 props: {
                     tx: { type: 'buffer', length: HASH_BYTE_LENGTH, required: true }, // tx hash
                     txv: { type: 'buffer', length: HASH_BYTE_LENGTH, required: true }, // tx validity
-                    to: { type: 'buffer', length: TRAC_ADDRESS_SIZE, required: true }, // recipient address
+                    to: { type: 'buffer', length: this.#config.addressLength, required: true }, // recipient address
                     am: { type: 'buffer_amount', length: AMOUNT_BYTE_LENGTH, required: true }, // amount to transfer
                     in: { type: 'buffer', length: NONCE_BYTE_LENGTH, required: true }, // nonce of the invoker
                     is: { type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true }, // signature of the invoker
-                    va: { type: 'buffer', length: TRAC_ADDRESS_SIZE, optional: true },  // validator address
+                    va: { type: 'buffer', length: this.#config.addressLength, optional: true },  // validator address
                     vn: { type: 'buffer', length: NONCE_BYTE_LENGTH, optional: true },  // validator nonce
                     vs: { type: 'buffer', length: SIGNATURE_BYTE_LENGTH, optional: true } // validator signature
 

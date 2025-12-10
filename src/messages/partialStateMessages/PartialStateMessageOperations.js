@@ -2,6 +2,17 @@ import PartialStateMessageBuilder from './PartialStateMessageBuilder.js';
 import PartialStateMessageDirector from './PartialStateMessageDirector.js';
 
 class PartialStateMessageOperations {
+    #wallet;
+    #config
+
+    /**
+     * @param {PeerWallet} wallet - Wallet of the requester/invoker node that broadcasts the operation
+     * @param {object} config - A configuration object
+     */
+    constructor(wallet, config) {
+        this.#wallet = wallet;
+        this.#config = config;
+    }
 
     /**
      * Assembles a PARTIAL bootstrap deployment operation, which can be sent to a validator.
@@ -9,8 +20,6 @@ class PartialStateMessageOperations {
      * Bootstrap deployment is required to register a subnetwork. The network will reject
      * TransactionOperation messages for external bootstraps that are not registered.
      * Do NOT attempt to register the MSB bootstrap key.
-     *
-     * @param {Object} wallet - Wallet of the requester/invoker node that broadcasts the operation
      * @param {String} externalBootstrap - Bootstrap key from the subnetwork to be registered.
      *                                    MUST be different from the MSB bootstrap key.
      *                                    BEFORE deploying ensure if the subnetwork bootstrap is not already deployed.
@@ -20,13 +29,13 @@ class PartialStateMessageOperations {
      * @returns {Promise<Object>} The assembled bootstrap deployment operation message
      * @throws {Error} If assembly of the bootstrap deployment operation message fails
      */
-    static async assembleBootstrapDeploymentMessage(wallet, externalBootstrap, channel, txValidity) {
+    async assembleBootstrapDeploymentMessage(externalBootstrap, channel, txValidity) {
         try {
-            const builder = new PartialStateMessageBuilder(wallet);
+            const builder = new PartialStateMessageBuilder(this.#wallet, this.#config);
             const director = new PartialStateMessageDirector();
             director.builder = builder;
             return await director.buildPartialBootstrapDeploymentMessage(
-                wallet.address,
+                this.#wallet.address,
                 externalBootstrap,
                 channel,
                 txValidity
@@ -36,34 +45,34 @@ class PartialStateMessageOperations {
         }
     }
 
-    static async assembleAddWriterMessage(wallet, writingKey, txValidity) {
+    async assembleAddWriterMessage(writingKey, txValidity) {
         try {
-            const builder = new PartialStateMessageBuilder(wallet);
+            const builder = new PartialStateMessageBuilder(this.#wallet, this.#config);
             const director = new PartialStateMessageDirector();
             director.builder = builder;
-            return await director.buildAddWriterMessage(wallet.address, writingKey, txValidity);
+            return await director.buildAddWriterMessage(this.#wallet.address, writingKey, txValidity);
         } catch (error) {
             throw new Error(`Failed to assemble add writer message: ${error.message}`);
         }
     }
 
-    static async assembleRemoveWriterMessage(wallet, writerKey, txValidity) {
+    async assembleRemoveWriterMessage(writerKey, txValidity) {
         try {
-            const builder = new PartialStateMessageBuilder(wallet);
+            const builder = new PartialStateMessageBuilder(this.#wallet, this.#config);
             const director = new PartialStateMessageDirector();
             director.builder = builder;
-            return await director.buildRemoveWriterMessage(wallet.address, writerKey, txValidity);
+            return await director.buildRemoveWriterMessage(this.#wallet.address, writerKey, txValidity);
         } catch (error) {
             throw new Error(`Failed to assemble remove writer message: ${error.message}`);
         }
     }
 
-    static async assembleAdminRecoveryMessage(wallet, writingKey, txValidity) {
+    async assembleAdminRecoveryMessage(writingKey, txValidity) {
         try {
-            const builder = new PartialStateMessageBuilder(wallet);
+            const builder = new PartialStateMessageBuilder(this.#wallet, this.#config);
             const director = new PartialStateMessageDirector();
             director.builder = builder;
-            return await director.buildAdminRecoveryMessage(wallet.address, writingKey, txValidity);
+            return await director.buildAdminRecoveryMessage(this.#wallet.address, writingKey, txValidity);
         } catch (error) {
             throw new Error(`Failed to assemble admin recovery message: ${error.message}`);
         }
@@ -73,8 +82,6 @@ class PartialStateMessageOperations {
     /**
      * Assembles a PARTIAL transaction operation, which can be sent to a validator, who can then
      * sign the transaction to make it COMPLETE.
-     *
-     * @param {Object} wallet - Wallet of the requester/invoker node that broadcasts the transaction
      * @param {String} incomingWritingKey - Writing key from the subnetwork, used for authentication of the requesting node
      * @param {String} txValidity - Transaction validity hash representing current indexer combination.
      *                              Transaction remains valid as long as indexer keys maintain their order.
@@ -91,13 +98,13 @@ class PartialStateMessageOperations {
      * @returns {Promise<Object>} The assembled transaction operation message
      * @throws {Error} If assembly of the transaction operation message fails
      */
-    static async assembleTransactionOperationMessage(wallet, incomingWritingKey, txValidity, contentHash, externalBootstrap, msbBootstrap) {
+    async assembleTransactionOperationMessage(incomingWritingKey, txValidity, contentHash, externalBootstrap, msbBootstrap) {
         try {
-            const builder = new PartialStateMessageBuilder(wallet);
+            const builder = new PartialStateMessageBuilder(this.#wallet, this.#config);
             const director = new PartialStateMessageDirector();
             director.builder = builder;
             return await director.buildTransactionOperationMessage(
-                wallet.address,
+                this.#wallet.address,
                 incomingWritingKey,
                 txValidity,
                 contentHash,
@@ -109,13 +116,13 @@ class PartialStateMessageOperations {
         }
     }
 
-    static async assembleTransferOperationMessage(wallet, recipientAddress, amount, txValidity) {
+    async assembleTransferOperationMessage(recipientAddress, amount, txValidity) {
         try {
-            const builder = new PartialStateMessageBuilder(wallet);
+            const builder = new PartialStateMessageBuilder(this.#wallet, this.#config);
             const director = new PartialStateMessageDirector();
             director.builder = builder;
             return await director.buildTransferOperationMessage(
-                wallet.address,
+                this.#wallet.address,
                 recipientAddress,
                 amount,
                 txValidity

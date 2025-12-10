@@ -3,7 +3,7 @@ import OperationValidationScenarioBase from '../../base/OperationValidationScena
 import { safeDecodeApplyOperation } from '../../../../../../../src/utils/protobuf/operationHelpers.js';
 import addressUtils from '../../../../../../../src/core/state/utils/address.js';
 import { eventFlush } from '../../../../../../helpers/autobaseTestHelpers.js';
-import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
+import { config } from '../../../../../../helpers/config.js'
 
 export const ValidatorEntryMutation = {
 	DELETE: Symbol('validator-entry-delete')
@@ -179,7 +179,7 @@ function extractValidatorAddress(payloadBuffer, path) {
 		return null;
 	}
 
-	const addressString = addressUtils.bufferToAddress(value, TRAC_NETWORK_MSB_MAINNET_PREFIX);
+	const addressString = addressUtils.bufferToAddress(value, config.addressPrefix);
 	if (!addressString) {
 		return null;
 	}

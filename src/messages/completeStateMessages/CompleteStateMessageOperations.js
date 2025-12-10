@@ -1,17 +1,23 @@
 import CompleteStateMessageDirector from './CompleteStateMessageDirector.js';
 import CompleteStateMessageBuilder from './CompleteStateMessageBuilder.js';
 import { safeEncodeApplyOperation } from '../../utils/protobuf/operationHelpers.js';
-import fileUtils from '../../../src/utils/fileUtils.js';
+import { blake3Hash } from '../../utils/crypto.js';
 
 class CompleteStateMessageOperations {
+    #config
+    #wallet
+    constructor(wallet, config) {
+        this.#wallet = wallet
+        this.#config = config
+    }
 
-    static async assembleAddAdminMessage(wallet, writingKey, txValidity) {
+    async assembleAddAdminMessage(writingKey, txValidity) {
         try {
-            const builder = new CompleteStateMessageBuilder(wallet);
+            const builder = new CompleteStateMessageBuilder(this.#wallet, this.#config);
             const director = new CompleteStateMessageDirector();
             director.builder = builder;
 
-            const payload = await director.buildAddAdminMessage(wallet.address, writingKey, txValidity);
+            const payload = await director.buildAddAdminMessage(this.#wallet.address, writingKey, txValidity);
             return safeEncodeApplyOperation(payload);
 
         } catch (error) {
@@ -19,17 +25,16 @@ class CompleteStateMessageOperations {
         }
     }
 
-    static async assembleDisableInitializationMessage(wallet, writingKey, txValidity) {
-        const builder = new CompleteStateMessageBuilder(wallet);
+    async assembleDisableInitializationMessage(writingKey, txValidity) {
+        const builder = new CompleteStateMessageBuilder(this.#wallet, this.#config);
         const director = new CompleteStateMessageDirector();
         director.builder = builder;
 
-        const payload = await director.buildDisableInitializationMessage(wallet.address, writingKey, txValidity);
+        const payload = await director.buildDisableInitializationMessage(this.#wallet.address, writingKey, txValidity);
         return safeEncodeApplyOperation(payload);
     }
 
-    static async assembleAddWriterMessage(
-        wallet,
+    async assembleAddWriterMessage(
         invokerAddress,
         transactionHash,
         txValidity,
@@ -38,7 +43,7 @@ class CompleteStateMessageOperations {
         incomingSignature
     ) {
         try {
-            const builder = new CompleteStateMessageBuilder(wallet);
+            const builder = new CompleteStateMessageBuilder(this.#wallet, this.#config);
             const director = new CompleteStateMessageDirector();
             director.builder = builder;
 
@@ -57,8 +62,7 @@ class CompleteStateMessageOperations {
         }
     }
 
-    static async assembleRemoveWriterMessage(
-        wallet,
+    async assembleRemoveWriterMessage(
         invokerAddress,
         transactionHash,
         txValidity,
@@ -67,7 +71,7 @@ class CompleteStateMessageOperations {
         incomingSignature
     ) {
         try {
-            const builder = new CompleteStateMessageBuilder(wallet);
+            const builder = new CompleteStateMessageBuilder(this.#wallet, this.#config);
             const director = new CompleteStateMessageDirector();
             director.builder = builder;
 
@@ -86,8 +90,7 @@ class CompleteStateMessageOperations {
         }
     }
 
-    static async assembleAdminRecoveryMessage(
-        wallet,
+    async assembleAdminRecoveryMessage(
         invokerAddress,
         transactionHash,
         txValidity,
@@ -96,7 +99,7 @@ class CompleteStateMessageOperations {
         incomingSignature
     ) {
         try {
-            const builder = new CompleteStateMessageBuilder(wallet);
+            const builder = new CompleteStateMessageBuilder(this.#wallet, this.#config);
             const director = new CompleteStateMessageDirector();
             director.builder = builder;
 
@@ -115,13 +118,13 @@ class CompleteStateMessageOperations {
         }
     }
 
-    static async assembleAddIndexerMessage(wallet, incomingAddress, txValidity) {
+    async assembleAddIndexerMessage(incomingAddress, txValidity) {
         try {
-            const builder = new CompleteStateMessageBuilder(wallet);
+            const builder = new CompleteStateMessageBuilder(this.#wallet, this.#config);
             const director = new CompleteStateMessageDirector();
             director.builder = builder;
 
-            const payload = await director.buildAddIndexerMessage(wallet.address, incomingAddress, txValidity);
+            const payload = await director.buildAddIndexerMessage(this.#wallet.address, incomingAddress, txValidity);
             return safeEncodeApplyOperation(payload);
 
         } catch (error) {
@@ -131,13 +134,13 @@ class CompleteStateMessageOperations {
 
 
 
-    static async assembleRemoveIndexerMessage(wallet, incomingAddress, txValidity) {
+    async assembleRemoveIndexerMessage(incomingAddress, txValidity) {
         try {
-            const builder = new CompleteStateMessageBuilder(wallet);
+            const builder = new CompleteStateMessageBuilder(this.#wallet, this.#config);
             const director = new CompleteStateMessageDirector();
             director.builder = builder;
 
-            const payload = await director.buildRemoveIndexerMessage(wallet.address, incomingAddress, txValidity);
+            const payload = await director.buildRemoveIndexerMessage(this.#wallet.address, incomingAddress, txValidity);
             return safeEncodeApplyOperation(payload);
 
         } catch (error) {
@@ -145,14 +148,13 @@ class CompleteStateMessageOperations {
         }
     }
 
-    static async assembleAppendWhitelistMessages(wallet, txValidity, addressToWhitelist) {
+    async assembleAppendWhitelistMessages(txValidity, addressToWhitelist) {
         try {
-
-            const builder = new CompleteStateMessageBuilder(wallet);
+            const builder = new CompleteStateMessageBuilder(this.#wallet, this.#config);
             const director = new CompleteStateMessageDirector();
             director.builder = builder;
 
-            const payload = await director.buildAppendWhitelistMessage(wallet.address, addressToWhitelist, txValidity);
+            const payload = await director.buildAppendWhitelistMessage(this.#wallet.address, addressToWhitelist, txValidity);
             
             return safeEncodeApplyOperation(payload);;
         } catch (error) {
@@ -160,9 +162,9 @@ class CompleteStateMessageOperations {
         }
     }
 
-    static async assembleBalanceInitializationMessages(wallet, txValidity, addressBalancePair) {
+    async assembleBalanceInitializationMessages(txValidity, addressBalancePair) {
         try {
-            const builder = new CompleteStateMessageBuilder(wallet);
+            const builder = new CompleteStateMessageBuilder(this.#wallet, this.#config);
             const director = new CompleteStateMessageDirector();
             director.builder = builder;
 
@@ -170,7 +172,7 @@ class CompleteStateMessageOperations {
 
             for (const [recipientAddress, balanceBuffer] of addressBalancePair) {
                 const payload = await director.buildBalanceInitializationMessage(
-                    wallet.address,
+                    this.#wallet.address,
                     recipientAddress,
                     balanceBuffer,
                     txValidity
@@ -184,13 +186,13 @@ class CompleteStateMessageOperations {
         }
     }
 
-    static async assembleBanWriterMessage(wallet, incomingAddress, txValidity) {
+    async assembleBanWriterMessage(incomingAddress, txValidity) {
         try {
-            const builder = new CompleteStateMessageBuilder(wallet);
+            const builder = new CompleteStateMessageBuilder(this.#wallet, this.#config);
             const director = new CompleteStateMessageDirector();
             director.builder = builder;
 
-            const payload = await director.buildBanWriterMessage(wallet.address, incomingAddress, txValidity);
+            const payload = await director.buildBanWriterMessage(this.#wallet.address, incomingAddress, txValidity);
             return safeEncodeApplyOperation(payload);
 
         } catch (error) {
@@ -198,8 +200,7 @@ class CompleteStateMessageOperations {
         }
     }
 
-    static async assembleCompleteTransactionOperationMessage(
-        wallet,
+    async assembleCompleteTransactionOperationMessage(
         invokerAddress,
         txHash,
         txValidity,
@@ -211,7 +212,7 @@ class CompleteStateMessageOperations {
         msbBootstrap
     ) {
         try {
-            const builder = new CompleteStateMessageBuilder(wallet);
+            const builder = new CompleteStateMessageBuilder(this.#wallet, this.#config);
             const director = new CompleteStateMessageDirector();
             director.builder = builder;
             const payload = await director.buildTransactionOperationMessage(
@@ -232,8 +233,7 @@ class CompleteStateMessageOperations {
         }
     }
 
-    static async assembleCompleteBootstrapDeployment(
-        wallet,
+    async assembleCompleteBootstrapDeployment(
         invokerAddress,
         transactionHash,
         txValidity,
@@ -243,7 +243,7 @@ class CompleteStateMessageOperations {
         incomingSignature
     ) {
         try {
-            const builder = new CompleteStateMessageBuilder(wallet);
+            const builder = new CompleteStateMessageBuilder(this.#wallet, this.#config);
             const director = new CompleteStateMessageDirector();
             director.builder = builder;
 
@@ -263,8 +263,7 @@ class CompleteStateMessageOperations {
         }
     }
 
-    static async assembleCompleteTransferOperationMessage(
-        wallet,
+    async assembleCompleteTransferOperationMessage(
         invokerAddress,
         transactionHash,
         txValidity,
@@ -274,7 +273,7 @@ class CompleteStateMessageOperations {
         incomingSignature
     ) {
         try {
-            const builder = new CompleteStateMessageBuilder(wallet);
+            const builder = new CompleteStateMessageBuilder(this.#wallet, this.#config);
             const director = new CompleteStateMessageDirector();
             director.builder = builder;
 

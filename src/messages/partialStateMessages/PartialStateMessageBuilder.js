@@ -2,13 +2,12 @@ import PeerWallet from "trac-wallet";
 import b4a from "b4a";
 
 import StateBuilder from '../base/StateBuilder.js'
-import { OperationType, TRAC_ADDRESS_SIZE, NETWORK_ID } from '../../utils/constants.js';
+import { OperationType, TRAC_ADDRESS_SIZE } from '../../utils/constants.js';
 import { addressToBuffer, isAddressValid } from '../../core/state/utils/address.js';
 import { isHexString } from "../../utils/helpers.js";
 import { blake3Hash } from "../../utils/crypto.js";
 import { createMessage } from "../../utils/buffer.js";
 import { isTransaction, isRoleAccess, isBootstrapDeployment, isTransfer } from "../../utils/operations.js";
-import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from "trac-wallet/constants.js";
 
 class PartialStateMessageBuilder extends StateBuilder {
     #wallet;
@@ -19,22 +18,25 @@ class PartialStateMessageBuilder extends StateBuilder {
     #contentHash;
     #externalBootstrap;
     #withMsbBootstrap;
-    #bootstrapNonce;
-    #bootstrapSignature;
     #channel;
     #incomingAddress;
     #amount;
     #payload;
+    #config;
 
-    constructor(wallet) {
+    /**
+     * @param {PeerWallet} wallet
+     * @param {object} config
+     **/
+    constructor(wallet, config) {
         super();
+        this.#config = config;
         if (!wallet || typeof wallet !== 'object') {
             throw new Error('Wallet must be a valid wallet object');
         }
-        if (!isAddressValid(wallet.address, TRAC_NETWORK_MSB_MAINNET_PREFIX)) {
+        if (!isAddressValid(wallet.address, this.#config.addressPrefix)) {
             throw new Error('Wallet should have a valid TRAC address.');
         }
-
 
         this.#wallet = wallet;
         this.reset();
@@ -48,8 +50,6 @@ class PartialStateMessageBuilder extends StateBuilder {
         this.#contentHash = null;
         this.#externalBootstrap = null;
         this.#withMsbBootstrap = false;
-        this.#bootstrapNonce = null;
-        this.#bootstrapSignature = null;
         this.#incomingAddress = null;
         this.#amount = null;
         this.#channel = null;
@@ -67,7 +67,7 @@ class PartialStateMessageBuilder extends StateBuilder {
     }
 
     withAddress(address) {
-        if (!isAddressValid(address, TRAC_NETWORK_MSB_MAINNET_PREFIX)) {
+        if (!isAddressValid(address, this.#config.addressPrefix)) {
             throw new Error(`Address field must be a valid TRAC bech32m address with length ${TRAC_ADDRESS_SIZE}.`);
         }
 
@@ -117,7 +117,7 @@ class PartialStateMessageBuilder extends StateBuilder {
     }
 
     withIncomingAddress(address) {
-        if (!isAddressValid(address, TRAC_NETWORK_MSB_MAINNET_PREFIX)) {
+        if (!isAddressValid(address, this.#config.addressPrefix)) {
             throw new Error(`Incoming address field must be a valid TRAC bech32m address with length ${TRAC_ADDRESS_SIZE}.`);
         }
 
@@ -156,7 +156,7 @@ class PartialStateMessageBuilder extends StateBuilder {
             case OperationType.REMOVE_WRITER:
             case OperationType.ADMIN_RECOVERY:
                 txMsg = createMessage(
-                    NETWORK_ID,
+                    this.#config.networkId,
                     b4a.from(this.#txValidity, 'hex'),
                     b4a.from(this.#writingKey, 'hex'),
                     nonce,
@@ -169,7 +169,7 @@ class PartialStateMessageBuilder extends StateBuilder {
                     throw new Error('External bootstrap key must be set for BOOTSTRAP DEPLOYMENT operation.');
                 }
                 txMsg = createMessage(
-                    NETWORK_ID,
+                    this.#config.networkId,
                     b4a.from(this.#txValidity, 'hex'),
                     b4a.from(this.#externalBootstrap, 'hex'),
                     b4a.from(this.#channel, 'hex'),
@@ -180,7 +180,7 @@ class PartialStateMessageBuilder extends StateBuilder {
 
             case OperationType.TX:
                 txMsg = createMessage(
-                    NETWORK_ID,
+                    this.#config.networkId,
                     b4a.from(this.#txValidity, 'hex'),
                     b4a.from(this.#writingKey, 'hex'),
                     b4a.from(this.#contentHash, 'hex'),
@@ -192,9 +192,9 @@ class PartialStateMessageBuilder extends StateBuilder {
                 break;
             case OperationType.TRANSFER:
                 txMsg = createMessage(
-                    NETWORK_ID,
+                    this.#config.networkId,
                     b4a.from(this.#txValidity, 'hex'),
-                    addressToBuffer(this.#incomingAddress, TRAC_NETWORK_MSB_MAINNET_PREFIX), // we need to sign address of the recipient as well
+                    addressToBuffer(this.#incomingAddress, this.#config.addressPrefix), // we need to sign address of the recipient as well
                     b4a.from(this.#amount, 'hex'),
                     nonce,
                     OperationType.TRANSFER

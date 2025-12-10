@@ -17,21 +17,23 @@ import {
 import PartialStateMessageOperations from "../../../src/messages/partialStateMessages/PartialStateMessageOperations.js";
 import CompleteStateMessageOperations from '../../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
 import { $TNK } from '../../../src/core/state/utils/balance.js';
+import { config } from '../../helpers/config.js';
 
 const buildTransfer = async (admin, from, to, amount) => {
     const txValidity = await from.msb.state.getIndexerSequenceState()
-    const tx = await PartialStateMessageOperations.assembleTransferOperationMessage(from.wallet, to.wallet.address, b4a.toString(amount, 'hex'), b4a.toString(txValidity, 'hex'))
+    const tx = await new PartialStateMessageOperations(from.wallet, config)
+        .assembleTransferOperationMessage(to.wallet.address, b4a.toString(amount, 'hex'), b4a.toString(txValidity, 'hex'))
     return { 
-        raw: await CompleteStateMessageOperations.assembleCompleteTransferOperationMessage(
-            admin.wallet,
-            tx.address,
-            b4a.from(tx.tro.tx, 'hex'),
-            b4a.from(tx.tro.txv, 'hex'),
-            b4a.from(tx.tro.in, 'hex'),
-            tx.tro.to,
-            b4a.from(tx.tro.am, 'hex'),
-            b4a.from(tx.tro.is, 'hex'),
-        ),
+        raw: await new CompleteStateMessageOperations(admin.wallet, config)
+            .assembleCompleteTransferOperationMessage(
+                tx.address,
+                b4a.from(tx.tro.tx, 'hex'),
+                b4a.from(tx.tro.txv, 'hex'),
+                b4a.from(tx.tro.in, 'hex'),
+                tx.tro.to,
+                b4a.from(tx.tro.am, 'hex'),
+                b4a.from(tx.tro.is, 'hex'),
+            ),
         hash: tx.tro.tx
     }
 }

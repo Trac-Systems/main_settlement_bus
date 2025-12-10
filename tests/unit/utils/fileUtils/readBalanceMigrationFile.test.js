@@ -3,6 +3,7 @@ import fileUtils from '../../../../src/utils/fileUtils.js';
 import { errorMessageIncludes } from "../../../helpers/regexHelper.js";
 import fs from 'fs';
 import PeerWallet from 'trac-wallet';
+import { config } from '../../../helpers/config.js';
 
 const DUMMY_PATH_OK = './dummy_balance_ok.csv';
 const DUMMY_PATH_DUP = './dummy_balance_dup.csv';
@@ -51,7 +52,7 @@ hook('Initialize dummy balance files', async t => {
         return wallet.address;
     }
     for (let i = 0; i < 1000; i++) {
-        const rand = await randomAddress();
+        const rand = await randomAddress(config.addressPrefix);
         large += `${rand},1.0\n`;
     }
     fs.writeFileSync(DUMMY_PATH_LARGE, large);

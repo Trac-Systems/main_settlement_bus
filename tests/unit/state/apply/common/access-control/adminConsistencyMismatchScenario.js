@@ -3,7 +3,7 @@ import OperationValidationScenarioBase from '../base/OperationValidationScenario
 import { eventFlush } from '../../../../../helpers/autobaseTestHelpers.js';
 import { EntryType, TRAC_ADDRESS_SIZE } from '../../../../../../src/utils/constants.js';
 import addressUtils from '../../../../../../src/core/state/utils/address.js';
-import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
+import { config } from '../../../../../helpers/config.js'
 
 export default class AdminConsistencyMismatchScenario extends OperationValidationScenarioBase {
 	constructor({
@@ -40,7 +40,7 @@ async function applyWithMutatedAdminEntry(context, payload) {
 		throw new Error('Admin consistency scenario requires a reader peer with a wallet.');
 	}
 
-	const alternateAddressBuffer = addressUtils.addressToBuffer(reader.wallet.address, TRAC_NETWORK_MSB_MAINNET_PREFIX);
+	const alternateAddressBuffer = addressUtils.addressToBuffer(reader.wallet.address, config.addressPrefix);
 	if (!alternateAddressBuffer || alternateAddressBuffer.length !== TRAC_ADDRESS_SIZE) {
 		throw new Error('Failed to derive alternate admin address buffer.');
 	}

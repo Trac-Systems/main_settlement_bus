@@ -13,7 +13,7 @@ import nodeEntryUtils, { ZERO_LICENSE } from '../../../../../src/core/state/util
 import lengthEntryUtils from '../../../../../src/core/state/utils/lengthEntry.js';
 import addressUtils from '../../../../../src/core/state/utils/address.js';
 import { buildAddAdminRequesterPayload } from '../addAdmin/addAdminScenarioHelpers.js';
-import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
+import { config } from '../../../../helpers/config.js';
 
 export async function setupAppendWhitelistScenario(t, { nodes = 2 } = {}) {
 	const context = await setupStateNetwork({
@@ -45,11 +45,11 @@ export async function buildAppendWhitelistPayload(context, readerAddress = null)
 	const adminNode = context.adminBootstrap;
 	const targetAddress = readerAddress ?? selectReaderPeer(context).wallet.address;
 	const txValidity = await deriveIndexerSequenceState(adminNode.base);
-	return CompleteStateMessageOperations.assembleAppendWhitelistMessages(
-		adminNode.wallet,
-		txValidity,
-		targetAddress
-	);
+    return new CompleteStateMessageOperations(adminNode.wallet, config)
+        .assembleAppendWhitelistMessages(
+            txValidity,
+            targetAddress
+        );
 }
 
 export async function buildAppendWhitelistPayloadWithTxValidity(
@@ -59,21 +59,21 @@ export async function buildAppendWhitelistPayloadWithTxValidity(
 ) {
 	const adminNode = context.adminBootstrap;
 	const targetAddress = readerAddress ?? selectReaderPeer(context).wallet.address;
-	return CompleteStateMessageOperations.assembleAppendWhitelistMessages(
-		adminNode.wallet,
-		txValidity,
-		targetAddress
-	);
+    return new CompleteStateMessageOperations(adminNode.wallet, config)
+        .assembleAppendWhitelistMessages(
+            txValidity,
+            targetAddress
+        );
 }
 
 export async function buildBanWriterPayload(context, readerAddress) {
 	const adminNode = context.adminBootstrap;
 	const txValidity = await deriveIndexerSequenceState(adminNode.base);
-	return CompleteStateMessageOperations.assembleBanWriterMessage(
-		adminNode.wallet,
-		readerAddress,
-		txValidity
-	);
+    return new CompleteStateMessageOperations(adminNode.wallet, config)
+        .assembleBanWriterMessage(
+            readerAddress,
+            txValidity
+        );
 }
 
 export function mutateAppendWhitelistPayloadForInvalidSchema(t, validPayload) {
@@ -147,7 +147,7 @@ export async function assertReaderWhitelisted(
 	const licenseId = lengthEntryUtils.decodeBE(decodedEntry.license);
 	const licenseIndexEntry = await base.view.get(`${EntryType.LICENSE_INDEX}${licenseId}`);
 	t.ok(licenseIndexEntry, 'license index entry exists for reader');
-	const readerAddressBuffer = addressUtils.addressToBuffer(readerAddress, TRAC_NETWORK_MSB_MAINNET_PREFIX);
+	const readerAddressBuffer = addressUtils.addressToBuffer(readerAddress, config.addressPrefix);
 	t.ok(readerAddressBuffer.length > 0, 'reader address encodes to buffer');
 	t.ok(
 		licenseIndexEntry && b4a.equals(licenseIndexEntry.value, readerAddressBuffer),
