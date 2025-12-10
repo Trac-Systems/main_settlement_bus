@@ -11,6 +11,7 @@ import { AUTOBASE_VALUE_ENCODING, EntryType } from '../../../../../src/utils/con
 import { safeDecodeApplyOperation, safeEncodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
 import { safeWriteUInt32BE } from '../../../../../src/utils/buffer.js';
 import { buildAddAdminRequesterPayload } from '../addAdmin/addAdminScenarioHelpers.js';
+import { config } from '../../../../helpers/config.js';
 
 export async function setupDisableInitializationScenario(t) {
 	const context = await setupStateNetwork({
@@ -54,20 +55,20 @@ export async function buildDisableInitializationPayload(context) {
 	const adminNode = context.adminBootstrap;
 	const txValidity = await deriveIndexerSequenceState(adminNode.base);
 
-	return CompleteStateMessageOperations.assembleDisableInitializationMessage(
-		adminNode.wallet,
-		adminNode.base.local.key,
-		txValidity
-	);
+    return new CompleteStateMessageOperations(adminNode.wallet, config)
+        .assembleDisableInitializationMessage(
+            adminNode.base.local.key,
+            txValidity
+        );
 }
 
 export async function buildDisableInitializationPayloadWithTxValidity(context, txValidity) {
 	const adminNode = context.adminBootstrap;
-	return CompleteStateMessageOperations.assembleDisableInitializationMessage(
-		adminNode.wallet,
-		adminNode.base.local.key,
-		txValidity
-	);
+    return new CompleteStateMessageOperations(adminNode.wallet, config)
+        .assembleDisableInitializationMessage(
+            adminNode.base.local.key,
+            txValidity
+        );
 }
 
 export async function assertInitializationDisabledState(t, base, payload) {

@@ -7,6 +7,7 @@ import fileUtils from "../../src/utils/fileUtils.js";
 import CompleteStateMessageOperations from "../../src/messages/completeStateMessages/CompleteStateMessageOperations.js";
 import {bufferToAddress} from "../../src/core/state/utils/address.js";
 import {errorMessageIncludes} from "../utils/regexHelper.js";
+import { config } from '../../helpers/config.js'
 
 // MOCK SETUP
 const whitelistAddresses = [
@@ -22,7 +23,7 @@ test('assembleWhitelistMessages', async (t) => {
 
 
     t.test('assembleWhitelistMessages - Happy Path', async (k) => {
-        const mapMsg = await CompleteStateMessageOperations.assembleAppendWhitelistMessages(walletAdmin);
+        const mapMsg = await new CompleteStateMessageOperations(walletAdmin, config).assembleAppendWhitelistMessages();
         const msg = mapMsg.get(whitelistAddresses[0])
         k.ok(msg, 'Message should be created');
         k.ok(msg.length > 0, 'Message should be an array with at least one element');
@@ -31,7 +32,7 @@ test('assembleWhitelistMessages', async (t) => {
         k.is(Object.keys(decodedMsg.bko).length, 2, 'Message value should have 2 keys');
         k.is(decodedMsg.type, OperationType.APPEND_WHITELIST, 'Message type should be APPEND_WHITELIST');
 
-        k.is(bufferToAddress(decodedMsg.address, TRAC_NETWORK_MSB_MAINNET_PREFIX) , whitelistAddresses[0], 'Message address should be the address in the file');
+        k.is(bufferToAddress(decodedMsg.address, config.addressPrefix) , whitelistAddresses[0], 'Message address should be the address in the file');
         k.is(decodedMsg.bko.nonce.length, 32, 'Message nonce should be 32 bytes long');
         k.ok(b4a.isBuffer(decodedMsg.bko.nonce), 'Message nonce should be a buffer');
         k.is(decodedMsg.bko.sig.length, 64, 'Message signature should be 64 bytes long');
@@ -40,7 +41,7 @@ test('assembleWhitelistMessages', async (t) => {
 
     t.test('assembleWhitelistMessages - Should return null when wallet is invalid', async (k) => {
         await k.exception(
-            async () => await CompleteStateMessageOperations.assembleAppendWhitelistMessages(null),
+            async () => await new CompleteStateMessageOperations(null, config).assembleAppendWhitelistMessages(),
             errorMessageIncludes('Wallet must be a valid wallet object')
         );
     });
@@ -48,7 +49,7 @@ test('assembleWhitelistMessages', async (t) => {
 
     t.test('assembleWhitelistMessages - Empty object', async (k) => {
         await k.exception(
-            async () => await CompleteStateMessageOperations.assembleAppendWhitelistMessages({}),
+            async () => await new CompleteStateMessageOperations({}, config).assembleAppendWhitelistMessages(),
             errorMessageIncludes('Wallet should have a valid TRAC address.')
         );
 

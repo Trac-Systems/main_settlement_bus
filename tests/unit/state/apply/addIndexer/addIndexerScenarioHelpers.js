@@ -12,7 +12,7 @@ import transactionUtils from '../../../../../src/core/state/utils/transaction.js
 import addressUtils from '../../../../../src/core/state/utils/address.js';
 import { safeDecodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
 import nodeRoleUtils from '../../../../../src/core/state/utils/roles.js';
-import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
+import { config } from '../../../../helpers/config.js';
 
 export function selectIndexerCandidatePeer(context, offset = 0) {
 	return selectWriterPeer(context, offset);
@@ -51,11 +51,11 @@ export async function buildAddIndexerPayload(
 	}
 
 	const txValidity = await deriveIndexerSequenceState(adminPeer.base);
-	return CompleteStateMessageOperations.assembleAddIndexerMessage(
-		adminPeer.wallet,
-		writerPeer.wallet.address,
-		txValidity
-	);
+    return new CompleteStateMessageOperations(adminPeer.wallet, config)
+        .assembleAddIndexerMessage(
+            writerPeer.wallet.address,
+            txValidity
+        );
 }
 
 export async function applyWithIndexerRoleUpdateFailure(context, invalidPayload) {
@@ -99,11 +99,11 @@ export async function buildAddIndexerPayloadWithTxValidity(
 		throw new Error('buildAddIndexerPayloadWithTxValidity requires an admin peer.');
 	}
 
-	return CompleteStateMessageOperations.assembleAddIndexerMessage(
-		adminPeer.wallet,
-		writerPeer.wallet.address,
-		mutatedTxValidity
-	);
+    return new CompleteStateMessageOperations(adminPeer.wallet, config)
+        .assembleAddIndexerMessage(
+            writerPeer.wallet.address,
+            mutatedTxValidity
+        );
 }
 
 export function ensureIndexerRegistration(base, writingKey) {
@@ -147,11 +147,11 @@ export async function buildRemoveIndexerPayload(
 	}
 
 	const txValidity = await deriveIndexerSequenceState(adminPeer.base);
-	return CompleteStateMessageOperations.assembleRemoveIndexerMessage(
-		adminPeer.wallet,
-		indexerPeer.wallet.address,
-		txValidity
-	);
+    return new CompleteStateMessageOperations(adminPeer.wallet, config)
+        .assembleRemoveIndexerMessage(
+            indexerPeer.wallet.address,
+            txValidity
+        );
 }
 
 export async function buildRemoveIndexerPayloadWithTxValidity(
@@ -169,11 +169,11 @@ export async function buildRemoveIndexerPayloadWithTxValidity(
 		throw new Error('buildRemoveIndexerPayloadWithTxValidity requires an admin peer.');
 	}
 
-	return CompleteStateMessageOperations.assembleRemoveIndexerMessage(
-		adminPeer.wallet,
-		indexerPeer.wallet.address,
-		mutatedTxValidity
-	);
+    return new CompleteStateMessageOperations(adminPeer.wallet, config)
+        .assembleRemoveIndexerMessage(
+            indexerPeer.wallet.address,
+            mutatedTxValidity
+        );
 }
 
 export async function assertAddIndexerSuccessState(
@@ -300,7 +300,7 @@ async function assertAddIndexerPayloadMetadata(t, base, payload, expectedAdminAd
 
 	const requesterAddressBuffer = decodedOperation.address;
 	t.ok(requesterAddressBuffer, 'addIndexer payload contains requester address');
-	const requesterAddress = addressUtils.bufferToAddress(requesterAddressBuffer, TRAC_NETWORK_MSB_MAINNET_PREFIX);
+	const requesterAddress = addressUtils.bufferToAddress(requesterAddressBuffer, config.addressPrefix);
 	t.ok(requesterAddress, 'addIndexer requester address decodes');
 	if (requesterAddress) {
 		t.is(requesterAddress, expectedAdminAddress, 'addIndexer payload signed by admin');
@@ -308,7 +308,7 @@ async function assertAddIndexerPayloadMetadata(t, base, payload, expectedAdminAd
 
 	const candidateAddressBuffer = decodedOperation?.aco?.ia;
 	t.ok(candidateAddressBuffer, 'addIndexer payload contains candidate address');
-	const candidateAddress = addressUtils.bufferToAddress(candidateAddressBuffer, TRAC_NETWORK_MSB_MAINNET_PREFIX);
+	const candidateAddress = addressUtils.bufferToAddress(candidateAddressBuffer, config.addressPrefix);
 	t.ok(candidateAddress, 'addIndexer candidate address decodes');
 	if (candidateAddress) {
 		t.is(candidateAddress, expectedCandidate, 'addIndexer payload nominates expected writer');
@@ -404,7 +404,7 @@ export async function applyWithPretenderRoleMutation(context, invalidPayload, ro
 				if (typeof key === 'string' ? key !== address : true) {
 					// string path comparison; buffer path is unlikely for address entries here
 					if (b4a.isBuffer(key)) {
-						const addrBuf = addressUtils.addressToBuffer(address, TRAC_NETWORK_MSB_MAINNET_PREFIX);
+						const addrBuf = addressUtils.addressToBuffer(address, config.addressPrefix);
 						if (!addrBuf || !b4a.equals(addrBuf, key)) {
 							return originalGet(key);
 						}

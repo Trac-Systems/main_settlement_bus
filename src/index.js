@@ -23,9 +23,9 @@ import {
     MAX_MESSAGE_SEND_ATTEMPTS,
     CustomEventType,
     BALANCE_MIGRATION_SLEEP_INTERVAL,
-    WHITELIST_MIGRATION_DIR
+    WHITELIST_MIGRATION_DIR,
+    NETWORK_ID
 } from "./utils/constants.js";
-import partialStateMessageOperations from "./messages/partialStateMessages/PartialStateMessageOperations.js";
 import { randomBytes } from "hypercore-crypto";
 import { decimalStringToBigInt, bigIntTo16ByteBuffer, bufferToBigInt, bigIntToDecimalString } from "./utils/amountSerialization.js"
 import { normalizeTransferOperation, normalizeTransactionOperation } from "./utils/normalizers.js"
@@ -369,11 +369,11 @@ export class MainSettlementBus extends ReadyResource {
         }
 
         const txValidity = await blake3Hash(this.bootstrap);
-        const addAdminMessage = await CompleteStateMessageOperations.assembleAddAdminMessage(
-            this.#wallet,
-            this.#state.writingKey,
-            txValidity
-        );
+        const addAdminMessage = await new CompleteStateMessageOperations(this.#wallet, { networkId: NETWORK_ID, addressPrefix: TRAC_NETWORK_MSB_MAINNET_PREFIX })
+            .assembleAddAdminMessage(
+                this.#state.writingKey,
+                txValidity
+            );
 
         await this.#state.append(addAdminMessage);
     }
@@ -401,11 +401,11 @@ export class MainSettlementBus extends ReadyResource {
         }
 
         const txValidity = await this.#state.getIndexerSequenceState();
-        const adminRecoveryMessage = await partialStateMessageOperations.assembleAdminRecoveryMessage(
-            this.#wallet,
-            this.#state.writingKey.toString('hex'),
-            txValidity.toString('hex')
-        );
+        const adminRecoveryMessage = await new PartialStateMessageOperations(this.#wallet, { networkId: NETWORK_ID, addressPrefix: TRAC_NETWORK_MSB_MAINNET_PREFIX })
+            .assembleAdminRecoveryMessage(
+                this.#state.writingKey.toString('hex'),
+                txValidity.toString('hex')
+            );
 
         await this.broadcastPartialTransaction(adminRecoveryMessage);
         console.info(`Transaction hash: ${adminRecoveryMessage.rao.tx}`);
@@ -435,11 +435,11 @@ export class MainSettlementBus extends ReadyResource {
 
         for (const addressToWhitelist of addresses) {
             const txValidity = await this.#state.getIndexerSequenceState();
-            const encodedPayload = await CompleteStateMessageOperations.assembleAppendWhitelistMessages(
-                this.#wallet,
-                txValidity,
-                addressToWhitelist
-            );
+            const encodedPayload = await new CompleteStateMessageOperations(this.#wallet, { networkId: NETWORK_ID, addressPrefix: TRAC_NETWORK_MSB_MAINNET_PREFIX })
+                .assembleAppendWhitelistMessages(
+                    txValidity,
+                    addressToWhitelist
+                );
             messages.set(addressToWhitelist, encodedPayload);
         }
 
@@ -512,11 +512,11 @@ export class MainSettlementBus extends ReadyResource {
             }
 
             const txValidity = await this.#state.getIndexerSequenceState();
-            const assembledMessage = await PartialStateMessageOperations.assembleAddWriterMessage(
-                this.#wallet,
-                this.#state.writingKey.toString('hex'),
-                txValidity.toString('hex')
-            )
+            const assembledMessage = await new PartialStateMessageOperations(this.#wallet, { networkId: NETWORK_ID, addressPrefix: TRAC_NETWORK_MSB_MAINNET_PREFIX })
+                .assembleAddWriterMessage(
+                    this.#state.writingKey.toString('hex'),
+                    txValidity.toString('hex')
+                )
 
             await this.broadcastPartialTransaction(assembledMessage);
             console.info(`Transaction hash: ${assembledMessage.rao.tx}`);
@@ -539,11 +539,11 @@ export class MainSettlementBus extends ReadyResource {
         }
 
         const txValidity = await this.#state.getIndexerSequenceState();
-        const assembledMessage = await PartialStateMessageOperations.assembleRemoveWriterMessage(
-            this.#wallet,
-            nodeEntry.wk.toString('hex'),
-            txValidity.toString('hex')
-        )
+        const assembledMessage = await new PartialStateMessageOperations(this.#wallet, { networkId: NETWORK_ID, addressPrefix: TRAC_NETWORK_MSB_MAINNET_PREFIX })
+            .assembleRemoveWriterMessage(
+                nodeEntry.wk.toString('hex'),
+                txValidity.toString('hex')
+            )
 
         await this.broadcastPartialTransaction(assembledMessage);
         console.info(`Transaction hash: ${assembledMessage.rao.tx}`);
@@ -607,7 +607,8 @@ export class MainSettlementBus extends ReadyResource {
                 );
             }
             const txValidity = await this.#state.getIndexerSequenceState();
-            const assembledAddIndexerMessage = await CompleteStateMessageOperations.assembleAddIndexerMessage(this.#wallet, address, txValidity);
+            const assembledAddIndexerMessage = await new CompleteStateMessageOperations(this.#wallet, { networkId: NETWORK_ID, addressPrefix: TRAC_NETWORK_MSB_MAINNET_PREFIX })
+                .assembleAddIndexerMessage(address, txValidity);
             await this.#state.append(assembledAddIndexerMessage);
         } else {
             const canRemoveIndexer =
@@ -619,7 +620,8 @@ export class MainSettlementBus extends ReadyResource {
                 );
             }
             const txValidity = await this.#state.getIndexerSequenceState();
-            const assembledRemoveIndexer = await CompleteStateMessageOperations.assembleRemoveIndexerMessage(this.#wallet, address, txValidity);
+            const assembledRemoveIndexer = await new CompleteStateMessageOperations(this.#wallet, { networkId: NETWORK_ID, addressPrefix: TRAC_NETWORK_MSB_MAINNET_PREFIX })
+                .assembleRemoveIndexerMessage(address, txValidity);
             await this.#state.append(assembledRemoveIndexer);
         }
     }
@@ -659,11 +661,11 @@ export class MainSettlementBus extends ReadyResource {
             );
         }
         const txValidity = await this.#state.getIndexerSequenceState();
-        const assembledBanValidatorMessage = await CompleteStateMessageOperations.assembleBanWriterMessage(
-            this.#wallet,
-            address,
-            txValidity
-        );
+        const assembledBanValidatorMessage = await new CompleteStateMessageOperations(this.#wallet, { networkId: NETWORK_ID, addressPrefix: TRAC_NETWORK_MSB_MAINNET_PREFIX })
+            .assembleBanWriterMessage(
+                address,
+                txValidity
+            );
         await this.#state.append(assembledBanValidatorMessage);
     }
 
@@ -737,12 +739,12 @@ export class MainSettlementBus extends ReadyResource {
         }
 
         const txValidity = await this.#state.getIndexerSequenceState();
-        const payload = await PartialStateMessageOperations.assembleBootstrapDeploymentMessage(
-            this.#wallet,
-            externalBootstrap,
-            channel,
-            txValidity.toString('hex')
-        );
+        const payload = await new PartialStateMessageOperations(this.#wallet, { networkId: NETWORK_ID, addressPrefix: TRAC_NETWORK_MSB_MAINNET_PREFIX })
+            .assembleBootstrapDeploymentMessage(
+                externalBootstrap,
+                channel,
+                txValidity.toString('hex')
+            );
 
         await this.broadcastPartialTransaction(payload);
         console.info(`Transaction hash: ${payload.bdo.tx}`);
@@ -823,12 +825,12 @@ export class MainSettlementBus extends ReadyResource {
         }
 
         const txValidity = await this.#state.getIndexerSequenceState();
-        const payload = await PartialStateMessageOperations.assembleTransferOperationMessage(
-            this.#wallet,
-            address,
-            amountBuffer.toString('hex'),
-            txValidity.toString('hex'),
-        )
+        const payload = await new PartialStateMessageOperations(this.#wallet, { networkId: NETWORK_ID, addressPrefix: TRAC_NETWORK_MSB_MAINNET_PREFIX })
+            .assembleTransferOperationMessage(
+                address,
+                amountBuffer.toString('hex'),
+                txValidity.toString('hex'),
+            )
 
         await this.broadcastPartialTransaction(payload);
 
@@ -892,11 +894,11 @@ export class MainSettlementBus extends ReadyResource {
         await fileUtils.createMigrationEntryFile(addressBalancePair, migrationNumber);
 
         const txValidity = await this.#state.getIndexerSequenceState();
-        const messages = await CompleteStateMessageOperations.assembleBalanceInitializationMessages(
-            this.#wallet,
-            txValidity,
-            addressBalancePair,
-        );
+        const messages = await new CompleteStateMessageOperations(this.#wallet, { networkId: NETWORK_ID, addressPrefix: TRAC_NETWORK_MSB_MAINNET_PREFIX })
+            .assembleBalanceInitializationMessages(
+                txValidity,
+                addressBalancePair,
+            );
 
         console.log(`Total balance to migrate: ${bigIntToDecimalString(totalBalance)} across ${totalAddresses} addresses.`);
 
@@ -957,11 +959,11 @@ export class MainSettlementBus extends ReadyResource {
         }
         // add more checks
         const txValidity = await this.#state.getIndexerSequenceState();
-        const payload = await CompleteStateMessageOperations.assembleDisableInitializationMessage(
-            this.#wallet,
-            this.#state.writingKey,
-            txValidity,
-        )
+        const payload = await new CompleteStateMessageOperations(this.#wallet, { networkId: NETWORK_ID, addressPrefix: TRAC_NETWORK_MSB_MAINNET_PREFIX })
+            .assembleDisableInitializationMessage(
+                this.#state.writingKey,
+                txValidity,
+            )
         console.log('Disabling initialization...');
         await this.#state.append(payload);
     }

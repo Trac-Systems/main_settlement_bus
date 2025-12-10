@@ -16,8 +16,8 @@ import { setupAdminAndWhitelistedReaderNetwork } from '../common/commonScenarioH
 import { applyWithRequesterEntryRemoval } from '../addWriter/addWriterScenarioHelpers.js';
 import { createMessage } from '../../../../../src/utils/buffer.js';
 import { blake3Hash } from '../../../../../src/utils/crypto.js';
-import { NETWORK_ID, OperationType } from '../../../../../src/utils/constants.js';
-import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
+import { OperationType } from '../../../../../src/utils/constants.js';
+import { config } from '../../../../helpers/config.js';
 
 export async function setupBanValidatorScenario(
 	t,
@@ -62,8 +62,7 @@ export async function buildBanValidatorPayload(
 	/* cover tests */
 ) {
 	const txValidity = await deriveIndexerSequenceState(adminPeer.base);
-	return CompleteStateMessageOperations.assembleBanWriterMessage(
-		adminPeer.wallet,
+	return await new CompleteStateMessageOperations(adminPeer.wallet, config).assembleBanWriterMessage(
 		validatorPeer.wallet.address,
 		txValidity
 	);
@@ -74,8 +73,7 @@ export async function buildBanValidatorPayloadWithTxValidity(
 	mutatedTxValidity,
 	{ adminPeer = context.adminBootstrap, validatorPeer = selectWriterPeer(context) } = {}
 ) {
-	return CompleteStateMessageOperations.assembleBanWriterMessage(
-		adminPeer.wallet,
+	return new CompleteStateMessageOperations(adminPeer.wallet, config).assembleBanWriterMessage(
 		validatorPeer.wallet.address,
 		mutatedTxValidity
 	);
@@ -155,7 +153,7 @@ export async function assertBanValidatorSuccessState(
 	const licenseIndexEntry = await adminPeer.base.view.get(`${EntryType.LICENSE_INDEX}${licenseId}`);
 	t.ok(licenseIndexEntry, 'license index entry persists after banValidator');
 	if (licenseIndexEntry?.value) {
-		const validatorAddressBuffer = addressUtils.addressToBuffer(validatorPeer.wallet.address, TRAC_NETWORK_MSB_MAINNET_PREFIX);
+		const validatorAddressBuffer = addressUtils.addressToBuffer(validatorPeer.wallet.address, config.addressPrefix);
 		t.ok(
 			b4a.equals(licenseIndexEntry.value, validatorAddressBuffer),
 			'license index still maps to validator address'
@@ -168,7 +166,7 @@ export async function assertBanValidatorSuccessState(
 		const registryEntry = await adminPeer.base.view.get(registryKey);
 		t.ok(registryEntry, 'writer registry entry persists after banValidator');
 		if (registryEntry?.value) {
-			const validatorAddressBuffer = addressUtils.addressToBuffer(validatorPeer.wallet.address, TRAC_NETWORK_MSB_MAINNET_PREFIX);
+			const validatorAddressBuffer = addressUtils.addressToBuffer(validatorPeer.wallet.address, config.addressPrefix);
 			t.ok(
 				b4a.equals(registryEntry.value, validatorAddressBuffer),
 				'writer registry maps writing key to validator address'
@@ -305,7 +303,7 @@ export async function applyInvalidTargetAddressPayload(context, validPayload) {
 	decoded.aco.ia = invalidAddress;
 
 	const message = createMessage(
-		NETWORK_ID,
+		config.networkId,
 		decoded.aco.txv,
 		decoded.aco.ia,
 		decoded.aco.in,
@@ -341,8 +339,7 @@ export async function promoteValidatorToIndexer(
 	{ adminPeer = context.adminBootstrap, validatorPeer = selectWriterPeer(context) } = {}
 ) {
 	const txValidity = await deriveIndexerSequenceState(adminPeer.base);
-	const payload = await CompleteStateMessageOperations.assembleAddIndexerMessage(
-		adminPeer.wallet,
+	const payload = await new CompleteStateMessageOperations(adminPeer.wallet, config).assembleAddIndexerMessage(
 		validatorPeer.wallet.address,
 		txValidity
 	);
@@ -420,7 +417,7 @@ export async function applyWithBanValidatorRoleDecodeFailure(context, invalidPay
 export async function applyWithBanValidatorWithdrawFailure(context, invalidPayload) {
 	const targetPeer = context.banValidatorScenario?.validatorPeer ?? selectWriterPeer(context);
 	const targetAddress = targetPeer.wallet.address;
-	const targetBuffer = addressUtils.addressToBuffer(targetAddress, TRAC_NETWORK_MSB_MAINNET_PREFIX);
+	const targetBuffer = addressUtils.addressToBuffer(targetAddress, config.addressPrefix);
 	const adminPeer = context.adminBootstrap;
 	const base = adminPeer.base;
 	const originalApply = base._handlers.apply;
@@ -481,13 +478,13 @@ async function assertBanValidatorPayloadMetadata(t, base, payload, { adminAddres
 	t.ok(decodedPayload, 'banValidator payload decodes');
 	if (!decodedPayload) return;
 
-	const requesterAddress = addressUtils.bufferToAddress(decodedPayload.address, TRAC_NETWORK_MSB_MAINNET_PREFIX);
+	const requesterAddress = addressUtils.bufferToAddress(decodedPayload.address, config.addressPrefix);
 	t.ok(requesterAddress, 'banValidator requester address decodes');
 	if (requesterAddress) {
 		t.is(requesterAddress, adminAddress, 'banValidator payload signed by admin');
 	}
 
-	const targetAddressDecoded = addressUtils.bufferToAddress(decodedPayload?.aco?.ia, TRAC_NETWORK_MSB_MAINNET_PREFIX);
+	const targetAddressDecoded = addressUtils.bufferToAddress(decodedPayload?.aco?.ia, config.addressPrefix);
 	t.ok(targetAddressDecoded, 'banValidator target address decodes');
 	if (targetAddressDecoded) {
 		t.is(targetAddressDecoded, targetAddress, 'banValidator payload targets expected validator');

@@ -22,7 +22,7 @@ import nodeEntryUtils from '../../../../../src/core/state/utils/nodeEntry.js';
 import lengthEntryUtils from '../../../../../src/core/state/utils/lengthEntry.js';
 import addressUtils from '../../../../../src/core/state/utils/address.js';
 import { safeWriteUInt32BE } from '../../../../../src/utils/buffer.js';
-import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
+import { config } from '../../../../helpers/config.js';
 
 export async function setupAddAdminScenario(t) {
 	const context = await setupStateNetwork({
@@ -42,11 +42,11 @@ export async function setupAddAdminScenario(t) {
 export async function buildAddAdminRequesterPayload(context) {
 	const adminNode = context.adminBootstrap;
 	const txValidity = await deriveIndexerSequenceState(adminNode.base);
-	return CompleteStateMessageOperations.assembleAddAdminMessage(
-		adminNode.wallet,
-		adminNode.base.local.key,
-		txValidity
-	);
+    return new CompleteStateMessageOperations(adminNode.wallet, config)
+        .assembleAddAdminMessage(
+            adminNode.base.local.key,
+            txValidity
+        );
 }
 
 export async function assertAddAdminRequesterFailureState(t, context) {
@@ -103,7 +103,7 @@ export async function assertAdminState(t, base, wallet, writingKey, payload) {
 	const adminEntryRecord = await base.view.get(EntryType.ADMIN);
 	t.ok(adminEntryRecord, 'admin entry should exist');
 
-	const decodedAdminEntry = adminEntryUtils.decode(adminEntryRecord.value, TRAC_NETWORK_MSB_MAINNET_PREFIX);
+	const decodedAdminEntry = adminEntryUtils.decode(adminEntryRecord.value, config.addressPrefix);
 	t.ok(decodedAdminEntry, 'admin entry decodes');
 	t.is(decodedAdminEntry.address, wallet.address, 'admin entry stores wallet address');
 	t.ok(b4a.equals(decodedAdminEntry.wk, writingKey), 'admin entry stores writing key');
@@ -126,7 +126,7 @@ export async function assertAdminState(t, base, wallet, writingKey, payload) {
 		'admin license id assigned'
 	);
 
-	const adminAddressBuffer = addressUtils.addressToBuffer(wallet.address, TRAC_NETWORK_MSB_MAINNET_PREFIX);
+	const adminAddressBuffer = addressUtils.addressToBuffer(wallet.address, config.addressPrefix);
 	t.ok(adminAddressBuffer.length > 0, 'admin address encoded as buffer');
 	const writerRegistry = await base.view.get(EntryType.WRITER_ADDRESS + writingKey.toString('hex'));
 	t.ok(writerRegistry, 'writer registry entry exists');

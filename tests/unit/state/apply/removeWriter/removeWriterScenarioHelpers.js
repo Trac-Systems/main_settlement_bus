@@ -16,6 +16,7 @@ import { eventFlush } from '../../../../helpers/autobaseTestHelpers.js';
 import { safeDecodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
 import { EntryType } from '../../../../../src/utils/constants.js';
 import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
+import { config } from '../../../../helpers/config.js';
 
 export async function setupRemoveWriterScenario(t, options = {}) {
 	const context = await setupAddWriterScenario(t, options);
@@ -180,13 +181,11 @@ export async function buildRemoveWriterPayloadWithTxValidity(context, mutatedTxV
 	}
 	const { readerPeer = selectWriterPeer(context), validatorPeer = context.adminBootstrap, writerKeyBuffer = null } = options;
 	const writerKey = writerKeyBuffer ?? readerPeer.base.local.key;
-	const partial = await PartialStateMessageOperations.assembleRemoveWriterMessage(
-		readerPeer.wallet,
+	const partial = await new PartialStateMessageOperations(readerPeer.wallet, config).assembleRemoveWriterMessage(
 		writerKey.toString('hex'),
 		mutatedTxValidity.toString('hex')
 	);
-	return CompleteStateMessageOperations.assembleRemoveWriterMessage(
-		validatorPeer.wallet,
+	return new CompleteStateMessageOperations(validatorPeer.wallet, config).assembleRemoveWriterMessage(
 		partial.address,
 		b4a.from(partial.rao.tx, 'hex'),
 		mutatedTxValidity,
