@@ -1,0 +1,76 @@
+syntax = "proto3";
+
+package network.v1;
+
+enum MessageType {
+    UNKNOWN = 0;
+    VALIDATOR_CONNECTION_REQUEST = 1;
+    VALIDATOR_CONNECTION_RESPONSE = 2;
+    LIVENESS_REQUEST = 3;
+    LIVENESS_RESPONSE = 4;
+    BROADCAST_TRANSACTION_REQUEST = 5;
+    BROADCAST_TRANSACTION_RESPONSE = 6;
+}
+
+enum ResultCode {
+    OK = 0;
+    INVALID_PAYLOAD = 1;
+    UNSUPPORTED_VERSION = 2;
+    RATE_LIMITED = 3;
+    TIMEOUT = 4;
+    SIGNATURE_INVALID = 5;
+}
+
+message ValidatorConnectionRequest {
+    bytes issuer_address = 1;
+    bytes nonce = 2;
+    bytes signature = 3;
+}
+
+message ValidatorConnectionResponse {
+    bytes issuer_address = 1;
+    bytes nonce = 2;
+    bytes signature = 5;
+    ResultCode result = 4;
+}
+
+message LivenessRequest {
+    string data = 1;
+    bytes nonce = 2;
+    bytes signature = 3;
+}
+
+message LivenessResponse {
+    string data = 1;
+    bytes nonce = 2;
+    bytes signature = 3;
+    ResultCode result = 4;
+}
+
+message BroadcastTransactionRequest {
+    bytes data = 1; // binary encoded payload
+    bytes nonce = 2;
+    bytes signature = 3;
+}
+
+message BroadcastTransactionResponse {
+    bytes data = 1;
+    bytes nonce = 2;
+    bytes signature = 3;
+    ResultCode result = 4;
+}
+
+message MessageHeader {
+    MessageType type = 1;
+    uint64 session_id = 2;
+    uint64 timestamp = 3;
+    oneof field {
+        ValidatorConnectionRequest            validator_connection_request  = 4;
+        ValidatorConnectionResponse           validator_connection_response  = 5;
+        LivenessRequest                       liveness_request = 6;
+        LivenessResponse                      liveness_response = 7;
+        BroadcastTransactionRequest           broadcast_transaction_request = 8;
+        BroadcastTransactionResponse          broadcast_transaction_response = 9;
+    }
+    repeated string capabilities = 10; // maybe ["binary", "hb:v1"]
+}
