@@ -7,7 +7,7 @@ import { addressToBuffer, isAddressValid } from '../../core/state/utils/address.
 import { isHexString } from "../../utils/helpers.js";
 import { blake3Hash } from "../../utils/crypto.js";
 import { createMessage } from "../../utils/buffer.js";
-import { isTransaction, isRoleAccess, isBootstrapDeployment, isTransfer } from "../../utils/operations.js";
+import { isTransaction, isRoleAccess, isBootstrapDeployment, isTransfer } from "../../utils/applyOperations.js";
 
 class PartialStateMessageBuilder extends StateBuilder {
     #wallet;

@@ -15,7 +15,7 @@ import {
     isBootstrapDeployment,
     isTransfer,
     isBalanceInitialization
-} from '../../utils/operations.js';
+} from '../../utils/applyOperations.js';
 
 class CompleteStateMessageBuilder extends StateBuilder {
     #wallet;

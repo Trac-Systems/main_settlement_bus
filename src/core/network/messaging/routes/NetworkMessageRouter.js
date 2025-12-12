@@ -5,7 +5,7 @@ import RoleOperationHandler from "../handlers/RoleOperationHandler.js";
 import SubnetworkOperationHandler from "../handlers/SubnetworkOperationHandler.js";
 import TransferOperationHandler from "../handlers/TransferOperationHandler.js";
 import {NETWORK_MESSAGE_TYPES} from '../../../../utils/constants.js';
-import * as operation from '../../../../utils/operations.js';
+import * as operation from '../../../../utils/applyOperations.js';
 import TransactionRateLimiterService from "../../services/TransactionRateLimiterService.js";
 import State from "../../../state/State.js";
 import PeerWallet from "trac-wallet";

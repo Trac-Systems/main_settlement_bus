@@ -7,7 +7,7 @@ import {OperationType} from "../../../../../utils/constants.js";
 import {blake3Hash} from "../../../../../utils/crypto.js";
 import {bufferToBigInt} from "../../../../../utils/amountSerialization.js";
 import {FEE} from "../../../../state/utils/transaction.js";
-import * as operationsUtils from '../../../../../utils/operations.js';
+import * as operationsUtils from '../../../../../utils/applyOperations.js';
 
 const MAX_AMOUNT = BigInt('0xffffffffffffffffffffffffffffffff');
 const FEE_BIGINT = bufferToBigInt(FEE);
@@ -177,7 +177,7 @@ class PartialOperation {
     isOperationNotCompleted(payload) {
         const operationKey = operationsUtils.operationToPayload(payload.type);
         const operation = payload[operationKey];
-        const {va, vn, vs} = operation;
+        const { va, vn, vs } = operation;
 
         const condition = va === undefined && vn === undefined && vs === undefined
         if (!condition) {
