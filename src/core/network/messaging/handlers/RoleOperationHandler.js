@@ -5,6 +5,7 @@ import CompleteStateMessageOperations
     from "../../../../messages/completeStateMessages/CompleteStateMessageOperations.js";
 import {normalizeHex} from "../../../../utils/helpers.js";
 import BaseOperationHandler from './base/BaseOperationHandler.js';
+import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
 
 class RoleOperationHandler extends BaseOperationHandler {
     #partialRoleAccessValidator;
@@ -107,7 +108,7 @@ class RoleOperationHandler extends BaseOperationHandler {
 
         return {
             type,
-            address: addressToBuffer(address),
+            address: addressToBuffer(address, TRAC_NETWORK_MSB_MAINNET_PREFIX),
             rao: normalizedRao
         };
     }

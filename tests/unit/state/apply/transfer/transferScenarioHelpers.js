@@ -19,6 +19,7 @@ import { EntryType, OperationType, NETWORK_ID } from '../../../../../src/utils/c
 import { createMessage } from '../../../../../src/utils/buffer.js';
 import { blake3Hash } from '../../../../../src/utils/crypto.js';
 import OperationValidationScenarioBase from '../common/base/OperationValidationScenarioBase.js';
+import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
 
 export const DEFAULT_INITIAL_BALANCE = bigIntTo16ByteBuffer(decimalStringToBigInt('10'));
 export const DEFAULT_TRANSFER_AMOUNT = bigIntTo16ByteBuffer(decimalStringToBigInt('2'));
@@ -204,9 +205,9 @@ export async function assertTransferSuccessState(
 	t.ok(decodedPayload?.tro, 'transfer payload decodes');
 	if (!decodedPayload?.tro) return;
 
-	const senderAddress = addressUtils.bufferToAddress(decodedPayload.address);
-	const recipientAddress = addressUtils.bufferToAddress(decodedPayload.tro.to);
-	const validatorAddress = addressUtils.bufferToAddress(decodedPayload.tro.va);
+	const senderAddress = addressUtils.bufferToAddress(decodedPayload.address, TRAC_NETWORK_MSB_MAINNET_PREFIX);
+	const recipientAddress = addressUtils.bufferToAddress(decodedPayload.tro.to, TRAC_NETWORK_MSB_MAINNET_PREFIX);
+	const validatorAddress = addressUtils.bufferToAddress(decodedPayload.tro.va, TRAC_NETWORK_MSB_MAINNET_PREFIX);
 
 	const amount = toBalance(decodedPayload.tro.am);
 	const fee = toBalance(transactionUtils.FEE);
@@ -611,7 +612,7 @@ async function applyTransferSenderEntryOverride(context, invalidPayload, mutateE
 	}
 
 	const senderAddress = senderPeer.wallet.address;
-	const senderBuffer = addressUtils.addressToBuffer(senderAddress);
+	const senderBuffer = addressUtils.addressToBuffer(senderAddress, TRAC_NETWORK_MSB_MAINNET_PREFIX);
 	const base = node.base;
 	const originalApply = base._handlers.apply;
 
@@ -948,7 +949,7 @@ async function applyTransferRecipientEntryOverride(context, invalidPayload, muta
 	}
 
 	const recipientAddress = recipientPeer.wallet.address;
-	const recipientBuffer = addressUtils.addressToBuffer(recipientAddress);
+	const recipientBuffer = addressUtils.addressToBuffer(recipientAddress, TRAC_NETWORK_MSB_MAINNET_PREFIX);
 	const base = node.base;
 	const originalApply = base._handlers.apply;
 
@@ -992,7 +993,7 @@ async function applyTransferRecipientBalanceDecodeFailure(context, invalidPayloa
 	}
 
 	const targetAddress = recipientPeer.wallet.address;
-	const targetBuffer = addressUtils.addressToBuffer(targetAddress);
+	const targetBuffer = addressUtils.addressToBuffer(targetAddress, TRAC_NETWORK_MSB_MAINNET_PREFIX);
 	const originalDecode = nodeEntryUtils.decode;
 	let shouldMutateNextDecode = false;
 

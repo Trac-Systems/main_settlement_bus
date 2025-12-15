@@ -4,18 +4,19 @@ import { WRITER_BYTE_LENGTH, TRAC_ADDRESS_SIZE } from '../../../../src/utils/con
 import { randomAddress, randomBuffer } from '../stateTestUtils.js';
 import addressUtils from '../../../../src/core/state/utils/address.js';
 import adminEntryUtils from '../../../../src/core/state/utils/adminEntry.js';
+import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
 
-const isAddressValid = addressUtils.isAddressValid;
+const isAddressValid = address => addressUtils.isAddressValid(address, TRAC_NETWORK_MSB_MAINNET_PREFIX);
 const addressToBuffer = addressUtils.addressToBuffer;
-const encodeAdminEntry = adminEntryUtils.encode;
-const decodeAdminEntry = adminEntryUtils.decode;
+const encodeAdminEntry = (address, wk) => adminEntryUtils.encode(address, wk, TRAC_NETWORK_MSB_MAINNET_PREFIX);
+const decodeAdminEntry = entry => adminEntryUtils.decode(entry, TRAC_NETWORK_MSB_MAINNET_PREFIX);
 const ADMIN_ENTRY_SIZE = TRAC_ADDRESS_SIZE + WRITER_BYTE_LENGTH;
 
 test('Admin Entry - Encode and Decode - Happy Path', t => {
     const address = randomAddress();
     const wk = randomBuffer(WRITER_BYTE_LENGTH);
 
-    const encoded = encodeAdminEntry(addressToBuffer(address), wk);
+    const encoded = encodeAdminEntry(addressToBuffer(address, TRAC_NETWORK_MSB_MAINNET_PREFIX), wk);
     t.is(encoded.length, ADMIN_ENTRY_SIZE, "encoding has valid length");
 
     const decoded = decodeAdminEntry(encoded);
@@ -27,7 +28,7 @@ test('Admin Entry - Encode and Decode - Happy Path', t => {
 
 test('Admin Entry - Encode returns empty buffer on invalid input', t => {
     const addrString = randomAddress();
-    const validAddress = addressToBuffer(addrString);
+    const validAddress = addressToBuffer(addrString, TRAC_NETWORK_MSB_MAINNET_PREFIX);
     const separatorIndex = addrString.indexOf('1');
     const invalidAddress = validAddress.subarray(separatorIndex); // missing HRP
 

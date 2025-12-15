@@ -12,6 +12,7 @@ import transactionUtils from '../../../../../src/core/state/utils/transaction.js
 import addressUtils from '../../../../../src/core/state/utils/address.js';
 import { safeDecodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
 import nodeRoleUtils from '../../../../../src/core/state/utils/roles.js';
+import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
 
 export function selectIndexerCandidatePeer(context, offset = 0) {
 	return selectWriterPeer(context, offset);
@@ -299,7 +300,7 @@ async function assertAddIndexerPayloadMetadata(t, base, payload, expectedAdminAd
 
 	const requesterAddressBuffer = decodedOperation.address;
 	t.ok(requesterAddressBuffer, 'addIndexer payload contains requester address');
-	const requesterAddress = addressUtils.bufferToAddress(requesterAddressBuffer);
+	const requesterAddress = addressUtils.bufferToAddress(requesterAddressBuffer, TRAC_NETWORK_MSB_MAINNET_PREFIX);
 	t.ok(requesterAddress, 'addIndexer requester address decodes');
 	if (requesterAddress) {
 		t.is(requesterAddress, expectedAdminAddress, 'addIndexer payload signed by admin');
@@ -307,7 +308,7 @@ async function assertAddIndexerPayloadMetadata(t, base, payload, expectedAdminAd
 
 	const candidateAddressBuffer = decodedOperation?.aco?.ia;
 	t.ok(candidateAddressBuffer, 'addIndexer payload contains candidate address');
-	const candidateAddress = addressUtils.bufferToAddress(candidateAddressBuffer);
+	const candidateAddress = addressUtils.bufferToAddress(candidateAddressBuffer, TRAC_NETWORK_MSB_MAINNET_PREFIX);
 	t.ok(candidateAddress, 'addIndexer candidate address decodes');
 	if (candidateAddress) {
 		t.is(candidateAddress, expectedCandidate, 'addIndexer payload nominates expected writer');
@@ -403,7 +404,7 @@ export async function applyWithPretenderRoleMutation(context, invalidPayload, ro
 				if (typeof key === 'string' ? key !== address : true) {
 					// string path comparison; buffer path is unlikely for address entries here
 					if (b4a.isBuffer(key)) {
-						const addrBuf = addressUtils.addressToBuffer(address);
+						const addrBuf = addressUtils.addressToBuffer(address, TRAC_NETWORK_MSB_MAINNET_PREFIX);
 						if (!addrBuf || !b4a.equals(addrBuf, key)) {
 							return originalGet(key);
 						}

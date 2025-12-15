@@ -11,6 +11,7 @@ import {testKeyPair1, testKeyPair2, testKeyPair3, testKeyPair4} from '../../../f
 import b4a from 'b4a';
 import { decode as decodeAdmin } from '../../../../src/core/state/utils/adminEntry.js';
 import { EntryType } from '../../../../src/utils/constants.js';
+import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
 //TODO: ADD TEST WHEN NON-ADMIN NODE FORGES ADD ADMIN OPERATION AND BROADCASTS IT TO THE STATE -  SHOULD BE REJECTED
 
 let admin, newAdmin;
@@ -104,7 +105,7 @@ test('Apply function addAdmin for recovery - happy path', async (k) => {
     )
     await writer.msb.state.append(rawTx)
     await tryToSyncWriters(writer, indexer1, indexer2, newAdmin);
-    const adminEntryAfter = decodeAdmin(await writer.msb.state.get(EntryType.ADMIN)); // check if the admin entry was added successfully in the base
+    const adminEntryAfter = decodeAdmin(await writer.msb.state.get(EntryType.ADMIN), TRAC_NETWORK_MSB_MAINNET_PREFIX); // check if the admin entry was added successfully in the base
     k.ok(adminEntryAfter, 'Result should not be null');
     k.ok(adminEntryAfter.address === newAdmin.wallet.address, 'New Admin address in base should match new admin wallet address');
     k.ok(adminAddressBeforeRecovery === newAdmin.wallet.address, 'New Admin wallet address should be the same as old admin wallet address');

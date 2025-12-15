@@ -3,6 +3,7 @@ import PeerWallet from 'trac-wallet';
 import { bufferToAddress } from "../../../state/utils/address.js";
 import { bufferToBigInt } from "../../../../utils/amountSerialization.js";
 import PartialOperation from './base/PartialOperation.js';
+import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
 
 class PartialTransfer extends PartialOperation {
 
@@ -26,7 +27,7 @@ class PartialTransfer extends PartialOperation {
     }
 
     #validateRecipientAddress(payload) {
-        const incomingAddress = bufferToAddress(payload.tro.to);
+        const incomingAddress = bufferToAddress(payload.tro.to, TRAC_NETWORK_MSB_MAINNET_PREFIX);
         if (!incomingAddress) {
             throw new Error('Invalid recipient address in transfer payload.');
         }
@@ -39,8 +40,8 @@ class PartialTransfer extends PartialOperation {
     }
 
     async #validateStateBalances(payload) {
-        const senderAddress = bufferToAddress(payload.address);
-        const recipientAddress = bufferToAddress(payload.tro.to);
+        const senderAddress = bufferToAddress(payload.address, TRAC_NETWORK_MSB_MAINNET_PREFIX);
+        const recipientAddress = bufferToAddress(payload.tro.to, TRAC_NETWORK_MSB_MAINNET_PREFIX);
 
         const transferAmount = bufferToBigInt(payload.tro.am);
         if (transferAmount > this.max_amount) {

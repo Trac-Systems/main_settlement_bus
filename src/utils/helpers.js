@@ -1,6 +1,7 @@
 import b4a from "b4a";
 import {bufferToAddress} from "../core/state/utils/address.js";
 import { EntryType, TRAC_ADDRESS_SIZE } from "./constants.js";
+import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from "trac-wallet/constants.js";
 
 //TODO: change file name or split functions below into multiple files (Remember to update imports and tests accordingly)
 
@@ -56,7 +57,7 @@ export async function getFormattedIndexersWithAddresses(state) {
 
     const results = await Promise.all(
         formatted.map(async (entry) => {            
-            const address = bufferToAddress(await state.getSigned(EntryType.WRITER_ADDRESS + entry.writingKey));
+            const address = bufferToAddress(await state.getSigned(EntryType.WRITER_ADDRESS + entry.writingKey), TRAC_NETWORK_MSB_MAINNET_PREFIX);
 
             return {
                 ...entry,
@@ -89,7 +90,7 @@ export function formatIndexersEntry(indexersEntry) {
 export function convertAdminCoreOperationPayloadToHex(payload) {
     return {
         ...payload,
-        address: bufferToAddress(payload.address),
+        address: bufferToAddress(payload.address, TRAC_NETWORK_MSB_MAINNET_PREFIX),
         aco: {
             tx: payload.aco.tx.toString('hex'),
             txv: payload.aco.txv.toString('hex'),

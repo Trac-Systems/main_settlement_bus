@@ -2,6 +2,7 @@ import b4a from 'b4a';
 import OperationValidationScenarioBase from '../base/OperationValidationScenarioBase.js';
 import addressUtils from '../../../../../../src/core/state/utils/address.js';
 import { eventFlush } from '../../../../../helpers/autobaseTestHelpers.js';
+import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
 
 export default class RequesterNodeEntryBufferMissingScenario extends OperationValidationScenarioBase {
 	constructor({
@@ -26,7 +27,7 @@ export default class RequesterNodeEntryBufferMissingScenario extends OperationVa
 				}
 
 				const targetAddressString = peer.wallet.address;
-				const targetAddressBuffer = addressUtils.addressToBuffer(targetAddressString);
+				const targetAddressBuffer = addressUtils.addressToBuffer(targetAddressString, TRAC_NETWORK_MSB_MAINNET_PREFIX);
 
 				const originalApply = node.base._handlers.apply;
 				node.base._handlers.apply = async function patchedApply(nodes, view, baseCtx) {

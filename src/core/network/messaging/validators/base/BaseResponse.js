@@ -2,6 +2,8 @@ import b4a from 'b4a';
 import PeerWallet from 'trac-wallet';
 import { bufferToAddress } from '../../../../state/utils/address.js';
 import { blake3Hash } from '../../../../../utils/crypto.js';
+import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
+import State from '../../../../state/State.js';
 
 /*
     BaseResponse class for handling common validation logic for network responses.
@@ -11,6 +13,11 @@ class BaseResponse {
     #wallet;
     #state;
 
+    /**
+     * 
+     * @param {State} state 
+     * @param {PeerWallet} wallet 
+     */
     constructor(state, wallet) {
         this.#state = state;
         this.#wallet = wallet;
@@ -63,7 +70,7 @@ class BaseResponse {
 
                 break;
             default:
-                const addressString = bufferToAddress(message.address);
+                const addressString = bufferToAddress(message.address, TRAC_NETWORK_MSB_MAINNET_PREFIX);
                 publicKey = PeerWallet.decodeBech32m(addressString);
         }
 

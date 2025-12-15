@@ -13,9 +13,10 @@ import {
     BATCH_SIZE,
     ADMIN_INITIAL_STAKED_BALANCE,
     MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION,
-    NETWORK_ID,
     TRAC_NAMESPACE,
-    CustomEventType
+    CustomEventType,
+    NETWORK_ID,
+    TRAC_ADDRESS_SIZE
 } from '../../utils/constants.js';
 import { isHexString, sleep, isTransactionRecordPut } from '../../utils/helpers.js';
 import PeerWallet from 'trac-wallet';
@@ -24,7 +25,7 @@ import { safeDecodeApplyOperation } from '../../utils/protobuf/operationHelpers.
 import { createMessage, ZERO_WK } from '../../utils/buffer.js';
 import addressUtils from './utils/address.js';
 import adminEntryUtils from './utils/adminEntry.js';
-import nodeEntryUtils, { setWritingKey, ZERO_BALANCE, NODE_ENTRY_SIZE } from './utils/nodeEntry.js';
+import nodeEntryUtils, { setWritingKey, NODE_ENTRY_SIZE } from './utils/nodeEntry.js';
 import nodeRoleUtils from './utils/roles.js';
 import lengthEntryUtils from './utils/lengthEntry.js';
 import transactionUtils from './utils/transaction.js';
@@ -43,6 +44,8 @@ import { safeWriteUInt32BE } from '../../utils/buffer.js';
 import deploymentEntryUtils from './utils/deploymentEntry.js';
 import { deepCopyBuffer } from '../../utils/buffer.js';
 import { Status } from './utils/transaction.js';
+import Corestore from 'corestore';
+import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
 
 const OVERSIZED_BATCH_PENALTY_MULTIPLIER = BATCH_SIZE;
 
@@ -51,24 +54,34 @@ const OVERSIZED_BATCH_PENALTY_MULTIPLIER = BATCH_SIZE;
 class State extends ReadyResource {
     #base;
     #bee;
-    #bootstrap;
     #store;
     #wallet;
-    #enable_tx_apply_logs;
-    #enable_error_apply_logs;
     #writingKey;
+    #config
 
+    /**
+     * @param {Corestore} store
+     * @param {string} bootstrap
+     * @param {PeerWallet} wallet
+     * @param {object} options
+     **/
     constructor(store, bootstrap, wallet, options = {}) {
         super();
 
+        this.#config = {
+            networkId: NETWORK_ID,
+            bootstrap,
+            addressLength: TRAC_ADDRESS_SIZE,
+            addressPrefix: TRAC_NETWORK_MSB_MAINNET_PREFIX,
+            enableTxApplyLogs: options.enable_tx_apply_logs !== undefined ? options.enable_tx_apply_logs : true,
+            enableErrorApplyLogs: options.enable_error_apply_logs !== undefined ? options.enable_error_apply_logs : true
+        } // this will later be injected
+
         this.#store = store;
-        this.#bootstrap = bootstrap;
         this.#wallet = wallet;
-        this.#enable_tx_apply_logs = options.enable_tx_apply_logs !== undefined ? options.enable_tx_apply_logs : true;
-        this.#enable_error_apply_logs = options.enable_error_apply_logs !== undefined ? options.enable_error_apply_logs : true;
 
         this.check = new Check();
-        this.#base = new Autobase(this.#store, this.#bootstrap, {
+        this.#base = new Autobase(this.#store, this.#config.bootstrap, {
             ackInterval: ACK_INTERVAL,
             valueEncoding: AUTOBASE_VALUE_ENCODING,
             bigBatches: false,
@@ -84,10 +97,6 @@ class State extends ReadyResource {
 
     get writingKey() {
         return this.#writingKey;
-    }
-
-    get bootstrap() {
-        return this.#bootstrap;
     }
 
     get applyHandler() {
@@ -152,7 +161,7 @@ class State extends ReadyResource {
 
     async getAdminEntry() {
         const adminEntry = await this.getSigned(EntryType.ADMIN);
-        return adminEntry ? adminEntryUtils.decode(adminEntry) : null;
+        return adminEntry ? adminEntryUtils.decode(adminEntry, this.#config.addressPrefix) : null;
     }
 
     async getNodeEntry(address) {
@@ -179,7 +188,7 @@ class State extends ReadyResource {
     }
 
     async isAdminAllowedToValidate() {
-        const isAdmin = this.writingKey.toString('hex') === this.bootstrap.toString('hex');
+        const isAdmin = this.writingKey.toString('hex') === this.#config.bootstrap.toString('hex');
         const isIndexer = this.isIndexer();
         const lengthCondition = await this.getWriterLength() <= MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION;
         return !!(isAdmin && isIndexer && lengthCondition);
@@ -228,7 +237,7 @@ class State extends ReadyResource {
 
     async getAddressByLicenseId(licenseId) {
         const address = await this.getSigned(EntryType.LICENSE_INDEX + licenseId);
-        return address ? addressUtils.bufferToAddress(address) : null;
+        return address ? addressUtils.bufferToAddress(address, this.#config.addressPrefix) : null;
     }
 
     async getWriterIndex(index) {
@@ -337,7 +346,7 @@ class State extends ReadyResource {
 
     async getRegisteredWriterKey(writingKey) {
         const entry = await this.get(EntryType.WRITER_ADDRESS + writingKey);
-        return entry ? addressUtils.addressToBuffer(entry) : null;
+        return entry ? addressUtils.addressToBuffer(entry, this.#config.addressPrefix) : null;
     }
 
     #setupHyperbee(store) {
@@ -435,7 +444,7 @@ class State extends ReadyResource {
 
         // Extract and validate the requester network address
         const adminAddressBuffer = op.address;
-        const adminAddressString = addressUtils.bufferToAddress(adminAddressBuffer);
+        const adminAddressString = addressUtils.bufferToAddress(adminAddressBuffer, this.#config.addressPrefix);
         if (adminAddressString === null) {
             this.#safeLogApply(OperationType.BALANCE_INITIALIZATION, "Requester address is invalid.", node.from.key)
             return Status.FAILURE;
@@ -450,7 +459,7 @@ class State extends ReadyResource {
 
         // Validate recipient address
         const recipientAddress = op.bio.ia;
-        const recipientAddressString = addressUtils.bufferToAddress(recipientAddress);
+        const recipientAddressString = addressUtils.bufferToAddress(recipientAddress, this.#config.addressPrefix);
         if (recipientAddressString === null) {
             this.#safeLogApply(OperationType.BALANCE_INITIALIZATION, "Recipient address is invalid.", node.from.key)
             return Status.FAILURE;
@@ -478,7 +487,7 @@ class State extends ReadyResource {
 
         // Ensure that an admin invoked this operation
         const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
-        const decodedAdminEntry = adminEntryUtils.decode(adminEntry);
+        const decodedAdminEntry = adminEntryUtils.decode(adminEntry, this.#config.addressPrefix);
 
         if (decodedAdminEntry === null) {
             this.#safeLogApply(OperationType.BALANCE_INITIALIZATION, "Failed to decode admin entry.", node.from.key)
@@ -504,7 +513,7 @@ class State extends ReadyResource {
 
         // Recreate requester message
         const message = createMessage(
-            NETWORK_ID,
+            this.#config.networkId,
             op.bio.txv,
             op.bio.ia,
             amount.value,
@@ -586,7 +595,7 @@ class State extends ReadyResource {
 
         // Extract and validate the network address
         const adminAddressBuffer = op.address;
-        const adminAddressString = addressUtils.bufferToAddress(adminAddressBuffer);
+        const adminAddressString = addressUtils.bufferToAddress(adminAddressBuffer, this.#config.addressPrefix);
         if (adminAddressString === null) {
             this.#safeLogApply(OperationType.DISABLE_INITIALIZATION, "Failed to validate requester address.", node.from.key)
             return Status.FAILURE;
@@ -601,7 +610,7 @@ class State extends ReadyResource {
 
         // Ensure that an admin invoked this operation
         const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
-        const decodedAdminEntry = adminEntryUtils.decode(adminEntry);
+        const decodedAdminEntry = adminEntryUtils.decode(adminEntry, this.#config.addressPrefix);
 
         if (decodedAdminEntry === null) {
             this.#safeLogApply(OperationType.DISABLE_INITIALIZATION, "Failed to decode admin entry.", node.from.key)
@@ -627,7 +636,7 @@ class State extends ReadyResource {
 
         // Recreate requester message
         const message = createMessage(
-            NETWORK_ID,
+            this.#config.networkId,
             op.cao.txv,
             op.cao.iw,
             op.cao.in,
@@ -691,7 +700,7 @@ class State extends ReadyResource {
 
         // Extract and validate the requester address (admin)
         const adminAddressBuffer = op.address;
-        const adminAddressString = addressUtils.bufferToAddress(adminAddressBuffer);
+        const adminAddressString = addressUtils.bufferToAddress(adminAddressBuffer, this.#config.addressPrefix);
         if (adminAddressString === null) {
             this.#safeLogApply(OperationType.ADD_ADMIN, "Requester address is invalid.", node.from.key)
             return Status.FAILURE;
@@ -705,14 +714,14 @@ class State extends ReadyResource {
         };
 
         // Check if the operation is being performed by the bootstrap node - the original deployer of the Trac Network
-        if (!b4a.equals(node.from.key, this.bootstrap) || !b4a.equals(op.cao.iw, this.bootstrap)) {
+        if (!b4a.equals(node.from.key, this.#config.bootstrap) || !b4a.equals(op.cao.iw, this.#config.bootstrap)) {
             this.#safeLogApply(OperationType.ADD_ADMIN, "Node is not a bootstrap node.", node.from.key)
             return Status.FAILURE;
         };
 
         // recreate requester message
         const requesterMessage = createMessage(
-            NETWORK_ID,
+            this.#config.networkId,
             op.cao.txv,
             op.cao.iw,
             op.cao.in,
@@ -788,7 +797,7 @@ class State extends ReadyResource {
         }
 
         // Create a new admin entry
-        const newAdminEntry = adminEntryUtils.encode(adminAddressBuffer, op.cao.iw);
+        const newAdminEntry = adminEntryUtils.encode(adminAddressBuffer, op.cao.iw, this.#config.addressPrefix);
         if (newAdminEntry.length === 0) {
             this.#safeLogApply(OperationType.ADD_ADMIN, "Failed to verify message signature.", node.from.key)
             return Status.FAILURE;
@@ -813,7 +822,7 @@ class State extends ReadyResource {
         await batch.put(EntryType.INITIALIZATION, safeWriteUInt32BE(1, 0));
         await batch.put(txHashHexString, node.value);
 
-        if (this.#enable_tx_apply_logs) {
+        if (this.#config.enableTxApplyLogs) {
             console.info(`Admin added addr:wk:tx - ${adminAddressString}:${op.cao.iw.toString('hex')}:${txHashHexString}`);
         }
 
@@ -852,7 +861,7 @@ class State extends ReadyResource {
 
         // Extract and validate the requester address and pubkey
         const requesterAdminAddressBuffer = op.address;
-        const requesterAdminAddressString = addressUtils.bufferToAddress(requesterAdminAddressBuffer);
+        const requesterAdminAddressString = addressUtils.bufferToAddress(requesterAdminAddressBuffer, this.#config.addressPrefix);
         if (requesterAdminAddressString === null) {
             this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Requester address is invalid.", node.from.key)
             return Status.FAILURE;
@@ -866,7 +875,7 @@ class State extends ReadyResource {
 
         // recreate requester message
         const requesterMessage = createMessage(
-            NETWORK_ID,
+            this.#config.networkId,
             op.rao.txv,
             op.rao.iw,
             op.rao.in,
@@ -894,7 +903,7 @@ class State extends ReadyResource {
 
         // Extract and validate the validator address and pubkey
         const validatorAddress = op.rao.va;
-        const validatorAddressString = addressUtils.bufferToAddress(validatorAddress);
+        const validatorAddressString = addressUtils.bufferToAddress(validatorAddress, this.#config.addressPrefix);
         if (validatorAddressString === null) {
             this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Failed to validate validator address.", node.from.key)
             return Status.FAILURE;
@@ -908,7 +917,7 @@ class State extends ReadyResource {
 
         // recreate validator message
         const validatorMessage = createMessage(
-            NETWORK_ID,
+            this.#config.networkId,
             op.rao.tx,
             op.rao.vn,
             OperationType.ADMIN_RECOVERY
@@ -956,7 +965,7 @@ class State extends ReadyResource {
         }
 
         const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
-        const decodedAdminEntry = adminEntryUtils.decode(adminEntry);
+        const decodedAdminEntry = adminEntryUtils.decode(adminEntry, this.#config.addressPrefix);
 
         if (decodedAdminEntry === null) {
             this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Failed to decode admin entry.", node.from.key)
@@ -984,7 +993,7 @@ class State extends ReadyResource {
         }; // Old admin wk is not in indexers entry
 
         // Update admin entry with new writing key
-        const newAdminEntry = adminEntryUtils.encode(requesterAdminAddressBuffer, op.rao.iw);
+        const newAdminEntry = adminEntryUtils.encode(requesterAdminAddressBuffer, op.rao.iw, this.#config.addressPrefix);
         if (newAdminEntry.length === 0) {
             this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Invalid admin entry.", node.from.key)
             return Status.FAILURE;
@@ -1001,7 +1010,7 @@ class State extends ReadyResource {
         }; // New admin wk is already in indexers entry
 
         // charging fee from the requester (admin)
-        const decodedAdminNodeEntry = nodeEntryUtils.decode(newAdminNodeEntry)
+        const decodedAdminNodeEntry = nodeEntryUtils.decode(newAdminNodeEntry, this.#config.addressPrefix)
         if (decodedAdminNodeEntry === null) {
             this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Failed to decode node entry.", node.from.key)
             return Status.FAILURE;
@@ -1026,7 +1035,7 @@ class State extends ReadyResource {
         const chargedAdminEntry = updatedFee.update(newAdminNodeEntry)
 
         // Reward logic
-        const validatorNodeEntry = nodeEntryUtils.decode(validatorEntryBuffer);
+        const validatorNodeEntry = nodeEntryUtils.decode(validatorEntryBuffer, this.#config.addressPrefix);
         if (validatorNodeEntry === null) {
             this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Invalid validator node entry.", node.from.key)
             return Status.FAILURE;
@@ -1064,7 +1073,7 @@ class State extends ReadyResource {
         await batch.put(validatorAddressString, updatedValidatorNodeEntry);
         await batch.put(txHashHexString, node.value);
 
-        if (this.#enable_tx_apply_logs) {
+        if (this.#config.enableTxApplyLogs) {
             console.info(`Admin has been recovered addr:wk:tx - ${requesterAdminAddressString}:${op.rao.iw.toString('hex')}:${txHashHexString}`);
         }
 
@@ -1079,7 +1088,7 @@ class State extends ReadyResource {
 
         // Validate the recipient address
         const adminAddressBuffer = op.address;
-        const adminAddressString = addressUtils.bufferToAddress(adminAddressBuffer);
+        const adminAddressString = addressUtils.bufferToAddress(adminAddressBuffer, this.#config.addressPrefix);
         if (adminAddressString === null) {
             this.#safeLogApply(OperationType.APPEND_WHITELIST, "Recipient address is invalid.", node.from.key)
             return Status.FAILURE;
@@ -1098,7 +1107,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const decodedAdminEntry = adminEntryUtils.decode(adminEntry);
+        const decodedAdminEntry = adminEntryUtils.decode(adminEntry, this.#config.addressPrefix);
         if (decodedAdminEntry === null) {
             this.#safeLogApply(OperationType.APPEND_WHITELIST, "Failed to decode admin entry.", node.from.key)
             return Status.FAILURE;
@@ -1126,7 +1135,7 @@ class State extends ReadyResource {
         // Extract and validate the network prefix from the node's address
         const nodeAddressBuffer = op.aco.ia;
 
-        const nodeAddressString = addressUtils.bufferToAddress(nodeAddressBuffer);
+        const nodeAddressString = addressUtils.bufferToAddress(nodeAddressBuffer, this.#config.addressPrefix);
         if (nodeAddressString === null) {
             this.#safeLogApply(OperationType.APPEND_WHITELIST, "Failed to verify node address.", node.from.key)
             return Status.FAILURE;
@@ -1139,7 +1148,7 @@ class State extends ReadyResource {
 
         // verify signature
         const message = createMessage(
-            NETWORK_ID,
+            this.#config.networkId,
             op.aco.txv,
             op.aco.ia,
             op.aco.in,
@@ -1199,7 +1208,7 @@ class State extends ReadyResource {
                 return Status.FAILURE;
             };
 
-            const decodedNodeEntry = nodeEntryUtils.decode(adminNodeEntry)
+            const decodedNodeEntry = nodeEntryUtils.decode(adminNodeEntry, this.#config.addressPrefix)
             if (decodedNodeEntry === null) {
                 this.#safeLogApply(OperationType.APPEND_WHITELIST, "Failed to decode admin entry.", node.from.key)
                 return Status.FAILURE;
@@ -1352,7 +1361,7 @@ class State extends ReadyResource {
 
         // Extract and validate the requester address
         const requesterAddressBuffer = op.address;
-        const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer);
+        const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer, this.#config.addressPrefix);
         if (requesterAddressString === null) {
             this.#safeLogApply(OperationType.ADD_WRITER, "Requester address is invalid.", node.from.key)
             return Status.FAILURE;
@@ -1372,7 +1381,7 @@ class State extends ReadyResource {
 
         // verify requester signature
         const requesterMessage = createMessage(
-            NETWORK_ID,
+            this.#config.networkId,
             op.rao.txv,
             op.rao.iw,
             op.rao.in,
@@ -1399,7 +1408,7 @@ class State extends ReadyResource {
 
         // verify validator signature
         const validatorAddress = op.rao.va;
-        const validatorAddressString = addressUtils.bufferToAddress(validatorAddress);
+        const validatorAddressString = addressUtils.bufferToAddress(validatorAddress, this.#config.addressPrefix);
         if (validatorAddressString === null) {
             this.#safeLogApply(OperationType.ADD_WRITER, "Failed to validate validator address.", node.from.key)
             return Status.FAILURE;
@@ -1414,7 +1423,7 @@ class State extends ReadyResource {
 
         // recreate validator message
         const validatorMessage = createMessage(
-            NETWORK_ID,
+            this.#config.networkId,
             op.rao.tx,
             op.rao.vn,
             OperationType.ADD_WRITER
@@ -1481,7 +1490,7 @@ class State extends ReadyResource {
             return null;
         };
 
-        const decodedRequesterNodeEntry = nodeEntryUtils.decode(requesterNodeEntry)
+        const decodedRequesterNodeEntry = nodeEntryUtils.decode(requesterNodeEntry, this.#config.addressPrefix)
         if (decodedRequesterNodeEntry === null) {
             this.#safeLogApply(OperationType.ADD_WRITER, "Failed to decode node entry.", node.from.key)
             return null;
@@ -1566,7 +1575,7 @@ class State extends ReadyResource {
 
         // reward the validator
 
-        const decodedValidatorEntry = nodeEntryUtils.decode(validatorEntryBuffer)
+        const decodedValidatorEntry = nodeEntryUtils.decode(validatorEntryBuffer, this.#config.addressPrefix)
         if (decodedValidatorEntry === null) {
             this.#safeLogApply(OperationType.ADD_WRITER, "Failed to decode validator entry.", node.from.key)
             return null;
@@ -1619,7 +1628,7 @@ class State extends ReadyResource {
         await batch.put(validatorAddressString, updatedValidatorEntry);
         await batch.put(txHashHexString, node.value);
 
-        if (this.#enable_tx_apply_logs) {
+        if (this.#config.enableTxApplyLogs) {
             console.info(`Writer has been added addr:wk:tx - ${requesterAddressString}:${op.rao.iw.toString('hex')}:${txHashHexString}`);
         }
     }
@@ -1656,7 +1665,7 @@ class State extends ReadyResource {
 
         // Extract and validate the network address
         const requesterAddress = op.address;
-        const requesterAddressString = addressUtils.bufferToAddress(requesterAddress);
+        const requesterAddressString = addressUtils.bufferToAddress(requesterAddress, this.#config.addressPrefix);
         if (requesterAddressString === null) {
             this.#safeLogApply(OperationType.REMOVE_WRITER, "Requester address is invalid.", node.from.key)
             return Status.FAILURE;
@@ -1671,7 +1680,7 @@ class State extends ReadyResource {
 
         // verify requester signature
         const requesterMessage = createMessage(
-            NETWORK_ID,
+            this.#config.networkId,
             op.rao.txv,
             op.rao.iw,
             op.rao.in,
@@ -1698,7 +1707,7 @@ class State extends ReadyResource {
 
         // verify validator signature
         const validatorAddress = op.rao.va;
-        const validatorAddressString = addressUtils.bufferToAddress(validatorAddress);
+        const validatorAddressString = addressUtils.bufferToAddress(validatorAddress, this.#config.addressPrefix);
         if (validatorAddressString === null) {
             this.#safeLogApply(OperationType.REMOVE_WRITER, "Failed to verify validator address.", node.from.key)
             return Status.FAILURE;
@@ -1713,7 +1722,7 @@ class State extends ReadyResource {
 
         // recreate validator message
         const validatorMessage = createMessage(
-            NETWORK_ID,
+            this.#config.networkId,
             op.rao.tx,
             op.rao.vn,
             OperationType.REMOVE_WRITER
@@ -1782,7 +1791,7 @@ class State extends ReadyResource {
             return null;
         };
 
-        const decodedNodeEntry = nodeEntryUtils.decode(requesterNodeEntry);
+        const decodedNodeEntry = nodeEntryUtils.decode(requesterNodeEntry, this.#config.addressPrefix);
         if (decodedNodeEntry === null) {
             this.#safeLogApply(OperationType.REMOVE_WRITER, "Failed to decode requester node entry.", node.from.key)
             return null;
@@ -1843,7 +1852,7 @@ class State extends ReadyResource {
         };
 
         // Validator reward logic 
-        const decodedValidatorEntry = nodeEntryUtils.decode(validatorEntryBuffer);
+        const decodedValidatorEntry = nodeEntryUtils.decode(validatorEntryBuffer, this.#config.addressPrefix);
         if (decodedValidatorEntry === null) {
             this.#safeLogApply(OperationType.REMOVE_WRITER, "Failed to decode validator node entry.", node.from.key)
             return null;
@@ -1881,7 +1890,7 @@ class State extends ReadyResource {
         await batch.put(validatorAddressString, updateValidatorEntry);
         await batch.put(txHashHexString, node.value);
 
-        if (this.#enable_tx_apply_logs) {
+        if (this.#config.enableTxApplyLogs) {
             console.info(`Writer removed: addr:wk:tx - ${requesterAddressString}:${op.rao.iw.toString('hex')}:${txHashHexString}`);
         }
 
@@ -1896,7 +1905,7 @@ class State extends ReadyResource {
 
         // Extract and validate the requester address (admin)
         const requesterAddressBuffer = op.address;
-        const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer);
+        const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer, this.#config.addressPrefix);
         if (requesterAddressString === null) {
             this.#safeLogApply(OperationType.ADD_INDEXER, "Requester address is invalid.", node.from.key)
             return Status.FAILURE;
@@ -1911,7 +1920,7 @@ class State extends ReadyResource {
 
         // Extract and validate pretending indexer address
         const pretendingAddressBuffer = op.aco.ia;
-        const pretendingAddressString = addressUtils.bufferToAddress(pretendingAddressBuffer);
+        const pretendingAddressString = addressUtils.bufferToAddress(pretendingAddressBuffer, this.#config.addressPrefix);
         if (pretendingAddressString === null) {
             this.#safeLogApply(OperationType.ADD_INDEXER, "Pretending indexer address is invalid.", node.from.key)
             return Status.FAILURE;
@@ -1931,7 +1940,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const decodedAdminEntry = adminEntryUtils.decode(adminEntry);
+        const decodedAdminEntry = adminEntryUtils.decode(adminEntry, this.#config.addressPrefix);
         if (decodedAdminEntry === null) {
             this.#safeLogApply(OperationType.ADD_INDEXER, "Failed to decode admin entry.", node.from.key)
             return Status.FAILURE;
@@ -1957,7 +1966,7 @@ class State extends ReadyResource {
 
         // verify requester signature
         const message = createMessage(
-            NETWORK_ID,
+            this.#config.networkId,
             op.aco.txv,
             op.aco.ia,
             op.aco.in,
@@ -2017,7 +2026,7 @@ class State extends ReadyResource {
             return null;
         };
 
-        const decodedPretenderNodeEntry = nodeEntryUtils.decode(pretenderNodeEntry);
+        const decodedPretenderNodeEntry = nodeEntryUtils.decode(pretenderNodeEntry, this.#config.addressPrefix);
         if (decodedPretenderNodeEntry === null) {
             this.#safeLogApply(OperationType.ADD_INDEXER, "Failed to decode pretender indexer node entry.", node.from.key)
             return null;
@@ -2058,7 +2067,7 @@ class State extends ReadyResource {
             return null;
         };
 
-        const adminNodeEntry = nodeEntryUtils.decode(adminNodeEntryBuffer);
+        const adminNodeEntry = nodeEntryUtils.decode(adminNodeEntryBuffer, this.#config.addressPrefix);
         if (adminNodeEntry === null) {
             this.#safeLogApply(OperationType.ADD_INDEXER, "Failed to decode requester node entry.", node.from.key)
             return null;
@@ -2099,7 +2108,7 @@ class State extends ReadyResource {
         // store operation hash to avoid replay attack.
         await batch.put(txHashHexString, node.value);
 
-        if (this.#enable_tx_apply_logs) {
+        if (this.#config.enableTxApplyLogs) {
             console.info(`Indexer added addr:wk:tx - ${pretendingAddressString}:${decodedPretenderNodeEntry.wk.toString('hex')}:${txHashHexString}`);
         }
 
@@ -2114,7 +2123,7 @@ class State extends ReadyResource {
 
         // Extract and validate the requester address (admin)
         const requesterAddressBuffer = op.address;
-        const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer);
+        const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer, this.#config.addressPrefix);
         if (requesterAddressString === null) {
             this.#safeLogApply(OperationType.REMOVE_INDEXER, "Requester address is invalid.", node.from.key)
             return Status.FAILURE;
@@ -2129,7 +2138,7 @@ class State extends ReadyResource {
 
         // Extract and validate pretending indexer address
         const toRemoveAddressBuffer = op.aco.ia;
-        const toRemoveAddressString = addressUtils.bufferToAddress(toRemoveAddressBuffer);
+        const toRemoveAddressString = addressUtils.bufferToAddress(toRemoveAddressBuffer, this.#config.addressPrefix);
         if (toRemoveAddressString === null) {
             this.#safeLogApply(OperationType.REMOVE_INDEXER, "Target indexer address is invalid.", node.from.key)
             return Status.FAILURE;
@@ -2148,7 +2157,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const decodedAdminEntry = adminEntryUtils.decode(adminEntry);
+        const decodedAdminEntry = adminEntryUtils.decode(adminEntry, this.#config.addressPrefix);
         if (decodedAdminEntry === null) {
             this.#safeLogApply(OperationType.REMOVE_INDEXER, "Failed to decode admin entry.", node.from.key)
             return Status.FAILURE;
@@ -2172,7 +2181,7 @@ class State extends ReadyResource {
 
         // verify requester signature
         const message = createMessage(
-            NETWORK_ID,
+            this.#config.networkId,
             op.aco.txv,
             op.aco.ia,
             op.aco.in,
@@ -2230,7 +2239,7 @@ class State extends ReadyResource {
             return null;
         };
 
-        const decodedNodeEntry = nodeEntryUtils.decode(toRemoveNodeEntry);
+        const decodedNodeEntry = nodeEntryUtils.decode(toRemoveNodeEntry, this.#config.addressPrefix);
         if (decodedNodeEntry === null) {
             this.#safeLogApply(OperationType.REMOVE_INDEXER, "Failed to decode target indexer node entry.", node.from.key)
             return null;
@@ -2264,7 +2273,7 @@ class State extends ReadyResource {
             return null;
         };
 
-        const decodedAdminNodeEntry = nodeEntryUtils.decode(adminNodeEntry)
+        const decodedAdminNodeEntry = nodeEntryUtils.decode(adminNodeEntry, this.#config.addressPrefix)
         if (decodedAdminNodeEntry === null) {
             this.#safeLogApply(OperationType.REMOVE_INDEXER, "Failed to decode requester node entry.", node.from.key)
             return null;
@@ -2318,7 +2327,7 @@ class State extends ReadyResource {
 
         // store operation hash to avoid replay attack.
         await batch.put(txHashHexString, node.value);
-        if (this.#enable_tx_apply_logs) {
+        if (this.#config.enableTxApplyLogs) {
             console.info(`Indexer has been removed addr:wk:tx - ${toRemoveAddressString}:${decodedNodeEntry.wk.toString('hex')}:${txHashHexString}`);
         }
     }
@@ -2330,7 +2339,7 @@ class State extends ReadyResource {
         };
         // Extract and validate the network prefix from the node's address
         const requesterAddressBuffer = op.address;
-        const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer);
+        const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer, this.#config.addressPrefix);
         if (requesterAddressString === null) {
             this.#safeLogApply(OperationType.BAN_VALIDATOR, "Requester address is invalid.", node.from.key)
             return Status.FAILURE;
@@ -2350,7 +2359,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const decodedAdminEntry = adminEntryUtils.decode(adminEntry);
+        const decodedAdminEntry = adminEntryUtils.decode(adminEntry, this.#config.addressPrefix);
         if (decodedAdminEntry === null) {
             this.#safeLogApply(OperationType.BAN_VALIDATOR, "Failed to decode admin node entry.", node.from.key)
             return Status.FAILURE;
@@ -2375,7 +2384,7 @@ class State extends ReadyResource {
 
         // recreate requester message
         const message = createMessage(
-            NETWORK_ID,
+            this.#config.networkId,
             op.aco.txv,
             op.aco.ia,
             op.aco.in,
@@ -2421,7 +2430,7 @@ class State extends ReadyResource {
 
         // Extract and validate the node address to be banned
         const nodeToBeBannedAddressBuffer = op.aco.ia;
-        const nodeToBeBannedAddressString = addressUtils.bufferToAddress(nodeToBeBannedAddressBuffer);
+        const nodeToBeBannedAddressString = addressUtils.bufferToAddress(nodeToBeBannedAddressBuffer, this.#config.addressPrefix);
         if (nodeToBeBannedAddressString === null) {
             this.#safeLogApply(OperationType.BAN_VALIDATOR, "Failed to verify target node address.", node.from.key)
             return Status.FAILURE;
@@ -2450,7 +2459,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const decodedToBanNodeEntry = nodeEntryUtils.decode(updatedToBanNodeEntry);
+        const decodedToBanNodeEntry = nodeEntryUtils.decode(updatedToBanNodeEntry, this.#config.addressPrefix);
         if (decodedToBanNodeEntry === null) {
             this.#safeLogApply(OperationType.BAN_VALIDATOR, "Failed to decode target node entry.", node.from.key)
             return Status.FAILURE;
@@ -2469,7 +2478,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const adminNodeEntry = nodeEntryUtils.decode(adminNodeEntryBuffer);
+        const adminNodeEntry = nodeEntryUtils.decode(adminNodeEntryBuffer, this.#config.addressPrefix);
         if (adminNodeEntry === null) {
             this.#safeLogApply(OperationType.BAN_VALIDATOR, "Failed to verify admin node entry.", node.from.key)
             return Status.FAILURE;
@@ -2515,7 +2524,7 @@ class State extends ReadyResource {
 
         await batch.put(requesterAddressString, updatedAdminNodeEntry);
         await batch.put(txHashHexString, node.value);
-        if (this.#enable_tx_apply_logs) {
+        if (this.#config.enableTxApplyLogs) {
             console.info(`Node has been banned: addr:wk:tx - ${nodeToBeBannedAddressString}:${decodedToBanNodeEntry.wk.toString('hex')}:${txHashHexString}`);
         }
 
@@ -2535,7 +2544,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
         // do not allow to deploy bootstrap deployment on the same bootstrap.
-        if (b4a.equals(op.bdo.bs, this.bootstrap)) {
+        if (b4a.equals(op.bdo.bs, this.#config.bootstrap)) {
             this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Cannot deploy bootstrap on existing same bootstrap.", node.from.key)
             return Status.FAILURE;
         };
@@ -2558,7 +2567,7 @@ class State extends ReadyResource {
 
         // validate requester signature
         const requesterAddressBuffer = op.address;
-        const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer);
+        const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer, this.#config.addressPrefix);
         if (requesterAddressString === null) {
             this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Requester address is invalid.", node.from.key)
             return Status.FAILURE;
@@ -2573,7 +2582,7 @@ class State extends ReadyResource {
 
         // recreate requester message
         const requesterMessage = createMessage(
-            NETWORK_ID,
+            this.#config.networkId,
             op.bdo.txv,
             op.bdo.bs,
             op.bdo.ic,
@@ -2603,7 +2612,7 @@ class State extends ReadyResource {
 
         //validation of validator signature
         const validatorAddressBuffer = op.bdo.va;
-        const validatorAddressString = addressUtils.bufferToAddress(validatorAddressBuffer);
+        const validatorAddressString = addressUtils.bufferToAddress(validatorAddressBuffer, this.#config.addressPrefix);
         if (validatorAddressString === null) {
             this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Invalid validator address.", node.from.key)
             return Status.FAILURE;
@@ -2618,7 +2627,7 @@ class State extends ReadyResource {
 
         // recreate validator message
         const validatorMessage = createMessage(
-            NETWORK_ID,
+            this.#config.networkId,
             op.bdo.tx,
             op.bdo.vn,
             OperationType.BOOTSTRAP_DEPLOYMENT
@@ -2673,7 +2682,7 @@ class State extends ReadyResource {
             return Status.IGNORE;
         };
 
-        const deploymentEntry = deploymentEntryUtils.encode(op.bdo.tx, requesterAddressBuffer);
+        const deploymentEntry = deploymentEntryUtils.encode(op.bdo.tx, requesterAddressBuffer, this.#config.addressPrefix);
         if (deploymentEntry.length === 0) {
             this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Invalid deployment entry.", node.from.key)
             return Status.FAILURE;
@@ -2692,7 +2701,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const requesterNodeEntry = nodeEntryUtils.decode(requesterNodeEntryBuffer);
+        const requesterNodeEntry = nodeEntryUtils.decode(requesterNodeEntryBuffer, this.#config.addressPrefix);
         if (requesterNodeEntry === null) {
             this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Invalid requester node entry.", node.from.key)
             return Status.FAILURE;
@@ -2722,7 +2731,7 @@ class State extends ReadyResource {
         };
 
         // reward validator for processing this transaction.
-        const validatorNodeEntry = nodeEntryUtils.decode(validatorEntryBuffer);
+        const validatorNodeEntry = nodeEntryUtils.decode(validatorEntryBuffer, this.#config.addressPrefix);
         if (validatorNodeEntry === null) {
             this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Invalid validator node entry.", node.from.key)
             return Status.FAILURE;
@@ -2751,7 +2760,7 @@ class State extends ReadyResource {
         await batch.put(validatorAddressString, updatedValidatorNodeEntry);
         await batch.put(hashHexString, node.value);
 
-        if (this.#enable_tx_apply_logs) {
+        if (this.#config.enableTxApplyLogs) {
             console.info(`Deployment operation: ${hashHexString} and deployment/${bootstrapDeploymentHexString} have been appended.`);
         }
         return Status.SUCCESS;
@@ -2789,14 +2798,14 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        if (!b4a.equals(op.txo.mbs, this.bootstrap)) {
+        if (!b4a.equals(op.txo.mbs, this.#config.bootstrap)) {
             this.#safeLogApply(OperationType.TX, "Declared MSB bootstrap is different than real MSB bootstrap.", node.from.key)
             return Status.FAILURE;
         };
 
         // validate invoker signature
         const requesterAddressBuffer = op.address;
-        const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer);
+        const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer, this.#config.addressPrefix);
         if (requesterAddressString === null) {
             this.#safeLogApply(OperationType.TX, "Invalid requester address.", node.from.key)
             return Status.FAILURE;
@@ -2809,12 +2818,12 @@ class State extends ReadyResource {
         };
 
         const requesterMessage = createMessage(
-            NETWORK_ID,
+            this.#config.networkId,
             op.txo.txv,
             op.txo.iw,
             op.txo.ch,
             op.txo.bs,
-            this.bootstrap,
+            this.#config.bootstrap,
             op.txo.in,
             OperationType.TX
         );
@@ -2837,7 +2846,7 @@ class State extends ReadyResource {
 
         //second signature
         const validatorAddressBuffer = op.txo.va;
-        const validatorAddressString = addressUtils.bufferToAddress(validatorAddressBuffer);
+        const validatorAddressString = addressUtils.bufferToAddress(validatorAddressBuffer, this.#config.addressPrefix);
         if (validatorAddressString === null) {
             this.#safeLogApply(OperationType.TX, "Invalid validator address.", node.from.key)
             return Status.FAILURE;
@@ -2851,7 +2860,7 @@ class State extends ReadyResource {
 
         // recreate validator message
         const validatorMessage = createMessage(
-            NETWORK_ID,
+            this.#config.networkId,
             op.txo.tx,
             op.txo.vn,
             OperationType.TX
@@ -2908,13 +2917,13 @@ class State extends ReadyResource {
         };
 
         // check the subnetwork creator address
-        const deploymentEntry = deploymentEntryUtils.decode(bootstrapHasBeenRegistered);
+        const deploymentEntry = deploymentEntryUtils.decode(bootstrapHasBeenRegistered, this.#config.addressLength);
         if (deploymentEntry === null) {
             this.#safeLogApply(OperationType.TX, "Invalid deployment entry.", node.from.key)
             return Status.FAILURE;
         };
 
-        const subnetworkCreatorAddressString = addressUtils.bufferToAddress(deploymentEntry.address);
+        const subnetworkCreatorAddressString = addressUtils.bufferToAddress(deploymentEntry.address, this.#config.addressPrefix);
         if (subnetworkCreatorAddressString === null) {
             this.#safeLogApply(OperationType.TX, "Invalid subnet creator address.", node.from.key)
             return Status.FAILURE;
@@ -2966,7 +2975,7 @@ class State extends ReadyResource {
         }
         await batch.put(hashHexString, node.value);
 
-        if (this.#enable_tx_apply_logs) {
+        if (this.#config.enableTxApplyLogs) {
             console.info(`Subnetwork TX operation: ${hashHexString} has been appended.`);
         }
         return Status.SUCCESS;
@@ -3000,7 +3009,7 @@ class State extends ReadyResource {
 
         // validate requester signature
         const requesterAddressBuffer = op.address;
-        const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer);
+        const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer, this.#config.addressPrefix);
         if (requesterAddressString === null) {
             this.#safeLogApply(OperationType.TRANSFER, "Requester address is invalid.", node.from.key)
             return Status.FAILURE;
@@ -3014,7 +3023,7 @@ class State extends ReadyResource {
 
         // recreate requester message
         const requesterMessage = createMessage(
-            NETWORK_ID,
+            this.#config.networkId,
             op.tro.txv,
             op.tro.to,
             op.tro.am,
@@ -3042,7 +3051,7 @@ class State extends ReadyResource {
 
         // signature of the validator
         const validatorAddressBuffer = op.tro.va;
-        const validatorAddressString = addressUtils.bufferToAddress(validatorAddressBuffer);
+        const validatorAddressString = addressUtils.bufferToAddress(validatorAddressBuffer, this.#config.addressPrefix);
         if (validatorAddressString === null) {
             this.#safeLogApply(OperationType.TRANSFER, "Validator address is invalid.", node.from.key)
             return Status.FAILURE;
@@ -3055,7 +3064,7 @@ class State extends ReadyResource {
         };
 
         const validatorMessage = createMessage(
-            NETWORK_ID,
+            this.#config.networkId,
             op.tro.tx,
             op.tro.vn,
             OperationType.TRANSFER
@@ -3104,7 +3113,7 @@ class State extends ReadyResource {
 
         // Check if recipient address is valid.
         const recipientAddressBuffer = op.tro.to;
-        const recipientAddressString = addressUtils.bufferToAddress(recipientAddressBuffer);
+        const recipientAddressString = addressUtils.bufferToAddress(recipientAddressBuffer, this.#config.addressPrefix);
         if (recipientAddressString === null) {
             this.#safeLogApply(OperationType.TRANSFER, "Invalid recipient address.", node.from.key)
             return Status.FAILURE;
@@ -3170,7 +3179,7 @@ class State extends ReadyResource {
 
         await batch.put(hashHexString, node.value);
 
-        if (this.#enable_tx_apply_logs) {
+        if (this.#config.enableTxApplyLogs) {
             console.info(`Transfer operation: ${hashHexString} has been appended.`);
         }
         return Status.SUCCESS;
@@ -3211,7 +3220,7 @@ class State extends ReadyResource {
             return null;
         }
 
-        const senderEntry = nodeEntryUtils.decode(senderEntryBuffer);
+        const senderEntry = nodeEntryUtils.decode(senderEntryBuffer, this.#config.addressPrefix);
         if (senderEntry === null) {
             this.#safeLogApply(OperationType.TRANSFER, "Invalid sender node entry.", node.from.key)
             return null;
@@ -3264,7 +3273,7 @@ class State extends ReadyResource {
                 };
                 result.recipientEntry = newRecipientEntry;
             } else {
-                const recipientEntry = nodeEntryUtils.decode(recipientEntryBuffer);
+                const recipientEntry = nodeEntryUtils.decode(recipientEntryBuffer, this.#config.addressPrefix);
                 if (recipientEntry === null) {
                     this.#safeLogApply(OperationType.TRANSFER, "Invalid recipient entry.", node.from.key)
                     return null;
@@ -3291,7 +3300,7 @@ class State extends ReadyResource {
             }
         }
 
-        const validatorEntry = nodeEntryUtils.decode(validatorEntryBuffer);
+        const validatorEntry = nodeEntryUtils.decode(validatorEntryBuffer, this.#config.addressPrefix);
         if (validatorEntry === null) {
             this.#safeLogApply(OperationType.TRANSFER, "Invalid validator entry.", node.from.key)
             return null;
@@ -3370,7 +3379,7 @@ class State extends ReadyResource {
             return false;
         };
 
-        const decodedValidatorEntry = nodeEntryUtils.decode(validatorEntryBuffer);
+        const decodedValidatorEntry = nodeEntryUtils.decode(validatorEntryBuffer, this.#config.addressPrefix);
         if (decodedValidatorEntry === null) {
             this.#safeLogApply(op.type, "Failed to decode validator entry.", node.from.key)
             return false;
@@ -3432,7 +3441,7 @@ class State extends ReadyResource {
     }
 
     #safeLogApply(operationType = "Common", errorMessage, writingKey = null) {
-        if (!this.#enable_error_apply_logs) return;
+        if (!this.#config.enableErrorApplyLogs) return;
         try {
             const date = new Date().toISOString();
             const wk = writingKey ? writingKey.toString('hex') : 'N/A';
@@ -3448,7 +3457,7 @@ class State extends ReadyResource {
             return null;
         }
 
-        const decodedNodeEntry = nodeEntryUtils.decode(nodeEntryBuffer);
+        const decodedNodeEntry = nodeEntryUtils.decode(nodeEntryBuffer, this.#config.addressPrefix);
         if (decodedNodeEntry === null) {
             this.#safeLogApply("StakeBalance", "Failed to decode node entry", node.from.key);
             return null;
@@ -3492,7 +3501,7 @@ class State extends ReadyResource {
             return null;
         }
 
-        const decodedNodeEntry = nodeEntryUtils.decode(nodeEntryBuffer);
+        const decodedNodeEntry = nodeEntryUtils.decode(nodeEntryBuffer, this.#config.addressPrefix);
         if (decodedNodeEntry === null) {
             this.#safeLogApply("withdrawStakedBalanceApply", "Failed to decode node entry", node.from.key);
             return null;
@@ -3543,7 +3552,7 @@ class State extends ReadyResource {
             this.#safeLogApply("ValidatorPenalty", "Admin entry not found", writingKeyBuffer);
             return;
         }
-        const adminEntry = adminEntryUtils.decode(adminEntryBuffer);
+        const adminEntry = adminEntryUtils.decode(adminEntryBuffer, this.#config.addressPrefix);
         if (adminEntry === null) {
             this.#safeLogApply("ValidatorPenalty", "Failed to decode admin entry", writingKeyBuffer);
             return;
@@ -3563,7 +3572,7 @@ class State extends ReadyResource {
             return;
         }
 
-        const validatorAddressString = addressUtils.bufferToAddress(validatorAddressBuffer);
+        const validatorAddressString = addressUtils.bufferToAddress(validatorAddressBuffer, this.#config.addressPrefix);
         if (validatorAddressString === null) {
             this.#safeLogApply("ValidatorPenalty", `Invalid validator address: ${validatorAddressString}`, writingKeyBuffer);
             return;
@@ -3581,7 +3590,7 @@ class State extends ReadyResource {
             return;
         }
 
-        const decodedValidatorNodeEntry = nodeEntryUtils.decode(validatorNodeEntryBuffer);
+        const decodedValidatorNodeEntry = nodeEntryUtils.decode(validatorNodeEntryBuffer, this.#config.addressPrefix);
         if (decodedValidatorNodeEntry === null) {
             this.#safeLogApply("ValidatorPenalty", `Failed to decode validator node entry for address: ${validatorAddressString}`, writingKeyBuffer);
             return;
@@ -3715,7 +3724,7 @@ class State extends ReadyResource {
             return null;
         }
 
-        const requesterNodeEntry = nodeEntryUtils.decode(requesterNodeEntryBuffer);
+        const requesterNodeEntry = nodeEntryUtils.decode(requesterNodeEntryBuffer, this.#config.addressPrefix);
         if (requesterNodeEntry === null) {
             this.#safeLogApply("transferFeeTxOperation", "Invalid requester node entry, can not to decode.", node.from.key)
             return null;
@@ -3746,7 +3755,7 @@ class State extends ReadyResource {
 
         // Validator always gets 50% of the fee by the base
 
-        const validatorNodeEntry = nodeEntryUtils.decode(validatorEntryBuffer);
+        const validatorNodeEntry = nodeEntryUtils.decode(validatorEntryBuffer, this.#config.addressPrefix);
         if (validatorNodeEntry === null) {
             this.#safeLogApply("transferFeeTxOperation", "Invalid validator node entry, can not to decode.", node.from.key)
             return null;
@@ -3816,7 +3825,7 @@ class State extends ReadyResource {
             return null;
         }
 
-        const subnetworkCreatorNodeEntry = nodeEntryUtils.decode(subnetworkCreatorNodeEntryBuffer);
+        const subnetworkCreatorNodeEntry = nodeEntryUtils.decode(subnetworkCreatorNodeEntryBuffer, this.#config.addressPrefix);
         if (subnetworkCreatorNodeEntry === null) {
             this.#safeLogApply("transferFeeTxOperation", "Invalid subnetwork creator node entry, can not to decode.", node.from.key)
             return null;

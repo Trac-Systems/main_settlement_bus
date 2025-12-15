@@ -15,6 +15,7 @@ import { toBalance, BALANCE_FEE, BALANCE_TO_STAKE } from '../../../../../src/cor
 import { eventFlush } from '../../../../helpers/autobaseTestHelpers.js';
 import { safeDecodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
 import { EntryType } from '../../../../../src/utils/constants.js';
+import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
 
 export async function setupRemoveWriterScenario(t, options = {}) {
 	const context = await setupAddWriterScenario(t, options);
@@ -142,7 +143,7 @@ async function assertWriterStillPromoted(t, base, writerPeer, expected) {
 		'writer stake remains untouched'
 	);
 
-	const writerAddressBuffer = addressUtils.addressToBuffer(writerAddress);
+	const writerAddressBuffer = addressUtils.addressToBuffer(writerAddress, TRAC_NETWORK_MSB_MAINNET_PREFIX);
 	const writingKeyHex = writerPeer.base.local.key.toString('hex');
 	const registryKey = EntryType.WRITER_ADDRESS + writingKeyHex;
 	const registryEntry = await base.view.get(registryKey);
@@ -161,7 +162,7 @@ async function assertPayloadProcessedByValidator(t, payload, expectedValidatorAd
 	const validatorAddressBuffer = decodedOperation?.rao?.va;
 	t.ok(validatorAddressBuffer, 'removeWriter payload carries validator address');
 	if (!validatorAddressBuffer) return;
-	const validatorAddress = addressUtils.bufferToAddress(validatorAddressBuffer);
+	const validatorAddress = addressUtils.bufferToAddress(validatorAddressBuffer, TRAC_NETWORK_MSB_MAINNET_PREFIX);
 	t.ok(validatorAddress, 'removeWriter payload validator address decodes');
 	if (!validatorAddress) return;
 	t.is(
@@ -256,7 +257,7 @@ export async function applyWithWriterRegistryForeignAddress(context, invalidPayl
 		throw new Error('Foreign registry override requires a peer with an address.');
 	}
 	const foreignEntry = {
-		value: addressUtils.addressToBuffer(foreignAddress)
+		value: addressUtils.addressToBuffer(foreignAddress, TRAC_NETWORK_MSB_MAINNET_PREFIX)
 	};
 	await withWriterRegistryOverrideOnApply({
 		context,

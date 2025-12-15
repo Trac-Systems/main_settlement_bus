@@ -6,6 +6,8 @@ import { EntryType } from "./constants.js";
 import { bufferToAddress } from "../core/state/utils/address.js";
 import deploymentEntryUtils from "../core/state/utils/deploymentEntry.js";
 import { safeDecodeApplyOperation } from "./protobuf/operationHelpers.js";
+import { TRAC_ADDRESS_SIZE } from "./constants.js";
+import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from "trac-wallet/constants.js";
 
 export async function getBalanceCommand(state, address, confirmedFlag) {
     const unconfirmedBalance = confirmedFlag === "false";
@@ -88,7 +90,7 @@ export async function getValidatorAddressCommand(state, wkHexString) {
     if (payload === null) {
         console.log(`No address assigned to the writer key: ${wkHexString}`);
     } else {
-        console.log(`Address assigned to the writer key: ${wkHexString} - ${bufferToAddress(payload)}`);
+        console.log(`Address assigned to the writer key: ${wkHexString} - ${bufferToAddress(payload, TRAC_NETWORK_MSB_MAINNET_PREFIX)}`);
     }
 }
 
@@ -96,7 +98,7 @@ export async function getDeploymentCommand(state, bootstrapHex) {
     const deploymentEntry = await state.getRegisteredBootstrapEntry(bootstrapHex);
     console.log(`Searching deployment for bootstrap: ${bootstrapHex}`);
     if (deploymentEntry) {
-        const decodedDeploymentEntry = deploymentEntryUtils.decode(deploymentEntry);
+        const decodedDeploymentEntry = deploymentEntryUtils.decode(deploymentEntry, TRAC_ADDRESS_SIZE);
         const txhash = decodedDeploymentEntry.txHash.toString("hex");
         console.log(`Bootstrap deployed under transaction hash: ${txhash}`);
         const payload = await state.getSigned(txhash);

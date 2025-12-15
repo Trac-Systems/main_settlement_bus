@@ -4,6 +4,7 @@ import { MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION, TRAC_ADDRESS_SIZE } from '../
 import { bufferToAddress } from '../../state/utils/address.js';
 import { sleep } from '../../../utils/helpers.js';
 import Scheduler from "../../../utils/Scheduler.js";
+import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from "trac-wallet/constants.js";
 
 const POLL_INTERVAL = 3500 // This was increase since the iterations dont wait for the execution its about 10 * DELAY_INTERVAL
 const DELAY_INTERVAL = 250
@@ -101,7 +102,7 @@ class ValidatorObserverService {
         
         if (!isValidatorValid) return;
         
-        const validatorAddress = bufferToAddress(validatorAddressBuffer);
+        const validatorAddress = bufferToAddress(validatorAddressBuffer, TRAC_NETWORK_MSB_MAINNET_PREFIX);
         const validatorPubKeyBuffer = PeerWallet.decodeBech32m(validatorAddress);
         const validatorPubKeyHex = validatorPubKeyBuffer.toString('hex');
         const adminEntry = await this.state.getAdminEntry();
@@ -115,7 +116,7 @@ class ValidatorObserverService {
     async #isValidatorValid(forbiddenAddress, validatorAddressBuffer, validatorListLength) {
         if (validatorAddressBuffer === null || b4a.byteLength(validatorAddressBuffer) !== TRAC_ADDRESS_SIZE) return false;
         
-        const validatorAddress = bufferToAddress(validatorAddressBuffer);
+        const validatorAddress = bufferToAddress(validatorAddressBuffer, TRAC_NETWORK_MSB_MAINNET_PREFIX);
         if (validatorAddress === forbiddenAddress) return false;
 
         const validatorPubKeyBuffer = PeerWallet.decodeBech32m(validatorAddress);

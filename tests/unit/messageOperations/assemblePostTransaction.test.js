@@ -7,7 +7,8 @@ import b4a from 'b4a';
 import {safeDecodeApplyOperation} from '../../src/utils/protobuf/operationHelpers.js';
 import {isAddressValid} from "../../src/core/state/utils/address.js";
 import {errorMessageIncludes} from "../utils/regexHelper.js";
-import {generatePostTx, randomBytes} from "../../helpers/setupApplyTests.js";
+import {randomBytes} from "../../helpers/setupApplyTests.js";
+import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
 
 const msgTxoLength = 10;
 const opType = OperationType.TX;
@@ -44,11 +45,11 @@ test('assemblePostTxMessage - ....', async (k) => {
 
     k.is(decodedPostTx.type, opType, `Message type should be ${opType}`);
 
-    k.ok(isAddressValid(decodedPostTx.address), 'Message validator address should be a valid address');
-    k.ok(isAddressValid(decodedPostTx.txo.ia), 'Message incoming address should be a valid address');
+    k.ok(isAddressValid(decodedPostTx.address, TRAC_NETWORK_MSB_MAINNET_PREFIX), 'Message validator address should be a valid address');
+    k.ok(isAddressValid(decodedPostTx.txo.ia, TRAC_NETWORK_MSB_MAINNET_PREFIX), 'Message incoming address should be a valid address');
 
-    k.ok(bufferToAddress(decodedPostTx.txo.ia) === incomingAddress, 'Message incoming address should be the address of the peer wallet');
-    k.ok(bufferToAddress(decodedPostTx.address) === validatorAddress, 'Message validator address should be the address of the non-admin wallet');
+    k.ok(bufferToAddress(decodedPostTx.txo.ia, TRAC_NETWORK_MSB_MAINNET_PREFIX) === incomingAddress, 'Message incoming address should be the address of the peer wallet');
+    k.ok(bufferToAddress(decodedPostTx.address, TRAC_NETWORK_MSB_MAINNET_PREFIX) === validatorAddress, 'Message validator address should be the address of the non-admin wallet');
 
     k.ok(b4a.isBuffer(decodedPostTx.txo.tx), 'tx should be a buffer');
     k.is(decodedPostTx.txo.tx.length, 32, 'tx should be 32 bytes long');

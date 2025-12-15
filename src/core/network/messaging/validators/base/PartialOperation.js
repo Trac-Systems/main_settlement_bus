@@ -9,6 +9,7 @@ import { blake3Hash } from "../../../../../utils/crypto.js";
 import { bufferToBigInt } from "../../../../../utils/amountSerialization.js";
 import { FEE } from "../../../../state/utils/transaction.js";
 import * as operationsUtils from '../../../../../utils/operations.js';
+import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
 
 const MAX_AMOUNT = BigInt('0xffffffffffffffffffffffffffffffff');
 const FEE_BIGINT = bufferToBigInt(FEE);
@@ -65,7 +66,7 @@ class PartialOperation {
     }
 
     validateRequesterAddress(payload) {
-        const incomingAddress = bufferToAddress(payload.address);
+        const incomingAddress = bufferToAddress(payload.address, TRAC_NETWORK_MSB_MAINNET_PREFIX);
         if (!incomingAddress) {
             throw new Error('Invalid requesting address in payload.');
         }
@@ -131,7 +132,7 @@ class PartialOperation {
         const operationKey = operationsUtils.operationToPayload(payload.type);
         const operation = payload[operationKey];
 
-        const incomingPublicKey = PeerWallet.decodeBech32mSafe(bufferToAddress(payload.address));
+        const incomingPublicKey = PeerWallet.decodeBech32mSafe(bufferToAddress(payload.address, TRAC_NETWORK_MSB_MAINNET_PREFIX));
         const incomingSignature = operation.is;
         const messageComponents = this.#getMessageComponents(payload);
 
@@ -181,7 +182,7 @@ class PartialOperation {
     }
 
     async validateRequesterBalance(payload, signed = false) {
-        const requesterAddress = bufferToAddress(payload.address);
+        const requesterAddress = bufferToAddress(payload.address, TRAC_NETWORK_MSB_MAINNET_PREFIX);
         let requesterEntry;
         if (signed) {
             requesterEntry = await this.state.getNodeEntry(requesterAddress);
