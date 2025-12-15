@@ -14,9 +14,7 @@ import {
     ADMIN_INITIAL_STAKED_BALANCE,
     MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION,
     TRAC_NAMESPACE,
-    CustomEventType,
-    NETWORK_ID,
-    TRAC_ADDRESS_SIZE
+    CustomEventType
 } from '../../utils/constants.js';
 import { isHexString, sleep, isTransactionRecordPut } from '../../utils/helpers.js';
 import PeerWallet from 'trac-wallet';

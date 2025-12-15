@@ -15,7 +15,7 @@ import { toBalance, PERCENT_75, BALANCE_ZERO } from '../../../../../src/core/sta
 import { decimalStringToBigInt, bigIntTo16ByteBuffer } from '../../../../../src/utils/amountSerialization.js';
 import { safeDecodeApplyOperation, safeEncodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
 import { ZERO_WK } from '../../../../../src/utils/buffer.js';
-import { EntryType, OperationType, NETWORK_ID } from '../../../../../src/utils/constants.js';
+import { EntryType, OperationType } from '../../../../../src/utils/constants.js';
 import { createMessage } from '../../../../../src/utils/buffer.js';
 import { blake3Hash } from '../../../../../src/utils/crypto.js';
 import OperationValidationScenarioBase from '../common/base/OperationValidationScenarioBase.js';
@@ -688,7 +688,7 @@ export async function mutateTransferAmountWithRehashedTx(t, validPayload) {
 	mutatedAmount[mutatedAmount.length - 1] ^= 0x01;
 	parent.am = mutatedAmount;
 
-	const message = createMessage(NETWORK_ID, parent.txv, parent.to, parent.am, parent.in, OperationType.TRANSFER);
+	const message = createMessage(config.networkId, parent.txv, parent.to, parent.am, parent.in, OperationType.TRANSFER);
 	const regeneratedTxHash = await blake3Hash(message);
 	if (regeneratedTxHash?.length === parent.tx?.length) {
 		parent.tx = regeneratedTxHash;
@@ -736,7 +736,7 @@ export async function mutateTransferAmountInvalidWithRehash(t, validPayload, con
 	parent.am = b4a.alloc(1); // invalid length to break toBalance
 
 	const requesterMessage = createMessage(
-		NETWORK_ID,
+		config.networkId,
 		parent.txv,
 		parent.to,
 		parent.am,
@@ -752,7 +752,7 @@ export async function mutateTransferAmountInvalidWithRehash(t, validPayload, con
 		parent.is = requesterWallet.sign(regeneratedTxHash);
 	}
 	if (validatorWallet && parent.vn) {
-		const validatorMessage = createMessage(NETWORK_ID, parent.tx, parent.vn, OperationType.TRANSFER);
+		const validatorMessage = createMessage(config.networkId, parent.tx, parent.vn, OperationType.TRANSFER);
 		parent.vs = validatorWallet.sign(await blake3Hash(validatorMessage));
 	}
 
@@ -773,7 +773,7 @@ export async function mutateTransferRecipientAddressWithRehash(t, validPayload, 
 	}
 	parent.to = mutatedTo;
 
-	const message = createMessage(NETWORK_ID, parent.txv, parent.to, parent.am, parent.in, OperationType.TRANSFER);
+	const message = createMessage(config.networkId, parent.txv, parent.to, parent.am, parent.in, OperationType.TRANSFER);
 	const regeneratedTxHash = await blake3Hash(message);
 	if (regeneratedTxHash?.length === parent.tx?.length) {
 		parent.tx = regeneratedTxHash;
@@ -783,7 +783,7 @@ export async function mutateTransferRecipientAddressWithRehash(t, validPayload, 
 		parent.is = requesterWallet.sign(regeneratedTxHash);
 	}
 	if (validatorWallet && parent.vn) {
-		const validatorMessage = createMessage(NETWORK_ID, parent.tx, parent.vn, OperationType.TRANSFER);
+		const validatorMessage = createMessage(config.networkId, parent.tx, parent.vn, OperationType.TRANSFER);
 		parent.vs = validatorWallet.sign(await blake3Hash(validatorMessage));
 	}
 
@@ -805,7 +805,7 @@ export async function mutateTransferRecipientPublicKeyInvalidWithRehash(t, valid
 	}
 	parent.to = mutatedTo;
 
-	const message = createMessage(NETWORK_ID, parent.txv, parent.to, parent.am, parent.in, OperationType.TRANSFER);
+	const message = createMessage(config.networkId, parent.txv, parent.to, parent.am, parent.in, OperationType.TRANSFER);
 	const regeneratedTxHash = await blake3Hash(message);
 	if (regeneratedTxHash?.length === parent.tx?.length) {
 		parent.tx = regeneratedTxHash;
@@ -815,7 +815,7 @@ export async function mutateTransferRecipientPublicKeyInvalidWithRehash(t, valid
 		parent.is = requesterWallet.sign(regeneratedTxHash);
 	}
 	if (validatorWallet && parent.vn) {
-		const validatorMessage = createMessage(NETWORK_ID, parent.tx, parent.vn, OperationType.TRANSFER);
+		const validatorMessage = createMessage(config.networkId, parent.tx, parent.vn, OperationType.TRANSFER);
 		parent.vs = validatorWallet.sign(await blake3Hash(validatorMessage));
 	}
 
@@ -842,7 +842,7 @@ export async function mutateTransferAmountToInvalidValue(t, validPayload, contex
 	parent.am = b4a.alloc(1); // forces toBalance(amount).value === null
 
 	const requesterMessage = createMessage(
-		NETWORK_ID,
+		config.networkId,
 		parent.txv,
 		parent.to,
 		parent.am,
@@ -858,7 +858,7 @@ export async function mutateTransferAmountToInvalidValue(t, validPayload, contex
 		parent.is = requesterWallet.sign(regeneratedTxHash);
 	}
 	if (validatorWallet && parent.vn) {
-		const validatorMessage = createMessage(NETWORK_ID, parent.tx, parent.vn, OperationType.TRANSFER);
+		const validatorMessage = createMessage(config.networkId, parent.tx, parent.vn, OperationType.TRANSFER);
 		parent.vs = validatorWallet.sign(await blake3Hash(validatorMessage));
 	}
 

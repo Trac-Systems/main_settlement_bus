@@ -4,7 +4,7 @@ import tracCrypto from "trac-crypto-api";
 import { $TNK } from "../../src/core/state/utils/balance.js";
 import { createMessage } from "../../src/utils/buffer.js";
 import { blake3Hash } from "../../src/utils/crypto.js";
-import { OperationType, NETWORK_ID } from "../../src/utils/constants.js";
+import { OperationType } from "../../src/utils/constants.js";
 import { addressToBuffer } from "../../src/core/state/utils/address.js";
 import { config } from '../helpers/config.js'
 
@@ -42,7 +42,7 @@ export async function buildRpcSelfTransferPayload(wallet, state, amountTnk = 1n)
     const toBuf = addressToBuffer(toAddress, config.addressPrefix);
 
     const message = createMessage(
-        NETWORK_ID,
+        config.networkId,
         txvBuf,
         toBuf,
         amountBuf,

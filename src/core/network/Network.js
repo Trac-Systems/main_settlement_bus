@@ -12,9 +12,7 @@ import {
     MAX_PARALLEL,
     MAX_SERVER_CONNECTIONS,
     MAX_CLIENT_CONNECTIONS,
-    NETWORK_MESSAGE_TYPES,
-    NETWORK_ID,
-    TRAC_ADDRESS_SIZE
+    NETWORK_MESSAGE_TYPES
 } from '../../utils/constants.js';
 import ConnectionManager from './services/ConnectionManager.js';
 import MessageOrchestrator from './services/MessageOrchestrator.js';

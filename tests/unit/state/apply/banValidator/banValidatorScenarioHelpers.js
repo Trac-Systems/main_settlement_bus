@@ -16,7 +16,7 @@ import { setupAdminAndWhitelistedReaderNetwork } from '../common/commonScenarioH
 import { applyWithRequesterEntryRemoval } from '../addWriter/addWriterScenarioHelpers.js';
 import { createMessage } from '../../../../../src/utils/buffer.js';
 import { blake3Hash } from '../../../../../src/utils/crypto.js';
-import { NETWORK_ID, OperationType } from '../../../../../src/utils/constants.js';
+import { OperationType } from '../../../../../src/utils/constants.js';
 import { config } from '../../../../helpers/config.js';
 
 export async function setupBanValidatorScenario(
@@ -303,7 +303,7 @@ export async function applyInvalidTargetAddressPayload(context, validPayload) {
 	decoded.aco.ia = invalidAddress;
 
 	const message = createMessage(
-		NETWORK_ID,
+		config.networkId,
 		decoded.aco.txv,
 		decoded.aco.ia,
 		decoded.aco.in,

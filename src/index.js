@@ -69,7 +69,7 @@ export class MainSettlementBus extends ReadyResource {
         super();
         this.#config = {
             channel: b4a.alloc(32).fill(options.channel),
-            networkId: NETWORK_ID,
+            networkId: this.#config.networkId,
             bootstrap: options.bootstrap ? b4a.from(options.bootstrap, "hex") : null,
             addressLength: TRAC_ADDRESS_SIZE,
             addressPrefix: TRAC_NETWORK_MSB_MAINNET_PREFIX,
@@ -481,7 +481,7 @@ export class MainSettlementBus extends ReadyResource {
             }
 
             const txValidity = await this.#state.getIndexerSequenceState();
-            const assembledMessage = await new PartialStateMessageOperations(this.#wallet, { networkId: NETWORK_ID, addressPrefix: this.#config.addressPrefix })
+            const assembledMessage = await new PartialStateMessageOperations(this.#wallet, { networkId: this.#config.networkId, addressPrefix: this.#config.addressPrefix })
                 .assembleAddWriterMessage(
                     this.#state.writingKey.toString('hex'),
                     txValidity.toString('hex')
@@ -508,7 +508,7 @@ export class MainSettlementBus extends ReadyResource {
         }
 
         const txValidity = await this.#state.getIndexerSequenceState();
-        const assembledMessage = await new PartialStateMessageOperations(this.#wallet, { networkId: NETWORK_ID, addressPrefix: this.#config.addressPrefix })
+        const assembledMessage = await new PartialStateMessageOperations(this.#wallet, { networkId: this.#config.networkId, addressPrefix: this.#config.addressPrefix })
             .assembleRemoveWriterMessage(
                 nodeEntry.wk.toString('hex'),
                 txValidity.toString('hex')
