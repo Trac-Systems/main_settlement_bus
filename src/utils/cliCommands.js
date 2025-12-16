@@ -6,7 +6,6 @@ import { EntryType } from "./constants.js";
 import { bufferToAddress } from "../core/state/utils/address.js";
 import deploymentEntryUtils from "../core/state/utils/deploymentEntry.js";
 import { safeDecodeApplyOperation } from "./protobuf/operationHelpers.js";
-import { TRAC_ADDRESS_SIZE } from "./constants.js";
 
 export async function getBalanceCommand(state, address, confirmedFlag) {
     const unconfirmedBalance = confirmedFlag === "false";
@@ -93,11 +92,11 @@ export async function getValidatorAddressCommand(state, wkHexString, prefix) {
     }
 }
 
-export async function getDeploymentCommand(state, bootstrapHex) {
+export async function getDeploymentCommand(state, bootstrapHex, addressLength) {
     const deploymentEntry = await state.getRegisteredBootstrapEntry(bootstrapHex);
     console.log(`Searching deployment for bootstrap: ${bootstrapHex}`);
     if (deploymentEntry) {
-        const decodedDeploymentEntry = deploymentEntryUtils.decode(deploymentEntry, TRAC_ADDRESS_SIZE);
+        const decodedDeploymentEntry = deploymentEntryUtils.decode(deploymentEntry, addressLength);
         const txhash = decodedDeploymentEntry.txHash.toString("hex");
         console.log(`Bootstrap deployed under transaction hash: ${txhash}`);
         const payload = await state.getSigned(txhash);

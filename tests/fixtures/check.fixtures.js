@@ -7,8 +7,7 @@ import {
     WRITER_BYTE_LENGTH,
     BOOTSTRAP_BYTE_LENGTH,
     NONCE_BYTE_LENGTH,
-    OperationType, AMOUNT_BYTE_LENGTH,
-    config.addressLength
+    OperationType, AMOUNT_BYTE_LENGTH
 } from '../../src/utils/constants.js';
 import { config } from '../helpers/config.js'
 

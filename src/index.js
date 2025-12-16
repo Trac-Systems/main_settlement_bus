@@ -21,7 +21,10 @@ import {
     OperationType,
     CustomEventType,
     BALANCE_MIGRATION_SLEEP_INTERVAL,
-    WHITELIST_MIGRATION_DIR
+    WHITELIST_MIGRATION_DIR,
+    WRITER_BYTE_LENGTH,
+    HASH_BYTE_LENGTH,
+    NONCE_BYTE_LENGTH
 } from "./utils/constants.js";
 import { randomBytes } from "hypercore-crypto";
 import { decimalStringToBigInt, bigIntTo16ByteBuffer, bufferToBigInt, bigIntToDecimalString } from "./utils/amountSerialization.js"
@@ -89,7 +92,9 @@ export class MainSettlementBus extends ReadyResource {
             maxRetries: Number(options.max_retries) ? options.max_retries : MAX_MESSAGE_SEND_ATTEMPTS,
             maxValidators: options.max_validators,
             storesFullPath: options.stores_directory + options.store_name,
+            transactionTotalSize: 3 * WRITER_BYTE_LENGTH + 2 * TRAC_ADDRESS_SIZE + HASH_BYTE_LENGTH + NONCE_BYTE_LENGTH
         }
+
         if (!options.channel) {
             throw new Error(
                 "MainSettlementBus: Channel is required. Application cannot start without channel."
@@ -1023,7 +1028,7 @@ export class MainSettlementBus extends ReadyResource {
             await getValidatorAddressCommand(this.#state, wkHexString, this.#config.addressPrefix);
         } else if (input.startsWith("/get_deployment")) {
             const bootstrapHex = parts[0];
-            await getDeploymentCommand(this.#state, bootstrapHex);
+            await getDeploymentCommand(this.#state, bootstrapHex, this.#config.addressLength);
         } else if (input.startsWith("/get_tx_info")) {
             const txHash = parts[0];
             await getTxInfoCommand(this.#state, txHash);
