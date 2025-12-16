@@ -1,7 +1,7 @@
 import b4a from 'b4a';
 import OperationValidationScenarioBase from '../base/OperationValidationScenarioBase.js';
 import { eventFlush } from '../../../../../helpers/autobaseTestHelpers.js';
-import { EntryType, TRAC_ADDRESS_SIZE } from '../../../../../../src/utils/constants.js';
+import { EntryType } from '../../../../../../src/utils/constants.js';
 import addressUtils from '../../../../../../src/core/state/utils/address.js';
 import { config } from '../../../../../helpers/config.js'
 
@@ -41,7 +41,7 @@ async function applyWithMutatedAdminEntry(context, payload) {
 	}
 
 	const alternateAddressBuffer = addressUtils.addressToBuffer(reader.wallet.address, config.addressPrefix);
-	if (!alternateAddressBuffer || alternateAddressBuffer.length !== TRAC_ADDRESS_SIZE) {
+	if (!alternateAddressBuffer || alternateAddressBuffer.length !== config.addressLength) {
 		throw new Error('Failed to derive alternate admin address buffer.');
 	}
 
@@ -86,7 +86,7 @@ function patchAdminEntryMismatch(base, alternateAddressBuffer) {
 
 					mutatedOnce = true;
 					const mutated = b4a.from(adminEntry.value);
-					alternateAddressBuffer.copy(mutated, 0, 0, TRAC_ADDRESS_SIZE);
+					alternateAddressBuffer.copy(mutated, 0, 0, config.addressLength);
 
 					return {
 						...adminEntry,

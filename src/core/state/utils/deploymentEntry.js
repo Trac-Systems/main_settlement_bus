@@ -8,7 +8,7 @@ import { isBufferValid } from '../../../utils/buffer.js';
  * Encodes a transaction entry into a buffer containing the TX hash and TRAC address.
  *
  * Buffer format:
- *   [TX_HASH(32)][TRAC_ADDRESS(TRAC_ADDRESS_SIZE)]
+ *   [TX_HASH(32)][TRAC_ADDRESS(addressLength)]
  *
  * - TX_HASH: Transaction hash buffer (must be exactly HASH_BYTE_LENGTH bytes).
  * - TRAC_ADDRESS: A bech32m-encoded address (without HRP and separator).
@@ -43,7 +43,7 @@ export function encode(txHash, address, hrp) {
  * Decodes a transaction entry buffer into its TX hash and TRAC address.
  *
  * Buffer format:
- *   [TX_HASH(32)][TRAC_ADDRESS(TRAC_ADDRESS_SIZE)]
+ *   [TX_HASH(32)][TRAC_ADDRESS(addressLength)]
  *
  * - TX_HASH: Transaction hash buffer.
  * - TRAC_ADDRESS: A bech32m-encoded address (without HRP and separator).

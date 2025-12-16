@@ -5,7 +5,6 @@ import StateBuilder from '../base/StateBuilder.js'
 import {createMessage} from '../../utils/buffer.js';
 import {OperationType} from '../../utils/protobuf/applyOperations.cjs'
 import {addressToBuffer, bufferToAddress} from '../../core/state/utils/address.js';
-import { TRAC_ADDRESS_SIZE } from '../../utils/constants.js';
 import {isAddressValid} from "../../core/state/utils/address.js";
 import {blake3Hash} from '../../utils/crypto.js';
 import {
@@ -86,12 +85,12 @@ class CompleteStateMessageBuilder extends StateBuilder {
     }
 
     withAddress(address) {
-        if (b4a.isBuffer(address) && address.length === TRAC_ADDRESS_SIZE) {
+        if (b4a.isBuffer(address) && address.length === this.#config.addressLength) {
             address = bufferToAddress(address, this.#config.addressPrefix);
         }
 
         if (!isAddressValid(address, this.#config.addressPrefix)) {
-            throw new Error(`Address field must be a valid TRAC bech32m address with length ${TRAC_ADDRESS_SIZE}.`);
+            throw new Error(`Address field must be a valid TRAC bech32m address with length ${this.#config.addressLength}.`);
         }
 
         this.#address = addressToBuffer(address, this.#config.addressPrefix);
@@ -116,12 +115,12 @@ class CompleteStateMessageBuilder extends StateBuilder {
     }
 
     withIncomingAddress(address) {
-        if (b4a.isBuffer(address) && address.length === TRAC_ADDRESS_SIZE) {
+        if (b4a.isBuffer(address) && address.length === this.#config.addressLength) {
             address = bufferToAddress(address, this.#config.addressPrefix);
         }
 
         if (!isAddressValid(address, this.#config.addressPrefix)) {
-            throw new Error(`Address field must be a valid TRAC bech32m address with length ${TRAC_ADDRESS_SIZE}.`);
+            throw new Error(`Address field must be a valid TRAC bech32m address with length ${this.#config.addressLength}.`);
         }
 
         this.#incomingAddress = addressToBuffer(address, this.#config.addressPrefix);

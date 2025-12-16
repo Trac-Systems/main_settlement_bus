@@ -16,7 +16,7 @@ import addressUtils from '../../../../../src/core/state/utils/address.js';
 import deploymentEntryUtils from '../../../../../src/core/state/utils/deploymentEntry.js';
 import transactionUtils from '../../../../../src/core/state/utils/transaction.js';
 import { toBalance, PERCENT_25, PERCENT_50, PERCENT_75 } from '../../../../../src/core/state/utils/balance.js';
-import { EntryType, TRAC_ADDRESS_SIZE } from '../../../../../src/utils/constants.js';
+import { EntryType } from '../../../../../src/utils/constants.js';
 import { decimalStringToBigInt, bigIntTo16ByteBuffer } from '../../../../../src/utils/amountSerialization.js';
 import {
 	buildBootstrapDeploymentPayload
@@ -310,7 +310,7 @@ export async function assertTxOperationSuccessState(
 	const deploymentKey = `${EntryType.DEPLOYMENT}${externalBootstrap.toString('hex')}`;
 	const deploymentEntry = await validatorPeer.base.view.get(deploymentKey);
 	t.ok(deploymentEntry, 'deployment entry remains present after tx');
-	const decodedDeployment = deploymentEntryUtils.decode(deploymentEntry?.value, TRAC_ADDRESS_SIZE);
+	const decodedDeployment = deploymentEntryUtils.decode(deploymentEntry?.value, config.addressLength);
 	t.ok(decodedDeployment, 'deployment entry decodes after tx');
 	if (decodedDeployment?.address) {
 		const creatorAddress = addressUtils.bufferToAddress(decodedDeployment.address, config.addressPrefix);

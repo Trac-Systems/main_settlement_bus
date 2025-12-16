@@ -8,7 +8,7 @@ import {
     BOOTSTRAP_BYTE_LENGTH,
     NONCE_BYTE_LENGTH,
     OperationType, AMOUNT_BYTE_LENGTH,
-    TRAC_ADDRESS_SIZE
+    config.addressLength
 } from '../../src/utils/constants.js';
 import { config } from '../helpers/config.js'
 
@@ -47,19 +47,19 @@ export const TRO = {
         tx: HASH_BYTE_LENGTH,
         txv: HASH_BYTE_LENGTH,
         in: NONCE_BYTE_LENGTH,
-        to: TRAC_ADDRESS_SIZE,
+        to: config.addressLength,
         am: AMOUNT_BYTE_LENGTH,
     },
     required_length_of_fields_for_complete_transfer: {
         tx: HASH_BYTE_LENGTH,
         txv: HASH_BYTE_LENGTH,
         in: NONCE_BYTE_LENGTH,
-        to: TRAC_ADDRESS_SIZE,
+        to: config.addressLength,
         am: AMOUNT_BYTE_LENGTH,
         is: SIGNATURE_BYTE_LENGTH,
         vn: NONCE_BYTE_LENGTH,
         vs: SIGNATURE_BYTE_LENGTH,
-        va: TRAC_ADDRESS_SIZE
+        va: config.addressLength
     },
 
 }
@@ -105,7 +105,7 @@ export const BDO = {
         is: SIGNATURE_BYTE_LENGTH,
         vn: NONCE_BYTE_LENGTH,
         vs: SIGNATURE_BYTE_LENGTH,
-        va: TRAC_ADDRESS_SIZE
+        va: config.addressLength
     },
     required_length_of_fields_for_partial_bootstrap_deployment: {
         tx: HASH_BYTE_LENGTH,
@@ -163,7 +163,7 @@ export const TXO = {
         mbs: BOOTSTRAP_BYTE_LENGTH,
         vn: NONCE_BYTE_LENGTH,
         vs: SIGNATURE_BYTE_LENGTH,
-        va: TRAC_ADDRESS_SIZE
+        va: config.addressLength
 
     },
     required_length_of_fields_for_partial_transaction_operation: {
@@ -268,7 +268,7 @@ export const ACO = {
         tx: HASH_BYTE_LENGTH,
         txv: HASH_BYTE_LENGTH,
         in: NONCE_BYTE_LENGTH,
-        ia: TRAC_ADDRESS_SIZE,
+        ia: config.addressLength,
         is: SIGNATURE_BYTE_LENGTH
     }
 };
@@ -361,7 +361,7 @@ export const RAO = {
         iw: WRITER_BYTE_LENGTH,
         in: NONCE_BYTE_LENGTH,
         is: SIGNATURE_BYTE_LENGTH,
-        va: TRAC_ADDRESS_SIZE,
+        va: config.addressLength,
         vn: NONCE_BYTE_LENGTH,
         vs: SIGNATURE_BYTE_LENGTH
     },
@@ -396,7 +396,7 @@ export const BIO = {
         tx: HASH_BYTE_LENGTH,
         txv: HASH_BYTE_LENGTH,
         in: NONCE_BYTE_LENGTH,
-        ia: TRAC_ADDRESS_SIZE,
+        ia: config.addressLength,
         am: AMOUNT_BYTE_LENGTH,
         is: SIGNATURE_BYTE_LENGTH
     }

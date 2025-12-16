@@ -1,7 +1,8 @@
 import b4a from 'b4a';
 import OperationValidationScenarioBase from '../base/OperationValidationScenarioBase.js';
 import { eventFlush } from '../../../../../helpers/autobaseTestHelpers.js';
-import { EntryType, TRAC_ADDRESS_SIZE } from '../../../../../../src/utils/constants.js';
+import { EntryType } from '../../../../../../src/utils/constants.js';
+import { config } from '../../../../../helpers/config.js';
 
 const ADMIN_KEY_BUFFER = b4a.from(EntryType.ADMIN);
 
@@ -97,12 +98,12 @@ function patchAdminEntryAddress(base) {
 }
 
 function mutateAdminAddress(value) {
-	if (!b4a.isBuffer(value) || value.length < TRAC_ADDRESS_SIZE) {
+	if (!b4a.isBuffer(value) || value.length < config.addressLength) {
 		return value;
 	}
 
 	const mutated = b4a.from(value);
-	const lastIndex = TRAC_ADDRESS_SIZE - 1;
+	const lastIndex = config.addressLength - 1;
 	const asciiP = 'p'.charCodeAt(0);
 	const asciiQ = 'q'.charCodeAt(0);
 	mutated[lastIndex] = mutated[lastIndex] === asciiP ? asciiQ : asciiP;

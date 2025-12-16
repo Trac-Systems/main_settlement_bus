@@ -8,8 +8,8 @@ import {
 import { initializeBalances, whitelistAddress } from '../common/commonScenarioHelper.js';
 import nodeEntryUtils from '../../../../../src/core/state/utils/nodeEntry.js';
 import deploymentEntryUtils from '../../../../../src/core/state/utils/deploymentEntry.js';
-import { TRAC_ADDRESS_SIZE } from '../../../../../src/utils/constants.js';
 import { safeDecodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
+import { config } from '../../../../helpers/config.js';
 
 async function setupDuplicateBootstrapScenario(t) {
 	const context = await setupBootstrapDeploymentScenario(t, { nodes: 4 });
@@ -74,7 +74,7 @@ async function assertDuplicateBootstrapState(t, context, validPayload, invalidPa
 	const deploymentKey = `deployment/${bootstrapHex}`;
 	const deploymentEntry = await validatorPeer.base.view.get(deploymentKey);
 	t.ok(deploymentEntry, 'deployment entry still stored');
-	const decodedDeployment = deploymentEntry ? deploymentEntryUtils.decode(deploymentEntry.value, TRAC_ADDRESS_SIZE) : null;
+	const decodedDeployment = deploymentEntry ? deploymentEntryUtils.decode(deploymentEntry.value, config.addressLength) : null;
 	t.ok(decodedDeployment, 'deployment entry decodes');
 	if (decodedDeployment?.txHash) {
 		t.is(decodedDeployment.txHash.toString('hex'), firstTxHex, 'deployment entry keeps original tx hash');
