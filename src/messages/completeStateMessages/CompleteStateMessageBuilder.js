@@ -75,7 +75,7 @@ class CompleteStateMessageBuilder extends StateBuilder {
         this.#amount = null;
     }
 
-    forOperationType(operationType) {
+    withOperationType(operationType) {
         if (!Object.values(OperationType).includes(operationType) || OperationType === OperationType.UNKNOWN) {
             throw new Error(`Invalid operation type: ${operationType}`);
         }

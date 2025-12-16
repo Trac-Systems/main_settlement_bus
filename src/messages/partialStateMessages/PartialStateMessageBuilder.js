@@ -56,7 +56,7 @@ class PartialStateMessageBuilder extends StateBuilder {
         this.#payload = {};
     }
 
-    forOperationType(operationType) {
+    withOperationType(operationType) {
         if (!Object.values(OperationType).includes(operationType) || OperationType === OperationType.UNKNOWN) {
             throw new Error(`Invalid operation type: ${operationType}`);
         }

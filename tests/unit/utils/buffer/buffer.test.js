@@ -1,6 +1,7 @@
 import test from 'brittle';
 import b4a from 'b4a';
-import {createMessage, isBufferValid, safeWriteUInt32BE, deepCopyBuffer} from '../../../../src/utils/buffer.js';
+import { createMessage, isBufferValid, safeWriteUInt32BE, deepCopyBuffer, encodeCapabilities, timestampToBuffer, sessionIdToBuffer } from '../../../../src/utils/buffer.js';
+import { errorMessageIncludes } from "../../../helpers/regexHelper.js";
 
 const invalidDataTypes = [
     null,
@@ -187,4 +188,62 @@ test('deepCopyBuffer - modifying copy does not affect original (is not a referen
 
     t.is(buf[0], 9, 'original unchanged');
     t.is(copy[0], 1, 'copy modified independently');
+});
+
+test('encodeCapabilities - deterministic ordering and encoding', t => {
+    const caps = ['cap-b', 'cap-a'];
+    const result = encodeCapabilities(caps);
+
+    const capA = b4a.from('cap-a', 'utf8');
+    const capB = b4a.from('cap-b', 'utf8');
+
+    const expected = b4a.concat([
+        b4a.from([0x00, capA.length]),
+        capA,
+        b4a.from([0x00, capB.length]),
+        capB
+    ]);
+
+    t.is(result.length, expected.length, 'length matches');
+    t.ok(b4a.equals(result, expected), 'ordering is sorted and encoding matches');
+});
+
+test('encodeCapabilities - empty array yields empty buffer', t => {
+    const result = encodeCapabilities([]);
+    t.ok(b4a.isBuffer(result), 'returns a buffer');
+    t.is(result.length, 0, 'empty buffer for no caps');
+});
+
+test('encodeCapabilities - throws on invalid input', t => {
+    t.exception(
+        () => encodeCapabilities('not-array'),
+        errorMessageIncludes('Capabilities must be an array')
+    );
+
+    t.exception(
+        () => encodeCapabilities([1, 2]),
+        errorMessageIncludes('must contain only strings')
+    );
+});
+
+test('timestampToBuffer and sessionIdToBuffer - encode uint64 BE', t => {
+    const ts = 2n ** 53n; // beyond uint32
+    const sid = 1234567890123n;
+
+    const tsBuf = timestampToBuffer(ts);
+    const sidBuf = sessionIdToBuffer(sid);
+
+    t.is(tsBuf.length, 8);
+    t.is(sidBuf.length, 8);
+    t.is(tsBuf.readBigUInt64BE(0), ts);
+    t.is(sidBuf.readBigUInt64BE(0), sid);
+});
+
+test('timestampToBuffer and sessionIdToBuffer - reject invalid input', t => {
+    t.exception(() => timestampToBuffer(-1), errorMessageIncludes('timestamp'));
+    t.exception(() => timestampToBuffer(1.5), errorMessageIncludes('timestamp'));
+    t.exception(() => timestampToBuffer('1'), errorMessageIncludes('timestamp'));
+    t.exception(() => sessionIdToBuffer(-1), errorMessageIncludes('session id'));
+    t.exception(() => sessionIdToBuffer(1.1), errorMessageIncludes('session id'));
+    t.exception(() => sessionIdToBuffer('abc'), errorMessageIncludes('session id'));
 });

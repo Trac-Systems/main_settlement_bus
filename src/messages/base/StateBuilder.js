@@ -6,7 +6,7 @@ class StateBuilder {
         }
     }
     reset() { throw new Error("Method 'reset()' must be implemented.");}
-    forOperationType(operationType) {throw new Error("Method 'forOperationType()' must be implemented.");}
+    withOperationType(operationType) {throw new Error("Method 'forOperationType()' must be implemented.");}
     withAddress(address) { throw new Error("Method 'withAddress()' must be implemented.");}
     withWriterKey(writerKey) { throw new Error("Method 'withWriterKey()' must be implemented.");}
     async buildValueAndSign() { throw new Error("Method 'buildValueAndSign()' must be implemented.");}

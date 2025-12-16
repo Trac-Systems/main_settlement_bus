@@ -95,7 +95,7 @@ function defineValidatorConnectionRequest () {
   function encodingLength (obj) {
     var length = 0
     if (defined(obj.issuer_address)) {
-      var len = encodings.bytes.encodingLength(obj.issuer_address)
+      var len = encodings.string.encodingLength(obj.issuer_address)
       length += 1 + len
     }
     if (defined(obj.nonce)) {
@@ -115,8 +115,8 @@ function defineValidatorConnectionRequest () {
     var oldOffset = offset
     if (defined(obj.issuer_address)) {
       buf[offset++] = 10
-      encodings.bytes.encode(obj.issuer_address, buf, offset)
-      offset += encodings.bytes.encode.bytes
+      encodings.string.encode(obj.issuer_address, buf, offset)
+      offset += encodings.string.encode.bytes
     }
     if (defined(obj.nonce)) {
       buf[offset++] = 18
@@ -138,7 +138,7 @@ function defineValidatorConnectionRequest () {
     if (!(end <= buf.length && offset <= buf.length)) throw new Error("Decoded message is not valid")
     var oldOffset = offset
     var obj = {
-      issuer_address: null,
+      issuer_address: "",
       nonce: null,
       signature: null
     }
@@ -152,8 +152,8 @@ function defineValidatorConnectionRequest () {
       var tag = prefix >> 3
       switch (tag) {
         case 1:
-        obj.issuer_address = encodings.bytes.decode(buf, offset)
-        offset += encodings.bytes.decode.bytes
+        obj.issuer_address = encodings.string.decode(buf, offset)
+        offset += encodings.string.decode.bytes
         break
         case 2:
         obj.nonce = encodings.bytes.decode(buf, offset)
@@ -178,7 +178,7 @@ function defineValidatorConnectionResponse () {
   function encodingLength (obj) {
     var length = 0
     if (defined(obj.issuer_address)) {
-      var len = encodings.bytes.encodingLength(obj.issuer_address)
+      var len = encodings.string.encodingLength(obj.issuer_address)
       length += 1 + len
     }
     if (defined(obj.nonce)) {
@@ -202,8 +202,8 @@ function defineValidatorConnectionResponse () {
     var oldOffset = offset
     if (defined(obj.issuer_address)) {
       buf[offset++] = 10
-      encodings.bytes.encode(obj.issuer_address, buf, offset)
-      offset += encodings.bytes.encode.bytes
+      encodings.string.encode(obj.issuer_address, buf, offset)
+      offset += encodings.string.encode.bytes
     }
     if (defined(obj.nonce)) {
       buf[offset++] = 18
@@ -230,7 +230,7 @@ function defineValidatorConnectionResponse () {
     if (!(end <= buf.length && offset <= buf.length)) throw new Error("Decoded message is not valid")
     var oldOffset = offset
     var obj = {
-      issuer_address: null,
+      issuer_address: "",
       nonce: null,
       signature: null,
       result: 0
@@ -245,8 +245,8 @@ function defineValidatorConnectionResponse () {
       var tag = prefix >> 3
       switch (tag) {
         case 1:
-        obj.issuer_address = encodings.bytes.decode(buf, offset)
-        offset += encodings.bytes.decode.bytes
+        obj.issuer_address = encodings.string.decode(buf, offset)
+        offset += encodings.string.decode.bytes
         break
         case 2:
         obj.nonce = encodings.bytes.decode(buf, offset)

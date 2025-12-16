@@ -1,4 +1,5 @@
-import { OperationType as OP } from './protobuf/applyOperations.cjs';
+import { OperationType as ApplyOperationType } from './protobuf/applyOperations.cjs';
+import { MessageType as NetworkMessageType, ResultCode as NetworkResultCode } from './protobuf/network.cjs';
 import b4a from 'b4a'
 // TODO: We are going to have a lot of contstants. It would be good, to separate them into different files.
 
@@ -17,19 +18,38 @@ export const EntryType = Object.freeze({
 
 //ATTENTION - THIS IS USED IN THE APPLY FUNCTION!
 export const OperationType = Object.freeze({
-    ADD_ADMIN: OP.ADD_ADMIN,
-    DISABLE_INITIALIZATION: OP.DISABLE_INITIALIZATION,
-    BALANCE_INITIALIZATION: OP.BALANCE_INITIALIZATION,
-    APPEND_WHITELIST: OP.APPEND_WHITELIST,
-    ADD_WRITER: OP.ADD_WRITER,
-    REMOVE_WRITER: OP.REMOVE_WRITER,
-    ADMIN_RECOVERY: OP.ADMIN_RECOVERY,
-    ADD_INDEXER: OP.ADD_INDEXER,
-    REMOVE_INDEXER: OP.REMOVE_INDEXER,
-    BAN_VALIDATOR: OP.BAN_VALIDATOR,
-    BOOTSTRAP_DEPLOYMENT: OP.BOOTSTRAP_DEPLOYMENT,
-    TX: OP.TX,
-    TRANSFER: OP.TRANSFER,
+    ADD_ADMIN: ApplyOperationType.ADD_ADMIN,
+    DISABLE_INITIALIZATION: ApplyOperationType.DISABLE_INITIALIZATION,
+    BALANCE_INITIALIZATION: ApplyOperationType.BALANCE_INITIALIZATION,
+    APPEND_WHITELIST: ApplyOperationType.APPEND_WHITELIST,
+    ADD_WRITER: ApplyOperationType.ADD_WRITER,
+    REMOVE_WRITER: ApplyOperationType.REMOVE_WRITER,
+    ADMIN_RECOVERY: ApplyOperationType.ADMIN_RECOVERY,
+    ADD_INDEXER: ApplyOperationType.ADD_INDEXER,
+    REMOVE_INDEXER: ApplyOperationType.REMOVE_INDEXER,
+    BAN_VALIDATOR: ApplyOperationType.BAN_VALIDATOR,
+    BOOTSTRAP_DEPLOYMENT: ApplyOperationType.BOOTSTRAP_DEPLOYMENT,
+    TX: ApplyOperationType.TX,
+    TRANSFER: ApplyOperationType.TRANSFER,
+});
+
+export const NetworkOperationType = Object.freeze({
+    VALIDATOR_CONNECTION_REQUEST: NetworkMessageType.MESSAGE_TYPE_VALIDATOR_CONNECTION_REQUEST,
+    VALIDATOR_CONNECTION_RESPONSE: NetworkMessageType.MESSAGE_TYPE_VALIDATOR_CONNECTION_RESPONSE,
+    LIVENESS_REQUEST: NetworkMessageType.MESSAGE_TYPE_LIVENESS_REQUEST,
+    LIVENESS_RESPONSE: NetworkMessageType.MESSAGE_TYPE_LIVENESS_RESPONSE,
+    BROADCAST_TRANSACTION_REQUEST: NetworkMessageType.MESSAGE_TYPE_BROADCAST_TRANSACTION_REQUEST,
+    BROADCAST_TRANSACTION_RESPONSE: NetworkMessageType.MESSAGE_TYPE_BROADCAST_TRANSACTION_RESPONSE,
+});
+
+export const ResultCode = Object.freeze({
+    UNSPECIFIED: NetworkResultCode.RESULT_CODE_UNSPECIFIED,
+    OK: NetworkResultCode. RESULT_CODE_OK,
+    INVALID_PAYLOAD: NetworkResultCode. RESULT_CODE_INVALID_PAYLOAD,
+    UNSUPPORTED_VERSION: NetworkResultCode. RESULT_CODE_UNSUPPORTED_VERSION,
+    RATE_LIMITED: NetworkResultCode. RESULT_CODE_RATE_LIMITED,
+    TIMEOUT: NetworkResultCode. RESULT_CODE_TIMEOUT,
+    SIGNATURE_INVALID: NetworkResultCode. RESULT_CODE_SIGNATURE_INVALID,
 });
 
 // Role managment constants
@@ -67,6 +87,7 @@ export const MAX_PARALLEL = 64;
 export const MAX_SERVER_CONNECTIONS = Infinity;
 export const MAX_CLIENT_CONNECTIONS = Infinity;
 export const MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION = 10;
+
 // State
 export const ACK_INTERVAL = 1_000;
 export const AUTOBASE_VALUE_ENCODING = 'binary';
