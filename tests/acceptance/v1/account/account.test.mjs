@@ -1,6 +1,6 @@
 import request from "supertest"
 import { bufferToBigInt, licenseBufferToBigInt } from "../../../../src/utils/amountSerialization.js"
-import { ZERO_WK } from "../../../../rpc/constants.mjs"
+import { ZERO_WK } from "../../../../rpc/constants.js"
 import { ADMIN_INITIAL_STAKED_BALANCE } from "../../../../src/utils/constants.js"
 import { BALANCE_TO_STAKE } from "../../../../src/core/state/utils/balance.js"
 import { randomAddress } from "../../../unit/state/stateTestUtils.js"

@@ -5,7 +5,7 @@ import { testKeyPair1, testKeyPair2, testKeyPair3, testKeyPair4, testKeyPair5, t
 import ConnectionManager from "../../../src/core/network/services/ConnectionManager.js";
 import { tick } from "../../helpers/setupApplyTests.js";
 import b4a from 'b4a'
-import { config } from "../../helpers/config.js";
+import { createConfig, ENV } from "../../../src/config/env.js";
 
 const createConnection = (key) => {
     const emitter = new EventEmitter()
@@ -18,8 +18,8 @@ const createConnection = (key) => {
     return { key: b4a.from(key, 'hex'), connection: emitter }
 }
 
-const makeManager = (maxValidators = config.maxValidators, conns = connections) => {
-    const merged = { ...config, maxValidators }
+const makeManager = (maxValidators = 6, conns = connections) => {
+    const merged = createConfig(ENV.DEVELOPMENT, { maxValidators })
     const connectionManager = new ConnectionManager(merged)
 
     conns.forEach(({ key, connection }) => {

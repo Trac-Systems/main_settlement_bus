@@ -1,7 +1,7 @@
 // rpc_server.mjs
 import http from 'http'
-import { applyCors } from './cors.mjs';
-import { routes } from './routes/index.mjs';
+import { applyCors } from './cors.js';
+import { routes } from './routes/index.js';
 
 export const createServer = (msbInstance) => {
   const server = http.createServer({}, async (req, res) => {

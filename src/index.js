@@ -66,42 +66,14 @@ export class MainSettlementBus extends ReadyResource {
     #config
 
     /**
-     * @param {object} options
+     * @param {object} config
      **/
-    constructor(options = {}) {
+    constructor(config) {
         super();
-        this.#config = {
-            channel: b4a.alloc(32).fill(options.channel),
-            networkId: this.#config.networkId,
-            bootstrap: options.bootstrap ? b4a.from(options.bootstrap, "hex") : null,
-            addressLength: TRAC_ADDRESS_SIZE,
-            addressPrefix: TRAC_NETWORK_MSB_MAINNET_PREFIX,
-            dhtBootstrap: DHT_BOOTSTRAPS,
-            disableRateLimit: options.disable_rate_limit === true,
-            enableInteractiveMode: options.enable_interactive_mode !== false,
-            enableErrorApplyLogs: options.enable_error_apply_logs !== undefined ? options.enable_error_apply_logs : true,
-            enableRoleRequester: options.enable_role_requester !== undefined
-                ? options.enable_role_requester
-                : false,
-            enableValidatorObserver: options.enable_validator_observer !== undefined
-                ? options.enable_validator_observer
-                : true,
-            enableTxApplyLogs: options.enable_tx_apply_logs !== undefined ? options.enable_tx_apply_logs : true,
-            enableWallet: options.enable_wallet !== false,
-            isAdminMode: options.store_name === 'admin',
-            maxRetries: Number(options.max_retries) ? options.max_retries : MAX_MESSAGE_SEND_ATTEMPTS,
-            maxValidators: options.max_validators,
-            storesFullPath: options.stores_directory + options.store_name,
-            transactionTotalSize: 3 * WRITER_BYTE_LENGTH + 2 * TRAC_ADDRESS_SIZE + HASH_BYTE_LENGTH + NONCE_BYTE_LENGTH
-        }
+        this.#config = config
 
-        if (!options.channel) {
-            throw new Error(
-                "MainSettlementBus: Channel is required. Application cannot start without channel."
-            );
-        }
         this.#store = new Corestore(this.#config.storesFullPath);
-        this.#wallet = new PeerWallet(options);
+        this.#wallet = new PeerWallet({ networkPrefix: this.#config.addressPrefix });
         this.#readline_instance = null;
 
         if (this.#config.enableInteractiveMode) {
