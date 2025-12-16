@@ -6,6 +6,7 @@ import path from 'path';
 import CompleteStateMessageOperations from '../../src/messages/completeStateMessages/CompleteStateMessageOperations.js'
 import PartialStateMessageOperations from '../../src/messages/partialStateMessages/PartialStateMessageOperations.js';
 import {MainSettlementBus} from '../../src/index.js'
+import { createConfig, ENV } from '../../src/config/env.js'
 import fileUtils from '../../src/utils/fileUtils.js'
 import {EntryType} from '../../src/utils/constants.js';
 import {sleep} from '../../src/utils/helpers.js'
@@ -88,9 +89,9 @@ export async function fundPeer(admin, toFund, amount) {
 export async function initMsbPeer(peerName, peerKeyPair, temporaryDirectory, options = {}) {
     const peer = await initDirectoryStructure(peerName, peerKeyPair, temporaryDirectory);
     peer.options = options
-    peer.options.stores_directory = peer.storesDirectory;
-    peer.options.store_name = peer.storeName;
-    const msb = new MainSettlementBus(peer.options);
+    peer.options.storesDirectory = peer.storesDirectory;
+    peer.options.storeName = peer.storeName;
+    const msb = new MainSettlementBus(createConfig(ENV.DEVELOPMENT, peer.options));
 
     peer.msb = msb;
     peer.wallet = msb.wallet;
@@ -113,7 +114,7 @@ export async function initMsbAdmin(keyPair, temporaryDirectory, options = {}) {
     admin.options.bootstrap = admin.msb.state.writingKey;
     await admin.msb.close();
 
-    admin.msb = new MainSettlementBus(admin.options);
+    admin.msb = new MainSettlementBus(createConfig(ENV.DEVELOPMENT, admin.options));
     await admin.msb.ready();
     await admin.msb.state.append(null); // before initialization system.indexers is empty, we need to initialize first block to create system.indexers array
     return admin;

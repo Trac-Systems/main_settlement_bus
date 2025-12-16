@@ -6,12 +6,13 @@ export class Config {
     #bootstrap
     #channel
 
-    constructor(options, config) {
+    constructor(options = {}, config = {}) {
         this.#validate(options, config)
         this.#options = options
         this.#config = config
         this.#bootstrap = b4a.from(this.#options.bootstrap || this.#config.bootstrap)
-        this.#channel = b4a.alloc(32).fill(options.channel || config.channel);
+        // Ensure a 32-byte channel buffer (repeat-fill from string/Buffer if provided)
+        this.#channel = b4a.alloc(32).fill(this.#options.channel || this.#config.channel || 0)
     }
 
     get addressLength() {
@@ -35,43 +36,51 @@ export class Config {
     }
 
     get channel() {
-        this.#channel
+        return this.#channel
     }
 
     get dhtBootstrap() {
-        return this.#options.dhtBootstrap || this.#config.dhtBootstrap
+        if (this.#isOverriden('dhtBootstrap')) return this.#options.dhtBootstrap
+        return this.#config.dhtBootstrap
     }
 
     get disableRateLimit() {
-        return !!this.#options.disable_rate_limit
+        if (this.#isOverriden('disableRateLimit')) return !!this.#options.disableRateLimit
+        return !!this.#config.disableRateLimit
     }
 
     get enableErrorApplyLogs() {
-        return !!this.#options.enable_error_apply_logs
+        if (this.#isOverriden('enableErrorApplyLogs')) return !!this.#options.enableErrorApplyLogs
+        return !!this.#config.enableErrorApplyLogs
     }
 
     get enableInteractiveMode() {
-        return this.#options.enable_interactive_mode !== false
+        if (this.#isOverriden('enableInteractiveMode')) return this.#options.enableInteractiveMode !== false
+        return !!this.#config.enableInteractiveMode
     }
 
     get enableRoleRequester() {
-        return !!this.#options.enable_role_requester
+        if (this.#isOverriden('enableRoleRequester')) return !!this.#options.enableRoleRequester
+        return !!this.#config.enableRoleRequester
     }
 
     get enableValidatorObserver() {
-        return !!this.#options.enable_validator_observer
+        if (this.#isOverriden('enableValidatorObserver')) return !!this.#options.enableValidatorObserver
+        return !!this.#config.enableValidatorObserver
     }
 
     get enableTxApplyLogs() {
-        return !!this.#options.enable_tx_apply_logs
+        if (this.#isOverriden('enableTxApplyLogs')) return !!this.#options.enableTxApplyLogs
+        return !!this.#config.enableTxApplyLogs
     }
 
     get enableWallet() {
-        return this.#options.enable_wallet !== false
+        if (this.#isOverriden('enableWallet')) return this.#options.enableWallet !== false
+        return !!this.#config.enableWallet
     }
 
     get isAdminMode() {
-        return this.#options.store_name === 'admin'
+        return this.#options.storeName === 'admin'
     }
 
     get keyPairPath()  {
@@ -79,11 +88,13 @@ export class Config {
     }
 
     get maxRetries() {
-        return Number(options.max_retries) ? options.max_retries : this.#config.maxRetries
+        if (this.#isOverriden('maxRetries')) return this.#options.maxRetries
+        return this.#config.maxRetries
     }
 
     get maxValidators() {
-        return this.#options.maxValidators || this.#config.maxValidators
+        if (this.#isOverriden('maxValidators')) return this.#options.maxValidators
+        return this.#config.maxValidators
     }
 
     get networkId() {
@@ -91,11 +102,17 @@ export class Config {
     }
 
     get storesDirectory() {
-        return this.#options.stores_directory || this.#config.storesDirectory
+        if (this.#isOverriden('storesDirectory')) return this.#options.storesDirectory
+        return this.#config.storesDirectory
     }
 
     get storesFullPath() {
-        return `${this.storesDirectory}${this.#options.store_name}`
+        return `${this.storesDirectory}${this.#options.storeName}`
+    }
+
+    // Most of these properties are boolean
+    #isOverriden(prop) {
+        return this.#options.hasOwnProperty(prop)
     }
 
     #validate(options, config) {

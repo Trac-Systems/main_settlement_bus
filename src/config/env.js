@@ -25,6 +25,7 @@ const configData = {
         enableValidatorObserver: true,
         enableWallet: true,
         maxValidators: 6,
+        maxRetries: 3,
         networkId: 918,
         storesDirectory : 'stores/',
         transactionTotalSize: 3 * WRITER_BYTE_LENGTH + 2 * TRAC_ADDRESS_SIZE + HASH_BYTE_LENGTH + NONCE_BYTE_LENGTH
@@ -45,6 +46,7 @@ const configData = {
         enableValidatorObserver: true,
         enableWallet: true,
         maxValidators: 6,
+        maxRetries: 0,
         networkId: 918,
         storesDirectory : 'stores/',
         transactionTotalSize: 3 * WRITER_BYTE_LENGTH + 2 * TRAC_ADDRESS_SIZE + HASH_BYTE_LENGTH + NONCE_BYTE_LENGTH
