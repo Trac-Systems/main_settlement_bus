@@ -17,7 +17,7 @@ import CompleteStateMessageDirector from '../../src/messages/completeStateMessag
 import { safeEncodeApplyOperation } from "../../src/utils/protobuf/operationHelpers.js"
 import { $TNK } from '../../src/core/state/utils/balance.js';
 import { EventType } from '../../src/utils/constants.js';
-import { config } from './config.js';
+import { Config } from '../../src/config/config.js';
 let os, fsp;
 
 /**
@@ -112,10 +112,11 @@ export async function initMsbAdmin(keyPair, temporaryDirectory, options = {}) {
     const admin = await initMsbPeer(peerName, keyPair, temporaryDirectory, { ...options, bootstrap: randomBytes(32).toString('hex') });
 
     await admin.msb.ready();
-    admin.options.bootstrap = admin.msb.state.writingKey;
+    admin.options.bootstrap = admin.msb.state.writingKey.toString('hex');
+    admin.config = new Config(admin.options, admin.config)
     await admin.msb.close();
 
-    admin.msb = new MainSettlementBus(createConfig(ENV.DEVELOPMENT, admin.options));
+    admin.msb = new MainSettlementBus(admin.config);
     await admin.msb.ready();
     await admin.msb.state.append(null); // before initialization system.indexers is empty, we need to initialize first block to create system.indexers array
     return admin;
@@ -172,7 +173,7 @@ export async function promoteToWriter(admin, writerCandidate) {
             isIndexer: false,
         })
     const validity = await admin.msb.state.getIndexerSequenceState()
-    const req = await new PartialStateMessageOperations(writerCandidate.wallet, admin.config)
+    const req = await new PartialStateMessageOperations(writerCandidate.wallet, writerCandidate.config)
         .assembleAddWriterMessage(
             b4a.toString(writerCandidate.msb.state.writingKey, 'hex'),
             b4a.toString(validity, 'hex'));
@@ -266,7 +267,7 @@ export async function setupWhitelist(admin, whitelistAddresses) {
         await admin.msb.state.append(msg);
         await sleep(100)
     }
-    await admin.msb.state.base.forceFastForward()
+
     fileUtils.readAddressesFromWhitelistFile = originalReadAddressesFromWhitelistFile;
 }
 

@@ -16,18 +16,18 @@ import { config } from '../helpers/config.js'
  * PartialOperation.validateSignature, so that tests broadcast
  * transactions the node will accept without touching consensus code.
  *
- * @param {import("trac-wallet").default} wallet - Writer wallet used for signing.
+ * @param {object} context - General context
  * @param {import("../../src/core/state/State.js").default} state - MSB state instance.
  * @param {bigint} [amountTnk=1n] - Transfer amount in TNK units.
  * @returns {Promise<{ payload: string, txHashHex: string }>}
  */
-export async function buildRpcSelfTransferPayload(wallet, state, amountTnk = 1n) {
+export async function buildRpcSelfTransferPayload(context, state, amountTnk = 1n) {
     const txvBuffer = await state.getIndexerSequenceState();
     const txvHex = b4a.toString(txvBuffer, "hex");
 
     const txData = await tracCrypto.transaction.preBuild(
-        wallet.address,
-        wallet.address,
+        context.wallet.address,
+        context.adminWallet.address,
         b4a.toString($TNK(amountTnk), "hex"),
         txvHex
     );
@@ -51,11 +51,11 @@ export async function buildRpcSelfTransferPayload(wallet, state, amountTnk = 1n)
     );
 
     const messageHash = await blake3Hash(message);
-    const signature = wallet.sign(messageHash);
+    const signature = context.wallet.sign(messageHash);
 
     const payloadObject = {
         type: OperationType.TRANSFER,
-        address: wallet.address,
+        address: context.wallet.address,
         tro: {
             tx: b4a.toString(messageHash, "hex"),
             txv: txData.validity,

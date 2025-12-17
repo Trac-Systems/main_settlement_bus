@@ -9,7 +9,7 @@ export const registerBroadcastTransactionTests = (context) => {
     describe("POST /v1/broadcast-transaction", () => {
         it("broadcasts transaction and returns lengths", async () => {
             const { payload } = await buildRpcSelfTransferPayload(
-                context.wallet,
+                context,
                 context.rpcMsb.state,
                 1n
             );
