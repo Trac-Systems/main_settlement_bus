@@ -5,11 +5,11 @@ import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
 
 import NetworkWalletFactory from '../../../src/core/network/identity/NetworkWalletFactory.js';
 import NetworkMessageBuilder from '../../../src/messages/network/v1/NetworkMessageBuilder.js';
-import { MessageHeader, MessageType } from '../../../src/utils/protobuf/network.cjs';
 import {
     NetworkOperationType,
     ResultCode as NetworkResultCode
 } from '../../../src/utils/constants.js';
+import { decodeV1networkOperation, encodeV1networkOperation } from '../../../src/utils/protobuf/operationHelpers.js';
 import { errorMessageIncludes } from '../../helpers/regexHelper.js';
 import {
     createMessage,
@@ -52,26 +52,26 @@ test('NetworkMessageBuilder builds validator connection request and verifies sig
         .setCapabilities(caps)
         .buildPayload();
 
-    const header = builder.getResult();
-    t.is(header.type, MessageType.VALIDATOR_CONNECTION_REQUEST);
-    t.is(header.session_id, sessionId);
-    t.alike(header.capabilities, caps);
-    t.ok(b4a.isBuffer(header.validator_connection_request.nonce));
-    t.ok(b4a.isBuffer(header.validator_connection_request.signature));
+    const payload = builder.getResult();
+    t.is(payload.type, NetworkOperationType.VALIDATOR_CONNECTION_REQUEST);
+    t.is(payload.session_id, sessionId);
+    t.alike(payload.capabilities, caps);
+    t.ok(b4a.isBuffer(payload.validator_connection_request.nonce));
+    t.ok(b4a.isBuffer(payload.validator_connection_request.signature));
 
     const message = createMessage(
-        header.type,
+        payload.type,
         sessionIdToBuffer(sessionId),
-        timestampToBuffer(header.timestamp),
+        timestampToBuffer(payload.timestamp),
         addressToBuffer(wallet.address),
-        header.validator_connection_request.nonce,
+        payload.validator_connection_request.nonce,
         encodeCapabilities(caps)
     );
     const hash = await PeerWallet.blake3(message);
-    t.ok(wallet.verify(header.validator_connection_request.signature, hash, wallet.publicKey));
+    t.ok(wallet.verify(payload.validator_connection_request.signature, hash, wallet.publicKey));
 
-    const roundTrip = MessageHeader.decode(MessageHeader.encode(header));
-    t.is(roundTrip.type, MessageType.VALIDATOR_CONNECTION_REQUEST);
+    const roundTrip = decodeV1networkOperation(encodeV1networkOperation(payload));
+    t.is(roundTrip.type, NetworkOperationType.VALIDATOR_CONNECTION_REQUEST);
 });
 
 test('NetworkMessageBuilder iterates validator connection response ResultCode values', async t => {
@@ -92,23 +92,23 @@ test('NetworkMessageBuilder iterates validator connection response ResultCode va
             .setResultCode(code)
             .buildPayload();
 
-        const header = builder.getResult();
-        t.is(header.type, MessageType.VALIDATOR_CONNECTION_RESPONSE);
-        t.is(header.validator_connection_response.result, code);
+        const payload = builder.getResult();
+        t.is(payload.type, NetworkOperationType.VALIDATOR_CONNECTION_RESPONSE);
+        t.is(payload.validator_connection_response.result, code);
 
         const msg = createMessage(
-            header.type,
-            sessionIdToBuffer(header.session_id),
-            timestampToBuffer(header.timestamp),
+            payload.type,
+            sessionIdToBuffer(payload.session_id),
+            timestampToBuffer(payload.timestamp),
             addressToBuffer(otherAddress),
-            header.validator_connection_response.nonce,
+            payload.validator_connection_response.nonce,
             safeWriteUInt32BE(code, 0),
             encodeCapabilities(caps)
         );
         const hash = await PeerWallet.blake3(msg);
-        t.ok(wallet.verify(header.validator_connection_response.signature, hash, wallet.publicKey));
+        t.ok(wallet.verify(payload.validator_connection_response.signature, hash, wallet.publicKey));
 
-        const decoded = MessageHeader.decode(MessageHeader.encode(header));
+        const decoded = decodeV1networkOperation(encodeV1networkOperation(payload));
         t.is(decoded.validator_connection_response.result, code);
     }
 });
@@ -131,22 +131,22 @@ test('NetworkMessageBuilder iterates liveness response ResultCode values', async
             .setResultCode(code)
             .buildPayload();
 
-        const header = builder.getResult();
-        t.is(header.type, MessageType.LIVENESS_RESPONSE);
-        t.is(header.liveness_response.result, code);
+        const payload = builder.getResult();
+        t.is(payload.type, NetworkOperationType.LIVENESS_RESPONSE);
+        t.is(payload.liveness_response.result, code);
 
         const msg = createMessage(
-            header.type,
-            sessionIdToBuffer(header.session_id),
-            timestampToBuffer(header.timestamp),
-            header.liveness_response.nonce,
+            payload.type,
+            sessionIdToBuffer(payload.session_id),
+            timestampToBuffer(payload.timestamp),
+            payload.liveness_response.nonce,
             safeWriteUInt32BE(code, 0),
             encodeCapabilities(caps)
         );
         const hash = await PeerWallet.blake3(msg);
-        t.ok(wallet.verify(header.liveness_response.signature, hash, wallet.publicKey));
+        t.ok(wallet.verify(payload.liveness_response.signature, hash, wallet.publicKey));
 
-        const decoded = MessageHeader.decode(MessageHeader.encode(header));
+        const decoded = decodeV1networkOperation(encodeV1networkOperation(payload));
         t.is(decoded.liveness_response.result, code);
     }
 });
@@ -167,20 +167,20 @@ test('NetworkMessageBuilder builds liveness request and verifies signature (data
         .setCapabilities(caps)
         .buildPayload();
 
-    const header = builder.getResult();
-    t.is(header.type, MessageType.LIVENESS_REQUEST);
-    t.ok(b4a.isBuffer(header.liveness_request.nonce));
-    t.ok(b4a.isBuffer(header.liveness_request.signature));
+    const payload = builder.getResult();
+    t.is(payload.type, NetworkOperationType.LIVENESS_REQUEST);
+    t.ok(b4a.isBuffer(payload.liveness_request.nonce));
+    t.ok(b4a.isBuffer(payload.liveness_request.signature));
 
     const msg = createMessage(
-        header.type,
-        sessionIdToBuffer(header.session_id),
-        timestampToBuffer(header.timestamp),
-        header.liveness_request.nonce,
+        payload.type,
+        sessionIdToBuffer(payload.session_id),
+        timestampToBuffer(payload.timestamp),
+        payload.liveness_request.nonce,
         encodeCapabilities(caps)
     );
     const hash = await PeerWallet.blake3(msg);
-    t.ok(wallet.verify(header.liveness_request.signature, hash, wallet.publicKey));
+    t.ok(wallet.verify(payload.liveness_request.signature, hash, wallet.publicKey));
 });
 
 test('NetworkMessageBuilder iterates broadcast transaction response ResultCode values', async t => {
@@ -199,22 +199,22 @@ test('NetworkMessageBuilder iterates broadcast transaction response ResultCode v
             .setResultCode(code)
             .buildPayload();
 
-        const header = builder.getResult();
-        t.is(header.type, MessageType.BROADCAST_TRANSACTION_RESPONSE);
-        t.is(header.broadcast_transaction_response.result, code);
+        const payload = builder.getResult();
+        t.is(payload.type, NetworkOperationType.BROADCAST_TRANSACTION_RESPONSE);
+        t.is(payload.broadcast_transaction_response.result, code);
 
         const msg = createMessage(
-            header.type,
-            sessionIdToBuffer(header.session_id),
-            timestampToBuffer(header.timestamp),
-            header.broadcast_transaction_response.nonce,
+            payload.type,
+            sessionIdToBuffer(payload.session_id),
+            timestampToBuffer(payload.timestamp),
+            payload.broadcast_transaction_response.nonce,
             safeWriteUInt32BE(code, 0),
             encodeCapabilities(caps)
         );
         const hash = await PeerWallet.blake3(msg);
-        t.ok(wallet.verify(header.broadcast_transaction_response.signature, hash, wallet.publicKey));
+        t.ok(wallet.verify(payload.broadcast_transaction_response.signature, hash, wallet.publicKey));
 
-        const decoded = MessageHeader.decode(MessageHeader.encode(header));
+        const decoded = decodeV1networkOperation(encodeV1networkOperation(payload));
         t.is(decoded.broadcast_transaction_response.result, code);
     }
 });
@@ -235,20 +235,20 @@ test('NetworkMessageBuilder builds broadcast transaction request and verifies si
         .setCapabilities(caps)
         .buildPayload();
 
-    const header = builder.getResult();
-    t.is(header.type, MessageType.BROADCAST_TRANSACTION_REQUEST);
-    t.alike(header.broadcast_transaction_request.data, data);
+    const payload = builder.getResult();
+    t.is(payload.type, NetworkOperationType.BROADCAST_TRANSACTION_REQUEST);
+    t.alike(payload.broadcast_transaction_request.data, data);
 
     const msg = createMessage(
-        header.type,
-        sessionIdToBuffer(header.session_id),
-        timestampToBuffer(header.timestamp),
+        payload.type,
+        sessionIdToBuffer(payload.session_id),
+        timestampToBuffer(payload.timestamp),
         data,
-        header.broadcast_transaction_request.nonce,
+        payload.broadcast_transaction_request.nonce,
         encodeCapabilities(caps)
     );
     const hash = await PeerWallet.blake3(msg);
-    t.ok(wallet.verify(header.broadcast_transaction_request.signature, hash, wallet.publicKey));
+    t.ok(wallet.verify(payload.broadcast_transaction_request.signature, hash, wallet.publicKey));
 });
 
 test('NetworkMessageBuilder validates required inputs', async t => {

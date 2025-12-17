@@ -1,7 +1,6 @@
 import PeerWallet from "trac-wallet";
 import b4a from "b4a";
 
-import StateBuilder from '../base/StateBuilder.js'
 import { OperationType } from '../../utils/constants.js';
 import { addressToBuffer, isAddressValid } from '../../core/state/utils/address.js';
 import { isHexString } from "../../utils/helpers.js";
@@ -9,7 +8,7 @@ import { blake3Hash } from "../../utils/crypto.js";
 import { createMessage } from "../../utils/buffer.js";
 import { isTransaction, isRoleAccess, isBootstrapDeployment, isTransfer } from "../../utils/applyOperations.js";
 
-class PartialStateMessageBuilder extends StateBuilder {
+class PartialStateMessageBuilder {
     #wallet;
     #operationType;
     #address;
@@ -29,7 +28,6 @@ class PartialStateMessageBuilder extends StateBuilder {
      * @param {object} config
      **/
     constructor(wallet, config) {
-        super();
         this.#config = config;
         if (!wallet || typeof wallet !== 'object') {
             throw new Error('Wallet must be a valid wallet object');

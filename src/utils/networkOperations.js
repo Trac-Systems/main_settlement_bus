@@ -1,17 +1,17 @@
-import { MessageType } from './protobuf/network.cjs';
+import { NetworkOperationType } from './constants.js';
 
-const isValidatorConnectionRequest = (type) => type === MessageType.VALIDATOR_CONNECTION_REQUEST;
-const isValidatorConnectionResponse = (type) => type === MessageType.VALIDATOR_CONNECTION_RESPONSE;
+const isValidatorConnectionRequest = (type) => type === NetworkOperationType.VALIDATOR_CONNECTION_REQUEST;
+const isValidatorConnectionResponse = (type) => type === NetworkOperationType.VALIDATOR_CONNECTION_RESPONSE;
 const isValidatorConnection = (type) => (
     isValidatorConnectionRequest(type) || isValidatorConnectionResponse(type)
 );
 
-const isLivenessRequest = (type) => type === MessageType.LIVENESS_REQUEST;
-const isLivenessResponse = (type) => type === MessageType.LIVENESS_RESPONSE;
+const isLivenessRequest = (type) => type === NetworkOperationType.LIVENESS_REQUEST;
+const isLivenessResponse = (type) => type === NetworkOperationType.LIVENESS_RESPONSE;
 const isLiveness = (type) => isLivenessRequest(type) || isLivenessResponse(type);
 
-const isBroadcastTransactionRequest = (type) => type === MessageType.BROADCAST_TRANSACTION_REQUEST;
-const isBroadcastTransactionResponse = (type) => type === MessageType.BROADCAST_TRANSACTION_RESPONSE;
+const isBroadcastTransactionRequest = (type) => type === NetworkOperationType.BROADCAST_TRANSACTION_REQUEST;
+const isBroadcastTransactionResponse = (type) => type === NetworkOperationType.BROADCAST_TRANSACTION_RESPONSE;
 const isBroadcastTransaction = (type) => (
     isBroadcastTransactionRequest(type) || isBroadcastTransactionResponse(type)
 );

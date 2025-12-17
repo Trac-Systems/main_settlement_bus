@@ -1,14 +1,9 @@
-import StateBuilder from '../base/StateBuilder.js'
 import {OperationType} from '../../utils/constants.js'
-import address from "../../core/state/utils/address.js";
 
 class PartialStateMessageDirector {
     #builder;
 
-    set builder(builderInstance) {
-        if (!(builderInstance instanceof StateBuilder)) {
-            throw new Error('Director requires a Builder instance.');
-        }
+    constructor(builderInstance) {
         this.#builder = builderInstance;
     }
 

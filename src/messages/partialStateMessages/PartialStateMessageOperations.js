@@ -32,8 +32,8 @@ class PartialStateMessageOperations {
     async assembleBootstrapDeploymentMessage(externalBootstrap, channel, txValidity) {
         try {
             const builder = new PartialStateMessageBuilder(this.#wallet, this.#config);
-            const director = new PartialStateMessageDirector();
-            director.builder = builder;
+            const director = new PartialStateMessageDirector(builder);
+
             return await director.buildPartialBootstrapDeploymentMessage(
                 this.#wallet.address,
                 externalBootstrap,
@@ -48,8 +48,8 @@ class PartialStateMessageOperations {
     async assembleAddWriterMessage(writingKey, txValidity) {
         try {
             const builder = new PartialStateMessageBuilder(this.#wallet, this.#config);
-            const director = new PartialStateMessageDirector();
-            director.builder = builder;
+            const director = new PartialStateMessageDirector(builder);
+
             return await director.buildAddWriterMessage(this.#wallet.address, writingKey, txValidity);
         } catch (error) {
             throw new Error(`Failed to assemble add writer message: ${error.message}`);
@@ -59,8 +59,8 @@ class PartialStateMessageOperations {
     async assembleRemoveWriterMessage(writerKey, txValidity) {
         try {
             const builder = new PartialStateMessageBuilder(this.#wallet, this.#config);
-            const director = new PartialStateMessageDirector();
-            director.builder = builder;
+            const director = new PartialStateMessageDirector(builder);
+
             return await director.buildRemoveWriterMessage(this.#wallet.address, writerKey, txValidity);
         } catch (error) {
             throw new Error(`Failed to assemble remove writer message: ${error.message}`);
@@ -70,7 +70,7 @@ class PartialStateMessageOperations {
     async assembleAdminRecoveryMessage(writingKey, txValidity) {
         try {
             const builder = new PartialStateMessageBuilder(this.#wallet, this.#config);
-            const director = new PartialStateMessageDirector();
+            const director = new PartialStateMessageDirector(builder);
             director.builder = builder;
             return await director.buildAdminRecoveryMessage(this.#wallet.address, writingKey, txValidity);
         } catch (error) {
@@ -101,8 +101,8 @@ class PartialStateMessageOperations {
     async assembleTransactionOperationMessage(incomingWritingKey, txValidity, contentHash, externalBootstrap, msbBootstrap) {
         try {
             const builder = new PartialStateMessageBuilder(this.#wallet, this.#config);
-            const director = new PartialStateMessageDirector();
-            director.builder = builder;
+            const director = new PartialStateMessageDirector(builder);
+
             return await director.buildTransactionOperationMessage(
                 this.#wallet.address,
                 incomingWritingKey,
@@ -119,8 +119,8 @@ class PartialStateMessageOperations {
     async assembleTransferOperationMessage(recipientAddress, amount, txValidity) {
         try {
             const builder = new PartialStateMessageBuilder(this.#wallet, this.#config);
-            const director = new PartialStateMessageDirector();
-            director.builder = builder;
+            const director = new PartialStateMessageDirector(builder);
+
             return await director.buildTransferOperationMessage(
                 this.#wallet.address,
                 recipientAddress,

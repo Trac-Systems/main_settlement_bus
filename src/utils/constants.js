@@ -43,13 +43,12 @@ export const NetworkOperationType = Object.freeze({
 });
 
 export const ResultCode = Object.freeze({
-    UNSPECIFIED: NetworkResultCode.RESULT_CODE_UNSPECIFIED,
-    OK: NetworkResultCode. RESULT_CODE_OK,
-    INVALID_PAYLOAD: NetworkResultCode. RESULT_CODE_INVALID_PAYLOAD,
-    UNSUPPORTED_VERSION: NetworkResultCode. RESULT_CODE_UNSUPPORTED_VERSION,
-    RATE_LIMITED: NetworkResultCode. RESULT_CODE_RATE_LIMITED,
-    TIMEOUT: NetworkResultCode. RESULT_CODE_TIMEOUT,
-    SIGNATURE_INVALID: NetworkResultCode. RESULT_CODE_SIGNATURE_INVALID,
+    OK: NetworkResultCode.RESULT_CODE_OK,
+    INVALID_PAYLOAD: NetworkResultCode.RESULT_CODE_INVALID_PAYLOAD,
+    UNSUPPORTED_VERSION: NetworkResultCode.RESULT_CODE_UNSUPPORTED_VERSION,
+    RATE_LIMITED: NetworkResultCode.RESULT_CODE_RATE_LIMITED,
+    TIMEOUT: NetworkResultCode.RESULT_CODE_TIMEOUT,
+    SIGNATURE_INVALID: NetworkResultCode.RESULT_CODE_SIGNATURE_INVALID,
 });
 
 // Role managment constants

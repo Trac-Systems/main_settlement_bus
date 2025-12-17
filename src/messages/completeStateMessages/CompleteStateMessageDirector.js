@@ -1,13 +1,8 @@
-import StateBuilder from '../base/StateBuilder.js'
 import { OperationType } from '../../utils/protobuf/applyOperations.cjs'
 
 class CompleteStateMessageDirector {
     #builder;
-
-    set builder(builderInstance) {
-        if (!(builderInstance instanceof StateBuilder)) {
-            throw new Error('Director requires a Builder instance.');
-        }
+    constructor(builderInstance) {
         this.#builder = builderInstance;
     }
 

@@ -5,8 +5,8 @@ import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
 
 import NetworkWalletFactory from '../../../src/core/network/identity/NetworkWalletFactory.js';
 import NetworkMessageDirector from '../../../src/messages/network/v1/NetworkMessageDirector.js';
-import { MessageHeader, MessageType } from '../../../src/utils/protobuf/network.cjs';
-import { ResultCode as NetworkResultCode } from '../../../src/utils/constants.js';
+import { NetworkOperationType, ResultCode as NetworkResultCode } from '../../../src/utils/constants.js';
+import { decodeV1networkOperation, encodeV1networkOperation } from '../../../src/utils/protobuf/operationHelpers.js';
 import {
     createMessage,
     encodeCapabilities,
@@ -40,21 +40,21 @@ test('NetworkMessageDirector builds validator connection request and verifies si
     const sessionId = 1;
     const caps = ['cap:b', 'cap:a'];
 
-    const header = await director.buildValidatorConnectionRequest(sessionId, wallet.address, caps);
-    t.is(header.type, MessageType.VALIDATOR_CONNECTION_REQUEST);
-    t.is(header.session_id, sessionId);
-    t.alike(header.capabilities, caps);
+    const payload = await director.buildValidatorConnectionRequest(sessionId, wallet.address, caps);
+    t.is(payload.type, NetworkOperationType.VALIDATOR_CONNECTION_REQUEST);
+    t.is(payload.session_id, sessionId);
+    t.alike(payload.capabilities, caps);
 
     const msg = createMessage(
-        header.type,
-        sessionIdToBuffer(header.session_id),
-        timestampToBuffer(header.timestamp),
+        payload.type,
+        sessionIdToBuffer(payload.session_id),
+        timestampToBuffer(payload.timestamp),
         addressToBuffer(wallet.address),
-        header.validator_connection_request.nonce,
+        payload.validator_connection_request.nonce,
         encodeCapabilities(caps)
     );
     const hash = await PeerWallet.blake3(msg);
-    t.ok(wallet.verify(header.validator_connection_request.signature, hash, wallet.publicKey));
+    t.ok(wallet.verify(payload.validator_connection_request.signature, hash, wallet.publicKey));
 });
 
 test('NetworkMessageDirector builds liveness request and verifies signature', async t => {
@@ -65,20 +65,20 @@ test('NetworkMessageDirector builds liveness request and verifies signature', as
     const caps = ['cap:b', 'cap:a'];
     const data = b4a.from('ping', 'utf8');
 
-    const header = await director.buildLivenessRequest(sessionId, data, caps);
-    t.is(header.type, MessageType.LIVENESS_REQUEST);
-    t.is(header.session_id, sessionId);
-    t.alike(header.capabilities, caps);
+    const payload = await director.buildLivenessRequest(sessionId, data, caps);
+    t.is(payload.type, NetworkOperationType.LIVENESS_REQUEST);
+    t.is(payload.session_id, sessionId);
+    t.alike(payload.capabilities, caps);
 
     const msg = createMessage(
-        header.type,
-        sessionIdToBuffer(header.session_id),
-        timestampToBuffer(header.timestamp),
-        header.liveness_request.nonce,
+        payload.type,
+        sessionIdToBuffer(payload.session_id),
+        timestampToBuffer(payload.timestamp),
+        payload.liveness_request.nonce,
         encodeCapabilities(caps)
     );
     const hash = await PeerWallet.blake3(msg);
-    t.ok(wallet.verify(header.liveness_request.signature, hash, wallet.publicKey));
+    t.ok(wallet.verify(payload.liveness_request.signature, hash, wallet.publicKey));
 });
 
 test('NetworkMessageDirector iterates liveness response ResultCode values', async t => {
@@ -90,22 +90,22 @@ test('NetworkMessageDirector iterates liveness response ResultCode values', asyn
     const data = b4a.from('ping', 'utf8');
 
     for (const code of uniqueResultCodes()) {
-        const header = await director.buildLivenessResponse(sessionId, data, caps, code);
-        t.is(header.type, MessageType.LIVENESS_RESPONSE);
-        t.is(header.liveness_response.result, code);
+        const payload = await director.buildLivenessResponse(sessionId, data, caps, code);
+        t.is(payload.type, NetworkOperationType.LIVENESS_RESPONSE);
+        t.is(payload.liveness_response.result, code);
 
         const msg = createMessage(
-            header.type,
-            sessionIdToBuffer(header.session_id),
-            timestampToBuffer(header.timestamp),
-            header.liveness_response.nonce,
+            payload.type,
+            sessionIdToBuffer(payload.session_id),
+            timestampToBuffer(payload.timestamp),
+            payload.liveness_response.nonce,
             safeWriteUInt32BE(code, 0),
             encodeCapabilities(caps)
         );
         const hash = await PeerWallet.blake3(msg);
-        t.ok(wallet.verify(header.liveness_response.signature, hash, wallet.publicKey));
+        t.ok(wallet.verify(payload.liveness_response.signature, hash, wallet.publicKey));
 
-        const decoded = MessageHeader.decode(MessageHeader.encode(header));
+        const decoded = decodeV1networkOperation(encodeV1networkOperation(payload));
         t.is(decoded.liveness_response.result, code);
     }
 });
@@ -118,25 +118,25 @@ test('NetworkMessageDirector builds broadcast transaction request and verifies s
     const data = b4a.from('deadbeef', 'hex');
     const caps = ['cap:b', 'cap:a'];
 
-    const header = await director.buildBroadcastTransactionRequest(sessionId, data, caps);
-    t.is(header.type, MessageType.BROADCAST_TRANSACTION_REQUEST);
-    t.is(header.session_id, sessionId);
-    t.alike(header.capabilities, caps);
-    t.alike(header.broadcast_transaction_request.data, data);
+    const payload = await director.buildBroadcastTransactionRequest(sessionId, data, caps);
+    t.is(payload.type, NetworkOperationType.BROADCAST_TRANSACTION_REQUEST);
+    t.is(payload.session_id, sessionId);
+    t.alike(payload.capabilities, caps);
+    t.alike(payload.broadcast_transaction_request.data, data);
 
     const message = createMessage(
-        header.type,
+        payload.type,
         sessionIdToBuffer(sessionId),
-        timestampToBuffer(header.timestamp),
+        timestampToBuffer(payload.timestamp),
         data,
-        header.broadcast_transaction_request.nonce,
+        payload.broadcast_transaction_request.nonce,
         encodeCapabilities(caps)
     );
     const hash = await PeerWallet.blake3(message);
-    t.ok(wallet.verify(header.broadcast_transaction_request.signature, hash, wallet.publicKey));
+    t.ok(wallet.verify(payload.broadcast_transaction_request.signature, hash, wallet.publicKey));
 
-    const decoded = MessageHeader.decode(MessageHeader.encode(header));
-    t.is(decoded.type, MessageType.BROADCAST_TRANSACTION_REQUEST);
+    const decoded = decodeV1networkOperation(encodeV1networkOperation(payload));
+    t.is(decoded.type, NetworkOperationType.BROADCAST_TRANSACTION_REQUEST);
 });
 
 test('NetworkMessageDirector iterates broadcast transaction response ResultCode values', async t => {
@@ -147,22 +147,22 @@ test('NetworkMessageDirector iterates broadcast transaction response ResultCode 
     const caps = ['cap:b', 'cap:a'];
 
     for (const code of uniqueResultCodes()) {
-        const header = await director.buildBroadcastTransactionResponse(sessionId, caps, code);
-        t.is(header.type, MessageType.BROADCAST_TRANSACTION_RESPONSE);
-        t.is(header.broadcast_transaction_response.result, code);
+        const payload = await director.buildBroadcastTransactionResponse(sessionId, caps, code);
+        t.is(payload.type, NetworkOperationType.BROADCAST_TRANSACTION_RESPONSE);
+        t.is(payload.broadcast_transaction_response.result, code);
 
         const msg = createMessage(
-            header.type,
-            sessionIdToBuffer(header.session_id),
-            timestampToBuffer(header.timestamp),
-            header.broadcast_transaction_response.nonce,
+            payload.type,
+            sessionIdToBuffer(payload.session_id),
+            timestampToBuffer(payload.timestamp),
+            payload.broadcast_transaction_response.nonce,
             safeWriteUInt32BE(code, 0),
             encodeCapabilities(caps)
         );
         const hash = await PeerWallet.blake3(msg);
-        t.ok(wallet.verify(header.broadcast_transaction_response.signature, hash, wallet.publicKey));
+        t.ok(wallet.verify(payload.broadcast_transaction_response.signature, hash, wallet.publicKey));
 
-        const decoded = MessageHeader.decode(MessageHeader.encode(header));
+        const decoded = decodeV1networkOperation(encodeV1networkOperation(payload));
         t.is(decoded.broadcast_transaction_response.result, code);
     }
 });
@@ -177,25 +177,25 @@ test('NetworkMessageDirector iterates validator connection response ResultCode v
         'trac1xm76l9qaujh7vqktk8302mw9sfrxau3l45w62hqfl4kasswt6yts0autkh';
 
     for (const code of uniqueResultCodes()) {
-        const header = await director.buildValidatorConnectionResponse(
+        const payload = await director.buildValidatorConnectionResponse(
             sessionId,
             otherAddress,
             caps,
             code
         );
-        t.is(header.type, MessageType.VALIDATOR_CONNECTION_RESPONSE);
-        t.is(header.validator_connection_response.result, code);
+        t.is(payload.type, NetworkOperationType.VALIDATOR_CONNECTION_RESPONSE);
+        t.is(payload.validator_connection_response.result, code);
 
         const msg = createMessage(
-            header.type,
-            sessionIdToBuffer(header.session_id),
-            timestampToBuffer(header.timestamp),
+            payload.type,
+            sessionIdToBuffer(payload.session_id),
+            timestampToBuffer(payload.timestamp),
             addressToBuffer(otherAddress),
-            header.validator_connection_response.nonce,
+            payload.validator_connection_response.nonce,
             safeWriteUInt32BE(code, 0),
             encodeCapabilities(caps)
         );
         const hash = await PeerWallet.blake3(msg);
-        t.ok(wallet.verify(header.validator_connection_response.signature, hash, wallet.publicKey));
+        t.ok(wallet.verify(payload.validator_connection_response.signature, hash, wallet.publicKey));
     }
 });

@@ -1,12 +1,11 @@
 import b4a from 'b4a';
 import PeerWallet from 'trac-wallet';
 
-import StateBuilder from '../base/StateBuilder.js'
-import {createMessage} from '../../utils/buffer.js';
-import {OperationType} from '../../utils/protobuf/applyOperations.cjs'
-import {addressToBuffer, bufferToAddress} from '../../core/state/utils/address.js';
-import {isAddressValid} from "../../core/state/utils/address.js";
-import {blake3Hash} from '../../utils/crypto.js';
+import { createMessage } from '../../utils/buffer.js';
+import { OperationType } from '../../utils/protobuf/applyOperations.cjs'
+import { addressToBuffer, bufferToAddress } from '../../core/state/utils/address.js';
+import { isAddressValid } from "../../core/state/utils/address.js";
+import { blake3Hash } from '../../utils/crypto.js';
 import {
     isCoreAdmin,
     isAdminControl,
@@ -17,7 +16,7 @@ import {
     isBalanceInitialization
 } from '../../utils/applyOperations.js';
 
-class CompleteStateMessageBuilder extends StateBuilder {
+class CompleteStateMessageBuilder {
     #wallet;
     #config
     #operationType;
@@ -38,12 +37,11 @@ class CompleteStateMessageBuilder extends StateBuilder {
     #amount;
 
     /**
-     * 
-     * @param {PeerWallet} wallet 
-     * @param {Config} config 
+     *
+     * @param {PeerWallet} wallet
+     * @param {Config} config
      */
     constructor(wallet, config) {
-        super();
         this.#config = config;
         if (!wallet || typeof wallet !== 'object') {
             throw new Error('Wallet must be a valid wallet object');
@@ -85,7 +83,7 @@ class CompleteStateMessageBuilder extends StateBuilder {
     }
 
     withAddress(address) {
-        if (b4a.isBuffer(address) && address.length === this.#config.addressLength) {
+        if (b4a.isBuffer(address)) {
             address = bufferToAddress(address, this.#config.addressPrefix);
         }
 
