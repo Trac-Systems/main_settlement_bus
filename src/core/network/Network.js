@@ -39,8 +39,8 @@ class Network extends ReadyResource {
         super();
         this.#config = config
 
-        this.#transactionPoolService = new TransactionPoolService(state, address, options);
-        this.#validatorObserverService = new ValidatorObserverService(this, state, address, options);
+        this.#transactionPoolService = new TransactionPoolService(state, address, this.#config);
+        this.#validatorObserverService = new ValidatorObserverService(this, state, address, this.#config);
         this.#networkMessages = new NetworkMessages(this, this.#config);
         this.#validatorConnectionManager = new ConnectionManager(this.#config);
         this.#validatorMessageOrchestrator = new MessageOrchestrator(this.#validatorConnectionManager, state);

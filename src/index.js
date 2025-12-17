@@ -112,7 +112,7 @@ export class MainSettlementBus extends ReadyResource {
     async _open() {
         if (this.#config.enableWallet) {
             await this.#wallet.initKeyPair(
-                this.key_pair_path,
+                this.#config.keyPairPath,
                 this.#readline_instance
             );
         }

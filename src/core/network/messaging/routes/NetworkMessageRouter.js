@@ -43,27 +43,27 @@ class NetworkMessageRouter {
             const channelString = b4a.toString(this.#config.channel, 'utf8');
             if (this.#isGetRequest(incomingMessage)) {
                 await this.#handlers.get.handle(incomingMessage, messageProtomux, connection, channelString);
-                this.network.swarm.leavePeer(connection.remotePublicKey);
+                this.#network.swarm.leavePeer(connection.remotePublicKey);
             }
             else if (this.#isResponse(incomingMessage)) {
                 await this.#handlers.response.handle(incomingMessage, connection, channelString);
-                this.network.swarm.leavePeer(connection.remotePublicKey);
+                this.#network.swarm.leavePeer(connection.remotePublicKey);
             }
             else if (this.#isRoleAccessOperation(incomingMessage)) {
                 await this.#handlers.roleTransaction.handle(incomingMessage, connection);
-                this.network.swarm.leavePeer(connection.remotePublicKey);
+                this.#network.swarm.leavePeer(connection.remotePublicKey);
 
             }
             else if (this.#isSubnetworkOperation(incomingMessage)) {
                 await this.#handlers.subNetworkTransaction.handle(incomingMessage, connection);
-                this.network.swarm.leavePeer(connection.remotePublicKey);
+                this.#network.swarm.leavePeer(connection.remotePublicKey);
             }
             else if(this.#isTransferOperation(incomingMessage)) {
                 await this.#handlers.tracNetworkTransaction.handle(incomingMessage, connection);
-                this.network.swarm.leavePeer(connection.remotePublicKey);
+                this.#network.swarm.leavePeer(connection.remotePublicKey);
             }
             else {
-                this.network.swarm.leavePeer(connection.remotePublicKey);
+                this.#network.swarm.leavePeer(connection.remotePublicKey);
             }
             
         } catch (error) {

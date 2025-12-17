@@ -51,7 +51,7 @@ class NetworkMessages {
                 } catch (error) {
                     console.error(`NetworkMessages: Failed to handle incoming message: ${error.message}`);
                 } finally {
-                    this.network.swarm.leavePeer(connection.remotePublicKey);
+                    this.#network.swarm.leavePeer(connection.remotePublicKey);
                 }
             }
         });

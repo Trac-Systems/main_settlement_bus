@@ -10,9 +10,9 @@ export class Config {
         this.#validate(options, config)
         this.#options = options
         this.#config = config
-        this.#bootstrap = b4a.from(this.#options.bootstrap || this.#config.bootstrap)
+        this.#bootstrap = b4a.from(this.#options.bootstrap || this.#config.bootstrap, 'hex')
         // Ensure a 32-byte channel buffer (repeat-fill from string/Buffer if provided)
-        this.#channel = b4a.alloc(32).fill(this.#options.channel || this.#config.channel || 0)
+        this.#channel = b4a.alloc(32).fill(this.#options.channel || this.#config.channel)
     }
 
     get addressLength() {

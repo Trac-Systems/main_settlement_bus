@@ -2,7 +2,7 @@ import b4a from 'b4a';
 import BaseResponse from './base/BaseResponse.js';
 class ValidatorResponse extends BaseResponse {
 
-    constructor(state, wallet) {
+    constructor(state, wallet, config) {
         super(state, wallet, config);
     }
 

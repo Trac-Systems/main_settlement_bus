@@ -15,7 +15,6 @@ class MessageOrchestrator {
      * Attempts to send a message to validators with retries and state checks.
      * @param {ConnectionManager} connectionManager - The connection manager instance
      * @param {object} state - The state to look for the message outcome
-     * @param {object} options - { messageThreshold: number, maxRetries: number, retryDelay: number (milliseconds), timeout: number (milliseconds) }
      * messageThreshold: How many successful sends before removing a validator from the pool
      * maxRetries: How many times to retry sending a message to a single validator
      * retryDelay: How long to wait between retries (ms)
@@ -25,10 +24,10 @@ class MessageOrchestrator {
         this.connectionManager = connectionManager;
         this.state = state;
         // TODO: Adjust these default values or fetch them from config
-        this.messageThreshold = options.messageThreshold || MAX_SUCCESSIVE_MESSAGES_PER_VALIDATOR;
-        this.maxRetries = options.maxRetries || MAX_MESSAGE_SEND_ATTEMPTS; // Amount of retries for a single validator
-        this.retryDelay = options.retryDelay || MESSAGE_VALIDATOR_RETRY_DELAY_MS; // How long to wait before retrying (ms)
-        this.timeout = options.timeout || MESSAGE_VALIDATOR_RESPONSE_TIMEOUT_MS; // Overall timeout for sending a message (ms)
+        this.messageThreshold = options.messageThreshold ?? MAX_SUCCESSIVE_MESSAGES_PER_VALIDATOR;
+        this.maxRetries = options.maxRetries ?? MAX_MESSAGE_SEND_ATTEMPTS; // Amount of retries for a single validator
+        this.retryDelay = options.retryDelay ?? MESSAGE_VALIDATOR_RETRY_DELAY_MS; // How long to wait before retrying (ms)
+        this.timeout = options.timeout ?? MESSAGE_VALIDATOR_RESPONSE_TIMEOUT_MS; // Overall timeout for sending a message (ms)
     }
 
     /**

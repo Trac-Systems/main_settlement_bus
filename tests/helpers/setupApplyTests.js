@@ -71,7 +71,7 @@ export const tick = () => new Promise(resolve => setImmediate(resolve));
 export async function fundPeer(admin, toFund, amount) {
     const txValidity = await admin.msb.state.getIndexerSequenceState()
     const director = new CompleteStateMessageDirector();
-    director.builder = new CompleteStateMessageBuilder(admin.wallet);
+    director.builder = new CompleteStateMessageBuilder(admin.wallet, admin.config);
     const payload = await director.buildBalanceInitializationMessage(
         admin.wallet.address,
         toFund.wallet.address,
@@ -91,7 +91,8 @@ export async function initMsbPeer(peerName, peerKeyPair, temporaryDirectory, opt
     peer.options = options
     peer.options.storesDirectory = peer.storesDirectory;
     peer.options.storeName = peer.storeName;
-    const msb = new MainSettlementBus(createConfig(ENV.DEVELOPMENT, peer.options));
+    peer.config = createConfig(ENV.DEVELOPMENT, peer.options)
+    const msb = new MainSettlementBus(peer.config);
 
     peer.msb = msb;
     peer.wallet = msb.wallet;
@@ -123,7 +124,7 @@ export async function initMsbAdmin(keyPair, temporaryDirectory, options = {}) {
 export async function setupMsbAdmin(keyPair, temporaryDirectory, options = {}) {
     const admin = await initMsbAdmin(keyPair, temporaryDirectory, options);
     const txValidity = await admin.msb.state.getIndexerSequenceState();
-    const addAdminMessage = await new CompleteStateMessageOperations(admin.wallet, config)
+    const addAdminMessage = await new CompleteStateMessageOperations(admin.wallet, admin.config)
         .assembleAddAdminMessage(admin.msb.state.writingKey, txValidity);
 
     await admin.msb.state.append(addAdminMessage);
@@ -136,13 +137,13 @@ export async function setupNodeAsWriter(admin, writerCandidate) {
         await setupWhitelist(admin, [writerCandidate.wallet.address]); // ensure if is whitelisted
 
         const validity = await admin.msb.getIndexerSequenceState()
-        const req = await new PartialStateMessageOperations(writerCandidate.wallet, config)
+        const req = await new PartialStateMessageOperations(writerCandidate.wallet, admin.config)
             .assembleAddWriterMessage(
                 b4a.toString(writerCandidate.msb.state.writingKey, 'hex'),
                 b4a.toString(validity, 'hex'));
 
         await waitWritable(admin, writerCandidate, async () => {
-            const raw = await new CompleteStateMessageOperations(admin.wallet, config)
+            const raw = await new CompleteStateMessageOperations(admin.wallet, admin.config)
                 .assembleAddWriterMessage(
                     admin.wallet.address,
                     b4a.from(req.rao.tx, 'hex'),
@@ -171,13 +172,13 @@ export async function promoteToWriter(admin, writerCandidate) {
             isIndexer: false,
         })
     const validity = await admin.msb.state.getIndexerSequenceState()
-    const req = await new PartialStateMessageOperations(writerCandidate.wallet, config)
+    const req = await new PartialStateMessageOperations(writerCandidate.wallet, admin.config)
         .assembleAddWriterMessage(
             b4a.toString(writerCandidate.msb.state.writingKey, 'hex'),
             b4a.toString(validity, 'hex'));
 
     await waitWritable(writerCandidate, writerCandidate, async () => {
-        const raw = await new CompleteStateMessageOperations(admin.wallet, config)
+        const raw = await new CompleteStateMessageOperations(admin.wallet, admin.config)
             .assembleAddWriterMessage(
                 req.address,
                 b4a.from(req.rao.tx, 'hex'),
@@ -205,7 +206,7 @@ export async function setupMsbWriter(admin, peerName, peerKeyPair, temporaryDire
 export async function setupMsbIndexer(indexerCandidate, admin) {
     try {
     const validity = await admin.msb.state.getIndexerSequenceState()
-    const req = await new CompleteStateMessageOperations(admin.wallet, config)
+    const req = await new CompleteStateMessageOperations(admin.wallet, admin.config)
         .assembleAddIndexerMessage(indexerCandidate.wallet.address, validity);
 
         await admin.msb.state.append(req);
@@ -216,7 +217,7 @@ export async function setupMsbIndexer(indexerCandidate, admin) {
             if (!indexersEntry) {
                 return false;
             }
-            const formatted = formatIndexersEntry(indexersEntry, config.addressLength);
+            const formatted = formatIndexersEntry(indexersEntry, admin.config.addressLength);
             if (!formatted || !formatted.addresses) return false;
             return formatted.addresses.includes(indexerCandidate.wallet.address);
         }
@@ -259,7 +260,7 @@ export async function setupWhitelist(admin, whitelistAddresses) {
     fileUtils.readAddressesFromWhitelistFile = async () => whitelistAddresses;
     const validity = await admin.msb.state.getIndexerSequenceState()
     for (const address of whitelistAddresses) {
-        const msg = await new CompleteStateMessageOperations(admin.wallet, config)
+        const msg = await new CompleteStateMessageOperations(admin.wallet, admin.config)
             .assembleAppendWhitelistMessages(validity, address);
 
         await admin.msb.state.append(msg);
@@ -313,14 +314,14 @@ export async function initDirectoryStructure(peerName, keyPair, temporaryDirecto
 export const deployExternalBootstrap = async (writer, externalNode) => {
     const externalBootstrap = randomBytes(32).toString('hex');
     const txValidity = await writer.msb.state.getIndexerSequenceState();
-    const payload = await new PartialStateMessageOperations(externalNode.msb.wallet, config)
+    const payload = await new PartialStateMessageOperations(externalNode.msb.wallet, admin.config)
         .assembleBootstrapDeploymentMessage(
             externalBootstrap,
             randomBytes(32).toString('hex'),
             txValidity.toString('hex')
         );
 
-    const raw = await new CompleteStateMessageOperations(writer.msb.wallet, config)
+    const raw = await new CompleteStateMessageOperations(writer.msb.wallet, admin.config)
         .assembleCompleteBootstrapDeployment(
             payload.address,
             b4a.from(payload.bdo.tx, 'hex'),
@@ -352,7 +353,7 @@ export const generatePostTx = async (writer, externalNode, externalContractBoots
 
     const contentHash = await blake3Hash(JSON.stringify(testObj));
     const validity = await writer.msb.state.getIndexerSequenceState()
-    const tx = await new PartialStateMessageOperations(externalNode.wallet, config)
+    const tx = await new PartialStateMessageOperations(externalNode.wallet, admin.config)
         .assembleTransactionOperationMessage(
             peerWriterKey,
             b4a.toString(validity, 'hex'),
@@ -361,7 +362,7 @@ export const generatePostTx = async (writer, externalNode, externalContractBoots
             b4a.toString(writer.msb.bootstrap, 'hex')
         )
 
-    const postTx = await new CompleteStateMessageOperations(writer.wallet, config)
+    const postTx = await new CompleteStateMessageOperations(writer.wallet, admin.config)
         .assembleCompleteTransactionOperationMessage(
             tx.address,
             b4a.from(tx.txo.tx, 'hex'),
@@ -424,7 +425,7 @@ export async function waitForNotIndexer(indexer) {
             if (!indexersEntry) {
                 notIndexer = true;
             } else {
-                const formatted = formatIndexersEntry(indexersEntry, config.addressLength);
+                const formatted = formatIndexersEntry(indexersEntry, admin.config.addressLength);
                 if (!formatted || !formatted.addresses) {
                     notIndexer = true;
                 } else if (!formatted.addresses.includes(indexer.wallet.address)) {
@@ -571,7 +572,7 @@ export async function waitForIndexersEntry(node, expected) {
                 await sleep(250);
                 continue;
             }
-            const formatted = formatIndexersEntry(indexersEntry, config.addressLength);
+            const formatted = formatIndexersEntry(indexersEntry, admin.config.addressLength);
             if (formatted && formatted.addresses && formatted.addresses.includes(expected.address)) {
                 break;
             }

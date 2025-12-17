@@ -4,7 +4,7 @@ import {
     OperationType
 } from '../../../../utils/constants.js';
 import PartialBootstrapDeployment from "../validators/PartialBootstrapDeployment.js";
-import {addressToBuffer, bufferToAddress} from "../../../state/utils/address.js";
+import {addressToBuffer} from "../../../state/utils/address.js";
 import PartialTransaction from "../validators/PartialTransaction.js";
 import {normalizeHex} from "../../../../utils/helpers.js";
 

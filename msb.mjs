@@ -6,14 +6,15 @@ const pearApp = typeof Pear !== 'undefined' ? (Pear.app ?? Pear.config) : undefi
 const runtimeArgs = typeof process !== 'undefined' ? process.argv.slice(2) : [];
 const args = pearApp?.args ?? runtimeArgs;
 const runRpc = args.includes('--rpc');
+const storeName = pearApp?.args?.[0] ?? runtimeArgs[0]
 
 const rpc = {
-    store_name: pearApp?.args?.[0] ?? runtimeArgs[0],
-    enable_wallet: false,
-    enable_interactive_mode: false
+    storeName: pearApp?.args?.[0] ?? runtimeArgs[0],
+    enableWallet: false,
+    enableInteractiveMode: false
 }
 
-const options = args.includes('--rpc') ? rpc : {}
+const options = args.includes('--rpc') ? rpc : { storeName }
 
 const msb = new MainSettlementBus(createConfig(ENV.MAINNET, options));
 

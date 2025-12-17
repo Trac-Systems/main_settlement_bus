@@ -72,7 +72,7 @@ export const registerAccountTests = (context) => {
         })
 
         it("returns default state for non-existent node", async () => {
-            const address = randomAddress()
+            const address = randomAddress(context.rpcMsb.config.addressPrefix)
 
             const res = await request(context.server).get(`/v1/account/${address}`)
             expect(res.statusCode).toBe(200)
