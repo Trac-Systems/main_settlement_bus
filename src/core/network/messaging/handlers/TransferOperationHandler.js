@@ -15,6 +15,7 @@ import {normalizeTransferOperation} from "../../../../utils/normalizers.js"
 class TransferOperationHandler extends BaseOperationHandler {
     #partialTransferValidator;
     #config;
+    #wallet;
 
     /**
      * @param {Network} network
@@ -26,6 +27,7 @@ class TransferOperationHandler extends BaseOperationHandler {
     constructor(network, state, wallet, rateLimiter, config) {
         super(network, state, wallet, rateLimiter, config);
         this.#config = config;
+        this.#wallet = wallet;
         this.#partialTransferValidator = new PartialTransfer(state, this.#config);
     }
 
@@ -43,7 +45,7 @@ class TransferOperationHandler extends BaseOperationHandler {
             throw new Error("TransferHandler: Transfer validation failed.");
         }
 
-        const completeTransferOperation = await new CompleteStateMessageOperations(this.wallet, this.#config)
+        const completeTransferOperation = await new CompleteStateMessageOperations(this.#wallet, this.#config)
             .assembleCompleteTransferOperationMessage(
                 normalizedPayload.address,
                 normalizedPayload.tro.tx,

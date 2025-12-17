@@ -43,11 +43,11 @@ let admin, writer1, writer2, writer3, tmpDirectory;
 hook('Initialize nodes for addWriter tests', async t => {
     const randomChannel = randomBytes(32).toString('hex');
     const baseOptions = {
-        enable_tx_apply_logs: false,
-        enable_interactive_mode: false,
-        enable_role_requester: false,
+        enableTxApplyLogs: false,
+        enableInteractiveMode: false,
+        enableRoleRequester: false,
         channel: randomChannel,
-        enable_validator_observer: false
+        enableValidatorObserver: false
     }
     tmpDirectory = await initTemporaryDirectory();
     admin = await setupMsbAdmin(testKeyPair1, tmpDirectory, baseOptions);

@@ -21,10 +21,7 @@ import {
     OperationType,
     CustomEventType,
     BALANCE_MIGRATION_SLEEP_INTERVAL,
-    WHITELIST_MIGRATION_DIR,
-    WRITER_BYTE_LENGTH,
-    HASH_BYTE_LENGTH,
-    NONCE_BYTE_LENGTH
+    WHITELIST_MIGRATION_DIR
 } from "./utils/constants.js";
 import { randomBytes } from "hypercore-crypto";
 import { decimalStringToBigInt, bigIntTo16ByteBuffer, bufferToBigInt, bigIntToDecimalString } from "./utils/amountSerialization.js"
@@ -225,7 +222,8 @@ export class MainSettlementBus extends ReadyResource {
                 break;
             }
 
-            this.network.validatorConnectionManager.rotate(); // force change connection rotation for the next retry
+            // send has a fair chance of picking a new validator by itself so this is commented out until further improvement
+            // this.#network.validatorConnectionManager.pickRandomConnectedValidator(); // force change connection rotation for the next retry
         }
 
         if (await this.#state.get(hash) === null) {
@@ -954,7 +952,7 @@ export class MainSettlementBus extends ReadyResource {
                 console.log(await this.#state.getIndexersEntry());
             },
             "/validator_pool": () => {
-                this.network.validatorConnectionManager.prettyPrint();
+                this.#network.validatorConnectionManager.prettyPrint();
             },
             "/stats": () => verifyDag(
                 this.#state,

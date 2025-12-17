@@ -13,9 +13,9 @@ hook('Initialize admin node for addWhitelist tests', async () => {
     const randomChannel = randomBytes(32).toString('hex');
     const baseOptions = {
         enable_txchannels: false,
-        enable_tx_apply_logs: false,
-        enable_interactive_mode: false,
-        enable_role_requester: false,
+        enableTxApplyLogs: false,
+        enableInteractiveMode: false,
+        enableRoleRequester: false,
         channel: randomChannel,
     }
     tmpDirectory = await initTemporaryDirectory();
