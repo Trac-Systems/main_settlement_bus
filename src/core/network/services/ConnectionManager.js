@@ -1,4 +1,3 @@
-import { MAX_VALIDATORS_IN_CONNECTION_POOL } from "../../../utils/constants.js"
 import b4a from 'b4a'
 import PeerWallet from "trac-wallet"
 
@@ -26,7 +25,7 @@ class ConnectionManager {
     constructor(config)  {
         this.#validators = new Map();
         this.#config = config
-        this.#maxValidators = config.maxValidators || MAX_VALIDATORS_IN_CONNECTION_POOL
+        this.#maxValidators = config.maxValidators
     }
 
     /**

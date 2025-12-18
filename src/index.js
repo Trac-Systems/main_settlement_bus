@@ -102,10 +102,6 @@ export class MainSettlementBus extends ReadyResource {
         return this.#wallet;
     }
 
-    get tracPublicKey() {
-        return this.#wallet?.publicKey;
-    }
-
     async _open() {
         if (this.#config.enableWallet) {
             await this.#wallet.initKeyPair(
@@ -184,7 +180,7 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async broadcastPartialTransaction(partialTransactionPayload) {
-        await this.#network.validatorMessageOrchestrator.send(partialTransactionPayload);
+        return await this.#network.validatorMessageOrchestrator.send(partialTransactionPayload);
     }
 
     async broadcastTransactionCommand(payload) {
@@ -213,20 +209,9 @@ export class MainSettlementBus extends ReadyResource {
         const signedLength = this.#state.getSignedLength();
         const unsignedLength = this.#state.getUnsignedLength();
 
-        for (let attempt = 0; attempt <= this.#config.maxRetries; attempt++) { // should iterate once if maxRetries === 0
-            await this.broadcastPartialTransaction(payload);
-            await sleep(1000 * (attempt + 1)); // linear backoff wait time
-            const tx = await this.#state.get(hash);
+        const success = await this.broadcastPartialTransaction(payload);
 
-            if (tx !== null) {
-                break;
-            }
-
-            // send has a fair chance of picking a new validator by itself so this is commented out until further improvement
-            // this.#network.validatorConnectionManager.pickRandomConnectedValidator(); // force change connection rotation for the next retry
-        }
-
-        if (await this.#state.get(hash) === null) {
+        if (!success) {
             throw new Error("Failed to broadcast transaction after multiple attempts.");
         }
 
@@ -491,7 +476,6 @@ export class MainSettlementBus extends ReadyResource {
 
         await this.broadcastPartialTransaction(assembledMessage);
         console.info(`Transaction hash: ${assembledMessage.rao.tx}`);
-        return;
     }
 
     async #updateIndexerRole(address, toAdd) {
@@ -1047,8 +1031,7 @@ export class MainSettlementBus extends ReadyResource {
             if (!payload) {
                 throw new Error("Missing payload for fetching tx payloads.");
             }
-            const hashes = payload;
-            const result = await getTxPayloadsBulkCommand(this.#state, hashes, this.#config);
+            const result = await getTxPayloadsBulkCommand(this.#state, payload, this.#config);
             if (rl) rl.prompt();
             return result;
         } else if (input.startsWith("/get_txs_hashes")) {

@@ -1,6 +1,5 @@
 import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
 import { Config } from './config.js';
-import { HASH_BYTE_LENGTH, NONCE_BYTE_LENGTH, TRAC_ADDRESS_SIZE, WRITER_BYTE_LENGTH } from '../utils/constants.js';
 
 export const ENV = {
     MAINNET: 'mainnet',
@@ -24,11 +23,10 @@ const configData = {
         enableTxApplyLogs: false,
         enableValidatorObserver: true,
         enableWallet: true,
-        maxValidators: 6,
+        maxValidators: 50,
         maxRetries: 3,
         networkId: 918,
         storesDirectory : 'stores/',
-        transactionTotalSize: 3 * WRITER_BYTE_LENGTH + 2 * TRAC_ADDRESS_SIZE + HASH_BYTE_LENGTH + NONCE_BYTE_LENGTH
     },
     [ENV.DEVELOPMENT]: {
         addressLength: 63,
@@ -49,7 +47,6 @@ const configData = {
         maxRetries: 0,
         networkId: 918,
         storesDirectory : 'stores/',
-        transactionTotalSize: 3 * WRITER_BYTE_LENGTH + 2 * TRAC_ADDRESS_SIZE + HASH_BYTE_LENGTH + NONCE_BYTE_LENGTH
     }
 }
 
