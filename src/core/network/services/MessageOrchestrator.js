@@ -1,33 +1,20 @@
 import { sleep } from '../../../utils/helpers.js';
-import {
-    MAX_MESSAGE_SEND_ATTEMPTS,
-    MAX_SUCCESSIVE_MESSAGES_PER_VALIDATOR,
-    MESSAGE_VALIDATOR_RESPONSE_TIMEOUT_MS,
-    MESSAGE_VALIDATOR_RETRY_DELAY_MS
-} from '../../../utils/constants.js';
-
 /**
  * MessageOrchestrator coordinates message submission, retry, and validator management.
  * It works with ConnectionManager and ledger state to ensure reliable message delivery.
  */
 class MessageOrchestrator {
+    #config;
     /**
      * Attempts to send a message to validators with retries and state checks.
      * @param {ConnectionManager} connectionManager - The connection manager instance
      * @param {object} state - The state to look for the message outcome
-     * messageThreshold: How many successful sends before removing a validator from the pool
-     * maxRetries: How many times to retry sending a message to a single validator
-     * retryDelay: How long to wait between retries (ms)
-     * timeout: Overall timeout for sending a message (ms)
+     * @param {object} config - Configuration options:
      */
-    constructor(connectionManager, state, options = {}) {
+    constructor(connectionManager, state, config) {
         this.connectionManager = connectionManager;
         this.state = state;
-        // TODO: Adjust these default values or fetch them from config
-        this.messageThreshold = options.messageThreshold ?? MAX_SUCCESSIVE_MESSAGES_PER_VALIDATOR;
-        this.maxRetries = options.maxRetries ?? MAX_MESSAGE_SEND_ATTEMPTS; // Amount of retries for a single validator
-        this.retryDelay = options.retryDelay ?? MESSAGE_VALIDATOR_RETRY_DELAY_MS; // How long to wait before retrying (ms)
-        this.timeout = options.timeout ?? MESSAGE_VALIDATOR_RESPONSE_TIMEOUT_MS; // Overall timeout for sending a message (ms)
+        this.#config = config;
     }
 
     /**
@@ -37,7 +24,7 @@ class MessageOrchestrator {
      */
     async send(message) {
         const startTime = Date.now();
-        while (Date.now() - startTime < this.timeout) {
+        while (Date.now() - startTime < this.#config.messageValidatorResponseTimeout) {
             const validator = this.connectionManager.pickRandomConnectedValidator();
             if (!validator) return false;
 
@@ -51,10 +38,10 @@ class MessageOrchestrator {
 
     async #attemptSendMessage(validator, message) {
         let attempts = 0;
-        while (attempts < this.maxRetries) {
+        while (attempts < this.#config.maxRetries) {
             this.connectionManager.sendSingleMessage(message, validator);
 
-            const appeared = await this.waitForUnsignedState(message.tro.tx, this.retryDelay);
+            const appeared = await this.waitForUnsignedState(message.tro.tx, this.#config.messageValidatorRetryDelay);
             if (appeared) {
                 this.incrementSentCount(validator);
                 if (this.shouldRemove(validator)) {
@@ -87,7 +74,7 @@ class MessageOrchestrator {
     }
 
     shouldRemove(validatorPubKey) {
-        return this.connectionManager.getSentCount(validatorPubKey) >= this.messageThreshold;
+        return this.connectionManager.getSentCount(validatorPubKey) >= this.#config.messageThreshold;
     }
 }
 

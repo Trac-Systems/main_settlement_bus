@@ -761,7 +761,6 @@ export class MainSettlementBus extends ReadyResource {
                 txValidity.toString('hex'),
             )
 
-        await this.broadcastPartialTransaction(payload);
 
         const expectedNewBalance = senderBalance - totalDeductedAmount;
         console.info('Transfer Details:');
@@ -776,6 +775,14 @@ export class MainSettlementBus extends ReadyResource {
             console.info(`Total: ${bigIntToDecimalString(totalDeductedAmount)}`);
         }
         console.log(`Expected Balance After Transfer: ${bigIntToDecimalString(expectedNewBalance)}`);
+
+        const success =  await this.broadcastPartialTransaction(payload);
+        if (!success) {
+            throw new Error("Failed to broadcast transfer transaction after multiple attempts.");
+        } else {
+            console.log(`Transfer transaction broadcasted successfully. Tx hash: ${payload.tro.tx}`);
+        }
+
     }
 
     async #handleBalanceMigrationOperation() {

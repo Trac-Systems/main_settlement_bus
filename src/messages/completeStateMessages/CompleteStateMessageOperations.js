@@ -19,7 +19,6 @@ class CompleteStateMessageOperations {
 
             const payload = await director.buildAddAdminMessage(this.#wallet.address, writingKey, txValidity);
             return safeEncodeApplyOperation(payload);
-
         } catch (error) {
             throw new Error(`Failed to assemble admin message: ${error.message}`);
         }

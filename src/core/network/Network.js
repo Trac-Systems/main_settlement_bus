@@ -43,7 +43,7 @@ class Network extends ReadyResource {
         this.#validatorObserverService = new ValidatorObserverService(this, state, address, this.#config);
         this.#networkMessages = new NetworkMessages(this, this.#config);
         this.#validatorConnectionManager = new ConnectionManager(this.#config);
-        this.#validatorMessageOrchestrator = new MessageOrchestrator(this.#validatorConnectionManager, state);
+        this.#validatorMessageOrchestrator = new MessageOrchestrator(this.#validatorConnectionManager, state, this.#config);
         this.admin_stream = null;
         this.admin = null;
         this.validator = null;

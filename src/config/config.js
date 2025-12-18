@@ -110,6 +110,18 @@ export class Config {
         return `${this.storesDirectory}${this.#options.storeName}`
     }
 
+    get messageThreshold() {
+        return this.#config.messageThreshold
+    }
+
+    get messageValidatorRetryDelay() {
+        return this.#config.messageValidatorRetryDelay
+    }
+
+    get messageValidatorResponseTimeout() {
+        return this.#config.messageValidatorResponseTimeout
+    }
+
     // Most of these properties are boolean
     #isOverriden(prop) {
         return this.#options.hasOwnProperty(prop)

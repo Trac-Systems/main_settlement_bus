@@ -25,8 +25,11 @@ const configData = {
         enableWallet: true,
         maxValidators: 50,
         maxRetries: 3,
+        messageThreshold: 3,
+        messageValidatorRetryDelay: 1000, //How long to wait before retrying (ms) MESSAGE_VALIDATOR_RETRY_DELAY_MS
+        messageValidatorResponseTimeout: 3 * 3 * 1000, //Overall timeout for sending a message (ms). This is 3 * maxRetries * messageValidatorRetryDelay;
         networkId: 918,
-        storesDirectory : 'stores/',
+        storesDirectory: 'stores/',
     },
     [ENV.DEVELOPMENT]: {
         addressLength: 63,
@@ -45,6 +48,9 @@ const configData = {
         enableWallet: true,
         maxValidators: 6,
         maxRetries: 0,
+        messageThreshold: 3,
+        messageValidatorRetryDelay: 1000, //How long to wait before retrying (ms) MESSAGE_VALIDATOR_RETRY_DELAY_MS
+        messageValidatorResponseTimeout: 3 * 3 * 1000, //Overall timeout for sending a message (ms). This is 3 * maxRetries * messageValidatorRetryDelay;
         networkId: 918,
         storesDirectory : 'stores/',
     }
