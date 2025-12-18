@@ -45,12 +45,18 @@ class GetRequestHandler {
         };
 
         const hash = await blake3Hash(JSON.stringify(payload));
+       
+
         const sig = this.#wallet.sign(hash);
 
         const responseMessage = {
             ...payload,
             sig: sig.toString('hex'),
         };
+
+        console.log("SENT payload, ", responseMessage);
+        console.log("SENT hash, ", hash.toString('hex'));
+        
         messageProtomux.send(responseMessage);
     }
 

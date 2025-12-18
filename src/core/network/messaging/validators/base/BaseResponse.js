@@ -80,9 +80,12 @@ class BaseResponse {
             throw new Error("Failed to derive public key from message.");
         }
 
-        const messageWithoutSig = { ...message };
+        const messageDeepCopy = structuredClone(message)
+        const messageWithoutSig = { ...messageDeepCopy };
         delete messageWithoutSig.sig;
         const hash = await blake3Hash(JSON.stringify(messageWithoutSig));
+        console.log("verify message, ", message);
+        console.log("verify hash, ", hash.toString('hex'));
         const signature = b4a.from(message.sig, 'hex');
         const verified = this.#wallet.verify(signature, hash, publicKey);
 
