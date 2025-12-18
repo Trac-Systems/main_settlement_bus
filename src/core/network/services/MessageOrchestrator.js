@@ -1,4 +1,5 @@
 import { sleep } from '../../../utils/helpers.js';
+import { operationToPayload } from '../../../utils/operations.js';
 /**
  * MessageOrchestrator coordinates message submission, retry, and validator management.
  * It works with ConnectionManager and ledger state to ensure reliable message delivery.
@@ -38,10 +39,11 @@ class MessageOrchestrator {
 
     async #attemptSendMessage(validator, message) {
         let attempts = 0;
+        const deductedTxType = operationToPayload(message.type);
         while (attempts < this.#config.maxRetries) {
             this.connectionManager.sendSingleMessage(message, validator);
 
-            const appeared = await this.waitForUnsignedState(message.tro.tx, this.#config.messageValidatorRetryDelay);
+            const appeared = await this.waitForUnsignedState(message[deductedTxType].tx, this.#config.messageValidatorRetryDelay);
             if (appeared) {
                 this.incrementSentCount(validator);
                 if (this.shouldRemove(validator)) {
