@@ -205,7 +205,7 @@ class PartialOperation {
         const operationKey = operationsUtils.operationToPayload(payload.type);
         const operation = payload[operationKey];
         const bs = operation.bs;
-        if (b4a.equals(this.state.bootstrap, bs)) {
+        if (b4a.equals(this.#config.bootstrap, bs)) {
             throw new Error(`External bootstrap is the same as MSB bootstrap: ${bs.toString('hex')}`);
         }
     }

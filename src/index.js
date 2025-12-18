@@ -335,7 +335,12 @@ export class MainSettlementBus extends ReadyResource {
             txValidity.toString('hex')
         );
 
-        await this.broadcastPartialTransaction(adminRecoveryMessage);
+        const success = await this.broadcastPartialTransaction(adminRecoveryMessage);
+
+        if (!success) {
+            throw new Error("Failed to broadcast transaction after multiple attempts.");
+        }
+
         console.info(`Transaction hash: ${adminRecoveryMessage.rao.tx}`);
     }
 
@@ -447,7 +452,12 @@ export class MainSettlementBus extends ReadyResource {
                     txValidity.toString('hex')
                 )
 
-            await this.broadcastPartialTransaction(assembledMessage);
+            const success = await this.broadcastPartialTransaction(assembledMessage);
+
+            if (!success) {
+                throw new Error("Failed to broadcast transaction after multiple attempts.");
+            }
+
             console.info(`Transaction hash: ${assembledMessage.rao.tx}`);
             return;
         }
@@ -474,7 +484,12 @@ export class MainSettlementBus extends ReadyResource {
                 txValidity.toString('hex')
             )
 
-        await this.broadcastPartialTransaction(assembledMessage);
+        const success = await this.broadcastPartialTransaction(assembledMessage);
+
+        if (!success) {
+            throw new Error("Failed to broadcast transaction after multiple attempts.");
+        }
+
         console.info(`Transaction hash: ${assembledMessage.rao.tx}`);
     }
 
@@ -675,7 +690,12 @@ export class MainSettlementBus extends ReadyResource {
                 txValidity.toString('hex')
             );
 
-        await this.broadcastPartialTransaction(payload);
+        const success = await this.broadcastPartialTransaction(payload);
+
+        if (!success) {
+            throw new Error("Failed to broadcast transaction after multiple attempts.");
+        }
+
         console.info(`Transaction hash: ${payload.bdo.tx}`);
         console.log(`Bootstrap ${externalBootstrap} deployment requested on channel ${channel}`);
         console.log('Bootstrap Deployment Fee Details:');
@@ -776,7 +796,7 @@ export class MainSettlementBus extends ReadyResource {
         }
         console.log(`Expected Balance After Transfer: ${bigIntToDecimalString(expectedNewBalance)}`);
 
-        const success =  await this.broadcastPartialTransaction(payload);
+        const success = await this.broadcastPartialTransaction(payload);
         if (!success) {
             throw new Error("Failed to broadcast transfer transaction after multiple attempts.");
         } else {
@@ -924,7 +944,6 @@ export class MainSettlementBus extends ReadyResource {
 
     async handleCommand(input, rl = null, payload = null) {
         const [command, ...parts] = input.split(" ");
-
         const exactHandlers = {
             "/help": async () => {
                 printHelp(this.#config.isAdminMode);
