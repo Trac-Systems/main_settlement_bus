@@ -53,6 +53,7 @@ import {
     getLicenseAddressCommand,
     getLicenseCountCommand
 } from "./utils/cliCommands.js";
+import { CommandLineHandler } from "./cli/CommandLineHandler.js";
 import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from "trac-wallet/constants.js";
 export class MainSettlementBus extends ReadyResource {
     // internal attributes
@@ -156,6 +157,14 @@ export class MainSettlementBus extends ReadyResource {
     get tracPublicKey() {
         if (!this.#wallet) return null;
         return this.#wallet.publicKey;
+    }
+
+    get readlineInterface() {
+        return this.#readline_instance;
+    }
+
+    get isAdminMode() {
+        return this.#is_admin_mode;
     }
 
     async _open() {
@@ -967,163 +976,141 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async interactiveMode() {
-        if (this.#readline_instance === null) return;
-        const rl = this.#readline_instance;
-
-        printHelp(this.#is_admin_mode);
-
-        rl.on("line", async (input) => {
-            try {
-                await this.handleCommand(input.trim(), rl);
-            } catch (err) {
-                console.error(`${err}`);
-            }
-            rl.prompt();
-        });
-
-        rl.prompt();
+        const handler = new CommandLineHandler(this);
+        handler.start();
     }
 
-    async handleCommand(input, rl = null, payload = null) {
-        const [command, ...parts] = input.split(" ");
+    async addAdmin() {
+        await this.#handleAdminCreation();
+    }
 
-        const exactHandlers = {
-            "/help": async () => {
-                printHelp(this.#is_admin_mode);
-            },
-            "/exit": async () => {
-                if (rl) rl.close();
-                await this.close();
-            },
-            "/add_admin": () => this.#handleAdminCreation(),
-            "/add_admin --recovery": () => this.#handleAdminRecovery(),
-            "/add_whitelist": () => this.#handleWhitelistOperations(),
-            "/add_writer": () => this.#handleAddWriterOperation(),
-            "/remove_writer": () => this.#handleRemoveWriterOperation(),
-            "/core": () => coreInfoCommand(this.#state),
-            "/indexers_list": async () => {
-                console.log(await this.#state.getIndexersEntry());
-            },
-            "/validator_pool": () => {
-                this.network.validatorConnectionManager.prettyPrint();
-            },
-            "/stats": () => verifyDag(
-                this.#state,
-                this.#network,
-                this.#wallet,
-                this.#state.writingKey
-            ),
-            "/balance_migration": () => this.#handleBalanceMigrationOperation(),
-            "/disable_initialization": () => this.#disableInitialization()
-        };
+    async recoverAdmin() {
+        await this.#handleAdminRecovery();
+    }
 
-        if (exactHandlers[command]) {
-            const result = await exactHandlers[command]();
-            if (rl) rl.prompt();
-            return result;
-        }
+    async addWhitelist() {
+        await this.#handleWhitelistOperations();
+    }
 
-        if (input.startsWith("/node_status")) {
-            const address = parts[0];
-            const result = await nodeStatusCommand(this.#state, address);
-            if (rl) rl.prompt();
-            return result;
-        }
+    async addWriter() {
+        await this.#handleAddWriterOperation();
+    }
 
-        if (input.startsWith("/add_indexer")) {
-            const address = parts[0];
-            await this.#handleAddIndexerOperation(address);
-        } else if (input.startsWith("/remove_indexer")) {
-            const address = parts[0];
-            await this.#handleRemoveIndexerOperation(address);
-        } else if (input.startsWith("/ban_writer")) {
-            const address = parts[0];
-            await this.#handleBanValidatorOperation(address);
-        } else if (input.startsWith("/deployment")) {
-            const bootstrapToDeploy = parts[0];
-            const channel = parts[1] || randomBytes(32).toString("hex");
-            if (channel.length !== 64 || !isHexString(channel)) {
-                throw new Error("Channel must be a 32-byte hex string");
-            }
-            await this.#handleBootstrapDeploymentOperation(bootstrapToDeploy, channel);
-        } else if (input.startsWith("/get_validator_addr")) {
-            const wkHexString = parts[0];
-            await getValidatorAddressCommand(this.#state, wkHexString);
-        } else if (input.startsWith("/get_deployment")) {
-            const bootstrapHex = parts[0];
-            await getDeploymentCommand(this.#state, bootstrapHex);
-        } else if (input.startsWith("/get_tx_info")) {
-            const txHash = parts[0];
-            await getTxInfoCommand(this.#state, txHash);
-        } else if (input.startsWith("/transfer")) {
-            const address = parts[0];
-            const amount = parts[1];
-            await this.#handleTransferOperation(address, amount);
-        } else if (input.startsWith("/get_balance")) {
-            const address = parts[0];
-            const confirmedFlag = parts[1];
-            const result = await getBalanceCommand(this.#state, address, confirmedFlag);
-            if (rl) rl.prompt();
-            return result;
-        } else if (input.startsWith("/get_license_number")) {
-            const address = parts[0];
-            await getLicenseNumberCommand(this.#state, address);
-        } else if (input.startsWith("/get_license_address")) {
-            const licenseId = parseInt(parts[0]);
-            await getLicenseAddressCommand(this.#state, licenseId);
-        } else if (input.startsWith("/get_license_count")) {
-            await getLicenseCountCommand(this.#state, this.#isAdmin.bind(this));
-        } else if (input.startsWith("/get_txv")) {
-            const result = await getTxvCommand(this.#state);
-            if (rl) rl.prompt();
-            return result;
-        } else if (input.startsWith("/get_fee")) {
-            const result = getFeeCommand(this.#state);
-            if (rl) rl.prompt();
-            return result;
-        } else if (input.startsWith("/confirmed_length")) {
-            const result = getConfirmedLengthCommand(this.#state);
-            if (rl) rl.prompt();
-            return result;
-        } else if (input.startsWith("/unconfirmed_length")) {
-            const result = getUnconfirmedLengthCommand(this.#state);
-            if (rl) rl.prompt();
-            return result;
-        } else if (input.startsWith("/broadcast_transaction")) {
-            if (!payload) {
-                throw new Error("Transaction payload is required for broadcast_transaction command.");
-            }
-            const result = await this.broadcastTransactionCommand(payload);
-            if (rl) rl.prompt();
-            return result;
-        } else if (input.startsWith("/get_tx_payloads_bulk")) {
-            if (!payload) {
-                throw new Error("Missing payload for fetching tx payloads.");
-            }
-            const hashes = payload;
-            const result = await getTxPayloadsBulkCommand(this.#state, hashes);
-            if (rl) rl.prompt();
-            return result;
-        } else if (input.startsWith("/get_txs_hashes")) {
-            const start = parseInt(parts[0]);
-            const end = parseInt(parts[1]);
-            const result = await getTxHashesCommand(this.#state, start, end);
-            if (rl) rl.prompt();
-            return result;
-        } else if (input.startsWith("/get_tx_details")) {
-            const hash = parts[0];
-            const result = await getTxDetailsCommand(this.#state, hash);
-            if (rl) rl.prompt();
-            return result;
-        } else if (input.startsWith("/get_extended_tx_details")) {
-            const hash = parts[0];
-            const confirmed = parts[1] === "true";
-            const result = await getExtendedTxDetailsCommand(this.#state, hash, confirmed);
-            if (rl) rl.prompt();
-            return result;
-        }
+    async removeWriter() {
+        await this.#handleRemoveWriterOperation();
+    }
 
-        if (rl) rl.prompt();
+    async printCoreInfo() {
+        await coreInfoCommand(this.#state);
+    }
+
+    async printIndexersList() {
+        console.log(await this.#state.getIndexersEntry());
+    }
+
+    printValidatorPool() {
+        this.#network.validatorConnectionManager.prettyPrint();
+    }
+
+    async verifyDag() {
+        await verifyDag(
+            this.#state,
+            this.#network,
+            this.#wallet,
+            this.#state.writingKey
+        );
+    }
+
+    async runBalanceMigration() {
+        await this.#handleBalanceMigrationOperation();
+    }
+
+    async disableInitializationCommand() {
+        await this.#disableInitialization();
+    }
+
+    async nodeStatus(address) {
+        await nodeStatusCommand(this.#state, address);
+    }
+
+    async addIndexer(address) {
+        await this.#handleAddIndexerOperation(address);
+    }
+
+    async removeIndexer(address) {
+        await this.#handleRemoveIndexerOperation(address);
+    }
+
+    async banWriter(address) {
+        await this.#handleBanValidatorOperation(address);
+    }
+
+    async deployBootstrap(bootstrapHex, channelHex) {
+        await this.#handleBootstrapDeploymentOperation(bootstrapHex, channelHex);
+    }
+
+    async printValidatorAddress(wkHexString) {
+        await getValidatorAddressCommand(this.#state, wkHexString);
+    }
+
+    async printDeployment(bootstrapHex) {
+        await getDeploymentCommand(this.#state, bootstrapHex);
+    }
+
+    async printTxInfo(txHash) {
+        await getTxInfoCommand(this.#state, txHash);
+    }
+
+    async transfer(address, amount) {
+        await this.#handleTransferOperation(address, amount);
+    }
+
+    async getBalanceCli(address, confirmedFlag) {
+        await getBalanceCommand(this.#state, address, confirmedFlag);
+    }
+
+    async printLicenseNumber(address) {
+        await getLicenseNumberCommand(this.#state, address);
+    }
+
+    async printLicenseAddress(licenseId) {
+        await getLicenseAddressCommand(this.#state, licenseId);
+    }
+
+    async printLicenseCount() {
+        await getLicenseCountCommand(this.#state, this.#isAdmin.bind(this));
+    }
+
+    async printTxv() {
+        await getTxvCommand(this.#state);
+    }
+
+    async printFee() {
+        getFeeCommand(this.#state);
+    }
+
+    async printConfirmedLength() {
+        getConfirmedLengthCommand(this.#state);
+    }
+
+    async printUnconfirmedLength() {
+        getUnconfirmedLengthCommand(this.#state);
+    }
+
+    async getTxPayloadsBulkCli(hashes) {
+        return getTxPayloadsBulkCommand(this.#state, hashes);
+    }
+
+    async printTxHashes(start, end) {
+        await getTxHashesCommand(this.#state, start, end);
+    }
+
+    async printTxDetails(hash) {
+        await getTxDetailsCommand(this.#state, hash);
+    }
+
+    async printExtendedTxDetails(hash, confirmed) {
+        await getExtendedTxDetailsCommand(this.#state, hash, confirmed);
     }
 }
 
