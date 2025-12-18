@@ -354,7 +354,7 @@ export class MainSettlementBus extends ReadyResource {
         const addresses = await fileUtils.readAddressesFromWhitelistFile();
 
         for (const address of addresses) {
-            await migrationUtils.validateAddressFromIncomingFile(this.#state, address, adminEntry);
+            await migrationUtils.validateAddressFromIncomingFile(this.#state, this.#config, address, adminEntry);
         }
         await fileUtils.validateWhitelistMigrationData(addresses, WHITELIST_MIGRATION_DIR);
         const migrationNumber = await fileUtils.getNextMigrationNumber(WHITELIST_MIGRATION_DIR);
@@ -822,7 +822,7 @@ export class MainSettlementBus extends ReadyResource {
         const { addressBalancePair, totalBalance, totalAddresses, addresses } = await fileUtils.readBalanceMigrationFile();
 
         for (let i = 0; i < addresses.length; i++) {
-            await migrationUtils.validateAddressFromIncomingFile(this.#state, addresses[i].address, adminEntry);
+            await migrationUtils.validateAddressFromIncomingFile(this.#state, this.#config, addresses[i].address, adminEntry);
         }
 
         await fileUtils.validateBalanceMigrationData(addresses);

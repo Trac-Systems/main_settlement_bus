@@ -3,6 +3,8 @@ import migrationUtils from '../../../../src/utils/migrationUtils.js';
 import { errorMessageIncludes } from "../../../helpers/regexHelper.js";
 import { ZERO_LICENSE } from '../../../../src/core/state/utils/nodeEntry.js';
 import b4a from 'b4a';
+import { config } from '../../../helpers/config.js';
+
 const VALID_ADDRESS = 'trac1dguwzsvcsehslh6dgj2mqlsxdn7s5t5vhem56yd0xlg47aq6exzqymhr6u';
 const ADMIN_ADDRESS = 'trac1yva2pduhz5yst8jgzmrc9ve0as5mx7tcw6le9srj6xcwqkx9hacqxxhsf9';
 const INVALID_ADDRESS = 'notanaddress';

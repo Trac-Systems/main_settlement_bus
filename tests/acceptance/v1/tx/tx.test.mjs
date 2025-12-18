@@ -3,7 +3,7 @@ import { buildRpcSelfTransferPayload } from "../../../helpers/transactionPayload
 
 export const registerTxTests = (context) => {
     describe("GET /v1/tx/:hash", () => {
-        it.only("returns tx details for a broadcasted transaction", async () => {
+        it("returns tx details for a broadcasted transaction", async () => {
             const { payload, txHashHex } = await buildRpcSelfTransferPayload(
                 context,
                 context.rpcMsb.state,
