@@ -27,7 +27,7 @@ export async function buildRpcSelfTransferPayload(context, state, amountTnk = 1n
 
     const txData = await tracCrypto.transaction.preBuild(
         context.wallet.address,
-        context.adminWallet.address,
+        context.wallet.address,
         b4a.toString($TNK(amountTnk), "hex"),
         txvHex
     );
