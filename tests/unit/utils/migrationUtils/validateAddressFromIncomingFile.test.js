@@ -41,6 +41,7 @@ const mockStateInstanceBanned = {
 test('validateAddressFromIncomingFile - valid address', async (t) => {
     await migrationUtils.validateAddressFromIncomingFile(
         mockStateInstance,
+        config,
         VALID_ADDRESS,
         { address: ADMIN_ADDRESS }
     );
@@ -51,6 +52,7 @@ test('validateAddressFromIncomingFile - invalid address format', async (t) => {
     await t.exception(
         () => migrationUtils.validateAddressFromIncomingFile(
             mockStateInstance,
+            config,
             INVALID_ADDRESS,
             { address: ADMIN_ADDRESS }
         ),
@@ -62,6 +64,7 @@ test('validateAddressFromIncomingFile - admin address', async (t) => {
     await t.exception(
         () => migrationUtils.validateAddressFromIncomingFile(
             mockStateInstance,
+            config,
             ADMIN_ADDRESS,
             { address: ADMIN_ADDRESS }
         ),
@@ -73,6 +76,7 @@ test('validateAddressFromIncomingFile - whitelisted node', async (t) => {
     await t.exception(
         () => migrationUtils.validateAddressFromIncomingFile(
             mockStateInstanceWhitelisted,
+            config,
             VALID_ADDRESS,
             { address: ADMIN_ADDRESS }
         ),
@@ -84,6 +88,7 @@ test('validateAddressFromIncomingFile - banned/previously whitelisted address', 
     await t.exception(
         () => migrationUtils.validateAddressFromIncomingFile(
             mockStateInstanceBanned,
+            config,
             VALID_ADDRESS,
             { address: ADMIN_ADDRESS }
         ),

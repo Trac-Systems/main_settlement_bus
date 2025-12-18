@@ -3,9 +3,8 @@ import { isAddressValid } from '../core/state/utils/address.js';
 import PeerWallet from 'trac-wallet';
 import b4a from 'b4a';
 import { ZERO_LICENSE } from '../core/state/utils/nodeEntry.js';
-import { config } from '../../tests/helpers/config.js';
 
-export async function validateAddressFromIncomingFile(stateInstance, address, adminEntry) {
+export async function validateAddressFromIncomingFile(stateInstance, config, address, adminEntry) {
     if (!isAddressValid(address, config.addressPrefix)) {
         throw new Error(`Invalid address format: '${address}'. Please ensure all addresses are valid.`);
     }
