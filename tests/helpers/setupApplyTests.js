@@ -413,7 +413,6 @@ export const tryToSyncWriters = async (...args) => {
     }
 }
 
-
 export async function waitForNotIndexer(indexer) {
     try {
         let attempts = 0;

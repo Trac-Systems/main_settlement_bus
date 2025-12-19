@@ -1,12 +1,25 @@
 import b4a from "b4a";
 import tracCrypto from "trac-crypto-api";
-
 import { $TNK } from "../../src/core/state/utils/balance.js";
 import { createMessage } from "../../src/utils/buffer.js";
 import { blake3Hash } from "../../src/utils/crypto.js";
 import { OperationType } from "../../src/utils/constants.js";
 import { addressToBuffer } from "../../src/core/state/utils/address.js";
 import { config } from '../helpers/config.js'
+import { sleep } from "../../src/utils/helpers.js";
+
+export const waitForConnection = async node => {
+    let attempts = 0
+    while (attempts < 60) {
+        const count = node.network.validatorConnectionManager.connectionCount()
+        if (count > 0) {
+            break
+        }
+        
+        await sleep(300);
+        attempts++;
+    }
+}
 
 /**
  * Build a base64-encoded transfer payload and matching tx hash

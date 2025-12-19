@@ -40,7 +40,7 @@ class MessageOrchestrator {
     async #attemptSendMessage(validator, message) {
         let attempts = 0;
         const deductedTxType = operationToPayload(message.type);
-        while (attempts < this.#config.maxRetries) {
+        while (attempts <= this.#config.maxRetries) {
             this.connectionManager.sendSingleMessage(message, validator);
 
             const appeared = await this.waitForUnsignedState(message[deductedTxType].tx, this.#config.messageValidatorRetryDelay);

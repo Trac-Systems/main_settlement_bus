@@ -1,7 +1,7 @@
 import request from "supertest"
 import b4a from "b4a"
 import { $TNK } from "../../../../src/core/state/utils/balance.js"
-import { buildRpcSelfTransferPayload } from "../../../helpers/transactionPayloads.mjs"
+import { buildRpcSelfTransferPayload, waitForConnection } from "../../../helpers/transactionPayloads.mjs"
 
 const toBase64 = (value) => b4a.toString(b4a.from(JSON.stringify(value)), "base64")
 
@@ -13,6 +13,7 @@ export const registerBroadcastTransactionTests = (context) => {
                 context.rpcMsb.state,
                 1n
             );
+            await waitForConnection(context.rpcMsb)
             const res = await request(context.server)
                 .post("/v1/broadcast-transaction")
                 .set("Accept", "application/json")
@@ -30,6 +31,7 @@ export const registerBroadcastTransactionTests = (context) => {
         })
 
         it("returns 400 when payload is missing", async () => {
+            await waitForConnection(context.rpcMsb)
             const res = await request(context.server)
                 .post("/v1/broadcast-transaction")
                 .set("Accept", "application/json")
@@ -40,6 +42,7 @@ export const registerBroadcastTransactionTests = (context) => {
         })
 
         it("returns 400 when payload is not base64", async () => {
+            await waitForConnection(context.rpcMsb)
             const res = await request(context.server)
                 .post("/v1/broadcast-transaction")
                 .set("Accept", "application/json")
@@ -52,6 +55,8 @@ export const registerBroadcastTransactionTests = (context) => {
         // TODO: enable once handler returns 400 for client-side decode errors
         it.skip("returns 400 when decoded payload is not valid JSON", async () => {
             const invalidJsonBase64 = b4a.toString(b4a.from("{{invalid"), "base64")
+
+            await waitForConnection(context.rpcMsb)
             const res = await request(context.server)
                 .post("/v1/broadcast-transaction")
                 .set("Accept", "application/json")
@@ -67,6 +72,8 @@ export const registerBroadcastTransactionTests = (context) => {
                 type: 1,
                 address: context.wallet.address,
             }
+
+            await waitForConnection(context.rpcMsb)
             const res = await request(context.server)
                 .post("/v1/broadcast-transaction")
                 .set("Accept", "application/json")
@@ -81,6 +88,7 @@ export const registerBroadcastTransactionTests = (context) => {
             const largeString = "a".repeat(3_000_000)
             const payload = toBase64({ type: 1, address: context.wallet.address, txo: { large: largeString } })
 
+            await waitForConnection(context.rpcMsb)
             const res = await request(context.server)
                 .post("/v1/broadcast-transaction")
                 .set("Accept", "application/json")
@@ -99,6 +107,7 @@ export const registerBroadcastTransactionTests = (context) => {
             )
 
             const payload = tracCrypto.transaction.build(txData, b4a.from(context.wallet.secretKey, 'hex'))
+            await waitForConnection(context.rpcMsb)
             const res = await request(context.server)
                 .post("/v1/broadcast-transaction")
                 .set("Accept", "application/json")

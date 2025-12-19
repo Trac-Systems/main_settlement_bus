@@ -1,5 +1,5 @@
 import request from "supertest"
-import { buildRpcSelfTransferPayload } from "../../../helpers/transactionPayloads.mjs"
+import { buildRpcSelfTransferPayload, waitForConnection } from "../../../helpers/transactionPayloads.mjs"
 
 export const registerTxTests = (context) => {
     describe("GET /v1/tx/:hash", () => {
@@ -9,6 +9,8 @@ export const registerTxTests = (context) => {
                 context.rpcMsb.state,
                 1n
             );
+
+            await waitForConnection(context.rpcMsb)
             const broadcastRes = await request(context.server)
                 .post("/v1/broadcast-transaction")
                 .set("Accept", "application/json")
