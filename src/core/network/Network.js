@@ -259,7 +259,7 @@ class Network extends ReadyResource {
                 enableWallet: this.#config.enableWallet,
                 wallet,
                 keyPair,
-                networkPrefix: this.#config.networkPrefix
+                networkPrefix: this.#config.addressPrefix
             });
         }
         return this.#identityProvider;
