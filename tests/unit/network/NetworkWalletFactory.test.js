@@ -19,7 +19,7 @@ test('NetworkWalletFactory.provide returns wallet when enabled', async t => {
         verify: sinon.stub().returns(true)
     };
 
-    const provider = NetworkWalletFactory.provide({ wallet, enableWallet: true });
+    const provider = NetworkWalletFactory.provide({ wallet, enableWallet: true, networkPrefix: config.addressPrefix });
     const message = b4a.from('00112233', 'hex');
     const signature = provider.sign(message);
 
@@ -38,7 +38,7 @@ test('NetworkWalletFactory.provide returns wallet when enabled', async t => {
 test('NetworkWalletFactory.provide requires both public and secret keys when wallet disabled', async t => {
     const publicKey = b4a.from(testKeyPair1.publicKey, 'hex');
     await t.exception(
-        () => NetworkWalletFactory.provide({ enableWallet: false, keyPair: { publicKey } }),
+        () => NetworkWalletFactory.provide({ enableWallet: false, keyPair: { publicKey }, networkPrefix: config.addressPrefix }),
         errorMessageIncludes('keyPair with publicKey and secretKey is required')
     );
 });
@@ -49,7 +49,8 @@ test('NetworkWalletFactory.provide rejects non-buffer inputs', async t => {
         () =>
             NetworkWalletFactory.provide({
                 enableWallet: false,
-                keyPair: { publicKey: 'not-a-buffer', secretKey }
+                keyPair: { publicKey: 'not-a-buffer', secretKey },
+                networkPrefix: config.addressPrefix
             }),
         errorMessageIncludes('must be a Buffer')
     );
