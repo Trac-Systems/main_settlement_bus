@@ -1,19 +1,20 @@
 import PeerWallet from 'trac-wallet';
 
-import { bufferToAddress } from "../../../state/utils/address.js";
-import { bufferToBigInt } from "../../../../utils/amountSerialization.js";
+import {bufferToAddress} from "../../../state/utils/address.js";
+import {bufferToBigInt} from "../../../../utils/amountSerialization.js";
 import PartialOperation from './base/PartialOperation.js';
 
 class PartialTransfer extends PartialOperation {
     #config
 
-    constructor(state, config) {
-        super(state, config);
+    constructor(state, wallet, config) {
+        super(state, wallet, config);
         this.#config = config
     }
 
     async validate(payload) {
         this.isPayloadSchemaValid(payload);
+        this.validateNoSelfValidation(payload);
         this.validateRequesterAddress(payload);
         await this.validateTransactionUniqueness(payload);
         await this.validateSignature(payload);

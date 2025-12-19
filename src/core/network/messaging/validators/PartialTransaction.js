@@ -1,18 +1,19 @@
 import b4a from 'b4a';
-import { safeDecodeApplyOperation } from "../../../../utils/protobuf/operationHelpers.js";
+import {safeDecodeApplyOperation} from "../../../../utils/protobuf/operationHelpers.js";
 import deploymentEntryUtils from "../../../state/utils/deploymentEntry.js";
 import PartialOperation from './base/PartialOperation.js';
 
 class PartialTransaction extends PartialOperation {
     #config
 
-    constructor(state, config) {
-        super(state, config);
+    constructor(state, wallet, config) {
+        super(state, wallet, config);
         this.#config = config
     }
 
     async validate(payload) {
         this.isPayloadSchemaValid(payload);
+        this.validateNoSelfValidation(payload);
         this.validateRequesterAddress(payload);
         await this.validateTransactionUniqueness(payload);
         await this.validateSignature(payload);
@@ -44,7 +45,7 @@ class PartialTransaction extends PartialOperation {
         const decodedPayload = deploymentEntryUtils.decode(externalBootstrapResult, this.#config.addressLength);
         const txHash = decodedPayload.txHash
         const getBootstrapTransactionTxPayload = await this.state.get(txHash.toString('hex'));
-        
+
         if (getBootstrapTransactionTxPayload === null) {
             throw new Error(`External bootstrap is not registered as usual tx ${externalBootstrapResult.toString('hex')}: ${payload}`);
         }
