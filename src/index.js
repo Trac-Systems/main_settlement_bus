@@ -120,8 +120,8 @@ export class MainSettlementBus extends ReadyResource {
             printWalletInfo(this.#wallet.address, this.#state.writingKey, this.#state, this.#config.enableWallet);
         }
 
-        this.#partialTransferValidator = new PartialTransfer(this.state, this.#config);
-        this.#partialTransactionValidator = new PartialTransaction(this.state, this.#config);
+        this.#partialTransferValidator = new PartialTransfer(this.state, this.#wallet, this.#config);
+        this.#partialTransactionValidator = new PartialTransaction(this.state, this.#wallet ,this.#config);
 
         await this.#network.replicate(
             this.#state,

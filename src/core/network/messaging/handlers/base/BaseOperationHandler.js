@@ -1,8 +1,5 @@
 import b4a from 'b4a';
 import {MAX_PARTIAL_TX_PAYLOAD_BYTE_SIZE, TRANSACTION_POOL_SIZE} from '../../../../../utils/constants.js';
-import Network from '../../../Network.js';
-import TransactionRateLimiterService from '../../../services/TransactionRateLimiterService.js';
-import State from '../../../../state/State.js';
 
 class BaseOperationHandler {
     #network;
@@ -13,8 +10,8 @@ class BaseOperationHandler {
 
     /**
      * @param {Network} network
-     * @param {State} network
-     * @param {PeerWallet} state
+     * @param {State} state
+     * @param {PeerWallet} wallet
      * @param {TransactionRateLimiterService} rateLimiter
      * @param {object} config
      **/

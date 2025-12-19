@@ -1,12 +1,12 @@
 import b4a from 'b4a';
 import PeerWallet from 'trac-wallet';
 import Check from '../../../../../utils/check.js';
-import { bufferToAddress } from "../../../../state/utils/address.js";
-import { createMessage } from "../../../../../utils/buffer.js";
-import { OperationType } from "../../../../../utils/constants.js";
-import { blake3Hash } from "../../../../../utils/crypto.js";
-import { bufferToBigInt } from "../../../../../utils/amountSerialization.js";
-import { FEE } from "../../../../state/utils/transaction.js";
+import {bufferToAddress} from "../../../../state/utils/address.js";
+import {createMessage} from "../../../../../utils/buffer.js";
+import {OperationType} from "../../../../../utils/constants.js";
+import {blake3Hash} from "../../../../../utils/crypto.js";
+import {bufferToBigInt} from "../../../../../utils/amountSerialization.js";
+import {FEE} from "../../../../state/utils/transaction.js";
 import * as operationsUtils from '../../../../../utils/operations.js';
 
 const MAX_AMOUNT = BigInt('0xffffffffffffffffffffffffffffffff');
@@ -17,13 +17,15 @@ class PartialOperation {
     #state;
     #check;
     #config
+    #wallet
 
-    constructor(state, config) {
+    constructor(state, wallet, config) {
         this.#state = state;
         this.#config = config;
         this.#check = new Check(this.#config);
         this.max_amount = MAX_AMOUNT;
         this.fee = FEE_BIGINT;
+        this.#wallet = wallet;
     }
 
     get state() {
@@ -34,7 +36,9 @@ class PartialOperation {
         return this.#check;
     }
 
-    async validate(payload) { throw new Error("Method 'validate()' must be implemented."); }
+    async validate(payload) {
+        throw new Error("Method 'validate()' must be implemented.");
+    }
 
     isPayloadSchemaValid(payload) {
         if (!payload || !payload.type) {
@@ -173,7 +177,7 @@ class PartialOperation {
     isOperationNotCompleted(payload) {
         const operationKey = operationsUtils.operationToPayload(payload.type);
         const operation = payload[operationKey];
-        const { va, vn, vs } = operation;
+        const {va, vn, vs} = operation;
 
         const condition = va === undefined && vn === undefined && vs === undefined
         if (!condition) {
@@ -207,6 +211,18 @@ class PartialOperation {
         const bs = operation.bs;
         if (b4a.equals(this.#config.bootstrap, bs)) {
             throw new Error(`External bootstrap is the same as MSB bootstrap: ${bs.toString('hex')}`);
+        }
+    }
+
+    /*
+     * Guard against self-validation (RPC/orchestrator loop): a validator may receive its own submitted tx for validation.
+     * Even if unlikely, this must be rejected to avoid incorrect failures/punishments.
+     * Flow: Validator -> submits tx with tap-wallet -> RPC-> Validator -validates tx-> REJECT (self-validation)
+     */
+    validateNoSelfValidation(payload) {
+        const requesterAddress = bufferToAddress(payload.address, this.#config.addressPrefix);
+        if (this.#wallet.address === requesterAddress) {
+            throw new Error('Requester address cannot be the same as the validator wallet address.');
         }
     }
 

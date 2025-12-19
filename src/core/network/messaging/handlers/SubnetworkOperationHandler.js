@@ -1,5 +1,6 @@
 import BaseOperationHandler from './base/BaseOperationHandler.js';
-import CompleteStateMessageOperations from "../../../../messages/completeStateMessages/CompleteStateMessageOperations.js";
+import CompleteStateMessageOperations
+    from "../../../../messages/completeStateMessages/CompleteStateMessageOperations.js";
 import {
     OperationType
 } from '../../../../utils/constants.js';
@@ -8,12 +9,6 @@ import {addressToBuffer} from "../../../state/utils/address.js";
 import PartialTransaction from "../validators/PartialTransaction.js";
 import {normalizeHex} from "../../../../utils/helpers.js";
 
-/**
- * THIS CLASS IS ULTRA IMPORTANT BECAUSE IF SOMEONE WILL SEND A TRASH TO VALIDATOR AND IT WON'T BE HANDLED PROPERTLY -
- * FOR EXAMPLE VALIDATOR WILL BROADCAST IT TO THE INDEXER LAYER THEN IT WILL BE BANNED. SO EVERYTHING WHAT IS TRASH
- * MUST BE REFUSED.
- * TODO: WE SHOULD AUDIT VALIDATORS AND MAKE SURE THEY ARE NOT BROADCASTING TRASH TO THE INDEXER LAYER.
- */
 
 class SubnetworkOperationHandler extends BaseOperationHandler {
     #partialBootstrapDeploymentValidator;
@@ -21,12 +16,19 @@ class SubnetworkOperationHandler extends BaseOperationHandler {
     #config;
     #wallet;
 
+    /**
+     * @param {Network} network
+     * @param {State} state
+     * @param {PeerWallet} wallet
+     * @param {TransactionRateLimiterService} rateLimiter
+     * @param {object} config
+     **/
     constructor(network, state, wallet, rateLimiter, config) {
         super(network, state, wallet, rateLimiter, config);
         this.#config = config
         this.#wallet = wallet
-        this.#partialBootstrapDeploymentValidator = new PartialBootstrapDeployment(state, config);
-        this.#partialTransactionValidator = new PartialTransaction(state, config);
+        this.#partialBootstrapDeploymentValidator = new PartialBootstrapDeployment(state, wallet, config);
+        this.#partialTransactionValidator = new PartialTransaction(state, wallet, config);
     }
 
     async handleOperation(payload) {

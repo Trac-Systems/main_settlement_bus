@@ -1,18 +1,20 @@
 import b4a from 'b4a';
-import { OperationType } from "../../../../utils/constants.js";
-import { bufferToAddress } from "../../../state/utils/address.js";
+import {OperationType} from "../../../../utils/constants.js";
+import {bufferToAddress} from "../../../state/utils/address.js";
 import PartialOperation from './base/PartialOperation.js';
-import { bufferToBigInt } from "../../../../utils/amountSerialization.js";
+import {bufferToBigInt} from "../../../../utils/amountSerialization.js";
 
 class PartialRoleAccess extends PartialOperation {
     #config;
-    constructor(state, config) {
-        super(state, config);
+
+    constructor(state, wallet, config) {
+        super(state, wallet, config);
         this.#config = config
     }
 
     async validate(payload) {
         this.isPayloadSchemaValid(payload);
+        this.validateNoSelfValidation(payload);
         this.validateRequesterAddress(payload);
         await this.validateTransactionUniqueness(payload);
         await this.validateSignature(payload);
@@ -34,7 +36,7 @@ class PartialRoleAccess extends PartialOperation {
     }
 
     async isRequesterAllowedToChangeRole(payload) {
-        const { type } = payload;
+        const {type} = payload;
 
         if (type === OperationType.ADD_WRITER) {
             const nodeAddress = bufferToAddress(payload.address, this.#config.addressPrefix);

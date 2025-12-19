@@ -1,16 +1,9 @@
 import BaseOperationHandler from './base/BaseOperationHandler.js';
-import CompleteStateMessageOperations from "../../../../messages/completeStateMessages/CompleteStateMessageOperations.js";
-import { OperationType } from '../../../../utils/constants.js';
+import CompleteStateMessageOperations
+    from "../../../../messages/completeStateMessages/CompleteStateMessageOperations.js";
+import {OperationType} from '../../../../utils/constants.js';
 import PartialTransfer from "../validators/PartialTransfer.js";
 import {normalizeTransferOperation} from "../../../../utils/normalizers.js"
-
-/**
- * THIS CLASS IS ULTRA IMPORTANT BECAUSE IF SOMEONE WILL SEND A TRASH TO VALIDATOR AND IT WON'T BE HANDLED PROPERTLY -
- * FOR EXAMPLE VALIDATOR WILL BROADCAST IT TO THE INDEXER LAYER THEN IT WILL BE BANNED. SO EVERYTHING WHAT IS TRASH
- * MUST BE REFUSED.
- * TODO: WE SHOULD AUDIT VALIDATORS AND MAKE SURE THEY ARE NOT BROADCASTING TRASH TO THE INDEXER LAYER.
- */
-
 
 class TransferOperationHandler extends BaseOperationHandler {
     #partialTransferValidator;
@@ -19,8 +12,8 @@ class TransferOperationHandler extends BaseOperationHandler {
 
     /**
      * @param {Network} network
-     * @param {State} network
-     * @param {PeerWallet} state
+     * @param {State} state
+     * @param {PeerWallet} wallet
      * @param {TransactionRateLimiterService} rateLimiter
      * @param {object} config
      **/
@@ -28,7 +21,7 @@ class TransferOperationHandler extends BaseOperationHandler {
         super(network, state, wallet, rateLimiter, config);
         this.#config = config;
         this.#wallet = wallet;
-        this.#partialTransferValidator = new PartialTransfer(state, this.#config);
+        this.#partialTransferValidator = new PartialTransfer(state, wallet, this.#config);
     }
 
     async handleOperation(payload) {
