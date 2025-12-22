@@ -1,5 +1,7 @@
 import {OperationType} from '../../utils/constants.js'
 
+// TODO: DEPRACATED - Remove this class in the future.
+
 class PartialStateMessageDirector {
     #builder;
 

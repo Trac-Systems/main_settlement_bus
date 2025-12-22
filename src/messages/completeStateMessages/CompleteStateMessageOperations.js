@@ -3,6 +3,7 @@ import CompleteStateMessageBuilder from './CompleteStateMessageBuilder.js';
 import { safeEncodeApplyOperation } from '../../utils/protobuf/operationHelpers.js';
 import { blake3Hash } from '../../utils/crypto.js';
 
+// TODO: DEPRACATED - Remove this class in the future.
 class CompleteStateMessageOperations {
     #config
     #wallet

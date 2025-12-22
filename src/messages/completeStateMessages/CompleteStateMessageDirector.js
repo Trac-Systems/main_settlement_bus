@@ -1,5 +1,6 @@
 import { OperationType } from '../../utils/protobuf/applyOperations.cjs'
 
+// TODO: DEPRACATED - Remove this class in the future.
 class CompleteStateMessageDirector {
     #builder;
     constructor(builderInstance) {

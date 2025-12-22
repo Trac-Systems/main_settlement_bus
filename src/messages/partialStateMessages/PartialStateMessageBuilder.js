@@ -16,7 +16,7 @@ class PartialStateMessageBuilder {
     #txValidity;
     #contentHash;
     #externalBootstrap;
-    #withMsbBootstrap;
+    #msbBootstrap;
     #channel;
     #incomingAddress;
     #amount;
@@ -47,7 +47,7 @@ class PartialStateMessageBuilder {
         this.#txValidity = null;
         this.#contentHash = null;
         this.#externalBootstrap = null;
-        this.#withMsbBootstrap = false;
+        this.#msbBootstrap = false;
         this.#incomingAddress = null;
         this.#amount = null;
         this.#channel = null;
@@ -94,7 +94,7 @@ class PartialStateMessageBuilder {
         if (!isHexString(msbBootstrap) || msbBootstrap.length !== 64) {
             throw new Error('MSB Bootstrap key must be a 64-length hexstring.');
         }
-        this.#withMsbBootstrap = msbBootstrap;
+        this.#msbBootstrap = msbBootstrap;
         return this;
     }
 
@@ -183,7 +183,7 @@ class PartialStateMessageBuilder {
                     b4a.from(this.#writingKey, 'hex'),
                     b4a.from(this.#contentHash, 'hex'),
                     b4a.from(this.#externalBootstrap, 'hex'),
-                    b4a.from(this.#withMsbBootstrap, 'hex'),
+                    b4a.from(this.#msbBootstrap, 'hex'),
                     nonce,
                     OperationType.TX
                 );
@@ -231,7 +231,7 @@ class PartialStateMessageBuilder {
                 iw: this.#writingKey,
                 ch: this.#contentHash,
                 bs: this.#externalBootstrap,
-                mbs: this.#withMsbBootstrap,
+                mbs: this.#msbBootstrap,
                 in: nonce.toString('hex'),
                 is: signature.toString('hex'),
             };

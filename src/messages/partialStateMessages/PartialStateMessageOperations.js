@@ -1,6 +1,7 @@
 import PartialStateMessageBuilder from './PartialStateMessageBuilder.js';
 import PartialStateMessageDirector from './PartialStateMessageDirector.js';
 
+// TODO: DEPRACATED - Remove this class in the future.
 class PartialStateMessageOperations {
     #wallet;
     #config
