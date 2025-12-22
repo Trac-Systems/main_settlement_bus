@@ -70,8 +70,9 @@ export const tick = () => new Promise(resolve => setImmediate(resolve));
 
 export async function fundPeer(admin, toFund, amount) {
     const txValidity = await admin.msb.state.getIndexerSequenceState()
-    const director = new CompleteStateMessageDirector();
-    director.builder = new CompleteStateMessageBuilder(admin.wallet, admin.config);
+    const director = new CompleteStateMessageDirector(
+        new CompleteStateMessageBuilder(admin.wallet, admin.config)
+    );
     const payload = await director.buildBalanceInitializationMessage(
         admin.wallet.address,
         toFund.wallet.address,
