@@ -16,10 +16,10 @@ import deploymentEntryUtils from '../../../../../src/core/state/utils/deployment
 import transactionUtils from '../../../../../src/core/state/utils/transaction.js';
 import addressUtils from '../../../../../src/core/state/utils/address.js';
 import { toBalance } from '../../../../../src/core/state/utils/balance.js';
-import { EntryType, TRAC_ADDRESS_SIZE } from '../../../../../src/utils/constants.js';
+import { EntryType } from '../../../../../src/utils/constants.js';
 import { decimalStringToBigInt, bigIntTo16ByteBuffer } from '../../../../../src/utils/amountSerialization.js';
 import { safeDecodeApplyOperation, safeEncodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
-import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
+import { config } from '../../../../helpers/config.js';
 
 const DEFAULT_FUNDING = bigIntTo16ByteBuffer(decimalStringToBigInt('10'));
 
@@ -109,23 +109,23 @@ export async function buildBootstrapDeploymentPayload(context, options = {}) {
 		context.bootstrapDeployment?.txValidity ??
 		(await deriveIndexerSequenceState(validatorPeer.base));
 
-	const partial = await PartialStateMessageOperations.assembleBootstrapDeploymentMessage(
-		deployerPeer.wallet,
-		externalBootstrap.toString('hex'),
-		channel.toString('hex'),
-		txValidity.toString('hex')
-	);
+    const partial = await new PartialStateMessageOperations(deployerPeer.wallet, config)
+        .assembleBootstrapDeploymentMessage(
+            externalBootstrap.toString('hex'),
+            channel.toString('hex'),
+            txValidity.toString('hex')
+        );
 
-	return CompleteStateMessageOperations.assembleCompleteBootstrapDeployment(
-		validatorPeer.wallet,
+    return new CompleteStateMessageOperations(validatorPeer.wallet, config)
+        .assembleCompleteBootstrapDeployment(
 		partial.address,
-		b4a.from(partial.bdo.tx, 'hex'),
-		b4a.from(partial.bdo.txv, 'hex'),
-		b4a.from(partial.bdo.bs, 'hex'),
-		b4a.from(partial.bdo.ic, 'hex'),
-		b4a.from(partial.bdo.in, 'hex'),
-		b4a.from(partial.bdo.is, 'hex')
-	);
+            b4a.from(partial.bdo.tx, 'hex'),
+            b4a.from(partial.bdo.txv, 'hex'),
+            b4a.from(partial.bdo.bs, 'hex'),
+            b4a.from(partial.bdo.ic, 'hex'),
+            b4a.from(partial.bdo.in, 'hex'),
+            b4a.from(partial.bdo.is, 'hex')
+        );
 }
 
 export async function buildBootstrapDeploymentPayloadWithTxValidity(context, txValidity, options = {}) {
@@ -174,8 +174,8 @@ export async function assertBootstrapDeploymentSuccessState(
 	t.ok(validatorAddressBuffer, 'payload carries validator address');
 	t.ok(txHashBuffer, 'payload exposes tx hash');
 
-	const requesterAddress = addressUtils.bufferToAddress(requesterAddressBuffer, TRAC_NETWORK_MSB_MAINNET_PREFIX);
-	const validatorAddress = addressUtils.bufferToAddress(validatorAddressBuffer, TRAC_NETWORK_MSB_MAINNET_PREFIX);
+	const requesterAddress = addressUtils.bufferToAddress(requesterAddressBuffer, config.addressPrefix);
+	const validatorAddress = addressUtils.bufferToAddress(validatorAddressBuffer, config.addressPrefix);
 
 	if (requesterAddress) {
 		t.is(requesterAddress, deployerPeer.wallet.address, 'payload signed by expected requester');
@@ -330,7 +330,7 @@ async function assertDeploymentEntry(
 	const deploymentKey = `${EntryType.DEPLOYMENT}${bootstrapBuffer.toString('hex')}`;
 	const deploymentEntry = await base.view.get(deploymentKey);
 	t.ok(deploymentEntry, 'deployment entry stored');
-	const decodedDeployment = deploymentEntryUtils.decode(deploymentEntry?.value, TRAC_ADDRESS_SIZE);
+	const decodedDeployment = deploymentEntryUtils.decode(deploymentEntry?.value, config.addressLength);
 	t.ok(decodedDeployment?.txHash, 'deployment entry decodes');
 	if (!decodedDeployment || !decodedDeployment.txHash) return;
 

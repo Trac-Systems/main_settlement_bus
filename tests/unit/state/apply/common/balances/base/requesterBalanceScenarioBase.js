@@ -4,7 +4,7 @@ import nodeEntryUtils from '../../../../../../../src/core/state/utils/nodeEntry.
 import addressUtils from '../../../../../../../src/core/state/utils/address.js';
 import { BALANCE_ZERO } from '../../../../../../../src/core/state/utils/balance.js';
 import { eventFlush } from '../../../../../../helpers/autobaseTestHelpers.js';
-import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
+import { config } from '../../../../../../helpers/config.js'
 
 export default class RequesterBalanceScenarioBase extends OperationValidationScenarioBase {
 	constructor({
@@ -77,7 +77,7 @@ function createApplyInvalidPayload({
 		}
 
 		const targetAddressString = peer.wallet.address;
-		const targetAddressBuffer = addressUtils.addressToBuffer(targetAddressString, TRAC_NETWORK_MSB_MAINNET_PREFIX);
+		const targetAddressBuffer = addressUtils.addressToBuffer(targetAddressString, config.addressPrefix);
 
 		const originalDecode = nodeEntryUtils.decode;
 		let shouldFailNextSub = false;

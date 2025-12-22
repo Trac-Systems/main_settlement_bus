@@ -1,7 +1,6 @@
 import b4a from "b4a";
 import {bufferToAddress} from "../core/state/utils/address.js";
-import { EntryType, TRAC_ADDRESS_SIZE } from "./constants.js";
-import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from "trac-wallet/constants.js";
+import { EntryType } from "./constants.js";
 
 //TODO: change file name or split functions below into multiple files (Remember to update imports and tests accordingly)
 
@@ -49,7 +48,7 @@ export const safeJsonParse = (str) => {
     return undefined;
 }
 
-export async function getFormattedIndexersWithAddresses(state) {
+export async function getFormattedIndexersWithAddresses(state, config) {
     const indexers = await state.getIndexersEntry();
     const formatted = indexers.map((entry) => ({
         writingKey: b4a.toString(entry.key, "hex"),
@@ -57,7 +56,10 @@ export async function getFormattedIndexersWithAddresses(state) {
 
     const results = await Promise.all(
         formatted.map(async (entry) => {            
-            const address = bufferToAddress(await state.getSigned(EntryType.WRITER_ADDRESS + entry.writingKey), TRAC_NETWORK_MSB_MAINNET_PREFIX);
+            const address = bufferToAddress(
+                await state.getSigned(EntryType.WRITER_ADDRESS + entry.writingKey),
+                config.addressPrefix
+            );
 
             return {
                 ...entry,
@@ -69,14 +71,14 @@ export async function getFormattedIndexersWithAddresses(state) {
     return results;
 }
 
-export function formatIndexersEntry(indexersEntry) {
+export function formatIndexersEntry(indexersEntry, addressLength) {
 
     const count = indexersEntry[0];
     const indexers = [];
 
     for (let i = 0; i < count; i++) {
-        const start = 1 + (i * TRAC_ADDRESS_SIZE);
-        const end = start + TRAC_ADDRESS_SIZE;
+        const start = 1 + (i * addressLength);
+        const end = start + addressLength;
         const indexerAddr = indexersEntry.subarray(start, end);
         indexers.push(indexerAddr.toString('ascii'));
     }
@@ -84,20 +86,6 @@ export function formatIndexersEntry(indexersEntry) {
     return {
         count,
         addresses: indexers
-    };
-}
-
-export function convertAdminCoreOperationPayloadToHex(payload) {
-    return {
-        ...payload,
-        address: bufferToAddress(payload.address, TRAC_NETWORK_MSB_MAINNET_PREFIX),
-        aco: {
-            tx: payload.aco.tx.toString('hex'),
-            txv: payload.aco.txv.toString('hex'),
-            in: payload.aco.in.toString('hex'),
-            ia: payload.aco.ia.toString('hex'),
-            is: payload.aco.is.toString('hex'),
-        },
     };
 }
 

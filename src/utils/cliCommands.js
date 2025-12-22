@@ -6,8 +6,6 @@ import { EntryType } from "./constants.js";
 import { bufferToAddress } from "../core/state/utils/address.js";
 import deploymentEntryUtils from "../core/state/utils/deploymentEntry.js";
 import { safeDecodeApplyOperation } from "./protobuf/operationHelpers.js";
-import { TRAC_ADDRESS_SIZE } from "./constants.js";
-import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from "trac-wallet/constants.js";
 
 export async function getBalanceCommand(state, address, confirmedFlag) {
     const unconfirmedBalance = confirmedFlag === "false";
@@ -85,20 +83,20 @@ export async function coreInfoCommand(state) {
     }
 }
 
-export async function getValidatorAddressCommand(state, wkHexString) {
+export async function getValidatorAddressCommand(state, wkHexString, prefix) {
     const payload = await state.getSigned(EntryType.WRITER_ADDRESS + wkHexString);
     if (payload === null) {
         console.log(`No address assigned to the writer key: ${wkHexString}`);
     } else {
-        console.log(`Address assigned to the writer key: ${wkHexString} - ${bufferToAddress(payload, TRAC_NETWORK_MSB_MAINNET_PREFIX)}`);
+        console.log(`Address assigned to the writer key: ${wkHexString} - ${bufferToAddress(payload, prefix)}`);
     }
 }
 
-export async function getDeploymentCommand(state, bootstrapHex) {
+export async function getDeploymentCommand(state, bootstrapHex, addressLength) {
     const deploymentEntry = await state.getRegisteredBootstrapEntry(bootstrapHex);
     console.log(`Searching deployment for bootstrap: ${bootstrapHex}`);
     if (deploymentEntry) {
-        const decodedDeploymentEntry = deploymentEntryUtils.decode(deploymentEntry, TRAC_ADDRESS_SIZE);
+        const decodedDeploymentEntry = deploymentEntryUtils.decode(deploymentEntry, addressLength);
         const txhash = decodedDeploymentEntry.txHash.toString("hex");
         console.log(`Bootstrap deployed under transaction hash: ${txhash}`);
         const payload = await state.getSigned(txhash);
@@ -191,7 +189,7 @@ export function getUnconfirmedLengthCommand(state) {
     return unconfirmedLength;
 }
 
-export async function getTxPayloadsBulkCommand(state, hashes) {
+export async function getTxPayloadsBulkCommand(state, hashes, config) {
     if (!Array.isArray(hashes) || hashes.length === 0) {
         throw new Error("Missing hash list.");
     }
@@ -210,7 +208,7 @@ export async function getTxPayloadsBulkCommand(state, hashes) {
         if (result === null || result === undefined) {
             res.missing.push(hash);
         } else {
-            const decodedResult = normalizeDecodedPayloadForJson(result.decoded);
+            const decodedResult = normalizeDecodedPayloadForJson(result.decoded, config);
             res.results.push({ hash, payload: decodedResult });
         }
     });
@@ -227,20 +225,20 @@ export async function getTxHashesCommand(state, start, end) {
     }
 }
 
-export async function getTxDetailsCommand(state, hash) {
+export async function getTxDetailsCommand(state, hash, config) {
     try {
         const rawPayload = await get_confirmed_tx_info(state, hash);
         if (!rawPayload) {
             console.log(`No payload found for tx hash: ${hash}`);
             return null;
         }
-        return normalizeDecodedPayloadForJson(rawPayload.decoded);
+        return normalizeDecodedPayloadForJson(rawPayload.decoded, config);
     } catch (error) {
         throw new Error("Invalid params to perform the request.", error.message);
     }
 }
 
-export async function getExtendedTxDetailsCommand(state, hash, confirmed) {
+export async function getExtendedTxDetailsCommand(state, hash, confirmed, config) {
     if (confirmed) {
         const rawPayload = await get_confirmed_tx_info(state, hash);
         if (!rawPayload) {
@@ -250,7 +248,7 @@ export async function getExtendedTxDetailsCommand(state, hash, confirmed) {
         if (confirmedLength === null) {
             throw new Error(`No confirmed length found for tx hash: ${hash} in confirmed mode`);
         }
-        const normalizedPayload = normalizeDecodedPayloadForJson(rawPayload.decoded, true);
+        const normalizedPayload = normalizeDecodedPayloadForJson(rawPayload.decoded, config);
         const fee = state.getFee();
         return {
             txDetails: normalizedPayload,
@@ -263,7 +261,7 @@ export async function getExtendedTxDetailsCommand(state, hash, confirmed) {
     if (!rawPayload) {
         throw new Error(`No payload found for tx hash: ${hash}`);
     }
-    const normalizedPayload = normalizeDecodedPayloadForJson(rawPayload.decoded, true);
+    const normalizedPayload = normalizeDecodedPayloadForJson(rawPayload.decoded, config);
     const length = await state.getTransactionConfirmedLength(hash);
     if (length === null) {
         return {

@@ -6,7 +6,6 @@ import PeerWallet from "trac-wallet";
 import b4a from "b4a";
 import readline from "readline";
 import tty from "tty";
-
 import { sleep, isHexString } from "./utils/helpers.js";
 import { verifyDag, printHelp, printWalletInfo, printBalance } from "./utils/cli.js";
 import CompleteStateMessageOperations from "./messages/completeStateMessages/CompleteStateMessageOperations.js";
@@ -20,12 +19,10 @@ import {
     WHITELIST_SLEEP_INTERVAL,
     BOOTSTRAP_HEXSTRING_LENGTH,
     OperationType,
-    MAX_MESSAGE_SEND_ATTEMPTS,
     CustomEventType,
     BALANCE_MIGRATION_SLEEP_INTERVAL,
     WHITELIST_MIGRATION_DIR
 } from "./utils/constants.js";
-import partialStateMessageOperations from "./messages/partialStateMessages/PartialStateMessageOperations.js";
 import { randomBytes } from "hypercore-crypto";
 import { decimalStringToBigInt, bigIntTo16ByteBuffer, bufferToBigInt, bigIntToDecimalString } from "./utils/amountSerialization.js"
 import { normalizeTransferOperation, normalizeTransactionOperation } from "./utils/normalizers.js"
@@ -53,95 +50,47 @@ import {
     getLicenseAddressCommand,
     getLicenseCountCommand
 } from "./utils/cliCommands.js";
-import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from "trac-wallet/constants.js";
 export class MainSettlementBus extends ReadyResource {
     // internal attributes
-    #options;
-    #stores_directory;
-    #key_pair_path;
-    #bootstrap;
-    #channel;
     #store;
-    #enable_wallet;
     #wallet;
     #network;
     #readline_instance;
-    #enable_validator_observer;
-    #enable_role_requester;
     #state;
     #isClosing = false;
-    #is_admin_mode;
     #partialTransferValidator;
     #partialTransactionValidator;
-    #maxRetries
+    #config
 
-    constructor(options = {}) {
+    /**
+     * @param {object} config
+     **/
+    constructor(config) {
         super();
-        this.#options = options;
-        this.#stores_directory = options.stores_directory;
-        this.#key_pair_path = `${this.#stores_directory}${options.store_name}/db/keypair.json`;
-        this.#enable_wallet = options.enable_wallet !== false;
-        this.enable_interactive_mode = options.enable_interactive_mode !== false;
-        this.#is_admin_mode = options.store_name === 'admin';
-        this.#enable_role_requester =
-            options.enable_role_requester !== undefined
-                ? options.enable_role_requester
-                : false;
-        this.#enable_validator_observer =
-            options.enable_validator_observer !== undefined
-                ? options.enable_validator_observer
-                : true;
-        this.#bootstrap = options.bootstrap
-            ? b4a.from(options.bootstrap, "hex")
-            : null;
+        this.#config = config
 
-        if (!options.channel) {
-            throw new Error(
-                "MainSettlementBus: Channel is required. Application cannot start without channel."
-            );
-        }
-
-        this.#channel = b4a.alloc(32).fill(options.channel);
-        this.#store = new Corestore(this.#stores_directory + options.store_name);
-        this.#wallet = new PeerWallet(options);
+        this.#store = new Corestore(this.#config.storesFullPath);
+        this.#wallet = new PeerWallet({ networkPrefix: this.#config.addressPrefix });
         this.#readline_instance = null;
-        this.#maxRetries = Number(options.max_retries) ? options.max_retries : MAX_MESSAGE_SEND_ATTEMPTS
 
-        if (this.enable_interactive_mode !== false) {
+        if (this.#config.enableInteractiveMode) {
             try {
                 this.#readline_instance = readline.createInterface({
                     input: new tty.ReadStream(0),
                     output: new tty.WriteStream(1),
                 });
-            } catch (e) {
-            }
+            } catch (_ignored) {}
         }
 
-        this.check = new Check();
+        this.check = new Check(this.#config);
     }
 
-    get options() {
-        return this.#options;
-    }
-
-    get stores_directory() {
-        return this.#stores_directory;
-    }
-
-    get key_pair_path() {
-        return this.#key_pair_path;
-    }
-
-    get bootstrap() {
-        return this.#bootstrap;
+    get config() {
+        return this.#config
     }
 
     get state() {
         return this.#state;
-    }
-
-    get channel() {
-        return this.#channel;
     }
 
     get network() {
@@ -153,31 +102,26 @@ export class MainSettlementBus extends ReadyResource {
         return this.#wallet;
     }
 
-    get tracPublicKey() {
-        if (!this.#wallet) return null;
-        return this.#wallet.publicKey;
-    }
-
     async _open() {
-        if (this.#enable_wallet) {
+        if (this.#config.enableWallet) {
             await this.#wallet.initKeyPair(
-                this.key_pair_path,
+                this.#config.keyPairPath,
                 this.#readline_instance
             );
         }
-        this.#state = new State(this.#store, this.bootstrap, this.#wallet, this.options);
-        this.#network = new Network(this.#state, this.#channel, this.#wallet.address, this.options);
+        this.#state = new State(this.#store, this.#wallet, this.#config);
+        this.#network = new Network(this.#state, this.#config, this.#wallet.address);
 
         await this.#state.ready();
         await this.#network.ready();
         this.#stateEventsListener();
 
-        if (this.#enable_wallet) {
-            printWalletInfo(this.#wallet.address, this.#state.writingKey, this.#state, this.#enable_wallet);
+        if (this.#config.enableWallet) {
+            printWalletInfo(this.#wallet.address, this.#state.writingKey, this.#state, this.#config.enableWallet);
         }
 
-        this.#partialTransferValidator = new PartialTransfer(this.state);
-        this.#partialTransactionValidator = new PartialTransaction(this.state);
+        this.#partialTransferValidator = new PartialTransfer(this.state, this.#wallet, this.#config);
+        this.#partialTransactionValidator = new PartialTransaction(this.state, this.#wallet ,this.#config);
 
         await this.#network.replicate(
             this.#state,
@@ -193,7 +137,7 @@ export class MainSettlementBus extends ReadyResource {
         console.log("MSB Unsigned Length:", this.#state.getUnsignedLength());
         console.log("MSB Signed Length:", this.#state.getSignedLength());
 
-        await printBalance(this.#wallet.address, this.#state, this.#enable_wallet);
+        await printBalance(this.#wallet.address, this.#state, this.#config.enableWallet);
     }
 
     async _close() {
@@ -236,7 +180,7 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async broadcastPartialTransaction(partialTransactionPayload) {
-        await this.#network.validatorMessageOrchestrator.send(partialTransactionPayload);
+        return await this.#network.validatorMessageOrchestrator.send(partialTransactionPayload);
     }
 
     async broadcastTransactionCommand(payload) {
@@ -249,11 +193,11 @@ export class MainSettlementBus extends ReadyResource {
         let hash;
 
         if (payload.type === OperationType.TRANSFER) {
-            normalizedPayload = normalizeTransferOperation(payload);
+            normalizedPayload = normalizeTransferOperation(payload, this.#config);
             isValid = await this.#partialTransferValidator.validate(normalizedPayload);
             hash = b4a.toString(normalizedPayload.tro.tx, "hex");
         } else if (payload.type === OperationType.TX) {
-            normalizedPayload = normalizeTransactionOperation(payload);
+            normalizedPayload = normalizeTransactionOperation(payload, this.#config);
             isValid = await this.#partialTransactionValidator.validate(normalizedPayload);
             hash = b4a.toString(normalizedPayload.txo.tx, "hex");
         }
@@ -265,19 +209,9 @@ export class MainSettlementBus extends ReadyResource {
         const signedLength = this.#state.getSignedLength();
         const unsignedLength = this.#state.getUnsignedLength();
 
-        for (let attempt = 0; attempt <= this.#maxRetries; attempt++) { // should iterate once if maxRetries === 0
-            await this.broadcastPartialTransaction(payload);
-            await sleep(1000 * (attempt + 1)); // linear backoff wait time
-            const tx = await this.#state.get(hash);
+        const success = await this.broadcastPartialTransaction(payload);
 
-            if (tx !== null) {
-                break;
-            }
-
-            this.network.validatorConnectionManager.rotate(); // force change connection rotation for the next retry
-        }
-
-        if (await this.#state.get(hash) === null) {
+        if (!success) {
             throw new Error("Failed to broadcast transaction after multiple attempts.");
         }
 
@@ -285,7 +219,7 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async #setUpRoleAutomatically() {
-        if (!this.#state.isWritable() && this.#enable_role_requester) {
+        if (!this.#state.isWritable() && this.#config.enableRoleRequester) {
             console.log("Requesting writer role... This may take a moment.");
             await this.#requestWriterRole(false);
             setTimeout(async () => {
@@ -296,15 +230,12 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     #isAdmin(adminEntry) {
-        if (!adminEntry || this.#enable_wallet === false) return false;
-        return !!(
-            this.#wallet.address === adminEntry.address &&
-            b4a.equals(adminEntry.wk, this.#state.writingKey)
-        );
+        if (!adminEntry || !this.#config.enableWallet) return false;
+        return this.#wallet.address === adminEntry.address && b4a.equals(adminEntry.wk, this.#state.writingKey)
     }
 
     async #isAllowedToRequestRole(adminEntry, nodeEntry) {
-        return nodeEntry && nodeEntry.isWhitelisted && !this.#isAdmin(adminEntry);
+        return nodeEntry?.isWhitelisted && !this.#isAdmin(adminEntry);
     }
 
     async #stateEventsListener() {
@@ -335,18 +266,15 @@ export class MainSettlementBus extends ReadyResource {
         });
 
         this.#state.base.on(EventType.UNWRITABLE, async () => {
-            if (this.#enable_wallet === false) {
-                console.log("Current node is unwritable");
-                return;
-            }
             console.log("Current node is unwritable");
         });
     }
 
     async #handleAdminCreation() {
-        if (this.#enable_wallet === false) {
+        if (!this.#config.enableWallet) {
             throw new Error("Can not initialize an admin - wallet is not enabled.");
         }
+
         const adminEntry = await this.#state.getAdminEntry();
 
         if (adminEntry) {
@@ -362,25 +290,26 @@ export class MainSettlementBus extends ReadyResource {
                 "Can not initialize an admin - writing key is not initialized."
             );
         }
-        if (!b4a.equals(this.#state.writingKey, this.#bootstrap)) {
+        if (!b4a.equals(this.#state.writingKey, this.#config.bootstrap)) {
             throw new Error(
                 "Can not initialize an admin - bootstrap is not equal to writing key."
             );
         }
 
-        const txValidity = await blake3Hash(this.bootstrap);
-        const addAdminMessage = await CompleteStateMessageOperations.assembleAddAdminMessage(
-            this.#wallet,
-            this.#state.writingKey,
-            txValidity
-        );
+        const txValidity = await blake3Hash(this.#config.bootstrap);
+        const addAdminMessage = await new CompleteStateMessageOperations(this.#wallet, this.#config)
+            .assembleAddAdminMessage(
+                this.#state.writingKey,
+                txValidity
+            );
 
         await this.#state.append(addAdminMessage);
     }
     async #handleAdminRecovery() {
-        if (this.#enable_wallet === false) {
+        if (!this.#config.enableWallet) {
             throw new Error("Can not initialize an admin - wallet is not enabled.");
         }
+
         const adminEntry = await this.#state.getAdminEntry();
 
         if (!adminEntry) {
@@ -401,22 +330,25 @@ export class MainSettlementBus extends ReadyResource {
         }
 
         const txValidity = await this.#state.getIndexerSequenceState();
-        const adminRecoveryMessage = await partialStateMessageOperations.assembleAdminRecoveryMessage(
-            this.#wallet,
+        const adminRecoveryMessage = await new PartialStateMessageOperations(this.#wallet, this.#config).assembleAdminRecoveryMessage(
             this.#state.writingKey.toString('hex'),
             txValidity.toString('hex')
         );
 
-        await this.broadcastPartialTransaction(adminRecoveryMessage);
+        const success = await this.broadcastPartialTransaction(adminRecoveryMessage);
+
+        if (!success) {
+            throw new Error("Failed to broadcast transaction after multiple attempts.");
+        }
+
         console.info(`Transaction hash: ${adminRecoveryMessage.rao.tx}`);
     }
 
     async #handleWhitelistOperations() {
-        if (this.#enable_wallet === false) {
+        if (!this.#config.enableWallet) {
             throw new Error("Cannot perform whitelisting - wallet is not enabled.");
         }
 
-        if (this.#enable_wallet === false) return;
         const adminEntry = await this.#state.getAdminEntry();
 
         if (!this.#isAdmin(adminEntry)) {
@@ -427,7 +359,7 @@ export class MainSettlementBus extends ReadyResource {
         const addresses = await fileUtils.readAddressesFromWhitelistFile();
 
         for (const address of addresses) {
-            await migrationUtils.validateAddressFromIncomingFile(this.#state, address, adminEntry);
+            await migrationUtils.validateAddressFromIncomingFile(this.#state, this.#config, address, adminEntry);
         }
         await fileUtils.validateWhitelistMigrationData(addresses, WHITELIST_MIGRATION_DIR);
         const migrationNumber = await fileUtils.getNextMigrationNumber(WHITELIST_MIGRATION_DIR);
@@ -435,11 +367,12 @@ export class MainSettlementBus extends ReadyResource {
 
         for (const addressToWhitelist of addresses) {
             const txValidity = await this.#state.getIndexerSequenceState();
-            const encodedPayload = await CompleteStateMessageOperations.assembleAppendWhitelistMessages(
-                this.#wallet,
-                txValidity,
-                addressToWhitelist
-            );
+            const encodedPayload = await new CompleteStateMessageOperations(this.#wallet, this.#config)
+                .assembleAppendWhitelistMessages(
+                    txValidity,
+                    addressToWhitelist
+                );
+
             messages.set(addressToWhitelist, encodedPayload);
         }
 
@@ -473,12 +406,13 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async #requestWriterRole(toAdd) {
-        if (this.#enable_wallet === false) {
+        if (!this.#config.enableWallet) {
             throw new Error("Cannot request writer role - wallet is not enabled");
         }
+
         const adminEntry = await this.#state.getAdminEntry();
         const nodeEntry = await this.#state.getNodeEntry(this.#wallet.address);
-        const isAlreadyWriter = !!(nodeEntry && nodeEntry.isWriter === true);
+        const isAlreadyWriter = !!nodeEntry?.isWriter;
 
         if (toAdd) {
             if (isAlreadyWriter) {
@@ -512,13 +446,18 @@ export class MainSettlementBus extends ReadyResource {
             }
 
             const txValidity = await this.#state.getIndexerSequenceState();
-            const assembledMessage = await PartialStateMessageOperations.assembleAddWriterMessage(
-                this.#wallet,
-                this.#state.writingKey.toString('hex'),
-                txValidity.toString('hex')
-            )
+            const assembledMessage = await new PartialStateMessageOperations(this.#wallet, { networkId: this.#config.networkId, addressPrefix: this.#config.addressPrefix })
+                .assembleAddWriterMessage(
+                    this.#state.writingKey.toString('hex'),
+                    txValidity.toString('hex')
+                )
 
-            await this.broadcastPartialTransaction(assembledMessage);
+            const success = await this.broadcastPartialTransaction(assembledMessage);
+
+            if (!success) {
+                throw new Error("Failed to broadcast transaction after multiple attempts.");
+            }
+
             console.info(`Transaction hash: ${assembledMessage.rao.tx}`);
             return;
         }
@@ -539,19 +478,23 @@ export class MainSettlementBus extends ReadyResource {
         }
 
         const txValidity = await this.#state.getIndexerSequenceState();
-        const assembledMessage = await PartialStateMessageOperations.assembleRemoveWriterMessage(
-            this.#wallet,
-            nodeEntry.wk.toString('hex'),
-            txValidity.toString('hex')
-        )
+        const assembledMessage = await new PartialStateMessageOperations(this.#wallet, { networkId: this.#config.networkId, addressPrefix: this.#config.addressPrefix })
+            .assembleRemoveWriterMessage(
+                nodeEntry.wk.toString('hex'),
+                txValidity.toString('hex')
+            )
 
-        await this.broadcastPartialTransaction(assembledMessage);
+        const success = await this.broadcastPartialTransaction(assembledMessage);
+
+        if (!success) {
+            throw new Error("Failed to broadcast transaction after multiple attempts.");
+        }
+
         console.info(`Transaction hash: ${assembledMessage.rao.tx}`);
-        return;
     }
 
     async #updateIndexerRole(address, toAdd) {
-        if (this.#enable_wallet === false) {
+        if (!this.#config.enableWallet) {
             throw new Error(
                 `Can not request indexer role for: ${address} - wallet is not enabled.`
             );
@@ -565,7 +508,7 @@ export class MainSettlementBus extends ReadyResource {
             );
         }
 
-        if (!isAddressValid(address, TRAC_NETWORK_MSB_MAINNET_PREFIX)) {
+        if (!isAddressValid(address, this.#config.addressPrefix)) {
             throw new Error(
                 `Can not request indexer role for: ${address} - invalid address.`
             );
@@ -607,7 +550,8 @@ export class MainSettlementBus extends ReadyResource {
                 );
             }
             const txValidity = await this.#state.getIndexerSequenceState();
-            const assembledAddIndexerMessage = await CompleteStateMessageOperations.assembleAddIndexerMessage(this.#wallet, address, txValidity);
+            const assembledAddIndexerMessage = await new CompleteStateMessageOperations(this.#wallet, this.#config)
+                .assembleAddIndexerMessage(address, txValidity);
             await this.#state.append(assembledAddIndexerMessage);
         } else {
             const canRemoveIndexer =
@@ -619,13 +563,15 @@ export class MainSettlementBus extends ReadyResource {
                 );
             }
             const txValidity = await this.#state.getIndexerSequenceState();
-            const assembledRemoveIndexer = await CompleteStateMessageOperations.assembleRemoveIndexerMessage(this.#wallet, address, txValidity);
+            const assembledRemoveIndexer = await new CompleteStateMessageOperations(this.#wallet, this.#config)
+                .assembleRemoveIndexerMessage(address, txValidity);
+
             await this.#state.append(assembledRemoveIndexer);
         }
     }
 
     async #banValidator(address) {
-        if (this.#enable_wallet === false) {
+        if (!this.#config.enableWallet) {
             throw new Error(
                 `Can not ban writer with address: ${address} - wallet is not enabled.`
             );
@@ -638,7 +584,7 @@ export class MainSettlementBus extends ReadyResource {
             );
         }
 
-        if (!isAddressValid(address, TRAC_NETWORK_MSB_MAINNET_PREFIX)) {
+        if (!isAddressValid(address, this.#config.addressPrefix)) {
             throw new Error(
                 `Can not ban writer with address:  ${address} - invalid address.`
             );
@@ -659,16 +605,16 @@ export class MainSettlementBus extends ReadyResource {
             );
         }
         const txValidity = await this.#state.getIndexerSequenceState();
-        const assembledBanValidatorMessage = await CompleteStateMessageOperations.assembleBanWriterMessage(
-            this.#wallet,
-            address,
-            txValidity
-        );
+        const assembledBanValidatorMessage = await new CompleteStateMessageOperations(this.#wallet, this.#config)
+            .assembleBanWriterMessage(
+                address,
+                txValidity
+            );
         await this.#state.append(assembledBanValidatorMessage);
     }
 
     async #deployBootstrap(externalBootstrap, channel) {
-        if (this.#enable_wallet === false) {
+        if (!this.#config.enableWallet) {
             throw new Error(
                 "Can not perform bootstrap deployment - wallet is not enabled."
             );
@@ -716,7 +662,7 @@ export class MainSettlementBus extends ReadyResource {
             );
         }
 
-        if (externalBootstrap === this.bootstrap.toString("hex")) {
+        if (externalBootstrap === this.#config.bootstrap.toString("hex")) {
             throw new Error(
                 `Can not perform bootstrap deployment - bootstrap ${externalBootstrap} is equal to MSB bootstrap!`
             );
@@ -737,14 +683,19 @@ export class MainSettlementBus extends ReadyResource {
         }
 
         const txValidity = await this.#state.getIndexerSequenceState();
-        const payload = await PartialStateMessageOperations.assembleBootstrapDeploymentMessage(
-            this.#wallet,
-            externalBootstrap,
-            channel,
-            txValidity.toString('hex')
-        );
+        const payload = await new PartialStateMessageOperations(this.#wallet, this.#config)
+            .assembleBootstrapDeploymentMessage(
+                externalBootstrap,
+                channel,
+                txValidity.toString('hex')
+            );
 
-        await this.broadcastPartialTransaction(payload);
+        const success = await this.broadcastPartialTransaction(payload);
+
+        if (!success) {
+            throw new Error("Failed to broadcast transaction after multiple attempts.");
+        }
+
         console.info(`Transaction hash: ${payload.bdo.tx}`);
         console.log(`Bootstrap ${externalBootstrap} deployment requested on channel ${channel}`);
         console.log('Bootstrap Deployment Fee Details:');
@@ -778,7 +729,7 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async #handleTransferOperation(address, amount) {
-        if (this.#enable_wallet === false) {
+        if (!this.#config.enableWallet) {
             throw new Error(
                 "Can not perform transfer - wallet is not enabled."
             );
@@ -790,7 +741,7 @@ export class MainSettlementBus extends ReadyResource {
             );
         }
 
-        if (!isAddressValid(address, TRAC_NETWORK_MSB_MAINNET_PREFIX)) {
+        if (!isAddressValid(address, this.#config.addressPrefix)) {
             throw new Error("Invalid recipient address");
         }
 
@@ -823,14 +774,13 @@ export class MainSettlementBus extends ReadyResource {
         }
 
         const txValidity = await this.#state.getIndexerSequenceState();
-        const payload = await PartialStateMessageOperations.assembleTransferOperationMessage(
-            this.#wallet,
-            address,
-            amountBuffer.toString('hex'),
-            txValidity.toString('hex'),
-        )
+        const payload = await new PartialStateMessageOperations(this.#wallet, this.#config)
+            .assembleTransferOperationMessage(
+                address,
+                amountBuffer.toString('hex'),
+                txValidity.toString('hex'),
+            )
 
-        await this.broadcastPartialTransaction(payload);
 
         const expectedNewBalance = senderBalance - totalDeductedAmount;
         console.info('Transfer Details:');
@@ -845,6 +795,14 @@ export class MainSettlementBus extends ReadyResource {
             console.info(`Total: ${bigIntToDecimalString(totalDeductedAmount)}`);
         }
         console.log(`Expected Balance After Transfer: ${bigIntToDecimalString(expectedNewBalance)}`);
+
+        const success = await this.broadcastPartialTransaction(payload);
+        if (!success) {
+            throw new Error("Failed to broadcast transfer transaction after multiple attempts.");
+        } else {
+            console.log(`Transfer transaction broadcasted successfully. Tx hash: ${payload.tro.tx}`);
+        }
+
     }
 
     async #handleBalanceMigrationOperation() {
@@ -855,7 +813,7 @@ export class MainSettlementBus extends ReadyResource {
             throw new Error("Can not initialize balance - balance initialization is disabled.");
         }
 
-        if (this.#enable_wallet === false) {
+        if (!this.#config.enableWallet) {
             throw new Error("Can not initialize an admin - wallet is not enabled.");
         }
 
@@ -877,14 +835,14 @@ export class MainSettlementBus extends ReadyResource {
             throw new Error("Can not initialize an admin - writing key is not initialized.");
         }
 
-        if (!b4a.equals(this.#state.writingKey, this.#bootstrap)) {
+        if (!b4a.equals(this.#state.writingKey, this.#config.bootstrap)) {
             throw new Error("Can not initialize an admin - bootstrap is not equal to writing key.");
         }
 
         const { addressBalancePair, totalBalance, totalAddresses, addresses } = await fileUtils.readBalanceMigrationFile();
 
         for (let i = 0; i < addresses.length; i++) {
-            await migrationUtils.validateAddressFromIncomingFile(this.#state, addresses[i].address, adminEntry);
+            await migrationUtils.validateAddressFromIncomingFile(this.#state, this.#config, addresses[i].address, adminEntry);
         }
 
         await fileUtils.validateBalanceMigrationData(addresses);
@@ -892,11 +850,11 @@ export class MainSettlementBus extends ReadyResource {
         await fileUtils.createMigrationEntryFile(addressBalancePair, migrationNumber);
 
         const txValidity = await this.#state.getIndexerSequenceState();
-        const messages = await CompleteStateMessageOperations.assembleBalanceInitializationMessages(
-            this.#wallet,
-            txValidity,
-            addressBalancePair,
-        );
+        const messages = await new CompleteStateMessageOperations(this.#wallet, this.#config)
+            .assembleBalanceInitializationMessages(
+                txValidity,
+                addressBalancePair,
+            );
 
         console.log(`Total balance to migrate: ${bigIntToDecimalString(totalBalance)} across ${totalAddresses} addresses.`);
 
@@ -943,7 +901,7 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async #disableInitialization() {
-        if (this.#enable_wallet === false) {
+        if (!this.#config.enableWallet) {
             throw new Error("Can not initialize an admin - wallet is not enabled.");
         }
         const adminEntry = await this.#state.getAdminEntry();
@@ -957,11 +915,11 @@ export class MainSettlementBus extends ReadyResource {
         }
         // add more checks
         const txValidity = await this.#state.getIndexerSequenceState();
-        const payload = await CompleteStateMessageOperations.assembleDisableInitializationMessage(
-            this.#wallet,
-            this.#state.writingKey,
-            txValidity,
-        )
+        const payload = await new CompleteStateMessageOperations(this.#wallet, this.#config)
+            .assembleDisableInitializationMessage(
+                this.#state.writingKey,
+                txValidity,
+            )
         console.log('Disabling initialization...');
         await this.#state.append(payload);
     }
@@ -970,7 +928,7 @@ export class MainSettlementBus extends ReadyResource {
         if (this.#readline_instance === null) return;
         const rl = this.#readline_instance;
 
-        printHelp(this.#is_admin_mode);
+        printHelp(this.#config.isAdminMode);
 
         rl.on("line", async (input) => {
             try {
@@ -986,10 +944,9 @@ export class MainSettlementBus extends ReadyResource {
 
     async handleCommand(input, rl = null, payload = null) {
         const [command, ...parts] = input.split(" ");
-
         const exactHandlers = {
             "/help": async () => {
-                printHelp(this.#is_admin_mode);
+                printHelp(this.#config.isAdminMode);
             },
             "/exit": async () => {
                 if (rl) rl.close();
@@ -1005,7 +962,7 @@ export class MainSettlementBus extends ReadyResource {
                 console.log(await this.#state.getIndexersEntry());
             },
             "/validator_pool": () => {
-                this.network.validatorConnectionManager.prettyPrint();
+                this.#network.validatorConnectionManager.prettyPrint();
             },
             "/stats": () => verifyDag(
                 this.#state,
@@ -1048,10 +1005,10 @@ export class MainSettlementBus extends ReadyResource {
             await this.#handleBootstrapDeploymentOperation(bootstrapToDeploy, channel);
         } else if (input.startsWith("/get_validator_addr")) {
             const wkHexString = parts[0];
-            await getValidatorAddressCommand(this.#state, wkHexString);
+            await getValidatorAddressCommand(this.#state, wkHexString, this.#config.addressPrefix);
         } else if (input.startsWith("/get_deployment")) {
             const bootstrapHex = parts[0];
-            await getDeploymentCommand(this.#state, bootstrapHex);
+            await getDeploymentCommand(this.#state, bootstrapHex, this.#config.addressLength);
         } else if (input.startsWith("/get_tx_info")) {
             const txHash = parts[0];
             await getTxInfoCommand(this.#state, txHash);
@@ -1100,8 +1057,7 @@ export class MainSettlementBus extends ReadyResource {
             if (!payload) {
                 throw new Error("Missing payload for fetching tx payloads.");
             }
-            const hashes = payload;
-            const result = await getTxPayloadsBulkCommand(this.#state, hashes);
+            const result = await getTxPayloadsBulkCommand(this.#state, payload, this.#config);
             if (rl) rl.prompt();
             return result;
         } else if (input.startsWith("/get_txs_hashes")) {
@@ -1112,13 +1068,13 @@ export class MainSettlementBus extends ReadyResource {
             return result;
         } else if (input.startsWith("/get_tx_details")) {
             const hash = parts[0];
-            const result = await getTxDetailsCommand(this.#state, hash);
+            const result = await getTxDetailsCommand(this.#state, hash, this.#config);
             if (rl) rl.prompt();
             return result;
         } else if (input.startsWith("/get_extended_tx_details")) {
             const hash = parts[0];
             const confirmed = parts[1] === "true";
-            const result = await getExtendedTxDetailsCommand(this.#state, hash, confirmed);
+            const result = await getExtendedTxDetailsCommand(this.#state, hash, confirmed, this.#config);
             if (rl) rl.prompt();
             return result;
         }

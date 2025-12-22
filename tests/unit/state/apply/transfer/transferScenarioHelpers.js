@@ -15,11 +15,11 @@ import { toBalance, PERCENT_75, BALANCE_ZERO } from '../../../../../src/core/sta
 import { decimalStringToBigInt, bigIntTo16ByteBuffer } from '../../../../../src/utils/amountSerialization.js';
 import { safeDecodeApplyOperation, safeEncodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
 import { ZERO_WK } from '../../../../../src/utils/buffer.js';
-import { EntryType, OperationType, NETWORK_ID } from '../../../../../src/utils/constants.js';
+import { EntryType, OperationType } from '../../../../../src/utils/constants.js';
 import { createMessage } from '../../../../../src/utils/buffer.js';
 import { blake3Hash } from '../../../../../src/utils/crypto.js';
 import OperationValidationScenarioBase from '../common/base/OperationValidationScenarioBase.js';
-import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
+import { config } from '../../../../helpers/config.js';
 
 export const DEFAULT_INITIAL_BALANCE = bigIntTo16ByteBuffer(decimalStringToBigInt('10'));
 export const DEFAULT_TRANSFER_AMOUNT = bigIntTo16ByteBuffer(decimalStringToBigInt('2'));
@@ -123,23 +123,23 @@ export async function buildTransferPayload(
 	const resolvedTxValidity =
 		txValidity ?? (await deriveIndexerSequenceState(validatorPeer.base));
 
-	const partial = await PartialStateMessageOperations.assembleTransferOperationMessage(
-		senderPeer.wallet,
-		recipientAddress,
-		b4a.toString(amount, 'hex'),
-		b4a.toString(resolvedTxValidity, 'hex')
-	);
+    const partial = await new PartialStateMessageOperations(senderPeer.wallet, config)
+        .assembleTransferOperationMessage(
+            recipientAddress,
+            b4a.toString(amount, 'hex'),
+            b4a.toString(resolvedTxValidity, 'hex')
+        );
 
-	return CompleteStateMessageOperations.assembleCompleteTransferOperationMessage(
-		validatorPeer.wallet,
-		partial.address,
-		b4a.from(partial.tro.tx, 'hex'),
-		b4a.from(partial.tro.txv, 'hex'),
-		b4a.from(partial.tro.in, 'hex'),
-		partial.tro.to,
-		b4a.from(partial.tro.am, 'hex'),
-		b4a.from(partial.tro.is, 'hex')
-	);
+    return new CompleteStateMessageOperations(validatorPeer.wallet, config)
+        .assembleCompleteTransferOperationMessage(
+            partial.address,
+            b4a.from(partial.tro.tx, 'hex'),
+            b4a.from(partial.tro.txv, 'hex'),
+            b4a.from(partial.tro.in, 'hex'),
+            partial.tro.to,
+            b4a.from(partial.tro.am, 'hex'),
+            b4a.from(partial.tro.is, 'hex')
+        );
 }
 
 export async function buildTransferPayloadWithTxValidity(
@@ -205,9 +205,9 @@ export async function assertTransferSuccessState(
 	t.ok(decodedPayload?.tro, 'transfer payload decodes');
 	if (!decodedPayload?.tro) return;
 
-	const senderAddress = addressUtils.bufferToAddress(decodedPayload.address, TRAC_NETWORK_MSB_MAINNET_PREFIX);
-	const recipientAddress = addressUtils.bufferToAddress(decodedPayload.tro.to, TRAC_NETWORK_MSB_MAINNET_PREFIX);
-	const validatorAddress = addressUtils.bufferToAddress(decodedPayload.tro.va, TRAC_NETWORK_MSB_MAINNET_PREFIX);
+	const senderAddress = addressUtils.bufferToAddress(decodedPayload.address, config.addressPrefix);
+	const recipientAddress = addressUtils.bufferToAddress(decodedPayload.tro.to, config.addressPrefix);
+	const validatorAddress = addressUtils.bufferToAddress(decodedPayload.tro.va, config.addressPrefix);
 
 	const amount = toBalance(decodedPayload.tro.am);
 	const fee = toBalance(transactionUtils.FEE);
@@ -612,7 +612,7 @@ async function applyTransferSenderEntryOverride(context, invalidPayload, mutateE
 	}
 
 	const senderAddress = senderPeer.wallet.address;
-	const senderBuffer = addressUtils.addressToBuffer(senderAddress, TRAC_NETWORK_MSB_MAINNET_PREFIX);
+	const senderBuffer = addressUtils.addressToBuffer(senderAddress, config.addressPrefix);
 	const base = node.base;
 	const originalApply = base._handlers.apply;
 
@@ -688,7 +688,7 @@ export async function mutateTransferAmountWithRehashedTx(t, validPayload) {
 	mutatedAmount[mutatedAmount.length - 1] ^= 0x01;
 	parent.am = mutatedAmount;
 
-	const message = createMessage(NETWORK_ID, parent.txv, parent.to, parent.am, parent.in, OperationType.TRANSFER);
+	const message = createMessage(config.networkId, parent.txv, parent.to, parent.am, parent.in, OperationType.TRANSFER);
 	const regeneratedTxHash = await blake3Hash(message);
 	if (regeneratedTxHash?.length === parent.tx?.length) {
 		parent.tx = regeneratedTxHash;
@@ -736,7 +736,7 @@ export async function mutateTransferAmountInvalidWithRehash(t, validPayload, con
 	parent.am = b4a.alloc(1); // invalid length to break toBalance
 
 	const requesterMessage = createMessage(
-		NETWORK_ID,
+		config.networkId,
 		parent.txv,
 		parent.to,
 		parent.am,
@@ -752,7 +752,7 @@ export async function mutateTransferAmountInvalidWithRehash(t, validPayload, con
 		parent.is = requesterWallet.sign(regeneratedTxHash);
 	}
 	if (validatorWallet && parent.vn) {
-		const validatorMessage = createMessage(NETWORK_ID, parent.tx, parent.vn, OperationType.TRANSFER);
+		const validatorMessage = createMessage(config.networkId, parent.tx, parent.vn, OperationType.TRANSFER);
 		parent.vs = validatorWallet.sign(await blake3Hash(validatorMessage));
 	}
 
@@ -773,7 +773,7 @@ export async function mutateTransferRecipientAddressWithRehash(t, validPayload, 
 	}
 	parent.to = mutatedTo;
 
-	const message = createMessage(NETWORK_ID, parent.txv, parent.to, parent.am, parent.in, OperationType.TRANSFER);
+	const message = createMessage(config.networkId, parent.txv, parent.to, parent.am, parent.in, OperationType.TRANSFER);
 	const regeneratedTxHash = await blake3Hash(message);
 	if (regeneratedTxHash?.length === parent.tx?.length) {
 		parent.tx = regeneratedTxHash;
@@ -783,7 +783,7 @@ export async function mutateTransferRecipientAddressWithRehash(t, validPayload, 
 		parent.is = requesterWallet.sign(regeneratedTxHash);
 	}
 	if (validatorWallet && parent.vn) {
-		const validatorMessage = createMessage(NETWORK_ID, parent.tx, parent.vn, OperationType.TRANSFER);
+		const validatorMessage = createMessage(config.networkId, parent.tx, parent.vn, OperationType.TRANSFER);
 		parent.vs = validatorWallet.sign(await blake3Hash(validatorMessage));
 	}
 
@@ -805,7 +805,7 @@ export async function mutateTransferRecipientPublicKeyInvalidWithRehash(t, valid
 	}
 	parent.to = mutatedTo;
 
-	const message = createMessage(NETWORK_ID, parent.txv, parent.to, parent.am, parent.in, OperationType.TRANSFER);
+	const message = createMessage(config.networkId, parent.txv, parent.to, parent.am, parent.in, OperationType.TRANSFER);
 	const regeneratedTxHash = await blake3Hash(message);
 	if (regeneratedTxHash?.length === parent.tx?.length) {
 		parent.tx = regeneratedTxHash;
@@ -815,7 +815,7 @@ export async function mutateTransferRecipientPublicKeyInvalidWithRehash(t, valid
 		parent.is = requesterWallet.sign(regeneratedTxHash);
 	}
 	if (validatorWallet && parent.vn) {
-		const validatorMessage = createMessage(NETWORK_ID, parent.tx, parent.vn, OperationType.TRANSFER);
+		const validatorMessage = createMessage(config.networkId, parent.tx, parent.vn, OperationType.TRANSFER);
 		parent.vs = validatorWallet.sign(await blake3Hash(validatorMessage));
 	}
 
@@ -842,7 +842,7 @@ export async function mutateTransferAmountToInvalidValue(t, validPayload, contex
 	parent.am = b4a.alloc(1); // forces toBalance(amount).value === null
 
 	const requesterMessage = createMessage(
-		NETWORK_ID,
+		config.networkId,
 		parent.txv,
 		parent.to,
 		parent.am,
@@ -858,7 +858,7 @@ export async function mutateTransferAmountToInvalidValue(t, validPayload, contex
 		parent.is = requesterWallet.sign(regeneratedTxHash);
 	}
 	if (validatorWallet && parent.vn) {
-		const validatorMessage = createMessage(NETWORK_ID, parent.tx, parent.vn, OperationType.TRANSFER);
+		const validatorMessage = createMessage(config.networkId, parent.tx, parent.vn, OperationType.TRANSFER);
 		parent.vs = validatorWallet.sign(await blake3Hash(validatorMessage));
 	}
 
@@ -949,7 +949,7 @@ async function applyTransferRecipientEntryOverride(context, invalidPayload, muta
 	}
 
 	const recipientAddress = recipientPeer.wallet.address;
-	const recipientBuffer = addressUtils.addressToBuffer(recipientAddress, TRAC_NETWORK_MSB_MAINNET_PREFIX);
+	const recipientBuffer = addressUtils.addressToBuffer(recipientAddress, config.addressPrefix);
 	const base = node.base;
 	const originalApply = base._handlers.apply;
 
@@ -993,7 +993,7 @@ async function applyTransferRecipientBalanceDecodeFailure(context, invalidPayloa
 	}
 
 	const targetAddress = recipientPeer.wallet.address;
-	const targetBuffer = addressUtils.addressToBuffer(targetAddress, TRAC_NETWORK_MSB_MAINNET_PREFIX);
+	const targetBuffer = addressUtils.addressToBuffer(targetAddress, config.addressPrefix);
 	const originalDecode = nodeEntryUtils.decode;
 	let shouldMutateNextDecode = false;
 

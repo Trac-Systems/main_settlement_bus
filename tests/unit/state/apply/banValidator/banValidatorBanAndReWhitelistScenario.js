@@ -19,7 +19,7 @@ import addressUtils from '../../../../../src/core/state/utils/address.js';
 import { EntryType } from '../../../../../src/utils/constants.js';
 import { BALANCE_ZERO, toBalance } from '../../../../../src/core/state/utils/balance.js';
 import lengthEntryUtils from '../../../../../src/core/state/utils/lengthEntry.js';
-import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
+import { config } from '../../../../helpers/config.js';
 
 export default function banValidatorBanAndReWhitelistScenario() {
 	test('State.apply banValidator allows re-whitelisting without changing license', async t => {
@@ -94,7 +94,7 @@ export default function banValidatorBanAndReWhitelistScenario() {
 		const licenseId = decodedBefore.license.readUInt32BE();
 		const licenseIndexEntry = await adminPeer.base.view.get(`${EntryType.LICENSE_INDEX}${licenseId}`);
 		t.ok(licenseIndexEntry, 'license index entry persists after re-whitelist');
-		const addressBuffer = addressUtils.addressToBuffer(validatorPeer.wallet.address, TRAC_NETWORK_MSB_MAINNET_PREFIX);
+		const addressBuffer = addressUtils.addressToBuffer(validatorPeer.wallet.address, config.addressPrefix);
 	if (licenseIndexEntry?.value && addressBuffer) {
 		t.ok(
 			b4a.equals(licenseIndexEntry.value, addressBuffer),

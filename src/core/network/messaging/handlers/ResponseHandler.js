@@ -3,7 +3,6 @@ import ValidatorResponse from '../validators/ValidatorResponse.js';
 import AdminResponse from '../validators/AdminResponse.js';
 import CustomNodeResponse from '../validators/CustomNodeResponse.js';
 import PeerWallet from 'trac-wallet';
-import b4a from "b4a";
 
 class ResponseHandler {
     #network;
@@ -12,12 +11,12 @@ class ResponseHandler {
     #adminValidator;
     #customNodeValidator;
     
-    constructor(network, state, wallet) {
+    constructor(network, state, wallet, config) {
         this.#network = network;
         this.#state = state;
-        this.#responseValidator = new ValidatorResponse(this.state, wallet);
-        this.#adminValidator = new AdminResponse(this.state, wallet);
-        this.#customNodeValidator = new CustomNodeResponse(this.state, wallet);
+        this.#responseValidator = new ValidatorResponse(this.state, wallet, config);
+        this.#adminValidator = new AdminResponse(this.state, wallet, config);
+        this.#customNodeValidator = new CustomNodeResponse(this.state, wallet, config);
 
     }
 

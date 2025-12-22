@@ -1,14 +1,16 @@
 import request from "supertest"
-import { buildRpcSelfTransferPayload } from "../../../helpers/transactionPayloads.mjs"
+import { buildRpcSelfTransferPayload, waitForConnection } from "../../../helpers/transactionPayloads.mjs"
 
 export const registerTxDetailsTests = (context) => {
     describe("GET /v1/tx/details", () => {
         it("returns 200 for broadcasted hash (confirmed and unconfirmed)", async () => {
             const { payload, txHashHex } = await buildRpcSelfTransferPayload(
-                context.wallet,
+                context,
                 context.rpcMsb.state,
                 1n
             );
+
+            await waitForConnection(context.rpcMsb)
             const broadcastRes = await request(context.server)
                 .post("/v1/broadcast-transaction")
                 .set("Accept", "application/json")
@@ -38,7 +40,7 @@ export const registerTxDetailsTests = (context) => {
 
         it("handles null confirmed_length for unconfirmed transaction", async () => {
             const { payload, txHashHex } = await buildRpcSelfTransferPayload(
-                context.wallet,
+                context,
                 context.rpcMsb.state,
                 1n
             );
@@ -47,6 +49,8 @@ export const registerTxDetailsTests = (context) => {
             context.rpcMsb.state.getTransactionConfirmedLength = async () => null
 
             try {
+
+                await waitForConnection(context.rpcMsb)
                 const broadcastRes = await request(context.server)
                     .post("/v1/broadcast-transaction")
                     .set("Accept", "application/json")

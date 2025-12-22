@@ -51,7 +51,7 @@ export async function getTxDetails(msbInstance, hash) {
         return null;
     }
 
-    return normalizeDecodedPayloadForJson(rawPayload.decoded);
+    return normalizeDecodedPayloadForJson(rawPayload.decoded, msbInstance.config);
 }
 
 export async function fetchBulkTxPayloads(msbInstance, hashes) {
@@ -73,7 +73,7 @@ export async function fetchBulkTxPayloads(msbInstance, hashes) {
         if (result === null || result === undefined) {
             res.missing.push(hash);
         } else {
-            const decodedResult = normalizeDecodedPayloadForJson(result.decoded);
+            const decodedResult = normalizeDecodedPayloadForJson(result.decoded, msbInstance.config);
             res.results.push({ hash, payload: decodedResult });
         }
     });
@@ -93,7 +93,7 @@ export async function getExtendedTxDetails(msbInstance, hash, confirmed) {
         if (confirmedLength === null) {
             throw new Error(`No confirmed length found for tx hash: ${hash} in confirmed mode`);
         }
-        const normalizedPayload = normalizeDecodedPayloadForJson(rawPayload.decoded, true);
+        const normalizedPayload = normalizeDecodedPayloadForJson(rawPayload.decoded, msbInstance.config);
         const feeBuffer = state.getFee();
         return {
             txDetails: normalizedPayload,
@@ -107,7 +107,7 @@ export async function getExtendedTxDetails(msbInstance, hash, confirmed) {
         throw new Error(`No payload found for tx hash: ${hash}`);
     }
 
-    const normalizedPayload = normalizeDecodedPayloadForJson(rawPayload.decoded, true);
+    const normalizedPayload = normalizeDecodedPayloadForJson(rawPayload.decoded, msbInstance.config);
     const length = await state.getTransactionConfirmedLength(hash);
     if (length === null) {
         return {

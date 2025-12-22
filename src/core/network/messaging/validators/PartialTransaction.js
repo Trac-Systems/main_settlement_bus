@@ -1,19 +1,19 @@
 import b4a from 'b4a';
-
-import { safeDecodeApplyOperation } from "../../../../utils/protobuf/operationHelpers.js";
+import {safeDecodeApplyOperation} from "../../../../utils/protobuf/operationHelpers.js";
 import deploymentEntryUtils from "../../../state/utils/deploymentEntry.js";
-import { TRAC_ADDRESS_SIZE } from "../../../../utils/constants.js";
 import PartialOperation from './base/PartialOperation.js';
 
 class PartialTransaction extends PartialOperation {
+    #config
 
-
-    constructor(state) {
-        super(state);
+    constructor(state, wallet, config) {
+        super(state, wallet, config);
+        this.#config = config
     }
 
     async validate(payload) {
         this.isPayloadSchemaValid(payload);
+        this.validateNoSelfValidation(payload);
         this.validateRequesterAddress(payload);
         await this.validateTransactionUniqueness(payload);
         await this.validateSignature(payload);
@@ -22,8 +22,6 @@ class PartialTransaction extends PartialOperation {
         await this.validateRequesterBalance(payload);
         await this.validateRequesterBalance(payload, true);
         this.validateSubnetworkBootstrapEquality(payload);
-        
-
 
         // non common validations below
         this.validateMsbBootstrap(payload);
@@ -33,7 +31,7 @@ class PartialTransaction extends PartialOperation {
     }
 
     validateMsbBootstrap(payload) {
-        if (!b4a.equals(this.state.bootstrap, payload.txo.mbs)) {
+        if (!b4a.equals(this.#config.bootstrap, payload.txo.mbs)) {
             throw new Error(`Declared MSB bootstrap is different than network bootstrap in transaction operation: ${payload.txo.mbs.toString('hex')}`);
         }
     }
@@ -44,10 +42,10 @@ class PartialTransaction extends PartialOperation {
             throw new Error(`External bootstrap with hash ${payload.txo.bs.toString('hex')} is not registered as deployment entry.`);
         }
 
-        const decodedPayload = deploymentEntryUtils.decode(externalBootstrapResult, TRAC_ADDRESS_SIZE);
+        const decodedPayload = deploymentEntryUtils.decode(externalBootstrapResult, this.#config.addressLength);
         const txHash = decodedPayload.txHash
         const getBootstrapTransactionTxPayload = await this.state.get(txHash.toString('hex'));
-        
+
         if (getBootstrapTransactionTxPayload === null) {
             throw new Error(`External bootstrap is not registered as usual tx ${externalBootstrapResult.toString('hex')}: ${payload}`);
         }

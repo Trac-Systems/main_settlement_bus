@@ -12,7 +12,7 @@ import { initializeBalances, whitelistAddress } from '../common/commonScenarioHe
 import { eventFlush } from '../../../../helpers/autobaseTestHelpers.js';
 import { safeDecodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
 import addressUtils from '../../../../../src/core/state/utils/address.js';
-import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
+import { config } from '../../../../helpers/config.js';
 
 export default function addWriterValidatorRewardScenario() {
 	test(
@@ -98,7 +98,7 @@ function assertPayloadValidator(t, payload, validatorAddress) {
 	t.ok(decoded, 'validator reward payload decodes');
 	const validatorBuffer = decoded?.rao?.va;
 	t.ok(validatorBuffer, 'payload carries validator address');
-	const expected = addressUtils.addressToBuffer(validatorAddress, TRAC_NETWORK_MSB_MAINNET_PREFIX);
+	const expected = addressUtils.addressToBuffer(validatorAddress, config.addressPrefix);
 	t.ok(
 		b4a.equals(validatorBuffer, expected),
 		'payload validator address matches processing writer'

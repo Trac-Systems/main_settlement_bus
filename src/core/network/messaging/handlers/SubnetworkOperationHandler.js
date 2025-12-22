@@ -1,29 +1,34 @@
 import BaseOperationHandler from './base/BaseOperationHandler.js';
-import CompleteStateMessageOperations from "../../../../messages/completeStateMessages/CompleteStateMessageOperations.js";
+import CompleteStateMessageOperations
+    from "../../../../messages/completeStateMessages/CompleteStateMessageOperations.js";
 import {
     OperationType
 } from '../../../../utils/constants.js';
 import PartialBootstrapDeployment from "../validators/PartialBootstrapDeployment.js";
-import {addressToBuffer, bufferToAddress} from "../../../state/utils/address.js";
+import {addressToBuffer} from "../../../state/utils/address.js";
 import PartialTransaction from "../validators/PartialTransaction.js";
 import {normalizeHex} from "../../../../utils/helpers.js";
-import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
 
-/**
- * THIS CLASS IS ULTRA IMPORTANT BECAUSE IF SOMEONE WILL SEND A TRASH TO VALIDATOR AND IT WON'T BE HANDLED PROPERTLY -
- * FOR EXAMPLE VALIDATOR WILL BROADCAST IT TO THE INDEXER LAYER THEN IT WILL BE BANNED. SO EVERYTHING WHAT IS TRASH
- * MUST BE REFUSED.
- * TODO: WE SHOULD AUDIT VALIDATORS AND MAKE SURE THEY ARE NOT BROADCASTING TRASH TO THE INDEXER LAYER.
- */
 
 class SubnetworkOperationHandler extends BaseOperationHandler {
     #partialBootstrapDeploymentValidator;
     #partialTransactionValidator;
+    #config;
+    #wallet;
 
-    constructor(network, state, wallet, rateLimiter, options = {}) {
-        super(network, state, wallet, rateLimiter, options);
-        this.#partialBootstrapDeploymentValidator = new PartialBootstrapDeployment(this.state);
-        this.#partialTransactionValidator = new PartialTransaction(this.state);
+    /**
+     * @param {Network} network
+     * @param {State} state
+     * @param {PeerWallet} wallet
+     * @param {TransactionRateLimiterService} rateLimiter
+     * @param {object} config
+     **/
+    constructor(network, state, wallet, rateLimiter, config) {
+        super(network, state, wallet, rateLimiter, config);
+        this.#config = config
+        this.#wallet = wallet
+        this.#partialBootstrapDeploymentValidator = new PartialBootstrapDeployment(state, wallet, config);
+        this.#partialTransactionValidator = new PartialTransaction(state, wallet, config);
     }
 
     async handleOperation(payload) {
@@ -37,24 +42,24 @@ class SubnetworkOperationHandler extends BaseOperationHandler {
     }
 
     async #partialTransactionSubHandler(payload) {
-        const normalizedPayload = this.#normalizeTransactionOperation(payload);
+        const normalizedPayload = this.#normalizeTransactionOperation(payload, this.#config);
         const isValid = await this.#partialTransactionValidator.validate(normalizedPayload);
         if (!isValid) {
             throw new Error("SubnetworkHandler: Transaction validation failed.");
         }
 
-        const completeTransactionOperation = await CompleteStateMessageOperations.assembleCompleteTransactionOperationMessage(
-            this.wallet,
-            normalizedPayload.address,
-            normalizedPayload.txo.tx,
-            normalizedPayload.txo.txv,
-            normalizedPayload.txo.iw,
-            normalizedPayload.txo.in,
-            normalizedPayload.txo.ch,
-            normalizedPayload.txo.is,
-            normalizedPayload.txo.bs,
-            normalizedPayload.txo.mbs
-        );
+        const completeTransactionOperation = await new CompleteStateMessageOperations(this.#wallet, this.#config)
+            .assembleCompleteTransactionOperationMessage(
+                normalizedPayload.address,
+                normalizedPayload.txo.tx,
+                normalizedPayload.txo.txv,
+                normalizedPayload.txo.iw,
+                normalizedPayload.txo.in,
+                normalizedPayload.txo.ch,
+                normalizedPayload.txo.is,
+                normalizedPayload.txo.bs,
+                normalizedPayload.txo.mbs
+            );
         this.network.transactionPoolService.addTransaction(completeTransactionOperation);
     }
 
@@ -65,16 +70,16 @@ class SubnetworkOperationHandler extends BaseOperationHandler {
             throw new Error("SubnetworkHandler: Bootstrap deployment validation failed.");
         }
 
-        const completeBootstrapDeploymentOperation = await CompleteStateMessageOperations.assembleCompleteBootstrapDeployment(
-            this.wallet,
-            normalizedPayload.address,
-            normalizedPayload.bdo.tx,
-            normalizedPayload.bdo.txv,
-            normalizedPayload.bdo.bs,
-            normalizedPayload.bdo.ic,
-            normalizedPayload.bdo.in,
-            normalizedPayload.bdo.is,
-        )
+        const completeBootstrapDeploymentOperation = await new CompleteStateMessageOperations(this.#wallet, this.#config)
+            .assembleCompleteBootstrapDeployment(
+                normalizedPayload.address,
+                normalizedPayload.bdo.tx,
+                normalizedPayload.bdo.txv,
+                normalizedPayload.bdo.bs,
+                normalizedPayload.bdo.ic,
+                normalizedPayload.bdo.in,
+                normalizedPayload.bdo.is,
+            )
         this.network.transactionPoolService.addTransaction(completeBootstrapDeploymentOperation);
 
     }
@@ -103,7 +108,7 @@ class SubnetworkOperationHandler extends BaseOperationHandler {
 
         return {
             type,
-            address: addressToBuffer(address, TRAC_NETWORK_MSB_MAINNET_PREFIX),
+            address: addressToBuffer(address, this.#config.addressPrefix),
             bdo: normalizedBdo
         };
     }
@@ -135,7 +140,7 @@ class SubnetworkOperationHandler extends BaseOperationHandler {
 
         return {
             type,
-            address: addressToBuffer(address, TRAC_NETWORK_MSB_MAINNET_PREFIX),
+            address: addressToBuffer(address, this.#config.addressPrefix),
             txo: normalizedTxo
         };
     }

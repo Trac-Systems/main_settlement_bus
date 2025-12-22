@@ -21,7 +21,7 @@ import {testKeyPair1, testKeyPair2, testKeyPair3, testKeyPair4, testKeyPair5} fr
 import {OperationType} from "../../../../src/utils/constants.js";
 import {addressToBuffer} from "../../../../src/core/state/utils/address.js";
 import { $TNK } from '../../../../src/core/state/utils/balance.js';
-import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
+import { config } from '../../../helpers/config.js';
 
 let tmpDirectory, admin, writer, externalNode, externalBootstrap, maliciousPeer;
 
@@ -33,10 +33,10 @@ hook('Initialize nodes', async t => {
     const randomChannel = randomBytes(32).toString('hex');
 
     const baseOptions = {
-        enable_tx_apply_logs: false,
-        enable_interactive_mode: false,
-        enable_role_requester: false,
-        enable_validator_observer: false,
+        enableTxApplyLogs: false,
+        enableInteractiveMode: false,
+        enableRoleRequester: false,
+        enableValidatorObserver: false,
         channel: randomChannel,
     }
 
@@ -108,33 +108,6 @@ test('handleApplyTxOperation (apply) - different operation type', async t => {
     t.absent(await writer.msb.state.get(txHash), 'post tx with incorrect operation type should not be added to the base');
 })
 
-// test('handleApplyTxOperation (apply) - replay attack', async t => {
-//     const {postTx, txHash} = await generatePostTx(writer, externalNode, externalBootstrap)
-//     const rawTx = await CompleteStateMessageOperations.assembleCompleteTransactionOperationMessage(
-//         writer.msb.wallet,
-//         postTx.address,
-//         b4a.from(postTx.txo.tx, 'hex'),
-//         b4a.from(postTx.txo.txv, 'hex'),
-//         b4a.from(postTx.txo.iw, 'hex'),
-//         b4a.from(postTx.txo.in, 'hex'),
-//         b4a.from(postTx.txo.ch, 'hex'),
-//         b4a.from(postTx.txo.is, 'hex'),
-//         b4a.from(postTx.txo.bs, 'hex'),
-//         b4a.from(postTx.txo.mbs, 'hex')
-//     );
-//     await writer.msb.state.append(rawTx);
-//     await tick();
-//     await sleep(500)
-//     const firstRes = await writer.msb.state.base.view.get(txHash);
-
-//     await writer.msb.state.append(rawTx);
-//     await sleep(500)
-//     await tick();
-//     const secondRes = await writer.msb.state.base.view.get(txHash);
-
-//     t.is(firstRes.seq, secondRes.seq, 'post tx should not be added to the base twice');
-// })
-
 test('handleApplyTxOperation (apply) - invalid postTx signature (adversary signature - writer signature)', async t => {
     const maliciousWriter = await promoteToWriter(admin, maliciousPeer)
     const {postTx, txHash} = await generatePostTx(writer, externalNode, externalBootstrap)
@@ -190,7 +163,7 @@ test('handleApplyTxOperation (apply) - invalid postTx address (malicious node re
     const maliciousWriter = await promoteToWriter(admin, maliciousPeer)
     const {postTx, txHash} = await generatePostTx(writer, externalNode, externalBootstrap)
     let decodedPostTx = safeDecodeApplyOperation(postTx);
-    decodedPostTx.address = addressToBuffer(maliciousWriter.wallet.address, TRAC_NETWORK_MSB_MAINNET_PREFIX);
+    decodedPostTx.address = addressToBuffer(maliciousWriter.wallet.address, config.addressPrefix);
     const encodedMaliciousPostTx = safeEncodeApplyOperation(decodedPostTx);
     await maliciousWriter.msb.state.append(encodedMaliciousPostTx);
     await waitDemotion(maliciousWriter, async () => {
@@ -204,7 +177,7 @@ test('handleApplyTxOperation (apply) - invalid postTx txo.ia (malicious node rep
     const maliciousWriter = await promoteToWriter(admin, maliciousPeer)
     const {postTx, txHash} = await generatePostTx(writer, externalNode, externalBootstrap)
     let decodedPostTx = safeDecodeApplyOperation(postTx);
-    decodedPostTx.txo.ia = addressToBuffer(maliciousWriter.wallet.address, TRAC_NETWORK_MSB_MAINNET_PREFIX);
+    decodedPostTx.txo.ia = addressToBuffer(maliciousWriter.wallet.address, config.addressPrefix);
     const encodedMaliciousPostTx = safeEncodeApplyOperation(decodedPostTx);
     await waitDemotion(maliciousWriter, async () => {
         await maliciousWriter.msb.state.append(encodedMaliciousPostTx);

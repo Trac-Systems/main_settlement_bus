@@ -5,26 +5,26 @@ import CompleteStateMessageOperations
     from "../../../../messages/completeStateMessages/CompleteStateMessageOperations.js";
 import {normalizeHex} from "../../../../utils/helpers.js";
 import BaseOperationHandler from './base/BaseOperationHandler.js';
-import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
 
 class RoleOperationHandler extends BaseOperationHandler {
     #partialRoleAccessValidator;
     #wallet;
     #network;
+    #config;
 
-    constructor(network, state, wallet, rateLimiter, options = {}) {
-        super(network, state, wallet, rateLimiter, options);
+    /**
+     * @param {Network} network
+     * @param {State} state
+     * @param {PeerWallet} wallet
+     * @param {TransactionRateLimiterService} rateLimiter
+     * @param {object} config
+     **/
+    constructor(network, state, wallet, rateLimiter, config) {
+        super(network, state, wallet, rateLimiter, config);
         this.#wallet = wallet;
+        this.#config = config;
         this.#network = network;
-        this.#partialRoleAccessValidator = new PartialRoleAccess(state)
-    }
-
-    get wallet() {
-        return this.#wallet;
-    }
-
-    get network() {
-        return this.#network;
+        this.#partialRoleAccessValidator = new PartialRoleAccess(state, wallet ,this.#config)
     }
 
     get partialRoleAccessValidator() {
@@ -41,8 +41,7 @@ class RoleOperationHandler extends BaseOperationHandler {
         
         switch (normalizedPartialRoleAccessPayload.type) {
             case OperationType.ADD_WRITER:
-                completePayload = await CompleteStateMessageOperations.assembleAddWriterMessage(
-                    this.wallet,
+                completePayload = await new CompleteStateMessageOperations(this.#wallet, this.#config).assembleAddWriterMessage(
                     normalizedPartialRoleAccessPayload.address,
                     normalizedPartialRoleAccessPayload.rao.tx,
                     normalizedPartialRoleAccessPayload.rao.txv,
@@ -52,8 +51,7 @@ class RoleOperationHandler extends BaseOperationHandler {
                 );
                 break;
             case OperationType.REMOVE_WRITER:
-                completePayload = await CompleteStateMessageOperations.assembleRemoveWriterMessage(
-                    this.wallet,
+                completePayload = await new CompleteStateMessageOperations(this.#wallet, this.#config).assembleRemoveWriterMessage(
                     normalizedPartialRoleAccessPayload.address,
                     normalizedPartialRoleAccessPayload.rao.tx,
                     normalizedPartialRoleAccessPayload.rao.txv,
@@ -63,8 +61,7 @@ class RoleOperationHandler extends BaseOperationHandler {
                 );
                 break;
             case OperationType.ADMIN_RECOVERY:
-                completePayload = await CompleteStateMessageOperations.assembleAdminRecoveryMessage(
-                    this.wallet,
+                completePayload = await new CompleteStateMessageOperations(this.#wallet, this.#config).assembleAdminRecoveryMessage(
                     normalizedPartialRoleAccessPayload.address,
                     normalizedPartialRoleAccessPayload.rao.tx,
                     normalizedPartialRoleAccessPayload.rao.txv,
@@ -82,7 +79,7 @@ class RoleOperationHandler extends BaseOperationHandler {
             throw new Error("OperationHandler: Assembling complete role access operation failed.");
         }
 
-        this.network.transactionPoolService.addTransaction(completePayload)
+        this.#network.transactionPoolService.addTransaction(completePayload)
     }
 
     #normalizePartialRoleAccess(payload) {
@@ -108,7 +105,7 @@ class RoleOperationHandler extends BaseOperationHandler {
 
         return {
             type,
-            address: addressToBuffer(address, TRAC_NETWORK_MSB_MAINNET_PREFIX),
+            address: addressToBuffer(address, this.#config.addressPrefix),
             rao: normalizedRao
         };
     }

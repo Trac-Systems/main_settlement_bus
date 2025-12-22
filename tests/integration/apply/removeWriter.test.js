@@ -21,26 +21,27 @@ import {
 } from '../../fixtures/apply.fixtures.js';
 import CompleteStateMessageOperations from '../../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
 import PartialStateMessageOperations from '../../../src/messages/partialStateMessages/PartialStateMessageOperations.js';
+import { config } from '../../helpers/config.js';
 
 let admin, writer1, writer2, writer3, writer4, indexer, tmpDirectory;
 
 const sendRemoveWriter = async (invoker, broadcaster) => {
     const validity = await invoker.msb.state.getIndexerSequenceState()
-    const writerRemoval = await PartialStateMessageOperations.assembleRemoveWriterMessage(
-        invoker.wallet,
-        b4a.toString(invoker.msb.state.writingKey, 'hex'),
-        b4a.toString(validity, 'hex')
-    );
+    const writerRemoval = await new PartialStateMessageOperations(invoker.wallet, config)
+        .assembleRemoveWriterMessage(
+            b4a.toString(invoker.msb.state.writingKey, 'hex'),
+            b4a.toString(validity, 'hex')
+        );
 
-    const raw = await CompleteStateMessageOperations.assembleRemoveWriterMessage(
-        broadcaster.wallet,
-        writerRemoval.address,
-        b4a.from(writerRemoval.rao.tx, 'hex'),
-        b4a.from(writerRemoval.rao.txv, 'hex'),
-        b4a.from(writerRemoval.rao.iw, 'hex'),
-        b4a.from(writerRemoval.rao.in, 'hex'),
-        b4a.from(writerRemoval.rao.is, 'hex'),
-    )
+    const raw = await new CompleteStateMessageOperations(broadcaster.wallet, config)
+        .assembleRemoveWriterMessage(
+            writerRemoval.address,
+            b4a.from(writerRemoval.rao.tx, 'hex'),
+            b4a.from(writerRemoval.rao.txv, 'hex'),
+            b4a.from(writerRemoval.rao.iw, 'hex'),
+            b4a.from(writerRemoval.rao.in, 'hex'),
+            b4a.from(writerRemoval.rao.is, 'hex'),
+        )
 
     return await broadcaster.msb.state.append(raw)
 }
@@ -50,10 +51,10 @@ hook('Initialize nodes for removeWriter tests', async () => {
     const randomChannel = randomBytes(32).toString('hex');
 
     admin = await setupMsbAdmin(testKeyPair1, tmpDirectory, {
-        enable_tx_apply_logs: false,
-        enable_interactive_mode: false,
-        enable_role_requester: false,
-        enable_validator_observer: false,
+        enableTxApplyLogs: false,
+        enableInteractiveMode: false,
+        enableRoleRequester: false,
+        enableValidatorObserver: false,
         channel: randomChannel,
     });
     writer1 = await setupMsbWriter(admin, 'writer', testKeyPair2, tmpDirectory, admin.options);

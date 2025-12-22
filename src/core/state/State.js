@@ -14,9 +14,7 @@ import {
     ADMIN_INITIAL_STAKED_BALANCE,
     MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION,
     TRAC_NAMESPACE,
-    CustomEventType,
-    NETWORK_ID,
-    TRAC_ADDRESS_SIZE
+    CustomEventType
 } from '../../utils/constants.js';
 import { isHexString, sleep, isTransactionRecordPut } from '../../utils/helpers.js';
 import PeerWallet from 'trac-wallet';
@@ -45,7 +43,6 @@ import deploymentEntryUtils from './utils/deploymentEntry.js';
 import { deepCopyBuffer } from '../../utils/buffer.js';
 import { Status } from './utils/transaction.js';
 import Corestore from 'corestore';
-import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
 
 const OVERSIZED_BATCH_PENALTY_MULTIPLIER = BATCH_SIZE;
 
@@ -61,26 +58,18 @@ class State extends ReadyResource {
 
     /**
      * @param {Corestore} store
-     * @param {string} bootstrap
      * @param {PeerWallet} wallet
-     * @param {object} options
+     * @param {object} config
      **/
-    constructor(store, bootstrap, wallet, options = {}) {
+    constructor(store, wallet, config) {
         super();
 
-        this.#config = {
-            networkId: NETWORK_ID,
-            bootstrap,
-            addressLength: TRAC_ADDRESS_SIZE,
-            addressPrefix: TRAC_NETWORK_MSB_MAINNET_PREFIX,
-            enableTxApplyLogs: options.enable_tx_apply_logs !== undefined ? options.enable_tx_apply_logs : true,
-            enableErrorApplyLogs: options.enable_error_apply_logs !== undefined ? options.enable_error_apply_logs : true
-        } // this will later be injected
+        this.#config = config
 
         this.#store = store;
         this.#wallet = wallet;
 
-        this.check = new Check();
+        this.check = new Check(config);
         this.#base = new Autobase(this.#store, this.#config.bootstrap, {
             ackInterval: ACK_INTERVAL,
             valueEncoding: AUTOBASE_VALUE_ENCODING,

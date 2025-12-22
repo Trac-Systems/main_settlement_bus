@@ -1,22 +1,22 @@
 import { test } from 'brittle';
 import b4a from 'b4a';
-import { WRITER_BYTE_LENGTH, TRAC_ADDRESS_SIZE } from '../../../../src/utils/constants.js';
+import { WRITER_BYTE_LENGTH } from '../../../../src/utils/constants.js';
 import { randomAddress, randomBuffer } from '../stateTestUtils.js';
 import addressUtils from '../../../../src/core/state/utils/address.js';
 import adminEntryUtils from '../../../../src/core/state/utils/adminEntry.js';
-import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
+import { config } from '../../../helpers/config.js';
 
-const isAddressValid = address => addressUtils.isAddressValid(address, TRAC_NETWORK_MSB_MAINNET_PREFIX);
+const isAddressValid = address => addressUtils.isAddressValid(address, config.addressPrefix);
 const addressToBuffer = addressUtils.addressToBuffer;
-const encodeAdminEntry = (address, wk) => adminEntryUtils.encode(address, wk, TRAC_NETWORK_MSB_MAINNET_PREFIX);
-const decodeAdminEntry = entry => adminEntryUtils.decode(entry, TRAC_NETWORK_MSB_MAINNET_PREFIX);
-const ADMIN_ENTRY_SIZE = TRAC_ADDRESS_SIZE + WRITER_BYTE_LENGTH;
+const encodeAdminEntry = (address, wk) => adminEntryUtils.encode(address, wk, config.addressPrefix);
+const decodeAdminEntry = entry => adminEntryUtils.decode(entry, config.addressPrefix);
+const ADMIN_ENTRY_SIZE = config.addressLength + WRITER_BYTE_LENGTH;
 
 test('Admin Entry - Encode and Decode - Happy Path', t => {
-    const address = randomAddress();
+    const address = randomAddress(config.addressPrefix);
     const wk = randomBuffer(WRITER_BYTE_LENGTH);
 
-    const encoded = encodeAdminEntry(addressToBuffer(address, TRAC_NETWORK_MSB_MAINNET_PREFIX), wk);
+    const encoded = encodeAdminEntry(addressToBuffer(address, config.addressPrefix), wk);
     t.is(encoded.length, ADMIN_ENTRY_SIZE, "encoding has valid length");
 
     const decoded = decodeAdminEntry(encoded);
@@ -27,8 +27,8 @@ test('Admin Entry - Encode and Decode - Happy Path', t => {
 });
 
 test('Admin Entry - Encode returns empty buffer on invalid input', t => {
-    const addrString = randomAddress();
-    const validAddress = addressToBuffer(addrString, TRAC_NETWORK_MSB_MAINNET_PREFIX);
+    const addrString = randomAddress(config.addressPrefix);
+    const validAddress = addressToBuffer(addrString, config.addressPrefix);
     const separatorIndex = addrString.indexOf('1');
     const invalidAddress = validAddress.subarray(separatorIndex); // missing HRP
 

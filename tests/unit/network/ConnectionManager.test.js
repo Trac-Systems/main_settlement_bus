@@ -5,6 +5,7 @@ import { testKeyPair1, testKeyPair2, testKeyPair3, testKeyPair4, testKeyPair5, t
 import ConnectionManager from "../../../src/core/network/services/ConnectionManager.js";
 import { tick } from "../../helpers/setupApplyTests.js";
 import b4a from 'b4a'
+import { createConfig, ENV } from "../../../src/config/env.js";
 
 const createConnection = (key) => {
     const emitter = new EventEmitter()
@@ -18,7 +19,8 @@ const createConnection = (key) => {
 }
 
 const makeManager = (maxValidators = 6, conns = connections) => {
-    const connectionManager = new ConnectionManager({ maxValidators })
+    const merged = createConfig(ENV.DEVELOPMENT, { maxValidators })
+    const connectionManager = new ConnectionManager(merged)
 
     conns.forEach(({ key, connection }) => {
         connectionManager.addValidator(key, connection)
@@ -78,7 +80,7 @@ test('ConnectionManager', () => {
                 createConnection(testKeyPair2.publicKey),
             ]
 
-            const connectionManager = new ConnectionManager({ maxValidators: maxConnections })
+            const connectionManager = makeManager(maxConnections)
             localConnections.forEach(({ key, connection }) => {
                 connectionManager.addValidator(key, connection)
             })

@@ -3,10 +3,9 @@ import { isAddressValid } from '../core/state/utils/address.js';
 import PeerWallet from 'trac-wallet';
 import b4a from 'b4a';
 import { ZERO_LICENSE } from '../core/state/utils/nodeEntry.js';
-import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
 
-export async function validateAddressFromIncomingFile(stateInstance, address, adminEntry) {
-    if (!isAddressValid(address, TRAC_NETWORK_MSB_MAINNET_PREFIX)) {
+export async function validateAddressFromIncomingFile(stateInstance, config, address, adminEntry) {
+    if (!isAddressValid(address, config.addressPrefix)) {
         throw new Error(`Invalid address format: '${address}'. Please ensure all addresses are valid.`);
     }
 

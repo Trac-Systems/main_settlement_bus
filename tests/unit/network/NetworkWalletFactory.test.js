@@ -3,15 +3,14 @@ import sinon from 'sinon';
 import b4a from 'b4a';
 
 import PeerWallet from 'trac-wallet';
-import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
-
 import NetworkWalletFactory, { EphemeralWallet } from '../../../src/core/network/identity/NetworkWalletFactory.js';
 import { errorMessageIncludes } from '../../helpers/regexHelper.js';
 import { testKeyPair1, testKeyPair2 } from '../../fixtures/apply.fixtures.js';
+import { config } from '../../helpers/config.js';
 
 test('NetworkWalletFactory.provide returns wallet when enabled', async t => {
     const publicKey = b4a.from(testKeyPair2.publicKey, 'hex');
-    const address = PeerWallet.encodeBech32m(TRAC_NETWORK_MSB_MAINNET_PREFIX, publicKey);
+    const address = PeerWallet.encodeBech32m(config.addressPrefix, publicKey);
     const signResult = b4a.from('abcd', 'hex');
     const wallet = {
         publicKey,
@@ -20,7 +19,7 @@ test('NetworkWalletFactory.provide returns wallet when enabled', async t => {
         verify: sinon.stub().returns(true)
     };
 
-    const provider = NetworkWalletFactory.provide({ wallet, enableWallet: true });
+    const provider = NetworkWalletFactory.provide({ wallet, enableWallet: true, networkPrefix: config.addressPrefix });
     const message = b4a.from('00112233', 'hex');
     const signature = provider.sign(message);
 
@@ -39,7 +38,7 @@ test('NetworkWalletFactory.provide returns wallet when enabled', async t => {
 test('NetworkWalletFactory.provide requires both public and secret keys when wallet disabled', async t => {
     const publicKey = b4a.from(testKeyPair1.publicKey, 'hex');
     await t.exception(
-        () => NetworkWalletFactory.provide({ enableWallet: false, keyPair: { publicKey } }),
+        () => NetworkWalletFactory.provide({ enableWallet: false, keyPair: { publicKey }, networkPrefix: config.addressPrefix }),
         errorMessageIncludes('keyPair with publicKey and secretKey is required')
     );
 });
@@ -50,7 +49,8 @@ test('NetworkWalletFactory.provide rejects non-buffer inputs', async t => {
         () =>
             NetworkWalletFactory.provide({
                 enableWallet: false,
-                keyPair: { publicKey: 'not-a-buffer', secretKey }
+                keyPair: { publicKey: 'not-a-buffer', secretKey },
+                networkPrefix: config.addressPrefix
             }),
         errorMessageIncludes('must be a Buffer')
     );
@@ -65,7 +65,7 @@ test('NetworkWalletFactory.provide propagates invalid public key length errors',
             NetworkWalletFactory.provide({
                 enableWallet: false,
                 keyPair: { publicKey: invalidPublicKey, secretKey },
-                networkPrefix: TRAC_NETWORK_MSB_MAINNET_PREFIX
+                networkPrefix: config.addressPrefix
             }),
         errorMessageIncludes('Invalid public key')
     );
@@ -79,14 +79,14 @@ test('NetworkWalletFactory.provide derives address and signs payloads from keyPa
     const provider = NetworkWalletFactory.provide({
         enableWallet: false,
         keyPair,
-        networkPrefix: TRAC_NETWORK_MSB_MAINNET_PREFIX
+        networkPrefix: config.addressPrefix
     });
     const message = b4a.from('123455555', 'hex');
     const signature = provider.sign(message);
 
     t.is(
         provider.address,
-        PeerWallet.encodeBech32m(TRAC_NETWORK_MSB_MAINNET_PREFIX, provider.publicKey)
+        PeerWallet.encodeBech32m(config.addressPrefix, provider.publicKey)
     );
     t.ok(PeerWallet.verify(signature, message, provider.publicKey));
     t.ok(provider.verify(signature, message));
@@ -104,7 +104,7 @@ test('NetworkWalletFactory handles falsy address derivation results', async t =>
             NetworkWalletFactory.provide({
                 enableWallet: false,
                 keyPair,
-                networkPrefix: TRAC_NETWORK_MSB_MAINNET_PREFIX
+                networkPrefix: config.addressPrefix
             }),
         errorMessageIncludes('failed to derive address')
     );
@@ -124,7 +124,7 @@ test('NetworkWalletFactory propagates encoder exceptions', async t => {
             NetworkWalletFactory.provide({
                 enableWallet: false,
                 keyPair,
-                networkPrefix: TRAC_NETWORK_MSB_MAINNET_PREFIX
+                networkPrefix: config.addressPrefix
             }),
         errorMessageIncludes('test exception')
     );
@@ -137,12 +137,12 @@ test('EphemeralWallet exposes wallet like interface', async t => {
         publicKey: b4a.from(testKeyPair1.publicKey, 'hex'),
         secretKey: b4a.from(testKeyPair1.secretKey, 'hex')
     };
-    const wallet = new EphemeralWallet(keyPair, TRAC_NETWORK_MSB_MAINNET_PREFIX);
+    const wallet = new EphemeralWallet(keyPair, config.addressPrefix);
     const message = b4a.from('feedface', 'hex');
     const signature = wallet.sign(message);
 
     t.alike(wallet.publicKey, keyPair.publicKey);
-    t.is(wallet.address, PeerWallet.encodeBech32m(TRAC_NETWORK_MSB_MAINNET_PREFIX, keyPair.publicKey));
+    t.is(wallet.address, PeerWallet.encodeBech32m(config.addressPrefix, keyPair.publicKey));
     t.ok(PeerWallet.verify(signature, message, wallet.publicKey));
     t.ok(wallet.verify(signature, message));
 });
@@ -150,7 +150,7 @@ test('EphemeralWallet exposes wallet like interface', async t => {
 test('EphemeralWallet requires both public and secret keys', async t => {
     const publicKey = b4a.from(testKeyPair1.publicKey, 'hex');
     await t.exception(
-        () => new EphemeralWallet({ publicKey }, TRAC_NETWORK_MSB_MAINNET_PREFIX),
+        () => new EphemeralWallet({ publicKey }, config.addressPrefix),
         errorMessageIncludes('keyPair with publicKey and secretKey is required')
     );
 });

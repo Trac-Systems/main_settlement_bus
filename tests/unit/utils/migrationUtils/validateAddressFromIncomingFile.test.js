@@ -3,6 +3,8 @@ import migrationUtils from '../../../../src/utils/migrationUtils.js';
 import { errorMessageIncludes } from "../../../helpers/regexHelper.js";
 import { ZERO_LICENSE } from '../../../../src/core/state/utils/nodeEntry.js';
 import b4a from 'b4a';
+import { config } from '../../../helpers/config.js';
+
 const VALID_ADDRESS = 'trac1dguwzsvcsehslh6dgj2mqlsxdn7s5t5vhem56yd0xlg47aq6exzqymhr6u';
 const ADMIN_ADDRESS = 'trac1yva2pduhz5yst8jgzmrc9ve0as5mx7tcw6le9srj6xcwqkx9hacqxxhsf9';
 const INVALID_ADDRESS = 'notanaddress';
@@ -41,6 +43,7 @@ const mockStateInstanceBanned = {
 test('validateAddressFromIncomingFile - valid address', async (t) => {
     await migrationUtils.validateAddressFromIncomingFile(
         mockStateInstance,
+        config,
         VALID_ADDRESS,
         { address: ADMIN_ADDRESS }
     );
@@ -51,6 +54,7 @@ test('validateAddressFromIncomingFile - invalid address format', async (t) => {
     await t.exception(
         () => migrationUtils.validateAddressFromIncomingFile(
             mockStateInstance,
+            config,
             INVALID_ADDRESS,
             { address: ADMIN_ADDRESS }
         ),
@@ -62,6 +66,7 @@ test('validateAddressFromIncomingFile - admin address', async (t) => {
     await t.exception(
         () => migrationUtils.validateAddressFromIncomingFile(
             mockStateInstance,
+            config,
             ADMIN_ADDRESS,
             { address: ADMIN_ADDRESS }
         ),
@@ -73,6 +78,7 @@ test('validateAddressFromIncomingFile - whitelisted node', async (t) => {
     await t.exception(
         () => migrationUtils.validateAddressFromIncomingFile(
             mockStateInstanceWhitelisted,
+            config,
             VALID_ADDRESS,
             { address: ADMIN_ADDRESS }
         ),
@@ -84,6 +90,7 @@ test('validateAddressFromIncomingFile - banned/previously whitelisted address', 
     await t.exception(
         () => migrationUtils.validateAddressFromIncomingFile(
             mockStateInstanceBanned,
+            config,
             VALID_ADDRESS,
             { address: ADMIN_ADDRESS }
         ),

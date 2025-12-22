@@ -1,12 +1,25 @@
 import b4a from "b4a";
 import tracCrypto from "trac-crypto-api";
-
 import { $TNK } from "../../src/core/state/utils/balance.js";
 import { createMessage } from "../../src/utils/buffer.js";
 import { blake3Hash } from "../../src/utils/crypto.js";
-import { OperationType, NETWORK_ID } from "../../src/utils/constants.js";
+import { OperationType } from "../../src/utils/constants.js";
 import { addressToBuffer } from "../../src/core/state/utils/address.js";
-import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from "trac-wallet/constants.js";
+import { config } from '../helpers/config.js'
+import { sleep } from "../../src/utils/helpers.js";
+
+export const waitForConnection = async node => {
+    let attempts = 0
+    while (attempts < 60) {
+        const count = node.network.validatorConnectionManager.connectionCount()
+        if (count > 0) {
+            break
+        }
+        
+        await sleep(300);
+        attempts++;
+    }
+}
 
 /**
  * Build a base64-encoded transfer payload and matching tx hash
@@ -16,18 +29,18 @@ import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from "trac-wallet/constants.js";
  * PartialOperation.validateSignature, so that tests broadcast
  * transactions the node will accept without touching consensus code.
  *
- * @param {import("trac-wallet").default} wallet - Writer wallet used for signing.
+ * @param {object} context - General context
  * @param {import("../../src/core/state/State.js").default} state - MSB state instance.
  * @param {bigint} [amountTnk=1n] - Transfer amount in TNK units.
  * @returns {Promise<{ payload: string, txHashHex: string }>}
  */
-export async function buildRpcSelfTransferPayload(wallet, state, amountTnk = 1n) {
+export async function buildRpcSelfTransferPayload(context, state, amountTnk = 1n) {
     const txvBuffer = await state.getIndexerSequenceState();
     const txvHex = b4a.toString(txvBuffer, "hex");
 
     const txData = await tracCrypto.transaction.preBuild(
-        wallet.address,
-        wallet.address,
+        context.wallet.address,
+        context.wallet.address,
         b4a.toString($TNK(amountTnk), "hex"),
         txvHex
     );
@@ -39,10 +52,10 @@ export async function buildRpcSelfTransferPayload(wallet, state, amountTnk = 1n)
     const txvBuf = b4a.from(txData.validity, "hex");
     const nonceBuf = b4a.from(nonceHex, "hex");
     const amountBuf = b4a.from(amountHex, "hex");
-    const toBuf = addressToBuffer(toAddress, TRAC_NETWORK_MSB_MAINNET_PREFIX);
+    const toBuf = addressToBuffer(toAddress, config.addressPrefix);
 
     const message = createMessage(
-        NETWORK_ID,
+        config.networkId,
         txvBuf,
         toBuf,
         amountBuf,
@@ -51,11 +64,11 @@ export async function buildRpcSelfTransferPayload(wallet, state, amountTnk = 1n)
     );
 
     const messageHash = await blake3Hash(message);
-    const signature = wallet.sign(messageHash);
+    const signature = context.wallet.sign(messageHash);
 
     const payloadObject = {
         type: OperationType.TRANSFER,
-        address: wallet.address,
+        address: context.wallet.address,
         tro: {
             tx: b4a.toString(messageHash, "hex"),
             txv: txData.validity,

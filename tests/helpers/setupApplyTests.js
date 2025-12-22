@@ -6,6 +6,7 @@ import path from 'path';
 import CompleteStateMessageOperations from '../../src/messages/completeStateMessages/CompleteStateMessageOperations.js'
 import PartialStateMessageOperations from '../../src/messages/partialStateMessages/PartialStateMessageOperations.js';
 import {MainSettlementBus} from '../../src/index.js'
+import { createConfig, ENV } from '../../src/config/env.js'
 import fileUtils from '../../src/utils/fileUtils.js'
 import {EntryType} from '../../src/utils/constants.js';
 import {sleep} from '../../src/utils/helpers.js'
@@ -15,8 +16,8 @@ import CompleteStateMessageBuilder from '../../src/messages/completeStateMessage
 import CompleteStateMessageDirector from '../../src/messages/completeStateMessages/CompleteStateMessageDirector.js'
 import { safeEncodeApplyOperation } from "../../src/utils/protobuf/operationHelpers.js"
 import { $TNK } from '../../src/core/state/utils/balance.js';
-import { operation } from 'trac-crypto-api'
 import { EventType } from '../../src/utils/constants.js';
+import { Config } from '../../src/config/config.js';
 let os, fsp;
 
 /**
@@ -70,7 +71,7 @@ export const tick = () => new Promise(resolve => setImmediate(resolve));
 export async function fundPeer(admin, toFund, amount) {
     const txValidity = await admin.msb.state.getIndexerSequenceState()
     const director = new CompleteStateMessageDirector();
-    director.builder = new CompleteStateMessageBuilder(admin.wallet);
+    director.builder = new CompleteStateMessageBuilder(admin.wallet, admin.config);
     const payload = await director.buildBalanceInitializationMessage(
         admin.wallet.address,
         toFund.wallet.address,
@@ -88,9 +89,10 @@ export async function fundPeer(admin, toFund, amount) {
 export async function initMsbPeer(peerName, peerKeyPair, temporaryDirectory, options = {}) {
     const peer = await initDirectoryStructure(peerName, peerKeyPair, temporaryDirectory);
     peer.options = options
-    peer.options.stores_directory = peer.storesDirectory;
-    peer.options.store_name = peer.storeName;
-    const msb = new MainSettlementBus(peer.options);
+    peer.options.storesDirectory = peer.storesDirectory;
+    peer.options.storeName = peer.storeName;
+    peer.config = createConfig(ENV.DEVELOPMENT, peer.options)
+    const msb = new MainSettlementBus(peer.config);
 
     peer.msb = msb;
     peer.wallet = msb.wallet;
@@ -110,10 +112,11 @@ export async function initMsbAdmin(keyPair, temporaryDirectory, options = {}) {
     const admin = await initMsbPeer(peerName, keyPair, temporaryDirectory, { ...options, bootstrap: randomBytes(32).toString('hex') });
 
     await admin.msb.ready();
-    admin.options.bootstrap = admin.msb.state.writingKey;
+    admin.options.bootstrap = admin.msb.state.writingKey.toString('hex');
+    admin.config = new Config(admin.options, admin.config)
     await admin.msb.close();
 
-    admin.msb = new MainSettlementBus(admin.options);
+    admin.msb = new MainSettlementBus(admin.config);
     await admin.msb.ready();
     await admin.msb.state.append(null); // before initialization system.indexers is empty, we need to initialize first block to create system.indexers array
     return admin;
@@ -122,7 +125,9 @@ export async function initMsbAdmin(keyPair, temporaryDirectory, options = {}) {
 export async function setupMsbAdmin(keyPair, temporaryDirectory, options = {}) {
     const admin = await initMsbAdmin(keyPair, temporaryDirectory, options);
     const txValidity = await admin.msb.state.getIndexerSequenceState();
-    const addAdminMessage = await CompleteStateMessageOperations.assembleAddAdminMessage(admin.wallet, admin.msb.state.writingKey, txValidity);
+    const addAdminMessage = await new CompleteStateMessageOperations(admin.wallet, admin.config)
+        .assembleAddAdminMessage(admin.msb.state.writingKey, txValidity);
+
     await admin.msb.state.append(addAdminMessage);
     await tick();
     return admin;
@@ -133,21 +138,21 @@ export async function setupNodeAsWriter(admin, writerCandidate) {
         await setupWhitelist(admin, [writerCandidate.wallet.address]); // ensure if is whitelisted
 
         const validity = await admin.msb.getIndexerSequenceState()
-        const req = await PartialStateMessageOperations.assembleAddWriterMessage(
-            writerCandidate.wallet,
-            writerCandidate.msb.state.writingKey,
-            validity);
+        const req = await new PartialStateMessageOperations(writerCandidate.wallet, admin.config)
+            .assembleAddWriterMessage(
+                b4a.toString(writerCandidate.msb.state.writingKey, 'hex'),
+                b4a.toString(validity, 'hex'));
 
         await waitWritable(admin, writerCandidate, async () => {
-            const raw = await CompleteStateMessageOperations.assembleAddWriterMessage(
-                admin.wallet,
-                req.address,
-                b4a.from(req.rao.tx, 'hex'),
-                b4a.from(req.rao.txv, 'hex'),
-                b4a.from(req.rao.iw, 'hex'),
-                b4a.from(req.rao.in, 'hex'),
-                b4a.from(req.rao.is, 'hex')
-            )
+            const raw = await new CompleteStateMessageOperations(admin.wallet, admin.config)
+                .assembleAddWriterMessage(
+                    admin.wallet.address,
+                    b4a.from(req.rao.tx, 'hex'),
+                    b4a.from(req.rao.txv, 'hex'),
+                    b4a.from(req.rao.iw, 'hex'),
+                    b4a.from(req.rao.in, 'hex'),
+                    b4a.from(req.rao.is, 'hex')
+                )
             await admin.msb.state.append(raw)
         })
 
@@ -168,21 +173,21 @@ export async function promoteToWriter(admin, writerCandidate) {
             isIndexer: false,
         })
     const validity = await admin.msb.state.getIndexerSequenceState()
-    const req = await PartialStateMessageOperations.assembleAddWriterMessage(
-        writerCandidate.wallet,
-        b4a.toString(writerCandidate.msb.state.writingKey, 'hex'),
-        b4a.toString(validity, 'hex'));
+    const req = await new PartialStateMessageOperations(writerCandidate.wallet, writerCandidate.config)
+        .assembleAddWriterMessage(
+            b4a.toString(writerCandidate.msb.state.writingKey, 'hex'),
+            b4a.toString(validity, 'hex'));
 
     await waitWritable(writerCandidate, writerCandidate, async () => {
-        const raw = await CompleteStateMessageOperations.assembleAddWriterMessage(
-            admin.wallet,
-            req.address,
-            b4a.from(req.rao.tx, 'hex'),
-            b4a.from(req.rao.txv, 'hex'),
-            b4a.from(req.rao.iw, 'hex'),
-            b4a.from(req.rao.in, 'hex'),
-            b4a.from(req.rao.is, 'hex')
-        )
+        const raw = await new CompleteStateMessageOperations(admin.wallet, admin.config)
+            .assembleAddWriterMessage(
+                req.address,
+                b4a.from(req.rao.tx, 'hex'),
+                b4a.from(req.rao.txv, 'hex'),
+                b4a.from(req.rao.iw, 'hex'),
+                b4a.from(req.rao.in, 'hex'),
+                b4a.from(req.rao.is, 'hex')
+            )
         await admin.msb.state.append(raw)
     })
 
@@ -201,8 +206,10 @@ export async function setupMsbWriter(admin, peerName, peerKeyPair, temporaryDire
 
 export async function setupMsbIndexer(indexerCandidate, admin) {
     try {
-        const validity = await admin.msb.state.getIndexerSequenceState()
-        const req = await CompleteStateMessageOperations.assembleAddIndexerMessage(admin.wallet, indexerCandidate.wallet.address, validity);
+    const validity = await admin.msb.state.getIndexerSequenceState()
+    const req = await new CompleteStateMessageOperations(admin.wallet, admin.config)
+        .assembleAddIndexerMessage(indexerCandidate.wallet.address, validity);
+
         await admin.msb.state.append(req);
         await tick(); // wait for the request to be processed
 
@@ -211,7 +218,7 @@ export async function setupMsbIndexer(indexerCandidate, admin) {
             if (!indexersEntry) {
                 return false;
             }
-            const formatted = formatIndexersEntry(indexersEntry);
+            const formatted = formatIndexersEntry(indexersEntry, admin.config.addressLength);
             if (!formatted || !formatted.addresses) return false;
             return formatted.addresses.includes(indexerCandidate.wallet.address);
         }
@@ -254,11 +261,13 @@ export async function setupWhitelist(admin, whitelistAddresses) {
     fileUtils.readAddressesFromWhitelistFile = async () => whitelistAddresses;
     const validity = await admin.msb.state.getIndexerSequenceState()
     for (const address of whitelistAddresses) {
-        const msg = await CompleteStateMessageOperations.assembleAppendWhitelistMessages(admin.wallet, validity, address);
+        const msg = await new CompleteStateMessageOperations(admin.wallet, admin.config)
+            .assembleAppendWhitelistMessages(validity, address);
+
         await admin.msb.state.append(msg);
         await sleep(100)
     }
-    await admin.msb.state.base.forceFastForward()
+
     fileUtils.readAddressesFromWhitelistFile = originalReadAddressesFromWhitelistFile;
 }
 
@@ -306,23 +315,23 @@ export async function initDirectoryStructure(peerName, keyPair, temporaryDirecto
 export const deployExternalBootstrap = async (writer, externalNode) => {
     const externalBootstrap = randomBytes(32).toString('hex');
     const txValidity = await writer.msb.state.getIndexerSequenceState();
-    const payload = await PartialStateMessageOperations.assembleBootstrapDeploymentMessage(
-        externalNode.msb.wallet,
-        externalBootstrap,
-        randomBytes(32).toString('hex'),
-        txValidity.toString('hex')
-    );
+    const payload = await new PartialStateMessageOperations(externalNode.msb.wallet, admin.config)
+        .assembleBootstrapDeploymentMessage(
+            externalBootstrap,
+            randomBytes(32).toString('hex'),
+            txValidity.toString('hex')
+        );
 
-    const raw = await CompleteStateMessageOperations.assembleCompleteBootstrapDeployment(
-        writer.msb.wallet,
-        payload.address,
-        b4a.from(payload.bdo.tx, 'hex'),
-        b4a.from(payload.bdo.txv, 'hex'),
-        b4a.from(payload.bdo.bs, 'hex'),
-        b4a.from(payload.bdo.ic, 'hex'),
-        b4a.from(payload.bdo.in, 'hex'),
-        b4a.from(payload.bdo.is, 'hex'),
-    )
+    const raw = await new CompleteStateMessageOperations(writer.msb.wallet, admin.config)
+        .assembleCompleteBootstrapDeployment(
+            payload.address,
+            b4a.from(payload.bdo.tx, 'hex'),
+            b4a.from(payload.bdo.txv, 'hex'),
+            b4a.from(payload.bdo.bs, 'hex'),
+            b4a.from(payload.bdo.ic, 'hex'),
+            b4a.from(payload.bdo.in, 'hex'),
+            b4a.from(payload.bdo.is, 'hex'),
+        )
     await writer.msb.state.base.append(raw)
     await tick()
     await waitForHash(writer, payload.bdo.tx)
@@ -345,27 +354,27 @@ export const generatePostTx = async (writer, externalNode, externalContractBoots
 
     const contentHash = await blake3Hash(JSON.stringify(testObj));
     const validity = await writer.msb.state.getIndexerSequenceState()
-    const tx = await PartialStateMessageOperations.assembleTransactionOperationMessage(
-        externalNode.wallet,
-        peerWriterKey,
-        b4a.toString(validity, 'hex'),
-        b4a.toString(contentHash, 'hex'),
-        externalContractBootstrap,
-        b4a.toString(writer.msb.bootstrap, 'hex')
-    )
+    const tx = await new PartialStateMessageOperations(externalNode.wallet, admin.config)
+        .assembleTransactionOperationMessage(
+            peerWriterKey,
+            b4a.toString(validity, 'hex'),
+            b4a.toString(contentHash, 'hex'),
+            externalContractBootstrap,
+            b4a.toString(writer.msb.bootstrap, 'hex')
+        )
 
-    const postTx = await CompleteStateMessageOperations.assembleCompleteTransactionOperationMessage(
-        writer.wallet,
-        tx.address,
-        b4a.from(tx.txo.tx, 'hex'),
-        b4a.from(tx.txo.txv, 'hex'),
-        b4a.from(tx.txo.iw, 'hex'),
-        b4a.from(tx.txo.in, 'hex'),
-        b4a.from(tx.txo.ch, 'hex'),
-        b4a.from(tx.txo.is, 'hex'),
-        b4a.from(tx.txo.bs, 'hex'),
-        b4a.from(tx.txo.mbs, 'hex')
-    );
+    const postTx = await new CompleteStateMessageOperations(writer.wallet, admin.config)
+        .assembleCompleteTransactionOperationMessage(
+            tx.address,
+            b4a.from(tx.txo.tx, 'hex'),
+            b4a.from(tx.txo.txv, 'hex'),
+            b4a.from(tx.txo.iw, 'hex'),
+            b4a.from(tx.txo.in, 'hex'),
+            b4a.from(tx.txo.ch, 'hex'),
+            b4a.from(tx.txo.is, 'hex'),
+            b4a.from(tx.txo.bs, 'hex'),
+            b4a.from(tx.txo.mbs, 'hex')
+        );
 
     return { postTx, txHash: tx.txo.tx };
 }
@@ -404,7 +413,6 @@ export const tryToSyncWriters = async (...args) => {
     }
 }
 
-
 export async function waitForNotIndexer(indexer) {
     try {
         let attempts = 0;
@@ -417,7 +425,7 @@ export async function waitForNotIndexer(indexer) {
             if (!indexersEntry) {
                 notIndexer = true;
             } else {
-                const formatted = formatIndexersEntry(indexersEntry);
+                const formatted = formatIndexersEntry(indexersEntry, admin.config.addressLength);
                 if (!formatted || !formatted.addresses) {
                     notIndexer = true;
                 } else if (!formatted.addresses.includes(indexer.wallet.address)) {
@@ -564,7 +572,7 @@ export async function waitForIndexersEntry(node, expected) {
                 await sleep(250);
                 continue;
             }
-            const formatted = formatIndexersEntry(indexersEntry);
+            const formatted = formatIndexersEntry(indexersEntry, admin.config.addressLength);
             if (formatted && formatted.addresses && formatted.addresses.includes(expected.address)) {
                 break;
             }

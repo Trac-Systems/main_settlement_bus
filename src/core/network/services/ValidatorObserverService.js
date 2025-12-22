@@ -1,10 +1,10 @@
 import PeerWallet from "trac-wallet";
 import b4a from "b4a";
-import { MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION, TRAC_ADDRESS_SIZE } from '../../../utils/constants.js';
+import { MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION } from '../../../utils/constants.js';
 import { bufferToAddress } from '../../state/utils/address.js';
 import { sleep } from '../../../utils/helpers.js';
 import Scheduler from "../../../utils/Scheduler.js";
-import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from "trac-wallet/constants.js";
+import Network from "../Network.js";
 
 const POLL_INTERVAL = 3500 // This was increase since the iterations dont wait for the execution its about 10 * DELAY_INTERVAL
 const DELAY_INTERVAL = 250
@@ -19,15 +19,21 @@ const debugLog = (...args) => {
 };
 
 class ValidatorObserverService {
-    #enable_validator_observer;
+    #config;
     #state;
     #network;
     #scheduler;
     #address;
     #isInterrupted
 
-    constructor(network, state, address, options = {}) {
-        this.#enable_validator_observer = options.enable_validator_observer !== false;
+    /**
+     * @param {Network} network
+     * @param {State} state
+     * @param {string} address
+     * @param {object} config
+     **/
+    constructor(network, state, address, config) {
+        this.#config = config
         this.#network = network;
         this.#state = state;
         this.#address = address;
@@ -102,7 +108,7 @@ class ValidatorObserverService {
         
         if (!isValidatorValid) return;
         
-        const validatorAddress = bufferToAddress(validatorAddressBuffer, TRAC_NETWORK_MSB_MAINNET_PREFIX);
+        const validatorAddress = bufferToAddress(validatorAddressBuffer, this.#config.addressPrefix);
         const validatorPubKeyBuffer = PeerWallet.decodeBech32m(validatorAddress);
         const validatorPubKeyHex = validatorPubKeyBuffer.toString('hex');
         const adminEntry = await this.state.getAdminEntry();
@@ -114,9 +120,9 @@ class ValidatorObserverService {
     };
 
     async #isValidatorValid(forbiddenAddress, validatorAddressBuffer, validatorListLength) {
-        if (validatorAddressBuffer === null || b4a.byteLength(validatorAddressBuffer) !== TRAC_ADDRESS_SIZE) return false;
+        if (validatorAddressBuffer === null || b4a.byteLength(validatorAddressBuffer) !== this.#config.addressLength) return false;
         
-        const validatorAddress = bufferToAddress(validatorAddressBuffer, TRAC_NETWORK_MSB_MAINNET_PREFIX);
+        const validatorAddress = bufferToAddress(validatorAddressBuffer, this.#config.addressPrefix);
         if (validatorAddress === forbiddenAddress) return false;
 
         const validatorPubKeyBuffer = PeerWallet.decodeBech32m(validatorAddress);
@@ -147,11 +153,7 @@ class ValidatorObserverService {
     }
 
     #shouldRun() {
-        if (!this.#enable_validator_observer || this.#isInterrupted) {
-            return false;
-        }
-
-        return true;
+        return this.#config.enableValidatorObserver && !this.#isInterrupted
     }
 
     async #lengthEntry() {

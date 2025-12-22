@@ -4,13 +4,13 @@ import {OperationType} from '../../src/utils/protobuf/applyOperations.cjs';
 import {initAll, walletNonAdmin, writingKeyNonAdmin} from '../fixtures/assembleMessage.fixtures.js';
 import {messageOperationsEkoTest} from './commonsStateMessageOperationsTest.js';
 import {safeDecodeApplyOperation} from '../../src/utils/protobuf/operationHelpers.js';
-
+import { config } from '../../helpers/config.js';
 
 const testName = 'assembleRemoveWriterMessage';
 test(testName, async (t) => {
     await initAll();
         const assembler = async (wallet, writingKey) => {
-            return safeDecodeApplyOperation(await CompleteStateMessageOperations.assembleRemoveWriterMessage(wallet, writingKey));
+            return safeDecodeApplyOperation(await new CompleteStateMessageOperations(wallet, config).assembleRemoveWriterMessage(writingKey));
     }
     await messageOperationsEkoTest(t, testName, assembler, walletNonAdmin, writingKeyNonAdmin, OperationType.REMOVE_WRITER, 3, walletNonAdmin.address);
 });

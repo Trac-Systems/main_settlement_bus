@@ -1,7 +1,6 @@
-import { MAX_VALIDATORS_IN_CONNECTION_POOL } from "../../../utils/constants.js"
 import b4a from 'b4a'
 import PeerWallet from "trac-wallet"
-import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
+
 
 // -- Debug Mode --
 // TODO: Implement a better debug system in the future. This is just temporary.
@@ -15,14 +14,18 @@ const debugLog = (...args) => {
 class ConnectionManager {
     #validators
     #maxValidators
+    #config
 
     // Note: #validators is using publicKey (Buffer) as key
     // As Buffers are objects, we will rely on internal conversions done by JS to compare them.
     // It would be better to handle these conversions manually by using hex strings as keys to avoid issues
-
-    constructor({ maxValidators }) {
+    /**
+     * @param {object} config
+     **/
+    constructor(config)  {
         this.#validators = new Map();
-        this.#maxValidators = maxValidators || MAX_VALIDATORS_IN_CONNECTION_POOL
+        this.#config = config
+        this.#maxValidators = config.maxValidators
     }
 
     /**
@@ -288,19 +291,10 @@ class ConnectionManager {
         }
     }
 
-    #evictRandomValidator() {
-        const connected = this.connectedValidators();
-        if (connected.length === 0) return;
-
-        const idx = Math.floor(Math.random() * connected.length);
-        const toRemove = connected[idx];
-        this.remove(toRemove);
-    }
-
     #toAddress(publicKey) {
         const keyHex = b4a.isBuffer(publicKey) ? publicKey : b4a.from(publicKey, 'hex');
         return PeerWallet.encodeBech32m(
-            TRAC_NETWORK_MSB_MAINNET_PREFIX, // TODO: This won't work for other networks. Make it dynamic after configuration is available.
+            this.#config.addressPrefix,
             keyHex
         );
     }
