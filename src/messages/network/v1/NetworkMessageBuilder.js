@@ -17,12 +17,14 @@ class NetworkMessageBuilder {
     #header;
     #payloadKey;
     #body;
+    #config;
 
-    constructor(wallet) {
+    constructor(wallet, config) {
+        this.#config = config;
         if (!wallet || typeof wallet !== 'object') {
             throw new Error('Wallet must be a valid wallet object');
         }
-        if (!isAddressValid(wallet.address)) {
+        if (!isAddressValid(wallet.address, this.#config.addressPrefix)) {
             throw new Error('Wallet should have a valid TRAC address.');
         }
 
@@ -54,7 +56,7 @@ class NetworkMessageBuilder {
     }
 
     setIssuerAddress(issuerAddress) {
-        if (!isAddressValid(issuerAddress)) {
+        if (!isAddressValid(issuerAddress, this.#config.addressPrefix)) {
             throw new Error('Issuer TRAC address must be valid.');
         }
         this.#issuerAddress = issuerAddress;
@@ -112,7 +114,7 @@ class NetworkMessageBuilder {
 
     async #buildValidatorConnectionRequestPayload() {
         const issuer = this.#issuerAddress
-        if (!isAddressValid(issuer)) {
+        if (!isAddressValid(issuer, this.#config.addressPrefix)) {
             throw new Error('Issuer address must be a valid TRAC address');
         }
 
@@ -127,7 +129,7 @@ class NetworkMessageBuilder {
             this.#type,
             sessionBuf,
             tsBuf,
-            addressToBuffer(issuer),
+            addressToBuffer(issuer, this.#config.addressPrefix),
             nonce,
             encodeCapabilities(this.#capabilities),
         );
@@ -144,7 +146,7 @@ class NetworkMessageBuilder {
 
     async #buildValidatorConnectionResponsePayload() {
         const issuer = this.#issuerAddress
-        if (!isAddressValid(issuer)) {
+        if (!isAddressValid(issuer, this.#config.addressPrefix)) {
             throw new Error('Issuer address must be a valid TRAC address');
         }
 
@@ -163,7 +165,7 @@ class NetworkMessageBuilder {
             this.#type,
             sessionBuf,
             tsBuf,
-            addressToBuffer(issuer),
+            addressToBuffer(issuer, this.#config.addressPrefix),
             nonce,
             safeWriteUInt32BE(this.#resultCode, 0),
             encodeCapabilities(this.#capabilities),

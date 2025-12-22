@@ -19,6 +19,7 @@ import {
     timestampToBuffer
 } from '../../../src/utils/buffer.js';
 import { addressToBuffer } from '../../../src/core/state/utils/address.js';
+import { config } from '../../helpers/config.js';
 import { testKeyPair1 } from '../../fixtures/apply.fixtures.js';
 
 function createWallet() {
@@ -39,7 +40,7 @@ function uniqueResultCodes() {
 
 test('NetworkMessageBuilder builds validator connection request and verifies signature', async t => {
     const wallet = createWallet();
-    const builder = new NetworkMessageBuilder(wallet);
+    const builder = new NetworkMessageBuilder(wallet, config);
 
     const sessionId = 1;
     const caps = ['cap:b', 'cap:a'];
@@ -63,7 +64,7 @@ test('NetworkMessageBuilder builds validator connection request and verifies sig
         payload.type,
         sessionIdToBuffer(sessionId),
         timestampToBuffer(payload.timestamp),
-        addressToBuffer(wallet.address),
+        addressToBuffer(wallet.address, config.addressPrefix),
         payload.validator_connection_request.nonce,
         encodeCapabilities(caps)
     );
@@ -76,7 +77,7 @@ test('NetworkMessageBuilder builds validator connection request and verifies sig
 
 test('NetworkMessageBuilder iterates validator connection response ResultCode values', async t => {
     const wallet = createWallet();
-    const builder = new NetworkMessageBuilder(wallet);
+    const builder = new NetworkMessageBuilder(wallet, config);
 
     const otherAddress = 'trac1xm76l9qaujh7vqktk8302mw9sfrxau3l45w62hqfl4kasswt6yts0autkh';
     const caps = ['cap:b', 'cap:a'];
@@ -100,7 +101,7 @@ test('NetworkMessageBuilder iterates validator connection response ResultCode va
             payload.type,
             sessionIdToBuffer(payload.session_id),
             timestampToBuffer(payload.timestamp),
-            addressToBuffer(otherAddress),
+            addressToBuffer(otherAddress, config.addressPrefix),
             payload.validator_connection_response.nonce,
             safeWriteUInt32BE(code, 0),
             encodeCapabilities(caps)
@@ -115,7 +116,7 @@ test('NetworkMessageBuilder iterates validator connection response ResultCode va
 
 test('NetworkMessageBuilder iterates liveness response ResultCode values', async t => {
     const wallet = createWallet();
-    const builder = new NetworkMessageBuilder(wallet);
+    const builder = new NetworkMessageBuilder(wallet, config);
     const sessionId = 1;
     const caps = ['cap:b', 'cap:a'];
     const data = b4a.from('ping', 'utf8');
@@ -153,7 +154,7 @@ test('NetworkMessageBuilder iterates liveness response ResultCode values', async
 
 test('NetworkMessageBuilder builds liveness request and verifies signature (data not signed)', async t => {
     const wallet = createWallet();
-    const builder = new NetworkMessageBuilder(wallet);
+    const builder = new NetworkMessageBuilder(wallet, config);
 
     const sessionId = 1;
     const caps = ['cap:b', 'cap:a'];
@@ -185,7 +186,7 @@ test('NetworkMessageBuilder builds liveness request and verifies signature (data
 
 test('NetworkMessageBuilder iterates broadcast transaction response ResultCode values', async t => {
     const wallet = createWallet();
-    const builder = new NetworkMessageBuilder(wallet);
+    const builder = new NetworkMessageBuilder(wallet, config);
     const sessionId = 1;
     const caps = ['cap:b', 'cap:a'];
 
@@ -221,7 +222,7 @@ test('NetworkMessageBuilder iterates broadcast transaction response ResultCode v
 
 test('NetworkMessageBuilder builds broadcast transaction request and verifies signature', async t => {
     const wallet = createWallet();
-    const builder = new NetworkMessageBuilder(wallet);
+    const builder = new NetworkMessageBuilder(wallet, config);
 
     const sessionId = 1;
     const caps = ['cap:b', 'cap:a'];
@@ -253,7 +254,7 @@ test('NetworkMessageBuilder builds broadcast transaction request and verifies si
 
 test('NetworkMessageBuilder validates required inputs', async t => {
     const wallet = createWallet();
-    const builder = new NetworkMessageBuilder(wallet);
+    const builder = new NetworkMessageBuilder(wallet, config);
 
     await t.exception(
         () => builder.setType(undefined),

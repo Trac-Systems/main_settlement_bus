@@ -4,8 +4,8 @@ import { NetworkOperationType } from '../../../utils/constants.js';
 class NetworkMessageDirector {
     #builder;
 
-    constructor(wallet) {
-        this.#builder = new NetworkMessageBuilder(wallet);
+    constructor(wallet, config) {
+        this.#builder = new NetworkMessageBuilder(wallet, config);
     }
 
     async buildValidatorConnectionRequest(sessionId, issuerAddress, capabilities) {

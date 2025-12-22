@@ -15,6 +15,7 @@ import {
     timestampToBuffer
 } from '../../../src/utils/buffer.js';
 import { addressToBuffer } from '../../../src/core/state/utils/address.js';
+import { config } from '../../helpers/config.js';
 import { testKeyPair1 } from '../../fixtures/apply.fixtures.js';
 
 function createWallet() {
@@ -35,7 +36,7 @@ function uniqueResultCodes() {
 
 test('NetworkMessageDirector builds validator connection request and verifies signature', async t => {
     const wallet = createWallet();
-    const director = new NetworkMessageDirector(wallet);
+    const director = new NetworkMessageDirector(wallet, config);
 
     const sessionId = 1;
     const caps = ['cap:b', 'cap:a'];
@@ -49,7 +50,7 @@ test('NetworkMessageDirector builds validator connection request and verifies si
         payload.type,
         sessionIdToBuffer(payload.session_id),
         timestampToBuffer(payload.timestamp),
-        addressToBuffer(wallet.address),
+        addressToBuffer(wallet.address, config.addressPrefix),
         payload.validator_connection_request.nonce,
         encodeCapabilities(caps)
     );
@@ -59,7 +60,7 @@ test('NetworkMessageDirector builds validator connection request and verifies si
 
 test('NetworkMessageDirector builds liveness request and verifies signature', async t => {
     const wallet = createWallet();
-    const director = new NetworkMessageDirector(wallet);
+    const director = new NetworkMessageDirector(wallet, config);
 
     const sessionId = 1;
     const caps = ['cap:b', 'cap:a'];
@@ -83,7 +84,7 @@ test('NetworkMessageDirector builds liveness request and verifies signature', as
 
 test('NetworkMessageDirector iterates liveness response ResultCode values', async t => {
     const wallet = createWallet();
-    const director = new NetworkMessageDirector(wallet);
+    const director = new NetworkMessageDirector(wallet, config);
 
     const sessionId = 1;
     const caps = ['cap:b', 'cap:a'];
@@ -112,7 +113,7 @@ test('NetworkMessageDirector iterates liveness response ResultCode values', asyn
 
 test('NetworkMessageDirector builds broadcast transaction request and verifies signature', async t => {
     const wallet = createWallet();
-    const director = new NetworkMessageDirector(wallet);
+    const director = new NetworkMessageDirector(wallet, config);
 
     const sessionId = 1;
     const data = b4a.from('deadbeef', 'hex');
@@ -141,7 +142,7 @@ test('NetworkMessageDirector builds broadcast transaction request and verifies s
 
 test('NetworkMessageDirector iterates broadcast transaction response ResultCode values', async t => {
     const wallet = createWallet();
-    const director = new NetworkMessageDirector(wallet);
+    const director = new NetworkMessageDirector(wallet, config);
 
     const sessionId = 1;
     const caps = ['cap:b', 'cap:a'];
@@ -169,7 +170,7 @@ test('NetworkMessageDirector iterates broadcast transaction response ResultCode 
 
 test('NetworkMessageDirector iterates validator connection response ResultCode values', async t => {
     const wallet = createWallet();
-    const director = new NetworkMessageDirector(wallet);
+    const director = new NetworkMessageDirector(wallet, config);
 
     const sessionId = 1;
     const caps = ['cap:b', 'cap:a'];
@@ -190,7 +191,7 @@ test('NetworkMessageDirector iterates validator connection response ResultCode v
             payload.type,
             sessionIdToBuffer(payload.session_id),
             timestampToBuffer(payload.timestamp),
-            addressToBuffer(otherAddress),
+            addressToBuffer(otherAddress, config.addressPrefix),
             payload.validator_connection_response.nonce,
             safeWriteUInt32BE(code, 0),
             encodeCapabilities(caps)
