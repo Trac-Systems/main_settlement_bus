@@ -7,21 +7,22 @@ import { addressToBuffer, bufferToAddress } from '../../core/state/utils/address
 import { isAddressValid } from "../../core/state/utils/address.js";
 import { blake3Hash } from '../../utils/crypto.js';
 import {
-    isCoreAdmin,
     isAdminControl,
+    isBalanceInitialization,
+    isBootstrapDeployment,
+    isCoreAdmin,
     isRoleAccess,
     isTransaction,
-    isBootstrapDeployment,
     isTransfer,
-    isBalanceInitialization,
     operationToPayload
 } from '../../utils/applyOperations.js';
 import { isHexString } from '../../utils/helpers.js';
 
-// TODO: DEPRACATED - Remove this class in the future.
+// Single use per transaction: reuse of this instance needs mutex/queue or fail-fast and can delay validation or break validation rule.
+// A fresh instance is effectively zero-cost, so no reset() is provided.
 
 class ApplyStateMessageBuilder {
-    #address; // ok
+    #address;
     #amount;
     #channel;
     #config
@@ -36,15 +37,13 @@ class ApplyStateMessageBuilder {
     #payload;
     #txHash;
     #txValidity;
-    #validatorNonce;
     #wallet;
     #writingKey;
     #phase;
     #output;
     #payloadKey;
-    #built;
-
-
+    #built=false;
+    
     /**
      * @param {PeerWallet} wallet
      * @param {object} config
@@ -60,30 +59,6 @@ class ApplyStateMessageBuilder {
         }
 
         this.#wallet = wallet;
-        this.reset();
-    }
-
-    reset() {
-        this.#address = null;
-        this.#amount = null;
-        this.#built = false;
-        this.#channel = null;
-        this.#contentHash = null;
-        this.#externalBootstrap = null;
-        this.#incomingAddress = null;
-        this.#incomingNonce = null;
-        this.#incomingSignature = null;
-        this.#incomingWriterKey = null;
-        this.#msbBootstrap = null;
-        this.#operationType = null
-        this.#output = null;
-        this.#payload = null;
-        this.#payloadKey = null;
-        this.#phase = null;
-        this.#txHash = null;
-        this.#txValidity = null;
-        this.#validatorNonce = null;
-        this.#writingKey = null;
     }
 
     setPhase(phase) {
@@ -222,9 +197,7 @@ class ApplyStateMessageBuilder {
         if (!this.#built || !this.#payload) {
             throw new Error('Payload has not been built.');
         }
-        const payload = this.#output === 'json' ? this.#encodePayloadJson(this.#payload) : this.#payload;
-        this.reset();
-        return payload;
+        return this.#output === 'json' ? this.#encodePayloadJson(this.#payload) : this.#payload;
     }
 
     #assertPhaseAndOutput() {

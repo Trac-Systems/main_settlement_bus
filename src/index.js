@@ -8,11 +8,11 @@ import tty from "tty";
 import { sleep, isHexString } from "./utils/helpers.js";
 import { verifyDag, printHelp, printWalletInfo, printBalance } from "./utils/cli.js";
 import CompleteStateMessageOperations from "./messages/completeStateMessages/CompleteStateMessageOperations.js";
+import PartialStateMessageOperations from "./messages/partialStateMessages/PartialStateMessageOperations.js";
 import { isAddressValid } from "./core/state/utils/address.js";
 import Network from "./core/network/Network.js";
 import Check from "./utils/check.js";
 import State from "./core/state/State.js";
-import PartialStateMessageOperations from "./messages/partialStateMessages/PartialStateMessageOperations.js";
 import {
     EventType,
     WHITELIST_SLEEP_INTERVAL,
@@ -45,6 +45,8 @@ import {
     getLicenseAddressCommand,
     getLicenseCountCommand
 } from "./utils/cliCommands.js";
+import ApplyStateMessageBuilder from "./messages/state/ApplyStateMessageBuilder.js";
+
 export class MainSettlementBus extends ReadyResource {
     // internal attributes
     #store;
@@ -61,7 +63,6 @@ export class MainSettlementBus extends ReadyResource {
     constructor(config) {
         super();
         this.#config = config
-
         this.#store = new Corestore(this.#config.storesFullPath);
         this.#wallet = new PeerWallet({ networkPrefix: this.#config.addressPrefix });
         this.#readline_instance = null;
@@ -123,6 +124,8 @@ export class MainSettlementBus extends ReadyResource {
 
         const adminEntry = await this.#state.getAdminEntry();
         await this.#setUpRoleAutomatically(adminEntry);
+
+
 
         console.log(`isIndexer: ${this.#state.isIndexer()}`);
         console.log(`isWriter: ${this.#state.isWritable()}`);
