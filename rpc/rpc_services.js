@@ -46,7 +46,7 @@ export async function getUnconfirmedLength(msbInstance) {
 
 export async function broadcastTransaction(msbInstance, config, payload) {
     if (!payload) {
-        throw new Error("Transaction payload is required for broadcast_transaction command.");
+        throw new Error("Transaction payload is required for broadcasting.");
     }
     let normalizedPayload;
     let isValid = false;
