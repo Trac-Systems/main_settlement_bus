@@ -1,4 +1,3 @@
-
 /** @typedef {import('pear-interface')} */ /* global Pear */
 import ReadyResource from "ready-resource";
 import Corestore from "corestore";
@@ -18,17 +17,13 @@ import {
     EventType,
     WHITELIST_SLEEP_INTERVAL,
     BOOTSTRAP_HEXSTRING_LENGTH,
-    OperationType,
     CustomEventType,
     BALANCE_MIGRATION_SLEEP_INTERVAL,
     WHITELIST_MIGRATION_DIR
 } from "./utils/constants.js";
 import { randomBytes } from "hypercore-crypto";
 import { decimalStringToBigInt, bigIntTo16ByteBuffer, bufferToBigInt, bigIntToDecimalString } from "./utils/amountSerialization.js"
-import { normalizeTransferOperation, normalizeTransactionOperation } from "./utils/normalizers.js"
-import PartialTransfer from "./core/network/messaging/validators/PartialTransfer.js";
 import { blake3Hash } from "./utils/crypto.js";
-import PartialTransaction from "./core/network/messaging/validators/PartialTransaction.js";
 import fileUtils from './utils/fileUtils.js';
 import migrationUtils from './utils/migrationUtils.js';
 import {
@@ -58,8 +53,6 @@ export class MainSettlementBus extends ReadyResource {
     #readline_instance;
     #state;
     #isClosing = false;
-    #partialTransferValidator;
-    #partialTransactionValidator;
     #config
 
     /**
@@ -97,8 +90,10 @@ export class MainSettlementBus extends ReadyResource {
         return this.#network;
     }
 
-    // This can be null if enable_wallet is false
     get wallet() {
+        if (!this.#config.enableWallet) {
+            return undefined;
+        }
         return this.#wallet;
     }
 
@@ -114,14 +109,11 @@ export class MainSettlementBus extends ReadyResource {
 
         await this.#state.ready();
         await this.#network.ready();
-        this.#stateEventsListener();
+        await this.#stateEventsListener();
 
         if (this.#config.enableWallet) {
             printWalletInfo(this.#wallet.address, this.#state.writingKey, this.#state, this.#config.enableWallet);
         }
-
-        this.#partialTransferValidator = new PartialTransfer(this.state, this.#wallet, this.#config);
-        this.#partialTransactionValidator = new PartialTransaction(this.state, this.#wallet ,this.#config);
 
         await this.#network.replicate(
             this.#state,
@@ -181,41 +173,6 @@ export class MainSettlementBus extends ReadyResource {
 
     async broadcastPartialTransaction(partialTransactionPayload) {
         return await this.#network.validatorMessageOrchestrator.send(partialTransactionPayload);
-    }
-
-    async broadcastTransactionCommand(payload) {
-        if (!payload) {
-            throw new Error("Transaction payload is required for broadcast_transaction command.");
-        }
-
-        let normalizedPayload;
-        let isValid = false;
-        let hash;
-
-        if (payload.type === OperationType.TRANSFER) {
-            normalizedPayload = normalizeTransferOperation(payload, this.#config);
-            isValid = await this.#partialTransferValidator.validate(normalizedPayload);
-            hash = b4a.toString(normalizedPayload.tro.tx, "hex");
-        } else if (payload.type === OperationType.TX) {
-            normalizedPayload = normalizeTransactionOperation(payload, this.#config);
-            isValid = await this.#partialTransactionValidator.validate(normalizedPayload);
-            hash = b4a.toString(normalizedPayload.txo.tx, "hex");
-        }
-
-        if (!isValid) {
-            throw new Error("Invalid transaction payload.");
-        }
-
-        const signedLength = this.#state.getSignedLength();
-        const unsignedLength = this.#state.getUnsignedLength();
-
-        const success = await this.broadcastPartialTransaction(payload);
-
-        if (!success) {
-            throw new Error("Failed to broadcast transaction after multiple attempts.");
-        }
-
-        return { message: "Transaction broadcasted successfully.", signedLength, unsignedLength, tx: hash };
     }
 
     async #setUpRoleAutomatically() {
@@ -1044,13 +1001,6 @@ export class MainSettlementBus extends ReadyResource {
             return result;
         } else if (input.startsWith("/unconfirmed_length")) {
             const result = getUnconfirmedLengthCommand(this.#state);
-            if (rl) rl.prompt();
-            return result;
-        } else if (input.startsWith("/broadcast_transaction")) {
-            if (!payload) {
-                throw new Error("Transaction payload is required for broadcast_transaction command.");
-            }
-            const result = await this.broadcastTransactionCommand(payload);
             if (rl) rl.prompt();
             return result;
         } else if (input.startsWith("/get_tx_payloads_bulk")) {

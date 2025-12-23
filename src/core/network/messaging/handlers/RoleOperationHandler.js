@@ -24,7 +24,7 @@ class RoleOperationHandler extends BaseOperationHandler {
         this.#wallet = wallet;
         this.#config = config;
         this.#network = network;
-        this.#partialRoleAccessValidator = new PartialRoleAccess(state, wallet ,this.#config)
+        this.#partialRoleAccessValidator = new PartialRoleAccess(state, this.#wallet.address ,this.#config)
     }
 
     get partialRoleAccessValidator() {

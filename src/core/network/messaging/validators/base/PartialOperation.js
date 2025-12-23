@@ -17,15 +17,15 @@ class PartialOperation {
     #state;
     #check;
     #config
-    #wallet
+    #selfAddress
 
-    constructor(state, wallet, config) {
+    constructor(state, selfAddress, config) {
         this.#state = state;
         this.#config = config;
         this.#check = new Check(this.#config);
         this.max_amount = MAX_AMOUNT;
         this.fee = FEE_BIGINT;
-        this.#wallet = wallet;
+        this.#selfAddress = selfAddress;
     }
 
     get state() {
@@ -220,8 +220,10 @@ class PartialOperation {
      * Flow: Validator -> submits tx with tap-wallet -> RPC-> Validator -validates tx-> REJECT (self-validation)
      */
     validateNoSelfValidation(payload) {
+        if (!this.#selfAddress) return;
+
         const requesterAddress = bufferToAddress(payload.address, this.#config.addressPrefix);
-        if (this.#wallet.address === requesterAddress) {
+        if (this.#selfAddress === requesterAddress) {
             throw new Error('Requester address cannot be the same as the validator wallet address.');
         }
     }

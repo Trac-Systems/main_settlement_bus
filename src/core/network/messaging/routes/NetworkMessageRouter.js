@@ -37,9 +37,6 @@ class NetworkMessageRouter {
 
     async route(incomingMessage, connection, messageProtomux) {
         try {
-            // TODO: Add a check here — only a writer should be able to process the handlers isRoleAccessOperation,isSubnetworkOperation
-            // and admin nodes until the writers' index is less than 25. OperationType.APPEND_WHITELIST can be processed by only READERS
-
             const channelString = b4a.toString(this.#config.channel, 'utf8');
             if (this.#isGetRequest(incomingMessage)) {
                 await this.#handlers.get.handle(incomingMessage, messageProtomux, connection, channelString);
