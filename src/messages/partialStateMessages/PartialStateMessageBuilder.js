@@ -1,15 +1,14 @@
 import PeerWallet from "trac-wallet";
 import b4a from "b4a";
 
-import StateBuilder from '../base/StateBuilder.js'
-import { OperationType, TRAC_ADDRESS_SIZE, NETWORK_ID } from '../../utils/constants.js';
-import { addressToBuffer, bufferToAddress, isAddressValid } from '../../core/state/utils/address.js';
+import { OperationType } from '../../utils/constants.js';
+import { addressToBuffer, isAddressValid } from '../../core/state/utils/address.js';
 import { isHexString } from "../../utils/helpers.js";
 import { blake3Hash } from "../../utils/crypto.js";
 import { createMessage } from "../../utils/buffer.js";
-import { isTransaction, isRoleAccess, isBootstrapDeployment, isTransfer } from "../../utils/operations.js";
+import { isTransaction, isRoleAccess, isBootstrapDeployment, isTransfer } from "../../utils/applyOperations.js";
 
-class PartialStateMessageBuilder extends StateBuilder {
+class PartialStateMessageBuilder {
     #wallet;
     #operationType;
     #address;
@@ -17,23 +16,25 @@ class PartialStateMessageBuilder extends StateBuilder {
     #txValidity;
     #contentHash;
     #externalBootstrap;
-    #withMsbBootstrap;
-    #bootstrapNonce;
-    #bootstrapSignature;
+    #msbBootstrap;
     #channel;
     #incomingAddress;
     #amount;
     #payload;
+    #config;
 
-    constructor(wallet) {
-        super();
+    /**
+     * @param {PeerWallet} wallet
+     * @param {object} config
+     **/
+    constructor(wallet, config) {
+        this.#config = config;
         if (!wallet || typeof wallet !== 'object') {
             throw new Error('Wallet must be a valid wallet object');
         }
-        if (!isAddressValid(wallet.address)) {
+        if (!isAddressValid(wallet.address, this.#config.addressPrefix)) {
             throw new Error('Wallet should have a valid TRAC address.');
         }
-
 
         this.#wallet = wallet;
         this.reset();
@@ -46,16 +47,14 @@ class PartialStateMessageBuilder extends StateBuilder {
         this.#txValidity = null;
         this.#contentHash = null;
         this.#externalBootstrap = null;
-        this.#withMsbBootstrap = false;
-        this.#bootstrapNonce = null;
-        this.#bootstrapSignature = null;
+        this.#msbBootstrap = false;
         this.#incomingAddress = null;
         this.#amount = null;
         this.#channel = null;
         this.#payload = {};
     }
 
-    forOperationType(operationType) {
+    withOperationType(operationType) {
         if (!Object.values(OperationType).includes(operationType) || OperationType === OperationType.UNKNOWN) {
             throw new Error(`Invalid operation type: ${operationType}`);
         }
@@ -66,8 +65,8 @@ class PartialStateMessageBuilder extends StateBuilder {
     }
 
     withAddress(address) {
-        if (!isAddressValid(address)) {
-            throw new Error(`Address field must be a valid TRAC bech32m address with length ${TRAC_ADDRESS_SIZE}.`);
+        if (!isAddressValid(address, this.#config.addressPrefix)) {
+            throw new Error(`Address field must be a valid TRAC bech32m address with length ${this.#config.addressLength}.`);
         }
 
         this.#address = address;
@@ -95,7 +94,7 @@ class PartialStateMessageBuilder extends StateBuilder {
         if (!isHexString(msbBootstrap) || msbBootstrap.length !== 64) {
             throw new Error('MSB Bootstrap key must be a 64-length hexstring.');
         }
-        this.#withMsbBootstrap = msbBootstrap;
+        this.#msbBootstrap = msbBootstrap;
         return this;
     }
 
@@ -116,8 +115,8 @@ class PartialStateMessageBuilder extends StateBuilder {
     }
 
     withIncomingAddress(address) {
-        if (!isAddressValid(address)) {
-            throw new Error(`Incoming address field must be a valid TRAC bech32m address with length ${TRAC_ADDRESS_SIZE}.`);
+        if (!isAddressValid(address, this.#config.addressPrefix)) {
+            throw new Error(`Incoming address field must be a valid TRAC bech32m address with length ${this.#config.addressLength}.`);
         }
 
         this.#incomingAddress = address;
@@ -155,7 +154,7 @@ class PartialStateMessageBuilder extends StateBuilder {
             case OperationType.REMOVE_WRITER:
             case OperationType.ADMIN_RECOVERY:
                 txMsg = createMessage(
-                    NETWORK_ID,
+                    this.#config.networkId,
                     b4a.from(this.#txValidity, 'hex'),
                     b4a.from(this.#writingKey, 'hex'),
                     nonce,
@@ -168,7 +167,7 @@ class PartialStateMessageBuilder extends StateBuilder {
                     throw new Error('External bootstrap key must be set for BOOTSTRAP DEPLOYMENT operation.');
                 }
                 txMsg = createMessage(
-                    NETWORK_ID,
+                    this.#config.networkId,
                     b4a.from(this.#txValidity, 'hex'),
                     b4a.from(this.#externalBootstrap, 'hex'),
                     b4a.from(this.#channel, 'hex'),
@@ -179,21 +178,21 @@ class PartialStateMessageBuilder extends StateBuilder {
 
             case OperationType.TX:
                 txMsg = createMessage(
-                    NETWORK_ID,
+                    this.#config.networkId,
                     b4a.from(this.#txValidity, 'hex'),
                     b4a.from(this.#writingKey, 'hex'),
                     b4a.from(this.#contentHash, 'hex'),
                     b4a.from(this.#externalBootstrap, 'hex'),
-                    b4a.from(this.#withMsbBootstrap, 'hex'),
+                    b4a.from(this.#msbBootstrap, 'hex'),
                     nonce,
                     OperationType.TX
                 );
                 break;
             case OperationType.TRANSFER:
                 txMsg = createMessage(
-                    NETWORK_ID,
+                    this.#config.networkId,
                     b4a.from(this.#txValidity, 'hex'),
-                    addressToBuffer(this.#incomingAddress), // we need to sign address of the recipient as well
+                    addressToBuffer(this.#incomingAddress, this.#config.addressPrefix), // we need to sign address of the recipient as well
                     b4a.from(this.#amount, 'hex'),
                     nonce,
                     OperationType.TRANSFER
@@ -232,7 +231,7 @@ class PartialStateMessageBuilder extends StateBuilder {
                 iw: this.#writingKey,
                 ch: this.#contentHash,
                 bs: this.#externalBootstrap,
-                mbs: this.#withMsbBootstrap,
+                mbs: this.#msbBootstrap,
                 in: nonce.toString('hex'),
                 is: signature.toString('hex'),
             };

@@ -37,7 +37,7 @@ export const registerBalanceTests = (context) => {
         })
 
         it("returns zero balance for an unknown address", async () => {
-            const address = randomAddress()
+            const address = randomAddress(context.rpcMsb.config.addressPrefix)
             const res = await request(context.server).get(`/v1/balance/${address}`)
             expect(res.statusCode).toBe(200)
             expect(res.body.address).toBe(address)

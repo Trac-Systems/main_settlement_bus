@@ -2,8 +2,8 @@ import BaseResponse from './base/BaseResponse.js';
 
 class CustomNodeResponse extends BaseResponse {
 
-    constructor(state, wallet) {
-        super(state, wallet);
+    constructor(state, wallet, config) {
+        super(state, wallet, config);
     }
 
     async validate(message, channelString) {

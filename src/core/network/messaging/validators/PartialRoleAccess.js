@@ -1,17 +1,20 @@
 import b4a from 'b4a';
-
-import { OperationType } from "../../../../utils/constants.js";
-import { bufferToAddress } from "../../../state/utils/address.js";
+import {OperationType} from "../../../../utils/constants.js";
+import {bufferToAddress} from "../../../state/utils/address.js";
 import PartialOperation from './base/PartialOperation.js';
-import { bufferToBigInt } from "../../../../utils/amountSerialization.js";
+import {bufferToBigInt} from "../../../../utils/amountSerialization.js";
 
 class PartialRoleAccess extends PartialOperation {
-    constructor(state) {
-        super(state);
+    #config;
+
+    constructor(state, selfAddress, config) {
+        super(state, selfAddress, config);
+        this.#config = config
     }
 
     async validate(payload) {
         this.isPayloadSchemaValid(payload);
+        this.validateNoSelfValidation(payload);
         this.validateRequesterAddress(payload);
         await this.validateTransactionUniqueness(payload);
         await this.validateSignature(payload);
@@ -33,10 +36,10 @@ class PartialRoleAccess extends PartialOperation {
     }
 
     async isRequesterAllowedToChangeRole(payload) {
-        const { type } = payload;
+        const {type} = payload;
 
         if (type === OperationType.ADD_WRITER) {
-            const nodeAddress = bufferToAddress(payload.address);
+            const nodeAddress = bufferToAddress(payload.address, this.#config.addressPrefix);
             const nodeEntry = await this.state.getNodeEntry(nodeAddress);
             if (!nodeEntry) {
                 throw new Error(`Node with address ${nodeAddress} entry does not exist.`);
@@ -54,7 +57,7 @@ class PartialRoleAccess extends PartialOperation {
             return;
 
         } else if (type === OperationType.REMOVE_WRITER) {
-            const nodeAddress = bufferToAddress(payload.address);
+            const nodeAddress = bufferToAddress(payload.address, this.#config.addressPrefix);
             const nodeEntry = await this.state.getNodeEntry(nodeAddress);
             if (!nodeEntry) {
                 throw new Error(`Node with address ${nodeAddress} entry does not exist.`);
@@ -78,7 +81,7 @@ class PartialRoleAccess extends PartialOperation {
             }
 
             const adminAddressBuffer = payload.address;
-            const adminAddress = bufferToAddress(adminAddressBuffer);
+            const adminAddress = bufferToAddress(adminAddressBuffer, this.#config.addressPrefix);
             const isRecoveryCase = !!(
                 adminEntry.address === adminAddress &&
                 !b4a.equals(payload.rao.iw, adminEntry.wk)
@@ -94,7 +97,7 @@ class PartialRoleAccess extends PartialOperation {
     }
 
     async validateWriterKey(payload) {
-        const requesterAddress = bufferToAddress(payload.address);
+        const requesterAddress = bufferToAddress(payload.address, this.#config.addressPrefix);
         const nodeEntry = await this.state.getNodeEntry(requesterAddress);
         if (!nodeEntry) {
             throw new Error(`Node entry not found for address ${requesterAddress}`);
@@ -114,7 +117,7 @@ class PartialRoleAccess extends PartialOperation {
     }
 
     async validateRequesterBalanceForAddWriterOperation(payload, signed = false) {
-        const requesterAddress = bufferToAddress(payload.address);
+        const requesterAddress = bufferToAddress(payload.address, this.#config.addressPrefix);
         let requesterEntry;
         if (signed) {
             requesterEntry = await this.state.getNodeEntry(requesterAddress);

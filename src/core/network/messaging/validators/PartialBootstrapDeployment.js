@@ -1,13 +1,13 @@
 import PartialOperation from './base/PartialOperation.js';
 
-
 class PartialBootstrapDeployment extends PartialOperation {
-    constructor(state) {
-        super(state);
+    constructor(state, selfAddress , config) {
+        super(state, selfAddress , config);
     }
 
     async validate(payload) {
         this.isPayloadSchemaValid(payload);
+        this.validateNoSelfValidation(payload);
         this.validateRequesterAddress(payload);
         await this.validateTransactionUniqueness(payload);
         await this.validateSignature(payload);

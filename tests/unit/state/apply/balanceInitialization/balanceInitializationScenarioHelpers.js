@@ -11,6 +11,7 @@ import { AUTOBASE_VALUE_ENCODING } from '../../../../../src/utils/constants.js';
 import { toTerm } from '../../../../../src/core/state/utils/balance.js';
 import { safeDecodeApplyOperation, safeEncodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
 import { buildAddAdminRequesterPayload } from '../addAdmin/addAdminScenarioHelpers.js';
+import { config } from '../../../../helpers/config.js';
 
 export async function setupBalanceInitializationScenario(t, { recipientCount = 2 } = {}) {
 	const context = await setupStateNetwork({
@@ -41,8 +42,7 @@ async function bootstrapAdmin(context) {
 export async function buildBalanceInitializationPayload(context, recipientAddress, balanceBuffer) {
 	const adminNode = context.adminBootstrap;
 	const txValidity = await deriveIndexerSequenceState(adminNode.base);
-	const messages = await CompleteStateMessageOperations.assembleBalanceInitializationMessages(
-		adminNode.wallet,
+	const messages = await new CompleteStateMessageOperations(adminNode.wallet, config).assembleBalanceInitializationMessages(
 		txValidity,
 		[[recipientAddress, balanceBuffer]]
 	);
@@ -60,8 +60,7 @@ export async function buildBalanceInitializationPayloadWithTxValidity({
 	}
 
 	const adminNode = context.adminBootstrap;
-	const messages = await CompleteStateMessageOperations.assembleBalanceInitializationMessages(
-		adminNode.wallet,
+	const messages = await new CompleteStateMessageOperations(adminNode.wallet, config).assembleBalanceInitializationMessages(
 		mutatedTxValidity,
 		[[decoded.bio.ia, decoded.bio.am]]
 	);

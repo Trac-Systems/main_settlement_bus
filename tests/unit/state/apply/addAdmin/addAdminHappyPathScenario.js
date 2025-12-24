@@ -6,8 +6,8 @@ import {
 import nodeEntryUtils from '../../../../../src/core/state/utils/nodeEntry.js';
 import { toTerm } from '../../../../../src/core/state/utils/balance.js';
 import CompleteStateMessageOperations from '../../../../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
-
 import { setupAddAdminScenario, assertAdminState } from './addAdminScenarioHelpers.js';
+import { config } from '../../../../helpers/config.js';
 
 export default function addAdminHappyPathScenario() {
 	test('State.apply addAdmin bootstraps admin node - happy path', async t => {
@@ -17,11 +17,11 @@ export default function addAdminHappyPathScenario() {
 		const reader = readerNodes[0];
 
 		const txValidity = await deriveIndexerSequenceState(adminNode.base);
-		const addAdminPayload = await CompleteStateMessageOperations.assembleAddAdminMessage(
-			adminNode.wallet,
-			adminNode.base.local.key,
-			txValidity
-		);
+        const addAdminPayload = await new CompleteStateMessageOperations(adminNode.wallet, config)
+            .assembleAddAdminMessage(
+                adminNode.base.local.key,
+                txValidity
+            );
 
 		await adminNode.base.append(addAdminPayload);
 		await adminNode.base.update();

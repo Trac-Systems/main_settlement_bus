@@ -1,6 +1,7 @@
 import {test, hook} from '../../helpers/wrapper.js';
 
 import CompleteStateMessageOperations from '../../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
+import { config } from '../../helpers/config.js';
 import {
     initTemporaryDirectory,
     removeTemporaryDirectory,
@@ -17,10 +18,10 @@ let tmpDirectory, admin, indexer1, indexer2, writer;
 hook('Initialize nodes for addIndexer tests', async t => {
     const randomChannel = randomBytes(32).toString('hex');
     const baseOptions = {
-        enable_tx_apply_logs: false,
-        enable_interactive_mode: false,
-        enable_role_requester: false,
-        enable_validator_observer: false,
+        enableTxApplyLogs: false,
+        enableInteractiveMode: false,
+        enableRoleRequester: false,
+        enableValidatorObserver: false,
         channel: randomChannel,
     }
     tmpDirectory = await initTemporaryDirectory();
@@ -41,7 +42,8 @@ test('handleApplyRemoveIndexerOperation (apply) - Append removeIndexer payload i
     // writer is already a writer
     const indexersEntryBefore = await writer.msb.state.getIndexersEntry();
     const validity = await admin.msb.state.getIndexerSequenceState()
-    const assembledRemoveIndexerMessage = await CompleteStateMessageOperations.assembleRemoveIndexerMessage(admin.wallet, indexer1.wallet.address, validity);
+    const assembledRemoveIndexerMessage = await new CompleteStateMessageOperations(admin.wallet, config)
+        .assembleRemoveIndexerMessage(indexer1.wallet.address, validity);
     await admin.msb.state.append(assembledRemoveIndexerMessage);
     await tryToSyncWriters(admin, indexer1, indexer2);
     await waitForNodeState(indexer1, indexer1.wallet.address, {
@@ -71,7 +73,8 @@ test('handleApplyRemoveIndexerOperation (apply) - Append removeIndexer payload i
 
     const indexersEntryBefore = await indexer1.msb.state.getIndexersEntry();
     const validity = await admin.msb.state.getIndexerSequenceState()
-    const assembledRemoveIndexerMessage = await CompleteStateMessageOperations.assembleRemoveIndexerMessage(admin.wallet, indexer1.wallet.address, validity);
+    const assembledRemoveIndexerMessage = await new CompleteStateMessageOperations(admin.wallet, config)
+        .assembleRemoveIndexerMessage(indexer1.wallet.address, validity);
     await admin.msb.state.append(assembledRemoveIndexerMessage);
     await tryToSyncWriters(admin, indexer2, writer);
 
@@ -100,7 +103,8 @@ test('handleApplyAddIndexerOperation (apply) - Append removeIndexer payload into
     const indexer2SignedLengthBefore = indexer2.msb.state.getSignedLength();
 
     const validity = await admin.msb.state.getIndexerSequenceState()
-    const assembledRemoveIndexerMessage = await CompleteStateMessageOperations.assembleRemoveIndexerMessage(admin.wallet, indexer2.wallet.address, validity);
+    const assembledRemoveIndexerMessage = await new CompleteStateMessageOperations(admin.wallet, config)
+        .assembleRemoveIndexerMessage(indexer2.wallet.address, validity);
     await writer.msb.state.append(assembledRemoveIndexerMessage);
     await tryToSyncWriters(admin, indexer2, writer);
 

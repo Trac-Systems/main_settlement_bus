@@ -15,6 +15,7 @@ import { toBalance, BALANCE_FEE, BALANCE_TO_STAKE } from '../../../../../src/cor
 import { eventFlush } from '../../../../helpers/autobaseTestHelpers.js';
 import { safeDecodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
 import { EntryType } from '../../../../../src/utils/constants.js';
+import { config } from '../../../../helpers/config.js';
 
 export async function setupRemoveWriterScenario(t, options = {}) {
 	const context = await setupAddWriterScenario(t, options);
@@ -142,7 +143,7 @@ async function assertWriterStillPromoted(t, base, writerPeer, expected) {
 		'writer stake remains untouched'
 	);
 
-	const writerAddressBuffer = addressUtils.addressToBuffer(writerAddress);
+	const writerAddressBuffer = addressUtils.addressToBuffer(writerAddress, config.addressPrefix);
 	const writingKeyHex = writerPeer.base.local.key.toString('hex');
 	const registryKey = EntryType.WRITER_ADDRESS + writingKeyHex;
 	const registryEntry = await base.view.get(registryKey);
@@ -161,7 +162,7 @@ async function assertPayloadProcessedByValidator(t, payload, expectedValidatorAd
 	const validatorAddressBuffer = decodedOperation?.rao?.va;
 	t.ok(validatorAddressBuffer, 'removeWriter payload carries validator address');
 	if (!validatorAddressBuffer) return;
-	const validatorAddress = addressUtils.bufferToAddress(validatorAddressBuffer);
+	const validatorAddress = addressUtils.bufferToAddress(validatorAddressBuffer, config.addressPrefix);
 	t.ok(validatorAddress, 'removeWriter payload validator address decodes');
 	if (!validatorAddress) return;
 	t.is(
@@ -179,13 +180,11 @@ export async function buildRemoveWriterPayloadWithTxValidity(context, mutatedTxV
 	}
 	const { readerPeer = selectWriterPeer(context), validatorPeer = context.adminBootstrap, writerKeyBuffer = null } = options;
 	const writerKey = writerKeyBuffer ?? readerPeer.base.local.key;
-	const partial = await PartialStateMessageOperations.assembleRemoveWriterMessage(
-		readerPeer.wallet,
+	const partial = await new PartialStateMessageOperations(readerPeer.wallet, config).assembleRemoveWriterMessage(
 		writerKey.toString('hex'),
 		mutatedTxValidity.toString('hex')
 	);
-	return CompleteStateMessageOperations.assembleRemoveWriterMessage(
-		validatorPeer.wallet,
+	return new CompleteStateMessageOperations(validatorPeer.wallet, config).assembleRemoveWriterMessage(
 		partial.address,
 		b4a.from(partial.rao.tx, 'hex'),
 		mutatedTxValidity,
@@ -256,7 +255,7 @@ export async function applyWithWriterRegistryForeignAddress(context, invalidPayl
 		throw new Error('Foreign registry override requires a peer with an address.');
 	}
 	const foreignEntry = {
-		value: addressUtils.addressToBuffer(foreignAddress)
+		value: addressUtils.addressToBuffer(foreignAddress, config.addressPrefix)
 	};
 	await withWriterRegistryOverrideOnApply({
 		context,

@@ -1,6 +1,6 @@
-import { decodeBase64Payload, isBase64, sanitizeBulkPayloadsRequestBody, sanitizeTransferPayload, validatePayloadStructure } from "./utils/helpers.mjs"
-import { MAX_SIGNED_LENGTH, ZERO_WK } from "./constants.mjs";
-import { buildRequestUrl } from "./utils/url.mjs";
+import { decodeBase64Payload, isBase64, sanitizeBulkPayloadsRequestBody, sanitizeTransferPayload, validatePayloadStructure } from "./utils/helpers.js"
+import { MAX_SIGNED_LENGTH, ZERO_WK } from "./constants.js";
+import { buildRequestUrl } from "./utils/url.js";
 import { isHexString } from "../src/utils/helpers.js";
 import {
     getBalance,
@@ -16,7 +16,7 @@ import {
 } from "./rpc_services.js";
 import { bufferToBigInt, licenseBufferToBigInt } from "../src/utils/amountSerialization.js";
 import { isAddressValid } from "../src/core/state/utils/address.js";
-import { getConfirmedParameter } from "./utils/confirmedParameter.mjs";
+import { getConfirmedParameter } from "./utils/confirmedParameter.js";
 
 export async function handleBalance({ req, respond, msbInstance }) {
     const url = buildRequestUrl(req);
@@ -52,7 +52,7 @@ export async function handleConfirmedLength({ msbInstance, respond }) {
     respond(200, { confirmed_length });
 }
 
-export async function handleBroadcastTransaction({ msbInstance, respond, req }) {
+export async function handleBroadcastTransaction({ msbInstance, config, respond, req }) {
     let body = '';
     req.on('data', chunk => {
         body += chunk.toString();
@@ -72,7 +72,7 @@ export async function handleBroadcastTransaction({ msbInstance, respond, req }) 
             const decodedPayload = decodeBase64Payload(payload);
             validatePayloadStructure(decodedPayload);
             const sanitizedPayload = sanitizeTransferPayload(decodedPayload);
-            const result = await broadcastTransaction(msbInstance, sanitizedPayload);
+            const result = await broadcastTransaction(msbInstance, config, sanitizedPayload);
             respond(200, { result });
         } catch (error) {
             let code = error instanceof SyntaxError ? 400 : 500;
@@ -258,7 +258,7 @@ export async function handleAccountDetails({ msbInstance, respond, req }) {
         return respond(400, { error: 'Parameter "confirmed" must be exactly "true" or "false"' });
     }
 
-    if (!isAddressValid(address)) {
+    if (!isAddressValid(address, msbInstance.config.addressPrefix)) {
         return respond(400, { error: "Invalid account address format" });
     }
 

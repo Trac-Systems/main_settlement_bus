@@ -23,6 +23,7 @@ import addAdminEntryExistsScenario from './adminEntryExistsScenario.js';
 import addAdminNonBootstrapNodeScenario from './nonBootstrapNodeScenario.js';
 import addAdminNodeEntryInitializationFailureScenario from './nodeEntryInitializationFailureScenario.js';
 import addAdminEntryEncodingFailureScenario from './adminEntryEncodingFailureScenario.js';
+import { config } from '../../../../helpers/config.js';
 
 // happy path
 addAdminHappyPathScenario();
@@ -128,11 +129,11 @@ new TransactionValidityMismatchScenario({
 	assertStateUnchanged: assertAddAdminRequesterFailureState,
 	rebuildPayloadWithTxValidity: ({ context, mutatedTxValidity }) => {
 		const adminNode = context.adminBootstrap;
-		return CompleteStateMessageOperations.assembleAddAdminMessage(
-			adminNode.wallet,
-			adminNode.base.local.key,
-			mutatedTxValidity
-		);
+        return new CompleteStateMessageOperations(adminNode.wallet, config)
+            .assembleAddAdminMessage(
+                adminNode.base.local.key,
+                mutatedTxValidity
+            );
 },
 	expectedLogs: ['Transaction was not executed.']
 }).performScenario();

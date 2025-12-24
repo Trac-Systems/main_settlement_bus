@@ -1,6 +1,7 @@
 import { eventFlush, deriveIndexerSequenceState } from '../../../../../helpers/autobaseTestHelpers.js';
 import OperationValidationScenarioBase from '../base/OperationValidationScenarioBase.js';
 import CompleteStateMessageOperations from '../../../../../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
+import { config } from '../../../../../helpers/config.js';
 
 export default class InitializationDisabledScenario extends OperationValidationScenarioBase {
 	constructor({
@@ -33,8 +34,7 @@ async function disableInitializationAndApply(context, invalidPayload) {
 	}
 
 	const txValidity = await deriveIndexerSequenceState(adminNode.base);
-	const disablePayload = await CompleteStateMessageOperations.assembleDisableInitializationMessage(
-		adminNode.wallet,
+	const disablePayload = await new CompleteStateMessageOperations(adminNode.wallet, config).assembleDisableInitializationMessage(
 		adminNode.base.local.key,
 		txValidity
 	);

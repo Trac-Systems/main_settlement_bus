@@ -1,10 +1,10 @@
 import test from 'brittle'
-
 import Check from '../../../../src/utils/check.js'
-import {ACO, not_allowed_data_types} from '../../../fixtures/check.fixtures.js'
+import { ACO, not_allowed_data_types } from '../../../fixtures/check.fixtures.js'
 import { topLevelValidationTests, valueLevelValidationTest, addressBufferLengthTest, fieldsBufferLengthTest } from './common.test.js';
+import { config } from '../../../helpers/config.js';
 
-const check = new Check()
+const check = new Check(config)
 
 test('validateAdminControlOperation- happy paths for all operation types', t => {
     const validInputs = [

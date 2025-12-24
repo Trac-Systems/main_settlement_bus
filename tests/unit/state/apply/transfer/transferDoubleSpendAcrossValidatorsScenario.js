@@ -13,6 +13,7 @@ import { promotePeerToWriter } from '../addWriter/addWriterScenarioHelpers.js';
 import transactionUtils from '../../../../../src/core/state/utils/transaction.js';
 import { toBalance } from '../../../../../src/core/state/utils/balance.js';
 import nodeEntryUtils from '../../../../../src/core/state/utils/nodeEntry.js';
+import { config } from '../../../../helpers/config.js';
 
 export default function transferDoubleSpendAcrossValidatorsScenario() {
 	test('State.apply transfer prevents double spend across validators (distinct tx hashes)', async t => {
@@ -49,40 +50,40 @@ export default function transferDoubleSpendAcrossValidatorsScenario() {
 		const txValidityA = await deriveIndexerSequenceState(primaryValidator.base);
 		const txValidityB = await deriveIndexerSequenceState(secondaryValidator.base);
 
-		const partialA = await PartialStateMessageOperations.assembleTransferOperationMessage(
-			senderPeer.wallet,
-			recipientA.wallet.address,
-			b4a.toString(DEFAULT_TRANSFER_AMOUNT, 'hex'),
-			b4a.toString(txValidityA, 'hex')
-		);
-		const partialB = await PartialStateMessageOperations.assembleTransferOperationMessage(
-			senderPeer.wallet,
-			recipientB.wallet.address,
-			b4a.toString(DEFAULT_TRANSFER_AMOUNT, 'hex'),
-			b4a.toString(txValidityB, 'hex')
-		);
+        const partialA = await new PartialStateMessageOperations(senderPeer.wallet, config)
+            .assembleTransferOperationMessage(
+                recipientA.wallet.address,
+                b4a.toString(DEFAULT_TRANSFER_AMOUNT, 'hex'),
+                b4a.toString(txValidityA, 'hex')
+            );
+        const partialB = await new PartialStateMessageOperations(senderPeer.wallet, config)
+            .assembleTransferOperationMessage(
+                recipientB.wallet.address,
+                b4a.toString(DEFAULT_TRANSFER_AMOUNT, 'hex'),
+                b4a.toString(txValidityB, 'hex')
+            );
 
-		const payloadA = await CompleteStateMessageOperations.assembleCompleteTransferOperationMessage(
-			primaryValidator.wallet,
-			partialA.address,
-			b4a.from(partialA.tro.tx, 'hex'),
-			b4a.from(partialA.tro.txv, 'hex'),
-			b4a.from(partialA.tro.in, 'hex'),
-			partialA.tro.to,
-			b4a.from(partialA.tro.am, 'hex'),
-			b4a.from(partialA.tro.is, 'hex')
-		);
+        const payloadA = await new CompleteStateMessageOperations(primaryValidator.wallet, config)
+            .assembleCompleteTransferOperationMessage(
+                partialA.address,
+                b4a.from(partialA.tro.tx, 'hex'),
+                b4a.from(partialA.tro.txv, 'hex'),
+                b4a.from(partialA.tro.in, 'hex'),
+                partialA.tro.to,
+                b4a.from(partialA.tro.am, 'hex'),
+                b4a.from(partialA.tro.is, 'hex')
+            );
 
-		const payloadB = await CompleteStateMessageOperations.assembleCompleteTransferOperationMessage(
-			secondaryValidator.wallet,
-			partialB.address,
-			b4a.from(partialB.tro.tx, 'hex'),
-			b4a.from(partialB.tro.txv, 'hex'),
-			b4a.from(partialB.tro.in, 'hex'),
-			partialB.tro.to,
-			b4a.from(partialB.tro.am, 'hex'),
-			b4a.from(partialB.tro.is, 'hex')
-		);
+        const payloadB = await new CompleteStateMessageOperations(secondaryValidator.wallet, config)
+            .assembleCompleteTransferOperationMessage(
+                partialB.address,
+                b4a.from(partialB.tro.tx, 'hex'),
+                b4a.from(partialB.tro.txv, 'hex'),
+                b4a.from(partialB.tro.in, 'hex'),
+                partialB.tro.to,
+                b4a.from(partialB.tro.am, 'hex'),
+                b4a.from(partialB.tro.is, 'hex')
+            );
 
 		// Apply first transfer successfully via primary validator.
 		await primaryValidator.base.append(payloadA);

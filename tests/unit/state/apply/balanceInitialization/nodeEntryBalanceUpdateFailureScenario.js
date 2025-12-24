@@ -7,6 +7,7 @@ import setupBalanceInitializationScenario, {
 	buildDefaultBalanceInitializationPayload,
 	assertBalanceInitializationFailureState
 } from './balanceInitializationScenarioHelpers.js';
+import { config } from '../../../../helpers/config.js';
 
 export default function balanceInitializationNodeEntryBalanceUpdateFailureScenario() {
 	new OperationValidationScenarioBase({
@@ -30,7 +31,7 @@ async function applyWithCorruptExistingNodeEntry(context, payload, _t, validPayl
 	const decoded = safeDecodeApplyOperation(validPayload ?? payload);
 	const targetAddressBuffer = decoded?.bio?.ia;
 	const targetAddressString = targetAddressBuffer
-		? addressUtils.bufferToAddress(targetAddressBuffer)
+		? addressUtils.bufferToAddress(targetAddressBuffer, config.addressPrefix)
 		: null;
 	if (!targetAddressString || !targetAddressBuffer) {
 		throw new Error('Failed to resolve recipient address for balance update failure scenario.');

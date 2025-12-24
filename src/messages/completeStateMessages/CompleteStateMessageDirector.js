@@ -1,13 +1,9 @@
-import StateBuilder from '../base/StateBuilder.js'
 import { OperationType } from '../../utils/protobuf/applyOperations.cjs'
 
+// TODO: DEPRACATED - Remove this class in the future.
 class CompleteStateMessageDirector {
     #builder;
-
-    set builder(builderInstance) {
-        if (!(builderInstance instanceof StateBuilder)) {
-            throw new Error('Director requires a Builder instance.');
-        }
+    constructor(builderInstance) {
         this.#builder = builderInstance;
     }
 
@@ -15,7 +11,7 @@ class CompleteStateMessageDirector {
         if (!this.#builder) throw new Error('Builder has not been set.');
 
         await this.#builder
-            .forOperationType(OperationType.ADD_ADMIN)
+            .withOperationType(OperationType.ADD_ADMIN)
             .withAddress(invokerAddress)
             .withWriterKey(writingKey)
             .withTxValidity(txValidity)
@@ -28,7 +24,7 @@ class CompleteStateMessageDirector {
         if (!this.#builder) throw new Error('Builder has not been set.');
 
         await this.#builder
-            .forOperationType(OperationType.DISABLE_INITIALIZATION)
+            .withOperationType(OperationType.DISABLE_INITIALIZATION)
             .withAddress(invokerAddress)
             .withWriterKey(writingKey)
             .withTxValidity(txValidity)
@@ -40,7 +36,7 @@ class CompleteStateMessageDirector {
     async buildBalanceInitializationMessage(invokerAddress, recipientAddress, amount, txValidity) {
         if (!this.#builder) throw new Error('Builder has not been set.');
         await this.#builder
-            .forOperationType(OperationType.BALANCE_INITIALIZATION)
+            .withOperationType(OperationType.BALANCE_INITIALIZATION)
             .withAddress(invokerAddress)
             .withIncomingAddress(recipientAddress)
             .withAmount(amount)
@@ -54,7 +50,7 @@ class CompleteStateMessageDirector {
         if (!this.#builder) throw new Error('Builder has not been set.');
 
         await this.#builder
-            .forOperationType(OperationType.APPEND_WHITELIST)
+            .withOperationType(OperationType.APPEND_WHITELIST)
             .withAddress(invokerAddress)
             .withTxValidity(txValidity)
             .withIncomingAddress(incomingAddress)
@@ -74,7 +70,7 @@ class CompleteStateMessageDirector {
         if (!this.#builder) throw new Error('Builder has not been set.');
 
         await this.#builder
-            .forOperationType(OperationType.ADD_WRITER)
+            .withOperationType(OperationType.ADD_WRITER)
             .withAddress(invokerAddress)
             .withTxHash(txHash)
             .withTxValidity(txValidity)
@@ -97,7 +93,7 @@ class CompleteStateMessageDirector {
         if (!this.#builder) throw new Error('Builder has not been set.');
 
         await this.#builder
-            .forOperationType(OperationType.REMOVE_WRITER)
+            .withOperationType(OperationType.REMOVE_WRITER)
             .withAddress(invokerAddress)
             .withTxHash(txHash)
             .withTxValidity(txValidity)
@@ -120,7 +116,7 @@ class CompleteStateMessageDirector {
         if (!this.#builder) throw new Error('Builder has not been set.');
 
         await this.#builder
-            .forOperationType(OperationType.ADMIN_RECOVERY)
+            .withOperationType(OperationType.ADMIN_RECOVERY)
             .withAddress(invokerAddress)
             .withTxHash(txHash)
             .withTxValidity(txValidity)
@@ -136,7 +132,7 @@ class CompleteStateMessageDirector {
         if (!this.#builder) throw new Error('Builder has not been set.');
 
         await this.#builder
-            .forOperationType(OperationType.ADD_INDEXER)
+            .withOperationType(OperationType.ADD_INDEXER)
             .withAddress(invokerAddress)
             .withTxValidity(txValidity)
             .withIncomingAddress(incomingAddress)
@@ -148,7 +144,7 @@ class CompleteStateMessageDirector {
     async buildRemoveIndexerMessage(invokerAddress, incomingAddress, txValidity) {
         if (!this.#builder) throw new Error('Builder has not been set.');
         await this.#builder
-            .forOperationType(OperationType.REMOVE_INDEXER)
+            .withOperationType(OperationType.REMOVE_INDEXER)
             .withAddress(invokerAddress)
             .withTxValidity(txValidity)
             .withIncomingAddress(incomingAddress)
@@ -161,7 +157,7 @@ class CompleteStateMessageDirector {
         if (!this.#builder) throw new Error('Builder has not been set.');
 
         await this.#builder
-            .forOperationType(OperationType.BAN_VALIDATOR)
+            .withOperationType(OperationType.BAN_VALIDATOR)
             .withAddress(invokerAddress)
             .withTxValidity(txValidity)
             .withIncomingAddress(incomingAddress)
@@ -183,7 +179,7 @@ class CompleteStateMessageDirector {
     ) {
         if (!this.#builder) throw new Error('Builder has not been set.');
         await this.#builder
-            .forOperationType(OperationType.TX)
+            .withOperationType(OperationType.TX)
             .withAddress(invokerAddress)
             .withTxHash(txHash)
             .withTxValidity(txValidity)
@@ -210,7 +206,7 @@ class CompleteStateMessageDirector {
         if (!this.#builder) throw new Error('Builder has not been set.');
 
         await this.#builder
-            .forOperationType(OperationType.BOOTSTRAP_DEPLOYMENT)
+            .withOperationType(OperationType.BOOTSTRAP_DEPLOYMENT)
             .withAddress(invokerAddress)
             .withTxHash(transactionHash)
             .withTxValidity(txValidity)
@@ -234,7 +230,7 @@ class CompleteStateMessageDirector {
     ) {
         if (!this.#builder) throw new Error('Builder has not been set.');
         await this.#builder
-            .forOperationType(OperationType.TRANSFER)
+            .withOperationType(OperationType.TRANSFER)
             .withAddress(invokerAddress)
             .withTxHash(transactionHash)
             .withTxValidity(txValidity)

@@ -1,4 +1,5 @@
 import applyOperations from './applyOperations.cjs';
+import networkV1Operations from './network.cjs';
 import b4a from 'b4a';
 
 /**
@@ -48,3 +49,12 @@ export const normalizeIncomingMessage = (message) => {
 
     return null;
 };
+
+export const encodeV1networkOperation = (payload) => {
+    return networkV1Operations.MessageHeader.encode(payload);
+}
+
+
+export const decodeV1networkOperation = (payload) => {
+    return networkV1Operations.MessageHeader.decode(payload);
+}

@@ -1,17 +1,20 @@
 import PeerWallet from 'trac-wallet';
 
-import { bufferToAddress } from "../../../state/utils/address.js";
-import { bufferToBigInt } from "../../../../utils/amountSerialization.js";
+import {bufferToAddress} from "../../../state/utils/address.js";
+import {bufferToBigInt} from "../../../../utils/amountSerialization.js";
 import PartialOperation from './base/PartialOperation.js';
 
 class PartialTransfer extends PartialOperation {
+    #config
 
-    constructor(state) {
-        super(state);
+    constructor(state, selfAddress, config) {
+        super(state, selfAddress, config);
+        this.#config = config
     }
 
     async validate(payload) {
         this.isPayloadSchemaValid(payload);
+        this.validateNoSelfValidation(payload);
         this.validateRequesterAddress(payload);
         await this.validateTransactionUniqueness(payload);
         await this.validateSignature(payload);
@@ -26,7 +29,7 @@ class PartialTransfer extends PartialOperation {
     }
 
     #validateRecipientAddress(payload) {
-        const incomingAddress = bufferToAddress(payload.tro.to);
+        const incomingAddress = bufferToAddress(payload.tro.to, this.#config.addressPrefix);
         if (!incomingAddress) {
             throw new Error('Invalid recipient address in transfer payload.');
         }
@@ -39,8 +42,8 @@ class PartialTransfer extends PartialOperation {
     }
 
     async #validateStateBalances(payload) {
-        const senderAddress = bufferToAddress(payload.address);
-        const recipientAddress = bufferToAddress(payload.tro.to);
+        const senderAddress = bufferToAddress(payload.address, this.#config.addressPrefix);
+        const recipientAddress = bufferToAddress(payload.tro.to, this.#config.addressPrefix);
 
         const transferAmount = bufferToBigInt(payload.tro.am);
         if (transferAmount > this.max_amount) {

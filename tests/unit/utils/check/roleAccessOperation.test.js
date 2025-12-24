@@ -1,10 +1,11 @@
 import test from 'brittle'
 
 import Check from '../../../../src/utils/check.js';
-import {RAO, not_allowed_data_types} from '../../../fixtures/check.fixtures.js';
+import { RAO, not_allowed_data_types } from '../../../fixtures/check.fixtures.js';
 import { topLevelValidationTests, valueLevelValidationTest, addressBufferLengthTest, fieldsBufferLengthTest, partialTypeCommonTests } from './common.test.js';
+import { config } from '../../../helpers/config.js';
 
-const check = new Check();
+const check = new Check(config)
 
 test('validateRoleAccessOperation - happy-path case', t => {
     // ADD_WRITER

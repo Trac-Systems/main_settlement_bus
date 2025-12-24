@@ -2,7 +2,6 @@ import ReadyResource from 'ready-resource';
 import Hyperswarm from 'hyperswarm';
 import w from 'protomux-wakeup';
 import b4a from 'b4a';
-
 import TransactionPoolService from './services/TransactionPoolService.js';
 import ValidatorObserverService from './services/ValidatorObserverService.js';
 import NetworkMessages from './messaging/NetworkMessages.js';
@@ -13,37 +12,38 @@ import {
     MAX_PARALLEL,
     MAX_SERVER_CONNECTIONS,
     MAX_CLIENT_CONNECTIONS,
-    NETWORK_MESSAGE_TYPES,
-    DHT_BOOTSTRAPS
+    NETWORK_MESSAGE_TYPES
 } from '../../utils/constants.js';
 import ConnectionManager from './services/ConnectionManager.js';
 import MessageOrchestrator from './services/MessageOrchestrator.js';
 import NetworkWalletFactory from './identity/NetworkWalletFactory.js';
+
 const wakeup = new w();
 
 class Network extends ReadyResource {
-    #dht_bootstrap = DHT_BOOTSTRAPS;
     #swarm = null;
-    #enable_wallet;
-    #channel;
     #networkMessages;
     #transactionPoolService;
     #validatorObserverService;
     #validatorConnectionManager;
     #validatorMessageOrchestrator;
-    #options;
+    #config;
     #identityProvider = null;
 
-    constructor(state, channel, address = null, options = {}) {
+    /**
+     * @param {State} state
+     * @param {object} config
+     * @param {string} address
+     **/
+    constructor(state, config, address = null) {
         super();
-        this.#options = options;
-        this.#enable_wallet = options.enable_wallet !== false;
-        this.#channel = channel;
-        this.#transactionPoolService = new TransactionPoolService(state, address, options);
-        this.#validatorObserverService = new ValidatorObserverService(this, state, address, options);
-        this.#networkMessages = new NetworkMessages(this, options);
-        this.#validatorConnectionManager = new ConnectionManager({ maxValidators: options.max_validators });
-        this.#validatorMessageOrchestrator = new MessageOrchestrator(this.#validatorConnectionManager, state);
+        this.#config = config
+
+        this.#transactionPoolService = new TransactionPoolService(state, address, this.#config);
+        this.#validatorObserverService = new ValidatorObserverService(this, state, address, this.#config);
+        this.#networkMessages = new NetworkMessages(this, this.#config);
+        this.#validatorConnectionManager = new ConnectionManager(this.#config);
+        this.#validatorMessageOrchestrator = new MessageOrchestrator(this.#validatorConnectionManager, state, this.#config);
         this.admin_stream = null;
         this.admin = null;
         this.validator = null;
@@ -53,10 +53,6 @@ class Network extends ReadyResource {
 
     get swarm() {
         return this.#swarm;
-    }
-
-    get channel() {
-        return this.#channel;
     }
 
     get transactionPoolService() {
@@ -103,14 +99,14 @@ class Network extends ReadyResource {
             const wrappedWallet = this.#getNetworkWalletWrapper(wallet, keyPair);
             this.#swarm = new Hyperswarm({
                 keyPair,
-                bootstrap: this.#dht_bootstrap,
+                bootstrap: this.#config.dhtBootstrap,
                 maxPeers: MAX_PEERS,
                 maxParallel: MAX_PARALLEL,
                 maxServerConnections: MAX_SERVER_CONNECTIONS,
                 maxClientConnections: MAX_CLIENT_CONNECTIONS
             });
 
-            console.log(`Channel: ${b4a.toString(this.#channel)}`);
+            console.log(`Channel: ${b4a.toString(this.#config.channel)}`);
             this.#networkMessages.initializeMessageRouter(state, wrappedWallet);
 
             this.#swarm.on('connection', async (connection) => {
@@ -151,13 +147,13 @@ class Network extends ReadyResource {
 
             });
 
-            this.#swarm.join(this.#channel, { server: true, client: true });
+            this.#swarm.join(this.#config.channel, { server: true, client: true });
             this.#swarm.flush();
         }
     }
 
     async initializeNetworkingKeyPair(store, wallet) {
-        if (!this.#enable_wallet) {
+        if (!this.#config.enableWallet) {
             return await store.createKeyPair(TRAC_NAMESPACE);
         } else {
             return {
@@ -260,10 +256,10 @@ class Network extends ReadyResource {
     #getNetworkWalletWrapper(wallet, keyPair) {
         if (!this.#identityProvider) {
             this.#identityProvider = NetworkWalletFactory.provide({
-                enableWallet: this.#enable_wallet,
+                enableWallet: this.#config.enableWallet,
                 wallet,
                 keyPair,
-                networkPrefix: this.#options?.networkPrefix
+                networkPrefix: this.#config.addressPrefix
             });
         }
         return this.#identityProvider;

@@ -1,6 +1,14 @@
 import { bufferToBigInt } from "../src/utils/amountSerialization.js";
-import { normalizeDecodedPayloadForJson } from "../src/utils/normalizers.js";
+import {
+    normalizeDecodedPayloadForJson,
+    normalizeTransactionOperation,
+    normalizeTransferOperation
+} from "../src/utils/normalizers.js";
 import { get_confirmed_tx_info, get_unconfirmed_tx_info } from "../src/utils/cli.js";
+import {OperationType} from "../src/utils/constants.js";
+import b4a from "b4a";
+import PartialTransaction from "../src/core/network/messaging/validators/PartialTransaction.js";
+import PartialTransfer from "../src/core/network/messaging/validators/PartialTransfer.js";
 
 export async function getBalance(msbInstance, address, confirmed) {
     const state = msbInstance.state;
@@ -36,8 +44,41 @@ export async function getUnconfirmedLength(msbInstance) {
     return msbInstance.state.getUnsignedLength();
 }
 
-export async function broadcastTransaction(msbInstance, payload) {
-    return msbInstance.broadcastTransactionCommand(payload);
+export async function broadcastTransaction(msbInstance, config, payload) {
+    if (!payload) {
+        throw new Error("Transaction payload is required for broadcasting.");
+    }
+    let normalizedPayload;
+    let isValid = false;
+    let hash;
+
+    const partialTransferValidator = new PartialTransfer(msbInstance.state, null , config);
+    const partialTransactionValidator = new PartialTransaction(msbInstance.state, null , config);
+
+    if (payload.type === OperationType.TRANSFER) {
+        normalizedPayload = normalizeTransferOperation(payload, config);
+        isValid = await partialTransferValidator.validate(normalizedPayload);
+        hash = b4a.toString(normalizedPayload.tro.tx, "hex");
+    } else if (payload.type === OperationType.TX) {
+        normalizedPayload = normalizeTransactionOperation(payload, config);
+        isValid = await partialTransactionValidator.validate(normalizedPayload);
+        hash = b4a.toString(normalizedPayload.txo.tx, "hex");
+    }
+
+    if (!isValid) {
+        throw new Error("Invalid transaction payload.");
+    }
+
+    const success = await msbInstance.broadcastPartialTransaction(payload);
+
+    if (!success) {
+        throw new Error("Failed to broadcast transaction after multiple attempts.");
+    }
+
+    const signedLength = msbInstance.state.getSignedLength();
+    const unsignedLength = msbInstance.state.getUnsignedLength();
+
+    return { message: "Transaction broadcasted successfully.", signedLength, unsignedLength, tx: hash };
 }
 
 export async function getTxHashes(msbInstance, start, end) {
@@ -51,7 +92,7 @@ export async function getTxDetails(msbInstance, hash) {
         return null;
     }
 
-    return normalizeDecodedPayloadForJson(rawPayload.decoded);
+    return normalizeDecodedPayloadForJson(rawPayload.decoded, msbInstance.config);
 }
 
 export async function fetchBulkTxPayloads(msbInstance, hashes) {
@@ -73,7 +114,7 @@ export async function fetchBulkTxPayloads(msbInstance, hashes) {
         if (result === null || result === undefined) {
             res.missing.push(hash);
         } else {
-            const decodedResult = normalizeDecodedPayloadForJson(result.decoded);
+            const decodedResult = normalizeDecodedPayloadForJson(result.decoded, msbInstance.config);
             res.results.push({ hash, payload: decodedResult });
         }
     });
@@ -93,7 +134,7 @@ export async function getExtendedTxDetails(msbInstance, hash, confirmed) {
         if (confirmedLength === null) {
             throw new Error(`No confirmed length found for tx hash: ${hash} in confirmed mode`);
         }
-        const normalizedPayload = normalizeDecodedPayloadForJson(rawPayload.decoded, true);
+        const normalizedPayload = normalizeDecodedPayloadForJson(rawPayload.decoded, msbInstance.config);
         const feeBuffer = state.getFee();
         return {
             txDetails: normalizedPayload,
@@ -107,7 +148,7 @@ export async function getExtendedTxDetails(msbInstance, hash, confirmed) {
         throw new Error(`No payload found for tx hash: ${hash}`);
     }
 
-    const normalizedPayload = normalizeDecodedPayloadForJson(rawPayload.decoded, true);
+    const normalizedPayload = normalizeDecodedPayloadForJson(rawPayload.decoded, msbInstance.config);
     const length = await state.getTransactionConfirmedLength(hash);
     if (length === null) {
         return {

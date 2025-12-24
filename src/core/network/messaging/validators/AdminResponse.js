@@ -4,8 +4,8 @@ import BaseResponse from './base/BaseResponse.js';
 
 class AdminResponse extends BaseResponse {
 
-    constructor(state, wallet) {
-        super(state, wallet);
+    constructor(state, wallet, config) {
+        super(state, wallet, config);
     }
 
     async validate(message, channelString) {

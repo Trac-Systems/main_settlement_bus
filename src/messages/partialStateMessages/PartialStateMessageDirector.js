@@ -1,14 +1,11 @@
-import StateBuilder from '../base/StateBuilder.js'
 import {OperationType} from '../../utils/constants.js'
-import address from "../../core/state/utils/address.js";
+
+// TODO: DEPRACATED - Remove this class in the future.
 
 class PartialStateMessageDirector {
     #builder;
 
-    set builder(builderInstance) {
-        if (!(builderInstance instanceof StateBuilder)) {
-            throw new Error('Director requires a Builder instance.');
-        }
+    constructor(builderInstance) {
         this.#builder = builderInstance;
     }
 
@@ -33,7 +30,7 @@ class PartialStateMessageDirector {
         if (!this.#builder) throw new Error('Builder has not been set.');
 
         await this.#builder
-            .forOperationType(OperationType.BOOTSTRAP_DEPLOYMENT)
+            .withOperationType(OperationType.BOOTSTRAP_DEPLOYMENT)
             .withAddress(address)
             .withTxValidity(txValidity)
             .withExternalBootstrap(bootstrap)
@@ -47,7 +44,7 @@ class PartialStateMessageDirector {
         if (!this.#builder) throw new Error('Builder has not been set.');
 
         await this.#builder
-            .forOperationType(OperationType.ADD_WRITER)
+            .withOperationType(OperationType.ADD_WRITER)
             .withAddress(address)
             .withTxValidity(txValidity)
             .withWriterKey(writingKey)
@@ -60,7 +57,7 @@ class PartialStateMessageDirector {
         if (!this.#builder) throw new Error('Builder has not been set.');
 
         await this.#builder
-            .forOperationType(OperationType.REMOVE_WRITER)
+            .withOperationType(OperationType.REMOVE_WRITER)
             .withAddress(address)
             .withTxValidity(txValidity)
             .withWriterKey(writerKey)
@@ -73,7 +70,7 @@ class PartialStateMessageDirector {
         if (!this.#builder) throw new Error('Builder has not been set.');
 
         await this.#builder
-            .forOperationType(OperationType.ADMIN_RECOVERY)
+            .withOperationType(OperationType.ADMIN_RECOVERY)
             .withAddress(address)
             .withTxValidity(txValidity)
             .withWriterKey(writingKey)
@@ -111,7 +108,7 @@ class PartialStateMessageDirector {
     ) {
         if (!this.#builder) throw new Error('Builder has not been set.');
         await this.#builder
-            .forOperationType(OperationType.TX)
+            .withOperationType(OperationType.TX)
             .withAddress(address)
             .withTxValidity(txValidity)
             .withWriterKey(incomingWritingKey)
@@ -124,7 +121,7 @@ class PartialStateMessageDirector {
     async buildTransferOperationMessage(address, recipientAddress, amount, txValidity){
         if (!this.#builder) throw new Error('Builder has not been set.');
         await this.#builder
-            .forOperationType(OperationType.TRANSFER)
+            .withOperationType(OperationType.TRANSFER)
             .withAddress(address)
             .withTxValidity(txValidity)
             .withIncomingAddress(recipientAddress)

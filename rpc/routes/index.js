@@ -1,4 +1,4 @@
-import { v1Routes } from './v1.mjs';
+import { v1Routes } from './v1.js';
 
 // future version
 // import { v2Routes } from './v2.mjs';

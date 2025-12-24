@@ -5,6 +5,7 @@ import { safeDecodeApplyOperation } from '../../../../../../../src/utils/protobu
 import addressUtils from '../../../../../../../src/core/state/utils/address.js';
 import { eventFlush } from '../../../../../../helpers/autobaseTestHelpers.js';
 import { BALANCE_ZERO } from '../../../../../../../src/core/state/utils/balance.js';
+import { config } from '../../../../../../helpers/config.js'
 
 const DEFAULT_VALIDATOR_ADDRESS_PATH = ['rao', 'va'];
 const VALIDATOR_ENTRY_MARK = Symbol('validator-entry-mark');
@@ -285,7 +286,7 @@ function extractValidatorAddress(payloadBuffer, path) {
 		return null;
 	}
 
-	const addressString = addressUtils.bufferToAddress(value);
+	const addressString = addressUtils.bufferToAddress(value, config.addressPrefix);
 	if (!addressString) {
 		return null;
 	}

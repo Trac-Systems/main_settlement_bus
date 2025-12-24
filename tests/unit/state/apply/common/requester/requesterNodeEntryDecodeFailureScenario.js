@@ -2,6 +2,7 @@ import b4a from 'b4a';
 import OperationValidationScenarioBase from '../base/OperationValidationScenarioBase.js';
 import addressUtils from '../../../../../../src/core/state/utils/address.js';
 import { eventFlush } from '../../../../../helpers/autobaseTestHelpers.js';
+import { config } from '../../../../../helpers/config.js'
 
 export default class RequesterNodeEntryDecodeFailureScenario extends OperationValidationScenarioBase {
 	constructor({
@@ -26,7 +27,7 @@ export default class RequesterNodeEntryDecodeFailureScenario extends OperationVa
 				}
 
 				const targetAddressString = peer.wallet.address;
-				const targetAddressBuffer = addressUtils.addressToBuffer(targetAddressString);
+				const targetAddressBuffer = addressUtils.addressToBuffer(targetAddressString, config.addressPrefix);
 
 				const originalApply = node.base._handlers.apply;
 				node.base._handlers.apply = async function patchedApply(nodes, view, baseCtx) {

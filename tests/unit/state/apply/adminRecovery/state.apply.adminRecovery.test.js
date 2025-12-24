@@ -4,17 +4,13 @@ import {
 	setupAdminRecoveryScenario,
 	buildAdminRecoveryPayload,
 	assertAdminRecoveryFailureState,
-	assertAdminRecoverySuccessState,
 	applyAdminRecoveryViaValidator,
 	buildAdminRecoveryPayloadWithTxValidity,
 	applyWithMissingComponentBypass,
 	applyWithRoleAccessBypass,
 	applyWithRegisteredWriterKey,
 	applyWithIndexerSequenceFailure,
-	applyWithIndexerSequenceCorruption,
 	applyWithAdminEntryMutation,
-	applyWithAdminNodeEntryMutation,
-	cloneIndexers,
 	applyWithAdminEncodeFailure,
 	applyWithAdminBalanceDecodeFailure,
 	applyWithInvalidRequesterMessage,
@@ -51,7 +47,7 @@ import ValidatorConsistencyScenarioBase, {
 } from '../common/validatorConsistency/base/validatorConsistencyScenarioBase.js';
 import adminEntryUtils from '../../../../../src/core/state/utils/adminEntry.js';
 import addressUtils from '../../../../../src/core/state/utils/address.js';
-import nodeEntryUtils from '../../../../../src/core/state/utils/nodeEntry.js';
+import { config } from '../../../../helpers/config.js';
 
 adminRecoveryHappyPathScenario();
 
@@ -299,8 +295,8 @@ new OperationValidationScenarioBase({
 	mutatePayload: (_t, payload) => payload,
 	applyInvalidPayload: async (context, invalidPayload) => {
 		const otherAddress = context.adminRecovery.validatorPeer2.wallet.address;
-		const otherAddressBuffer = addressUtils.addressToBuffer(otherAddress);
-		const mutatedEntry = adminEntryUtils.encode(otherAddressBuffer, context.adminRecovery.oldAdminWriterKey);
+		const otherAddressBuffer = addressUtils.addressToBuffer(otherAddress, config.addressPrefix);
+		const mutatedEntry = adminEntryUtils.encode(otherAddressBuffer, context.adminRecovery.oldAdminWriterKey, config.addressPrefix);
 		return applyWithAdminEntryMutation(context, invalidPayload, () => ({ value: mutatedEntry }));
 	},
 	expectedLogs: ['Admin public key does not match the node public key.']

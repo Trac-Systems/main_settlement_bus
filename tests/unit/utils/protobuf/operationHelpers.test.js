@@ -2,12 +2,20 @@ import test from 'brittle';
 import b4a from 'b4a';
 
 import applyOperations from '../../../../src/utils/protobuf/applyOperations.cjs';
+import {
+    decodeV1networkOperation,
+    encodeV1networkOperation,
+    normalizeIncomingMessage,
+    safeDecodeApplyOperation,
+    safeEncodeApplyOperation,
+} from '../../../../src/utils/protobuf/operationHelpers.js';
 import fixtures from '../../../fixtures/protobuf.fixtures.js';
+import networkV1Fixtures from '../../../fixtures/networkV1.fixtures.js';
 
-//TODO add missing operations tests and fill fixtures with them
 test('Happy path encode/decode roundtrip for protobuf applyOperation payloads', t => {
     const payloadsHashMap = new Map([
         ["txComplete", fixtures.validTransactionOperation],
+        ["txPartial", fixtures.validPartialTransactionOperation],
         ["addIndexer", fixtures.validAddIndexer],
         ["removeIndexer", fixtures.validRemoveIndexer],
         ["appendWhitelist", fixtures.validAppendWhitelist],
@@ -19,8 +27,12 @@ test('Happy path encode/decode roundtrip for protobuf applyOperation payloads', 
         ["removeWriterPartial", fixtures.validPartialRemoveWriter],
         ["adminRecoveryComplete", fixtures.validCompleteAdminRecovery],
         ["adminRecoveryPartial", fixtures.validPartialAdminRecovery],
+        ["bootstrapDeploymentComplete", fixtures.validCompleteBootstrapDeployment],
+        ["bootstrapDeploymentPartial", fixtures.validPartialBootstrapDeployment],
         ["transferComplete", fixtures.validTransferOperation],
-        ["balanceInitialization", fixtures.validBalanceInitOperation]
+        ["transferPartial", fixtures.validPartialTransferOperation],
+        ["balanceInitialization", fixtures.validBalanceInitOperation],
+        ["disableInitialization", fixtures.validDisableInitialization],
     ]);
 
     for (const [key, value] of payloadsHashMap) {
@@ -101,12 +113,26 @@ test('Protobuf encode/decode is order-independent for all operation types', t =>
     let decoded = applyOperations.Operation.decode(encoded);
     t.ok(JSON.stringify(decoded) === JSON.stringify(fixtures.validTransactionOperation), 'TX operation encodes/decodes correctly with shuffled fields');
 
+    // Test TX operation (partial)
+    const shuffledPartialTxo = shuffleObject(fixtures.validPartialTransactionOperation.txo);
+    const shuffledPartialTx = { ...fixtures.validPartialTransactionOperation, txo: shuffledPartialTxo };
+    encoded = applyOperations.Operation.encode(shuffledPartialTx);
+    decoded = applyOperations.Operation.decode(encoded);
+    t.ok(JSON.stringify(decoded) === JSON.stringify(fixtures.validPartialTransactionOperation), 'Partial TX operation encodes/decodes correctly with shuffled fields');
+
     // Test TRANSFER operation
     const shuffledTro = shuffleObject(fixtures.validTransferOperation.tro);
     const shuffledTransfer = { ...fixtures.validTransferOperation, tro: shuffledTro };
     encoded = applyOperations.Operation.encode(shuffledTransfer);
     decoded = applyOperations.Operation.decode(encoded);
     t.ok(JSON.stringify(decoded) === JSON.stringify(fixtures.validTransferOperation), 'TRANSFER operation encodes/decodes correctly with shuffled fields');
+
+    // Test TRANSFER operation (partial)
+    const shuffledPartialTro = shuffleObject(fixtures.validPartialTransferOperation.tro);
+    const shuffledPartialTransfer = { ...fixtures.validPartialTransferOperation, tro: shuffledPartialTro };
+    encoded = applyOperations.Operation.encode(shuffledPartialTransfer);
+    decoded = applyOperations.Operation.decode(encoded);
+    t.ok(JSON.stringify(decoded) === JSON.stringify(fixtures.validPartialTransferOperation), 'Partial TRANSFER operation encodes/decodes correctly with shuffled fields');
 
     // Test ADD_INDEXER operation
     const shuffledAco = shuffleObject(fixtures.validAddIndexer.aco);
@@ -184,4 +210,96 @@ test('Protobuf encode/decode is order-independent for all operation types', t =>
     encoded = applyOperations.Operation.encode(shuffledPartialAdminRecovery);
     decoded = applyOperations.Operation.decode(encoded);
     t.ok(JSON.stringify(decoded) === JSON.stringify(fixtures.validPartialAdminRecovery), 'Partial ADMIN_RECOVERY operation encodes/decodes correctly with shuffled fields');
+
+    // Test BOOTSTRAP_DEPLOYMENT (complete) operation
+    const shuffledCompleteBootstrapBdo = shuffleObject(fixtures.validCompleteBootstrapDeployment.bdo);
+    const shuffledCompleteBootstrap = { ...fixtures.validCompleteBootstrapDeployment, bdo: shuffledCompleteBootstrapBdo };
+    encoded = applyOperations.Operation.encode(shuffledCompleteBootstrap);
+    decoded = applyOperations.Operation.decode(encoded);
+    t.ok(JSON.stringify(decoded) === JSON.stringify(fixtures.validCompleteBootstrapDeployment), 'Complete BOOTSTRAP_DEPLOYMENT operation encodes/decodes correctly with shuffled fields');
+
+    // Test BOOTSTRAP_DEPLOYMENT (partial) operation
+    const shuffledPartialBootstrapBdo = shuffleObject(fixtures.validPartialBootstrapDeployment.bdo);
+    const shuffledPartialBootstrap = { ...fixtures.validPartialBootstrapDeployment, bdo: shuffledPartialBootstrapBdo };
+    encoded = applyOperations.Operation.encode(shuffledPartialBootstrap);
+    decoded = applyOperations.Operation.decode(encoded);
+    t.ok(JSON.stringify(decoded) === JSON.stringify(fixtures.validPartialBootstrapDeployment), 'Partial BOOTSTRAP_DEPLOYMENT operation encodes/decodes correctly with shuffled fields');
+
+    // Test BALANCE_INITIALIZATION operation
+    const shuffledBio = shuffleObject(fixtures.validBalanceInitOperation.bio);
+    const shuffledBalanceInit = { ...fixtures.validBalanceInitOperation, bio: shuffledBio };
+    encoded = applyOperations.Operation.encode(shuffledBalanceInit);
+    decoded = applyOperations.Operation.decode(encoded);
+    t.ok(JSON.stringify(decoded) === JSON.stringify(fixtures.validBalanceInitOperation), 'BALANCE_INITIALIZATION operation encodes/decodes correctly with shuffled fields');
+
+    // Test DISABLE_INITIALIZATION operation
+    const shuffledDisableCao = shuffleObject(fixtures.validDisableInitialization.cao);
+    const shuffledDisableInitialization = { ...fixtures.validDisableInitialization, cao: shuffledDisableCao };
+    encoded = applyOperations.Operation.encode(shuffledDisableInitialization);
+    decoded = applyOperations.Operation.decode(encoded);
+    t.ok(JSON.stringify(decoded) === JSON.stringify(fixtures.validDisableInitialization), 'DISABLE_INITIALIZATION operation encodes/decodes correctly with shuffled fields');
+});
+
+test('encodeV1networkOperation/decodeV1networkOperation roundtrip for network v1 payloads', t => {
+    const payloadsHashMap = new Map([
+        ['validatorConnectionRequest', networkV1Fixtures.payloadValidatorConnectionRequest],
+        ['validatorConnectionResponse', networkV1Fixtures.payloadValidatorConnectionResponse],
+        ['livenessRequest', networkV1Fixtures.payloadLivenessRequest],
+        ['livenessResponse', networkV1Fixtures.payloadLivenessResponse],
+        ['broadcastTransactionRequest', networkV1Fixtures.payloadBroadcastTransactionRequest],
+        ['broadcastTransactionResponse', networkV1Fixtures.payloadBroadcastTransactionResponse],
+    ]);
+
+    for (const [key, payload] of payloadsHashMap) {
+        const encoded = encodeV1networkOperation(payload);
+        const decoded = decodeV1networkOperation(encoded);
+        t.ok(b4a.isBuffer(encoded) && encoded.length > 0, `Payload ${key} encodes to a non-empty buffer`);
+        t.ok(JSON.stringify(decoded) === JSON.stringify(payload), `Payload ${key} decodes back correctly`);
+    }
+});
+
+test('safeEncodeApplyOperation returns an empty buffer on encode errors (and does not throw)', t => {
+    const originalLog = console.log;
+    console.log = () => {};
+    try {
+        const encoded = safeEncodeApplyOperation(fixtures.invalidPayloadWithMultipleOneOfKeys);
+        t.ok(b4a.isBuffer(encoded));
+        t.is(encoded.length, 0);
+    } finally {
+        console.log = originalLog;
+    }
+});
+
+test('safeEncodeApplyOperation encodes valid payloads to a non-empty buffer', t => {
+    const encoded = safeEncodeApplyOperation(fixtures.validTransactionOperation);
+    t.ok(b4a.isBuffer(encoded));
+    t.ok(encoded.length > 0);
+});
+
+test('safeDecodeApplyOperation returns null for invalid input (and does not throw)', t => {
+    t.is(safeDecodeApplyOperation(null), null);
+    t.is(safeDecodeApplyOperation({}), null);
+    t.is(safeDecodeApplyOperation('not-a-buffer'), null);
+
+    const originalLog = console.log;
+    console.log = () => {};
+    try {
+        t.is(safeDecodeApplyOperation(b4a.from([0x0F])), null);
+    } finally {
+        console.log = originalLog;
+    }
+});
+
+test('normalizeIncomingMessage decodes buffers and JSON buffers', t => {
+    const payload = fixtures.validTransactionOperation;
+    const encoded = applyOperations.Operation.encode(payload);
+
+    const decodedFromBuffer = normalizeIncomingMessage(encoded);
+    t.ok(JSON.stringify(decodedFromBuffer) === JSON.stringify(payload));
+
+    const decodedFromJsonBuffer = normalizeIncomingMessage({ type: 'Buffer', data: Array.from(encoded) });
+    t.ok(JSON.stringify(decodedFromJsonBuffer) === JSON.stringify(payload));
+
+    t.is(normalizeIncomingMessage(null), null);
+    t.is(normalizeIncomingMessage({ type: 'nope', data: [] }), null);
 });

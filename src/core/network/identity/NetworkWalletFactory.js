@@ -1,14 +1,13 @@
 import PeerWallet from 'trac-wallet';
-import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
 import b4a from 'b4a';
 
 export class NetworkWalletFactory {
     static provide(options = {}) {
         const {
-            enableWallet = true,
+            enableWallet,
             wallet,
             keyPair,
-            networkPrefix = TRAC_NETWORK_MSB_MAINNET_PREFIX
+            networkPrefix
         } = options;
 
         if (enableWallet) {
@@ -34,7 +33,7 @@ class EphemeralWallet {
     #secretKey;
     #address;
 
-    constructor(keyPair, networkPrefix = TRAC_NETWORK_MSB_MAINNET_PREFIX) {
+    constructor(keyPair, networkPrefix) {
         
         if (!keyPair?.publicKey || !keyPair?.secretKey) {
             throw new Error('NetworkIdentityProvider: keyPair with publicKey and secretKey is required');

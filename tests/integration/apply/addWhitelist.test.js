@@ -5,17 +5,17 @@ import { testKeyPair1, testKeyPair2 } from '../../fixtures/apply.fixtures.js';
 import fileUtils from '../../../src/utils/fileUtils.js';
 import CompleteStateMessageOperations from '../../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
 import { address as addressApi } from 'trac-crypto-api';
-import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
+import { config } from '../../helpers/config.js';
 
 let admin, whitelistKeys, tmpDirectory, originalReadAddressesFromWhitelistFile;
-const address = addressApi.encode(TRAC_NETWORK_MSB_MAINNET_PREFIX, b4a.from(testKeyPair2.publicKey, 'hex'))
+const address = addressApi.encode(config.addressPrefix, b4a.from(testKeyPair2.publicKey, 'hex'))
 hook('Initialize admin node for addWhitelist tests', async () => {
     const randomChannel = randomBytes(32).toString('hex');
     const baseOptions = {
         enable_txchannels: false,
-        enable_tx_apply_logs: false,
-        enable_interactive_mode: false,
-        enable_role_requester: false,
+        enableTxApplyLogs: false,
+        enableInteractiveMode: false,
+        enableRoleRequester: false,
         channel: randomChannel,
     }
     tmpDirectory = await initTemporaryDirectory();
@@ -31,9 +31,9 @@ hook('Initialize admin node for addWhitelist tests', async () => {
 });
 
 test('Apply function addWhitelist - happy path', async (t) => {
-    const validity = b4a.from(await admin.msb.state.getIndexerSequenceState(), 'hex')
-    const assembledWhitelistMessages = await CompleteStateMessageOperations.assembleAppendWhitelistMessages(admin.wallet, validity);
-    const payload = assembledWhitelistMessages.get(address);
+    const validity = await admin.msb.state.getIndexerSequenceState();
+    const payload = await new CompleteStateMessageOperations(admin.wallet, config)
+        .assembleAppendWhitelistMessages(validity, address);
 
     await admin.msb.state.append(payload);
     const isWhitelisted = await admin.msb.state.isAddressWhitelisted(address);
