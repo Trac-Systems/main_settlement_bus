@@ -160,6 +160,14 @@ class ApplyStateMessageBuilder {
         return this;
     }
 
+    #requireFields(fields) {
+        for (const [value, name] of fields) {
+            if (!value) {
+                throw new Error(`${name} must be set before build.`);
+            }
+        }
+    }
+
     async build() {
         this.#assertPhaseAndOutput();
 
@@ -647,14 +655,6 @@ class ApplyStateMessageBuilder {
                 };
             default:
                 throw new Error(`JSON output is not supported for payload ${this.#payloadKey}.`);
-        }
-    }
-
-    #requireFields(fields) {
-        for (const [value, name] of fields) {
-            if (!value) {
-                throw new Error(`${name} must be set before build.`);
-            }
         }
     }
 }

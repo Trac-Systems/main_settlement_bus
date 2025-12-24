@@ -9,6 +9,7 @@ import { sleep, isHexString } from "./utils/helpers.js";
 import { verifyDag, printHelp, printWalletInfo, printBalance } from "./utils/cli.js";
 import CompleteStateMessageOperations from "./messages/completeStateMessages/CompleteStateMessageOperations.js";
 import PartialStateMessageOperations from "./messages/partialStateMessages/PartialStateMessageOperations.js";
+import {createApplyStateMessageFactory} from "./messages/state/applyStateMessageFactory.js";
 import { isAddressValid } from "./core/state/utils/address.js";
 import Network from "./core/network/Network.js";
 import Check from "./utils/check.js";
@@ -45,7 +46,7 @@ import {
     getLicenseAddressCommand,
     getLicenseCountCommand
 } from "./utils/cliCommands.js";
-import ApplyStateMessageBuilder from "./messages/state/ApplyStateMessageBuilder.js";
+import {safeEncodeApplyOperation} from "./utils/protobuf/operationHelpers.js";
 
 export class MainSettlementBus extends ReadyResource {
     // internal attributes
@@ -257,14 +258,17 @@ export class MainSettlementBus extends ReadyResource {
         }
 
         const txValidity = await blake3Hash(this.#config.bootstrap);
-        const addAdminMessage = await new CompleteStateMessageOperations(this.#wallet, this.#config)
-            .assembleAddAdminMessage(
+        const addAdminMessage = await createApplyStateMessageFactory(this.#wallet, this.#config)
+            .buildCompleteAddAdminMessage(
+                this.#wallet.address,
                 this.#state.writingKey,
-                txValidity
-            );
+                txValidity,
+            )
+        const encodedPayload = safeEncodeApplyOperation(addAdminMessage);
 
-        await this.#state.append(addAdminMessage);
+        await this.#state.append(encodedPayload);
     }
+
     async #handleAdminRecovery() {
         if (!this.#config.enableWallet) {
             throw new Error("Can not initialize an admin - wallet is not enabled.");
@@ -290,10 +294,13 @@ export class MainSettlementBus extends ReadyResource {
         }
 
         const txValidity = await this.#state.getIndexerSequenceState();
-        const adminRecoveryMessage = await new PartialStateMessageOperations(this.#wallet, this.#config).assembleAdminRecoveryMessage(
-            this.#state.writingKey.toString('hex'),
-            txValidity.toString('hex')
-        );
+        const adminRecoveryMessage = await createApplyStateMessageFactory(this.#wallet, this.#config)
+            .buildPartialAdminRecoveryMessage(
+                this.#wallet.address,
+                this.#state.writingKey,
+                txValidity,
+                "json"
+            )
 
         const success = await this.broadcastPartialTransaction(adminRecoveryMessage);
 
@@ -327,12 +334,13 @@ export class MainSettlementBus extends ReadyResource {
 
         for (const addressToWhitelist of addresses) {
             const txValidity = await this.#state.getIndexerSequenceState();
-            const encodedPayload = await new CompleteStateMessageOperations(this.#wallet, this.#config)
-                .assembleAppendWhitelistMessages(
+            const appendWhitelistMessage = await createApplyStateMessageFactory(this.#wallet, this.#config)
+                .buildCompleteAppendWhitelistMessage(
+                    this.#wallet.address,
+                    addressToWhitelist,
                     txValidity,
-                    addressToWhitelist
-                );
-
+                )
+            const encodedPayload = safeEncodeApplyOperation(appendWhitelistMessage)
             messages.set(addressToWhitelist, encodedPayload);
         }
 
@@ -406,10 +414,13 @@ export class MainSettlementBus extends ReadyResource {
             }
 
             const txValidity = await this.#state.getIndexerSequenceState();
-            const assembledMessage = await new PartialStateMessageOperations(this.#wallet, { networkId: this.#config.networkId, addressPrefix: this.#config.addressPrefix })
-                .assembleAddWriterMessage(
-                    this.#state.writingKey.toString('hex'),
-                    txValidity.toString('hex')
+
+            const assembledMessage = await createApplyStateMessageFactory(this.#wallet, this.#config)
+                .buildPartialAddWriterMessage(
+                    this.#wallet.address,
+                    this.#state.writingKey,
+                    txValidity,
+                    'json'
                 )
 
             const success = await this.broadcastPartialTransaction(assembledMessage);
@@ -438,10 +449,12 @@ export class MainSettlementBus extends ReadyResource {
         }
 
         const txValidity = await this.#state.getIndexerSequenceState();
-        const assembledMessage = await new PartialStateMessageOperations(this.#wallet, { networkId: this.#config.networkId, addressPrefix: this.#config.addressPrefix })
-            .assembleRemoveWriterMessage(
-                nodeEntry.wk.toString('hex'),
-                txValidity.toString('hex')
+        const assembledMessage = await createApplyStateMessageFactory(this.#wallet, this.#config)
+            .buildPartialRemoveWriterMessage(
+                this.#wallet.address,
+                nodeEntry.wk,
+                txValidity,
+                "json"
             )
 
         const success = await this.broadcastPartialTransaction(assembledMessage);
@@ -453,10 +466,10 @@ export class MainSettlementBus extends ReadyResource {
         console.info(`Transaction hash: ${assembledMessage.rao.tx}`);
     }
 
-    async #updateIndexerRole(address, toAdd) {
+    async #updateWriterToIndexerRole(addressToUpdate, toAdd) {
         if (!this.#config.enableWallet) {
             throw new Error(
-                `Can not request indexer role for: ${address} - wallet is not enabled.`
+                `Can not request indexer role for: ${addressToUpdate} - wallet is not enabled.`
             );
         }
 
@@ -464,29 +477,29 @@ export class MainSettlementBus extends ReadyResource {
 
         if (!adminEntry) {
             throw new Error(
-                `Can not request indexer role for: ${address} - admin entry has not been initialized.`
+                `Can not request indexer role for: ${addressToUpdate} - admin entry has not been initialized.`
             );
         }
 
-        if (!isAddressValid(address, this.#config.addressPrefix)) {
+        if (!isAddressValid(addressToUpdate, this.#config.addressPrefix)) {
             throw new Error(
-                `Can not request indexer role for: ${address} - invalid address.`
+                `Can not request indexer role for: ${addressToUpdate} - invalid address.`
             );
         }
 
         if (!this.#isAdmin(adminEntry) && !this.#state.isWritable()) {
             throw new Error(
-                `Can not request indexer role for: ${address} - You are not an admin or writer.`
+                `Can not request indexer role for: ${addressToUpdate} - You are not an admin or writer.`
             );
         }
-        const nodeEntry = await this.#state.getNodeEntry(address);
+        const nodeEntry = await this.#state.getNodeEntry(addressToUpdate);
         if (!nodeEntry) {
             throw new Error(
-                `Can not request indexer role for: ${address} - node entry has not been not initialized.`
+                `Can not request indexer role for: ${addressToUpdate} - node entry has not been not initialized.`
             );
         }
 
-        const indexerNodeEntry = await this.#state.getNodeEntry(address);
+        const indexerNodeEntry = await this.#state.getNodeEntry(addressToUpdate);
         const indexerListHasAddress = await this.#state.isWkInIndexersEntry(
             indexerNodeEntry.wk,
         );
@@ -494,7 +507,7 @@ export class MainSettlementBus extends ReadyResource {
         if (toAdd) {
             if (indexerListHasAddress) {
                 throw new Error(
-                    `Cannot update indexer role for: ${address} - address is already in indexers list.`
+                    `Cannot update indexer role for: ${addressToUpdate} - address is already in indexers list.`
                 );
             }
 
@@ -506,71 +519,86 @@ export class MainSettlementBus extends ReadyResource {
 
             if (!canAddIndexer) {
                 throw new Error(
-                    `Can not request indexer role for: ${address} - node is not whitelisted, not a writer or already an indexer.`
+                    `Can not request indexer role for: ${addressToUpdate} - node is not whitelisted, not a writer or already an indexer.`
                 );
             }
             const txValidity = await this.#state.getIndexerSequenceState();
-            const assembledAddIndexerMessage = await new CompleteStateMessageOperations(this.#wallet, this.#config)
-                .assembleAddIndexerMessage(address, txValidity);
-            await this.#state.append(assembledAddIndexerMessage);
+
+            const assembledAddIndexerMessage = await createApplyStateMessageFactory(this.#wallet, this.#config)
+                .buildCompleteAddIndexerMessage(
+                    this.#wallet.address,
+                    addressToUpdate,
+                    txValidity,
+                )
+
+            const encodedPayload = safeEncodeApplyOperation(assembledAddIndexerMessage);
+
+            await this.#state.append(encodedPayload);
         } else {
             const canRemoveIndexer =
                 !toAdd && nodeEntry.isIndexer && indexerListHasAddress;
 
             if (!canRemoveIndexer) {
                 throw new Error(
-                    `Can not remove indexer role for: ${address} - node is not an indexer or address is not in indexers list.`
+                    `Can not remove indexer role for: ${addressToUpdate} - node is not an indexer or address is not in indexers list.`
                 );
             }
             const txValidity = await this.#state.getIndexerSequenceState();
-            const assembledRemoveIndexer = await new CompleteStateMessageOperations(this.#wallet, this.#config)
-                .assembleRemoveIndexerMessage(address, txValidity);
+            const assembledRemoveIndexerMessage = await createApplyStateMessageFactory(this.#wallet, this.#config)
+                .buildCompleteRemoveIndexerMessage(
+                    this.#wallet.address,
+                    addressToUpdate,
+                    txValidity,
+                )
+            const encodedPayload = safeEncodeApplyOperation(assembledRemoveIndexerMessage);
 
-            await this.#state.append(assembledRemoveIndexer);
+            await this.#state.append(encodedPayload);
         }
     }
 
-    async #banValidator(address) {
+    async #banValidator(addresstToBan) {
         if (!this.#config.enableWallet) {
             throw new Error(
-                `Can not ban writer with address: ${address} - wallet is not enabled.`
+                `Can not ban writer with address: ${addresstToBan} - wallet is not enabled.`
             );
         }
         const adminEntry = await this.#state.getAdminEntry();
 
         if (!adminEntry) {
             throw new Error(
-                `Can not ban writer with address: ${address} - admin entry has not been initialized.`
+                `Can not ban writer with address: ${addresstToBan} - admin entry has not been initialized.`
             );
         }
 
-        if (!isAddressValid(address, this.#config.addressPrefix)) {
+        if (!isAddressValid(addresstToBan, this.#config.addressPrefix)) {
             throw new Error(
-                `Can not ban writer with address:  ${address} - invalid address.`
+                `Can not ban writer with address:  ${addresstToBan} - invalid address.`
             );
         }
 
         if (!this.#isAdmin(adminEntry)) {
             throw new Error(
-                `Can not ban writer with address: ${address} - You are not an admin.`
+                `Can not ban writer with address: ${addresstToBan} - You are not an admin.`
             );
         }
 
-        const isWhitelisted = await this.#state.isAddressWhitelisted(address);
-        const nodeEntry = await this.#state.getNodeEntry(address);
+        const isWhitelisted = await this.#state.isAddressWhitelisted(addresstToBan);
+        const nodeEntry = await this.#state.getNodeEntry(addresstToBan);
 
         if (!isWhitelisted || null === nodeEntry || nodeEntry.isIndexer === true) {
             throw new Error(
-                `Can not ban writer with address: ${address} - node is not whitelisted or is an indexer.`
+                `Can not ban writer with address: ${addresstToBan} - node is not whitelisted or is an indexer.`
             );
         }
         const txValidity = await this.#state.getIndexerSequenceState();
-        const assembledBanValidatorMessage = await new CompleteStateMessageOperations(this.#wallet, this.#config)
-            .assembleBanWriterMessage(
-                address,
-                txValidity
-            );
-        await this.#state.append(assembledBanValidatorMessage);
+        const assembledBanValidatorMessage = await createApplyStateMessageFactory(this.#wallet, this.#config)
+            .buildCompleteBanWriterMessage(
+                this.#wallet.address,
+                addresstToBan,
+                txValidity,
+            )
+        const encodedPayload = safeEncodeApplyOperation(assembledBanValidatorMessage)
+        await this.#state.append(encodedPayload);
     }
 
     async #deployBootstrap(externalBootstrap, channel) {
@@ -643,14 +671,19 @@ export class MainSettlementBus extends ReadyResource {
         }
 
         const txValidity = await this.#state.getIndexerSequenceState();
-        const payload = await new PartialStateMessageOperations(this.#wallet, this.#config)
-            .assembleBootstrapDeploymentMessage(
+
+        const payload = await createApplyStateMessageFactory(this.#wallet, this.#config)
+            .buildPartialBootstrapDeploymentMessage(
+                this.#wallet.address,
                 externalBootstrap,
                 channel,
-                txValidity.toString('hex')
-            );
+                txValidity,
+                "json"
+            )
 
-        const success = await this.broadcastPartialTransaction(payload);
+        const encodedPayload = safeEncodeApplyOperation(payload)
+
+        const success = await this.broadcastPartialTransaction(encodedPayload);
 
         if (!success) {
             throw new Error("Failed to broadcast transaction after multiple attempts.");
@@ -665,11 +698,11 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async #handleAddIndexerOperation(address) {
-        await this.#updateIndexerRole(address, true);
+        await this.#updateWriterToIndexerRole(address, true);
     }
 
     async #handleRemoveIndexerOperation(address) {
-        await this.#updateIndexerRole(address, false);
+        await this.#updateWriterToIndexerRole(address, false);
     }
 
     async #handleAddWriterOperation() {
@@ -688,7 +721,7 @@ export class MainSettlementBus extends ReadyResource {
         await this.#deployBootstrap(bootstrapHex, channel);
     }
 
-    async #handleTransferOperation(address, amount) {
+    async #handleTransferOperation(recipientAddress, amount) {
         if (!this.#config.enableWallet) {
             throw new Error(
                 "Can not perform transfer - wallet is not enabled."
@@ -701,7 +734,7 @@ export class MainSettlementBus extends ReadyResource {
             );
         }
 
-        if (!isAddressValid(address, this.#config.addressPrefix)) {
+        if (!isAddressValid(recipientAddress, this.#config.addressPrefix)) {
             throw new Error("Invalid recipient address");
         }
 
@@ -726,7 +759,7 @@ export class MainSettlementBus extends ReadyResource {
         const fee = this.#state.getFee();
         const feeBigInt = bufferToBigInt(fee);
         const senderBalance = bufferToBigInt(senderEntry.balance);
-        const isSelfTransfer = address === this.#wallet.address;
+        const isSelfTransfer = recipientAddress === this.#wallet.address;
         const totalDeductedAmount = isSelfTransfer ? feeBigInt : amountBigInt + feeBigInt;
 
         if (!(senderBalance >= totalDeductedAmount)) {
@@ -734,13 +767,13 @@ export class MainSettlementBus extends ReadyResource {
         }
 
         const txValidity = await this.#state.getIndexerSequenceState();
-        const payload = await new PartialStateMessageOperations(this.#wallet, this.#config)
-            .assembleTransferOperationMessage(
-                address,
-                amountBuffer.toString('hex'),
-                txValidity.toString('hex'),
-            )
-
+        const payload = await createApplyStateMessageFactory(this.#wallet, this.#config).buildPartialTransferOperationMessage(
+            this.#wallet.address,
+            recipientAddress,
+            amountBuffer,
+            txValidity,
+            "json"
+        )
 
         const expectedNewBalance = senderBalance - totalDeductedAmount;
         console.info('Transfer Details:');
@@ -810,6 +843,14 @@ export class MainSettlementBus extends ReadyResource {
         await fileUtils.createMigrationEntryFile(addressBalancePair, migrationNumber);
 
         const txValidity = await this.#state.getIndexerSequenceState();
+        // TODO : we need to refactor this method a little bit. We need to extract pair manyally here
+        await createApplyStateMessageFactory(this.#wallet, this.#config).buildCompleteBalanceInitializationMessage(
+            this.#wallet.address,
+            recipientAddress,
+            amountBuffer,
+            txValidity,
+        )
+
         const messages = await new CompleteStateMessageOperations(this.#wallet, this.#config)
             .assembleBalanceInitializationMessages(
                 txValidity,
@@ -864,6 +905,10 @@ export class MainSettlementBus extends ReadyResource {
         if (!this.#config.enableWallet) {
             throw new Error("Can not initialize an admin - wallet is not enabled.");
         }
+        const isInitDisabled = await this.#state.isInitalizationDisabled();
+        if (isInitDisabled) {
+            throw new Error("Can not disable initialization - it is already disabled.");
+        }
         const adminEntry = await this.#state.getAdminEntry();
 
         if (!adminEntry) {
@@ -873,15 +918,24 @@ export class MainSettlementBus extends ReadyResource {
         if (!this.#isAdmin(adminEntry)) {
             throw new Error('Cannot perform whitelisting - you are not the admin!.');
         }
-        // add more checks
+        if (!this.#wallet) {
+            throw new Error("Can not initialize an admin - wallet is not initialized.");
+        }
+        if (!this.#state.writingKey) {
+            throw new Error("Can not initialize an admin - writing key is not initialized.");
+        }
         const txValidity = await this.#state.getIndexerSequenceState();
-        const payload = await new CompleteStateMessageOperations(this.#wallet, this.#config)
-            .assembleDisableInitializationMessage(
+
+
+        const payload = await createApplyStateMessageFactory(this.#wallet, this.#config)
+            .buildCompleteDisableInitializationMessage(
+                this.#wallet.address,
                 this.#state.writingKey,
                 txValidity,
             )
         console.log('Disabling initialization...');
-        await this.#state.append(payload);
+        const encodedPayload = safeEncodeApplyOperation(payload);
+        await this.#state.append(encodedPayload);
     }
 
     async interactiveMode() {
