@@ -98,7 +98,7 @@ class ApplyStateMessageDirector {
         return this.#builder.getPayload();
     }
 
-    async buildAddAdminMessage(invokerAddress, writingKey, txValidity) {
+    async buildCompleteAddAdminMessage(invokerAddress, writingKey, txValidity) {
         if (!this.#builder) throw new Error('Builder has not been set.');
         await this.#builder
             .setPhase('complete')
@@ -111,7 +111,7 @@ class ApplyStateMessageDirector {
         return this.#builder.getPayload();
     }
 
-    async buildDisableInitializationMessage(invokerAddress, writingKey, txValidity) {
+    async buildCompleteDisableInitializationMessage(invokerAddress, writingKey, txValidity) {
         if (!this.#builder) throw new Error('Builder has not been set.');
         await this.#builder
             .setPhase('complete')
@@ -124,7 +124,7 @@ class ApplyStateMessageDirector {
         return this.#builder.getPayload();
     }
 
-    async buildBalanceInitializationMessage(invokerAddress, recipientAddress, amount, txValidity) {
+    async buildCompleteBalanceInitializationMessage(invokerAddress, recipientAddress, amount, txValidity) {
         if (!this.#builder) throw new Error('Builder has not been set.');
         await this.#builder
             .setPhase('complete')
@@ -138,7 +138,7 @@ class ApplyStateMessageDirector {
         return this.#builder.getPayload();
     }
 
-    async buildAppendWhitelistMessage(invokerAddress, incomingAddress, txValidity) {
+    async buildCompleteAppendWhitelistMessage(invokerAddress, incomingAddress, txValidity) {
         if (!this.#builder) throw new Error('Builder has not been set.');
         await this.#builder
             .setPhase('complete')
@@ -151,7 +151,7 @@ class ApplyStateMessageDirector {
         return this.#builder.getPayload();
     }
 
-    async buildAddWriterMessage(
+    async buildCompleteAddWriterMessage(
         invokerAddress,
         txHash,
         txValidity,
@@ -174,7 +174,7 @@ class ApplyStateMessageDirector {
         return this.#builder.getPayload();
     }
 
-    async buildRemoveWriterMessage(
+    async buildCompleteRemoveWriterMessage(
         invokerAddress,
         txHash,
         txValidity,
@@ -197,7 +197,7 @@ class ApplyStateMessageDirector {
         return this.#builder.getPayload();
     }
 
-    async buildAdminRecoveryMessage(
+    async buildCompleteAdminRecoveryMessage(
         invokerAddress,
         txHash,
         txValidity,
@@ -220,7 +220,7 @@ class ApplyStateMessageDirector {
         return this.#builder.getPayload();
     }
 
-    async buildAddIndexerMessage(invokerAddress, incomingAddress, txValidity) {
+    async buildCompleteAddIndexerMessage(invokerAddress, incomingAddress, txValidity) {
         if (!this.#builder) throw new Error('Builder has not been set.');
         await this.#builder
             .setPhase('complete')
@@ -233,7 +233,7 @@ class ApplyStateMessageDirector {
         return this.#builder.getPayload();
     }
 
-    async buildRemoveIndexerMessage(invokerAddress, incomingAddress, txValidity) {
+    async buildCompleteRemoveIndexerMessage(invokerAddress, incomingAddress, txValidity) {
         if (!this.#builder) throw new Error('Builder has not been set.');
         await this.#builder
             .setPhase('complete')
@@ -246,7 +246,7 @@ class ApplyStateMessageDirector {
         return this.#builder.getPayload();
     }
 
-    async buildBanWriterMessage(invokerAddress, incomingAddress, txValidity) {
+    async buildCompleteBanWriterMessage(invokerAddress, incomingAddress, txValidity) {
         if (!this.#builder) throw new Error('Builder has not been set.');
         await this.#builder
             .setPhase('complete')
@@ -259,7 +259,7 @@ class ApplyStateMessageDirector {
         return this.#builder.getPayload();
     }
 
-    async buildTransactionOperationMessage(
+    async buildCompleteTransactionOperationMessage(
         invokerAddress,
         txHash,
         txValidity,
@@ -288,7 +288,7 @@ class ApplyStateMessageDirector {
         return this.#builder.getPayload();
     }
 
-    async buildBootstrapDeploymentMessage(
+    async buildCompleteBootstrapDeploymentMessage(
         invokerAddress,
         transactionHash,
         txValidity,
@@ -313,7 +313,7 @@ class ApplyStateMessageDirector {
         return this.#builder.getPayload();
     }
 
-    async buildTransferOperationMessage(
+    async buildCompleteTransferOperationMessage(
         invokerAddress,
         transactionHash,
         txValidity,

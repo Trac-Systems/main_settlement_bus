@@ -102,7 +102,7 @@ test('add writer matches legacy directors', async t => {
             )
         ),
         () => buildNew(wallet, director =>
-            director.buildAddWriterMessage(
+            director.buildCompleteAddWriterMessage(
                 wallet.address,
                 txHashBuf,
                 txValidityBuf,
@@ -140,7 +140,7 @@ test('remove writer matches legacy directors', async t => {
             )
         ),
         () => buildNew(wallet, director =>
-            director.buildRemoveWriterMessage(
+            director.buildCompleteRemoveWriterMessage(
                 wallet.address,
                 txHashBuf,
                 txValidityBuf,
@@ -178,7 +178,7 @@ test('admin recovery matches legacy directors', async t => {
             )
         ),
         () => buildNew(wallet, director =>
-            director.buildAdminRecoveryMessage(
+            director.buildCompleteAdminRecoveryMessage(
                 wallet.address,
                 txHashBuf,
                 txValidityBuf,
@@ -217,7 +217,7 @@ test('bootstrap deployment matches legacy directors', async t => {
             )
         ),
         () => buildNew(wallet, director =>
-            director.buildBootstrapDeploymentMessage(
+            director.buildCompleteBootstrapDeploymentMessage(
                 wallet.address,
                 txHashBuf,
                 txValidityBuf,
@@ -274,7 +274,7 @@ test('transaction operation matches legacy directors', async t => {
             )
         ),
         () => buildNew(wallet, director =>
-            director.buildTransactionOperationMessage(
+            director.buildCompleteTransactionOperationMessage(
                 wallet.address,
                 txHashBuf,
                 txValidityBuf,
@@ -327,7 +327,7 @@ test('transfer operation matches legacy directors', async t => {
             )
         ),
         () => buildNew(wallet, director =>
-            director.buildTransferOperationMessage(
+            director.buildCompleteTransferOperationMessage(
                 wallet.address,
                 txHashBuf,
                 txValidityBuf,
@@ -349,7 +349,7 @@ test('add admin matches legacy directors', async t => {
             director.buildAddAdminMessage(wallet.address, writingKeyBuf, txValidityBuf)
         ),
         () => buildNew(wallet, director =>
-            director.buildAddAdminMessage(wallet.address, writingKeyBuf, txValidityBuf)
+            director.buildCompleteAddAdminMessage(wallet.address, writingKeyBuf, txValidityBuf)
         )
     );
 });
@@ -363,7 +363,7 @@ test('disable initialization matches legacy directors', async t => {
             director.buildDisableInitializationMessage(wallet.address, writingKeyBuf, txValidityBuf)
         ),
         () => buildNew(wallet, director =>
-            director.buildDisableInitializationMessage(wallet.address, writingKeyBuf, txValidityBuf)
+            director.buildCompleteDisableInitializationMessage(wallet.address, writingKeyBuf, txValidityBuf)
         )
     );
 });
@@ -377,7 +377,7 @@ test('balance initialization matches legacy directors', async t => {
             director.buildBalanceInitializationMessage(wallet.address, otherWallet.address, amountBuf, txValidityBuf)
         ),
         () => buildNew(wallet, director =>
-            director.buildBalanceInitializationMessage(wallet.address, otherWallet.address, amountBuf, txValidityBuf)
+            director.buildCompleteBalanceInitializationMessage(wallet.address, otherWallet.address, amountBuf, txValidityBuf)
         )
     );
 });
@@ -391,7 +391,7 @@ test('append whitelist matches legacy directors', async t => {
             director.buildAppendWhitelistMessage(wallet.address, otherWallet.address, txValidityBuf)
         ),
         () => buildNew(wallet, director =>
-            director.buildAppendWhitelistMessage(wallet.address, otherWallet.address, txValidityBuf)
+            director.buildCompleteAppendWhitelistMessage(wallet.address, otherWallet.address, txValidityBuf)
         )
     );
 });
@@ -405,7 +405,7 @@ test('add indexer matches legacy directors', async t => {
             director.buildAddIndexerMessage(wallet.address, otherWallet.address, txValidityBuf)
         ),
         () => buildNew(wallet, director =>
-            director.buildAddIndexerMessage(wallet.address, otherWallet.address, txValidityBuf)
+            director.buildCompleteAddIndexerMessage(wallet.address, otherWallet.address, txValidityBuf)
         )
     );
 });
@@ -419,7 +419,7 @@ test('remove indexer matches legacy directors', async t => {
             director.buildRemoveIndexerMessage(wallet.address, otherWallet.address, txValidityBuf)
         ),
         () => buildNew(wallet, director =>
-            director.buildRemoveIndexerMessage(wallet.address, otherWallet.address, txValidityBuf)
+            director.buildCompleteRemoveIndexerMessage(wallet.address, otherWallet.address, txValidityBuf)
         )
     );
 });
@@ -433,7 +433,7 @@ test('ban validator matches legacy directors', async t => {
             director.buildBanWriterMessage(wallet.address, otherWallet.address, txValidityBuf)
         ),
         () => buildNew(wallet, director =>
-            director.buildBanWriterMessage(wallet.address, otherWallet.address, txValidityBuf)
+            director.buildCompleteBanWriterMessage(wallet.address, otherWallet.address, txValidityBuf)
         )
     );
 });
