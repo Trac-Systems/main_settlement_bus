@@ -7,39 +7,39 @@ class ApplyStateMessageDirector {
         this.#builder = builderInstance;
     }
 
-    async buildPartialAddWriterMessage(address, writingKey, txValidity, output) {
+    async buildPartialAddWriterMessage(invokerAddress, writingKey, txValidity, output) {
         if (!this.#builder) throw new Error('Builder has not been set.');
         await this.#builder
             .setPhase('partial')
             .setOutput(output)
             .setOperationType(OperationType.ADD_WRITER)
-            .setAddress(address)
+            .setAddress(invokerAddress)
             .setTxValidity(txValidity)
             .setWriterKey(writingKey)
             .build();
         return this.#builder.getPayload();
     }
 
-    async buildPartialRemoveWriterMessage(address, writerKey, txValidity, output) {
+    async buildPartialRemoveWriterMessage(invokerAddress, writerKey, txValidity, output) {
         if (!this.#builder) throw new Error('Builder has not been set.');
         await this.#builder
             .setPhase('partial')
             .setOutput(output)
             .setOperationType(OperationType.REMOVE_WRITER)
-            .setAddress(address)
+            .setAddress(invokerAddress)
             .setTxValidity(txValidity)
             .setWriterKey(writerKey)
             .build();
         return this.#builder.getPayload();
     }
 
-    async buildPartialAdminRecoveryMessage(address, writingKey, txValidity, output) {
+    async buildPartialAdminRecoveryMessage(invokerAddress, writingKey, txValidity, output) {
         if (!this.#builder) throw new Error('Builder has not been set.');
         await this.#builder
             .setPhase('partial')
             .setOutput(output)
             .setOperationType(OperationType.ADMIN_RECOVERY)
-            .setAddress(address)
+            .setAddress(invokerAddress)
             .setTxValidity(txValidity)
             .setWriterKey(writingKey)
             .build();
@@ -47,7 +47,7 @@ class ApplyStateMessageDirector {
     }
 
     async buildPartialTransactionOperationMessage(
-        address,
+        invokerAddress,
         incomingWritingKey,
         txValidity,
         contentHash,
@@ -60,7 +60,7 @@ class ApplyStateMessageDirector {
             .setPhase('partial')
             .setOutput(output)
             .setOperationType(OperationType.TX)
-            .setAddress(address)
+            .setAddress(invokerAddress)
             .setTxValidity(txValidity)
             .setWriterKey(incomingWritingKey)
             .setContentHash(contentHash)
@@ -70,13 +70,13 @@ class ApplyStateMessageDirector {
         return this.#builder.getPayload();
     }
 
-    async buildPartialBootstrapDeploymentMessage(address, bootstrap, channel, txValidity, output) {
+    async buildPartialBootstrapDeploymentMessage(invokerAddress, bootstrap, channel, txValidity, output) {
         if (!this.#builder) throw new Error('Builder has not been set.');
         await this.#builder
             .setPhase('partial')
             .setOutput(output)
             .setOperationType(OperationType.BOOTSTRAP_DEPLOYMENT)
-            .setAddress(address)
+            .setAddress(invokerAddress)
             .setTxValidity(txValidity)
             .setExternalBootstrap(bootstrap)
             .setChannel(channel)
@@ -84,13 +84,13 @@ class ApplyStateMessageDirector {
         return this.#builder.getPayload();
     }
 
-    async buildPartialTransferOperationMessage(address, recipientAddress, amount, txValidity, output) {
+    async buildPartialTransferOperationMessage(invokerAddress, recipientAddress, amount, txValidity, output) {
         if (!this.#builder) throw new Error('Builder has not been set.');
         await this.#builder
             .setPhase('partial')
             .setOutput(output)
             .setOperationType(OperationType.TRANSFER)
-            .setAddress(address)
+            .setAddress(invokerAddress)
             .setTxValidity(txValidity)
             .setIncomingAddress(recipientAddress)
             .setAmount(amount)
