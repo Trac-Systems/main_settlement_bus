@@ -12,7 +12,6 @@ async function runMsgUtilsTests() {
     await import('./assembleWhitelistMessages.test.js');
     await import('./assemblePostTransaction.test.js');
 
-    // TODO: Implement mocked tests for MessageOperations.verifyEventMessage
     test.resume();
 }
 

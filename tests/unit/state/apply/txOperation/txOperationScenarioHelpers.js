@@ -1,6 +1,5 @@
 import b4a from 'b4a';
-import PartialStateMessageOperations from '../../../../../src/messages/partialStateMessages/PartialStateMessageOperations.js';
-import CompleteStateMessageOperations from '../../../../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
+import { createApplyStateMessageFactory } from '../../../../../src/messages/state/applyStateMessageFactory.js';
 import {
 	deriveIndexerSequenceState,
 	eventFlush
@@ -139,20 +138,22 @@ export async function buildTxOperationPayload(
 		writerKeyBuffer = broadcasterPeer.base.local.key
 	} = {}
 ) {
-	const resolvedTxValidity = txValidity ?? (await deriveIndexerSequenceState(validatorPeer.base));
+    const resolvedTxValidity = txValidity ?? (await deriveIndexerSequenceState(validatorPeer.base));
 
-    const partial = await new PartialStateMessageOperations(broadcasterPeer.wallet, config)
-        .assembleTransactionOperationMessage(
+    const partial = await createApplyStateMessageFactory(broadcasterPeer.wallet, config)
+        .buildPartialTransactionOperationMessage(
+            broadcasterPeer.wallet.address,
             writerKeyBuffer.toString('hex'),
             resolvedTxValidity.toString('hex'),
             contentHash.toString('hex'),
             externalBootstrap.toString('hex'),
-            msbBootstrap.toString('hex')
+            msbBootstrap.toString('hex'),
+            'json'
         );
 
-    return new CompleteStateMessageOperations(validatorPeer.wallet, config)
-        .assembleCompleteTransactionOperationMessage(
-						partial.address,
+    const payload = await createApplyStateMessageFactory(validatorPeer.wallet, config)
+        .buildCompleteTransactionOperationMessage(
+            partial.address,
             b4a.from(partial.txo.tx, 'hex'),
             b4a.from(partial.txo.txv, 'hex'),
             b4a.from(partial.txo.iw, 'hex'),
@@ -162,6 +163,7 @@ export async function buildTxOperationPayload(
             b4a.from(partial.txo.bs, 'hex'),
             b4a.from(partial.txo.mbs, 'hex')
         );
+    return safeEncodeApplyOperation(payload);
 }
 
 export async function buildTxOperationPayloadWithTxValidity(context, txValidity, options = {}) {

@@ -6,7 +6,7 @@ import {
 	deriveIndexerSequenceState,
 	eventFlush
 } from '../../../../helpers/autobaseTestHelpers.js';
-import CompleteStateMessageOperations from '../../../../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
+import { createApplyStateMessageFactory } from '../../../../../src/messages/state/applyStateMessageFactory.js';
 import { AUTOBASE_VALUE_ENCODING } from '../../../../../src/utils/constants.js';
 import { toTerm } from '../../../../../src/core/state/utils/balance.js';
 import { safeDecodeApplyOperation, safeEncodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
@@ -42,11 +42,14 @@ async function bootstrapAdmin(context) {
 export async function buildBalanceInitializationPayload(context, recipientAddress, balanceBuffer) {
 	const adminNode = context.adminBootstrap;
 	const txValidity = await deriveIndexerSequenceState(adminNode.base);
-	const messages = await new CompleteStateMessageOperations(adminNode.wallet, config).assembleBalanceInitializationMessages(
-		txValidity,
-		[[recipientAddress, balanceBuffer]]
-	);
-	return messages[0];
+	const payload = await createApplyStateMessageFactory(adminNode.wallet, config)
+		.buildCompleteBalanceInitializationMessage(
+			adminNode.wallet.address,
+			recipientAddress,
+			balanceBuffer,
+			txValidity
+		);
+	return safeEncodeApplyOperation(payload);
 }
 
 export async function buildBalanceInitializationPayloadWithTxValidity({
@@ -60,11 +63,14 @@ export async function buildBalanceInitializationPayloadWithTxValidity({
 	}
 
 	const adminNode = context.adminBootstrap;
-	const messages = await new CompleteStateMessageOperations(adminNode.wallet, config).assembleBalanceInitializationMessages(
-		mutatedTxValidity,
-		[[decoded.bio.ia, decoded.bio.am]]
-	);
-	return messages[0];
+	const payload = await createApplyStateMessageFactory(adminNode.wallet, config)
+		.buildCompleteBalanceInitializationMessage(
+			adminNode.wallet.address,
+			decoded.bio.ia,
+			decoded.bio.am,
+			mutatedTxValidity
+		);
+	return safeEncodeApplyOperation(payload);
 }
 
 export async function buildDefaultBalanceInitializationPayload(context) {

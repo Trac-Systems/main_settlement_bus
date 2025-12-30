@@ -23,29 +23,32 @@ import {
     testKeyPair5,
     testKeyPair6
 } from '../../fixtures/apply.fixtures.js';
-import PartialStateMessageOperations from "../../../src/messages/partialStateMessages/PartialStateMessageOperations.js";
-import CompleteStateMessageOperations from '../../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
+import { createApplyStateMessageFactory } from '../../../src/messages/state/applyStateMessageFactory.js';
+import { safeEncodeApplyOperation } from '../../../src/utils/protobuf/operationHelpers.js';
 import {ZERO_WK} from '../../../src/utils/buffer.js';
 import { $TNK } from '../../../src/core/state/utils/balance.js';
 import { config } from '../../helpers/config.js';
 
 const sendAddWriter = async (invoker, broadcaster) => {
     const validity = await invoker.msb.state.getIndexerSequenceState()
-    const req = await new PartialStateMessageOperations(invoker.wallet, config)
-        .assembleAddWriterMessage(
+    const req = await createApplyStateMessageFactory(invoker.wallet, config)
+        .buildPartialAddWriterMessage(
+            invoker.wallet.address,
             b4a.toString(invoker.msb.state.writingKey, 'hex'),
-            b4a.toString(validity, 'hex'));
+            b4a.toString(validity, 'hex'),
+            'json'
+        );
 
-    const raw = await new CompleteStateMessageOperations(broadcaster.wallet, config)
-        .assembleAddWriterMessage(
+    const rawPayload = await createApplyStateMessageFactory(broadcaster.wallet, config)
+        .buildCompleteAddWriterMessage(
             req.address,
             b4a.from(req.rao.tx, 'hex'),
             b4a.from(req.rao.txv, 'hex'),
             b4a.from(req.rao.iw, 'hex'),
             b4a.from(req.rao.in, 'hex'),
             b4a.from(req.rao.is, 'hex')
-        )
-    return await broadcaster.msb.state.append(raw)
+        );
+    return await broadcaster.msb.state.append(safeEncodeApplyOperation(rawPayload))
 }
 
 let admin, writer1, writer2, writer3, writer4, indexer1, tmpDirectory;
@@ -146,21 +149,24 @@ test('handleApplyAddWriterOperation (apply) - Append addWriter payload into the 
     const signedLengthWriter1Before = writer1.msb.state.getSignedLength();
 
     const validity = await writer3.msb.state.getIndexerSequenceState()
-    const req = await new PartialStateMessageOperations(writer3.wallet, config)
-        .assembleAddWriterMessage(
+    const req = await createApplyStateMessageFactory(writer3.wallet, config)
+        .buildPartialAddWriterMessage(
+            writer3.wallet.address,
             b4a.toString(ZERO_WK, 'hex'),
-            b4a.toString(validity, 'hex'));
+            b4a.toString(validity, 'hex'),
+            'json'
+        );
 
-    const raw = await new CompleteStateMessageOperations(admin.wallet, config)
-        .assembleAddWriterMessage(
+    const rawPayload = await createApplyStateMessageFactory(admin.wallet, config)
+        .buildCompleteAddWriterMessage(
             admin.wallet.address,
             b4a.from(req.rao.tx, 'hex'),
             b4a.from(req.rao.txv, 'hex'),
             b4a.from(req.rao.iw, 'hex'),
             b4a.from(req.rao.in, 'hex'),
             b4a.from(req.rao.is, 'hex')
-        )
-    await admin.msb.state.append(raw)
+        );
+    await admin.msb.state.append(safeEncodeApplyOperation(rawPayload))
     await tryToSyncWriters(writer3, admin, writer1, writer2, indexer1);
 
     const result = await writer1.msb.state.getNodeEntry(writer3.wallet.address);

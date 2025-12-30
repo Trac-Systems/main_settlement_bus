@@ -5,7 +5,8 @@ import {
 	deriveIndexerSequenceState,
 	eventFlush
 } from '../../../../helpers/autobaseTestHelpers.js';
-import CompleteStateMessageOperations from '../../../../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
+import { createApplyStateMessageFactory } from '../../../../../src/messages/state/applyStateMessageFactory.js';
+import { safeEncodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
 import { AUTOBASE_VALUE_ENCODING } from '../../../../../src/utils/constants.js';
 import { buildAddAdminRequesterPayload } from '../addAdmin/addAdminScenarioHelpers.js';
 import { config } from '../../../../helpers/config.js';
@@ -59,13 +60,16 @@ export async function initializeBalances(context, recipients) {
 	if (!adminNode || !Array.isArray(recipients) || recipients.length === 0) return;
 
 	const txValidity = await deriveIndexerSequenceState(adminNode.base);
-	const payloads = await new CompleteStateMessageOperations(adminNode.wallet, config).assembleBalanceInitializationMessages(
-		txValidity,
-		recipients
-	);
-
-	for (const payload of payloads) {
-		await adminNode.base.append(payload);
+	for (const [recipientAddress, balanceBuffer] of recipients) {
+		const payload = await createApplyStateMessageFactory(adminNode.wallet, config)
+			.buildCompleteBalanceInitializationMessage(
+				adminNode.wallet.address,
+				recipientAddress,
+				balanceBuffer,
+				txValidity
+			);
+		const encoded = safeEncodeApplyOperation(payload);
+		await adminNode.base.append(encoded);
 		await adminNode.base.update();
 		await eventFlush();
 	}
@@ -76,12 +80,9 @@ export async function whitelistAddress(context, address) {
 	if (!adminNode || !address) return;
 
 	const txValidity = await deriveIndexerSequenceState(adminNode.base);
-	const payload = await new CompleteStateMessageOperations(adminNode.wallet, config).assembleAppendWhitelistMessages(
-		txValidity,
-		address
-	);
-
-	await adminNode.base.append(payload);
+	const payload = await createApplyStateMessageFactory(adminNode.wallet, config)
+		.buildCompleteAppendWhitelistMessage(adminNode.wallet.address, address, txValidity);
+	await adminNode.base.append(safeEncodeApplyOperation(payload));
 	await adminNode.base.update();
 	await eventFlush();
 }

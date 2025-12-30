@@ -6,7 +6,7 @@ import {
 	deriveIndexerSequenceState,
 	eventFlush
 } from '../../../../helpers/autobaseTestHelpers.js';
-import CompleteStateMessageOperations from '../../../../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
+import { createApplyStateMessageFactory } from '../../../../../src/messages/state/applyStateMessageFactory.js';
 import { AUTOBASE_VALUE_ENCODING, EntryType } from '../../../../../src/utils/constants.js';
 import { safeDecodeApplyOperation, safeEncodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
 import nodeEntryUtils, { ZERO_LICENSE } from '../../../../../src/core/state/utils/nodeEntry.js';
@@ -45,11 +45,10 @@ export async function buildAppendWhitelistPayload(context, readerAddress = null)
 	const adminNode = context.adminBootstrap;
 	const targetAddress = readerAddress ?? selectReaderPeer(context).wallet.address;
 	const txValidity = await deriveIndexerSequenceState(adminNode.base);
-    return new CompleteStateMessageOperations(adminNode.wallet, config)
-        .assembleAppendWhitelistMessages(
-            txValidity,
-            targetAddress
-        );
+	return safeEncodeApplyOperation(
+		await createApplyStateMessageFactory(adminNode.wallet, config)
+			.buildCompleteAppendWhitelistMessage(adminNode.wallet.address, targetAddress, txValidity)
+	);
 }
 
 export async function buildAppendWhitelistPayloadWithTxValidity(
@@ -59,21 +58,19 @@ export async function buildAppendWhitelistPayloadWithTxValidity(
 ) {
 	const adminNode = context.adminBootstrap;
 	const targetAddress = readerAddress ?? selectReaderPeer(context).wallet.address;
-    return new CompleteStateMessageOperations(adminNode.wallet, config)
-        .assembleAppendWhitelistMessages(
-            txValidity,
-            targetAddress
-        );
+	return safeEncodeApplyOperation(
+		await createApplyStateMessageFactory(adminNode.wallet, config)
+			.buildCompleteAppendWhitelistMessage(adminNode.wallet.address, targetAddress, txValidity)
+	);
 }
 
 export async function buildBanWriterPayload(context, readerAddress) {
 	const adminNode = context.adminBootstrap;
 	const txValidity = await deriveIndexerSequenceState(adminNode.base);
-    return new CompleteStateMessageOperations(adminNode.wallet, config)
-        .assembleBanWriterMessage(
-            readerAddress,
-            txValidity
-        );
+	return safeEncodeApplyOperation(
+		await createApplyStateMessageFactory(adminNode.wallet, config)
+			.buildCompleteBanWriterMessage(adminNode.wallet.address, readerAddress, txValidity)
+	);
 }
 
 export function mutateAppendWhitelistPayloadForInvalidSchema(t, validPayload) {

@@ -1,7 +1,7 @@
 import b4a from 'b4a';
 import { test } from 'brittle';
-import PartialStateMessageOperations from '../../../../../src/messages/partialStateMessages/PartialStateMessageOperations.js';
-import CompleteStateMessageOperations from '../../../../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
+import { createApplyStateMessageFactory } from '../../../../../src/messages/state/applyStateMessageFactory.js';
+import { safeEncodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
 import { deriveIndexerSequenceState, eventFlush } from '../../../../helpers/autobaseTestHelpers.js';
 import {
 	setupTransferScenario,
@@ -50,40 +50,48 @@ export default function transferDoubleSpendAcrossValidatorsScenario() {
 		const txValidityA = await deriveIndexerSequenceState(primaryValidator.base);
 		const txValidityB = await deriveIndexerSequenceState(secondaryValidator.base);
 
-        const partialA = await new PartialStateMessageOperations(senderPeer.wallet, config)
-            .assembleTransferOperationMessage(
+        const partialA = await createApplyStateMessageFactory(senderPeer.wallet, config)
+            .buildPartialTransferOperationMessage(
+                senderPeer.wallet.address,
                 recipientA.wallet.address,
                 b4a.toString(DEFAULT_TRANSFER_AMOUNT, 'hex'),
-                b4a.toString(txValidityA, 'hex')
+                b4a.toString(txValidityA, 'hex'),
+                'json'
             );
-        const partialB = await new PartialStateMessageOperations(senderPeer.wallet, config)
-            .assembleTransferOperationMessage(
+        const partialB = await createApplyStateMessageFactory(senderPeer.wallet, config)
+            .buildPartialTransferOperationMessage(
+                senderPeer.wallet.address,
                 recipientB.wallet.address,
                 b4a.toString(DEFAULT_TRANSFER_AMOUNT, 'hex'),
-                b4a.toString(txValidityB, 'hex')
+                b4a.toString(txValidityB, 'hex'),
+                'json'
             );
 
-        const payloadA = await new CompleteStateMessageOperations(primaryValidator.wallet, config)
-            .assembleCompleteTransferOperationMessage(
-                partialA.address,
-                b4a.from(partialA.tro.tx, 'hex'),
-                b4a.from(partialA.tro.txv, 'hex'),
-                b4a.from(partialA.tro.in, 'hex'),
-                partialA.tro.to,
-                b4a.from(partialA.tro.am, 'hex'),
-                b4a.from(partialA.tro.is, 'hex')
-            );
+        const payloadA = safeEncodeApplyOperation(
+            await createApplyStateMessageFactory(primaryValidator.wallet, config)
+                .buildCompleteTransferOperationMessage(
+                    partialA.address,
+                    b4a.from(partialA.tro.tx, 'hex'),
+                    b4a.from(partialA.tro.txv, 'hex'),
+                    b4a.from(partialA.tro.in, 'hex'),
+                    partialA.tro.to,
+                    b4a.from(partialA.tro.am, 'hex'),
+                    b4a.from(partialA.tro.is, 'hex')
+                )
+        );
 
-        const payloadB = await new CompleteStateMessageOperations(secondaryValidator.wallet, config)
-            .assembleCompleteTransferOperationMessage(
-                partialB.address,
-                b4a.from(partialB.tro.tx, 'hex'),
-                b4a.from(partialB.tro.txv, 'hex'),
-                b4a.from(partialB.tro.in, 'hex'),
-                partialB.tro.to,
-                b4a.from(partialB.tro.am, 'hex'),
-                b4a.from(partialB.tro.is, 'hex')
-            );
+        const payloadB = safeEncodeApplyOperation(
+            await createApplyStateMessageFactory(secondaryValidator.wallet, config)
+                .buildCompleteTransferOperationMessage(
+                    partialB.address,
+                    b4a.from(partialB.tro.tx, 'hex'),
+                    b4a.from(partialB.tro.txv, 'hex'),
+                    b4a.from(partialB.tro.in, 'hex'),
+                    partialB.tro.to,
+                    b4a.from(partialB.tro.am, 'hex'),
+                    b4a.from(partialB.tro.is, 'hex')
+                )
+        );
 
 		// Apply first transfer successfully via primary validator.
 		await primaryValidator.base.append(payloadA);

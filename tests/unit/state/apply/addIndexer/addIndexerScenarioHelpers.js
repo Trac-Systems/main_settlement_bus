@@ -1,5 +1,6 @@
 import b4a from 'b4a';
-import CompleteStateMessageOperations from '../../../../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
+import { createApplyStateMessageFactory } from '../../../../../src/messages/state/applyStateMessageFactory.js';
+import { safeEncodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
 import { deriveIndexerSequenceState, eventFlush } from '../../../../helpers/autobaseTestHelpers.js';
 import {
 	setupAddWriterScenario,
@@ -51,11 +52,10 @@ export async function buildAddIndexerPayload(
 	}
 
 	const txValidity = await deriveIndexerSequenceState(adminPeer.base);
-    return new CompleteStateMessageOperations(adminPeer.wallet, config)
-        .assembleAddIndexerMessage(
-            writerPeer.wallet.address,
-            txValidity
-        );
+	return safeEncodeApplyOperation(
+		await createApplyStateMessageFactory(adminPeer.wallet, config)
+			.buildCompleteAddIndexerMessage(adminPeer.wallet.address, writerPeer.wallet.address, txValidity)
+	);
 }
 
 export async function applyWithIndexerRoleUpdateFailure(context, invalidPayload) {
@@ -99,11 +99,10 @@ export async function buildAddIndexerPayloadWithTxValidity(
 		throw new Error('buildAddIndexerPayloadWithTxValidity requires an admin peer.');
 	}
 
-    return new CompleteStateMessageOperations(adminPeer.wallet, config)
-        .assembleAddIndexerMessage(
-            writerPeer.wallet.address,
-            mutatedTxValidity
-        );
+	return safeEncodeApplyOperation(
+		await createApplyStateMessageFactory(adminPeer.wallet, config)
+			.buildCompleteAddIndexerMessage(adminPeer.wallet.address, writerPeer.wallet.address, mutatedTxValidity)
+	);
 }
 
 export function ensureIndexerRegistration(base, writingKey) {
@@ -147,11 +146,10 @@ export async function buildRemoveIndexerPayload(
 	}
 
 	const txValidity = await deriveIndexerSequenceState(adminPeer.base);
-    return new CompleteStateMessageOperations(adminPeer.wallet, config)
-        .assembleRemoveIndexerMessage(
-            indexerPeer.wallet.address,
-            txValidity
-        );
+	return safeEncodeApplyOperation(
+		await createApplyStateMessageFactory(adminPeer.wallet, config)
+			.buildCompleteRemoveIndexerMessage(adminPeer.wallet.address, indexerPeer.wallet.address, txValidity)
+	);
 }
 
 export async function buildRemoveIndexerPayloadWithTxValidity(
@@ -169,11 +167,10 @@ export async function buildRemoveIndexerPayloadWithTxValidity(
 		throw new Error('buildRemoveIndexerPayloadWithTxValidity requires an admin peer.');
 	}
 
-    return new CompleteStateMessageOperations(adminPeer.wallet, config)
-        .assembleRemoveIndexerMessage(
-            indexerPeer.wallet.address,
-            mutatedTxValidity
-        );
+	return safeEncodeApplyOperation(
+		await createApplyStateMessageFactory(adminPeer.wallet, config)
+			.buildCompleteRemoveIndexerMessage(adminPeer.wallet.address, indexerPeer.wallet.address, mutatedTxValidity)
+	);
 }
 
 export async function assertAddIndexerSuccessState(

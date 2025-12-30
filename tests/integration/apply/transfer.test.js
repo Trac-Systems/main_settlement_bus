@@ -14,18 +14,25 @@ import {
     testKeyPair3,
     testKeyPair4
 } from '../../fixtures/apply.fixtures.js';
-import PartialStateMessageOperations from "../../../src/messages/partialStateMessages/PartialStateMessageOperations.js";
-import CompleteStateMessageOperations from '../../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
+import { createApplyStateMessageFactory } from '../../../src/messages/state/applyStateMessageFactory.js';
+import { safeEncodeApplyOperation } from '../../../src/utils/protobuf/operationHelpers.js';
 import { $TNK } from '../../../src/core/state/utils/balance.js';
 import { config } from '../../helpers/config.js';
 
 const buildTransfer = async (admin, from, to, amount) => {
     const txValidity = await from.msb.state.getIndexerSequenceState()
-    const tx = await new PartialStateMessageOperations(from.wallet, config)
-        .assembleTransferOperationMessage(to.wallet.address, b4a.toString(amount, 'hex'), b4a.toString(txValidity, 'hex'))
+    const tx = await createApplyStateMessageFactory(from.wallet, config)
+        .buildPartialTransferOperationMessage(
+            from.wallet.address,
+            to.wallet.address,
+            b4a.toString(amount, 'hex'),
+            b4a.toString(txValidity, 'hex'),
+            'json'
+        );
     return { 
-        raw: await new CompleteStateMessageOperations(admin.wallet, config)
-            .assembleCompleteTransferOperationMessage(
+        raw: safeEncodeApplyOperation(
+            await createApplyStateMessageFactory(admin.wallet, config)
+                .buildCompleteTransferOperationMessage(
                 tx.address,
                 b4a.from(tx.tro.tx, 'hex'),
                 b4a.from(tx.tro.txv, 'hex'),
@@ -33,7 +40,8 @@ const buildTransfer = async (admin, from, to, amount) => {
                 tx.tro.to,
                 b4a.from(tx.tro.am, 'hex'),
                 b4a.from(tx.tro.is, 'hex'),
-            ),
+            )
+        ),
         hash: tx.tro.tx
     }
 }

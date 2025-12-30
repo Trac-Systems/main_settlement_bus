@@ -47,7 +47,6 @@ import {
 import {safeEncodeApplyOperation} from "./utils/protobuf/operationHelpers.js";
 
 export class MainSettlementBus extends ReadyResource {
-    // internal attributes
     #store;
     #wallet;
     #network;
