@@ -1,9 +1,9 @@
 import BaseOperationHandler from './base/BaseOperationHandler.js';
-import CompleteStateMessageOperations
-    from "../../../../messages/completeStateMessages/CompleteStateMessageOperations.js";
 import {OperationType} from '../../../../utils/constants.js';
 import PartialTransfer from "../validators/PartialTransfer.js";
 import {normalizeTransferOperation} from "../../../../utils/normalizers.js"
+import {createApplyStateMessageFactory} from "../../../../messages/state/applyStateMessageFactory.js";
+import {safeEncodeApplyOperation} from "../../../../utils/protobuf/operationHelpers.js";
 
 class TransferOperationHandler extends BaseOperationHandler {
     #partialTransferValidator;
@@ -38,8 +38,8 @@ class TransferOperationHandler extends BaseOperationHandler {
             throw new Error("TransferHandler: Transfer validation failed.");
         }
 
-        const completeTransferOperation = await new CompleteStateMessageOperations(this.#wallet, this.#config)
-            .assembleCompleteTransferOperationMessage(
+        const completeTransferOperation = await createApplyStateMessageFactory(this.#wallet, this.#config)
+            .buildCompleteTransferOperationMessage(
                 normalizedPayload.address,
                 normalizedPayload.tro.tx,
                 normalizedPayload.tro.txv,
@@ -47,9 +47,9 @@ class TransferOperationHandler extends BaseOperationHandler {
                 normalizedPayload.tro.to,
                 normalizedPayload.tro.am,
                 normalizedPayload.tro.is
-            );
+            )
 
-        this.network.transactionPoolService.addTransaction(completeTransferOperation);
+        this.network.transactionPoolService.addTransaction(safeEncodeApplyOperation(completeTransferOperation));
     }
 }
 
