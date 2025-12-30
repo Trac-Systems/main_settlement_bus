@@ -3,20 +3,20 @@ import b4a from 'b4a';
 import PeerWallet from 'trac-wallet';
 import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
 
-import NetworkWalletFactory from '../../../src/core/network/identity/NetworkWalletFactory.js';
-import NetworkMessageDirector from '../../../src/messages/network/v1/NetworkMessageDirector.js';
-import { NetworkOperationType, ResultCode as NetworkResultCode } from '../../../src/utils/constants.js';
-import { decodeV1networkOperation, encodeV1networkOperation } from '../../../src/utils/protobuf/operationHelpers.js';
+import NetworkWalletFactory from '../../../../src/core/network/identity/NetworkWalletFactory.js';
+import NetworkMessageDirector from '../../../../src/messages/network/v1/NetworkMessageDirector.js';
+import { NetworkOperationType, ResultCode as NetworkResultCode } from '../../../../src/utils/constants.js';
+import { decodeV1networkOperation, encodeV1networkOperation } from '../../../../src/utils/protobuf/operationHelpers.js';
 import {
     createMessage,
     encodeCapabilities,
     safeWriteUInt32BE,
     sessionIdToBuffer,
     timestampToBuffer
-} from '../../../src/utils/buffer.js';
-import { addressToBuffer } from '../../../src/core/state/utils/address.js';
-import { config } from '../../helpers/config.js';
-import { testKeyPair1 } from '../../fixtures/apply.fixtures.js';
+} from '../../../../src/utils/buffer.js';
+import { addressToBuffer } from '../../../../src/core/state/utils/address.js';
+import { config } from '../../../helpers/config.js';
+import { testKeyPair1 } from '../../../fixtures/apply.fixtures.js';
 
 function createWallet() {
     const keyPair = {
