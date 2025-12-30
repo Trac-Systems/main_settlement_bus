@@ -1,0 +1,11 @@
+import { default as test } from 'brittle';
+
+async function runMsgUtilsTests() {
+    test.pause();
+    await import('./state/applyStateMessageBuilder.complete.test.js');
+    await import('./state/applyStateMessageBuilder.partial.test.js');
+    await import('./state/applyStateMessageBuilderRegTests.test.js');
+    test.resume();
+}
+
+await runMsgUtilsTests();

@@ -2,14 +2,14 @@ import { test } from 'brittle';
 import b4a from 'b4a';
 import PeerWallet from 'trac-wallet';
 
-import ApplyStateMessageBuilder from '../../../src/messages/state/ApplyStateMessageBuilder.js';
-import ApplyStateMessageDirector from '../../../src/messages/state/ApplyStateMessageDirector.js';
-import PartialStateMessageBuilder from '../../../src/messages/partialStateMessages/PartialStateMessageBuilder.js';
-import PartialStateMessageDirector from '../../../src/messages/partialStateMessages/PartialStateMessageDirector.js';
-import CompleteStateMessageBuilder from '../../../src/messages/completeStateMessages/CompleteStateMessageBuilder.js';
-import CompleteStateMessageDirector from '../../../src/messages/completeStateMessages/CompleteStateMessageDirector.js';
-import { config } from '../../helpers/config.js';
-import { testKeyPair1, testKeyPair2 } from '../../fixtures/apply.fixtures.js';
+import ApplyStateMessageBuilder from '../../../../src/messages/state/ApplyStateMessageBuilder.js';
+import ApplyStateMessageDirector from '../../../../src/messages/state/ApplyStateMessageDirector.js';
+import PartialStateMessageBuilder from '../../../../src/messages/partialStateMessages/PartialStateMessageBuilder.js';
+import PartialStateMessageDirector from '../../../../src/messages/partialStateMessages/PartialStateMessageDirector.js';
+import CompleteStateMessageBuilder from '../../../../src/messages/completeStateMessages/CompleteStateMessageBuilder.js';
+import CompleteStateMessageDirector from '../../../../src/messages/completeStateMessages/CompleteStateMessageDirector.js';
+import { config } from '../../../helpers/config.js';
+import { testKeyPair1, testKeyPair2 } from '../../../fixtures/apply.fixtures.js';
 
 const hex = (value, bytes) => value.repeat(bytes);
 const toBuf = value => b4a.from(value, 'hex');
