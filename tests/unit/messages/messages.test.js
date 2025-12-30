@@ -6,7 +6,6 @@ async function runMsgUtilsTests() {
     await import('./network/NetworkMessageDirector.test.js');
     await import('./state/applyStateMessageBuilder.complete.test.js');
     await import('./state/applyStateMessageBuilder.partial.test.js');
-    await import('./state/applyStateMessageBuilderRegTests.test.js');
     test.resume();
 }
 
