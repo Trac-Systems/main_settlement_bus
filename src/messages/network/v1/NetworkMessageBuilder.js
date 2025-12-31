@@ -5,6 +5,11 @@ import {NetworkOperationType, ResultCode} from '../../../utils/constants.js';
 import {addressToBuffer, isAddressValid} from "../../../core/state/utils/address.js";
 import {encodeCapabilities} from "../../../utils/buffer.js";
 
+/**
+ * Builder for v1 internal network protocol messages.
+ * @param {PeerWallet} wallet
+ * @param {object} config
+ */
 class NetworkMessageBuilder {
     #wallet;
     #type;
@@ -19,6 +24,10 @@ class NetworkMessageBuilder {
     #body;
     #config;
 
+    /**
+     * @param {PeerWallet} wallet
+     * @param {object} config
+     */
     constructor(wallet, config) {
         this.#config = config;
         if (!wallet || typeof wallet !== 'object') {

@@ -1,12 +1,26 @@
 import { OperationType } from '../../utils/constants.js';
 
+/**
+ * Director that orchestrates ApplyStateMessageBuilder for partial and complete messages.
+ */
 class ApplyStateMessageDirector {
     #builder;
 
+    /**
+     * @param {ApplyStateMessageBuilder} builderInstance
+     */
     constructor(builderInstance) {
         this.#builder = builderInstance;
     }
 
+    /**
+     * Build a partial add writer payload.
+     * @param {string|Buffer} invokerAddress
+     * @param {string|Buffer} writingKey
+     * @param {string|Buffer} txValidity
+     * @param {'json'|'buffer'} output
+     * @returns {Promise<object>}
+     */
     async buildPartialAddWriterMessage(invokerAddress, writingKey, txValidity, output) {
         if (!this.#builder) throw new Error('Builder has not been set.');
         await this.#builder
@@ -20,6 +34,14 @@ class ApplyStateMessageDirector {
         return this.#builder.getPayload();
     }
 
+    /**
+     * Build a partial remove writer payload.
+     * @param {string|Buffer} invokerAddress
+     * @param {string|Buffer} writerKey
+     * @param {string|Buffer} txValidity
+     * @param {'json'|'buffer'} output
+     * @returns {Promise<object>}
+     */
     async buildPartialRemoveWriterMessage(invokerAddress, writerKey, txValidity, output) {
         if (!this.#builder) throw new Error('Builder has not been set.');
         await this.#builder
@@ -33,6 +55,14 @@ class ApplyStateMessageDirector {
         return this.#builder.getPayload();
     }
 
+    /**
+     * Build a partial admin recovery payload.
+     * @param {string|Buffer} invokerAddress
+     * @param {string|Buffer} writingKey
+     * @param {string|Buffer} txValidity
+     * @param {'json'|'buffer'} output
+     * @returns {Promise<object>}
+     */
     async buildPartialAdminRecoveryMessage(invokerAddress, writingKey, txValidity, output) {
         if (!this.#builder) throw new Error('Builder has not been set.');
         await this.#builder
@@ -46,6 +76,17 @@ class ApplyStateMessageDirector {
         return this.#builder.getPayload();
     }
 
+    /**
+     * Build a partial transaction payload.
+     * @param {string|Buffer} invokerAddress
+     * @param {string|Buffer} incomingWritingKey
+     * @param {string|Buffer} txValidity
+     * @param {string|Buffer} contentHash
+     * @param {string|Buffer} externalBootstrap
+     * @param {string|Buffer} msbBootstrap
+     * @param {'json'|'buffer'} output
+     * @returns {Promise<object>}
+     */
     async buildPartialTransactionOperationMessage(
         invokerAddress,
         incomingWritingKey,
@@ -70,6 +111,15 @@ class ApplyStateMessageDirector {
         return this.#builder.getPayload();
     }
 
+    /**
+     * Build a partial bootstrap deployment payload.
+     * @param {string|Buffer} invokerAddress
+     * @param {string|Buffer} bootstrap
+     * @param {string|Buffer} channel
+     * @param {string|Buffer} txValidity
+     * @param {'json'|'buffer'} output
+     * @returns {Promise<object>}
+     */
     async buildPartialBootstrapDeploymentMessage(invokerAddress, bootstrap, channel, txValidity, output) {
         if (!this.#builder) throw new Error('Builder has not been set.');
         await this.#builder
@@ -84,6 +134,15 @@ class ApplyStateMessageDirector {
         return this.#builder.getPayload();
     }
 
+    /**
+     * Build a partial transfer payload.
+     * @param {string|Buffer} invokerAddress
+     * @param {string|Buffer} recipientAddress
+     * @param {string|Buffer} amount
+     * @param {string|Buffer} txValidity
+     * @param {'json'|'buffer'} output
+     * @returns {Promise<object>}
+     */
     async buildPartialTransferOperationMessage(invokerAddress, recipientAddress, amount, txValidity, output) {
         if (!this.#builder) throw new Error('Builder has not been set.');
         await this.#builder
@@ -98,6 +157,13 @@ class ApplyStateMessageDirector {
         return this.#builder.getPayload();
     }
 
+    /**
+     * Build a complete add admin payload.
+     * @param {string|Buffer} invokerAddress
+     * @param {string|Buffer} writingKey
+     * @param {string|Buffer} txValidity
+     * @returns {Promise<object>}
+     */
     async buildCompleteAddAdminMessage(invokerAddress, writingKey, txValidity) {
         if (!this.#builder) throw new Error('Builder has not been set.');
         await this.#builder
@@ -111,6 +177,13 @@ class ApplyStateMessageDirector {
         return this.#builder.getPayload();
     }
 
+    /**
+     * Build a complete disable initialization payload.
+     * @param {string|Buffer} invokerAddress
+     * @param {string|Buffer} writingKey
+     * @param {string|Buffer} txValidity
+     * @returns {Promise<object>}
+     */
     async buildCompleteDisableInitializationMessage(invokerAddress, writingKey, txValidity) {
         if (!this.#builder) throw new Error('Builder has not been set.');
         await this.#builder
@@ -124,6 +197,14 @@ class ApplyStateMessageDirector {
         return this.#builder.getPayload();
     }
 
+    /**
+     * Build a complete balance initialization payload.
+     * @param {string|Buffer} invokerAddress
+     * @param {string|Buffer} recipientAddress
+     * @param {string|Buffer} amount
+     * @param {string|Buffer} txValidity
+     * @returns {Promise<object>}
+     */
     async buildCompleteBalanceInitializationMessage(invokerAddress, recipientAddress, amount, txValidity) {
         if (!this.#builder) throw new Error('Builder has not been set.');
         await this.#builder
@@ -138,6 +219,13 @@ class ApplyStateMessageDirector {
         return this.#builder.getPayload();
     }
 
+    /**
+     * Build a complete append whitelist payload.
+     * @param {string|Buffer} invokerAddress
+     * @param {string|Buffer} incomingAddress
+     * @param {string|Buffer} txValidity
+     * @returns {Promise<object>}
+     */
     async buildCompleteAppendWhitelistMessage(invokerAddress, incomingAddress, txValidity) {
         if (!this.#builder) throw new Error('Builder has not been set.');
         await this.#builder
@@ -151,6 +239,16 @@ class ApplyStateMessageDirector {
         return this.#builder.getPayload();
     }
 
+    /**
+     * Build a complete add writer payload.
+     * @param {string|Buffer} invokerAddress
+     * @param {string|Buffer} txHash
+     * @param {string|Buffer} txValidity
+     * @param {string|Buffer} incomingWritingKey
+     * @param {string|Buffer} incomingNonce
+     * @param {string|Buffer} incomingSignature
+     * @returns {Promise<object>}
+     */
     async buildCompleteAddWriterMessage(
         invokerAddress,
         txHash,
@@ -174,6 +272,16 @@ class ApplyStateMessageDirector {
         return this.#builder.getPayload();
     }
 
+    /**
+     * Build a complete remove writer payload.
+     * @param {string|Buffer} invokerAddress
+     * @param {string|Buffer} txHash
+     * @param {string|Buffer} txValidity
+     * @param {string|Buffer} incomingWritingKey
+     * @param {string|Buffer} incomingNonce
+     * @param {string|Buffer} incomingSignature
+     * @returns {Promise<object>}
+     */
     async buildCompleteRemoveWriterMessage(
         invokerAddress,
         txHash,
@@ -197,6 +305,16 @@ class ApplyStateMessageDirector {
         return this.#builder.getPayload();
     }
 
+    /**
+     * Build a complete admin recovery payload.
+     * @param {string|Buffer} invokerAddress
+     * @param {string|Buffer} txHash
+     * @param {string|Buffer} txValidity
+     * @param {string|Buffer} incomingWritingKey
+     * @param {string|Buffer} incomingNonce
+     * @param {string|Buffer} incomingSignature
+     * @returns {Promise<object>}
+     */
     async buildCompleteAdminRecoveryMessage(
         invokerAddress,
         txHash,
@@ -220,6 +338,13 @@ class ApplyStateMessageDirector {
         return this.#builder.getPayload();
     }
 
+    /**
+     * Build a complete add indexer payload.
+     * @param {string|Buffer} invokerAddress
+     * @param {string|Buffer} incomingAddress
+     * @param {string|Buffer} txValidity
+     * @returns {Promise<object>}
+     */
     async buildCompleteAddIndexerMessage(invokerAddress, incomingAddress, txValidity) {
         if (!this.#builder) throw new Error('Builder has not been set.');
         await this.#builder
@@ -233,6 +358,13 @@ class ApplyStateMessageDirector {
         return this.#builder.getPayload();
     }
 
+    /**
+     * Build a complete remove indexer payload.
+     * @param {string|Buffer} invokerAddress
+     * @param {string|Buffer} incomingAddress
+     * @param {string|Buffer} txValidity
+     * @returns {Promise<object>}
+     */
     async buildCompleteRemoveIndexerMessage(invokerAddress, incomingAddress, txValidity) {
         if (!this.#builder) throw new Error('Builder has not been set.');
         await this.#builder
@@ -246,6 +378,13 @@ class ApplyStateMessageDirector {
         return this.#builder.getPayload();
     }
 
+    /**
+     * Build a complete ban validator payload.
+     * @param {string|Buffer} invokerAddress
+     * @param {string|Buffer} incomingAddress
+     * @param {string|Buffer} txValidity
+     * @returns {Promise<object>}
+     */
     async buildCompleteBanWriterMessage(invokerAddress, incomingAddress, txValidity) {
         if (!this.#builder) throw new Error('Builder has not been set.');
         await this.#builder
@@ -259,6 +398,19 @@ class ApplyStateMessageDirector {
         return this.#builder.getPayload();
     }
 
+    /**
+     * Build a complete transaction payload.
+     * @param {string|Buffer} invokerAddress
+     * @param {string|Buffer} txHash
+     * @param {string|Buffer} txValidity
+     * @param {string|Buffer} incomingWriterKey
+     * @param {string|Buffer} incomingNonce
+     * @param {string|Buffer} contentHash
+     * @param {string|Buffer} incomingSignature
+     * @param {string|Buffer} externalBootstrap
+     * @param {string|Buffer} msbBootstrap
+     * @returns {Promise<object>}
+     */
     async buildCompleteTransactionOperationMessage(
         invokerAddress,
         txHash,
@@ -288,6 +440,17 @@ class ApplyStateMessageDirector {
         return this.#builder.getPayload();
     }
 
+    /**
+     * Build a complete bootstrap deployment payload.
+     * @param {string|Buffer} invokerAddress
+     * @param {string|Buffer} transactionHash
+     * @param {string|Buffer} txValidity
+     * @param {string|Buffer} externalBootstrap
+     * @param {string|Buffer} channel
+     * @param {string|Buffer} incomingNonce
+     * @param {string|Buffer} incomingSignature
+     * @returns {Promise<object>}
+     */
     async buildCompleteBootstrapDeploymentMessage(
         invokerAddress,
         transactionHash,
@@ -313,6 +476,17 @@ class ApplyStateMessageDirector {
         return this.#builder.getPayload();
     }
 
+    /**
+     * Build a complete transfer payload.
+     * @param {string|Buffer} invokerAddress
+     * @param {string|Buffer} transactionHash
+     * @param {string|Buffer} txValidity
+     * @param {string|Buffer} incomingNonce
+     * @param {string|Buffer} recipientAddress
+     * @param {string|Buffer} amount
+     * @param {string|Buffer} incomingSignature
+     * @returns {Promise<object>}
+     */
     async buildCompleteTransferOperationMessage(
         invokerAddress,
         transactionHash,

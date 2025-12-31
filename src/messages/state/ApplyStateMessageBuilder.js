@@ -21,6 +21,11 @@ import { isHexString } from '../../utils/helpers.js';
 // Single use per transaction: reuse of this instance needs mutex/queue or fail-fast and can delay validation or break validation rule.
 // A fresh instance is effectively zero-cost, so no reset() is provided.
 
+/**
+ * Builder for partial/complete ApplyState messages.
+ * @param {PeerWallet} wallet
+ * @param {object} config
+ */
 class ApplyStateMessageBuilder {
     #address;
     #amount;
@@ -43,11 +48,6 @@ class ApplyStateMessageBuilder {
     #output;
     #payloadKey;
     #built=false;
-    
-    /**
-     * @param {PeerWallet} wallet
-     * @param {object} config
-     **/
 
     constructor(wallet, config) {
         this.#config = config;
