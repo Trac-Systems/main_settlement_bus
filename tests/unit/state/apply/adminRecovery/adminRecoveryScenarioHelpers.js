@@ -4,7 +4,7 @@ import nodeEntryUtils, { setWritingKey } from '../../../../../src/core/state/uti
 import { EntryType } from '../../../../../src/utils/constants.js';
 import { decimalStringToBigInt, bigIntTo16ByteBuffer } from '../../../../../src/utils/amountSerialization.js';
 import { deriveIndexerSequenceState, eventFlush } from '../../../../helpers/autobaseTestHelpers.js';
-import { createApplyStateMessageFactory } from '../../../../../src/messages/state/applyStateMessageFactory.js';
+import { applyStateMessageFactory } from '../../../../../src/messages/state/applyStateMessageFactory.js';
 import { safeEncodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
 import {
 	setupAdminNetwork,
@@ -90,7 +90,7 @@ export async function buildAdminRecoveryPayload(context) {
 	const { adminPeer, validatorPeer1, newAdminWriterKey } = context.adminRecovery;
 	const txValidity = await deriveIndexerSequenceState(validatorPeer1.base);
 
-    const partial = await createApplyStateMessageFactory(adminPeer.wallet, config)
+    const partial = await applyStateMessageFactory(adminPeer.wallet, config)
         .buildPartialAdminRecoveryMessage(
             adminPeer.wallet.address,
             b4a.toString(newAdminWriterKey, 'hex'),
@@ -98,7 +98,7 @@ export async function buildAdminRecoveryPayload(context) {
             'json'
         );
 
-    const payload = await createApplyStateMessageFactory(validatorPeer1.wallet, config)
+    const payload = await applyStateMessageFactory(validatorPeer1.wallet, config)
         .buildCompleteAdminRecoveryMessage(
             partial.address,
             b4a.from(partial.rao.tx, 'hex'),
@@ -116,7 +116,7 @@ export async function buildAdminRecoveryPayloadWithTxValidity(context, mutatedTx
 	}
 
 	const { adminPeer, validatorPeer1, newAdminWriterKey } = context.adminRecovery;
-    const partial = await createApplyStateMessageFactory(adminPeer.wallet, config)
+    const partial = await applyStateMessageFactory(adminPeer.wallet, config)
         .buildPartialAdminRecoveryMessage(
             adminPeer.wallet.address,
             b4a.toString(newAdminWriterKey, 'hex'),
@@ -124,7 +124,7 @@ export async function buildAdminRecoveryPayloadWithTxValidity(context, mutatedTx
             'json'
         );
 
-    const payload = await createApplyStateMessageFactory(validatorPeer1.wallet, config)
+    const payload = await applyStateMessageFactory(validatorPeer1.wallet, config)
         .buildCompleteAdminRecoveryMessage(
 			partial.address,
             b4a.from(partial.rao.tx, 'hex'),
@@ -522,7 +522,7 @@ export async function applyTransferSeries(context, count = TRANSFER_COUNT) {
 
 async function buildSimpleTransferPayload({ requesterPeer, validatorPeer, recipientPeer, amount }) {
 	const txValidity = await deriveIndexerSequenceState(validatorPeer.base);
-	const partial = await createApplyStateMessageFactory(requesterPeer.wallet, config)
+	const partial = await applyStateMessageFactory(requesterPeer.wallet, config)
 		.buildPartialTransferOperationMessage(
 			requesterPeer.wallet.address,
 			recipientPeer.wallet.address,
@@ -531,7 +531,7 @@ async function buildSimpleTransferPayload({ requesterPeer, validatorPeer, recipi
 			'json'
 		);
 
-	const payload = await createApplyStateMessageFactory(validatorPeer.wallet, config)
+	const payload = await applyStateMessageFactory(validatorPeer.wallet, config)
 		.buildCompleteTransferOperationMessage(
 			partial.address,
 			b4a.from(partial.tro.tx, 'hex'),

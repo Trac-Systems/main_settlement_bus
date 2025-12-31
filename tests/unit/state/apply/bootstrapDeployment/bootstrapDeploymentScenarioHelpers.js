@@ -1,5 +1,5 @@
 import b4a from 'b4a';
-import { createApplyStateMessageFactory } from '../../../../../src/messages/state/applyStateMessageFactory.js';
+import { applyStateMessageFactory } from '../../../../../src/messages/state/applyStateMessageFactory.js';
 import { deriveIndexerSequenceState } from '../../../../helpers/autobaseTestHelpers.js';
 import {
 	setupAdminNetwork,
@@ -108,7 +108,7 @@ export async function buildBootstrapDeploymentPayload(context, options = {}) {
 		context.bootstrapDeployment?.txValidity ??
 		(await deriveIndexerSequenceState(validatorPeer.base));
 
-    const partial = await createApplyStateMessageFactory(deployerPeer.wallet, config)
+    const partial = await applyStateMessageFactory(deployerPeer.wallet, config)
         .buildPartialBootstrapDeploymentMessage(
             deployerPeer.wallet.address,
             externalBootstrap.toString('hex'),
@@ -117,7 +117,7 @@ export async function buildBootstrapDeploymentPayload(context, options = {}) {
             'json'
         );
 
-    const payload = await createApplyStateMessageFactory(validatorPeer.wallet, config)
+    const payload = await applyStateMessageFactory(validatorPeer.wallet, config)
         .buildCompleteBootstrapDeploymentMessage(
 		partial.address,
             b4a.from(partial.bdo.tx, 'hex'),

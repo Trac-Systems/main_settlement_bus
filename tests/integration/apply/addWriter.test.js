@@ -23,7 +23,7 @@ import {
     testKeyPair5,
     testKeyPair6
 } from '../../fixtures/apply.fixtures.js';
-import { createApplyStateMessageFactory } from '../../../src/messages/state/applyStateMessageFactory.js';
+import { applyStateMessageFactory } from '../../../src/messages/state/applyStateMessageFactory.js';
 import { safeEncodeApplyOperation } from '../../../src/utils/protobuf/operationHelpers.js';
 import {ZERO_WK} from '../../../src/utils/buffer.js';
 import { $TNK } from '../../../src/core/state/utils/balance.js';
@@ -31,7 +31,7 @@ import { config } from '../../helpers/config.js';
 
 const sendAddWriter = async (invoker, broadcaster) => {
     const validity = await invoker.msb.state.getIndexerSequenceState()
-    const req = await createApplyStateMessageFactory(invoker.wallet, config)
+    const req = await applyStateMessageFactory(invoker.wallet, config)
         .buildPartialAddWriterMessage(
             invoker.wallet.address,
             b4a.toString(invoker.msb.state.writingKey, 'hex'),
@@ -39,7 +39,7 @@ const sendAddWriter = async (invoker, broadcaster) => {
             'json'
         );
 
-    const rawPayload = await createApplyStateMessageFactory(broadcaster.wallet, config)
+    const rawPayload = await applyStateMessageFactory(broadcaster.wallet, config)
         .buildCompleteAddWriterMessage(
             req.address,
             b4a.from(req.rao.tx, 'hex'),
@@ -149,7 +149,7 @@ test('handleApplyAddWriterOperation (apply) - Append addWriter payload into the 
     const signedLengthWriter1Before = writer1.msb.state.getSignedLength();
 
     const validity = await writer3.msb.state.getIndexerSequenceState()
-    const req = await createApplyStateMessageFactory(writer3.wallet, config)
+    const req = await applyStateMessageFactory(writer3.wallet, config)
         .buildPartialAddWriterMessage(
             writer3.wallet.address,
             b4a.toString(ZERO_WK, 'hex'),
@@ -157,7 +157,7 @@ test('handleApplyAddWriterOperation (apply) - Append addWriter payload into the 
             'json'
         );
 
-    const rawPayload = await createApplyStateMessageFactory(admin.wallet, config)
+    const rawPayload = await applyStateMessageFactory(admin.wallet, config)
         .buildCompleteAddWriterMessage(
             admin.wallet.address,
             b4a.from(req.rao.tx, 'hex'),

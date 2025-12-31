@@ -1,4 +1,3 @@
-import NetworkMessageBuilder from './NetworkMessageBuilder.js';
 import { NetworkOperationType } from '../../../utils/constants.js';
 
 /**
@@ -8,11 +7,10 @@ class NetworkMessageDirector {
     #builder;
 
     /**
-     * @param {PeerWallet} wallet
-     * @param {object} config
+     * @param {NetworkMessageBuilder} builderInstance
      */
-    constructor(wallet, config) {
-        this.#builder = new NetworkMessageBuilder(wallet, config);
+    constructor(builderInstance) {
+        this.#builder = builderInstance;
     }
 
     /**
@@ -23,7 +21,6 @@ class NetworkMessageDirector {
      * @returns {Promise<object>}
      */
     async buildValidatorConnectionRequest(sessionId, issuerAddress, capabilities) {
-        this.#builder.reset();
         await this.#builder
             .setType(NetworkOperationType.VALIDATOR_CONNECTION_REQUEST)
             .setSessionId(sessionId)
@@ -45,7 +42,6 @@ class NetworkMessageDirector {
      * @returns {Promise<object>}
      */
     async buildValidatorConnectionResponse(sessionId, issuerAddress, capabilities, statusCode) {
-        this.#builder.reset();
         await this.#builder
         .setType(NetworkOperationType.VALIDATOR_CONNECTION_RESPONSE)
         .setSessionId(sessionId)
@@ -66,7 +62,6 @@ class NetworkMessageDirector {
      * @returns {Promise<object>}
      */
     async buildLivenessRequest(sessionId, data, capabilities) {
-        this.#builder.reset();
         await this.#builder
             .setType(NetworkOperationType.LIVENESS_REQUEST)
             .setSessionId(sessionId)
@@ -87,7 +82,6 @@ class NetworkMessageDirector {
      * @returns {Promise<object>}
      */
     async buildLivenessResponse(sessionId, data, capabilities, statusCode) {
-        this.#builder.reset();
         await this.#builder
             .setType(NetworkOperationType.LIVENESS_RESPONSE)
             .setSessionId(sessionId)
@@ -108,7 +102,6 @@ class NetworkMessageDirector {
      * @returns {Promise<object>}
      */
     async buildBroadcastTransactionRequest(sessionId, data, capabilities) {
-        this.#builder.reset();
         await this.#builder
             .setType(NetworkOperationType.BROADCAST_TRANSACTION_REQUEST)
             .setSessionId(sessionId)
@@ -128,7 +121,6 @@ class NetworkMessageDirector {
      * @returns {Promise<object>}
      */
     async buildBroadcastTransactionResponse(sessionId, capabilities, statusCode) {
-        this.#builder.reset();
         await this.#builder
             .setType(NetworkOperationType.BROADCAST_TRANSACTION_RESPONSE)
             .setSessionId(sessionId)

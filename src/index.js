@@ -7,7 +7,7 @@ import readline from "readline";
 import tty from "tty";
 import { sleep, isHexString } from "./utils/helpers.js";
 import { verifyDag, printHelp, printWalletInfo, printBalance } from "./utils/cli.js";
-import { createApplyStateMessageFactory } from "./messages/state/applyStateMessageFactory.js";
+import { applyStateMessageFactory } from "./messages/state/applyStateMessageFactory.js";
 import { isAddressValid } from "./core/state/utils/address.js";
 import Network from "./core/network/Network.js";
 import Check from "./utils/check.js";
@@ -255,7 +255,7 @@ export class MainSettlementBus extends ReadyResource {
         }
 
         const txValidity = await blake3Hash(this.#config.bootstrap);
-        const addAdminMessage = await createApplyStateMessageFactory(this.#wallet, this.#config)
+        const addAdminMessage = await applyStateMessageFactory(this.#wallet, this.#config)
             .buildCompleteAddAdminMessage(
                 this.#wallet.address,
                 this.#state.writingKey,
@@ -291,7 +291,7 @@ export class MainSettlementBus extends ReadyResource {
         }
 
         const txValidity = await this.#state.getIndexerSequenceState();
-        const adminRecoveryMessage = await createApplyStateMessageFactory(this.#wallet, this.#config)
+        const adminRecoveryMessage = await applyStateMessageFactory(this.#wallet, this.#config)
             .buildPartialAdminRecoveryMessage(
                 this.#wallet.address,
                 this.#state.writingKey,
@@ -331,7 +331,7 @@ export class MainSettlementBus extends ReadyResource {
 
         for (const addressToWhitelist of addresses) {
             const txValidity = await this.#state.getIndexerSequenceState();
-            const appendWhitelistMessage = await createApplyStateMessageFactory(this.#wallet, this.#config)
+            const appendWhitelistMessage = await applyStateMessageFactory(this.#wallet, this.#config)
                 .buildCompleteAppendWhitelistMessage(
                     this.#wallet.address,
                     addressToWhitelist,
@@ -412,7 +412,7 @@ export class MainSettlementBus extends ReadyResource {
 
             const txValidity = await this.#state.getIndexerSequenceState();
 
-            const assembledMessage = await createApplyStateMessageFactory(this.#wallet, this.#config)
+            const assembledMessage = await applyStateMessageFactory(this.#wallet, this.#config)
                 .buildPartialAddWriterMessage(
                     this.#wallet.address,
                     this.#state.writingKey,
@@ -446,7 +446,7 @@ export class MainSettlementBus extends ReadyResource {
         }
 
         const txValidity = await this.#state.getIndexerSequenceState();
-        const assembledMessage = await createApplyStateMessageFactory(this.#wallet, this.#config)
+        const assembledMessage = await applyStateMessageFactory(this.#wallet, this.#config)
             .buildPartialRemoveWriterMessage(
                 this.#wallet.address,
                 nodeEntry.wk,
@@ -521,7 +521,7 @@ export class MainSettlementBus extends ReadyResource {
             }
             const txValidity = await this.#state.getIndexerSequenceState();
 
-            const assembledAddIndexerMessage = await createApplyStateMessageFactory(this.#wallet, this.#config)
+            const assembledAddIndexerMessage = await applyStateMessageFactory(this.#wallet, this.#config)
                 .buildCompleteAddIndexerMessage(
                     this.#wallet.address,
                     addressToUpdate,
@@ -541,7 +541,7 @@ export class MainSettlementBus extends ReadyResource {
                 );
             }
             const txValidity = await this.#state.getIndexerSequenceState();
-            const assembledRemoveIndexerMessage = await createApplyStateMessageFactory(this.#wallet, this.#config)
+            const assembledRemoveIndexerMessage = await applyStateMessageFactory(this.#wallet, this.#config)
                 .buildCompleteRemoveIndexerMessage(
                     this.#wallet.address,
                     addressToUpdate,
@@ -588,7 +588,7 @@ export class MainSettlementBus extends ReadyResource {
             );
         }
         const txValidity = await this.#state.getIndexerSequenceState();
-        const assembledBanValidatorMessage = await createApplyStateMessageFactory(this.#wallet, this.#config)
+        const assembledBanValidatorMessage = await applyStateMessageFactory(this.#wallet, this.#config)
             .buildCompleteBanWriterMessage(
                 this.#wallet.address,
                 addresstToBan,
@@ -669,7 +669,7 @@ export class MainSettlementBus extends ReadyResource {
 
         const txValidity = await this.#state.getIndexerSequenceState();
 
-        const payload = await createApplyStateMessageFactory(this.#wallet, this.#config)
+        const payload = await applyStateMessageFactory(this.#wallet, this.#config)
             .buildPartialBootstrapDeploymentMessage(
                 this.#wallet.address,
                 externalBootstrap,
@@ -738,7 +738,7 @@ export class MainSettlementBus extends ReadyResource {
         }
 
         const txValidity = await this.#state.getIndexerSequenceState();
-        const payload = await createApplyStateMessageFactory(this.#wallet, this.#config)
+        const payload = await applyStateMessageFactory(this.#wallet, this.#config)
             .buildPartialTransferOperationMessage(
             this.#wallet.address,
             recipientAddress,
@@ -818,7 +818,7 @@ export class MainSettlementBus extends ReadyResource {
         let messages = [];
 
         for (const [recipientAddress, amountBuffer] of addressBalancePair) {
-            const payload = await createApplyStateMessageFactory(this.#wallet, this.#config).buildCompleteBalanceInitializationMessage(
+            const payload = await applyStateMessageFactory(this.#wallet, this.#config).buildCompleteBalanceInitializationMessage(
                 this.#wallet.address,
                 recipientAddress,
                 amountBuffer,
@@ -897,7 +897,7 @@ export class MainSettlementBus extends ReadyResource {
         const txValidity = await this.#state.getIndexerSequenceState();
 
 
-        const payload = await createApplyStateMessageFactory(this.#wallet, this.#config)
+        const payload = await applyStateMessageFactory(this.#wallet, this.#config)
             .buildCompleteDisableInitializationMessage(
                 this.#wallet.address,
                 this.#state.writingKey,

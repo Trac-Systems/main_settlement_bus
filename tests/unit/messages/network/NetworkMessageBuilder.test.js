@@ -83,7 +83,6 @@ test('NetworkMessageBuilder iterates validator connection response ResultCode va
     const caps = ['cap:b', 'cap:a'];
 
     for (const code of uniqueResultCodes()) {
-        builder.reset();
         await builder
             .setType(NetworkOperationType.VALIDATOR_CONNECTION_RESPONSE)
             .setSessionId(1)
@@ -122,7 +121,6 @@ test('NetworkMessageBuilder iterates liveness response ResultCode values', async
     const data = b4a.from('ping', 'utf8');
 
     for (const code of uniqueResultCodes()) {
-        builder.reset();
         await builder
             .setType(NetworkOperationType.LIVENESS_RESPONSE)
             .setSessionId(sessionId)
@@ -191,7 +189,6 @@ test('NetworkMessageBuilder iterates broadcast transaction response ResultCode v
     const caps = ['cap:b', 'cap:a'];
 
     for (const code of uniqueResultCodes()) {
-        builder.reset();
         await builder
             .setType(NetworkOperationType.BROADCAST_TRANSACTION_RESPONSE)
             .setSessionId(sessionId)

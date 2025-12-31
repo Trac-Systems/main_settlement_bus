@@ -5,7 +5,7 @@ import {
 } from '../../../helpers/setupApplyTests.js';
 
 import {randomBytes} from '../../../helpers/setupApplyTests.js';
-import { createApplyStateMessageFactory } from '../../../../src/messages/state/applyStateMessageFactory.js';
+import { applyStateMessageFactory } from '../../../../src/messages/state/applyStateMessageFactory.js';
 import { safeEncodeApplyOperation } from '../../../../src/utils/protobuf/operationHelpers.js';
 import {testKeyPair1, testKeyPair2, testKeyPair3, testKeyPair4} from '../../../fixtures/apply.fixtures.js';
 import b4a from 'b4a';
@@ -88,7 +88,7 @@ test('Apply function addAdmin for recovery - happy path', async (k) => {
     await newAdmin.msb.ready();
     await newAdmin.msb.state.append(null);
     const validity = b4a.toString(await newAdmin.msb.state.getIndexerSequenceState(), 'hex')
-    const addAdminMessage = await createApplyStateMessageFactory(newAdmin.wallet, config)
+    const addAdminMessage = await applyStateMessageFactory(newAdmin.wallet, config)
         .buildPartialAdminRecoveryMessage(
             newAdmin.wallet.address,
             b4a.toString(newAdmin.msb.state.writingKey, 'hex'),
@@ -96,7 +96,7 @@ test('Apply function addAdmin for recovery - happy path', async (k) => {
             'json'
         );
 
-    const rawPayload = await createApplyStateMessageFactory(writer.wallet, config)
+    const rawPayload = await applyStateMessageFactory(writer.wallet, config)
         .buildCompleteAdminRecoveryMessage(
             addAdminMessage.address,
             b4a.from(addAdminMessage.rao.tx, 'hex'),

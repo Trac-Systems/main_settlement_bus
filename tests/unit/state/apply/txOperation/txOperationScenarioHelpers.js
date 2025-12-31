@@ -1,5 +1,5 @@
 import b4a from 'b4a';
-import { createApplyStateMessageFactory } from '../../../../../src/messages/state/applyStateMessageFactory.js';
+import { applyStateMessageFactory } from '../../../../../src/messages/state/applyStateMessageFactory.js';
 import {
 	deriveIndexerSequenceState,
 	eventFlush
@@ -140,7 +140,7 @@ export async function buildTxOperationPayload(
 ) {
     const resolvedTxValidity = txValidity ?? (await deriveIndexerSequenceState(validatorPeer.base));
 
-    const partial = await createApplyStateMessageFactory(broadcasterPeer.wallet, config)
+    const partial = await applyStateMessageFactory(broadcasterPeer.wallet, config)
         .buildPartialTransactionOperationMessage(
             broadcasterPeer.wallet.address,
             writerKeyBuffer.toString('hex'),
@@ -151,7 +151,7 @@ export async function buildTxOperationPayload(
             'json'
         );
 
-    const payload = await createApplyStateMessageFactory(validatorPeer.wallet, config)
+    const payload = await applyStateMessageFactory(validatorPeer.wallet, config)
         .buildCompleteTransactionOperationMessage(
             partial.address,
             b4a.from(partial.txo.tx, 'hex'),

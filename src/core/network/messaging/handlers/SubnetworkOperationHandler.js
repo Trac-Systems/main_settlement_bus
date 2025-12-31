@@ -4,7 +4,7 @@ import {
 } from '../../../../utils/constants.js';
 import PartialBootstrapDeployment from "../validators/PartialBootstrapDeployment.js";
 import PartialTransaction from "../validators/PartialTransaction.js";
-import {createApplyStateMessageFactory} from "../../../../messages/state/applyStateMessageFactory.js";
+import {applyStateMessageFactory} from "../../../../messages/state/applyStateMessageFactory.js";
 import {safeEncodeApplyOperation} from "../../../../utils/protobuf/operationHelpers.js";
 import {
     normalizeBootstrapDeploymentOperation,
@@ -50,7 +50,7 @@ class SubnetworkOperationHandler extends BaseOperationHandler {
             throw new Error("SubnetworkHandler: Transaction validation failed.");
         }
 
-        const completeTransactionOperation = await createApplyStateMessageFactory(this.#wallet,this.#config)
+        const completeTransactionOperation = await applyStateMessageFactory(this.#wallet,this.#config)
             .buildCompleteTransactionOperationMessage(
                 normalizedPayload.address,
                 normalizedPayload.txo.tx,
@@ -73,7 +73,7 @@ class SubnetworkOperationHandler extends BaseOperationHandler {
         }
 
 
-        const completeBootstrapDeploymentOperation = await createApplyStateMessageFactory(this.#wallet, this.#config)
+        const completeBootstrapDeploymentOperation = await applyStateMessageFactory(this.#wallet, this.#config)
             .buildCompleteBootstrapDeploymentMessage(
                 normalizedPayload.address,
                 normalizedPayload.bdo.tx,

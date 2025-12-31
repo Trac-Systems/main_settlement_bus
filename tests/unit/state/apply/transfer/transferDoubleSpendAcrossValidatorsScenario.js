@@ -1,6 +1,6 @@
 import b4a from 'b4a';
 import { test } from 'brittle';
-import { createApplyStateMessageFactory } from '../../../../../src/messages/state/applyStateMessageFactory.js';
+import { applyStateMessageFactory } from '../../../../../src/messages/state/applyStateMessageFactory.js';
 import { safeEncodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
 import { deriveIndexerSequenceState, eventFlush } from '../../../../helpers/autobaseTestHelpers.js';
 import {
@@ -50,7 +50,7 @@ export default function transferDoubleSpendAcrossValidatorsScenario() {
 		const txValidityA = await deriveIndexerSequenceState(primaryValidator.base);
 		const txValidityB = await deriveIndexerSequenceState(secondaryValidator.base);
 
-        const partialA = await createApplyStateMessageFactory(senderPeer.wallet, config)
+        const partialA = await applyStateMessageFactory(senderPeer.wallet, config)
             .buildPartialTransferOperationMessage(
                 senderPeer.wallet.address,
                 recipientA.wallet.address,
@@ -58,7 +58,7 @@ export default function transferDoubleSpendAcrossValidatorsScenario() {
                 b4a.toString(txValidityA, 'hex'),
                 'json'
             );
-        const partialB = await createApplyStateMessageFactory(senderPeer.wallet, config)
+        const partialB = await applyStateMessageFactory(senderPeer.wallet, config)
             .buildPartialTransferOperationMessage(
                 senderPeer.wallet.address,
                 recipientB.wallet.address,
@@ -68,7 +68,7 @@ export default function transferDoubleSpendAcrossValidatorsScenario() {
             );
 
         const payloadA = safeEncodeApplyOperation(
-            await createApplyStateMessageFactory(primaryValidator.wallet, config)
+            await applyStateMessageFactory(primaryValidator.wallet, config)
                 .buildCompleteTransferOperationMessage(
                     partialA.address,
                     b4a.from(partialA.tro.tx, 'hex'),
@@ -81,7 +81,7 @@ export default function transferDoubleSpendAcrossValidatorsScenario() {
         );
 
         const payloadB = safeEncodeApplyOperation(
-            await createApplyStateMessageFactory(secondaryValidator.wallet, config)
+            await applyStateMessageFactory(secondaryValidator.wallet, config)
                 .buildCompleteTransferOperationMessage(
                     partialB.address,
                     b4a.from(partialB.tro.tx, 'hex'),

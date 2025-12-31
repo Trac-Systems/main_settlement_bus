@@ -19,7 +19,7 @@ import {
     testKeyPair5,
     testKeyPair6
 } from '../../fixtures/apply.fixtures.js';
-import { createApplyStateMessageFactory } from '../../../src/messages/state/applyStateMessageFactory.js';
+import { applyStateMessageFactory } from '../../../src/messages/state/applyStateMessageFactory.js';
 import { safeEncodeApplyOperation } from '../../../src/utils/protobuf/operationHelpers.js';
 import { config } from '../../helpers/config.js';
 
@@ -27,7 +27,7 @@ let admin, writer1, writer2, writer3, writer4, indexer, tmpDirectory;
 
 const sendRemoveWriter = async (invoker, broadcaster) => {
     const validity = await invoker.msb.state.getIndexerSequenceState()
-    const writerRemoval = await createApplyStateMessageFactory(invoker.wallet, config)
+    const writerRemoval = await applyStateMessageFactory(invoker.wallet, config)
         .buildPartialRemoveWriterMessage(
             invoker.wallet.address,
             b4a.toString(invoker.msb.state.writingKey, 'hex'),
@@ -35,7 +35,7 @@ const sendRemoveWriter = async (invoker, broadcaster) => {
             'json'
         );
 
-    const rawPayload = await createApplyStateMessageFactory(broadcaster.wallet, config)
+    const rawPayload = await applyStateMessageFactory(broadcaster.wallet, config)
         .buildCompleteRemoveWriterMessage(
             writerRemoval.address,
             b4a.from(writerRemoval.rao.tx, 'hex'),

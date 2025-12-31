@@ -1,5 +1,5 @@
 import b4a from 'b4a';
-import { createApplyStateMessageFactory } from '../../../../../src/messages/state/applyStateMessageFactory.js';
+import { applyStateMessageFactory } from '../../../../../src/messages/state/applyStateMessageFactory.js';
 import { safeEncodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
 import { deriveIndexerSequenceState, eventFlush } from '../../../../helpers/autobaseTestHelpers.js';
 import {
@@ -53,7 +53,7 @@ export async function buildAddIndexerPayload(
 
 	const txValidity = await deriveIndexerSequenceState(adminPeer.base);
 	return safeEncodeApplyOperation(
-		await createApplyStateMessageFactory(adminPeer.wallet, config)
+		await applyStateMessageFactory(adminPeer.wallet, config)
 			.buildCompleteAddIndexerMessage(adminPeer.wallet.address, writerPeer.wallet.address, txValidity)
 	);
 }
@@ -100,7 +100,7 @@ export async function buildAddIndexerPayloadWithTxValidity(
 	}
 
 	return safeEncodeApplyOperation(
-		await createApplyStateMessageFactory(adminPeer.wallet, config)
+		await applyStateMessageFactory(adminPeer.wallet, config)
 			.buildCompleteAddIndexerMessage(adminPeer.wallet.address, writerPeer.wallet.address, mutatedTxValidity)
 	);
 }
@@ -147,7 +147,7 @@ export async function buildRemoveIndexerPayload(
 
 	const txValidity = await deriveIndexerSequenceState(adminPeer.base);
 	return safeEncodeApplyOperation(
-		await createApplyStateMessageFactory(adminPeer.wallet, config)
+		await applyStateMessageFactory(adminPeer.wallet, config)
 			.buildCompleteRemoveIndexerMessage(adminPeer.wallet.address, indexerPeer.wallet.address, txValidity)
 	);
 }
@@ -168,7 +168,7 @@ export async function buildRemoveIndexerPayloadWithTxValidity(
 	}
 
 	return safeEncodeApplyOperation(
-		await createApplyStateMessageFactory(adminPeer.wallet, config)
+		await applyStateMessageFactory(adminPeer.wallet, config)
 			.buildCompleteRemoveIndexerMessage(adminPeer.wallet.address, indexerPeer.wallet.address, mutatedTxValidity)
 	);
 }

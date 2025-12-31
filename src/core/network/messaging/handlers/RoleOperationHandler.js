@@ -1,7 +1,7 @@
 import {OperationType} from '../../../../utils/constants.js';
 import PartialRoleAccess from "../validators/PartialRoleAccess.js";
 import BaseOperationHandler from './base/BaseOperationHandler.js';
-import {createApplyStateMessageFactory} from "../../../../messages/state/applyStateMessageFactory.js";
+import {applyStateMessageFactory} from "../../../../messages/state/applyStateMessageFactory.js";
 import {safeEncodeApplyOperation} from "../../../../utils/protobuf/operationHelpers.js";
 import {normalizeRoleAccessOperation} from "../../../../utils/normalizers.js";
 
@@ -40,7 +40,7 @@ class RoleOperationHandler extends BaseOperationHandler {
         
         switch (normalizedPartialRoleAccessPayload.type) {
             case OperationType.ADD_WRITER:
-                completePayload = await createApplyStateMessageFactory(this.#wallet, this.#config)
+                completePayload = await applyStateMessageFactory(this.#wallet, this.#config)
                     .buildCompleteAddWriterMessage(
                         normalizedPartialRoleAccessPayload.address,
                         normalizedPartialRoleAccessPayload.rao.tx,
@@ -51,7 +51,7 @@ class RoleOperationHandler extends BaseOperationHandler {
                     )
                 break;
             case OperationType.REMOVE_WRITER:
-                completePayload = await createApplyStateMessageFactory(this.#wallet, this.#config)
+                completePayload = await applyStateMessageFactory(this.#wallet, this.#config)
                     .buildCompleteRemoveWriterMessage(
                         normalizedPartialRoleAccessPayload.address,
                         normalizedPartialRoleAccessPayload.rao.tx,
@@ -63,7 +63,7 @@ class RoleOperationHandler extends BaseOperationHandler {
                 break;
             case OperationType.ADMIN_RECOVERY:
 
-                completePayload = await createApplyStateMessageFactory(this.#wallet, this.#config)
+                completePayload = await applyStateMessageFactory(this.#wallet, this.#config)
                     .buildCompleteAdminRecoveryMessage(
                         normalizedPartialRoleAccessPayload.address,
                         normalizedPartialRoleAccessPayload.rao.tx,

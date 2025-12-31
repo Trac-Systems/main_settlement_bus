@@ -1,5 +1,5 @@
 import {test, hook, solo} from 'brittle';
-import { createApplyStateMessageFactory } from '../../../src/messages/state/applyStateMessageFactory.js';
+import { applyStateMessageFactory } from '../../../src/messages/state/applyStateMessageFactory.js';
 import { safeEncodeApplyOperation } from '../../../src/utils/protobuf/operationHelpers.js';
 import {
     initTemporaryDirectory,
@@ -57,7 +57,7 @@ test('handleApplyAddIndexerOperation (apply) - Append addIndexer payload into th
     const oldIndexersEntry = await admin.msb.state.getIndexersEntry();
     const validity = await admin.msb.state.getIndexerSequenceState()
     const assembledAddIndexerMessage = safeEncodeApplyOperation(
-        await createApplyStateMessageFactory(admin.wallet, config)
+        await applyStateMessageFactory(admin.wallet, config)
             .buildCompleteAddIndexerMessage(admin.wallet.address, indexer1.wallet.address, validity)
     );
     await waitIndexer(indexer1, async () => await admin.msb.state.append(assembledAddIndexerMessage))
@@ -86,7 +86,7 @@ test('handleApplyAddIndexerOperation (apply) - Append addIndexer payload into th
     // indexer3 is just a writer.
     const indexersEntryBefore = await admin.msb.state.getIndexersEntry();
     const assembledAddIndexerMessage = safeEncodeApplyOperation(
-        await createApplyStateMessageFactory(admin.wallet, config)
+        await applyStateMessageFactory(admin.wallet, config)
             .buildCompleteAddIndexerMessage(
                 admin.wallet.address,
                 indexer2.wallet.address,
@@ -106,7 +106,7 @@ test('handleApplyAddIndexerOperation (apply) - Append addIndexer payload into th
 
     const adminSignedLengthBefore = admin.msb.state.getSignedLength();
     const reqAddIndexerMessageAgain = safeEncodeApplyOperation(
-        await createApplyStateMessageFactory(admin.wallet, config)
+        await applyStateMessageFactory(admin.wallet, config)
             .buildCompleteAddIndexerMessage(
                 admin.wallet.address,
                 indexer2.wallet.address,
@@ -146,7 +146,7 @@ test('handleApplyAddIndexerOperation (apply) - Append addIndexer payload into th
     const indexersEntryBefore = await indexer1.msb.state.getIndexersEntry();
     const validity = await admin.msb.state.getIndexerSequenceState()
     const reqAddReader = safeEncodeApplyOperation(
-        await createApplyStateMessageFactory(admin.wallet, config)
+        await applyStateMessageFactory(admin.wallet, config)
             .buildCompleteAddIndexerMessage(admin.wallet.address, reader1.wallet.address, validity)
     );
 
@@ -182,7 +182,7 @@ test('handleApplyAddIndexerOperation (apply) - Append addIndexer payload into th
     const adminSignedLengthBefore = admin.msb.state.getSignedLength();
     const validity = await admin.msb.state.getIndexerSequenceState()
     const reqAddIndexer2 = safeEncodeApplyOperation(
-        await createApplyStateMessageFactory(admin.wallet, config)
+        await applyStateMessageFactory(admin.wallet, config)
             .buildCompleteAddIndexerMessage(
                 admin.wallet.address,
                 reader2.wallet.address,
@@ -217,7 +217,7 @@ test('handleApplyAddIndexerOperation (apply) - Append addIndexer payload into th
 
     const validity = await admin.msb.state.getIndexerSequenceState()
     const assembledAddIndexerMessage = safeEncodeApplyOperation(
-        await createApplyStateMessageFactory(admin.wallet, config)
+        await applyStateMessageFactory(admin.wallet, config)
             .buildCompleteAddIndexerMessage(
                 admin.wallet.address,
                 indexer3.wallet.address,

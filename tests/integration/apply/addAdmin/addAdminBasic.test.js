@@ -4,7 +4,7 @@ import {
     tryToSyncWriters
 } from '../../../helpers/setupApplyTests.js';
 import {randomBytes} from '../../../helpers/setupApplyTests.js';
-import { createApplyStateMessageFactory } from '../../../../src/messages/state/applyStateMessageFactory.js';
+import { applyStateMessageFactory } from '../../../../src/messages/state/applyStateMessageFactory.js';
 import { safeEncodeApplyOperation } from '../../../../src/utils/protobuf/operationHelpers.js';
 import { config } from '../../../helpers/config.js';
 import {testKeyPair1} from '../../../fixtures/apply.fixtures.js';
@@ -20,7 +20,7 @@ let randomChannel;
 const sendAddAdmin = async (invoker) => {
     const validity = b4a.from(await admin.msb.state.getIndexerSequenceState(), 'hex')
     const addAdminMessage = safeEncodeApplyOperation(
-        await createApplyStateMessageFactory(admin.wallet, config)
+        await applyStateMessageFactory(admin.wallet, config)
             .buildCompleteAddAdminMessage(
                 admin.wallet.address,
                 admin.msb.state.writingKey,

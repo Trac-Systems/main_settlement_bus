@@ -9,7 +9,7 @@ import {
     tryToSyncWriters
 } from '../../helpers/setupApplyTests.js';
 import { randomBytes } from '../../helpers/setupApplyTests.js';
-import { createApplyStateMessageFactory } from '../../../src/messages/state/applyStateMessageFactory.js';
+import { applyStateMessageFactory } from '../../../src/messages/state/applyStateMessageFactory.js';
 import { safeEncodeApplyOperation } from '../../../src/utils/protobuf/operationHelpers.js';
 
 import { testKeyPair1, testKeyPair2, testKeyPair3, testKeyPair4 } from '../../fixtures/apply.fixtures.js';
@@ -43,7 +43,7 @@ hook('Initialize nodes for banValidator tests', async () => {
 test('handleApplyBanValidatorOperation (apply) - Append banValidator payload - ban indexer', async t => {
     const validity = await admin.msb.state.getIndexerSequenceState()
     const assembledBanWriter = safeEncodeApplyOperation(
-        await createApplyStateMessageFactory(admin.wallet, config)
+        await applyStateMessageFactory(admin.wallet, config)
             .buildCompleteBanWriterMessage(admin.wallet.address, indexer.wallet.address, validity)
     );
     await admin.msb.state.append(assembledBanWriter);
@@ -60,7 +60,7 @@ test('handleApplyBanValidatorOperation (apply) - Append banValidator payload - b
 test('handleApplyBanValidatorOperation (apply) - Append banValidator payload into the base by non-admin node', async t => {
     const validity = await admin.msb.state.getIndexerSequenceState()
     const assembledBanWriter = safeEncodeApplyOperation(
-        await createApplyStateMessageFactory(writer1.wallet, config)
+        await applyStateMessageFactory(writer1.wallet, config)
             .buildCompleteBanWriterMessage(writer1.wallet.address, writer2.wallet.address, validity)
     );
     await writer1.msb.state.append(assembledBanWriter);
@@ -77,7 +77,7 @@ test('handleApplyBanValidatorOperation (apply) - Append banValidator payload int
 test('handleApplyBanValidatorOperation (apply) - Append banValidator payload into the base - happy path', async t => {
     const validity = await admin.msb.state.getIndexerSequenceState()
     const assembledBanWriter = safeEncodeApplyOperation(
-        await createApplyStateMessageFactory(admin.wallet, config)
+        await applyStateMessageFactory(admin.wallet, config)
             .buildCompleteBanWriterMessage(admin.wallet.address, writer1.wallet.address, validity)
     );
     await admin.msb.state.append(assembledBanWriter);
@@ -93,7 +93,7 @@ test('handleApplyBanValidatorOperation (apply) - Append banValidator payload int
 test('handleApplyBanValidatorOperation (apply) - Append banValidator payload into the base - idempotence', async t => {
     const validity = await admin.msb.state.getIndexerSequenceState()
     const assembledBanWriter = safeEncodeApplyOperation(
-        await createApplyStateMessageFactory(admin.wallet, config)
+        await applyStateMessageFactory(admin.wallet, config)
             .buildCompleteBanWriterMessage(admin.wallet.address, writer2.wallet.address, validity)
     );
     await admin.msb.state.append(assembledBanWriter);
@@ -103,7 +103,7 @@ test('handleApplyBanValidatorOperation (apply) - Append banValidator payload int
 
     const validity2 = await admin.msb.state.getIndexerSequenceState()
     const assembledBanWriter2 = safeEncodeApplyOperation(
-        await createApplyStateMessageFactory(admin.wallet, config)
+        await applyStateMessageFactory(admin.wallet, config)
             .buildCompleteBanWriterMessage(admin.wallet.address, writer2.wallet.address, validity2)
     );
     await admin.msb.state.append(assembledBanWriter2);

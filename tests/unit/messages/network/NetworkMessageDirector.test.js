@@ -5,6 +5,7 @@ import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
 
 import NetworkWalletFactory from '../../../../src/core/network/identity/NetworkWalletFactory.js';
 import NetworkMessageDirector from '../../../../src/messages/network/v1/NetworkMessageDirector.js';
+import NetworkMessageBuilder from '../../../../src/messages/network/v1/NetworkMessageBuilder.js';
 import { NetworkOperationType, ResultCode as NetworkResultCode } from '../../../../src/utils/constants.js';
 import { decodeV1networkOperation, encodeV1networkOperation } from '../../../../src/utils/protobuf/operationHelpers.js';
 import {
@@ -36,7 +37,7 @@ function uniqueResultCodes() {
 
 test('NetworkMessageDirector builds validator connection request and verifies signature', async t => {
     const wallet = createWallet();
-    const director = new NetworkMessageDirector(wallet, config);
+    const director = new NetworkMessageDirector(new NetworkMessageBuilder(wallet, config));
 
     const sessionId = 1;
     const caps = ['cap:b', 'cap:a'];
@@ -60,7 +61,7 @@ test('NetworkMessageDirector builds validator connection request and verifies si
 
 test('NetworkMessageDirector builds liveness request and verifies signature', async t => {
     const wallet = createWallet();
-    const director = new NetworkMessageDirector(wallet, config);
+    const director = new NetworkMessageDirector(new NetworkMessageBuilder(wallet, config));
 
     const sessionId = 1;
     const caps = ['cap:b', 'cap:a'];
@@ -84,7 +85,7 @@ test('NetworkMessageDirector builds liveness request and verifies signature', as
 
 test('NetworkMessageDirector iterates liveness response ResultCode values', async t => {
     const wallet = createWallet();
-    const director = new NetworkMessageDirector(wallet, config);
+    const director = new NetworkMessageDirector(new NetworkMessageBuilder(wallet, config));
 
     const sessionId = 1;
     const caps = ['cap:b', 'cap:a'];
@@ -113,7 +114,7 @@ test('NetworkMessageDirector iterates liveness response ResultCode values', asyn
 
 test('NetworkMessageDirector builds broadcast transaction request and verifies signature', async t => {
     const wallet = createWallet();
-    const director = new NetworkMessageDirector(wallet, config);
+    const director = new NetworkMessageDirector(new NetworkMessageBuilder(wallet, config));
 
     const sessionId = 1;
     const data = b4a.from('deadbeef', 'hex');
@@ -142,7 +143,7 @@ test('NetworkMessageDirector builds broadcast transaction request and verifies s
 
 test('NetworkMessageDirector iterates broadcast transaction response ResultCode values', async t => {
     const wallet = createWallet();
-    const director = new NetworkMessageDirector(wallet, config);
+    const director = new NetworkMessageDirector(new NetworkMessageBuilder(wallet, config));
 
     const sessionId = 1;
     const caps = ['cap:b', 'cap:a'];
@@ -170,7 +171,7 @@ test('NetworkMessageDirector iterates broadcast transaction response ResultCode 
 
 test('NetworkMessageDirector iterates validator connection response ResultCode values', async t => {
     const wallet = createWallet();
-    const director = new NetworkMessageDirector(wallet, config);
+    const director = new NetworkMessageDirector(new NetworkMessageBuilder(wallet, config));
 
     const sessionId = 1;
     const caps = ['cap:b', 'cap:a'];

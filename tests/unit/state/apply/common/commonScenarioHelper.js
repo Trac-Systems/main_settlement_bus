@@ -5,7 +5,7 @@ import {
 	deriveIndexerSequenceState,
 	eventFlush
 } from '../../../../helpers/autobaseTestHelpers.js';
-import { createApplyStateMessageFactory } from '../../../../../src/messages/state/applyStateMessageFactory.js';
+import { applyStateMessageFactory } from '../../../../../src/messages/state/applyStateMessageFactory.js';
 import { safeEncodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
 import { AUTOBASE_VALUE_ENCODING } from '../../../../../src/utils/constants.js';
 import { buildAddAdminRequesterPayload } from '../addAdmin/addAdminScenarioHelpers.js';
@@ -61,7 +61,7 @@ export async function initializeBalances(context, recipients) {
 
 	const txValidity = await deriveIndexerSequenceState(adminNode.base);
 	for (const [recipientAddress, balanceBuffer] of recipients) {
-		const payload = await createApplyStateMessageFactory(adminNode.wallet, config)
+		const payload = await applyStateMessageFactory(adminNode.wallet, config)
 			.buildCompleteBalanceInitializationMessage(
 				adminNode.wallet.address,
 				recipientAddress,
@@ -80,7 +80,7 @@ export async function whitelistAddress(context, address) {
 	if (!adminNode || !address) return;
 
 	const txValidity = await deriveIndexerSequenceState(adminNode.base);
-	const payload = await createApplyStateMessageFactory(adminNode.wallet, config)
+	const payload = await applyStateMessageFactory(adminNode.wallet, config)
 		.buildCompleteAppendWhitelistMessage(adminNode.wallet.address, address, txValidity);
 	await adminNode.base.append(safeEncodeApplyOperation(payload));
 	await adminNode.base.update();

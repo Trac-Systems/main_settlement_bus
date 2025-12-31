@@ -38,20 +38,6 @@ class NetworkMessageBuilder {
         }
 
         this.#wallet = wallet;
-        this.reset();
-    }
-
-    reset() {
-        this.#header = null;
-        this.#payloadKey = null;
-        this.#body = null;
-        this.#type = null;
-        this.#capabilities = null;
-        this.#sessionId = null;
-        this.#timestamp = null;
-        this.#issuerAddress = null;
-        this.#resultCode = null;
-        this.#data = null;
     }
 
     setSessionId(sessionId) {

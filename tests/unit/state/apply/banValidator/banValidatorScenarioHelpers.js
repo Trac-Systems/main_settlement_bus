@@ -1,6 +1,6 @@
 import b4a from 'b4a';
 import { deriveIndexerSequenceState, eventFlush } from '../../../../helpers/autobaseTestHelpers.js';
-import { createApplyStateMessageFactory } from '../../../../../src/messages/state/applyStateMessageFactory.js';
+import { applyStateMessageFactory } from '../../../../../src/messages/state/applyStateMessageFactory.js';
 import nodeEntryUtils, { ZERO_LICENSE } from '../../../../../src/core/state/utils/nodeEntry.js';
 import addressUtils from '../../../../../src/core/state/utils/address.js';
 import lengthEntryUtils from '../../../../../src/core/state/utils/lengthEntry.js';
@@ -63,7 +63,7 @@ export async function buildBanValidatorPayload(
 ) {
 	const txValidity = await deriveIndexerSequenceState(adminPeer.base);
 	return safeEncodeApplyOperation(
-		await createApplyStateMessageFactory(adminPeer.wallet, config)
+		await applyStateMessageFactory(adminPeer.wallet, config)
 			.buildCompleteBanWriterMessage(adminPeer.wallet.address, validatorPeer.wallet.address, txValidity)
 	);
 }
@@ -74,7 +74,7 @@ export async function buildBanValidatorPayloadWithTxValidity(
 	{ adminPeer = context.adminBootstrap, validatorPeer = selectWriterPeer(context) } = {}
 ) {
 	return safeEncodeApplyOperation(
-		await createApplyStateMessageFactory(adminPeer.wallet, config)
+		await applyStateMessageFactory(adminPeer.wallet, config)
 			.buildCompleteBanWriterMessage(adminPeer.wallet.address, validatorPeer.wallet.address, mutatedTxValidity)
 	);
 }
@@ -340,7 +340,7 @@ export async function promoteValidatorToIndexer(
 ) {
     const txValidity = await deriveIndexerSequenceState(adminPeer.base);
     const payload = safeEncodeApplyOperation(
-        await createApplyStateMessageFactory(adminPeer.wallet, config)
+        await applyStateMessageFactory(adminPeer.wallet, config)
             .buildCompleteAddIndexerMessage(adminPeer.wallet.address, validatorPeer.wallet.address, txValidity)
     );
 

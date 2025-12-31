@@ -1,6 +1,6 @@
 import {test, hook} from '../../helpers/wrapper.js';
 
-import { createApplyStateMessageFactory } from '../../../src/messages/state/applyStateMessageFactory.js';
+import { applyStateMessageFactory } from '../../../src/messages/state/applyStateMessageFactory.js';
 import { safeEncodeApplyOperation } from '../../../src/utils/protobuf/operationHelpers.js';
 import { config } from '../../helpers/config.js';
 import {
@@ -44,7 +44,7 @@ test('handleApplyRemoveIndexerOperation (apply) - Append removeIndexer payload i
     const indexersEntryBefore = await writer.msb.state.getIndexersEntry();
     const validity = await admin.msb.state.getIndexerSequenceState()
     const assembledRemoveIndexerMessage = safeEncodeApplyOperation(
-        await createApplyStateMessageFactory(admin.wallet, config)
+        await applyStateMessageFactory(admin.wallet, config)
             .buildCompleteRemoveIndexerMessage(admin.wallet.address, indexer1.wallet.address, validity)
     );
     await admin.msb.state.append(assembledRemoveIndexerMessage);
@@ -77,7 +77,7 @@ test('handleApplyRemoveIndexerOperation (apply) - Append removeIndexer payload i
     const indexersEntryBefore = await indexer1.msb.state.getIndexersEntry();
     const validity = await admin.msb.state.getIndexerSequenceState()
     const assembledRemoveIndexerMessage = safeEncodeApplyOperation(
-        await createApplyStateMessageFactory(admin.wallet, config)
+        await applyStateMessageFactory(admin.wallet, config)
             .buildCompleteRemoveIndexerMessage(admin.wallet.address, indexer1.wallet.address, validity)
     );
     await admin.msb.state.append(assembledRemoveIndexerMessage);
@@ -109,7 +109,7 @@ test('handleApplyAddIndexerOperation (apply) - Append removeIndexer payload into
 
     const validity = await admin.msb.state.getIndexerSequenceState()
     const assembledRemoveIndexerMessage = safeEncodeApplyOperation(
-        await createApplyStateMessageFactory(admin.wallet, config)
+        await applyStateMessageFactory(admin.wallet, config)
             .buildCompleteRemoveIndexerMessage(admin.wallet.address, indexer2.wallet.address, validity)
     );
     await writer.msb.state.append(assembledRemoveIndexerMessage);

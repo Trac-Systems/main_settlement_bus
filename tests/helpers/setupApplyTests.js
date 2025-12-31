@@ -10,7 +10,7 @@ import {EntryType} from '../../src/utils/constants.js';
 import {sleep} from '../../src/utils/helpers.js'
 import {formatIndexersEntry} from '../../src/utils/helpers.js';
 import {blake3Hash} from '../../src/utils/crypto.js';
-import { createApplyStateMessageFactory } from "../../src/messages/state/applyStateMessageFactory.js";
+import { applyStateMessageFactory } from "../../src/messages/state/applyStateMessageFactory.js";
 import { safeEncodeApplyOperation } from "../../src/utils/protobuf/operationHelpers.js"
 import { $TNK } from '../../src/core/state/utils/balance.js';
 import { EventType } from '../../src/utils/constants.js';
@@ -67,7 +67,7 @@ export const tick = () => new Promise(resolve => setImmediate(resolve));
 
 export async function fundPeer(admin, toFund, amount) {
     const txValidity = await admin.msb.state.getIndexerSequenceState()
-    const payload = await createApplyStateMessageFactory(admin.wallet, admin.config)
+    const payload = await applyStateMessageFactory(admin.wallet, admin.config)
         .buildCompleteBalanceInitializationMessage(
             admin.wallet.address,
             toFund.wallet.address,
@@ -121,7 +121,7 @@ export async function initMsbAdmin(keyPair, temporaryDirectory, options = {}) {
 export async function setupMsbAdmin(keyPair, temporaryDirectory, options = {}) {
     const admin = await initMsbAdmin(keyPair, temporaryDirectory, options);
     const txValidity = await admin.msb.state.getIndexerSequenceState();
-    const payload = await createApplyStateMessageFactory(admin.wallet, admin.config)
+    const payload = await applyStateMessageFactory(admin.wallet, admin.config)
         .buildCompleteAddAdminMessage(admin.wallet.address, admin.msb.state.writingKey, txValidity);
 
     await admin.msb.state.append(safeEncodeApplyOperation(payload));
@@ -134,7 +134,7 @@ export async function setupNodeAsWriter(admin, writerCandidate) {
         await setupWhitelist(admin, [writerCandidate.wallet.address]); // ensure if is whitelisted
 
         const validity = await admin.msb.getIndexerSequenceState()
-        const req = await createApplyStateMessageFactory(writerCandidate.wallet, admin.config)
+        const req = await applyStateMessageFactory(writerCandidate.wallet, admin.config)
             .buildPartialAddWriterMessage(
                 writerCandidate.wallet.address,
                 b4a.toString(writerCandidate.msb.state.writingKey, 'hex'),
@@ -143,7 +143,7 @@ export async function setupNodeAsWriter(admin, writerCandidate) {
             );
 
         await waitWritable(admin, writerCandidate, async () => {
-            const payload = await createApplyStateMessageFactory(admin.wallet, admin.config)
+            const payload = await applyStateMessageFactory(admin.wallet, admin.config)
                 .buildCompleteAddWriterMessage(
                     admin.wallet.address,
                     b4a.from(req.rao.tx, 'hex'),
@@ -172,7 +172,7 @@ export async function promoteToWriter(admin, writerCandidate) {
             isIndexer: false,
         })
     const validity = await admin.msb.state.getIndexerSequenceState()
-    const req = await createApplyStateMessageFactory(writerCandidate.wallet, writerCandidate.config)
+    const req = await applyStateMessageFactory(writerCandidate.wallet, writerCandidate.config)
         .buildPartialAddWriterMessage(
             writerCandidate.wallet.address,
             b4a.toString(writerCandidate.msb.state.writingKey, 'hex'),
@@ -181,7 +181,7 @@ export async function promoteToWriter(admin, writerCandidate) {
         );
 
     await waitWritable(writerCandidate, writerCandidate, async () => {
-        const payload = await createApplyStateMessageFactory(admin.wallet, admin.config)
+        const payload = await applyStateMessageFactory(admin.wallet, admin.config)
             .buildCompleteAddWriterMessage(
                 req.address,
                 b4a.from(req.rao.tx, 'hex'),
@@ -209,7 +209,7 @@ export async function setupMsbWriter(admin, peerName, peerKeyPair, temporaryDire
 export async function setupMsbIndexer(indexerCandidate, admin) {
     try {
     const validity = await admin.msb.state.getIndexerSequenceState()
-    const payload = await createApplyStateMessageFactory(admin.wallet, admin.config)
+    const payload = await applyStateMessageFactory(admin.wallet, admin.config)
         .buildCompleteAddIndexerMessage(admin.wallet.address, indexerCandidate.wallet.address, validity);
 
         await admin.msb.state.append(safeEncodeApplyOperation(payload));
@@ -263,7 +263,7 @@ export async function setupWhitelist(admin, whitelistAddresses) {
     fileUtils.readAddressesFromWhitelistFile = async () => whitelistAddresses;
     const validity = await admin.msb.state.getIndexerSequenceState()
     for (const address of whitelistAddresses) {
-        const payload = await createApplyStateMessageFactory(admin.wallet, admin.config)
+        const payload = await applyStateMessageFactory(admin.wallet, admin.config)
             .buildCompleteAppendWhitelistMessage(admin.wallet.address, address, validity);
 
         await admin.msb.state.append(safeEncodeApplyOperation(payload));
@@ -317,7 +317,7 @@ export async function initDirectoryStructure(peerName, keyPair, temporaryDirecto
 export const deployExternalBootstrap = async (writer, externalNode) => {
     const externalBootstrap = randomBytes(32).toString('hex');
     const txValidity = await writer.msb.state.getIndexerSequenceState();
-    const payload = await createApplyStateMessageFactory(externalNode.msb.wallet, admin.config)
+    const payload = await applyStateMessageFactory(externalNode.msb.wallet, admin.config)
         .buildPartialBootstrapDeploymentMessage(
             externalNode.msb.wallet.address,
             externalBootstrap,
@@ -326,7 +326,7 @@ export const deployExternalBootstrap = async (writer, externalNode) => {
             'json'
         );
 
-    const rawPayload = await createApplyStateMessageFactory(writer.msb.wallet, admin.config)
+    const rawPayload = await applyStateMessageFactory(writer.msb.wallet, admin.config)
         .buildCompleteBootstrapDeploymentMessage(
             payload.address,
             b4a.from(payload.bdo.tx, 'hex'),
@@ -358,7 +358,7 @@ export const generatePostTx = async (writer, externalNode, externalContractBoots
 
     const contentHash = await blake3Hash(JSON.stringify(testObj));
     const validity = await writer.msb.state.getIndexerSequenceState()
-    const tx = await createApplyStateMessageFactory(externalNode.wallet, admin.config)
+    const tx = await applyStateMessageFactory(externalNode.wallet, admin.config)
         .buildPartialTransactionOperationMessage(
             externalNode.wallet.address,
             peerWriterKey,
@@ -369,7 +369,7 @@ export const generatePostTx = async (writer, externalNode, externalContractBoots
             'json'
         )
 
-    const postTxPayload = await createApplyStateMessageFactory(writer.wallet, admin.config)
+    const postTxPayload = await applyStateMessageFactory(writer.wallet, admin.config)
         .buildCompleteTransactionOperationMessage(
             tx.address,
             b4a.from(tx.txo.tx, 'hex'),

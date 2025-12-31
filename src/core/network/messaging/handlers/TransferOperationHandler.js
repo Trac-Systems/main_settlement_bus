@@ -2,7 +2,7 @@ import BaseOperationHandler from './base/BaseOperationHandler.js';
 import {OperationType} from '../../../../utils/constants.js';
 import PartialTransfer from "../validators/PartialTransfer.js";
 import {normalizeTransferOperation} from "../../../../utils/normalizers.js"
-import {createApplyStateMessageFactory} from "../../../../messages/state/applyStateMessageFactory.js";
+import {applyStateMessageFactory} from "../../../../messages/state/applyStateMessageFactory.js";
 import {safeEncodeApplyOperation} from "../../../../utils/protobuf/operationHelpers.js";
 
 class TransferOperationHandler extends BaseOperationHandler {
@@ -38,7 +38,7 @@ class TransferOperationHandler extends BaseOperationHandler {
             throw new Error("TransferHandler: Transfer validation failed.");
         }
 
-        const completeTransferOperation = await createApplyStateMessageFactory(this.#wallet, this.#config)
+        const completeTransferOperation = await applyStateMessageFactory(this.#wallet, this.#config)
             .buildCompleteTransferOperationMessage(
                 normalizedPayload.address,
                 normalizedPayload.tro.tx,

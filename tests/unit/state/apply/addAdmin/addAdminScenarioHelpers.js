@@ -6,7 +6,7 @@ import {
 	deriveIndexerSequenceState,
 	eventFlush
 } from '../../../../helpers/autobaseTestHelpers.js';
-import { createApplyStateMessageFactory } from '../../../../../src/messages/state/applyStateMessageFactory.js';
+import { applyStateMessageFactory } from '../../../../../src/messages/state/applyStateMessageFactory.js';
 import {
 	safeDecodeApplyOperation,
 	safeEncodeApplyOperation
@@ -43,7 +43,7 @@ export async function buildAddAdminRequesterPayload(context) {
 	const adminNode = context.adminBootstrap;
 	const txValidity = await deriveIndexerSequenceState(adminNode.base);
 	return safeEncodeApplyOperation(
-		await createApplyStateMessageFactory(adminNode.wallet, config)
+		await applyStateMessageFactory(adminNode.wallet, config)
 			.buildCompleteAddAdminMessage(
 				adminNode.wallet.address,
 				adminNode.base.local.key,

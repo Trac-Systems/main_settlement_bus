@@ -1,5 +1,5 @@
 import b4a from 'b4a';
-import { createApplyStateMessageFactory } from '../../../../../src/messages/state/applyStateMessageFactory.js';
+import { applyStateMessageFactory } from '../../../../../src/messages/state/applyStateMessageFactory.js';
 import { deriveIndexerSequenceState, eventFlush } from '../../../../helpers/autobaseTestHelpers.js';
 import {
 	setupAdminNetwork,
@@ -122,7 +122,7 @@ export async function buildTransferPayload(
 	const resolvedTxValidity =
 		txValidity ?? (await deriveIndexerSequenceState(validatorPeer.base));
 
-    const partial = await createApplyStateMessageFactory(senderPeer.wallet, config)
+    const partial = await applyStateMessageFactory(senderPeer.wallet, config)
         .buildPartialTransferOperationMessage(
             senderPeer.wallet.address,
             recipientAddress,
@@ -131,7 +131,7 @@ export async function buildTransferPayload(
             'json'
         );
 
-    const payload = await createApplyStateMessageFactory(validatorPeer.wallet, config)
+    const payload = await applyStateMessageFactory(validatorPeer.wallet, config)
         .buildCompleteTransferOperationMessage(
             partial.address,
             b4a.from(partial.tro.tx, 'hex'),

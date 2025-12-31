@@ -7,6 +7,6 @@ import ApplyStateMessageBuilder from "./ApplyStateMessageBuilder.js";
  * @param {object} config
  * @returns {ApplyStateMessageDirector}
  */
-export const createApplyStateMessageFactory = (wallet, config) =>{
+export const applyStateMessageFactory = (wallet, config) =>{
     return new ApplyStateMessageDirector(new ApplyStateMessageBuilder(wallet, config))
 }

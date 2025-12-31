@@ -7,7 +7,7 @@ import {
 	assertValidatorReward,
 	promotePeerToWriter
 } from '../addWriter/addWriterScenarioHelpers.js';
-import { createApplyStateMessageFactory } from '../../../../../src/messages/state/applyStateMessageFactory.js';
+import { applyStateMessageFactory } from '../../../../../src/messages/state/applyStateMessageFactory.js';
 import { safeEncodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
 import nodeEntryUtils from '../../../../../src/core/state/utils/nodeEntry.js';
 import addressUtils from '../../../../../src/core/state/utils/address.js';
@@ -180,14 +180,14 @@ export async function buildRemoveWriterPayloadWithTxValidity(context, mutatedTxV
 	}
 	const { readerPeer = selectWriterPeer(context), validatorPeer = context.adminBootstrap, writerKeyBuffer = null } = options;
 	const writerKey = writerKeyBuffer ?? readerPeer.base.local.key;
-	const partial = await createApplyStateMessageFactory(readerPeer.wallet, config)
+	const partial = await applyStateMessageFactory(readerPeer.wallet, config)
 		.buildPartialRemoveWriterMessage(
 			readerPeer.wallet.address,
 			writerKey.toString('hex'),
 			mutatedTxValidity.toString('hex'),
 			'json'
 		);
-	const payload = await createApplyStateMessageFactory(validatorPeer.wallet, config)
+	const payload = await applyStateMessageFactory(validatorPeer.wallet, config)
 		.buildCompleteRemoveWriterMessage(
 			partial.address,
 			b4a.from(partial.rao.tx, 'hex'),

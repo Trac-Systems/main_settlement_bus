@@ -14,14 +14,14 @@ import {
     testKeyPair3,
     testKeyPair4
 } from '../../fixtures/apply.fixtures.js';
-import { createApplyStateMessageFactory } from '../../../src/messages/state/applyStateMessageFactory.js';
+import { applyStateMessageFactory } from '../../../src/messages/state/applyStateMessageFactory.js';
 import { safeEncodeApplyOperation } from '../../../src/utils/protobuf/operationHelpers.js';
 import { $TNK } from '../../../src/core/state/utils/balance.js';
 import { config } from '../../helpers/config.js';
 
 const buildTransfer = async (admin, from, to, amount) => {
     const txValidity = await from.msb.state.getIndexerSequenceState()
-    const tx = await createApplyStateMessageFactory(from.wallet, config)
+    const tx = await applyStateMessageFactory(from.wallet, config)
         .buildPartialTransferOperationMessage(
             from.wallet.address,
             to.wallet.address,
@@ -31,7 +31,7 @@ const buildTransfer = async (admin, from, to, amount) => {
         );
     return { 
         raw: safeEncodeApplyOperation(
-            await createApplyStateMessageFactory(admin.wallet, config)
+            await applyStateMessageFactory(admin.wallet, config)
                 .buildCompleteTransferOperationMessage(
                 tx.address,
                 b4a.from(tx.tro.tx, 'hex'),

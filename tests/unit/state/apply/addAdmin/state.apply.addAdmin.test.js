@@ -18,7 +18,7 @@ import WriterKeyExistsValidationScenario from '../common/writerKeyExistsValidati
 import OperationAlreadyAppliedScenario from '../common/operationAlreadyAppliedScenario.js';
 import TransactionValidityMismatchScenario from '../common/transactionValidityMismatchScenario.js';
 import IndexerSequenceStateInvalidScenario from '../common/indexer/indexerSequenceStateInvalidScenario.js';
-import { createApplyStateMessageFactory } from '../../../../../src/messages/state/applyStateMessageFactory.js';
+import { applyStateMessageFactory } from '../../../../../src/messages/state/applyStateMessageFactory.js';
 import { safeEncodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
 import addAdminEntryExistsScenario from './adminEntryExistsScenario.js';
 import addAdminNonBootstrapNodeScenario from './nonBootstrapNodeScenario.js';
@@ -130,7 +130,7 @@ new TransactionValidityMismatchScenario({
 	assertStateUnchanged: assertAddAdminRequesterFailureState,
 	rebuildPayloadWithTxValidity: async ({ context, mutatedTxValidity }) => {
 		const adminNode = context.adminBootstrap;
-		const payload = await createApplyStateMessageFactory(adminNode.wallet, config)
+		const payload = await applyStateMessageFactory(adminNode.wallet, config)
 			.buildCompleteAddAdminMessage(
 				adminNode.wallet.address,
 				adminNode.base.local.key,

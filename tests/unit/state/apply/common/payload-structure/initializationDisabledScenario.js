@@ -1,6 +1,6 @@
 import { eventFlush, deriveIndexerSequenceState } from '../../../../../helpers/autobaseTestHelpers.js';
 import OperationValidationScenarioBase from '../base/OperationValidationScenarioBase.js';
-import { createApplyStateMessageFactory } from '../../../../../../src/messages/state/applyStateMessageFactory.js';
+import { applyStateMessageFactory } from '../../../../../../src/messages/state/applyStateMessageFactory.js';
 import { safeEncodeApplyOperation } from '../../../../../../src/utils/protobuf/operationHelpers.js';
 import { config } from '../../../../../helpers/config.js';
 
@@ -36,7 +36,7 @@ async function disableInitializationAndApply(context, invalidPayload) {
 
 	const txValidity = await deriveIndexerSequenceState(adminNode.base);
 	const disablePayload = safeEncodeApplyOperation(
-		await createApplyStateMessageFactory(adminNode.wallet, config)
+		await applyStateMessageFactory(adminNode.wallet, config)
 			.buildCompleteDisableInitializationMessage(
 				adminNode.wallet.address,
 				adminNode.base.local.key,
