@@ -1,5 +1,5 @@
 import { sleep } from '../../../utils/helpers.js';
-import { operationToPayload } from '../../../utils/operations.js';
+import { operationToPayload } from '../../../utils/applyOperations.js';
 /**
  * MessageOrchestrator coordinates message submission, retry, and validator management.
  * It works with ConnectionManager and ledger state to ensure reliable message delivery.

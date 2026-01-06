@@ -202,8 +202,7 @@ class State extends ReadyResource {
     }
 
     async getIndexersEntry() {
-        const indexersEntry = Object.values(this.#base.system.indexers);
-        return indexersEntry
+        return Object.values(this.#base.system.indexers);
     }
 
     async isWkInIndexersEntry(wk) {

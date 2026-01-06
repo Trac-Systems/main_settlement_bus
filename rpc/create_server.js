@@ -3,7 +3,7 @@ import http from 'http'
 import { applyCors } from './cors.js';
 import { routes } from './routes/index.js';
 
-export const createServer = (msbInstance) => {
+export const createServer = (msbInstance, config) => {
   const server = http.createServer({}, async (req, res) => {
     
     // --- 1. Define safe 'respond' utility (Payload MUST be an object) ---
@@ -53,7 +53,7 @@ export const createServer = (msbInstance) => {
             try {
                 // This try/catch covers synchronous errors and errors from awaited promises
                 // within the route.handler function.
-                await route.handler({ req, res, respond, msbInstance });
+                await route.handler({ req, res, respond,  msbInstance, config});
             } catch (error) {
                 // Catch errors thrown directly from the handler (or its awaited parts)
                 console.error(`Error on ${route.path}:`, error);

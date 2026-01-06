@@ -4,8 +4,8 @@ import nodeEntryUtils, { setWritingKey } from '../../../../../src/core/state/uti
 import { EntryType } from '../../../../../src/utils/constants.js';
 import { decimalStringToBigInt, bigIntTo16ByteBuffer } from '../../../../../src/utils/amountSerialization.js';
 import { deriveIndexerSequenceState, eventFlush } from '../../../../helpers/autobaseTestHelpers.js';
-import PartialStateMessageOperations from '../../../../../src/messages/partialStateMessages/PartialStateMessageOperations.js';
-import CompleteStateMessageOperations from '../../../../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
+import { applyStateMessageFactory } from '../../../../../src/messages/state/applyStateMessageFactory.js';
+import { safeEncodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
 import {
 	setupAdminNetwork,
 	initializeBalances,
@@ -90,21 +90,24 @@ export async function buildAdminRecoveryPayload(context) {
 	const { adminPeer, validatorPeer1, newAdminWriterKey } = context.adminRecovery;
 	const txValidity = await deriveIndexerSequenceState(validatorPeer1.base);
 
-    const partial = await new PartialStateMessageOperations(adminPeer.wallet, config)
-        .assembleAdminRecoveryMessage(
+    const partial = await applyStateMessageFactory(adminPeer.wallet, config)
+        .buildPartialAdminRecoveryMessage(
+            adminPeer.wallet.address,
             b4a.toString(newAdminWriterKey, 'hex'),
-            b4a.toString(txValidity, 'hex')
+            b4a.toString(txValidity, 'hex'),
+            'json'
         );
 
-        return new CompleteStateMessageOperations(validatorPeer1.wallet, config)
-            .assembleAdminRecoveryMessage(
-                partial.address,
-                b4a.from(partial.rao.tx, 'hex'),
-                b4a.from(partial.rao.txv, 'hex'),
-                b4a.from(partial.rao.iw, 'hex'),
-                b4a.from(partial.rao.in, 'hex'),
-                b4a.from(partial.rao.is, 'hex')
-            );
+    const payload = await applyStateMessageFactory(validatorPeer1.wallet, config)
+        .buildCompleteAdminRecoveryMessage(
+            partial.address,
+            b4a.from(partial.rao.tx, 'hex'),
+            b4a.from(partial.rao.txv, 'hex'),
+            b4a.from(partial.rao.iw, 'hex'),
+            b4a.from(partial.rao.in, 'hex'),
+            b4a.from(partial.rao.is, 'hex')
+        );
+    return safeEncodeApplyOperation(payload);
 }
 
 export async function buildAdminRecoveryPayloadWithTxValidity(context, mutatedTxValidity) {
@@ -113,21 +116,24 @@ export async function buildAdminRecoveryPayloadWithTxValidity(context, mutatedTx
 	}
 
 	const { adminPeer, validatorPeer1, newAdminWriterKey } = context.adminRecovery;
-    const partial = await new PartialStateMessageOperations(adminPeer.wallet, config)
-        .assembleAdminRecoveryMessage(
+    const partial = await applyStateMessageFactory(adminPeer.wallet, config)
+        .buildPartialAdminRecoveryMessage(
+            adminPeer.wallet.address,
             b4a.toString(newAdminWriterKey, 'hex'),
-            b4a.toString(mutatedTxValidity, 'hex')
+            b4a.toString(mutatedTxValidity, 'hex'),
+            'json'
         );
 
-    return new CompleteStateMessageOperations(validatorPeer1.wallet, config)
-        .assembleAdminRecoveryMessage(
-						partial.address,
+    const payload = await applyStateMessageFactory(validatorPeer1.wallet, config)
+        .buildCompleteAdminRecoveryMessage(
+			partial.address,
             b4a.from(partial.rao.tx, 'hex'),
             mutatedTxValidity,
             b4a.from(partial.rao.iw, 'hex'),
             b4a.from(partial.rao.in, 'hex'),
             b4a.from(partial.rao.is, 'hex')
         );
+    return safeEncodeApplyOperation(payload);
 }
 
 export async function applyAdminRecovery(context, payload) {
@@ -516,21 +522,26 @@ export async function applyTransferSeries(context, count = TRANSFER_COUNT) {
 
 async function buildSimpleTransferPayload({ requesterPeer, validatorPeer, recipientPeer, amount }) {
 	const txValidity = await deriveIndexerSequenceState(validatorPeer.base);
-	const partial = await new PartialStateMessageOperations(requesterPeer.wallet, config).assembleTransferOperationMessage(
-		recipientPeer.wallet.address,
-		b4a.toString(amount, 'hex'),
-		b4a.toString(txValidity, 'hex')
-	);
+	const partial = await applyStateMessageFactory(requesterPeer.wallet, config)
+		.buildPartialTransferOperationMessage(
+			requesterPeer.wallet.address,
+			recipientPeer.wallet.address,
+			b4a.toString(amount, 'hex'),
+			b4a.toString(txValidity, 'hex'),
+			'json'
+		);
 
-	return new CompleteStateMessageOperations(validatorPeer.wallet, config).assembleCompleteTransferOperationMessage(
-		partial.address,
-		b4a.from(partial.tro.tx, 'hex'),
-		b4a.from(partial.tro.txv, 'hex'),
-		b4a.from(partial.tro.in, 'hex'),
-		partial.tro.to,
-		b4a.from(partial.tro.am, 'hex'),
-		b4a.from(partial.tro.is, 'hex')
-	);
+	const payload = await applyStateMessageFactory(validatorPeer.wallet, config)
+		.buildCompleteTransferOperationMessage(
+			partial.address,
+			b4a.from(partial.tro.tx, 'hex'),
+			b4a.from(partial.tro.txv, 'hex'),
+			b4a.from(partial.tro.in, 'hex'),
+			partial.tro.to,
+			b4a.from(partial.tro.am, 'hex'),
+			b4a.from(partial.tro.is, 'hex')
+		);
+	return safeEncodeApplyOperation(payload);
 }
 
 export async function assertAdminRecoverySuccessState(t, context, { viewBase } = {}) {

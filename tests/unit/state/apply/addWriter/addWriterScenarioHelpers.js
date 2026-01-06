@@ -1,6 +1,6 @@
 import b4a from 'b4a';
-import PartialStateMessageOperations from '../../../../../src/messages/partialStateMessages/PartialStateMessageOperations.js';
-import CompleteStateMessageOperations from '../../../../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
+import { applyStateMessageFactory } from '../../../../../src/messages/state/applyStateMessageFactory.js';
+import { safeEncodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
 import { deriveIndexerSequenceState, eventFlush } from '../../../../helpers/autobaseTestHelpers.js';
 import { safeDecodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
 import nodeEntryUtils, { ZERO_LICENSE } from '../../../../../src/core/state/utils/nodeEntry.js';
@@ -105,19 +105,24 @@ export async function buildAddWriterPayload(
 ) {
 	const txValidity = await deriveIndexerSequenceState(validatorPeer.base);
 	const writingKey = writerKeyBuffer ?? readerPeer.base.local.key;
-	const partial = await new PartialStateMessageOperations(readerPeer.wallet, config).assembleAddWriterMessage(
-		writingKey.toString('hex'),
-		txValidity.toString('hex')
-	);
+	const partial = await applyStateMessageFactory(readerPeer.wallet, config)
+		.buildPartialAddWriterMessage(
+			readerPeer.wallet.address,
+			writingKey.toString('hex'),
+			txValidity.toString('hex'),
+			'json'
+		);
 
-	return new CompleteStateMessageOperations(validatorPeer.wallet, config).assembleAddWriterMessage(
-		partial.address,
-		b4a.from(partial.rao.tx, 'hex'),
-		b4a.from(partial.rao.txv, 'hex'),
-		b4a.from(partial.rao.iw, 'hex'),
-		b4a.from(partial.rao.in, 'hex'),
-		b4a.from(partial.rao.is, 'hex')
-	);
+	const payload = await applyStateMessageFactory(validatorPeer.wallet, config)
+		.buildCompleteAddWriterMessage(
+			partial.address,
+			b4a.from(partial.rao.tx, 'hex'),
+			b4a.from(partial.rao.txv, 'hex'),
+			b4a.from(partial.rao.iw, 'hex'),
+			b4a.from(partial.rao.in, 'hex'),
+			b4a.from(partial.rao.is, 'hex')
+		);
+	return safeEncodeApplyOperation(payload);
 }
 
 export async function buildAddWriterPayloadWithTxValidity(
@@ -134,19 +139,24 @@ export async function buildAddWriterPayloadWithTxValidity(
 	}
 
 	const writingKey = writerKeyBuffer ?? readerPeer.base.local.key;
-	const partial = await new PartialStateMessageOperations(readerPeer.wallet, config).assembleAddWriterMessage(
-		writingKey.toString('hex'),
-		mutatedTxValidity.toString('hex')
-	);
+	const partial = await applyStateMessageFactory(readerPeer.wallet, config)
+		.buildPartialAddWriterMessage(
+			readerPeer.wallet.address,
+			writingKey.toString('hex'),
+			mutatedTxValidity.toString('hex'),
+			'json'
+		);
 
-	return new CompleteStateMessageOperations(validatorPeer.wallet, config).assembleAddWriterMessage(
-		partial.address,
-		b4a.from(partial.rao.tx, 'hex'),
-		mutatedTxValidity,
-		b4a.from(partial.rao.iw, 'hex'),
-		b4a.from(partial.rao.in, 'hex'),
-		b4a.from(partial.rao.is, 'hex')
-	);
+	const payload = await applyStateMessageFactory(validatorPeer.wallet, config)
+		.buildCompleteAddWriterMessage(
+			partial.address,
+			b4a.from(partial.rao.tx, 'hex'),
+			mutatedTxValidity,
+			b4a.from(partial.rao.iw, 'hex'),
+			b4a.from(partial.rao.in, 'hex'),
+			b4a.from(partial.rao.is, 'hex')
+		);
+	return safeEncodeApplyOperation(payload);
 }
 
 export async function buildRemoveWriterPayload(
@@ -159,19 +169,24 @@ export async function buildRemoveWriterPayload(
 ) {
 	const txValidity = await deriveIndexerSequenceState(validatorPeer.base);
 	const writerKey = writerKeyBuffer ?? readerPeer.base.local.key;
-	const partial = await new PartialStateMessageOperations(readerPeer.wallet, config).assembleRemoveWriterMessage(
-		writerKey.toString('hex'),
-		txValidity.toString('hex')
-	);
+	const partial = await applyStateMessageFactory(readerPeer.wallet, config)
+		.buildPartialRemoveWriterMessage(
+			readerPeer.wallet.address,
+			writerKey.toString('hex'),
+			txValidity.toString('hex'),
+			'json'
+		);
 
-	return new CompleteStateMessageOperations(validatorPeer.wallet, config).assembleRemoveWriterMessage(
-		partial.address,
-		b4a.from(partial.rao.tx, 'hex'),
-		b4a.from(partial.rao.txv, 'hex'),
-		b4a.from(partial.rao.iw, 'hex'),
-		b4a.from(partial.rao.in, 'hex'),
-		b4a.from(partial.rao.is, 'hex')
-	);
+	const payload = await applyStateMessageFactory(validatorPeer.wallet, config)
+		.buildCompleteRemoveWriterMessage(
+			partial.address,
+			b4a.from(partial.rao.tx, 'hex'),
+			b4a.from(partial.rao.txv, 'hex'),
+			b4a.from(partial.rao.iw, 'hex'),
+			b4a.from(partial.rao.in, 'hex'),
+			b4a.from(partial.rao.is, 'hex')
+		);
+	return safeEncodeApplyOperation(payload);
 }
 
 export async function assertAddWriterSuccessState(
