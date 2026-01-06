@@ -1,15 +1,15 @@
 import BaseOperationHandler from './base/BaseOperationHandler.js';
 import {
     OperationType
-} from '../../../../utils/constants.js';
+} from '../../../../../utils/constants.js';
 import PartialBootstrapDeployment from "../validators/PartialBootstrapDeployment.js";
 import PartialTransaction from "../validators/PartialTransaction.js";
-import {applyStateMessageFactory} from "../../../../messages/state/applyStateMessageFactory.js";
-import {safeEncodeApplyOperation} from "../../../../utils/protobuf/operationHelpers.js";
+import {applyStateMessageFactory} from "../../../../../messages/state/applyStateMessageFactory.js";
+import {safeEncodeApplyOperation} from "../../../../../utils/protobuf/operationHelpers.js";
 import {
     normalizeBootstrapDeploymentOperation,
     normalizeTransactionOperation
-} from "../../../../utils/normalizers.js";
+} from "../../../../../utils/normalizers.js";
 
 
 class SubnetworkOperationHandler extends BaseOperationHandler {

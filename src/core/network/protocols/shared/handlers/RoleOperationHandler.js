@@ -1,9 +1,9 @@
-import {OperationType} from '../../../../utils/constants.js';
+import {OperationType} from '../../../../../utils/constants.js';
 import PartialRoleAccess from "../validators/PartialRoleAccess.js";
 import BaseOperationHandler from './base/BaseOperationHandler.js';
-import {applyStateMessageFactory} from "../../../../messages/state/applyStateMessageFactory.js";
-import {safeEncodeApplyOperation} from "../../../../utils/protobuf/operationHelpers.js";
-import {normalizeRoleAccessOperation} from "../../../../utils/normalizers.js";
+import {applyStateMessageFactory} from "../../../../../messages/state/applyStateMessageFactory.js";
+import {safeEncodeApplyOperation} from "../../../../../utils/protobuf/operationHelpers.js";
+import {normalizeRoleAccessOperation} from "../../../../../utils/normalizers.js";
 
 class RoleOperationHandler extends BaseOperationHandler {
     #partialRoleAccessValidator;

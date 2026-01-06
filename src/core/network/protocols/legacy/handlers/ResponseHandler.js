@@ -1,7 +1,5 @@
-import { NETWORK_MESSAGE_TYPES } from '../../../../utils/constants.js';
+import { NETWORK_MESSAGE_TYPES } from '../../../../../utils/constants.js';
 import ValidatorResponse from '../validators/ValidatorResponse.js';
-import AdminResponse from '../validators/AdminResponse.js';
-import CustomNodeResponse from '../validators/CustomNodeResponse.js';
 import PeerWallet from 'trac-wallet';
 
 class ResponseHandler {
@@ -15,8 +13,6 @@ class ResponseHandler {
         this.#network = network;
         this.#state = state;
         this.#responseValidator = new ValidatorResponse(this.state, wallet, config);
-        this.#adminValidator = new AdminResponse(this.state, wallet, config);
-        this.#customNodeValidator = new CustomNodeResponse(this.state, wallet, config);
 
     }
 
@@ -41,19 +37,7 @@ class ResponseHandler {
     }
 
     async handle(message, connection, channelString) {
-        switch (message.op) {
-            case NETWORK_MESSAGE_TYPES.RESPONSE.VALIDATOR:
-                await this.#handleValidatorResponse(message, connection, channelString);
-                break;
-            case NETWORK_MESSAGE_TYPES.RESPONSE.ADMIN:
-                await this.#handleAdminResponse(message, connection, channelString);
-                break;
-            case NETWORK_MESSAGE_TYPES.RESPONSE.NODE:
-                await this.#handleCustomNodeResponse(message, connection, channelString);
-                break;
-            default:
-                throw new Error(`Unhandled RESPONSE type: ${message}`);
-        }
+        await this.#handleValidatorResponse(message, connection, channelString);
     }
 
     async #handleValidatorResponse(message, connection, channelString) {
