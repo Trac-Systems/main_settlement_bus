@@ -1,8 +1,8 @@
 import b4a from 'b4a';
-import {OperationType} from "../../../../utils/constants.js";
-import {bufferToAddress} from "../../../state/utils/address.js";
+import {OperationType} from "../../../../../utils/constants.js";
+import {bufferToAddress} from "../../../../state/utils/address.js";
 import PartialOperation from './base/PartialOperation.js';
-import {bufferToBigInt} from "../../../../utils/amountSerialization.js";
+import {bufferToBigInt} from "../../../../../utils/amountSerialization.js";
 
 class PartialRoleAccess extends PartialOperation {
     #config;

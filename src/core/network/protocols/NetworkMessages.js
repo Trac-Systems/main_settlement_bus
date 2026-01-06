@@ -2,7 +2,7 @@
 import Protomux from 'protomux';
 import b4a from 'b4a';
 import c from 'compact-encoding';
-import NetworkMessageRouter from './routes/NetworkMessageRouter.js';
+import NetworkMessageRouter from './legacy/NetworkMessageRouter.js';
 import Network from '../Network.js';
 
 class NetworkMessages {

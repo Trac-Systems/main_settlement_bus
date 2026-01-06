@@ -1,9 +1,9 @@
 import BaseOperationHandler from './base/BaseOperationHandler.js';
-import {OperationType} from '../../../../utils/constants.js';
+import {OperationType} from '../../../../../utils/constants.js';
 import PartialTransfer from "../validators/PartialTransfer.js";
-import {normalizeTransferOperation} from "../../../../utils/normalizers.js"
-import {applyStateMessageFactory} from "../../../../messages/state/applyStateMessageFactory.js";
-import {safeEncodeApplyOperation} from "../../../../utils/protobuf/operationHelpers.js";
+import {normalizeTransferOperation} from "../../../../../utils/normalizers.js"
+import {applyStateMessageFactory} from "../../../../../messages/state/applyStateMessageFactory.js";
+import {safeEncodeApplyOperation} from "../../../../../utils/protobuf/operationHelpers.js";
 
 class TransferOperationHandler extends BaseOperationHandler {
     #partialTransferValidator;

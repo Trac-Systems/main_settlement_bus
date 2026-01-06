@@ -1,6 +1,5 @@
 import b4a from 'b4a';
 import PeerWallet from 'trac-wallet';
-import { bufferToAddress } from '../../../../state/utils/address.js';
 import State from '../../../../state/State.js';
 
 /*
