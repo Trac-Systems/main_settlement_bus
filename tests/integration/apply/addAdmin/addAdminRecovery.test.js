@@ -5,8 +5,8 @@ import {
 } from '../../../helpers/setupApplyTests.js';
 
 import {randomBytes} from '../../../helpers/setupApplyTests.js';
-import CompleteStateMessageOperations from '../../../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
-import PartialStateMessageOperations from '../../../../src/messages/partialStateMessages/PartialStateMessageOperations.js'
+import { applyStateMessageFactory } from '../../../../src/messages/state/applyStateMessageFactory.js';
+import { safeEncodeApplyOperation } from '../../../../src/utils/protobuf/operationHelpers.js';
 import {testKeyPair1, testKeyPair2, testKeyPair3, testKeyPair4} from '../../../fixtures/apply.fixtures.js';
 import b4a from 'b4a';
 import { decode as decodeAdmin } from '../../../../src/core/state/utils/adminEntry.js';
@@ -88,22 +88,24 @@ test('Apply function addAdmin for recovery - happy path', async (k) => {
     await newAdmin.msb.ready();
     await newAdmin.msb.state.append(null);
     const validity = b4a.toString(await newAdmin.msb.state.getIndexerSequenceState(), 'hex')
-    const addAdminMessage = await new PartialStateMessageOperations(newAdmin.wallet, config)
-        .assembleAdminRecoveryMessage(
+    const addAdminMessage = await applyStateMessageFactory(newAdmin.wallet, config)
+        .buildPartialAdminRecoveryMessage(
+            newAdmin.wallet.address,
             b4a.toString(newAdmin.msb.state.writingKey, 'hex'),
-            validity
+            validity,
+            'json'
         );
 
-    const rawTx = await new CompleteStateMessageOperations(writer.wallet, config)
-        .assembleAdminRecoveryMessage(
+    const rawPayload = await applyStateMessageFactory(writer.wallet, config)
+        .buildCompleteAdminRecoveryMessage(
             addAdminMessage.address,
             b4a.from(addAdminMessage.rao.tx, 'hex'),
             b4a.from(addAdminMessage.rao.txv, 'hex'),
             b4a.from(addAdminMessage.rao.iw, 'hex'),
             b4a.from(addAdminMessage.rao.in, 'hex'),
             b4a.from(addAdminMessage.rao.is, 'hex')
-        )
-    await writer.msb.state.append(rawTx)
+        );
+    await writer.msb.state.append(safeEncodeApplyOperation(rawPayload))
     await tryToSyncWriters(writer, indexer1, indexer2, newAdmin);
     const adminEntryAfter = decodeAdmin(await writer.msb.state.get(EntryType.ADMIN), config.addressPrefix); // check if the admin entry was added successfully in the base
     k.ok(adminEntryAfter, 'Result should not be null');

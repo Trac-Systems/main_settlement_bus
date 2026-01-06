@@ -1,7 +1,7 @@
 import b4a from 'b4a';
 import PeerWallet from 'trac-wallet';
 import { deriveIndexerSequenceState, eventFlush } from '../../../../helpers/autobaseTestHelpers.js';
-import CompleteStateMessageOperations from '../../../../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
+import { applyStateMessageFactory } from '../../../../../src/messages/state/applyStateMessageFactory.js';
 import nodeEntryUtils, { ZERO_LICENSE } from '../../../../../src/core/state/utils/nodeEntry.js';
 import addressUtils from '../../../../../src/core/state/utils/address.js';
 import lengthEntryUtils from '../../../../../src/core/state/utils/lengthEntry.js';
@@ -62,9 +62,9 @@ export async function buildBanValidatorPayload(
 	/* cover tests */
 ) {
 	const txValidity = await deriveIndexerSequenceState(adminPeer.base);
-	return new CompleteStateMessageOperations(adminPeer.wallet, config).assembleBanWriterMessage(
-		validatorPeer.wallet.address,
-		txValidity
+	return safeEncodeApplyOperation(
+		await applyStateMessageFactory(adminPeer.wallet, config)
+			.buildCompleteBanWriterMessage(adminPeer.wallet.address, validatorPeer.wallet.address, txValidity)
 	);
 }
 
@@ -73,9 +73,9 @@ export async function buildBanValidatorPayloadWithTxValidity(
 	mutatedTxValidity,
 	{ adminPeer = context.adminBootstrap, validatorPeer = selectWriterPeer(context) } = {}
 ) {
-	return new CompleteStateMessageOperations(adminPeer.wallet, config).assembleBanWriterMessage(
-		validatorPeer.wallet.address,
-		mutatedTxValidity
+	return safeEncodeApplyOperation(
+		await applyStateMessageFactory(adminPeer.wallet, config)
+			.buildCompleteBanWriterMessage(adminPeer.wallet.address, validatorPeer.wallet.address, mutatedTxValidity)
 	);
 }
 
@@ -339,11 +339,10 @@ export async function promoteValidatorToIndexer(
     { adminPeer = context.adminBootstrap, validatorPeer = selectWriterPeer(context) } = {}
 ) {
     const txValidity = await deriveIndexerSequenceState(adminPeer.base);
-    const payload = await new CompleteStateMessageOperations(adminPeer.wallet, config)
-        .assembleAddIndexerMessage(
-            validatorPeer.wallet.address,
-            txValidity
-        );
+    const payload = safeEncodeApplyOperation(
+        await applyStateMessageFactory(adminPeer.wallet, config)
+            .buildCompleteAddIndexerMessage(adminPeer.wallet.address, validatorPeer.wallet.address, txValidity)
+    );
 
 	await adminPeer.base.append(payload);
 	await adminPeer.base.update();

@@ -6,8 +6,8 @@ import PartialOperation from './base/PartialOperation.js';
 class PartialTransaction extends PartialOperation {
     #config
 
-    constructor(state, wallet, config) {
-        super(state, wallet, config);
+    constructor(state, selfAddress, config) {
+        super(state, selfAddress, config);
         this.#config = config
     }
 

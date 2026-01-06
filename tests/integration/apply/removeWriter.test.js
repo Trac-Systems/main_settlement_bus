@@ -19,31 +19,33 @@ import {
     testKeyPair5,
     testKeyPair6
 } from '../../fixtures/apply.fixtures.js';
-import CompleteStateMessageOperations from '../../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
-import PartialStateMessageOperations from '../../../src/messages/partialStateMessages/PartialStateMessageOperations.js';
+import { applyStateMessageFactory } from '../../../src/messages/state/applyStateMessageFactory.js';
+import { safeEncodeApplyOperation } from '../../../src/utils/protobuf/operationHelpers.js';
 import { config } from '../../helpers/config.js';
 
 let admin, writer1, writer2, writer3, writer4, indexer, tmpDirectory;
 
 const sendRemoveWriter = async (invoker, broadcaster) => {
     const validity = await invoker.msb.state.getIndexerSequenceState()
-    const writerRemoval = await new PartialStateMessageOperations(invoker.wallet, config)
-        .assembleRemoveWriterMessage(
+    const writerRemoval = await applyStateMessageFactory(invoker.wallet, config)
+        .buildPartialRemoveWriterMessage(
+            invoker.wallet.address,
             b4a.toString(invoker.msb.state.writingKey, 'hex'),
-            b4a.toString(validity, 'hex')
+            b4a.toString(validity, 'hex'),
+            'json'
         );
 
-    const raw = await new CompleteStateMessageOperations(broadcaster.wallet, config)
-        .assembleRemoveWriterMessage(
+    const rawPayload = await applyStateMessageFactory(broadcaster.wallet, config)
+        .buildCompleteRemoveWriterMessage(
             writerRemoval.address,
             b4a.from(writerRemoval.rao.tx, 'hex'),
             b4a.from(writerRemoval.rao.txv, 'hex'),
             b4a.from(writerRemoval.rao.iw, 'hex'),
             b4a.from(writerRemoval.rao.in, 'hex'),
             b4a.from(writerRemoval.rao.is, 'hex'),
-        )
+        );
 
-    return await broadcaster.msb.state.append(raw)
+    return await broadcaster.msb.state.append(safeEncodeApplyOperation(rawPayload))
 }
 
 hook('Initialize nodes for removeWriter tests', async () => {

@@ -3,48 +3,47 @@ syntax = "proto3";
 package network.v1;
 
 enum MessageType {
-    UNKNOWN = 0;
-    VALIDATOR_CONNECTION_REQUEST = 1;
-    VALIDATOR_CONNECTION_RESPONSE = 2;
-    LIVENESS_REQUEST = 3;
-    LIVENESS_RESPONSE = 4;
-    BROADCAST_TRANSACTION_REQUEST = 5;
-    BROADCAST_TRANSACTION_RESPONSE = 6;
+    MESSAGE_TYPE_UNSPECIFIED = 0;
+    MESSAGE_TYPE_VALIDATOR_CONNECTION_REQUEST = 1;
+    MESSAGE_TYPE_VALIDATOR_CONNECTION_RESPONSE = 2;
+    MESSAGE_TYPE_LIVENESS_REQUEST = 3;
+    MESSAGE_TYPE_LIVENESS_RESPONSE = 4;
+    MESSAGE_TYPE_BROADCAST_TRANSACTION_REQUEST = 5;
+    MESSAGE_TYPE_BROADCAST_TRANSACTION_RESPONSE = 6;
 }
 
 enum ResultCode {
-    OK = 0;
-    INVALID_PAYLOAD = 1;
-    UNSUPPORTED_VERSION = 2;
-    RATE_LIMITED = 3;
-    TIMEOUT = 4;
-    SIGNATURE_INVALID = 5;
+    RESULT_CODE_UNSPECIFIED = 0;
+    RESULT_CODE_OK = 1;
+    RESULT_CODE_INVALID_PAYLOAD = 2;
+    RESULT_CODE_UNSUPPORTED_VERSION = 3;
+    RESULT_CODE_RATE_LIMITED = 4;
+    RESULT_CODE_TIMEOUT = 5;
+    RESULT_CODE_SIGNATURE_INVALID = 6;
 }
 
 message ValidatorConnectionRequest {
-    bytes issuer_address = 1;
+    string issuer_address = 1;
     bytes nonce = 2;
     bytes signature = 3;
 }
 
 message ValidatorConnectionResponse {
-    bytes issuer_address = 1;
+    string issuer_address = 1;
     bytes nonce = 2;
-    bytes signature = 5;
+    bytes signature = 3;
     ResultCode result = 4;
 }
 
 message LivenessRequest {
-    string data = 1;
-    bytes nonce = 2;
-    bytes signature = 3;
+    bytes nonce = 1;
+    bytes signature = 2;
 }
 
 message LivenessResponse {
-    string data = 1;
-    bytes nonce = 2;
-    bytes signature = 3;
-    ResultCode result = 4;
+    bytes nonce = 1;
+    bytes signature = 2;
+    ResultCode result = 3;
 }
 
 message BroadcastTransactionRequest {
@@ -54,10 +53,9 @@ message BroadcastTransactionRequest {
 }
 
 message BroadcastTransactionResponse {
-    bytes data = 1;
-    bytes nonce = 2;
-    bytes signature = 3;
-    ResultCode result = 4;
+    bytes nonce = 1;
+    bytes signature = 2;
+    ResultCode result = 3;
 }
 
 message MessageHeader {
@@ -72,5 +70,5 @@ message MessageHeader {
         BroadcastTransactionRequest           broadcast_transaction_request = 8;
         BroadcastTransactionResponse          broadcast_transaction_response = 9;
     }
-    repeated string capabilities = 10; // maybe ["binary", "hb:v1"]
+    repeated string capabilities = 10;
 }

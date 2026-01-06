@@ -52,7 +52,7 @@ export async function handleConfirmedLength({ msbInstance, respond }) {
     respond(200, { confirmed_length });
 }
 
-export async function handleBroadcastTransaction({ msbInstance, respond, req }) {
+export async function handleBroadcastTransaction({ msbInstance, config, respond, req }) {
     let body = '';
     req.on('data', chunk => {
         body += chunk.toString();
@@ -72,7 +72,7 @@ export async function handleBroadcastTransaction({ msbInstance, respond, req }) 
             const decodedPayload = decodeBase64Payload(payload);
             validatePayloadStructure(decodedPayload);
             const sanitizedPayload = sanitizeTransferPayload(decodedPayload);
-            const result = await broadcastTransaction(msbInstance, sanitizedPayload);
+            const result = await broadcastTransaction(msbInstance, config, sanitizedPayload);
             respond(200, { result });
         } catch (error) {
             let code = error instanceof SyntaxError ? 400 : 500;

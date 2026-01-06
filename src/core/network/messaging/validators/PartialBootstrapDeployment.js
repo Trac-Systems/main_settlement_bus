@@ -1,8 +1,8 @@
 import PartialOperation from './base/PartialOperation.js';
 
 class PartialBootstrapDeployment extends PartialOperation {
-    constructor(state, wallet , config) {
-        super(state, wallet , config);
+    constructor(state, selfAddress , config) {
+        super(state, selfAddress , config);
     }
 
     async validate(payload) {
