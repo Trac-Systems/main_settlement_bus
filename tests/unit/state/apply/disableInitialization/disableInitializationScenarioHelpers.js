@@ -6,7 +6,7 @@ import {
 	deriveIndexerSequenceState,
 	eventFlush
 } from '../../../../helpers/autobaseTestHelpers.js';
-import CompleteStateMessageOperations from '../../../../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
+import { applyStateMessageFactory } from '../../../../../src/messages/state/applyStateMessageFactory.js';
 import { AUTOBASE_VALUE_ENCODING, EntryType } from '../../../../../src/utils/constants.js';
 import { safeDecodeApplyOperation, safeEncodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
 import { safeWriteUInt32BE } from '../../../../../src/utils/buffer.js';
@@ -55,20 +55,26 @@ export async function buildDisableInitializationPayload(context) {
 	const adminNode = context.adminBootstrap;
 	const txValidity = await deriveIndexerSequenceState(adminNode.base);
 
-    return new CompleteStateMessageOperations(adminNode.wallet, config)
-        .assembleDisableInitializationMessage(
-            adminNode.base.local.key,
-            txValidity
-        );
+	return safeEncodeApplyOperation(
+		await applyStateMessageFactory(adminNode.wallet, config)
+			.buildCompleteDisableInitializationMessage(
+				adminNode.wallet.address,
+				adminNode.base.local.key,
+				txValidity
+			)
+	);
 }
 
 export async function buildDisableInitializationPayloadWithTxValidity(context, txValidity) {
 	const adminNode = context.adminBootstrap;
-    return new CompleteStateMessageOperations(adminNode.wallet, config)
-        .assembleDisableInitializationMessage(
-            adminNode.base.local.key,
-            txValidity
-        );
+	return safeEncodeApplyOperation(
+		await applyStateMessageFactory(adminNode.wallet, config)
+			.buildCompleteDisableInitializationMessage(
+				adminNode.wallet.address,
+				adminNode.base.local.key,
+				txValidity
+			)
+	);
 }
 
 export async function assertInitializationDisabledState(t, base, payload) {

@@ -1,6 +1,5 @@
 import b4a from 'b4a';
-import PartialStateMessageOperations from '../../../../../src/messages/partialStateMessages/PartialStateMessageOperations.js';
-import CompleteStateMessageOperations from '../../../../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
+import { applyStateMessageFactory } from '../../../../../src/messages/state/applyStateMessageFactory.js';
 import { deriveIndexerSequenceState } from '../../../../helpers/autobaseTestHelpers.js';
 import {
 	setupAdminNetwork,
@@ -109,15 +108,17 @@ export async function buildBootstrapDeploymentPayload(context, options = {}) {
 		context.bootstrapDeployment?.txValidity ??
 		(await deriveIndexerSequenceState(validatorPeer.base));
 
-    const partial = await new PartialStateMessageOperations(deployerPeer.wallet, config)
-        .assembleBootstrapDeploymentMessage(
+    const partial = await applyStateMessageFactory(deployerPeer.wallet, config)
+        .buildPartialBootstrapDeploymentMessage(
+            deployerPeer.wallet.address,
             externalBootstrap.toString('hex'),
             channel.toString('hex'),
-            txValidity.toString('hex')
+            txValidity.toString('hex'),
+            'json'
         );
 
-    return new CompleteStateMessageOperations(validatorPeer.wallet, config)
-        .assembleCompleteBootstrapDeployment(
+    const payload = await applyStateMessageFactory(validatorPeer.wallet, config)
+        .buildCompleteBootstrapDeploymentMessage(
 		partial.address,
             b4a.from(partial.bdo.tx, 'hex'),
             b4a.from(partial.bdo.txv, 'hex'),
@@ -126,6 +127,7 @@ export async function buildBootstrapDeploymentPayload(context, options = {}) {
             b4a.from(partial.bdo.in, 'hex'),
             b4a.from(partial.bdo.is, 'hex')
         );
+    return safeEncodeApplyOperation(payload);
 }
 
 export async function buildBootstrapDeploymentPayloadWithTxValidity(context, txValidity, options = {}) {

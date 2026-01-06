@@ -7,7 +7,7 @@ async function runTests() {
 	await import('./network/networkModule.test.js')
 	await import('./state/stateModule.test.js');
 	await import('./utils/utils.test.js');
-	// await import('./messageOperations/stateMessageOperations.test.js'); // Broken test - needs fixing
+	await import('./messages/messages.test.js');
 	test.resume();
 }
 

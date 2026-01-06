@@ -15,8 +15,8 @@ const rpc = {
 }
 
 const options = args.includes('--rpc') ? rpc : { storeName }
-
-const msb = new MainSettlementBus(createConfig(ENV.MAINNET, options));
+const config = createConfig(ENV.MAINNET, options)
+const msb = new MainSettlementBus(config);
 
 msb.ready().then(async () => {
     if (runRpc) {
@@ -25,7 +25,7 @@ msb.ready().then(async () => {
         const port = (portIndex !== -1 && args[portIndex + 1]) ? parseInt(args[portIndex + 1], 10) : 5000;
         const hostIndex = args.indexOf('--host');
         const host = (hostIndex !== -1 && args[hostIndex + 1]) ? args[hostIndex + 1] : 'localhost';
-        startRpcServer(msb, host, port);
+        startRpcServer(msb, config , host, port);
     } else {
         console.log('RPC server will not be started.');
         msb.interactiveMode();

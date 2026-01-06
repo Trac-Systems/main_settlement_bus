@@ -5,7 +5,8 @@ import {
 } from '../../../../helpers/autobaseTestHelpers.js';
 import nodeEntryUtils from '../../../../../src/core/state/utils/nodeEntry.js';
 import { toTerm } from '../../../../../src/core/state/utils/balance.js';
-import CompleteStateMessageOperations from '../../../../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
+import { applyStateMessageFactory } from '../../../../../src/messages/state/applyStateMessageFactory.js';
+import { safeEncodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
 import { setupAddAdminScenario, assertAdminState } from './addAdminScenarioHelpers.js';
 import { config } from '../../../../helpers/config.js';
 
@@ -17,11 +18,14 @@ export default function addAdminHappyPathScenario() {
 		const reader = readerNodes[0];
 
 		const txValidity = await deriveIndexerSequenceState(adminNode.base);
-        const addAdminPayload = await new CompleteStateMessageOperations(adminNode.wallet, config)
-            .assembleAddAdminMessage(
-                adminNode.base.local.key,
-                txValidity
-            );
+		const addAdminPayload = safeEncodeApplyOperation(
+			await applyStateMessageFactory(adminNode.wallet, config)
+				.buildCompleteAddAdminMessage(
+					adminNode.wallet.address,
+					adminNode.base.local.key,
+					txValidity
+				)
+		);
 
 		await adminNode.base.append(addAdminPayload);
 		await adminNode.base.update();

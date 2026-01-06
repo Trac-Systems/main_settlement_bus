@@ -1,5 +1,5 @@
 import b4a from "b4a"
-import { operationToPayload } from "../../src/utils/operations.js"
+import { operationToPayload } from "../../src/utils/applyOperations.js"
 export function decodeBase64Payload(base64) {
 	let decodedPayloadString
 	try {

@@ -9,7 +9,8 @@ import {
     tryToSyncWriters
 } from '../../helpers/setupApplyTests.js';
 import { randomBytes } from '../../helpers/setupApplyTests.js';
-import CompleteStateMessageOperations from '../../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
+import { applyStateMessageFactory } from '../../../src/messages/state/applyStateMessageFactory.js';
+import { safeEncodeApplyOperation } from '../../../src/utils/protobuf/operationHelpers.js';
 
 import { testKeyPair1, testKeyPair2, testKeyPair3, testKeyPair4 } from '../../fixtures/apply.fixtures.js';
 import { sleep } from '../../../src/utils/helpers.js';
@@ -41,8 +42,10 @@ hook('Initialize nodes for banValidator tests', async () => {
 
 test('handleApplyBanValidatorOperation (apply) - Append banValidator payload - ban indexer', async t => {
     const validity = await admin.msb.state.getIndexerSequenceState()
-    const assembledBanWriter = await new CompleteStateMessageOperations(admin.wallet, config)
-        .assembleBanWriterMessage(indexer.wallet.address, validity);
+    const assembledBanWriter = safeEncodeApplyOperation(
+        await applyStateMessageFactory(admin.wallet, config)
+            .buildCompleteBanWriterMessage(admin.wallet.address, indexer.wallet.address, validity)
+    );
     await admin.msb.state.append(assembledBanWriter);
     await tryToSyncWriters(admin, indexer, writer1, writer2);
 
@@ -56,8 +59,10 @@ test('handleApplyBanValidatorOperation (apply) - Append banValidator payload - b
 
 test('handleApplyBanValidatorOperation (apply) - Append banValidator payload into the base by non-admin node', async t => {
     const validity = await admin.msb.state.getIndexerSequenceState()
-    const assembledBanWriter = await new CompleteStateMessageOperations(writer1.wallet, config)
-        .assembleBanWriterMessage(writer2.wallet.address, validity);
+    const assembledBanWriter = safeEncodeApplyOperation(
+        await applyStateMessageFactory(writer1.wallet, config)
+            .buildCompleteBanWriterMessage(writer1.wallet.address, writer2.wallet.address, validity)
+    );
     await writer1.msb.state.append(assembledBanWriter);
     await sleep(5000); // wait for both peers to sync state
     await tryToSyncWriters(admin);
@@ -71,8 +76,10 @@ test('handleApplyBanValidatorOperation (apply) - Append banValidator payload int
 
 test('handleApplyBanValidatorOperation (apply) - Append banValidator payload into the base - happy path', async t => {
     const validity = await admin.msb.state.getIndexerSequenceState()
-    const assembledBanWriter = await new CompleteStateMessageOperations(admin.wallet, config)
-        .assembleBanWriterMessage(writer1.wallet.address, validity);
+    const assembledBanWriter = safeEncodeApplyOperation(
+        await applyStateMessageFactory(admin.wallet, config)
+            .buildCompleteBanWriterMessage(admin.wallet.address, writer1.wallet.address, validity)
+    );
     await admin.msb.state.append(assembledBanWriter);
     await sleep(5000); // wait for both peers to sync state
 
@@ -85,16 +92,20 @@ test('handleApplyBanValidatorOperation (apply) - Append banValidator payload int
 
 test('handleApplyBanValidatorOperation (apply) - Append banValidator payload into the base - idempotence', async t => {
     const validity = await admin.msb.state.getIndexerSequenceState()
-    const assembledBanWriter = await new CompleteStateMessageOperations(admin.wallet, config)
-        .assembleBanWriterMessage(writer2.wallet.address, validity);
+    const assembledBanWriter = safeEncodeApplyOperation(
+        await applyStateMessageFactory(admin.wallet, config)
+            .buildCompleteBanWriterMessage(admin.wallet.address, writer2.wallet.address, validity)
+    );
     await admin.msb.state.append(assembledBanWriter);
     await sleep(5000); // wait for both peers to sync state
 
     const nodeInfo = await writer2.msb.state.getNodeEntry(writer2.wallet.address);
 
     const validity2 = await admin.msb.state.getIndexerSequenceState()
-    const assembledBanWriter2 = await new CompleteStateMessageOperations(admin.wallet, config)
-        .assembleBanWriterMessage(writer2.wallet.address, validity2);
+    const assembledBanWriter2 = safeEncodeApplyOperation(
+        await applyStateMessageFactory(admin.wallet, config)
+            .buildCompleteBanWriterMessage(admin.wallet.address, writer2.wallet.address, validity2)
+    );
     await admin.msb.state.append(assembledBanWriter2);
     await sleep(5000); // wait for both peers to sync state
 

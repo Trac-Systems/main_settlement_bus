@@ -4,7 +4,8 @@ import {
     tryToSyncWriters
 } from '../../../helpers/setupApplyTests.js';
 import {randomBytes} from '../../../helpers/setupApplyTests.js';
-import CompleteStateMessageOperations from '../../../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
+import { applyStateMessageFactory } from '../../../../src/messages/state/applyStateMessageFactory.js';
+import { safeEncodeApplyOperation } from '../../../../src/utils/protobuf/operationHelpers.js';
 import { config } from '../../../helpers/config.js';
 import {testKeyPair1} from '../../../fixtures/apply.fixtures.js';
 import b4a from 'b4a';
@@ -18,11 +19,14 @@ let randomChannel;
 
 const sendAddAdmin = async (invoker) => {
     const validity = b4a.from(await admin.msb.state.getIndexerSequenceState(), 'hex')
-    const addAdminMessage = await new CompleteStateMessageOperations(admin.wallet, config)
-        .assembleAddAdminMessage(
-            admin.msb.state.writingKey,
-            validity
-        );
+    const addAdminMessage = safeEncodeApplyOperation(
+        await applyStateMessageFactory(admin.wallet, config)
+            .buildCompleteAddAdminMessage(
+                admin.wallet.address,
+                admin.msb.state.writingKey,
+                validity
+            )
+    );
 
     // add admin to base
     await invoker.msb.state.append(addAdminMessage); // Send `add admin` request to apply function

@@ -12,22 +12,23 @@ var varint = encodings.varint
 var skip = encodings.skip
 
 exports.MessageType = {
-  "UNKNOWN": 0,
-  "VALIDATOR_CONNECTION_REQUEST": 1,
-  "VALIDATOR_CONNECTION_RESPONSE": 2,
-  "LIVENESS_REQUEST": 3,
-  "LIVENESS_RESPONSE": 4,
-  "BROADCAST_TRANSACTION_REQUEST": 5,
-  "BROADCAST_TRANSACTION_RESPONSE": 6
+  "MESSAGE_TYPE_UNSPECIFIED": 0,
+  "MESSAGE_TYPE_VALIDATOR_CONNECTION_REQUEST": 1,
+  "MESSAGE_TYPE_VALIDATOR_CONNECTION_RESPONSE": 2,
+  "MESSAGE_TYPE_LIVENESS_REQUEST": 3,
+  "MESSAGE_TYPE_LIVENESS_RESPONSE": 4,
+  "MESSAGE_TYPE_BROADCAST_TRANSACTION_REQUEST": 5,
+  "MESSAGE_TYPE_BROADCAST_TRANSACTION_RESPONSE": 6
 }
 
 exports.ResultCode = {
-  "OK": 0,
-  "INVALID_PAYLOAD": 1,
-  "UNSUPPORTED_VERSION": 2,
-  "RATE_LIMITED": 3,
-  "TIMEOUT": 4,
-  "SIGNATURE_INVALID": 5
+  "RESULT_CODE_UNSPECIFIED": 0,
+  "RESULT_CODE_OK": 1,
+  "RESULT_CODE_INVALID_PAYLOAD": 2,
+  "RESULT_CODE_UNSUPPORTED_VERSION": 3,
+  "RESULT_CODE_RATE_LIMITED": 4,
+  "RESULT_CODE_TIMEOUT": 5,
+  "RESULT_CODE_SIGNATURE_INVALID": 6
 }
 
 var ValidatorConnectionRequest = exports.ValidatorConnectionRequest = {
@@ -95,7 +96,7 @@ function defineValidatorConnectionRequest () {
   function encodingLength (obj) {
     var length = 0
     if (defined(obj.issuer_address)) {
-      var len = encodings.bytes.encodingLength(obj.issuer_address)
+      var len = encodings.string.encodingLength(obj.issuer_address)
       length += 1 + len
     }
     if (defined(obj.nonce)) {
@@ -115,8 +116,8 @@ function defineValidatorConnectionRequest () {
     var oldOffset = offset
     if (defined(obj.issuer_address)) {
       buf[offset++] = 10
-      encodings.bytes.encode(obj.issuer_address, buf, offset)
-      offset += encodings.bytes.encode.bytes
+      encodings.string.encode(obj.issuer_address, buf, offset)
+      offset += encodings.string.encode.bytes
     }
     if (defined(obj.nonce)) {
       buf[offset++] = 18
@@ -138,7 +139,7 @@ function defineValidatorConnectionRequest () {
     if (!(end <= buf.length && offset <= buf.length)) throw new Error("Decoded message is not valid")
     var oldOffset = offset
     var obj = {
-      issuer_address: null,
+      issuer_address: "",
       nonce: null,
       signature: null
     }
@@ -152,8 +153,8 @@ function defineValidatorConnectionRequest () {
       var tag = prefix >> 3
       switch (tag) {
         case 1:
-        obj.issuer_address = encodings.bytes.decode(buf, offset)
-        offset += encodings.bytes.decode.bytes
+        obj.issuer_address = encodings.string.decode(buf, offset)
+        offset += encodings.string.decode.bytes
         break
         case 2:
         obj.nonce = encodings.bytes.decode(buf, offset)
@@ -178,7 +179,7 @@ function defineValidatorConnectionResponse () {
   function encodingLength (obj) {
     var length = 0
     if (defined(obj.issuer_address)) {
-      var len = encodings.bytes.encodingLength(obj.issuer_address)
+      var len = encodings.string.encodingLength(obj.issuer_address)
       length += 1 + len
     }
     if (defined(obj.nonce)) {
@@ -202,8 +203,8 @@ function defineValidatorConnectionResponse () {
     var oldOffset = offset
     if (defined(obj.issuer_address)) {
       buf[offset++] = 10
-      encodings.bytes.encode(obj.issuer_address, buf, offset)
-      offset += encodings.bytes.encode.bytes
+      encodings.string.encode(obj.issuer_address, buf, offset)
+      offset += encodings.string.encode.bytes
     }
     if (defined(obj.nonce)) {
       buf[offset++] = 18
@@ -211,7 +212,7 @@ function defineValidatorConnectionResponse () {
       offset += encodings.bytes.encode.bytes
     }
     if (defined(obj.signature)) {
-      buf[offset++] = 42
+      buf[offset++] = 26
       encodings.bytes.encode(obj.signature, buf, offset)
       offset += encodings.bytes.encode.bytes
     }
@@ -230,7 +231,7 @@ function defineValidatorConnectionResponse () {
     if (!(end <= buf.length && offset <= buf.length)) throw new Error("Decoded message is not valid")
     var oldOffset = offset
     var obj = {
-      issuer_address: null,
+      issuer_address: "",
       nonce: null,
       signature: null,
       result: 0
@@ -245,14 +246,14 @@ function defineValidatorConnectionResponse () {
       var tag = prefix >> 3
       switch (tag) {
         case 1:
-        obj.issuer_address = encodings.bytes.decode(buf, offset)
-        offset += encodings.bytes.decode.bytes
+        obj.issuer_address = encodings.string.decode(buf, offset)
+        offset += encodings.string.decode.bytes
         break
         case 2:
         obj.nonce = encodings.bytes.decode(buf, offset)
         offset += encodings.bytes.decode.bytes
         break
-        case 5:
+        case 3:
         obj.signature = encodings.bytes.decode(buf, offset)
         offset += encodings.bytes.decode.bytes
         break
@@ -274,10 +275,6 @@ function defineLivenessRequest () {
 
   function encodingLength (obj) {
     var length = 0
-    if (defined(obj.data)) {
-      var len = encodings.string.encodingLength(obj.data)
-      length += 1 + len
-    }
     if (defined(obj.nonce)) {
       var len = encodings.bytes.encodingLength(obj.nonce)
       length += 1 + len
@@ -293,18 +290,13 @@ function defineLivenessRequest () {
     if (!offset) offset = 0
     if (!buf) buf = b4a.allocUnsafe(encodingLength(obj))
     var oldOffset = offset
-    if (defined(obj.data)) {
-      buf[offset++] = 10
-      encodings.string.encode(obj.data, buf, offset)
-      offset += encodings.string.encode.bytes
-    }
     if (defined(obj.nonce)) {
-      buf[offset++] = 18
+      buf[offset++] = 10
       encodings.bytes.encode(obj.nonce, buf, offset)
       offset += encodings.bytes.encode.bytes
     }
     if (defined(obj.signature)) {
-      buf[offset++] = 26
+      buf[offset++] = 18
       encodings.bytes.encode(obj.signature, buf, offset)
       offset += encodings.bytes.encode.bytes
     }
@@ -318,7 +310,6 @@ function defineLivenessRequest () {
     if (!(end <= buf.length && offset <= buf.length)) throw new Error("Decoded message is not valid")
     var oldOffset = offset
     var obj = {
-      data: "",
       nonce: null,
       signature: null
     }
@@ -332,14 +323,10 @@ function defineLivenessRequest () {
       var tag = prefix >> 3
       switch (tag) {
         case 1:
-        obj.data = encodings.string.decode(buf, offset)
-        offset += encodings.string.decode.bytes
-        break
-        case 2:
         obj.nonce = encodings.bytes.decode(buf, offset)
         offset += encodings.bytes.decode.bytes
         break
-        case 3:
+        case 2:
         obj.signature = encodings.bytes.decode(buf, offset)
         offset += encodings.bytes.decode.bytes
         break
@@ -357,10 +344,6 @@ function defineLivenessResponse () {
 
   function encodingLength (obj) {
     var length = 0
-    if (defined(obj.data)) {
-      var len = encodings.string.encodingLength(obj.data)
-      length += 1 + len
-    }
     if (defined(obj.nonce)) {
       var len = encodings.bytes.encodingLength(obj.nonce)
       length += 1 + len
@@ -380,23 +363,18 @@ function defineLivenessResponse () {
     if (!offset) offset = 0
     if (!buf) buf = b4a.allocUnsafe(encodingLength(obj))
     var oldOffset = offset
-    if (defined(obj.data)) {
-      buf[offset++] = 10
-      encodings.string.encode(obj.data, buf, offset)
-      offset += encodings.string.encode.bytes
-    }
     if (defined(obj.nonce)) {
-      buf[offset++] = 18
+      buf[offset++] = 10
       encodings.bytes.encode(obj.nonce, buf, offset)
       offset += encodings.bytes.encode.bytes
     }
     if (defined(obj.signature)) {
-      buf[offset++] = 26
+      buf[offset++] = 18
       encodings.bytes.encode(obj.signature, buf, offset)
       offset += encodings.bytes.encode.bytes
     }
     if (defined(obj.result)) {
-      buf[offset++] = 32
+      buf[offset++] = 24
       encodings.enum.encode(obj.result, buf, offset)
       offset += encodings.enum.encode.bytes
     }
@@ -410,7 +388,6 @@ function defineLivenessResponse () {
     if (!(end <= buf.length && offset <= buf.length)) throw new Error("Decoded message is not valid")
     var oldOffset = offset
     var obj = {
-      data: "",
       nonce: null,
       signature: null,
       result: 0
@@ -425,18 +402,14 @@ function defineLivenessResponse () {
       var tag = prefix >> 3
       switch (tag) {
         case 1:
-        obj.data = encodings.string.decode(buf, offset)
-        offset += encodings.string.decode.bytes
-        break
-        case 2:
         obj.nonce = encodings.bytes.decode(buf, offset)
         offset += encodings.bytes.decode.bytes
         break
-        case 3:
+        case 2:
         obj.signature = encodings.bytes.decode(buf, offset)
         offset += encodings.bytes.decode.bytes
         break
-        case 4:
+        case 3:
         obj.result = encodings.enum.decode(buf, offset)
         offset += encodings.enum.decode.bytes
         break
@@ -537,10 +510,6 @@ function defineBroadcastTransactionResponse () {
 
   function encodingLength (obj) {
     var length = 0
-    if (defined(obj.data)) {
-      var len = encodings.bytes.encodingLength(obj.data)
-      length += 1 + len
-    }
     if (defined(obj.nonce)) {
       var len = encodings.bytes.encodingLength(obj.nonce)
       length += 1 + len
@@ -560,23 +529,18 @@ function defineBroadcastTransactionResponse () {
     if (!offset) offset = 0
     if (!buf) buf = b4a.allocUnsafe(encodingLength(obj))
     var oldOffset = offset
-    if (defined(obj.data)) {
-      buf[offset++] = 10
-      encodings.bytes.encode(obj.data, buf, offset)
-      offset += encodings.bytes.encode.bytes
-    }
     if (defined(obj.nonce)) {
-      buf[offset++] = 18
+      buf[offset++] = 10
       encodings.bytes.encode(obj.nonce, buf, offset)
       offset += encodings.bytes.encode.bytes
     }
     if (defined(obj.signature)) {
-      buf[offset++] = 26
+      buf[offset++] = 18
       encodings.bytes.encode(obj.signature, buf, offset)
       offset += encodings.bytes.encode.bytes
     }
     if (defined(obj.result)) {
-      buf[offset++] = 32
+      buf[offset++] = 24
       encodings.enum.encode(obj.result, buf, offset)
       offset += encodings.enum.encode.bytes
     }
@@ -590,7 +554,6 @@ function defineBroadcastTransactionResponse () {
     if (!(end <= buf.length && offset <= buf.length)) throw new Error("Decoded message is not valid")
     var oldOffset = offset
     var obj = {
-      data: null,
       nonce: null,
       signature: null,
       result: 0
@@ -605,18 +568,14 @@ function defineBroadcastTransactionResponse () {
       var tag = prefix >> 3
       switch (tag) {
         case 1:
-        obj.data = encodings.bytes.decode(buf, offset)
-        offset += encodings.bytes.decode.bytes
-        break
-        case 2:
         obj.nonce = encodings.bytes.decode(buf, offset)
         offset += encodings.bytes.decode.bytes
         break
-        case 3:
+        case 2:
         obj.signature = encodings.bytes.decode(buf, offset)
         offset += encodings.bytes.decode.bytes
         break
-        case 4:
+        case 3:
         obj.result = encodings.enum.decode(buf, offset)
         offset += encodings.enum.decode.bytes
         break

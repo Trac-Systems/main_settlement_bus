@@ -44,6 +44,14 @@ export function normalizeTransferOperation(payload, config) {
     };
 }
 
+/**
+ * Normalizes the payload for a transaction operation.
+ * This is useful for validating and assembling a transaction operation.
+ *
+ * @param {Object} payload The raw payload for the transaction operation.
+ * @param {object} config The environment configuration object.
+ * @returns {Object} A normalized payload with addresses converted to buffers and hex values normalized.
+ */
 export function normalizeTransactionOperation(payload, config) {
     if (!payload || typeof payload !== 'object' || !payload.txo) {
         throw new Error('Invalid payload for transaction operation normalization.');
@@ -80,8 +88,9 @@ export function normalizeTransactionOperation(payload, config) {
  * Normalizes an operation payload by converting any Buffer values to hex strings.
  * This is useful for preparing a payload to be returned as a JSON response.
  *
- * @param {Object} payload The decoded transaction payload.
- * @returns {Object} A new object with Buffer values converted to hex strings.
+ * @param {Object} payload The raw payload for the role access operation.
+ * @param {object} config The environment configuration object.
+ * @returns {Object} A normalized payload with addresses converted to buffers and hex values normalized.
  */
 export function normalizeDecodedPayloadForJson(payload, config) {
     if (!payload || typeof payload !== "object") {
@@ -116,4 +125,77 @@ export function normalizeDecodedPayloadForJson(payload, config) {
         }
     }
     return newPayload;
+}
+
+/**
+ * Normalizes the payload for a role access operation.
+ * This is useful for validating and assembling a role access operation.
+ *
+ * @param {Object} payload The raw payload for the role access operation.
+ * @param {object} config The environment configuration object.
+ * @returns {Object} A normalized payload with addresses converted to buffers and hex values normalized.
+ */
+export function normalizeRoleAccessOperation(payload, config) {
+    if (!payload || typeof payload !== 'object' || !payload.rao) {
+        throw new Error('Invalid payload for role access normalization.');
+    }
+    const { type, address, rao } = payload;
+    if (
+        !type ||
+        !address ||
+        !rao.tx || !rao.txv || !rao.iw || !rao.in || !rao.is
+    ) {
+        throw new Error('Missing required fields in role access payload.');
+    }
+
+    const normalizedRao = {
+        tx: normalizeHex(rao.tx),
+        txv: normalizeHex(rao.txv),
+        iw: normalizeHex(rao.iw),
+        in: normalizeHex(rao.in),
+        is: normalizeHex(rao.is)
+    };
+
+    return {
+        type,
+        address: addressToBuffer(address, config.addressPrefix),
+        rao: normalizedRao
+    };
+}
+
+/**
+ * Normalizes the payload for a bootstrap deployment operation.
+ * This is useful for validating and assembling a bootstrap deployment operation.
+ *
+ * @param {Object} payload The raw payload for the bootstrap deployment operation.
+ * @param {object} config The environment configuration object.
+ * @returns {Object} A normalized payload with addresses converted to buffers and hex values normalized.
+ */
+export function normalizeBootstrapDeploymentOperation(payload, config) {
+    if (!payload || typeof payload !== 'object' || !payload.bdo) {
+        throw new Error('Invalid payload for bootstrap deployment normalization.');
+    }
+    const { type, address, bdo } = payload;
+    if (
+        type !== OperationType.BOOTSTRAP_DEPLOYMENT ||
+        !address ||
+        !bdo.tx || !bdo.bs || !bdo.ic || !bdo.in || !bdo.is || !bdo.txv
+    ) {
+        throw new Error('Missing required fields in bootstrap deployment payload.');
+    }
+
+    const normalizedBdo = {
+        tx: normalizeHex(bdo.tx),   // Transaction hash
+        txv: normalizeHex(bdo.txv), // Transaction validity
+        bs: normalizeHex(bdo.bs),   // External bootstrap
+        ic: normalizeHex(bdo.ic),   // Channel
+        in: normalizeHex(bdo.in),   // Nonce
+        is: normalizeHex(bdo.is)    // Signature
+    };
+
+    return {
+        type,
+        address: addressToBuffer(address, config.addressPrefix),
+        bdo: normalizedBdo
+    };
 }

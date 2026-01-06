@@ -1,7 +1,7 @@
 import PeerWallet from 'trac-wallet';
 import b4a from 'b4a';
 
-export class NetworkWalletFactory {
+class NetworkWalletFactory {
     static provide(options = {}) {
         const {
             enableWallet,
@@ -28,7 +28,7 @@ export class NetworkWalletFactory {
 // TODO: Once Wallet class in trac-wallet exposes a constructor/factory that accepts an existing keyPair
 // (e.g. Wallet.fromKeyPair({ publicKey, secretKey }, networkPrefix)), replace EphemeralWallet
 // with a thin wrapper around that functionality instead of duplicating signing/verification logic.
-class EphemeralWallet {
+export class EphemeralWallet {
     #publicKey;
     #secretKey;
     #address;

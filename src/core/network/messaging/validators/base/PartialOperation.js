@@ -7,7 +7,7 @@ import {OperationType} from "../../../../../utils/constants.js";
 import {blake3Hash} from "../../../../../utils/crypto.js";
 import {bufferToBigInt} from "../../../../../utils/amountSerialization.js";
 import {FEE} from "../../../../state/utils/transaction.js";
-import * as operationsUtils from '../../../../../utils/operations.js';
+import * as operationsUtils from '../../../../../utils/applyOperations.js';
 
 const MAX_AMOUNT = BigInt('0xffffffffffffffffffffffffffffffff');
 const FEE_BIGINT = bufferToBigInt(FEE);
@@ -17,15 +17,15 @@ class PartialOperation {
     #state;
     #check;
     #config
-    #wallet
+    #selfAddress
 
-    constructor(state, wallet, config) {
+    constructor(state, selfAddress, config) {
         this.#state = state;
         this.#config = config;
         this.#check = new Check(this.#config);
         this.max_amount = MAX_AMOUNT;
         this.fee = FEE_BIGINT;
-        this.#wallet = wallet;
+        this.#selfAddress = selfAddress;
     }
 
     get state() {
@@ -177,7 +177,7 @@ class PartialOperation {
     isOperationNotCompleted(payload) {
         const operationKey = operationsUtils.operationToPayload(payload.type);
         const operation = payload[operationKey];
-        const {va, vn, vs} = operation;
+        const { va, vn, vs } = operation;
 
         const condition = va === undefined && vn === undefined && vs === undefined
         if (!condition) {
@@ -220,8 +220,10 @@ class PartialOperation {
      * Flow: Validator -> submits tx with tap-wallet -> RPC-> Validator -validates tx-> REJECT (self-validation)
      */
     validateNoSelfValidation(payload) {
+        if (!this.#selfAddress) return;
+
         const requesterAddress = bufferToAddress(payload.address, this.#config.addressPrefix);
-        if (this.#wallet.address === requesterAddress) {
+        if (this.#selfAddress === requesterAddress) {
             throw new Error('Requester address cannot be the same as the validator wallet address.');
         }
     }

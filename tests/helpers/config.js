@@ -1,3 +1,3 @@
 import { createConfig, ENV } from '../../src/config/env.js'
 
-export const config = createConfig(ENV.DEVELOPMENT, {})
+export const config = createConfig(ENV.MAINNET, {})
