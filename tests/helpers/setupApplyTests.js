@@ -11,7 +11,6 @@ import fileUtils from '../../src/utils/fileUtils.js'
 import {EntryType} from '../../src/utils/constants.js';
 import {sleep} from '../../src/utils/helpers.js'
 import {formatIndexersEntry} from '../../src/utils/helpers.js';
-import {blake3Hash} from '../../src/utils/crypto.js';
 import CompleteStateMessageBuilder from '../../src/messages/completeStateMessages/CompleteStateMessageBuilder.js'
 import CompleteStateMessageDirector from '../../src/messages/completeStateMessages/CompleteStateMessageDirector.js'
 import { safeEncodeApplyOperation } from "../../src/utils/protobuf/operationHelpers.js"
@@ -352,7 +351,7 @@ export const generatePostTx = async (writer, externalNode, externalContractBoots
         }
     };
 
-    const contentHash = await blake3Hash(JSON.stringify(testObj));
+    const contentHash = await PeerWallet.blake3(JSON.stringify(testObj));
     const validity = await writer.msb.state.getIndexerSequenceState()
     const tx = await new PartialStateMessageOperations(externalNode.wallet, admin.config)
         .assembleTransactionOperationMessage(

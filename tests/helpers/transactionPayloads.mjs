@@ -1,8 +1,8 @@
 import b4a from "b4a";
 import tracCrypto from "trac-crypto-api";
+import PeerWallet from "trac-wallet";
 import { $TNK } from "../../src/core/state/utils/balance.js";
 import { createMessage } from "../../src/utils/buffer.js";
-import { blake3Hash } from "../../src/utils/crypto.js";
 import { OperationType } from "../../src/utils/constants.js";
 import { addressToBuffer } from "../../src/core/state/utils/address.js";
 import { config } from '../helpers/config.js'
@@ -63,7 +63,7 @@ export async function buildRpcSelfTransferPayload(context, state, amountTnk = 1n
         OperationType.TRANSFER
     );
 
-    const messageHash = await blake3Hash(message);
+    const messageHash = await PeerWallet.blake3(message);
     const signature = context.wallet.sign(messageHash);
 
     const payloadObject = {

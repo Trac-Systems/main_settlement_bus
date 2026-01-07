@@ -1,4 +1,5 @@
 import b4a from 'b4a';
+import PeerWallet from 'trac-wallet';
 import PartialStateMessageOperations from '../../../../../src/messages/partialStateMessages/PartialStateMessageOperations.js';
 import CompleteStateMessageOperations from '../../../../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
 import { deriveIndexerSequenceState, eventFlush } from '../../../../helpers/autobaseTestHelpers.js';
@@ -17,7 +18,6 @@ import { safeDecodeApplyOperation, safeEncodeApplyOperation } from '../../../../
 import { ZERO_WK } from '../../../../../src/utils/buffer.js';
 import { EntryType, OperationType } from '../../../../../src/utils/constants.js';
 import { createMessage } from '../../../../../src/utils/buffer.js';
-import { blake3Hash } from '../../../../../src/utils/crypto.js';
 import OperationValidationScenarioBase from '../common/base/OperationValidationScenarioBase.js';
 import { config } from '../../../../helpers/config.js';
 
@@ -689,7 +689,7 @@ export async function mutateTransferAmountWithRehashedTx(t, validPayload) {
 	parent.am = mutatedAmount;
 
 	const message = createMessage(config.networkId, parent.txv, parent.to, parent.am, parent.in, OperationType.TRANSFER);
-	const regeneratedTxHash = await blake3Hash(message);
+	const regeneratedTxHash = await PeerWallet.blake3(message);
 	if (regeneratedTxHash?.length === parent.tx?.length) {
 		parent.tx = regeneratedTxHash;
 	}
@@ -743,7 +743,7 @@ export async function mutateTransferAmountInvalidWithRehash(t, validPayload, con
 		parent.in,
 		OperationType.TRANSFER
 	);
-	const regeneratedTxHash = await blake3Hash(requesterMessage);
+	const regeneratedTxHash = await PeerWallet.blake3(requesterMessage);
 	if (regeneratedTxHash?.length === parent.tx?.length) {
 		parent.tx = regeneratedTxHash;
 	}
@@ -753,7 +753,7 @@ export async function mutateTransferAmountInvalidWithRehash(t, validPayload, con
 	}
 	if (validatorWallet && parent.vn) {
 		const validatorMessage = createMessage(config.networkId, parent.tx, parent.vn, OperationType.TRANSFER);
-		parent.vs = validatorWallet.sign(await blake3Hash(validatorMessage));
+		parent.vs = validatorWallet.sign(await PeerWallet.blake3(validatorMessage));
 	}
 
 	return safeEncodeApplyOperation(decoded);
@@ -774,7 +774,7 @@ export async function mutateTransferRecipientAddressWithRehash(t, validPayload, 
 	parent.to = mutatedTo;
 
 	const message = createMessage(config.networkId, parent.txv, parent.to, parent.am, parent.in, OperationType.TRANSFER);
-	const regeneratedTxHash = await blake3Hash(message);
+	const regeneratedTxHash = await PeerWallet.blake3(message);
 	if (regeneratedTxHash?.length === parent.tx?.length) {
 		parent.tx = regeneratedTxHash;
 	}
@@ -784,7 +784,7 @@ export async function mutateTransferRecipientAddressWithRehash(t, validPayload, 
 	}
 	if (validatorWallet && parent.vn) {
 		const validatorMessage = createMessage(config.networkId, parent.tx, parent.vn, OperationType.TRANSFER);
-		parent.vs = validatorWallet.sign(await blake3Hash(validatorMessage));
+		parent.vs = validatorWallet.sign(await PeerWallet.blake3(validatorMessage));
 	}
 
 	return safeEncodeApplyOperation(decoded);
@@ -806,7 +806,7 @@ export async function mutateTransferRecipientPublicKeyInvalidWithRehash(t, valid
 	parent.to = mutatedTo;
 
 	const message = createMessage(config.networkId, parent.txv, parent.to, parent.am, parent.in, OperationType.TRANSFER);
-	const regeneratedTxHash = await blake3Hash(message);
+	const regeneratedTxHash = await PeerWallet.blake3(message);
 	if (regeneratedTxHash?.length === parent.tx?.length) {
 		parent.tx = regeneratedTxHash;
 	}
@@ -816,7 +816,7 @@ export async function mutateTransferRecipientPublicKeyInvalidWithRehash(t, valid
 	}
 	if (validatorWallet && parent.vn) {
 		const validatorMessage = createMessage(config.networkId, parent.tx, parent.vn, OperationType.TRANSFER);
-		parent.vs = validatorWallet.sign(await blake3Hash(validatorMessage));
+		parent.vs = validatorWallet.sign(await PeerWallet.blake3(validatorMessage));
 	}
 
 	return safeEncodeApplyOperation(decoded);
@@ -849,7 +849,7 @@ export async function mutateTransferAmountToInvalidValue(t, validPayload, contex
 		parent.in,
 		OperationType.TRANSFER
 	);
-	const regeneratedTxHash = await blake3Hash(requesterMessage);
+	const regeneratedTxHash = await PeerWallet.blake3(requesterMessage);
 	if (regeneratedTxHash?.length === parent.tx?.length) {
 		parent.tx = regeneratedTxHash;
 	}
@@ -859,7 +859,7 @@ export async function mutateTransferAmountToInvalidValue(t, validPayload, contex
 	}
 	if (validatorWallet && parent.vn) {
 		const validatorMessage = createMessage(config.networkId, parent.tx, parent.vn, OperationType.TRANSFER);
-		parent.vs = validatorWallet.sign(await blake3Hash(validatorMessage));
+		parent.vs = validatorWallet.sign(await PeerWallet.blake3(validatorMessage));
 	}
 
 	return safeEncodeApplyOperation(decoded);

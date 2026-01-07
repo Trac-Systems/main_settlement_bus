@@ -1,4 +1,5 @@
 import b4a from 'b4a';
+import PeerWallet from 'trac-wallet';
 import { deriveIndexerSequenceState, eventFlush } from '../../../../helpers/autobaseTestHelpers.js';
 import CompleteStateMessageOperations from '../../../../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
 import nodeEntryUtils, { ZERO_LICENSE } from '../../../../../src/core/state/utils/nodeEntry.js';
@@ -15,7 +16,6 @@ import {
 import { setupAdminAndWhitelistedReaderNetwork } from '../common/commonScenarioHelper.js';
 import { applyWithRequesterEntryRemoval } from '../addWriter/addWriterScenarioHelpers.js';
 import { createMessage } from '../../../../../src/utils/buffer.js';
-import { blake3Hash } from '../../../../../src/utils/crypto.js';
 import { OperationType } from '../../../../../src/utils/constants.js';
 import { config } from '../../../../helpers/config.js';
 
@@ -309,7 +309,7 @@ export async function applyInvalidTargetAddressPayload(context, validPayload) {
 		decoded.aco.in,
 		OperationType.BAN_VALIDATOR
 	);
-	const newHash = await blake3Hash(message);
+	const newHash = await PeerWallet.blake3(message);
 	decoded.aco.tx = newHash;
 	decoded.aco.is = adminPeer.wallet.sign(newHash);
 

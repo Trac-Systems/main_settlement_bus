@@ -764,15 +764,22 @@ export async function applyWithIndexerSequenceFailure(context, payload) {
 }
 
 export async function applyWithIndexerSequenceCorruption(context, payload) {
-	const cryptoUtils = await import('../../../../../src/utils/crypto.js');
-	const originalHash = cryptoUtils.blake3Hash;
-	cryptoUtils.blake3Hash = async () => {
+	const { PeerWallet } = await import('trac-wallet');
+	const originalHash = PeerWallet.blake3;
+	const originalHashSafe = PeerWallet.blake3Safe;
+
+	PeerWallet.blake3 = async () => {
 		throw new Error('forced indexer sequence state failure');
 	};
+	PeerWallet.blake3Safe = async () => {
+		return b4a.alloc(0);
+	}
+	
 	try {
 		await applyAdminRecoveryViaValidator(context, payload);
 	} finally {
-		cryptoUtils.blake3Hash = originalHash;
+		PeerWallet.blake3 = originalHash;
+		PeerWallet.blake3Safe = originalHashSafe;
 	}
 }
 

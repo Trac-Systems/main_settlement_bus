@@ -3,7 +3,7 @@ import {
 	safeDecodeApplyOperation,
 	safeEncodeApplyOperation
 } from '../../../../../../src/utils/protobuf/operationHelpers.js';
-import { blake3Hash } from '../../../../../../src/utils/crypto.js';
+import PeerWallet from 'trac-wallet';
 import OperationValidationScenarioBase from '../base/OperationValidationScenarioBase.js';
 
 export default class InvalidHashValidationScenario extends OperationValidationScenarioBase {
@@ -32,7 +32,7 @@ async function defaultMutateHash(t, validPayload) {
 	const decodedPayload = safeDecodeApplyOperation(validPayload);
 	t.ok(decodedPayload, 'fixtures decode');
 
-	const invalidHash = await blake3Hash(validPayload);
+	const invalidHash = await PeerWallet.blake3(validPayload);
 
 	switch (true) {
 		case Boolean(decodedPayload.cao?.tx):
