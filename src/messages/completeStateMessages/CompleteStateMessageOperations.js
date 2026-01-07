@@ -1,7 +1,6 @@
 import CompleteStateMessageDirector from './CompleteStateMessageDirector.js';
 import CompleteStateMessageBuilder from './CompleteStateMessageBuilder.js';
 import { safeEncodeApplyOperation } from '../../utils/protobuf/operationHelpers.js';
-import { blake3Hash } from '../../utils/crypto.js';
 
 class CompleteStateMessageOperations {
     #config

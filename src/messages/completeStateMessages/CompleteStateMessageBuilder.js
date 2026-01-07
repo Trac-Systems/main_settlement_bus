@@ -6,7 +6,6 @@ import {createMessage} from '../../utils/buffer.js';
 import {OperationType} from '../../utils/protobuf/applyOperations.cjs'
 import {addressToBuffer, bufferToAddress} from '../../core/state/utils/address.js';
 import {isAddressValid} from "../../core/state/utils/address.js";
-import {blake3Hash} from '../../utils/crypto.js';
 import {
     isCoreAdmin,
     isAdminControl,
@@ -315,7 +314,7 @@ class CompleteStateMessageBuilder extends StateBuilder {
                 throw new Error(`Unsupported operation type for building value: ${OperationType[this.#operationType]}.`);
         }
 
-        tx = await blake3Hash(msg);
+        tx = await PeerWallet.blake3(msg);
         signature = this.#wallet.sign(tx);
 
         if (isCoreAdmin(this.#operationType)) {

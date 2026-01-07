@@ -9,7 +9,6 @@ import Hyperbee from 'hyperbee';
 import b4a from 'b4a';
 import PeerWallet from 'trac-wallet';
 import Hypercore from 'hypercore';
-import { blake3Hash } from '../../src/utils/crypto.js';
 import {
 	ACK_INTERVAL,
 	AUTOBASE_VALUE_ENCODING,
@@ -335,7 +334,7 @@ export function deriveIndexerSequenceState(base) {
 		.map(entry => entry?.key)
 		.filter(key => key && key.length > 0);
 	const concatenated = buffers.length > 0 ? b4a.concat(buffers) : b4a.alloc(0);
-	return blake3Hash(concatenated);
+	return PeerWallet.blake3(concatenated);
 }
 
 let osModule;

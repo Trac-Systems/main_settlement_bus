@@ -5,7 +5,6 @@ import StateBuilder from '../base/StateBuilder.js'
 import { OperationType } from '../../utils/constants.js';
 import { addressToBuffer, isAddressValid } from '../../core/state/utils/address.js';
 import { isHexString } from "../../utils/helpers.js";
-import { blake3Hash } from "../../utils/crypto.js";
 import { createMessage } from "../../utils/buffer.js";
 import { isTransaction, isRoleAccess, isBootstrapDeployment, isTransfer } from "../../utils/operations.js";
 
@@ -205,7 +204,7 @@ class PartialStateMessageBuilder extends StateBuilder {
         }
 
         // tx and signature
-        tx = await blake3Hash(txMsg);
+        tx = await PeerWallet.blake3(txMsg);
         signature = this.#wallet.sign(tx);
 
         // Build the payload based on operation type

@@ -27,7 +27,6 @@ import { randomBytes } from "hypercore-crypto";
 import { decimalStringToBigInt, bigIntTo16ByteBuffer, bufferToBigInt, bigIntToDecimalString } from "./utils/amountSerialization.js"
 import { normalizeTransferOperation, normalizeTransactionOperation } from "./utils/normalizers.js"
 import PartialTransfer from "./core/network/messaging/validators/PartialTransfer.js";
-import { blake3Hash } from "./utils/crypto.js";
 import PartialTransaction from "./core/network/messaging/validators/PartialTransaction.js";
 import fileUtils from './utils/fileUtils.js';
 import migrationUtils from './utils/migrationUtils.js';
@@ -296,7 +295,7 @@ export class MainSettlementBus extends ReadyResource {
             );
         }
 
-        const txValidity = await blake3Hash(this.#config.bootstrap);
+        const txValidity = await PeerWallet.blake3(this.#config.bootstrap);
         const addAdminMessage = await new CompleteStateMessageOperations(this.#wallet, this.#config)
             .assembleAddAdminMessage(
                 this.#state.writingKey,

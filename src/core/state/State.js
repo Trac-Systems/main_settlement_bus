@@ -27,7 +27,6 @@ import nodeEntryUtils, { setWritingKey, NODE_ENTRY_SIZE } from './utils/nodeEntr
 import nodeRoleUtils from './utils/roles.js';
 import lengthEntryUtils from './utils/lengthEntry.js';
 import transactionUtils from './utils/transaction.js';
-import { blake3Hash } from '../../utils/crypto.js';
 import {
     BALANCE_FEE,
     toBalance,
@@ -254,7 +253,7 @@ class State extends ReadyResource {
         for (const indexer of Object.values(this.#base.system.indexers)) {
             buf.push(indexer.key);
         }
-        return await blake3Hash(b4a.concat(buf));
+        return await PeerWallet.blake3(b4a.concat(buf));
     }
 
     async isInitalizationDisabled() {
@@ -514,7 +513,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const hash = await blake3Hash(message);
+        const hash = await PeerWallet.blake3Safe(message);
         const txHashHexString = op.bio.tx.toString('hex');
         if (!b4a.equals(hash, op.bio.tx)) {
             this.#safeLogApply(OperationType.BALANCE_INITIALIZATION, "Message hash does not match the tx_hash.", node.from.key)
@@ -636,7 +635,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const hash = await blake3Hash(message);
+        const hash = await PeerWallet.blake3Safe(message);
         const txHashHexString = op.cao.tx.toString('hex');
         if (!b4a.equals(hash, op.cao.tx)) {
             this.#safeLogApply(OperationType.DISABLE_INITIALIZATION, "Message hash does not match the tx_hash.", node.from.key)
@@ -722,7 +721,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const hash = await blake3Hash(requesterMessage);
+        const hash = await PeerWallet.blake3Safe(requesterMessage);
         if (!b4a.equals(hash, op.cao.tx)) {
             this.#safeLogApply(OperationType.ADD_ADMIN, "Message hash does not match the tx_hash.", node.from.key)
             return Status.FAILURE;
@@ -876,7 +875,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const hash = await blake3Hash(requesterMessage);
+        const hash = await PeerWallet.blake3Safe(requesterMessage);
         if (!b4a.equals(hash, op.rao.tx)) {
             this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Message hash does not match the tx_hash.", node.from.key)
             return Status.FAILURE;
@@ -918,7 +917,7 @@ class State extends ReadyResource {
         };
 
         // verify validator signature
-        const validatorHash = await blake3Hash(validatorMessage);
+        const validatorHash = await PeerWallet.blake3Safe(validatorMessage);
         const isValidatorMessageVerifed = this.#wallet.verify(op.rao.vs, validatorHash, validatorPublicKey);
         if (!isValidatorMessageVerifed) {
             this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Failed to verify message signature.", node.from.key)
@@ -1149,7 +1148,7 @@ class State extends ReadyResource {
         };
 
         // verify signature
-        const hash = await blake3Hash(message);
+        const hash = await PeerWallet.blake3Safe(message);
         if (!b4a.equals(hash, op.aco.tx)) {
             this.#safeLogApply(OperationType.APPEND_WHITELIST, "Message hash does not match the tx_hash.", node.from.key)
             return Status.FAILURE;
@@ -1382,7 +1381,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const hash = await blake3Hash(requesterMessage);
+        const hash = await PeerWallet.blake3Safe(requesterMessage);
         if (!b4a.equals(hash, op.rao.tx)) {
             this.#safeLogApply(OperationType.ADD_WRITER, "Message hash does not match the tx_hash.", node.from.key)
             return Status.FAILURE;
@@ -1423,7 +1422,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const validatorHash = await blake3Hash(validatorMessage);
+        const validatorHash = await PeerWallet.blake3Safe(validatorMessage);
         const isValidatorMessageVerifed = this.#wallet.verify(op.rao.vs, validatorHash, validatorPublicKey);
         if (!isValidatorMessageVerifed) {
             this.#safeLogApply(OperationType.ADD_WRITER, "Failed to verify validator message signature.", node.from.key)
@@ -1681,7 +1680,7 @@ class State extends ReadyResource {
         };
 
         // compare hashes
-        const hash = await blake3Hash(requesterMessage);
+        const hash = await PeerWallet.blake3Safe(requesterMessage);
         if (!b4a.equals(hash, op.rao.tx)) {
             this.#safeLogApply(OperationType.REMOVE_WRITER, "Message hash does not match the tx_hash.", node.from.key)
             return Status.FAILURE;
@@ -1721,7 +1720,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const validatorHash = await blake3Hash(validatorMessage);
+        const validatorHash = await PeerWallet.blake3Safe(validatorMessage);
         const isValidatorMessageVerifed = this.#wallet.verify(op.rao.vs, validatorHash, validatorPublicKey);
         if (!isValidatorMessageVerifed) {
             this.#safeLogApply(OperationType.REMOVE_WRITER, "Failed to verify validator message signature.", node.from.key)
@@ -1967,7 +1966,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const hash = await blake3Hash(message);
+        const hash = await PeerWallet.blake3Safe(message);
         if (!b4a.equals(hash, op.aco.tx)) {
             this.#safeLogApply(OperationType.ADD_INDEXER, "Message hash does not match the tx_hash.", node.from.key)
             return Status.FAILURE;
@@ -2182,7 +2181,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
         // compare hashes
-        const hash = await blake3Hash(message);
+        const hash = await PeerWallet.blake3Safe(message);
         if (!b4a.equals(hash, op.aco.tx)) {
             this.#safeLogApply(OperationType.REMOVE_INDEXER, "Message hash does not match the tx_hash.", node.from.key)
             return Status.FAILURE;
@@ -2385,7 +2384,7 @@ class State extends ReadyResource {
         };
 
         // compare hashes
-        const regeneratedHash = await blake3Hash(message);
+        const regeneratedHash = await PeerWallet.blake3Safe(message);
         if (!b4a.equals(regeneratedHash, op.aco.tx)) {
             this.#safeLogApply(OperationType.BAN_VALIDATOR, "Message hash does not match the tx_hash.", node.from.key)
             return Status.FAILURE;
@@ -2585,7 +2584,7 @@ class State extends ReadyResource {
         };
 
         // ensure that tx is valid
-        const regeneratedTxHash = await blake3Hash(requesterMessage);
+        const regeneratedTxHash = await PeerWallet.blake3Safe(requesterMessage);
         if (!b4a.equals(regeneratedTxHash, op.bdo.tx)) {
             this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Message hash does not match the tx_hash.", node.from.key)
             return Status.FAILURE;
@@ -2627,7 +2626,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const validatorMessageHash = await blake3Hash(validatorMessage);
+        const validatorMessageHash = await PeerWallet.blake3Safe(validatorMessage);
 
         const isValidatorSignatureValid = this.#wallet.verify(op.bdo.vs, validatorMessageHash, validatorPublicKey);
         if (!isValidatorSignatureValid) {
@@ -2821,7 +2820,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const regeneratedTxHash = await blake3Hash(requesterMessage);
+        const regeneratedTxHash = await PeerWallet.blake3Safe(requesterMessage);
         if (!b4a.equals(regeneratedTxHash, op.txo.tx)) {
             this.#safeLogApply(OperationType.TX, "Message hash does not match the tx_hash.", node.from.key)
             return Status.FAILURE;
@@ -2860,7 +2859,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const validatorMessageHash = await blake3Hash(validatorMessage);
+        const validatorMessageHash = await PeerWallet.blake3Safe(validatorMessage);
         const isValidatorSignatureValid = this.#wallet.verify(op.txo.vs, validatorMessageHash, validatorPublicKey);
         if (!isValidatorSignatureValid) {
             this.#safeLogApply(OperationType.TX, "Failed to verify validator message signature.", node.from.key)
@@ -3026,7 +3025,7 @@ class State extends ReadyResource {
         };
 
         // ensure that tx is valid
-        const regeneratedTxHash = await blake3Hash(requesterMessage);
+        const regeneratedTxHash = await PeerWallet.blake3Safe(requesterMessage);
         if (!b4a.equals(regeneratedTxHash, op.tro.tx)) {
             this.#safeLogApply(OperationType.TRANSFER, "Message hash does not match the tx_hash.", node.from.key)
             return Status.FAILURE;
@@ -3064,7 +3063,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const validatorMessageHash = await blake3Hash(validatorMessage);
+        const validatorMessageHash = await PeerWallet.blake3Safe(validatorMessage);
         const isValidatorSignatureValid = this.#wallet.verify(op.tro.vs, validatorMessageHash, validatorPublicKey);
         if (!isValidatorSignatureValid) {
             this.#safeLogApply(OperationType.TRANSFER, "Failed to verify message signature.", node.from.key)
@@ -3346,7 +3345,7 @@ class State extends ReadyResource {
             for (const indexer of Object.values(base.system.indexers)) {
                 buf.push(indexer.key);
             }
-            return await blake3Hash(b4a.concat(buf));
+            return await PeerWallet.blake3Safe(b4a.concat(buf));
         } catch (error) {
             console.error(error);
             return null;

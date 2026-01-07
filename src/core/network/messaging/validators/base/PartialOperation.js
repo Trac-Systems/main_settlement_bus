@@ -4,7 +4,6 @@ import Check from '../../../../../utils/check.js';
 import {bufferToAddress} from "../../../../state/utils/address.js";
 import {createMessage} from "../../../../../utils/buffer.js";
 import {OperationType} from "../../../../../utils/constants.js";
-import {blake3Hash} from "../../../../../utils/crypto.js";
 import {bufferToBigInt} from "../../../../../utils/amountSerialization.js";
 import {FEE} from "../../../../state/utils/transaction.js";
 import * as operationsUtils from '../../../../../utils/operations.js';
@@ -141,7 +140,7 @@ class PartialOperation {
         const messageComponents = this.#getMessageComponents(payload);
 
         const message = createMessage(...messageComponents);
-        const messageHash = await blake3Hash(message);
+        const messageHash = await PeerWallet.blake3(message);
         const payloadHash = operation.tx;
         if (!b4a.equals(payloadHash, messageHash)) {
             throw new Error('Regenerated transaction does not match incoming transaction in payload.');
