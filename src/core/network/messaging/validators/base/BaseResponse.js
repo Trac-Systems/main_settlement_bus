@@ -71,8 +71,7 @@ class BaseResponse {
 
                 break;
             default:
-                const addressString = bufferToAddress(message.address, this.#config.addressPrefix);
-                publicKey = PeerWallet.decodeBech32m(addressString);
+                publicKey = PeerWallet.decodeBech32m(message.address);
         }
 
         if (!publicKey) {
@@ -81,7 +80,8 @@ class BaseResponse {
 
         const messageWithoutSig = { ...message };
         delete messageWithoutSig.sig;
-        const hash = await PeerWallet.blake3(JSON.stringify(messageWithoutSig));
+        const hashInput = b4a.from(JSON.stringify(messageWithoutSig), 'utf8');
+        const hash = await PeerWallet.blake3(hashInput);
         const signature = b4a.from(message.sig, 'hex');
         const verified = this.#wallet.verify(signature, hash, publicKey);
 
