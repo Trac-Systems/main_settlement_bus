@@ -1,7 +1,7 @@
-import { NETWORK_MESSAGE_TYPES } from '../../../../utils/constants.js';
+import { NETWORK_MESSAGE_TYPES } from '../../../../../utils/constants.js';
 import PeerWallet from 'trac-wallet';
 import b4a from 'b4a';
-import { blake3Hash } from '../../../../utils/crypto.js';
+import { blake3Hash } from '../../../../../utils/crypto.js';
 
 class GetRequestHandler {
     #wallet;

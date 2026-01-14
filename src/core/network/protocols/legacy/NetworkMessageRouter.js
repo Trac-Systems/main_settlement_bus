@@ -1,9 +1,9 @@
 import b4a from "b4a";
-import GetRequestHandler from "../handlers/GetRequestHandler.js";
-import ResponseHandler from "../handlers/ResponseHandler.js";
-import RoleOperationHandler from "../handlers/RoleOperationHandler.js";
-import SubnetworkOperationHandler from "../handlers/SubnetworkOperationHandler.js";
-import TransferOperationHandler from "../handlers/TransferOperationHandler.js";
+import GetRequestHandler from "./handlers/GetRequestHandler.js";
+import ResponseHandler from "./handlers/ResponseHandler.js";
+import RoleOperationHandler from "../shared/handlers/RoleOperationHandler.js";
+import SubnetworkOperationHandler from "../shared/handlers/SubnetworkOperationHandler.js";
+import TransferOperationHandler from "../shared/handlers/TransferOperationHandler.js";
 import {NETWORK_MESSAGE_TYPES} from '../../../../utils/constants.js';
 import * as operation from '../../../../utils/applyOperations.js';
 import TransactionRateLimiterService from "../../services/TransactionRateLimiterService.js";

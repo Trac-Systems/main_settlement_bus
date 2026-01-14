@@ -4,7 +4,7 @@ import w from 'protomux-wakeup';
 import b4a from 'b4a';
 import TransactionPoolService from './services/TransactionPoolService.js';
 import ValidatorObserverService from './services/ValidatorObserverService.js';
-import NetworkMessages from './messaging/NetworkMessages.js';
+import NetworkMessages from './protocols/NetworkMessages.js';
 import { sleep } from '../../utils/helpers.js';
 import {
     TRAC_NAMESPACE,
@@ -44,11 +44,7 @@ class Network extends ReadyResource {
         this.#networkMessages = new NetworkMessages(this, this.#config);
         this.#validatorConnectionManager = new ConnectionManager(this.#config);
         this.#validatorMessageOrchestrator = new MessageOrchestrator(this.#validatorConnectionManager, state, this.#config);
-        this.admin_stream = null;
-        this.admin = null;
-        this.validator = null;
-        this.custom_stream = null;
-        this.custom_node = null;
+
     }
 
     get swarm() {
@@ -110,25 +106,23 @@ class Network extends ReadyResource {
             this.#networkMessages.initializeMessageRouter(state, wrappedWallet);
 
             this.#swarm.on('connection', async (connection) => {
-                const { message_channel, message } = await this.#networkMessages.setupProtomuxMessages(connection);
-                connection.messenger = message;
+                // Per-peer connection initialization:
+                // - attach Protomux (legacy + v1 channels/messages)
+                // - attach connection.protocolSession (used later by tryConnect / orchestrators to send messages)
+                const { protocolChannels } = await this.#networkMessages.setupProtomuxMessages(connection);
+                const channels = protocolChannels;
 
                 // ATTENTION: Must be called AFTER the protomux init above
                 const stream = store.replicate(connection);
                 wakeup.addStream(stream);
-
+                
                 connection.on('close', () => {
-                    if (this.admin_stream === connection) {
-                        this.admin_stream = null;
-                        this.admin = null;
+                    if (channels.legacy) {
+                        try { channels.legacy.close() } catch (e) { }
                     }
-
-                    if (this.custom_stream === connection) {
-                        this.custom_stream = null;
-                        this.custom_node = null;
+                    if (channels.v1) {
+                        try { channels.v1.close() } catch (e) { }
                     }
-                    try { message_channel.close() } catch (e) { }
-
                 });
 
                 connection.on('error', (error) => {
@@ -142,7 +136,6 @@ class Network extends ReadyResource {
                         return;
                     }
                     console.error(error.message)
-
                 });
 
             });
@@ -179,40 +172,34 @@ class Network extends ReadyResource {
         const peerInfo = this.#swarm.peers.get(publicKey);
         if (!peerInfo) return;
 
-        // Wait for the swarm to establish the connection and for protomux to attach
-        let stream = this.#swarm._allConnections.get(peerInfo.publicKey);
+        // Wait for the swarm to establish the transport connection AND for our connection handler
+        // (swarm.on('connection') -> setupProtomuxMessages) to attach connection.protocolSession.
+        let connection = this.#swarm._allConnections.get(peerInfo.publicKey);
         let attempts = 0;
-        while ((!stream || !stream.messenger) && attempts < 1500) { // TODO: Get rid of the magic number and add a config option
+        while ((!connection || !connection.protocolSession) && attempts < 1500) { // TODO: Get rid of the magic number and add a config option
             await sleep(10);
             attempts += 1;
-            stream = this.#swarm._allConnections.get(peerInfo.publicKey);
+            connection = this.#swarm._allConnections.get(peerInfo.publicKey);
         }
-        if (!stream || !stream.messenger) return;
+        if (!connection || !connection.protocolSession) return;
 
         if (type === 'validator') {
-            this.#validatorConnectionManager.addValidator(target, stream);
+            this.#validatorConnectionManager.addValidator(target, connection);
         }
-        await this.#sendRequestByType(stream, type);
+
+        await this.#sendRequestByType(connection, type);
+        
     }
 
-    async isConnected(publicKey) {
-        return this.#swarm.peers.has(publicKey) &&
-            this.#swarm.peers.get(publicKey).connectedTime != -1
-    }
-
-    async #sendRequestByType(stream, type) {
+    async #sendRequestByType(connection, type) {
         const waitFor = {
             validator: () => this.validatorConnectionManager.connectionCount(),
-            admin: () => this.admin_stream,
-            node: () => this.custom_stream
         }[type];
 
         if (type === 'validator') {
-            await stream.messenger.send(NETWORK_MESSAGE_TYPES.GET.VALIDATOR);
-        } else if (type === 'admin') {
-            await stream.messenger.send(NETWORK_MESSAGE_TYPES.GET.ADMIN);
-        } else if (type === 'node') {
-            await stream.messenger.send(NETWORK_MESSAGE_TYPES.GET.NODE);
+            const legacyMessenger = connection.protocolSession?.getLegacy();
+            if (!legacyMessenger) return;
+            await legacyMessenger.send(NETWORK_MESSAGE_TYPES.GET.VALIDATOR);
         } else {
             return;
         }
@@ -224,32 +211,6 @@ class Network extends ReadyResource {
         while (conditionFn() && counter < maxIterations) {
             await sleep(intervalMs);
             counter++;
-        }
-    }
-
-    async sendMessageToNode(nodePublicKey, message) {
-        try {
-            if (!nodePublicKey || !message) {
-                return;
-            }
-            await this.tryConnect(nodePublicKey, 'node');
-
-            await this.spinLock(() =>
-                this.custom_stream === null ||
-                !b4a.equals(this.custom_node, b4a.from(nodePublicKey, 'hex'))
-            );
-            if (
-                this.custom_stream !== null &&
-                this.custom_node !== null &&
-                b4a.equals(this.custom_node, b4a.from(nodePublicKey, 'hex'))
-            ) {
-                await this.custom_stream.messenger.send(message);
-            } else {
-                throw new Error(`Failed to send message to node: ${nodePublicKey}`);
-            }
-
-        } catch (e) {
-            console.log(e)
         }
     }
 
