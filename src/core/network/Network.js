@@ -60,11 +60,7 @@ class Network extends ReadyResource {
         this.#networkMessages = new NetworkMessages(this, this.#config);
         this.#validatorConnectionManager = new ConnectionManager(this.#config);
         this.#validatorMessageOrchestrator = new MessageOrchestrator(this.#validatorConnectionManager, state, this.#config);
-        this.admin_stream = null;
-        this.admin = null;
-        this.validator = null;
-        this.custom_stream = null;
-        this.custom_node = null;
+
     }
 
     get swarm() {
@@ -171,8 +167,11 @@ class Network extends ReadyResource {
             this.#networkMessages.initializeMessageRouter(state, wrappedWallet);
 
             this.#swarm.on('connection', async (connection) => {
-                const { message_channel, message } = await this.#networkMessages.setupProtomuxMessages(connection);
-                connection.messenger = message;
+                // Per-peer connection initialization:
+                // - attach Protomux (legacy + v1 channels/messages)
+                // - attach connection.protocolSession (used later by tryConnect / orchestrators to send messages)
+                const { protocolChannels } = await this.#networkMessages.setupProtomuxMessages(connection);
+                const channels = protocolChannels;
 
                 // ATTENTION: Must be called AFTER the protomux init above
                 const stream = store.replicate(connection);
@@ -185,17 +184,12 @@ class Network extends ReadyResource {
                 }
 
                 connection.on('close', () => {
-                    if (this.admin_stream === connection) {
-                        this.admin_stream = null;
-                        this.admin = null;
+                    if (channels.legacy) {
+                        try { channels.legacy.close() } catch (e) { }
                     }
-
-                    if (this.custom_stream === connection) {
-                        this.custom_stream = null;
-                        this.custom_node = null;
+                    if (channels.v1) {
+                        try { channels.v1.close() } catch (e) { }
                     }
-                    try { message_channel.close() } catch (e) { }
-
                 });
 
                 connection.on('error', (error) => {
@@ -209,7 +203,6 @@ class Network extends ReadyResource {
                         return;
                     }
                     console.error(error.message)
-
                 });
 
             });
@@ -279,16 +272,12 @@ class Network extends ReadyResource {
     async #sendRequestByType(stream, type) {
         const waitFor = {
             validator: () => this.validatorConnectionManager.connectionCount(),
-            admin: () => this.admin_stream,
-            node: () => this.custom_stream
         }[type];
 
         if (type === 'validator') {
-            await stream.messenger.send(NETWORK_MESSAGE_TYPES.GET.VALIDATOR);
-        } else if (type === 'admin') {
-            await stream.messenger.send(NETWORK_MESSAGE_TYPES.GET.ADMIN);
-        } else if (type === 'node') {
-            await stream.messenger.send(NETWORK_MESSAGE_TYPES.GET.NODE);
+            const legacyMessenger = connection.protocolSession?.getLegacy();
+            if (!legacyMessenger) return;
+            await legacyMessenger.send(NETWORK_MESSAGE_TYPES.GET.VALIDATOR);
         } else {
             return;
         }
