@@ -66,10 +66,6 @@ class Network extends ReadyResource {
         this.custom_node = null;
     }
 
-    pendingConnectionsLength() {
-        return this.#pendingConnections.size;
-    }
-
     get swarm() {
         return this.#swarm;
     }
@@ -116,7 +112,7 @@ class Network extends ReadyResource {
 
     setupNetworkListeners() {
         // connect:timeout
-        this.on('connect:timeout', async ({ publicKey, type, timeoutMs }) => {
+        this.on('connect:timeout', ({ publicKey, type, timeoutMs }) => {
             debugLog(`Network Event: connect:timeout | PublicKey: ${publicKey} | Type: ${type} | TimeoutMs: ${timeoutMs}`);
             if (type === 'validator') {
                 this.#pendingConnections.delete(publicKey);
@@ -124,7 +120,7 @@ class Network extends ReadyResource {
         });
 
         // connect:ready
-        this.on('connect:ready', async ({ publicKey, type, connection }) => {
+        this.on('connect:ready', ({ publicKey, type, connection }) => {
             debugLog(`Network Event: connect:ready | PublicKey: ${publicKey} | Type: ${type}`);
             if (type === 'validator') {
                 const { timeoutId } = this.#pendingConnections.get(publicKey);
@@ -132,10 +128,8 @@ class Network extends ReadyResource {
                 this.#pendingConnections.delete(publicKey);
 
                 const target = b4a.from(publicKey, 'hex');
-                if (await this.isConnected(publicKey)) {
-                    this.#validatorConnectionManager.addValidator(target, connection);
-                }
-                await this.#sendRequestByType(connection, type);
+                this.#validatorConnectionManager.addValidator(target, connection);
+                this.#sendRequestByType(connection, type);
             }
         });
     }
@@ -226,6 +220,10 @@ class Network extends ReadyResource {
 
     isConnectionPending(publicKey) {
         return this.#pendingConnections.has(publicKey);
+    }
+
+    pendingConnectionsCount() {
+        return this.#pendingConnections.size;
     }
 
     async initializeNetworkingKeyPair(store, wallet) {
