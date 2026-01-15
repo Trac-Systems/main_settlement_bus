@@ -114,19 +114,19 @@ class Network extends ReadyResource {
         // connect:timeout
         this.on('connect:timeout', ({ publicKey, type, timeoutMs }) => {
             debugLog(`Network Event: connect:timeout | PublicKey: ${publicKey} | Type: ${type} | TimeoutMs: ${timeoutMs}`);
-            if (type === 'validator') {
-                this.#pendingConnections.delete(publicKey);
-            }
+            this.#pendingConnections.delete(publicKey);
         });
 
         // connect:ready
         this.on('connect:ready', ({ publicKey, type, connection }) => {
             debugLog(`Network Event: connect:ready | PublicKey: ${publicKey} | Type: ${type}`);
-            if (type === 'validator') {
-                const { timeoutId } = this.#pendingConnections.get(publicKey);
-                clearTimeout(timeoutId);
-                this.#pendingConnections.delete(publicKey);
+            const { timeoutId } = this.#pendingConnections.get(publicKey);
+            if (!timeoutId) return;
 
+            clearTimeout(timeoutId);
+            this.#pendingConnections.delete(publicKey);
+
+            if (type === 'validator') {
                 const target = b4a.from(publicKey, 'hex');
                 this.#validatorConnectionManager.addValidator(target, connection);
                 this.#sendRequestByType(connection, type);
@@ -239,7 +239,10 @@ class Network extends ReadyResource {
 
     async tryConnect(publicKey, type = null) {
         if (this.#swarm === null) throw new Error('Network swarm is not initialized');
-        if (this.#pendingConnections.has(publicKey) || this.#pendingConnections.size >= this.#maxPendingConnections) return; // Connection is already in progress
+        if (this.#pendingConnections.has(publicKey) || this.#pendingConnections.size >= this.#maxPendingConnections) {
+            debugLog(`Network.tryConnect: Connection to peer: ${publicKey} as type: ${type} is already pending or max pending connections reached.`);
+            return;
+        }
 
         const timeoutId = setTimeout(() => {
             if (!this.#pendingConnections.has(publicKey)) return;
