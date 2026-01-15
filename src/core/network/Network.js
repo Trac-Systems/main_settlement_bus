@@ -18,6 +18,15 @@ import ConnectionManager from './services/ConnectionManager.js';
 import MessageOrchestrator from './services/MessageOrchestrator.js';
 import NetworkWalletFactory from './identity/NetworkWalletFactory.js';
 
+// -- Debug Mode --
+// TODO: Implement a better debug system in the future. This is just temporary.
+const DEBUG = false;
+const debugLog = (...args) => {
+    if (DEBUG) {
+        console.log('DEBUG [Network] ==> ', ...args);
+    }
+};
+
 const wakeup = new w();
 
 class Network extends ReadyResource {
@@ -29,6 +38,8 @@ class Network extends ReadyResource {
     #validatorMessageOrchestrator;
     #config;
     #identityProvider = null;
+    #pendingConnections;
+    #connectTimeoutMs;
 
     /**
      * @param {State} state
@@ -38,7 +49,9 @@ class Network extends ReadyResource {
     constructor(state, config, address = null) {
         super();
         this.#config = config
+        this.#connectTimeoutMs = config.connectTimeoutMs || 15000;
 
+        this.#pendingConnections = new Map();
         this.#transactionPoolService = new TransactionPoolService(state, address, this.#config);
         this.#validatorObserverService = new ValidatorObserverService(this, state, address, this.#config);
         this.#networkMessages = new NetworkMessages(this, this.#config);
@@ -165,34 +178,48 @@ class Network extends ReadyResource {
 
     async tryConnect(publicKey, type = null) {
         if (this.#swarm === null) throw new Error('Network swarm is not initialized');
+        if (this.#pendingConnections.has(publicKey)) return; // Connection is already in progress
+
+        this.#pendingConnections.set(publicKey, true); // Mark connection as in progress
 
         const target = b4a.from(publicKey, 'hex');
         if (!this.#swarm.peers.has(publicKey)) {
             this.#swarm.joinPeer(target);
             let cnt = 0;
-            while (!this.#swarm.peers.has(publicKey) && cnt < 1500) { // TODO: Get rid of the magic number and add a config option for this
+            while (!this.#swarm.peers.has(publicKey) && cnt < this.#connectTimeoutMs/10) {
                 await sleep(10);
                 cnt += 1;
             }
         }
 
         const peerInfo = this.#swarm.peers.get(publicKey);
-        if (!peerInfo) return;
-
+        if (!peerInfo) {
+            debugLog('Network.tryConnect: Could not join peer:', publicKey);
+            this.#pendingConnections.delete(publicKey);
+            return;
+        }
+        
         // Wait for the swarm to establish the connection and for protomux to attach
         let stream = this.#swarm._allConnections.get(peerInfo.publicKey);
         let attempts = 0;
-        while ((!stream || !stream.messenger) && attempts < 1500) { // TODO: Get rid of the magic number and add a config option
+        while ((!stream || !stream.messenger) && attempts < this.#connectTimeoutMs/10) {
             await sleep(10);
             attempts += 1;
             stream = this.#swarm._allConnections.get(peerInfo.publicKey);
         }
-        if (!stream || !stream.messenger) return;
+
+        if (!stream || !stream.messenger) {
+            debugLog('Network.tryConnect: Failed to establish connection to peer:', publicKey);
+            this.#pendingConnections.delete(publicKey);
+            return;
+        }
 
         if (type === 'validator') {
             this.#validatorConnectionManager.addValidator(target, stream);
         }
         await this.#sendRequestByType(stream, type);
+        this.#pendingConnections.delete(publicKey); // Connection attempt finished
+        debugLog(`Network.tryConnect: Connected to peer: ${publicKey} as type: ${type}`);
     }
 
     async isConnected(publicKey) {

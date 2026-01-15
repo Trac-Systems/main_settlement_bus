@@ -115,7 +115,7 @@ class ValidatorObserverService {
 
 
         if (validatorAddress !== adminEntry?.address || validatorListLength < MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION) {
-            await this.#network.tryConnect(validatorPubKeyHex, 'validator');
+            this.#network.tryConnect(validatorPubKeyHex, 'validator');
         }
     };
 
