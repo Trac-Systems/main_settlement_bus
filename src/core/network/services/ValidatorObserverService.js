@@ -39,6 +39,12 @@ class ValidatorObserverService {
         this.#state = state;
         this.#address = address;
         this.#isInterrupted = false;
+        if (DEBUG) {
+            this.initTimestamp = Date.now();
+            this.reachedMax = false;
+            this.end = 0;
+            this.begin = 0;
+        }
     }
 
     get state() {
@@ -73,6 +79,7 @@ class ValidatorObserverService {
 
     async #worker(next) {
         if (!this.#network.validatorConnectionManager.maxConnectionsReached()) {
+            if (DEBUG) this.begin = Date.now();
             const length = await this.#lengthEntry()
 
             const promises = [];
@@ -82,8 +89,19 @@ class ValidatorObserverService {
             }
             await Promise.all(promises);
 
-            next(POLL_INTERVAL)
+            if (DEBUG) this.end = Date.now();
+            debugLog('Worker cycle completed in (ms):', this.end - this.begin, '| Validator Connections:', this.#network.validatorConnectionManager.connectionCount(), " | Pending: ", this.#network.pendingConnectionsCount());
         }
+        else if (DEBUG) {
+            if (!this.reachedMax) {
+                this.reachedMax = true;
+                debugLog('Max validator connections reached. Skipping this cycle.');
+                const now = Date.now();
+                const elapsed = now - this.initTimestamp;
+                debugLog('>>> Time elapsed since start (ms):', elapsed);
+            }
+        }
+        next(POLL_INTERVAL);
     }
 
     async #findValidator(address, validatorListLength) {
