@@ -6,8 +6,9 @@ import { sleep } from '../../../utils/helpers.js';
 import Scheduler from "../../../utils/Scheduler.js";
 import Network from "../Network.js";
 
-const POLL_INTERVAL = 3500 // This was increase since the iterations dont wait for the execution its about 10 * DELAY_INTERVAL
-const DELAY_INTERVAL = 250
+const DELAY_INTERVAL = 50
+const VALIDATOR_CANDIDATES_PER_CYCLE = 10
+const POLL_INTERVAL = (VALIDATOR_CANDIDATES_PER_CYCLE + 1) * DELAY_INTERVAL // This is to avoid more than one instance of the worker running at the same time
 
 // -- Debug Mode --
 // TODO: Implement a better debug system in the future. This is just temporary.
@@ -75,7 +76,7 @@ class ValidatorObserverService {
             const length = await this.#lengthEntry()
 
             const promises = [];
-            for (let i = 0; i < 10; i++) {
+            for (let i = 0; i < VALIDATOR_CANDIDATES_PER_CYCLE; i++) {
                 promises.push(this.#findValidator(this.#address, length + 1));
                 await sleep(DELAY_INTERVAL); // Low key dangerous as the network progresses
             }
@@ -105,14 +106,13 @@ class ValidatorObserverService {
         else {
             debugLog(`Found valid validator to connect after ${attempts} attempts.`);
         }
-        
+
         if (!isValidatorValid) return;
-        
+
         const validatorAddress = bufferToAddress(validatorAddressBuffer, this.#config.addressPrefix);
         const validatorPubKeyBuffer = PeerWallet.decodeBech32m(validatorAddress);
         const validatorPubKeyHex = validatorPubKeyBuffer.toString('hex');
         const adminEntry = await this.state.getAdminEntry();
-
 
         if (validatorAddress !== adminEntry?.address || validatorListLength < MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION) {
             this.#network.tryConnect(validatorPubKeyHex, 'validator');
@@ -121,13 +121,17 @@ class ValidatorObserverService {
 
     async #isValidatorValid(forbiddenAddress, validatorAddressBuffer, validatorListLength) {
         if (validatorAddressBuffer === null || b4a.byteLength(validatorAddressBuffer) !== this.#config.addressLength) return false;
-        
+
         const validatorAddress = bufferToAddress(validatorAddressBuffer, this.#config.addressPrefix);
         if (validatorAddress === forbiddenAddress) return false;
 
         const validatorPubKeyBuffer = PeerWallet.decodeBech32m(validatorAddress);
         const validatorEntry = await this.state.getNodeEntry(validatorAddress);
         const adminEntry = await this.state.getAdminEntry();
+
+        if (this.#network.isConnectionPending(validatorPubKeyBuffer.toString('hex'))) {
+            return false;
+        }
 
         if (validatorAddress === adminEntry?.address && validatorListLength >= MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION) {
             if (this.#network.validatorConnectionManager.exists(validatorPubKeyBuffer)) {

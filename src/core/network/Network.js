@@ -40,6 +40,7 @@ class Network extends ReadyResource {
     #identityProvider = null;
     #pendingConnections;
     #connectTimeoutMs;
+    #maxPendingConnections;
 
     /**
      * @param {State} state
@@ -49,7 +50,8 @@ class Network extends ReadyResource {
     constructor(state, config, address = null) {
         super();
         this.#config = config
-        this.#connectTimeoutMs = config.connectTimeoutMs || 15000;
+        this.#connectTimeoutMs = config.connectTimeoutMs || 5000;
+        this.#maxPendingConnections = config.maxPendingConnections || 50;
 
         this.#pendingConnections = new Map();
         this.#transactionPoolService = new TransactionPoolService(state, address, this.#config);
@@ -62,6 +64,10 @@ class Network extends ReadyResource {
         this.validator = null;
         this.custom_stream = null;
         this.custom_node = null;
+    }
+
+    pendingConnectionsLength() {
+        return this.#pendingConnections.size;
     }
 
     get swarm() {
@@ -86,6 +92,9 @@ class Network extends ReadyResource {
 
     async _open() {
         console.log('Network initialization...');
+
+        this.setupNetworkListeners();
+
         this.transactionPoolService.start();
         this.validatorObserverService.start();
     }
@@ -97,9 +106,53 @@ class Network extends ReadyResource {
         this.#validatorObserverService.stopValidatorObserver();
         await sleep(5_000);
 
+        this.cleanupNetworkListeners();
+        this.cleanupPendingConnections();
+
         if (this.#swarm !== null) {
             this.#swarm.destroy();
         }
+    }
+
+    setupNetworkListeners() {
+        // connect:timeout
+        this.on('connect:timeout', async ({ publicKey, type, timeoutMs }) => {
+            debugLog(`Network Event: connect:timeout | PublicKey: ${publicKey} | Type: ${type} | TimeoutMs: ${timeoutMs}`);
+            if (type === 'validator') {
+                this.#pendingConnections.delete(publicKey);
+            }
+        });
+
+        // connect:ready
+        this.on('connect:ready', async ({ publicKey, type, connection }) => {
+            debugLog(`Network Event: connect:ready | PublicKey: ${publicKey} | Type: ${type}`);
+            if (type === 'validator') {
+                const { timeoutId } = this.#pendingConnections.get(publicKey);
+                clearTimeout(timeoutId);
+                this.#pendingConnections.delete(publicKey);
+
+                const target = b4a.from(publicKey, 'hex');
+                if (await this.isConnected(publicKey)) {
+                    this.#validatorConnectionManager.addValidator(target, connection);
+                }
+                await this.#sendRequestByType(connection, type);
+            }
+        });
+    }
+
+    cleanupNetworkListeners() {
+        // connect:timeout
+        this.removeAllListeners('connect:timeout');
+
+        // connect:ready
+        this.removeAllListeners('connect:ready');
+    }
+
+    cleanupPendingConnections() {
+        for (const { timeoutId } of this.#pendingConnections.values()) {
+            clearTimeout(timeoutId);
+        }
+        this.#pendingConnections.clear();
     }
 
     async replicate(
@@ -129,6 +182,12 @@ class Network extends ReadyResource {
                 // ATTENTION: Must be called AFTER the protomux init above
                 const stream = store.replicate(connection);
                 wakeup.addStream(stream);
+
+                const publicKey = b4a.toString(connection.remotePublicKey, 'hex');
+                if (this.#pendingConnections.has(publicKey)) {
+                    const { type } = this.#pendingConnections.get(publicKey);
+                    await this.#finalizeConnection(publicKey, type, connection);
+                }
 
                 connection.on('close', () => {
                     if (this.admin_stream === connection) {
@@ -165,6 +224,10 @@ class Network extends ReadyResource {
         }
     }
 
+    isConnectionPending(publicKey) {
+        return this.#pendingConnections.has(publicKey);
+    }
+
     async initializeNetworkingKeyPair(store, wallet) {
         if (!this.#config.enableWallet) {
             return await store.createKeyPair(TRAC_NAMESPACE);
@@ -178,53 +241,37 @@ class Network extends ReadyResource {
 
     async tryConnect(publicKey, type = null) {
         if (this.#swarm === null) throw new Error('Network swarm is not initialized');
-        if (this.#pendingConnections.has(publicKey)) return; // Connection is already in progress
+        if (this.#pendingConnections.has(publicKey) || this.#pendingConnections.size >= this.#maxPendingConnections) return; // Connection is already in progress
 
-        this.#pendingConnections.set(publicKey, true); // Mark connection as in progress
+        const timeoutId = setTimeout(() => {
+            if (!this.#pendingConnections.has(publicKey)) return;
+            this.emit('connect:timeout', { publicKey, type, timeoutMs: this.#connectTimeoutMs });
+        }, this.#connectTimeoutMs);
+        this.#pendingConnections.set(publicKey, { type, timeoutId });
 
         const target = b4a.from(publicKey, 'hex');
         if (!this.#swarm.peers.has(publicKey)) {
             this.#swarm.joinPeer(target);
-            let cnt = 0;
-            while (!this.#swarm.peers.has(publicKey) && cnt < this.#connectTimeoutMs/10) {
-                await sleep(10);
-                cnt += 1;
-            }
         }
 
         const peerInfo = this.#swarm.peers.get(publicKey);
-        if (!peerInfo) {
-            debugLog('Network.tryConnect: Could not join peer:', publicKey);
-            this.#pendingConnections.delete(publicKey);
-            return;
+        if (peerInfo) {
+            const connection = this.#swarm._allConnections.get(peerInfo.publicKey);
+            if (connection && connection.messenger) {
+                await this.#finalizeConnection(publicKey, type, connection);
+            }
         }
-        
-        // Wait for the swarm to establish the connection and for protomux to attach
-        let stream = this.#swarm._allConnections.get(peerInfo.publicKey);
-        let attempts = 0;
-        while ((!stream || !stream.messenger) && attempts < this.#connectTimeoutMs/10) {
-            await sleep(10);
-            attempts += 1;
-            stream = this.#swarm._allConnections.get(peerInfo.publicKey);
-        }
-
-        if (!stream || !stream.messenger) {
-            debugLog('Network.tryConnect: Failed to establish connection to peer:', publicKey);
-            this.#pendingConnections.delete(publicKey);
-            return;
-        }
-
-        if (type === 'validator') {
-            this.#validatorConnectionManager.addValidator(target, stream);
-        }
-        await this.#sendRequestByType(stream, type);
-        this.#pendingConnections.delete(publicKey); // Connection attempt finished
-        debugLog(`Network.tryConnect: Connected to peer: ${publicKey} as type: ${type}`);
     }
 
     async isConnected(publicKey) {
         return this.#swarm.peers.has(publicKey) &&
             this.#swarm.peers.get(publicKey).connectedTime != -1
+    }
+
+    async #finalizeConnection(publicKey, type, connection) {
+        if (!this.#pendingConnections.has(publicKey)) return;
+        this.emit('connect:ready', { publicKey, type, connection });
+        debugLog(`Network.finalizeConnection: Connected to peer: ${publicKey} as type: ${type}`);
     }
 
     async #sendRequestByType(stream, type) {
@@ -251,32 +298,6 @@ class Network extends ReadyResource {
         while (conditionFn() && counter < maxIterations) {
             await sleep(intervalMs);
             counter++;
-        }
-    }
-
-    async sendMessageToNode(nodePublicKey, message) {
-        try {
-            if (!nodePublicKey || !message) {
-                return;
-            }
-            await this.tryConnect(nodePublicKey, 'node');
-
-            await this.spinLock(() =>
-                this.custom_stream === null ||
-                !b4a.equals(this.custom_node, b4a.from(nodePublicKey, 'hex'))
-            );
-            if (
-                this.custom_stream !== null &&
-                this.custom_node !== null &&
-                b4a.equals(this.custom_node, b4a.from(nodePublicKey, 'hex'))
-            ) {
-                await this.custom_stream.messenger.send(message);
-            } else {
-                throw new Error(`Failed to send message to node: ${nodePublicKey}`);
-            }
-
-        } catch (e) {
-            console.log(e)
         }
     }
 
