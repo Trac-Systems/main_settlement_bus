@@ -40,6 +40,8 @@ export const EventType = Object.freeze({
     WRITABLE: 'writable',
     UNWRITABLE: 'unwritable',
     WARNING: 'warning',
+    VALIDATOR_CONNECTION_READY: 'validator-connection-ready',
+    VALIDATOR_CONNECTION_TIMEOUT: 'validator-connection-timeout',
 });
 
 // Role managment constants

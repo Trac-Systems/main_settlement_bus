@@ -17,6 +17,7 @@ import {
 import ConnectionManager from './services/ConnectionManager.js';
 import MessageOrchestrator from './services/MessageOrchestrator.js';
 import NetworkWalletFactory from './identity/NetworkWalletFactory.js';
+import { EventType } from '../../utils/constants.js';
 
 // -- Debug Mode --
 // TODO: Implement a better debug system in the future. This is just temporary.
@@ -111,15 +112,15 @@ class Network extends ReadyResource {
     }
 
     setupNetworkListeners() {
-        // connect:timeout
-        this.on('connect:timeout', ({ publicKey, type, timeoutMs }) => {
-            debugLog(`Network Event: connect:timeout | PublicKey: ${publicKey} | Type: ${type} | TimeoutMs: ${timeoutMs}`);
+        // VALIDATOR_CONNECTION_TIMEOUT
+        this.on(EventType.VALIDATOR_CONNECTION_TIMEOUT, ({ publicKey, type, timeoutMs }) => {
+            debugLog(`Network Event: VALIDATOR_CONNECTION_TIMEOUT | PublicKey: ${publicKey} | Type: ${type} | TimeoutMs: ${timeoutMs}`);
             this.#pendingConnections.delete(publicKey);
         });
 
-        // connect:ready
-        this.on('connect:ready', ({ publicKey, type, connection }) => {
-            debugLog(`Network Event: connect:ready | PublicKey: ${publicKey} | Type: ${type}`);
+        // VALIDATOR_CONNECTION_READY
+        this.on(EventType.VALIDATOR_CONNECTION_READY, ({ publicKey, type, connection }) => {
+            debugLog(`Network Event: VALIDATOR_CONNECTION_READY | PublicKey: ${publicKey} | Type: ${type}`);
             const { timeoutId } = this.#pendingConnections.get(publicKey);
             if (!timeoutId) return;
 
@@ -246,7 +247,7 @@ class Network extends ReadyResource {
 
         const timeoutId = setTimeout(() => {
             if (!this.#pendingConnections.has(publicKey)) return;
-            this.emit('connect:timeout', { publicKey, type, timeoutMs: this.#connectTimeoutMs });
+            this.emit(EventType.VALIDATOR_CONNECTION_TIMEOUT, { publicKey, type, timeoutMs: this.#connectTimeoutMs });
         }, this.#connectTimeoutMs);
         this.#pendingConnections.set(publicKey, { type, timeoutId });
 
@@ -271,7 +272,7 @@ class Network extends ReadyResource {
 
     async #finalizeConnection(publicKey, type, connection) {
         if (!this.#pendingConnections.has(publicKey)) return;
-        this.emit('connect:ready', { publicKey, type, connection });
+        this.emit(EventType.VALIDATOR_CONNECTION_READY, { publicKey, type, connection });
         debugLog(`Network.finalizeConnection: Connected to peer: ${publicKey} as type: ${type}`);
     }
 
