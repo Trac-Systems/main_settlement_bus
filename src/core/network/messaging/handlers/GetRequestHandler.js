@@ -43,7 +43,9 @@ class GetRequestHandler {
             timestamp: Date.now(),
         };
 
-        const hash = await PeerWallet.blake3(JSON.stringify(payload));
+
+        const hashInput = b4a.from(JSON.stringify(payload), 'utf8');
+        const hash = await PeerWallet.blake3(hashInput);
         const sig = this.#wallet.sign(hash);
 
         const responseMessage = {
