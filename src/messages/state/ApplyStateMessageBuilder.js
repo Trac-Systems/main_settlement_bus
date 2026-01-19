@@ -5,7 +5,6 @@ import { createMessage } from '../../utils/buffer.js';
 import { OperationType } from '../../utils/constants.js';
 import { addressToBuffer, bufferToAddress } from '../../core/state/utils/address.js';
 import { isAddressValid } from "../../core/state/utils/address.js";
-import { blake3Hash } from '../../utils/crypto.js';
 import {
     isAdminControl,
     isBalanceInitialization,
@@ -330,7 +329,7 @@ class ApplyStateMessageBuilder {
                 throw new Error(`Unsupported operation type: ${this.#operationType}`);
         }
 
-        const tx = await blake3Hash(msg);
+        const tx = await PeerWallet.blake3(msg);
         const signature = this.#wallet.sign(tx);
 
         if (isBootstrapDeployment(this.#operationType)) {
@@ -504,7 +503,7 @@ class ApplyStateMessageBuilder {
                 throw new Error(`Unsupported operation type: ${this.#operationType}`);
         }
 
-        const tx = await blake3Hash(msg);
+        const tx = await PeerWallet.blake3(msg);
         const signature = this.#wallet.sign(tx);
         const validatorAddress = addressToBuffer(this.#wallet.address, this.#config.addressPrefix);
 
