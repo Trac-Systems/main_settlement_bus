@@ -252,7 +252,7 @@ class Network extends ReadyResource {
         const peerInfo = this.#swarm.peers.get(publicKey);
         if (peerInfo) {
             const connection = this.#swarm._allConnections.get(peerInfo.publicKey);
-            if (connection && connection.messenger) {
+            if (connection && connection.protocolSession?.getLegacy()) {
                 await this.#finalizeConnection(publicKey, type, connection);
             }
         }
@@ -269,13 +269,13 @@ class Network extends ReadyResource {
         debugLog(`Network.finalizeConnection: Connected to peer: ${publicKey} as type: ${type}`);
     }
 
-    async #sendRequestByType(stream, type) {
+    async #sendRequestByType(connection, type) {
         const waitFor = {
             validator: () => this.validatorConnectionManager.connectionCount(),
         }[type];
 
         if (type === 'validator') {
-            const legacyMessenger = connection.protocolSession?.getLegacy();
+            const legacyMessenger = connection.protocolSession.getLegacy();
             if (!legacyMessenger) return;
             await legacyMessenger.send(NETWORK_MESSAGE_TYPES.GET.VALIDATOR);
         } else {

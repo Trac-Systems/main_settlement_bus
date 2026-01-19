@@ -1,6 +1,6 @@
 import b4a from 'b4a';
 import PeerWallet from 'trac-wallet';
-import State from '../../../../state/State.js';
+import State from '../../../../../state/State.js';
 
 /*
     BaseResponse class for handling common validation logic for network responses.
