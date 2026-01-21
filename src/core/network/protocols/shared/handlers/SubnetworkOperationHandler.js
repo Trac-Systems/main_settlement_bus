@@ -1,15 +1,15 @@
 import BaseOperationHandler from './base/BaseOperationHandler.js';
 import {
     OperationType
-} from '../../../../utils/constants.js';
+} from '../../../../../utils/constants.js';
 import PartialBootstrapDeployment from "../validators/PartialBootstrapDeployment.js";
 import PartialTransaction from "../validators/PartialTransaction.js";
-import {applyStateMessageFactory} from "../../../../messages/state/applyStateMessageFactory.js";
-import {safeEncodeApplyOperation} from "../../../../utils/protobuf/operationHelpers.js";
+import {applyStateMessageFactory} from "../../../../../messages/state/applyStateMessageFactory.js";
+import {safeEncodeApplyOperation} from "../../../../../utils/protobuf/operationHelpers.js";
 import {
     normalizeBootstrapDeploymentOperation,
     normalizeTransactionOperation
-} from "../../../../utils/normalizers.js";
+} from "../../../../../utils/normalizers.js";
 
 
 class SubnetworkOperationHandler extends BaseOperationHandler {
@@ -33,17 +33,17 @@ class SubnetworkOperationHandler extends BaseOperationHandler {
         this.#partialTransactionValidator = new PartialTransaction(state, this.#wallet.address, config);
     }
 
-    async handleOperation(payload) {
+    async handleOperation(payload, connection)  {
         if (payload.type === OperationType.TX) {
-            await this.#partialTransactionSubHandler(payload);
+            await this.#partialTransactionSubHandler(payload, connection);
         } else if (payload.type === OperationType.BOOTSTRAP_DEPLOYMENT) {
-            await this.#partialBootstrapDeploymentSubHandler(payload);
+            await this.#partialBootstrapDeploymentSubHandler(payload, connection);
         } else {
             throw new Error('Unsupported operation type for SubnetworkOperationHandler');
         }
     }
 
-    async #partialTransactionSubHandler(payload) {
+    async #partialTransactionSubHandler(payload, connection) {
         const normalizedPayload = normalizeTransactionOperation(payload, this.#config);
         const isValid = await this.#partialTransactionValidator.validate(normalizedPayload);
         if (!isValid) {
@@ -65,7 +65,7 @@ class SubnetworkOperationHandler extends BaseOperationHandler {
         this.network.transactionPoolService.addTransaction(safeEncodeApplyOperation(completeTransactionOperation));
     }
 
-    async #partialBootstrapDeploymentSubHandler(payload) {
+    async #partialBootstrapDeploymentSubHandler(payload, connection) {
         const normalizedPayload = normalizeBootstrapDeploymentOperation(payload, this.#config);
         const isValid = await this.#partialBootstrapDeploymentValidator.validate(normalizedPayload);
         if (!isValid) {

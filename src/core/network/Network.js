@@ -4,7 +4,7 @@ import w from 'protomux-wakeup';
 import b4a from 'b4a';
 import TransactionPoolService from './services/TransactionPoolService.js';
 import ValidatorObserverService from './services/ValidatorObserverService.js';
-import NetworkMessages from './messaging/NetworkMessages.js';
+import NetworkMessages from './protocols/NetworkMessages.js';
 import { sleep } from '../../utils/helpers.js';
 import {
     TRAC_NAMESPACE,
@@ -18,7 +18,7 @@ import ConnectionManager from './services/ConnectionManager.js';
 import MessageOrchestrator from './services/MessageOrchestrator.js';
 import NetworkWalletFactory from './identity/NetworkWalletFactory.js';
 import { EventType } from '../../utils/constants.js';
-
+import { networkMessageFactory } from '../../messages/network/v1/networkMessageFactory.js';
 // -- Debug Mode --
 // TODO: Implement a better debug system in the future. This is just temporary.
 const DEBUG = false;
@@ -42,6 +42,7 @@ class Network extends ReadyResource {
     #pendingConnections;
     #connectTimeoutMs;
     #maxPendingConnections;
+    #wallet
 
     /**
      * @param {State} state
@@ -60,11 +61,7 @@ class Network extends ReadyResource {
         this.#networkMessages = new NetworkMessages(this, this.#config);
         this.#validatorConnectionManager = new ConnectionManager(this.#config);
         this.#validatorMessageOrchestrator = new MessageOrchestrator(this.#validatorConnectionManager, state, this.#config);
-        this.admin_stream = null;
-        this.admin = null;
-        this.validator = null;
-        this.custom_stream = null;
-        this.custom_node = null;
+
     }
 
     get swarm() {
@@ -130,17 +127,15 @@ class Network extends ReadyResource {
             if (type === 'validator') {
                 const target = b4a.from(publicKey, 'hex');
                 this.#validatorConnectionManager.addValidator(target, connection);
-                this.#sendRequestByType(connection, type);
+                this.#sendRequestByType(connection);
             }
+            
         });
     }
 
     cleanupNetworkListeners() {
-        // connect:timeout
-        this.removeAllListeners('connect:timeout');
-
-        // connect:ready
-        this.removeAllListeners('connect:ready');
+        this.removeAllListeners(EventType.VALIDATOR_CONNECTION_TIMEOUT);
+        this.removeAllListeners(EventType.VALIDATOR_CONNECTION_READY);
     }
 
     cleanupPendingConnections() {
@@ -157,7 +152,7 @@ class Network extends ReadyResource {
     ) {
         if (!this.#swarm) {
             const keyPair = await this.initializeNetworkingKeyPair(store, wallet);
-            const wrappedWallet = this.#getNetworkWalletWrapper(wallet, keyPair);
+            this.#wallet = this.#getNetworkWalletWrapper(wallet, keyPair);
             this.#swarm = new Hyperswarm({
                 keyPair,
                 bootstrap: this.#config.dhtBootstrap,
@@ -168,11 +163,14 @@ class Network extends ReadyResource {
             });
 
             console.log(`Channel: ${b4a.toString(this.#config.channel)}`);
-            this.#networkMessages.initializeMessageRouter(state, wrappedWallet);
+            this.#networkMessages.initializeMessageRouter(state, this.#wallet);
 
             this.#swarm.on('connection', async (connection) => {
-                const { message_channel, message } = await this.#networkMessages.setupProtomuxMessages(connection);
-                connection.messenger = message;
+                // Per-peer connection initialization:
+                // - attach Protomux (legacy + v1 channels/messages)
+                // - attach connection.protocolSession (used later by tryConnect / orchestrators to send messages)
+                const { protocolChannels } = await this.#networkMessages.setupProtomuxMessages(connection);
+                const channels = protocolChannels;
 
                 // ATTENTION: Must be called AFTER the protomux init above
                 const stream = store.replicate(connection);
@@ -185,17 +183,12 @@ class Network extends ReadyResource {
                 }
 
                 connection.on('close', () => {
-                    if (this.admin_stream === connection) {
-                        this.admin_stream = null;
-                        this.admin = null;
+                    if (channels.legacy) {
+                        try { channels.legacy.close() } catch (e) { }
                     }
-
-                    if (this.custom_stream === connection) {
-                        this.custom_stream = null;
-                        this.custom_node = null;
+                    if (channels.v1) {
+                        try { channels.v1.close() } catch (e) { }
                     }
-                    try { message_channel.close() } catch (e) { }
-
                 });
 
                 connection.on('error', (error) => {
@@ -209,7 +202,6 @@ class Network extends ReadyResource {
                         return;
                     }
                     console.error(error.message)
-
                 });
 
             });
@@ -259,7 +251,7 @@ class Network extends ReadyResource {
         const peerInfo = this.#swarm.peers.get(publicKey);
         if (peerInfo) {
             const connection = this.#swarm._allConnections.get(peerInfo.publicKey);
-            if (connection && connection.messenger) {
+            if (connection && connection.protocolSession) {
                 await this.#finalizeConnection(publicKey, type, connection);
             }
         }
@@ -276,23 +268,12 @@ class Network extends ReadyResource {
         debugLog(`Network.finalizeConnection: Connected to peer: ${publicKey} as type: ${type}`);
     }
 
-    async #sendRequestByType(stream, type) {
-        const waitFor = {
-            validator: () => this.validatorConnectionManager.connectionCount(),
-            admin: () => this.admin_stream,
-            node: () => this.custom_stream
-        }[type];
 
-        if (type === 'validator') {
-            await stream.messenger.send(NETWORK_MESSAGE_TYPES.GET.VALIDATOR);
-        } else if (type === 'admin') {
-            await stream.messenger.send(NETWORK_MESSAGE_TYPES.GET.ADMIN);
-        } else if (type === 'node') {
-            await stream.messenger.send(NETWORK_MESSAGE_TYPES.GET.NODE);
-        } else {
-            return;
-        }
-        await this.spinLock(() => !waitFor())
+    async #sendRequestByType(connection) {
+
+        const legacyMessenger = connection.protocolSession.getLegacy();
+        if (!legacyMessenger) return;
+        await legacyMessenger.send(NETWORK_MESSAGE_TYPES.GET.VALIDATOR);
     };
 
     async spinLock(conditionFn, maxIterations = 1500, intervalMs = 10) {

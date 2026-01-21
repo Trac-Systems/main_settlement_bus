@@ -1,6 +1,6 @@
 import b4a from 'b4a';
-import {safeDecodeApplyOperation} from "../../../../utils/protobuf/operationHelpers.js";
-import deploymentEntryUtils from "../../../state/utils/deploymentEntry.js";
+import {safeDecodeApplyOperation} from "../../../../../utils/protobuf/operationHelpers.js";
+import deploymentEntryUtils from "../../../../state/utils/deploymentEntry.js";
 import PartialOperation from './base/PartialOperation.js';
 
 class PartialTransaction extends PartialOperation {

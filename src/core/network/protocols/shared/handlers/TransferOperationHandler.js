@@ -1,9 +1,9 @@
 import BaseOperationHandler from './base/BaseOperationHandler.js';
-import {OperationType} from '../../../../utils/constants.js';
+import {OperationType} from '../../../../../utils/constants.js';
 import PartialTransfer from "../validators/PartialTransfer.js";
-import {normalizeTransferOperation} from "../../../../utils/normalizers.js"
-import {applyStateMessageFactory} from "../../../../messages/state/applyStateMessageFactory.js";
-import {safeEncodeApplyOperation} from "../../../../utils/protobuf/operationHelpers.js";
+import {normalizeTransferOperation} from "../../../../../utils/normalizers.js"
+import {applyStateMessageFactory} from "../../../../../messages/state/applyStateMessageFactory.js";
+import {safeEncodeApplyOperation} from "../../../../../utils/protobuf/operationHelpers.js";
 
 class TransferOperationHandler extends BaseOperationHandler {
     #partialTransferValidator;
@@ -24,14 +24,14 @@ class TransferOperationHandler extends BaseOperationHandler {
         this.#partialTransferValidator = new PartialTransfer(state, this.#wallet.address, this.#config);
     }
 
-    async handleOperation(payload) {
+    async handleOperation(payload, connection) {
         if (payload.type !== OperationType.TRANSFER) {
             throw new Error('Unsupported operation type for TransferOperationHandler');
         }
-        await this.#handleTransfer(payload);
+        await this.#handleTransfer(payload, connection);
     }
 
-    async #handleTransfer(payload) {
+    async #handleTransfer(payload, connection) {
         const normalizedPayload = normalizeTransferOperation(payload, this.#config);
         const isValid = await this.#partialTransferValidator.validate(normalizedPayload);
         if (!isValid) {

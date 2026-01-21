@@ -1,5 +1,5 @@
 import b4a from 'b4a';
-import {MAX_PARTIAL_TX_PAYLOAD_BYTE_SIZE, TRANSACTION_POOL_SIZE} from '../../../../../utils/constants.js';
+import {MAX_PARTIAL_TX_PAYLOAD_BYTE_SIZE, TRANSACTION_POOL_SIZE} from '../../../../../../utils/constants.js';
 
 class BaseOperationHandler {
     #network;

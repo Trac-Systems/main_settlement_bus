@@ -1,7 +1,7 @@
 import PeerWallet from 'trac-wallet';
 
-import {bufferToAddress} from "../../../state/utils/address.js";
-import {bufferToBigInt} from "../../../../utils/amountSerialization.js";
+import {bufferToAddress} from "../../../../state/utils/address.js";
+import {bufferToBigInt} from "../../../../../utils/amountSerialization.js";
 import PartialOperation from './base/PartialOperation.js';
 
 class PartialTransfer extends PartialOperation {

@@ -1,4 +1,4 @@
-import { NETWORK_MESSAGE_TYPES } from '../../../../utils/constants.js';
+import { NETWORK_MESSAGE_TYPES } from '../../../../../utils/constants.js';
 import PeerWallet from 'trac-wallet';
 import b4a from 'b4a';
 
