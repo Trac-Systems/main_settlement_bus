@@ -24,14 +24,14 @@ class TransferOperationHandler extends BaseOperationHandler {
         this.#partialTransferValidator = new PartialTransfer(state, this.#wallet.address, this.#config);
     }
 
-    async handleOperation(payload) {
+    async handleOperation(payload, connection) {
         if (payload.type !== OperationType.TRANSFER) {
             throw new Error('Unsupported operation type for TransferOperationHandler');
         }
-        await this.#handleTransfer(payload);
+        await this.#handleTransfer(payload, connection);
     }
 
-    async #handleTransfer(payload) {
+    async #handleTransfer(payload, connection) {
         const normalizedPayload = normalizeTransferOperation(payload, this.#config);
         const isValid = await this.#partialTransferValidator.validate(normalizedPayload);
         if (!isValid) {

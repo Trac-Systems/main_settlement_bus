@@ -40,6 +40,7 @@ class NetworkMessages {
             wallet,
             this.#config
         );
+        
         this.#v1MessageRouter = new NetworkMessageRouterV1(
             this.#network,
             state,
@@ -115,6 +116,7 @@ class NetworkMessages {
         // ProtocolSession is attached to the Hyperswarm connection so other parts of the system (e.g. tryConnect)
         // can send messages without knowing how Protomux was initialized.
         const protocolSession = new ProtocolSession(legacy_message, v1_message);
+        
         connection.protocolSession = protocolSession;
         return {
             protocolChannels: { legacy: legacy_channel, v1: v1_channel },

@@ -37,7 +37,7 @@ class TransactionPoolService {
             console.info('TransactionPoolService can not start. Wallet is not enabled');
             return;
         }
-        if (this.scheduler && this.scheduler.isRunning) {
+        if (this.scheduler && this.#scheduler.isRunning) {
             console.info('TransactionPoolService is already started');
             return;
         }
@@ -65,7 +65,6 @@ class TransactionPoolService {
 
     async #processTransactions() {
         const canValidate = await this.#checkValidationPermissions();
-
         if (canValidate && this.#tx_pool.length > 0) {
             const batch = this.#prepareBatch();
             await this.#state.append(batch);

@@ -18,7 +18,7 @@ import ConnectionManager from './services/ConnectionManager.js';
 import MessageOrchestrator from './services/MessageOrchestrator.js';
 import NetworkWalletFactory from './identity/NetworkWalletFactory.js';
 import { EventType } from '../../utils/constants.js';
-
+import { networkMessageFactory } from '../../messages/network/v1/networkMessageFactory.js';
 // -- Debug Mode --
 // TODO: Implement a better debug system in the future. This is just temporary.
 const DEBUG = false;
@@ -42,6 +42,7 @@ class Network extends ReadyResource {
     #pendingConnections;
     #connectTimeoutMs;
     #maxPendingConnections;
+    #wallet
 
     /**
      * @param {State} state
@@ -126,17 +127,15 @@ class Network extends ReadyResource {
             if (type === 'validator') {
                 const target = b4a.from(publicKey, 'hex');
                 this.#validatorConnectionManager.addValidator(target, connection);
-                this.#sendRequestByType(connection, type);
+                this.#sendRequestByType(connection);
             }
+            
         });
     }
 
     cleanupNetworkListeners() {
-        // connect:timeout
-        this.removeAllListeners('connect:timeout');
-
-        // connect:ready
-        this.removeAllListeners('connect:ready');
+        this.removeAllListeners(EventType.VALIDATOR_CONNECTION_TIMEOUT);
+        this.removeAllListeners(EventType.VALIDATOR_CONNECTION_READY);
     }
 
     cleanupPendingConnections() {
@@ -153,7 +152,7 @@ class Network extends ReadyResource {
     ) {
         if (!this.#swarm) {
             const keyPair = await this.initializeNetworkingKeyPair(store, wallet);
-            const wrappedWallet = this.#getNetworkWalletWrapper(wallet, keyPair);
+            this.#wallet = this.#getNetworkWalletWrapper(wallet, keyPair);
             this.#swarm = new Hyperswarm({
                 keyPair,
                 bootstrap: this.#config.dhtBootstrap,
@@ -164,7 +163,7 @@ class Network extends ReadyResource {
             });
 
             console.log(`Channel: ${b4a.toString(this.#config.channel)}`);
-            this.#networkMessages.initializeMessageRouter(state, wrappedWallet);
+            this.#networkMessages.initializeMessageRouter(state, this.#wallet);
 
             this.#swarm.on('connection', async (connection) => {
                 // Per-peer connection initialization:
@@ -252,7 +251,7 @@ class Network extends ReadyResource {
         const peerInfo = this.#swarm.peers.get(publicKey);
         if (peerInfo) {
             const connection = this.#swarm._allConnections.get(peerInfo.publicKey);
-            if (connection && connection.protocolSession?.getLegacy()) {
+            if (connection && connection.protocolSession) {
                 await this.#finalizeConnection(publicKey, type, connection);
             }
         }
@@ -269,19 +268,12 @@ class Network extends ReadyResource {
         debugLog(`Network.finalizeConnection: Connected to peer: ${publicKey} as type: ${type}`);
     }
 
-    async #sendRequestByType(connection, type) {
-        const waitFor = {
-            validator: () => this.validatorConnectionManager.connectionCount(),
-        }[type];
 
-        if (type === 'validator') {
-            const legacyMessenger = connection.protocolSession.getLegacy();
-            if (!legacyMessenger) return;
-            await legacyMessenger.send(NETWORK_MESSAGE_TYPES.GET.VALIDATOR);
-        } else {
-            return;
-        }
-        await this.spinLock(() => !waitFor())
+    async #sendRequestByType(connection) {
+
+        const legacyMessenger = connection.protocolSession.getLegacy();
+        if (!legacyMessenger) return;
+        await legacyMessenger.send(NETWORK_MESSAGE_TYPES.GET.VALIDATOR);
     };
 
     async spinLock(conditionFn, maxIterations = 1500, intervalMs = 10) {
