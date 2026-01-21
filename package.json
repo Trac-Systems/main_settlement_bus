@@ -66,5 +66,9 @@
   "publishConfig": {
     "registry": "https://registry.npmjs.org",
     "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Trac-Systems/main_settlement_bus"
   }
 }
