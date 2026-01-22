@@ -94,6 +94,7 @@ class Network extends ReadyResource {
     }
 
     async _close() {
+        // TODO: Implement better "await" logic for stopping services
         console.log('Network: closing gracefully...');
         this.transactionPoolService.stopPool();
         await sleep(100);
@@ -169,8 +170,7 @@ class Network extends ReadyResource {
                 // Per-peer connection initialization:
                 // - attach Protomux (legacy + v1 channels/messages)
                 // - attach connection.protocolSession (used later by tryConnect / orchestrators to send messages)
-                const { protocolChannels } = await this.#networkMessages.setupProtomuxMessages(connection);
-                const channels = protocolChannels;
+                await this.#networkMessages.setupProtomuxMessages(connection);
 
                 // ATTENTION: Must be called AFTER the protomux init above
                 const stream = store.replicate(connection);
@@ -183,12 +183,8 @@ class Network extends ReadyResource {
                 }
 
                 connection.on('close', () => {
-                    if (channels.legacy) {
-                        try { channels.legacy.close() } catch (e) { }
-                    }
-                    if (channels.v1) {
-                        try { channels.v1.close() } catch (e) { }
-                    }
+                    this.#validatorConnectionManager.remove(publicKey);
+                    connection.protocolSession.close();
                 });
 
                 connection.on('error', (error) => {
@@ -270,10 +266,9 @@ class Network extends ReadyResource {
 
 
     async #sendRequestByType(connection) {
-
-        const legacyMessenger = connection.protocolSession.getLegacy();
-        if (!legacyMessenger) return;
-        await legacyMessenger.send(NETWORK_MESSAGE_TYPES.GET.VALIDATOR);
+        const messenger = connection.protocolSession;
+        if (!messenger) return;
+        await messenger.send(NETWORK_MESSAGE_TYPES.GET.VALIDATOR);
     };
 
     async spinLock(conditionFn, maxIterations = 1500, intervalMs = 10) {

@@ -57,20 +57,20 @@ class NetworkMessages {
 
         // "legacy" protocol: JSON payloads (compact-encoding c.json).
         // This keeps backward-compatibility with older nodes that only speak the legacy protocol.
-        const legacy_channel = mux.createChannel({
+        const legacyChannel = mux.createChannel({
             protocol: this.#protocol_versions.legacy,
             onopen() { },
             onclose() { }
         });
 
-        legacy_channel.open();
+        legacyChannel.open();
 
-        const legacy_message = legacy_channel.addMessage({
+        const legacySession = legacyChannel.addMessage({
             encoding: c.json,
             onmessage: async (incomingMessage) => {
                 try {
                     if (typeof incomingMessage === 'object' || typeof incomingMessage === 'string') {
-                        await this.#legacyMessageRouter.route(incomingMessage, connection, legacy_message);
+                        await this.#legacyMessageRouter.route(incomingMessage, connection, legacySession);
                     } else {
                         throw new Error('NetworkMessages: Received message is undefined');
                     }
@@ -87,20 +87,20 @@ class NetworkMessages {
 
         // "v1" protocol: binary payloads (protobuf over compact-encoding c.raw).
         // It runs on a different Protomux protocol name so legacy and v1 can coexist.
-        const v1_channel = mux.createChannel({
+        const v1Channel = mux.createChannel({
             protocol: this.#protocol_versions.v1,
             onopen() { },
             onclose() { }
         });
 
-        v1_channel.open();
+        v1Channel.open();
 
-        const v1_message = v1_channel.addMessage({
+        const v1Session = v1Channel.addMessage({
             encoding: c.raw,
             onmessage: async (incomingMessage) => {
                 try {
                     if (b4a.isBuffer(incomingMessage)) {
-                        await this.#v1MessageRouter.route(incomingMessage, connection, v1_message);
+                        await this.#v1MessageRouter.route(incomingMessage, connection, v1Session);
                     } else {
                         throw new Error('NetworkMessages: v1 message must be a buffer');
                     }
@@ -115,12 +115,9 @@ class NetworkMessages {
 
         // ProtocolSession is attached to the Hyperswarm connection so other parts of the system (e.g. tryConnect)
         // can send messages without knowing how Protomux was initialized.
-        const protocolSession = new ProtocolSession(legacy_message, v1_message);
+        const protocolSession = new ProtocolSession(legacyChannel, legacySession, v1Channel, v1Session);
         
         connection.protocolSession = protocolSession;
-        return {
-            protocolChannels: { legacy: legacy_channel, v1: v1_channel },
-        };
     }
 }
 
