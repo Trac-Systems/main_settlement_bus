@@ -126,8 +126,6 @@ class Network extends ReadyResource {
             this.#pendingConnections.delete(publicKey);
 
             if (type === 'validator') {
-                const target = b4a.from(publicKey, 'hex');
-                this.#validatorConnectionManager.addValidator(target, connection);
                 this.#sendRequestByType(connection);
             }
             
