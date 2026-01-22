@@ -63,6 +63,14 @@ export const EventType = Object.freeze({
     VALIDATOR_CONNECTION_TIMEOUT: 'validator-connection-timeout',
 });
 
+export const LegacyProtocolEventType = Object.freeze({
+    GET: 'get',
+    RESPONSE: 'response',
+    ROLE_TRANSACTION: 'roleTransaction',
+    SUBNETWORK_TRANSACTION: 'subNetworkTransaction',
+    TRANSFER_TRANSACTION: 'tracNetworkTransaction',
+});
+
 // Role managment constants
 export const CustomEventType = Object.freeze({
     IS_INDEXER: 'msb:is-indexer',

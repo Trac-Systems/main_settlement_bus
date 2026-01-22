@@ -6,6 +6,7 @@ import NetworkMessageRouter from './legacy/NetworkMessageRouter.js';
 import NetworkMessageRouterV1 from './v1/NetworkMessageRouter.js';
 import ProtocolSession from './ProtocolSession.js';
 import Network from '../Network.js';
+import LegacyProtocol from './LegacyProtocol.js';
 class NetworkMessages {
     #legacyMessageRouter;
     #v1MessageRouter;
@@ -34,59 +35,59 @@ class NetworkMessages {
     }
 
     initializeMessageRouter(state, wallet) {
-        this.#legacyMessageRouter = new NetworkMessageRouter(
-            this.#network,
-            state,
-            wallet,
-            this.#config
-        );
+        this.#legacyMessageRouter = new NetworkMessageRouter(this.#network, this.#config);
         
-        this.#v1MessageRouter = new NetworkMessageRouterV1(
-            this.#network,
-            state,
-            wallet,
-            this.#config
-        );
+        // this.#v1MessageRouter = new NetworkMessageRouterV1(
+        //     this.#network,
+        //     state,
+        //     wallet,
+        //     this.#config
+        // );
     }
 
     async setupProtomuxMessages(connection) {
         // Attach a Protomux instance to this Hyperswarm connection.
         // Protomux multiplexes multiple logical protocol channels over a single encrypted stream.
-        const mux = Protomux.from(connection);
-        connection.userData = mux;
+        
+
+        const legacyProtocol = new LegacyProtocol(this.#network, connection, this.#config);
+        // legacyProtocol.channel.open()
+        // legacyProtocol.session.send()
 
         // "legacy" protocol: JSON payloads (compact-encoding c.json).
         // This keeps backward-compatibility with older nodes that only speak the legacy protocol.
-        const legacyChannel = mux.createChannel({
-            protocol: this.#protocol_versions.legacy,
-            onopen() { },
-            onclose() { }
-        });
+        // const legacyChannel = mux.createChannel({
+        //     protocol: this.#protocol_versions.legacy,
+        //     onopen() { },
+        //     onclose() { }
+        // });
 
-        legacyChannel.open();
+        // legacyChannel.open();
 
-        const legacySession = legacyChannel.addMessage({
-            encoding: c.json,
-            onmessage: async (incomingMessage) => {
-                try {
-                    if (typeof incomingMessage === 'object' || typeof incomingMessage === 'string') {
-                        await this.#legacyMessageRouter.route(incomingMessage, connection, legacySession);
-                    } else {
-                        throw new Error('NetworkMessages: Received message is undefined');
-                    }
-                } catch (error) {
-                    console.error(`NetworkMessages: Failed to handle incoming message: ${error.message}`);
-                } finally {
-                    // Stop attempting to maintain a direct joinPeer connection after handling a message.
-                    // NOTE: hyperswarm.leavePeer does NOT destroy an existing connection.
-                    //TODO: We need to change this.
-                    this.#network.swarm.leavePeer(connection.remotePublicKey);
-                }
-            }
-        });
+        // const legacySession = legacyChannel.addMessage({
+        //     encoding: c.json,
+        //     onmessage: async (incomingMessage) => {
+        //         try {
+        //             if (typeof incomingMessage === 'object' || typeof incomingMessage === 'string') {
+        //                 await this.#legacyMessageRouter.route(incomingMessage, connection, legacySession);
+        //             } else {
+        //                 throw new Error('NetworkMessages: Received message is undefined');
+        //             }
+        //         } catch (error) {
+        //             console.error(`NetworkMessages: Failed to handle incoming message: ${error.message}`);
+        //         } finally {
+        //             // Stop attempting to maintain a direct joinPeer connection after handling a message.
+        //             // NOTE: hyperswarm.leavePeer does NOT destroy an existing connection.
+        //             //TODO: We need to change this.
+        //             this.#network.swarm.leavePeer(connection.remotePublicKey);
+        //         }
+        //     }
+        // });
 
         // "v1" protocol: binary payloads (protobuf over compact-encoding c.raw).
         // It runs on a different Protomux protocol name so legacy and v1 can coexist.
+        const mux = Protomux.from(connection);
+        connection.userData = mux;
         const v1Channel = mux.createChannel({
             protocol: this.#protocol_versions.v1,
             onopen() { },
@@ -115,7 +116,7 @@ class NetworkMessages {
 
         // ProtocolSession is attached to the Hyperswarm connection so other parts of the system (e.g. tryConnect)
         // can send messages without knowing how Protomux was initialized.
-        const protocolSession = new ProtocolSession(legacyChannel, legacySession, v1Channel, v1Session);
+        const protocolSession = new ProtocolSession(legacyProtocol.channel, legacyProtocol.session, v1Channel, v1Session);
         
         connection.protocolSession = protocolSession;
     }

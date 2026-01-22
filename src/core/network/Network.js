@@ -19,6 +19,8 @@ import MessageOrchestrator from './services/MessageOrchestrator.js';
 import NetworkWalletFactory from './identity/NetworkWalletFactory.js';
 import { EventType } from '../../utils/constants.js';
 import { networkMessageFactory } from '../../messages/network/v1/networkMessageFactory.js';
+import TransactionRateLimiterService from './services/TransactionRateLimiterService.js';
+import LegacyProtocolProcesser from './services/LegacyProtocolProcesser.js';
 // -- Debug Mode --
 // TODO: Implement a better debug system in the future. This is just temporary.
 const DEBUG = false;
@@ -42,7 +44,9 @@ class Network extends ReadyResource {
     #pendingConnections;
     #connectTimeoutMs;
     #maxPendingConnections;
-    #wallet
+    #wallet;
+    #rateLimiterService;
+    #legacyProtocolProcesser;
 
     /**
      * @param {State} state
@@ -58,9 +62,11 @@ class Network extends ReadyResource {
         this.#pendingConnections = new Map();
         this.#transactionPoolService = new TransactionPoolService(state, address, this.#config);
         this.#validatorObserverService = new ValidatorObserverService(this, state, address, this.#config);
+        this.#rateLimiterService = new TransactionRateLimiterService();
         this.#networkMessages = new NetworkMessages(this, this.#config);
         this.#validatorConnectionManager = new ConnectionManager(this.#config);
         this.#validatorMessageOrchestrator = new MessageOrchestrator(this.#validatorConnectionManager, state, this.#config);
+
 
     }
 
@@ -88,7 +94,6 @@ class Network extends ReadyResource {
         console.log('Network initialization...');
 
         this.setupNetworkListeners();
-
         this.transactionPoolService.start();
         this.validatorObserverService.start();
     }
@@ -100,7 +105,7 @@ class Network extends ReadyResource {
         await sleep(100);
         this.#validatorObserverService.stopValidatorObserver();
         await sleep(5_000);
-
+        
         this.cleanupNetworkListeners();
         this.cleanupPendingConnections();
 
@@ -128,7 +133,7 @@ class Network extends ReadyResource {
             if (type === 'validator') {
                 this.#sendRequestByType(connection);
             }
-            
+
         });
     }
 
@@ -152,6 +157,16 @@ class Network extends ReadyResource {
         if (!this.#swarm) {
             const keyPair = await this.initializeNetworkingKeyPair(store, wallet);
             this.#wallet = this.#getNetworkWalletWrapper(wallet, keyPair);
+            if (!this.#legacyProtocolProcesser) {
+                this.#legacyProtocolProcesser = new LegacyProtocolProcesser(
+                    this,
+                    state,
+                    this.#wallet,
+                    this.#rateLimiterService,
+                    this.#config
+                );
+            }
+
             this.#swarm = new Hyperswarm({
                 keyPair,
                 bootstrap: this.#config.dhtBootstrap,
@@ -268,14 +283,6 @@ class Network extends ReadyResource {
         if (!messenger) return;
         await messenger.send(NETWORK_MESSAGE_TYPES.GET.VALIDATOR);
     };
-
-    async spinLock(conditionFn, maxIterations = 1500, intervalMs = 10) {
-        let counter = 0;
-        while (conditionFn() && counter < maxIterations) {
-            await sleep(intervalMs);
-            counter++;
-        }
-    }
 
     #getNetworkWalletWrapper(wallet, keyPair) {
         if (!this.#identityProvider) {
