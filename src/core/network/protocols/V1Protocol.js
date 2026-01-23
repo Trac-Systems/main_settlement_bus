@@ -3,7 +3,7 @@ import ProtocolInterface from './ProtocolInterface.js';
 import b4a from 'b4a';
 import c from 'compact-encoding';
 
-class LegacyProtocol extends ProtocolInterface {
+class V1Protocol extends ProtocolInterface {
     #channel;
     #session;
     #config;
@@ -25,30 +25,28 @@ class LegacyProtocol extends ProtocolInterface {
     }
 
     init(connection) {
-        // TODO: Abstract in a separate function
         const mux = Protomux.from(connection);
         connection.userData = mux;
 
         this.#channel = mux.createChannel({
-            protocol: b4a.toString(this.#config.channel, 'utf8'),
+            protocol: 'network/v1',
             onopen() { },
             onclose() { }
         });
 
         this.#channel.open();
 
-        // Todo: Abstract in a separate function
         this.#session = this.#channel.addMessage({
-            encoding: c.json,
+            encoding: c.raw,
             onmessage: async (incomingMessage) => {
                 try {
-                    if (typeof incomingMessage === 'object' || typeof incomingMessage === 'string') {
+                    if (b4a.isBuffer(incomingMessage)) {
                         await this.#router.route(incomingMessage, connection, this.#session);
                     } else {
-                        throw new Error('NetworkMessages: Received message is undefined');
+                        throw new Error('NetworkMessages: v1 message must be a buffer');
                     }
                 } catch (error) {
-                    console.error(`NetworkMessages: Failed to handle incoming message: ${error.message}`);
+                    console.error(`NetworkMessages: Failed to handle incoming v1 message: ${error.message}`);
                 }
             }
         });
@@ -61,7 +59,6 @@ class LegacyProtocol extends ProtocolInterface {
     close() {
         this.#channel.close();
     }
-
 }
 
-export default LegacyProtocol;
+export default V1Protocol;

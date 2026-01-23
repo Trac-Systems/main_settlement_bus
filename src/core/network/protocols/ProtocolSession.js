@@ -4,33 +4,27 @@
 // Why it exists:
 // - `setupProtomuxMessages(connection)` creates Protomux channels/messages for a specific peer.
 class ProtocolSession {
-    #legacySession;
-    #legacyChannel;
+    #legacyProtocol;
+    #v1Protocol;
 
-    #v1Session;
-    #v1Channel;
-
-    constructor(legacyChannel, legacySession, v1Channel, v1Session) {
+    constructor(legacyProtocol, v1Protocol) {
         // These are Protomux "message" objects (returned by channel.addMessage).
         // They are connection-scoped and expose .send(...), already wired to the channel's encoding.
-        this.#legacyChannel = legacyChannel;
-        this.#legacySession = legacySession;
-
-        this.#v1Session = v1Session;
-        this.#v1Channel = v1Channel;
+        this.#legacyProtocol = legacyProtocol;
+        this.#v1Protocol = v1Protocol;
     }
 
     getLegacy() {
-        return this.#legacySession;
+        return this.#legacyProtocol;
     }
 
     getV1() {
-        return this.#v1Session;
+        return this.#v1Protocol;
     }
 
     get(protocol) {
-        if (protocol === 'legacy') return this.#legacySession;
-        if (protocol === 'v1') return this.#v1Session;
+        if (protocol === 'legacy') return this.#legacyProtocol;
+        if (protocol === 'v1') return this.#v1Protocol;
         return null;
     }
 
@@ -40,21 +34,21 @@ class ProtocolSession {
 
     send(message) {
         // TODO: Support v1 messages
-        this.#legacySession.send(message);
+        this.#legacyProtocol.send(message);
     }
 
     close() {
-        if (this.#legacyChannel) {
+        if (this.#legacyProtocol) {
             try {
-                this.#legacyChannel.close();
+                this.#legacyProtocol.close();
             } catch (e) {
                 console.error('Failed to close legacy channel:', e); // TODO: Think about throwing instead
             }
         }
 
-        if (this.#v1Channel) {
+        if (this.#v1Protocol) {
             try {
-                this.#v1Channel.close();
+                this.#v1Protocol.close();
             } catch (e) {
                 console.error('Failed to close v1 channel:', e); // TODO: Think about throwing instead
             }

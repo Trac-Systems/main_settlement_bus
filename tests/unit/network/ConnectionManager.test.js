@@ -36,7 +36,7 @@ const makeManager = (maxValidators = 6, conns = connections) => {
 const reset = () => {
     sinon.restore()
     connections.forEach(connection => {
-        connection.connection.protocolSession.getLegacy().send.resetHistory()
+        connection.connection.protocolSession.send.resetHistory()
     })
 }
 
@@ -125,7 +125,7 @@ test('ConnectionManager', () => {
 
             const target = connectionManager.send([1,2,3,4])
 
-            const totalCalls = connections.reduce((sum, con) => sum + con.connection.protocolSession.getLegacy().send.callCount, 0)
+            const totalCalls = connections.reduce((sum, con) => sum + con.connection.protocolSession.send.callCount, 0)
             t.is(totalCalls, 1, 'should send to exactly one validator')
             t.ok(target, 'should return a target public key')
         })
@@ -138,7 +138,7 @@ test('ConnectionManager', () => {
             ]
 
             errorConnections.forEach(con => {
-                con.connection.protocolSession.getLegacy().send = sinon.stub().throws(new Error())
+                con.connection.protocolSession.send = sinon.stub().throws(new Error())
             })
 
             const connectionManager = makeManager(5, errorConnections)

@@ -58,7 +58,6 @@ class Network extends ReadyResource {
         this.#pendingConnections = new Map();
         this.#transactionPoolService = new TransactionPoolService(state, address, this.#config);
         this.#validatorObserverService = new ValidatorObserverService(this, state, address, this.#config);
-        this.#networkMessages = new NetworkMessages(this.#config);
         this.#validatorConnectionManager = new ConnectionManager(this.#config);
         this.#validatorMessageOrchestrator = new MessageOrchestrator(this.#validatorConnectionManager, state, this.#config);
 
@@ -117,7 +116,7 @@ class Network extends ReadyResource {
         });
 
         // VALIDATOR_CONNECTION_READY
-        this.on(EventType.VALIDATOR_CONNECTION_READY, ({ publicKey, type, connection }) => {
+        this.on(EventType.VALIDATOR_CONNECTION_READY, async ({ publicKey, type, connection }) => {
             debugLog(`Network Event: VALIDATOR_CONNECTION_READY | PublicKey: ${publicKey} | Type: ${type}`);
             const { timeoutId } = this.#pendingConnections.get(publicKey);
             if (!timeoutId) return;
@@ -126,7 +125,7 @@ class Network extends ReadyResource {
             this.#pendingConnections.delete(publicKey);
 
             if (type === 'validator') {
-                this.#sendRequestByType(connection);
+                await connection.protocolSession.send(NETWORK_MESSAGE_TYPES.GET.VALIDATOR);
             }
 
         });
@@ -162,13 +161,15 @@ class Network extends ReadyResource {
             });
 
             this.#rateLimiter = new TransactionRateLimiterService(this.#swarm);
-            this.#networkMessages.initializeMessageRouter(
+            this.#networkMessages = new NetworkMessages(
                 state,
                 wrappedWallet,
                 this.#rateLimiter,
                 this.#transactionPoolService,
-                this.#validatorConnectionManager
+                this.#validatorConnectionManager,
+                this.#config
             );
+
             console.log(`Channel: ${b4a.toString(this.#config.channel)}`);
 
             this.#swarm.on('connection', async (connection) => {
@@ -188,6 +189,7 @@ class Network extends ReadyResource {
                 }
 
                 connection.on('close', () => {
+                    this.#swarm.leavePeer(connection.remotePublicKey);
                     this.#validatorConnectionManager.remove(publicKey);
                     connection.protocolSession.close();
                 });
@@ -267,21 +269,6 @@ class Network extends ReadyResource {
         if (!this.#pendingConnections.has(publicKey)) return;
         this.emit(EventType.VALIDATOR_CONNECTION_READY, { publicKey, type, connection });
         debugLog(`Network.finalizeConnection: Connected to peer: ${publicKey} as type: ${type}`);
-    }
-
-
-    async #sendRequestByType(connection) {
-        const messenger = connection.protocolSession;
-        if (!messenger) return;
-        await messenger.send(NETWORK_MESSAGE_TYPES.GET.VALIDATOR);
-    };
-
-    async spinLock(conditionFn, maxIterations = 1500, intervalMs = 10) {
-        let counter = 0;
-        while (conditionFn() && counter < maxIterations) {
-            await sleep(intervalMs);
-            counter++;
-        }
     }
 
     #getNetworkWalletWrapper(wallet, keyPair) {
