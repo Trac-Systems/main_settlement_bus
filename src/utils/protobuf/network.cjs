@@ -598,8 +598,8 @@ function defineMessageHeader () {
       var len = encodings.enum.encodingLength(obj.type)
       length += 1 + len
     }
-    if (defined(obj.session_id)) {
-      var len = encodings.varint.encodingLength(obj.session_id)
+    if (defined(obj.id)) {
+      var len = encodings.string.encodingLength(obj.id)
       length += 1 + len
     }
     if (defined(obj.timestamp)) {
@@ -656,10 +656,10 @@ function defineMessageHeader () {
       encodings.enum.encode(obj.type, buf, offset)
       offset += encodings.enum.encode.bytes
     }
-    if (defined(obj.session_id)) {
-      buf[offset++] = 16
-      encodings.varint.encode(obj.session_id, buf, offset)
-      offset += encodings.varint.encode.bytes
+    if (defined(obj.id)) {
+      buf[offset++] = 18
+      encodings.string.encode(obj.id, buf, offset)
+      offset += encodings.string.encode.bytes
     }
     if (defined(obj.timestamp)) {
       buf[offset++] = 24
@@ -727,7 +727,7 @@ function defineMessageHeader () {
     var oldOffset = offset
     var obj = {
       type: 0,
-      session_id: 0,
+      id: "",
       timestamp: 0,
       validator_connection_request: null,
       validator_connection_response: null,
@@ -751,8 +751,8 @@ function defineMessageHeader () {
         offset += encodings.enum.decode.bytes
         break
         case 2:
-        obj.session_id = encodings.varint.decode(buf, offset)
-        offset += encodings.varint.decode.bytes
+        obj.id = encodings.string.decode(buf, offset)
+        offset += encodings.string.decode.bytes
         break
         case 3:
         obj.timestamp = encodings.varint.decode(buf, offset)

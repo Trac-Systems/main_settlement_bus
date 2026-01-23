@@ -1,6 +1,6 @@
 import test from 'brittle';
 import b4a from 'b4a';
-import { createMessage, isBufferValid, safeWriteUInt32BE, deepCopyBuffer, encodeCapabilities, timestampToBuffer, sessionIdToBuffer } from '../../../../src/utils/buffer.js';
+import { createMessage, isBufferValid, safeWriteUInt32BE, deepCopyBuffer, encodeCapabilities, timestampToBuffer, idToBuffer } from '../../../../src/utils/buffer.js';
 import { errorMessageIncludes } from "../../../helpers/regexHelper.js";
 
 const invalidDataTypes = [
@@ -226,24 +226,26 @@ test('encodeCapabilities - throws on invalid input', t => {
     );
 });
 
-test('timestampToBuffer and sessionIdToBuffer - encode uint64 BE', t => {
+test('timestampToBuffer - encodes uint64 BE', t => {
     const ts = 2n ** 53n; // beyond uint32
-    const sid = 1234567890123n;
 
     const tsBuf = timestampToBuffer(ts);
-    const sidBuf = sessionIdToBuffer(sid);
 
     t.is(tsBuf.length, 8);
-    t.is(sidBuf.length, 8);
     t.is(tsBuf.readBigUInt64BE(0), ts);
-    t.is(sidBuf.readBigUInt64BE(0), sid);
 });
 
-test('timestampToBuffer and sessionIdToBuffer - reject invalid input', t => {
+test('idToBuffer - encodes utf8 string', t => {
+    const id = 'test-id';
+    const idBuf = idToBuffer(id);
+    t.ok(b4a.isBuffer(idBuf));
+    t.ok(b4a.equals(idBuf, b4a.from(id, 'utf8')));
+});
+
+test('timestampToBuffer and idToBuffer - reject invalid input', t => {
     t.exception(() => timestampToBuffer(-1), errorMessageIncludes('timestamp'));
     t.exception(() => timestampToBuffer(1.5), errorMessageIncludes('timestamp'));
     t.exception(() => timestampToBuffer('1'), errorMessageIncludes('timestamp'));
-    t.exception(() => sessionIdToBuffer(-1), errorMessageIncludes('session id'));
-    t.exception(() => sessionIdToBuffer(1.1), errorMessageIncludes('session id'));
-    t.exception(() => sessionIdToBuffer('abc'), errorMessageIncludes('session id'));
+    t.exception.all(() => idToBuffer(1));
+    t.exception.all(() => idToBuffer(null));
 });

@@ -9,12 +9,9 @@ import { createConfig, ENV } from "../../../src/config/env.js";
 
 const createConnection = (key) => {
     const emitter = new EventEmitter()
-    const legacyMessenger = {
-        send: sinon.stub().resolves(),
-    };
     emitter.protocolSession = {
         has: (name) => name === 'legacy',
-        getLegacy: () => legacyMessenger,
+        send: sinon.stub().resolves(),
     };
     emitter.connected = true
     emitter.remotePublicKey = b4a.from(key, 'hex')

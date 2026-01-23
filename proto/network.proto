@@ -60,7 +60,7 @@ message BroadcastTransactionResponse {
 
 message MessageHeader {
     MessageType type = 1;
-    uint64 session_id = 2;
+    string id = 2;
     uint64 timestamp = 3;
     oneof field {
         ValidatorConnectionRequest            validator_connection_request  = 4;

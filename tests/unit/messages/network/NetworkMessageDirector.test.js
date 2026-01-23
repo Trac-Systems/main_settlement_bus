@@ -12,7 +12,7 @@ import {
     createMessage,
     encodeCapabilities,
     safeWriteUInt32BE,
-    sessionIdToBuffer,
+    idToBuffer,
     timestampToBuffer
 } from '../../../../src/utils/buffer.js';
 import { addressToBuffer } from '../../../../src/core/state/utils/address.js';
@@ -39,17 +39,17 @@ test('NetworkMessageDirector builds validator connection request and verifies si
     const wallet = createWallet();
     const director = new NetworkMessageDirector(new NetworkMessageBuilder(wallet, config));
 
-    const sessionId = 1;
+    const id = '1';
     const caps = ['cap:b', 'cap:a'];
 
-    const payload = await director.buildValidatorConnectionRequest(sessionId, wallet.address, caps);
+    const payload = await director.buildValidatorConnectionRequest(id, wallet.address, caps);
     t.is(payload.type, NetworkOperationType.VALIDATOR_CONNECTION_REQUEST);
-    t.is(payload.session_id, sessionId);
+    t.is(payload.id, id);
     t.alike(payload.capabilities, caps);
 
     const msg = createMessage(
         payload.type,
-        sessionIdToBuffer(payload.session_id),
+        idToBuffer(payload.id),
         timestampToBuffer(payload.timestamp),
         addressToBuffer(wallet.address, config.addressPrefix),
         payload.validator_connection_request.nonce,
@@ -63,18 +63,18 @@ test('NetworkMessageDirector builds liveness request and verifies signature', as
     const wallet = createWallet();
     const director = new NetworkMessageDirector(new NetworkMessageBuilder(wallet, config));
 
-    const sessionId = 1;
+    const id = '1';
     const caps = ['cap:b', 'cap:a'];
     const data = b4a.from('ping', 'utf8');
 
-    const payload = await director.buildLivenessRequest(sessionId, data, caps);
+    const payload = await director.buildLivenessRequest(id, data, caps);
     t.is(payload.type, NetworkOperationType.LIVENESS_REQUEST);
-    t.is(payload.session_id, sessionId);
+    t.is(payload.id, id);
     t.alike(payload.capabilities, caps);
 
     const msg = createMessage(
         payload.type,
-        sessionIdToBuffer(payload.session_id),
+        idToBuffer(payload.id),
         timestampToBuffer(payload.timestamp),
         payload.liveness_request.nonce,
         encodeCapabilities(caps)
@@ -87,18 +87,18 @@ test('NetworkMessageDirector iterates liveness response ResultCode values', asyn
     const wallet = createWallet();
     const director = new NetworkMessageDirector(new NetworkMessageBuilder(wallet, config));
 
-    const sessionId = 1;
+    const id = '1';
     const caps = ['cap:b', 'cap:a'];
     const data = b4a.from('ping', 'utf8');
 
     for (const code of uniqueResultCodes()) {
-        const payload = await director.buildLivenessResponse(sessionId, data, caps, code);
+        const payload = await director.buildLivenessResponse(id, data, caps, code);
         t.is(payload.type, NetworkOperationType.LIVENESS_RESPONSE);
         t.is(payload.liveness_response.result, code);
 
         const msg = createMessage(
             payload.type,
-            sessionIdToBuffer(payload.session_id),
+            idToBuffer(payload.id),
             timestampToBuffer(payload.timestamp),
             payload.liveness_response.nonce,
             safeWriteUInt32BE(code, 0),
@@ -116,19 +116,19 @@ test('NetworkMessageDirector builds broadcast transaction request and verifies s
     const wallet = createWallet();
     const director = new NetworkMessageDirector(new NetworkMessageBuilder(wallet, config));
 
-    const sessionId = 1;
+    const id = '1';
     const data = b4a.from('deadbeef', 'hex');
     const caps = ['cap:b', 'cap:a'];
 
-    const payload = await director.buildBroadcastTransactionRequest(sessionId, data, caps);
+    const payload = await director.buildBroadcastTransactionRequest(id, data, caps);
     t.is(payload.type, NetworkOperationType.BROADCAST_TRANSACTION_REQUEST);
-    t.is(payload.session_id, sessionId);
+    t.is(payload.id, id);
     t.alike(payload.capabilities, caps);
     t.alike(payload.broadcast_transaction_request.data, data);
 
     const message = createMessage(
         payload.type,
-        sessionIdToBuffer(sessionId),
+        idToBuffer(id),
         timestampToBuffer(payload.timestamp),
         data,
         payload.broadcast_transaction_request.nonce,
@@ -145,17 +145,17 @@ test('NetworkMessageDirector iterates broadcast transaction response ResultCode 
     const wallet = createWallet();
     const director = new NetworkMessageDirector(new NetworkMessageBuilder(wallet, config));
 
-    const sessionId = 1;
+    const id = '1';
     const caps = ['cap:b', 'cap:a'];
 
     for (const code of uniqueResultCodes()) {
-        const payload = await director.buildBroadcastTransactionResponse(sessionId, caps, code);
+        const payload = await director.buildBroadcastTransactionResponse(id, caps, code);
         t.is(payload.type, NetworkOperationType.BROADCAST_TRANSACTION_RESPONSE);
         t.is(payload.broadcast_transaction_response.result, code);
 
         const msg = createMessage(
             payload.type,
-            sessionIdToBuffer(payload.session_id),
+            idToBuffer(payload.id),
             timestampToBuffer(payload.timestamp),
             payload.broadcast_transaction_response.nonce,
             safeWriteUInt32BE(code, 0),
@@ -173,14 +173,14 @@ test('NetworkMessageDirector iterates validator connection response ResultCode v
     const wallet = createWallet();
     const director = new NetworkMessageDirector(new NetworkMessageBuilder(wallet, config));
 
-    const sessionId = 1;
+    const id = '1';
     const caps = ['cap:b', 'cap:a'];
     const otherAddress =
         'trac1xm76l9qaujh7vqktk8302mw9sfrxau3l45w62hqfl4kasswt6yts0autkh';
 
     for (const code of uniqueResultCodes()) {
         const payload = await director.buildValidatorConnectionResponse(
-            sessionId,
+            id,
             otherAddress,
             caps,
             code
@@ -190,7 +190,7 @@ test('NetworkMessageDirector iterates validator connection response ResultCode v
 
         const msg = createMessage(
             payload.type,
-            sessionIdToBuffer(payload.session_id),
+            idToBuffer(payload.id),
             timestampToBuffer(payload.timestamp),
             addressToBuffer(otherAddress, config.addressPrefix),
             payload.validator_connection_response.nonce,

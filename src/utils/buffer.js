@@ -63,12 +63,15 @@ export function deepCopyBuffer(buffer) {
 
 function uint64ToBuffer(value, fieldName) {
     if (typeof value === 'number') {
-        if (!Number.isInteger(value) || value < 0) {
-            throw new Error(`${fieldName} must be a non-negative integer`);
+        if (!Number.isSafeInteger(value) || value < 0) {
+            throw new Error(`${fieldName} must be a non-negative safe integer`);
         }
         value = BigInt(value);
     } else if (typeof value !== 'bigint') {
         throw new Error(`${fieldName} must be a number or bigint`);
+    }
+    if (value < 0n) {
+        throw new Error(`${fieldName} must be a non-negative integer`);
     }
 
     const buf = b4a.alloc(8);
@@ -80,8 +83,8 @@ export function timestampToBuffer(timestamp) {
     return uint64ToBuffer(timestamp, 'timestamp');
 }
 
-export function sessionIdToBuffer(sessionId) {
-    return uint64ToBuffer(sessionId, 'session id');
+export function idToBuffer(id) {
+    return b4a.from(id, 'utf8');
 }
 
 
