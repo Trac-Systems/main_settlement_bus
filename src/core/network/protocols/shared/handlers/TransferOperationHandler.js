@@ -9,19 +9,20 @@ class TransferOperationHandler extends BaseOperationHandler {
     #partialTransferValidator;
     #config;
     #wallet;
+    #txPoolService;
 
     /**
-     * @param {Network} network
      * @param {State} state
      * @param {PeerWallet} wallet
      * @param {TransactionRateLimiterService} rateLimiter
      * @param {object} config
      **/
-    constructor(network, state, wallet, rateLimiter, config) {
-        super(network, state, wallet, rateLimiter, config);
+    constructor(state, wallet, rateLimiter, txPoolService, config) {
+        super(state, wallet, rateLimiter, txPoolService, config);
         this.#config = config;
         this.#wallet = wallet;
         this.#partialTransferValidator = new PartialTransfer(state, this.#wallet.address, this.#config);
+        this.#txPoolService = txPoolService;
     }
 
     async handleOperation(payload, connection) {
@@ -49,7 +50,7 @@ class TransferOperationHandler extends BaseOperationHandler {
                 normalizedPayload.tro.is
             )
 
-        this.network.transactionPoolService.addTransaction(safeEncodeApplyOperation(completeTransferOperation));
+        this.#txPoolService.addTransaction(safeEncodeApplyOperation(completeTransferOperation));
     }
 }
 

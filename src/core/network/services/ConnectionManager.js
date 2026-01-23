@@ -47,7 +47,7 @@ class ConnectionManager {
         if (!entry || !entry.connection || !entry.connection.protocolSession?.has('legacy')) return null;
 
         try {
-            entry.connection.protocolSession.getLegacy().send(message);
+            entry.connection.protocolSession.send(message);
             entry.sent = (entry.sent || 0) + 1;
         } catch (e) {
             // Swallow individual send errors.
@@ -67,9 +67,9 @@ class ConnectionManager {
         if (!this.exists(publicKeyHex) || !this.connected(publicKeyHex)) return false; // Fail silently
 
         const validator = this.#validators.get(publicKeyHex);
-        if (!validator || !validator.connection || !validator.connection.protocolSession?.has('legacy')) return false;
+        if (!validator || !validator.connection || !validator.connection.protocolSession) return false;
         try {
-            validator.connection.protocolSession.getLegacy().send(message);
+            validator.connection.protocolSession.send(message);
         } catch (e) {
             // Swallow individual send errors.
         }

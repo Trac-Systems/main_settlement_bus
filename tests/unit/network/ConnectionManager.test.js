@@ -9,12 +9,9 @@ import { createConfig, ENV } from "../../../src/config/env.js";
 
 const createConnection = (key) => {
     const emitter = new EventEmitter()
-    const legacyMessenger = {
-        send: sinon.stub().resolves(),
-    };
     emitter.protocolSession = {
         has: (name) => name === 'legacy',
-        getLegacy: () => legacyMessenger,
+        send: sinon.stub().resolves(),
     };
     emitter.connected = true
     emitter.remotePublicKey = b4a.from(key, 'hex')
@@ -36,7 +33,7 @@ const makeManager = (maxValidators = 6, conns = connections) => {
 const reset = () => {
     sinon.restore()
     connections.forEach(connection => {
-        connection.connection.protocolSession.getLegacy().send.resetHistory()
+        connection.connection.protocolSession.send.resetHistory()
     })
 }
 
@@ -125,7 +122,7 @@ test('ConnectionManager', () => {
 
             const target = connectionManager.send([1,2,3,4])
 
-            const totalCalls = connections.reduce((sum, con) => sum + con.connection.protocolSession.getLegacy().send.callCount, 0)
+            const totalCalls = connections.reduce((sum, con) => sum + con.connection.protocolSession.send.callCount, 0)
             t.is(totalCalls, 1, 'should send to exactly one validator')
             t.ok(target, 'should return a target public key')
         })
@@ -138,7 +135,7 @@ test('ConnectionManager', () => {
             ]
 
             errorConnections.forEach(con => {
-                con.connection.protocolSession.getLegacy().send = sinon.stub().throws(new Error())
+                con.connection.protocolSession.send = sinon.stub().throws(new Error())
             })
 
             const connectionManager = makeManager(5, errorConnections)

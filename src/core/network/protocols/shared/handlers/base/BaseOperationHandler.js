@@ -2,32 +2,28 @@ import b4a from 'b4a';
 import {MAX_PARTIAL_TX_PAYLOAD_BYTE_SIZE, TRANSACTION_POOL_SIZE} from '../../../../../../utils/constants.js';
 
 class BaseOperationHandler {
-    #network;
     #state;
     #wallet;
     #rateLimiter;
+    #txPoolService;
     #config;
 
     /**
-     * @param {Network} network
      * @param {State} state
      * @param {PeerWallet} wallet
      * @param {TransactionRateLimiterService} rateLimiter
+     * @param {TransactionPoolService} txPoolService
      * @param {object} config
      **/
-    constructor(network, state, wallet, rateLimiter, config) {
+    constructor(state, wallet, rateLimiter, txPoolService, config) {
         if (new.target === BaseOperationHandler) {
             throw new Error('BaseOperationHandler is abstract and cannot be instantiated directly');
         }
-        this.#network = network;
         this.#state = state;
         this.#wallet = wallet;
         this.#rateLimiter = rateLimiter;
+        this.#txPoolService = txPoolService;
         this.#config = config;
-    }
-
-    get network() {
-        return this.#network;
     }
 
     async validateBasicRequirements(payload, connection) {
@@ -42,7 +38,7 @@ class BaseOperationHandler {
             throw new Error('OperationHandler: State is not writable or is an indexer without admin privileges.');
         }
 
-        if (this.#network.transactionPoolService.tx_pool.length >= TRANSACTION_POOL_SIZE) {
+        if (this.#txPoolService.tx_pool.length >= TRANSACTION_POOL_SIZE) {
             throw new Error("OperationHandler: Transaction pool is full, ignoring incoming transaction.");
         }
 
@@ -51,7 +47,7 @@ class BaseOperationHandler {
         }
         
         if (!this.#config.disableRateLimit) {
-            const shouldDisconnect = this.#rateLimiter.handleRateLimit(connection, this.#network);
+            const shouldDisconnect = this.#rateLimiter.handleRateLimit(connection);
             if (shouldDisconnect) {
                 throw new Error(`OperationHandler: Rate limit exceeded for peer ${b4a.toString(connection.remotePublicKey, 'hex')}. Disconnecting...`);
             }

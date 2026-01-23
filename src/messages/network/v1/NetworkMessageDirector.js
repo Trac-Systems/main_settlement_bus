@@ -15,15 +15,15 @@ class NetworkMessageDirector {
 
     /**
      * Build a validator connection request message.
-     * @param {number} sessionId
+     * @param {string} id
      * @param {string} issuerAddress
      * @param {string[]} capabilities
      * @returns {Promise<object>}
      */
-    async buildValidatorConnectionRequest(sessionId, issuerAddress, capabilities) {
+    async buildValidatorConnectionRequest(id, issuerAddress, capabilities) {
         await this.#builder
             .setType(NetworkOperationType.VALIDATOR_CONNECTION_REQUEST)
-            .setSessionId(sessionId)
+            .setId(id)
             .setTimestamp()
             .setIssuerAddress(issuerAddress)
             .setCapabilities(capabilities)
@@ -35,16 +35,16 @@ class NetworkMessageDirector {
 
     /**
      * Build a validator connection response message.
-     * @param {number} sessionId
+     * @param {string} id
      * @param {string} issuerAddress
      * @param {string[]} capabilities
      * @param {number} statusCode
      * @returns {Promise<object>}
      */
-    async buildValidatorConnectionResponse(sessionId, issuerAddress, capabilities, statusCode) {
+    async buildValidatorConnectionResponse(id, issuerAddress, capabilities, statusCode) {
         await this.#builder
         .setType(NetworkOperationType.VALIDATOR_CONNECTION_RESPONSE)
-        .setSessionId(sessionId)
+        .setId(id)
         .setTimestamp()
         .setIssuerAddress(issuerAddress)
         .setCapabilities(capabilities)
@@ -56,15 +56,15 @@ class NetworkMessageDirector {
 
     /**
      * Build a liveness request message.
-     * @param {number} sessionId
+     * @param {string} id
      * @param {Buffer} data
      * @param {string[]} capabilities
      * @returns {Promise<object>}
      */
-    async buildLivenessRequest(sessionId, data, capabilities) {
+    async buildLivenessRequest(id, data, capabilities) {
         await this.#builder
             .setType(NetworkOperationType.LIVENESS_REQUEST)
-            .setSessionId(sessionId)
+            .setId(id)
             .setTimestamp()
             .setData(data)
             .setCapabilities(capabilities)
@@ -75,16 +75,16 @@ class NetworkMessageDirector {
 
     /**
      * Build a liveness response message.
-     * @param {number} sessionId
+     * @param {string} id
      * @param {Buffer} data
      * @param {string[]} capabilities
      * @param {number} statusCode
      * @returns {Promise<object>}
      */
-    async buildLivenessResponse(sessionId, data, capabilities, statusCode) {
+    async buildLivenessResponse(id, data, capabilities, statusCode) {
         await this.#builder
             .setType(NetworkOperationType.LIVENESS_RESPONSE)
-            .setSessionId(sessionId)
+            .setId(id)
             .setTimestamp()
             .setData(data)
             .setCapabilities(capabilities)
@@ -96,15 +96,15 @@ class NetworkMessageDirector {
 
     /**
      * Build a broadcast transaction request message.
-     * @param {number} sessionId
+     * @param {string} id
      * @param {Buffer} data
      * @param {string[]} capabilities
      * @returns {Promise<object>}
      */
-    async buildBroadcastTransactionRequest(sessionId, data, capabilities) {
+    async buildBroadcastTransactionRequest(id, data, capabilities) {
         await this.#builder
             .setType(NetworkOperationType.BROADCAST_TRANSACTION_REQUEST)
-            .setSessionId(sessionId)
+            .setId(id)
             .setTimestamp()
             .setData(data)
             .setCapabilities(capabilities)
@@ -115,15 +115,15 @@ class NetworkMessageDirector {
 
     /**
      * Build a broadcast transaction response message.
-     * @param {number} sessionId
+     * @param {string} id
      * @param {string[]} capabilities
      * @param {number} statusCode
      * @returns {Promise<object>}
      */
-    async buildBroadcastTransactionResponse(sessionId, capabilities, statusCode) {
+    async buildBroadcastTransactionResponse(id, capabilities, statusCode) {
         await this.#builder
             .setType(NetworkOperationType.BROADCAST_TRANSACTION_RESPONSE)
-            .setSessionId(sessionId)
+            .setId(id)
             .setTimestamp()
             .setCapabilities(capabilities)
             .setResultCode(statusCode)

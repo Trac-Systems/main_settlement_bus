@@ -8,22 +8,22 @@ import {normalizeRoleAccessOperation} from "../../../../../utils/normalizers.js"
 class RoleOperationHandler extends BaseOperationHandler {
     #partialRoleAccessValidator;
     #wallet;
-    #network;
     #config;
+    #txPoolService;
 
     /**
-     * @param {Network} network
      * @param {State} state
      * @param {PeerWallet} wallet
      * @param {TransactionRateLimiterService} rateLimiter
+     * @param {TransactionPoolService} txPoolService
      * @param {object} config
      **/
-    constructor(network, state, wallet, rateLimiter, config) {
-        super(network, state, wallet, rateLimiter, config);
+    constructor(state, wallet, rateLimiter, txPoolService ,config) {
+        super(state, wallet, rateLimiter, txPoolService, config);
         this.#wallet = wallet;
         this.#config = config;
-        this.#network = network;
         this.#partialRoleAccessValidator = new PartialRoleAccess(state, this.#wallet.address ,this.#config)
+        this.#txPoolService = txPoolService;
     }
 
     get partialRoleAccessValidator() {
@@ -81,7 +81,7 @@ class RoleOperationHandler extends BaseOperationHandler {
             throw new Error("OperationHandler: Assembling complete role access operation failed.");
         }
 
-        this.#network.transactionPoolService.addTransaction(safeEncodeApplyOperation(completePayload))
+        this.#txPoolService.addTransaction(safeEncodeApplyOperation(completePayload))
     }
 }
 
