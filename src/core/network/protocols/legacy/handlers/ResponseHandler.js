@@ -2,37 +2,14 @@ import ValidatorResponse from '../validators/ValidatorResponse.js';
 import PeerWallet from 'trac-wallet';
 
 class ResponseHandler {
-    #network;
-    #state;
     #responseValidator;
-    #adminValidator;
-    #customNodeValidator;
+    #connectionManager;
+
     
-    constructor(network, state, wallet, config) {
-        this.#network = network;
-        this.#state = state;
-        this.#responseValidator = new ValidatorResponse(this.state, wallet, config);
+    constructor(state, wallet, connectionManager ,config) {
+        this.#responseValidator = new ValidatorResponse(state, wallet, config);
+        this.#connectionManager = connectionManager;
 
-    }
-
-    get network() {
-        return this.#network;
-    }
-
-    get state() {
-        return this.#state;
-    }
-
-    get responseValidator() {
-        return this.#responseValidator;
-    }
-
-    get adminValidator() {
-        return this.#adminValidator;
-    }
-    
-    get customNodeValidator() {
-        return this.#customNodeValidator;
     }
 
     async handle(message, connection, channelString) {
@@ -40,17 +17,17 @@ class ResponseHandler {
     }
 
     async #handleValidatorResponse(message, connection, channelString) {
-        const isValid = await this.responseValidator.validate(message, channelString);
+        const isValid = await this.#responseValidator.validate(message, channelString);
         if (isValid) {
             const validatorAddressString = message.address;
             const validatorPublicKey = PeerWallet.decodeBech32m(validatorAddressString);
 
-            if (this.network.validatorConnectionManager.connected(validatorPublicKey)) {
+            if (this.#connectionManager.connected(validatorPublicKey)) {
                 return;
+                // TODO: What we should return? Or maybe we should throw?
             }
 
-            // console.log('Validator stream established', validatorAddressString);
-            this.network.validatorConnectionManager.addValidator(validatorPublicKey, connection)
+            this.#connectionManager.addValidator(validatorPublicKey, connection)
         } else {
             throw new Error("Validator response verification failed");
         }

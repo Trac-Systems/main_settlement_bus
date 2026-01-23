@@ -17,20 +17,22 @@ class SubnetworkOperationHandler extends BaseOperationHandler {
     #partialTransactionValidator;
     #config;
     #wallet;
+    #txPoolService;
 
     /**
-     * @param {Network} network
      * @param {State} state
      * @param {PeerWallet} wallet
      * @param {TransactionRateLimiterService} rateLimiter
+     * @param {TransactionPoolService} txPoolService
      * @param {object} config
      **/
-    constructor(network, state, wallet, rateLimiter, config) {
-        super(network, state, wallet, rateLimiter, config);
-        this.#config = config
+    constructor( state, wallet, rateLimiter, txPoolService, config) {
+        super(state, wallet, rateLimiter, txPoolService, config);
+        this.#config = config;
         this.#wallet = wallet
         this.#partialBootstrapDeploymentValidator = new PartialBootstrapDeployment(state, this.#wallet.address, config);
         this.#partialTransactionValidator = new PartialTransaction(state, this.#wallet.address, config);
+        this.#txPoolService = txPoolService;
     }
 
     async handleOperation(payload, connection)  {
@@ -62,7 +64,7 @@ class SubnetworkOperationHandler extends BaseOperationHandler {
                 normalizedPayload.txo.bs,
                 normalizedPayload.txo.mbs
             )
-        this.network.transactionPoolService.addTransaction(safeEncodeApplyOperation(completeTransactionOperation));
+        this.#txPoolService.addTransaction(safeEncodeApplyOperation(completeTransactionOperation));
     }
 
     async #partialBootstrapDeploymentSubHandler(payload, connection) {
@@ -83,7 +85,7 @@ class SubnetworkOperationHandler extends BaseOperationHandler {
                 normalizedPayload.bdo.in,
                 normalizedPayload.bdo.is
             )
-        this.network.transactionPoolService.addTransaction(safeEncodeApplyOperation(completeBootstrapDeploymentOperation));
+        this.#txPoolService.addTransaction(safeEncodeApplyOperation(completeBootstrapDeploymentOperation));
 
     }
 }

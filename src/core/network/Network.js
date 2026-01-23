@@ -19,6 +19,7 @@ import MessageOrchestrator from './services/MessageOrchestrator.js';
 import NetworkWalletFactory from './identity/NetworkWalletFactory.js';
 import { EventType } from '../../utils/constants.js';
 import { networkMessageFactory } from '../../messages/network/v1/networkMessageFactory.js';
+import TransactionRateLimiterService from './services/TransactionRateLimiterService.js';
 // -- Debug Mode --
 // TODO: Implement a better debug system in the future. This is just temporary.
 const DEBUG = false;
@@ -42,7 +43,7 @@ class Network extends ReadyResource {
     #pendingConnections;
     #connectTimeoutMs;
     #maxPendingConnections;
-    #wallet
+    #rateLimiter;
 
     /**
      * @param {State} state
@@ -54,11 +55,10 @@ class Network extends ReadyResource {
         this.#config = config
         this.#connectTimeoutMs = config.connectTimeoutMs || 5000;
         this.#maxPendingConnections = config.maxPendingConnections || 50;
-
         this.#pendingConnections = new Map();
         this.#transactionPoolService = new TransactionPoolService(state, address, this.#config);
         this.#validatorObserverService = new ValidatorObserverService(this, state, address, this.#config);
-        this.#networkMessages = new NetworkMessages(this, this.#config);
+        this.#networkMessages = new NetworkMessages(this.#config);
         this.#validatorConnectionManager = new ConnectionManager(this.#config);
         this.#validatorMessageOrchestrator = new MessageOrchestrator(this.#validatorConnectionManager, state, this.#config);
 
@@ -128,7 +128,7 @@ class Network extends ReadyResource {
             if (type === 'validator') {
                 this.#sendRequestByType(connection);
             }
-            
+
         });
     }
 
@@ -151,7 +151,7 @@ class Network extends ReadyResource {
     ) {
         if (!this.#swarm) {
             const keyPair = await this.initializeNetworkingKeyPair(store, wallet);
-            this.#wallet = this.#getNetworkWalletWrapper(wallet, keyPair);
+            const wrappedWallet = this.#getNetworkWalletWrapper(wallet, keyPair);
             this.#swarm = new Hyperswarm({
                 keyPair,
                 bootstrap: this.#config.dhtBootstrap,
@@ -161,8 +161,15 @@ class Network extends ReadyResource {
                 maxClientConnections: MAX_CLIENT_CONNECTIONS
             });
 
+            this.#rateLimiter = new TransactionRateLimiterService(this.#swarm);
+            this.#networkMessages.initializeMessageRouter(
+                state,
+                wrappedWallet,
+                this.#rateLimiter,
+                this.#transactionPoolService,
+                this.#validatorConnectionManager
+            );
             console.log(`Channel: ${b4a.toString(this.#config.channel)}`);
-            this.#networkMessages.initializeMessageRouter(state, this.#wallet);
 
             this.#swarm.on('connection', async (connection) => {
                 // Per-peer connection initialization:
