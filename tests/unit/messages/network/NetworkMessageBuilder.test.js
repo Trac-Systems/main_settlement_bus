@@ -2,7 +2,7 @@ import { test } from 'brittle';
 import b4a from 'b4a';
 import PeerWallet from 'trac-wallet';
 import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
-
+import { v7 as uuidv7 } from 'uuid';
 import NetworkWalletFactory from '../../../../src/core/network/identity/NetworkWalletFactory.js';
 import NetworkMessageBuilder from '../../../../src/messages/network/v1/NetworkMessageBuilder.js';
 import {
@@ -15,7 +15,7 @@ import {
     createMessage,
     encodeCapabilities,
     safeWriteUInt32BE,
-    sessionIdToBuffer,
+    idToBuffer,
     timestampToBuffer
 } from '../../../../src/utils/buffer.js';
 import { addressToBuffer } from '../../../../src/core/state/utils/address.js';
@@ -42,12 +42,12 @@ test('NetworkMessageBuilder builds validator connection request and verifies sig
     const wallet = createWallet();
     const builder = new NetworkMessageBuilder(wallet, config);
 
-    const sessionId = 1;
+    const id = uuidv7();
     const caps = ['cap:b', 'cap:a'];
 
     await builder
         .setType(NetworkOperationType.VALIDATOR_CONNECTION_REQUEST)
-        .setSessionId(sessionId)
+        .setId(id)
         .setTimestamp()
         .setIssuerAddress(wallet.address)
         .setCapabilities(caps)
@@ -55,14 +55,14 @@ test('NetworkMessageBuilder builds validator connection request and verifies sig
 
     const payload = builder.getResult();
     t.is(payload.type, NetworkOperationType.VALIDATOR_CONNECTION_REQUEST);
-    t.is(payload.session_id, sessionId);
+    t.is(payload.id, id);
     t.alike(payload.capabilities, caps);
     t.ok(b4a.isBuffer(payload.validator_connection_request.nonce));
     t.ok(b4a.isBuffer(payload.validator_connection_request.signature));
 
     const message = createMessage(
         payload.type,
-        sessionIdToBuffer(sessionId),
+        idToBuffer(id),
         timestampToBuffer(payload.timestamp),
         addressToBuffer(wallet.address, config.addressPrefix),
         payload.validator_connection_request.nonce,
@@ -78,14 +78,14 @@ test('NetworkMessageBuilder builds validator connection request and verifies sig
 test('NetworkMessageBuilder iterates validator connection response ResultCode values', async t => {
     const wallet = createWallet();
     const builder = new NetworkMessageBuilder(wallet, config);
-
+    const id = uuidv7();
     const otherAddress = 'trac1xm76l9qaujh7vqktk8302mw9sfrxau3l45w62hqfl4kasswt6yts0autkh';
     const caps = ['cap:b', 'cap:a'];
 
     for (const code of uniqueResultCodes()) {
         await builder
             .setType(NetworkOperationType.VALIDATOR_CONNECTION_RESPONSE)
-            .setSessionId(1)
+            .setId(id)
             .setTimestamp()
             .setIssuerAddress(otherAddress)
             .setCapabilities(caps)
@@ -98,7 +98,7 @@ test('NetworkMessageBuilder iterates validator connection response ResultCode va
 
         const msg = createMessage(
             payload.type,
-            sessionIdToBuffer(payload.session_id),
+            idToBuffer(payload.id),
             timestampToBuffer(payload.timestamp),
             addressToBuffer(otherAddress, config.addressPrefix),
             payload.validator_connection_response.nonce,
@@ -116,14 +116,14 @@ test('NetworkMessageBuilder iterates validator connection response ResultCode va
 test('NetworkMessageBuilder iterates liveness response ResultCode values', async t => {
     const wallet = createWallet();
     const builder = new NetworkMessageBuilder(wallet, config);
-    const sessionId = 1;
+    const id = uuidv7();
     const caps = ['cap:b', 'cap:a'];
     const data = b4a.from('ping', 'utf8');
 
     for (const code of uniqueResultCodes()) {
         await builder
             .setType(NetworkOperationType.LIVENESS_RESPONSE)
-            .setSessionId(sessionId)
+            .setId(id)
             .setTimestamp()
             .setData(data)
             .setCapabilities(caps)
@@ -136,7 +136,7 @@ test('NetworkMessageBuilder iterates liveness response ResultCode values', async
 
         const msg = createMessage(
             payload.type,
-            sessionIdToBuffer(payload.session_id),
+            idToBuffer(payload.id),
             timestampToBuffer(payload.timestamp),
             payload.liveness_response.nonce,
             safeWriteUInt32BE(code, 0),
@@ -154,13 +154,13 @@ test('NetworkMessageBuilder builds liveness request and verifies signature (data
     const wallet = createWallet();
     const builder = new NetworkMessageBuilder(wallet, config);
 
-    const sessionId = 1;
+    const id = uuidv7();
     const caps = ['cap:b', 'cap:a'];
     const data = b4a.from('ping', 'utf8');
 
     await builder
         .setType(NetworkOperationType.LIVENESS_REQUEST)
-        .setSessionId(sessionId)
+        .setId(id)
         .setTimestamp()
         .setData(data)
         .setCapabilities(caps)
@@ -173,7 +173,7 @@ test('NetworkMessageBuilder builds liveness request and verifies signature (data
 
     const msg = createMessage(
         payload.type,
-        sessionIdToBuffer(payload.session_id),
+        idToBuffer(payload.id),
         timestampToBuffer(payload.timestamp),
         payload.liveness_request.nonce,
         encodeCapabilities(caps)
@@ -185,13 +185,13 @@ test('NetworkMessageBuilder builds liveness request and verifies signature (data
 test('NetworkMessageBuilder iterates broadcast transaction response ResultCode values', async t => {
     const wallet = createWallet();
     const builder = new NetworkMessageBuilder(wallet, config);
-    const sessionId = 1;
+    const id = uuidv7();
     const caps = ['cap:b', 'cap:a'];
 
     for (const code of uniqueResultCodes()) {
         await builder
             .setType(NetworkOperationType.BROADCAST_TRANSACTION_RESPONSE)
-            .setSessionId(sessionId)
+            .setId(id)
             .setTimestamp()
             .setCapabilities(caps)
             .setResultCode(code)
@@ -203,7 +203,7 @@ test('NetworkMessageBuilder iterates broadcast transaction response ResultCode v
 
         const msg = createMessage(
             payload.type,
-            sessionIdToBuffer(payload.session_id),
+            idToBuffer(payload.id),
             timestampToBuffer(payload.timestamp),
             payload.broadcast_transaction_response.nonce,
             safeWriteUInt32BE(code, 0),
@@ -221,13 +221,13 @@ test('NetworkMessageBuilder builds broadcast transaction request and verifies si
     const wallet = createWallet();
     const builder = new NetworkMessageBuilder(wallet, config);
 
-    const sessionId = 1;
+    const id = uuidv7();
     const caps = ['cap:b', 'cap:a'];
     const data = b4a.from('deadbeef', 'hex');
 
     await builder
         .setType(NetworkOperationType.BROADCAST_TRANSACTION_REQUEST)
-        .setSessionId(sessionId)
+        .setId(id)
         .setTimestamp()
         .setData(data)
         .setCapabilities(caps)
@@ -239,7 +239,7 @@ test('NetworkMessageBuilder builds broadcast transaction request and verifies si
 
     const msg = createMessage(
         payload.type,
-        sessionIdToBuffer(payload.session_id),
+        idToBuffer(payload.id),
         timestampToBuffer(payload.timestamp),
         data,
         payload.broadcast_transaction_request.nonce,
@@ -252,7 +252,7 @@ test('NetworkMessageBuilder builds broadcast transaction request and verifies si
 test('NetworkMessageBuilder validates required inputs', async t => {
     const wallet = createWallet();
     const builder = new NetworkMessageBuilder(wallet, config);
-
+    const id = uuidv7();
     await t.exception(
         () => builder.setType(undefined),
         errorMessageIncludes('Invalid operation type')
@@ -267,7 +267,7 @@ test('NetworkMessageBuilder validates required inputs', async t => {
         () =>
             builder
                 .setType(NetworkOperationType.BROADCAST_TRANSACTION_REQUEST)
-                .setSessionId(1)
+                .setId(id)
                 .setTimestamp()
                 .setCapabilities([])
                 .buildPayload(),

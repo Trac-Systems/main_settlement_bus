@@ -1,9 +1,10 @@
 import b4a from 'b4a';
+import { v7 as uuidv7 } from 'uuid';
 import { NetworkOperationType, ResultCode as NetworkResultCode } from '../../src/utils/constants.js';
 
 const payloadValidatorConnectionRequest = {
     type: NetworkOperationType.VALIDATOR_CONNECTION_REQUEST,
-    session_id: 1,
+    id: uuidv7(),
     timestamp: 123,
     validator_connection_request: {
         issuer_address: 'trac1xm76l9qaujh7vqktk8302mw9sfrxau3l45w62hqfl4kasswt6yts0autkh',
@@ -15,7 +16,7 @@ const payloadValidatorConnectionRequest = {
 
 const payloadValidatorConnectionResponse = {
     type: NetworkOperationType.VALIDATOR_CONNECTION_RESPONSE,
-    session_id: 2,
+    id: uuidv7(),
     timestamp: 456,
     validator_connection_response: {
         issuer_address: 'trac1xm76l9qaujh7vqktk8302mw9sfrxau3l45w62hqfl4kasswt6yts0autkh',
@@ -28,7 +29,7 @@ const payloadValidatorConnectionResponse = {
 
 const payloadLivenessRequest = {
     type: NetworkOperationType.LIVENESS_REQUEST,
-    session_id: 3,
+    id: uuidv7(),
     timestamp: 789,
     liveness_request: {
         nonce: b4a.from('04', 'hex'),
@@ -39,7 +40,7 @@ const payloadLivenessRequest = {
 
 const payloadLivenessResponse = {
     type: NetworkOperationType.LIVENESS_RESPONSE,
-    session_id: 4,
+    id: uuidv7(),
     timestamp: 101112,
     liveness_response: {
         nonce: b4a.from('06', 'hex'),
@@ -51,7 +52,7 @@ const payloadLivenessResponse = {
 
 const payloadBroadcastTransactionRequest = {
     type: NetworkOperationType.BROADCAST_TRANSACTION_REQUEST,
-    session_id: 5,
+    id: uuidv7(),
     timestamp: 131415,
     broadcast_transaction_request: {
         data: b4a.from('deadbeef', 'hex'),
@@ -63,7 +64,7 @@ const payloadBroadcastTransactionRequest = {
 
 const payloadBroadcastTransactionResponse = {
     type: NetworkOperationType.BROADCAST_TRANSACTION_RESPONSE,
-    session_id: 6,
+    id: uuidv7(),
     timestamp: 161718,
     broadcast_transaction_response: {
         nonce: b4a.from('0a', 'hex'),
@@ -81,4 +82,3 @@ export default {
     payloadBroadcastTransactionRequest,
     payloadBroadcastTransactionResponse,
 };
-

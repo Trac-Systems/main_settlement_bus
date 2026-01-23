@@ -1,6 +1,6 @@
 import PeerWallet from 'trac-wallet';
 import b4a from 'b4a';
-import {createMessage, safeWriteUInt32BE, sessionIdToBuffer, timestampToBuffer} from "../../../utils/buffer.js";
+import {createMessage, safeWriteUInt32BE, idToBuffer, timestampToBuffer} from "../../../utils/buffer.js";
 import {NetworkOperationType, ResultCode} from '../../../utils/constants.js';
 import {addressToBuffer, isAddressValid} from "../../../core/state/utils/address.js";
 import {encodeCapabilities} from "../../../utils/buffer.js";
@@ -14,7 +14,7 @@ class NetworkMessageBuilder {
     #wallet;
     #type;
     #capabilities;
-    #sessionId;
+    #id;
     #timestamp;
     #issuerAddress;
     #resultCode;
@@ -40,8 +40,8 @@ class NetworkMessageBuilder {
         this.#wallet = wallet;
     }
 
-    setSessionId(sessionId) {
-        this.#sessionId = sessionId;
+    setId(id) {
+        this.#id = id;
         return this;
     }
 
@@ -94,13 +94,13 @@ class NetworkMessageBuilder {
 
     #setHeader() {
         if (!this.#type) throw new Error('Header requires type to be set');
-        if (!this.#sessionId) throw new Error('Header requires session_id to be set');
+        if (!this.#id) throw new Error('Header requires id to be set');
         if (!this.#timestamp) throw new Error('Header requires a timestamp provider');
         if (!Array.isArray(this.#capabilities)) throw new Error('Header requires capabilities array');
 
         this.#header = {
             type: this.#type,
-            session_id: this.#sessionId,
+            id: this.#id,
             timestamp: this.#timestamp,
             capabilities: this.#capabilities,
         };
@@ -119,10 +119,10 @@ class NetworkMessageBuilder {
 
         const nonce = PeerWallet.generateNonce();
         const tsBuf = timestampToBuffer(this.#timestamp);
-        const sessionBuf = sessionIdToBuffer(this.#sessionId);
+        const idBuf = idToBuffer(this.#id);
         const message = createMessage(
             this.#type,
-            sessionBuf,
+            idBuf,
             tsBuf,
             addressToBuffer(issuer, this.#config.addressPrefix),
             nonce,
@@ -155,10 +155,10 @@ class NetworkMessageBuilder {
 
         const nonce = PeerWallet.generateNonce();
         const tsBuf = timestampToBuffer(this.#timestamp);
-        const sessionBuf = sessionIdToBuffer(this.#sessionId);
+        const idBuf = idToBuffer(this.#id);
         const message = createMessage(
             this.#type,
-            sessionBuf,
+            idBuf,
             tsBuf,
             addressToBuffer(issuer, this.#config.addressPrefix),
             nonce,
@@ -180,10 +180,10 @@ class NetworkMessageBuilder {
     async #buildLivenessRequestPayload() {
         const nonce = PeerWallet.generateNonce();
         const tsBuf = timestampToBuffer(this.#timestamp);
-        const sessionBuf = sessionIdToBuffer(this.#sessionId);
+        const idBuf = idToBuffer(this.#id);
         const message = createMessage(
             this.#type,
-            sessionBuf,
+            idBuf,
             tsBuf,
             nonce,
             encodeCapabilities(this.#capabilities),
@@ -205,10 +205,10 @@ class NetworkMessageBuilder {
 
         const nonce = PeerWallet.generateNonce();
         const tsBuf = timestampToBuffer(this.#timestamp);
-        const sessionBuf = sessionIdToBuffer(this.#sessionId);
+        const idBuf = idToBuffer(this.#id);
         const message = createMessage(
             this.#type,
-            sessionBuf,
+            idBuf,
             tsBuf,
             nonce,
             safeWriteUInt32BE(this.#resultCode, 0),
@@ -231,10 +231,10 @@ class NetworkMessageBuilder {
         }
         const nonce = PeerWallet.generateNonce();
         const tsBuf = timestampToBuffer(this.#timestamp);
-        const sessionBuf = sessionIdToBuffer(this.#sessionId);
+        const idBuf = idToBuffer(this.#id);
         const message = createMessage(
             this.#type,
-            sessionBuf,
+            idBuf,
             tsBuf,
             this.#data,
             nonce,
@@ -257,10 +257,10 @@ class NetworkMessageBuilder {
         }
         const nonce = PeerWallet.generateNonce();
         const tsBuf = timestampToBuffer(this.#timestamp);
-        const sessionBuf = sessionIdToBuffer(this.#sessionId);
+        const idBuf = idToBuffer(this.#id);
         const message = createMessage(
             this.#type,
-            sessionBuf,
+            idBuf,
             tsBuf,
             nonce,
             safeWriteUInt32BE(this.#resultCode, 0),
