@@ -60,3 +60,55 @@ export function deepCopyBuffer(buffer) {
     buffer.copy(copy);
     return copy;
 }
+
+function uint64ToBuffer(value, fieldName) {
+    if (typeof value === 'number') {
+        if (!Number.isSafeInteger(value) || value < 0) {
+            throw new Error(`${fieldName} must be a non-negative safe integer`);
+        }
+        value = BigInt(value);
+    } else if (typeof value !== 'bigint') {
+        throw new Error(`${fieldName} must be a number or bigint`);
+    }
+    if (value < 0n) {
+        throw new Error(`${fieldName} must be a non-negative integer`);
+    }
+
+    const buf = b4a.alloc(8);
+    buf.writeBigUInt64BE(value);
+    return buf;
+}
+
+export function timestampToBuffer(timestamp) {
+    return uint64ToBuffer(timestamp, 'timestamp');
+}
+
+export function idToBuffer(id) {
+    if (typeof id !== 'string') {
+        throw new Error('id must be a string');
+    }
+    return b4a.from(id, 'utf8');
+}
+
+
+export function encodeCapabilities(capabilities) {
+    if (!Array.isArray(capabilities)) {
+        throw new Error('Capabilities must be an array');
+    }
+    const validCapabilities = capabilities.map((capability) => {
+        if (typeof capability !== 'string') {
+            throw new Error('Capabilities array must contain only strings');
+        }
+        return capability;
+    });
+
+    const parts = [];
+    for (const capability of validCapabilities.slice().sort()) {
+        const capabilityBuffer = b4a.from(capability, 'utf8');
+        const bufferLen = b4a.allocUnsafe(2);
+        bufferLen.writeUInt16BE(capabilityBuffer.length, 0);
+        parts.push(bufferLen, capabilityBuffer);
+    }
+
+    return parts.length ? b4a.concat(parts) : b4a.alloc(0);
+}

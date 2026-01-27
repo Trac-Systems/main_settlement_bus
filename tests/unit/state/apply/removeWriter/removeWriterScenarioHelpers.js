@@ -7,8 +7,8 @@ import {
 	assertValidatorReward,
 	promotePeerToWriter
 } from '../addWriter/addWriterScenarioHelpers.js';
-import PartialStateMessageOperations from '../../../../../src/messages/partialStateMessages/PartialStateMessageOperations.js';
-import CompleteStateMessageOperations from '../../../../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
+import { applyStateMessageFactory } from '../../../../../src/messages/state/applyStateMessageFactory.js';
+import { safeEncodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
 import nodeEntryUtils from '../../../../../src/core/state/utils/nodeEntry.js';
 import addressUtils from '../../../../../src/core/state/utils/address.js';
 import { toBalance, BALANCE_FEE, BALANCE_TO_STAKE } from '../../../../../src/core/state/utils/balance.js';
@@ -180,18 +180,23 @@ export async function buildRemoveWriterPayloadWithTxValidity(context, mutatedTxV
 	}
 	const { readerPeer = selectWriterPeer(context), validatorPeer = context.adminBootstrap, writerKeyBuffer = null } = options;
 	const writerKey = writerKeyBuffer ?? readerPeer.base.local.key;
-	const partial = await new PartialStateMessageOperations(readerPeer.wallet, config).assembleRemoveWriterMessage(
-		writerKey.toString('hex'),
-		mutatedTxValidity.toString('hex')
-	);
-	return new CompleteStateMessageOperations(validatorPeer.wallet, config).assembleRemoveWriterMessage(
-		partial.address,
-		b4a.from(partial.rao.tx, 'hex'),
-		mutatedTxValidity,
-		b4a.from(partial.rao.iw, 'hex'),
-		b4a.from(partial.rao.in, 'hex'),
-		b4a.from(partial.rao.is, 'hex')
-	);
+	const partial = await applyStateMessageFactory(readerPeer.wallet, config)
+		.buildPartialRemoveWriterMessage(
+			readerPeer.wallet.address,
+			writerKey.toString('hex'),
+			mutatedTxValidity.toString('hex'),
+			'json'
+		);
+	const payload = await applyStateMessageFactory(validatorPeer.wallet, config)
+		.buildCompleteRemoveWriterMessage(
+			partial.address,
+			b4a.from(partial.rao.tx, 'hex'),
+			mutatedTxValidity,
+			b4a.from(partial.rao.iw, 'hex'),
+			b4a.from(partial.rao.in, 'hex'),
+			b4a.from(partial.rao.is, 'hex')
+		);
+	return safeEncodeApplyOperation(payload);
 }
 
 export async function snapshotDowngradedWriterEntry(context) {

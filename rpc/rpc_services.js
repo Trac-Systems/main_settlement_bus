@@ -1,6 +1,14 @@
 import { bufferToBigInt } from "../src/utils/amountSerialization.js";
-import { normalizeDecodedPayloadForJson } from "../src/utils/normalizers.js";
+import {
+    normalizeDecodedPayloadForJson,
+    normalizeTransactionOperation,
+    normalizeTransferOperation
+} from "../src/utils/normalizers.js";
 import { get_confirmed_tx_info, get_unconfirmed_tx_info } from "../src/utils/cli.js";
+import {OperationType} from "../src/utils/constants.js";
+import b4a from "b4a";
+import PartialTransaction from "../src/core/network/protocols/shared/validators/PartialTransaction.js";
+import PartialTransfer from "../src/core/network/protocols/shared/validators/PartialTransfer.js";
 
 export async function getBalance(msbInstance, address, confirmed) {
     const state = msbInstance.state;
@@ -36,8 +44,41 @@ export async function getUnconfirmedLength(msbInstance) {
     return msbInstance.state.getUnsignedLength();
 }
 
-export async function broadcastTransaction(msbInstance, payload) {
-    return msbInstance.broadcastTransactionCommand(payload);
+export async function broadcastTransaction(msbInstance, config, payload) {
+    if (!payload) {
+        throw new Error("Transaction payload is required for broadcasting.");
+    }
+    let normalizedPayload;
+    let isValid = false;
+    let hash;
+
+    const partialTransferValidator = new PartialTransfer(msbInstance.state, null , config);
+    const partialTransactionValidator = new PartialTransaction(msbInstance.state, null , config);
+
+    if (payload.type === OperationType.TRANSFER) {
+        normalizedPayload = normalizeTransferOperation(payload, config);
+        isValid = await partialTransferValidator.validate(normalizedPayload);
+        hash = b4a.toString(normalizedPayload.tro.tx, "hex");
+    } else if (payload.type === OperationType.TX) {
+        normalizedPayload = normalizeTransactionOperation(payload, config);
+        isValid = await partialTransactionValidator.validate(normalizedPayload);
+        hash = b4a.toString(normalizedPayload.txo.tx, "hex");
+    }
+
+    if (!isValid) {
+        throw new Error("Invalid transaction payload.");
+    }
+
+    const success = await msbInstance.broadcastPartialTransaction(payload);
+
+    if (!success) {
+        throw new Error("Failed to broadcast transaction after multiple attempts.");
+    }
+
+    const signedLength = msbInstance.state.getSignedLength();
+    const unsignedLength = msbInstance.state.getUnsignedLength();
+
+    return { message: "Transaction broadcasted successfully.", signedLength, unsignedLength, tx: hash };
 }
 
 export async function getTxHashes(msbInstance, start, end) {

@@ -58,7 +58,7 @@ const setupNetwork = async () => {
 
 beforeAll(async () => {
     const { admin, writer, reader } = await setupNetwork()
-    const server = createServer(reader.msb)
+    const server = createServer(reader.msb, reader.config)
     toClose = admin.msb
     Object.assign(testContext, {
         writerMsb: writer.msb,

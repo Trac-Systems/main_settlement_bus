@@ -1,7 +1,6 @@
 import b4a from 'b4a';
 import PeerWallet from 'trac-wallet';
-import PartialStateMessageOperations from '../../../../../src/messages/partialStateMessages/PartialStateMessageOperations.js';
-import CompleteStateMessageOperations from '../../../../../src/messages/completeStateMessages/CompleteStateMessageOperations.js';
+import { applyStateMessageFactory } from '../../../../../src/messages/state/applyStateMessageFactory.js';
 import { deriveIndexerSequenceState, eventFlush } from '../../../../helpers/autobaseTestHelpers.js';
 import {
 	setupAdminNetwork,
@@ -123,15 +122,17 @@ export async function buildTransferPayload(
 	const resolvedTxValidity =
 		txValidity ?? (await deriveIndexerSequenceState(validatorPeer.base));
 
-    const partial = await new PartialStateMessageOperations(senderPeer.wallet, config)
-        .assembleTransferOperationMessage(
+    const partial = await applyStateMessageFactory(senderPeer.wallet, config)
+        .buildPartialTransferOperationMessage(
+            senderPeer.wallet.address,
             recipientAddress,
             b4a.toString(amount, 'hex'),
-            b4a.toString(resolvedTxValidity, 'hex')
+            b4a.toString(resolvedTxValidity, 'hex'),
+            'json'
         );
 
-    return new CompleteStateMessageOperations(validatorPeer.wallet, config)
-        .assembleCompleteTransferOperationMessage(
+    const payload = await applyStateMessageFactory(validatorPeer.wallet, config)
+        .buildCompleteTransferOperationMessage(
             partial.address,
             b4a.from(partial.tro.tx, 'hex'),
             b4a.from(partial.tro.txv, 'hex'),
@@ -140,6 +141,7 @@ export async function buildTransferPayload(
             b4a.from(partial.tro.am, 'hex'),
             b4a.from(partial.tro.is, 'hex')
         );
+    return safeEncodeApplyOperation(payload);
 }
 
 export async function buildTransferPayloadWithTxValidity(

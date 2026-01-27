@@ -8,10 +8,12 @@ import {
 class TransactionRateLimiterService {
     #lastCleanup;
     #connectionsStatistics;
+    #swarm;
 
-    constructor() {
+    constructor(swarm) {
         this.#lastCleanup = Date.now();
         this.#connectionsStatistics = new Map();
+        this.#swarm = swarm
     }
 
     /*
@@ -39,7 +41,7 @@ class TransactionRateLimiterService {
         If the peer has exceeded the rate limit, it disconnects the peer.
         Otherwise, it updates the connection info with the current timestamp.
     */
-    handleRateLimit(connection, network) {
+    handleRateLimit(connection) {
         const peer = b4a.toString(connection.remotePublicKey, 'hex');
         const currentTime = Date.now();
 
@@ -53,7 +55,7 @@ class TransactionRateLimiterService {
 
         if (this.#hasExceededRateLimit(peer)) {
             console.warn(`Rate limit exceeded for peer ${peer}. Disconnecting...`);
-            network.swarm.leavePeer(connection.remotePublicKey);
+            this.#swarm.leavePeer(connection.remotePublicKey);
             connection.end();
             return true;
         }

@@ -6,6 +6,8 @@ export const ENV = {
     DEVELOPMENT: 'development',
     TESTNET1: 'testnet1'
 }
+// TODO: CREATE TEST ENV CONFIG SIMILAR TO MAINNET AND USE IT IN TESTS.
+// TODO: CREATE TESTNET1 ENV CONFIG and update npm scripts to run node witn mainnet or testnet1.
 
 const configData = {
     [ENV.MAINNET]: {

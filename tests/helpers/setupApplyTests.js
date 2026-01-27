@@ -3,16 +3,13 @@ import {generateMnemonic, mnemonicToSeed} from 'bip39-mnemonic';
 import b4a from 'b4a'
 import PeerWallet from "trac-wallet"
 import path from 'path';
-import CompleteStateMessageOperations from '../../src/messages/completeStateMessages/CompleteStateMessageOperations.js'
-import PartialStateMessageOperations from '../../src/messages/partialStateMessages/PartialStateMessageOperations.js';
 import {MainSettlementBus} from '../../src/index.js'
 import { createConfig, ENV } from '../../src/config/env.js'
 import fileUtils from '../../src/utils/fileUtils.js'
 import {EntryType} from '../../src/utils/constants.js';
 import {sleep} from '../../src/utils/helpers.js'
 import {formatIndexersEntry} from '../../src/utils/helpers.js';
-import CompleteStateMessageBuilder from '../../src/messages/completeStateMessages/CompleteStateMessageBuilder.js'
-import CompleteStateMessageDirector from '../../src/messages/completeStateMessages/CompleteStateMessageDirector.js'
+import { applyStateMessageFactory } from "../../src/messages/state/applyStateMessageFactory.js";
 import { safeEncodeApplyOperation } from "../../src/utils/protobuf/operationHelpers.js"
 import { $TNK } from '../../src/core/state/utils/balance.js';
 import { EventType } from '../../src/utils/constants.js';
@@ -69,14 +66,13 @@ export const tick = () => new Promise(resolve => setImmediate(resolve));
 
 export async function fundPeer(admin, toFund, amount) {
     const txValidity = await admin.msb.state.getIndexerSequenceState()
-    const director = new CompleteStateMessageDirector();
-    director.builder = new CompleteStateMessageBuilder(admin.wallet, admin.config);
-    const payload = await director.buildBalanceInitializationMessage(
-        admin.wallet.address,
-        toFund.wallet.address,
-        amount,
-        txValidity
-    );
+    const payload = await applyStateMessageFactory(admin.wallet, admin.config)
+        .buildCompleteBalanceInitializationMessage(
+            admin.wallet.address,
+            toFund.wallet.address,
+            amount,
+            txValidity
+        );
 
     await admin.msb.state.append(safeEncodeApplyOperation(payload));
     await tick()
@@ -124,10 +120,10 @@ export async function initMsbAdmin(keyPair, temporaryDirectory, options = {}) {
 export async function setupMsbAdmin(keyPair, temporaryDirectory, options = {}) {
     const admin = await initMsbAdmin(keyPair, temporaryDirectory, options);
     const txValidity = await admin.msb.state.getIndexerSequenceState();
-    const addAdminMessage = await new CompleteStateMessageOperations(admin.wallet, admin.config)
-        .assembleAddAdminMessage(admin.msb.state.writingKey, txValidity);
+    const payload = await applyStateMessageFactory(admin.wallet, admin.config)
+        .buildCompleteAddAdminMessage(admin.wallet.address, admin.msb.state.writingKey, txValidity);
 
-    await admin.msb.state.append(addAdminMessage);
+    await admin.msb.state.append(safeEncodeApplyOperation(payload));
     await tick();
     return admin;
 }
@@ -137,22 +133,25 @@ export async function setupNodeAsWriter(admin, writerCandidate) {
         await setupWhitelist(admin, [writerCandidate.wallet.address]); // ensure if is whitelisted
 
         const validity = await admin.msb.getIndexerSequenceState()
-        const req = await new PartialStateMessageOperations(writerCandidate.wallet, admin.config)
-            .assembleAddWriterMessage(
+        const req = await applyStateMessageFactory(writerCandidate.wallet, admin.config)
+            .buildPartialAddWriterMessage(
+                writerCandidate.wallet.address,
                 b4a.toString(writerCandidate.msb.state.writingKey, 'hex'),
-                b4a.toString(validity, 'hex'));
+                b4a.toString(validity, 'hex'),
+                'json'
+            );
 
         await waitWritable(admin, writerCandidate, async () => {
-            const raw = await new CompleteStateMessageOperations(admin.wallet, admin.config)
-                .assembleAddWriterMessage(
+            const payload = await applyStateMessageFactory(admin.wallet, admin.config)
+                .buildCompleteAddWriterMessage(
                     admin.wallet.address,
                     b4a.from(req.rao.tx, 'hex'),
                     b4a.from(req.rao.txv, 'hex'),
                     b4a.from(req.rao.iw, 'hex'),
                     b4a.from(req.rao.in, 'hex'),
                     b4a.from(req.rao.is, 'hex')
-                )
-            await admin.msb.state.append(raw)
+                );
+            await admin.msb.state.append(safeEncodeApplyOperation(payload))
         })
 
         return writerCandidate;
@@ -172,22 +171,25 @@ export async function promoteToWriter(admin, writerCandidate) {
             isIndexer: false,
         })
     const validity = await admin.msb.state.getIndexerSequenceState()
-    const req = await new PartialStateMessageOperations(writerCandidate.wallet, writerCandidate.config)
-        .assembleAddWriterMessage(
+    const req = await applyStateMessageFactory(writerCandidate.wallet, writerCandidate.config)
+        .buildPartialAddWriterMessage(
+            writerCandidate.wallet.address,
             b4a.toString(writerCandidate.msb.state.writingKey, 'hex'),
-            b4a.toString(validity, 'hex'));
+            b4a.toString(validity, 'hex'),
+            'json'
+        );
 
     await waitWritable(writerCandidate, writerCandidate, async () => {
-        const raw = await new CompleteStateMessageOperations(admin.wallet, admin.config)
-            .assembleAddWriterMessage(
+        const payload = await applyStateMessageFactory(admin.wallet, admin.config)
+            .buildCompleteAddWriterMessage(
                 req.address,
                 b4a.from(req.rao.tx, 'hex'),
                 b4a.from(req.rao.txv, 'hex'),
                 b4a.from(req.rao.iw, 'hex'),
                 b4a.from(req.rao.in, 'hex'),
                 b4a.from(req.rao.is, 'hex')
-            )
-        await admin.msb.state.append(raw)
+            );
+        await admin.msb.state.append(safeEncodeApplyOperation(payload))
     })
 
     return writerCandidate;
@@ -206,10 +208,10 @@ export async function setupMsbWriter(admin, peerName, peerKeyPair, temporaryDire
 export async function setupMsbIndexer(indexerCandidate, admin) {
     try {
     const validity = await admin.msb.state.getIndexerSequenceState()
-    const req = await new CompleteStateMessageOperations(admin.wallet, admin.config)
-        .assembleAddIndexerMessage(indexerCandidate.wallet.address, validity);
+    const payload = await applyStateMessageFactory(admin.wallet, admin.config)
+        .buildCompleteAddIndexerMessage(admin.wallet.address, indexerCandidate.wallet.address, validity);
 
-        await admin.msb.state.append(req);
+        await admin.msb.state.append(safeEncodeApplyOperation(payload));
         await tick(); // wait for the request to be processed
 
         const isIndexer = async () => {
@@ -260,10 +262,10 @@ export async function setupWhitelist(admin, whitelistAddresses) {
     fileUtils.readAddressesFromWhitelistFile = async () => whitelistAddresses;
     const validity = await admin.msb.state.getIndexerSequenceState()
     for (const address of whitelistAddresses) {
-        const msg = await new CompleteStateMessageOperations(admin.wallet, admin.config)
-            .assembleAppendWhitelistMessages(validity, address);
+        const payload = await applyStateMessageFactory(admin.wallet, admin.config)
+            .buildCompleteAppendWhitelistMessage(admin.wallet.address, address, validity);
 
-        await admin.msb.state.append(msg);
+        await admin.msb.state.append(safeEncodeApplyOperation(payload));
         await sleep(100)
     }
 
@@ -314,15 +316,17 @@ export async function initDirectoryStructure(peerName, keyPair, temporaryDirecto
 export const deployExternalBootstrap = async (writer, externalNode) => {
     const externalBootstrap = randomBytes(32).toString('hex');
     const txValidity = await writer.msb.state.getIndexerSequenceState();
-    const payload = await new PartialStateMessageOperations(externalNode.msb.wallet, admin.config)
-        .assembleBootstrapDeploymentMessage(
+    const payload = await applyStateMessageFactory(externalNode.msb.wallet, admin.config)
+        .buildPartialBootstrapDeploymentMessage(
+            externalNode.msb.wallet.address,
             externalBootstrap,
             randomBytes(32).toString('hex'),
-            txValidity.toString('hex')
+            txValidity.toString('hex'),
+            'json'
         );
 
-    const raw = await new CompleteStateMessageOperations(writer.msb.wallet, admin.config)
-        .assembleCompleteBootstrapDeployment(
+    const rawPayload = await applyStateMessageFactory(writer.msb.wallet, admin.config)
+        .buildCompleteBootstrapDeploymentMessage(
             payload.address,
             b4a.from(payload.bdo.tx, 'hex'),
             b4a.from(payload.bdo.txv, 'hex'),
@@ -331,7 +335,7 @@ export const deployExternalBootstrap = async (writer, externalNode) => {
             b4a.from(payload.bdo.in, 'hex'),
             b4a.from(payload.bdo.is, 'hex'),
         )
-    await writer.msb.state.base.append(raw)
+    await writer.msb.state.base.append(safeEncodeApplyOperation(rawPayload))
     await tick()
     await waitForHash(writer, payload.bdo.tx)
     return externalBootstrap
@@ -353,17 +357,19 @@ export const generatePostTx = async (writer, externalNode, externalContractBoots
 
     const contentHash = await PeerWallet.blake3(JSON.stringify(testObj));
     const validity = await writer.msb.state.getIndexerSequenceState()
-    const tx = await new PartialStateMessageOperations(externalNode.wallet, admin.config)
-        .assembleTransactionOperationMessage(
+    const tx = await applyStateMessageFactory(externalNode.wallet, admin.config)
+        .buildPartialTransactionOperationMessage(
+            externalNode.wallet.address,
             peerWriterKey,
             b4a.toString(validity, 'hex'),
             b4a.toString(contentHash, 'hex'),
             externalContractBootstrap,
-            b4a.toString(writer.msb.bootstrap, 'hex')
+            b4a.toString(writer.msb.bootstrap, 'hex'),
+            'json'
         )
 
-    const postTx = await new CompleteStateMessageOperations(writer.wallet, admin.config)
-        .assembleCompleteTransactionOperationMessage(
+    const postTxPayload = await applyStateMessageFactory(writer.wallet, admin.config)
+        .buildCompleteTransactionOperationMessage(
             tx.address,
             b4a.from(tx.txo.tx, 'hex'),
             b4a.from(tx.txo.txv, 'hex'),
@@ -375,6 +381,7 @@ export const generatePostTx = async (writer, externalNode, externalContractBoots
             b4a.from(tx.txo.mbs, 'hex')
         );
 
+    const postTx = safeEncodeApplyOperation(postTxPayload);
     return { postTx, txHash: tx.txo.tx };
 }
 
