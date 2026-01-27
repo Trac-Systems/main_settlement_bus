@@ -4,7 +4,7 @@ import NetworkMessageRouter from './legacy/NetworkMessageRouter.js';
 import NetworkMessageRouterV1 from './v1/NetworkMessageRouter.js';
 import ProtocolSession from './ProtocolSession.js';
 import LegacyProtocol from './LegacyProtocol.js';
-import V1Protocol from './v1Protocol.js';
+import V1Protocol from './V1Protocol.js';
 class NetworkMessages {
     #legacyMessageRouter;
     #v1MessageRouter;
