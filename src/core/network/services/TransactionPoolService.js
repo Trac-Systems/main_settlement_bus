@@ -37,7 +37,7 @@ class TransactionPoolService {
             console.info('TransactionPoolService can not start. Wallet is not enabled');
             return;
         }
-        if (this.scheduler && this.#scheduler.isRunning) {
+        if (this.#scheduler && this.#scheduler.isRunning) {
             console.info('TransactionPoolService is already started');
             return;
         }
