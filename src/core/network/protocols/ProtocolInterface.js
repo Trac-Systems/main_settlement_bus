@@ -13,7 +13,7 @@ class ProtocolInterface {
     }
 
     init(connection) {
-        // Abstract method. Needt to be implemented by subclasses.
+        // Abstract method. Need to be implemented by subclasses.
         throw new Error('init() method must be implemented by subclass');
     }
 
@@ -23,7 +23,7 @@ class ProtocolInterface {
     }
 
     close() {
-        // Abstract method. Needt to be implemented by subclasses.
+        // Abstract method. Need to be implemented by subclasses.
         throw new Error('close() method must be implemented by subclass');
     }
 }
