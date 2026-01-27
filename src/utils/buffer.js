@@ -84,6 +84,9 @@ export function timestampToBuffer(timestamp) {
 }
 
 export function idToBuffer(id) {
+    if (typeof id !== 'string') {
+        throw new Error('id must be a string');
+    }
     return b4a.from(id, 'utf8');
 }
 
