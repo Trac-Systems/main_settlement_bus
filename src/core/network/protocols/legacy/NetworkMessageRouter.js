@@ -52,7 +52,7 @@ class NetworkMessageRouter {
             await this.#handlers.tracNetworkTransaction.handle(incomingMessage, connection);
         }
         else {
-            throw new Error(`Failed to route message: ${error.message}. Pubkey of requester is ${connection.remotePublicKey ? b4a.toString(connection.remotePublicKey, 'hex') : 'unknown'}`);
+            throw new Error(`Failed to route message. Pubkey of requester is ${connection.remotePublicKey ? b4a.toString(connection.remotePublicKey, 'hex') : 'unknown'}`);
         }
 
     }
