@@ -122,6 +122,10 @@ export class Config {
         return this.#config.messageValidatorResponseTimeout
     }
 
+    get pendingRequestTimeout() {
+        return this.#config.pendingRequestTimeout
+    }
+
     // Most of these properties are boolean
     #isOverriden(prop) {
         return this.#options.hasOwnProperty(prop)
