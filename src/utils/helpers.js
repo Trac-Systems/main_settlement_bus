@@ -1,7 +1,7 @@
 import b4a from "b4a";
 import {bufferToAddress} from "../core/state/utils/address.js";
 import { EntryType } from "./constants.js";
-
+import { v7 as uuidv7 } from 'uuid';
 //TODO: change file name or split functions below into multiple files (Remember to update imports and tests accordingly)
 
 export function isHexString(string) {
@@ -94,4 +94,8 @@ export function isTransactionRecordPut(entry) {
     const isHex = isHexString(entry.key);
     const is64 = entry.key.length === 64;
     return isPut && isHex && is64;
+}
+
+export function generateUUID() {
+    return uuidv7();
 }
