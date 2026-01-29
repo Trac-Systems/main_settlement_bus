@@ -4,6 +4,7 @@ async function runNetworkModuleTests() {
     test.pause();
     await import('./ConnectionManager.test.js');
     await import('./NetworkWalletFactory.test.js');
+    await import('./PendingRequestService.test.js');
     test.resume();
 }
 

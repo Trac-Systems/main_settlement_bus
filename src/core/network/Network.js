@@ -20,6 +20,7 @@ import NetworkWalletFactory from './identity/NetworkWalletFactory.js';
 import { EventType } from '../../utils/constants.js';
 import { networkMessageFactory } from '../../messages/network/v1/networkMessageFactory.js';
 import TransactionRateLimiterService from './services/TransactionRateLimiterService.js';
+import PendingRequestService from './services/PendingRequestService.js';
 // -- Debug Mode --
 // TODO: Implement a better debug system in the future. This is just temporary.
 const DEBUG = false;
@@ -44,6 +45,7 @@ class Network extends ReadyResource {
     #connectTimeoutMs;
     #maxPendingConnections;
     #rateLimiter;
+    #pendingRequestsService;
 
     /**
      * @param {State} state
@@ -60,6 +62,7 @@ class Network extends ReadyResource {
         this.#validatorObserverService = new ValidatorObserverService(this, state, address, this.#config);
         this.#validatorConnectionManager = new ConnectionManager(this.#config);
         this.#validatorMessageOrchestrator = new MessageOrchestrator(this.#validatorConnectionManager, state, this.#config);
+        this.#pendingRequestsService = new PendingRequestService(this.#config);
 
     }
 
