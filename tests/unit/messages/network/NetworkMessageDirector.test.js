@@ -17,6 +17,7 @@ import { addressToBuffer } from '../../../../src/core/state/utils/address.js';
 import { config } from '../../../helpers/config.js';
 import { asAddress } from '../../../helpers/address.js';
 import { testKeyPair1 } from '../../../fixtures/apply.fixtures.js';
+import { v7 as uuidv7 } from 'uuid';
 
 function createWallet() {
     const keyPair = {
@@ -34,64 +35,15 @@ function uniqueResultCodes() {
     return [...new Set(Object.values(NetworkResultCode))].sort((a, b) => a - b);
 }
 
-test('NetworkMessageDirector builds validator connection request and verifies signature', async t => {
-    const wallet = createWallet();
-    const director = new NetworkMessageDirector(new NetworkMessageBuilder(wallet, config));
-
-    const id = '1';
-    const caps = ['cap:b', 'cap:a'];
-
-    const payload = await director.buildValidatorConnectionRequest(id, wallet.address, caps);
-    t.is(payload.type, NetworkOperationType.VALIDATOR_CONNECTION_REQUEST);
-    t.is(payload.id, id);
-    t.alike(payload.capabilities, caps);
-
-    const msg = createMessage(
-        payload.type,
-        idToBuffer(payload.id),
-        timestampToBuffer(payload.timestamp),
-        addressToBuffer(wallet.address, config.addressPrefix),
-        payload.validator_connection_request.nonce,
-        encodeCapabilities(caps)
-    );
-    const hash = await PeerWallet.blake3(msg);
-    t.ok(wallet.verify(payload.validator_connection_request.signature, hash, wallet.publicKey));
-});
-
-test('NetworkMessageDirector builds liveness request and verifies signature', async t => {
-    const wallet = createWallet();
-    const director = new NetworkMessageDirector(new NetworkMessageBuilder(wallet, config));
-
-    const id = '1';
-    const caps = ['cap:b', 'cap:a'];
-    const data = b4a.from('ping', 'utf8');
-
-    const payload = await director.buildLivenessRequest(id, data, caps);
-    t.is(payload.type, NetworkOperationType.LIVENESS_REQUEST);
-    t.is(payload.id, id);
-    t.alike(payload.capabilities, caps);
-
-    const msg = createMessage(
-        payload.type,
-        idToBuffer(payload.id),
-        timestampToBuffer(payload.timestamp),
-        payload.liveness_request.nonce,
-        encodeCapabilities(caps)
-    );
-    const hash = await PeerWallet.blake3(msg);
-    t.ok(wallet.verify(payload.liveness_request.signature, hash, wallet.publicKey));
-});
-
 test('NetworkMessageDirector iterates liveness response ResultCode values', async t => {
     const wallet = createWallet();
     const director = new NetworkMessageDirector(new NetworkMessageBuilder(wallet, config));
 
-    const id = '1';
+    const id = uuidv7();
     const caps = ['cap:b', 'cap:a'];
-    const data = b4a.from('ping', 'utf8');
 
     for (const code of uniqueResultCodes()) {
-        const payload = await director.buildLivenessResponse(id, data, caps, code);
+        const payload = await director.buildLivenessResponse(id, caps, code);
         t.is(payload.type, NetworkOperationType.LIVENESS_RESPONSE);
         t.is(payload.liveness_response.result, code);
 
@@ -115,7 +67,7 @@ test('NetworkMessageDirector builds broadcast transaction request and verifies s
     const wallet = createWallet();
     const director = new NetworkMessageDirector(new NetworkMessageBuilder(wallet, config));
 
-    const id = '1';
+    const id = uuidv7();
     const data = b4a.from('deadbeef', 'hex');
     const caps = ['cap:b', 'cap:a'];
 
@@ -144,7 +96,7 @@ test('NetworkMessageDirector iterates broadcast transaction response ResultCode 
     const wallet = createWallet();
     const director = new NetworkMessageDirector(new NetworkMessageBuilder(wallet, config));
 
-    const id = '1';
+    const id = uuidv7();
     const caps = ['cap:b', 'cap:a'];
 
     for (const code of uniqueResultCodes()) {
@@ -165,37 +117,5 @@ test('NetworkMessageDirector iterates broadcast transaction response ResultCode 
 
         const decoded = decodeV1networkOperation(encodeV1networkOperation(payload));
         t.is(decoded.broadcast_transaction_response.result, code);
-    }
-});
-
-test('NetworkMessageDirector iterates validator connection response ResultCode values', async t => {
-    const wallet = createWallet();
-    const director = new NetworkMessageDirector(new NetworkMessageBuilder(wallet, config));
-
-    const id = '1';
-    const caps = ['cap:b', 'cap:a'];
-    const otherAddress = asAddress('36fdaf941de4afe602cbb1e2f56dc582466ef23fad1da55c09fd6dd841cbd117');
-
-    for (const code of uniqueResultCodes()) {
-        const payload = await director.buildValidatorConnectionResponse(
-            id,
-            otherAddress,
-            caps,
-            code
-        );
-        t.is(payload.type, NetworkOperationType.VALIDATOR_CONNECTION_RESPONSE);
-        t.is(payload.validator_connection_response.result, code);
-
-        const msg = createMessage(
-            payload.type,
-            idToBuffer(payload.id),
-            timestampToBuffer(payload.timestamp),
-            addressToBuffer(otherAddress, config.addressPrefix),
-            payload.validator_connection_response.nonce,
-            safeWriteUInt32BE(code, 0),
-            encodeCapabilities(caps)
-        );
-        const hash = await PeerWallet.blake3(msg);
-        t.ok(wallet.verify(payload.validator_connection_response.signature, hash, wallet.publicKey));
     }
 });
