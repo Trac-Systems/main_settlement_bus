@@ -16,22 +16,38 @@ function installFakeTimeouts(t) {
 
     const callbacks = new Map();
     let nextId = 1;
+    let restored = false;
 
     globalThis.setTimeout = (fn, _ms, ...args) => {
         const id = nextId++;
         callbacks.set(id, () => fn(...args));
-        return id;
+        return {
+            _clear: () => {
+                callbacks.delete(id);
+            }
+        };
     };
 
-    globalThis.clearTimeout = id => {
-        callbacks.delete(id);
+    globalThis.clearTimeout = timer => {
+        if (timer && typeof timer._clear === 'function') {
+            timer._clear();
+            return;
+        }
+        if (callbacks.delete(timer)) return;
+        if (timer && typeof timer === 'object' && typeof originalClearTimeout === 'function') {
+            originalClearTimeout(timer);
+        }
     };
 
-    t.teardown(() => {
+    const restore = () => {
+        if (restored) return;
+        restored = true;
         globalThis.setTimeout = originalSetTimeout;
         globalThis.clearTimeout = originalClearTimeout;
         callbacks.clear();
-    });
+    };
+
+    t.teardown(restore);
 
     return {
         runAll() {
@@ -39,7 +55,8 @@ function installFakeTimeouts(t) {
                 callbacks.delete(id);
                 cb();
             }
-        }
+        },
+        restore
     };
 }
 
@@ -129,16 +146,20 @@ test('PendingRequestService rejects pending request on timeout', async t => {
     const promise = service.registerPendingRequest(peer, request);
     t.ok(service.has(request.id));
 
-    timers.runAll();
-
     try {
-        await promise;
-        t.fail('Expected pending request to time out');
-    } catch (error) {
-        t.ok(error?.message?.includes(`timed out after ${pendingRequestTimeout} ms`));
-    }
+        timers.runAll();
 
-    t.is(service.has(request.id), false);
+        try {
+            await promise;
+            t.fail('Expected pending request to time out');
+        } catch (error) {
+            t.ok(error?.message?.includes(`timed out after ${pendingRequestTimeout} ms`));
+        }
+
+        t.is(service.has(request.id), false);
+    } finally {
+        timers.restore();
+    }
 });
 
 test('PendingRequestService.close rejects all pending requests', async t => {
