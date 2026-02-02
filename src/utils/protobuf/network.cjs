@@ -13,12 +13,10 @@ var skip = encodings.skip
 
 exports.MessageType = {
   "MESSAGE_TYPE_UNSPECIFIED": 0,
-  "MESSAGE_TYPE_VALIDATOR_CONNECTION_REQUEST": 1,
-  "MESSAGE_TYPE_VALIDATOR_CONNECTION_RESPONSE": 2,
-  "MESSAGE_TYPE_LIVENESS_REQUEST": 3,
-  "MESSAGE_TYPE_LIVENESS_RESPONSE": 4,
-  "MESSAGE_TYPE_BROADCAST_TRANSACTION_REQUEST": 5,
-  "MESSAGE_TYPE_BROADCAST_TRANSACTION_RESPONSE": 6
+  "MESSAGE_TYPE_LIVENESS_REQUEST": 1,
+  "MESSAGE_TYPE_LIVENESS_RESPONSE": 2,
+  "MESSAGE_TYPE_BROADCAST_TRANSACTION_REQUEST": 3,
+  "MESSAGE_TYPE_BROADCAST_TRANSACTION_RESPONSE": 4
 }
 
 exports.ResultCode = {
@@ -593,7 +591,7 @@ function defineMessageHeader () {
 
   function encodingLength (obj) {
     var length = 0
-    if ((+defined(obj.validator_connection_request) + +defined(obj.validator_connection_response) + +defined(obj.liveness_request) + +defined(obj.liveness_response) + +defined(obj.broadcast_transaction_request) + +defined(obj.broadcast_transaction_response)) > 1) throw new Error("only one of the properties defined in oneof field can be set")
+    if ((+defined(obj.liveness_request) + +defined(obj.liveness_response) + +defined(obj.broadcast_transaction_request) + +defined(obj.broadcast_transaction_response)) > 1) throw new Error("only one of the properties defined in oneof field can be set")
     if (defined(obj.type)) {
       var len = encodings.enum.encodingLength(obj.type)
       length += 1 + len
@@ -604,16 +602,6 @@ function defineMessageHeader () {
     }
     if (defined(obj.timestamp)) {
       var len = encodings.varint.encodingLength(obj.timestamp)
-      length += 1 + len
-    }
-    if (defined(obj.validator_connection_request)) {
-      var len = ValidatorConnectionRequest.encodingLength(obj.validator_connection_request)
-      length += varint.encodingLength(len)
-      length += 1 + len
-    }
-    if (defined(obj.validator_connection_response)) {
-      var len = ValidatorConnectionResponse.encodingLength(obj.validator_connection_response)
-      length += varint.encodingLength(len)
       length += 1 + len
     }
     if (defined(obj.liveness_request)) {
@@ -650,7 +638,7 @@ function defineMessageHeader () {
     if (!offset) offset = 0
     if (!buf) buf = b4a.allocUnsafe(encodingLength(obj))
     var oldOffset = offset
-    if ((+defined(obj.validator_connection_request) + +defined(obj.validator_connection_response) + +defined(obj.liveness_request) + +defined(obj.liveness_response) + +defined(obj.broadcast_transaction_request) + +defined(obj.broadcast_transaction_response)) > 1) throw new Error("only one of the properties defined in oneof field can be set")
+    if ((+defined(obj.liveness_request) + +defined(obj.liveness_response) + +defined(obj.broadcast_transaction_request) + +defined(obj.broadcast_transaction_response)) > 1) throw new Error("only one of the properties defined in oneof field can be set")
     if (defined(obj.type)) {
       buf[offset++] = 8
       encodings.enum.encode(obj.type, buf, offset)
@@ -666,43 +654,29 @@ function defineMessageHeader () {
       encodings.varint.encode(obj.timestamp, buf, offset)
       offset += encodings.varint.encode.bytes
     }
-    if (defined(obj.validator_connection_request)) {
-      buf[offset++] = 34
-      varint.encode(ValidatorConnectionRequest.encodingLength(obj.validator_connection_request), buf, offset)
-      offset += varint.encode.bytes
-      ValidatorConnectionRequest.encode(obj.validator_connection_request, buf, offset)
-      offset += ValidatorConnectionRequest.encode.bytes
-    }
-    if (defined(obj.validator_connection_response)) {
-      buf[offset++] = 42
-      varint.encode(ValidatorConnectionResponse.encodingLength(obj.validator_connection_response), buf, offset)
-      offset += varint.encode.bytes
-      ValidatorConnectionResponse.encode(obj.validator_connection_response, buf, offset)
-      offset += ValidatorConnectionResponse.encode.bytes
-    }
     if (defined(obj.liveness_request)) {
-      buf[offset++] = 50
+      buf[offset++] = 34
       varint.encode(LivenessRequest.encodingLength(obj.liveness_request), buf, offset)
       offset += varint.encode.bytes
       LivenessRequest.encode(obj.liveness_request, buf, offset)
       offset += LivenessRequest.encode.bytes
     }
     if (defined(obj.liveness_response)) {
-      buf[offset++] = 58
+      buf[offset++] = 42
       varint.encode(LivenessResponse.encodingLength(obj.liveness_response), buf, offset)
       offset += varint.encode.bytes
       LivenessResponse.encode(obj.liveness_response, buf, offset)
       offset += LivenessResponse.encode.bytes
     }
     if (defined(obj.broadcast_transaction_request)) {
-      buf[offset++] = 66
+      buf[offset++] = 50
       varint.encode(BroadcastTransactionRequest.encodingLength(obj.broadcast_transaction_request), buf, offset)
       offset += varint.encode.bytes
       BroadcastTransactionRequest.encode(obj.broadcast_transaction_request, buf, offset)
       offset += BroadcastTransactionRequest.encode.bytes
     }
     if (defined(obj.broadcast_transaction_response)) {
-      buf[offset++] = 74
+      buf[offset++] = 58
       varint.encode(BroadcastTransactionResponse.encodingLength(obj.broadcast_transaction_response), buf, offset)
       offset += varint.encode.bytes
       BroadcastTransactionResponse.encode(obj.broadcast_transaction_response, buf, offset)
@@ -711,7 +685,7 @@ function defineMessageHeader () {
     if (defined(obj.capabilities)) {
       for (var i = 0; i < obj.capabilities.length; i++) {
         if (!defined(obj.capabilities[i])) continue
-        buf[offset++] = 82
+        buf[offset++] = 66
         encodings.string.encode(obj.capabilities[i], buf, offset)
         offset += encodings.string.encode.bytes
       }
@@ -729,8 +703,6 @@ function defineMessageHeader () {
       type: 0,
       id: "",
       timestamp: 0,
-      validator_connection_request: null,
-      validator_connection_response: null,
       liveness_request: null,
       liveness_response: null,
       broadcast_transaction_request: null,
@@ -759,30 +731,6 @@ function defineMessageHeader () {
         offset += encodings.varint.decode.bytes
         break
         case 4:
-        delete obj.validator_connection_response
-        delete obj.liveness_request
-        delete obj.liveness_response
-        delete obj.broadcast_transaction_request
-        delete obj.broadcast_transaction_response
-        var len = varint.decode(buf, offset)
-        offset += varint.decode.bytes
-        obj.validator_connection_request = ValidatorConnectionRequest.decode(buf, offset, offset + len)
-        offset += ValidatorConnectionRequest.decode.bytes
-        break
-        case 5:
-        delete obj.validator_connection_request
-        delete obj.liveness_request
-        delete obj.liveness_response
-        delete obj.broadcast_transaction_request
-        delete obj.broadcast_transaction_response
-        var len = varint.decode(buf, offset)
-        offset += varint.decode.bytes
-        obj.validator_connection_response = ValidatorConnectionResponse.decode(buf, offset, offset + len)
-        offset += ValidatorConnectionResponse.decode.bytes
-        break
-        case 6:
-        delete obj.validator_connection_request
-        delete obj.validator_connection_response
         delete obj.liveness_response
         delete obj.broadcast_transaction_request
         delete obj.broadcast_transaction_response
@@ -791,9 +739,7 @@ function defineMessageHeader () {
         obj.liveness_request = LivenessRequest.decode(buf, offset, offset + len)
         offset += LivenessRequest.decode.bytes
         break
-        case 7:
-        delete obj.validator_connection_request
-        delete obj.validator_connection_response
+        case 5:
         delete obj.liveness_request
         delete obj.broadcast_transaction_request
         delete obj.broadcast_transaction_response
@@ -802,9 +748,7 @@ function defineMessageHeader () {
         obj.liveness_response = LivenessResponse.decode(buf, offset, offset + len)
         offset += LivenessResponse.decode.bytes
         break
-        case 8:
-        delete obj.validator_connection_request
-        delete obj.validator_connection_response
+        case 6:
         delete obj.liveness_request
         delete obj.liveness_response
         delete obj.broadcast_transaction_response
@@ -813,9 +757,7 @@ function defineMessageHeader () {
         obj.broadcast_transaction_request = BroadcastTransactionRequest.decode(buf, offset, offset + len)
         offset += BroadcastTransactionRequest.decode.bytes
         break
-        case 9:
-        delete obj.validator_connection_request
-        delete obj.validator_connection_response
+        case 7:
         delete obj.liveness_request
         delete obj.liveness_response
         delete obj.broadcast_transaction_request
@@ -824,7 +766,7 @@ function defineMessageHeader () {
         obj.broadcast_transaction_response = BroadcastTransactionResponse.decode(buf, offset, offset + len)
         offset += BroadcastTransactionResponse.decode.bytes
         break
-        case 10:
+        case 8:
         obj.capabilities.push(encodings.string.decode(buf, offset))
         offset += encodings.string.decode.bytes
         break

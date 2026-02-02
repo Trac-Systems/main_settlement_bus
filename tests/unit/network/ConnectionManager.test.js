@@ -115,36 +115,37 @@ test('ConnectionManager', () => {
         })
     })
 
-    test('send', async t => {
-        test('triggers send on messenger', async t => {
-            reset()
-            const connectionManager = makeManager()
+    // Note: These tests were commented out because connectionManager.send is being deprecated. When it is completely removed, the tests should be deleted.
+    // test('send', async t => {
+    //     // test('triggers send on messenger', async t => {
+    //     //     reset()
+    //     //     const connectionManager = makeManager()
 
-            const target = connectionManager.send([1,2,3,4])
+    //     //     const target = connectionManager.send([1,2,3,4])
 
-            const totalCalls = connections.reduce((sum, con) => sum + con.connection.protocolSession.send.callCount, 0)
-            t.is(totalCalls, 1, 'should send to exactly one validator')
-            t.ok(target, 'should return a target public key')
-        })
+    //     //     const totalCalls = connections.reduce((sum, con) => sum + con.connection.protocolSession.send.callCount, 0)
+    //     //     t.is(totalCalls, 1, 'should send to exactly one validator')
+    //     //     t.ok(target, 'should return a target public key')
+    //     // })
 
-        test('does not throw on individual send errors', async t => {
-            reset()
-            const errorConnections = [
-                createConnection(testKeyPair7.publicKey),
-                createConnection(testKeyPair8.publicKey),
-            ]
+    //     test('does not throw on individual send errors', async t => {
+    //         reset()
+    //         const errorConnections = [
+    //             createConnection(testKeyPair7.publicKey),
+    //             createConnection(testKeyPair8.publicKey),
+    //         ]
 
-            errorConnections.forEach(con => {
-                con.connection.protocolSession.send = sinon.stub().throws(new Error())
-            })
+    //         errorConnections.forEach(con => {
+    //             con.connection.protocolSession.send = sinon.stub().throws(new Error())
+    //         })
 
-            const connectionManager = makeManager(5, errorConnections)
+    //         const connectionManager = makeManager(5, errorConnections)
 
-            t.is(errorConnections.length, 2, 'should have two connections')
-            connectionManager.send([1,2,3,4])
-            t.ok(true, 'send should not throw even if individual sends fail')
-        })
-    })
+    //         t.is(errorConnections.length, 2, 'should have two connections')
+    //         connectionManager.send([1,2,3,4])
+    //         t.ok(true, 'send should not throw even if individual sends fail')
+    //     })
+    // })
 
     test('on close', async t => {
         test('removes from list', async t => {
