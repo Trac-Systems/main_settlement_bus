@@ -1,4 +1,5 @@
 // TODO: add more validation + write unit tests
+import { NetworkOperationType } from '../../../utils/constants.js';
 
 class PendingRequestService {
     #pendingRequests;
@@ -8,13 +9,25 @@ class PendingRequestService {
         this.#pendingRequests = new Map(); // Map<id, pendingRequestEntry>
         this.#config = config;
     }
-    
+
     has(id) {
         return this.#pendingRequests.has(id);
     }
 
-    async registerPendingRequest(peerPubKeyHex, requestData) {
-        const id = requestData.id;
+    isAlreadyProbed(peerPubKeyHex, preferedProtocol) {
+        for (const [, entry] of this.#pendingRequests) {
+            if (entry.requestedTo === peerPubKeyHex && entry.requestType === NetworkOperationType.LIVENESS_REQUEST && preferedProtocol === null) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /*
+    @returns {Promise}
+    */
+    registerPendingRequest(peerPubKeyHex, message) {
+        const id = message.id;
         if (this.#pendingRequests.size >= 1_000_000) {
             throw new Error('Maximum number of pending requests reached.');
         }
@@ -22,9 +35,10 @@ class PendingRequestService {
         if (this.#pendingRequests.has(id)) {
             throw new Error(`Pending request with ID ${id} from peer ${peerPubKeyHex} already exists.`);
         }
+
         const entry = {
             id: id,
-            requestData: requestData,
+            requestType: message.type,
             requestedTo: peerPubKeyHex,
             timeoutMs: this.#config.pendingRequestTimeout,
             timeoutId: null,
@@ -40,7 +54,7 @@ class PendingRequestService {
             entry.resolve = resolve;
             entry.reject = reject;
         });
-        
+
         entry.timeoutId = setTimeout(() => {
             this.rejectPendingRequest(
                 id,
@@ -48,7 +62,6 @@ class PendingRequestService {
         }, this.#config.pendingRequestTimeout);
 
         this.#pendingRequests.set(id, entry);
-            
         return promise;
     }
 
@@ -74,16 +87,17 @@ class PendingRequestService {
         entry.reject(error);
         return true;
     }
-    
+
     close() {
         for (const [id, entry] of this.#pendingRequests) {
             clearTimeout(entry.timeoutId);
-            try { 
-                entry.reject(new Error(`Pending request ${id} cancelled (shutdown).`)); 
-            } catch {}
+            try {
+                entry.reject(new Error(`Pending request ${id} cancelled (shutdown).`));
+            } catch {
+            }
         }
-    this.#pendingRequests.clear();
-  }
+        this.#pendingRequests.clear();
+    }
 }
 
 export default PendingRequestService;

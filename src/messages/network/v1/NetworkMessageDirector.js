@@ -14,59 +14,17 @@ class NetworkMessageDirector {
     }
 
     /**
-     * Build a validator connection request message.
-     * @param {string} id
-     * @param {string} issuerAddress
-     * @param {string[]} capabilities
-     * @returns {Promise<object>}
-     */
-    async buildValidatorConnectionRequest(id, issuerAddress, capabilities) {
-        await this.#builder
-            .setType(NetworkOperationType.VALIDATOR_CONNECTION_REQUEST)
-            .setId(id)
-            .setTimestamp()
-            .setIssuerAddress(issuerAddress)
-            .setCapabilities(capabilities)
-            .buildPayload()
-
-
-        return this.#builder.getResult();
-    }
-
-    /**
-     * Build a validator connection response message.
-     * @param {string} id
-     * @param {string} issuerAddress
-     * @param {string[]} capabilities
-     * @param {number} statusCode
-     * @returns {Promise<object>}
-     */
-    async buildValidatorConnectionResponse(id, issuerAddress, capabilities, statusCode) {
-        await this.#builder
-        .setType(NetworkOperationType.VALIDATOR_CONNECTION_RESPONSE)
-        .setId(id)
-        .setTimestamp()
-        .setIssuerAddress(issuerAddress)
-        .setCapabilities(capabilities)
-        .setResultCode(statusCode)
-        .buildPayload()
-
-        return this.#builder.getResult();
-    }
-
-    /**
      * Build a liveness request message.
      * @param {string} id
      * @param {Buffer} data
      * @param {string[]} capabilities
      * @returns {Promise<object>}
      */
-    async buildLivenessRequest(id, data, capabilities) {
+    async buildLivenessRequest(id, capabilities) {
         await this.#builder
             .setType(NetworkOperationType.LIVENESS_REQUEST)
             .setId(id)
             .setTimestamp()
-            .setData(data)
             .setCapabilities(capabilities)
             .buildPayload();
 
@@ -76,17 +34,15 @@ class NetworkMessageDirector {
     /**
      * Build a liveness response message.
      * @param {string} id
-     * @param {Buffer} data
      * @param {string[]} capabilities
      * @param {number} statusCode
      * @returns {Promise<object>}
      */
-    async buildLivenessResponse(id, data, capabilities, statusCode) {
+    async buildLivenessResponse(id, capabilities, statusCode) {
         await this.#builder
             .setType(NetworkOperationType.LIVENESS_RESPONSE)
             .setId(id)
             .setTimestamp()
-            .setData(data)
             .setCapabilities(capabilities)
             .setResultCode(statusCode)
             .buildPayload();

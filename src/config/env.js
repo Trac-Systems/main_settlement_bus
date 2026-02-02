@@ -81,6 +81,7 @@ const configData = {
         rateLimitCleanupIntervalMs: 120_000, // Rate limiting constants
         rateLimitConnectionTimeoutMs: 60_000, // Rate limiting constants
         rateLimitMaxTransactionsPerSecond: 50, // Rate limiting constants
+        pendingRequestTimeout: 1000, // TODO: ADD description
         storesDirectory: 'stores/',
         storeName: 'mainnet',
     },
@@ -118,6 +119,7 @@ const configData = {
         rateLimitCleanupIntervalMs: 120_000, // Rate limiting constants
         rateLimitConnectionTimeoutMs: 60_000, // Rate limiting constants
         rateLimitMaxTransactionsPerSecond: 50, // Rate limiting constants
+        pendingRequestTimeout: 1000, // TODO: ADD description
         storesDirectory : 'stores/',
         storeName: 'development',
     }
