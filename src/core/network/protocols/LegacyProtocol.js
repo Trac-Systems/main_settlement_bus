@@ -9,8 +9,8 @@ class LegacyProtocol extends ProtocolInterface {
     #config;
     #router;
 
-    constructor(router, connection, config) {
-        super(router, connection, config);
+    constructor(router, connection, pendingRequestServiceInstance = null, config) {
+        super(router, connection, pendingRequestServiceInstance, config);
         this.#config = config;
         this.#router = router;
         this.init(connection);
@@ -54,7 +54,19 @@ class LegacyProtocol extends ProtocolInterface {
         });
     }
 
-    send(message) {
+    // TODO: Legacy protocol does not require encoding. Consider removing this method after refactoring v1 and the protocol interface
+    decode(message) {
+        // No-op for legacy protocol
+        return message;
+    }
+
+    async send(message) {
+        this.sendAndForget(message);
+        // TODO: Change 'null' to an appropriate response if needed in the future
+        return Promise.resolve(null); // This is to maintain consistency with the ProtocolInterface and v1 protocol.
+    }
+
+    sendAndForget(message) {
         this.#session.send(message);
     }
 

@@ -2,17 +2,22 @@ import Protomux from 'protomux';
 import ProtocolInterface from './ProtocolInterface.js';
 import b4a from 'b4a';
 import c from 'compact-encoding';
+import { encodeV1networkOperation, decodeV1networkOperation } from '../../../utils/protobuf/operationHelpers.js';
 
 class V1Protocol extends ProtocolInterface {
     #channel;
     #session;
     #config;
     #router;
+    #publicKeyHex;
+    #pendingRequestServiceInstance;
 
-    constructor(router, connection, config) {
-        super(router, connection, config);
-        this.#config = config;
+    constructor(router, connection, pendingRequestServiceInstance, config) {
+        super(router, connection, pendingRequestServiceInstance, config);
+        this.#config = config; // TODO: We are ot using config anywhere. Consider deleting it
         this.#router = router;
+        this.#publicKeyHex = connection.remotePublicKey.toString('hex');
+        this.#pendingRequestServiceInstance = pendingRequestServiceInstance;
         this.init(connection);
     }
 
@@ -52,8 +57,20 @@ class V1Protocol extends ProtocolInterface {
         });
     }
 
-    send(message) {
-        this.#session.send(message);
+    // TODO: Consider making this method private/internal-only, just like 'encode'
+    // NOTE: This method might be moved to v1/NetworkMessageRouter.js as it is only used there
+    decode(message) {
+        return decodeV1networkOperation(message);
+    }
+
+    async send(message) {
+        this.#session.send(encodeV1networkOperation(message));
+        const msgReplyPromise = this.#pendingRequestServiceInstance.registerPendingRequest(this.#publicKeyHex, message);
+        return msgReplyPromise;
+    }
+
+    sendAndForget(message) {
+        this.#session.send(encodeV1networkOperation(message));
     }
 
     close() {

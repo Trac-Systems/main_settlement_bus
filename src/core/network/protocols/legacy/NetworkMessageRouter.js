@@ -18,32 +18,34 @@ class NetworkMessageRouter {
      * @param {PeerWallet} wallet
      * @param {TransactionRateLimiterService} rateLimiterService
      * @param {TransactionPoolService} txPoolService
-     * @param {ConnectionManager} connectionManager
      * @param {object} config
      **/
-    constructor(state, wallet, rateLimiterService, txPoolService, connectionManager, config) {
+    constructor(state, wallet, rateLimiterService, txPoolService, config) {
         this.#config = config;
 
         this.#handlers = {
             get: new GetRequestHandler(wallet, state),
-            response: new ResponseHandler(state, wallet, connectionManager, this.#config),
+            response: new ResponseHandler(state, wallet, this.#config),
             roleTransaction: new RoleOperationHandler(state, wallet, rateLimiterService, txPoolService, this.#config),
             subNetworkTransaction: new SubnetworkOperationHandler(state, wallet, rateLimiterService, txPoolService, this.#config),
             tracNetworkTransaction: new TransferOperationHandler(state, wallet, rateLimiterService, txPoolService, this.#config),
         }
     }
 
-    // NOTE: messageProtomux can be deleted, ad this is a session, and we can extract this from connection
-    async route(incomingMessage, connection, messageProtomux) {
+    // TODO: if node is to slow, then message is older than 5 seconds, then decide what to do in legacy and v1 (similar problem)
+    async route(incomingMessage, connection, session) {
         const channelString = b4a.toString(this.#config.channel, 'utf8');
+
+        connection.protocolSession.setLegacyAsPreferredProtocol();
         if (this.#isGetRequest(incomingMessage)) {
-            await this.#handlers.get.handle(incomingMessage, messageProtomux, connection, channelString);
+            await this.#handlers.get.handle(incomingMessage, connection, channelString);
         }
         else if (this.#isResponse(incomingMessage)) {
             await this.#handlers.response.handle(incomingMessage, connection, channelString);
         }
         else if (this.#isRoleAccessOperation(incomingMessage)) {
             await this.#handlers.roleTransaction.handle(incomingMessage, connection);
+            
         }
         else if (this.#isSubnetworkOperation(incomingMessage)) {
             await this.#handlers.subNetworkTransaction.handle(incomingMessage, connection);
