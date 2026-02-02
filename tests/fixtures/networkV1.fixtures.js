@@ -1,32 +1,6 @@
 import b4a from 'b4a';
 import { v7 as uuidv7 } from 'uuid';
 import { NetworkOperationType, ResultCode as NetworkResultCode } from '../../src/utils/constants.js';
-import { asAddress } from '../helpers/address.js';
-
-const payloadValidatorConnectionRequest = {
-    type: NetworkOperationType.VALIDATOR_CONNECTION_REQUEST,
-    id: uuidv7(),
-    timestamp: 123,
-    validator_connection_request: {
-        issuer_address: asAddress('36fdaf941de4afe602cbb1e2f56dc582466ef23fad1da55c09fd6dd841cbd117'),
-        nonce: b4a.from('00', 'hex'),
-        signature: b4a.from('01', 'hex')
-    },
-    capabilities: ['cap:a', 'cap:b']
-};
-
-const payloadValidatorConnectionResponse = {
-    type: NetworkOperationType.VALIDATOR_CONNECTION_RESPONSE,
-    id: uuidv7(),
-    timestamp: 456,
-    validator_connection_response: {
-        issuer_address: asAddress('36fdaf941de4afe602cbb1e2f56dc582466ef23fad1da55c09fd6dd841cbd117'),
-        nonce: b4a.from('02', 'hex'),
-        signature: b4a.from('03', 'hex'),
-        result: NetworkResultCode.OK
-    },
-    capabilities: ['cap:a']
-};
 
 const payloadLivenessRequest = {
     type: NetworkOperationType.LIVENESS_REQUEST,
@@ -76,8 +50,6 @@ const payloadBroadcastTransactionResponse = {
 };
 
 export default {
-    payloadValidatorConnectionRequest,
-    payloadValidatorConnectionResponse,
     payloadLivenessRequest,
     payloadLivenessResponse,
     payloadBroadcastTransactionRequest,

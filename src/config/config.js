@@ -194,6 +194,10 @@ export class Config {
         if (this.#isOverriden('rateLimitMaxTransactionsPerSecond')) return this.#options.rateLimitMaxTransactionsPerSecond
         return this.#config.rateLimitMaxTransactionsPerSecond
     }
+    
+    get pendingRequestTimeout() {
+        return this.#config.pendingRequestTimeout
+    }
 
     // Most of these properties are boolean
     #isOverriden(prop) {

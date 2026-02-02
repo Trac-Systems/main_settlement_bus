@@ -4,12 +4,10 @@ package network.v1;
 
 enum MessageType {
     MESSAGE_TYPE_UNSPECIFIED = 0;
-    MESSAGE_TYPE_VALIDATOR_CONNECTION_REQUEST = 1;
-    MESSAGE_TYPE_VALIDATOR_CONNECTION_RESPONSE = 2;
-    MESSAGE_TYPE_LIVENESS_REQUEST = 3;
-    MESSAGE_TYPE_LIVENESS_RESPONSE = 4;
-    MESSAGE_TYPE_BROADCAST_TRANSACTION_REQUEST = 5;
-    MESSAGE_TYPE_BROADCAST_TRANSACTION_RESPONSE = 6;
+    MESSAGE_TYPE_LIVENESS_REQUEST = 1;
+    MESSAGE_TYPE_LIVENESS_RESPONSE = 2;
+    MESSAGE_TYPE_BROADCAST_TRANSACTION_REQUEST = 3;
+    MESSAGE_TYPE_BROADCAST_TRANSACTION_RESPONSE = 4;
 }
 
 enum ResultCode {
@@ -63,12 +61,10 @@ message MessageHeader {
     string id = 2;
     uint64 timestamp = 3;
     oneof field {
-        ValidatorConnectionRequest            validator_connection_request  = 4;
-        ValidatorConnectionResponse           validator_connection_response  = 5;
-        LivenessRequest                       liveness_request = 6;
-        LivenessResponse                      liveness_response = 7;
-        BroadcastTransactionRequest           broadcast_transaction_request = 8;
-        BroadcastTransactionResponse          broadcast_transaction_response = 9;
+        LivenessRequest                       liveness_request = 4;
+        LivenessResponse                      liveness_response = 5;
+        BroadcastTransactionRequest           broadcast_transaction_request = 6;
+        BroadcastTransactionResponse          broadcast_transaction_response = 7;
     }
-    repeated string capabilities = 10;
+    repeated string capabilities = 8;
 }
