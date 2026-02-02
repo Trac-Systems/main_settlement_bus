@@ -1,6 +1,9 @@
 import b4a from 'b4a'
 import PeerWallet from "trac-wallet"
 
+/**
+ * @typedef {import('hyperswarm').Connection} Connection
+ */
 
 // -- Debug Mode --
 // TODO: Implement a better debug system in the future. This is just temporary.
@@ -22,10 +25,21 @@ class ConnectionManager {
     /**
      * @param {object} config
      **/
-    constructor(config)  {
+    constructor(config) {
         this.#validators = new Map();
         this.#config = config
         this.#maxValidators = config.maxValidators
+    }
+
+    /**
+     * Retrieves the Hyperswarm connection object for a given validator public key.
+     * @param {String | Buffer} publicKey - The public key (Buffer or hex string) of the validator.
+     * @returns {Connection|undefined} - The connection object if found, otherwise undefined.
+     */
+    getConnection(publicKey) {
+        const publicKeyHex = this.#toHexString(publicKey);
+        const entry = this.#validators.get(publicKeyHex);
+        return entry ? entry.connection : undefined;
     }
 
     /**
@@ -35,26 +49,26 @@ class ConnectionManager {
      * @param {Object} message - The message to send to the validator
      * @returns {String} - The public key of the validator used
      */
-    send(message) {
-        const connectedValidators = this.connectedValidators();
+    // send(message) {
+    //     const connectedValidators = this.connectedValidators();
 
-        if (connectedValidators.length === 0) {
-            throw new Error('ConnectionManager: no connected validators available to send message');
-        }
+    //     if (connectedValidators.length === 0) {
+    //         throw new Error('ConnectionManager: no connected validators available to send message');
+    //     }
 
-        const target = this.pickRandomValidator(connectedValidators);
-        const entry = this.#validators.get(target);
-        if (!entry || !entry.connection || !entry.connection.protocolSession?.has('legacy')) return null;
+    //     const target = this.pickRandomValidator(connectedValidators);
+    //     const entry = this.#validators.get(target);
+    //     if (!entry || !entry.connection || !entry.connection.protocolSession?.has('legacy')) return null;
 
-        try {
-            entry.connection.protocolSession.send(message);
-            entry.sent = (entry.sent || 0) + 1;
-        } catch (e) {
-            // Swallow individual send errors.
-        }
+    //     try {
+    //         entry.connection.protocolSession.send(message);
+    //         entry.sent = (entry.sent || 0) + 1;
+    //     } catch (e) {
+    //         // Swallow individual send errors.
+    //     }
 
-        return target;
-    }
+    //     return target;
+    // }
 
     /**
      * Sends a message through a specific validator without increasing sent messages count.
@@ -62,18 +76,26 @@ class ConnectionManager {
      * @param {String | Buffer} publicKey - A validator public key hex string to be fetched from the pool.
      * @returns {Boolean} True if the message was sent, false otherwise.
      */
-    sendSingleMessage(message, publicKey) {
+    async sendSingleMessage(message, publicKey) {
         let publicKeyHex = this.#toHexString(publicKey);
         if (!this.exists(publicKeyHex) || !this.connected(publicKeyHex)) return false; // Fail silently
 
         const validator = this.#validators.get(publicKeyHex);
         if (!validator || !validator.connection || !validator.connection.protocolSession) return false;
-        try {
-            validator.connection.protocolSession.send(message);
-        } catch (e) {
-            // Swallow individual send errors.
-        }
-        return true; // TODO: Implement better success/failure reporting
+
+        let result = false;
+        await validator.connection.protocolSession.send(message)
+            .then(
+                () => {
+                    result = true;
+                }
+            )
+            .catch(
+                () => {
+                    result = false;
+                }
+            )
+        return result;
     }
 
     /**

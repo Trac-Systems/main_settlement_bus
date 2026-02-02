@@ -34,8 +34,6 @@ export const OperationType = Object.freeze({
 });
 
 export const NetworkOperationType = Object.freeze({
-    VALIDATOR_CONNECTION_REQUEST: NetworkMessageType.MESSAGE_TYPE_VALIDATOR_CONNECTION_REQUEST,
-    VALIDATOR_CONNECTION_RESPONSE: NetworkMessageType.MESSAGE_TYPE_VALIDATOR_CONNECTION_RESPONSE,
     LIVENESS_REQUEST: NetworkMessageType.MESSAGE_TYPE_LIVENESS_REQUEST,
     LIVENESS_RESPONSE: NetworkMessageType.MESSAGE_TYPE_LIVENESS_RESPONSE,
     BROADCAST_TRANSACTION_REQUEST: NetworkMessageType.MESSAGE_TYPE_BROADCAST_TRANSACTION_REQUEST,
@@ -140,3 +138,5 @@ export const NETWORK_MESSAGE_TYPES = Object.freeze({
         NODE: 'nodeResponse'
     },
 });
+
+export const NETWORK_CAPABILITIES = Object.freeze(["protocols:v1:legacy"]);
