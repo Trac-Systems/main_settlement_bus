@@ -1,9 +1,9 @@
-import BaseOperationHandler from './base/BaseOperationHandler.js';
+import BaseStateOperationHandler from '../../shared/handlers/BaseStateOperationHandler.js';
 import {
     OperationType
 } from '../../../../../utils/constants.js';
-import PartialBootstrapDeployment from "../validators/PartialBootstrapDeployment.js";
-import PartialTransaction from "../validators/PartialTransaction.js";
+import PartialBootstrapDeployment from "../../shared/validators/PartialBootstrapDeployment.js";
+import PartialTransaction from "../../shared/validators/PartialTransaction.js";
 import {applyStateMessageFactory} from "../../../../../messages/state/applyStateMessageFactory.js";
 import {safeEncodeApplyOperation} from "../../../../../utils/protobuf/operationHelpers.js";
 import {
@@ -12,7 +12,7 @@ import {
 } from "../../../../../utils/normalizers.js";
 
 
-class SubnetworkOperationHandler extends BaseOperationHandler {
+class LegacySubnetworkOperationHandler extends BaseStateOperationHandler {
     #partialBootstrapDeploymentValidator;
     #partialTransactionValidator;
     #config;
@@ -41,7 +41,7 @@ class SubnetworkOperationHandler extends BaseOperationHandler {
         } else if (payload.type === OperationType.BOOTSTRAP_DEPLOYMENT) {
             await this.#partialBootstrapDeploymentSubHandler(payload, connection);
         } else {
-            throw new Error('Unsupported operation type for SubnetworkOperationHandler');
+            throw new Error('Unsupported operation type for LegacySubnetworkOperationHandler');
         }
     }
 
@@ -90,4 +90,4 @@ class SubnetworkOperationHandler extends BaseOperationHandler {
     }
 }
 
-export default SubnetworkOperationHandler;
+export default LegacySubnetworkOperationHandler;

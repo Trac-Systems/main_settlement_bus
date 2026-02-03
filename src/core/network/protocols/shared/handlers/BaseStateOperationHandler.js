@@ -1,7 +1,7 @@
 import b4a from 'b4a';
-import {MAX_PARTIAL_TX_PAYLOAD_BYTE_SIZE, TRANSACTION_POOL_SIZE} from '../../../../../../utils/constants.js';
+import {MAX_PARTIAL_TX_PAYLOAD_BYTE_SIZE, TRANSACTION_POOL_SIZE} from '../../../../../utils/constants.js';
 
-class BaseOperationHandler {
+class BaseStateOperationHandler {
     #state;
     #wallet;
     #rateLimiter;
@@ -16,8 +16,8 @@ class BaseOperationHandler {
      * @param {object} config
      **/
     constructor(state, wallet, rateLimiter, txPoolService, config) {
-        if (new.target === BaseOperationHandler) {
-            throw new Error('BaseOperationHandler is abstract and cannot be instantiated directly');
+        if (new.target === BaseStateOperationHandler) {
+            throw new Error('BaseStateOperationHandler is abstract and cannot be instantiated directly');
         }
         this.#state = state;
         this.#wallet = wallet;
@@ -64,4 +64,4 @@ class BaseOperationHandler {
     }
 
 }
-export default BaseOperationHandler;
+export default BaseStateOperationHandler;

@@ -1,11 +1,11 @@
 import {OperationType} from '../../../../../utils/constants.js';
-import PartialRoleAccess from "../validators/PartialRoleAccess.js";
-import BaseOperationHandler from './base/BaseOperationHandler.js';
+import PartialRoleAccess from "../../shared/validators/PartialRoleAccess.js";
+import BaseStateOperationHandler from '../../shared/handlers/BaseStateOperationHandler.js';
 import {applyStateMessageFactory} from "../../../../../messages/state/applyStateMessageFactory.js";
 import {safeEncodeApplyOperation} from "../../../../../utils/protobuf/operationHelpers.js";
 import {normalizeRoleAccessOperation} from "../../../../../utils/normalizers.js";
 
-class RoleOperationHandler extends BaseOperationHandler {
+class LegacyRoleOperationHandler extends BaseStateOperationHandler {
     #partialRoleAccessValidator;
     #wallet;
     #config;
@@ -85,4 +85,4 @@ class RoleOperationHandler extends BaseOperationHandler {
     }
 }
 
-export default RoleOperationHandler;
+export default LegacyRoleOperationHandler;
