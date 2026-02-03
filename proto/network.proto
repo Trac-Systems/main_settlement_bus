@@ -20,19 +20,6 @@ enum ResultCode {
     RESULT_CODE_SIGNATURE_INVALID = 6;
 }
 
-message ValidatorConnectionRequest {
-    string issuer_address = 1;
-    bytes nonce = 2;
-    bytes signature = 3;
-}
-
-message ValidatorConnectionResponse {
-    string issuer_address = 1;
-    bytes nonce = 2;
-    bytes signature = 3;
-    ResultCode result = 4;
-}
-
 message LivenessRequest {
     bytes nonce = 1;
     bytes signature = 2;
