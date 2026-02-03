@@ -1,11 +1,16 @@
 import Validator from 'fastest-validator';
 import b4a from 'b4a';
-import {NetworkOperationType, NONCE_BYTE_LENGTH, SIGNATURE_BYTE_LENGTH} from '../../../../../utils/constants.js';
+import {
+    NetworkOperationType,
+    NONCE_BYTE_LENGTH,
+    SIGNATURE_BYTE_LENGTH
+} from '../../../../../utils/constants.js';
 
 class V1ValidationSchema {
     #validator;
-    #validateV1LivenessRequst
-    #config
+    #validateV1LivenessRequest;
+    #validateV1LivenessResponse;
+    #config;
 
     /**
      * @param {object} config
@@ -52,7 +57,8 @@ class V1ValidationSchema {
             };
         });
 
-        this.#validateV1LivenessRequst= this.#compileV1LivenessRequestSchema();
+        this.#validateV1LivenessRequest= this.#compileV1LivenessRequestSchema();
+        this.#validateV1LivenessResponse= this.#compileV1LivenessResponseSchema();
     }
 
     #compileV1LivenessRequestSchema() {
@@ -95,12 +101,54 @@ class V1ValidationSchema {
     }
 
     validateV1LivenessRequest(operation) {
-        return this.#validateV1LivenessRequst(operation) === true;
+        return this.#validateV1LivenessRequest(operation) === true;
     }
 
+    #compileV1LivenessResponseSchema() {
+        const schema = {
+            $$strict: true,
+            type: {
+                type: 'number',
+                required: true,
+                custom: (value, errors) => {
+                    const allowedTypes = [
+                        NetworkOperationType.LIVENESS_RESPONSE
+                    ];
+
+                    if (!allowedTypes.includes(value)) {
+                        errors.push({
+                            type: 'valueNotAllowed',
+                            actual: value,
+                            expected: allowedTypes,
+                            field: 'type',
+                            message: `Operation type must be: ${allowedTypes.join(', ')}`
+                        });
+                    }
+                    return value;
+                }
+            },
+            id: { type: 'string', min: 1, max: 64, required: true },
+            timestamp: { type: 'number', integer: true, min: 1, max: Number.MAX_SAFE_INTEGER, required: true },
+            liveness_response: {
+                strict: true,
+                type: 'object',
+                props: {
+                    nonce: {type: 'buffer', length: NONCE_BYTE_LENGTH, required: true},
+                    signature: {type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true},
+                    result: {type: 'number', integer: true, min: 0, max: Number.MAX_SAFE_INTEGER, required: true},
+                }
+            },
+            capabilities: { type: 'array', items: 'string', required: true },
+
+        };
+        return this.#validator.compile(schema);
+    }
+
+    validateV1LivenessResponse(operation) {
+        return this.#validateV1LivenessResponse(operation) === true;
+    }
 
 
 }
 
 export default V1ValidationSchema;
-
