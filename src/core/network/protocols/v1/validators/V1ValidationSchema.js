@@ -64,28 +64,9 @@ class V1ValidationSchema {
     #compileV1LivenessRequestSchema() {
         const schema = {
             $$strict: true,
-            type: {
-                type: 'number',
-                required: true,
-                custom: (value, errors) => {
-                    const allowedTypes = [
-                        NetworkOperationType.LIVENESS_REQUEST
-                    ];
-
-                    if (!allowedTypes.includes(value)) {
-                        errors.push({
-                            type: 'valueNotAllowed',
-                            actual: value,
-                            expected: allowedTypes,
-                            field: 'type',
-                            message: `Operation type must be: ${allowedTypes.join(', ')}`
-                        });
-                    }
-                    return value;
-                }
-            },
-            id: { type: 'string', min: 1, max: 64, required: true },
-            timestamp: { type: 'number', integer: true, min: 1, max: Number.MAX_SAFE_INTEGER, required: true },
+            type: {type: 'number', integer: true, equal: NetworkOperationType.LIVENESS_REQUEST, required: true},
+            id: {type: 'string', min: 1, max: 64, required: true},
+            timestamp: {type: 'number', integer: true, min: 1, max: Number.MAX_SAFE_INTEGER, required: true},
             liveness_request: {
                 strict: true,
                 type: 'object',
@@ -94,7 +75,7 @@ class V1ValidationSchema {
                     signature: {type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true},
                 }
             },
-            capabilities: { type: 'array', items: 'string', required: true },
+            capabilities: {type: 'array', items: 'string', required: true},
 
         };
         return this.#validator.compile(schema);
@@ -107,28 +88,9 @@ class V1ValidationSchema {
     #compileV1LivenessResponseSchema() {
         const schema = {
             $$strict: true,
-            type: {
-                type: 'number',
-                required: true,
-                custom: (value, errors) => {
-                    const allowedTypes = [
-                        NetworkOperationType.LIVENESS_RESPONSE
-                    ];
-
-                    if (!allowedTypes.includes(value)) {
-                        errors.push({
-                            type: 'valueNotAllowed',
-                            actual: value,
-                            expected: allowedTypes,
-                            field: 'type',
-                            message: `Operation type must be: ${allowedTypes.join(', ')}`
-                        });
-                    }
-                    return value;
-                }
-            },
-            id: { type: 'string', min: 1, max: 64, required: true },
-            timestamp: { type: 'number', integer: true, min: 1, max: Number.MAX_SAFE_INTEGER, required: true },
+            type: {type: 'number', integer: true, equal: NetworkOperationType.LIVENESS_RESPONSE, required: true},
+            id: {type: 'string', min: 1, max: 64, required: true},
+            timestamp: {type: 'number', integer: true, min: 1, max: Number.MAX_SAFE_INTEGER, required: true},
             liveness_response: {
                 strict: true,
                 type: 'object',
@@ -138,7 +100,7 @@ class V1ValidationSchema {
                     result: {type: 'number', integer: true, min: 0, max: Number.MAX_SAFE_INTEGER, required: true},
                 }
             },
-            capabilities: { type: 'array', items: 'string', required: true },
+            capabilities: {type: 'array', items: 'string', required: true},
 
         };
         return this.#validator.compile(schema);
