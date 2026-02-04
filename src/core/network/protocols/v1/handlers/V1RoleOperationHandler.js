@@ -3,3 +3,5 @@ import baseOperationHandler from "../../shared/handlers/BaseStateOperationHandle
 class V1RoleOperationHandler extends baseOperationHandler{
     //Placeholder for future implementation
 }
+
+export default V1RoleOperationHandler;

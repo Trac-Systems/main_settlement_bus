@@ -27,3 +27,5 @@ class V1LivenessOperationHandler {
         }
     }
 }
+
+export default V1LivenessOperationHandler;
