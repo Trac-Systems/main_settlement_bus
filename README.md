@@ -1,3 +1,11 @@
+[![release](https://img.shields.io/github/v/release/Trac-Systems/main_settlement_bus)](https://github.com/Trac-Systems/main_settlement_bus/releases/latest)
+[![tag](https://img.shields.io/github/v/tag/Trac-Systems/main_settlement_bus?sort=semver)](https://github.com/Trac-Systems/main_settlement_bus/tags)
+[![npm](https://img.shields.io/npm/v/trac-msb)](https://www.npmjs.com/package/trac-msb)
+[![license](https://img.shields.io/github/license/Trac-Systems/main_settlement_bus)](https://github.com/Trac-Systems/main_settlement_bus/blob/main/LICENSE)
+[![node](https://img.shields.io/badge/node-v22.22.0-brightgreen)](https://www.npmjs.com/package/trac-msb)
+[![dependabot](https://img.shields.io/badge/dependabot-enabled-brightgreen)](https://github.com/Trac-Systems/main_settlement_bus/security/dependabot)
+
+
 # Main Settlement Bus (MSB)
 
 A peer-to-peer crypto validator network to verify and append transactions.
@@ -8,7 +16,7 @@ The MSB leverages the [Pear Runtime and Holepunch](https://pears.com/).
 
 ## Prerequisites
 
-Node.js is required to run the application. Before installing Node.js, refer to the official [Node.js documentation](https://nodejs.org) for the latest recommended version and installation instructions. For this project, Node.js v24.11.0 (LTS) and npm 11.6.1 or newer are compatible.
+Node.js is required to run the application. Before installing Node.js, refer to the official [Node.js documentation](https://nodejs.org) for the latest recommended version and installation instructions. For this project, Node.js v22.22.0 (LTS) and npm 11.6.1 or newer are compatible.
 
 The Pear Runtime CLI is required to run the application. Before installing Pear, refer to the official [Pear documentation](https://docs.pears.com/guides/getting-started) for the latest recommended version and installation instructions. For this project, the latest Pear CLI is compatible.
 
@@ -24,7 +32,7 @@ Docker is optional and only needed for running the containerized RPC node. Befor
 ## Install
 
 ```shell
-git clone -b main --single-branch git@github.com:Trac-Systems/main_settlement_bus.git
+git clone -b <tag> --single-branch git@github.com:Trac-Systems/main_settlement_bus.git
 cd main_settlement_bus
 npm install
 ```
@@ -199,5 +207,5 @@ Stop the service with `docker compose stop msb-rpc`, remove the stack entirely w
 
 ## Troubleshooting
 
-- **Dependency install failures** – confirm you are on Node.js v24.11.0 (LTS) and npm ≥ 11.6.1. If packages still fail to build, clear artifacts (`rm -rf node_modules package-lock.json && npm install`) and rerun `npm run test:unit:all`.
+- **Dependency install failures** – confirm you are on Node.js v22.22.0 (LTS) and npm ≥ 11.6.1. If packages still fail to build, clear artifacts (`rm -rf node_modules package-lock.json && npm install`) and rerun `npm run test:unit:all`.
 - **Unit tests fail only in one runtime** – run the targeted commands (`npm run test:unit:node` or `npm run test:unit:bare`) to isolate regressions, then inspect `tests/unit/unit.test.js` for the failing cases.
