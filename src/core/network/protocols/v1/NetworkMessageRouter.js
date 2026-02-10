@@ -1,74 +1,90 @@
-import {decodeV1networkOperation} from '../../../../utils/protobuf/operationHelpers.js';
-import b4a from "b4a";
-import PeerWallet from 'trac-wallet';
-import {NETWORK_CAPABILITIES, ResultCode} from '../../../../utils/constants.js';
-import {networkMessageFactory} from '../../../../messages/network/v1/networkMessageFactory.js';
-import {NetworkOperationType} from "../../../../utils/constants.js"
-import V1RoleOperationHandler from  './handlers/V1RoleOperationHandler.js';
-import V1SubnetworkOperationHandler from   './handlers/V1SubnetworkOperationHandler.js';
-import V1TransferOperationHandler from  './handlers/V1TransferOperationHandler.js';
-import V1LivenessOperationHandler from  './handlers/V1LivenessOperationHandler.js';
-
+import {decodeV1networkOperation} from '../../../../utils/protobuf/operationHelpers.js'
+import b4a from 'b4a'
+import {NetworkOperationType, V1_PROTOCOL_PAYLOAD_MAX_SIZE} from '../../../../utils/constants.js'
+import {publicKeyToAddress} from '../../../../utils/helpers.js'
+import V1LivenessOperationHandler from './handlers/V1LivenessOperationHandler.js'
+import V1BroadcastTransactionOperationHandler from "./handlers/V1BroadcastTransactionOperationHandler.js";
 
 class NetworkMessageRouterV1 {
-    // TODO: WE NEED TO LEAVEPEER AND CLOSE THE CONNECTION CRITICAL Throws
-    #config;
-    #wallet;
-    #pendingRequestsService;
-    #roleTransaction;
-    #subNetworkTransaction;
-    #tracNetworkTransaction;
-    #livenessRequestHandler;
+    #config
+    #wallet
+    #livenessRequestHandler
+    #broadcastTransactionHandler
 
     constructor(state, wallet, rateLimiterService, txPoolService, pendingRequestsService, config) {
-        this.#config = config;
-        this.#wallet = wallet;
-        this.#pendingRequestsService = pendingRequestsService;
-        this.#livenessRequestHandler = new V1LivenessOperationHandler();
-
+        this.#config = config
+        this.#wallet = wallet
+        this.#livenessRequestHandler = new V1LivenessOperationHandler(
+            wallet,
+            rateLimiterService,
+            pendingRequestsService,
+            config
+        );
+        this.#broadcastTransactionHandler = new V1BroadcastTransactionOperationHandler(
+            state,
+            wallet,
+            rateLimiterService,
+            txPoolService,
+            pendingRequestsService,
+            config
+        );
     }
 
     async route(incomingMessage, connection) {
-        this.#preValidate(incomingMessage, connection);
+        if (!this.#preValidate(incomingMessage)) {
+            this.#disconnect(connection, 'Pre-validation failed for incoming V1 message')
+            return;
+        }
+        let decodedMessage;
 
-        connection.protocolSession.setV1AsPreferredProtocol();
-        const decodedMessage = decodeV1networkOperation(incomingMessage);
-
-        switch (decodedMessage.type) {
-            case NetworkOperationType.LIVENESS_REQUEST: {
-                const message = await networkMessageFactory(this.#wallet, this.#config).buildLivenessResponse(
-                    decodedMessage.id,
-                    NETWORK_CAPABILITIES,
-                    ResultCode.OK
-                );
-                connection.protocolSession.sendAndForget(message);
-                break;
-            }
-
-            case NetworkOperationType.LIVENESS_RESPONSE: {
-                // TODO: How we gonna behave when response will be to old result === false? Decide for v1 and legacy
-                const result = this.#pendingRequestsService.resolvePendingRequest(decodedMessage.id)
-                break;
-            }
-            case NetworkOperationType.BROADCAST_TRANSACTION_REQUEST: {
-                // handle inoming broadcast request message
-                break;
-            }
-            case NetworkOperationType.BROADCAST_TRANSACTION_RESPONSE: {
-                // handle incoming broadcast response message
-                break;
-            }
+        try {
+            decodedMessage = decodeV1networkOperation(incomingMessage)
+        } catch (error) {
+            this.#disconnect(connection, `Failed to decode incoming V1 message: ${error.message}`)
+            return;
         }
 
+        if (!decodedMessage || !Number.isInteger(decodedMessage.type) || decodedMessage.type === 0) {
+            this.#disconnect(connection, `Invalid V1 message type: ${decodedMessage?.type}`)
+            return;
+        }
+
+        connection.protocolSession.setV1AsPreferredProtocol()
+
+        try {
+            switch (decodedMessage.type) {
+                case NetworkOperationType.LIVENESS_REQUEST:
+                    await this.#livenessRequestHandler.handleRequest(decodedMessage, connection);
+                    break;
+                case NetworkOperationType.LIVENESS_RESPONSE:
+                    await this.#livenessRequestHandler.handleResponse(decodedMessage, connection);
+                    break;
+
+                case NetworkOperationType.BROADCAST_TRANSACTION_REQUEST:
+                    await this.#broadcastTransactionHandler.handleRequest(decodedMessage, connection);
+                    break;
+
+                case NetworkOperationType.BROADCAST_TRANSACTION_RESPONSE:
+                    await this.#broadcastTransactionHandler.handleResponse(decodedMessage, connection);
+                    break;
+                default:
+                    this.#disconnect(connection, `Unsupported V1 message type: ${decodedMessage.type}`)
+            }
+        } catch (error) {
+            this.#disconnect(connection, `Unhandled error while routing V1 message: ${error.message}`)
+        }
+    }
+
+    #preValidate(incomingMessage) {
+        return !(!incomingMessage || !b4a.isBuffer(incomingMessage) || incomingMessage.length === 0 || incomingMessage.length > V1_PROTOCOL_PAYLOAD_MAX_SIZE);
 
     }
 
-    #preValidate(incomingMessage, connection) {
-        if (!incomingMessage || !b4a.isBuffer(incomingMessage) || incomingMessage.length === 0 || incomingMessage.length > 4096) {
-            const sender = PeerWallet.encodeBech32m(this.#config.addressPrefix, connection.remotePublicKey);
-            throw new Error(`Invalid incoming V1 message format, sender: ${sender}`);
-        }
+    #disconnect(connection, reason) {
+        const sender = publicKeyToAddress(connection.remotePublicKey, this.#config)
+        console.error(`NetworkMessageRouterV1: ${reason}, sender: ${sender}`)
+        connection.end();
     }
 }
 
-export default NetworkMessageRouterV1;
+export default NetworkMessageRouterV1

@@ -182,6 +182,7 @@ class Network extends ReadyResource {
         if (!this.#swarm) {
             const keyPair = await this.initializeNetworkingKeyPair(store, wallet);
             this.#wallet = this.#getNetworkWalletWrapper(wallet, keyPair);
+            this.#validatorMessageOrchestrator.setWallet(this.#wallet);
 
             this.#swarm = new Hyperswarm({
                 keyPair,
@@ -192,7 +193,7 @@ class Network extends ReadyResource {
                 maxClientConnections: MAX_CLIENT_CONNECTIONS
             });
 
-            this.#rateLimiter = new TransactionRateLimiterService(this.#swarm);
+            this.#rateLimiter = new TransactionRateLimiterService(this.#swarm, this.#config);
             this.#networkMessages = new NetworkMessages(
                 state,
                 this.#wallet,
