@@ -1,4 +1,6 @@
 import b4a from 'b4a';
+import {RateLimitedError} from "../protocols/v1/V1ProtocolError.js";
+import {publicKeyToAddress} from "../../../utils/helpers.js";
 
 class TransactionRateLimiterService {
     #lastCleanup;
@@ -14,19 +16,23 @@ class TransactionRateLimiterService {
     }
 
     /*
-        Checks if the peer has exceeded the rate limit.
+        Checks if the peer has exceeded the rate limit for the current 1-second window.
         A peer is considered to have exceeded the rate limit if:
-        - The time since the last activity is greater than or equal to 1000 ms (1 second)
-        - The number of transactions in the current session is greater than or equal to rateLimitMaxTransactionsPerSecond
-        If the rate limit is exceeded, the peer is disconnected.
+        - The request belongs to the same 1-second window as previous requests (tracked per peer)
+        - The number of transactions already seen in this window is >= rateLimitMaxTransactionsPerSecond
+
+        Important:
+        - This method assumes the caller increments transactionCount AFTER calling this method.
+          (So exactly rateLimitMaxTransactionsPerSecond are allowed; the next one is blocked.)
     */
-    #hasExceededRateLimit(peer) {
+    #hasExceededRateLimit(peer, currentTime) {
         const peerData = this.#connectionsStatistics.get(peer);
-        const currentSecond = Math.floor((peerData.lastActivityTime - peerData.sessionStartTime) / 1000);
-        
-        if (currentSecond > Math.floor((peerData.lastCounterReset - peerData.sessionStartTime) / 1000)) {
+        const currentSecond = Math.floor((currentTime - peerData.sessionStartTime) / 1000);
+        const lastResetSecond = Math.floor((peerData.lastCounterReset - peerData.sessionStartTime) / 1000);
+
+        if (currentSecond > lastResetSecond) {
             peerData.transactionCount = 0;
-            peerData.lastCounterReset = peerData.lastActivityTime;
+            peerData.lastCounterReset = currentTime;
             this.#connectionsStatistics.set(peer, peerData);
         }
         
@@ -34,23 +40,18 @@ class TransactionRateLimiterService {
     }
 
     /*
-        Handles the rate limiting for a peer connection.
-        If the peer has exceeded the rate limit, it disconnects the peer.
-        Otherwise, it updates the connection info with the current timestamp.
+        Handles rate limiting for a peer connection (legacy protocol).
+        If the peer has exceeded the rate limit, it disconnects the peer and returns true.
+        Otherwise, it updates the connection info with the current timestamp and returns false.
     */
-    handleRateLimit(connection) {
+    legacyHandleRateLimit(connection) {
         const peer = b4a.toString(connection.remotePublicKey, 'hex');
         const currentTime = Date.now();
 
         this.#cleanUpOldConnections(currentTime);
         this.#initializePeerConnectionInfoEntry(peer, currentTime);
 
-        if (this.#isConnectionExpired(peer)) {
-            this.#connectionsStatistics.delete(peer);
-            return false;
-        }
-
-        if (this.#hasExceededRateLimit(peer)) {
+        if (this.#hasExceededRateLimit(peer, currentTime)) {
             console.warn(`Rate limit exceeded for peer ${peer}. Disconnecting...`);
             this.#swarm.leavePeer(connection.remotePublicKey);
             connection.end();
@@ -61,14 +62,31 @@ class TransactionRateLimiterService {
         return false;
     }
 
+    /*
+        Handles rate limiting for a peer connection (v1 protocol).
+        If the peer has exceeded the rate limit, it throws RateLimitedError.
+        Otherwise, it updates the connection info with the current timestamp.
+    */
+    v1HandleRateLimit(connection) {
+        const peer = b4a.toString(connection.remotePublicKey, 'hex');
+        const currentTime = Date.now();
+
+        this.#cleanUpOldConnections(currentTime);
+        this.#initializePeerConnectionInfoEntry(peer, currentTime);
+
+        if (this.#hasExceededRateLimit(peer, currentTime)) {
+            throw new RateLimitedError(`Rate limit exceeded for peer ${publicKeyToAddress(connection.remotePublicKey, this.#config)}`);
+        }
+        this.#updatePeerConnectionInfo(peer, currentTime);
+    }
+
     #shouldCleanupConnections(currentTime) {
         return currentTime - this.#lastCleanup >= this.#config.rateLimitCleanupIntervalMs;
     }
 
     /**
-        Cleans up old connections that have timed out.
-        Condition for cleanup based on #shouldCleanupConnections:
-        - If the last cleanup was more than rateLimitCleanupIntervalMs ago
+        Cleans up per-peer statistics that have been inactive for more than rateLimitCleanupIntervalMs.
+        Runs at most once every rateLimitCleanupIntervalMs.
     */
     #cleanUpOldConnections(currentTime) {
         if (!this.#shouldCleanupConnections(currentTime)) {
@@ -76,8 +94,7 @@ class TransactionRateLimiterService {
         }
 
         for (const [peer, _] of this.#connectionsStatistics.entries()) {
-            if (this.#isConnectionExpired(peer)) {
-                //console.log(`Connection for peer ${peer} has expired. Removing...`);
+            if (this.#isConnectionExpired(peer, currentTime)) {
                 this.#connectionsStatistics.delete(peer);
             }
         }
@@ -87,19 +104,19 @@ class TransactionRateLimiterService {
 
     /*
         Initializes the connection statistics for a peer.
-        Connection is a HashMap with the following structure:
-            peerPublicKey: {
-                sessionStartTime: timestamp,     // When the external peer started their session
-                lastActivityTime: timestamp,     // Timestamp of peer's most recent activity (default: 0)
-                transactionCount: number         // Number of transactions in the current session (default: 0)
+        Stored as a HashMap with the following structure:
+            peerPublicKeyHex: {
+                sessionStartTime: timestamp,  // When we first saw this peer (start of local tracking session)
+                lastActivityTime: timestamp,  // Timestamp of peer's most recent activity
+                lastCounterReset: timestamp,  // Timestamp when the per-second counter was last reset
+                transactionCount: number      // Transactions seen in the current 1-second window
             }
-        
     */
     #initializePeerConnectionInfoEntry(peer, timestamp) {
         if (!this.#connectionsStatistics.has(peer)) {
             this.#connectionsStatistics.set(peer, {
                 sessionStartTime: timestamp,
-                lastActivityTime: 0,
+                lastActivityTime: timestamp,
                 lastCounterReset: timestamp,
                 transactionCount: 0
             });
@@ -118,11 +135,12 @@ class TransactionRateLimiterService {
     }
 
     /*
-        Checks if the connection for a peer has expired.
+        Checks if the stored statistics for a peer have expired due to inactivity.
+        Note: this is NOT a network-level connection timeout; it's only used to evict old Map entries.
     */
-    #isConnectionExpired(peer) {
+    #isConnectionExpired(peer, currentTime) {
         const peerData = this.#connectionsStatistics.get(peer);
-        return peerData.lastActivityTime - peerData.sessionStartTime >= this.#config.rateLimitConnectionTimeoutMs;
+        return currentTime - peerData.lastActivityTime >= this.#config.rateLimitConnectionTimeoutMs;
     }
 }
 

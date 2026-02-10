@@ -1,6 +1,6 @@
 import ValidatorResponse from '../validators/ValidatorResponse.js';
 
-class ResponseHandler {
+class LegacyResponseHandler {
     #responseValidator;
 
     constructor(state, wallet, config) {
@@ -20,4 +20,4 @@ class ResponseHandler {
     }
 }
 
-export default ResponseHandler;
+export default LegacyResponseHandler;
