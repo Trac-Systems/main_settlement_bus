@@ -1,5 +1,5 @@
 import {networkMessageFactory} from "../../../../../messages/network/v1/networkMessageFactory.js";
-import {NETWORK_CAPABILITIES, OperationType, ResultCode} from "../../../../../utils/constants.js";
+import {NETWORK_CAPABILITIES, OperationType, ResultCode, TRANSACTION_POOL_SIZE} from "../../../../../utils/constants.js";
 import {
     getResultCode,
     InvalidPayloadError,
@@ -61,6 +61,7 @@ class V1BroadcastTransactionOperationHandler {
 
         try {
             await this.#validationCapability();
+            this.#isTxPoolFull()
 
             if (!this.#config.disableRateLimit) {
                 this.#rateLimiterService.v1HandleRateLimit(connection);
@@ -164,6 +165,13 @@ class V1BroadcastTransactionOperationHandler {
         return null;
     }
 
+    #isTxPoolFull() {
+        // TODO: CREATE NEW ERROR THAT WILL describe that node is overloaded and it won't process transaction for now
+        // In this case we should not return unexpected error.
+        if (this.#txPoolService.tx_pool.length >= TRANSACTION_POOL_SIZE) {
+            throw new UnexpectedError('Transaction pool is full, ignoring incoming transaction.', false);
+        }
+    }
     async #validationCapability() {
         const isAllowedToValidate = await this.#state.allowedToValidate(this.#wallet.address);
         const isAdminAllowedToValidate = await this.#state.isAdminAllowedToValidate();
