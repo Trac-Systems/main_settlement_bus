@@ -7,8 +7,8 @@ import {
 import { get_confirmed_tx_info, get_unconfirmed_tx_info } from "../src/utils/cli.js";
 import {OperationType} from "../src/utils/constants.js";
 import b4a from "b4a";
-import PartialTransaction from "../src/core/network/protocols/shared/validators/PartialTransaction.js";
-import PartialTransfer from "../src/core/network/protocols/shared/validators/PartialTransfer.js";
+import PartialTransactionValidator from "../src/core/network/protocols/shared/validators/PartialTransactionValidator.js";
+import PartialTransferValidator from "../src/core/network/protocols/shared/validators/PartialTransferValidator.js";
 
 export async function getBalance(msbInstance, address, confirmed) {
     const state = msbInstance.state;
@@ -52,8 +52,8 @@ export async function broadcastTransaction(msbInstance, config, payload) {
     let isValid = false;
     let hash;
 
-    const partialTransferValidator = new PartialTransfer(msbInstance.state, null , config);
-    const partialTransactionValidator = new PartialTransaction(msbInstance.state, null , config);
+    const partialTransferValidator = new PartialTransferValidator(msbInstance.state, null , config);
+    const partialTransactionValidator = new PartialTransactionValidator(msbInstance.state, null , config);
 
     if (payload.type === OperationType.TRANSFER) {
         normalizedPayload = normalizeTransferOperation(payload, config);

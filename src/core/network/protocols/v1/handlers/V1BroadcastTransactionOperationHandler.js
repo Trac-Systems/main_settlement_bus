@@ -13,10 +13,10 @@ import {
     unsafeEncodeApplyOperation
 } from "../../../../../utils/protobuf/operationHelpers.js";
 import {isBootstrapDeployment, isRoleAccess, isTransaction, isTransfer} from '../../../../../utils/applyOperations.js';
-import PartialRoleAccess from "../../shared/validators/PartialRoleAccess.js";
-import PartialBootstrapDeployment from "../../shared/validators/PartialBootstrapDeployment.js";
-import PartialTransaction from "../../shared/validators/PartialTransaction.js";
-import PartialTransfer from "../../shared/validators/PartialTransfer.js";
+import PartialRoleAccessValidator from "../../shared/validators/PartialRoleAccessValidator.js";
+import PartialBootstrapDeploymentValidator from "../../shared/validators/PartialBootstrapDeploymentValidator.js";
+import PartialTransactionValidator from "../../shared/validators/PartialTransactionValidator.js";
+import PartialTransferValidator from "../../shared/validators/PartialTransferValidator.js";
 import {mapValidationErrorToV1Error} from "../V1ValidationErrorMapper.js";
 import {applyStateMessageFactory} from "../../../../../messages/state/applyStateMessageFactory.js";
 import V1BroadcastTransactionResponse from "../validators/V1BroadcastTransactionResponse.js";
@@ -39,10 +39,10 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
         this.#wallet = wallet;
         this.#txPoolService = txPoolService;
         this.#broadcastTransactionRequestValidator = new V1BroadcastTransactionRequest(config);
-        this.#partialRoleAccessValidator = new PartialRoleAccess(state, this.#wallet.address, config);
-        this.#partialBootstrapDeploymentValidator = new PartialBootstrapDeployment(state, this.#wallet.address, config);
-        this.#partialTransactionValidator = new PartialTransaction(state, this.#wallet.address, config);
-        this.#partialTransferValidator = new PartialTransfer(state, this.#wallet.address, config);
+        this.#partialRoleAccessValidator = new PartialRoleAccessValidator(state, this.#wallet.address, config);
+        this.#partialBootstrapDeploymentValidator = new PartialBootstrapDeploymentValidator(state, this.#wallet.address, config);
+        this.#partialTransactionValidator = new PartialTransactionValidator(state, this.#wallet.address, config);
+        this.#partialTransferValidator = new PartialTransferValidator(state, this.#wallet.address, config);
         this.#broadcastTransactionResponseValidator = new V1BroadcastTransactionResponse(config);
     }
 

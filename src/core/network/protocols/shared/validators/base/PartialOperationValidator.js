@@ -12,7 +12,7 @@ const MAX_AMOUNT = BigInt('0xffffffffffffffffffffffffffffffff');
 const FEE_BIGINT = bufferToBigInt(FEE);
 const PUBLIC_KEY_LENGTH = 32;
 
-class PartialOperation {
+class PartialOperationValidator {
     #state;
     #check;
     #config
@@ -229,4 +229,4 @@ class PartialOperation {
 
 }
 
-export default PartialOperation;
+export default PartialOperationValidator;
