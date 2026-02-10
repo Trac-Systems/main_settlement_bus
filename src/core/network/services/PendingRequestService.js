@@ -1,5 +1,6 @@
 // TODO: add more validation + write unit tests
-import { NetworkOperationType } from '../../../utils/constants.js';
+import {NetworkOperationType, ResultCode} from '../../../utils/constants.js';
+import {TimeoutError, UnexpectedError, V1ProtocolError} from "../protocols/v1/V1ProtocolError.js";
 
 class PendingRequestService {
     #pendingRequests;
@@ -44,10 +45,6 @@ class PendingRequestService {
             timeoutId: null,
             resolve: null,
             reject: null,
-            // timedOut: false, // To discuss what can be shared with legacy. It would be good to create this object as a class.
-            // sent: true,
-            //protocol: "v1"
-            //retries: 0
         }
 
         const promise = new Promise((resolve, reject) => {
@@ -58,7 +55,11 @@ class PendingRequestService {
         entry.timeoutId = setTimeout(() => {
             this.rejectPendingRequest(
                 id,
-                new Error(`Pending request with ID ${id} from peer ${peerPubKeyHex} timed out after ${this.#config.pendingRequestTimeout} ms.`));
+                new TimeoutError(
+                    `Pending request with ID ${id} from peer ${peerPubKeyHex} timed out after ${this.#config.pendingRequestTimeout} ms.`,
+                    false
+                ));
+
         }, this.#config.pendingRequestTimeout);
 
         this.#pendingRequests.set(id, entry);
@@ -74,17 +75,35 @@ class PendingRequestService {
         return entry;
     }
 
-    resolvePendingRequest(id) {
+    getPendingRequest(id) {
+        const entry = this.#pendingRequests.get(id);
+        if (!entry) return null;
+        return entry;
+    }
+
+    resolvePendingRequest(id, resultCode = ResultCode.OK) {
         const entry = this.getAndDeletePendingRequest(id);
         if (!entry) return false;
-        entry.resolve();
+        entry.resolve(resultCode);
         return true;
     }
 
     rejectPendingRequest(id, error) {
         const entry = this.getAndDeletePendingRequest(id);
         if (!entry) return false;
-        entry.reject(error);
+        const err = error instanceof V1ProtocolError
+            ? error
+            : new UnexpectedError(error?.message ?? 'Unexpected error', false);
+        entry.reject(err);
+        return true;
+    }
+
+    stopPendingRequestTimeout(id) {
+        const entry = this.#pendingRequests.get(id);
+        if (!entry) return false;
+
+        clearTimeout(entry.timeoutId);
+        entry.timeoutId = null;
         return true;
     }
 
@@ -92,7 +111,11 @@ class PendingRequestService {
         for (const [id, entry] of this.#pendingRequests) {
             clearTimeout(entry.timeoutId);
             try {
-                entry.reject(new Error(`Pending request ${id} cancelled (shutdown).`));
+                entry.reject(
+                    new UnexpectedError(
+                        `Pending request ${id} cancelled (shutdown).`,
+                        false)
+                );
             } catch {
             }
         }
