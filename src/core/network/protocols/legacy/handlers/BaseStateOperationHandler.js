@@ -47,7 +47,7 @@ class BaseStateOperationHandler {
         }
         
         if (!this.#config.disableRateLimit) {
-            const shouldDisconnect = this.#rateLimiter.handleRateLimit(connection);
+            const shouldDisconnect = this.#rateLimiter.legacyHandleRateLimit(connection);
             if (shouldDisconnect) {
                 throw new Error(`OperationHandler: Rate limit exceeded for peer ${b4a.toString(connection.remotePublicKey, 'hex')}. Disconnecting...`);
             }

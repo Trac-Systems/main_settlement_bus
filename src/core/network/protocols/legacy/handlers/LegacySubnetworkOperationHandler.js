@@ -1,4 +1,4 @@
-import BaseStateOperationHandler from '../../shared/handlers/BaseStateOperationHandler.js';
+import BaseStateOperationHandler from './BaseStateOperationHandler.js';
 import {
     OperationType
 } from '../../../../../utils/constants.js';

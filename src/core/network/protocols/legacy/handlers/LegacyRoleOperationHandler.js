@@ -1,6 +1,6 @@
 import {OperationType} from '../../../../../utils/constants.js';
 import PartialRoleAccess from "../../shared/validators/PartialRoleAccess.js";
-import BaseStateOperationHandler from '../../shared/handlers/BaseStateOperationHandler.js';
+import BaseStateOperationHandler from './BaseStateOperationHandler.js';
 import {applyStateMessageFactory} from "../../../../../messages/state/applyStateMessageFactory.js";
 import {safeEncodeApplyOperation} from "../../../../../utils/protobuf/operationHelpers.js";
 import {normalizeRoleAccessOperation} from "../../../../../utils/normalizers.js";
