@@ -178,6 +178,7 @@ class Network extends ReadyResource {
         if (!this.#swarm) {
             const keyPair = await this.initializeNetworkingKeyPair(store, wallet);
             this.#wallet = this.#getNetworkWalletWrapper(wallet, keyPair);
+            this.#validatorMessageOrchestrator.setWallet(this.#wallet);
 
             this.#swarm = new Hyperswarm({
                 keyPair,
