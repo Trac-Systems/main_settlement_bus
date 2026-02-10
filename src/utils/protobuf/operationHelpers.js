@@ -36,6 +36,14 @@ export const safeDecodeApplyOperation = (payload) => {
     return null;
 }
 
+export const unsafeDecodeApplyOperation= (payload) => {
+    return applyOperations.Operation.decode(payload);
+}
+
+export const unsafeEncodeApplyOperation = (payload) => {
+    return applyOperations.Operation.encode(payload);
+}
+
 export const normalizeIncomingMessage = (message) => {
     if (!message) return null;
     if (b4a.isBuffer(message)) {

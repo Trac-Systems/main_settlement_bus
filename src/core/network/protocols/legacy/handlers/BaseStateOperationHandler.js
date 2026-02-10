@@ -1,6 +1,6 @@
 import b4a from 'b4a';
 
-class BaseOperationHandler {
+class BaseStateOperationHandler {
     #state;
     #wallet;
     #rateLimiter;
@@ -15,8 +15,8 @@ class BaseOperationHandler {
      * @param {Config} config
      **/
     constructor(state, wallet, rateLimiter, txPoolService, config) {
-        if (new.target === BaseOperationHandler) {
-            throw new Error('BaseOperationHandler is abstract and cannot be instantiated directly');
+        if (new.target === BaseStateOperationHandler) {
+            throw new Error('BaseStateOperationHandler is abstract and cannot be instantiated directly');
         }
         this.#state = state;
         this.#wallet = wallet;
@@ -46,7 +46,7 @@ class BaseOperationHandler {
         }
         
         if (!this.#config.disableRateLimit) {
-            const shouldDisconnect = this.#rateLimiter.handleRateLimit(connection);
+            const shouldDisconnect = this.#rateLimiter.legacyHandleRateLimit(connection);
             if (shouldDisconnect) {
                 throw new Error(`OperationHandler: Rate limit exceeded for peer ${b4a.toString(connection.remotePublicKey, 'hex')}. Disconnecting...`);
             }
@@ -63,4 +63,4 @@ class BaseOperationHandler {
     }
 
 }
-export default BaseOperationHandler;
+export default BaseStateOperationHandler;
