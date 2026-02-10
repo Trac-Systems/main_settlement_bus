@@ -97,15 +97,15 @@ class Network extends ReadyResource {
     }
 
     async _close() {
-        // TODO: Implement better "await" logic for stopping services
         console.log('Network: closing gracefully...');
-        this.transactionPoolService.stopPool();
+        await this.transactionPoolService.stopPool();
         await sleep(100);
-        this.#validatorObserverService.stopValidatorObserver();
+        await this.#validatorObserverService.stopValidatorObserver();
         await sleep(5_000);
 
         this.cleanupNetworkListeners();
         this.cleanupPendingConnections();
+        this.#pendingRequestsService.close();
 
         if (this.#swarm !== null) {
             this.#swarm.destroy();
