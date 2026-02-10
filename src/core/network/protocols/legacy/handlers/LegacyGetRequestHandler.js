@@ -2,7 +2,7 @@ import { NETWORK_MESSAGE_TYPES } from '../../../../../utils/constants.js';
 import PeerWallet from 'trac-wallet';
 import b4a from 'b4a';
 
-class GetRequestHandler {
+class LegacyGetRequestHandler {
     #wallet;
     #state;
 
@@ -50,4 +50,4 @@ class GetRequestHandler {
     }
 }
 
-export default GetRequestHandler;
+export default LegacyGetRequestHandler;

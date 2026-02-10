@@ -10,27 +10,18 @@ enum MessageType {
     MESSAGE_TYPE_BROADCAST_TRANSACTION_RESPONSE = 4;
 }
 
+
+// Warning: Do not change the numeric values of existing enum fields. They are part of the public API.
+// New values can be added, but existing values must never be renumbered or deleted.
 enum ResultCode {
     RESULT_CODE_UNSPECIFIED = 0;
     RESULT_CODE_OK = 1;
     RESULT_CODE_INVALID_PAYLOAD = 2;
-    RESULT_CODE_UNSUPPORTED_VERSION = 3;
-    RESULT_CODE_RATE_LIMITED = 4;
-    RESULT_CODE_TIMEOUT = 5;
-    RESULT_CODE_SIGNATURE_INVALID = 6;
-}
-
-message ValidatorConnectionRequest {
-    string issuer_address = 1;
-    bytes nonce = 2;
-    bytes signature = 3;
-}
-
-message ValidatorConnectionResponse {
-    string issuer_address = 1;
-    bytes nonce = 2;
-    bytes signature = 3;
-    ResultCode result = 4;
+    RESULT_CODE_RATE_LIMITED = 3;
+    RESULT_CODE_SIGNATURE_INVALID = 4;
+    RESULT_CODE_UNEXPECTED_ERROR = 5;
+    RESULT_CODE_TIMEOUT = 6;
+    RESULT_CODE_NODE_HAS_NO_WRITE_ACCESS = 7;
 }
 
 message LivenessRequest {
@@ -45,7 +36,7 @@ message LivenessResponse {
 }
 
 message BroadcastTransactionRequest {
-    bytes data = 1; // binary encoded payload
+    bytes data = 1;
     bytes nonce = 2;
     bytes signature = 3;
 }

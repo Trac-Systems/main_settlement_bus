@@ -2,7 +2,7 @@ import Protomux from 'protomux';
 import ProtocolInterface from './ProtocolInterface.js';
 import b4a from 'b4a';
 import c from 'compact-encoding';
-import { encodeV1networkOperation, decodeV1networkOperation } from '../../../utils/protobuf/operationHelpers.js';
+import {encodeV1networkOperation, decodeV1networkOperation} from '../../../utils/protobuf/operationHelpers.js';
 
 class V1Protocol extends ProtocolInterface {
     #channel;
@@ -35,24 +35,24 @@ class V1Protocol extends ProtocolInterface {
 
         this.#channel = mux.createChannel({
             protocol: 'network/v1',
-            onopen() { },
-            onclose() { }
+            onopen() {
+            },
+            onclose() {
+            }
         });
 
         this.#channel.open();
 
         this.#session = this.#channel.addMessage({
             encoding: c.raw,
-            onmessage: async (incomingMessage) => {
-                try {
-                    if (b4a.isBuffer(incomingMessage)) {
-                        await this.#router.route(incomingMessage, connection, this.#session);
-                    } else {
-                        throw new Error('NetworkMessages: v1 message must be a buffer');
+            onmessage: (incomingMessage) => {
+                this.#router.route(incomingMessage, connection).catch((err) => {
+                    console.error(`V1Protocol: unhandled router error: ${err.message}`);
+                    try {
+                        connection.end();
+                    } catch {
                     }
-                } catch (error) {
-                    console.error(`NetworkMessages: Failed to handle incoming v1 message: ${error.message}`);
-                }
+                });
             }
         });
     }

@@ -1,11 +1,11 @@
-import BaseOperationHandler from './base/BaseOperationHandler.js';
+import BaseStateOperationHandler from './BaseStateOperationHandler.js';
 import {OperationType} from '../../../../../utils/constants.js';
-import PartialTransfer from "../validators/PartialTransfer.js";
+import PartialTransfer from "../../shared/validators/PartialTransfer.js";
 import {normalizeTransferOperation} from "../../../../../utils/normalizers.js"
 import {applyStateMessageFactory} from "../../../../../messages/state/applyStateMessageFactory.js";
 import {safeEncodeApplyOperation} from "../../../../../utils/protobuf/operationHelpers.js";
 
-class TransferOperationHandler extends BaseOperationHandler {
+class LegacyTransferOperationHandler extends BaseStateOperationHandler {
     #partialTransferValidator;
     #config;
     #wallet;
@@ -15,6 +15,7 @@ class TransferOperationHandler extends BaseOperationHandler {
      * @param {State} state
      * @param {PeerWallet} wallet
      * @param {TransactionRateLimiterService} rateLimiter
+     * @param txPoolService
      * @param {object} config
      **/
     constructor(state, wallet, rateLimiter, txPoolService, config) {
@@ -27,7 +28,7 @@ class TransferOperationHandler extends BaseOperationHandler {
 
     async handleOperation(payload, connection) {
         if (payload.type !== OperationType.TRANSFER) {
-            throw new Error('Unsupported operation type for TransferOperationHandler');
+            throw new Error('Unsupported operation type for LegacyTransferOperationHandler');
         }
         await this.#handleTransfer(payload, connection);
     }
@@ -54,4 +55,4 @@ class TransferOperationHandler extends BaseOperationHandler {
     }
 }
 
-export default TransferOperationHandler;
+export default LegacyTransferOperationHandler;

@@ -1,13 +1,22 @@
-import { sleep } from '../../../utils/helpers.js';
+import { generateUUID, sleep } from '../../../utils/helpers.js';
 import { operationToPayload } from '../../../utils/applyOperations.js';
 import PeerWallet from "trac-wallet";
 import b4a from "b4a";
+import {networkMessageFactory} from "../../../messages/network/v1/networkMessageFactory.js";
+import {NETWORK_CAPABILITIES} from "../../../utils/constants.js";
+import {
+    safeDecodeApplyOperation,
+    safeEncodeApplyOperation,
+    unsafeEncodeApplyOperation
+} from "../../../utils/protobuf/operationHelpers.js";
+import {normalizeMessageByOperationType} from "../../../utils/normalizers.js";
 /**
  * MessageOrchestrator coordinates message submission, retry, and validator management.
  * It works with ConnectionManager and ledger state to ensure reliable message delivery.
  */
 class MessageOrchestrator {
     #config;
+    #wallet;
     /**
      * Attempts to send a message to validators with retries and state checks.
      * @param {ConnectionManager} connectionManager - The connection manager instance
@@ -18,6 +27,11 @@ class MessageOrchestrator {
         this.connectionManager = connectionManager;
         this.state = state;
         this.#config = config;
+        this.#wallet = null;
+    }
+
+    setWallet(wallet) {
+        this.#wallet = wallet;
     }
 
     /**
@@ -46,9 +60,16 @@ class MessageOrchestrator {
             }
 
         } else if (preferredProtocol === validatorConnection.protocolSession.supportedProtocols.V1) {
-            //send via v1 protocol
-            //
-            const success = await this.#attemptSendMessageForV1(message, validatorPublicKey);
+            const normalizedMessage = normalizeMessageByOperationType(message, this.#config)
+            const encodedTransaction = unsafeEncodeApplyOperation(normalizedMessage)
+            const v1Message = await networkMessageFactory(this.#wallet, this.#config)
+                .buildBroadcastTransactionRequest(
+                    generateUUID(),
+                    encodedTransaction,
+                    NETWORK_CAPABILITIES
+                );
+
+            const success = await this.#attemptSendMessageForV1(validatorPublicKey, v1Message);
             if (success) {
                 return true;
             }

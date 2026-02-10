@@ -1,9 +1,9 @@
 import b4a from "b4a";
-import GetRequestHandler from "./handlers/GetRequestHandler.js";
-import ResponseHandler from "./handlers/ResponseHandler.js";
-import RoleOperationHandler from "../shared/handlers/RoleOperationHandler.js";
-import SubnetworkOperationHandler from "../shared/handlers/SubnetworkOperationHandler.js";
-import TransferOperationHandler from "../shared/handlers/TransferOperationHandler.js";
+import LegacyGetRequestHandler from "./handlers/LegacyGetRequestHandler.js";
+import LegacyResponseHandler from "./handlers/LegacyResponseHandler.js";
+import LegacyRoleOperationHandler from "./handlers/LegacyRoleOperationHandler.js";
+import LegacySubnetworkOperationHandler from "./handlers/LegacySubnetworkOperationHandler.js";
+import LegacyTransferOperationHandler from "./handlers/LegacyTransferOperationHandler.js";
 import { NETWORK_MESSAGE_TYPES } from '../../../../utils/constants.js';
 import * as operation from '../../../../utils/applyOperations.js';
 import State from "../../../state/State.js";
@@ -24,11 +24,12 @@ class NetworkMessageRouter {
         this.#config = config;
 
         this.#handlers = {
-            get: new GetRequestHandler(wallet, state),
-            response: new ResponseHandler(state, wallet, this.#config),
-            roleTransaction: new RoleOperationHandler(state, wallet, rateLimiterService, txPoolService, this.#config),
-            subNetworkTransaction: new SubnetworkOperationHandler(state, wallet, rateLimiterService, txPoolService, this.#config),
-            tracNetworkTransaction: new TransferOperationHandler(state, wallet, rateLimiterService, txPoolService, this.#config),
+            get: new LegacyGetRequestHandler(wallet, state),
+            response: new LegacyResponseHandler(state, wallet, this.#config),
+            roleTransaction: new LegacyRoleOperationHandler(state, wallet, rateLimiterService, txPoolService, this.#config),
+            subNetworkTransaction: new LegacySubnetworkOperationHandler(state, wallet, rateLimiterService, txPoolService, this.#config),
+            tracNetworkTransaction: new LegacyTransferOperationHandler(state, wallet, rateLimiterService, txPoolService, this.#config),
+
         }
     }
 
