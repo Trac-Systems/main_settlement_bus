@@ -1,4 +1,5 @@
 import b4a from "b4a";
+import PeerWallet from "trac-wallet";
 import {bufferToAddress} from "../core/state/utils/address.js";
 import { EntryType } from "./constants.js";
 import { v7 as uuidv7 } from 'uuid';
@@ -98,4 +99,8 @@ export function isTransactionRecordPut(entry) {
 
 export function generateUUID() {
     return uuidv7();
+}
+
+export function publicKeyToAddress(publicKey, config) {
+    return PeerWallet.encodeBech32m(config.addressPrefix, b4a.isBuffer(publicKey) ? publicKey : b4a.from(publicKey, typeof publicKey === 'string' ? 'hex' : undefined));
 }
