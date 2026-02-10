@@ -44,12 +44,13 @@ class V1BroadcastTransactionOperationHandler {
         this.#txPoolService = txPoolService;
         this.#pendingRequestService = pendingRequestService;
         this.#broadcastTransactionRequestValidator = new V1BroadcastTransactionRequest(config);
-        this.#partialRoleAccessValidator = new PartialRoleAccess(state, this.#wallet.address ,this.#config)
+        this.#partialRoleAccessValidator = new PartialRoleAccess(state, this.#wallet.address ,config)
         this.#partialBootstrapDeploymentValidator = new PartialBootstrapDeployment(state, this.#wallet.address, config);
         this.#partialTransactionValidator = new PartialTransaction(state, this.#wallet.address, config);
-        this.#partialTransferValidator = new PartialTransfer(state, this.#wallet.address, this.#config);
+        this.#partialTransferValidator = new PartialTransfer(state, this.#wallet.address, config);
         this.#broadcastTransactionResponseValidator = new V1BroadcastTransactionResponse(config);
         this.#config = config;
+
 
     }
 
