@@ -1,7 +1,6 @@
 import { test } from 'brittle';
 import b4a from 'b4a';
 import PeerWallet from 'trac-wallet';
-import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
 import { v7 as uuidv7 } from 'uuid';
 import NetworkWalletFactory from '../../../../src/core/network/identity/NetworkWalletFactory.js';
 import NetworkMessageBuilder from '../../../../src/messages/network/v1/NetworkMessageBuilder.js';
@@ -20,6 +19,7 @@ import {
 } from '../../../../src/utils/buffer.js';
 import { addressToBuffer } from '../../../../src/core/state/utils/address.js';
 import { config } from '../../../helpers/config.js';
+import { asAddress } from '../../../helpers/address.js';
 import { testKeyPair1 } from '../../../fixtures/apply.fixtures.js';
 
 function createWallet() {
@@ -30,7 +30,7 @@ function createWallet() {
     return NetworkWalletFactory.provide({
         enableWallet: false,
         keyPair,
-        networkPrefix: TRAC_NETWORK_MSB_MAINNET_PREFIX
+        networkPrefix: config.addressPrefix
     });
 }
 
@@ -79,7 +79,7 @@ test('NetworkMessageBuilder iterates validator connection response ResultCode va
     const wallet = createWallet();
     const builder = new NetworkMessageBuilder(wallet, config);
     const id = uuidv7();
-    const otherAddress = 'trac1xm76l9qaujh7vqktk8302mw9sfrxau3l45w62hqfl4kasswt6yts0autkh';
+    const otherAddress = asAddress('36fdaf941de4afe602cbb1e2f56dc582466ef23fad1da55c09fd6dd841cbd117');
     const caps = ['cap:b', 'cap:a'];
 
     for (const code of uniqueResultCodes()) {
