@@ -160,7 +160,7 @@ class Network extends ReadyResource {
                 maxClientConnections: MAX_CLIENT_CONNECTIONS
             });
 
-            this.#rateLimiter = new TransactionRateLimiterService(this.#swarm);
+            this.#rateLimiter = new TransactionRateLimiterService(this.#swarm, this.#config);
             this.#networkMessages = new NetworkMessages(
                 state,
                 wrappedWallet,

@@ -117,11 +117,6 @@ export const BOOTSTRAP_HEXSTRING_LENGTH = 64;
 export const BATCH_SIZE = 10;
 export const PROCESS_INTERVAL_MS = 50;
 
-// Rate limiting constants
-export const CLEANUP_INTERVAL_MS = 120_000;
-export const CONNECTION_TIMEOUT_MS = 60_000;
-export const MAX_TRANSACTIONS_PER_SECOND = 50;
-
 // Operation handler constants
 export const MAX_PARTIAL_TX_PAYLOAD_BYTE_SIZE = 3072;
 export const TRANSACTION_POOL_SIZE = 1000;

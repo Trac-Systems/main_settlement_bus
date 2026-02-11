@@ -1,26 +1,23 @@
 import b4a from 'b4a';
-import {
-    CLEANUP_INTERVAL_MS,
-    CONNECTION_TIMEOUT_MS,
-    MAX_TRANSACTIONS_PER_SECOND
-} from '../../../utils/constants.js';
 
 class TransactionRateLimiterService {
     #lastCleanup;
     #connectionsStatistics;
     #swarm;
+    #config;
 
-    constructor(swarm) {
+    constructor(swarm, config) {
         this.#lastCleanup = Date.now();
         this.#connectionsStatistics = new Map();
         this.#swarm = swarm
+        this.#config = config
     }
 
     /*
         Checks if the peer has exceeded the rate limit.
         A peer is considered to have exceeded the rate limit if:
         - The time since the last activity is greater than or equal to 1000 ms (1 second)
-        - The number of transactions in the current session is greater than or equal to MAX_TRANSACTIONS_PER_SECOND
+        - The number of transactions in the current session is greater than or equal to rateLimitMaxTransactionsPerSecond
         If the rate limit is exceeded, the peer is disconnected.
     */
     #hasExceededRateLimit(peer) {
@@ -33,7 +30,7 @@ class TransactionRateLimiterService {
             this.#connectionsStatistics.set(peer, peerData);
         }
         
-        return peerData.transactionCount >= MAX_TRANSACTIONS_PER_SECOND;
+        return peerData.transactionCount >= this.#config.rateLimitMaxTransactionsPerSecond;
     }
 
     /*
@@ -65,13 +62,13 @@ class TransactionRateLimiterService {
     }
 
     #shouldCleanupConnections(currentTime) {
-        return currentTime - this.#lastCleanup >= CLEANUP_INTERVAL_MS;
+        return currentTime - this.#lastCleanup >= this.#config.rateLimitCleanupIntervalMs;
     }
 
     /**
         Cleans up old connections that have timed out.
         Condition for cleanup based on #shouldCleanupConnections:
-        - If the last cleanup was more than CLEANUP_INTERVAL_MS ago
+        - If the last cleanup was more than rateLimitCleanupIntervalMs ago
     */
     #cleanUpOldConnections(currentTime) {
         if (!this.#shouldCleanupConnections(currentTime)) {
@@ -125,7 +122,7 @@ class TransactionRateLimiterService {
     */
     #isConnectionExpired(peer) {
         const peerData = this.#connectionsStatistics.get(peer);
-        return peerData.lastActivityTime - peerData.sessionStartTime >= CONNECTION_TIMEOUT_MS;
+        return peerData.lastActivityTime - peerData.sessionStartTime >= this.#config.rateLimitConnectionTimeoutMs;
     }
 }
 

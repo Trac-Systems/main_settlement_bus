@@ -122,6 +122,21 @@ export class Config {
         return this.#config.messageValidatorResponseTimeout
     }
 
+    get rateLimitCleanupIntervalMs() {
+        if (this.#isOverriden('rateLimitCleanupIntervalMs')) return this.#options.rateLimitCleanupIntervalMs
+        return this.#config.rateLimitCleanupIntervalMs
+    }
+
+    get rateLimitConnectionTimeoutMs() {
+        if (this.#isOverriden('rateLimitConnectionTimeoutMs')) return this.#options.rateLimitConnectionTimeoutMs
+        return this.#config.rateLimitConnectionTimeoutMs
+    }
+
+    get rateLimitMaxTransactionsPerSecond() {
+        if (this.#isOverriden('rateLimitMaxTransactionsPerSecond')) return this.#options.rateLimitMaxTransactionsPerSecond
+        return this.#config.rateLimitMaxTransactionsPerSecond
+    }
+
     // Most of these properties are boolean
     #isOverriden(prop) {
         return this.#options.hasOwnProperty(prop)

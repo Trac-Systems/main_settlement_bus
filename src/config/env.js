@@ -33,6 +33,9 @@ const configData = {
         messageValidatorRetryDelay: 1000, //How long to wait before retrying (ms) MESSAGE_VALIDATOR_RETRY_DELAY_MS
         messageValidatorResponseTimeout: 3 * 3 * 1000, //Overall timeout for sending a message (ms). This is 3 * maxRetries * messageValidatorRetryDelay;
         networkId: 918,
+        rateLimitCleanupIntervalMs: 120_000, // Rate limiting constants
+        rateLimitConnectionTimeoutMs: 60_000, // Rate limiting constants
+        rateLimitMaxTransactionsPerSecond: 50, // Rate limiting constants
         storesDirectory : 'stores/',
     },
     [ENV.MAINNET]: {
@@ -56,6 +59,9 @@ const configData = {
         messageValidatorRetryDelay: 1000, //How long to wait before retrying (ms) MESSAGE_VALIDATOR_RETRY_DELAY_MS
         messageValidatorResponseTimeout: 3 * 3 * 1000, //Overall timeout for sending a message (ms). This is 3 * maxRetries * messageValidatorRetryDelay;
         networkId: 918,
+        rateLimitCleanupIntervalMs: 120_000, // Rate limiting constants
+        rateLimitConnectionTimeoutMs: 60_000, // Rate limiting constants
+        rateLimitMaxTransactionsPerSecond: 50, // Rate limiting constants
         storesDirectory: 'stores/',
     },
     [ENV.DEVELOPMENT]: {
@@ -79,6 +85,9 @@ const configData = {
         messageValidatorRetryDelay: 1000, //How long to wait before retrying (ms) MESSAGE_VALIDATOR_RETRY_DELAY_MS
         messageValidatorResponseTimeout: 3 * 3 * 1000, //Overall timeout for sending a message (ms). This is 3 * maxRetries * messageValidatorRetryDelay;
         networkId: 918,
+        rateLimitCleanupIntervalMs: 120_000, // Rate limiting constants
+        rateLimitConnectionTimeoutMs: 60_000, // Rate limiting constants
+        rateLimitMaxTransactionsPerSecond: 50, // Rate limiting constants
         storesDirectory : 'stores/',
     }
 }
