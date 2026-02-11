@@ -97,6 +97,36 @@ export class Config {
         return this.#config.maxValidators
     }
 
+    get maxPeers() {
+        if (this.#isOverriden('maxPeers')) return this.#options.maxPeers
+        return this.#config.maxPeers
+    }
+
+    get maxParallel() {
+        if (this.#isOverriden('maxParallel')) return this.#options.maxParallel
+        return this.#config.maxParallel
+    }
+
+    get maxServerConnections() {
+        if (this.#isOverriden('maxServerConnections')) return this.#options.maxServerConnections
+        return this.#config.maxServerConnections
+    }
+
+    get maxClientConnections() {
+        if (this.#isOverriden('maxClientConnections')) return this.#options.maxClientConnections
+        return this.#config.maxClientConnections
+    }
+
+    get maxWritersForAdminIndexerConnection() {
+        if (this.#isOverriden('maxWritersForAdminIndexerConnection')) return this.#options.maxWritersForAdminIndexerConnection
+        return this.#config.maxWritersForAdminIndexerConnection
+    }
+
+    get processIntervalMs() {
+        if (this.#isOverriden('processIntervalMs')) return this.#options.processIntervalMs
+        return this.#config.processIntervalMs
+    }
+
     get networkId() {
         return this.#config.networkId
     }

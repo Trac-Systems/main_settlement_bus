@@ -82,13 +82,6 @@ export const TRAC_NAMESPACE = 'TracNetwork';
 export const WHITELIST_SLEEP_INTERVAL = 1_000;
 export const BALANCE_MIGRATION_SLEEP_INTERVAL = 500;
 
-// Connectivity constants
-export const MAX_PEERS = 64;
-export const MAX_PARALLEL = 64;
-export const MAX_SERVER_CONNECTIONS = Infinity;
-export const MAX_CLIENT_CONNECTIONS = Infinity;
-export const MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION = 10;
-
 // State
 export const ACK_INTERVAL = 1_000;
 export const AUTOBASE_VALUE_ENCODING = 'binary';
@@ -115,7 +108,6 @@ export const BOOTSTRAP_HEXSTRING_LENGTH = 64;
 
 // Pool constants
 export const BATCH_SIZE = 10;
-export const PROCESS_INTERVAL_MS = 50;
 
 // Operation handler constants
 export const MAX_PARTIAL_TX_PAYLOAD_BYTE_SIZE = 3072;

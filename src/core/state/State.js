@@ -12,7 +12,6 @@ import {
     HYPERBEE_VALUE_ENCODING,
     BATCH_SIZE,
     ADMIN_INITIAL_STAKED_BALANCE,
-    MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION,
     TRAC_NAMESPACE,
     CustomEventType
 } from '../../utils/constants.js';
@@ -178,7 +177,7 @@ class State extends ReadyResource {
     async isAdminAllowedToValidate() {
         const isAdmin = this.writingKey.toString('hex') === this.#config.bootstrap.toString('hex');
         const isIndexer = this.isIndexer();
-        const lengthCondition = await this.getWriterLength() <= MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION;
+        const lengthCondition = await this.getWriterLength() <= this.#config.maxWritersForAdminIndexerConnection;
         return !!(isAdmin && isIndexer && lengthCondition);
     }
 

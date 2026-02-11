@@ -1,6 +1,5 @@
 import PeerWallet from "trac-wallet";
 import b4a from "b4a";
-import { MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION } from '../../../utils/constants.js';
 import { bufferToAddress } from '../../state/utils/address.js';
 import { sleep } from '../../../utils/helpers.js';
 import Scheduler from "../../../utils/Scheduler.js";
@@ -132,7 +131,7 @@ class ValidatorObserverService {
         const validatorPubKeyHex = validatorPubKeyBuffer.toString('hex');
         const adminEntry = await this.state.getAdminEntry();
 
-        if (validatorAddress !== adminEntry?.address || validatorListLength < MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION) {
+        if (validatorAddress !== adminEntry?.address || validatorListLength < this.#config.maxWritersForAdminIndexerConnection) {
             this.#network.tryConnect(validatorPubKeyHex, 'validator');
         }
     };
@@ -151,7 +150,7 @@ class ValidatorObserverService {
             return false;
         }
 
-        if (validatorAddress === adminEntry?.address && validatorListLength >= MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION) {
+        if (validatorAddress === adminEntry?.address && validatorListLength >= this.#config.maxWritersForAdminIndexerConnection) {
             if (this.#network.validatorConnectionManager.exists(validatorPubKeyBuffer)) {
                 this.#network.validatorConnectionManager.remove(validatorPubKeyBuffer)
             }
@@ -161,12 +160,12 @@ class ValidatorObserverService {
         // - Cannot connect if already connected to a validator
         // - Validator must exist and be a writer
         // - Cannot connect to indexers, except for admin-indexer
-        // - Admin-indexer connection is allowed only when writers length has less than 10 writers
+        // - Admin-indexer connection is allowed only when writers length is below maxWritersForAdminIndexerConnection
         if (this.#network.validatorConnectionManager.connected(validatorPubKeyBuffer) ||
             this.#network.validatorConnectionManager.maxConnectionsReached() ||
             validatorEntry === null ||
             !validatorEntry.isWriter ||
-            (validatorEntry.isIndexer && (validatorAddress !== adminEntry?.address || validatorListLength >= MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION))
+            (validatorEntry.isIndexer && (validatorAddress !== adminEntry?.address || validatorListLength >= this.#config.maxWritersForAdminIndexerConnection))
         ) {
             return false;
         }

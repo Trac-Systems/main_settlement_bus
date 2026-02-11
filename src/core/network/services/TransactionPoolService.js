@@ -1,5 +1,5 @@
 // PoolService.js
-import { BATCH_SIZE, PROCESS_INTERVAL_MS } from '../../../utils/constants.js';
+import { BATCH_SIZE } from '../../../utils/constants.js';
 import Scheduler from '../../../utils/Scheduler.js';
 
 class TransactionPoolService {
@@ -52,7 +52,7 @@ class TransactionPoolService {
             if (this.#tx_pool.length > 0) {
                 next(0);
             } else {
-                next(PROCESS_INTERVAL_MS);
+                next(this.#config.processIntervalMs);
             }
         } catch (error) {
             throw new Error(`TransactionPoolService worker error: ${error.message}`);
@@ -60,7 +60,7 @@ class TransactionPoolService {
     }
 
     #createScheduler() {
-        return new Scheduler((next) => this.#worker(next), PROCESS_INTERVAL_MS);
+        return new Scheduler((next) => this.#worker(next), this.#config.processIntervalMs);
     }
 
     async #processTransactions() {

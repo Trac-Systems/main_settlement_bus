@@ -33,6 +33,12 @@ const configData = {
         messageValidatorRetryDelay: 1000, //How long to wait before retrying (ms) MESSAGE_VALIDATOR_RETRY_DELAY_MS
         messageValidatorResponseTimeout: 3 * 3 * 1000, //Overall timeout for sending a message (ms). This is 3 * maxRetries * messageValidatorRetryDelay;
         networkId: 918,
+        maxPeers: 64, // Connectivity constants
+        maxParallel: 64, // Connectivity constants
+        maxServerConnections: Infinity, // Connectivity constants
+        maxClientConnections: Infinity, // Connectivity constants
+        maxWritersForAdminIndexerConnection: 10, // Connectivity constants
+        processIntervalMs: 50, // Pool constants
         rateLimitCleanupIntervalMs: 120_000, // Rate limiting constants
         rateLimitConnectionTimeoutMs: 60_000, // Rate limiting constants
         rateLimitMaxTransactionsPerSecond: 50, // Rate limiting constants
@@ -59,6 +65,12 @@ const configData = {
         messageValidatorRetryDelay: 1000, //How long to wait before retrying (ms) MESSAGE_VALIDATOR_RETRY_DELAY_MS
         messageValidatorResponseTimeout: 3 * 3 * 1000, //Overall timeout for sending a message (ms). This is 3 * maxRetries * messageValidatorRetryDelay;
         networkId: 918,
+        maxPeers: 64, // Connectivity constants
+        maxParallel: 64, // Connectivity constants
+        maxServerConnections: Infinity, // Connectivity constants
+        maxClientConnections: Infinity, // Connectivity constants
+        maxWritersForAdminIndexerConnection: 10, // Connectivity constants
+        processIntervalMs: 50, // Pool constants
         rateLimitCleanupIntervalMs: 120_000, // Rate limiting constants
         rateLimitConnectionTimeoutMs: 60_000, // Rate limiting constants
         rateLimitMaxTransactionsPerSecond: 50, // Rate limiting constants
@@ -85,6 +97,12 @@ const configData = {
         messageValidatorRetryDelay: 1000, //How long to wait before retrying (ms) MESSAGE_VALIDATOR_RETRY_DELAY_MS
         messageValidatorResponseTimeout: 3 * 3 * 1000, //Overall timeout for sending a message (ms). This is 3 * maxRetries * messageValidatorRetryDelay;
         networkId: 918,
+        maxPeers: 64, // Connectivity constants
+        maxParallel: 64, // Connectivity constants
+        maxServerConnections: Infinity, // Connectivity constants
+        maxClientConnections: Infinity, // Connectivity constants
+        maxWritersForAdminIndexerConnection: 10, // Connectivity constants
+        processIntervalMs: 50, // Pool constants
         rateLimitCleanupIntervalMs: 120_000, // Rate limiting constants
         rateLimitConnectionTimeoutMs: 60_000, // Rate limiting constants
         rateLimitMaxTransactionsPerSecond: 50, // Rate limiting constants

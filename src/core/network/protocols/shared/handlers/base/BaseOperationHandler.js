@@ -30,7 +30,7 @@ class BaseOperationHandler {
         // Validate if operation can be processed:
         // - Non-writable nodes cannot process operations
         // - Regular indexers cannot process operations
-        // - Admin-indexer can process operations only when network has less than MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION writers
+        // - Admin-indexer can process operations only when network has less than maxWritersForAdminIndexerConnection writers
         const isAllowedToValidate = await this.#state.allowedToValidate(this.#wallet.address);
         const isAdminAllowedToValidate = await this.#state.isAdminAllowedToValidate();
         const canValidate = isAllowedToValidate || isAdminAllowedToValidate;
