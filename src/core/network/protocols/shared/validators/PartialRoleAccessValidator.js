@@ -1,10 +1,10 @@
 import b4a from 'b4a';
 import {OperationType} from "../../../../../utils/constants.js";
 import {bufferToAddress} from "../../../../state/utils/address.js";
-import PartialOperation from './base/PartialOperation.js';
+import PartialOperationValidator from './base/PartialOperationValidator.js';
 import {bufferToBigInt} from "../../../../../utils/amountSerialization.js";
 
-class PartialRoleAccess extends PartialOperation {
+class PartialRoleAccessValidator extends PartialOperationValidator {
     #config;
 
     constructor(state, selfAddress, config) {
@@ -137,4 +137,4 @@ class PartialRoleAccess extends PartialOperation {
     }
 }
 
-export default PartialRoleAccess;
+export default PartialRoleAccessValidator;

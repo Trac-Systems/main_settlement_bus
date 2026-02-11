@@ -2,8 +2,8 @@ import BaseStateOperationHandler from './BaseStateOperationHandler.js';
 import {
     OperationType
 } from '../../../../../utils/constants.js';
-import PartialBootstrapDeployment from "../../shared/validators/PartialBootstrapDeployment.js";
-import PartialTransaction from "../../shared/validators/PartialTransaction.js";
+import PartialBootstrapDeploymentValidator from "../../shared/validators/PartialBootstrapDeploymentValidator.js";
+import PartialTransactionValidator from "../../shared/validators/PartialTransactionValidator.js";
 import {applyStateMessageFactory} from "../../../../../messages/state/applyStateMessageFactory.js";
 import {safeEncodeApplyOperation} from "../../../../../utils/protobuf/operationHelpers.js";
 import {
@@ -30,8 +30,8 @@ class LegacySubnetworkOperationHandler extends BaseStateOperationHandler {
         super(state, wallet, rateLimiter, txPoolService, config);
         this.#config = config;
         this.#wallet = wallet
-        this.#partialBootstrapDeploymentValidator = new PartialBootstrapDeployment(state, this.#wallet.address, config);
-        this.#partialTransactionValidator = new PartialTransaction(state, this.#wallet.address, config);
+        this.#partialBootstrapDeploymentValidator = new PartialBootstrapDeploymentValidator(state, this.#wallet.address, config);
+        this.#partialTransactionValidator = new PartialTransactionValidator(state, this.#wallet.address, config);
         this.#txPoolService = txPoolService;
     }
 

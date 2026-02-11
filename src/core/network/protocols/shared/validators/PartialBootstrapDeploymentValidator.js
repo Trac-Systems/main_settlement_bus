@@ -1,6 +1,6 @@
-import PartialOperation from './base/PartialOperation.js';
+import PartialOperationValidator from './base/PartialOperationValidator.js';
 
-class PartialBootstrapDeployment extends PartialOperation {
+class PartialBootstrapDeploymentValidator extends PartialOperationValidator {
     constructor(state, selfAddress , config) {
         super(state, selfAddress , config);
     }
@@ -31,4 +31,4 @@ class PartialBootstrapDeployment extends PartialOperation {
     }
 }
 
-export default PartialBootstrapDeployment;
+export default PartialBootstrapDeploymentValidator;

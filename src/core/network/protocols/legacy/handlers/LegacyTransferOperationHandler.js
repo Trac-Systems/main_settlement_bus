@@ -1,6 +1,6 @@
 import BaseStateOperationHandler from './BaseStateOperationHandler.js';
 import {OperationType} from '../../../../../utils/constants.js';
-import PartialTransfer from "../../shared/validators/PartialTransfer.js";
+import PartialTransferValidator from "../../shared/validators/PartialTransferValidator.js";
 import {normalizeTransferOperation} from "../../../../../utils/normalizers.js"
 import {applyStateMessageFactory} from "../../../../../messages/state/applyStateMessageFactory.js";
 import {safeEncodeApplyOperation} from "../../../../../utils/protobuf/operationHelpers.js";
@@ -22,7 +22,7 @@ class LegacyTransferOperationHandler extends BaseStateOperationHandler {
         super(state, wallet, rateLimiter, txPoolService, config);
         this.#config = config;
         this.#wallet = wallet;
-        this.#partialTransferValidator = new PartialTransfer(state, this.#wallet.address, this.#config);
+        this.#partialTransferValidator = new PartialTransferValidator(state, this.#wallet.address, this.#config);
         this.#txPoolService = txPoolService;
     }
 

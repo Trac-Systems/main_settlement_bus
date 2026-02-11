@@ -41,15 +41,13 @@ class LegacyProtocol extends ProtocolInterface {
         this.#session = this.#channel.addMessage({
             encoding: c.json,
             onmessage: async (incomingMessage) => {
-                try {
-                    if (typeof incomingMessage === 'object' || typeof incomingMessage === 'string') {
-                        await this.#router.route(incomingMessage, connection, this.#session);
-                    } else {
-                        throw new Error('NetworkMessages: Received message is undefined');
+                this.#router.route(incomingMessage, connection).catch((err) => {
+                    console.error(`LegacyProtocol: unhandled router error: ${err.message}`);
+                    try {
+                        connection.end();
+                    } catch {
                     }
-                } catch (error) {
-                    console.error(`NetworkMessages: Failed to handle incoming message: ${error.message}`);
-                }
+                });
             }
         });
     }

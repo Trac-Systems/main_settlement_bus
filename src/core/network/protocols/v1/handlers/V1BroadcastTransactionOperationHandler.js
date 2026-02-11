@@ -1,5 +1,5 @@
 import {networkMessageFactory} from "../../../../../messages/network/v1/networkMessageFactory.js";
-import {NETWORK_CAPABILITIES, OperationType, ResultCode} from "../../../../../utils/constants.js";
+import {NETWORK_CAPABILITIES, OperationType, ResultCode, TRANSACTION_POOL_SIZE} from "../../../../../utils/constants.js";
 import {
     getResultCode,
     InvalidPayloadError,
@@ -7,64 +7,54 @@ import {
     shouldEndConnection,
     UnexpectedError
 } from "../V1ProtocolError.js";
-import {publicKeyToAddress} from "../../../../../utils/helpers.js";
 import V1BroadcastTransactionRequest from "../validators/V1BroadcastTransactionRequest.js";
 import {
-    safeEncodeApplyOperation,
     unsafeDecodeApplyOperation,
     unsafeEncodeApplyOperation
 } from "../../../../../utils/protobuf/operationHelpers.js";
 import {isBootstrapDeployment, isRoleAccess, isTransaction, isTransfer} from '../../../../../utils/applyOperations.js';
-import PartialRoleAccess from "../../shared/validators/PartialRoleAccess.js";
-import PartialBootstrapDeployment from "../../shared/validators/PartialBootstrapDeployment.js";
-import PartialTransaction from "../../shared/validators/PartialTransaction.js";
-import PartialTransfer from "../../shared/validators/PartialTransfer.js";
+import PartialRoleAccessValidator from "../../shared/validators/PartialRoleAccessValidator.js";
+import PartialBootstrapDeploymentValidator from "../../shared/validators/PartialBootstrapDeploymentValidator.js";
+import PartialTransactionValidator from "../../shared/validators/PartialTransactionValidator.js";
+import PartialTransferValidator from "../../shared/validators/PartialTransferValidator.js";
 import {mapValidationErrorToV1Error} from "../V1ValidationErrorMapper.js";
 import {applyStateMessageFactory} from "../../../../../messages/state/applyStateMessageFactory.js";
 import V1BroadcastTransactionResponse from "../validators/V1BroadcastTransactionResponse.js";
+import V1BaseOperationHandler from "./V1BaseOperationHandler.js";
 
-class V1BroadcastTransactionOperationHandler {
+class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
     #state;
     #wallet;
-    #rateLimiterService;
     #txPoolService;
-    #pendingRequestService;
     #broadcastTransactionRequestValidator;
     #broadcastTransactionResponseValidator;
     #partialRoleAccessValidator;
     #partialBootstrapDeploymentValidator;
     #partialTransactionValidator;
     #partialTransferValidator;
-    #config;
 
     constructor(state, wallet, rateLimiterService, txPoolService, pendingRequestService, config) {
+        super(rateLimiterService, pendingRequestService, config);
         this.#state = state;
         this.#wallet = wallet;
-        this.#rateLimiterService = rateLimiterService;
         this.#txPoolService = txPoolService;
-        this.#pendingRequestService = pendingRequestService;
         this.#broadcastTransactionRequestValidator = new V1BroadcastTransactionRequest(config);
-        this.#partialRoleAccessValidator = new PartialRoleAccess(state, this.#wallet.address ,config)
-        this.#partialBootstrapDeploymentValidator = new PartialBootstrapDeployment(state, this.#wallet.address, config);
-        this.#partialTransactionValidator = new PartialTransaction(state, this.#wallet.address, config);
-        this.#partialTransferValidator = new PartialTransfer(state, this.#wallet.address, config);
+        this.#partialRoleAccessValidator = new PartialRoleAccessValidator(state, this.#wallet.address, config);
+        this.#partialBootstrapDeploymentValidator = new PartialBootstrapDeploymentValidator(state, this.#wallet.address, config);
+        this.#partialTransactionValidator = new PartialTransactionValidator(state, this.#wallet.address, config);
+        this.#partialTransferValidator = new PartialTransferValidator(state, this.#wallet.address, config);
         this.#broadcastTransactionResponseValidator = new V1BroadcastTransactionResponse(config);
-        this.#config = config;
-
-
     }
 
     async handleRequest(message, connection) {
-
         let resultCode = ResultCode.OK;
         let endConnection = false;
 
         try {
             await this.#validationCapability();
+            this.#isTxPoolFull();
+            this.applyRateLimit(connection);
 
-            if (!this.#config.disableRateLimit) {
-                this.#rateLimiterService.v1HandleRateLimit(connection);
-            }
             await this.#broadcastTransactionRequestValidator.validate(message, connection.remotePublicKey);
             const decodedTransaction = this.decodeApplyOperation(message.broadcast_transaction_request.data);
             this.#sanitizeDecodedPartialTransaction(decodedTransaction);
@@ -89,38 +79,36 @@ class V1BroadcastTransactionOperationHandler {
                 "failed to build/send response to sender",
                 connection.remotePublicKey,
                 error
-            )
+            );
             connection.end();
         }
     }
 
     async handleResponse(message, connection) {
         try {
-            if (!this.#config.disableRateLimit) {
-                this.#rateLimiterService.v1HandleRateLimit(connection);
-            }
-            const pendingRequestServiceEntry = this.#pendingRequestService.getPendingRequest(message.id);
-            if (!pendingRequestServiceEntry) return;
-            this.#pendingRequestService.stopPendingRequestTimeout(message.id)
+            // TODO: In this case this should close connection of sender
+            this.applyRateLimit(connection);
 
-            await this.#broadcastTransactionResponseValidator.validate(message, connection, pendingRequestServiceEntry);
-            this.#pendingRequestService.resolvePendingRequest(message.id);
-
+            await this.resolvePendingResponse(
+                message,
+                connection,
+                this.#broadcastTransactionResponseValidator,
+                this.#extractBroadcastResultCode
+            );
         } catch (error) {
-            const err = (error && error.resultCode) ? error : new UnexpectedError(error.message, false);
-            const rejected = this.#pendingRequestService.rejectPendingRequest(message.id, err);
-            if (!rejected) return;
-            if (shouldEndConnection(err)) connection.end();
-            this.displayError("failed to process broadcast transaction response from sender",
-                connection.remotePublicKey,
-                error
+            // TODO: Question: how we should behave in this case? Consult this with Leo
+            this.handlePendingResponseError(
+                message.id,
+                connection,
+                error,
+                "failed to process broadcast transaction response from sender"
             );
         }
     }
 
     async #buildBroadcastTransactionResponse(id, capabilities, resultCode) {
         try {
-            return await networkMessageFactory(this.#wallet, this.#config).buildBroadcastTransactionResponse(
+            return await networkMessageFactory(this.#wallet, this.config).buildBroadcastTransactionResponse(
                 id,
                 capabilities,
                 resultCode
@@ -164,6 +152,14 @@ class V1BroadcastTransactionOperationHandler {
         return null;
     }
 
+    #isTxPoolFull() {
+        // TODO: CREATE NEW ERROR THAT WILL describe that node is overloaded and it won't process transaction for now
+        // In this case we should not return unexpected error.
+        if (this.#txPoolService.tx_pool.length >= TRANSACTION_POOL_SIZE) {
+            throw new UnexpectedError('Transaction pool is full, ignoring incoming transaction.', false);
+        }
+    }
+
     async #validationCapability() {
         const isAllowedToValidate = await this.#state.allowedToValidate(this.#wallet.address);
         const isAdminAllowedToValidate = await this.#state.isAdminAllowedToValidate();
@@ -174,7 +170,6 @@ class V1BroadcastTransactionOperationHandler {
     }
 
     async dispatchTransaction(decodedTransaction) {
-
         if (!decodedTransaction || !Number.isInteger(decodedTransaction.type) || decodedTransaction.type === 0) {
             throw new InvalidPayloadError('Decoded transaction type is missing.', false);
         }
@@ -202,7 +197,7 @@ class V1BroadcastTransactionOperationHandler {
     }
 
     async #buildCompleteRoleAccessOperation(decodedTransaction) {
-        const factory = applyStateMessageFactory(this.#wallet, this.#config);
+        const factory = applyStateMessageFactory(this.#wallet, this.config);
 
         switch (decodedTransaction.type) {
             case OperationType.ADD_WRITER:
@@ -238,7 +233,7 @@ class V1BroadcastTransactionOperationHandler {
     }
 
     async #buildCompleteTransactionOperation(decodedTransaction) {
-        return applyStateMessageFactory(this.#wallet, this.#config)
+        return applyStateMessageFactory(this.#wallet, this.config)
             .buildCompleteTransactionOperationMessage(
                 decodedTransaction.address,
                 decodedTransaction.txo.tx,
@@ -253,7 +248,7 @@ class V1BroadcastTransactionOperationHandler {
     }
 
     async #buildCompleteBootstrapDeploymentOperation(decodedTransaction) {
-        return applyStateMessageFactory(this.#wallet, this.#config)
+        return applyStateMessageFactory(this.#wallet, this.config)
             .buildCompleteBootstrapDeploymentMessage(
                 decodedTransaction.address,
                 decodedTransaction.bdo.tx,
@@ -266,7 +261,7 @@ class V1BroadcastTransactionOperationHandler {
     }
 
     async #buildCompleteTransferOperation(decodedTransaction) {
-        return applyStateMessageFactory(this.#wallet, this.#config)
+        return applyStateMessageFactory(this.#wallet, this.config)
             .buildCompleteTransferOperationMessage(
                 decodedTransaction.address,
                 decodedTransaction.tro.tx,
@@ -278,8 +273,8 @@ class V1BroadcastTransactionOperationHandler {
             );
     }
 
-    displayError(step = "undefined step", senderPublicKey, error) {
-        console.error(`${this.constructor.name}: ${step} ${publicKeyToAddress(senderPublicKey, this.#config)}: ${error.message}`);
+    #extractBroadcastResultCode(payload) {
+        return payload.broadcast_transaction_response.result;
     }
 }
 
