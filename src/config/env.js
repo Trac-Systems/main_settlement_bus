@@ -100,7 +100,7 @@ const configData = {
         messageThreshold: 1000,
         messageValidatorRetryDelay: 1000, //How long to wait before retrying (ms) MESSAGE_VALIDATOR_RETRY_DELAY_MS
         messageValidatorResponseTimeout: 3 * 3 * 1000, //Overall timeout for sending a message (ms). This is 3 * maxRetries * messageValidatorRetryDelay;
-        networkId: TRAC_NETWORK_MAINNET_ID,
+        networkId: TRAC_NETWORK_TESTNET_ID,
         maxPeers: 64, // Connectivity constants
         maxParallel: 64, // Connectivity constants
         maxServerConnections: Infinity, // Connectivity constants
