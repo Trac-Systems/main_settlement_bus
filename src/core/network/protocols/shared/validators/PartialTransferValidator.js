@@ -2,9 +2,9 @@ import PeerWallet from 'trac-wallet';
 
 import {bufferToAddress} from "../../../../state/utils/address.js";
 import {bufferToBigInt} from "../../../../../utils/amountSerialization.js";
-import PartialOperation from './base/PartialOperation.js';
+import PartialOperationValidator from './base/PartialOperationValidator.js';
 
-class PartialTransfer extends PartialOperation {
+class PartialTransferValidator extends PartialOperationValidator {
     #config
 
     constructor(state, selfAddress, config) {
@@ -76,4 +76,4 @@ class PartialTransfer extends PartialOperation {
     }
 }
 
-export default PartialTransfer;
+export default PartialTransferValidator;

@@ -1,6 +1,5 @@
 import V1BaseOperation from "./V1BaseOperation.js";
 
-
 class V1LivenessRequest extends V1BaseOperation {
     constructor(config) {
         super(config);
@@ -11,7 +10,6 @@ class V1LivenessRequest extends V1BaseOperation {
         await this.validateSignature(payload, remotePublicKey);
         return true;
     }
-
 }
 
 export default V1LivenessRequest;

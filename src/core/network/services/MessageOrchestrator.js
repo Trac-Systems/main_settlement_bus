@@ -78,7 +78,7 @@ class MessageOrchestrator {
     }
 
     async #attemptSendMessageForV1(validator, message) {
-        await this.connectionManager.sendSingleMessage(message, validator);
+        return this.connectionManager.sendSingleMessage(message, validator);
     }
 
     async #attemptSendMessageForLegacy(validatorPublicKey, message) {

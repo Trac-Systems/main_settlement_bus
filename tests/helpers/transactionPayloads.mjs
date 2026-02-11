@@ -23,10 +23,10 @@ export const waitForConnection = async node => {
 
 /**
  * Build a base64-encoded transfer payload and matching tx hash
- * that are compatible with MSB's PartialTransfer validator.
+ * that are compatible with MSB's PartialTransferValidator validator.
  *
  * This helper mirrors the hashing/signing logic used by
- * PartialOperation.validateSignature, so that tests broadcast
+ * PartialOperationValidator.validateSignature, so that tests broadcast
  * transactions the node will accept without touching consensus code.
  *
  * @param {object} context - General context
