@@ -30,7 +30,7 @@ class ValidatorObserverService {
      * @param {Network} network
      * @param {State} state
      * @param {string} address
-     * @param {object} config
+     * @param {Config} config
      **/
     constructor(network, state, address, config) {
         this.#config = config

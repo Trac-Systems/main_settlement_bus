@@ -15,7 +15,7 @@ class BaseResponse {
      * 
      * @param {State} state 
      * @param {PeerWallet} wallet 
-     * @param {object} config
+     * @param {Config} config
      */
     constructor(state, wallet, config) {
         this.#state = state;

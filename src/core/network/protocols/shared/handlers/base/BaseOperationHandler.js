@@ -12,7 +12,7 @@ class BaseOperationHandler {
      * @param {PeerWallet} wallet
      * @param {TransactionRateLimiterService} rateLimiter
      * @param {TransactionPoolService} txPoolService
-     * @param {object} config
+     * @param {Config} config
      **/
     constructor(state, wallet, rateLimiter, txPoolService, config) {
         if (new.target === BaseOperationHandler) {

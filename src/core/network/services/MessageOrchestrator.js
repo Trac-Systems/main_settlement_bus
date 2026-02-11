@@ -10,7 +10,7 @@ class MessageOrchestrator {
      * Attempts to send a message to validators with retries and state checks.
      * @param {ConnectionManager} connectionManager - The connection manager instance
      * @param {object} state - The state to look for the message outcome
-     * @param {object} config - Configuration options:
+     * @param {Config} config - Configuration options:
      */
     constructor(connectionManager, state, config) {
         this.connectionManager = connectionManager;

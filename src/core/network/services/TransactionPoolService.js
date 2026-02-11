@@ -12,7 +12,7 @@ class TransactionPoolService {
     /**
      * @param {State} state
      * @param {string} address
-     * @param {object} config
+     * @param {Config} config
      **/
     constructor(state, address, config) {
         this.#state = state;

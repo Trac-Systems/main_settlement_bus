@@ -57,7 +57,7 @@ class State extends ReadyResource {
     /**
      * @param {Corestore} store
      * @param {PeerWallet} wallet
-     * @param {object} config
+     * @param {Config} config
      **/
     constructor(store, wallet, config) {
         super();

@@ -43,7 +43,7 @@ class Network extends ReadyResource {
 
     /**
      * @param {State} state
-     * @param {object} config
+     * @param {Config} config
      * @param {string} address
      **/
     constructor(state, config, address = null) {

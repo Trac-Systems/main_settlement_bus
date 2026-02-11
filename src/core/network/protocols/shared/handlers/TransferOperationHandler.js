@@ -15,7 +15,7 @@ class TransferOperationHandler extends BaseOperationHandler {
      * @param {State} state
      * @param {PeerWallet} wallet
      * @param {TransactionRateLimiterService} rateLimiter
-     * @param {object} config
+     * @param {Config} config
      **/
     constructor(state, wallet, rateLimiter, txPoolService, config) {
         super(state, wallet, rateLimiter, txPoolService, config);
