@@ -13,7 +13,6 @@ class V1BroadcastTransactionResponse extends V1BaseOperation {
         return true;
     }
 
-
 }
 
 export default V1BroadcastTransactionResponse;
