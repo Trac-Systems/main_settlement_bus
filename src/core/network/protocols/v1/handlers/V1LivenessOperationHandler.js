@@ -2,34 +2,26 @@ import {networkMessageFactory} from "../../../../../messages/network/v1/networkM
 import {NETWORK_CAPABILITIES, ResultCode} from "../../../../../utils/constants.js";
 import V1LivenessRequest from "../validators/V1LivenessRequest.js";
 import {getResultCode, shouldEndConnection, UnexpectedError} from "../V1ProtocolError.js";
-import {publicKeyToAddress, sleep} from "../../../../../utils/helpers.js";
 import V1LivenessResponse from "../validators/V1LivenessResponse.js";
+import V1BaseOperationHandler from "./V1BaseOperationHandler.js";
 
-class V1LivenessOperationHandler {
+class V1LivenessOperationHandler extends V1BaseOperationHandler {
     #wallet;
-    #rateLimiterService;
-    #pendingRequestService;
     #v1LivenessRequestValidator;
     #v1LivenessResponseValidator;
-    #config;
 
     constructor(wallet, rateLimiterService, pendingRequestService, config) {
+        super(rateLimiterService, pendingRequestService, config);
         this.#wallet = wallet;
-        this.#rateLimiterService = rateLimiterService;
-        this.#pendingRequestService = pendingRequestService;
         this.#v1LivenessRequestValidator = new V1LivenessRequest(config);
         this.#v1LivenessResponseValidator = new V1LivenessResponse(config);
-        this.#config = config;
-
     }
 
     async handleRequest(message, connection) {
         let resultCode = ResultCode.OK;
         let endConnection = false;
         try {
-            if (!this.#config.disableRateLimit) {
-                this.#rateLimiterService.v1HandleRateLimit(connection);
-            }
+            this.applyRateLimit(connection);
             await this.#v1LivenessRequestValidator.validate(message, connection.remotePublicKey);
         } catch (error) {
             resultCode = getResultCode(error);
@@ -55,31 +47,28 @@ class V1LivenessOperationHandler {
 
     async handleResponse(message, connection) {
         try {
-            if (!this.#config.disableRateLimit) {
-                this.#rateLimiterService.v1HandleRateLimit(connection);
-            }
-            const pendingRequestServiceEntry = this.#pendingRequestService.getPendingRequest(message.id);
-            if (!pendingRequestServiceEntry) return;
-            this.#pendingRequestService.stopPendingRequestTimeout(message.id)
-
-            await this.#v1LivenessResponseValidator.validate(message, connection, pendingRequestServiceEntry);
-            this.#pendingRequestService.resolvePendingRequest(message.id);
-
+            // TODO: In this case this should close connection of sender. Consult this with Leo.
+            this.applyRateLimit(connection);
+            await this.resolvePendingResponse(
+                message,
+                connection,
+                this.#v1LivenessResponseValidator,
+                this.#extractLivenessResultCode
+            );
         } catch (error) {
-            const err = (error && error.resultCode) ? error : new UnexpectedError(error.message, false);
-            const rejected = this.#pendingRequestService.rejectPendingRequest(message.id, err);
-            if (!rejected) return;
-            if (shouldEndConnection(err)) connection.end();
-            this.displayError("failed to process liveness response from sender",
-                connection.remotePublicKey,
-                error
+            // TODO: Question: how we should behave in this case? Consult this with Leo.
+            this.handlePendingResponseError(
+                message.id,
+                connection,
+                error,
+                "failed to process liveness response from sender"
             );
         }
     }
 
     async #buildLivenessResponsePayload(id, capabilities, resultCode) {
         try {
-            return await networkMessageFactory(this.#wallet, this.#config).buildLivenessResponse(
+            return await networkMessageFactory(this.#wallet, this.config).buildLivenessResponse(
                 id,
                 capabilities,
                 resultCode
@@ -89,8 +78,8 @@ class V1LivenessOperationHandler {
         }
     }
 
-    displayError(step = "undefined step", senderPublicKey, error) {
-        console.error(`${this.constructor.name}: ${step} ${publicKeyToAddress(senderPublicKey, this.#config)}: ${error.message}`);
+    #extractLivenessResultCode(payload) {
+        return payload.liveness_response.result;
     }
 }
 

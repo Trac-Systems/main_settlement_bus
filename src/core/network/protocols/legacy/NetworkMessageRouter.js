@@ -33,8 +33,8 @@ class NetworkMessageRouter {
         }
     }
 
-    // TODO: if node is to slow, then message is older than 5 seconds, then decide what to do in legacy and v1 (similar problem)
-    async route(incomingMessage, connection, session) {
+    async route(incomingMessage, connection) {
+        this.#preValidate(incomingMessage);
         const channelString = b4a.toString(this.#config.channel, 'utf8');
 
         connection.protocolSession.setLegacyAsPreferredProtocol();
@@ -46,7 +46,6 @@ class NetworkMessageRouter {
         }
         else if (this.#isRoleAccessOperation(incomingMessage)) {
             await this.#handlers.roleTransaction.handle(incomingMessage, connection);
-            
         }
         else if (this.#isSubnetworkOperation(incomingMessage)) {
             await this.#handlers.subNetworkTransaction.handle(incomingMessage, connection);
@@ -57,13 +56,18 @@ class NetworkMessageRouter {
         else {
             throw new Error(`Failed to route message. Pubkey of requester is ${connection.remotePublicKey ? b4a.toString(connection.remotePublicKey, 'hex') : 'unknown'}`);
         }
+    }
 
+    #preValidate(message) {
+        const type = typeof message;
+        if (message === null || (type !== 'object' && type !== 'string')) {
+            throw new Error('Invalid message format: expected object or string.');
+        }
     }
 
     #isGetRequest(message) {
         return Object.values(NETWORK_MESSAGE_TYPES.GET).includes(message);
     }
-
 
     #isResponse(message) {
         return Object.values(NETWORK_MESSAGE_TYPES.RESPONSE).includes(message.op);
