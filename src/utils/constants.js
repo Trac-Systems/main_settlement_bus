@@ -109,10 +109,6 @@ export const BOOTSTRAP_HEXSTRING_LENGTH = 64;
 // Pool constants
 export const BATCH_SIZE = 10;
 
-// Operation handler constants
-export const MAX_PARTIAL_TX_PAYLOAD_BYTE_SIZE = 3072;
-export const TRANSACTION_POOL_SIZE = 1000;
-
 // Network message constants
 export const NETWORK_MESSAGE_TYPES = Object.freeze({
     GET: {

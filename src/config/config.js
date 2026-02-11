@@ -127,6 +127,16 @@ export class Config {
         return this.#config.processIntervalMs
     }
 
+    get maxPartialTxPayloadByteSize() {
+        if (this.#isOverriden('maxPartialTxPayloadByteSize')) return this.#options.maxPartialTxPayloadByteSize
+        return this.#config.maxPartialTxPayloadByteSize
+    }
+
+    get transactionPoolSize() {
+        if (this.#isOverriden('transactionPoolSize')) return this.#options.transactionPoolSize
+        return this.#config.transactionPoolSize
+    }
+
     get networkId() {
         return this.#config.networkId
     }
