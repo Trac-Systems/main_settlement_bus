@@ -77,7 +77,10 @@ class ValidatorHealthCheckService extends EventEmitter {
     stop(publicKey) {
         const publicKeyHex = this.#normalizePublicKey(publicKey);
         const entry = this.#timers.get(publicKeyHex);
-        if (!entry) return false;
+        if (!entry) {
+            debugLog(`stop: did not find scheduled health check for public key ${publicKey}. Aborting`);
+            return false;
+        }
         clearInterval(entry.timerId);
         this.#timers.delete(publicKeyHex);
         debugLog('stop: cancelled health checks for', publicKeyHex);
@@ -110,7 +113,7 @@ class ValidatorHealthCheckService extends EventEmitter {
             const message = await networkMessageFactory(this.#wallet, this.#config)
                 .buildLivenessRequest(requestId, this.#capabilities); // TODO: Check what are these "capabilities". Maybe the message could be assembles inside the event handler
             this.emit(EventType.VALIDATOR_HEALTH_CHECK, { publicKey, message, requestId }); // TODO: If we assemble the message in the event handler, we don't need to pass it here
-            debugLog(`Emitted health check for ${publicKey} with requestId ${requestId}`);
+            debugLog(`Emitted health check event for ${publicKey} with requestId ${requestId}`);
         } catch (error) {
             console.error(`ValidatorHealthCheckService: Failed to emit health check for ${publicKey}: ${error?.message || error}`);
         }

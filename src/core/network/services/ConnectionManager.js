@@ -42,6 +42,7 @@ class ConnectionManager {
     // Keep here only if we forsee having health checks for non-validator connections in the future. 
     // For now, it seems that it would be better to keep this logic here.
     subscribeToHealthChecks(healthCheckService) {
+        debugLog("subscribeToHealthChecks: Subscribing to health check events")
         if (!healthCheckService || typeof healthCheckService.on !== 'function') {
             throw new Error('ConnectionManager: invalid health check service');
         }
@@ -55,20 +56,29 @@ class ConnectionManager {
 
         this.#healthCheckService = healthCheckService; // TODO: Maybe this should be handled in the constructor directly?
         // TODO: declare this method outside this function to avoid redeclaring it every time we subscribe to health checks. We can just bind it to 'this' in the constructor.
-        this.#healthCheckHandler = async ({ publicKey, message }) => {
-            const publicKeyHex = this.#toHexString(publicKey);
-            debugLog('healthCheck: received', publicKeyHex);
-            if (!this.exists(publicKeyHex) || !this.connected(publicKeyHex)) {
-                debugLog('healthCheck: validator not connected, stopping checks', publicKeyHex);
-                this.#stopHealthCheck(publicKeyHex);
+        this.#healthCheckHandler = async ({ publicKey, message, requestId }) => {
+            if (typeof publicKey !== 'string' || typeof requestId !== 'string' || typeof message !== 'object') {
+                throw new Error(`ConnectionManager: Received malformed liveness request event. Typeof publicKey = ${typeof publicKey}. Typeof message = ${typeof message}. Typeof requestId = ${requestId}`)
+            }
+
+            let targetAddress = null;
+            if (DEBUG) {
+                // It is recommended to leave this if(DEBUG) statement here to avoid needlessly
+                // calculating the address from the pubKey during production execution
+                targetAddress = this.#toAddress(publicKey)
+            }
+
+            if (!this.exists(publicKey) || !this.connected(publicKey)) {
+                debugLog(`healthCheck: validator not connected, stopping checks. Address = ${targetAddress}; Request ID = ${requestId}`);
+                this.#stopHealthCheck(publicKey);
                 return;
             }
 
-            const connection = this.getConnection(publicKeyHex);
+            const connection = this.getConnection(publicKey);
             if (!connection || !connection.protocolSession) {
-                debugLog('healthCheck: missing protocol session, removing validator', publicKeyHex);
-                this.#stopHealthCheck(publicKeyHex);
-                this.remove(publicKeyHex);
+                debugLog(`healthCheck: missing protocol session, removing validator. Address = ${targetAddress}; Request ID = ${requestId}`);
+                this.#stopHealthCheck(publicKey);
+                this.remove(publicKey);
                 return;
             }
 
@@ -76,29 +86,30 @@ class ConnectionManager {
             // This was added only to garantee that we are not sending v1 messages to non-v1 peers.
             // It should be reoved when legacy protocol is deprecated.
             if (connection.protocolSession.preferredProtocol !== connection.protocolSession.supportedProtocols.V1) {
-                debugLog('healthCheck: validator not v1, stopping checks', publicKeyHex);
-                this.#stopHealthCheck(publicKeyHex);
+                debugLog(`healthCheck: validator not v1, stopping checks. Address = ${targetAddress}; Request ID = ${requestId}`);
+                this.#stopHealthCheck(publicKey);
                 return;
             }
 
             let success = false;
             try {
-                debugLog('healthCheck: sending liveness request', publicKeyHex);
+                debugLog(`healthCheck: sending liveness request. Address = ${targetAddress}; Request ID = ${requestId}`);
+
                 const resultCode = await connection.protocolSession.send(message);
                 success = resultCode === ResultCode.OK;
                 if (!success) {
-                    debugLog('healthCheck: non-OK result code', publicKeyHex, resultCode);
+                    debugLog(`healthCheck: non-OK result code. Address = ${targetAddress}; Request ID = ${requestId}`);
                 }
             } catch {
                 success = false;
             }
 
             if (!success) {
-                debugLog('healthCheck: failed, removing validator', publicKeyHex);
-                this.remove(publicKeyHex);
-                this.#stopHealthCheck(publicKeyHex);
+                debugLog(`healthCheck: liveness requestfailed, removing validator. Address = ${targetAddress}; Request ID = ${requestId}`);
+                this.remove(publicKey);
+                this.#stopHealthCheck(publicKey);
             } else {
-                debugLog('healthCheck: success', publicKeyHex);
+                debugLog(`healthCheck: success. Address = ${targetAddress}; Request ID = ${requestId}`);
             }
         };
 
@@ -107,17 +118,22 @@ class ConnectionManager {
     }
 
     #stopHealthCheck(publicKeyHex) {
+        let targetAddress = null;
+        if (DEBUG) {
+            targetAddress = this.#toAddress(publicKeyHex)
+        }
+
         if (!this.#healthCheckService) {
-            debugLog('stopHealthCheck: no health check service, cannot stop checks for', publicKeyHex);
+            debugLog('stopHealthCheck: no health check service, cannot stop checks for', targetAddress);
             return;
         }
         try {
             if (this.#healthCheckService.has(publicKeyHex)) {
-                debugLog('healthCheck: stopping scheduled checks for', publicKeyHex);
+                debugLog('stopHealthCheck: stopping scheduled checks for', targetAddress);
                 this.#healthCheckService.stop(publicKeyHex);
             }
         } catch (error) {
-            debugLog(`Failed to stop health check for validator ${this.#toAddress(publicKeyHex)}. Error: ${error.message}`);
+            debugLog(`StopHealthCheck: Failed to stop health check for validator ${targetAddress}. Error: ${error.message}`);
         }
     }
 

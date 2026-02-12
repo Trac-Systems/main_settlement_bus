@@ -222,7 +222,8 @@ test('ConnectionManager', () => {
 
                 healthCheckService.emit(EventType.VALIDATOR_HEALTH_CHECK, {
                     publicKey: testKeyPair1.publicKey,
-                    message: { id: 'ok' }
+                    message: { id: 'ok' },
+                    requestId: "123456"
                 });
 
                 await tick();
@@ -242,7 +243,8 @@ test('ConnectionManager', () => {
 
                 healthCheckService.emit(EventType.VALIDATOR_HEALTH_CHECK, {
                     publicKey: testKeyPair2.publicKey,
-                    message: { id: 'timeout' }
+                    message: { id: 'timeout' },
+                    requestId: "123456"
                 });
 
                 await tick();
@@ -262,7 +264,8 @@ test('ConnectionManager', () => {
 
                 healthCheckService.emit(EventType.VALIDATOR_HEALTH_CHECK, {
                     publicKey: testKeyPair3.publicKey,
-                    message: { id: 'rejected' }
+                    message: { id: 'rejected' },
+                    requestId: "123456"
                 });
 
                 await tick();
@@ -286,7 +289,8 @@ test('ConnectionManager', () => {
 
                 healthCheckService.emit(EventType.VALIDATOR_HEALTH_CHECK, {
                     publicKey: testKeyPair4.publicKey,
-                    message: { id: 'legacy' }
+                    message: { id: 'legacy' },
+                    requestId: "123456"
                 });
 
                 await tick();

@@ -154,7 +154,6 @@ class Network extends ReadyResource {
                             if (this.#validatorHealthCheckService) {
                                 this.#validatorHealthCheckService.start(publicKey);
                             }
-                            // TODO: Enable mechanism to check liveness of V1 node every X seconds here
                         }
                     )
                     .catch(
@@ -163,6 +162,9 @@ class Network extends ReadyResource {
                             // Timeouted / Router has rejected the pending request, now we can do something with this
                             connection.protocolSession.setLegacyAsPreferredProtocol();
                             this.#validatorConnectionManager.addValidator(publicKey, connection)
+                            if (this.#validatorHealthCheckService) {
+                                this.#validatorHealthCheckService.stop(publicKey)
+                            }
                         }
                     )
             }
