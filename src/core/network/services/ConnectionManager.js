@@ -1,5 +1,6 @@
 import b4a from 'b4a'
 import PeerWallet from "trac-wallet"
+import { EventType, ResultCode } from '../../../utils/constants.js';
 
 /**
  * @typedef {import('hyperswarm').Connection} Connection
@@ -18,6 +19,8 @@ class ConnectionManager {
     #validators
     #maxValidators
     #config
+    #healthCheckService
+    #healthCheckHandler
 
     // Note: #validators is using publicKey (Buffer) as key
     // As Buffers are objects, we will rely on internal conversions done by JS to compare them.
@@ -29,6 +32,93 @@ class ConnectionManager {
         this.#validators = new Map();
         this.#config = config
         this.#maxValidators = config.maxValidators
+    }
+
+    /**
+     * Subscribes to periodic validator health checks.
+     * @param {EventEmitter} healthCheckService
+     */
+    // TODO: We should consider moving this to ValodatorObserver instead.
+    // Keep here only if we forsee having health checks for non-validator connections in the future. 
+    // For now, it seems that it would be better to keep this logic here.
+    subscribeToHealthChecks(healthCheckService) {
+        if (!healthCheckService || typeof healthCheckService.on !== 'function') {
+            throw new Error('ConnectionManager: invalid health check service');
+        }
+
+        if (this.#healthCheckService && this.#healthCheckHandler) {
+            debugLog('subscribeToHealthChecks: removing previous health check handler');
+            // Unsubscribe from previous health check service if already subscribed
+            // TODO: Maybe we should not allow switching to a new health check service
+            this.#healthCheckService.removeListener(EventType.VALIDATOR_HEALTH_CHECK, this.#healthCheckHandler);
+        }
+
+        this.#healthCheckService = healthCheckService; // TODO: Maybe this should be handled in the constructor directly?
+        // TODO: declare this method outside this function to avoid redeclaring it every time we subscribe to health checks. We can just bind it to 'this' in the constructor.
+        this.#healthCheckHandler = async ({ publicKey, message }) => {
+            const publicKeyHex = this.#toHexString(publicKey);
+            debugLog('healthCheck: received', publicKeyHex);
+            if (!this.exists(publicKeyHex) || !this.connected(publicKeyHex)) {
+                debugLog('healthCheck: validator not connected, stopping checks', publicKeyHex);
+                this.#stopHealthCheck(publicKeyHex);
+                return;
+            }
+
+            const connection = this.getConnection(publicKeyHex);
+            if (!connection || !connection.protocolSession) {
+                debugLog('healthCheck: missing protocol session, removing validator', publicKeyHex);
+                this.#stopHealthCheck(publicKeyHex);
+                this.remove(publicKeyHex);
+                return;
+            }
+
+            // TODO: Ideally, the protocols should be transparent to Connection manager. 
+            // This was added only to garantee that we are not sending v1 messages to non-v1 peers.
+            // It should be reoved when legacy protocol is deprecated.
+            if (connection.protocolSession.preferredProtocol !== connection.protocolSession.supportedProtocols.V1) {
+                debugLog('healthCheck: validator not v1, stopping checks', publicKeyHex);
+                this.#stopHealthCheck(publicKeyHex);
+                return;
+            }
+
+            let success = false;
+            try {
+                debugLog('healthCheck: sending liveness request', publicKeyHex);
+                const resultCode = await connection.protocolSession.send(message);
+                success = resultCode === ResultCode.OK;
+                if (!success) {
+                    debugLog('healthCheck: non-OK result code', publicKeyHex, resultCode);
+                }
+            } catch {
+                success = false;
+            }
+
+            if (!success) {
+                debugLog('healthCheck: failed, removing validator', publicKeyHex);
+                this.remove(publicKeyHex);
+                this.#stopHealthCheck(publicKeyHex);
+            } else {
+                debugLog('healthCheck: success', publicKeyHex);
+            }
+        };
+
+        this.#healthCheckService.on(EventType.VALIDATOR_HEALTH_CHECK, this.#healthCheckHandler);
+        debugLog('subscribeToHealthChecks: subscribed to health check events');
+    }
+
+    #stopHealthCheck(publicKeyHex) {
+        if (!this.#healthCheckService) {
+            debugLog('stopHealthCheck: no health check service, cannot stop checks for', publicKeyHex);
+            return;
+        }
+        try {
+            if (this.#healthCheckService.has(publicKeyHex)) {
+                debugLog('healthCheck: stopping scheduled checks for', publicKeyHex);
+                this.#healthCheckService.stop(publicKeyHex);
+            }
+        } catch (error) {
+            debugLog(`Failed to stop health check for validator ${this.#toAddress(publicKeyHex)}. Error: ${error.message}`);
+        }
     }
 
     /**
@@ -141,6 +231,7 @@ class ConnectionManager {
     remove(publicKey) {
         debugLog(`remove: removing validator ${this.#toAddress(publicKey)}`);
         const publicKeyHex = this.#toHexString(publicKey);
+        this.#stopHealthCheck(publicKeyHex);
         if (this.exists(publicKeyHex)) {
             // Close the connection socket
             const entry = this.#validators.get(publicKeyHex);
@@ -230,7 +321,10 @@ class ConnectionManager {
     prettyPrint() {
         console.log('Connection count: ', this.connectionCount())
         console.log('Validator map keys count: ', this.#validators.size)
-        console.log('Validator map keys: ', Array.from(this.#validators.keys()).map(val => this.#toAddress(val)).join(', '))
+        console.log('Validator map keys:\n', Array.from(this.#validators.entries()).map(([key, val]) => {
+            const protocols = val.connection?.protocolSession?.preferredProtocol || 'none';
+            return `${this.#toAddress(key)}: ${protocols}`;
+        }).join('\n'))
     }
 
     // Note 1: This method shuffles the whole array (in practice, probably around 50 elements)

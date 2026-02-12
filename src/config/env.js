@@ -31,6 +31,7 @@ const configData = {
         messageValidatorRetryDelay: 1000, //How long to wait before retrying (ms) MESSAGE_VALIDATOR_RETRY_DELAY_MS
         messageValidatorResponseTimeout: 3 * 3 * 1000, //Overall timeout for sending a message (ms). This is 3 * maxRetries * messageValidatorRetryDelay;
         pendingRequestTimeout: 1000, // TODO: ADD description
+        validatorHealthCheckInterval: 5 * 60 * 1000, // How often to check validator health (ms)
         networkId: 918,
         storesDirectory: 'stores/',
     },
@@ -54,6 +55,7 @@ const configData = {
         messageThreshold: 1000,
         messageValidatorRetryDelay: 1000, //How long to wait before retrying (ms) MESSAGE_VALIDATOR_RETRY_DELAY_MS
         messageValidatorResponseTimeout: 3 * 3 * 1000, //Overall timeout for sending a message (ms). This is 3 * maxRetries * messageValidatorRetryDelay;
+        validatorHealthCheckInterval: 5 * 60 * 1000, // How often to check validator health (ms)
         pendingRequestTimeout: 1000, // TODO: ADD description
         networkId: 918,
         storesDirectory : 'stores/',
