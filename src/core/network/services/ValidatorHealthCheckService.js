@@ -1,4 +1,4 @@
-import { default as EventEmitter } from "bare-events"
+import ReadyResource from 'ready-resource';
 import b4a from 'b4a';
 import { networkMessageFactory } from '../../../messages/network/v1/networkMessageFactory.js';
 import { generateUUID } from '../../../utils/helpers.js';
@@ -6,14 +6,14 @@ import { EventType } from '../../../utils/constants.js';
 
 // -- Debug Mode --
 // TODO: Implement a better debug system in the future. This is just temporary.
-const DEBUG = true;
+const DEBUG = false;
 const debugLog = (...args) => {
     if (DEBUG) {
         console.log('DEBUG [ValidatorHealthCheckService] ==> ', ...args);
     }
 };
 
-class ValidatorHealthCheckService extends EventEmitter {
+class ValidatorHealthCheckService extends ReadyResource {
     #wallet;
     #config;
     #intervalMs;
@@ -32,11 +32,9 @@ class ValidatorHealthCheckService extends EventEmitter {
         this.#config = config;
         this.#timers = new Map();
 
-        this.#capabilities = capabilities;
-        this.#intervalMs = this.#config.validatorHealthCheckInterval || 300000; // Default to 5 minutes
-        
-        this.#checkInterval(this.#intervalMs);
-        this.#checkCapabilities(capabilities);
+        this.#capabilities = this.#checkCapabilities(capabilities);
+        this.#intervalMs = this.#checkInterval(this.#config.validatorHealthCheckInterval) || 300000; // Default to 5 minutes
+
         debugLog('initialized with intervalMs', this.#intervalMs, 'capabilities', this.#capabilities);
     }
 
@@ -48,11 +46,24 @@ class ValidatorHealthCheckService extends EventEmitter {
         return this.#timers.size;
     }
 
+    async _open() {
+        debugLog('open: health check service ready');
+    }
+
+    async _close() {
+        debugLog('close: stopping all health checks');
+        this.#stopAll();
+        this.#timers.clear();
+    }
+
     /**
      * Start periodic health checks for a validator.
      * @param {String} publicKey
      */
     start(publicKey) {
+        if (!this.opened) {
+            throw new Error('start: service not ready. Call ready() before start().');
+        }
         const publicKeyHex = this.#normalizePublicKey(publicKey);
         if (this.#timers.has(publicKeyHex)) {
             debugLog('start: already scheduled for', publicKey);
@@ -65,7 +76,7 @@ class ValidatorHealthCheckService extends EventEmitter {
 
         this.#timers.set(publicKeyHex, { timerId, intervalMs: this.#intervalMs });
         debugLog('start: scheduled health checks for', publicKeyHex, 'every', this.#intervalMs, 'ms');
-        
+
         return true;
     }
 
@@ -88,16 +99,6 @@ class ValidatorHealthCheckService extends EventEmitter {
     }
 
     /**
-     * Stop all scheduled health checks.
-     */
-    stopAll() {
-        debugLog('stopAll: cancelling health checks for', this.#timers.size, 'validators');
-        for (const publicKey of this.#timers.keys()) {
-            this.stop(publicKey);
-        }
-    }
-
-    /**
      * Check if a validator is scheduled.
      * @param {String} publicKey
      * @returns {boolean}
@@ -116,6 +117,13 @@ class ValidatorHealthCheckService extends EventEmitter {
             debugLog(`Emitted health check event for ${publicKey} with requestId ${requestId}`);
         } catch (error) {
             console.error(`ValidatorHealthCheckService: Failed to emit health check for ${publicKey}: ${error?.message || error}`);
+        }
+    }
+
+    #stopAll() {
+        debugLog('stopAll: cancelling health checks for', this.#timers.size, 'validators');
+        for (const publicKey of this.#timers.keys()) {
+            this.stop(publicKey);
         }
     }
 

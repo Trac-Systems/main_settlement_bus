@@ -27,18 +27,19 @@ test('ValidatorHealthCheckService', () => {
             const config = createConfig(ENV.MAINNET, { validatorHealthCheckInterval: 1000 });
             const wallet = createWallet();
             const service = new ValidatorHealthCheckService(wallet, ['cap:v1'], config);
+            await service.ready();
 
             const emitted = new Promise(resolve => {
                 service.once(EventType.VALIDATOR_HEALTH_CHECK, resolve);
             });
             t.ok(service.start(testKeyPair1.publicKey));
 
-            clock.tick(1000);
+            await clock.tickAsync(1000);
             const payload = await emitted;
             t.is(payload.publicKey, testKeyPair1.publicKey.toLowerCase());
             t.ok(payload.requestId);
             t.ok(payload.message);
-            service.stopAll();
+            await service.close();
         } finally {
             clock.restore();
             sinon.restore();
@@ -51,6 +52,7 @@ test('ValidatorHealthCheckService', () => {
             const config = createConfig(ENV.MAINNET, { validatorHealthCheckInterval: 1000 });
             const wallet = createWallet();
             const service = new ValidatorHealthCheckService(wallet, ['cap:v1'], config);
+            await service.ready();
             const emitted = [];
             const waitForTwo = new Promise(resolve => {
                 service.on(EventType.VALIDATOR_HEALTH_CHECK, payload => {
@@ -61,15 +63,14 @@ test('ValidatorHealthCheckService', () => {
             t.ok(service.start(testKeyPair1.publicKey));
             t.ok(service.start(testKeyPair2.publicKey));
 
-            clock.tick(1000);
+            await clock.tickAsync(1000);
             await waitForTwo;
             t.is(emitted.length, 2);
 
-            service.stopAll();
+            await service.close();
 
-            clock.tick(1000);
+            await clock.tickAsync(1000);
             t.is(emitted.length, 2);
-            service.stopAll();
         } finally {
             clock.restore();
             sinon.restore();

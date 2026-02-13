@@ -105,7 +105,7 @@ class Network extends ReadyResource {
         await this.#validatorObserverService.stopValidatorObserver();
         await sleep(5_000);
         if (this.#validatorHealthCheckService) {
-            this.#validatorHealthCheckService.stopAll();
+            await this.#validatorHealthCheckService.close();
         }
 
         this.cleanupNetworkListeners();
@@ -151,9 +151,7 @@ class Network extends ReadyResource {
                             console.log("setting v1")
                             connection.protocolSession.setV1AsPreferredProtocol();
                             this.#validatorConnectionManager.addValidator(publicKey, connection)
-                            if (this.#validatorHealthCheckService) {
-                                this.#validatorHealthCheckService.start(publicKey);
-                            }
+                            this.#validatorHealthCheckService.start(publicKey);
                         }
                     )
                     .catch(
@@ -162,9 +160,7 @@ class Network extends ReadyResource {
                             // Timeouted / Router has rejected the pending request, now we can do something with this
                             connection.protocolSession.setLegacyAsPreferredProtocol();
                             this.#validatorConnectionManager.addValidator(publicKey, connection)
-                            if (this.#validatorHealthCheckService) {
-                                this.#validatorHealthCheckService.stop(publicKey)
-                            }
+                            this.#validatorHealthCheckService.stop(publicKey)
                         }
                     )
             }
@@ -217,6 +213,7 @@ class Network extends ReadyResource {
                 NETWORK_CAPABILITIES,
                 this.#config
             );
+            await this.#validatorHealthCheckService.ready();
             this.#validatorConnectionManager.subscribeToHealthChecks(this.#validatorHealthCheckService);
 
             console.log(`Channel: ${b4a.toString(this.#config.channel)}`);

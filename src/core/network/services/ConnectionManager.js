@@ -1,6 +1,7 @@
 import b4a from 'b4a'
 import PeerWallet from "trac-wallet"
 import { EventType, ResultCode } from '../../../utils/constants.js';
+import ReadyResource from 'ready-resource';
 
 /**
  * @typedef {import('hyperswarm').Connection} Connection
@@ -36,29 +37,29 @@ class ConnectionManager {
 
     /**
      * Subscribes to periodic validator health checks.
-     * @param {EventEmitter} healthCheckService
+     * @param {ReadyResource} healthCheckService
      */
-    // TODO: We should consider moving this to ValodatorObserver instead.
+    // TODO: We should consider moving this to ValidatorObserver instead.
     // Keep here only if we forsee having health checks for non-validator connections in the future. 
     // For now, it seems that it would be better to keep this logic here.
     subscribeToHealthChecks(healthCheckService) {
         debugLog("subscribeToHealthChecks: Subscribing to health check events")
-        if (!healthCheckService || typeof healthCheckService.on !== 'function') {
-            throw new Error('ConnectionManager: invalid health check service');
+        if (!healthCheckService || typeof healthCheckService.on !== 'function' || typeof healthCheckService.off !== 'function') {
+            throw new Error('ConnectionManager: health check service must implement on/off');
         }
 
         if (this.#healthCheckService && this.#healthCheckHandler) {
             debugLog('subscribeToHealthChecks: removing previous health check handler');
             // Unsubscribe from previous health check service if already subscribed
             // TODO: Maybe we should not allow switching to a new health check service
-            this.#healthCheckService.removeListener(EventType.VALIDATOR_HEALTH_CHECK, this.#healthCheckHandler);
+            this.#healthCheckService.off(EventType.VALIDATOR_HEALTH_CHECK, this.#healthCheckHandler);
         }
 
         this.#healthCheckService = healthCheckService; // TODO: Maybe this should be handled in the constructor directly?
         // TODO: declare this method outside this function to avoid redeclaring it every time we subscribe to health checks. We can just bind it to 'this' in the constructor.
         this.#healthCheckHandler = async ({ publicKey, message, requestId }) => {
             if (typeof publicKey !== 'string' || typeof requestId !== 'string' || typeof message !== 'object') {
-                throw new Error(`ConnectionManager: Received malformed liveness request event. Typeof publicKey = ${typeof publicKey}. Typeof message = ${typeof message}. Typeof requestId = ${requestId}`)
+                throw new Error(`ConnectionManager: Received malformed liveness request event. Typeof publicKey = ${typeof publicKey}. Typeof message = ${typeof message}. Typeof requestId = ${typeof requestId}`)
             }
 
             let targetAddress = null;
@@ -105,7 +106,7 @@ class ConnectionManager {
             }
 
             if (!success) {
-                debugLog(`healthCheck: liveness requestfailed, removing validator. Address = ${targetAddress}; Request ID = ${requestId}`);
+                debugLog(`healthCheck: liveness request failed, removing validator. Address = ${targetAddress}; Request ID = ${requestId}`);
                 this.remove(publicKey);
                 this.#stopHealthCheck(publicKey);
             } else {
