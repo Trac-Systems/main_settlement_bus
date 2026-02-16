@@ -21,6 +21,61 @@ function createWallet() {
 }
 
 test('ValidatorHealthCheckService', () => {
+    test('throws when start is called before ready', async (t) => {
+        const config = createConfig(ENV.MAINNET, { validatorHealthCheckInterval: 1000 });
+        const wallet = createWallet();
+        const service = new ValidatorHealthCheckService(wallet, ['cap:v1'], config);
+
+        await t.exception(() => service.start(testKeyPair1.publicKey));
+        await service.close();
+    });
+
+    test('constructor rejects invalid capabilities', async (t) => {
+        const config = createConfig(ENV.MAINNET, { validatorHealthCheckInterval: 1000 });
+        const wallet = createWallet();
+
+        await t.exception.all(() => new ValidatorHealthCheckService(wallet, 'not-an-array', config));
+        await t.exception.all(() => new ValidatorHealthCheckService(wallet, [123], config));
+    });
+
+    test('constructor rejects invalid interval', async (t) => {
+        const wallet = createWallet();
+        const badConfig = createConfig(ENV.MAINNET, { validatorHealthCheckInterval: 0 });
+
+        await t.exception.all(() => new ValidatorHealthCheckService(wallet, ['cap:v1'], badConfig));
+    });
+
+    test('stop returns false when no schedule exists', async (t) => {
+        const config = createConfig(ENV.MAINNET, { validatorHealthCheckInterval: 1000 });
+        const wallet = createWallet();
+        const service = new ValidatorHealthCheckService(wallet, ['cap:v1'], config);
+        await service.ready();
+
+        t.is(service.stop(testKeyPair1.publicKey), false);
+        await service.close();
+    });
+
+    test('has throws on invalid public key type', async (t) => {
+        const config = createConfig(ENV.MAINNET, { validatorHealthCheckInterval: 1000 });
+        const wallet = createWallet();
+        const service = new ValidatorHealthCheckService(wallet, ['cap:v1'], config);
+        await service.ready();
+
+        await t.exception.all(() => service.has(123));
+        await service.close();
+    });
+
+    test('start returns false when already scheduled', async (t) => {
+        const config = createConfig(ENV.MAINNET, { validatorHealthCheckInterval: 1000 });
+        const wallet = createWallet();
+        const service = new ValidatorHealthCheckService(wallet, ['cap:v1'], config);
+        await service.ready();
+
+        t.ok(service.start(testKeyPair1.publicKey));
+        t.is(service.start(testKeyPair1.publicKey), false);
+        await service.close();
+    });
+
     test('emits health check on interval', async (t) => {
         const clock = sinon.useFakeTimers({ now: 0 });
         try {
