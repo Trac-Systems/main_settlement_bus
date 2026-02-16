@@ -1,7 +1,6 @@
 import b4a from 'b4a'
 import PeerWallet from "trac-wallet"
 import { EventType, ResultCode } from '../../../utils/constants.js';
-import ReadyResource from 'ready-resource';
 
 /**
  * @typedef {import('hyperswarm').Connection} Connection
@@ -58,7 +57,7 @@ class ConnectionManager {
         this.#healthCheckService = healthCheckService; // TODO: Maybe this should be handled in the constructor directly?
         // TODO: declare this method outside this function to avoid redeclaring it every time we subscribe to health checks. We can just bind it to 'this' in the constructor.
         this.#healthCheckHandler = async ({ publicKey, message, requestId }) => {
-            if (typeof publicKey !== 'string' || typeof requestId !== 'string' || typeof message !== 'object') {
+            if (typeof publicKey !== 'string' || typeof requestId !== 'string' || message === null || typeof message !== 'object') {
                 throw new Error(`ConnectionManager: Received malformed liveness request event. Typeof publicKey = ${typeof publicKey}. Typeof message = ${typeof message}. Typeof requestId = ${typeof requestId}`)
             }
 

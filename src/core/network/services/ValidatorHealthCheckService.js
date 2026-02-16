@@ -38,10 +38,6 @@ class ValidatorHealthCheckService extends ReadyResource {
         debugLog('initialized with intervalMs', this.#intervalMs, 'capabilities', this.#capabilities);
     }
 
-    get intervalMs() {
-        return this.#intervalMs;
-    }
-
     get size() {
         return this.#timers.size;
     }
