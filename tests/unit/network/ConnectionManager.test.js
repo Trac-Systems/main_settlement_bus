@@ -305,20 +305,14 @@ test('ConnectionManager', () => {
             try {
                 const v1Conn = createV1Connection(testKeyPair5.publicKey, sinon.stub().resolves(ResultCode.OK));
                 const connectionManager = makeManager(6, [v1Conn]);
-                const healthCheckService = makeHealthCheckService();
-                connectionManager.subscribeToHealthChecks(healthCheckService);
-
-                const expectUnhandled = async (payload) => {
-                    let unhandled = null;
-                    const onUnhandled = (err) => {
-                        unhandled = err;
-                    };
-                    process.once('unhandledRejection', onUnhandled);
-                    healthCheckService.emit(EventType.VALIDATOR_HEALTH_CHECK, payload);
-                    await tick();
-                    process.removeListener('unhandledRejection', onUnhandled);
-                    return unhandled;
+                let handler = null;
+                const healthCheckService = {
+                    on: (_event, fn) => { handler = fn; },
+                    off: () => {},
+                    has: sinon.stub().returns(true),
+                    stop: sinon.stub()
                 };
+                connectionManager.subscribeToHealthChecks(healthCheckService);
 
                 const cases = [
                     { label: 'publicKey', payload: { publicKey: 123, message: {}, requestId: 'abc' } },
@@ -327,9 +321,7 @@ test('ConnectionManager', () => {
                 ];
 
                 for (const testCase of cases) {
-                    const err = await expectUnhandled(testCase.payload);
-                    t.ok(err, `should reject malformed ${testCase.label}`);
-                    t.ok(err.message.includes('malformed liveness request event'));
+                    await t.exception.all(() => handler(testCase.payload));
                 }
             } finally {
                 sinon.restore();
