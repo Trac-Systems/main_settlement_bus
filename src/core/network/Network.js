@@ -21,6 +21,7 @@ import NetworkWalletFactory from './identity/NetworkWalletFactory.js';
 import { networkMessageFactory } from '../../messages/network/v1/networkMessageFactory.js';
 import TransactionRateLimiterService from './services/TransactionRateLimiterService.js';
 import PendingRequestService from './services/PendingRequestService.js';
+import ValidatorHealthCheckService from './services/ValidatorHealthCheckService.js';
 
 // -- Debug Mode --
 // TODO: Implement a better debug system in the future. This is just temporary.
@@ -48,6 +49,7 @@ class Network extends ReadyResource {
     #rateLimiter;
     #pendingRequestsService;
     #wallet;
+    #validatorHealthCheckService;
 
     /**
      * @param {State} state
@@ -102,6 +104,9 @@ class Network extends ReadyResource {
         await sleep(100);
         await this.#validatorObserverService.stopValidatorObserver();
         await sleep(5_000);
+        if (this.#validatorHealthCheckService) {
+            await this.#validatorHealthCheckService.close();
+        }
 
         this.cleanupNetworkListeners();
         this.cleanupPendingConnections();
@@ -146,7 +151,7 @@ class Network extends ReadyResource {
                             console.log("setting v1")
                             connection.protocolSession.setV1AsPreferredProtocol();
                             this.#validatorConnectionManager.addValidator(publicKey, connection)
-                            // TODO: Enable mechanism to check liveness of V1 node every X seconds here
+                            this.#validatorHealthCheckService.start(publicKey);
                         }
                     )
                     .catch(
@@ -155,6 +160,7 @@ class Network extends ReadyResource {
                             // Timeouted / Router has rejected the pending request, now we can do something with this
                             connection.protocolSession.setLegacyAsPreferredProtocol();
                             this.#validatorConnectionManager.addValidator(publicKey, connection)
+                            this.#validatorHealthCheckService.stop(publicKey)
                         }
                     )
             }
@@ -202,6 +208,13 @@ class Network extends ReadyResource {
                 this.#pendingRequestsService,
                 this.#config
             );
+            this.#validatorHealthCheckService = new ValidatorHealthCheckService(
+                this.#wallet,
+                NETWORK_CAPABILITIES,
+                this.#config
+            );
+            await this.#validatorHealthCheckService.ready();
+            this.#validatorConnectionManager.subscribeToHealthChecks(this.#validatorHealthCheckService);
 
             console.log(`Channel: ${b4a.toString(this.#config.channel)}`);
 
