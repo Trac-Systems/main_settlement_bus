@@ -203,6 +203,11 @@ export class Config {
         return this.#config.pendingRequestTimeout
     }
 
+    get validatorHealthCheckInterval() {
+        if (this.#isOverriden('validatorHealthCheckInterval')) return this.#options.validatorHealthCheckInterval
+        return this.#config.validatorHealthCheckInterval
+    }
+
     // Most of these properties are boolean
     #isOverriden(prop) {
         return this.#options.hasOwnProperty(prop) && isDefined(this.#options[prop])

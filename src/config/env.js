@@ -46,6 +46,7 @@ const configData = {
         rateLimitCleanupIntervalMs: 120_000, // Rate limiting constants
         rateLimitConnectionTimeoutMs: 60_000, // Rate limiting constants
         rateLimitMaxTransactionsPerSecond: 50, // Rate limiting constants
+        validatorHealthCheckInterval: 5 * 60 * 1000, // How often to check validator health (ms)
         storesDirectory : 'stores/',
         storeName: 'testnet',
     },
@@ -85,6 +86,7 @@ const configData = {
         rateLimitConnectionTimeoutMs: 60_000, // Rate limiting constants
         rateLimitMaxTransactionsPerSecond: 50, // Rate limiting constants
         pendingRequestTimeout: 1000, // TODO: ADD description
+        validatorHealthCheckInterval: 5 * 60 * 1000, // How often to check validator health (ms)
         storesDirectory: 'stores/',
         storeName: 'mainnet',
     },
@@ -124,6 +126,7 @@ const configData = {
         rateLimitConnectionTimeoutMs: 60_000, // Rate limiting constants
         rateLimitMaxTransactionsPerSecond: 50, // Rate limiting constants
         pendingRequestTimeout: 1000, // TODO: ADD description
+        validatorHealthCheckInterval: 5 * 60 * 1000, // How often to check validator health (ms)
         storesDirectory : 'stores/',
         storeName: 'development',
     }
