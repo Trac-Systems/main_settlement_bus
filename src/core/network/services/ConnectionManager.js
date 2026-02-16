@@ -1,6 +1,10 @@
 import b4a from 'b4a'
 import PeerWallet from "trac-wallet"
+import { EventType, ResultCode } from '../../../utils/constants.js';
 
+/**
+ * @typedef {import('hyperswarm').Connection} Connection
+ */
 
 // -- Debug Mode --
 // TODO: Implement a better debug system in the future. This is just temporary.
@@ -15,6 +19,8 @@ class ConnectionManager {
     #validators
     #maxValidators
     #config
+    #healthCheckService
+    #healthCheckHandler
 
     // Note: #validators is using publicKey (Buffer) as key
     // As Buffers are objects, we will rely on internal conversions done by JS to compare them.
@@ -22,10 +28,124 @@ class ConnectionManager {
     /**
      * @param {object} config
      **/
-    constructor(config)  {
+    constructor(config) {
         this.#validators = new Map();
         this.#config = config
         this.#maxValidators = config.maxValidators
+    }
+
+    /**
+     * Subscribes to periodic validator health checks.
+     * @param {ReadyResource} healthCheckService
+     */
+    // TODO: We should consider moving this to ValidatorObserver instead.
+    // Keep here only if we forsee having health checks for non-validator connections in the future. 
+    // For now, it seems that it would be better to keep this logic here.
+    subscribeToHealthChecks(healthCheckService) {
+        debugLog("subscribeToHealthChecks: Subscribing to health check events")
+        if (!healthCheckService || typeof healthCheckService.on !== 'function' || typeof healthCheckService.off !== 'function') {
+            throw new Error('ConnectionManager: health check service must implement on/off');
+        }
+
+        if (this.#healthCheckService && this.#healthCheckHandler) {
+            debugLog('subscribeToHealthChecks: removing previous health check handler');
+            // Unsubscribe from previous health check service if already subscribed
+            // TODO: Maybe we should not allow switching to a new health check service
+            this.#healthCheckService.off(EventType.VALIDATOR_HEALTH_CHECK, this.#healthCheckHandler);
+        }
+
+        this.#healthCheckService = healthCheckService; // TODO: Maybe this should be handled in the constructor directly?
+        // TODO: declare this method outside this function to avoid redeclaring it every time we subscribe to health checks. We can just bind it to 'this' in the constructor.
+        this.#healthCheckHandler = async ({ publicKey, message, requestId }) => {
+            if (typeof publicKey !== 'string' || typeof requestId !== 'string' || message === null || typeof message !== 'object') {
+                throw new Error(`ConnectionManager: Received malformed liveness request event. Typeof publicKey = ${typeof publicKey}. Typeof message = ${typeof message}. Typeof requestId = ${typeof requestId}`)
+            }
+
+            let targetAddress = null;
+            if (DEBUG) {
+                // It is recommended to leave this if(DEBUG) statement here to avoid needlessly
+                // calculating the address from the pubKey during production execution
+                targetAddress = this.#toAddress(publicKey)
+            }
+
+            if (!this.exists(publicKey) || !this.connected(publicKey)) {
+                debugLog(`healthCheck: validator not connected, stopping checks. Address = ${targetAddress}; Request ID = ${requestId}`);
+                this.#stopHealthCheck(publicKey);
+                return;
+            }
+
+            const connection = this.getConnection(publicKey);
+            if (!connection || !connection.protocolSession) {
+                debugLog(`healthCheck: missing protocol session, removing validator. Address = ${targetAddress}; Request ID = ${requestId}`);
+                this.#stopHealthCheck(publicKey);
+                this.remove(publicKey);
+                return;
+            }
+
+            // TODO: Ideally, the protocols should be transparent to Connection manager. 
+            // This was added only to garantee that we are not sending v1 messages to non-v1 peers.
+            // It should be reoved when legacy protocol is deprecated.
+            if (connection.protocolSession.preferredProtocol !== connection.protocolSession.supportedProtocols.V1) {
+                debugLog(`healthCheck: validator not v1, stopping checks. Address = ${targetAddress}; Request ID = ${requestId}`);
+                this.#stopHealthCheck(publicKey);
+                return;
+            }
+
+            let success = false;
+            try {
+                debugLog(`healthCheck: sending liveness request. Address = ${targetAddress}; Request ID = ${requestId}`);
+
+                const resultCode = await connection.protocolSession.send(message);
+                success = resultCode === ResultCode.OK;
+                if (!success) {
+                    debugLog(`healthCheck: non-OK result code. Address = ${targetAddress}; Request ID = ${requestId}`);
+                }
+            } catch {
+                success = false;
+            }
+
+            if (!success) {
+                debugLog(`healthCheck: liveness request failed, removing validator. Address = ${targetAddress}; Request ID = ${requestId}`);
+                this.remove(publicKey);
+                this.#stopHealthCheck(publicKey);
+            } else {
+                debugLog(`healthCheck: success. Address = ${targetAddress}; Request ID = ${requestId}`);
+            }
+        };
+
+        this.#healthCheckService.on(EventType.VALIDATOR_HEALTH_CHECK, this.#healthCheckHandler);
+        debugLog('subscribeToHealthChecks: subscribed to health check events');
+    }
+
+    #stopHealthCheck(publicKeyHex) {
+        let targetAddress = null;
+        if (DEBUG) {
+            targetAddress = this.#toAddress(publicKeyHex)
+        }
+
+        if (!this.#healthCheckService) {
+            debugLog('stopHealthCheck: no health check service, cannot stop checks for', targetAddress);
+            return;
+        }
+        try {
+            if (this.#healthCheckService.has(publicKeyHex)) {
+                debugLog('stopHealthCheck: stopping scheduled checks for', targetAddress);
+                this.#healthCheckService.stop(publicKeyHex);
+            }
+        } catch (error) {
+            debugLog(`StopHealthCheck: Failed to stop health check for validator ${targetAddress}. Error: ${error.message}`);
+        }
+    }
+
+    /**
+     * Retrieves the Hyperswarm connection object for a given validator public key.
+     * @param {String | Buffer} publicKey - The public key (Buffer or hex string) of the validator.
+     * @returns {Connection|undefined} - The connection object if found, otherwise undefined.
+     */
+    getConnection(publicKey) {
+        const publicKeyHex = this.#toHexString(publicKey);
+        const entry = this.#validators.get(publicKeyHex);
+        return entry ? entry.connection : undefined;
     }
 
     /**
@@ -35,26 +155,26 @@ class ConnectionManager {
      * @param {Object} message - The message to send to the validator
      * @returns {String} - The public key of the validator used
      */
-    send(message) {
-        const connectedValidators = this.connectedValidators();
+    // send(message) {
+    //     const connectedValidators = this.connectedValidators();
 
-        if (connectedValidators.length === 0) {
-            throw new Error('ConnectionManager: no connected validators available to send message');
-        }
+    //     if (connectedValidators.length === 0) {
+    //         throw new Error('ConnectionManager: no connected validators available to send message');
+    //     }
 
-        const target = this.pickRandomValidator(connectedValidators);
-        const entry = this.#validators.get(target);
-        if (!entry || !entry.connection || !entry.connection.protocolSession?.has('legacy')) return null;
+    //     const target = this.pickRandomValidator(connectedValidators);
+    //     const entry = this.#validators.get(target);
+    //     if (!entry || !entry.connection || !entry.connection.protocolSession?.has('legacy')) return null;
 
-        try {
-            entry.connection.protocolSession.send(message);
-            entry.sent = (entry.sent || 0) + 1;
-        } catch (e) {
-            // Swallow individual send errors.
-        }
+    //     try {
+    //         entry.connection.protocolSession.send(message);
+    //         entry.sent = (entry.sent || 0) + 1;
+    //     } catch (e) {
+    //         // Swallow individual send errors.
+    //     }
 
-        return target;
-    }
+    //     return target;
+    // }
 
     /**
      * Sends a message through a specific validator without increasing sent messages count.
@@ -62,18 +182,26 @@ class ConnectionManager {
      * @param {String | Buffer} publicKey - A validator public key hex string to be fetched from the pool.
      * @returns {Boolean} True if the message was sent, false otherwise.
      */
-    sendSingleMessage(message, publicKey) {
+    async sendSingleMessage(message, publicKey) {
         let publicKeyHex = this.#toHexString(publicKey);
         if (!this.exists(publicKeyHex) || !this.connected(publicKeyHex)) return false; // Fail silently
 
         const validator = this.#validators.get(publicKeyHex);
         if (!validator || !validator.connection || !validator.connection.protocolSession) return false;
-        try {
-            validator.connection.protocolSession.send(message);
-        } catch (e) {
-            // Swallow individual send errors.
-        }
-        return true; // TODO: Implement better success/failure reporting
+
+        let result = false;
+        await validator.connection.protocolSession.send(message)
+            .then(
+                () => {
+                    result = true;
+                }
+            )
+            .catch(
+                () => {
+                    result = false;
+                }
+            )
+        return result;
     }
 
     /**
@@ -119,6 +247,7 @@ class ConnectionManager {
     remove(publicKey) {
         debugLog(`remove: removing validator ${this.#toAddress(publicKey)}`);
         const publicKeyHex = this.#toHexString(publicKey);
+        this.#stopHealthCheck(publicKeyHex);
         if (this.exists(publicKeyHex)) {
             // Close the connection socket
             const entry = this.#validators.get(publicKeyHex);
@@ -208,7 +337,10 @@ class ConnectionManager {
     prettyPrint() {
         console.log('Connection count: ', this.connectionCount())
         console.log('Validator map keys count: ', this.#validators.size)
-        console.log('Validator map keys: ', Array.from(this.#validators.keys()).map(val => this.#toAddress(val)).join(', '))
+        console.log('Validator map keys:\n', Array.from(this.#validators.entries()).map(([key, val]) => {
+            const protocols = val.connection?.protocolSession?.preferredProtocol || 'none';
+            return `${this.#toAddress(key)}: ${protocols}`;
+        }).join('\n'))
     }
 
     // Note 1: This method shuffles the whole array (in practice, probably around 50 elements)

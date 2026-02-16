@@ -1,11 +1,11 @@
 import {OperationType} from '../../../../../utils/constants.js';
-import PartialRoleAccess from "../validators/PartialRoleAccess.js";
-import BaseOperationHandler from './base/BaseOperationHandler.js';
+import PartialRoleAccessValidator from "../../shared/validators/PartialRoleAccessValidator.js";
+import BaseStateOperationHandler from './BaseStateOperationHandler.js';
 import {applyStateMessageFactory} from "../../../../../messages/state/applyStateMessageFactory.js";
 import {safeEncodeApplyOperation} from "../../../../../utils/protobuf/operationHelpers.js";
 import {normalizeRoleAccessOperation} from "../../../../../utils/normalizers.js";
 
-class RoleOperationHandler extends BaseOperationHandler {
+class LegacyRoleOperationHandler extends BaseStateOperationHandler {
     #partialRoleAccessValidator;
     #wallet;
     #config;
@@ -22,7 +22,7 @@ class RoleOperationHandler extends BaseOperationHandler {
         super(state, wallet, rateLimiter, txPoolService, config);
         this.#wallet = wallet;
         this.#config = config;
-        this.#partialRoleAccessValidator = new PartialRoleAccess(state, this.#wallet.address ,this.#config)
+        this.#partialRoleAccessValidator = new PartialRoleAccessValidator(state, this.#wallet.address ,this.#config)
         this.#txPoolService = txPoolService;
     }
 
@@ -85,4 +85,4 @@ class RoleOperationHandler extends BaseOperationHandler {
     }
 }
 
-export default RoleOperationHandler;
+export default LegacyRoleOperationHandler;

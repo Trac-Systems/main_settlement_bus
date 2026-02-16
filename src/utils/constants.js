@@ -34,8 +34,6 @@ export const OperationType = Object.freeze({
 });
 
 export const NetworkOperationType = Object.freeze({
-    VALIDATOR_CONNECTION_REQUEST: NetworkMessageType.MESSAGE_TYPE_VALIDATOR_CONNECTION_REQUEST,
-    VALIDATOR_CONNECTION_RESPONSE: NetworkMessageType.MESSAGE_TYPE_VALIDATOR_CONNECTION_RESPONSE,
     LIVENESS_REQUEST: NetworkMessageType.MESSAGE_TYPE_LIVENESS_REQUEST,
     LIVENESS_RESPONSE: NetworkMessageType.MESSAGE_TYPE_LIVENESS_RESPONSE,
     BROADCAST_TRANSACTION_REQUEST: NetworkMessageType.MESSAGE_TYPE_BROADCAST_TRANSACTION_REQUEST,
@@ -43,12 +41,14 @@ export const NetworkOperationType = Object.freeze({
 });
 
 export const ResultCode = Object.freeze({
+    UNSPECIFIED: NetworkResultCode.RESULT_CODE_UNSPECIFIED,
     OK: NetworkResultCode.RESULT_CODE_OK,
     INVALID_PAYLOAD: NetworkResultCode.RESULT_CODE_INVALID_PAYLOAD,
-    UNSUPPORTED_VERSION: NetworkResultCode.RESULT_CODE_UNSUPPORTED_VERSION,
     RATE_LIMITED: NetworkResultCode.RESULT_CODE_RATE_LIMITED,
-    TIMEOUT: NetworkResultCode.RESULT_CODE_TIMEOUT,
     SIGNATURE_INVALID: NetworkResultCode.RESULT_CODE_SIGNATURE_INVALID,
+    UNEXPECTED_ERROR: NetworkResultCode.RESULT_CODE_UNEXPECTED_ERROR,
+    TIMEOUT: NetworkResultCode.RESULT_CODE_TIMEOUT,
+    NODE_HAS_NO_WRITE_ACCESS: NetworkResultCode.RESULT_CODE_NODE_HAS_NO_WRITE_ACCESS,
 });
 
 // Role managment constants
@@ -61,6 +61,7 @@ export const EventType = Object.freeze({
     WARNING: 'warning',
     VALIDATOR_CONNECTION_READY: 'validator-connection-ready',
     VALIDATOR_CONNECTION_TIMEOUT: 'validator-connection-timeout',
+    VALIDATOR_HEALTH_CHECK: 'validator-health-check',
 });
 
 // Role managment constants
@@ -125,6 +126,7 @@ export const MAX_TRANSACTIONS_PER_SECOND = 50;
 // Operation handler constants
 export const MAX_PARTIAL_TX_PAYLOAD_BYTE_SIZE = 3072;
 export const TRANSACTION_POOL_SIZE = 1000;
+export const V1_PROTOCOL_PAYLOAD_MAX_SIZE = 4096;
 
 // Network message constants
 export const NETWORK_MESSAGE_TYPES = Object.freeze({
@@ -140,3 +142,5 @@ export const NETWORK_MESSAGE_TYPES = Object.freeze({
         NODE: 'nodeResponse'
     },
 });
+
+export const NETWORK_CAPABILITIES = Object.freeze(["protocols:v1:legacy"]);

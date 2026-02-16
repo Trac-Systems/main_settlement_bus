@@ -1,9 +1,9 @@
-import BaseOperationHandler from './base/BaseOperationHandler.js';
+import BaseStateOperationHandler from './BaseStateOperationHandler.js';
 import {
     OperationType
 } from '../../../../../utils/constants.js';
-import PartialBootstrapDeployment from "../validators/PartialBootstrapDeployment.js";
-import PartialTransaction from "../validators/PartialTransaction.js";
+import PartialBootstrapDeploymentValidator from "../../shared/validators/PartialBootstrapDeploymentValidator.js";
+import PartialTransactionValidator from "../../shared/validators/PartialTransactionValidator.js";
 import {applyStateMessageFactory} from "../../../../../messages/state/applyStateMessageFactory.js";
 import {safeEncodeApplyOperation} from "../../../../../utils/protobuf/operationHelpers.js";
 import {
@@ -12,7 +12,7 @@ import {
 } from "../../../../../utils/normalizers.js";
 
 
-class SubnetworkOperationHandler extends BaseOperationHandler {
+class LegacySubnetworkOperationHandler extends BaseStateOperationHandler {
     #partialBootstrapDeploymentValidator;
     #partialTransactionValidator;
     #config;
@@ -30,8 +30,8 @@ class SubnetworkOperationHandler extends BaseOperationHandler {
         super(state, wallet, rateLimiter, txPoolService, config);
         this.#config = config;
         this.#wallet = wallet
-        this.#partialBootstrapDeploymentValidator = new PartialBootstrapDeployment(state, this.#wallet.address, config);
-        this.#partialTransactionValidator = new PartialTransaction(state, this.#wallet.address, config);
+        this.#partialBootstrapDeploymentValidator = new PartialBootstrapDeploymentValidator(state, this.#wallet.address, config);
+        this.#partialTransactionValidator = new PartialTransactionValidator(state, this.#wallet.address, config);
         this.#txPoolService = txPoolService;
     }
 
@@ -41,7 +41,7 @@ class SubnetworkOperationHandler extends BaseOperationHandler {
         } else if (payload.type === OperationType.BOOTSTRAP_DEPLOYMENT) {
             await this.#partialBootstrapDeploymentSubHandler(payload, connection);
         } else {
-            throw new Error('Unsupported operation type for SubnetworkOperationHandler');
+            throw new Error('Unsupported operation type for LegacySubnetworkOperationHandler');
         }
     }
 
@@ -90,4 +90,4 @@ class SubnetworkOperationHandler extends BaseOperationHandler {
     }
 }
 
-export default SubnetworkOperationHandler;
+export default LegacySubnetworkOperationHandler;

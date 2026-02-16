@@ -2,7 +2,7 @@ import { NETWORK_MESSAGE_TYPES } from '../../../../../utils/constants.js';
 import PeerWallet from 'trac-wallet';
 import b4a from 'b4a';
 
-class GetRequestHandler {
+class LegacyGetRequestHandler {
     #wallet;
     #state;
 
@@ -15,17 +15,17 @@ class GetRequestHandler {
         return this.#state;
     }
 
-    async handle(message, messageProtomux, connection, channelString) {
+    async handle(message, connection, channelString) {
         switch (message) {
             case NETWORK_MESSAGE_TYPES.GET.VALIDATOR:
-                await this.handleGetValidatorResponse(messageProtomux, connection, channelString);
+                await this.handleGetValidatorResponse(connection, channelString);
                 break;
             default:
                 throw new Error(`Unhandled GET type: ${message}`);
         }
     }
 
-    async handleGetValidatorResponse(messageProtomux, connection, channelString) {
+    async handleGetValidatorResponse(connection, channelString) {
         const nonce = PeerWallet.generateNonce().toString('hex');
         const payload = {
             op: 'validatorResponse',
@@ -46,8 +46,8 @@ class GetRequestHandler {
             ...payload,
             sig: sig.toString('hex'),
         };
-        messageProtomux.send(responseMessage);
+        connection.protocolSession.sendAndForget(responseMessage)
     }
 }
 
-export default GetRequestHandler;
+export default LegacyGetRequestHandler;

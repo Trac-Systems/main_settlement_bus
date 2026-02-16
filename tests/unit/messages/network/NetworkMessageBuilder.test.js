@@ -18,7 +18,6 @@ import {
     idToBuffer,
     timestampToBuffer
 } from '../../../../src/utils/buffer.js';
-import { addressToBuffer } from '../../../../src/core/state/utils/address.js';
 import { config } from '../../../helpers/config.js';
 import { testKeyPair1 } from '../../../fixtures/apply.fixtures.js';
 
@@ -38,81 +37,6 @@ function uniqueResultCodes() {
     return [...new Set(Object.values(NetworkResultCode))].sort((a, b) => a - b);
 }
 
-test('NetworkMessageBuilder builds validator connection request and verifies signature', async t => {
-    const wallet = createWallet();
-    const builder = new NetworkMessageBuilder(wallet, config);
-
-    const id = uuidv7();
-    const caps = ['cap:b', 'cap:a'];
-
-    await builder
-        .setType(NetworkOperationType.VALIDATOR_CONNECTION_REQUEST)
-        .setId(id)
-        .setTimestamp()
-        .setIssuerAddress(wallet.address)
-        .setCapabilities(caps)
-        .buildPayload();
-
-    const payload = builder.getResult();
-    t.is(payload.type, NetworkOperationType.VALIDATOR_CONNECTION_REQUEST);
-    t.is(payload.id, id);
-    t.alike(payload.capabilities, caps);
-    t.ok(b4a.isBuffer(payload.validator_connection_request.nonce));
-    t.ok(b4a.isBuffer(payload.validator_connection_request.signature));
-
-    const message = createMessage(
-        payload.type,
-        idToBuffer(id),
-        timestampToBuffer(payload.timestamp),
-        addressToBuffer(wallet.address, config.addressPrefix),
-        payload.validator_connection_request.nonce,
-        encodeCapabilities(caps)
-    );
-    const hash = await PeerWallet.blake3(message);
-    t.ok(wallet.verify(payload.validator_connection_request.signature, hash, wallet.publicKey));
-
-    const roundTrip = decodeV1networkOperation(encodeV1networkOperation(payload));
-    t.is(roundTrip.type, NetworkOperationType.VALIDATOR_CONNECTION_REQUEST);
-});
-
-test('NetworkMessageBuilder iterates validator connection response ResultCode values', async t => {
-    const wallet = createWallet();
-    const builder = new NetworkMessageBuilder(wallet, config);
-    const id = uuidv7();
-    const otherAddress = 'trac1xm76l9qaujh7vqktk8302mw9sfrxau3l45w62hqfl4kasswt6yts0autkh';
-    const caps = ['cap:b', 'cap:a'];
-
-    for (const code of uniqueResultCodes()) {
-        await builder
-            .setType(NetworkOperationType.VALIDATOR_CONNECTION_RESPONSE)
-            .setId(id)
-            .setTimestamp()
-            .setIssuerAddress(otherAddress)
-            .setCapabilities(caps)
-            .setResultCode(code)
-            .buildPayload();
-
-        const payload = builder.getResult();
-        t.is(payload.type, NetworkOperationType.VALIDATOR_CONNECTION_RESPONSE);
-        t.is(payload.validator_connection_response.result, code);
-
-        const msg = createMessage(
-            payload.type,
-            idToBuffer(payload.id),
-            timestampToBuffer(payload.timestamp),
-            addressToBuffer(otherAddress, config.addressPrefix),
-            payload.validator_connection_response.nonce,
-            safeWriteUInt32BE(code, 0),
-            encodeCapabilities(caps)
-        );
-        const hash = await PeerWallet.blake3(msg);
-        t.ok(wallet.verify(payload.validator_connection_response.signature, hash, wallet.publicKey));
-
-        const decoded = decodeV1networkOperation(encodeV1networkOperation(payload));
-        t.is(decoded.validator_connection_response.result, code);
-    }
-});
-
 test('NetworkMessageBuilder iterates liveness response ResultCode values', async t => {
     const wallet = createWallet();
     const builder = new NetworkMessageBuilder(wallet, config);
@@ -125,7 +49,6 @@ test('NetworkMessageBuilder iterates liveness response ResultCode values', async
             .setType(NetworkOperationType.LIVENESS_RESPONSE)
             .setId(id)
             .setTimestamp()
-            .setData(data)
             .setCapabilities(caps)
             .setResultCode(code)
             .buildPayload();
@@ -156,13 +79,11 @@ test('NetworkMessageBuilder builds liveness request and verifies signature (data
 
     const id = uuidv7();
     const caps = ['cap:b', 'cap:a'];
-    const data = b4a.from('ping', 'utf8');
 
     await builder
         .setType(NetworkOperationType.LIVENESS_REQUEST)
         .setId(id)
         .setTimestamp()
-        .setData(data)
         .setCapabilities(caps)
         .buildPayload();
 

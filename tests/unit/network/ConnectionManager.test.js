@@ -6,6 +6,7 @@ import ConnectionManager from "../../../src/core/network/services/ConnectionMana
 import { tick } from "../../helpers/setupApplyTests.js";
 import b4a from 'b4a'
 import { createConfig, ENV } from "../../../src/config/env.js";
+import { EventType, ResultCode } from "../../../src/utils/constants.js";
 
 const createConnection = (key) => {
     const emitter = new EventEmitter()
@@ -15,9 +16,30 @@ const createConnection = (key) => {
     };
     emitter.connected = true
     emitter.remotePublicKey = b4a.from(key, 'hex')
-    
+
     return { key: b4a.from(key, 'hex'), connection: emitter }
 }
+
+const createV1Connection = (key, sendStub = sinon.stub().resolves(ResultCode.OK), preferredProtocol = 'v1') => {
+    const emitter = new EventEmitter()
+    emitter.protocolSession = {
+        send: sendStub,
+        preferredProtocol,
+        supportedProtocols: { V1: 'v1' }
+    };
+    emitter.connected = true
+    emitter.remotePublicKey = b4a.from(key, 'hex')
+    emitter.end = sinon.stub()
+
+    return { key: b4a.from(key, 'hex'), connection: emitter }
+}
+
+const makeHealthCheckService = () => {
+    const emitter = new EventEmitter();
+    emitter.has = sinon.stub().returns(true);
+    emitter.stop = sinon.stub();
+    return emitter;
+};
 
 const makeManager = (maxValidators = 6, conns = connections) => {
     const merged = createConfig(ENV.DEVELOPMENT, { maxValidators })
@@ -115,36 +137,37 @@ test('ConnectionManager', () => {
         })
     })
 
-    test('send', async t => {
-        test('triggers send on messenger', async t => {
-            reset()
-            const connectionManager = makeManager()
+    // Note: These tests were commented out because connectionManager.send is being deprecated. When it is completely removed, the tests should be deleted.
+    // test('send', async t => {
+    //     // test('triggers send on messenger', async t => {
+    //     //     reset()
+    //     //     const connectionManager = makeManager()
 
-            const target = connectionManager.send([1,2,3,4])
+    //     //     const target = connectionManager.send([1,2,3,4])
 
-            const totalCalls = connections.reduce((sum, con) => sum + con.connection.protocolSession.send.callCount, 0)
-            t.is(totalCalls, 1, 'should send to exactly one validator')
-            t.ok(target, 'should return a target public key')
-        })
+    //     //     const totalCalls = connections.reduce((sum, con) => sum + con.connection.protocolSession.send.callCount, 0)
+    //     //     t.is(totalCalls, 1, 'should send to exactly one validator')
+    //     //     t.ok(target, 'should return a target public key')
+    //     // })
 
-        test('does not throw on individual send errors', async t => {
-            reset()
-            const errorConnections = [
-                createConnection(testKeyPair7.publicKey),
-                createConnection(testKeyPair8.publicKey),
-            ]
+    //     test('does not throw on individual send errors', async t => {
+    //         reset()
+    //         const errorConnections = [
+    //             createConnection(testKeyPair7.publicKey),
+    //             createConnection(testKeyPair8.publicKey),
+    //         ]
 
-            errorConnections.forEach(con => {
-                con.connection.protocolSession.send = sinon.stub().throws(new Error())
-            })
+    //         errorConnections.forEach(con => {
+    //             con.connection.protocolSession.send = sinon.stub().throws(new Error())
+    //         })
 
-            const connectionManager = makeManager(5, errorConnections)
+    //         const connectionManager = makeManager(5, errorConnections)
 
-            t.is(errorConnections.length, 2, 'should have two connections')
-            connectionManager.send([1,2,3,4])
-            t.ok(true, 'send should not throw even if individual sends fail')
-        })
-    })
+    //         t.is(errorConnections.length, 2, 'should have two connections')
+    //         connectionManager.send([1,2,3,4])
+    //         t.ok(true, 'send should not throw even if individual sends fail')
+    //     })
+    // })
 
     test('on close', async t => {
         test('removes from list', async t => {
@@ -166,7 +189,7 @@ test('ConnectionManager', () => {
             const connectionManager = makeManager()
             const previousCount = connectionManager.connectionCount()
             const lastValidator = connections.shift()
-            
+
             t.ok(connectionManager.connected(lastValidator.key), 'should be connected')
             connectionManager.remove(lastValidator.key)
 
@@ -187,5 +210,130 @@ test('ConnectionManager', () => {
             await tick()
             t.is(connectionCount, connectionManager.connectionCount() + 1, 'first on the list should have been called')
         })
+    })
+
+    test('health checks (strict)', async t => {
+        test('keeps validator on OK response', async t => {
+            try {
+                const v1Conn = createV1Connection(testKeyPair1.publicKey, sinon.stub().resolves(ResultCode.OK));
+                const connectionManager = makeManager(6, [v1Conn]);
+                const healthCheckService = makeHealthCheckService();
+                connectionManager.subscribeToHealthChecks(healthCheckService);
+
+                healthCheckService.emit(EventType.VALIDATOR_HEALTH_CHECK, {
+                    publicKey: testKeyPair1.publicKey,
+                    message: { id: 'ok' },
+                    requestId: "123456"
+                });
+
+                await tick();
+                t.ok(connectionManager.connected(v1Conn.key));
+                t.is(healthCheckService.stop.callCount, 0);
+            } finally {
+                sinon.restore();
+            }
+        });
+
+        test('removes validator on non-OK response', async t => {
+            try {
+                const v1Conn = createV1Connection(testKeyPair2.publicKey, sinon.stub().resolves(ResultCode.TIMEOUT));
+                const connectionManager = makeManager(6, [v1Conn]);
+                const healthCheckService = makeHealthCheckService();
+                connectionManager.subscribeToHealthChecks(healthCheckService);
+
+                healthCheckService.emit(EventType.VALIDATOR_HEALTH_CHECK, {
+                    publicKey: testKeyPair2.publicKey,
+                    message: { id: 'timeout' },
+                    requestId: "123456"
+                });
+
+                await tick();
+                t.ok(!connectionManager.connected(v1Conn.key));
+                t.ok(healthCheckService.stop.callCount >= 1);
+            } finally {
+                sinon.restore();
+            }
+        });
+
+        test('removes validator on send rejection', async t => {
+            try {
+                const v1Conn = createV1Connection(testKeyPair3.publicKey, sinon.stub().rejects(new Error('boom')));
+                const connectionManager = makeManager(6, [v1Conn]);
+                const healthCheckService = makeHealthCheckService();
+                connectionManager.subscribeToHealthChecks(healthCheckService);
+
+                healthCheckService.emit(EventType.VALIDATOR_HEALTH_CHECK, {
+                    publicKey: testKeyPair3.publicKey,
+                    message: { id: 'rejected' },
+                    requestId: "123456"
+                });
+
+                await tick();
+                t.ok(!connectionManager.connected(v1Conn.key));
+                t.ok(healthCheckService.stop.callCount >= 1);
+            } finally {
+                sinon.restore();
+            }
+        });
+
+        test('stops checks when protocol is not v1', async t => {
+            try {
+                const v1Conn = createV1Connection(
+                    testKeyPair4.publicKey,
+                    sinon.stub().resolves(ResultCode.OK),
+                    'legacy'
+                );
+                const connectionManager = makeManager(6, [v1Conn]);
+                const healthCheckService = makeHealthCheckService();
+                connectionManager.subscribeToHealthChecks(healthCheckService);
+
+                healthCheckService.emit(EventType.VALIDATOR_HEALTH_CHECK, {
+                    publicKey: testKeyPair4.publicKey,
+                    message: { id: 'legacy' },
+                    requestId: "123456"
+                });
+
+                await tick();
+                t.ok(connectionManager.connected(v1Conn.key));
+                t.ok(healthCheckService.stop.callCount >= 1);
+            } finally {
+                sinon.restore();
+            }
+        });
+
+        test('rejects malformed health check events', async t => {
+            try {
+                const v1Conn = createV1Connection(testKeyPair5.publicKey, sinon.stub().resolves(ResultCode.OK));
+                const connectionManager = makeManager(6, [v1Conn]);
+                const healthCheckService = makeHealthCheckService();
+                connectionManager.subscribeToHealthChecks(healthCheckService);
+
+                const expectUnhandled = async (payload) => {
+                    let unhandled = null;
+                    const onUnhandled = (err) => {
+                        unhandled = err;
+                    };
+                    process.once('unhandledRejection', onUnhandled);
+                    healthCheckService.emit(EventType.VALIDATOR_HEALTH_CHECK, payload);
+                    await tick();
+                    process.removeListener('unhandledRejection', onUnhandled);
+                    return unhandled;
+                };
+
+                const cases = [
+                    { label: 'publicKey', payload: { publicKey: 123, message: {}, requestId: 'abc' } },
+                    { label: 'message', payload: { publicKey: testKeyPair5.publicKey, message: 'bad', requestId: 'abc' } },
+                    { label: 'requestId', payload: { publicKey: testKeyPair5.publicKey, message: {}, requestId: 456 } },
+                ];
+
+                for (const testCase of cases) {
+                    const err = await expectUnhandled(testCase.payload);
+                    t.ok(err, `should reject malformed ${testCase.label}`);
+                    t.ok(err.message.includes('malformed liveness request event'));
+                }
+            } finally {
+                sinon.restore();
+            }
+        });
     })
 })

@@ -107,76 +107,6 @@ class NetworkMessageBuilder {
         return this;
     }
 
-    async #buildValidatorConnectionRequestPayload() {
-        const issuer = this.#issuerAddress
-        if (!isAddressValid(issuer, this.#config.addressPrefix)) {
-            throw new Error('Issuer address must be a valid TRAC address');
-        }
-
-        if (this.#issuerAddress !== this.#wallet.address) {
-            throw new Error('Issuer address must be the signer address');
-        }
-
-        const nonce = PeerWallet.generateNonce();
-        const tsBuf = timestampToBuffer(this.#timestamp);
-        const idBuf = idToBuffer(this.#id);
-        const message = createMessage(
-            this.#type,
-            idBuf,
-            tsBuf,
-            addressToBuffer(issuer, this.#config.addressPrefix),
-            nonce,
-            encodeCapabilities(this.#capabilities),
-        );
-        const hash = await PeerWallet.blake3(message);
-        const signature = this.#wallet.sign(hash);
-
-        this.#payloadKey = 'validator_connection_request';
-        this.#body = {
-            issuer_address: issuer,
-            nonce,
-            signature
-        };
-    }
-
-    async #buildValidatorConnectionResponsePayload() {
-        const issuer = this.#issuerAddress
-        if (!isAddressValid(issuer, this.#config.addressPrefix)) {
-            throw new Error('Issuer address must be a valid TRAC address');
-        }
-
-        if (this.#issuerAddress === this.#wallet.address) {
-            throw new Error('Issuer address must be the different than the signer address');
-        }
-
-        if (this.#resultCode === null || this.#resultCode === undefined) {
-            throw new Error('Result code must be set before building validator connection response');
-        }
-
-        const nonce = PeerWallet.generateNonce();
-        const tsBuf = timestampToBuffer(this.#timestamp);
-        const idBuf = idToBuffer(this.#id);
-        const message = createMessage(
-            this.#type,
-            idBuf,
-            tsBuf,
-            addressToBuffer(issuer, this.#config.addressPrefix),
-            nonce,
-            safeWriteUInt32BE(this.#resultCode, 0),
-            encodeCapabilities(this.#capabilities),
-        );
-        const hash = await PeerWallet.blake3(message);
-        const signature = this.#wallet.sign(hash);
-
-        this.#payloadKey = 'validator_connection_response';
-        this.#body = {
-            issuer_address: issuer,
-            nonce,
-            signature,
-            result: this.#resultCode
-        };
-    }
-
     async #buildLivenessRequestPayload() {
         const nonce = PeerWallet.generateNonce();
         const tsBuf = timestampToBuffer(this.#timestamp);
@@ -281,14 +211,6 @@ class NetworkMessageBuilder {
         this.#setHeader();
 
         switch (this.#type) {
-            case NetworkOperationType.VALIDATOR_CONNECTION_REQUEST: {
-                await this.#buildValidatorConnectionRequestPayload();
-                break;
-            }
-            case NetworkOperationType.VALIDATOR_CONNECTION_RESPONSE: {
-                await this.#buildValidatorConnectionResponsePayload();
-                break;
-            }
             case NetworkOperationType.LIVENESS_REQUEST: {
                 await this.#buildLivenessRequestPayload();
                 break;

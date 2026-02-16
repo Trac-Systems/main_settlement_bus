@@ -5,21 +5,24 @@ import b4a from 'b4a';
 import TransactionPoolService from './services/TransactionPoolService.js';
 import ValidatorObserverService from './services/ValidatorObserverService.js';
 import NetworkMessages from './protocols/NetworkMessages.js';
-import { sleep } from '../../utils/helpers.js';
+import { sleep, generateUUID } from '../../utils/helpers.js';
 import {
     TRAC_NAMESPACE,
     MAX_PEERS,
     MAX_PARALLEL,
     MAX_SERVER_CONNECTIONS,
     MAX_CLIENT_CONNECTIONS,
-    NETWORK_MESSAGE_TYPES
+    EventType,
+    NETWORK_CAPABILITIES
 } from '../../utils/constants.js';
 import ConnectionManager from './services/ConnectionManager.js';
 import MessageOrchestrator from './services/MessageOrchestrator.js';
 import NetworkWalletFactory from './identity/NetworkWalletFactory.js';
-import { EventType } from '../../utils/constants.js';
 import { networkMessageFactory } from '../../messages/network/v1/networkMessageFactory.js';
 import TransactionRateLimiterService from './services/TransactionRateLimiterService.js';
+import PendingRequestService from './services/PendingRequestService.js';
+import ValidatorHealthCheckService from './services/ValidatorHealthCheckService.js';
+
 // -- Debug Mode --
 // TODO: Implement a better debug system in the future. This is just temporary.
 const DEBUG = false;
@@ -44,6 +47,9 @@ class Network extends ReadyResource {
     #connectTimeoutMs;
     #maxPendingConnections;
     #rateLimiter;
+    #pendingRequestsService;
+    #wallet;
+    #validatorHealthCheckService;
 
     /**
      * @param {State} state
@@ -60,7 +66,7 @@ class Network extends ReadyResource {
         this.#validatorObserverService = new ValidatorObserverService(this, state, address, this.#config);
         this.#validatorConnectionManager = new ConnectionManager(this.#config);
         this.#validatorMessageOrchestrator = new MessageOrchestrator(this.#validatorConnectionManager, state, this.#config);
-
+        this.#pendingRequestsService = new PendingRequestService(this.#config);
     }
 
     get swarm() {
@@ -93,15 +99,18 @@ class Network extends ReadyResource {
     }
 
     async _close() {
-        // TODO: Implement better "await" logic for stopping services
         console.log('Network: closing gracefully...');
-        this.transactionPoolService.stopPool();
+        await this.transactionPoolService.stopPool();
         await sleep(100);
-        this.#validatorObserverService.stopValidatorObserver();
+        await this.#validatorObserverService.stopValidatorObserver();
         await sleep(5_000);
+        if (this.#validatorHealthCheckService) {
+            await this.#validatorHealthCheckService.close();
+        }
 
         this.cleanupNetworkListeners();
         this.cleanupPendingConnections();
+        this.#pendingRequestsService.close();
 
         if (this.#swarm !== null) {
             this.#swarm.destroy();
@@ -109,23 +118,51 @@ class Network extends ReadyResource {
     }
 
     setupNetworkListeners() {
-        // VALIDATOR_CONNECTION_TIMEOUT
         this.on(EventType.VALIDATOR_CONNECTION_TIMEOUT, ({ publicKey, type, timeoutMs }) => {
             debugLog(`Network Event: VALIDATOR_CONNECTION_TIMEOUT | PublicKey: ${publicKey} | Type: ${type} | TimeoutMs: ${timeoutMs}`);
             this.#pendingConnections.delete(publicKey);
         });
 
-        // VALIDATOR_CONNECTION_READY
         this.on(EventType.VALIDATOR_CONNECTION_READY, async ({ publicKey, type, connection }) => {
             debugLog(`Network Event: VALIDATOR_CONNECTION_READY | PublicKey: ${publicKey} | Type: ${type}`);
             const { timeoutId } = this.#pendingConnections.get(publicKey);
+
             if (!timeoutId) return;
 
             clearTimeout(timeoutId);
             this.#pendingConnections.delete(publicKey);
 
             if (type === 'validator') {
-                await connection.protocolSession.send(NETWORK_MESSAGE_TYPES.GET.VALIDATOR);
+                //await connection.protocolSession.send(NETWORK_MESSAGE_TYPES.GET.VALIDATOR);
+                // we are going to probe for v1 
+                // add this request to pending requests service
+                const requestId = generateUUID();
+                const message = await networkMessageFactory(this.#wallet, this.#config).buildLivenessRequest(
+                    requestId,
+                    NETWORK_CAPABILITIES
+                );
+                console.log("requestId", requestId)
+                // TODO: Refactor this part of the code. Network.js should not decide between p2p communication protocol layers
+                // Probe a node to check p2p communication protocol version
+                await connection.protocolSession.send(message)
+                    .then(
+                        () => {
+                            // Router resolved the pending request, now we can do something with this
+                            console.log("setting v1")
+                            connection.protocolSession.setV1AsPreferredProtocol();
+                            this.#validatorConnectionManager.addValidator(publicKey, connection)
+                            this.#validatorHealthCheckService.start(publicKey);
+                        }
+                    )
+                    .catch(
+                        () => {
+                            console.log("setting v0")
+                            // Timeouted / Router has rejected the pending request, now we can do something with this
+                            connection.protocolSession.setLegacyAsPreferredProtocol();
+                            this.#validatorConnectionManager.addValidator(publicKey, connection)
+                            this.#validatorHealthCheckService.stop(publicKey)
+                        }
+                    )
             }
 
         });
@@ -150,7 +187,9 @@ class Network extends ReadyResource {
     ) {
         if (!this.#swarm) {
             const keyPair = await this.initializeNetworkingKeyPair(store, wallet);
-            const wrappedWallet = this.#getNetworkWalletWrapper(wallet, keyPair);
+            this.#wallet = this.#getNetworkWalletWrapper(wallet, keyPair);
+            this.#validatorMessageOrchestrator.setWallet(this.#wallet);
+
             this.#swarm = new Hyperswarm({
                 keyPair,
                 bootstrap: this.#config.dhtBootstrap,
@@ -160,15 +199,22 @@ class Network extends ReadyResource {
                 maxClientConnections: MAX_CLIENT_CONNECTIONS
             });
 
-            this.#rateLimiter = new TransactionRateLimiterService(this.#swarm);
+            this.#rateLimiter = new TransactionRateLimiterService(this.#swarm, this.#config);
             this.#networkMessages = new NetworkMessages(
                 state,
-                wrappedWallet,
+                this.#wallet,
                 this.#rateLimiter,
                 this.#transactionPoolService,
-                this.#validatorConnectionManager,
+                this.#pendingRequestsService,
                 this.#config
             );
+            this.#validatorHealthCheckService = new ValidatorHealthCheckService(
+                this.#wallet,
+                NETWORK_CAPABILITIES,
+                this.#config
+            );
+            await this.#validatorHealthCheckService.ready();
+            this.#validatorConnectionManager.subscribeToHealthChecks(this.#validatorHealthCheckService);
 
             console.log(`Channel: ${b4a.toString(this.#config.channel)}`);
 
@@ -254,7 +300,11 @@ class Network extends ReadyResource {
         const peerInfo = this.#swarm.peers.get(publicKey);
         if (peerInfo) {
             const connection = this.#swarm._allConnections.get(peerInfo.publicKey);
-            if (connection && connection.protocolSession) {
+
+            if (connection &&
+                connection.protocolSession &&
+                !this.#pendingRequestsService.isAlreadyProbed(connection.remotePublicKey.toString('hex'), connection.protocolSession.preferredProtocol)
+            ) {
                 await this.#finalizeConnection(publicKey, type, connection);
             }
         }
