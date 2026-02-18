@@ -138,6 +138,7 @@ class ValidatorHealthCheckService extends ReadyResource {
         return capabilities;
     }
 
+    // TODO: This method is used in multiple places. Consider moving it to a utility file or exposing it from PeerWallet.
     #normalizePublicKey(publicKey) {
         if (b4a.isBuffer(publicKey)) return publicKey.toString('hex');
         if (typeof publicKey === 'string') return publicKey.toLowerCase();
