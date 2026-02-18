@@ -9,8 +9,8 @@ class NetworkMessages {
     #legacyMessageRouter;
     #v1MessageRouter;
     #config;
+    #wallet;
     #pendingRequestsServiceInstance;
-    #transactionCommitServiceInstance;
 
     constructor(
         state,
@@ -22,8 +22,8 @@ class NetworkMessages {
         config
     ) {
         this.#config = config;
+        this.#wallet = wallet;
         this.#pendingRequestsServiceInstance = pendingRequestsServiceInstance;
-        this.#transactionCommitServiceInstance = transactionCommitService;
         this.#legacyMessageRouter = new NetworkMessageRouter(
             state,
             wallet,
@@ -57,7 +57,7 @@ class NetworkMessages {
 
         // ProtocolSession is attached to the Hyperswarm connection so other parts of the system (e.g. tryConnect)
         // can send messages without knowing how Protomux was initialized.
-        const protocolSession = new ProtocolSession(legacyProtocol, v1Protocol);
+        const protocolSession = new ProtocolSession(legacyProtocol, v1Protocol, this.#wallet, this.#config);
         connection.protocolSession = protocolSession;
     }
 }

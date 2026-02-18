@@ -5,7 +5,7 @@ import b4a from 'b4a';
 import TransactionPoolService from './services/TransactionPoolService.js';
 import ValidatorObserverService from './services/ValidatorObserverService.js';
 import NetworkMessages from './protocols/NetworkMessages.js';
-import { sleep, generateUUID } from '../../utils/helpers.js';
+import { sleep } from '../../utils/helpers.js';
 import {
     TRAC_NAMESPACE,
     MAX_PEERS,
@@ -18,7 +18,6 @@ import {
 import ConnectionManager from './services/ConnectionManager.js';
 import MessageOrchestrator from './services/MessageOrchestrator.js';
 import NetworkWalletFactory from './identity/NetworkWalletFactory.js';
-import { networkMessageFactory } from '../../messages/network/v1/networkMessageFactory.js';
 import TransactionRateLimiterService from './services/TransactionRateLimiterService.js';
 import PendingRequestService from './services/PendingRequestService.js';
 import TransactionCommitService from "./services/TransactionCommitService.js";
@@ -137,36 +136,26 @@ class Network extends ReadyResource {
             this.#pendingConnections.delete(publicKey);
 
             if (type === 'validator') {
-                //await connection.protocolSession.send(NETWORK_MESSAGE_TYPES.GET.VALIDATOR);
-                // we are going to probe for v1 
-                // add this request to pending requests service
-                const requestId = generateUUID();
-                const message = await networkMessageFactory(this.#wallet, this.#config).buildLivenessRequest(
-                    requestId,
-                    NETWORK_CAPABILITIES
-                );
-                console.log("requestId", requestId)
-                // TODO: Refactor this part of the code. Network.js should not decide between p2p communication protocol layers
-                // Probe a node to check p2p communication protocol version
-                await connection.protocolSession.send(message)
-                    .then(
-                        () => {
-                            // Router resolved the pending request, now we can do something with this
-                            console.log("setting v1")
-                            connection.protocolSession.setV1AsPreferredProtocol();
-                            this.#validatorConnectionManager.addValidator(publicKey, connection)
-                            this.#validatorHealthCheckService.start(publicKey);
-                        }
-                    )
-                    .catch(
-                        () => {
-                            console.log("setting v0")
-                            // Timeouted / Router has rejected the pending request, now we can do something with this
-                            connection.protocolSession.setLegacyAsPreferredProtocol();
-                            this.#validatorConnectionManager.addValidator(publicKey, connection)
-                            this.#validatorHealthCheckService.stop(publicKey)
-                        }
-                    )
+                try {
+                    await connection.protocolSession.probe();
+                } catch (err) {
+                    debugLog(`failed to probe peer with publicKey ${publicKey}`, err);
+                }
+
+                this.#validatorConnectionManager.addValidator(publicKey, connection);
+
+                let healthCheckSupported = false;
+                try {
+                    healthCheckSupported = connection.protocolSession.isHealthCheckSupported();
+                } catch (err) {
+                    debugLog(`health check support unknown for peer with publicKey ${publicKey}`, err);
+                }
+
+                if (healthCheckSupported) {
+                    this.#validatorHealthCheckService.start(publicKey);
+                } else {
+                    this.#validatorHealthCheckService.stop(publicKey);
+                }
             }
 
         });
@@ -316,7 +305,8 @@ class Network extends ReadyResource {
 
             if (connection &&
                 connection.protocolSession &&
-                !this.#pendingRequestsService.isAlreadyProbed(connection.remotePublicKey.toString('hex'), connection.protocolSession.preferredProtocol)
+                !connection.protocolSession.isProbed() &&
+                !this.#pendingRequestsService.isProbePending(connection.remotePublicKey.toString('hex'))
             ) {
                 await this.#finalizeConnection(publicKey, type, connection);
             }

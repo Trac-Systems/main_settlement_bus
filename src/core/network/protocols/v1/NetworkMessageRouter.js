@@ -58,6 +58,7 @@ class NetworkMessageRouterV1 {
             return;
         }
 
+        // We received a v1 message, so we set the connection protocol accordingly
         connection.protocolSession.setV1AsPreferredProtocol()
 
         try {
