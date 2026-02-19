@@ -17,7 +17,7 @@ const configData = {
         addressPrefix: TRAC_NETWORK_MSB_TESTNET1_PREFIX,
         addressPrefixLength: TRAC_NETWORK_MSB_TESTNET1_PREFIX.length,
         bech32mHrpLength: TRAC_NETWORK_MSB_TESTNET1_PREFIX.length + 1, // len(addressPrefix + separator)
-        bootstrap: 'e90cca53847a12a82f3bf0f67401e45e2ccc1698ee163e61414c2894eb4c6b12',
+        bootstrap: 'e6d160b63ba10fd43091bfdbb16d92716709e014b02a4570925c0a27350577bf',
         channel: '1111trac1network1msb1testnet1111',
         dhtBootstrap: ['116.202.214.149:10001', '157.180.12.214:10001', 'node1.hyperdht.org:49737', 'node2.hyperdht.org:49737', 'node3.hyperdht.org:49737'], // these are used to peer discovery
         disableRateLimit: false,
