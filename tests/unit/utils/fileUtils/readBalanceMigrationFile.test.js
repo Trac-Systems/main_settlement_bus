@@ -4,6 +4,7 @@ import { errorMessageIncludes } from "../../../helpers/regexHelper.js";
 import fs from 'fs';
 import PeerWallet from 'trac-wallet';
 import { config } from '../../../helpers/config.js';
+import { asAddress } from '../../../helpers/address.js';
 
 const DUMMY_PATH_OK = './dummy_balance_ok.csv';
 const DUMMY_PATH_DUP = './dummy_balance_dup.csv';
@@ -19,8 +20,8 @@ const DUMMY_PATH_ZERO = './dummy_balance_zero.csv';
 const DUMMY_PATH_BOM = './dummy_balance_bom.csv';
 const DUMMY_PATH_LARGE = './dummy_balance_large.csv';
 
-const ADDR1 = 'trac1dguwzsvcsehslh6dgj2mqlsxdn7s5t5vhem56yd0xlg47aq6exzqymhr6u';
-const ADDR2 = 'trac123z3gfpr2epjwww7ntm3m6ud2fhmq0tvts27p2f5mx3qkecsutlqfys769';
+const ADDR1 = asAddress('6a38e14198866f0fdf4d4495b07e066cfd0a2e8cbe774d11af37d15f741ac984');
+const ADDR2 = asAddress('544514242356432739de9af71deb8d526fb03d6c5c15e0a934d9a20b6710e2fe');
 
 hook('Initialize dummy balance files', async t => {
     // Happy path

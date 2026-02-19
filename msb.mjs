@@ -15,7 +15,7 @@ const rpc = {
 }
 
 const options = args.includes('--rpc') ? rpc : { storeName }
-const config = createConfig(ENV.MAINNET, options)
+const config = createConfig(ENV.TESTNET1, options)
 const msb = new MainSettlementBus(config);
 
 msb.ready().then(async () => {

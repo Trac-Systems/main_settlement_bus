@@ -20,7 +20,7 @@ class ConnectionManager {
     // As Buffers are objects, we will rely on internal conversions done by JS to compare them.
     // It would be better to handle these conversions manually by using hex strings as keys to avoid issues
     /**
-     * @param {object} config
+     * @param {Config} config
      **/
     constructor(config)  {
         this.#validators = new Map();

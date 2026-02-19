@@ -24,7 +24,7 @@ class SubnetworkOperationHandler extends BaseOperationHandler {
      * @param {PeerWallet} wallet
      * @param {TransactionRateLimiterService} rateLimiter
      * @param {TransactionPoolService} txPoolService
-     * @param {object} config
+     * @param {Config} config
      **/
     constructor( state, wallet, rateLimiter, txPoolService, config) {
         super(state, wallet, rateLimiter, txPoolService, config);

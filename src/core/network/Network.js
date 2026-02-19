@@ -8,10 +8,6 @@ import NetworkMessages from './protocols/NetworkMessages.js';
 import { sleep } from '../../utils/helpers.js';
 import {
     TRAC_NAMESPACE,
-    MAX_PEERS,
-    MAX_PARALLEL,
-    MAX_SERVER_CONNECTIONS,
-    MAX_CLIENT_CONNECTIONS,
     NETWORK_MESSAGE_TYPES
 } from '../../utils/constants.js';
 import ConnectionManager from './services/ConnectionManager.js';
@@ -47,7 +43,7 @@ class Network extends ReadyResource {
 
     /**
      * @param {State} state
-     * @param {object} config
+     * @param {Config} config
      * @param {string} address
      **/
     constructor(state, config, address = null) {
@@ -154,13 +150,13 @@ class Network extends ReadyResource {
             this.#swarm = new Hyperswarm({
                 keyPair,
                 bootstrap: this.#config.dhtBootstrap,
-                maxPeers: MAX_PEERS,
-                maxParallel: MAX_PARALLEL,
-                maxServerConnections: MAX_SERVER_CONNECTIONS,
-                maxClientConnections: MAX_CLIENT_CONNECTIONS
+                maxPeers: this.#config.maxPeers,
+                maxParallel: this.#config.maxParallel,
+                maxServerConnections: this.#config.maxServerConnections,
+                maxClientConnections: this.#config.maxClientConnections
             });
 
-            this.#rateLimiter = new TransactionRateLimiterService(this.#swarm);
+            this.#rateLimiter = new TransactionRateLimiterService(this.#swarm, this.#config);
             this.#networkMessages = new NetworkMessages(
                 state,
                 wrappedWallet,

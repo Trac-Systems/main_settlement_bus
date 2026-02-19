@@ -26,7 +26,7 @@ class Check {
     #config
 
     /**
-     * @param {object} config
+     * @param {Config} config
      **/
     constructor(config) {
         this.#config = config

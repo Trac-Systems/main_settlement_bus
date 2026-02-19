@@ -19,7 +19,7 @@ class NetworkMessageRouter {
      * @param {TransactionRateLimiterService} rateLimiterService
      * @param {TransactionPoolService} txPoolService
      * @param {ConnectionManager} connectionManager
-     * @param {object} config
+     * @param {Config} config
      **/
     constructor(state, wallet, rateLimiterService, txPoolService, connectionManager, config) {
         this.#config = config;

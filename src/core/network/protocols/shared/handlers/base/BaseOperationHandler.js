@@ -1,5 +1,4 @@
 import b4a from 'b4a';
-import {MAX_PARTIAL_TX_PAYLOAD_BYTE_SIZE, TRANSACTION_POOL_SIZE} from '../../../../../../utils/constants.js';
 
 class BaseOperationHandler {
     #state;
@@ -13,7 +12,7 @@ class BaseOperationHandler {
      * @param {PeerWallet} wallet
      * @param {TransactionRateLimiterService} rateLimiter
      * @param {TransactionPoolService} txPoolService
-     * @param {object} config
+     * @param {Config} config
      **/
     constructor(state, wallet, rateLimiter, txPoolService, config) {
         if (new.target === BaseOperationHandler) {
@@ -30,7 +29,7 @@ class BaseOperationHandler {
         // Validate if operation can be processed:
         // - Non-writable nodes cannot process operations
         // - Regular indexers cannot process operations
-        // - Admin-indexer can process operations only when network has less than MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION writers
+        // - Admin-indexer can process operations only when network has less than maxWritersForAdminIndexerConnection writers
         const isAllowedToValidate = await this.#state.allowedToValidate(this.#wallet.address);
         const isAdminAllowedToValidate = await this.#state.isAdminAllowedToValidate();
         const canValidate = isAllowedToValidate || isAdminAllowedToValidate;
@@ -38,12 +37,12 @@ class BaseOperationHandler {
             throw new Error('OperationHandler: State is not writable or is an indexer without admin privileges.');
         }
 
-        if (this.#txPoolService.tx_pool.length >= TRANSACTION_POOL_SIZE) {
+        if (this.#txPoolService.tx_pool.length >= this.#config.transactionPoolSize) {
             throw new Error("OperationHandler: Transaction pool is full, ignoring incoming transaction.");
         }
 
-        if (b4a.byteLength(JSON.stringify(payload)) > MAX_PARTIAL_TX_PAYLOAD_BYTE_SIZE) {
-            throw new Error(`OperationHandler: Payload size exceeds maximum limit of ${MAX_PARTIAL_TX_PAYLOAD_BYTE_SIZE} bytes by ${b4a.byteLength(JSON.stringify(payload)) - MAX_PARTIAL_TX_PAYLOAD_BYTE_SIZE} bytes.`);
+        if (b4a.byteLength(JSON.stringify(payload)) > this.#config.maxPartialTxPayloadByteSize) {
+            throw new Error(`OperationHandler: Payload size exceeds maximum limit of ${this.#config.maxPartialTxPayloadByteSize} bytes by ${b4a.byteLength(JSON.stringify(payload)) - this.#config.maxPartialTxPayloadByteSize} bytes.`);
         }
         
         if (!this.#config.disableRateLimit) {

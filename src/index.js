@@ -55,7 +55,7 @@ export class MainSettlementBus extends ReadyResource {
     #config
 
     /**
-     * @param {object} config
+     * @param {Config} config
      **/
     constructor(config) {
         super();

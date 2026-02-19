@@ -97,6 +97,46 @@ export class Config {
         return this.#config.maxValidators
     }
 
+    get maxPeers() {
+        if (this.#isOverriden('maxPeers')) return this.#options.maxPeers
+        return this.#config.maxPeers
+    }
+
+    get maxParallel() {
+        if (this.#isOverriden('maxParallel')) return this.#options.maxParallel
+        return this.#config.maxParallel
+    }
+
+    get maxServerConnections() {
+        if (this.#isOverriden('maxServerConnections')) return this.#options.maxServerConnections
+        return this.#config.maxServerConnections
+    }
+
+    get maxClientConnections() {
+        if (this.#isOverriden('maxClientConnections')) return this.#options.maxClientConnections
+        return this.#config.maxClientConnections
+    }
+
+    get maxWritersForAdminIndexerConnection() {
+        if (this.#isOverriden('maxWritersForAdminIndexerConnection')) return this.#options.maxWritersForAdminIndexerConnection
+        return this.#config.maxWritersForAdminIndexerConnection
+    }
+
+    get processIntervalMs() {
+        if (this.#isOverriden('processIntervalMs')) return this.#options.processIntervalMs
+        return this.#config.processIntervalMs
+    }
+
+    get maxPartialTxPayloadByteSize() {
+        if (this.#isOverriden('maxPartialTxPayloadByteSize')) return this.#options.maxPartialTxPayloadByteSize
+        return this.#config.maxPartialTxPayloadByteSize
+    }
+
+    get transactionPoolSize() {
+        if (this.#isOverriden('transactionPoolSize')) return this.#options.transactionPoolSize
+        return this.#config.transactionPoolSize
+    }
+
     get networkId() {
         return this.#config.networkId
     }
@@ -120,6 +160,21 @@ export class Config {
 
     get messageValidatorResponseTimeout() {
         return this.#config.messageValidatorResponseTimeout
+    }
+
+    get rateLimitCleanupIntervalMs() {
+        if (this.#isOverriden('rateLimitCleanupIntervalMs')) return this.#options.rateLimitCleanupIntervalMs
+        return this.#config.rateLimitCleanupIntervalMs
+    }
+
+    get rateLimitConnectionTimeoutMs() {
+        if (this.#isOverriden('rateLimitConnectionTimeoutMs')) return this.#options.rateLimitConnectionTimeoutMs
+        return this.#config.rateLimitConnectionTimeoutMs
+    }
+
+    get rateLimitMaxTransactionsPerSecond() {
+        if (this.#isOverriden('rateLimitMaxTransactionsPerSecond')) return this.#options.rateLimitMaxTransactionsPerSecond
+        return this.#config.rateLimitMaxTransactionsPerSecond
     }
 
     // Most of these properties are boolean

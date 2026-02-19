@@ -11,7 +11,7 @@ class NetworkMessages {
     #config;
 
     /**
-     * @param {object} config
+     * @param {Config} config
      **/
     constructor(state, wallet, rateLimiterService, txPoolService, connectionManager, config) {
         this.#config = config;

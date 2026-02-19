@@ -1,13 +1,14 @@
 import b4a from 'b4a';
 import { v7 as uuidv7 } from 'uuid';
 import { NetworkOperationType, ResultCode as NetworkResultCode } from '../../src/utils/constants.js';
+import { asAddress } from '../helpers/address.js';
 
 const payloadValidatorConnectionRequest = {
     type: NetworkOperationType.VALIDATOR_CONNECTION_REQUEST,
     id: uuidv7(),
     timestamp: 123,
     validator_connection_request: {
-        issuer_address: 'trac1xm76l9qaujh7vqktk8302mw9sfrxau3l45w62hqfl4kasswt6yts0autkh',
+        issuer_address: asAddress('36fdaf941de4afe602cbb1e2f56dc582466ef23fad1da55c09fd6dd841cbd117'),
         nonce: b4a.from('00', 'hex'),
         signature: b4a.from('01', 'hex')
     },
@@ -19,7 +20,7 @@ const payloadValidatorConnectionResponse = {
     id: uuidv7(),
     timestamp: 456,
     validator_connection_response: {
-        issuer_address: 'trac1xm76l9qaujh7vqktk8302mw9sfrxau3l45w62hqfl4kasswt6yts0autkh',
+        issuer_address: asAddress('36fdaf941de4afe602cbb1e2f56dc582466ef23fad1da55c09fd6dd841cbd117'),
         nonce: b4a.from('02', 'hex'),
         signature: b4a.from('03', 'hex'),
         result: NetworkResultCode.OK

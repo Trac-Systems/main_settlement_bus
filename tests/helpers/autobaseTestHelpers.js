@@ -17,6 +17,7 @@ import {
 	TRAC_NAMESPACE
 } from '../../src/utils/constants.js';
 import Writer from 'autobase/lib/writer.js';
+import { config } from './config.js';
 
 const argv = typeof globalThis.Bare !== 'undefined' ? globalThis.Bare.argv : process.argv;
 
@@ -169,7 +170,7 @@ export function defaultOpenHyperbeeView(store) {
 }
 
 export async function createWallet(mnemonic = null) {
-	const wallet = new PeerWallet();
+	const wallet = new PeerWallet({ networkPrefix: config.addressPrefix });
 	await wallet.generateKeyPair(mnemonic ?? undefined);
 	return wallet;
 }
