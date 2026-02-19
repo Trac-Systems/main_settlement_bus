@@ -56,9 +56,9 @@ class ConnectionManager {
 
         this.#healthCheckService = healthCheckService; // TODO: Maybe this should be handled in the constructor directly?
         // TODO: declare this method outside this function to avoid redeclaring it every time we subscribe to health checks. We can just bind it to 'this' in the constructor.
-        this.#healthCheckHandler = async ({ publicKey, message, requestId }) => {
-            if (typeof publicKey !== 'string' || typeof requestId !== 'string' || message === null || typeof message !== 'object') {
-                throw new Error(`ConnectionManager: Received malformed liveness request event. Typeof publicKey = ${typeof publicKey}. Typeof message = ${typeof message}. Typeof requestId = ${typeof requestId}`)
+        this.#healthCheckHandler = async ({ publicKey, requestId }) => {
+            if (typeof publicKey !== 'string' || typeof requestId !== 'string') {
+                throw new Error(`ConnectionManager: Received malformed liveness request event. Typeof publicKey = ${typeof publicKey}. Typeof requestId = ${typeof requestId}`)
             }
 
             let targetAddress = null;
@@ -75,19 +75,10 @@ class ConnectionManager {
             }
 
             const connection = this.getConnection(publicKey);
-            if (!connection || !connection.protocolSession) {
+            if (!connection || !connection.protocolSession || typeof connection.protocolSession.sendHealthCheck !== 'function') {
                 debugLog(`healthCheck: missing protocol session, removing validator. Address = ${targetAddress}; Request ID = ${requestId}`);
                 this.#stopHealthCheck(publicKey);
                 this.remove(publicKey);
-                return;
-            }
-
-            // TODO: Ideally, the protocols should be transparent to Connection manager. 
-            // This was added only to garantee that we are not sending v1 messages to non-v1 peers.
-            // It should be reoved when legacy protocol is deprecated.
-            if (connection.protocolSession.preferredProtocol !== connection.protocolSession.supportedProtocols.V1) {
-                debugLog(`healthCheck: validator not v1, stopping checks. Address = ${targetAddress}; Request ID = ${requestId}`);
-                this.#stopHealthCheck(publicKey);
                 return;
             }
 
@@ -95,7 +86,7 @@ class ConnectionManager {
             try {
                 debugLog(`healthCheck: sending liveness request. Address = ${targetAddress}; Request ID = ${requestId}`);
 
-                const resultCode = await connection.protocolSession.send(message);
+                const resultCode = await connection.protocolSession.sendHealthCheck();
                 success = resultCode === ResultCode.OK;
                 if (!success) {
                     debugLog(`healthCheck: non-OK result code. Address = ${targetAddress}; Request ID = ${requestId}`);

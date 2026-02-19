@@ -12,8 +12,7 @@ import {
     MAX_PARALLEL,
     MAX_SERVER_CONNECTIONS,
     MAX_CLIENT_CONNECTIONS,
-    EventType,
-    NETWORK_CAPABILITIES
+    EventType
 } from '../../utils/constants.js';
 import ConnectionManager from './services/ConnectionManager.js';
 import MessageOrchestrator from './services/MessageOrchestrator.js';
@@ -202,11 +201,7 @@ class Network extends ReadyResource {
                 this.#transactionCommitService,
                 this.#config
             );
-            this.#validatorHealthCheckService = new ValidatorHealthCheckService(
-                this.#wallet,
-                NETWORK_CAPABILITIES,
-                this.#config
-            );
+            this.#validatorHealthCheckService = new ValidatorHealthCheckService(this.#config);
             await this.#validatorHealthCheckService.ready();
             this.#validatorConnectionManager.subscribeToHealthChecks(this.#validatorHealthCheckService);
 
