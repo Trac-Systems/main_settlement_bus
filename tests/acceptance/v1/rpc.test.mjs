@@ -13,6 +13,7 @@ import { registerTxDetailsTests } from "./tx-details/tx-details.test.mjs"
 import { registerTxTests } from "./tx/tx.test.mjs"
 import { registerTxvTests } from "./txv/txv.test.mjs"
 import { registerUnconfirmedLengthTests } from "./unconfirmed-length/unconfirmed-length.test.mjs"
+import { registerHealthTests } from "./health/health.test.mjs"
 
 let toClose
 let tmpDirectory
@@ -91,4 +92,5 @@ describe("API acceptance tests", () => {
     registerTxPayloadsBulkTests(testContext)
     registerTxDetailsTests(testContext)
     registerAccountTests(testContext)
+    registerHealthTests(testContext)
 })
