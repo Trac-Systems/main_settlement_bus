@@ -17,27 +17,25 @@ tags:
 
 paths:
   /v1/health:
-    get:
-      tags: [Network]
-      summary: Check API health status
-      description: Returns the connectivity status of the RPC node.
-      responses:
-        "200":
-          description: Service is healthy.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/HealthResponse"
-              example:
-                ok: true
-        "503":
-          description: Service Unavailable - RPC node is down or unreachable.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-              example:
-                error: Could not connect to RPC server
+      get:
+        tags: [Network]
+        summary: Check API health status
+        description: Returns the connectivity status of the RPC node based on the internal MSB state.
+        responses:
+          "200":
+            description: Service is healthy and synchronized.
+            content:
+              application/json:
+                schema:
+                  $ref: "#/components/schemas/HealthResponse"
+          "503":
+            description: Service Unavailable - RPC node is down or state is initializing.
+            content:
+              application/json:
+                schema:
+                  $ref: "#/components/schemas/ErrorResponse"
+                example:
+                  error: "Could not connect to RPC server"
 
   /v1/balance/{address}:
     get:
@@ -628,6 +626,7 @@ components:
       properties:
         error:
           type: string
+          description: Error message describing the failure.
 
     HealthResponse:
       type: object
@@ -636,6 +635,7 @@ components:
         ok:
           type: boolean
           description: Status indicator of the RPC node connectivity.
+          enum: [true]
           example: true
               
     BalanceResponse:
