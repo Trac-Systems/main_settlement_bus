@@ -18,6 +18,10 @@ import { bufferToBigInt, licenseBufferToBigInt } from "../src/utils/amountSerial
 import { isAddressValid } from "../src/core/state/utils/address.js";
 import { getConfirmedParameter } from "./utils/confirmedParameter.js";
 
+export async function handleHealth({ respond }) {
+    respond(200, { ok: true });
+}
+
 export async function handleBalance({ req, respond, msbInstance }) {
     const url = buildRequestUrl(req);
     const parts = url.pathname.split("/").filter(Boolean);

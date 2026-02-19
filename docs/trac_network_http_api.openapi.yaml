@@ -16,6 +16,29 @@ tags:
   - name: Transactions
 
 paths:
+  /v1/health:
+    get:
+      tags: [Network]
+      summary: Check API health status
+      description: Returns the connectivity status of the RPC node.
+      responses:
+        "200":
+          description: Service is healthy.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+              example:
+                ok: true
+        "503":
+          description: Service Unavailable - RPC node is down or unreachable.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: Could not connect to RPC server
+
   /v1/balance/{address}:
     get:
       tags: [Wallet]
@@ -606,6 +629,15 @@ components:
         error:
           type: string
 
+    HealthResponse:
+      type: object
+      required: [ok]
+      properties:
+        ok:
+          type: boolean
+          description: Status indicator of the RPC node connectivity.
+          example: true
+              
     BalanceResponse:
       type: object
       required: [address, balance]
