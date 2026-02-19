@@ -18,8 +18,15 @@ import { bufferToBigInt, licenseBufferToBigInt } from "../src/utils/amountSerial
 import { isAddressValid } from "../src/core/state/utils/address.js";
 import { getConfirmedParameter } from "./utils/confirmedParameter.js";
 
-export async function handleHealth({ respond }) {
-    respond(200, { ok: true });
+
+export async function handleHealth({ msbInstance, respond }) {
+    try {
+        const isReady = msbInstance && msbInstance.state;
+        if (isReady) return respond(200, { ok: true });
+        throw new Error("RPC_OFFLINE");
+    } catch (error) {
+        respond(503, { error: "Could not connect to RPC server" });
+    }
 }
 
 export async function handleBalance({ req, respond, msbInstance }) {
