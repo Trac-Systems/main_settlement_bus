@@ -5,7 +5,7 @@ import { v7 as uuidv7 } from 'uuid';
 import PendingRequestService from '../../../src/core/network/services/PendingRequestService.js';
 import NetworkWalletFactory from '../../../src/core/network/identity/NetworkWalletFactory.js';
 import NetworkMessageBuilder from '../../../src/messages/network/v1/NetworkMessageBuilder.js';
-import { UnexpectedError } from '../../../src/core/network/protocols/v1/V1ProtocolError.js';
+import { V1UnexpectedError } from '../../../src/core/network/protocols/v1/V1ProtocolError.js';
 import { NetworkOperationType } from '../../../src/utils/constants.js';
 import { errorMessageIncludes } from '../../helpers/regexHelper.js';
 import { config } from '../../helpers/config.js';
@@ -115,7 +115,7 @@ test('PendingRequestService rejects and removes pending request', async t => {
         await promise;
         t.fail('Expected pending request promise to reject');
     } catch (error) {
-        t.ok(error instanceof UnexpectedError);
+        t.ok(error instanceof V1UnexpectedError);
         t.is(error.message, expectedError.message);
         t.is(error.endConnection, false);
     }

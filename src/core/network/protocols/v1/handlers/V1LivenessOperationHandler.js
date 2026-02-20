@@ -1,7 +1,7 @@
 import {networkMessageFactory} from "../../../../../messages/network/v1/networkMessageFactory.js";
 import {NETWORK_CAPABILITIES, ResultCode} from "../../../../../utils/constants.js";
 import V1LivenessRequest from "../validators/V1LivenessRequest.js";
-import {getResultCode, shouldEndConnection, UnexpectedError} from "../V1ProtocolError.js";
+import {getResultCode, shouldEndConnection, V1UnexpectedError} from "../V1ProtocolError.js";
 import V1LivenessResponse from "../validators/V1LivenessResponse.js";
 import V1BaseOperationHandler from "./V1BaseOperationHandler.js";
 
@@ -47,7 +47,6 @@ class V1LivenessOperationHandler extends V1BaseOperationHandler {
 
     async handleResponse(message, connection) {
         try {
-            // TODO: In this case this should close connection of sender. Consult this with Leo.
             this.applyRateLimit(connection);
             await this.resolvePendingResponse(
                 message,
@@ -56,7 +55,6 @@ class V1LivenessOperationHandler extends V1BaseOperationHandler {
                 this.#extractLivenessResultCode
             );
         } catch (error) {
-            // TODO: Question: how we should behave in this case? Consult this with Leo.
             this.handlePendingResponseError(
                 message.id,
                 connection,
@@ -74,7 +72,7 @@ class V1LivenessOperationHandler extends V1BaseOperationHandler {
                 resultCode
             );
         } catch (error) {
-            throw new UnexpectedError(`Failed to build liveness response: ${error.message}`, true);
+            throw new V1UnexpectedError(`Failed to build liveness response: ${error.message}`, true);
         }
     }
 

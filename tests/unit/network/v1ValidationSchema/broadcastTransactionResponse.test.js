@@ -20,7 +20,7 @@ import {
     valueLevelValidationTests,
 } from './common.test.js';
 
-const v = new V1ValidationSchema(config);
+const v = new V1ValidationSchema();
 
 const validFixture = {
     type: NetworkOperationType.BROADCAST_TRANSACTION_RESPONSE,
@@ -29,6 +29,8 @@ const validFixture = {
     broadcast_transaction_response: {
         nonce: b4a.alloc(NONCE_BYTE_LENGTH, 1),
         signature: b4a.alloc(SIGNATURE_BYTE_LENGTH, 2),
+        proof: b4a.from('deadbeef', 'hex'),
+        appendedAt: Date.now(),
         result: ResultCode.OK,
     },
     capabilities: ['cap:a'],

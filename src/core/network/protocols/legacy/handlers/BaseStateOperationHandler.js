@@ -1,5 +1,5 @@
 import b4a from 'b4a';
-import {MAX_PARTIAL_TX_PAYLOAD_BYTE_SIZE, TRANSACTION_POOL_SIZE} from '../../../../../utils/constants.js';
+import {MAX_PARTIAL_TX_PAYLOAD_BYTE_SIZE} from '../../../../../utils/constants.js';
 
 class BaseStateOperationHandler {
     #state;
@@ -38,10 +38,7 @@ class BaseStateOperationHandler {
             throw new Error('OperationHandler: State is not writable or is an indexer without admin privileges.');
         }
 
-        if (this.#txPoolService.tx_pool.length >= TRANSACTION_POOL_SIZE) {
-            throw new Error("OperationHandler: Transaction pool is full, ignoring incoming transaction.");
-        }
-
+        this.#txPoolService.validateEnqueue();
         if (b4a.byteLength(JSON.stringify(payload)) > MAX_PARTIAL_TX_PAYLOAD_BYTE_SIZE) {
             throw new Error(`OperationHandler: Payload size exceeds maximum limit of ${MAX_PARTIAL_TX_PAYLOAD_BYTE_SIZE} bytes by ${b4a.byteLength(JSON.stringify(payload)) - MAX_PARTIAL_TX_PAYLOAD_BYTE_SIZE} bytes.`);
         }

@@ -10,6 +10,7 @@ import {
     normalizeBootstrapDeploymentOperation,
     normalizeTransactionOperation
 } from "../../../../../utils/normalizers.js";
+import b4a from "b4a";
 
 
 class LegacySubnetworkOperationHandler extends BaseStateOperationHandler {
@@ -64,7 +65,10 @@ class LegacySubnetworkOperationHandler extends BaseStateOperationHandler {
                 normalizedPayload.txo.bs,
                 normalizedPayload.txo.mbs
             )
-        this.#txPoolService.addTransaction(safeEncodeApplyOperation(completeTransactionOperation));
+        const encodedOperation = safeEncodeApplyOperation(completeTransactionOperation);
+        const txHash =  b4a.toString(normalizedPayload.txo.tx, 'hex');
+        this.#txPoolService.addTransaction(txHash, encodedOperation);
+
     }
 
     async #partialBootstrapDeploymentSubHandler(payload, connection) {
@@ -85,7 +89,9 @@ class LegacySubnetworkOperationHandler extends BaseStateOperationHandler {
                 normalizedPayload.bdo.in,
                 normalizedPayload.bdo.is
             )
-        this.#txPoolService.addTransaction(safeEncodeApplyOperation(completeBootstrapDeploymentOperation));
+        const encodedOperation = safeEncodeApplyOperation(completeBootstrapDeploymentOperation);
+        const txHash =  b4a.toString(normalizedPayload.bdo.tx, 'hex');
+        this.#txPoolService.addTransaction(txHash, encodedOperation);
 
     }
 }

@@ -126,6 +126,14 @@ export class Config {
         return this.#config.pendingRequestTimeout
     }
 
+    get txCommitTimeout() {
+        return this.#config.txCommitTimeout
+    }
+
+    get txPoolSize() {
+        return this.#config.txPoolSize
+    }
+
     // Most of these properties are boolean
     #isOverriden(prop) {
         return this.#options.hasOwnProperty(prop)
