@@ -33,6 +33,7 @@ const configData = {
         pendingRequestTimeout: 3000, // TODO: ADD description
         txCommitTimeout: 2200,
         txPoolSize: 1000, // size of transaction pool
+        validatorHealthCheckInterval: 5 * 60 * 1000, // How often to check validator health (ms)
         networkId: 918,
         storesDirectory: 'stores/',
     },
@@ -59,6 +60,7 @@ const configData = {
         pendingRequestTimeout: 3000, // TODO: ADD description
         txCommitTimeout: 2200,
         txPoolSize: 1000,
+        validatorHealthCheckInterval: 5 * 60 * 1000, // How often to check validator health (ms)
         networkId: 918,
         storesDirectory : 'stores/',
     }

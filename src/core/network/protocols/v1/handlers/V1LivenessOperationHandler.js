@@ -1,5 +1,5 @@
-import {networkMessageFactory} from "../../../../../messages/network/v1/networkMessageFactory.js";
-import {NETWORK_CAPABILITIES, ResultCode} from "../../../../../utils/constants.js";
+import { networkMessageFactory } from "../../../../../messages/network/v1/networkMessageFactory.js";
+import { NETWORK_CAPABILITIES, ResultCode } from "../../../../../utils/constants.js";
 import V1LivenessRequest from "../validators/V1LivenessRequest.js";
 import {getResultCode, shouldEndConnection, V1UnexpectedError} from "../V1ProtocolError.js";
 import V1LivenessResponse from "../validators/V1LivenessResponse.js";
