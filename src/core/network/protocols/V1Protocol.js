@@ -64,8 +64,13 @@ class V1Protocol extends ProtocolInterface {
     }
 
     async send(message) {
-        this.#session.send(encodeV1networkOperation(message));
+        const encodedMessage = encodeV1networkOperation(message);
         const msgReplyPromise = this.#pendingRequestServiceInstance.registerPendingRequest(this.#publicKeyHex, message);
+        try {
+            this.#session.send(encodedMessage);
+        } catch (error) {
+            this.#pendingRequestServiceInstance.rejectPendingRequest(message.id, error);
+        }
         return msgReplyPromise;
     }
 

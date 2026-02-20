@@ -69,8 +69,8 @@ class MessageOrchestrator {
                     NETWORK_CAPABILITIES
                 );
 
-            const success = await this.#attemptSendMessageForV1(validatorPublicKey, v1Message);
-            if (success) {
+            const sendResult = await this.#attemptSendMessageForV1(validatorPublicKey, v1Message);
+            if (sendResult.ok) {
                 return true;
             }
         }

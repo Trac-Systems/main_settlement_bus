@@ -950,7 +950,7 @@ export class MainSettlementBus extends ReadyResource {
                 this.#state.writingKey
             ),
             "/balance_migration": async () => await this.#balanceMigrationOperation(),
-            "/disable_initialization": async () => await this.#disableInitialization()
+            "/disable_initialization": async () => await this.#disableInitialization(),
         };
 
         if (exactHandlers[command]) {
@@ -994,7 +994,13 @@ export class MainSettlementBus extends ReadyResource {
         } else if (input.startsWith("/transfer")) {
             const address = parts[0];
             const amount = parts[1];
-            await this.#handleTransferOperation(address, amount);
+            for (let i = 0; i < 100; i++) {
+                await this.#handleTransferOperation(address, amount);
+                if (i % 49 === 0) {
+                    await sleep(1000)
+                }
+            }
+
         } else if (input.startsWith("/get_balance")) {
             const address = parts[0];
             const confirmedFlag = parts[1];

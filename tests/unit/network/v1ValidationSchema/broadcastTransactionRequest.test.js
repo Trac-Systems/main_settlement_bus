@@ -19,7 +19,7 @@ import {
     valueLevelValidationTests,
 } from './common.test.js';
 
-const v = new V1ValidationSchema(config);
+const v = new V1ValidationSchema();
 
 const bytes = (len, fill = 1) => b4a.alloc(len, fill);
 

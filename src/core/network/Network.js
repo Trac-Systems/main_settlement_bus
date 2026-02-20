@@ -21,7 +21,9 @@ import NetworkWalletFactory from './identity/NetworkWalletFactory.js';
 import { networkMessageFactory } from '../../messages/network/v1/networkMessageFactory.js';
 import TransactionRateLimiterService from './services/TransactionRateLimiterService.js';
 import PendingRequestService from './services/PendingRequestService.js';
+import TransactionCommitService from "./services/TransactionCommitService.js";
 import ValidatorHealthCheckService from './services/ValidatorHealthCheckService.js';
+
 
 // -- Debug Mode --
 // TODO: Implement a better debug system in the future. This is just temporary.
@@ -48,6 +50,7 @@ class Network extends ReadyResource {
     #maxPendingConnections;
     #rateLimiter;
     #pendingRequestsService;
+    #transactionCommitService;
     #wallet;
     #validatorHealthCheckService;
 
@@ -62,7 +65,8 @@ class Network extends ReadyResource {
         this.#connectTimeoutMs = config.connectTimeoutMs || 5000;
         this.#maxPendingConnections = config.maxPendingConnections || 50;
         this.#pendingConnections = new Map();
-        this.#transactionPoolService = new TransactionPoolService(state, address, this.#config);
+        this.#transactionCommitService = new TransactionCommitService(this.#config);
+        this.#transactionPoolService = new TransactionPoolService(state, address, this.#transactionCommitService ,this.#config);
         this.#validatorObserverService = new ValidatorObserverService(this, state, address, this.#config);
         this.#validatorConnectionManager = new ConnectionManager(this.#config);
         this.#validatorMessageOrchestrator = new MessageOrchestrator(this.#validatorConnectionManager, state, this.#config);
@@ -111,6 +115,7 @@ class Network extends ReadyResource {
         this.cleanupNetworkListeners();
         this.cleanupPendingConnections();
         this.#pendingRequestsService.close();
+        this.#transactionCommitService.close();
 
         if (this.#swarm !== null) {
             this.#swarm.destroy();
@@ -206,6 +211,7 @@ class Network extends ReadyResource {
                 this.#rateLimiter,
                 this.#transactionPoolService,
                 this.#pendingRequestsService,
+                this.#transactionCommitService,
                 this.#config
             );
             this.#validatorHealthCheckService = new ValidatorHealthCheckService(
@@ -308,11 +314,6 @@ class Network extends ReadyResource {
                 await this.#finalizeConnection(publicKey, type, connection);
             }
         }
-    }
-
-    async isConnected(publicKey) {
-        return this.#swarm.peers.has(publicKey) &&
-            this.#swarm.peers.get(publicKey).connectedTime != -1
     }
 
     async #finalizeConnection(publicKey, type, connection) {

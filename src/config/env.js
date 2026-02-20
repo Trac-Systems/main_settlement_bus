@@ -1,5 +1,5 @@
-import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
-import { Config } from './config.js';
+import {TRAC_NETWORK_MSB_MAINNET_PREFIX} from 'trac-wallet/constants.js';
+import {Config} from './config.js';
 
 export const ENV = {
     MAINNET: 'mainnet',
@@ -15,8 +15,8 @@ const configData = {
         addressPrefix: TRAC_NETWORK_MSB_MAINNET_PREFIX,
         addressPrefixLength: TRAC_NETWORK_MSB_MAINNET_PREFIX.length,
         bech32mHrpLength: TRAC_NETWORK_MSB_MAINNET_PREFIX.length + 1, // len(addressPrefix + separator)
-        bootstrap: 'acbc3a4344d3a804101d40e53db1dda82b767646425af73599d4cd6577d69685',
-        channel: '0000trac0network0msb0mainnet0000',
+        bootstrap: '8510c071a357aa68a5b90565444a6fd22950746c71302ce5d17329c92537a183',
+        channel: 'aaasd1211231231231322222',
         dhtBootstrap: ['116.202.214.149:10001', '157.180.12.214:10001', 'node1.hyperdht.org:49737', 'node2.hyperdht.org:49737', 'node3.hyperdht.org:49737'],
         disableRateLimit: false,
         enableErrorApplyLogs: false,
@@ -30,7 +30,9 @@ const configData = {
         messageThreshold: 3,
         messageValidatorRetryDelay: 1000, //How long to wait before retrying (ms) MESSAGE_VALIDATOR_RETRY_DELAY_MS
         messageValidatorResponseTimeout: 3 * 3 * 1000, //Overall timeout for sending a message (ms). This is 3 * maxRetries * messageValidatorRetryDelay;
-        pendingRequestTimeout: 1000, // TODO: ADD description
+        pendingRequestTimeout: 3000, // TODO: ADD description
+        txCommitTimeout: 2200,
+        txPoolSize: 1000, // size of transaction pool
         validatorHealthCheckInterval: 5 * 60 * 1000, // How often to check validator health (ms)
         networkId: 918,
         storesDirectory: 'stores/',
@@ -55,8 +57,10 @@ const configData = {
         messageThreshold: 1000,
         messageValidatorRetryDelay: 1000, //How long to wait before retrying (ms) MESSAGE_VALIDATOR_RETRY_DELAY_MS
         messageValidatorResponseTimeout: 3 * 3 * 1000, //Overall timeout for sending a message (ms). This is 3 * maxRetries * messageValidatorRetryDelay;
+        pendingRequestTimeout: 3000, // TODO: ADD description
+        txCommitTimeout: 2200,
+        txPoolSize: 1000,
         validatorHealthCheckInterval: 5 * 60 * 1000, // How often to check validator health (ms)
-        pendingRequestTimeout: 1000, // TODO: ADD description
         networkId: 918,
         storesDirectory : 'stores/',
     }
