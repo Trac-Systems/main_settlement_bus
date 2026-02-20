@@ -31,3 +31,4 @@ migration/*
 
 # Environment files
 .env
+testnet/
