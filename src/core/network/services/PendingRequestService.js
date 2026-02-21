@@ -100,6 +100,19 @@ class PendingRequestService {
         return true;
     }
 
+    rejectPendingRequestsForPeer(peerPubKeyHex, error) {
+        const idsToReject = [];
+        for (const [id, entry] of this.#pendingRequests) {
+            if (entry.requestedTo === peerPubKeyHex) idsToReject.push(id);
+        }
+
+        for (const id of idsToReject) {
+            this.rejectPendingRequest(id, error);
+        }
+
+        return idsToReject.length;
+    }
+
     stopPendingRequestTimeout(id) {
         const entry = this.#pendingRequests.get(id);
         if (!entry) return false;

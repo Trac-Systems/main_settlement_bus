@@ -184,3 +184,31 @@ test('PendingRequestService.close rejects all pending requests', async t => {
     t.is(results[1].status, 'rejected');
     t.ok(results[1]?.reason?.message?.includes(`Pending request ${request2.id} cancelled (shutdown).`));
 });
+
+test('PendingRequestService rejects all pending requests for a specific peer', async t => {
+    const service = new PendingRequestService(config);
+    const peerA = 'deadbeef';
+    const peerB = 'cafebabe';
+    const requestA1 = await buildV1Request();
+    const requestA2 = await buildV1Request();
+    const requestB1 = await buildV1Request();
+
+    const promiseA1 = service.registerPendingRequest(peerA, requestA1);
+    const promiseA2 = service.registerPendingRequest(peerA, requestA2);
+    const promiseB1 = service.registerPendingRequest(peerB, requestB1);
+
+    const rejectedCount = service.rejectPendingRequestsForPeer(peerA, new Error('peer disconnected'));
+    t.is(rejectedCount, 2);
+    t.is(service.has(requestA1.id), false);
+    t.is(service.has(requestA2.id), false);
+    t.is(service.has(requestB1.id), true);
+
+    const results = await Promise.allSettled([promiseA1, promiseA2]);
+    t.is(results[0].status, 'rejected');
+    t.is(results[0].reason.message, 'peer disconnected');
+    t.is(results[1].status, 'rejected');
+    t.is(results[1].reason.message, 'peer disconnected');
+
+    t.ok(service.resolvePendingRequest(requestB1.id));
+    await promiseB1;
+});

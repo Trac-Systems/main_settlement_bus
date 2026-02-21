@@ -227,12 +227,20 @@ class Network extends ReadyResource {
                 }
 
                 connection.on('close', () => {
+                    this.#pendingRequestsService.rejectPendingRequestsForPeer(
+                        publicKey,
+                        new Error('Connection closed before response')
+                    );
                     this.#swarm.leavePeer(connection.remotePublicKey);
                     this.#validatorConnectionManager.remove(publicKey);
                     connection.protocolSession.close();
                 });
 
                 connection.on('error', (error) => {
+                    this.#pendingRequestsService.rejectPendingRequestsForPeer(
+                        publicKey,
+                        error ?? new Error('Connection error before response')
+                    );
                     if (
                         error && error.message && (
                             error.message.includes('connection reset by peer') ||
