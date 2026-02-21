@@ -13,13 +13,8 @@ class V1ValidationSchema {
     #validateV1LivenessResponse;
     #validateV1BroadcastTransactionRequest;
     #validateV1BroadcastTransactionResponse;
-    #config;
 
-    /**
-     * @param {object} config
-     **/
-    constructor(config) {
-        this.#config = config
+    constructor() {
 
         this.#validator = new Validator({
             useNewCustomCheckerFunction: true,
@@ -35,6 +30,7 @@ class V1ValidationSchema {
         const isBuffer = b4a.isBuffer;
         this.#validator.add("buffer", function ({schema, messages}, path, context) {
             const allowZero = schema.allowZero === true;
+            const allowEmpty = schema.allowEmpty === true;
             const exactLength = Number.isInteger(schema.length) ? schema.length : null;
             const minLength = Number.isInteger(schema.min) ? schema.min : null;
             const maxLength = Number.isInteger(schema.max) ? schema.max : null;
@@ -58,7 +54,7 @@ class V1ValidationSchema {
                         if (len > ${maxLength}) {
                             ${this.makeError({type: "bufferMaxLength", expected: maxLength, actual: "len", messages})}
                         }`}
-                        if (len === 0) {
+                        if (len === 0 && !${allowEmpty}) {
                             ${this.makeError({type: "emptyBuffer", actual: "len", messages})}
                             return value;
                         }
@@ -187,6 +183,14 @@ class V1ValidationSchema {
                 props: {
                     nonce: {type: 'buffer', length: NONCE_BYTE_LENGTH, required: true},
                     signature: {type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true},
+                    proof: {type: 'buffer', allowEmpty: true, allowZero: true, required: true},
+                    appendedAt: {
+                        type: 'number',
+                        integer: true,
+                        min: 0,
+                        max: Number.MAX_SAFE_INTEGER,
+                        optional: true
+                    },
                     result: {type: 'number', integer: true, min: 0, max: Number.MAX_SAFE_INTEGER, required: true},
                 }
             },

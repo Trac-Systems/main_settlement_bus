@@ -4,6 +4,7 @@ import BaseStateOperationHandler from './BaseStateOperationHandler.js';
 import {applyStateMessageFactory} from "../../../../../messages/state/applyStateMessageFactory.js";
 import {safeEncodeApplyOperation} from "../../../../../utils/protobuf/operationHelpers.js";
 import {normalizeRoleAccessOperation} from "../../../../../utils/normalizers.js";
+import b4a from "b4a";
 
 class LegacyRoleOperationHandler extends BaseStateOperationHandler {
     #partialRoleAccessValidator;
@@ -81,7 +82,9 @@ class LegacyRoleOperationHandler extends BaseStateOperationHandler {
             throw new Error("OperationHandler: Assembling complete role access operation failed.");
         }
 
-        this.#txPoolService.addTransaction(safeEncodeApplyOperation(completePayload))
+        const encodedOperation = safeEncodeApplyOperation(completePayload);
+        const txHash =  b4a.toString(completePayload.rao.tx, 'hex');
+        this.#txPoolService.addTransaction(txHash, encodedOperation);
     }
 }
 

@@ -1,5 +1,5 @@
 import {publicKeyToAddress} from "../../../../../utils/helpers.js";
-import {shouldEndConnection, UnexpectedError} from "../V1ProtocolError.js";
+import {shouldEndConnection, V1UnexpectedError} from "../V1ProtocolError.js";
 
 class V1BaseOperationHandler {
     #rateLimiterService;
@@ -22,12 +22,12 @@ class V1BaseOperationHandler {
         }
     }
 
-    async resolvePendingResponse(message, connection, validator, extractResultCode) {
+    async resolvePendingResponse(message, connection, validator, extractResultCode, stateInstance) {
         const pendingRequestServiceEntry = this.#pendingRequestService.getPendingRequest(message.id);
         if (!pendingRequestServiceEntry) return false;
 
         this.#pendingRequestService.stopPendingRequestTimeout(message.id);
-        await validator.validate(message, connection, pendingRequestServiceEntry);
+        await validator.validate(message, connection, pendingRequestServiceEntry, stateInstance);
 
         const resultCode = extractResultCode(message);
         this.#pendingRequestService.resolvePendingRequest(message.id, resultCode);
@@ -50,7 +50,7 @@ class V1BaseOperationHandler {
         if (error && typeof error === 'object' && 'resultCode' in error) {
             return error;
         }
-        return new UnexpectedError(error?.message ?? 'Unexpected error', false);
+        return new V1UnexpectedError(error?.message ?? 'Unexpected error', false);
     }
 }
 

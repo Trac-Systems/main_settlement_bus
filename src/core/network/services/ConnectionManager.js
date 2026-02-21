@@ -74,28 +74,28 @@ class ConnectionManager {
      * Sends a message through a specific validator without increasing sent messages count.
      * @param {Object} message - The message to send to the validator
      * @param {String | Buffer} publicKey - A validator public key hex string to be fetched from the pool.
-     * @returns {Boolean} True if the message was sent, false otherwise.
+     * @returns {{ok: boolean, resultCode: number|null}}
      */
     async sendSingleMessage(message, publicKey) {
         let publicKeyHex = this.#toHexString(publicKey);
-        if (!this.exists(publicKeyHex) || !this.connected(publicKeyHex)) return false; // Fail silently
+        if (!this.exists(publicKeyHex) || !this.connected(publicKeyHex)) {
+            return {ok: false, resultCode: null}; // Fail silently
+        }
 
         const validator = this.#validators.get(publicKeyHex);
-        if (!validator || !validator.connection || !validator.connection.protocolSession) return false;
+        if (!validator || !validator.connection || !validator.connection.protocolSession) {
+            return {ok: false, resultCode: null};
+        }
 
-        let result = false;
-        await validator.connection.protocolSession.send(message)
-            .then(
-                () => {
-                    result = true;
-                }
-            )
-            .catch(
-                () => {
-                    result = false;
-                }
-            )
-        return result;
+        try {
+            const sendPromise = validator.connection.protocolSession.send(message);
+            const resultCode = await sendPromise;
+            console.log(`[ConnectionManager] V1 send resolved for ${publicKeyHex} with resultCode=${resultCode}`);
+            return {ok: true, resultCode};
+        } catch (error) {
+            console.error(`[ConnectionManager] V1 send failed for ${publicKeyHex}: ${error?.message ?? 'unknown error'}`);
+            return {ok: false, resultCode: null};
+        }
     }
 
     /**

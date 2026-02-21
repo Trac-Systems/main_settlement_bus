@@ -20,7 +20,7 @@ import {
     valueLevelValidationTests,
 } from './common.test.js';
 
-const v = new V1ValidationSchema(config);
+const v = new V1ValidationSchema();
 
 const validFixture = {
     type: NetworkOperationType.LIVENESS_RESPONSE,
