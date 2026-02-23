@@ -44,7 +44,7 @@ export const registerBalanceTests = (context) => {
             expect(BigInt(res.body.balance)).toBe(0n)
         })
 
-        it("returns zero balance for an invalid address format", async () => {
+        it("returns 400 for an invalid address format", async () => {
             const invalidAddress = "not-a-valid-address"
             const res = await request(context.server).get(`/v1/balance/${invalidAddress}`)
             expect(res.statusCode).toBe(400)
