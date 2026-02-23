@@ -132,6 +132,10 @@ export class Config {
 
     get txPoolSize() {
         return this.#config.txPoolSize
+
+    get validatorHealthCheckInterval() {
+        if (this.#isOverriden('validatorHealthCheckInterval')) return this.#options.validatorHealthCheckInterval
+        return this.#config.validatorHealthCheckInterval
     }
 
     // Most of these properties are boolean
