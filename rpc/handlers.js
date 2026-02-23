@@ -78,12 +78,27 @@ export async function handleConfirmedLength({ msbInstance, respond }) {
 
 export async function handleBroadcastTransaction({ msbInstance, config, respond, req }) {
     let body = '';
+    const MAX_BODY_SIZE = 2_000_000;
+    let limitExceeded = false;
+
     req.on('data', chunk => {
+        if (limitExceeded) return;
         body += chunk.toString();
+        if (body.length > MAX_BODY_SIZE) {
+            limitExceeded = true;
+            respond(413, { error: 'Payload too large.' });
+            req.resume();
+        }
     });
 
     req.on('end', async () => {
+        if (limitExceeded) return;
+
         try {
+            if (!body) {
+                return respond(400, { error: 'Invalid JSON payload.' });
+            }
+
             const { payload } = JSON.parse(body);
             if (!payload) {
                 return respond(400, { error: 'Payload is missing.' });
@@ -96,26 +111,46 @@ export async function handleBroadcastTransaction({ msbInstance, config, respond,
             const decodedPayload = decodeBase64Payload(payload);
             validatePayloadStructure(decodedPayload);
             const sanitizedPayload = sanitizeTransferPayload(decodedPayload);
+
             const result = await broadcastTransaction(msbInstance, config, sanitizedPayload);
             respond(200, { result });
-        } catch (error) {
-            let code = error instanceof SyntaxError ? 400 : 500;
-            let errorMsg = code === 400 ? 'Invalid JSON payload.' : 'An error occurred processing the transaction.'
 
-            if (error.message.includes("Failed to broadcast transaction after multiple attempts.")) {
+        } catch (error) {
+            const clientErrorMessages = [
+                "Failed to decode base64 payload.",
+                "Decoded payload is not valid JSON.",
+                "Invalid payload structure.",
+                "Payload is not a transfer/transaction operation.",
+                "Invalid transaction payload.",
+                "Transaction payload is required for broadcasting."
+            ];
+
+            let code = 500;
+            let errorMsg = 'An error occurred processing the transaction.';
+
+            const isClientError = error instanceof SyntaxError || clientErrorMessages.includes(error.message);
+            const isBroadcastFailure = error.message.toLowerCase().includes("failed to broadcast transaction");
+
+            if (isClientError) {
+                code = 400;
+                errorMsg = error instanceof SyntaxError ? "Invalid JSON payload." : error.message;
+            } else if (isBroadcastFailure) {
                 code = 429;
-                errorMsg = "Failed to broadcast transaction after multiple attempts."
+                errorMsg = "Failed to broadcast transaction after multiple attempts.";
             }
 
-            console.error('Error in handleBroadcastTransaction:', error);
-            // Use 400 for client errors (like bad JSON), 500 for server/command errors
+            if (code === 500) {
+                console.error('Error in handleBroadcastTransaction:', error);
+            }
+
             respond(code, { error: errorMsg });
         }
     });
 
     req.on('error', (err) => {
-        console.error('Stream error in handleBroadcastTransaction:', err);
-        respond(500, { error: 'Request stream failed during body transfer.' });
+        if (!limitExceeded) {
+            respond(500, { error: 'Request stream failed during body transfer.' });
+        }
     });
 }
 
