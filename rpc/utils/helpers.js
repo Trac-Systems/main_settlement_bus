@@ -16,6 +16,13 @@ export class BroadcastError extends Error {
   }
 }
 
+export class NotFoundError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "NotFoundError";
+  }
+}
+
 export function decodeBase64Payload(base64) {
   let decodedPayloadString
   try {

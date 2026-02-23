@@ -5,11 +5,13 @@ import {
     sanitizeBulkPayloadsRequestBody, 
     sanitizeTransferPayload, 
     validatePayloadStructure,
-    hasSpacesInUrl
+    hasSpacesInUrl,
+    BroadcastError, 
+    ValidationError,
+    NotFoundError
 } from "./utils/helpers.js"
 import { MAX_SIGNED_LENGTH, ZERO_WK } from "./constants.js";
 import { buildRequestUrl } from "./utils/url.js";
-import { BroadcastError, ValidationError} from "./utils/helpers.js"
 import {
     getBalance,
     getTxv,
@@ -25,7 +27,6 @@ import {
 import { bufferToBigInt, licenseBufferToBigInt } from "../src/utils/amountSerialization.js";
 import { isAddressValid } from "../src/core/state/utils/address.js";
 import { getConfirmedParameter } from "./utils/confirmedParameter.js";
-
 
 export async function handleHealth({ msbInstance, respond }) {
     try {
@@ -157,18 +158,14 @@ export async function handleTxHashes({ msbInstance, respond, req }) {
     const startSignedLength = parseInt(startSignedLengthStr);
     const endSignedLength = parseInt(endSignedLengthStr);
 
-    // 1. Check if the parsed values are valid numbers
     if (isNaN(startSignedLength) || isNaN(endSignedLength)) {
         return respond(400, { error: 'Params must be integer' });
     }
 
-    // 2. Check for non-negative numbers
-    // The requirement is "non-negative," which includes 0.
     if (startSignedLength < 0 || endSignedLength < 0) {
         return respond(400, { error: 'Params must be non-negative' });
     }
 
-    // 3. endSignedLength must be >= startSignedLength
     if (endSignedLength < startSignedLength) {
         return respond(400, { error: 'endSignedLength must be greater than or equal to startSignedLength.' });
     }
@@ -177,13 +174,9 @@ export async function handleTxHashes({ msbInstance, respond, req }) {
         return respond(400, { error: `The max range for signedLength must be ${MAX_SIGNED_LENGTH}.` });
     }
 
-    // 4. Get current confirmed length
     const currentConfirmedLength = await getConfirmedLength(msbInstance);
-
-    // 5. Adjust the end index to not exceed the confirmed length.
     const adjustedEndLength = Math.min(endSignedLength, currentConfirmedLength)
 
-    // 6. Fetch txs hashes for the adjusted range, assuming the command takes start and end index.
     const { hashes } = await getTxHashes(msbInstance, startSignedLength, adjustedEndLength);
     respond(200, { hashes });
 }
@@ -213,12 +206,17 @@ export async function handleTransactionDetails({ msbInstance, respond, req }) {
 
     try {
         const txDetails = await getTxDetails(msbInstance, normalizedHash);
-        if (txDetails === null) {
-            return respond(404, { txDetails: null });
-        }
         respond(200, { txDetails });
     } catch (error) {
-        respond(500, { error: "Internal error" });
+        let code = 500;
+        let errorMsg = "Internal error";
+
+        if (error instanceof NotFoundError) {
+            code = 404;
+            errorMsg = error.message;
+        }
+
+        respond(code, { [code === 404 ? 'txDetails' : 'error']: code === 404 ? null : errorMsg });
     }
 }
 
@@ -249,10 +247,15 @@ export async function handleTransactionExtendedDetails({ msbInstance, respond, r
         const details = await getExtendedTxDetails(msbInstance, hash, confirmed);
         respond(200, details);
     } catch (error) {
-        if (error.message?.includes('No payload found for tx hash')) {
-            return respond(404, { error: error.message });
+        let code = 500;
+        let errorMsg = 'An error occurred processing the request.';
+
+        if (error instanceof NotFoundError) {
+            code = 404;
+            errorMsg = error.message;
         }
-        respond(500, { error: 'An error occurred processing the request.' });
+
+        respond(code, { error: errorMsg });
     }
 }
 
@@ -260,48 +263,35 @@ export async function handleFetchBulkTxPayloads({ msbInstance, respond, req }) {
     let body = ''
     let bytesRead = 0;
     let limitBytes = 1_000_000;
-    let headersSent = false; // Add a flag to prevent double response
+    let headersSent = false;
 
     req.on('data', chunk => {
-        if (headersSent) return; // Stop processing if response has started/errored
-
+        if (headersSent) return;
         bytesRead += chunk.length;
         if (bytesRead > limitBytes) {
             respond(413, { error: 'Request body too large.' });
             headersSent = true;
-            req.destroy(); // Stop receiving data (GOOD PRACTICE)
+            req.destroy();
             return;
         }
         body += chunk.toString();
     });
 
     req.on('end', async () => {
-        if (headersSent) return; // Don't process if an error already occurred
-
+        if (headersSent) return;
 
         try {
-            if (body === null || body === '') {
-                return respond(400, { error: 'Missing payload.' });
+            if (!body) {
+                throw new ValidationError("Missing payload.");
             }
 
             const sanitizedPayload = sanitizeBulkPayloadsRequestBody(body);
-
-            if (sanitizedPayload === null) {
-                return respond(400, { error: 'Invalid payload.' });
+            if (!sanitizedPayload) {
+                throw new ValidationError("Invalid payload.");
             }
 
             const { hashes } = sanitizedPayload;
-
-            if (!Array.isArray(hashes) || hashes.length === 0) {
-                return respond(400, { error: 'Missing hash list.' });
-            }
-
-            if (hashes.length > 1500) {
-                return respond(413, { error: 'Too many hashes. Max 1500 allowed per request.' });
-            }
-
             const uniqueHashes = [...new Set(hashes)];
-
             const commandResult = await fetchBulkTxPayloads(msbInstance, uniqueHashes);
 
             const responseString = JSON.stringify(commandResult);
@@ -311,19 +301,22 @@ export async function handleFetchBulkTxPayloads({ msbInstance, respond, req }) {
 
             return respond(200, commandResult);
         } catch (error) {
-            console.error('Error in handleFetchBulkTxPayloads:', error);
-            // Use 400 for JSON errors, 500 otherwise
-            const code = error instanceof SyntaxError ? 400 : 500;
-            respond(code, { error: code === 400 ? 'Invalid request body format.' : 'An internal error occurred.' });
+            let code = 500;
+            let errorMsg = 'An internal error occurred.';
+
+            if (error instanceof ValidationError || error instanceof SyntaxError) {
+                code = 400;
+                errorMsg = error instanceof SyntaxError ? 'Invalid request body format.' : error.message;
+            }
+
+            respond(code, { error: errorMsg });
         }
     })
 
     req.on('error', (err) => {
-        console.error('Stream error in handleFetchBulkTxPayloads:', err);
         respond(500, { error: 'Request stream failed during body transfer.' });
     });
 }
-
 
 export async function handleAccountDetails({ msbInstance, respond, req }) {
     const url = buildRequestUrl(req);

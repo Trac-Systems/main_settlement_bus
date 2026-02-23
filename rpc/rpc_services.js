@@ -5,11 +5,11 @@ import {
     normalizeTransferOperation
 } from "../src/utils/normalizers.js";
 import { get_confirmed_tx_info, get_unconfirmed_tx_info } from "../src/utils/cli.js";
-import {OperationType} from "../src/utils/constants.js";
+import { OperationType } from "../src/utils/constants.js";
 import b4a from "b4a";
 import PartialTransaction from "../src/core/network/protocols/shared/validators/PartialTransaction.js";
 import PartialTransfer from "../src/core/network/protocols/shared/validators/PartialTransfer.js";
-import { ValidationError, BroadcastError } from "./utils/helpers.js";
+import { ValidationError, BroadcastError, NotFoundError } from "./utils/helpers.js";
 
 export async function getBalance(msbInstance, address, confirmed) {
     const state = msbInstance.state;
@@ -49,12 +49,13 @@ export async function broadcastTransaction(msbInstance, config, payload) {
     if (!payload) {
         throw new ValidationError("Transaction payload is required for broadcasting.");
     }
+
     let normalizedPayload;
     let isValid = false;
     let hash;
 
-    const partialTransferValidator = new PartialTransfer(msbInstance.state, null , config);
-    const partialTransactionValidator = new PartialTransaction(msbInstance.state, null , config);
+    const partialTransferValidator = new PartialTransfer(msbInstance.state, null, config);
+    const partialTransactionValidator = new PartialTransaction(msbInstance.state, null, config);
 
     if (payload.type === OperationType.TRANSFER) {
         normalizedPayload = normalizeTransferOperation(payload, config);
@@ -79,7 +80,12 @@ export async function broadcastTransaction(msbInstance, config, payload) {
     const signedLength = msbInstance.state.getSignedLength();
     const unsignedLength = msbInstance.state.getUnsignedLength();
 
-    return { message: "Transaction broadcasted successfully.", signedLength, unsignedLength, tx: hash };
+    return { 
+        message: "Transaction broadcasted successfully.", 
+        signedLength, 
+        unsignedLength, 
+        tx: hash 
+    };
 }
 
 export async function getTxHashes(msbInstance, start, end) {
@@ -90,7 +96,7 @@ export async function getTxHashes(msbInstance, start, end) {
 export async function getTxDetails(msbInstance, hash) {
     const rawPayload = await get_confirmed_tx_info(msbInstance.state, hash);
     if (!rawPayload) {
-        return null;
+        throw new NotFoundError(`Transaction ${hash} not found.`);
     }
 
     return normalizeDecodedPayloadForJson(rawPayload.decoded, msbInstance.config);
@@ -98,11 +104,11 @@ export async function getTxDetails(msbInstance, hash) {
 
 export async function fetchBulkTxPayloads(msbInstance, hashes) {
     if (!Array.isArray(hashes) || hashes.length === 0) {
-        throw new Error("Missing hash list.");
+        throw new ValidationError("Missing hash list.");
     }
 
     if (hashes.length > 1500) {
-        throw new Error("Length of input tx hashes exceeded.");
+        throw new ValidationError("Length of input tx hashes exceeded.");
     }
 
     const res = { results: [], missing: [] };
@@ -112,7 +118,7 @@ export async function fetchBulkTxPayloads(msbInstance, hashes) {
 
     results.forEach((result, index) => {
         const hash = hashes[index];
-        if (result === null || result === undefined) {
+        if (!result) {
             res.missing.push(hash);
         } else {
             const decodedResult = normalizeDecodedPayloadForJson(result.decoded, msbInstance.config);
@@ -125,32 +131,21 @@ export async function fetchBulkTxPayloads(msbInstance, hashes) {
 
 export async function getExtendedTxDetails(msbInstance, hash, confirmed) {
     const state = msbInstance.state;
+    let rawPayload;
 
     if (confirmed) {
-        const rawPayload = await get_confirmed_tx_info(state, hash);
-        if (!rawPayload) {
-            throw new Error(`No payload found for tx hash: ${hash}`);
-        }
-        const confirmedLength = await state.getTransactionConfirmedLength(hash);
-        if (confirmedLength === null) {
-            throw new Error(`No confirmed length found for tx hash: ${hash} in confirmed mode`);
-        }
-        const normalizedPayload = normalizeDecodedPayloadForJson(rawPayload.decoded, msbInstance.config);
-        const feeBuffer = state.getFee();
-        return {
-            txDetails: normalizedPayload,
-            confirmed_length: confirmedLength,
-            fee: bufferToBigInt(feeBuffer).toString(),
-        };
+        rawPayload = await get_confirmed_tx_info(state, hash);
+    } else {
+        rawPayload = await get_unconfirmed_tx_info(state, hash);
     }
 
-    const rawPayload = await get_unconfirmed_tx_info(state, hash);
     if (!rawPayload) {
-        throw new Error(`No payload found for tx hash: ${hash}`);
+        throw new NotFoundError(`No payload found for tx hash: ${hash}`);
     }
 
     const normalizedPayload = normalizeDecodedPayloadForJson(rawPayload.decoded, msbInstance.config);
     const length = await state.getTransactionConfirmedLength(hash);
+
     if (length === null) {
         return {
             txDetails: normalizedPayload,
