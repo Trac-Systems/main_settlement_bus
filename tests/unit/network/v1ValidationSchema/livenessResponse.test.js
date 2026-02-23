@@ -8,7 +8,6 @@ import {
     ResultCode,
     SIGNATURE_BYTE_LENGTH,
 } from '../../../../src/utils/constants.js';
-import {config} from '../../../helpers/config.js';
 import {not_allowed_data_types} from '../../../fixtures/check.fixtures.js';
 
 import {
@@ -20,7 +19,7 @@ import {
     valueLevelValidationTests,
 } from './common.test.js';
 
-const v = new V1ValidationSchema(config);
+const v = new V1ValidationSchema();
 
 const validFixture = {
     type: NetworkOperationType.LIVENESS_RESPONSE,
