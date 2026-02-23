@@ -1,5 +1,7 @@
 import b4a from "b4a"
 import { operationToPayload } from "../../src/utils/applyOperations.js"
+import { isHexString } from "../../src/utils/helpers.js"; 
+
 export function decodeBase64Payload(base64) {
 	let decodedPayloadString
 	try {
@@ -72,3 +74,22 @@ export function sanitizeBulkPayloadsRequestBody(body) {
 
 	return JSON.parse(cleanBody);
 }
+
+/**
+ * Checks if the transaction hash is a valid 64-character hex string.
+ * @param {string} hash 
+ * @returns {boolean}
+ */
+export function isValidTxHash(hash) {
+    return isHexString(hash) && hash?.length === 64;
+}
+
+/**
+ * Checks if the URL contains any spaces or encoded spaces.
+ * @param {string} url 
+ * @returns {boolean}
+ */
+export function hasSpacesInUrl(url) {
+    return url.includes('%20') || url.includes(' ');
+}
+
