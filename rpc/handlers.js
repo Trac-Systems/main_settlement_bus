@@ -220,7 +220,6 @@ export async function handleTransactionDetails({ msbInstance, respond, req }) {
     try {
         const txDetails = await getTxDetails(msbInstance, normalizedHash);
         if (txDetails === null) {
-            // RETORNO ESPECÍFICO PARA ESTE ENDPOINT (MANTÉM O QUE PASSAVA)
             return respond(404, { txDetails: null });
         }
         respond(200, { txDetails });
