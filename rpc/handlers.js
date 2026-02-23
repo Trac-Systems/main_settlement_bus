@@ -1,7 +1,15 @@
-import { decodeBase64Payload, isBase64, sanitizeBulkPayloadsRequestBody, sanitizeTransferPayload, validatePayloadStructure } from "./utils/helpers.js"
+import { 
+    decodeBase64Payload, 
+    isBase64, 
+    isValidTxHash, 
+    sanitizeBulkPayloadsRequestBody, 
+    sanitizeTransferPayload, 
+    validatePayloadStructure,
+    hasSpacesInUrl
+} from "./utils/helpers.js"
 import { MAX_SIGNED_LENGTH, ZERO_WK } from "./constants.js";
 import { buildRequestUrl } from "./utils/url.js";
-import { isHexString } from "../src/utils/helpers.js";
+import { isHexString } from "../src/utils/helpers.js"; 
 import {
     getBalance,
     getTxv,
@@ -49,7 +57,7 @@ export async function handleBalance({ req, respond, msbInstance }) {
     const confirmed = confirmedParam === null ? false : confirmedParam;
     const nodeInfo = await getBalance(msbInstance, address, confirmed);
     const balance = nodeInfo?.balance || "0";
-    
+
     respond(200, { address, balance });
 }
 
@@ -157,9 +165,37 @@ export async function handleUnconfirmedLength({ msbInstance, respond }) {
 }
 
 export async function handleTransactionDetails({ msbInstance, respond, req }) {
-    const hash = req.url.split('/')[3];
-    const txDetails = await getTxDetails(msbInstance, hash);
-    respond(txDetails === null ? 404 : 200 , { txDetails });
+    const InvalidHashFormatError = { error: "Invalid transaction hash format" };
+    const RequiredHashError = { error: "Transaction hash is required" };
+    const InternalError = { error: "Internal error" };
+
+    if (hasSpacesInUrl(req.url)) {
+        return respond(400, InvalidHashFormatError);
+    }
+
+    const url = buildRequestUrl(req);
+    const parts = url.pathname.split('/').filter(Boolean);
+    const rawHash = parts[2];
+
+    if (!rawHash || rawHash === 'tx') {
+        return respond(400, RequiredHashError);
+    }
+
+    if (!isValidTxHash(rawHash)) {
+        return respond(400, InvalidHashFormatError);
+    }
+
+    const normalizedHash = rawHash.toLowerCase();
+    
+    try {
+        const txDetails = await getTxDetails(msbInstance, normalizedHash);
+        if (txDetails === null) {
+            return respond(404, { txDetails: null });
+        }
+        respond(200, { txDetails });
+    } catch (error) {
+        respond(500, InternalError);
+    }
 }
 
 export async function handleFetchBulkTxPayloads({ msbInstance, respond, req }) {
