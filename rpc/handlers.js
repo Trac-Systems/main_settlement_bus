@@ -200,36 +200,66 @@ export async function handleUnconfirmedLength({ msbInstance, respond }) {
 }
 
 export async function handleTransactionDetails({ msbInstance, respond, req }) {
-    const InvalidHashFormatError = { error: "Invalid transaction hash format" };
-    const RequiredHashError = { error: "Transaction hash is required" };
-    const InternalError = { error: "Internal error" };
-
     if (hasSpacesInUrl(req.url)) {
-        return respond(400, InvalidHashFormatError);
+        return respond(400, { error: "Invalid transaction hash format" });
     }
 
     const url = buildRequestUrl(req);
     const parts = url.pathname.split('/').filter(Boolean);
-    const rawHash = parts[2];
+    const rawHash = parts[parts.length - 1];
 
     if (!rawHash || rawHash === 'tx') {
-        return respond(400, RequiredHashError);
-    }
-
-    if (!isValidTxHash(rawHash)) {
-        return respond(400, InvalidHashFormatError);
+        return respond(400, { error: "Transaction hash is required" });
     }
 
     const normalizedHash = rawHash.toLowerCase();
-    
+    if (!isValidTxHash(normalizedHash)) {
+        return respond(400, { error: "Invalid transaction hash format" });
+    }
+
     try {
         const txDetails = await getTxDetails(msbInstance, normalizedHash);
         if (txDetails === null) {
+            // RETORNO ESPECÍFICO PARA ESTE ENDPOINT (MANTÉM O QUE PASSAVA)
             return respond(404, { txDetails: null });
         }
         respond(200, { txDetails });
     } catch (error) {
-        respond(500, InternalError);
+        respond(500, { error: "Internal error" });
+    }
+}
+
+export async function handleTransactionExtendedDetails({ msbInstance, respond, req }) {
+    if (hasSpacesInUrl(req.url)) {
+        return respond(400, { error: "Invalid transaction hash format" });
+    }
+
+    const url = buildRequestUrl(req);
+    const pathParts = url.pathname.split('/').filter(Boolean);
+    const hashRaw = pathParts[pathParts.length - 1];
+
+    if (!hashRaw || hashRaw === 'details' || hashRaw === 'tx') {
+        return respond(400, { error: "Transaction hash is required" });
+    }
+
+    const hash = hashRaw.toLowerCase();
+    if (!isValidTxHash(hash)) {
+        return respond(400, { error: "Invalid transaction hash format" });
+    }
+
+    const confirmed = getConfirmedParameter(url);
+    if (confirmed === null) {
+        return respond(400, { error: 'Parameter "confirmed" must be exactly "true" or "false"' });
+    }
+
+    try {
+        const details = await getExtendedTxDetails(msbInstance, hash, confirmed);
+        respond(200, details);
+    } catch (error) {
+        if (error.message?.includes('No payload found for tx hash')) {
+            return respond(404, { error: error.message });
+        }
+        respond(500, { error: 'An error occurred processing the request.' });
     }
 }
 
@@ -301,36 +331,6 @@ export async function handleFetchBulkTxPayloads({ msbInstance, respond, req }) {
     });
 }
 
-export async function handleTransactionExtendedDetails({ msbInstance, respond, req }) {
-    const url = buildRequestUrl(req);
-    const pathParts = url.pathname.split('/').filter(Boolean);
-    const hash = pathParts[3];
-
-    if (!hash) {
-        return respond(400, { error: "Transaction hash is required" });
-    }
-
-    if (isHexString(hash) === false || hash.length !== 64) {
-        return respond(400, { error: "Invalid transaction hash format" });
-    }
-
-    const confirmed = getConfirmedParameter(url);
-    if (confirmed === null) {
-        return respond(400, { error: 'Parameter "confirmed" must be exactly "true" or "false"' });
-    }
-
-    try {
-        const details = await getExtendedTxDetails(msbInstance, hash, confirmed);
-        respond(200, details);
-    } catch (error) {
-        if (error.message?.includes('No payload found for tx hash')) {
-            respond(404, { error: error.message });
-        } else {
-            console.error('Error in handleTransactionDetails:', error);
-            respond(500, { error: 'An error occurred processing the request.' });
-        }
-    }
-}
 
 export async function handleAccountDetails({ msbInstance, respond, req }) {
     const url = buildRequestUrl(req);
