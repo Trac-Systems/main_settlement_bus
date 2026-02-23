@@ -5,8 +5,6 @@ import b4a from "b4a";
 import {networkMessageFactory} from "../../../messages/network/v1/networkMessageFactory.js";
 import {NETWORK_CAPABILITIES} from "../../../utils/constants.js";
 import {
-    safeDecodeApplyOperation,
-    safeEncodeApplyOperation,
     unsafeEncodeApplyOperation
 } from "../../../utils/protobuf/operationHelpers.js";
 import {normalizeMessageByOperationType} from "../../../utils/normalizers.js";
