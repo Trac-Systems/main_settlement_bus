@@ -1,7 +1,7 @@
 import sinon from "sinon";
 import { hook, test } from 'brittle'
 import { default as EventEmitter } from "bare-events"
-import { testKeyPair1, testKeyPair2, testKeyPair3, testKeyPair4, testKeyPair5, testKeyPair6, testKeyPair7, testKeyPair8, testKeyPair9 } from "../../fixtures/apply.fixtures.js";
+import { testKeyPair1, testKeyPair2, testKeyPair3, testKeyPair4, testKeyPair5, testKeyPair6, testKeyPair7, testKeyPair8 } from "../../fixtures/apply.fixtures.js";
 import ConnectionManager from "../../../src/core/network/services/ConnectionManager.js";
 import { tick } from "../../helpers/setupApplyTests.js";
 import b4a from 'b4a'
@@ -20,12 +20,10 @@ const createConnection = (key) => {
     return { key: b4a.from(key, 'hex'), connection: emitter }
 }
 
-const createV1Connection = (key, sendStub = sinon.stub().resolves(ResultCode.OK), preferredProtocol = 'v1') => {
+const createV1Connection = (key, sendHealthCheckStub = sinon.stub().resolves(ResultCode.OK)) => {
     const emitter = new EventEmitter()
     emitter.protocolSession = {
-        send: sendStub,
-        preferredProtocol,
-        supportedProtocols: { V1: 'v1' }
+        sendHealthCheck: sendHealthCheckStub
     };
     emitter.connected = true
     emitter.remotePublicKey = b4a.from(key, 'hex')
@@ -222,7 +220,6 @@ test('ConnectionManager', () => {
 
                 healthCheckService.emit(EventType.VALIDATOR_HEALTH_CHECK, {
                     publicKey: testKeyPair1.publicKey,
-                    message: { id: 'ok' },
                     requestId: "123456"
                 });
 
@@ -243,7 +240,6 @@ test('ConnectionManager', () => {
 
                 healthCheckService.emit(EventType.VALIDATOR_HEALTH_CHECK, {
                     publicKey: testKeyPair2.publicKey,
-                    message: { id: 'timeout' },
                     requestId: "123456"
                 });
 
@@ -264,37 +260,11 @@ test('ConnectionManager', () => {
 
                 healthCheckService.emit(EventType.VALIDATOR_HEALTH_CHECK, {
                     publicKey: testKeyPair3.publicKey,
-                    message: { id: 'rejected' },
                     requestId: "123456"
                 });
 
                 await tick();
                 t.ok(!connectionManager.connected(v1Conn.key));
-                t.ok(healthCheckService.stop.callCount >= 1);
-            } finally {
-                sinon.restore();
-            }
-        });
-
-        test('stops checks when protocol is not v1', async t => {
-            try {
-                const v1Conn = createV1Connection(
-                    testKeyPair4.publicKey,
-                    sinon.stub().resolves(ResultCode.OK),
-                    'legacy'
-                );
-                const connectionManager = makeManager(6, [v1Conn]);
-                const healthCheckService = makeHealthCheckService();
-                connectionManager.subscribeToHealthChecks(healthCheckService);
-
-                healthCheckService.emit(EventType.VALIDATOR_HEALTH_CHECK, {
-                    publicKey: testKeyPair4.publicKey,
-                    message: { id: 'legacy' },
-                    requestId: "123456"
-                });
-
-                await tick();
-                t.ok(connectionManager.connected(v1Conn.key));
                 t.ok(healthCheckService.stop.callCount >= 1);
             } finally {
                 sinon.restore();
@@ -315,9 +285,8 @@ test('ConnectionManager', () => {
                 connectionManager.subscribeToHealthChecks(healthCheckService);
 
                 const cases = [
-                    { label: 'publicKey', payload: { publicKey: 123, message: {}, requestId: 'abc' } },
-                    { label: 'message', payload: { publicKey: testKeyPair5.publicKey, message: 'bad', requestId: 'abc' } },
-                    { label: 'requestId', payload: { publicKey: testKeyPair5.publicKey, message: {}, requestId: 456 } },
+                    { label: 'publicKey', payload: { publicKey: 123, requestId: 'abc' } },
+                    { label: 'requestId', payload: { publicKey: testKeyPair5.publicKey, requestId: 456 } },
                 ];
 
                 for (const testCase of cases) {
