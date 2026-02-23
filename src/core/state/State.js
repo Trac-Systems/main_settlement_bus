@@ -41,13 +41,15 @@ import { safeWriteUInt32BE } from '../../utils/buffer.js';
 import deploymentEntryUtils from './utils/deploymentEntry.js';
 import { deepCopyBuffer } from '../../utils/buffer.js';
 import { Status } from './utils/transaction.js';
-import Corestore from 'corestore';
+import remote from 'hypercore/lib/fully-remote-proof.js'
+import PQueue from 'p-queue';
 
 const OVERSIZED_BATCH_PENALTY_MULTIPLIER = BATCH_SIZE;
 
 // TODO: #addWriter, #removeWriter, #transfer, #transferFeeTxOperation need to be refactored to get in arguments actor's nodeEntries in buffer format.
 
 class State extends ReadyResource {
+    #writeQueue = new PQueue({ concurrency: 1 });
     #base;
     #bee;
     #store;
@@ -188,18 +190,6 @@ class State extends ReadyResource {
         return !!nodeEntry.isWhitelisted;
     }
 
-    async isAddressWriter(address) {
-        const nodeEntry = await this.getNodeEntry(address);
-        if (nodeEntry === null) return false;
-        return !!nodeEntry.isWriter;
-    }
-
-    async isAddressIndexer(address) {
-        const nodeEntry = await this.getNodeEntry(address);
-        if (nodeEntry === null) return false;
-        return !!nodeEntry.isIndexer;
-    }
-
     async getIndexersEntry() {
         return Object.values(this.#base.system.indexers);
     }
@@ -244,7 +234,67 @@ class State extends ReadyResource {
     }
 
     async append(payload) {
-        await this.#base.append(payload);
+        return this.#writeQueue.add(() => this.#base.append(payload));
+    }
+
+    async appendWithProofOfPublication(batch, batchTxHashes) {
+        return this.#writeQueue.add(async () => {
+
+            const core = this.#base.local;
+            const end = await this.#base.append(batch);
+            const start = end - batch.length;
+            const appendedAt = new Date();
+            const snapshot = core.snapshot(); // consistent view while generating proofs.
+            await snapshot.ready();
+
+            try {
+                const receipts = [];
+                let failedProofs = 0;
+                for (let i = 0; i < batch.length; i++) {
+                    const blockNumber = start + i;
+                    const completeTx = batch[i];
+                    const txHash = batchTxHashes[i];
+
+                    let proof = null;
+                    let proofError = null;
+
+                    // wait:false makes get fail fast (null) instead of waiting for missing data/replication.
+                    const rawBlock = await snapshot.get(blockNumber, { raw: true, wait: false });
+                    if (!rawBlock) {
+                        proofError = `Missing raw block after append (block=${blockNumber}, start=${start}, end=${end})`;
+                        failedProofs++;
+                    } else {
+                        try {
+                            proof = await remote.proof(snapshot, { index: blockNumber, block: rawBlock });
+                        } catch (error) {
+                            proofError = `Proof generation failed (block=${blockNumber}, start=${start}, end=${end}): ${error?.message ?? 'unknown error'}`;
+                            failedProofs++;
+                        }
+                    }
+                    receipts.push({
+                        txHash,
+                        completeTx,
+                        proof,
+                        proofError,
+                        appendedAt,
+                        blockNumber
+                    });
+                }
+                if (failedProofs > 0) {
+                    console.error(`appendWithProof completed with ${failedProofs} proof failures (batch=${batch.length})`);
+                }
+                return receipts;
+            } finally {
+                await snapshot.close();
+            }
+        });
+    }
+
+    async verifyProofOfPublication(proof) {
+        // Valid concern. We currently rely on Hypercore’s internal fully-remote-proof helper, which requires low-level storage access
+        const out = await remote.verify(this.#store.storage, proof);
+        if (!out) throw new Error('Proof of publication verification failed');
+        return out;
     }
 
     async getIndexerSequenceState() {
@@ -265,6 +315,7 @@ class State extends ReadyResource {
             return b4a.equals(initialization, safeWriteUInt32BE(0, 0))
         }
     }
+
     async getTransactionConfirmedLength(hash) {
         if (!isHexString(hash) || hash.length !== 64) {
             throw new Error("Invalid hash format");
@@ -1794,9 +1845,9 @@ class State extends ReadyResource {
         };
 
         /**
-         * Ensure that: 
-         * 1) writer key exists in registry (we can not unregister something that was not registered), 
-         * 2) matches the one in node entry , 
+         * Ensure that:
+         * 1) writer key exists in registry (we can not unregister something that was not registered),
+         * 2) matches the one in node entry ,
          * 3) belongs to the requester - this prevents unauthorized key removal
          */
         const writerKeyHasBeenRegistered = await this.#getRegisteredWriterKeyApply(batch, op.rao.iw.toString('hex'))
@@ -2931,7 +2982,7 @@ class State extends ReadyResource {
             batch,
             node
         );
-        
+
         // TODO: cover next 4 guards below with tests
         if (transferFeeTxOperationResult === null) {
             this.#safeLogApply(OperationType.TX, "Fee transfer operation failed completely.", node.from.key);
@@ -3389,7 +3440,7 @@ class State extends ReadyResource {
 
     /**
      * Retrieves the address assigned to a given writing key from the registry.
-     * 
+     *
      * @param {Object} batch - The current Hyperbee batch instance used for reading state.
      * @param {string} writingKey - The writing key in hex string format.
      * @returns {Buffer|null} The address buffer assigned to the writing key, or null if not registered.
