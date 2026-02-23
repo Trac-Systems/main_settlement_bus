@@ -53,9 +53,7 @@ export async function handleBalance({ req, respond, msbInstance }) {
         return;
     }
 
-    const confirmedParam = getConfirmedParameter(url);
-    const confirmed = confirmedParam === null ? false : confirmedParam;
-    const nodeInfo = await getBalance(msbInstance, address, confirmed);
+    const nodeInfo = await getBalance(msbInstance, address, getConfirmedParameter(url) ?? false);
     const balance = nodeInfo?.balance || "0";
 
     respond(200, { address, balance });
