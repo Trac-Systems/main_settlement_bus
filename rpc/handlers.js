@@ -34,17 +34,22 @@ export async function handleBalance({ req, respond, msbInstance }) {
     const parts = url.pathname.split("/").filter(Boolean);
     const address = parts[2];
 
-    const confirmedParam = getConfirmedParameter(url);
-    const confirmed = confirmedParam === null ? false : confirmedParam; // invalid -> fallback to unconfirmed
-
-    // TODO: VALIDATION? 
     if (!address) {
         respond(400, { error: 'Wallet address is required' });
         return;
     }
 
+    const hrp = msbInstance.config.addressPrefix;
+    if (!isAddressValid(address, hrp)) {
+        respond(400, { error: 'Invalid account address format' });
+        return;
+    }
+
+    const confirmedParam = getConfirmedParameter(url);
+    const confirmed = confirmedParam === null ? false : confirmedParam;
     const nodeInfo = await getBalance(msbInstance, address, confirmed);
-    const balance = nodeInfo?.balance || 0;
+    const balance = nodeInfo?.balance || "0";
+    
     respond(200, { address, balance });
 }
 
