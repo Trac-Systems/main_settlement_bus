@@ -1,5 +1,5 @@
-import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
-import { Config } from './config.js';
+import {TRAC_NETWORK_MSB_MAINNET_PREFIX} from 'trac-wallet/constants.js';
+import {Config} from './config.js';
 
 export const ENV = {
     MAINNET: 'mainnet',
@@ -30,7 +30,9 @@ const configData = {
         messageThreshold: 3,
         messageValidatorRetryDelay: 1000, //How long to wait before retrying (ms) MESSAGE_VALIDATOR_RETRY_DELAY_MS
         messageValidatorResponseTimeout: 3 * 3 * 1000, //Overall timeout for sending a message (ms). This is 3 * maxRetries * messageValidatorRetryDelay;
-        pendingRequestTimeout: 1000, // TODO: ADD description
+        pendingRequestTimeout: 3000, // constant after which time the transaction will be considered invalid
+        txCommitTimeout: 2200,
+        txPoolSize: 1000, // size of transaction pool
         networkId: 918,
         storesDirectory: 'stores/',
     },
@@ -54,7 +56,9 @@ const configData = {
         messageThreshold: 1000,
         messageValidatorRetryDelay: 1000, //How long to wait before retrying (ms) MESSAGE_VALIDATOR_RETRY_DELAY_MS
         messageValidatorResponseTimeout: 3 * 3 * 1000, //Overall timeout for sending a message (ms). This is 3 * maxRetries * messageValidatorRetryDelay;
-        pendingRequestTimeout: 1000, // TODO: ADD description
+        pendingRequestTimeout: 3000, // constant after which time the transaction will be considered invalid
+        txCommitTimeout: 2200,
+        txPoolSize: 1000, // size of transaction pool
         networkId: 918,
         storesDirectory : 'stores/',
     }

@@ -4,7 +4,7 @@ import {
     CONNECTION_TIMEOUT_MS,
     MAX_TRANSACTIONS_PER_SECOND
 } from '../../../utils/constants.js';
-import {RateLimitedError} from "../protocols/v1/V1ProtocolError.js";
+import {V1RateLimitedError} from "../protocols/v1/V1ProtocolError.js";
 import {publicKeyToAddress} from "../../../utils/helpers.js";
 
 class TransactionRateLimiterService {
@@ -80,7 +80,7 @@ class TransactionRateLimiterService {
         this.#initializePeerConnectionInfoEntry(peer, currentTime);
 
         if (this.#hasExceededRateLimit(peer, currentTime)) {
-            throw new RateLimitedError(`Rate limit exceeded for peer ${publicKeyToAddress(connection.remotePublicKey, this.#config)}`);
+            throw new V1RateLimitedError(`Rate limit exceeded for peer ${publicKeyToAddress(connection.remotePublicKey, this.#config)}`);
         }
         this.#updatePeerConnectionInfo(peer, currentTime);
     }

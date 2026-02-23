@@ -22,6 +22,9 @@ enum ResultCode {
     RESULT_CODE_UNEXPECTED_ERROR = 5;
     RESULT_CODE_TIMEOUT = 6;
     RESULT_CODE_NODE_HAS_NO_WRITE_ACCESS = 7;
+    RESULT_CODE_TX_ACCEPTED_PROOF_UNAVAILABLE = 8;
+    RESULT_CODE_NODE_OVERLOADED = 9;
+    RESULT_CODE_TX_ALREADY_PENDING = 10;
 }
 
 message LivenessRequest {
@@ -44,7 +47,14 @@ message BroadcastTransactionRequest {
 message BroadcastTransactionResponse {
     bytes nonce = 1;
     bytes signature = 2;
-    ResultCode result = 3;
+    bytes proof = 3;
+    uint64 appendedAt = 4;
+    ResultCode result = 5;
+}
+
+message ProofData {
+    bytes proof = 1;
+    uint64 appendedAt = 2;
 }
 
 message MessageHeader {
