@@ -1,7 +1,7 @@
 import b4a from 'b4a';
 import {OperationType} from "../../../../../utils/constants.js";
 import {bufferToAddress} from "../../../../state/utils/address.js";
-import PartialOperationValidator from './base/PartialOperationValidator.js';
+import PartialOperationValidator from './PartialOperationValidator.js';
 import {bufferToBigInt} from "../../../../../utils/amountSerialization.js";
 
 class PartialRoleAccessValidator extends PartialOperationValidator {

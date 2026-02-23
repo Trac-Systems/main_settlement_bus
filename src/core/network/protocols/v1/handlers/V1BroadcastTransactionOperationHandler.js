@@ -1,11 +1,19 @@
 import {networkMessageFactory} from "../../../../../messages/network/v1/networkMessageFactory.js";
-import {NETWORK_CAPABILITIES, OperationType, ResultCode, TRANSACTION_POOL_SIZE} from "../../../../../utils/constants.js";
+import {
+    NETWORK_CAPABILITIES,
+    OperationType,
+    ResultCode
+} from "../../../../../utils/constants.js";
 import {
     getResultCode,
-    InvalidPayloadError,
-    NodeHasNoWriteAccess,
+    V1InvalidPayloadError,
+    V1NodeHasNoWriteAccess,
     shouldEndConnection,
-    UnexpectedError
+    V1TxAcceptedProofUnavailable,
+    V1UnexpectedError,
+    V1NodeOverloadedError,
+    V1TxAlreadyPendingError,
+    V1TimeoutError
 } from "../V1ProtocolError.js";
 import V1BroadcastTransactionRequest from "../validators/V1BroadcastTransactionRequest.js";
 import {
@@ -21,6 +29,17 @@ import {mapValidationErrorToV1Error} from "../V1ValidationErrorMapper.js";
 import {applyStateMessageFactory} from "../../../../../messages/state/applyStateMessageFactory.js";
 import V1BroadcastTransactionResponse from "../validators/V1BroadcastTransactionResponse.js";
 import V1BaseOperationHandler from "./V1BaseOperationHandler.js";
+import {
+    TransactionPoolMissingCommitReceiptError,
+    TransactionPoolProofUnavailableError,
+    TransactionPoolFullError, TransactionPoolInvalidIncomingDataError, TransactionPoolAlreadyQueuedError
+} from "../../../services/TransactionPoolService.js";
+import {
+    PendingCommitInvalidTxHashError,
+    PendingCommitAlreadyExistsError,
+    PendingCommitBufferFullError, PendingCommitTimeoutError
+} from "../../../services/TransactionCommitService.js";
+
 
 class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
     #state;
@@ -32,8 +51,9 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
     #partialBootstrapDeploymentValidator;
     #partialTransactionValidator;
     #partialTransferValidator;
+    #transactionCommitService;
 
-    constructor(state, wallet, rateLimiterService, txPoolService, pendingRequestService, config) {
+    constructor(state, wallet, rateLimiterService, txPoolService, pendingRequestService, transactionCommitService, config) {
         super(rateLimiterService, pendingRequestService, config);
         this.#state = state;
         this.#wallet = wallet;
@@ -44,24 +64,35 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
         this.#partialTransactionValidator = new PartialTransactionValidator(state, this.#wallet.address, config);
         this.#partialTransferValidator = new PartialTransferValidator(state, this.#wallet.address, config);
         this.#broadcastTransactionResponseValidator = new V1BroadcastTransactionResponse(config);
+        this.#transactionCommitService = transactionCommitService;
     }
 
     async handleRequest(message, connection) {
         let resultCode = ResultCode.OK;
         let endConnection = false;
+        let proof = null
+        let appendedAt = 0;
 
         try {
+            this.applyRateLimit(connection);
+            await this.#broadcastTransactionRequestValidator.validate(message, connection.remotePublicKey);
             await this.#validationCapability();
             this.#isTxPoolFull();
-            this.applyRateLimit(connection);
-
-            await this.#broadcastTransactionRequestValidator.validate(message, connection.remotePublicKey);
             const decodedTransaction = this.decodeApplyOperation(message.broadcast_transaction_request.data);
             this.#sanitizeDecodedPartialTransaction(decodedTransaction);
-            await this.dispatchTransaction(decodedTransaction);
+            const receipt = await this.dispatchTransaction(decodedTransaction);
+            proof = receipt.proof;
+            appendedAt = receipt.appendedAt;
         } catch (error) {
             const mappedError = mapValidationErrorToV1Error(error);
             resultCode = getResultCode(mappedError);
+            if (
+                resultCode === ResultCode.TX_ACCEPTED_PROOF_UNAVAILABLE &&
+                Number.isSafeInteger(mappedError.appendedAt) &&
+                mappedError.appendedAt > 0
+            ) {
+                appendedAt = mappedError.appendedAt;
+            }
             endConnection = shouldEndConnection(mappedError);
             this.displayError(
                 "failed to process broadcast transaction request from sender",
@@ -71,7 +102,14 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
         }
 
         try {
-            const response = await this.#buildBroadcastTransactionResponse(message.id, NETWORK_CAPABILITIES, resultCode);
+            const response = await this.#buildBroadcastTransactionResponse(
+                message.id,
+                NETWORK_CAPABILITIES,
+                proof,
+                appendedAt,
+                resultCode,
+            );
+
             connection.protocolSession.sendAndForget(response);
             if (endConnection) connection.end();
         } catch (error) {
@@ -86,17 +124,15 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
 
     async handleResponse(message, connection) {
         try {
-            // TODO: In this case this should close connection of sender
             this.applyRateLimit(connection);
-
             await this.resolvePendingResponse(
                 message,
                 connection,
                 this.#broadcastTransactionResponseValidator,
-                this.#extractBroadcastResultCode
+                this.#extractBroadcastResultCode,
+                this.#state
             );
         } catch (error) {
-            // TODO: Question: how we should behave in this case? Consult this with Leo
             this.handlePendingResponseError(
                 message.id,
                 connection,
@@ -106,15 +142,17 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
         }
     }
 
-    async #buildBroadcastTransactionResponse(id, capabilities, resultCode) {
+    async #buildBroadcastTransactionResponse(id, capabilities, proof, appendedAt = null, resultCode) {
         try {
             return await networkMessageFactory(this.#wallet, this.config).buildBroadcastTransactionResponse(
                 id,
                 capabilities,
-                resultCode
+                resultCode,
+                proof,
+                appendedAt
             );
         } catch (error) {
-            throw new UnexpectedError(`Failed to build broadcast transaction response: ${error.message}`, true);
+            throw new V1UnexpectedError(`Failed to build broadcast transaction response: ${error.message}`, true);
         }
     }
 
@@ -122,7 +160,7 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
         try {
             return unsafeDecodeApplyOperation(message);
         } catch (error) {
-            throw new UnexpectedError(`Failed to decode apply operation from message: ${error.message}`, true);
+            throw new V1UnexpectedError(`Failed to decode apply operation from message: ${error.message}`, true);
         }
     }
 
@@ -153,10 +191,13 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
     }
 
     #isTxPoolFull() {
-        // TODO: CREATE NEW ERROR THAT WILL describe that node is overloaded and it won't process transaction for now
-        // In this case we should not return unexpected error.
-        if (this.#txPoolService.tx_pool.length >= TRANSACTION_POOL_SIZE) {
-            throw new UnexpectedError('Transaction pool is full, ignoring incoming transaction.', false);
+        try {
+            this.#txPoolService.validateEnqueue();
+        } catch (error) {
+            if (error instanceof TransactionPoolFullError) {
+                throw new V1NodeOverloadedError('Transaction pool is full, ignoring incoming transaction.', false);
+            }
+            throw error;
         }
     }
 
@@ -165,14 +206,18 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
         const isAdminAllowedToValidate = await this.#state.isAdminAllowedToValidate();
         const canValidate = isAllowedToValidate || isAdminAllowedToValidate;
         if (!canValidate) {
-            throw new NodeHasNoWriteAccess('State is not writable or is an indexer without admin privileges.');
+            throw new V1NodeHasNoWriteAccess('State is not writable or is an indexer without admin privileges.');
         }
     }
 
     async dispatchTransaction(decodedTransaction) {
         if (!decodedTransaction || !Number.isInteger(decodedTransaction.type) || decodedTransaction.type === 0) {
-            throw new InvalidPayloadError('Decoded transaction type is missing.', false);
+            throw new V1InvalidPayloadError('Decoded transaction type is missing.', false);
         }
+        if (!this.#transactionCommitService) {
+            throw new V1UnexpectedError('TransactionCommitService is not configured.', true);
+        }
+
         const type = decodedTransaction.type;
         let completeTransactionOperation;
 
@@ -189,13 +234,65 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
             await this.#partialTransferValidator.validate(decodedTransaction);
             completeTransactionOperation = await this.#buildCompleteTransferOperation(decodedTransaction);
         } else {
-            throw new InvalidPayloadError(`Unsupported transaction type: ${type}`, false);
+            throw new V1InvalidPayloadError(`Unsupported transaction type: ${type}`, false);
         }
+        const payloadKey = this.#getOperationPayloadKey(type);
+        const txHash = decodedTransaction[payloadKey].tx.toString('hex');
 
         const encodedCompleteTransaction = unsafeEncodeApplyOperation(completeTransactionOperation);
-        this.#txPoolService.addTransaction(encodedCompleteTransaction);
+        let pendingCommit;
+
+        try {
+            pendingCommit = this.#transactionCommitService.registerPendingCommit(txHash);
+        } catch (error) {
+            if (error instanceof PendingCommitInvalidTxHashError) {
+                throw new V1InvalidPayloadError(error.message, false); // TODO: consider if false/true
+            }
+            if (error instanceof PendingCommitAlreadyExistsError) {
+                throw new V1TxAlreadyPendingError(error.message, false);
+            }
+            if (error instanceof PendingCommitBufferFullError) {
+                throw new V1NodeOverloadedError(error.message, false);
+            }
+            throw error;
+        }
+
+        try {
+            this.#txPoolService.addTransaction(txHash, encodedCompleteTransaction);
+        } catch (error) {
+            let err = error;
+            if (error instanceof TransactionPoolFullError) {
+                err = new V1NodeOverloadedError(error.message);
+            } else if (error instanceof TransactionPoolAlreadyQueuedError) {
+                err = new V1TxAlreadyPendingError(error.message);
+            } else if (error instanceof TransactionPoolInvalidIncomingDataError) {
+                err = new V1UnexpectedError(`Internal enqueue validation failed: ${error.message}`);
+            }
+            this.#transactionCommitService.rejectPendingCommit(txHash, err);
+            throw err; // will be mapped anyway on lower level.
+        }
+
+        let receipt;
+        try {
+            receipt = await pendingCommit;
+        } catch (error) {
+            if (error instanceof TransactionPoolProofUnavailableError) {
+                throw new V1TxAcceptedProofUnavailable(error.message, false, error.appendedAt);
+            }
+            if (error instanceof TransactionPoolMissingCommitReceiptError) {
+                throw new V1UnexpectedError(error.message, false);
+            }
+            if (error instanceof PendingCommitTimeoutError) {
+                throw new V1TimeoutError(error.message, false);
+            }
+            throw error;
+        }
+
+        return receipt;
     }
 
+
+    //TODO: Move responsibility to new class (next 4 functions)
     async #buildCompleteRoleAccessOperation(decodedTransaction) {
         const factory = applyStateMessageFactory(this.#wallet, this.config);
 
@@ -228,7 +325,7 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
                     decodedTransaction.rao.is
                 );
             default:
-                throw new InvalidPayloadError(`Unsupported role access transaction type: ${decodedTransaction.type}`, false);
+                throw new V1InvalidPayloadError(`Unsupported role access transaction type: ${decodedTransaction.type}`, false);
         }
     }
 

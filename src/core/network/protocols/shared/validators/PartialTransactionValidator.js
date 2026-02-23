@@ -1,7 +1,7 @@
 import b4a from 'b4a';
 import {safeDecodeApplyOperation} from "../../../../../utils/protobuf/operationHelpers.js";
 import deploymentEntryUtils from "../../../../state/utils/deploymentEntry.js";
-import PartialOperationValidator from './base/PartialOperationValidator.js';
+import PartialOperationValidator from './PartialOperationValidator.js';
 
 class PartialTransactionValidator extends PartialOperationValidator {
     #config

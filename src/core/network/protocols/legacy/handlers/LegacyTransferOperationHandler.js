@@ -4,12 +4,12 @@ import PartialTransferValidator from "../../shared/validators/PartialTransferVal
 import {normalizeTransferOperation} from "../../../../../utils/normalizers.js"
 import {applyStateMessageFactory} from "../../../../../messages/state/applyStateMessageFactory.js";
 import {safeEncodeApplyOperation} from "../../../../../utils/protobuf/operationHelpers.js";
+import b4a from "b4a";
 
 class LegacyTransferOperationHandler extends BaseStateOperationHandler {
     #partialTransferValidator;
     #config;
     #wallet;
-    #txPoolService;
 
     /**
      * @param {State} state
@@ -23,7 +23,6 @@ class LegacyTransferOperationHandler extends BaseStateOperationHandler {
         this.#config = config;
         this.#wallet = wallet;
         this.#partialTransferValidator = new PartialTransferValidator(state, this.#wallet.address, this.#config);
-        this.#txPoolService = txPoolService;
     }
 
     async handleOperation(payload, connection) {
@@ -50,8 +49,9 @@ class LegacyTransferOperationHandler extends BaseStateOperationHandler {
                 normalizedPayload.tro.am,
                 normalizedPayload.tro.is
             )
-
-        this.#txPoolService.addTransaction(safeEncodeApplyOperation(completeTransferOperation));
+        const encodedOperation = safeEncodeApplyOperation(completeTransferOperation);
+        const txHash =  b4a.toString(normalizedPayload.tro.tx, 'hex');
+        this.enqueueTransaction(txHash, encodedOperation, 'TransferHandler');
     }
 }
 
