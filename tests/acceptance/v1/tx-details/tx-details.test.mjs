@@ -182,18 +182,32 @@ export const registerTxDetailsTests = (context) => {
             expect(res.body).toEqual({ error: "Invalid transaction hash format" })
         })
 
-        // TODOadjust implementation to cover tests below
-        it.skip("accepts uppercase hex", async () => {
-            const hash = "A".repeat(64)
-            const res = await request(context.server).get(`/v1/tx/details/${hash}?confirmed=false`)
-            expect([200]).toContain(res.statusCode)
-            expect(res.statusCode).toBe(200)
-        })
+        it("accepts uppercase hex", async () => {
+            const { payload, txHashHex } = await buildRpcSelfTransferPayload(
+                context,
+                context.rpcMsb.state,
+                1n
+            );
 
-        it.skip("returns 400 for trailing space hash", async () => {
-            const hash = `${"a".repeat(64)} `
-            const res = await request(context.server).get(`/v1/tx/details/${hash}`)
-            expect(res.statusCode).toBe(400)
-        })
+            await waitForConnection(context.rpcMsb);
+            await request(context.server)
+                .post("/v1/broadcast-transaction")
+                .send(JSON.stringify({ payload }));
+
+            const upperHash = txHashHex.toUpperCase();
+            const res = await request(context.server)
+                .get(`/v1/tx/details/${upperHash}?confirmed=false`);
+
+            expect(res.statusCode).toBe(200);
+        });
+
+        it("returns 400 for trailing space hash", async () => {
+            const hash = "a".repeat(64) + " "; 
+            const res = await request(context.server)
+                .get(`/v1/tx/details/${encodeURIComponent(hash)}`);
+            
+            expect(res.statusCode).toBe(400);
+            expect(res.body).toEqual({ error: "Invalid transaction hash format" });
+        });
     })
 }
