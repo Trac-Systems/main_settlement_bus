@@ -9,6 +9,7 @@ import {OperationType} from "../src/utils/constants.js";
 import b4a from "b4a";
 import PartialTransaction from "../src/core/network/protocols/shared/validators/PartialTransaction.js";
 import PartialTransfer from "../src/core/network/protocols/shared/validators/PartialTransfer.js";
+import { ValidationError, BroadcastError } from "./utils/helpers.js";
 
 export async function getBalance(msbInstance, address, confirmed) {
     const state = msbInstance.state;
@@ -46,7 +47,7 @@ export async function getUnconfirmedLength(msbInstance) {
 
 export async function broadcastTransaction(msbInstance, config, payload) {
     if (!payload) {
-        throw new Error("Transaction payload is required for broadcasting.");
+        throw new ValidationError("Transaction payload is required for broadcasting.");
     }
     let normalizedPayload;
     let isValid = false;
@@ -66,13 +67,13 @@ export async function broadcastTransaction(msbInstance, config, payload) {
     }
 
     if (!isValid) {
-        throw new Error("Invalid transaction payload.");
+        throw new ValidationError("Invalid transaction payload.");
     }
 
     const success = await msbInstance.broadcastPartialTransaction(payload);
 
     if (!success) {
-        throw new Error("Failed to broadcast transaction after multiple attempts.");
+        throw new BroadcastError("Failed to broadcast transaction after multiple attempts.");
     }
 
     const signedLength = msbInstance.state.getSignedLength();

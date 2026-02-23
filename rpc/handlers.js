@@ -9,7 +9,7 @@ import {
 } from "./utils/helpers.js"
 import { MAX_SIGNED_LENGTH, ZERO_WK } from "./constants.js";
 import { buildRequestUrl } from "./utils/url.js";
-import { isHexString } from "../src/utils/helpers.js"; 
+import { BroadcastError, ValidationError} from "./utils/helpers.js"
 import {
     getBalance,
     getTxv,
@@ -20,7 +20,7 @@ import {
     getTxHashes,
     getTxDetails,
     fetchBulkTxPayloads,
-    getExtendedTxDetails
+    getExtendedTxDetails,
 } from "./rpc_services.js";
 import { bufferToBigInt, licenseBufferToBigInt } from "../src/utils/amountSerialization.js";
 import { isAddressValid } from "../src/core/state/utils/address.js";
@@ -94,16 +94,23 @@ export async function handleBroadcastTransaction({ msbInstance, config, respond,
 
         try {
             if (!body) {
-                return respond(400, { error: 'Invalid JSON payload.' });
+                throw new ValidationError("Invalid JSON payload.");
             }
 
-            const { payload } = JSON.parse(body);
+            let parsedBody;
+            try {
+                parsedBody = JSON.parse(body);
+            } catch (e) {
+                throw new ValidationError("Invalid JSON payload.");
+            }
+
+            const { payload } = parsedBody;
             if (!payload) {
-                return respond(400, { error: 'Payload is missing.' });
+                throw new ValidationError("Payload is missing.");
             }
 
             if (!isBase64(payload)) {
-                return respond(400, { error: 'Payload must be a valid base64 string.' });
+                throw new ValidationError("Payload must be a valid base64 string.");
             }
 
             const decodedPayload = decodeBase64Payload(payload);
@@ -114,27 +121,16 @@ export async function handleBroadcastTransaction({ msbInstance, config, respond,
             respond(200, { result });
 
         } catch (error) {
-            const clientErrorMessages = [
-                "Failed to decode base64 payload.",
-                "Decoded payload is not valid JSON.",
-                "Invalid payload structure.",
-                "Payload is not a transfer/transaction operation.",
-                "Invalid transaction payload.",
-                "Transaction payload is required for broadcasting."
-            ];
-
             let code = 500;
             let errorMsg = 'An error occurred processing the transaction.';
 
-            const isClientError = error instanceof SyntaxError || clientErrorMessages.includes(error.message);
-            const isBroadcastFailure = error.message.toLowerCase().includes("failed to broadcast transaction");
-
-            if (isClientError) {
+            if (error instanceof ValidationError || error instanceof SyntaxError) {
                 code = 400;
-                errorMsg = error instanceof SyntaxError ? "Invalid JSON payload." : error.message;
-            } else if (isBroadcastFailure) {
+                errorMsg = error.message;
+            } 
+            else if (error instanceof BroadcastError) {
                 code = 429;
-                errorMsg = "Failed to broadcast transaction after multiple attempts.";
+                errorMsg = error.message;
             }
 
             if (code === 500) {
