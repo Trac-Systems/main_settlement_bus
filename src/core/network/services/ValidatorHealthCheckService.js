@@ -12,6 +12,7 @@ const debugLog = (...args) => {
     }
 };
 
+const DEFAULT_HEALTH_CHECK_INTERVAL_MS = 300000; // 5 minutes
 class ValidatorHealthCheckService extends ReadyResource {
     #config;
     #intervalMs;
@@ -25,7 +26,8 @@ class ValidatorHealthCheckService extends ReadyResource {
         this.#config = config;
         this.#timers = new Map();
 
-        this.#intervalMs = this.#checkInterval(this.#config.validatorHealthCheckInterval) || 300000; // Default to 5 minutes
+        const interval = this.#config.validatorHealthCheckInterval;
+        this.#intervalMs = interval == null ? DEFAULT_HEALTH_CHECK_INTERVAL_MS : this.#checkInterval(interval);
 
         debugLog('initialized with intervalMs', this.#intervalMs);
     }

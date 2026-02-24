@@ -20,6 +20,16 @@ test('ValidatorHealthCheckService', () => {
         await t.exception.all(() => new ValidatorHealthCheckService(badConfig));
     });
 
+    test('constructor defaults interval when missing', async (t) => {
+        const config = createConfig(ENV.MAINNET, {});
+        const service = new ValidatorHealthCheckService(config);
+        await service.ready();
+
+        t.is(service.start(testKeyPair1.publicKey), true);
+        t.is(service.start(testKeyPair1.publicKey), false);
+        await service.close();
+    });
+
     test('stop returns false when no schedule exists', async (t) => {
         const config = createConfig(ENV.MAINNET, { validatorHealthCheckInterval: 1000 });
         const service = new ValidatorHealthCheckService(config);
