@@ -27,7 +27,7 @@ class ValidatorHealthCheckService extends ReadyResource {
         this.#timers = new Map();
 
         const interval = this.#config.validatorHealthCheckInterval;
-        this.#intervalMs = interval == null ? DEFAULT_HEALTH_CHECK_INTERVAL_MS : this.#checkInterval(interval);
+        this.#intervalMs = interval ? this.#checkInterval(interval) : DEFAULT_HEALTH_CHECK_INTERVAL_MS;
 
         debugLog('initialized with intervalMs', this.#intervalMs);
     }
