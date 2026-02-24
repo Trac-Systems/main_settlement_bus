@@ -1,8 +1,6 @@
-import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
+import { TRAC_NETWORK_MSB_MAINNET_PREFIX, TRAC_NETWORK_MSB_TESTNET1_PREFIX } from 'trac-wallet/constants.js';
 import { Config } from './config.js';
 import { TRAC_NETWORK_TESTNET_ID, TRAC_NETWORK_MAINNET_ID } from 'trac-crypto-api/constants.js';
-
-const TRAC_NETWORK_MSB_TESTNET1_PREFIX = "testtrac"
 
 export const ENV = {
     MAINNET: 'mainnet',
