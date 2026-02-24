@@ -1,7 +1,7 @@
 import { TRAC_NETWORK_MSB_MAINNET_PREFIX, TRAC_NETWORK_MSB_TESTNET1_PREFIX } from 'trac-wallet/constants.js';
-import { Config } from './config.js';
 import { TRAC_NETWORK_TESTNET_ID, TRAC_NETWORK_MAINNET_ID } from 'trac-crypto-api/constants.js';
 import { address } from 'trac-crypto-api';
+import {Config} from './config.js';
 
 export const ENV = {
     MAINNET: 'mainnet',
@@ -85,7 +85,9 @@ const configData = {
         rateLimitCleanupIntervalMs: 120_000, // Rate limiting constants
         rateLimitConnectionTimeoutMs: 60_000, // Rate limiting constants
         rateLimitMaxTransactionsPerSecond: 50, // Rate limiting constants
-        pendingRequestTimeout: 1000, // TODO: ADD description
+        pendingRequestTimeout: 3000, // constant after which time the transaction will be considered invalid
+        txCommitTimeout: 2200,
+        txPoolSize: 1000, // size of transaction pool
         validatorHealthCheckInterval: 5 * 60 * 1000, // How often to check validator health (ms)
         storesDirectory: 'stores/',
         storeName: 'mainnet',
@@ -126,6 +128,10 @@ const configData = {
         rateLimitConnectionTimeoutMs: 60_000, // Rate limiting constants
         rateLimitMaxTransactionsPerSecond: 50, // Rate limiting constants
         pendingRequestTimeout: 1000, // TODO: ADD description
+        validatorHealthCheckInterval: 5 * 60 * 1000, // How often to check validator health (ms)
+        pendingRequestTimeout: 3000, // constant after which time the transaction will be considered invalid
+        txCommitTimeout: 2200,
+        txPoolSize: 1000, // size of transaction pool
         validatorHealthCheckInterval: 5 * 60 * 1000, // How often to check validator health (ms)
         storesDirectory : 'stores/',
         storeName: 'development',
