@@ -9,8 +9,7 @@ export const isDeepEqualApplyPayload = (left, right) => {
     const rightIsBuffer = b4a.isBuffer(right);
 
     if (leftIsBuffer || rightIsBuffer) {
-        if (!leftIsBuffer || !rightIsBuffer) return false;
-        return b4a.equals(left, right);
+        return leftIsBuffer && rightIsBuffer && b4a.equals(left, right);
     }
 
     const leftIsArray = Array.isArray(left);
@@ -40,4 +39,3 @@ export const isDeepEqualApplyPayload = (left, right) => {
 
     return true;
 };
-
