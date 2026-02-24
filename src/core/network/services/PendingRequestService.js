@@ -1,6 +1,7 @@
 // TODO: add more validation + write unit tests
 import {NetworkOperationType, ResultCode} from '../../../utils/constants.js';
 import {V1TimeoutError, V1UnexpectedError, V1ProtocolError} from "../protocols/v1/V1ProtocolError.js";
+import b4a from 'b4a';
 
 class PendingRequestService {
     #pendingRequests;
@@ -40,7 +41,7 @@ class PendingRequestService {
         const entry = {
             id: id,
             requestType: message.type,
-            requestMessage: message,
+            requestTxData: this.#extractRequestTxData(message),
             requestedTo: peerPubKeyHex,
             timeoutMs: this.#config.pendingRequestTimeout,
             timeoutId: null,
@@ -65,6 +66,13 @@ class PendingRequestService {
 
         this.#pendingRequests.set(id, entry);
         return promise;
+    }
+
+    #extractRequestTxData(message) {
+        if (!message || typeof message !== 'object') return null;
+        if (message.type !== NetworkOperationType.BROADCAST_TRANSACTION_REQUEST) return null;
+        const txData = message.broadcast_transaction_request?.data;
+        return b4a.isBuffer(txData) ? txData : null;
     }
 
     getAndDeletePendingRequest(id) {

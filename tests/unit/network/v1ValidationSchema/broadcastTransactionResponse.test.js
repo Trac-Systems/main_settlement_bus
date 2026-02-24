@@ -109,6 +109,10 @@ test('V1ValidationSchema.validateV1BroadcastTransactionResponse - result value v
     const infinity = structuredClone(validFixture);
     infinity.broadcast_transaction_response.result = Infinity;
     t.absent(v.validateV1BroadcastTransactionResponse(infinity), 'result Infinity should fail');
+
+    const unknownCode = structuredClone(validFixture);
+    unknownCode.broadcast_transaction_response.result = Math.max(...Object.values(ResultCode)) + 1;
+    t.absent(v.validateV1BroadcastTransactionResponse(unknownCode), 'unknown result code should fail');
 });
 
 test('V1ValidationSchema.validateV1BroadcastTransactionResponse - buffer lengths', t => {

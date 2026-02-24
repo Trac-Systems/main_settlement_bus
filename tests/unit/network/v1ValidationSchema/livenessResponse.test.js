@@ -106,6 +106,10 @@ test('V1ValidationSchema.validateV1LivenessResponse - result value validation', 
     const infinity = structuredClone(validFixture);
     infinity.liveness_response.result = Infinity;
     t.absent(v.validateV1LivenessResponse(infinity), 'result Infinity should fail');
+
+    const unknownCode = structuredClone(validFixture);
+    unknownCode.liveness_response.result = Math.max(...Object.values(ResultCode)) + 1;
+    t.absent(v.validateV1LivenessResponse(unknownCode), 'unknown result code should fail');
 });
 
 test('V1ValidationSchema.validateV1LivenessResponse - buffer lengths', t => {

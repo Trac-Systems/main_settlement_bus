@@ -212,3 +212,39 @@ test('PendingRequestService rejects all pending requests for a specific peer', a
     t.ok(service.resolvePendingRequest(requestB1.id));
     await promiseB1;
 });
+
+test('PendingRequestService stores only transaction data for broadcast requests', async t => {
+    const service = new PendingRequestService(config);
+    const peer = 'deadbeef';
+    const livenessRequest = await buildV1Request();
+    const broadcastRequest = await buildV1BroadcastRequest();
+
+    const livenessPromise = service.registerPendingRequest(peer, livenessRequest);
+    const broadcastPromise = service.registerPendingRequest(peer, broadcastRequest);
+
+    const livenessEntry = service.getPendingRequest(livenessRequest.id);
+    const broadcastEntry = service.getPendingRequest(broadcastRequest.id);
+
+    t.is(livenessEntry.requestTxData, null);
+    t.ok(b4a.isBuffer(broadcastEntry.requestTxData));
+    t.alike(broadcastEntry.requestTxData, broadcastRequest.broadcast_transaction_request.data);
+    t.is(Object.prototype.hasOwnProperty.call(livenessEntry, 'requestMessage'), false);
+    t.is(Object.prototype.hasOwnProperty.call(broadcastEntry, 'requestMessage'), false);
+
+    t.ok(service.resolvePendingRequest(livenessRequest.id));
+    t.ok(service.resolvePendingRequest(broadcastRequest.id));
+    await Promise.all([livenessPromise, broadcastPromise]);
+});
+
+async function buildV1BroadcastRequest({ id = uuidv7(), data = b4a.from('deadbeef', 'hex') } = {}) {
+    const wallet = createWallet();
+    const builder = new NetworkMessageBuilder(wallet, config);
+    await builder
+        .setType(NetworkOperationType.BROADCAST_TRANSACTION_REQUEST)
+        .setId(id)
+        .setTimestamp()
+        .setData(data)
+        .setCapabilities([])
+        .buildPayload();
+    return builder.getResult();
+}

@@ -93,7 +93,10 @@ class V1BroadcastTransactionResponse extends V1BaseOperation {
     }
 
     async assertProofPayloadMatchesRequestPayload(proofResult, pendingRequestServiceEntry) {
-        const stateTxEncodedFromRequest = pendingRequestServiceEntry.requestMessage.broadcast_transaction_request.data;
+        const stateTxEncodedFromRequest = pendingRequestServiceEntry.requestTxData;
+        if (!b4a.isBuffer(stateTxEncodedFromRequest) || stateTxEncodedFromRequest.length === 0) {
+            throw new Error('Missing transaction data in pending request entry.');
+        }
         const provenBlock = proofResult.proof.block.value;
         const manifest = proofResult.proof.manifest;
         const stateTxEncodedFromResponse = await Autobase.decodeValue(provenBlock);
