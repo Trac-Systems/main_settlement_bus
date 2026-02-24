@@ -56,7 +56,7 @@ class ConnectionManager {
 
         this.#healthCheckService = healthCheckService; // TODO: Maybe this should be handled in the constructor directly?
         // TODO: declare this method outside this function to avoid redeclaring it every time we subscribe to health checks. We can just bind it to 'this' in the constructor.
-        this.#healthCheckHandler = async (payload = {}) => {
+        this.#healthCheckHandler = async (payload) => {
             const { publicKey, requestId } = payload;
             if (typeof publicKey !== 'string' || typeof requestId !== 'string') {
                 // We can't throw here because this is an event handler, but we should at least log the error and return early to avoid further issues.
