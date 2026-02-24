@@ -6,14 +6,12 @@ import {encodeV1networkOperation, decodeV1networkOperation} from '../../../utils
 class V1Protocol extends ProtocolInterface {
     #channel;
     #session;
-    #config;
     #router;
     #publicKeyHex;
     #pendingRequestServiceInstance;
 
     constructor(router, connection, pendingRequestServiceInstance, config) {
         super(router, connection, pendingRequestServiceInstance, config);
-        this.#config = config; // TODO: We are ot using config anywhere. Consider deleting it
         this.#router = router;
         this.#publicKeyHex = connection.remotePublicKey.toString('hex');
         this.#pendingRequestServiceInstance = pendingRequestServiceInstance;
