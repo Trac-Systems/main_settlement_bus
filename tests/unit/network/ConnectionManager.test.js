@@ -271,7 +271,7 @@ test('ConnectionManager', () => {
             }
         });
 
-        test('rejects malformed health check events', async t => {
+        test('ignores malformed health check events', async t => {
             try {
                 const v1Conn = createV1Connection(testKeyPair5.publicKey, sinon.stub().resolves(ResultCode.OK));
                 const connectionManager = makeManager(6, [v1Conn]);
@@ -287,10 +287,12 @@ test('ConnectionManager', () => {
                 const cases = [
                     { label: 'publicKey', payload: { publicKey: 123, requestId: 'abc' } },
                     { label: 'requestId', payload: { publicKey: testKeyPair5.publicKey, requestId: 456 } },
+                    { label: 'payload', payload: undefined },
                 ];
 
                 for (const testCase of cases) {
-                    await t.exception.all(() => handler(testCase.payload));
+                    await handler(testCase.payload);
+                    t.pass(`ignored malformed payload: ${testCase.label}`);
                 }
             } finally {
                 sinon.restore();

@@ -56,9 +56,12 @@ class ConnectionManager {
 
         this.#healthCheckService = healthCheckService; // TODO: Maybe this should be handled in the constructor directly?
         // TODO: declare this method outside this function to avoid redeclaring it every time we subscribe to health checks. We can just bind it to 'this' in the constructor.
-        this.#healthCheckHandler = async ({ publicKey, requestId }) => {
+        this.#healthCheckHandler = async (payload = {}) => {
+            const { publicKey, requestId } = payload;
             if (typeof publicKey !== 'string' || typeof requestId !== 'string') {
-                throw new Error(`ConnectionManager: Received malformed liveness request event. Typeof publicKey = ${typeof publicKey}. Typeof requestId = ${typeof requestId}`)
+                // We can't throw here because this is an event handler, but we should at least log the error and return early to avoid further issues.
+                console.error(`healthCheck: malformed event payload. Typeof publicKey = ${typeof publicKey}. Typeof requestId = ${typeof requestId}`);
+                return;
             }
 
             let targetAddress = null;
