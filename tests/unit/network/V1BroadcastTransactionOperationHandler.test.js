@@ -80,7 +80,31 @@ test('V1BroadcastTransactionOperationHandler dispatchTransaction does not emit u
             unhandled = error;
         };
 
-        process.once('unhandledRejection', onUnhandled);
+        const detachUnhandled = (() => {
+            const proc = globalThis.process;
+            if (proc?.once && proc?.removeListener) {
+                proc.once('unhandledRejection', onUnhandled);
+                return () => proc.removeListener('unhandledRejection', onUnhandled);
+            }
+            if (typeof globalThis.addEventListener === 'function') {
+                const listener = (event) => onUnhandled(event?.reason ?? event);
+                globalThis.addEventListener('unhandledrejection', listener);
+                return () => globalThis.removeEventListener('unhandledrejection', listener);
+            }
+            if ('onunhandledrejection' in globalThis) {
+                const previous = globalThis.onunhandledrejection;
+                globalThis.onunhandledrejection = (event) => {
+                    onUnhandled(event?.reason ?? event);
+                    if (typeof previous === 'function') {
+                        previous(event);
+                    }
+                };
+                return () => {
+                    globalThis.onunhandledrejection = previous;
+                };
+            }
+            return null;
+        })();
         try {
             let thrown = null;
             try {
@@ -93,7 +117,9 @@ test('V1BroadcastTransactionOperationHandler dispatchTransaction does not emit u
             t.ok(thrown instanceof V1NodeOverloadedError, 'should map tx pool full to V1NodeOverloadedError');
             await new Promise(resolve => setImmediate(resolve));
         } finally {
-            process.removeListener('unhandledRejection', onUnhandled);
+            if (detachUnhandled) {
+                detachUnhandled();
+            }
         }
 
         t.absent(unhandled, 'should not emit unhandledRejection');
