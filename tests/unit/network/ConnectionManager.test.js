@@ -218,10 +218,11 @@ test('ConnectionManager', () => {
                 const healthCheckService = makeHealthCheckService();
                 connectionManager.subscribeToHealthChecks(healthCheckService);
 
-                healthCheckService.emit(EventType.VALIDATOR_HEALTH_CHECK, {
-                    publicKey: testKeyPair1.publicKey,
-                    requestId: "123456"
-                });
+                healthCheckService.emit(
+                    EventType.VALIDATOR_HEALTH_CHECK,
+                    testKeyPair1.publicKey,
+                    "123456"
+                );
 
                 await tick();
                 t.ok(connectionManager.connected(v1Conn.key));
@@ -238,10 +239,11 @@ test('ConnectionManager', () => {
                 const healthCheckService = makeHealthCheckService();
                 connectionManager.subscribeToHealthChecks(healthCheckService);
 
-                healthCheckService.emit(EventType.VALIDATOR_HEALTH_CHECK, {
-                    publicKey: testKeyPair2.publicKey,
-                    requestId: "123456"
-                });
+                healthCheckService.emit(
+                    EventType.VALIDATOR_HEALTH_CHECK,
+                    testKeyPair2.publicKey,
+                    "123456"
+                );
 
                 await tick();
                 t.ok(!connectionManager.connected(v1Conn.key));
@@ -258,10 +260,11 @@ test('ConnectionManager', () => {
                 const healthCheckService = makeHealthCheckService();
                 connectionManager.subscribeToHealthChecks(healthCheckService);
 
-                healthCheckService.emit(EventType.VALIDATOR_HEALTH_CHECK, {
-                    publicKey: testKeyPair3.publicKey,
-                    requestId: "123456"
-                });
+                healthCheckService.emit(
+                    EventType.VALIDATOR_HEALTH_CHECK,
+                    testKeyPair3.publicKey,
+                    "123456"
+                );
 
                 await tick();
                 t.ok(!connectionManager.connected(v1Conn.key));
@@ -285,13 +288,13 @@ test('ConnectionManager', () => {
                 connectionManager.subscribeToHealthChecks(healthCheckService);
 
                 const cases = [
-                    { label: 'publicKey', payload: { publicKey: 123, requestId: 'abc' } },
-                    { label: 'requestId', payload: { publicKey: testKeyPair5.publicKey, requestId: 456 } },
-                    { label: 'payload', payload: undefined },
+                    { label: 'publicKey', publicKey: 123, requestId: 'abc' },
+                    { label: 'requestId', publicKey: testKeyPair5.publicKey, requestId: 456 },
+                    { label: 'undefined', publicKey: undefined, requestId: undefined },
                 ];
 
                 for (const testCase of cases) {
-                    await handler(testCase.payload);
+                    await handler(testCase.publicKey, testCase.requestId);
                     t.pass(`ignored malformed payload: ${testCase.label}`);
                 }
             } finally {

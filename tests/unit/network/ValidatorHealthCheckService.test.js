@@ -15,7 +15,7 @@ test('ValidatorHealthCheckService', () => {
     });
 
     test('constructor rejects invalid interval', async (t) => {
-        const badConfig = createConfig(ENV.MAINNET, { validatorHealthCheckInterval: 0 });
+        const badConfig = createConfig(ENV.MAINNET, { validatorHealthCheckInterval: -1 });
 
         await t.exception.all(() => new ValidatorHealthCheckService(badConfig));
     });
@@ -66,14 +66,16 @@ test('ValidatorHealthCheckService', () => {
             await service.ready();
 
             const emitted = new Promise(resolve => {
-                service.once(EventType.VALIDATOR_HEALTH_CHECK, resolve);
+                service.once(EventType.VALIDATOR_HEALTH_CHECK, (publicKey, requestId) => {
+                    resolve({ publicKey, requestId });
+                });
             });
             t.ok(service.start(testKeyPair1.publicKey));
 
             await clock.tickAsync(1000);
-            const payload = await emitted;
-            t.is(payload.publicKey, testKeyPair1.publicKey.toLowerCase());
-            t.ok(payload.requestId);
+            const { publicKey, requestId } = await emitted;
+            t.is(publicKey, testKeyPair1.publicKey.toLowerCase());
+            t.ok(requestId);
             await service.close();
         } finally {
             clock.restore();
@@ -89,8 +91,8 @@ test('ValidatorHealthCheckService', () => {
             await service.ready();
             const emitted = [];
             const waitForTwo = new Promise(resolve => {
-                service.on(EventType.VALIDATOR_HEALTH_CHECK, payload => {
-                    emitted.push(payload);
+                service.on(EventType.VALIDATOR_HEALTH_CHECK, (publicKey, requestId) => {
+                    emitted.push({ publicKey, requestId });
                     if (emitted.length === 2) resolve();
                 });
             });
