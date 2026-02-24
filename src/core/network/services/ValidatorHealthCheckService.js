@@ -100,7 +100,7 @@ class ValidatorHealthCheckService extends ReadyResource {
     async #emitHealthCheck(publicKey) {
         try {
             const requestId = generateUUID();
-            this.emit(EventType.VALIDATOR_HEALTH_CHECK, { publicKey, requestId });
+            this.emit(EventType.VALIDATOR_HEALTH_CHECK, publicKey, requestId);
             debugLog(`Emitted health check event for ${publicKey} with requestId ${requestId}`);
         } catch (error) {
             console.error(`ValidatorHealthCheckService: Failed to emit health check for ${publicKey}: ${error?.message || error}`);
