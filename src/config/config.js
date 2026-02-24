@@ -126,6 +126,14 @@ export class Config {
         return this.#config.pendingRequestTimeout
     }
 
+    get txCommitTimeout() {
+        return this.#config.txCommitTimeout
+    }
+
+    get txPoolSize() {
+        return this.#config.txPoolSize
+    }
+
     get validatorHealthCheckInterval() {
         if (this.#isOverriden('validatorHealthCheckInterval')) return this.#options.validatorHealthCheckInterval
         return this.#config.validatorHealthCheckInterval

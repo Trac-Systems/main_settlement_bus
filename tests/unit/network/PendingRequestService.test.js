@@ -5,7 +5,7 @@ import { v7 as uuidv7 } from 'uuid';
 import PendingRequestService from '../../../src/core/network/services/PendingRequestService.js';
 import NetworkWalletFactory from '../../../src/core/network/identity/NetworkWalletFactory.js';
 import NetworkMessageBuilder from '../../../src/messages/network/v1/NetworkMessageBuilder.js';
-import { UnexpectedError } from '../../../src/core/network/protocols/v1/V1ProtocolError.js';
+import { V1UnexpectedError } from '../../../src/core/network/protocols/v1/V1ProtocolError.js';
 import { NetworkOperationType } from '../../../src/utils/constants.js';
 import { errorMessageIncludes } from '../../helpers/regexHelper.js';
 import { config } from '../../helpers/config.js';
@@ -115,7 +115,7 @@ test('PendingRequestService rejects and removes pending request', async t => {
         await promise;
         t.fail('Expected pending request promise to reject');
     } catch (error) {
-        t.ok(error instanceof UnexpectedError);
+        t.ok(error instanceof V1UnexpectedError);
         t.is(error.message, expectedError.message);
         t.is(error.endConnection, false);
     }
@@ -184,3 +184,67 @@ test('PendingRequestService.close rejects all pending requests', async t => {
     t.is(results[1].status, 'rejected');
     t.ok(results[1]?.reason?.message?.includes(`Pending request ${request2.id} cancelled (shutdown).`));
 });
+
+test('PendingRequestService rejects all pending requests for a specific peer', async t => {
+    const service = new PendingRequestService(config);
+    const peerA = 'deadbeef';
+    const peerB = 'cafebabe';
+    const requestA1 = await buildV1Request();
+    const requestA2 = await buildV1Request();
+    const requestB1 = await buildV1Request();
+
+    const promiseA1 = service.registerPendingRequest(peerA, requestA1);
+    const promiseA2 = service.registerPendingRequest(peerA, requestA2);
+    const promiseB1 = service.registerPendingRequest(peerB, requestB1);
+
+    const rejectedCount = service.rejectPendingRequestsForPeer(peerA, new Error('peer disconnected'));
+    t.is(rejectedCount, 2);
+    t.is(service.has(requestA1.id), false);
+    t.is(service.has(requestA2.id), false);
+    t.is(service.has(requestB1.id), true);
+
+    const results = await Promise.allSettled([promiseA1, promiseA2]);
+    t.is(results[0].status, 'rejected');
+    t.is(results[0].reason.message, 'peer disconnected');
+    t.is(results[1].status, 'rejected');
+    t.is(results[1].reason.message, 'peer disconnected');
+
+    t.ok(service.resolvePendingRequest(requestB1.id));
+    await promiseB1;
+});
+
+test('PendingRequestService stores only transaction data for broadcast requests', async t => {
+    const service = new PendingRequestService(config);
+    const peer = 'deadbeef';
+    const livenessRequest = await buildV1Request();
+    const broadcastRequest = await buildV1BroadcastRequest();
+
+    const livenessPromise = service.registerPendingRequest(peer, livenessRequest);
+    const broadcastPromise = service.registerPendingRequest(peer, broadcastRequest);
+
+    const livenessEntry = service.getPendingRequest(livenessRequest.id);
+    const broadcastEntry = service.getPendingRequest(broadcastRequest.id);
+
+    t.is(livenessEntry.requestTxData, null);
+    t.ok(b4a.isBuffer(broadcastEntry.requestTxData));
+    t.alike(broadcastEntry.requestTxData, broadcastRequest.broadcast_transaction_request.data);
+    t.is(Object.prototype.hasOwnProperty.call(livenessEntry, 'requestMessage'), false);
+    t.is(Object.prototype.hasOwnProperty.call(broadcastEntry, 'requestMessage'), false);
+
+    t.ok(service.resolvePendingRequest(livenessRequest.id));
+    t.ok(service.resolvePendingRequest(broadcastRequest.id));
+    await Promise.all([livenessPromise, broadcastPromise]);
+});
+
+async function buildV1BroadcastRequest({ id = uuidv7(), data = b4a.from('deadbeef', 'hex') } = {}) {
+    const wallet = createWallet();
+    const builder = new NetworkMessageBuilder(wallet, config);
+    await builder
+        .setType(NetworkOperationType.BROADCAST_TRANSACTION_REQUEST)
+        .setId(id)
+        .setTimestamp()
+        .setData(data)
+        .setCapabilities([])
+        .buildPayload();
+    return builder.getResult();
+}

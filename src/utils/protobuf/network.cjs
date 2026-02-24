@@ -27,7 +27,10 @@ exports.ResultCode = {
   "RESULT_CODE_SIGNATURE_INVALID": 4,
   "RESULT_CODE_UNEXPECTED_ERROR": 5,
   "RESULT_CODE_TIMEOUT": 6,
-  "RESULT_CODE_NODE_HAS_NO_WRITE_ACCESS": 7
+  "RESULT_CODE_NODE_HAS_NO_WRITE_ACCESS": 7,
+  "RESULT_CODE_TX_ACCEPTED_PROOF_UNAVAILABLE": 8,
+  "RESULT_CODE_NODE_OVERLOADED": 9,
+  "RESULT_CODE_TX_ALREADY_PENDING": 10
 }
 
 var LivenessRequest = exports.LivenessRequest = {
@@ -58,6 +61,13 @@ var BroadcastTransactionResponse = exports.BroadcastTransactionResponse = {
   decode: null
 }
 
+var ProofData = exports.ProofData = {
+  buffer: true,
+  encodingLength: null,
+  encode: null,
+  decode: null
+}
+
 var MessageHeader = exports.MessageHeader = {
   buffer: true,
   encodingLength: null,
@@ -69,6 +79,7 @@ defineLivenessRequest()
 defineLivenessResponse()
 defineBroadcastTransactionRequest()
 defineBroadcastTransactionResponse()
+defineProofData()
 defineMessageHeader()
 
 function defineLivenessRequest () {
@@ -321,6 +332,14 @@ function defineBroadcastTransactionResponse () {
       var len = encodings.bytes.encodingLength(obj.signature)
       length += 1 + len
     }
+    if (defined(obj.proof)) {
+      var len = encodings.bytes.encodingLength(obj.proof)
+      length += 1 + len
+    }
+    if (defined(obj.appendedAt)) {
+      var len = encodings.varint.encodingLength(obj.appendedAt)
+      length += 1 + len
+    }
     if (defined(obj.result)) {
       var len = encodings.enum.encodingLength(obj.result)
       length += 1 + len
@@ -342,8 +361,18 @@ function defineBroadcastTransactionResponse () {
       encodings.bytes.encode(obj.signature, buf, offset)
       offset += encodings.bytes.encode.bytes
     }
+    if (defined(obj.proof)) {
+      buf[offset++] = 26
+      encodings.bytes.encode(obj.proof, buf, offset)
+      offset += encodings.bytes.encode.bytes
+    }
+    if (defined(obj.appendedAt)) {
+      buf[offset++] = 32
+      encodings.varint.encode(obj.appendedAt, buf, offset)
+      offset += encodings.varint.encode.bytes
+    }
     if (defined(obj.result)) {
-      buf[offset++] = 24
+      buf[offset++] = 40
       encodings.enum.encode(obj.result, buf, offset)
       offset += encodings.enum.encode.bytes
     }
@@ -359,6 +388,8 @@ function defineBroadcastTransactionResponse () {
     var obj = {
       nonce: null,
       signature: null,
+      proof: null,
+      appendedAt: 0,
       result: 0
     }
     while (true) {
@@ -379,8 +410,85 @@ function defineBroadcastTransactionResponse () {
         offset += encodings.bytes.decode.bytes
         break
         case 3:
+        obj.proof = encodings.bytes.decode(buf, offset)
+        offset += encodings.bytes.decode.bytes
+        break
+        case 4:
+        obj.appendedAt = encodings.varint.decode(buf, offset)
+        offset += encodings.varint.decode.bytes
+        break
+        case 5:
         obj.result = encodings.enum.decode(buf, offset)
         offset += encodings.enum.decode.bytes
+        break
+        default:
+        offset = skip(prefix & 7, buf, offset)
+      }
+    }
+  }
+}
+
+function defineProofData () {
+  ProofData.encodingLength = encodingLength
+  ProofData.encode = encode
+  ProofData.decode = decode
+
+  function encodingLength (obj) {
+    var length = 0
+    if (defined(obj.proof)) {
+      var len = encodings.bytes.encodingLength(obj.proof)
+      length += 1 + len
+    }
+    if (defined(obj.appendedAt)) {
+      var len = encodings.varint.encodingLength(obj.appendedAt)
+      length += 1 + len
+    }
+    return length
+  }
+
+  function encode (obj, buf, offset) {
+    if (!offset) offset = 0
+    if (!buf) buf = b4a.allocUnsafe(encodingLength(obj))
+    var oldOffset = offset
+    if (defined(obj.proof)) {
+      buf[offset++] = 10
+      encodings.bytes.encode(obj.proof, buf, offset)
+      offset += encodings.bytes.encode.bytes
+    }
+    if (defined(obj.appendedAt)) {
+      buf[offset++] = 16
+      encodings.varint.encode(obj.appendedAt, buf, offset)
+      offset += encodings.varint.encode.bytes
+    }
+    encode.bytes = offset - oldOffset
+    return buf
+  }
+
+  function decode (buf, offset, end) {
+    if (!offset) offset = 0
+    if (!end) end = buf.length
+    if (!(end <= buf.length && offset <= buf.length)) throw new Error("Decoded message is not valid")
+    var oldOffset = offset
+    var obj = {
+      proof: null,
+      appendedAt: 0
+    }
+    while (true) {
+      if (end <= offset) {
+        decode.bytes = offset - oldOffset
+        return obj
+      }
+      var prefix = varint.decode(buf, offset)
+      offset += varint.decode.bytes
+      var tag = prefix >> 3
+      switch (tag) {
+        case 1:
+        obj.proof = encodings.bytes.decode(buf, offset)
+        offset += encodings.bytes.decode.bytes
+        break
+        case 2:
+        obj.appendedAt = encodings.varint.decode(buf, offset)
+        offset += encodings.varint.decode.bytes
         break
         default:
         offset = skip(prefix & 7, buf, offset)

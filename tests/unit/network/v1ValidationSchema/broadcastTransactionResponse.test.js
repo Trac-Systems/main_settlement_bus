@@ -8,7 +8,6 @@ import {
     ResultCode,
     SIGNATURE_BYTE_LENGTH,
 } from '../../../../src/utils/constants.js';
-import {config} from '../../../helpers/config.js';
 import {not_allowed_data_types} from '../../../fixtures/check.fixtures.js';
 
 import {
@@ -20,7 +19,7 @@ import {
     valueLevelValidationTests,
 } from './common.test.js';
 
-const v = new V1ValidationSchema(config);
+const v = new V1ValidationSchema();
 
 const validFixture = {
     type: NetworkOperationType.BROADCAST_TRANSACTION_RESPONSE,
@@ -29,6 +28,8 @@ const validFixture = {
     broadcast_transaction_response: {
         nonce: b4a.alloc(NONCE_BYTE_LENGTH, 1),
         signature: b4a.alloc(SIGNATURE_BYTE_LENGTH, 2),
+        proof: b4a.from('deadbeef', 'hex'),
+        appendedAt: Date.now(),
         result: ResultCode.OK,
     },
     capabilities: ['cap:a'],
@@ -108,6 +109,10 @@ test('V1ValidationSchema.validateV1BroadcastTransactionResponse - result value v
     const infinity = structuredClone(validFixture);
     infinity.broadcast_transaction_response.result = Infinity;
     t.absent(v.validateV1BroadcastTransactionResponse(infinity), 'result Infinity should fail');
+
+    const unknownCode = structuredClone(validFixture);
+    unknownCode.broadcast_transaction_response.result = Math.max(...Object.values(ResultCode)) + 1;
+    t.absent(v.validateV1BroadcastTransactionResponse(unknownCode), 'unknown result code should fail');
 });
 
 test('V1ValidationSchema.validateV1BroadcastTransactionResponse - buffer lengths', t => {

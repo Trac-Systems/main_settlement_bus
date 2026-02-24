@@ -1,12 +1,12 @@
 import b4a from 'b4a';
 import PeerWallet from 'trac-wallet';
-import Check from '../../../../../../utils/check.js';
-import {bufferToAddress} from "../../../../../state/utils/address.js";
-import {createMessage} from "../../../../../../utils/buffer.js";
-import {OperationType} from "../../../../../../utils/constants.js";
-import {bufferToBigInt} from "../../../../../../utils/amountSerialization.js";
-import {FEE} from "../../../../../state/utils/transaction.js";
-import * as operationsUtils from '../../../../../../utils/applyOperations.js';
+import Check from '../../../../../utils/check.js';
+import {bufferToAddress} from "../../../../state/utils/address.js";
+import {createMessage} from "../../../../../utils/buffer.js";
+import {OperationType} from "../../../../../utils/constants.js";
+import {bufferToBigInt} from "../../../../../utils/amountSerialization.js";
+import {FEE} from "../../../../state/utils/transaction.js";
+import * as operationsUtils from '../../../../../utils/applyOperations.js';
 
 const MAX_AMOUNT = BigInt('0xffffffffffffffffffffffffffffffff');
 const FEE_BIGINT = bufferToBigInt(FEE);

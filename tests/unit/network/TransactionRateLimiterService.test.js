@@ -3,7 +3,7 @@ import { test } from 'brittle';
 import b4a from 'b4a';
 
 import TransactionRateLimiterService from '../../../src/core/network/services/TransactionRateLimiterService.js';
-import { RateLimitedError } from '../../../src/core/network/protocols/v1/V1ProtocolError.js';
+import { V1RateLimitedError } from '../../../src/core/network/protocols/v1/V1ProtocolError.js';
 import {
     CLEANUP_INTERVAL_MS,
     CONNECTION_TIMEOUT_MS,
@@ -85,7 +85,7 @@ test('TransactionRateLimiterService', async (t) => {
                 err = error;
             }
 
-            t.ok(err instanceof RateLimitedError);
+            t.ok(err instanceof V1RateLimitedError);
             t.ok(err.message.includes('Rate limit exceeded for peer'));
         } finally {
             clock.restore();

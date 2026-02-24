@@ -19,6 +19,8 @@ class NetworkMessageBuilder {
     #issuerAddress;
     #resultCode;
     #data;
+    #proof;
+    #appendedAt;
     #header;
     #payloadKey;
     #body;
@@ -85,10 +87,37 @@ class NetworkMessageBuilder {
     }
 
     setData(data) {
+        // case when response have to be empty.
+        if (data === undefined || data === null) data = b4a.alloc(0);
+
         if (!b4a.isBuffer(data)) {
             throw new Error(`Data must be a buffer.`);
         }
         this.#data = data;
+        return this;
+    }
+
+    setProof(proof) {
+        if (proof === undefined || proof === null) proof = b4a.alloc(0);
+        if (!b4a.isBuffer(proof)) {
+            throw new Error(`Proof must be a buffer.`);
+        }
+        this.#proof = proof;
+        return this;
+    }
+
+    setAppendedAt(appendedAt) {
+        if (appendedAt === undefined || appendedAt === null) {
+            this.#appendedAt = null;
+            return this;
+        }
+
+        const value = appendedAt instanceof Date ? appendedAt.getTime() : appendedAt;
+        if (!Number.isSafeInteger(value) || value < 0) {
+            throw new Error('appendedAt must be a non-negative safe integer or Date.');
+        }
+
+        this.#appendedAt = value;
         return this;
     }
 
@@ -188,21 +217,50 @@ class NetworkMessageBuilder {
         const nonce = PeerWallet.generateNonce();
         const tsBuf = timestampToBuffer(this.#timestamp);
         const idBuf = idToBuffer(this.#id);
+        const proof = b4a.isBuffer(this.#proof) ? this.#proof : b4a.alloc(0);
+        const hasProof = proof.length > 0;
+        const appendedAt = Number.isSafeInteger(this.#appendedAt) ? this.#appendedAt : 0;
+        const hasAppendedAt = appendedAt > 0;
+
+        if (this.#resultCode === ResultCode.OK) {
+            if (!hasProof || !hasAppendedAt) {
+                throw new Error('Result code OK requires non-empty proof and appendedAt > 0.');
+            }
+        } else if (this.#resultCode === ResultCode.TX_ACCEPTED_PROOF_UNAVAILABLE) {
+            if (hasProof) {
+                throw new Error('Result code TX_ACCEPTED_PROOF_UNAVAILABLE requires empty proof.');
+            }
+            if (!hasAppendedAt) {
+                throw new Error('Result code TX_ACCEPTED_PROOF_UNAVAILABLE requires appendedAt > 0.');
+            }
+        } else {
+            if (hasProof) {
+                throw new Error('Non-OK result code requires empty proof.');
+            }
+            if (appendedAt !== 0) {
+                throw new Error('Non-OK result code requires appendedAt to be 0, except TX_ACCEPTED_PROOF_UNAVAILABLE.');
+            }
+        }
+
         const message = createMessage(
             this.#type,
             idBuf,
             tsBuf,
             nonce,
+            proof,
+            timestampToBuffer(appendedAt),
             safeWriteUInt32BE(this.#resultCode, 0),
             encodeCapabilities(this.#capabilities),
         );
+
         const hash = await PeerWallet.blake3(message);
         const signature = this.#wallet.sign(hash);
-
         this.#payloadKey = 'broadcast_transaction_response';
         this.#body = {
             nonce,
             signature,
+            proof,
+            appendedAt,
             result: this.#resultCode
         };
     }

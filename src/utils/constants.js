@@ -49,6 +49,9 @@ export const ResultCode = Object.freeze({
     UNEXPECTED_ERROR: NetworkResultCode.RESULT_CODE_UNEXPECTED_ERROR,
     TIMEOUT: NetworkResultCode.RESULT_CODE_TIMEOUT,
     NODE_HAS_NO_WRITE_ACCESS: NetworkResultCode.RESULT_CODE_NODE_HAS_NO_WRITE_ACCESS,
+    TX_ACCEPTED_PROOF_UNAVAILABLE: NetworkResultCode.RESULT_CODE_TX_ACCEPTED_PROOF_UNAVAILABLE,
+    NODE_OVERLOADED: NetworkResultCode.RESULT_CODE_NODE_OVERLOADED,
+    TX_ALREADY_PENDING: NetworkResultCode.RESULT_CODE_TX_ALREADY_PENDING
 });
 
 // Role managment constants
@@ -127,6 +130,10 @@ export const MAX_TRANSACTIONS_PER_SECOND = 50;
 export const MAX_PARTIAL_TX_PAYLOAD_BYTE_SIZE = 3072;
 export const TRANSACTION_POOL_SIZE = 1000;
 export const V1_PROTOCOL_PAYLOAD_MAX_SIZE = 4096;
+
+// Transaction Commit Service
+
+export const TRANSACTION_COMMIT_SERVICE_BUFFER_SIZE = 1500;
 
 // Network message constants
 export const NETWORK_MESSAGE_TYPES = Object.freeze({

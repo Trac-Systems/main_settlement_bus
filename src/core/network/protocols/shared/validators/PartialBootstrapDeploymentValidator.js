@@ -1,4 +1,4 @@
-import PartialOperationValidator from './base/PartialOperationValidator.js';
+import PartialOperationValidator from './PartialOperationValidator.js';
 
 class PartialBootstrapDeploymentValidator extends PartialOperationValidator {
     constructor(state, selfAddress , config) {

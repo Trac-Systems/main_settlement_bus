@@ -6,6 +6,7 @@ async function runTests() {
 	test.pause();
 
 	await import('./check/check.test.js');
+	await import('./deepEqualApplyPayload/deepEqualApplyPayload.test.js');
 	await import('./protobuf/operationHelpers.test.js');
 	await import('./helpers/helpers.test.js');
 	await import('./fileUtils/readAddressesFromWhitelistFile.test.js');

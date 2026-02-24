@@ -1,4 +1,4 @@
-import { NetworkOperationType } from '../../../utils/constants.js';
+import {NetworkOperationType} from '../../../utils/constants.js';
 
 /**
  * Director for v1 internal network protocol messages.
@@ -71,18 +71,28 @@ class NetworkMessageDirector {
 
     /**
      * Build a broadcast transaction response message.
+     *
+     * Allowed payload variants:
+     * 1) resultCode === OK - proof must be non-empty and appendedAt must be > 0.
+     * 2) resultCode === TX_ACCEPTED_PROOF_UNAVAILABLE - proof must be empty and appendedAt must be > 0.
+     * 3) resultCode !== OK and resultCode !== TX_ACCEPTED_PROOF_UNAVAILABLE - proof must be empty and appendedAt must be 0.
+     *
      * @param {string} id
      * @param {string[]} capabilities
-     * @param {number} statusCode
+     * @param {number} resultCode
+     * @param {Buffer|null|undefined} proof
+     * @param {number|Date|null|undefined} appendedAt
      * @returns {Promise<object>}
      */
-    async buildBroadcastTransactionResponse(id, capabilities, statusCode) {
+    async buildBroadcastTransactionResponse(id, capabilities, resultCode, proof = null, appendedAt = null) {
         await this.#builder
             .setType(NetworkOperationType.BROADCAST_TRANSACTION_RESPONSE)
             .setId(id)
             .setTimestamp()
             .setCapabilities(capabilities)
-            .setResultCode(statusCode)
+            .setProof(proof)
+            .setAppendedAt(appendedAt)
+            .setResultCode(resultCode)
             .buildPayload();
 
         return this.#builder.getResult();
