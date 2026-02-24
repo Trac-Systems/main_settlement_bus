@@ -2,12 +2,12 @@ import { generateUUID, sleep } from '../../../utils/helpers.js';
 import { operationToPayload } from '../../../utils/applyOperations.js';
 import PeerWallet from "trac-wallet";
 import b4a from "b4a";
-import {networkMessageFactory} from "../../../messages/network/v1/networkMessageFactory.js";
-import {NETWORK_CAPABILITIES} from "../../../utils/constants.js";
+import { networkMessageFactory } from "../../../messages/network/v1/networkMessageFactory.js";
+import { NETWORK_CAPABILITIES } from "../../../utils/constants.js";
 import {
     unsafeEncodeApplyOperation
 } from "../../../utils/protobuf/operationHelpers.js";
-import {normalizeMessageByOperationType} from "../../../utils/normalizers.js";
+import { normalizeMessageByOperationType } from "../../../utils/normalizers.js";
 /**
  * MessageOrchestrator coordinates message submission, retry, and validator management.
  * It works with ConnectionManager and ledger state to ensure reliable message delivery.
@@ -43,21 +43,25 @@ class MessageOrchestrator {
         if (!validatorPublicKey) return false;
         console.log("Sending message to validator:", PeerWallet.encodeBech32m(this.#config.addressPrefix, b4a.from(validatorPublicKey, 'hex')));
 
+        /* NOTE: Since the retry logic for Legacy is handled here, and is very unique to the protocol,
+        * it was decided to not change MessageOrchestrator send method in the refactor to make protocols transparent.
+        * As the Legacy protocol is going to be deprecated soon, it was decided to keep the retry logic 
+        * here instead of abstracting it in the protocol implementation. 
+        * If we were to abstract it, we would need to add protocol-specific logic in the ProtocolSession
+        * or ProtocolInterface, which would make them less clean and more coupled with the specifics of the protocols.
+        * The parts to be refactored in the future are marked with TODO comments.
+        */
+
+        // TODO: After Legacy is deprecated, we don't need to check preferred protocol here.
         const validatorConnection = this.connectionManager.getConnection(validatorPublicKey);
         const preferredProtocol = validatorConnection.protocolSession.preferredProtocol;
 
         if (preferredProtocol === validatorConnection.protocolSession.supportedProtocols.LEGACY) {
-
-            const startTime = Date.now();
-            while (Date.now() - startTime < this.#config.messageValidatorResponseTimeout) {
-                const success = await this.#attemptSendMessageForLegacy(validatorPublicKey, message);
-                if (success) {
-                    return true;
-                }
-
-            }
-
+            return this.#attemptSendMessageForLegacy(validatorPublicKey, message);
         } else if (preferredProtocol === validatorConnection.protocolSession.supportedProtocols.V1) {
+            // TODO: This is probably better placed inside the V1 protocol definition.
+            // Both protocols should receive a 'canonical' message and solve the encodings internally
+            // Refactor 
             const normalizedMessage = normalizeMessageByOperationType(message, this.#config)
             const encodedTransaction = unsafeEncodeApplyOperation(normalizedMessage)
             const v1Message = await networkMessageFactory(this.#wallet, this.#config)
@@ -67,24 +71,18 @@ class MessageOrchestrator {
                     NETWORK_CAPABILITIES
                 );
 
-            const success = await this.#attemptSendMessageForV1(validatorPublicKey, v1Message);
-            if (success) {
-                return true;
-            }
+            return this.connectionManager.sendSingleMessage(v1Message, validatorPublicKey);
         }
         return false;
     }
 
-    async #attemptSendMessageForV1(validator, message) {
-        return this.connectionManager.sendSingleMessage(message, validator);
-    }
-
+    // TODO: Delete this function after legacy protocol is deprecated
     async #attemptSendMessageForLegacy(validatorPublicKey, message) {
-        let attempts = 0;
+        const startTime = Date.now();
         const deductedTxType = operationToPayload(message.type);
-        while (attempts <= this.#config.maxRetries) {
+        let attempts = 0;
+        while (attempts <= this.#config.maxRetries && Date.now() - startTime < this.#config.messageValidatorResponseTimeout) {
             await this.connectionManager.sendSingleMessage(message, validatorPublicKey);
-
             const appeared = await this.waitForUnsignedState(message[deductedTxType].tx, this.#config.messageValidatorRetryDelay);
             if (appeared) {
                 this.incrementSentCount(validatorPublicKey);

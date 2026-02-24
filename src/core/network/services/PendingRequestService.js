@@ -16,9 +16,9 @@ class PendingRequestService {
         return this.#pendingRequests.has(id);
     }
 
-    isAlreadyProbed(peerPubKeyHex, preferedProtocol) {
+    isProbePending(peerPubKeyHex) {
         for (const [, entry] of this.#pendingRequests) {
-            if (entry.requestedTo === peerPubKeyHex && entry.requestType === NetworkOperationType.LIVENESS_REQUEST && preferedProtocol === null) {
+            if (entry.requestedTo === peerPubKeyHex && entry.requestType === NetworkOperationType.LIVENESS_REQUEST) {
                 return true;
             }
         }
