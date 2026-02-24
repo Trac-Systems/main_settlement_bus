@@ -1,4 +1,5 @@
 import b4a from 'b4a';
+import {publicKeyToAddress} from "../../../../../utils/helpers.js";
 
 class BaseStateOperationHandler {
     #state;
@@ -37,18 +38,18 @@ class BaseStateOperationHandler {
             throw new Error('OperationHandler: State is not writable or is an indexer without admin privileges.');
         }
 
-        if (this.#txPoolService.tx_pool.length >= this.#config.transactionPoolSize) {
-            throw new Error("OperationHandler: Transaction pool is full, ignoring incoming transaction.");
-        }
-
-        if (b4a.byteLength(JSON.stringify(payload)) > this.#config.maxPartialTxPayloadByteSize) {
-            throw new Error(`OperationHandler: Payload size exceeds maximum limit of ${this.#config.maxPartialTxPayloadByteSize} bytes by ${b4a.byteLength(JSON.stringify(payload)) - this.#config.maxPartialTxPayloadByteSize} bytes.`);
+        this.#txPoolService.validateEnqueue();
+        if (b4a.byteLength(JSON.stringify(payload)) > this.#config.transactionPoolSize) {
+            throw new Error(
+                `OperationHandler: Payload size exceeds maximum limit of ${this.#config.transactionPoolSize} bytes by ${b4a.byteLength(JSON.stringify(payload)) - this.#config.transactionPoolSize} bytes.`);
         }
         
         if (!this.#config.disableRateLimit) {
             const shouldDisconnect = this.#rateLimiter.legacyHandleRateLimit(connection);
             if (shouldDisconnect) {
-                throw new Error(`OperationHandler: Rate limit exceeded for peer ${b4a.toString(connection.remotePublicKey, 'hex')}. Disconnecting...`);
+                throw new Error(
+                    `OperationHandler: Rate limit exceeded for ${publicKeyToAddress(connection.remotePublicKey, this.#config)}. Disconnecting...`
+                );
             }
         }
     }
@@ -56,6 +57,16 @@ class BaseStateOperationHandler {
     async handle(payload, connection) {
         await this.validateBasicRequirements(payload, connection);
         await this.handleOperation(payload, connection);
+    }
+
+    enqueueTransaction(txHash, encodedOperation, context = 'OperationHandler') {
+        try {
+            this.#txPoolService.addTransaction(txHash, encodedOperation);
+        } catch (error) {
+            throw new Error(
+                `${context}: Failed to add transaction ${txHash} to transaction pool: ${error?.message ?? String(error)}`
+            );
+        }
     }
 
     async handleOperation(payload, connection) {

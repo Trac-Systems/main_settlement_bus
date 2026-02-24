@@ -1,7 +1,7 @@
 import {
-    InvalidPayloadError,
-    SignatureInvalidError,
-    UnexpectedError,
+    V1InvalidPayloadError,
+    V1SignatureInvalidError,
+    V1UnexpectedError,
 } from './V1ProtocolError.js';
 
 // Temporary logic - delete and refactor validators with Legacy protocol depracation.
@@ -60,18 +60,18 @@ export function mapValidationErrorToV1Error(error) {
     const message = error?.message ?? 'Unexpected validation error.';
 
     if (signaturePatterns.some(pattern => pattern.test(message))) {
-        return new SignatureInvalidError(message, false);
+        return new V1SignatureInvalidError(message, false);
     }
 
     if (invalidPayloadPatterns.some(pattern => pattern.test(message))) {
-        return new InvalidPayloadError(message, false);
+        return new V1InvalidPayloadError(message, false);
     }
 
     if (unexpectedPatterns.some(pattern => pattern.test(message))) {
-        return new UnexpectedError(message, true);
+        return new V1UnexpectedError(message, true);
     }
 
-    return new UnexpectedError(message, true);
+    return new V1UnexpectedError(message, true);
 }
 
 export default {

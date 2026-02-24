@@ -1,5 +1,5 @@
 import V1ValidationSchema from "./V1ValidationSchema.js";
-import {NetworkOperationType} from "../../../../../utils/constants.js";
+import {NetworkOperationType, ResultCode} from "../../../../../utils/constants.js";
 import PeerWallet from "trac-wallet";
 import b4a from "b4a";
 import {
@@ -10,9 +10,9 @@ import {
     timestampToBuffer
 } from "../../../../../utils/buffer.js";
 import {
-    InvalidPayloadError,
-    SignatureInvalidError,
-    UnexpectedError,
+    V1InvalidPayloadError,
+    V1SignatureInvalidError,
+    V1UnexpectedError,
 } from "../V1ProtocolError.js";
 
 class V1BaseOperation {
@@ -21,7 +21,7 @@ class V1BaseOperation {
 
     constructor(config) {
         this.#config = config;
-        this.#v1ValidationSchema = new V1ValidationSchema(config);
+        this.#v1ValidationSchema = new V1ValidationSchema();
     }
 
     async validate(payload, connection, pendingRequestServiceEntry) {
@@ -30,13 +30,13 @@ class V1BaseOperation {
 
     isPayloadSchemaValid(payload) {
         if (!payload || payload.type === null || payload.type === undefined) {
-            throw new InvalidPayloadError('Payload or payload type is missing.');
+            throw new V1InvalidPayloadError('Payload or payload type is missing.');
         }
 
         const selectedValidator = this.#selectCheckSchemaValidator(payload.type);
         const isPayloadValid = selectedValidator(payload);
         if (!isPayloadValid) {
-            throw new InvalidPayloadError('Payload is invalid.');
+            throw new V1InvalidPayloadError('Payload is invalid.');
         }
     }
 
@@ -51,14 +51,14 @@ class V1BaseOperation {
             if (error && typeof error === 'object' && 'resultCode' in error) {
                 throw error;
             }
-            throw new InvalidPayloadError(`Failed to build signature message: ${error.message}`);
+            throw new V1InvalidPayloadError(`Failed to build signature message: ${error.message}`);
         }
 
         let hash;
         try {
             hash = await PeerWallet.blake3(message);
         } catch (error) {
-            throw new InvalidPayloadError('Failed to hash signature message.');
+            throw new V1InvalidPayloadError('Failed to hash signature message.');
         }
 
         let verified = false;
@@ -68,16 +68,16 @@ class V1BaseOperation {
             verified = false;
         }
         if (!verified) {
-            throw new SignatureInvalidError('signature verification failed.');
+            throw new V1SignatureInvalidError('signature verification failed.');
         }
     }
 
     #buildSignatureMessage(payload) {
         if (!Number.isInteger(payload.type)) {
-            throw new InvalidPayloadError('Operation type must be an integer.');
+            throw new V1InvalidPayloadError('Operation type must be an integer.');
         }
         if (payload.type === 0) {
-            throw new InvalidPayloadError('Operation type is unspecified.');
+            throw new V1InvalidPayloadError('Operation type is unspecified.');
         }
 
         const idBuf = idToBuffer(payload.id);
@@ -109,20 +109,57 @@ class V1BaseOperation {
                 const nonce = payload.broadcast_transaction_response.nonce;
                 const signature = payload.broadcast_transaction_response.signature;
                 const result = payload.broadcast_transaction_response.result;
-                const message = createMessage(payload.type, idBuf, tsBuf, nonce, safeWriteUInt32BE(result, 0), capsBuf);
+                const proofRaw = payload.broadcast_transaction_response.proof;
+                const proof = b4a.isBuffer(proofRaw) ? proofRaw : b4a.alloc(0);
+                const hasProof = proof.length > 0;
+                const appendedAtRaw = payload.broadcast_transaction_response.appendedAt;
+                const appendedAt = Number.isSafeInteger(appendedAtRaw) ? appendedAtRaw : 0;
+                const hasAppendedAt = appendedAt > 0;
+
+                if (result === ResultCode.OK) {
+                    if (!hasProof || !hasAppendedAt) {
+                        throw new V1InvalidPayloadError('Result code OK requires non-empty proof and appendedAt > 0.');
+                    }
+                } else if (result === ResultCode.TX_ACCEPTED_PROOF_UNAVAILABLE) {
+                    if (hasProof) {
+                        throw new V1InvalidPayloadError('Result code TX_ACCEPTED_PROOF_UNAVAILABLE requires empty proof.');
+                    }
+                    if (!hasAppendedAt) {
+                        throw new V1InvalidPayloadError('Result code TX_ACCEPTED_PROOF_UNAVAILABLE requires appendedAt > 0.');
+                    }
+                } else {
+                    if (hasProof) {
+                        throw new V1InvalidPayloadError('Non-OK result code requires empty proof.');
+                    }
+                    if (appendedAt !== 0) {
+                        throw new V1InvalidPayloadError('Non-OK result code requires appendedAt to be 0, except TX_ACCEPTED_PROOF_UNAVAILABLE.');
+                    }
+                }
+
+                const message = createMessage(
+                    payload.type,
+                    idBuf,
+                    tsBuf,
+                    nonce,
+                    proof,
+                    timestampToBuffer(appendedAt),
+                    safeWriteUInt32BE(result, 0),
+                    capsBuf
+                );
+
                 return {signature, message};
             }
             default:
-                throw new UnexpectedError(`Unknown operation type: ${payload.type}`);
+                throw new V1UnexpectedError(`Unknown operation type: ${payload.type}`);
         }
     }
 
     #selectCheckSchemaValidator(type) {
         if (!Number.isInteger(type)) {
-            throw new InvalidPayloadError('Operation type must be an integer.');
+            throw new V1InvalidPayloadError('Operation type must be an integer.');
         }
         if (type === 0) {
-            throw new InvalidPayloadError('Operation type is unspecified.');
+            throw new V1InvalidPayloadError('Operation type is unspecified.');
         }
 
         switch (type) {
@@ -135,14 +172,14 @@ class V1BaseOperation {
             case NetworkOperationType.BROADCAST_TRANSACTION_RESPONSE:
                 return this.#v1ValidationSchema.validateV1BroadcastTransactionResponse.bind(this.#v1ValidationSchema);
             default:
-                throw new UnexpectedError(`Unknown operation type: ${type}`);
+                throw new V1UnexpectedError(`Unknown operation type: ${type}`);
         }
     }
 
     validatePeerCorrectness(remotePublicKey, pendingRequestServiceEntry) {
         const senderPublicKeyHex = b4a.toString(remotePublicKey, 'hex');
         if (senderPublicKeyHex !== pendingRequestServiceEntry.requestedTo) {
-            throw new InvalidPayloadError(
+            throw new V1InvalidPayloadError(
                 `Response sender mismatch. Expected ${pendingRequestServiceEntry.requestedTo}, got ${senderPublicKeyHex}.`
             );
         }
@@ -158,11 +195,11 @@ class V1BaseOperation {
                 expectedResponseType = NetworkOperationType.BROADCAST_TRANSACTION_RESPONSE;
                 break;
             default:
-                throw new UnexpectedError(`Unsupported pending request type: ${pendingRequestServiceEntry.requestType}.`);
+                throw new V1UnexpectedError(`Unsupported pending request type: ${pendingRequestServiceEntry.requestType}.`);
         }
 
         if (payload.type !== expectedResponseType) {
-            throw new InvalidPayloadError(
+            throw new V1InvalidPayloadError(
                 `Response type mismatch for id ${pendingRequestServiceEntry.id}. Expected ${expectedResponseType}, got ${payload.type}.`
             );
         }
