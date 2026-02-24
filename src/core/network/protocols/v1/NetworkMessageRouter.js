@@ -11,7 +11,15 @@ class NetworkMessageRouterV1 {
     #livenessRequestHandler
     #broadcastTransactionHandler
 
-    constructor(state, wallet, rateLimiterService, txPoolService, pendingRequestsService, config) {
+    constructor(
+        state,
+        wallet,
+        rateLimiterService,
+        txPoolService,
+        pendingRequestsService,
+        transactionCommitService,
+        config
+    ) {
         this.#config = config
         this.#wallet = wallet
         this.#livenessRequestHandler = new V1LivenessOperationHandler(
@@ -26,6 +34,7 @@ class NetworkMessageRouterV1 {
             rateLimiterService,
             txPoolService,
             pendingRequestsService,
+            transactionCommitService,
             config
         );
     }

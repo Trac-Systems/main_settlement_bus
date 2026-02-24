@@ -7,7 +7,6 @@ import {
     NONCE_BYTE_LENGTH,
     SIGNATURE_BYTE_LENGTH,
 } from '../../../../src/utils/constants.js';
-import {config} from '../../../helpers/config.js';
 import {not_allowed_data_types} from '../../../fixtures/check.fixtures.js';
 
 import {
