@@ -11,6 +11,7 @@ import {
     normalizeTransactionOperation
 } from "../../../../../utils/normalizers.js";
 import b4a from "b4a";
+import {publicKeyToAddress} from "../../../../../utils/helpers.js";
 
 
 class LegacySubnetworkOperationHandler extends BaseStateOperationHandler {
@@ -26,7 +27,7 @@ class LegacySubnetworkOperationHandler extends BaseStateOperationHandler {
      * @param {TransactionPoolService} txPoolService
      * @param {object} config
      **/
-    constructor( state, wallet, rateLimiter, txPoolService, config) {
+    constructor(state, wallet, rateLimiter, txPoolService, config) {
         super(state, wallet, rateLimiter, txPoolService, config);
         this.#config = config;
         this.#wallet = wallet
@@ -34,13 +35,15 @@ class LegacySubnetworkOperationHandler extends BaseStateOperationHandler {
         this.#partialTransactionValidator = new PartialTransactionValidator(state, this.#wallet.address, config);
     }
 
-    async handleOperation(payload, connection)  {
+    async handleOperation(payload, connection) {
         if (payload.type === OperationType.TX) {
             await this.#partialTransactionSubHandler(payload, connection);
         } else if (payload.type === OperationType.BOOTSTRAP_DEPLOYMENT) {
             await this.#partialBootstrapDeploymentSubHandler(payload, connection);
         } else {
-            throw new Error('Unsupported operation type for LegacySubnetworkOperationHandler');
+            throw new Error(
+                `Unsupported operation type for LegacySubnetworkOperationHandler. Requested by ${publicKeyToAddress(connection.remotePublicKey, this.#config)} `
+            );
         }
     }
 
@@ -48,10 +51,12 @@ class LegacySubnetworkOperationHandler extends BaseStateOperationHandler {
         const normalizedPayload = normalizeTransactionOperation(payload, this.#config);
         const isValid = await this.#partialTransactionValidator.validate(normalizedPayload);
         if (!isValid) {
-            throw new Error("SubnetworkHandler: Transaction validation failed.");
+            throw new Error(`
+                SubnetworkHandler: Transaction validation failed. Requested by ${publicKeyToAddress(connection.remotePublicKey, this.#config)}`
+            );
         }
 
-        const completeTransactionOperation = await applyStateMessageFactory(this.#wallet,this.#config)
+        const completeTransactionOperation = await applyStateMessageFactory(this.#wallet, this.#config)
             .buildCompleteTransactionOperationMessage(
                 normalizedPayload.address,
                 normalizedPayload.txo.tx,
@@ -64,7 +69,7 @@ class LegacySubnetworkOperationHandler extends BaseStateOperationHandler {
                 normalizedPayload.txo.mbs
             )
         const encodedOperation = safeEncodeApplyOperation(completeTransactionOperation);
-        const txHash =  b4a.toString(normalizedPayload.txo.tx, 'hex');
+        const txHash = b4a.toString(normalizedPayload.txo.tx, 'hex');
         this.enqueueTransaction(txHash, encodedOperation, 'SubnetworkHandler');
 
     }
@@ -73,7 +78,9 @@ class LegacySubnetworkOperationHandler extends BaseStateOperationHandler {
         const normalizedPayload = normalizeBootstrapDeploymentOperation(payload, this.#config);
         const isValid = await this.#partialBootstrapDeploymentValidator.validate(normalizedPayload);
         if (!isValid) {
-            throw new Error("SubnetworkHandler: Bootstrap deployment validation failed.");
+            throw new Error(
+                `SubnetworkHandler: Bootstrap deployment validation failed. Requested by ${publicKeyToAddress(connection.remotePublicKey, this.#config)}`
+            );
         }
 
 
@@ -88,7 +95,7 @@ class LegacySubnetworkOperationHandler extends BaseStateOperationHandler {
                 normalizedPayload.bdo.is
             )
         const encodedOperation = safeEncodeApplyOperation(completeBootstrapDeploymentOperation);
-        const txHash =  b4a.toString(normalizedPayload.bdo.tx, 'hex');
+        const txHash = b4a.toString(normalizedPayload.bdo.tx, 'hex');
         this.enqueueTransaction(txHash, encodedOperation, 'SubnetworkHandler');
 
     }

@@ -1,5 +1,6 @@
 import b4a from 'b4a';
 import {MAX_PARTIAL_TX_PAYLOAD_BYTE_SIZE} from '../../../../../utils/constants.js';
+import {publicKeyToAddress} from "../../../../../utils/helpers.js";
 
 class BaseStateOperationHandler {
     #state;
@@ -40,13 +41,16 @@ class BaseStateOperationHandler {
 
         this.#txPoolService.validateEnqueue();
         if (b4a.byteLength(JSON.stringify(payload)) > MAX_PARTIAL_TX_PAYLOAD_BYTE_SIZE) {
-            throw new Error(`OperationHandler: Payload size exceeds maximum limit of ${MAX_PARTIAL_TX_PAYLOAD_BYTE_SIZE} bytes by ${b4a.byteLength(JSON.stringify(payload)) - MAX_PARTIAL_TX_PAYLOAD_BYTE_SIZE} bytes.`);
+            throw new Error(
+                `OperationHandler: Payload size exceeds maximum limit of ${MAX_PARTIAL_TX_PAYLOAD_BYTE_SIZE} bytes by ${b4a.byteLength(JSON.stringify(payload)) - MAX_PARTIAL_TX_PAYLOAD_BYTE_SIZE} bytes.`);
         }
         
         if (!this.#config.disableRateLimit) {
             const shouldDisconnect = this.#rateLimiter.legacyHandleRateLimit(connection);
             if (shouldDisconnect) {
-                throw new Error(`OperationHandler: Rate limit exceeded for peer ${b4a.toString(connection.remotePublicKey, 'hex')}. Disconnecting...`);
+                throw new Error(
+                    `OperationHandler: Rate limit exceeded for ${publicKeyToAddress(connection.remotePublicKey, this.#config)}. Disconnecting...`
+                );
             }
         }
     }

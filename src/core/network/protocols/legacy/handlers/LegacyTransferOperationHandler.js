@@ -5,6 +5,7 @@ import {normalizeTransferOperation} from "../../../../../utils/normalizers.js"
 import {applyStateMessageFactory} from "../../../../../messages/state/applyStateMessageFactory.js";
 import {safeEncodeApplyOperation} from "../../../../../utils/protobuf/operationHelpers.js";
 import b4a from "b4a";
+import {publicKeyToAddress} from "../../../../../utils/helpers.js";
 
 class LegacyTransferOperationHandler extends BaseStateOperationHandler {
     #partialTransferValidator;
@@ -27,7 +28,9 @@ class LegacyTransferOperationHandler extends BaseStateOperationHandler {
 
     async handleOperation(payload, connection) {
         if (payload.type !== OperationType.TRANSFER) {
-            throw new Error('Unsupported operation type for LegacyTransferOperationHandler');
+            throw new Error(
+                `Unsupported operation type for LegacyTransferOperationHandler. Requested by ${publicKeyToAddress(connection.remotePublicKey, this.#config)}`
+            );
         }
         await this.#handleTransfer(payload, connection);
     }
@@ -36,7 +39,9 @@ class LegacyTransferOperationHandler extends BaseStateOperationHandler {
         const normalizedPayload = normalizeTransferOperation(payload, this.#config);
         const isValid = await this.#partialTransferValidator.validate(normalizedPayload);
         if (!isValid) {
-            throw new Error("TransferHandler: Transfer validation failed.");
+            throw new Error(
+                `TransferHandler: Transfer validation failed. Requested by ${publicKeyToAddress(connection.remotePublicKey, this.#config)}`
+            );
         }
 
         const completeTransferOperation = await applyStateMessageFactory(this.#wallet, this.#config)

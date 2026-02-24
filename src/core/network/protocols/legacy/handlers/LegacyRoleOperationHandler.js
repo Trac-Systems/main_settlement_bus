@@ -4,6 +4,7 @@ import BaseStateOperationHandler from './BaseStateOperationHandler.js';
 import {applyStateMessageFactory} from "../../../../../messages/state/applyStateMessageFactory.js";
 import {safeEncodeApplyOperation} from "../../../../../utils/protobuf/operationHelpers.js";
 import {normalizeRoleAccessOperation} from "../../../../../utils/normalizers.js";
+import { publicKeyToAddress } from "../../../../../utils/helpers.js"
 import b4a from "b4a";
 
 class LegacyRoleOperationHandler extends BaseStateOperationHandler {
@@ -34,7 +35,8 @@ class LegacyRoleOperationHandler extends BaseStateOperationHandler {
         const isValid = await this.partialRoleAccessValidator.validate(normalizedPartialRoleAccessPayload)
         let completePayload = null
         if (!isValid) {
-            throw new Error("OperationHandler: partial role access payload validation failed.");
+            throw new Error(
+                `OperationHandler: partial role access payload validation failed. Requested by ${publicKeyToAddress(connection.remotePublicKey, this.#config)}`);
         }
         
         switch (normalizedPartialRoleAccessPayload.type) {
@@ -73,11 +75,15 @@ class LegacyRoleOperationHandler extends BaseStateOperationHandler {
                     )
                 break;
             default:
-                throw new Error("OperationHandler: Assembling complete role access operation failed due to unsupported operation type.");
+                throw new Error(
+                    `OperationHandler: Assembling complete role access operation failed due to unsupported operation type. Requested by ${publicKeyToAddress(connection.remotePublicKey, this.#config)}`
+                );
         }
 
         if (!completePayload) {
-            throw new Error("OperationHandler: Assembling complete role access operation failed.");
+            throw new Error(
+                `OperationHandler: Assembling complete role access operation failed. Requested by ${publicKeyToAddress(connection.remotePublicKey, this.#config)}`
+            );
         }
 
         const encodedOperation = safeEncodeApplyOperation(completePayload);
