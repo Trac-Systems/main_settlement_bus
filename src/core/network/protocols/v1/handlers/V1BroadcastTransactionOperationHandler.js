@@ -195,7 +195,7 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
             this.#txPoolService.validateEnqueue();
         } catch (error) {
             if (error instanceof TransactionPoolFullError) {
-                throw new V1NodeOverloadedError('Transaction pool is full, ignoring incoming transaction.', false);
+                throw new V1NodeOverloadedError('Transaction pool is full, ignoring incoming transaction.');
             }
             throw error;
         }
