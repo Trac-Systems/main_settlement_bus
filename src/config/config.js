@@ -141,6 +141,16 @@ export class Config {
         return this.#config.networkId
     }
 
+    get host() {
+        if (this.#isOverriden('host')) return this.#options.host
+        return this.#config.host
+    }
+
+    get port() {
+        if (this.#isOverriden('port')) return this.#options.port
+        return this.#config.port
+    }
+
     get storesDirectory() {
         if (this.#isOverriden('storesDirectory')) return this.#options.storesDirectory
         return this.#config.storesDirectory
@@ -179,7 +189,7 @@ export class Config {
 
     // Most of these properties are boolean
     #isOverriden(prop) {
-        return this.#options.hasOwnProperty(prop)
+        return this.#options.hasOwnProperty(prop) && this.#options[prop] !== undefined
     }
 
     #validate(options, config) {
