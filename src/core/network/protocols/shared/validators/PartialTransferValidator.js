@@ -2,7 +2,7 @@ import PeerWallet from 'trac-wallet';
 
 import {bufferToAddress} from "../../../../state/utils/address.js";
 import {bufferToBigInt} from "../../../../../utils/amountSerialization.js";
-import PartialOperationValidator from './base/PartialOperationValidator.js';
+import PartialOperationValidator from './PartialOperationValidator.js';
 
 class PartialTransferValidator extends PartialOperationValidator {
     #config
