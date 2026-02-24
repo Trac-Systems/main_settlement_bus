@@ -244,6 +244,7 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
 
         try {
             pendingCommit = this.#transactionCommitService.registerPendingCommit(txHash);
+            pendingCommit.catch(() => {});
         } catch (error) {
             if (error instanceof PendingCommitInvalidTxHashError) {
                 throw new V1InvalidPayloadError(error.message, false); // TODO: consider if false/true
