@@ -1,6 +1,5 @@
 import ReadyResource from 'ready-resource';
 import b4a from 'b4a';
-import { networkMessageFactory } from '../../../messages/network/v1/networkMessageFactory.js';
 import { generateUUID } from '../../../utils/helpers.js';
 import { EventType } from '../../../utils/constants.js';
 
@@ -13,29 +12,24 @@ const debugLog = (...args) => {
     }
 };
 
+const DEFAULT_HEALTH_CHECK_INTERVAL_MS = 300000; // 5 minutes
 class ValidatorHealthCheckService extends ReadyResource {
-    #wallet;
     #config;
     #intervalMs;
     #timers;
-    #capabilities;
 
     /**
-     * @param {object} wallet
-     * @param {string[]} capabilities
      * @param {object} config
      */
-    // TODO: Check if it is actually needed to pass capabilities here
-    constructor(wallet, capabilities, config = {}) {
+    constructor(config = {}) {
         super();
-        this.#wallet = wallet;
         this.#config = config;
         this.#timers = new Map();
 
-        this.#capabilities = this.#checkCapabilities(capabilities);
-        this.#intervalMs = this.#checkInterval(this.#config.validatorHealthCheckInterval) || 300000; // Default to 5 minutes
+        const interval = this.#config.validatorHealthCheckInterval;
+        this.#intervalMs = interval ? this.#checkInterval(interval) : DEFAULT_HEALTH_CHECK_INTERVAL_MS;
 
-        debugLog('initialized with intervalMs', this.#intervalMs, 'capabilities', this.#capabilities);
+        debugLog('initialized with intervalMs', this.#intervalMs);
     }
 
     get size() {
@@ -105,11 +99,8 @@ class ValidatorHealthCheckService extends ReadyResource {
 
     async #emitHealthCheck(publicKey) {
         try {
-            debugLog('emitHealthCheck: building liveness request for', publicKey);
             const requestId = generateUUID();
-            const message = await networkMessageFactory(this.#wallet, this.#config)
-                .buildLivenessRequest(requestId, this.#capabilities); // TODO: Check what are these "capabilities". Maybe the message could be assembles inside the event handler
-            this.emit(EventType.VALIDATOR_HEALTH_CHECK, { publicKey, message, requestId }); // TODO: If we assemble the message in the event handler, we don't need to pass it here
+            this.emit(EventType.VALIDATOR_HEALTH_CHECK, publicKey, requestId);
             debugLog(`Emitted health check event for ${publicKey} with requestId ${requestId}`);
         } catch (error) {
             console.error(`ValidatorHealthCheckService: Failed to emit health check for ${publicKey}: ${error?.message || error}`);
@@ -131,13 +122,7 @@ class ValidatorHealthCheckService extends ReadyResource {
         return ms;
     }
 
-    #checkCapabilities(capabilities) {
-        if (!Array.isArray(capabilities) || capabilities.some(cap => typeof cap !== 'string')) {
-            throw new TypeError('ValidatorHealthCheckService: capabilities must be an array of strings');
-        }
-        return capabilities;
-    }
-
+    // TODO: This method is used in multiple places. Consider moving it to a utility file or exposing it from PeerWallet.
     #normalizePublicKey(publicKey) {
         if (b4a.isBuffer(publicKey)) return publicKey.toString('hex');
         if (typeof publicKey === 'string') return publicKey.toLowerCase();

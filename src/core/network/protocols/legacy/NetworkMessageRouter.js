@@ -37,6 +37,7 @@ class NetworkMessageRouter {
         this.#preValidate(incomingMessage);
         const channelString = b4a.toString(this.#config.channel, 'utf8');
 
+        // We received a legacy message, so we set the connection protocol accordingly
         connection.protocolSession.setLegacyAsPreferredProtocol();
         if (this.#isGetRequest(incomingMessage)) {
             await this.#handlers.get.handle(incomingMessage, connection, channelString);
