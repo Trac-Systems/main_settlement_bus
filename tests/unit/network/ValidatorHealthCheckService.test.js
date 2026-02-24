@@ -59,7 +59,7 @@ test('ValidatorHealthCheckService', () => {
     });
 
     test('emits health check on interval', async (t) => {
-            const clock = sinon.useFakeTimers({ now: 0 });
+        const clock = sinon.useFakeTimers({ now: 0 });
         try {
             const config = createConfig(ENV.MAINNET, { validatorHealthCheckInterval: 1000 });
             const service = new ValidatorHealthCheckService(config);
@@ -82,7 +82,7 @@ test('ValidatorHealthCheckService', () => {
     });
 
     test('stopAll cancels scheduled checks', async (t) => {
-            const clock = sinon.useFakeTimers({ now: 0 });
+        const clock = sinon.useFakeTimers({ now: 0 });
         try {
             const config = createConfig(ENV.MAINNET, { validatorHealthCheckInterval: 1000 });
             const service = new ValidatorHealthCheckService(config);

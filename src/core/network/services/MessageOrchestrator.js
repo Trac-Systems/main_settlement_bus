@@ -44,7 +44,7 @@ class MessageOrchestrator {
         console.log("Sending message to validator:", PeerWallet.encodeBech32m(this.#config.addressPrefix, b4a.from(validatorPublicKey, 'hex')));
 
         /* NOTE: Since the retry logic for Legacy is handled here, and is very unique to the protocol,
-        * it was decided to not change MessageOrchestrator send method in the refator to make protocols transparent.
+        * it was decided to not change MessageOrchestrator send method in the refactor to make protocols transparent.
         * As the Legacy protocol is going to be deprecated soon, it was decided to keep the retry logic 
         * here instead of abstracting it in the protocol implementation. 
         * If we were to abstract it, we would need to add protocol-specific logic in the ProtocolSession
@@ -81,7 +81,7 @@ class MessageOrchestrator {
         const startTime = Date.now();
         const deductedTxType = operationToPayload(message.type);
         let attempts = 0;
-        while (attempts <= this.#config.maxRetries || Date.now() - startTime < this.#config.messageValidatorResponseTimeout) {
+        while (attempts <= this.#config.maxRetries && Date.now() - startTime < this.#config.messageValidatorResponseTimeout) {
             await this.connectionManager.sendSingleMessage(message, validatorPublicKey);
             const appeared = await this.waitForUnsignedState(message[deductedTxType].tx, this.#config.messageValidatorRetryDelay);
             if (appeared) {
