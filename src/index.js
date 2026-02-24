@@ -3,10 +3,8 @@ import ReadyResource from "ready-resource";
 import Corestore from "corestore";
 import PeerWallet from "trac-wallet";
 import b4a from "b4a";
-import readline from "readline";
-import tty from "tty";
 import { sleep, isHexString } from "./utils/helpers.js";
-import { verifyDag, printHelp, printWalletInfo, printBalance } from "./utils/cli.js";
+import { printWalletInfo, printBalance } from "./utils/cli.js";
 import { applyStateMessageFactory } from "./messages/state/applyStateMessageFactory.js";
 import { isAddressValid } from "./core/state/utils/address.js";
 import Network from "./core/network/Network.js";
@@ -20,29 +18,9 @@ import {
     BALANCE_MIGRATION_SLEEP_INTERVAL,
     WHITELIST_MIGRATION_DIR
 } from "./utils/constants.js";
-import { randomBytes } from "hypercore-crypto";
 import { decimalStringToBigInt, bigIntTo16ByteBuffer, bufferToBigInt, bigIntToDecimalString } from "./utils/amountSerialization.js"
 import fileUtils from './utils/fileUtils.js';
 import migrationUtils from './utils/migrationUtils.js';
-import {
-    getBalanceCommand,
-    getTxvCommand,
-    getFeeCommand,
-    getConfirmedLengthCommand,
-    getUnconfirmedLengthCommand,
-    getTxPayloadsBulkCommand,
-    getTxHashesCommand,
-    getTxDetailsCommand,
-    getExtendedTxDetailsCommand,
-    nodeStatusCommand,
-    coreInfoCommand,
-    getValidatorAddressCommand,
-    getDeploymentCommand,
-    getTxInfoCommand,
-    getLicenseNumberCommand,
-    getLicenseAddressCommand,
-    getLicenseCountCommand
-} from "./utils/cliCommands.js";
 import {safeEncodeApplyOperation} from "./utils/protobuf/operationHelpers.js";
 
 export class MainSettlementBus extends ReadyResource {
@@ -64,15 +42,6 @@ export class MainSettlementBus extends ReadyResource {
         this.#wallet = new PeerWallet({ networkPrefix: this.#config.addressPrefix });
         this.#readline_instance = null;
 
-        if (this.#config.enableInteractiveMode) {
-            try {
-                this.#readline_instance = readline.createInterface({
-                    input: new tty.ReadStream(0),
-                    output: new tty.WriteStream(1),
-                });
-            } catch (_ignored) {}
-        }
-
         this.check = new Check(this.#config);
     }
 
@@ -93,6 +62,10 @@ export class MainSettlementBus extends ReadyResource {
             return undefined;
         }
         return this.#wallet;
+    }
+
+    setReadlineInstance(readlineInstance) {
+        this.#readline_instance = readlineInstance;
     }
 
     async _open() {
@@ -144,31 +117,15 @@ export class MainSettlementBus extends ReadyResource {
 
         await sleep(100);
 
-        if (this.#readline_instance) {
-            const inputClosed = new Promise((resolve) =>
-                this.#readline_instance.input.once("close", resolve)
-            );
-            const outputClosed = new Promise((resolve) =>
-                this.#readline_instance.output.once("close", resolve)
-            );
-
-            this.#readline_instance.close();
-            this.#readline_instance.input.destroy();
-            this.#readline_instance.output.destroy();
-
-            // Do not remove this. Without it, readline may close too quickly and still hang.
-            await Promise.all([inputClosed, outputClosed]).catch((e) =>
-                console.log("Error during closing readline stream:", e)
-            );
-        }
-
-        await sleep(100);
-
         if (this.#store !== null) {
             await this.#store.close();
         }
 
         await sleep(100);
+    }
+
+    async destroy() {
+        return await this.close();
     }
 
     async broadcastPartialTransaction(partialTransactionPayload) {
@@ -178,21 +135,21 @@ export class MainSettlementBus extends ReadyResource {
     async #setUpRoleAutomatically() {
         if (!this.#state.isWritable() && this.#config.enableRoleRequester) {
             console.log("Requesting writer role... This may take a moment.");
-            await this.#requestWriterRole(false);
+            await this.requestWriterRole(false);
             setTimeout(async () => {
-                await this.#requestWriterRole(true);
+                await this.requestWriterRole(true);
             }, 5_000);
             await sleep(5_000);
         }
     }
 
-    #isAdmin(adminEntry) {
+    isAdmin(adminEntry) {
         if (!adminEntry || !this.#config.enableWallet) return false;
         return this.#wallet.address === adminEntry.address && b4a.equals(adminEntry.wk, this.#state.writingKey)
     }
 
     async #isAllowedToRequestRole(adminEntry, nodeEntry) {
-        return nodeEntry?.isWhitelisted && !this.#isAdmin(adminEntry);
+        return nodeEntry?.isWhitelisted && !this.isAdmin(adminEntry);
     }
 
     async #stateEventsListener() {
@@ -227,7 +184,7 @@ export class MainSettlementBus extends ReadyResource {
         });
     }
 
-    async #handleAdminCreation() {
+    async handleAdminCreation() {
         if (!this.#config.enableWallet) {
             throw new Error("Can not initialize an admin - wallet is not enabled.");
         }
@@ -265,7 +222,7 @@ export class MainSettlementBus extends ReadyResource {
         await this.#state.append(encodedPayload);
     }
 
-    async #handleAdminRecovery() {
+    async handleAdminRecovery() {
         if (!this.#config.enableWallet) {
             throw new Error("Can not initialize an admin - wallet is not enabled.");
         }
@@ -307,14 +264,14 @@ export class MainSettlementBus extends ReadyResource {
         console.info(`Transaction hash: ${adminRecoveryMessage.rao.tx}`);
     }
 
-    async #handleWhitelistOperations() {
+    async handleWhitelistOperations() {
         if (!this.#config.enableWallet) {
             throw new Error("Cannot perform whitelisting - wallet is not enabled.");
         }
 
         const adminEntry = await this.#state.getAdminEntry();
 
-        if (!this.#isAdmin(adminEntry)) {
+        if (!this.isAdmin(adminEntry)) {
             throw new Error('Cannot perform whitelisting - you are not the admin!.');
         }
 
@@ -369,7 +326,7 @@ export class MainSettlementBus extends ReadyResource {
         }
     }
 
-    async #requestWriterRole(toAdd) {
+    async requestWriterRole(toAdd) {
         if (!this.#config.enableWallet) {
             throw new Error("Cannot request writer role - wallet is not enabled");
         }
@@ -462,7 +419,7 @@ export class MainSettlementBus extends ReadyResource {
         console.info(`Transaction hash: ${assembledMessage.rao.tx}`);
     }
 
-    async #updateWriterToIndexerRole(addressToUpdate, toAdd) {
+    async updateWriterToIndexerRole(addressToUpdate, toAdd) {
         if (!this.#config.enableWallet) {
             throw new Error(
                 `Can not request indexer role for: ${addressToUpdate} - wallet is not enabled.`
@@ -483,7 +440,7 @@ export class MainSettlementBus extends ReadyResource {
             );
         }
 
-        if (!this.#isAdmin(adminEntry) && !this.#state.isWritable()) {
+        if (!this.isAdmin(adminEntry) && !this.#state.isWritable()) {
             throw new Error(
                 `Can not request indexer role for: ${addressToUpdate} - You are not an admin or writer.`
             );
@@ -552,7 +509,7 @@ export class MainSettlementBus extends ReadyResource {
         }
     }
 
-    async #banValidator(addresstToBan) {
+    async banValidator(addresstToBan) {
         if (!this.#config.enableWallet) {
             throw new Error(
                 `Can not ban writer with address: ${addresstToBan} - wallet is not enabled.`
@@ -572,7 +529,7 @@ export class MainSettlementBus extends ReadyResource {
             );
         }
 
-        if (!this.#isAdmin(adminEntry)) {
+        if (!this.isAdmin(adminEntry)) {
             throw new Error(
                 `Can not ban writer with address: ${addresstToBan} - You are not an admin.`
             );
@@ -597,7 +554,7 @@ export class MainSettlementBus extends ReadyResource {
         await this.#state.append(encodedPayload);
     }
 
-    async #deployBootstrap(externalBootstrap, channel) {
+    async deployBootstrap(externalBootstrap, channel) {
         if (!this.#config.enableWallet) {
             throw new Error(
                 "Can not perform bootstrap deployment - wallet is not enabled."
@@ -691,7 +648,7 @@ export class MainSettlementBus extends ReadyResource {
 
     }
 
-    async #handleTransferOperation(recipientAddress, amount) {
+    async handleTransferOperation(recipientAddress, amount) {
         if (!this.#config.enableWallet) {
             throw new Error(
                 "Can not perform transfer - wallet is not enabled."
@@ -768,7 +725,7 @@ export class MainSettlementBus extends ReadyResource {
 
     }
 
-    async #balanceMigrationOperation() {
+    async balanceMigrationOperation() {
 
         const isInitDisabled = await this.#state.isInitalizationDisabled()
 
@@ -786,7 +743,7 @@ export class MainSettlementBus extends ReadyResource {
             throw new Error("Can not initialize an admin - admin does not exist.");
         }
 
-        if (!this.#isAdmin(adminEntry)) {
+        if (!this.isAdmin(adminEntry)) {
             throw new Error('Cannot perform balance migration - you are not the admin!.');
         }
 
@@ -870,7 +827,7 @@ export class MainSettlementBus extends ReadyResource {
         console.log(`${bigIntToDecimalString(totalBalance)} $TNK have been migrated across ${totalAddresses} addresses.`);
     }
 
-    async #disableInitialization() {
+    async disableInitialization() {
         if (!this.#config.enableWallet) {
             throw new Error("Can not initialize an admin - wallet is not enabled.");
         }
@@ -884,7 +841,7 @@ export class MainSettlementBus extends ReadyResource {
             throw new Error("Can not initialize an admin - admin does not exist.");
         }
 
-        if (!this.#isAdmin(adminEntry)) {
+        if (!this.isAdmin(adminEntry)) {
             throw new Error('Cannot perform whitelisting - you are not the admin!.');
         }
         if (!this.#wallet) {
@@ -907,152 +864,6 @@ export class MainSettlementBus extends ReadyResource {
         await this.#state.append(encodedPayload);
     }
 
-    async interactiveMode() {
-        if (this.#readline_instance === null) return;
-        const rl = this.#readline_instance;
-
-        printHelp(this.#config.isAdminMode);
-
-        rl.on("line", async (input) => {
-            try {
-                await this.handleCommand(input.trim(), rl);
-            } catch (err) {
-                console.error(`${err}`);
-            }
-            rl.prompt();
-        });
-
-        rl.prompt();
-    }
-
-    async handleCommand(input, rl = null, payload = null) {
-        const [command, ...parts] = input.split(" ");
-        const exactHandlers = {
-            "/help": async () => {
-                printHelp(this.#config.isAdminMode);
-            },
-            "/exit": async () => {
-                if (rl) rl.close();
-                await this.close();
-            },
-            "/add_admin": async () => await this.#handleAdminCreation(),
-            "/add_admin --recovery": async () => await this.#handleAdminRecovery(),
-            "/add_whitelist": async () => await this.#handleWhitelistOperations(),
-            "/add_writer": async () => await this.#requestWriterRole(true),
-            "/remove_writer": async () => await this.#requestWriterRole(false),
-            "/core": async () => await coreInfoCommand(this.#state),
-            "/indexers_list": async () => console.log(await this.#state.getIndexersEntry()),
-            "/validator_pool": () => this.#network.validatorConnectionManager.prettyPrint(),
-            "/stats": async () => await verifyDag(
-                this.#state,
-                this.#network,
-                this.#wallet,
-                this.#state.writingKey
-            ),
-            "/balance_migration": async () => await this.#balanceMigrationOperation(),
-            "/disable_initialization": async () => await this.#disableInitialization()
-        };
-
-        if (exactHandlers[command]) {
-            const result = await exactHandlers[command]();
-            if (rl) rl.prompt();
-            return result;
-        }
-
-        if (input.startsWith("/node_status")) {
-            const address = parts[0];
-            const result = await nodeStatusCommand(this.#state, address);
-            if (rl) rl.prompt();
-            return result;
-        }
-
-        if (input.startsWith("/add_indexer")) {
-            const address = parts[0];
-            await this.#updateWriterToIndexerRole(address, true);
-        } else if (input.startsWith("/remove_indexer")) {
-            const address = parts[0];
-            await this.#updateWriterToIndexerRole(address, false);
-        } else if (input.startsWith("/ban_writer")) {
-            const address = parts[0];
-            await this.#banValidator(address);
-        } else if (input.startsWith("/deployment")) {
-            const bootstrapToDeploy = parts[0];
-            const channel = parts[1] || randomBytes(32).toString("hex");
-            if (channel.length !== 64 || !isHexString(channel)) {
-                throw new Error("Channel must be a 32-byte hex string");
-            }
-            await this.#deployBootstrap(bootstrapToDeploy, channel);
-        } else if (input.startsWith("/get_validator_addr")) {
-            const wkHexString = parts[0];
-            await getValidatorAddressCommand(this.#state, wkHexString, this.#config.addressPrefix);
-        } else if (input.startsWith("/get_deployment")) {
-            const bootstrapHex = parts[0];
-            await getDeploymentCommand(this.#state, bootstrapHex, this.#config.addressLength);
-        } else if (input.startsWith("/get_tx_info")) {
-            const txHash = parts[0];
-            await getTxInfoCommand(this.#state, txHash);
-        } else if (input.startsWith("/transfer")) {
-            const address = parts[0];
-            const amount = parts[1];
-            await this.#handleTransferOperation(address, amount);
-        } else if (input.startsWith("/get_balance")) {
-            const address = parts[0];
-            const confirmedFlag = parts[1];
-            const result = await getBalanceCommand(this.#state, address, confirmedFlag);
-            if (rl) rl.prompt();
-            return result;
-        } else if (input.startsWith("/get_license_number")) {
-            const address = parts[0];
-            await getLicenseNumberCommand(this.#state, address);
-        } else if (input.startsWith("/get_license_address")) {
-            const licenseId = parseInt(parts[0]);
-            await getLicenseAddressCommand(this.#state, licenseId);
-        } else if (input.startsWith("/get_license_count")) {
-            await getLicenseCountCommand(this.#state, this.#isAdmin.bind(this));
-        } else if (input.startsWith("/get_txv")) {
-            const result = await getTxvCommand(this.#state);
-            if (rl) rl.prompt();
-            return result;
-        } else if (input.startsWith("/get_fee")) {
-            const result = getFeeCommand(this.#state);
-            if (rl) rl.prompt();
-            return result;
-        } else if (input.startsWith("/confirmed_length")) {
-            const result = getConfirmedLengthCommand(this.#state);
-            if (rl) rl.prompt();
-            return result;
-        } else if (input.startsWith("/unconfirmed_length")) {
-            const result = getUnconfirmedLengthCommand(this.#state);
-            if (rl) rl.prompt();
-            return result;
-        } else if (input.startsWith("/get_tx_payloads_bulk")) {
-            if (!payload) {
-                throw new Error("Missing payload for fetching tx payloads.");
-            }
-            const result = await getTxPayloadsBulkCommand(this.#state, payload, this.#config);
-            if (rl) rl.prompt();
-            return result;
-        } else if (input.startsWith("/get_txs_hashes")) {
-            const start = parseInt(parts[0]);
-            const end = parseInt(parts[1]);
-            const result = await getTxHashesCommand(this.#state, start, end);
-            if (rl) rl.prompt();
-            return result;
-        } else if (input.startsWith("/get_tx_details")) {
-            const hash = parts[0];
-            const result = await getTxDetailsCommand(this.#state, hash, this.#config);
-            if (rl) rl.prompt();
-            return result;
-        } else if (input.startsWith("/get_extended_tx_details")) {
-            const hash = parts[0];
-            const confirmed = parts[1] === "true";
-            const result = await getExtendedTxDetailsCommand(this.#state, hash, confirmed, this.#config);
-            if (rl) rl.prompt();
-            return result;
-        }
-
-        if (rl) rl.prompt();
-    }
 }
 
 export default MainSettlementBus;
