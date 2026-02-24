@@ -157,6 +157,7 @@ class TransactionPoolService {
         await this.#scheduler.stop(waitForCurrent);
         this.#scheduler = null;
         this.#queuedTxHashes.clear();
+        this.#tx_pool.clear();
         console.info('TransactionPoolService: closing gracefully...');
     }
 
