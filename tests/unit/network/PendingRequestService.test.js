@@ -9,7 +9,10 @@ import { V1UnexpectedError } from '../../../src/core/network/protocols/v1/V1Prot
 import { NetworkOperationType } from '../../../src/utils/constants.js';
 import { errorMessageIncludes } from '../../helpers/regexHelper.js';
 import { config } from '../../helpers/config.js';
-import { testKeyPair1 } from '../../fixtures/apply.fixtures.js';
+import { testKeyPair1, testKeyPair2 } from '../../fixtures/apply.fixtures.js';
+
+const validPeerA = testKeyPair1.publicKey;
+const validPeerB = testKeyPair2.publicKey;
 
 function installFakeTimeouts(t) {
     const originalSetTimeout = globalThis.setTimeout;
@@ -100,7 +103,7 @@ function createWallet() {
 
 test('PendingRequestService registers and resolves v1 request', async t => {
     const service = new PendingRequestService(config);
-    const peer = 'deadbeef';
+    const peer = validPeerA;
     const request = await buildV1Request();
 
     const promise = service.registerPendingRequest(peer, request);
@@ -115,7 +118,7 @@ test('PendingRequestService registers and resolves v1 request', async t => {
 
 test('PendingRequestService rejects and removes pending request', async t => {
     const service = new PendingRequestService(config);
-    const peer = 'deadbeef';
+    const peer = validPeerA;
     const request = await buildV1Request();
 
     const promise = service.registerPendingRequest(peer, request);
@@ -138,7 +141,7 @@ test('PendingRequestService rejects and removes pending request', async t => {
 
 test('PendingRequestService throws on duplicate request id', async t => {
     const service = new PendingRequestService(config);
-    const peer = 'deadbeef';
+    const peer = validPeerA;
     const request = await buildV1Request();
 
     const promise = service.registerPendingRequest(peer, request);
@@ -155,8 +158,11 @@ test('PendingRequestService throws on duplicate request id', async t => {
 test('PendingRequestService rejects pending request on timeout', async t => {
     const timers = installFakeTimeouts(t);
     const pendingRequestTimeout = 123;
-    const service = new PendingRequestService({ pendingRequestTimeout });
-    const peer = 'deadbeef';
+    const service = new PendingRequestService({
+        pendingRequestTimeout,
+        maxPendingRequestsInPendingRequestsService: 10
+    });
+    const peer = validPeerA;
     const request = await buildV1Request();
 
     const promise = service.registerPendingRequest(peer, request);
@@ -180,7 +186,7 @@ test('PendingRequestService rejects pending request on timeout', async t => {
 
 test('PendingRequestService.close rejects all pending requests', async t => {
     const service = new PendingRequestService(config);
-    const peer = 'deadbeef';
+    const peer = validPeerA;
     const request1 = await buildV1Request();
     const request2 = await buildV1Request();
 
@@ -200,8 +206,8 @@ test('PendingRequestService.close rejects all pending requests', async t => {
 
 test('PendingRequestService rejects all pending requests for a specific peer', async t => {
     const service = new PendingRequestService(config);
-    const peerA = 'deadbeef';
-    const peerB = 'cafebabe';
+    const peerA = validPeerA;
+    const peerB = validPeerB;
     const requestA1 = await buildV1Request();
     const requestA2 = await buildV1Request();
     const requestB1 = await buildV1Request();
@@ -228,7 +234,7 @@ test('PendingRequestService rejects all pending requests for a specific peer', a
 
 test('PendingRequestService stores only transaction data for broadcast requests', async t => {
     const service = new PendingRequestService(config);
-    const peer = 'deadbeef';
+    const peer = validPeerA;
     const livenessRequest = await buildV1Request();
     const broadcastRequest = await buildV1BroadcastRequest();
 
@@ -251,8 +257,8 @@ test('PendingRequestService stores only transaction data for broadcast requests'
 
 test('PendingRequestService.isProbePending matches peer and liveness type', async t => {
     const service = new PendingRequestService(config);
-    const peerA = 'deadbeef';
-    const peerB = 'cafebabe';
+    const peerA = validPeerA;
+    const peerB = validPeerB;
 
     t.is(service.isProbePending(peerA), false);
     t.is(service.isProbePending(peerB), false);
@@ -283,21 +289,24 @@ test('PendingRequestService.isProbePending matches peer and liveness type', asyn
     await broadcastPromiseA;
 });
 
-test('PendingRequestService enforces global pending request limit', t => {
-    const service = new PendingRequestService(config);
-    const peer = 'deadbeef';
+test('PendingRequestService enforces global pending request limit', async t => {
+    const service = new PendingRequestService({
+        pendingRequestTimeout: config.pendingRequestTimeout,
+        maxPendingRequestsInPendingRequestsService: 3
+    });
+    const peer = validPeerA;
 
-    for (let i = 0; i < config.maxPendingRequestsInPendingRequestsService; i++) {
-        service
-            .registerPendingRequest(peer, {
-                id: `limit-${i}`,
-                type: NetworkOperationType.LIVENESS_REQUEST
-            })
-            .catch(() => {});
-    }
+    const request0 = await buildV1Request({ id: 'limit-0' });
+    const request1 = await buildV1Request({ id: 'limit-1' });
+    const request2 = await buildV1Request({ id: 'limit-2' });
+    const overflowRequest = await buildV1Request({ id: 'limit-overflow' });
+
+    service.registerPendingRequest(peer, request0).catch(() => {});
+    service.registerPendingRequest(peer, request1).catch(() => {});
+    service.registerPendingRequest(peer, request2).catch(() => {});
 
     t.exception(
-        () => service.registerPendingRequest(peer, { id: 'limit-overflow', type: NetworkOperationType.LIVENESS_REQUEST }),
+        () => service.registerPendingRequest(peer, overflowRequest),
         errorMessageIncludes('Maximum number of pending requests reached.')
     );
 
@@ -307,7 +316,7 @@ test('PendingRequestService enforces global pending request limit', t => {
 test('PendingRequestService.stopPendingRequestTimeout stops timeout and handles missing id', async t => {
     const timers = installFakeTimeouts(t);
     const service = new PendingRequestService(config);
-    const peer = 'deadbeef';
+    const peer = validPeerA;
     const request = await buildV1Request();
 
     const promise = service.registerPendingRequest(peer, request);
@@ -335,3 +344,107 @@ test('PendingRequestService.getPendingRequest returns null for missing id', t =>
     t.is(service.getPendingRequest('missing-id'), null);
 });
 
+
+test('PendingRequestService rejects invalid registerPendingRequest input', async t => {
+    const service = new PendingRequestService(config);
+    const peer = validPeerA;
+    const validLivenessRequest = await buildV1Request({ id: 'invalid-peer' });
+
+    t.exception(
+        () => service.registerPendingRequest(peer, 'not-an-object'),
+        errorMessageIncludes('Pending request message must be an object.')
+    );
+
+    t.exception(
+        () => service.registerPendingRequest(peer, {
+            id: '',
+            type: NetworkOperationType.LIVENESS_REQUEST
+        }),
+        errorMessageIncludes('Pending request ID must be a non-empty string.')
+    );
+
+    t.exception(
+        () => service.registerPendingRequest(peer, {
+            id: 'invalid-type',
+            type: 'LIVENESS_REQUEST'
+        }),
+        errorMessageIncludes('Unsupported pending request type.')
+    );
+
+    t.exception(
+        () => service.registerPendingRequest(peer, {
+            id: 'unsupported-type',
+            type: 999
+        }),
+        errorMessageIncludes('Unsupported pending request type.')
+    );
+
+    t.exception(
+        () => service.registerPendingRequest('deadbeef', validLivenessRequest),
+        errorMessageIncludes('Invalid peer public key. Expected 32-byte hex string.')
+    );
+
+    t.is(service.getPendingRequest('unsupported-type'), null);
+    t.is(service.getPendingRequest('invalid-type'), null);
+});
+
+test('PendingRequestService.rejectPendingRequest falls back to Unexpected error message', async t => {
+    const service = new PendingRequestService(config);
+    const peer = validPeerA;
+    const request = await buildV1Request();
+    const promise = service.registerPendingRequest(peer, request);
+
+    t.ok(service.rejectPendingRequest(request.id, {}));
+
+    try {
+        await promise;
+        t.fail('Expected pending request promise to reject');
+    } catch (error) {
+        t.ok(error instanceof V1UnexpectedError);
+        t.is(error.message, 'Unexpected error');
+        t.is(error.endConnection, false);
+    }
+});
+
+test('PendingRequestService.close catches reject errors and continues cleanup', async t => {
+    const service = new PendingRequestService(config);
+    const peer = validPeerA;
+    const request = await buildV1Request();
+    const promise = service.registerPendingRequest(peer, request);
+    const entry = service.getPendingRequest(request.id);
+    const originalReject = entry.reject;
+    const logs = [];
+    const originalConsoleError = console.error;
+
+    console.error = (...args) => {
+        logs.push(args);
+    };
+    t.teardown(() => {
+        console.error = originalConsoleError;
+    });
+
+    entry.reject = error => {
+        originalReject(error);
+        throw new Error('forced reject failure');
+    };
+
+    service.close();
+    t.is(service.has(request.id), false);
+    t.is(logs.length, 1);
+    t.ok(String(logs[0][0]).includes('PendingRequestService.close: failed to reject pending request'));
+
+    const result = await Promise.allSettled([promise]);
+    t.is(result[0].status, 'rejected');
+    t.ok(result[0]?.reason?.message?.includes(`Pending request ${request.id} cancelled (shutdown).`));
+});
+
+test('PendingRequestService throws when registerPendingRequest receives null message', t => {
+    const service = new PendingRequestService(config);
+    const peer = validPeerA;
+    try {
+        service.registerPendingRequest(peer, null);
+        t.fail('Expected registerPendingRequest to throw for null message');
+    } catch (error) {
+        t.ok(error?.message?.includes('Pending request message must be an object.'));
+    }
+});
