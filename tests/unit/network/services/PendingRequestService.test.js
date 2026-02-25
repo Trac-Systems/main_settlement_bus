@@ -1,6 +1,7 @@
 import { test } from 'brittle';
 import b4a from 'b4a';
 import { v7 as uuidv7 } from 'uuid';
+import sinon from 'sinon';
 
 import PendingRequestService from '../../../../src/core/network/services/PendingRequestService.js';
 import NetworkWalletFactory from '../../../../src/core/network/identity/NetworkWalletFactory.js';
@@ -13,56 +14,6 @@ import { testKeyPair1, testKeyPair2 } from '../../../fixtures/apply.fixtures.js'
 
 const validPeerA = testKeyPair1.publicKey;
 const validPeerB = testKeyPair2.publicKey;
-
-function installFakeTimeouts(t) {
-    const originalSetTimeout = globalThis.setTimeout;
-    const originalClearTimeout = globalThis.clearTimeout;
-
-    const callbacks = new Map();
-    let nextId = 1;
-    let restored = false;
-
-    globalThis.setTimeout = (fn, _ms, ...args) => {
-        const id = nextId++;
-        callbacks.set(id, () => fn(...args));
-        return {
-            _clear: () => {
-                callbacks.delete(id);
-            }
-        };
-    };
-
-    globalThis.clearTimeout = timer => {
-        if (timer && typeof timer._clear === 'function') {
-            timer._clear();
-            return;
-        }
-        if (callbacks.delete(timer)) return;
-        if (timer && typeof timer === 'object' && typeof originalClearTimeout === 'function') {
-            originalClearTimeout(timer);
-        }
-    };
-
-    const restore = () => {
-        if (restored) return;
-        restored = true;
-        globalThis.setTimeout = originalSetTimeout;
-        globalThis.clearTimeout = originalClearTimeout;
-        callbacks.clear();
-    };
-
-    t.teardown(restore);
-
-    return {
-        runAll() {
-            for (const [id, cb] of callbacks) {
-                callbacks.delete(id);
-                cb();
-            }
-        },
-        restore
-    };
-}
 
 async function buildV1Request({ id = uuidv7() } = {}) {
     const wallet = createWallet();
@@ -156,20 +107,21 @@ test('PendingRequestService throws on duplicate request id', async t => {
 });
 
 test('PendingRequestService rejects pending request on timeout', async t => {
-    const timers = installFakeTimeouts(t);
-    const pendingRequestTimeout = 123;
-    const service = new PendingRequestService({
-        pendingRequestTimeout,
-        maxPendingRequestsInPendingRequestsService: 10
-    });
-    const peer = validPeerA;
-    const request = await buildV1Request();
-
-    const promise = service.registerPendingRequest(peer, request);
-    t.ok(service.has(request.id));
-
+    const clock = sinon.useFakeTimers({ now: 1 });
     try {
-        timers.runAll();
+        const pendingRequestTimeout = 123;
+        const service = new PendingRequestService({
+            pendingRequestTimeout,
+            maxPendingRequestsInPendingRequestsService: 10
+        });
+        const peer = validPeerA;
+        const request = await buildV1Request();
+
+        const promise = service.registerPendingRequest(peer, request);
+        promise.catch(() => {});
+        t.ok(service.has(request.id));
+
+        await clock.runAllAsync();
 
         try {
             await promise;
@@ -180,7 +132,8 @@ test('PendingRequestService rejects pending request on timeout', async t => {
 
         t.is(service.has(request.id), false);
     } finally {
-        timers.restore();
+        clock.restore();
+        sinon.restore();
     }
 });
 
@@ -314,28 +267,33 @@ test('PendingRequestService enforces global pending request limit', async t => {
 });
 
 test('PendingRequestService.stopPendingRequestTimeout stops timeout and handles missing id', async t => {
-    const timers = installFakeTimeouts(t);
-    const service = new PendingRequestService(config);
-    const peer = validPeerA;
-    const request = await buildV1Request();
+    const clock = sinon.useFakeTimers({ now: 1 });
+    try {
+        const service = new PendingRequestService(config);
+        const peer = validPeerA;
+        const request = await buildV1Request();
 
-    const promise = service.registerPendingRequest(peer, request);
-    t.is(service.stopPendingRequestTimeout('missing-id'), false);
-    t.is(service.stopPendingRequestTimeout(request.id), true);
-    t.is(service.getPendingRequest(request.id)?.timeoutId, null);
+        const promise = service.registerPendingRequest(peer, request);
+        t.is(service.stopPendingRequestTimeout('missing-id'), false);
+        t.is(service.stopPendingRequestTimeout(request.id), true);
+        t.is(service.getPendingRequest(request.id)?.timeoutId, null);
 
-    let settled = false;
-    promise.then(
-        () => { settled = true; },
-        () => { settled = true; }
-    );
+        let settled = false;
+        promise.then(
+            () => { settled = true; },
+            () => { settled = true; }
+        );
 
-    timers.runAll();
-    await Promise.resolve();
-    t.is(settled, false);
+        await clock.runAllAsync();
+        await Promise.resolve();
+        t.is(settled, false);
 
-    t.ok(service.resolvePendingRequest(request.id));
-    await promise;
+        t.ok(service.resolvePendingRequest(request.id));
+        await promise;
+    } finally {
+        clock.restore();
+        sinon.restore();
+    }
 });
 
 
