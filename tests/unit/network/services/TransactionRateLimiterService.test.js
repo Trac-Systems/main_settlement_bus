@@ -2,15 +2,15 @@ import sinon from 'sinon';
 import { test } from 'brittle';
 import b4a from 'b4a';
 
-import TransactionRateLimiterService from '../../../src/core/network/services/TransactionRateLimiterService.js';
-import { V1RateLimitedError } from '../../../src/core/network/protocols/v1/V1ProtocolError.js';
+import TransactionRateLimiterService from '../../../../src/core/network/services/TransactionRateLimiterService.js';
+import { V1RateLimitedError } from '../../../../src/core/network/protocols/v1/V1ProtocolError.js';
 import {
     CLEANUP_INTERVAL_MS,
     CONNECTION_TIMEOUT_MS,
     MAX_TRANSACTIONS_PER_SECOND
-} from '../../../src/utils/constants.js';
-import { config } from '../../helpers/config.js';
-import { testKeyPair1, testKeyPair2 } from '../../fixtures/apply.fixtures.js';
+} from '../../../../src/utils/constants.js';
+import { config } from '../../../helpers/config.js';
+import { testKeyPair1, testKeyPair2 } from '../../../fixtures/apply.fixtures.js';
 
 const makeConnection = (publicKeyHex) => {
     return {

@@ -2,14 +2,14 @@ import { test } from 'brittle';
 import b4a from 'b4a';
 import { v7 as uuidv7 } from 'uuid';
 
-import PendingRequestService from '../../../src/core/network/services/PendingRequestService.js';
-import NetworkWalletFactory from '../../../src/core/network/identity/NetworkWalletFactory.js';
-import NetworkMessageBuilder from '../../../src/messages/network/v1/NetworkMessageBuilder.js';
-import { V1UnexpectedError } from '../../../src/core/network/protocols/v1/V1ProtocolError.js';
-import { NetworkOperationType } from '../../../src/utils/constants.js';
-import { errorMessageIncludes } from '../../helpers/regexHelper.js';
-import { config } from '../../helpers/config.js';
-import { testKeyPair1, testKeyPair2 } from '../../fixtures/apply.fixtures.js';
+import PendingRequestService from '../../../../src/core/network/services/PendingRequestService.js';
+import NetworkWalletFactory from '../../../../src/core/network/identity/NetworkWalletFactory.js';
+import NetworkMessageBuilder from '../../../../src/messages/network/v1/NetworkMessageBuilder.js';
+import { V1UnexpectedError } from '../../../../src/core/network/protocols/v1/V1ProtocolError.js';
+import { NetworkOperationType } from '../../../../src/utils/constants.js';
+import { errorMessageIncludes } from '../../../helpers/regexHelper.js';
+import { config } from '../../../helpers/config.js';
+import { testKeyPair1, testKeyPair2 } from '../../../fixtures/apply.fixtures.js';
 
 const validPeerA = testKeyPair1.publicKey;
 const validPeerB = testKeyPair2.publicKey;

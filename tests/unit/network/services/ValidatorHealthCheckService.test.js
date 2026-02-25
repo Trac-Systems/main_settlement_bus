@@ -1,9 +1,9 @@
 import sinon from 'sinon';
 import { test } from 'brittle';
-import ValidatorHealthCheckService from '../../../src/core/network/services/ValidatorHealthCheckService.js';
-import { createConfig, ENV } from '../../../src/config/env.js';
-import { EventType } from '../../../src/utils/constants.js';
-import { testKeyPair1, testKeyPair2 } from '../../fixtures/apply.fixtures.js';
+import ValidatorHealthCheckService from '../../../../src/core/network/services/ValidatorHealthCheckService.js';
+import { createConfig, ENV } from '../../../../src/config/env.js';
+import { EventType } from '../../../../src/utils/constants.js';
+import { testKeyPair1, testKeyPair2 } from '../../../fixtures/apply.fixtures.js';
 
 test('ValidatorHealthCheckService', () => {
     test('throws when start is called before ready', async (t) => {

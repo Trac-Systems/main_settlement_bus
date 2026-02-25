@@ -1,12 +1,12 @@
 import sinon from "sinon";
 import { hook, test } from 'brittle'
 import { default as EventEmitter } from "bare-events"
-import { testKeyPair1, testKeyPair2, testKeyPair3, testKeyPair4, testKeyPair5, testKeyPair6, testKeyPair7, testKeyPair8 } from "../../fixtures/apply.fixtures.js";
-import ConnectionManager from "../../../src/core/network/services/ConnectionManager.js";
-import { tick } from "../../helpers/setupApplyTests.js";
+import { testKeyPair1, testKeyPair2, testKeyPair3, testKeyPair4, testKeyPair5, testKeyPair6, testKeyPair7, testKeyPair8 } from "../../../fixtures/apply.fixtures.js";
+import ConnectionManager from "../../../../src/core/network/services/ConnectionManager.js";
+import { tick } from "../../../helpers/setupApplyTests.js";
 import b4a from 'b4a'
-import { createConfig, ENV } from "../../../src/config/env.js";
-import { EventType, ResultCode } from "../../../src/utils/constants.js";
+import { createConfig, ENV } from "../../../../src/config/env.js";
+import { EventType, ResultCode } from "../../../../src/utils/constants.js";
 
 const createConnection = (key) => {
     const emitter = new EventEmitter()
