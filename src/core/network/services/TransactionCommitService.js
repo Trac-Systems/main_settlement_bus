@@ -1,7 +1,6 @@
 import {isHexString} from '../../../utils/helpers.js';
 import {TRANSACTION_COMMIT_SERVICE_BUFFER_SIZE} from '../../../utils/constants.js';
 
-const FALLBACK_TX_COMMIT_TIMEOUT_MS = 2000;
 const TX_HASH_HEX_STRING_LENGTH = 64; // TODO - this should be in constants.
 
 class TransactionCommitService {
@@ -13,7 +12,14 @@ class TransactionCommitService {
         this.#config = config;
     }
 
+    #assertTxHash(txHash) {
+        if (!isHexString(txHash) || txHash.length !== TX_HASH_HEX_STRING_LENGTH) {
+            throw new PendingCommitInvalidTxHashError(txHash);
+        }
+    }
+
     has(txHash) {
+        this.#assertTxHash(txHash);
         return this.#pendingCommits.has(txHash);
     }
 
@@ -21,9 +27,7 @@ class TransactionCommitService {
         @returns {Promise}
     */
     registerPendingCommit(txHash) {
-        if (!isHexString(txHash) || txHash.length !== TX_HASH_HEX_STRING_LENGTH) {
-            throw new PendingCommitInvalidTxHashError(txHash);
-        }
+        this.#assertTxHash(txHash);
 
         if (this.#pendingCommits.size >= TRANSACTION_COMMIT_SERVICE_BUFFER_SIZE) {
             throw new PendingCommitBufferFullError(TRANSACTION_COMMIT_SERVICE_BUFFER_SIZE);
@@ -33,7 +37,7 @@ class TransactionCommitService {
             throw new PendingCommitAlreadyExistsError(txHash);
         }
 
-        const timeoutMs = this.#config.txCommitTimeout ?? FALLBACK_TX_COMMIT_TIMEOUT_MS;
+        const timeoutMs = this.#config.txCommitTimeout;
 
         const entry = {
             txHash,
@@ -60,6 +64,7 @@ class TransactionCommitService {
     }
 
     getAndDeletePendingCommit(txHash) {
+        this.#assertTxHash(txHash);
         const entry = this.#pendingCommits.get(txHash);
         if (!entry) return null;
 
@@ -69,6 +74,7 @@ class TransactionCommitService {
     }
 
     resolvePendingCommit(txHash, receipt = null) {
+        this.#assertTxHash(txHash);
         const entry = this.getAndDeletePendingCommit(txHash);
         if (!entry) return false;
         entry.resolve(receipt);
@@ -76,6 +82,7 @@ class TransactionCommitService {
     }
 
     rejectPendingCommit(txHash, error) {
+        this.#assertTxHash(txHash);
         const entry = this.getAndDeletePendingCommit(txHash);
         if (!entry) return false;
 
