@@ -284,11 +284,10 @@ test('PendingRequestService.isProbePending matches peer and liveness type', asyn
 });
 
 test('PendingRequestService enforces global pending request limit', t => {
-    const service = new PendingRequestService({ pendingRequestTimeout: 60_000 });
+    const service = new PendingRequestService(config);
     const peer = 'deadbeef';
-    const limit = 50_000;
 
-    for (let i = 0; i < limit; i++) {
+    for (let i = 0; i < config.maxPendingRequestsInPendingRequestsService; i++) {
         service
             .registerPendingRequest(peer, {
                 id: `limit-${i}`,
