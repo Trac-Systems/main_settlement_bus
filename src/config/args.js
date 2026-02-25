@@ -7,10 +7,13 @@ const getArguments = () => {
 };
 
 export const resolveEnvironment = (args = []) => {
-    const useDevelopment = args.includes('--development');
-    const useTestnet = args.includes('--testnet');
-    if (useDevelopment) return ENV.DEVELOPMENT;
-    return useTestnet ? ENV.TESTNET1 : ENV.MAINNET;
+    const networkIndex = args.indexOf('--network');
+    const network = (networkIndex !== -1 && args[networkIndex + 1]) ? args[networkIndex + 1] : undefined;
+
+    if (network === ENV.MAINNET) return ENV.MAINNET;
+    if (network === ENV.DEVELOPMENT) return ENV.DEVELOPMENT;
+    if (network === ENV.TESTNET1 || network === 'testnet') return ENV.TESTNET1;
+    return ENV.MAINNET;
 };
 
 export const isRpcEnabled = () => {
