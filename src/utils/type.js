@@ -56,7 +56,6 @@ function isNil(value) {
 
 /**
  * Checks if `value` is considered defined akin to RoR `#defined?`.
- * Since they produced that bizarre isNaN which should warrant developers a death-penalty. We had to custom bake a lodash-like function.
  * 
  * @static
  * @param {*} value The value to check.
