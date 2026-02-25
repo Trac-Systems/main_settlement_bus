@@ -329,3 +329,9 @@ test('PendingRequestService.stopPendingRequestTimeout stops timeout and handles 
     await promise;
 });
 
+
+test('PendingRequestService.getPendingRequest returns null for missing id', t => {
+    const service = new PendingRequestService(config);
+    t.is(service.getPendingRequest('missing-id'), null);
+});
+
