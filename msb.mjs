@@ -2,7 +2,8 @@ import { MainSettlementBus } from './src/index.js';
 import { startRpcServer } from './rpc/rpc_server.js';
 import { isRpcEnabled, resolveConfig } from './src/config/args.js';
 
-const msb = new MainSettlementBus(resolveConfig());
+const config = resolveConfig()
+const msb = new MainSettlementBus(config);
 
 msb.ready().then(async () => {
     if (isRpcEnabled()) {

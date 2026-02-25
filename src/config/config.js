@@ -1,4 +1,5 @@
 import b4a from 'b4a'
+import { isDefined } from '../utils/type.js'
 
 export class Config {
     #options
@@ -189,7 +190,7 @@ export class Config {
 
     // Most of these properties are boolean
     #isOverriden(prop) {
-        return this.#options.hasOwnProperty(prop) && this.#options[prop] !== undefined
+        return this.#options.hasOwnProperty(prop) && isDefined(this.#options[prop])
     }
 
     #validate(options, config) {
