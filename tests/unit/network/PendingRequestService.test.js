@@ -303,3 +303,29 @@ test('PendingRequestService enforces global pending request limit', t => {
 
     service.close();
 });
+
+test('PendingRequestService.stopPendingRequestTimeout stops timeout and handles missing id', async t => {
+    const timers = installFakeTimeouts(t);
+    const service = new PendingRequestService(config);
+    const peer = 'deadbeef';
+    const request = await buildV1Request();
+
+    const promise = service.registerPendingRequest(peer, request);
+    t.is(service.stopPendingRequestTimeout('missing-id'), false);
+    t.is(service.stopPendingRequestTimeout(request.id), true);
+    t.is(service.getPendingRequest(request.id)?.timeoutId, null);
+
+    let settled = false;
+    promise.then(
+        () => { settled = true; },
+        () => { settled = true; }
+    );
+
+    timers.runAll();
+    await Promise.resolve();
+    t.is(settled, false);
+
+    t.ok(service.resolvePendingRequest(request.id));
+    await promise;
+});
+
