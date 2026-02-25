@@ -282,3 +282,25 @@ test('PendingRequestService.isProbePending matches peer and liveness type', asyn
     t.ok(service.resolvePendingRequest(broadcastRequestA.id));
     await broadcastPromiseA;
 });
+
+test('PendingRequestService enforces global pending request limit', t => {
+    const service = new PendingRequestService({ pendingRequestTimeout: 60_000 });
+    const peer = 'deadbeef';
+    const limit = 50_000;
+
+    for (let i = 0; i < limit; i++) {
+        service
+            .registerPendingRequest(peer, {
+                id: `limit-${i}`,
+                type: NetworkOperationType.LIVENESS_REQUEST
+            })
+            .catch(() => {});
+    }
+
+    t.exception(
+        () => service.registerPendingRequest(peer, { id: 'limit-overflow', type: NetworkOperationType.LIVENESS_REQUEST }),
+        errorMessageIncludes('Maximum number of pending requests reached.')
+    );
+
+    service.close();
+});
