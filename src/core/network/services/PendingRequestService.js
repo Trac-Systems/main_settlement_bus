@@ -30,7 +30,7 @@ class PendingRequestService {
     */
     registerPendingRequest(peerPubKeyHex, message) {
         const id = message.id;
-        if (this.#pendingRequests.size >= 1_000_000) {
+        if (this.#pendingRequests.size >= this.#config.maxPendingRequestsInPendingRequestsService) {
             throw new Error('Maximum number of pending requests reached.');
         }
 

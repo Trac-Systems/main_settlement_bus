@@ -30,6 +30,7 @@ const configData = {
         messageThreshold: 3,
         messageValidatorRetryDelay: 1000, //How long to wait before retrying (ms) MESSAGE_VALIDATOR_RETRY_DELAY_MS
         messageValidatorResponseTimeout: 3 * 3 * 1000, //Overall timeout for sending a message (ms). This is 3 * maxRetries * messageValidatorRetryDelay;
+        maxPendingRequestsInPendingRequestsService: 50_000, // Maximum number of pending requests in PendingRequestService (This value should not exceed 256MB)
         pendingRequestTimeout: 3000, // constant after which time the transaction will be considered invalid
         txCommitTimeout: 2200,
         txPoolSize: 1000, // size of transaction pool

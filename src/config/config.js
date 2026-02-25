@@ -139,6 +139,10 @@ export class Config {
         return this.#config.validatorHealthCheckInterval
     }
 
+    get maxPendingRequestsInPendingRequestsService() {
+        return this.#config.maxPendingRequestsInPendingRequestsService
+    }
+
     // Most of these properties are boolean
     #isOverriden(prop) {
         return this.#options.hasOwnProperty(prop)
