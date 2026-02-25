@@ -61,18 +61,6 @@ function installFakeTimeouts(t) {
     };
 }
 
-function createWallet() {
-    const keyPair = {
-        publicKey: b4a.from(testKeyPair1.publicKey, 'hex'),
-        secretKey: b4a.from(testKeyPair1.secretKey, 'hex')
-    };
-    return NetworkWalletFactory.provide({
-        enableWallet: false,
-        keyPair,
-        networkPrefix: config.addressPrefix
-    });
-}
-
 async function buildV1Request({ id = uuidv7() } = {}) {
     const wallet = createWallet();
     const builder = new NetworkMessageBuilder(wallet, config);
@@ -83,6 +71,31 @@ async function buildV1Request({ id = uuidv7() } = {}) {
         .setCapabilities([])
         .buildPayload();
     return builder.getResult();
+}
+
+async function buildV1BroadcastRequest({ id = uuidv7(), data = b4a.from('deadbeef', 'hex') } = {}) {
+    const wallet = createWallet();
+    const builder = new NetworkMessageBuilder(wallet, config);
+    await builder
+        .setType(NetworkOperationType.BROADCAST_TRANSACTION_REQUEST)
+        .setId(id)
+        .setTimestamp()
+        .setData(data)
+        .setCapabilities([])
+        .buildPayload();
+    return builder.getResult();
+}
+
+function createWallet() {
+    const keyPair = {
+        publicKey: b4a.from(testKeyPair1.publicKey, 'hex'),
+        secretKey: b4a.from(testKeyPair1.secretKey, 'hex')
+    };
+    return NetworkWalletFactory.provide({
+        enableWallet: false,
+        keyPair,
+        networkPrefix: config.addressPrefix
+    });
 }
 
 test('PendingRequestService registers and resolves v1 request', async t => {
@@ -236,15 +249,36 @@ test('PendingRequestService stores only transaction data for broadcast requests'
     await Promise.all([livenessPromise, broadcastPromise]);
 });
 
-async function buildV1BroadcastRequest({ id = uuidv7(), data = b4a.from('deadbeef', 'hex') } = {}) {
-    const wallet = createWallet();
-    const builder = new NetworkMessageBuilder(wallet, config);
-    await builder
-        .setType(NetworkOperationType.BROADCAST_TRANSACTION_REQUEST)
-        .setId(id)
-        .setTimestamp()
-        .setData(data)
-        .setCapabilities([])
-        .buildPayload();
-    return builder.getResult();
-}
+test('PendingRequestService.isProbePending matches peer and liveness type', async t => {
+    const service = new PendingRequestService(config);
+    const peerA = 'deadbeef';
+    const peerB = 'cafebabe';
+
+    t.is(service.isProbePending(peerA), false);
+    t.is(service.isProbePending(peerB), false);
+
+    const broadcastRequestA = await buildV1BroadcastRequest();
+    const livenessRequestA = await buildV1Request();
+    const livenessRequestB = await buildV1Request();
+
+    const broadcastPromiseA = service.registerPendingRequest(peerA, broadcastRequestA);
+    t.is(service.isProbePending(peerA), false);
+
+    const livenessPromiseA = service.registerPendingRequest(peerA, livenessRequestA);
+    const livenessPromiseB = service.registerPendingRequest(peerB, livenessRequestB);
+
+    t.is(service.isProbePending(peerA), true);
+    t.is(service.isProbePending(peerB), true);
+
+    t.ok(service.resolvePendingRequest(livenessRequestA.id));
+    await livenessPromiseA;
+    t.is(service.isProbePending(peerA), false);
+    t.is(service.isProbePending(peerB), true);
+
+    t.ok(service.resolvePendingRequest(livenessRequestB.id));
+    await livenessPromiseB;
+    t.is(service.isProbePending(peerB), false);
+
+    t.ok(service.resolvePendingRequest(broadcastRequestA.id));
+    await broadcastPromiseA;
+});
