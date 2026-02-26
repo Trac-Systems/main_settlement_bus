@@ -1,5 +1,6 @@
 import b4a from 'b4a'
 import { isDefined } from '../utils/type.js'
+import { trimEnd, endsWith } from 'lodash'
 
 export class Config {
     #options
@@ -81,7 +82,7 @@ export class Config {
     }
 
     get isAdminMode() {
-        return this.#options.storeName === 'admin'
+        return endsWith(this.storesDirectory, 'admin')
     }
 
     get keyPairPath()  {
@@ -153,12 +154,12 @@ export class Config {
     }
 
     get storesDirectory() {
-        if (this.#isOverriden('storesDirectory')) return this.#options.storesDirectory
+        if (this.#isOverriden('storesDirectory')) return trimEnd(this.#options.storesDirectory, '/')
         return this.#config.storesDirectory
     }
 
     get storesFullPath() {
-        return `${this.storesDirectory}${this.#options.storeName}`
+        return `${this.storesDirectory}/${this.storeName}`
     }
 
     get messageThreshold() {

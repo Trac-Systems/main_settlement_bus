@@ -25,21 +25,21 @@ export const resolveConfig = () => {
     const args = getArguments();
     const runRpc = isRpcEnabled();
     const selectedEnv = resolveEnvironment(args);
-    const storeName = args[0];
+    const storesDirectory = args[0];
     const hostIndex = args.indexOf('--host');
     const host = (hostIndex !== -1 && args[hostIndex + 1]) ? args[hostIndex + 1] : undefined;
     const portIndex = args.indexOf('--port');
     const port = (portIndex !== -1 && args[portIndex + 1]) ? parseInt(args[portIndex + 1], 10) : undefined;
 
     const rpc = {
-        storeName,
+        storesDirectory,
         enableWallet: false,
         enableInteractiveMode: false,
         host,
         port
     };
 
-    const options = runRpc ? rpc : { storeName };
+    const options = runRpc ? rpc : { storesDirectory };
 
     return createConfig(selectedEnv, options);
 };
