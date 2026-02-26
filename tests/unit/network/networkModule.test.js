@@ -10,7 +10,9 @@ async function runNetworkModuleTests() {
     await import('./TransactionRateLimiterService.test.js');
     await import('./V1ValidationSchema.test.js');
     await import('./V1ValidationErrorMapper.test.js');
+    await import('./V1ResultCode.test.js');
     await import('./V1BroadcastTransactionOperationHandler.test.js');
+    await import('./V1BroadcastTransactionResponse.test.js');
     test.resume();
 }
 
