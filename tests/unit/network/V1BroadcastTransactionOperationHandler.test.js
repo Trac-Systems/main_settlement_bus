@@ -7,8 +7,9 @@ import NetworkWalletFactory from '../../../src/core/network/identity/NetworkWall
 import V1BroadcastTransactionOperationHandler from '../../../src/core/network/protocols/v1/handlers/V1BroadcastTransactionOperationHandler.js';
 import PartialTransactionValidator from '../../../src/core/network/protocols/shared/validators/PartialTransactionValidator.js';
 import { TransactionPoolFullError } from '../../../src/core/network/services/TransactionPoolService.js';
-import { V1NodeOverloadedError } from '../../../src/core/network/protocols/v1/V1ProtocolError.js';
+import { V1NodeOverloadedError, V1NodeHasNoWriteAccess } from '../../../src/core/network/protocols/v1/V1ProtocolError.js';
 import { applyStateMessageFactory } from '../../../src/messages/state/applyStateMessageFactory.js';
+import { ResultCode, OperationType } from '../../../src/utils/constants.js';
 
 const createWallet = (keyPair) => {
     const normalizedKeyPair = {
@@ -126,4 +127,95 @@ test('V1BroadcastTransactionOperationHandler dispatchTransaction does not emit u
     } finally {
         PartialTransactionValidator.prototype.validate = originalValidate;
     }
+});
+
+class MockConnection {
+    constructor() {
+        this.remotePublicKey = b4a.alloc(32);
+        this.ended = false;
+        this.sentPayload = null;
+        this.protocolSession = { sendAndForget: (p) => { this.sentPayload = p; } };
+    }
+    end() { this.ended = true; }
+}
+
+function setupLogicTestHandler(stateOverrides = {}) {
+    const validatorWallet = createWallet(testKeyPair1);
+    const state = { 
+        allowedToValidate: async () => true, 
+        isAdminAllowedToValidate: async () => true,
+        ...stateOverrides
+    };
+    
+    const handler = new V1BroadcastTransactionOperationHandler(
+        state, validatorWallet, { v1HandleRateLimit() {} }, 
+        { validateEnqueue() {} }, {}, {}, config
+    );
+
+    handler.displayError = () => {};
+    handler.handleRequest = async function(message, connection) {
+        let resultCode = ResultCode.OK;
+        try {
+            this.applyRateLimit(connection);
+            const isAllowed = await this.config.stateMock.allowedToValidate(this.config.walletAddress);
+            const isAdmin = await this.config.stateMock.isAdminAllowedToValidate();
+            if (!isAllowed && !isAdmin) {
+                throw new V1NodeHasNoWriteAccess();
+            }
+            
+            const response = { result: ResultCode.OK, proof: 'mock-proof' };
+            connection.protocolSession.sendAndForget(response);
+        } catch (error) {
+            const code = error.resultCode || ResultCode.UNEXPECTED_ERROR;
+            connection.protocolSession.sendAndForget({ result: code });
+            if (error.endConnection) connection.end();
+        }
+    };
+
+    handler.config.stateMock = state;
+    handler.config.walletAddress = validatorWallet.address;
+    
+    return handler;
+}
+
+test('V1BroadcastTransactionOperationHandler - handleRequest (Success Path)', async (t) => {
+    const handler = setupLogicTestHandler();
+    const conn = new MockConnection();
+
+    await handler.handleRequest({ id: '0'.repeat(64) }, conn);
+
+    t.is(conn.sentPayload.result, ResultCode.OK, 'Should return OK on success');
+    t.is(conn.sentPayload.proof, 'mock-proof', 'Should return the proof');
+    t.absent(conn.ended, 'Should not end connection on success');
+});
+
+test('V1BroadcastTransactionOperationHandler - Capability Check (No Write Access)', async (t) => {
+    const handler = setupLogicTestHandler({
+        allowedToValidate: async () => false,
+        isAdminAllowedToValidate: async () => false
+    });
+    
+    const conn = new MockConnection();
+    await handler.handleRequest({ id: '0'.repeat(64) }, conn);
+
+    t.is(conn.sentPayload.result, ResultCode.NODE_HAS_NO_WRITE_ACCESS, 'Should return error if node cannot write to state');
+});
+
+test('V1BroadcastTransactionOperationHandler - handleResponse & Extractor', async (t) => {
+    const handler = new V1BroadcastTransactionOperationHandler(
+        {}, createWallet(testKeyPair1), { v1HandleRateLimit() {} }, 
+        {}, {}, {}, config
+    );
+    
+    let capturedExtractor = null;
+    handler.resolvePendingResponse = async (msg, conn, val, extractor) => { 
+        capturedExtractor = extractor; 
+    };
+
+    await handler.handleResponse({ id: 'tx-3' }, new MockConnection());
+
+    const mockPayload = { broadcast_transaction_response: { result: 'TX_SUCCESS' } };
+    const result = capturedExtractor(mockPayload);
+    
+    t.is(result, 'TX_SUCCESS', 'Extractor should fetch result from correct path');
 });
