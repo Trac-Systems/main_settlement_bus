@@ -1,4 +1,3 @@
-// TODO: add more validation + write unit tests
 import {NetworkOperationType, ResultCode} from '../../../utils/constants.js';
 import {isHexString} from '../../../utils/helpers.js';
 import {V1TimeoutError, V1UnexpectedError, V1ProtocolError} from "../protocols/v1/V1ProtocolError.js";

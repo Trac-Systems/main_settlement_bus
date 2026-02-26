@@ -1,7 +1,7 @@
 import {isHexString} from '../../../utils/helpers.js';
 import {TRANSACTION_COMMIT_SERVICE_BUFFER_SIZE} from '../../../utils/constants.js';
 
-const TX_HASH_HEX_STRING_LENGTH = 64; // TODO - this should be in constants.
+const TX_HASH_HEX_STRING_LENGTH = 64;
 
 class TransactionCommitService {
     #pendingCommits;
