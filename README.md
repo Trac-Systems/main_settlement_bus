@@ -75,15 +75,15 @@ The script sources `.env` before invoking program and falls back to `node-store`
 #### Inline environment variables
 
 ```sh
-MSB_STORE=<store_name> npm run env-prod
+NETWORK=testnet MSB_STORE=<store_name> npm run env-prod
 ```
 
-This run persists data under `./stores/${MSB_STORE}` (defaults to `node-store`) and is intended for inline or CLI-supplied configuration.
+This run persists data under `./stores/${MSB_STORE}` (defaults to `node-store`), connects to testnet (defaults to `mainnet`) and is intended for inline or CLI-supplied configuration.
 
 #### CLI flags
 
 ```sh
-npm run prod --store=<store_name>
+npm run prod --store=<store_name> --network testnet
 ```
 
 ### RPC-enabled node
