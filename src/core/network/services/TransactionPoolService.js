@@ -35,10 +35,6 @@ class TransactionPoolService {
         return this.#state;
     }
 
-    get address() {
-        return this.#address;
-    }
-
     async start() {
         if (!this.#config.enableWallet) {
             console.info('TransactionPoolService can not start. Wallet is not enabled');
@@ -123,7 +119,7 @@ class TransactionPoolService {
 
     async #checkValidationPermissions() {
         const isAdminAllowedToValidate = await this.state.isAdminAllowedToValidate();
-        const isNodeAllowedToValidate = await this.state.allowedToValidate(this.address);
+        const isNodeAllowedToValidate = await this.state.allowedToValidate(this.#address);
         return isNodeAllowedToValidate || isAdminAllowedToValidate;
     }
 

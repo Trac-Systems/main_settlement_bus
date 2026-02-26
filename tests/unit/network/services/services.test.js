@@ -9,6 +9,7 @@ async function runTests() {
     await import('./ConnectionManager.test.js');
     await import('./PendingRequestService.test.js');
     await import('./TransactionCommitService.test.js');
+    await import('./TransactionPoolService.test.js');
     test.resume();
 }
 
