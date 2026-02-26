@@ -47,11 +47,11 @@ npm install -g bare
 
 - ✅ `npm run test:unit:all` – confirms the codebase builds and runs under both supported runtimes.
 - 📋 `npm run test:acceptance` – optional but recommended before upgrades. This suite spins up in-process nodes and may take a few minutes.
-- 🌐 RPC smoke test – start `MSB_STORE=smoke-store MSB_HOST=127.0.0.1 MSB_PORT=5000 NETWORK=mainnet npm run env-prod-rpc` in one terminal, then execute `curl -s http://127.0.0.1:5000/v1/fee` from another terminal to verify `/v1` routes respond. Stop the node with `Ctrl+C` once finished.
+- 🌐 RPC smoke test – start `MSB_STORE=smoke-store MSB_HOST=127.0.0.1 MSB_PORT=5000 NETWORK=mainnet npm run env-rpc` in one terminal, then execute `curl -s http://127.0.0.1:5000/v1/fee` from another terminal to verify `/v1` routes respond. Stop the node with `Ctrl+C` once finished.
 
 ## Usage
 
-Runtime entry points cover CLI-driven runs (`prod`, `prod-rpc`) and `.env`-aware runs (`env-prod`, `env-prod-rpc`). Each section below lists the accepted configuration inputs.
+Runtime entry points cover CLI-driven runs (`start`, `rpc`) and `.env`-aware runs (`env`, `env-rpc`). Each section below lists the accepted configuration inputs.
 
 ### Interactive regular node
 
@@ -67,7 +67,7 @@ MSB_STORE=<store_name>
 then
 
 ```
-npm run env-prod
+npm run env
 ```
 
 The script sources `.env` before invoking program and falls back to `node-store` when `MSB_STORE` is not defined.
@@ -75,7 +75,7 @@ The script sources `.env` before invoking program and falls back to `node-store`
 #### Inline environment variables
 
 ```sh
-NETWORK=testnet MSB_STORE=<store_name> npm run env-prod
+NETWORK=testnet MSB_STORE=<store_name> npm run env
 ```
 
 This run persists data under `./stores/${MSB_STORE}` (defaults to `node-store`), connects to testnet (defaults to `mainnet`) and is intended for inline or CLI-supplied configuration.
@@ -83,7 +83,7 @@ This run persists data under `./stores/${MSB_STORE}` (defaults to `node-store`),
 #### CLI flags
 
 ```sh
-npm run prod --store=<store_name> --network testnet
+npm run start --store=<store_name> -- --network testnet
 ```
 
 ### RPC-enabled node
@@ -99,7 +99,7 @@ NETWORK=mainnet
 ```
 
 ```
-npm run env-prod-rpc
+npm run env-rpc
 ```
 
 This entry point sources `.env` automatically and defaults to `rpc-node-store`, `127.0.0.1`, `5000`, and `mainnet` when variables are not present. Supported `NETWORK` values are `mainnet`, `development` and `testnet`.
@@ -107,7 +107,7 @@ This entry point sources `.env` automatically and defaults to `rpc-node-store`, 
 #### Inline environment variables
 
 ```sh
-MSB_STORE=<store_name> MSB_HOST=<host> MSB_PORT=<port> NETWORK=<network> npm run env-prod-rpc
+MSB_STORE=<store_name> MSB_HOST=<host> MSB_PORT=<port> NETWORK=<network> npm run env-rpc
 ```
 
 Override any combination of `MSB_STORE`, `MSB_HOST`, `MSB_PORT`, or `NETWORK`. Data is persisted under `./stores/${MSB_STORE}` (default `rpc-node-store` for this script).
@@ -115,7 +115,7 @@ Override any combination of `MSB_STORE`, `MSB_HOST`, `MSB_PORT`, or `NETWORK`. D
 #### CLI flags
 
 ```sh
-npm run prod-rpc --store=<store_name> --host=<host> --port=<port>
+npm run rpc --store=<store_name> --host=<host> --port=<port> -- --network <network>
 ```
 
 ## Docker usage
