@@ -47,7 +47,7 @@ class PartialOperationValidator {
         const selectedValidator = this.#selectCheckSchemaValidator(payload.type);
         const isPayloadValid = selectedValidator(payload);
         if (!isPayloadValid) {
-            throw new Error(`Payload is invalid.`);
+            throw new Error('Payload is invalid.');
         }
     }
 
@@ -158,7 +158,7 @@ class PartialOperationValidator {
         const incomingTxv = operation.txv
 
         if (!b4a.equals(currentTxv, incomingTxv)) {
-            throw new Error(`Transaction has expired.`);
+            throw new Error('Transaction has expired.');
         }
     }
 
