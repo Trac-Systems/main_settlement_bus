@@ -4,8 +4,8 @@
 [![license](https://img.shields.io/github/license/Trac-Systems/main_settlement_bus)](https://github.com/Trac-Systems/main_settlement_bus/blob/main/LICENSE)
 [![node](https://img.shields.io/badge/node-v22.22.0-brightgreen)](https://www.npmjs.com/package/trac-msb)
 [![dependabot](https://img.shields.io/badge/dependabot-enabled-brightgreen)](https://github.com/Trac-Systems/main_settlement_bus/security/dependabot)
-
-
+[![MSB-Unit-Tests](https://github.com/Trac-Systems/main_settlement_bus/actions/workflows/unit-tests.yml/badge.svg?branch=main)](https://github.com/Trac-Systems/main_settlement_bus/actions/workflows/unit-tests.yml)
+[![Acceptance Tests](https://github.com/Trac-Systems/main_settlement_bus/actions/workflows/acceptance-tests.yml/badge.svg?branch=main)](https://github.com/Trac-Systems/main_settlement_bus/actions/workflows/acceptance-tests.yml)
 # Main Settlement Bus (MSB)
 
 A peer-to-peer crypto validator network to verify and append transactions.
