@@ -1,6 +1,6 @@
 import test from 'brittle';
-import V1BaseOperationHandler from '../../../src/core/network/protocols/v1/handlers/V1BaseOperationHandler.js';
-import { V1UnexpectedError } from '../../../src/core/network/protocols/v1/V1ProtocolError.js';
+import V1BaseOperationHandler from '../../../../../src/core/network/protocols/v1/handlers/V1BaseOperationHandler.js';
+import { V1UnexpectedError } from '../../../../../src/core/network/protocols/v1/V1ProtocolError.js';
 
 class MockRateLimiter {
     constructor() { this.called = false; }
