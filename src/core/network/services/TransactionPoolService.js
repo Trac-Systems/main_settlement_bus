@@ -3,6 +3,7 @@ import {BATCH_SIZE, PROCESS_INTERVAL_MS} from '../../../utils/constants.js';
 import Scheduler from '../../../utils/Scheduler.js';
 import Denque from "denque";
 import b4a from "b4a";
+import {Config} from "../../../config/config.js";
 
 class TransactionPoolService {
     #state;
@@ -20,11 +21,23 @@ class TransactionPoolService {
      * @param {object} config
      **/
     constructor(state, address, transactionCommitService, config) {
+        Config.validateConfig(config);
+        this.#validateConfigMembers(config);
         this.#state = state;
         this.#address = address;
         this.#transactionCommitService = transactionCommitService;
         this.#queuedTxHashes = new Set(); // to improve lookup performance when checking for duplicate transactions
         this.#config = config;
+    }
+
+    #validateConfigMembers(config) {
+        if (! this.#config.txPoolSize ||  isNaN(config.txPoolSize) || config.txPoolSize <= 0) {
+            throw new TransactionPoolConfigValidationError('txPoolSize must be a positive integer.');
+        }
+        if (! this.#config.enableWallet || typeof config.enableWallet !== 'boolean') {
+            throw new TransactionPoolConfigValidationError('enableWallet must be a boolean value.');
+        }
+
     }
 
     get tx_pool() {
@@ -204,6 +217,12 @@ export class TransactionPoolFullError extends Error {
 export class TransactionPoolAlreadyQueuedError extends Error {
     constructor(txHash) {
         super(`Transaction with hash ${txHash} is already queued in the transaction pool.`);
+    }
+}
+
+export class TransactionPoolConfigValidationError extends Error {
+    constructor(message) {
+        super(`TransactionPoolService configuration error: ${message}`);
     }
 }
 

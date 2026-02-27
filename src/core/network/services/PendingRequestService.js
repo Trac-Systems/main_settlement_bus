@@ -1,6 +1,7 @@
 import {NetworkOperationType, ResultCode} from '../../../utils/constants.js';
 import {isHexString} from '../../../utils/helpers.js';
 import {V1TimeoutError, V1UnexpectedError, V1ProtocolError} from "../protocols/v1/V1ProtocolError.js";
+import {Config} from '../../../config/config.js';
 import b4a from 'b4a';
 
 const PEER_PUBLIC_KEY_HEX_LENGTH = 64;
@@ -11,8 +12,20 @@ class PendingRequestService {
     #config;
 
     constructor(config) {
+        Config.validateConfig(config);
+        this.#validateConfigMembers(config);
         this.#pendingRequests = new Map(); // Map<id, pendingRequestEntry>
         this.#config = config;
+    }
+
+    #validateConfigMembers(config) {
+        if (! this.#config.maxPendingRequestsInPendingRequestsService ||  isNaN(config.maxPendingRequestsInPendingRequestsService) || config.maxPendingRequestsInPendingRequestsService <= 0) {
+            throw new Error('Invalid config: maxPendingRequestsInPendingRequestsService must be a positive integer.');
+        }
+
+        if (! this.#config.pendingRequestTimeout ||  isNaN(config.pendingRequestTimeout) || config.pendingRequestTimeout <= 0) {
+            throw new Error('Invalid config: pendingRequestTimeout must be a positive integer.');
+        }
     }
 
     has(id) {

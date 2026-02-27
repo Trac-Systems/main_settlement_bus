@@ -1,5 +1,6 @@
 import {isHexString} from '../../../utils/helpers.js';
 import {TRANSACTION_COMMIT_SERVICE_BUFFER_SIZE} from '../../../utils/constants.js';
+import {Config} from "../../../config/config.js";
 
 const TX_HASH_HEX_STRING_LENGTH = 64;
 
@@ -8,8 +9,16 @@ class TransactionCommitService {
     #config;
 
     constructor(config) {
+        Config.validateConfig(config);
+        this.#validateConfigMembers(config);
         this.#pendingCommits = new Map(); // Map<txHash, pendingCommitEntry>
         this.#config = config;
+    }
+
+    #validateConfigMembers(config) {
+        if (! this.#config.txCommitTimeout ||  isNaN(config.txCommitTimeout) || config.txCommitTimeout <= 0) {
+            throw new PendingCommitConfigValidationError('txCommitTimeout must be a positive integer.');
+        }
     }
 
     #assertTxHash(txHash) {
@@ -145,5 +154,11 @@ export class PendingCommitCancelledError extends Error {
 export class PendingCommitUnexpectedError extends Error {
     constructor(message = 'Unexpected commit error') {
         super(message);
+    }
+}
+
+export class PendingCommitConfigValidationError extends Error {
+    constructor(message) {
+        super(`Invalid TransactionCommitService config: ${message}`);
     }
 }

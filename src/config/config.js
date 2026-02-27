@@ -155,4 +155,10 @@ export class Config {
             );
         }
     }
+
+    static validateConfig(config) {
+        if (!config || typeof config !== 'object' || !config instanceof Config) {
+            throw new Error('Config must be an object and an instance of Config class.');
+        }
+    }
 }
