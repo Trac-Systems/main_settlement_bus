@@ -47,11 +47,11 @@ npm install -g bare
 
 - ✅ `npm run test:unit:all` – confirms the codebase builds and runs under both supported runtimes.
 - 📋 `npm run test:acceptance` – optional but recommended before upgrades. This suite spins up in-process nodes and may take a few minutes.
-- 🌐 RPC smoke test – start `MSB_STORE=smoke-store MSB_HOST=127.0.0.1 MSB_PORT=5000 npm run env-prod-rpc` in one terminal, then execute `curl -s http://127.0.0.1:5000/v1/fee` from another terminal to verify `/v1` routes respond. Stop the node with `Ctrl+C` once finished.
+- 🌐 RPC smoke test – start `MSB_STORE=smoke-store MSB_HOST=127.0.0.1 MSB_PORT=5000 NETWORK=mainnet npm run env-rpc` in one terminal, then execute `curl -s http://127.0.0.1:5000/v1/fee` from another terminal to verify `/v1` routes respond. Stop the node with `Ctrl+C` once finished.
 
 ## Usage
 
-Runtime entry points cover CLI-driven runs (`prod`, `prod-rpc`) and `.env`-aware runs (`env-prod`, `env-prod-rpc`). Each section below lists the accepted configuration inputs.
+Runtime entry points cover CLI-driven runs (`start`, `rpc`) and `.env`-aware runs (`env`, `env-rpc`). Each section below lists the accepted configuration inputs.
 
 ### Interactive regular node
 
@@ -67,7 +67,7 @@ MSB_STORE=<store_name>
 then
 
 ```
-npm run env-prod
+npm run env
 ```
 
 The script sources `.env` before invoking program and falls back to `node-store` when `MSB_STORE` is not defined.
@@ -75,15 +75,15 @@ The script sources `.env` before invoking program and falls back to `node-store`
 #### Inline environment variables
 
 ```sh
-MSB_STORE=<store_name> npm run env-prod
+NETWORK=testnet MSB_STORE=<store_name> npm run env
 ```
 
-This run persists data under `./stores/${MSB_STORE}` (defaults to `node-store`) and is intended for inline or CLI-supplied configuration.
+This run persists data under `./stores/${MSB_STORE}` (defaults to `node-store`), connects to testnet (defaults to `mainnet`) and is intended for inline or CLI-supplied configuration.
 
 #### CLI flags
 
 ```sh
-npm run prod --store=<store_name>
+npm run start --store=<store_name> -- --network testnet
 ```
 
 ### RPC-enabled node
@@ -95,26 +95,27 @@ npm run prod --store=<store_name>
 MSB_STORE=<store_name>
 MSB_HOST=127.0.0.1
 MSB_PORT=5000
+NETWORK=mainnet
 ```
 
 ```
-npm run env-prod-rpc
+npm run env-rpc
 ```
 
-This entry point sources `.env` automatically and defaults to `rpc-node-store`, `127.0.0.1`, and `5000` when variables are not present.
+This entry point sources `.env` automatically and defaults to `rpc-node-store`, `127.0.0.1`, `5000`, and `mainnet` when variables are not present. Supported `NETWORK` values are `mainnet`, `development` and `testnet`.
 
 #### Inline environment variables
 
 ```sh
-MSB_STORE=<store_name> MSB_HOST=<host> MSB_PORT=<port> npm run env-prod-rpc
+MSB_STORE=<store_name> MSB_HOST=<host> MSB_PORT=<port> NETWORK=<network> npm run env-rpc
 ```
 
-Override any combination of `MSB_STORE`, `MSB_HOST`, or `MSB_PORT`. Data is persisted under `./stores/${MSB_STORE}` (default `rpc-node-store` for this script).
+Override any combination of `MSB_STORE`, `MSB_HOST`, `MSB_PORT`, or `NETWORK`. Data is persisted under `./stores/${MSB_STORE}` (default `rpc-node-store` for this script).
 
 #### CLI flags
 
 ```sh
-npm run prod-rpc --store=<store_name> --host=<host> --port=<port>
+npm run rpc --store=<store_name> --host=<host> --port=<port> -- --network <network>
 ```
 
 ## Docker usage
@@ -125,6 +126,7 @@ You can run the RPC node in a containerized environment using the provided `dock
 - `MSB_HOST`: host interface to bind (defaults to `127.0.0.1` to avoid exposing everything).
 - `MSB_PORT`: port the RPC server listens on **inside** the container (defaults to `5000`).
 - `MSB_PUBLISH_PORT`: host port to expose (defaults to `MSB_PORT`, so set it only when the host port should differ).
+- `NETWORK`: network environment for the RPC process (defaults to `mainnet`). Supported values are `mainnet`, `development`, `testnet`, and `testnet1`.
 
 Leave `MSB_PORT=5000` if you just want to publish the default RPC port and only bump `MSB_PUBLISH_PORT` when the host side must change. Set both to the same value if you want the RPC server itself to listen on another port.
 
@@ -134,6 +136,7 @@ Example (keep container port 5000, expose host port 6000):
 MSB_STORE=rpc-node-store \
 MSB_HOST=127.0.0.1 \
 MSB_PORT=5000 \
+NETWORK=mainnet \
 MSB_PUBLISH_PORT=6000 \
 docker compose up -d msb-rpc
 ```
@@ -162,13 +165,14 @@ Any of the following launch methods can be applied:
    MSB_STORE=rpc-node-store
    MSB_HOST=127.0.0.1
    MSB_PORT=5000
+   NETWORK=mainnet
    MSB_PUBLISH_PORT=1337
    ```
 
 2. **Passing variables inline** – use this method when environment variables should be provided directly in the command line, without modifying the `.env` file:
 
    ```sh
-   MSB_STORE=<store_name> MSB_HOST=<host> MSB_PORT=<container_port> MSB_PUBLISH_PORT=<host_port> docker compose up -d msb-rpc
+   MSB_STORE=<store_name> MSB_HOST=<host> MSB_PORT=<container_port> NETWORK=<network> MSB_PUBLISH_PORT=<host_port> docker compose up -d msb-rpc
    ```
 
    Skip `MSB_PORT` when you just want to keep the container on `5000` and expose a different host port.
@@ -180,6 +184,7 @@ Any of the following launch methods can be applied:
       -e MSB_STORE=<store_name> \
       -e MSB_HOST=<host> \
       -e MSB_PORT=<container_port> \
+      -e NETWORK=<network> \
       -e MSB_PUBLISH_PORT=<host_port> \
       -p <host_address>:<host_port>:<container_port> \
       -v /absolute/path/to/your/store_directory:/msb/stores \
@@ -195,6 +200,7 @@ Any of the following launch methods can be applied:
        -e MSB_STORE=rpc-node-store \
        -e MSB_HOST=127.0.0.1 \
        -e MSB_PORT=5000 \
+       -e NETWORK=mainnet \
        -e MSB_PUBLISH_PORT=6000 \
        -p 127.0.0.1:6000:5000 \
        -v /absolute/path/to/your/store_directory:/msb/stores \

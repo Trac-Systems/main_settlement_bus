@@ -12,6 +12,7 @@ async function runTests() {
 	await import('./fileUtils/readBalanceMigrationFile.test.js');
 	await import('./migrationUtils/validateAddressFromIncomingFile.test.js');
 	await import('./buffer/buffer.test.js')
+	await import('./type/type.test.js');
 	await import('./amountSerialization/amountSerialization.test.js');
 	test.resume();
 }

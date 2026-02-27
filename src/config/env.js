@@ -1,8 +1,6 @@
-import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
+import { TRAC_NETWORK_MSB_MAINNET_PREFIX, TRAC_NETWORK_MSB_TESTNET1_PREFIX } from 'trac-wallet/constants.js';
 import { Config } from './config.js';
 import { TRAC_NETWORK_TESTNET_ID, TRAC_NETWORK_MAINNET_ID } from 'trac-crypto-api/constants.js';
-
-const TRAC_NETWORK_MSB_TESTNET1_PREFIX = "testtrac"
 
 export const ENV = {
     MAINNET: 'mainnet',
@@ -32,6 +30,8 @@ const configData = {
         messageThreshold: 1000,
         messageValidatorRetryDelay: 1000, //How long to wait before retrying (ms) MESSAGE_VALIDATOR_RETRY_DELAY_MS
         messageValidatorResponseTimeout: 3 * 3 * 1000, //Overall timeout for sending a message (ms). This is 3 * maxRetries * messageValidatorRetryDelay;
+        host: 'localhost',
+        port: 5000,
         networkId: TRAC_NETWORK_TESTNET_ID,
         maxPeers: 64, // Connectivity constants
         maxParallel: 64, // Connectivity constants
@@ -66,6 +66,8 @@ const configData = {
         messageThreshold: 3,
         messageValidatorRetryDelay: 1000, //How long to wait before retrying (ms) MESSAGE_VALIDATOR_RETRY_DELAY_MS
         messageValidatorResponseTimeout: 3 * 3 * 1000, //Overall timeout for sending a message (ms). This is 3 * maxRetries * messageValidatorRetryDelay;
+        host: 'localhost',
+        port: 5000,
         networkId: TRAC_NETWORK_MAINNET_ID,
         maxPeers: 64, // Connectivity constants
         maxParallel: 64, // Connectivity constants
@@ -100,6 +102,8 @@ const configData = {
         messageThreshold: 1000,
         messageValidatorRetryDelay: 1000, //How long to wait before retrying (ms) MESSAGE_VALIDATOR_RETRY_DELAY_MS
         messageValidatorResponseTimeout: 3 * 3 * 1000, //Overall timeout for sending a message (ms). This is 3 * maxRetries * messageValidatorRetryDelay;
+        host: 'localhost',
+        port: 5000,
         networkId: TRAC_NETWORK_TESTNET_ID,
         maxPeers: 64, // Connectivity constants
         maxParallel: 64, // Connectivity constants
