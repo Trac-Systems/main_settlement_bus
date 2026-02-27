@@ -29,12 +29,12 @@ class MockPendingReqService {
 
 const mockConfig = { disableRateLimit: false };
 
-test('V1BaseOperationHandler - constructor & config', async (t) => {
+test('constructor: stores provided config -> config getter returns same reference', async (t) => {
     const handler = new V1BaseOperationHandler(null, null, mockConfig);
     t.is(handler.config, mockConfig, 'Should return the config passed in the constructor');
 });
 
-test('V1BaseOperationHandler - applyRateLimit (enabled)', async (t) => {
+test('applyRateLimit: rate limit enabled -> calls rate limiter with connection', async (t) => {
     const rateLimiter = new MockRateLimiter();
     const handler = new V1BaseOperationHandler(rateLimiter, null, mockConfig);
     const conn = { id: 1 };
@@ -45,7 +45,7 @@ test('V1BaseOperationHandler - applyRateLimit (enabled)', async (t) => {
     t.is(rateLimiter.conn, conn, 'Should pass the connection to the rate limiter');
 });
 
-test('V1BaseOperationHandler - applyRateLimit (disabled)', async (t) => {
+test('applyRateLimit: disableRateLimit=true -> skips rate limiter call', async (t) => {
     const rateLimiter = new MockRateLimiter();
     const handler = new V1BaseOperationHandler(rateLimiter, null, { disableRateLimit: true });
 
@@ -54,7 +54,7 @@ test('V1BaseOperationHandler - applyRateLimit (disabled)', async (t) => {
     t.absent(rateLimiter.called, 'Should NOT call the rate limiter when disableRateLimit is true');
 });
 
-test('V1BaseOperationHandler - resolvePendingResponse (no entry)', async (t) => {
+test('resolvePendingResponse: pending request missing -> returns false', async (t) => {
     const pendingReq = new MockPendingReqService();
     const handler = new V1BaseOperationHandler(null, pendingReq, mockConfig);
 
@@ -63,7 +63,7 @@ test('V1BaseOperationHandler - resolvePendingResponse (no entry)', async (t) => 
     t.is(result, false, 'Should return false if the pending request does not exist');
 });
 
-test('V1BaseOperationHandler - resolvePendingResponse (success)', async (t) => {
+test('resolvePendingResponse: valid pending response -> stops timeout and resolves request', async (t) => {
     const pendingReq = new MockPendingReqService();
     pendingReq.entries['msg-123'] = { id: 'msg-123' };
 
@@ -87,7 +87,7 @@ test('V1BaseOperationHandler - resolvePendingResponse (success)', async (t) => {
     t.is(pendingReq.resolved[0].code, 'SUCCESS', 'Should extract resultCode and resolve');
 });
 
-test('V1BaseOperationHandler - resolvePendingResponse (validation failure)', async (t) => {
+test('resolvePendingResponse: validator throws -> propagates validation error', async (t) => {
     const pendingReq = new MockPendingReqService();
     pendingReq.entries['msg-123'] = { id: 'msg-123' };
 
@@ -108,7 +108,7 @@ test('V1BaseOperationHandler - resolvePendingResponse (validation failure)', asy
     }, /Validation Failed/, 'Should propagate the validation error');
 });
 
-test('V1BaseOperationHandler - handlePendingResponseError (already rejected)', async (t) => {
+test('handlePendingResponseError: request already rejected -> does not close connection', async (t) => {
     const pendingReq = new MockPendingReqService();
     pendingReq.shouldReject = false;
 
@@ -122,7 +122,7 @@ test('V1BaseOperationHandler - handlePendingResponseError (already rejected)', a
     t.absent(ended, 'Should NOT end the connection if the request was already rejected');
 });
 
-test('V1BaseOperationHandler - handlePendingResponseError (fallback mapping)', async (t) => {
+test('handlePendingResponseError: unknown native error -> maps to V1UnexpectedError', async (t) => {
     const pendingReq = new MockPendingReqService();
     const handler = new V1BaseOperationHandler(null, pendingReq, mockConfig);
 
@@ -151,7 +151,7 @@ test('V1BaseOperationHandler - handlePendingResponseError (fallback mapping)', a
     t.absent(ended, 'V1UnexpectedError should not close the connection by default');
 });
 
-test('V1BaseOperationHandler - handlePendingResponseError (protocol error + endConnection)', async (t) => {
+test('handlePendingResponseError: protocol error with endConnection=true -> closes connection', async (t) => {
     const pendingReq = new MockPendingReqService();
     const handler = new V1BaseOperationHandler(null, pendingReq, mockConfig);
 
@@ -181,7 +181,7 @@ test('V1BaseOperationHandler - handlePendingResponseError (protocol error + endC
     t.ok(ended, 'Should call connection.end() when error dictates it');
 });
 
-test('displayError is called', async (t) => {
+test('handlePendingResponseError: delegates logging -> calls displayError', async (t) => {
     const pendingReq = new MockPendingReqService();
     const handler = new V1BaseOperationHandler(null, pendingReq, { hrp: 'trac' });
 
@@ -198,7 +198,7 @@ test('displayError is called', async (t) => {
     t.ok(called);
 });
 
-test('Protocol error remains untouched', async (t) => {
+test('handlePendingResponseError: protocol-shaped error -> keeps original error instance', async (t) => {
     const pendingReq = new MockPendingReqService();
     const handler = new V1BaseOperationHandler(null, pendingReq, mockConfig);
 
@@ -220,7 +220,7 @@ test('Protocol error remains untouched', async (t) => {
     );
 });
 
-test('handlePendingResponseError - undefined error fallback', async (t) => {
+test('handlePendingResponseError: undefined error -> uses Unexpected error fallback', async (t) => {
     const pendingReq = new MockPendingReqService();
     const handler = new V1BaseOperationHandler(null, pendingReq, mockConfig);
 
@@ -239,7 +239,7 @@ test('handlePendingResponseError - undefined error fallback', async (t) => {
     t.is(captured.message, 'Unexpected error');
 });
 
-test('displayError executes real implementation (throws due to crypto config)', async (t) => {
+test('displayError: real implementation with invalid config -> throws', async (t) => {
     const pendingReq = new MockPendingReqService();
 
     const handler = new V1BaseOperationHandler(
@@ -264,7 +264,7 @@ test('displayError executes real implementation (throws due to crypto config)', 
     t.pass();
 });
 
-test('handlePendingResponseError - primitive error fallback', async (t) => {
+test('handlePendingResponseError: primitive error value -> uses Unexpected error fallback', async (t) => {
     const pendingReq = new MockPendingReqService();
     const handler = new V1BaseOperationHandler(null, pendingReq, mockConfig);
 

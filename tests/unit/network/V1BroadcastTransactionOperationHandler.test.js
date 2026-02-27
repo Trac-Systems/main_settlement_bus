@@ -17,16 +17,43 @@ import PartialRoleAccessValidator from '../../../src/core/network/protocols/shar
 import PartialBootstrapDeploymentValidator from '../../../src/core/network/protocols/shared/validators/PartialBootstrapDeploymentValidator.js';
 import PartialTransactionValidator from '../../../src/core/network/protocols/shared/validators/PartialTransactionValidator.js';
 import PartialTransferValidator from '../../../src/core/network/protocols/shared/validators/PartialTransferValidator.js';
+import { config as testConfig } from '../../helpers/config.js';
 
-const VALID_ADDR = 'trac1p5d7rj67fzh6cs6ccfshv37t6z84nvtca4yv8mwwsc38qcz';
+const VALID_ADDR = 'trac123z3gfpr2epjwww7ntm3m6ud2fhmq0tvts27p2f5mx3qkecsutlqfys769';
+const VALID_TO_ADDR = 'trac1mqktwme8fvklrds4hlhfy6lhmsu9qgfn3c3kuhz7c5zwjt8rc3dqj9tx7h';
 const VALID_PUB = b4a.alloc(33, 2);
 
-const basePayload = {
+const basePayload = () => ({
     tx: b4a.alloc(32),
     txv: b4a.alloc(32),
-    in: 1,
-    is: b4a.alloc(32)
-};
+    in: b4a.alloc(32),
+    is: b4a.alloc(64)
+});
+
+const roleAccessPayload = () => ({
+    ...basePayload(),
+    iw: b4a.alloc(32)
+});
+
+const transferPayload = () => ({
+    ...basePayload(),
+    to: VALID_TO_ADDR,
+    am: b4a.alloc(16)
+});
+
+const transactionPayload = () => ({
+    ...basePayload(),
+    iw: b4a.alloc(32),
+    ch: b4a.alloc(32),
+    bs: b4a.alloc(32),
+    mbs: b4a.alloc(32)
+});
+
+const bootstrapDeploymentPayload = () => ({
+    ...basePayload(),
+    bs: b4a.alloc(32),
+    ic: b4a.alloc(32)
+});
 
 function setupHandler(overrides = {}) {
 
@@ -44,10 +71,10 @@ function setupHandler(overrides = {}) {
         isAdminAllowedToValidate: async () => true
     };
 
-    const wallet = {
+    const wallet = overrides.wallet || {
         address: VALID_ADDR,
         getPublicKey: () => VALID_PUB,
-        sign: async () => b4a.alloc(64)
+        sign: () => b4a.alloc(64)
     };
 
     const txPool = overrides.txPool || {
@@ -60,6 +87,7 @@ function setupHandler(overrides = {}) {
             Promise.resolve({ proof: b4a.alloc(32), appendedAt: 5 }),
         rejectPendingCommit() {}
     };
+    const config = overrides.config || testConfig;
 
     const handler = new V1BroadcastTransactionOperationHandler(
         state,
@@ -68,7 +96,7 @@ function setupHandler(overrides = {}) {
         txPool,
         { resolvePendingRequest() {} },
         commitService,
-        { hrp: 'trac', network: { hrp: 'trac' } }
+        config
     );
 
     handler.displayError = () => {};
@@ -85,15 +113,15 @@ function mockConn(assertFn) {
     };
 }
 
-test('All dispatch branches - full success coverage', async t => {
+test('handleRequest: dispatches all supported operation types -> sends response', async t => {
 
     const scenarios = [
-        { type: OperationType.ADD_WRITER, key: 'rao', data: { ...basePayload, iw: true } },
-        { type: OperationType.REMOVE_WRITER, key: 'rao', data: { ...basePayload, iw: false } },
-        { type: OperationType.ADMIN_RECOVERY, key: 'rao', data: { ...basePayload, iw: true } },
-        { type: OperationType.TRANSFER, key: 'tro', data: { ...basePayload, to: VALID_ADDR, am: '1' } },
-        { type: OperationType.TX, key: 'txo', data: { ...basePayload, iw: true, ch: 1, bs: b4a.alloc(32), mbs: b4a.alloc(32) } },
-        { type: OperationType.BOOTSTRAP_DEPLOYMENT, key: 'bdo', data: { ...basePayload, bs: b4a.alloc(32), ic: b4a.alloc(32) } }
+        { type: OperationType.ADD_WRITER, key: 'rao', data: roleAccessPayload() },
+        { type: OperationType.REMOVE_WRITER, key: 'rao', data: roleAccessPayload() },
+        { type: OperationType.ADMIN_RECOVERY, key: 'rao', data: roleAccessPayload() },
+        { type: OperationType.TRANSFER, key: 'tro', data: transferPayload() },
+        { type: OperationType.TX, key: 'txo', data: transactionPayload() },
+        { type: OperationType.BOOTSTRAP_DEPLOYMENT, key: 'bdo', data: bootstrapDeploymentPayload() }
     ];
 
     for (const s of scenarios) {
@@ -113,7 +141,7 @@ test('All dispatch branches - full success coverage', async t => {
     t.pass();
 });
 
-test('Invalid type + missing type branches', async t => {
+test('dispatchTransaction: missing/invalid type -> throws invalid payload error', async t => {
 
     const handler = setupHandler();
 
@@ -140,16 +168,7 @@ test('Commit service not configured', async t => {
     handler.decodeApplyOperation = () => ({
         type: OperationType.TX,
         address: VALID_ADDR,
-        txo: {
-            tx: b4a.alloc(32),
-            txv: b4a.alloc(32),
-            iw: true,
-            in: 1,
-            ch: 1,
-            is: b4a.alloc(32),
-            bs: b4a.alloc(32),
-            mbs: b4a.alloc(32)
-        }
+        txo: transactionPayload()
     });
 
     await handler.handleRequest(
@@ -176,7 +195,7 @@ test('TxPool validateEnqueue full', async t => {
     handler.decodeApplyOperation = () => ({
         type: OperationType.TX,
         address: VALID_ADDR,
-        txo: basePayload
+        txo: transactionPayload()
     });
 
     await handler.handleRequest(
@@ -207,7 +226,7 @@ test('Commit registration error mapping', async t => {
         handler.decodeApplyOperation = () => ({
             type: OperationType.TX,
             address: VALID_ADDR,
-            txo: basePayload
+            txo: transactionPayload()
         });
 
         await handler.handleRequest(
@@ -239,7 +258,7 @@ test('TxPool addTransaction error mapping', async t => {
         handler.decodeApplyOperation = () => ({
             type: OperationType.TX,
             address: VALID_ADDR,
-            txo: basePayload
+            txo: transactionPayload()
         });
 
         await handler.handleRequest(
@@ -273,7 +292,7 @@ test('Pending commit rejection branches', async t => {
         handler.decodeApplyOperation = () => ({
             type: OperationType.TX,
             address: VALID_ADDR,
-            txo: basePayload
+            txo: transactionPayload()
         });
 
         await handler.handleRequest(
@@ -297,7 +316,7 @@ test('Capability validation failure', async t => {
     handler.decodeApplyOperation = () => ({
         type: OperationType.TX,
         address: VALID_ADDR,
-        txo: basePayload
+        txo: transactionPayload()
     });
 
     await handler.handleRequest(
@@ -314,7 +333,7 @@ test('Response build failure branch', async t => {
     handler.decodeApplyOperation = () => ({
         type: OperationType.TX,
         address: VALID_ADDR,
-        txo: basePayload
+        txo: transactionPayload()
     });
 
     const conn = {
@@ -333,7 +352,7 @@ test('Response build failure branch', async t => {
     t.pass();
 });
 
-test('handleResponse error branch', async t => {
+test('handleResponse: resolvePendingResponse throws -> delegates to handlePendingResponseError', async t => {
 
     const handler = setupHandler();
 
@@ -359,14 +378,10 @@ test('Sanitize removes null completion fields', async t => {
         type: OperationType.TX,
         address: VALID_ADDR,
         txo: {
-            ...basePayload,
+            ...transactionPayload(),
             va: null,
             vn: null,
-            vs: null,
-            iw: true,
-            ch: 1,
-            bs: b4a.alloc(32),
-            mbs: b4a.alloc(32)
+            vs: null
         }
     };
 
@@ -398,7 +413,7 @@ test('Proof unavailable without appendedAt branch', async t => {
     handler.decodeApplyOperation = () => ({
         type: OperationType.TX,
         address: VALID_ADDR,
-        txo: basePayload
+        txo: transactionPayload()
     });
 
     await handler.handleRequest(
@@ -425,7 +440,7 @@ test('Proof unavailable appendedAt <= 0 branch', async t => {
     handler.decodeApplyOperation = () => ({
         type: OperationType.TX,
         address: VALID_ADDR,
-        txo: basePayload
+        txo: transactionPayload()
     });
 
     await handler.handleRequest(
@@ -438,11 +453,11 @@ test('Proof unavailable appendedAt <= 0 branch', async t => {
 
 test('Request validator failure mapping branch', async t => {
 
+    const handler = setupHandler();
+
     V1BroadcastTransactionRequest.prototype.validate = async () => {
         throw new Error('validation boom');
     };
-
-    const handler = setupHandler();
 
     await handler.handleRequest(
         { id: b4a.alloc(32), broadcast_transaction_request: { data: b4a.alloc(1) } },
@@ -473,7 +488,7 @@ test('Response build internal failure branch', async t => {
     const badWallet = {
         address: VALID_ADDR,
         getPublicKey: () => VALID_PUB,
-        sign: async () => { throw new Error('sign fail'); }
+        sign: () => { throw new Error('sign fail'); }
     };
 
     const handler = new V1BroadcastTransactionOperationHandler(
@@ -490,7 +505,7 @@ test('Response build internal failure branch', async t => {
                 Promise.resolve({ proof: b4a.alloc(32), appendedAt: 1 }),
             rejectPendingCommit() {}
         },
-        { hrp: 'trac', network: { hrp: 'trac' } }
+        testConfig
     );
 
     handler.displayError = () => {};
@@ -498,16 +513,7 @@ test('Response build internal failure branch', async t => {
     handler.decodeApplyOperation = () => ({
         type: OperationType.TX,
         address: VALID_ADDR,
-        txo: {
-            tx: b4a.alloc(32),
-            txv: b4a.alloc(32),
-            iw: true,
-            in: 1,
-            ch: 1,
-            is: b4a.alloc(32),
-            bs: b4a.alloc(32),
-            mbs: b4a.alloc(32)
-        }
+        txo: transactionPayload()
     });
 
     await handler.handleRequest(
@@ -525,11 +531,10 @@ test('Unsupported role access subtype', async t => {
 
     await t.exception(
         async () => handler.dispatchTransaction({
-            type: OperationType.ADD_WRITER,
+            type: 1234,
             address: VALID_ADDR,
-            rao: basePayload,
-            // override type so switch default triggers
-            type: 1234
+            rao: roleAccessPayload(),
+            // unsupported operation type
         }),
         /Unsupported transaction type/
     );
@@ -543,7 +548,7 @@ test('Role access switch default branch', async t => {
         async () => handler.dispatchTransaction({
             type: OperationType.ADD_WRITER + 999, // still integer but not matched
             address: VALID_ADDR,
-            rao: basePayload
+            rao: roleAccessPayload()
         }),
         /Unsupported transaction type/
     );
@@ -565,7 +570,7 @@ test('TransactionPoolMissingCommitReceiptError via receipt branch', async t => {
     handler.decodeApplyOperation = () => ({
         type: OperationType.TX,
         address: VALID_ADDR,
-        txo: basePayload
+        txo: transactionPayload()
     });
 
     await handler.handleRequest(
@@ -590,7 +595,7 @@ test('PendingCommitBufferFullError mapping branch', async t => {
     handler.decodeApplyOperation = () => ({
         type: OperationType.TX,
         address: VALID_ADDR,
-        txo: basePayload
+        txo: transactionPayload()
     });
 
     await handler.handleRequest(
@@ -651,7 +656,7 @@ test('TransactionPoolInvalidIncomingDataError mapping', async t => {
     handler.decodeApplyOperation = () => ({
         type: OperationType.TX,
         address: VALID_ADDR,
-        txo: basePayload
+        txo: transactionPayload()
     });
 
     await handler.handleRequest(
@@ -676,7 +681,7 @@ test('Unknown receipt error rethrow branch', async t => {
     handler.decodeApplyOperation = () => ({
         type: OperationType.TX,
         address: VALID_ADDR,
-        txo: basePayload
+        txo: transactionPayload()
     });
 
     await handler.handleRequest(
@@ -698,7 +703,7 @@ test('validateEnqueue rethrow unknown error branch', async t => {
     handler.decodeApplyOperation = () => ({
         type: OperationType.TX,
         address: VALID_ADDR,
-        txo: basePayload
+        txo: transactionPayload()
     });
 
     await handler.handleRequest(
@@ -721,7 +726,7 @@ test('Capability OR branch admin true', async t => {
     handler.decodeApplyOperation = () => ({
         type: OperationType.TX,
         address: VALID_ADDR,
-        txo: basePayload
+        txo: transactionPayload()
     });
 
     await handler.handleRequest(
