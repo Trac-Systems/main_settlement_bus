@@ -43,7 +43,7 @@ const mockRateLimiter = {
     v1HandleRateLimit: () => {}
 };
 
-test('V1LivenessOperationHandler - handleRequest coverage', async (t) => {
+test('handleRequest: request validation and response send -> covers success and error branches', async (t) => {
 
     // -------- SUCCESS FLOW (does not validate real payload) --------
     {
@@ -140,7 +140,7 @@ test('V1LivenessOperationHandler - handleRequest coverage', async (t) => {
     }
 });
 
-test('V1LivenessOperationHandler - handleResponse coverage', async (t) => {
+test('handleResponse: resolvePendingResponse result handling -> covers success and delegated error branches', async (t) => {
 
     const handler = new V1LivenessOperationHandler(
         mockWallet,
@@ -181,7 +181,7 @@ test('V1LivenessOperationHandler - handleResponse coverage', async (t) => {
     }
 });
 
-test('Cleanup', async (t) => {
+test('validators cleanup: restore original validator methods', async (t) => {
     V1LivenessRequest.prototype.validate = originalReqValidate;
     V1LivenessResponse.prototype.validate = originalResValidate;
     t.pass();
