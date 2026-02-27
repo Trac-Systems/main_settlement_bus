@@ -406,3 +406,21 @@ test('PendingRequestService throws when registerPendingRequest receives null mes
         t.ok(error?.message?.includes('Pending request message must be an object.'));
     }
 });
+
+test('PendingRequestService constructor validates config members', t => {
+    t.exception(
+        () => new PendingRequestService({
+            maxPendingRequestsInPendingRequestsService: 0,
+            pendingRequestTimeout: 1000
+        }),
+        errorMessageIncludes('maxPendingRequestsInPendingRequestsService must be a positive integer.')
+    );
+
+    t.exception(
+        () => new PendingRequestService({
+            maxPendingRequestsInPendingRequestsService: 100,
+            pendingRequestTimeout: 0
+        }),
+        errorMessageIncludes('pendingRequestTimeout must be a positive integer.')
+    );
+});

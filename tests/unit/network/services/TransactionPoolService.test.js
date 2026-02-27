@@ -16,6 +16,7 @@ import { safeDecodeApplyOperation } from '../../../../src/utils/protobuf/operati
 import { bigIntTo16ByteBuffer, decimalStringToBigInt } from '../../../../src/utils/amountSerialization.js';
 import { BATCH_SIZE } from '../../../../src/utils/constants.js';
 import { config } from '../../../helpers/config.js';
+import { errorMessageIncludes } from '../../../helpers/regexHelper.js';
 import {
     buildTransferPayload,
     setupTransferScenario
@@ -176,7 +177,7 @@ test('TransactionPoolService processes batch of 10 queued transactions and resol
 });
 
 test('TransactionPoolService.addTransaction enforces pool size limit via validateEnqueue', t => {
-    const service = new TransactionPoolService({}, 'test', {}, { txPoolSize: 1 });
+    const service = new TransactionPoolService({}, 'test', {}, { txPoolSize: 1, enableWallet: true });
 
     service.addTransaction('tx-1', b4a.from('aa', 'hex'));
     t.exception(
@@ -187,7 +188,7 @@ test('TransactionPoolService.addTransaction enforces pool size limit via validat
 });
 
 test('TransactionPoolService.addTransaction rejects invalid incoming payload', t => {
-    const service = new TransactionPoolService({}, 'test', {}, { txPoolSize: 10 });
+    const service = new TransactionPoolService({}, 'test', {}, { txPoolSize: 10, enableWallet: true });
 
     t.exception(
         () => service.addTransaction('', b4a.from('aa', 'hex')),
@@ -200,7 +201,7 @@ test('TransactionPoolService.addTransaction rejects invalid incoming payload', t
 });
 
 test('TransactionPoolService.addTransaction rejects duplicate txHash', t => {
-    const service = new TransactionPoolService({}, 'validator-address', {}, { txPoolSize: 10 });
+    const service = new TransactionPoolService({}, 'validator-address', {}, { txPoolSize: 10, enableWallet: true });
     service.addTransaction('tx-dup', b4a.from('aa', 'hex'));
 
     t.exception(
@@ -483,4 +484,22 @@ test('TransactionPoolService.start does nothing when wallet is disabled', async 
         console.info = originalInfo;
         await service.stopPool();
     }
+});
+
+test('TransactionPoolService constructor validates config members', t => {
+    t.exception(
+        () => new TransactionPoolService({}, 'validator-address', {}, {
+            txPoolSize: 0,
+            enableWallet: true
+        }),
+        errorMessageIncludes('txPoolSize must be a positive integer.')
+    );
+
+    t.exception(
+        () => new TransactionPoolService({}, 'validator-address', {}, {
+            txPoolSize: 10,
+            enableWallet: 'true'
+        }),
+        errorMessageIncludes('enableWallet must be a boolean value.')
+    );
 });
