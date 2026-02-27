@@ -44,6 +44,7 @@ import {
     getLicenseCountCommand
 } from "./utils/cliCommands.js";
 import {safeEncodeApplyOperation} from "./utils/protobuf/operationHelpers.js";
+import {Config} from "./config/config.js";
 
 export class MainSettlementBus extends ReadyResource {
     #store;
@@ -59,6 +60,7 @@ export class MainSettlementBus extends ReadyResource {
      **/
     constructor(config) {
         super();
+        Config.validateConfig(config);
         this.#config = config
         this.#store = new Corestore(this.#config.storesFullPath);
         this.#wallet = new PeerWallet({ networkPrefix: this.#config.addressPrefix });

@@ -20,11 +20,22 @@ class TransactionPoolService {
      * @param {object} config
      **/
     constructor(state, address, transactionCommitService, config) {
+        this.#validateConfigMembers(config);
         this.#state = state;
         this.#address = address;
         this.#transactionCommitService = transactionCommitService;
         this.#queuedTxHashes = new Set(); // to improve lookup performance when checking for duplicate transactions
         this.#config = config;
+    }
+
+    #validateConfigMembers(config) {
+        if (!config.txPoolSize || isNaN(config.txPoolSize) || config.txPoolSize <= 0) {
+            throw new TransactionPoolConfigValidationError('txPoolSize must be a positive integer.');
+        }
+        if (typeof config.enableWallet !== 'boolean') {
+            throw new TransactionPoolConfigValidationError('enableWallet must be a boolean value.');
+        }
+
     }
 
     get tx_pool() {
@@ -33,10 +44,6 @@ class TransactionPoolService {
 
     get state() {
         return this.#state;
-    }
-
-    get address() {
-        return this.#address;
     }
 
     async start() {
@@ -123,7 +130,7 @@ class TransactionPoolService {
 
     async #checkValidationPermissions() {
         const isAdminAllowedToValidate = await this.state.isAdminAllowedToValidate();
-        const isNodeAllowedToValidate = await this.state.allowedToValidate(this.address);
+        const isNodeAllowedToValidate = await this.state.allowedToValidate(this.#address);
         return isNodeAllowedToValidate || isAdminAllowedToValidate;
     }
 
@@ -208,6 +215,12 @@ export class TransactionPoolFullError extends Error {
 export class TransactionPoolAlreadyQueuedError extends Error {
     constructor(txHash) {
         super(`Transaction with hash ${txHash} is already queued in the transaction pool.`);
+    }
+}
+
+export class TransactionPoolConfigValidationError extends Error {
+    constructor(message) {
+        super(`TransactionPoolService configuration error: ${message}`);
     }
 }
 

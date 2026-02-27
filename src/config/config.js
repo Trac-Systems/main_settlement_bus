@@ -139,6 +139,10 @@ export class Config {
         return this.#config.validatorHealthCheckInterval
     }
 
+    get maxPendingRequestsInPendingRequestsService() {
+        return this.#config.maxPendingRequestsInPendingRequestsService
+    }
+
     // Most of these properties are boolean
     #isOverriden(prop) {
         return this.#options.hasOwnProperty(prop)
@@ -149,6 +153,12 @@ export class Config {
             throw new Error(
                 "MainSettlementBus: Channel is required. Application cannot start without channel."
             );
+        }
+    }
+
+    static validateConfig(config) {
+        if (!config || typeof config !== 'object' || !config instanceof Config) {
+            throw new Error('Config must be an object and an instance of Config class.');
         }
     }
 }

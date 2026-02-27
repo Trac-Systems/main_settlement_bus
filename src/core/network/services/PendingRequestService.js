@@ -1,15 +1,30 @@
-// TODO: add more validation + write unit tests
 import {NetworkOperationType, ResultCode} from '../../../utils/constants.js';
+import {isHexString} from '../../../utils/helpers.js';
 import {V1TimeoutError, V1UnexpectedError, V1ProtocolError} from "../protocols/v1/V1ProtocolError.js";
+import {Config} from '../../../config/config.js';
 import b4a from 'b4a';
+
+const PEER_PUBLIC_KEY_HEX_LENGTH = 64;
 
 class PendingRequestService {
     #pendingRequests;
+    #requestMessageTypes = [NetworkOperationType.LIVENESS_REQUEST, NetworkOperationType.BROADCAST_TRANSACTION_REQUEST];
     #config;
 
     constructor(config) {
+        this.#validateConfigMembers(config);
         this.#pendingRequests = new Map(); // Map<id, pendingRequestEntry>
         this.#config = config;
+    }
+
+    #validateConfigMembers(config) {
+        if (!config.maxPendingRequestsInPendingRequestsService || isNaN(config.maxPendingRequestsInPendingRequestsService) || config.maxPendingRequestsInPendingRequestsService <= 0) {
+            throw new Error('Invalid config: maxPendingRequestsInPendingRequestsService must be a positive integer.');
+        }
+
+        if (!config.pendingRequestTimeout || isNaN(config.pendingRequestTimeout) || config.pendingRequestTimeout <= 0) {
+            throw new Error('Invalid config: pendingRequestTimeout must be a positive integer.');
+        }
     }
 
     has(id) {
@@ -25,12 +40,31 @@ class PendingRequestService {
         return false;
     }
 
+    #validateRegisterInput(peerPubKeyHex, message) {
+        if (!isHexString(peerPubKeyHex) || peerPubKeyHex.length !== PEER_PUBLIC_KEY_HEX_LENGTH) {
+            throw new Error('Invalid peer public key. Expected 32-byte hex string.');
+        }
+
+        if (!message || typeof message !== 'object') {
+            throw new Error('Pending request message must be an object.');
+        }
+
+        if (typeof message.id !== 'string' || message.id.length === 0) {
+            throw new Error('Pending request ID must be a non-empty string.');
+        }
+
+        if (!this.#requestMessageTypes.includes(message.type)) {
+            throw new Error('Unsupported pending request type.');
+        }
+    }
+
     /*
     @returns {Promise}
     */
     registerPendingRequest(peerPubKeyHex, message) {
+        this.#validateRegisterInput(peerPubKeyHex, message);
         const id = message.id;
-        if (this.#pendingRequests.size >= 1_000_000) {
+        if (this.#pendingRequests.size >= this.#config.maxPendingRequestsInPendingRequestsService) {
             throw new Error('Maximum number of pending requests reached.');
         }
 
@@ -58,18 +92,17 @@ class PendingRequestService {
             this.rejectPendingRequest(
                 id,
                 new V1TimeoutError(
-                    `Pending request with ID ${id} from peer ${peerPubKeyHex} timed out after ${this.#config.pendingRequestTimeout} ms.`,
+                    `Pending request with ID ${id} from peer ${peerPubKeyHex} timed out after ${entry.timeoutMs} ms.`,
                     false
                 ));
 
-        }, this.#config.pendingRequestTimeout);
+        }, entry.timeoutMs);
 
         this.#pendingRequests.set(id, entry);
         return promise;
     }
 
     #extractRequestTxData(message) {
-        if (!message || typeof message !== 'object') return null;
         if (message.type !== NetworkOperationType.BROADCAST_TRANSACTION_REQUEST) return null;
         const txData = message.broadcast_transaction_request?.data;
         return b4a.isBuffer(txData) ? txData : null;
@@ -90,7 +123,7 @@ class PendingRequestService {
         return entry;
     }
 
-    // for now we are resolving only resultCode, but we can extend it in the future if needed...
+    // for now, we are resolving only resultCode, but we can extend it in the future if needed...
     resolvePendingRequest(id, resultCode = ResultCode.OK) {
         const entry = this.getAndDeletePendingRequest(id);
         if (!entry) return false;
