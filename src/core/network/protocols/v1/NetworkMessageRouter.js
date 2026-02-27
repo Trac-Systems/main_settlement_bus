@@ -1,13 +1,12 @@
-import {decodeV1networkOperation} from '../../../../utils/protobuf/operationHelpers.js'
+import { decodeV1networkOperation } from '../../../../utils/protobuf/operationHelpers.js'
 import b4a from 'b4a'
-import {NetworkOperationType, V1_PROTOCOL_PAYLOAD_MAX_SIZE} from '../../../../utils/constants.js'
-import {publicKeyToAddress} from '../../../../utils/helpers.js'
+import { NetworkOperationType, V1_PROTOCOL_PAYLOAD_MAX_SIZE } from '../../../../utils/constants.js'
+import { publicKeyToAddress } from '../../../../utils/helpers.js'
 import V1LivenessOperationHandler from './handlers/V1LivenessOperationHandler.js'
-import V1BroadcastTransactionOperationHandler from "./handlers/V1BroadcastTransactionOperationHandler.js";
+import V1BroadcastTransactionOperationHandler from './handlers/V1BroadcastTransactionOperationHandler.js'
 
 class NetworkMessageRouterV1 {
     #config
-    #wallet
     #livenessRequestHandler
     #broadcastTransactionHandler
 
@@ -21,7 +20,6 @@ class NetworkMessageRouterV1 {
         config
     ) {
         this.#config = config
-        this.#wallet = wallet
         this.#livenessRequestHandler = new V1LivenessOperationHandler(
             wallet,
             rateLimiterService,
@@ -53,7 +51,7 @@ class NetworkMessageRouterV1 {
             return;
         }
 
-        if (!decodedMessage || !Number.isInteger(decodedMessage.type) || decodedMessage.type === 0) {
+        if (!decodedMessage || !Number.isInteger(decodedMessage.type) || decodedMessage.type <= 0) {
             this.#disconnect(connection, `Invalid V1 message type: ${decodedMessage?.type}`)
             return;
         }

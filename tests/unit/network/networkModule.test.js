@@ -11,6 +11,7 @@ async function runNetworkModuleTests() {
     await import('./V1ValidationSchema.test.js');
     await import('./V1ValidationErrorMapper.test.js');
     await import('./V1BroadcastTransactionOperationHandler.test.js');
+    await import('./NetworkMessageRouterV1.test.js');
     test.resume();
 }
 
