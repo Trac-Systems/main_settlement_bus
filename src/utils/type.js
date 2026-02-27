@@ -5,19 +5,19 @@ import _ from "lodash"
  * 
  * @static
  * @param {*} value The value to check.
- * @returns {boolean} Returns `true` if `value` is nullish, else `false`.
+ * @returns {boolean} Returns `false` if `value` is nullish, else `true`.
  * @example
  *
- * _.isDefined(undefined);
+ * isDefined(undefined);
  * // => false
  *
- * _.isDefined(null);
+ * isDefined(null);
  * // => false
  *
- * _.isDefined(void 0);
+ * isDefined(void 0);
  * // => false
  *
- * _.isDefined(NaN);
+ * isDefined(NaN);
  * // => false
  */
 export function isDefined(value) {
