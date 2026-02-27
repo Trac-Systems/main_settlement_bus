@@ -1,9 +1,9 @@
 import test from 'brittle';
 import b4a from 'b4a';
-import V1LivenessOperationHandler from '../../../src/core/network/protocols/v1/handlers/V1LivenessOperationHandler.js';
-import V1LivenessRequest from '../../../src/core/network/protocols/v1/validators/V1LivenessRequest.js';
-import V1LivenessResponse from '../../../src/core/network/protocols/v1/validators/V1LivenessResponse.js';
-import { ResultCode } from '../../../src/utils/constants.js';
+import V1LivenessOperationHandler from '../../../../../src/core/network/protocols/v1/handlers/V1LivenessOperationHandler.js';
+import V1LivenessRequest from '../../../../../src/core/network/protocols/v1/validators/V1LivenessRequest.js';
+import V1LivenessResponse from '../../../../../src/core/network/protocols/v1/validators/V1LivenessResponse.js';
+import { ResultCode } from '../../../../../src/utils/constants.js';
 
 // Backup original validators
 const originalReqValidate = V1LivenessRequest.prototype.validate;
