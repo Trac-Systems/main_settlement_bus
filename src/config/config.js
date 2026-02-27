@@ -82,7 +82,7 @@ export class Config {
     }
 
     get isAdminMode() {
-        return this.storeName === 'admin'
+        return _.endsWith(this.storesDirectory, '/admin')
     }
 
     get keyPairPath()  {
