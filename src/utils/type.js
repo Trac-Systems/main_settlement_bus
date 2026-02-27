@@ -1,4 +1,4 @@
-import { isNaN, isNil } from "lodash"
+import _ from "lodash"
 
 /**
  * Checks if `value` is considered defined akin to RoR `#defined?`.
@@ -21,6 +21,6 @@ import { isNaN, isNil } from "lodash"
  * // => false
  */
 export function isDefined(value) {
-    return !isNil(value) && !isNaN(value)
+    return !_.isNil(value) && !_.isNaN(value)
 }
 
