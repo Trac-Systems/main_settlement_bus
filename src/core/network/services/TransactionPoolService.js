@@ -3,7 +3,6 @@ import {BATCH_SIZE, PROCESS_INTERVAL_MS} from '../../../utils/constants.js';
 import Scheduler from '../../../utils/Scheduler.js';
 import Denque from "denque";
 import b4a from "b4a";
-import {Config} from "../../../config/config.js";
 
 class TransactionPoolService {
     #state;
@@ -21,7 +20,6 @@ class TransactionPoolService {
      * @param {object} config
      **/
     constructor(state, address, transactionCommitService, config) {
-        Config.validateConfig(config);
         this.#validateConfigMembers(config);
         this.#state = state;
         this.#address = address;
@@ -34,7 +32,7 @@ class TransactionPoolService {
         if (!config.txPoolSize || isNaN(config.txPoolSize) || config.txPoolSize <= 0) {
             throw new TransactionPoolConfigValidationError('txPoolSize must be a positive integer.');
         }
-        if (!config.enableWallet || typeof config.enableWallet !== 'boolean') {
+        if (typeof config.enableWallet !== 'boolean') {
             throw new TransactionPoolConfigValidationError('enableWallet must be a boolean value.');
         }
 

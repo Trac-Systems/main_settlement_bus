@@ -12,7 +12,6 @@ class PendingRequestService {
     #config;
 
     constructor(config) {
-        Config.validateConfig(config);
         this.#validateConfigMembers(config);
         this.#pendingRequests = new Map(); // Map<id, pendingRequestEntry>
         this.#config = config;

@@ -1,6 +1,5 @@
 import {isHexString} from '../../../utils/helpers.js';
 import {TRANSACTION_COMMIT_SERVICE_BUFFER_SIZE} from '../../../utils/constants.js';
-import {Config} from "../../../config/config.js";
 
 const TX_HASH_HEX_STRING_LENGTH = 64;
 
@@ -9,7 +8,6 @@ class TransactionCommitService {
     #config;
 
     constructor(config) {
-        Config.validateConfig(config);
         this.#validateConfigMembers(config);
         this.#pendingCommits = new Map(); // Map<txHash, pendingCommitEntry>
         this.#config = config;
