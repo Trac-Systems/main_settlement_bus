@@ -238,3 +238,48 @@ test('handlePendingResponseError - undefined error fallback', async (t) => {
     t.ok(captured instanceof V1UnexpectedError);
     t.is(captured.message, 'Unexpected error');
 });
+
+test('displayError executes real implementation (throws due to crypto config)', async (t) => {
+    const pendingReq = new MockPendingReqService();
+
+    const handler = new V1BaseOperationHandler(
+        null,
+        pendingReq,
+        {} // intentionally invalid config
+    );
+
+    const originalConsoleError = console.error;
+    console.error = () => {};
+
+    await t.exception(() => {
+        handler.displayError(
+            'step',
+            Buffer.alloc(33, 1),
+            new Error('boom')
+        );
+    });
+
+    console.error = originalConsoleError;
+
+    t.pass();
+});
+
+test('handlePendingResponseError - primitive error fallback', async (t) => {
+    const pendingReq = new MockPendingReqService();
+    const handler = new V1BaseOperationHandler(null, pendingReq, mockConfig);
+
+    handler.displayError = () => {};
+
+    handler.handlePendingResponseError(
+        'msg-123',
+        { end() {}, remotePublicKey: Buffer.alloc(32) },
+        'string error',
+        'step'
+    );
+
+    const captured = pendingReq.rejected[0].err;
+
+    t.ok(captured instanceof V1UnexpectedError);
+    t.is(captured.message, 'Unexpected error');
+});
+
