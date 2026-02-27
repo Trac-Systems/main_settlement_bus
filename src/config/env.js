@@ -44,7 +44,8 @@ const configData = {
         rateLimitCleanupIntervalMs: 120_000, // Rate limiting constants
         rateLimitConnectionTimeoutMs: 60_000, // Rate limiting constants
         rateLimitMaxTransactionsPerSecond: 50, // Rate limiting constants
-        storesDirectory : 'testnet/',
+        storesDirectory : 'stores/',
+        storeName: 'testnet',
     },
     [ENV.MAINNET]: {
         addressLength: 63,
@@ -81,6 +82,7 @@ const configData = {
         rateLimitConnectionTimeoutMs: 60_000, // Rate limiting constants
         rateLimitMaxTransactionsPerSecond: 50, // Rate limiting constants
         storesDirectory: 'stores/',
+        storeName: 'mainnet',
     },
     [ENV.DEVELOPMENT]: {
         addressLength: 63,
@@ -117,6 +119,7 @@ const configData = {
         rateLimitConnectionTimeoutMs: 60_000, // Rate limiting constants
         rateLimitMaxTransactionsPerSecond: 50, // Rate limiting constants
         storesDirectory : 'stores/',
+        storeName: 'development',
     }
 }
 
