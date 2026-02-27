@@ -16,7 +16,7 @@ class TransactionCommitService {
     }
 
     #validateConfigMembers(config) {
-        if (! this.#config.txCommitTimeout ||  isNaN(config.txCommitTimeout) || config.txCommitTimeout <= 0) {
+        if (!config.txCommitTimeout || isNaN(config.txCommitTimeout) || config.txCommitTimeout <= 0) {
             throw new PendingCommitConfigValidationError('txCommitTimeout must be a positive integer.');
         }
     }

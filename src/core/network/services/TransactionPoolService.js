@@ -31,10 +31,10 @@ class TransactionPoolService {
     }
 
     #validateConfigMembers(config) {
-        if (! this.#config.txPoolSize ||  isNaN(config.txPoolSize) || config.txPoolSize <= 0) {
+        if (!config.txPoolSize || isNaN(config.txPoolSize) || config.txPoolSize <= 0) {
             throw new TransactionPoolConfigValidationError('txPoolSize must be a positive integer.');
         }
-        if (! this.#config.enableWallet || typeof config.enableWallet !== 'boolean') {
+        if (!config.enableWallet || typeof config.enableWallet !== 'boolean') {
             throw new TransactionPoolConfigValidationError('enableWallet must be a boolean value.');
         }
 
