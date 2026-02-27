@@ -1,23 +1,23 @@
 import test from 'brittle';
 import b4a from 'b4a';
 
-import V1BroadcastTransactionOperationHandler from '../../../src/core/network/protocols/v1/handlers/V1BroadcastTransactionOperationHandler.js';
-import V1BroadcastTransactionRequest from '../../../src/core/network/protocols/v1/validators/V1BroadcastTransactionRequest.js';
+import V1BroadcastTransactionOperationHandler from '../../../../../src/core/network/protocols/v1/handlers/V1BroadcastTransactionOperationHandler.js';
+import V1BroadcastTransactionRequest from '../../../../../src/core/network/protocols/v1/validators/V1BroadcastTransactionRequest.js';
 
 import {
     ResultCode,
     OperationType
-} from '../../../src/utils/constants.js';
+} from '../../../../../src/utils/constants.js';
 
-import * as PoolErrors from '../../../src/core/network/services/TransactionPoolService.js';
-import * as CommitErrors from '../../../src/core/network/services/TransactionCommitService.js';
+import * as PoolErrors from '../../../../../src/core/network/services/TransactionPoolService.js';
+import * as CommitErrors from '../../../../../src/core/network/services/TransactionCommitService.js';
 
 
-import PartialRoleAccessValidator from '../../../src/core/network/protocols/shared/validators/PartialRoleAccessValidator.js';
-import PartialBootstrapDeploymentValidator from '../../../src/core/network/protocols/shared/validators/PartialBootstrapDeploymentValidator.js';
-import PartialTransactionValidator from '../../../src/core/network/protocols/shared/validators/PartialTransactionValidator.js';
-import PartialTransferValidator from '../../../src/core/network/protocols/shared/validators/PartialTransferValidator.js';
-import { config as testConfig } from '../../helpers/config.js';
+import PartialRoleAccessValidator from '../../../../../src/core/network/protocols/shared/validators/PartialRoleAccessValidator.js';
+import PartialBootstrapDeploymentValidator from '../../../../../src/core/network/protocols/shared/validators/PartialBootstrapDeploymentValidator.js';
+import PartialTransactionValidator from '../../../../../src/core/network/protocols/shared/validators/PartialTransactionValidator.js';
+import PartialTransferValidator from '../../../../../src/core/network/protocols/shared/validators/PartialTransferValidator.js';
+import { config as testConfig } from '../../../../helpers/config.js';
 
 const VALID_ADDR = 'trac123z3gfpr2epjwww7ntm3m6ud2fhmq0tvts27p2f5mx3qkecsutlqfys769';
 const VALID_TO_ADDR = 'trac1mqktwme8fvklrds4hlhfy6lhmsu9qgfn3c3kuhz7c5zwjt8rc3dqj9tx7h';
