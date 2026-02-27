@@ -26,14 +26,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
-          #cache: 'npm'
       - name: Install dependencies
         run: npm ci
       - name: Install bare
         run: npm i -g bare
       - name: Run all tests
         run: npm run test:unit:all
-# For now acceptance tests should be disable due to instability of the running MSB instance in the github actions environment
-# Github machines are not powerful enough to run MSB, and we won't ever finish our tests.
-#      - name: Run rpc acceptance tests
-#        run: npm run test:acceptance
+      - name: Run rpc acceptance tests
+        run: npm run test:acceptance
