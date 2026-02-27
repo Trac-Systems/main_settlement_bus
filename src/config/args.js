@@ -25,7 +25,8 @@ export const resolveConfig = () => {
     const args = getArguments();
     const runRpc = isRpcEnabled();
     const selectedEnv = resolveEnvironment(args);
-    const storesDirectory = args[0];
+    const storesDirectoryIndex = args.indexOf('--stores-directory');
+    const storesDirectory = (storesDirectoryIndex !== -1 && args[storesDirectoryIndex + 1]) ? args[storesDirectoryIndex + 1] : undefined;
     const hostIndex = args.indexOf('--host');
     const host = (hostIndex !== -1 && args[hostIndex + 1]) ? args[hostIndex + 1] : undefined;
     const portIndex = args.indexOf('--port');

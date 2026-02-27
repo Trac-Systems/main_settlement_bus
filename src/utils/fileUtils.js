@@ -125,10 +125,10 @@ export async function getAllMigrationFiles(migrationDirectory = BALANCE_MIGRATED
 
 export async function ensureCoresStoreDir(config) {
     try {
-        const storesDirectoryStats = await fs.promises.stat(config.storesDirectory);
-        if (!storesDirectoryStats.isDirectory()) {
-            throw new Error(`Stores directory path is not a directory: ${config.storesDirectory}`);
-        }
+        // const storesDirectoryStats = await fs.promises.stat(config.storesDirectory);
+        // if (!storesDirectoryStats.isDirectory()) {
+        //     throw new Error(`Stores directory path is not a directory: ${config.storesDirectory}`);
+        // }
         await fs.promises.mkdir(config.storesFullPath, { recursive: true });
     } catch (err) {
         throw new Error(`Failed to ensure corestore directory: ${err.message}`);
