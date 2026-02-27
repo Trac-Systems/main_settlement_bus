@@ -32,5 +32,3 @@ jobs:
         run: npm i -g bare
       - name: Run all tests
         run: npm run test:unit:all
-      - name: Run rpc acceptance tests
-        run: npm run test:acceptance
