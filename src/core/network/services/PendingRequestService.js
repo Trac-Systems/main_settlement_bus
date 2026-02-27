@@ -19,11 +19,11 @@ class PendingRequestService {
     }
 
     #validateConfigMembers(config) {
-        if (! this.#config.maxPendingRequestsInPendingRequestsService ||  isNaN(config.maxPendingRequestsInPendingRequestsService) || config.maxPendingRequestsInPendingRequestsService <= 0) {
+        if (!config.maxPendingRequestsInPendingRequestsService || isNaN(config.maxPendingRequestsInPendingRequestsService) || config.maxPendingRequestsInPendingRequestsService <= 0) {
             throw new Error('Invalid config: maxPendingRequestsInPendingRequestsService must be a positive integer.');
         }
 
-        if (! this.#config.pendingRequestTimeout ||  isNaN(config.pendingRequestTimeout) || config.pendingRequestTimeout <= 0) {
+        if (!config.pendingRequestTimeout || isNaN(config.pendingRequestTimeout) || config.pendingRequestTimeout <= 0) {
             throw new Error('Invalid config: pendingRequestTimeout must be a positive integer.');
         }
     }
