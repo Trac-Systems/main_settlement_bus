@@ -1,5 +1,5 @@
 import b4a from 'b4a'
-import PeerWallet from "trac-wallet"
+import tracCryptoApi from 'trac-crypto-api'
 
 
 // -- Debug Mode --
@@ -293,7 +293,7 @@ class ConnectionManager {
 
     #toAddress(publicKey) {
         const keyHex = b4a.isBuffer(publicKey) ? publicKey : b4a.from(publicKey, 'hex');
-        return PeerWallet.encodeBech32m(
+        return tracCryptoApi.address.encode(
             this.#config.addressPrefix,
             keyHex
         );

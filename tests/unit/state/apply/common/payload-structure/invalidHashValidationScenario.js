@@ -32,7 +32,7 @@ async function defaultMutateHash(t, validPayload) {
 	const decodedPayload = safeDecodeApplyOperation(validPayload);
 	t.ok(decodedPayload, 'fixtures decode');
 
-	const invalidHash = await PeerWallet.blake3(validPayload);
+	const invalidHash = await tracCryptoApi.hash.blake3(validPayload);
 
 	switch (true) {
 		case Boolean(decodedPayload.cao?.tx):

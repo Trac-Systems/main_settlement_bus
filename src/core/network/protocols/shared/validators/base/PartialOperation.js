@@ -1,5 +1,5 @@
 import b4a from 'b4a';
-import PeerWallet from 'trac-wallet';
+import tracCryptoApi from 'trac-crypto-api';
 import Check from '../../../../../../utils/check.js';
 import {bufferToAddress} from "../../../../../state/utils/address.js";
 import {createMessage} from "../../../../../../utils/buffer.js";
@@ -74,7 +74,7 @@ class PartialOperation {
             throw new Error('Invalid requesting address in payload.');
         }
 
-        const incomingPublicKey = PeerWallet.decodeBech32mSafe(incomingAddress);
+        const incomingPublicKey = tracCryptoApi.address.decode(incomingAddress);
 
         // TODO: We can add check if public key belongs to the Ed25519 curve. Validate signature already checks that but it would be amazing to catch it earlier.
         if (!incomingPublicKey || incomingPublicKey.length !== PUBLIC_KEY_LENGTH) {
@@ -135,18 +135,18 @@ class PartialOperation {
         const operationKey = operationsUtils.operationToPayload(payload.type);
         const operation = payload[operationKey];
 
-        const incomingPublicKey = PeerWallet.decodeBech32mSafe(bufferToAddress(payload.address, this.#config.addressPrefix));
+        const incomingPublicKey = tracCryptoApi.address.decode(bufferToAddress(payload.address, this.#config.addressPrefix));
         const incomingSignature = operation.is;
         const messageComponents = this.#getMessageComponents(payload);
 
         const message = createMessage(...messageComponents);
-        const messageHash = await PeerWallet.blake3(message);
+        const messageHash = await tracCryptoApi.hash.blake3(message);
         const payloadHash = operation.tx;
         if (!b4a.equals(payloadHash, messageHash)) {
             throw new Error('Regenerated transaction does not match incoming transaction in payload.');
         }
 
-        if (!PeerWallet.verify(incomingSignature, messageHash, incomingPublicKey)) {
+        if (!tracCryptoApi.signature.verify(incomingSignature, messageHash, incomingPublicKey)) {
             throw new Error('Invalid signature in payload.');
         }
     }

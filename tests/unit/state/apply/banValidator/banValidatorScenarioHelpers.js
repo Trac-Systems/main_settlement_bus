@@ -309,7 +309,7 @@ export async function applyInvalidTargetAddressPayload(context, validPayload) {
 		decoded.aco.in,
 		OperationType.BAN_VALIDATOR
 	);
-	const newHash = await PeerWallet.blake3(message);
+	const newHash = await tracCryptoApi.hash.blake3(message);
 	decoded.aco.tx = newHash;
 	decoded.aco.is = adminPeer.wallet.sign(newHash);
 

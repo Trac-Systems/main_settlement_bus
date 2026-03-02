@@ -1,5 +1,5 @@
 import ValidatorResponse from '../validators/ValidatorResponse.js';
-import PeerWallet from 'trac-wallet';
+import tracCryptoApi from 'trac-crypto-api';
 
 class ResponseHandler {
     #responseValidator;
@@ -20,7 +20,7 @@ class ResponseHandler {
         const isValid = await this.#responseValidator.validate(message, channelString);
         if (isValid) {
             const validatorAddressString = message.address;
-            const validatorPublicKey = PeerWallet.decodeBech32m(validatorAddressString);
+            const validatorPublicKey = tracCryptoApi.address.decode(validatorAddressString);
 
             if (this.#connectionManager.connected(validatorPublicKey)) {
                 return;

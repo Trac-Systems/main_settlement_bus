@@ -63,7 +63,7 @@ export async function buildRpcSelfTransferPayload(context, state, amountTnk = 1n
         OperationType.TRANSFER
     );
 
-    const messageHash = await PeerWallet.blake3(message);
+    const messageHash = await tracCryptoApi.hash.blake3(message);
     const signature = context.wallet.sign(messageHash);
 
     const payloadObject = {

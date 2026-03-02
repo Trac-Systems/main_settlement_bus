@@ -54,7 +54,7 @@ test('NetworkMessageDirector builds validator connection request and verifies si
         payload.validator_connection_request.nonce,
         encodeCapabilities(caps)
     );
-    const hash = await PeerWallet.blake3(msg);
+    const hash = await tracCryptoApi.hash.blake3(msg);
     t.ok(wallet.verify(payload.validator_connection_request.signature, hash, wallet.publicKey));
 });
 
@@ -78,7 +78,7 @@ test('NetworkMessageDirector builds liveness request and verifies signature', as
         payload.liveness_request.nonce,
         encodeCapabilities(caps)
     );
-    const hash = await PeerWallet.blake3(msg);
+    const hash = await tracCryptoApi.hash.blake3(msg);
     t.ok(wallet.verify(payload.liveness_request.signature, hash, wallet.publicKey));
 });
 
@@ -103,7 +103,7 @@ test('NetworkMessageDirector iterates liveness response ResultCode values', asyn
             safeWriteUInt32BE(code, 0),
             encodeCapabilities(caps)
         );
-        const hash = await PeerWallet.blake3(msg);
+        const hash = await tracCryptoApi.hash.blake3(msg);
         t.ok(wallet.verify(payload.liveness_response.signature, hash, wallet.publicKey));
 
         const decoded = decodeV1networkOperation(encodeV1networkOperation(payload));
@@ -133,7 +133,7 @@ test('NetworkMessageDirector builds broadcast transaction request and verifies s
         payload.broadcast_transaction_request.nonce,
         encodeCapabilities(caps)
     );
-    const hash = await PeerWallet.blake3(message);
+    const hash = await tracCryptoApi.hash.blake3(message);
     t.ok(wallet.verify(payload.broadcast_transaction_request.signature, hash, wallet.publicKey));
 
     const decoded = decodeV1networkOperation(encodeV1networkOperation(payload));
@@ -160,7 +160,7 @@ test('NetworkMessageDirector iterates broadcast transaction response ResultCode 
             safeWriteUInt32BE(code, 0),
             encodeCapabilities(caps)
         );
-        const hash = await PeerWallet.blake3(msg);
+        const hash = await tracCryptoApi.hash.blake3(msg);
         t.ok(wallet.verify(payload.broadcast_transaction_response.signature, hash, wallet.publicKey));
 
         const decoded = decodeV1networkOperation(encodeV1networkOperation(payload));
@@ -195,7 +195,7 @@ test('NetworkMessageDirector iterates validator connection response ResultCode v
             safeWriteUInt32BE(code, 0),
             encodeCapabilities(caps)
         );
-        const hash = await PeerWallet.blake3(msg);
+        const hash = await tracCryptoApi.hash.blake3(msg);
         t.ok(wallet.verify(payload.validator_connection_response.signature, hash, wallet.publicKey));
     }
 });

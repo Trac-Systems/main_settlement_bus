@@ -355,7 +355,7 @@ export const generatePostTx = async (writer, externalNode, externalContractBoots
         }
     };
 
-    const contentHash = await PeerWallet.blake3(JSON.stringify(testObj));
+    const contentHash = await tracCryptoApi.hash.blake3(JSON.stringify(testObj));
     const validity = await writer.msb.state.getIndexerSequenceState()
     const tx = await applyStateMessageFactory(externalNode.wallet, admin.config)
         .buildPartialTransactionOperationMessage(
