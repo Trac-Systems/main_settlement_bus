@@ -13,7 +13,8 @@ import {
     V1UnexpectedError,
     V1NodeOverloadedError,
     V1TxAlreadyPendingError,
-    V1TimeoutError
+    V1TimeoutError,
+    V1ProtocolError
 } from "../V1ProtocolError.js";
 import V1BroadcastTransactionRequest from "../validators/V1BroadcastTransactionRequest.js";
 import {
@@ -247,7 +248,7 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
             pendingCommit.catch(() => {});
         } catch (error) {
             if (error instanceof PendingCommitInvalidTxHashError) {
-                throw new V1InvalidPayloadError(error.message, false); // TODO: consider if false/true
+                throw new V1ProtocolError(ResultCode.TX_HASH_INVALID_FORMAT, error.message, false);
             }
             if (error instanceof PendingCommitAlreadyExistsError) {
                 throw new V1TxAlreadyPendingError(error.message, false);
@@ -267,7 +268,11 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
             } else if (error instanceof TransactionPoolAlreadyQueuedError) {
                 err = new V1TxAlreadyPendingError(error.message);
             } else if (error instanceof TransactionPoolInvalidIncomingDataError) {
-                err = new V1UnexpectedError(`Internal enqueue validation failed: ${error.message}`);
+                err = new V1ProtocolError(
+                    ResultCode.INTERNAL_ENQUEUE_VALIDATION_FAILED,
+                    `Internal enqueue validation failed: ${error.message}`,
+                    false
+                );
             }
             this.#transactionCommitService.rejectPendingCommit(txHash, err);
             throw err; // will be mapped anyway on lower level.
@@ -281,7 +286,7 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
                 throw new V1TxAcceptedProofUnavailable(error.message, false, error.appendedAt);
             }
             if (error instanceof TransactionPoolMissingCommitReceiptError) {
-                throw new V1UnexpectedError(error.message, false);
+                throw new V1ProtocolError(ResultCode.TX_ACCEPTED_RECEIPT_MISSING, error.message, false);
             }
             if (error instanceof PendingCommitTimeoutError) {
                 throw new V1TimeoutError(error.message, false);
