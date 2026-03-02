@@ -1,8 +1,8 @@
 import {test} from 'brittle';
 import b4a from 'b4a';
 
-import {extractRequiredVaFromDecodedTx} from '../../../src/core/network/protocols/v1/validators/V1BroadcastTransactionResponse.js';
-import {ResultCode} from '../../../src/utils/constants.js';
+import {extractRequiredVaFromDecodedTx} from '../../../../src/core/network/protocols/v1/validators/V1BroadcastTransactionResponse.js';
+import {ResultCode} from '../../../../src/utils/constants.js';
 
 test('extractRequiredVaFromDecodedTx throws VALIDATOR_TX_OBJECT_INVALID for non-object', t => {
     try {
