@@ -1,5 +1,5 @@
 import b4a from 'b4a';
-import PeerWallet from 'trac-wallet';
+import tracCryptoApi from 'trac-crypto-api';
 import { deriveIndexerSequenceState, eventFlush } from '../../../../helpers/autobaseTestHelpers.js';
 import { applyStateMessageFactory } from '../../../../../src/messages/state/applyStateMessageFactory.js';
 import nodeEntryUtils, { ZERO_LICENSE } from '../../../../../src/core/state/utils/nodeEntry.js';
@@ -309,7 +309,7 @@ export async function applyInvalidTargetAddressPayload(context, validPayload) {
 		decoded.aco.in,
 		OperationType.BAN_VALIDATOR
 	);
-	const newHash = await PeerWallet.blake3(message);
+	const newHash = await tracCryptoApi.hash.blake3(message);
 	decoded.aco.tx = newHash;
 	decoded.aco.is = adminPeer.wallet.sign(newHash);
 

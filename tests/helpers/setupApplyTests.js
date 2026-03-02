@@ -1,6 +1,7 @@
 import sodium from 'sodium-native';
 import {generateMnemonic, mnemonicToSeed} from 'bip39-mnemonic';
 import b4a from 'b4a'
+import tracCryptoApi from 'trac-crypto-api';
 import PeerWallet from "trac-wallet"
 import path from 'path';
 import {MainSettlementBus} from '../../src/index.js'
@@ -351,7 +352,7 @@ export const generatePostTx = async (writer, externalNode, externalContractBoots
         }
     };
 
-    const contentHash = await PeerWallet.blake3(JSON.stringify(testObj));
+    const contentHash = await tracCryptoApi.hash.blake3(JSON.stringify(testObj));
     const validity = await writer.msb.state.getIndexerSequenceState()
     const tx = await applyStateMessageFactory(externalNode.wallet, admin.config)
         .buildPartialTransactionOperationMessage(

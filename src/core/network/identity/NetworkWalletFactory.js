@@ -1,4 +1,5 @@
 import PeerWallet from 'trac-wallet';
+import tracCryptoApi from 'trac-crypto-api';
 import b4a from 'b4a';
 
 class NetworkWalletFactory {
@@ -41,7 +42,7 @@ export class EphemeralWallet {
         this.#assertBuffer(keyPair.publicKey);
         this.#assertBuffer(keyPair.secretKey);
 
-        const address = PeerWallet.encodeBech32m(networkPrefix, keyPair.publicKey);
+        const address = tracCryptoApi.address.encode(networkPrefix, keyPair.publicKey);
         if (!address) {
             throw new Error('NetworkIdentityProvider: failed to derive address from networking key pair');
         }
@@ -64,7 +65,7 @@ export class EphemeralWallet {
     }
 
     verify(signature, message, publicKey = this.#publicKey) {
-        return PeerWallet.verify(signature, message, publicKey);
+        return tracCryptoApi.signature.verify(signature, message, publicKey);
     }
 
     #assertBuffer(value) {

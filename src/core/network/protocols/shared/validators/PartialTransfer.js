@@ -1,6 +1,4 @@
-import PeerWallet from 'trac-wallet';
-
-import {bufferToAddress} from "../../../../state/utils/address.js";
+import {bufferToAddress, decodeBech32mSafe} from "../../../../state/utils/address.js";
 import {bufferToBigInt} from "../../../../../utils/amountSerialization.js";
 import PartialOperation from './base/PartialOperation.js';
 
@@ -34,7 +32,7 @@ class PartialTransfer extends PartialOperation {
             throw new Error('Invalid recipient address in transfer payload.');
         }
 
-        const incomingPublicKey = PeerWallet.decodeBech32mSafe(incomingAddress);
+        const incomingPublicKey = decodeBech32mSafe(incomingAddress);
         if (incomingPublicKey === null) {
             throw new Error('Invalid recipient public key in transfer payload.');
         }

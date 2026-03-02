@@ -1,6 +1,5 @@
 import { test } from 'brittle';
 import b4a from 'b4a';
-import PeerWallet from 'trac-wallet';
 import { v7 as uuidv7 } from 'uuid';
 import NetworkWalletFactory from '../../../../src/core/network/identity/NetworkWalletFactory.js';
 import NetworkMessageBuilder from '../../../../src/messages/network/v1/NetworkMessageBuilder.js';
@@ -21,6 +20,7 @@ import { addressToBuffer } from '../../../../src/core/state/utils/address.js';
 import { config } from '../../../helpers/config.js';
 import { asAddress } from '../../../helpers/address.js';
 import { testKeyPair1 } from '../../../fixtures/apply.fixtures.js';
+import tracCryptoApi from 'trac-crypto-api';
 
 function createWallet() {
     const keyPair = {
@@ -68,7 +68,7 @@ test('NetworkMessageBuilder builds validator connection request and verifies sig
         payload.validator_connection_request.nonce,
         encodeCapabilities(caps)
     );
-    const hash = await PeerWallet.blake3(message);
+    const hash = await tracCryptoApi.hash.blake3(message);
     t.ok(wallet.verify(payload.validator_connection_request.signature, hash, wallet.publicKey));
 
     const roundTrip = decodeV1networkOperation(encodeV1networkOperation(payload));
@@ -105,7 +105,7 @@ test('NetworkMessageBuilder iterates validator connection response ResultCode va
             safeWriteUInt32BE(code, 0),
             encodeCapabilities(caps)
         );
-        const hash = await PeerWallet.blake3(msg);
+        const hash = await tracCryptoApi.hash.blake3(msg);
         t.ok(wallet.verify(payload.validator_connection_response.signature, hash, wallet.publicKey));
 
         const decoded = decodeV1networkOperation(encodeV1networkOperation(payload));
@@ -142,7 +142,7 @@ test('NetworkMessageBuilder iterates liveness response ResultCode values', async
             safeWriteUInt32BE(code, 0),
             encodeCapabilities(caps)
         );
-        const hash = await PeerWallet.blake3(msg);
+        const hash = await tracCryptoApi.hash.blake3(msg);
         t.ok(wallet.verify(payload.liveness_response.signature, hash, wallet.publicKey));
 
         const decoded = decodeV1networkOperation(encodeV1networkOperation(payload));
@@ -178,7 +178,7 @@ test('NetworkMessageBuilder builds liveness request and verifies signature (data
         payload.liveness_request.nonce,
         encodeCapabilities(caps)
     );
-    const hash = await PeerWallet.blake3(msg);
+    const hash = await tracCryptoApi.hash.blake3(msg);
     t.ok(wallet.verify(payload.liveness_request.signature, hash, wallet.publicKey));
 });
 
@@ -209,7 +209,7 @@ test('NetworkMessageBuilder iterates broadcast transaction response ResultCode v
             safeWriteUInt32BE(code, 0),
             encodeCapabilities(caps)
         );
-        const hash = await PeerWallet.blake3(msg);
+        const hash = await tracCryptoApi.hash.blake3(msg);
         t.ok(wallet.verify(payload.broadcast_transaction_response.signature, hash, wallet.publicKey));
 
         const decoded = decodeV1networkOperation(encodeV1networkOperation(payload));
@@ -245,7 +245,7 @@ test('NetworkMessageBuilder builds broadcast transaction request and verifies si
         payload.broadcast_transaction_request.nonce,
         encodeCapabilities(caps)
     );
-    const hash = await PeerWallet.blake3(msg);
+    const hash = await tracCryptoApi.hash.blake3(msg);
     t.ok(wallet.verify(payload.broadcast_transaction_request.signature, hash, wallet.publicKey));
 });
 

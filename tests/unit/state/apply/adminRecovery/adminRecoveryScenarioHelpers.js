@@ -1,4 +1,5 @@
 import b4a from 'b4a';
+import tracCryptoApi from 'trac-crypto-api';
 import adminEntryUtils from '../../../../../src/core/state/utils/adminEntry.js';
 import nodeEntryUtils, { setWritingKey } from '../../../../../src/core/state/utils/nodeEntry.js';
 import { EntryType } from '../../../../../src/utils/constants.js';
@@ -775,22 +776,21 @@ export async function applyWithIndexerSequenceFailure(context, payload) {
 }
 
 export async function applyWithIndexerSequenceCorruption(context, payload) {
-	const { PeerWallet } = await import('trac-wallet');
-	const originalHash = PeerWallet.blake3;
-	const originalHashSafe = PeerWallet.blake3Safe;
+	const originalHash = tracCryptoApi.hash.blake3;
+	const originalHashSafe = tracCryptoApi.hash.blake3Safe;
 
-	PeerWallet.blake3 = async () => {
+	tracCryptoApi.hash.blake3 = async () => {
 		throw new Error('forced indexer sequence state failure');
 	};
-	PeerWallet.blake3Safe = async () => {
+	tracCryptoApi.hash.blake3Safe = async () => {
 		return b4a.alloc(0);
-	}
-	
+	};
+
 	try {
 		await applyAdminRecoveryViaValidator(context, payload);
 	} finally {
-		PeerWallet.blake3 = originalHash;
-		PeerWallet.blake3Safe = originalHashSafe;
+		tracCryptoApi.hash.blake3 = originalHash;
+		tracCryptoApi.hash.blake3Safe = originalHashSafe;
 	}
 }
 
