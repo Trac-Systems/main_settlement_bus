@@ -8,6 +8,7 @@ import {addressToBuffer, bufferToAddress} from "../../../../state/utils/address.
 import {publicKeyToAddress} from "../../../../../utils/helpers.js";
 import Check from "../../../../../utils/check.js";
 import {OperationType, ResultCode} from "../../../../../utils/constants.js";
+import {V1ProtocolError} from "../V1ProtocolError.js";
 
 const VALIDATOR_METADATA_FIELDS = new Set(["va", "vn", "vs"]);
 
@@ -54,11 +55,19 @@ class V1BroadcastTransactionResponse extends V1BaseOperation {
     validateDecodedCompletePayloadSchema(validatorDecodedTx) {
         const type = validatorDecodedTx?.type;
         if (!Number.isInteger(type)) {
-            throw new Error('Decoded validator transaction type is missing or invalid.');
+            throw new V1ProtocolError(
+                ResultCode.VALIDATOR_RESPONSE_TX_TYPE_INVALID,
+                'Decoded validator transaction type is missing or invalid.',
+                false
+            );
         }
 
         if (!Object.values(OperationType).includes(type)) {
-            throw new Error(`Decoded validator transaction type ${type} is not defined in OperationType constants.`);
+            throw new V1ProtocolError(
+                ResultCode.VALIDATOR_RESPONSE_TX_TYPE_UNKNOWN,
+                `Decoded validator transaction type ${type} is not defined in OperationType constants.`,
+                false
+            );
         }
 
         let selectedValidator;
@@ -78,12 +87,20 @@ class V1BroadcastTransactionResponse extends V1BaseOperation {
                 selectedValidator = this.#check.validateTransferOperation.bind(this.#check);
                 break;
             default:
-                throw new Error(`Unsupported decoded validator transaction type: ${type}`);
+                throw new V1ProtocolError(
+                    ResultCode.VALIDATOR_RESPONSE_TX_TYPE_UNSUPPORTED,
+                    `Unsupported decoded validator transaction type: ${type}`,
+                    false
+                );
         }
 
         const isValid = selectedValidator(validatorDecodedTx);
         if (!isValid) {
-            throw new Error(`Decoded validator transaction schema validation failed for type ${type}.`);
+            throw new V1ProtocolError(
+                ResultCode.VALIDATOR_RESPONSE_SCHEMA_INVALID,
+                `Decoded validator transaction schema validation failed for type ${type}.`,
+                false
+            );
         }
     }
 
@@ -95,7 +112,11 @@ class V1BroadcastTransactionResponse extends V1BaseOperation {
     async assertProofPayloadMatchesRequestPayload(proofResult, pendingRequestServiceEntry) {
         const stateTxEncodedFromRequest = pendingRequestServiceEntry.requestTxData;
         if (!b4a.isBuffer(stateTxEncodedFromRequest) || stateTxEncodedFromRequest.length === 0) {
-            throw new Error('Missing transaction data in pending request entry.');
+            throw new V1ProtocolError(
+                ResultCode.PENDING_REQUEST_MISSING_TX_DATA,
+                'Missing transaction data in pending request entry.',
+                false
+            );
         }
         const provenBlock = proofResult.proof.block.value;
         const manifest = proofResult.proof.manifest;
@@ -106,7 +127,11 @@ class V1BroadcastTransactionResponse extends V1BaseOperation {
         const strippedValidatorPayload = stripValidatorMetadata(stateTxDecodedFromResponse);
 
         if (!isDeepEqualApplyPayload(stateTxDecodedFromRequest, strippedValidatorPayload)) {
-            throw new Error('Decoded transaction payload mismatch after removing validator metadata fields.');
+            throw new V1ProtocolError(
+                ResultCode.PROOF_PAYLOAD_MISMATCH,
+                'Decoded transaction payload mismatch after removing validator metadata fields.',
+                false
+            );
         }
         return {validatorDecodedTx: stateTxDecodedFromResponse, manifest};
     }
@@ -117,7 +142,11 @@ class V1BroadcastTransactionResponse extends V1BaseOperation {
 
         const validatorAddressBuffer = await stateInstance.getRegisteredWriterKey(writerKeyFromManifestHex);
         if (!b4a.isBuffer(validatorAddressBuffer) || validatorAddressBuffer.length === 0) {
-            throw new Error(`Validator with writer key ${writerKeyFromManifestHex} is not registered.`);
+            throw new V1ProtocolError(
+                ResultCode.VALIDATOR_WRITER_KEY_NOT_REGISTERED,
+                `Validator with writer key ${writerKeyFromManifestHex} is not registered.`,
+                false
+            );
         }
 
         return {
@@ -134,30 +163,54 @@ class V1BroadcastTransactionResponse extends V1BaseOperation {
         );
 
         if (!b4a.equals(validatorAddressFromTx, validatorAddressFromConnectionPublicKey)) {
-            throw new Error(`Validator address from transaction (${bufferToAddress(validatorAddressFromTx, this.#config.addressPrefix)}) does not match address derived from connection public key (${bufferToAddress(validatorAddressFromConnectionPublicKey, this.#config.addressPrefix)}).`);
+            throw new V1ProtocolError(
+                ResultCode.VALIDATOR_ADDRESS_MISMATCH,
+                `Validator address from transaction (${bufferToAddress(validatorAddressFromTx, this.#config.addressPrefix)}) does not match address derived from connection public key (${bufferToAddress(validatorAddressFromConnectionPublicKey, this.#config.addressPrefix)}).`,
+                false
+            );
         }
 
         if (!b4a.equals(validatorAddressFromTx, validatorAddressCorrelatedWithManifest)) {
-            throw new Error(`Validator address from transaction (${bufferToAddress(validatorAddressFromTx, this.#config.addressPrefix)}) does not match address correlated with manifest writer key (${bufferToAddress(validatorAddressCorrelatedWithManifest, this.#config.addressPrefix)}).`);
+            throw new V1ProtocolError(
+                ResultCode.VALIDATOR_ADDRESS_MISMATCH,
+                `Validator address from transaction (${bufferToAddress(validatorAddressFromTx, this.#config.addressPrefix)}) does not match address correlated with manifest writer key (${bufferToAddress(validatorAddressCorrelatedWithManifest, this.#config.addressPrefix)}).`,
+                false
+            );
         }
 
         if (!b4a.equals(validatorAddressCorrelatedWithManifest, validatorAddressFromConnectionPublicKey)) {
-            throw new Error(`Validator address correlated with manifest writer key (${bufferToAddress(validatorAddressCorrelatedWithManifest, this.#config.addressPrefix)}) does not match address derived from connection public key (${bufferToAddress(validatorAddressFromConnectionPublicKey, this.#config.addressPrefix)}).`);
+            throw new V1ProtocolError(
+                ResultCode.VALIDATOR_ADDRESS_MISMATCH,
+                `Validator address correlated with manifest writer key (${bufferToAddress(validatorAddressCorrelatedWithManifest, this.#config.addressPrefix)}) does not match address derived from connection public key (${bufferToAddress(validatorAddressFromConnectionPublicKey, this.#config.addressPrefix)}).`,
+                false
+            );
         }
 
         const validatorAddressFromConnection = bufferToAddress(validatorAddressFromConnectionPublicKey, this.#config.addressPrefix);
         const account = await stateInstance.getNodeEntry(validatorAddressFromConnection);
 
         if (!account) {
-            throw new Error(`No node entry found in state for validator address derived from connection public key (${validatorAddressFromConnection}).`);
+            throw new V1ProtocolError(
+                ResultCode.VALIDATOR_NODE_ENTRY_NOT_FOUND,
+                `No node entry found in state for validator address derived from connection public key (${validatorAddressFromConnection}).`,
+                false
+            );
         }
 
         if (!account.isWriter) {
-            throw new Error(`Node entry found for validator address derived from connection public key (${validatorAddressFromConnection}), but it is not registered as a writer.`);
+            throw new V1ProtocolError(
+                ResultCode.VALIDATOR_NODE_NOT_WRITER,
+                `Node entry found for validator address derived from connection public key (${validatorAddressFromConnection}), but it is not registered as a writer.`,
+                false
+            );
         }
 
         if (!b4a.isBuffer(account.wk) || !b4a.equals(account.wk, writerKeyFromManifest)) {
-            throw new Error(`Writer key from manifest (${b4a.toString(writerKeyFromManifest, "hex")}) does not match writer key in state for validator address derived from connection public key (${validatorAddressFromConnection}).`);
+            throw new V1ProtocolError(
+                ResultCode.VALIDATOR_WRITER_KEY_MISMATCH,
+                `Writer key from manifest (${b4a.toString(writerKeyFromManifest, "hex")}) does not match writer key in state for validator address derived from connection public key (${validatorAddressFromConnection}).`,
+                false
+            );
         }
     }
 }
@@ -182,7 +235,11 @@ const stripValidatorMetadata = (value) => {
 
 export function extractRequiredVaFromDecodedTx(validatorDecodedTx) {
     if (!validatorDecodedTx || typeof validatorDecodedTx !== 'object') {
-        throw new Error('Invalid decoded transaction: expected object');
+        throw new V1ProtocolError(
+            ResultCode.VALIDATOR_TX_OBJECT_INVALID,
+            'Invalid decoded transaction: expected object',
+            false
+        );
     }
 
     const operationPayload = Object.values(validatorDecodedTx).find((value) =>
@@ -196,7 +253,11 @@ export function extractRequiredVaFromDecodedTx(validatorDecodedTx) {
     const va = operationPayload?.va;
 
     if (!b4a.isBuffer(va)) {
-        throw new Error('Missing validator address (va) in decoded transaction');
+        throw new V1ProtocolError(
+            ResultCode.VALIDATOR_VA_MISSING,
+            'Missing validator address (va) in decoded transaction',
+            false
+        );
     }
     return va;
 }

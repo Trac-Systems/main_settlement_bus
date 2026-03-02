@@ -8,6 +8,8 @@ async function runNetworkModuleTests() {
     await import('./V1ValidationErrorMapper.test.js');
     await import('./v1/v1.handlers.test.js');
     await import('./services/services.test.js');
+    await import('./V1ResultCode.test.js');
+    await import('./V1BroadcastTransactionResponse.test.js');
     test.resume();
 }
 
