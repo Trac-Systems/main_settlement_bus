@@ -1,4 +1,3 @@
-import PeerWallet from 'trac-wallet';
 import tracCryptoApi from 'trac-crypto-api';
 import b4a from 'b4a';
 import {createMessage, safeWriteUInt32BE, idToBuffer, timestampToBuffer} from "../../../utils/buffer.js";

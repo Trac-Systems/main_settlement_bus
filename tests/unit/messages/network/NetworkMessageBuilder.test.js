@@ -1,6 +1,5 @@
 import { test } from 'brittle';
 import b4a from 'b4a';
-import PeerWallet from 'trac-wallet';
 import { v7 as uuidv7 } from 'uuid';
 import NetworkWalletFactory from '../../../../src/core/network/identity/NetworkWalletFactory.js';
 import NetworkMessageBuilder from '../../../../src/messages/network/v1/NetworkMessageBuilder.js';

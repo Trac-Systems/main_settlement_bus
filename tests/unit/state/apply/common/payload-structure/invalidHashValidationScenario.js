@@ -3,7 +3,6 @@ import {
 	safeDecodeApplyOperation,
 	safeEncodeApplyOperation
 } from '../../../../../../src/utils/protobuf/operationHelpers.js';
-import PeerWallet from 'trac-wallet';
 import OperationValidationScenarioBase from '../base/OperationValidationScenarioBase.js';
 
 export default class InvalidHashValidationScenario extends OperationValidationScenarioBase {

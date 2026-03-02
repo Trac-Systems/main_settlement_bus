@@ -1,5 +1,4 @@
 import b4a from 'b4a';
-import PeerWallet from 'trac-wallet';
 import tracCryptoApi from 'trac-crypto-api';
 
 import { createMessage } from '../../utils/buffer.js';

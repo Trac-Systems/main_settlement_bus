@@ -1,6 +1,5 @@
 import b4a from "b4a";
 import tracCrypto from "trac-crypto-api";
-import PeerWallet from "trac-wallet";
 import { $TNK } from "../../src/core/state/utils/balance.js";
 import { createMessage } from "../../src/utils/buffer.js";
 import { OperationType } from "../../src/utils/constants.js";

@@ -7,7 +7,6 @@ import TransferOperationHandler from "../shared/handlers/TransferOperationHandle
 import { NETWORK_MESSAGE_TYPES } from '../../../../utils/constants.js';
 import * as operation from '../../../../utils/applyOperations.js';
 import State from "../../../state/State.js";
-import PeerWallet from "trac-wallet";
 
 class NetworkMessageRouter {
     #handlers;

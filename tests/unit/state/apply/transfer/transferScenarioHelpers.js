@@ -1,5 +1,4 @@
 import b4a from 'b4a';
-import PeerWallet from 'trac-wallet';
 import { applyStateMessageFactory } from '../../../../../src/messages/state/applyStateMessageFactory.js';
 import { deriveIndexerSequenceState, eventFlush } from '../../../../helpers/autobaseTestHelpers.js';
 import {

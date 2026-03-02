@@ -1,5 +1,4 @@
 import { NETWORK_MESSAGE_TYPES } from '../../../../../utils/constants.js';
-import PeerWallet from 'trac-wallet';
 import tracCryptoApi from 'trac-crypto-api';
 import b4a from 'b4a';
 
