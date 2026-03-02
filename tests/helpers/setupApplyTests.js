@@ -1,6 +1,7 @@
 import sodium from 'sodium-native';
 import {generateMnemonic, mnemonicToSeed} from 'bip39-mnemonic';
 import b4a from 'b4a'
+import tracCryptoApi from 'trac-crypto-api';
 import PeerWallet from "trac-wallet"
 import path from 'path';
 import {MainSettlementBus} from '../../src/index.js'

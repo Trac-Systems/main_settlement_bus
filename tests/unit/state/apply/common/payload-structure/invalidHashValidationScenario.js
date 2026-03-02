@@ -4,6 +4,7 @@ import {
 	safeEncodeApplyOperation
 } from '../../../../../../src/utils/protobuf/operationHelpers.js';
 import OperationValidationScenarioBase from '../base/OperationValidationScenarioBase.js';
+import tracCryptoApi from 'trac-crypto-api'
 
 export default class InvalidHashValidationScenario extends OperationValidationScenarioBase {
 	constructor({

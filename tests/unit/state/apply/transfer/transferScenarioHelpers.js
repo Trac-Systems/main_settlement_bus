@@ -1,4 +1,5 @@
 import b4a from 'b4a';
+import tracCryptoApi from 'trac-crypto-api';
 import { applyStateMessageFactory } from '../../../../../src/messages/state/applyStateMessageFactory.js';
 import { deriveIndexerSequenceState, eventFlush } from '../../../../helpers/autobaseTestHelpers.js';
 import {

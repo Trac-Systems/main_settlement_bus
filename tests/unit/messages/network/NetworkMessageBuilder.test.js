@@ -20,6 +20,7 @@ import { addressToBuffer } from '../../../../src/core/state/utils/address.js';
 import { config } from '../../../helpers/config.js';
 import { asAddress } from '../../../helpers/address.js';
 import { testKeyPair1 } from '../../../fixtures/apply.fixtures.js';
+import tracCryptoApi from 'trac-crypto-api';
 
 function createWallet() {
     const keyPair = {

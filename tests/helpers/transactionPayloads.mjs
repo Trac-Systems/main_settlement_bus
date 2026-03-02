@@ -1,5 +1,5 @@
 import b4a from "b4a";
-import tracCrypto from "trac-crypto-api";
+import tracCryptoApi from "trac-crypto-api";
 import { $TNK } from "../../src/core/state/utils/balance.js";
 import { createMessage } from "../../src/utils/buffer.js";
 import { OperationType } from "../../src/utils/constants.js";
@@ -37,7 +37,7 @@ export async function buildRpcSelfTransferPayload(context, state, amountTnk = 1n
     const txvBuffer = await state.getIndexerSequenceState();
     const txvHex = b4a.toString(txvBuffer, "hex");
 
-    const txData = await tracCrypto.transaction.preBuild(
+    const txData = await tracCryptoApi.transaction.preBuild(
         context.wallet.address,
         context.wallet.address,
         b4a.toString($TNK(amountTnk), "hex"),
@@ -88,4 +88,3 @@ export async function buildRpcSelfTransferPayload(context, state, amountTnk = 1n
         txHashHex: b4a.toString(messageHash, "hex")
     };
 }
-
