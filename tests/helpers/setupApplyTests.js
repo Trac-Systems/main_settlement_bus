@@ -82,11 +82,10 @@ export async function fundPeer(admin, toFund, amount) {
 }
 
 export async function initMsbPeer(peerName, peerKeyPair, temporaryDirectory, options = {}) {
-    const peer = await initDirectoryStructure(peerName, peerKeyPair, temporaryDirectory);
-    peer.options = options
-    peer.options.storesDirectory = peer.storesDirectory;
-    peer.options.storeName = peer.storeName;
-    peer.config = createConfig(ENV.DEVELOPMENT, peer.options)
+    const config = createConfig(ENV.DEVELOPMENT, { ...options, storesDirectory: `${temporaryDirectory}/${peerName}` })
+    const peer = await initDirectoryStructure(peerName, peerKeyPair, config.storesFullPath);
+    peer.options = { ...options, storesDirectory: config.storesDirectory }
+    peer.config = config
     const msb = new MainSettlementBus(peer.config);
 
     peer.msb = msb;
@@ -290,9 +289,7 @@ export async function removeTemporaryDirectory(temporaryDirectory) {
 export async function initDirectoryStructure(peerName, keyPair, temporaryDirectory) {
     try {
         await ensureEnvReady();
-        const storesDirectory = temporaryDirectory + '/stores/';
-        const storeName = peerName + '/';
-        const corestoreDbDirectory = path.join(storesDirectory, storeName, 'db');
+        const corestoreDbDirectory = path.join(temporaryDirectory, 'db');
         await fsp.mkdir(corestoreDbDirectory, {recursive: true});
 
         const keypath = path.join(corestoreDbDirectory, 'keypair.json');
@@ -303,8 +300,7 @@ export async function initDirectoryStructure(peerName, keyPair, temporaryDirecto
         await wallet.ready
         await wallet.exportToFile(keypath)
         return {
-            storesDirectory,
-            storeName,
+            storesDirectory: temporaryDirectory,
             corestoreDbDirectory,
             keypath,
         }
