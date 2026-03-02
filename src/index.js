@@ -96,6 +96,8 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async _open() {
+        await fileUtils.ensureCoresStoreDir(this.#config);
+
         if (this.#config.enableWallet) {
             await this.#wallet.initKeyPair(
                 this.#config.keyPairPath,

@@ -123,6 +123,18 @@ export async function getAllMigrationFiles(migrationDirectory = BALANCE_MIGRATED
     }
 }
 
+export async function ensureCoresStoreDir(config) {
+    try {
+        // const storesDirectoryStats = await fs.promises.stat(config.storesDirectory);
+        // if (!storesDirectoryStats.isDirectory()) {
+        //     throw new Error(`Stores directory path is not a directory: ${config.storesDirectory}`);
+        // }
+        await fs.promises.mkdir(config.storesFullPath, { recursive: true });
+    } catch (err) {
+        throw new Error(`Failed to ensure corestore directory: ${err.message}`);
+    }
+}
+
 export async function validateBalanceMigrationData(addresses) {
     const migrationFiles = await getAllMigrationFiles(BALANCE_MIGRATED_DIR);
     const addressSet = new Set(addresses.map(a => a.address));
@@ -197,6 +209,7 @@ export default {
     readAddressesFromWhitelistFile,
     readBalanceMigrationFile,
     getAllMigrationFiles,
+    ensureCoresStoreDir,
     validateBalanceMigrationData,
     validateWhitelistMigrationData,
     getNextMigrationNumber,
