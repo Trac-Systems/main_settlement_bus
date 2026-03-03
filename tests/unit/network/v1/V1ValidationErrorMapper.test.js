@@ -1,12 +1,12 @@
 import {test} from 'brittle';
 
-import {mapValidationErrorToV1Error} from '../../../src/core/network/protocols/v1/V1ValidationErrorMapper.js';
+import {mapValidationErrorToV1Error} from '../../../../src/core/network/protocols/v1/V1ValidationErrorMapper.js';
 import {
     V1InvalidPayloadError,
     V1NodeHasNoWriteAccess,
     V1UnexpectedError,
-} from '../../../src/core/network/protocols/v1/V1ProtocolError.js';
-import {ResultCode} from '../../../src/utils/constants.js';
+} from '../../../../src/core/network/protocols/v1/V1ProtocolError.js';
+import {ResultCode} from '../../../../src/utils/constants.js';
 
 test('mapValidationErrorToV1Error keeps v1 protocol errors unchanged', t => {
     const input = new V1NodeHasNoWriteAccess('no access', true);
