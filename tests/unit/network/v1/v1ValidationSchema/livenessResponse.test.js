@@ -1,14 +1,14 @@
 import test from 'brittle';
 import b4a from 'b4a';
 
-import V1ValidationSchema from '../../../../src/core/network/protocols/v1/validators/V1ValidationSchema.js';
+import V1ValidationSchema from '../../../../../src/core/network/protocols/v1/validators/V1ValidationSchema.js';
 import {
     NetworkOperationType,
     NONCE_BYTE_LENGTH,
     ResultCode,
     SIGNATURE_BYTE_LENGTH,
-} from '../../../../src/utils/constants.js';
-import {not_allowed_data_types} from '../../../fixtures/check.fixtures.js';
+} from '../../../../../src/utils/constants.js';
+import {not_allowed_data_types} from '../../../../fixtures/check.fixtures.js';
 
 import {
     assertNoThrowAndAbsent,
