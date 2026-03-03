@@ -1,6 +1,6 @@
 import {test} from 'brittle';
 
-import {ResultCode} from '../../../src/utils/constants.js';
+import {ResultCode} from '../../../../src/utils/constants.js';
 
 test('ResultCode values are unique', t => {
     const values = Object.values(ResultCode);
