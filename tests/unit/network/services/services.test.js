@@ -12,6 +12,7 @@ async function runTests() {
     await import('./TransactionPoolService.test.js');
     await import('./ActivePoolUniformity.test.js')
     await import('./ActivePoolSelection.test.js')
+    await import('./ValidatorObserverLifecycle.test.js')
     test.resume();
 }
 
