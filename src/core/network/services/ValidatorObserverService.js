@@ -230,6 +230,10 @@ class ValidatorObserverService {
             return;
         }
 
+        if (length < this.#lastSyncedIndex) {
+            this.#lastSyncedIndex = 0;
+        }
+
         for (const hex of [...this.#addressIndex.keys()]) {
             const writerBuffer = b4a.from(hex, 'hex');
             const writerAddress = bufferToAddress(writerBuffer, this.#config.addressPrefix);

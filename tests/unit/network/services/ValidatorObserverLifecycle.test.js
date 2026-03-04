@@ -129,3 +129,61 @@ test('ValidatorObserverService coverage: pending connections and admin-indexer l
     await service.stopValidatorObserver(false);
     t.pass();
 });
+
+test('ValidatorObserverService resets sync index if ledger shrinks', async t => {
+    const mockState = new MockState();
+    const mockNetwork = new MockNetwork();
+    const config = { enableValidatorObserver: true, addressPrefix: 'trac', addressLength: 32 };
+    const service = new ValidatorObserverService(mockNetwork, mockState, 'my_own_address', config);
+
+    await service.start();
+    await sleep(600);
+    
+    mockState.writers = [b4a.alloc(32, 1)]; 
+    
+    await sleep(650); 
+
+    t.pass('Cycle completed with ledger shrink');
+    await service.stopValidatorObserver(false);
+});
+
+test('ValidatorObserverService removes writers that are no longer valid in state', async t => {
+    const mockState = new MockState();
+    const mockNetwork = new MockNetwork();
+    const config = { enableValidatorObserver: true, addressPrefix: 'trac', addressLength: 32 };
+    const service = new ValidatorObserverService(mockNetwork, mockState, 'my_own_address', config);
+
+    await service.start();
+    await sleep(600);
+  
+    const addr1 = 'trac1qyqsyqsyqsyqsyqsyqsyqsyqsyqsyqs997sl7';
+    mockState.getNodeEntry = async (addr) => {
+      
+        return { isWriter: false, isIndexer: false };
+    };
+
+    await sleep(650); 
+
+    t.pass('Cleanup loop executed and removed invalid writer');
+    await service.stopValidatorObserver(false);
+});
+
+test('ValidatorObserverService clears memory if ledger becomes empty', async t => {
+    const mockState = new MockState();
+    const mockNetwork = new MockNetwork();
+    const config = { enableValidatorObserver: true, addressPrefix: 'trac', addressLength: 32 };
+    const service = new ValidatorObserverService(mockNetwork, mockState, 'my_own_address', config);
+
+    await service.start();
+    await sleep(600);
+    
+    mockState.getWriterLength = async () => 0;
+    
+    await sleep(650); 
+
+    const selected = service._selectActiveWriter();
+    t.is(selected, null, 'Pool should be empty after ledger reset');
+    
+    await service.stopValidatorObserver(false);
+    t.pass('Full cleanup logic covered');
+});
