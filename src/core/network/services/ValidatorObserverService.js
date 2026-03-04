@@ -26,6 +26,10 @@ class ValidatorObserverService {
     #scheduler;
     #address;
     #isInterrupted
+    #activeWriterArray = [];
+    #addressIndex = new Map();
+    #isSyncing = false;
+    #lastSyncedIndex = 0;
 
     /**
      * @param {Network} network
@@ -78,13 +82,13 @@ class ValidatorObserverService {
     }
 
     async #worker(next) {
+        this.#scheduleSync();
         if (!this.#network.validatorConnectionManager.maxConnectionsReached()) {
             if (DEBUG) this.begin = Date.now();
-            const length = await this.#lengthEntry()
-
+            
             const promises = [];
             for (let i = 0; i < VALIDATOR_CANDIDATES_PER_CYCLE; i++) {
-                promises.push(this.#findValidator(this.#address, length + 1));
+                promises.push(this.#findValidator(this.#address));
                 await sleep(DELAY_INTERVAL); // Low key dangerous as the network progresses
             }
             await Promise.all(promises);
@@ -104,16 +108,18 @@ class ValidatorObserverService {
         next(POLL_INTERVAL);
     }
 
-    async #findValidator(address, validatorListLength) {
+    async #findValidator(address) {
         if (!this.#shouldRun()) return;
         const maxAttempts = 50; // TODO: make configurable
+        const validatorListLength = await this.#lengthEntry();
         let attempts = 0;
         let isValidatorValid = false;
         let validatorAddressBuffer = b4a.alloc(0);
 
         while (attempts < maxAttempts && !isValidatorValid) {
-            const rndIndex = Math.floor(Math.random() * validatorListLength);
-            validatorAddressBuffer = await this.state.getWriterIndex(rndIndex);
+            validatorAddressBuffer = this._selectActiveWriter();
+            if (!validatorAddressBuffer) break;
+
             isValidatorValid = await this.#isValidatorValid(address, validatorAddressBuffer, validatorListLength);
             attempts++;
         }
@@ -181,6 +187,86 @@ class ValidatorObserverService {
     async #lengthEntry() {
         const lengthEntry = await this.state.getWriterLength();
         return Number.isInteger(lengthEntry) && lengthEntry > 0 ? lengthEntry : 0;
+    }
+
+    _addActiveWriter(addrBuffer) {
+        const hex = addrBuffer.toString('hex');
+        if (this.#addressIndex.has(hex)) return;
+
+        this.#addressIndex.set(hex, this.#activeWriterArray.length);
+        this.#activeWriterArray.push(addrBuffer);
+    }
+
+    _removeActiveWriter(addrBuffer) {
+        const hex = addrBuffer.toString('hex');
+        const index = this.#addressIndex.get(hex);
+        if (index === undefined) return;
+
+        const lastIndex = this.#activeWriterArray.length - 1;
+        const lastBuffer = this.#activeWriterArray[lastIndex];
+        const lastHex = lastBuffer.toString('hex');
+
+        if (index !== lastIndex) {
+            this.#activeWriterArray[index] = lastBuffer;
+            this.#addressIndex.set(lastHex, index);
+        }
+
+        this.#activeWriterArray.pop();
+        this.#addressIndex.delete(hex);
+    }
+
+    _selectActiveWriter() {
+        const arr = this.#activeWriterArray;
+        return arr.length ? arr[Math.floor(Math.random() * arr.length)] : null;
+    }
+
+    async #syncActiveWriters() {
+        const length = await this.state.getWriterLength();
+
+        if (!length || length <= 0) {
+            this.#activeWriterArray = [];
+            this.#addressIndex.clear();
+            this.#lastSyncedIndex = 0;
+            return;
+        }
+
+        for (const hex of [...this.#addressIndex.keys()]) {
+            const writerBuffer = b4a.from(hex, 'hex');
+            const writerAddress = bufferToAddress(writerBuffer, this.#config.addressPrefix);
+            const entry = await this.state.getNodeEntry(writerAddress);
+
+            if (!entry?.isWriter) {
+                this._removeActiveWriter(writerBuffer);
+            }
+        }
+
+        if (length > this.#lastSyncedIndex) {
+            for (let i = this.#lastSyncedIndex; i < length; i++) {
+                const writerBuffer = await this.state.getWriterIndex(i);
+                if (!writerBuffer) continue;
+
+                const writerAddress = bufferToAddress(writerBuffer, this.#config.addressPrefix);
+                const entry = await this.state.getNodeEntry(writerAddress);
+
+                if (entry?.isWriter) {
+                    this._addActiveWriter(writerBuffer);
+                }
+            }
+            this.#lastSyncedIndex = length; 
+        }
+    }
+
+    #scheduleSync() {
+        if (this.#isSyncing) return;
+
+        this.#isSyncing = true;
+        this.#syncActiveWriters()
+            .catch(err => {
+                console.error('ValidatorObserverService sync error:', err);
+            })
+            .finally(() => {
+                this.#isSyncing = false;
+            });
     }
 }
 

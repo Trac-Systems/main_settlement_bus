@@ -10,6 +10,8 @@ async function runTests() {
     await import('./PendingRequestService.test.js');
     await import('./TransactionCommitService.test.js');
     await import('./TransactionPoolService.test.js');
+    await import('./ActivePoolUniformity.test.js')
+    await import('./ActivePoolSelection.test.js')
     test.resume();
 }
 
