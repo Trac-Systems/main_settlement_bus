@@ -26,7 +26,6 @@ import PartialRoleAccessValidator from "../../shared/validators/PartialRoleAcces
 import PartialBootstrapDeploymentValidator from "../../shared/validators/PartialBootstrapDeploymentValidator.js";
 import PartialTransactionValidator from "../../shared/validators/PartialTransactionValidator.js";
 import PartialTransferValidator from "../../shared/validators/PartialTransferValidator.js";
-import {mapValidationErrorToV1Error} from "../V1ValidationErrorMapper.js";
 import {applyStateMessageFactory} from "../../../../../messages/state/applyStateMessageFactory.js";
 import V1BroadcastTransactionResponse from "../validators/V1BroadcastTransactionResponse.js";
 import V1BaseOperationHandler from "./V1BaseOperationHandler.js";
@@ -85,20 +84,22 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
             proof = receipt.proof;
             appendedAt = receipt.appendedAt;
         } catch (error) {
-            const mappedError = mapValidationErrorToV1Error(error);
-            resultCode = getResultCode(mappedError);
+            const protocolError = error instanceof V1ProtocolError
+                ? error
+                : new V1UnexpectedError(error?.message ?? 'Unexpected error', true);
+            resultCode = getResultCode(protocolError);
             if (
                 resultCode === ResultCode.TX_ACCEPTED_PROOF_UNAVAILABLE &&
-                Number.isSafeInteger(mappedError.appendedAt) &&
-                mappedError.appendedAt > 0
+                Number.isSafeInteger(protocolError.appendedAt) &&
+                protocolError.appendedAt > 0
             ) {
-                appendedAt = mappedError.appendedAt;
+                appendedAt = protocolError.appendedAt;
             }
-            endConnection = shouldEndConnection(mappedError);
+            endConnection = shouldEndConnection(protocolError);
             this.displayError(
                 "failed to process broadcast transaction request from sender",
                 connection.remotePublicKey,
-                mappedError
+                protocolError
             );
         }
 
