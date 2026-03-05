@@ -1,5 +1,6 @@
 import {
     V1InvalidPayloadError,
+    V1TxInvalidPayloadError,
     V1ProtocolError,
     V1UnexpectedError,
 } from './V1ProtocolError.js';
@@ -7,13 +8,13 @@ import {ResultCode} from '../../../../utils/constants.js';
 import {
     SharedValidatorError,
 } from '../shared/validators/SharedValidatorError.js';
-import { sharedValidatorDomainCodeToResultCode } from './utils/sharedValidatorDomainCodeToResultCode.js';
+import { sharedValidatorDomainCodeToResultCode } from './utils/SharedValidatorDomainCodeToResultCode.js';
 
 // Temporary logic - delete and refactor validators with Legacy protocol depracation.
 
 const rules = [
     // Generic / schema-level
-    {resultCode: ResultCode.INVALID_PAYLOAD, endConnection: false, patterns: [/^Payload or payload type is missing\.$/]},
+    {resultCode: ResultCode.TX_INVALID_PAYLOAD, endConnection: false, patterns: [/^Payload or payload type is missing\.$/]},
     {resultCode: ResultCode.SCHEMA_VALIDATION_FAILED, endConnection: false, patterns: [/^Payload is invalid\.$/]},
     {resultCode: ResultCode.OPERATION_TYPE_UNKNOWN, endConnection: false, patterns: [/^Unknown operation type:/]},
 
@@ -86,6 +87,9 @@ export function mapValidationErrorToV1Error(error) {
         if (!mappedResultCode) {
             return new V1UnexpectedError(error.message, true);
         }
+        if (mappedResultCode === ResultCode.TX_INVALID_PAYLOAD) {
+            return new V1TxInvalidPayloadError(error.message, true);
+        }
         if (mappedResultCode === ResultCode.INVALID_PAYLOAD) {
             return new V1InvalidPayloadError(error.message, true);
         }
@@ -96,6 +100,9 @@ export function mapValidationErrorToV1Error(error) {
 
     for (const rule of rules) {
         if (rule.patterns.some(pattern => pattern.test(message))) {
+            if (rule.resultCode === ResultCode.TX_INVALID_PAYLOAD) {
+                return new V1TxInvalidPayloadError(message, false);
+            }
             if (rule.resultCode === ResultCode.INVALID_PAYLOAD) {
                 return new V1InvalidPayloadError(message, false);
             }

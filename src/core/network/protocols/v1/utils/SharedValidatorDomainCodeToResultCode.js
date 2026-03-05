@@ -2,7 +2,7 @@ import {ResultCode} from '../../../../../utils/constants.js';
 import {SharedValidatorErrorCode} from '../../shared/validators/SharedValidatorError.js';
 
 export const sharedValidatorDomainCodeToResultCode = Object.freeze({
-    [SharedValidatorErrorCode.PAYLOAD_TYPE_MISSING]: ResultCode.INVALID_PAYLOAD,
+    [SharedValidatorErrorCode.PAYLOAD_TYPE_MISSING]: ResultCode.TX_INVALID_PAYLOAD,
     [SharedValidatorErrorCode.PAYLOAD_SCHEMA_INVALID]: ResultCode.SCHEMA_VALIDATION_FAILED,
     [SharedValidatorErrorCode.OPERATION_TYPE_UNKNOWN]: ResultCode.OPERATION_TYPE_UNKNOWN,
     [SharedValidatorErrorCode.REQUESTER_ADDRESS_INVALID]: ResultCode.REQUESTER_ADDRESS_INVALID,

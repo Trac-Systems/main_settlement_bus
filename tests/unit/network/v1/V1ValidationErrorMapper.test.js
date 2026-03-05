@@ -2,8 +2,8 @@ import {test} from 'brittle';
 
 import {mapValidationErrorToV1Error} from '../../../../src/core/network/protocols/v1/V1ValidationErrorMapper.js';
 import {
-    V1InvalidPayloadError,
     V1NodeHasNoWriteAccess,
+    V1TxInvalidPayloadError,
     V1UnexpectedError,
 } from '../../../../src/core/network/protocols/v1/V1ProtocolError.js';
 import {ResultCode} from '../../../../src/utils/constants.js';
@@ -35,14 +35,14 @@ test('mapValidationErrorToV1Error maps shared validator domain errors by code (n
     t.is(output.endConnection, true);
 });
 
-test('mapValidationErrorToV1Error maps shared invalid-payload domain errors to V1InvalidPayloadError', t => {
+test('mapValidationErrorToV1Error maps shared invalid-payload domain errors to V1TxInvalidPayloadError', t => {
     const input = new SharedValidatorError(
         SharedValidatorErrorCode.PAYLOAD_TYPE_MISSING,
         'domain-payload-missing'
     );
     const output = mapValidationErrorToV1Error(input);
-    t.ok(output instanceof V1InvalidPayloadError);
-    t.is(output.resultCode, ResultCode.INVALID_PAYLOAD);
+    t.ok(output instanceof V1TxInvalidPayloadError);
+    t.is(output.resultCode, ResultCode.TX_INVALID_PAYLOAD);
     t.is(output.message, 'domain-payload-missing');
     t.is(output.endConnection, true);
 });
@@ -65,10 +65,10 @@ test('mapValidationErrorToV1Error maps schema invalid errors to SCHEMA_VALIDATIO
     t.is(output.endConnection, false);
 });
 
-test('mapValidationErrorToV1Error maps missing payload/type to INVALID_PAYLOAD (V1InvalidPayloadError)', t => {
+test('mapValidationErrorToV1Error maps missing payload/type to TX_INVALID_PAYLOAD (V1TxInvalidPayloadError)', t => {
     const output = mapValidationErrorToV1Error(new Error('Payload or payload type is missing.'));
-    t.ok(output instanceof V1InvalidPayloadError);
-    t.is(output.resultCode, ResultCode.INVALID_PAYLOAD);
+    t.ok(output instanceof V1TxInvalidPayloadError);
+    t.is(output.resultCode, ResultCode.TX_INVALID_PAYLOAD);
     t.is(output.endConnection, false);
 });
 

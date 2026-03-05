@@ -23,6 +23,12 @@ export class V1InvalidPayloadError extends V1ProtocolError {
     }
 }
 
+export class V1TxInvalidPayloadError extends V1ProtocolError {
+    constructor(message = 'Invalid tx payload', endConnection = false) {
+        super(ResultCode.TX_INVALID_PAYLOAD, message, endConnection);
+    }
+}
+
 export class V1SignatureInvalidError extends V1ProtocolError {
     constructor(message = 'Signature invalid', endConnection = false) {
         super(ResultCode.SIGNATURE_INVALID, message, endConnection);
