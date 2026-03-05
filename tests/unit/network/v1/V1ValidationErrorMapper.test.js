@@ -32,7 +32,7 @@ test('mapValidationErrorToV1Error maps shared validator domain errors by code (n
     const output = mapValidationErrorToV1Error(input);
     t.is(output.resultCode, ResultCode.TX_SIGNATURE_INVALID);
     t.is(output.message, 'domain-message-not-matching-regex');
-    t.is(output.endConnection, false);
+    t.is(output.endConnection, true);
 });
 
 test('mapValidationErrorToV1Error maps shared invalid-payload domain errors to V1InvalidPayloadError', t => {
@@ -44,7 +44,7 @@ test('mapValidationErrorToV1Error maps shared invalid-payload domain errors to V
     t.ok(output instanceof V1InvalidPayloadError);
     t.is(output.resultCode, ResultCode.INVALID_PAYLOAD);
     t.is(output.message, 'domain-payload-missing');
-    t.is(output.endConnection, false);
+    t.is(output.endConnection, true);
 });
 
 test('mapValidationErrorToV1Error falls back to unexpected for unknown shared domain codes', t => {

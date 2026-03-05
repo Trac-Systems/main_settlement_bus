@@ -22,4 +22,3 @@ test('ResultCode preserves existing numeric values (append-only)', t => {
 
     t.is(ResultCode.OPERATION_TYPE_UNKNOWN, 11);
 });
-

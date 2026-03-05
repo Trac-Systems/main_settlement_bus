@@ -7,7 +7,7 @@ import {ResultCode} from '../../../../utils/constants.js';
 import {
     SharedValidatorError,
 } from '../shared/validators/SharedValidatorError.js';
-import {sharedValidatorDomainCodeToResultCode} from './utils/SharedValidatorDomainCodeToResultCode.js';
+import { sharedValidatorDomainCodeToResultCode } from './utils/sharedValidatorDomainCodeToResultCode.js';
 
 // Temporary logic - delete and refactor validators with Legacy protocol depracation.
 
@@ -87,7 +87,7 @@ export function mapValidationErrorToV1Error(error) {
             return new V1UnexpectedError(error.message, true);
         }
         if (mappedResultCode === ResultCode.INVALID_PAYLOAD) {
-            return new V1InvalidPayloadError(error.message, false);
+            return new V1InvalidPayloadError(error.message, true);
         }
         return new V1ProtocolError(mappedResultCode, error.message, true);
     }
