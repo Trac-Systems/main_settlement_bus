@@ -7,10 +7,7 @@ import {
     V1UnexpectedError,
 } from '../../../../src/core/network/protocols/v1/V1ProtocolError.js';
 import {ResultCode} from '../../../../src/utils/constants.js';
-import {
-    SharedValidatorError,
-    SharedValidatorErrorCode,
-} from '../../../../src/core/network/protocols/shared/validators/SharedValidatorError.js';
+import SharedValidatorRejectionError from '../../../../src/core/network/protocols/shared/errors/SharedValidatorRejectionError.js';
 
 test('mapValidationErrorToV1Error keeps v1 protocol errors unchanged', t => {
     const input = new V1NodeHasNoWriteAccess('no access', true);
@@ -18,39 +15,18 @@ test('mapValidationErrorToV1Error keeps v1 protocol errors unchanged', t => {
     t.is(output, input);
 });
 
+test('mapValidationErrorToV1Error keeps typed domain errors with resultCode unchanged', t => {
+    const input = new SharedValidatorRejectionError(ResultCode.TX_INVALID_PAYLOAD, 'domain-invalid', true);
+    const output = mapValidationErrorToV1Error(input);
+    t.is(output, input);
+    t.is(output.resultCode, ResultCode.TX_INVALID_PAYLOAD);
+    t.is(output.endConnection, true);
+});
+
 test('mapValidationErrorToV1Error maps tx signature errors to TX_SIGNATURE_INVALID', t => {
     const output = mapValidationErrorToV1Error(new Error('Invalid signature in payload.'));
     t.is(output.resultCode, ResultCode.TX_SIGNATURE_INVALID);
     t.is(output.endConnection, false);
-});
-
-test('mapValidationErrorToV1Error maps shared validator domain errors by code (no message matching)', t => {
-    const input = new SharedValidatorError(
-        SharedValidatorErrorCode.TX_SIGNATURE_INVALID,
-        'domain-message-not-matching-regex'
-    );
-    const output = mapValidationErrorToV1Error(input);
-    t.is(output.resultCode, ResultCode.TX_SIGNATURE_INVALID);
-    t.is(output.message, 'domain-message-not-matching-regex');
-    t.is(output.endConnection, true);
-});
-
-test('mapValidationErrorToV1Error maps shared invalid-payload domain errors to V1TxInvalidPayloadError', t => {
-    const input = new SharedValidatorError(
-        SharedValidatorErrorCode.PAYLOAD_TYPE_MISSING,
-        'domain-payload-missing'
-    );
-    const output = mapValidationErrorToV1Error(input);
-    t.ok(output instanceof V1TxInvalidPayloadError);
-    t.is(output.resultCode, ResultCode.TX_INVALID_PAYLOAD);
-    t.is(output.message, 'domain-payload-missing');
-    t.is(output.endConnection, true);
-});
-
-test('mapValidationErrorToV1Error falls back to unexpected for unknown shared domain codes', t => {
-    const input = new SharedValidatorError('SOME_UNKNOWN_CODE', 'some-message');
-    const output = mapValidationErrorToV1Error(input);
-    t.ok(output instanceof V1UnexpectedError);
 });
 
 test('mapValidationErrorToV1Error maps requester-not-found errors to REQUESTER_NOT_FOUND', t => {

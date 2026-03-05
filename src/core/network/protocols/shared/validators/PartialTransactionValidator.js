@@ -2,10 +2,8 @@ import b4a from 'b4a';
 import {safeDecodeApplyOperation} from "../../../../../utils/protobuf/operationHelpers.js";
 import deploymentEntryUtils from "../../../../state/utils/deploymentEntry.js";
 import PartialOperationValidator from './PartialOperationValidator.js';
-import {
-    SharedValidatorError,
-    SharedValidatorErrorCode,
-} from './SharedValidatorError.js';
+import {ResultCode} from "../../../../../utils/constants.js";
+import SharedValidatorRejectionError from '../errors/SharedValidatorRejectionError.js';
 
 class PartialTransactionValidator extends PartialOperationValidator {
     #config
@@ -36,8 +34,8 @@ class PartialTransactionValidator extends PartialOperationValidator {
 
     validateMsbBootstrap(payload) {
         if (!b4a.equals(this.#config.bootstrap, payload.txo.mbs)) {
-            throw new SharedValidatorError(
-                SharedValidatorErrorCode.MSB_BOOTSTRAP_MISMATCH,
+            throw new SharedValidatorRejectionError(
+                ResultCode.MSB_BOOTSTRAP_MISMATCH,
                 `Declared MSB bootstrap is different than network bootstrap in transaction operation: ${payload.txo.mbs.toString('hex')}`
             );
         }
@@ -46,8 +44,8 @@ class PartialTransactionValidator extends PartialOperationValidator {
     async validateIfExternalBootstrapHasBeenDeployed(payload) {
         const externalBootstrapResult = await this.state.getRegisteredBootstrapEntry(payload.txo.bs.toString('hex'));
         if (externalBootstrapResult === null) {
-            throw new SharedValidatorError(
-                SharedValidatorErrorCode.EXTERNAL_BOOTSTRAP_NOT_DEPLOYED,
+            throw new SharedValidatorRejectionError(
+                ResultCode.EXTERNAL_BOOTSTRAP_NOT_DEPLOYED,
                 `External bootstrap with hash ${payload.txo.bs.toString('hex')} is not registered as deployment entry.`
             );
         }
@@ -57,8 +55,8 @@ class PartialTransactionValidator extends PartialOperationValidator {
         const getBootstrapTransactionTxPayload = await this.state.get(txHash.toString('hex'));
 
         if (getBootstrapTransactionTxPayload === null) {
-            throw new SharedValidatorError(
-                SharedValidatorErrorCode.EXTERNAL_BOOTSTRAP_TX_MISSING,
+            throw new SharedValidatorRejectionError(
+                ResultCode.EXTERNAL_BOOTSTRAP_TX_MISSING,
                 `External bootstrap is not registered as usual tx ${externalBootstrapResult.toString('hex')}: ${payload}`
             );
         }
@@ -67,8 +65,8 @@ class PartialTransactionValidator extends PartialOperationValidator {
 
         // edge case
         if (!b4a.equals(decodedBootstrapDeployment.bdo.bs, payload.txo.bs)) {
-            throw new SharedValidatorError(
-                SharedValidatorErrorCode.EXTERNAL_BOOTSTRAP_MISMATCH,
+            throw new SharedValidatorRejectionError(
+                ResultCode.EXTERNAL_BOOTSTRAP_MISMATCH,
                 `External bootstrap does not match the one in the transaction payload: ${decodedBootstrapDeployment.bdo.bs.toString('hex')} !== ${payload.txo.bs.toString('hex')}`
             );
         }

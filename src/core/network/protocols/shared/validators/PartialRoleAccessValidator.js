@@ -1,12 +1,9 @@
 import b4a from 'b4a';
-import {OperationType} from "../../../../../utils/constants.js";
+import {OperationType, ResultCode} from "../../../../../utils/constants.js";
 import {bufferToAddress} from "../../../../state/utils/address.js";
 import PartialOperationValidator from './PartialOperationValidator.js';
 import {bufferToBigInt} from "../../../../../utils/amountSerialization.js";
-import {
-    SharedValidatorError,
-    SharedValidatorErrorCode,
-} from './SharedValidatorError.js';
+import SharedValidatorRejectionError from '../errors/SharedValidatorRejectionError.js';
 
 class PartialRoleAccessValidator extends PartialOperationValidator {
     #config;
@@ -46,24 +43,24 @@ class PartialRoleAccessValidator extends PartialOperationValidator {
             const nodeAddress = bufferToAddress(payload.address, this.#config.addressPrefix);
             const nodeEntry = await this.state.getNodeEntry(nodeAddress);
             if (!nodeEntry) {
-                throw new SharedValidatorError(
-                    SharedValidatorErrorCode.ROLE_NODE_ENTRY_NOT_FOUND,
+                throw new SharedValidatorRejectionError(
+                    ResultCode.ROLE_NODE_ENTRY_NOT_FOUND,
                     `Node with address ${nodeAddress} entry does not exist.`
                 );
             }
 
             const isNodeAlreadyWriter = nodeEntry.isWriter;
             if (isNodeAlreadyWriter) {
-                throw new SharedValidatorError(
-                    SharedValidatorErrorCode.ROLE_NODE_ALREADY_WRITER,
+                throw new SharedValidatorRejectionError(
+                    ResultCode.ROLE_NODE_ALREADY_WRITER,
                     `Node with address ${nodeAddress} is already a writer.`
                 );
             }
 
             const isNodeWhitelisted = nodeEntry.isWhitelisted;
             if (!isNodeWhitelisted) {
-                throw new SharedValidatorError(
-                    SharedValidatorErrorCode.ROLE_NODE_NOT_WHITELISTED,
+                throw new SharedValidatorRejectionError(
+                    ResultCode.ROLE_NODE_NOT_WHITELISTED,
                     `Node with address ${nodeAddress} is not whitelisted.`
                 );
             }
@@ -73,24 +70,24 @@ class PartialRoleAccessValidator extends PartialOperationValidator {
             const nodeAddress = bufferToAddress(payload.address, this.#config.addressPrefix);
             const nodeEntry = await this.state.getNodeEntry(nodeAddress);
             if (!nodeEntry) {
-                throw new SharedValidatorError(
-                    SharedValidatorErrorCode.ROLE_NODE_ENTRY_NOT_FOUND,
+                throw new SharedValidatorRejectionError(
+                    ResultCode.ROLE_NODE_ENTRY_NOT_FOUND,
                     `Node with address ${nodeAddress} entry does not exist.`
                 );
             }
 
             const isAlreadyWriter = nodeEntry.isWriter;
             if (!isAlreadyWriter) {
-                throw new SharedValidatorError(
-                    SharedValidatorErrorCode.ROLE_NODE_NOT_WRITER,
+                throw new SharedValidatorRejectionError(
+                    ResultCode.ROLE_NODE_NOT_WRITER,
                     `Node with address ${nodeAddress} is not a writer.`
                 );
             }
 
             const isAlreadyIndexer = nodeEntry.isIndexer;
             if (isAlreadyIndexer) {
-                throw new SharedValidatorError(
-                    SharedValidatorErrorCode.ROLE_NODE_IS_INDEXER,
+                throw new SharedValidatorRejectionError(
+                    ResultCode.ROLE_NODE_IS_INDEXER,
                     `Node with address ${nodeAddress} is an indexer.`
                 );
             }
@@ -99,10 +96,7 @@ class PartialRoleAccessValidator extends PartialOperationValidator {
         } else if (type === OperationType.ADMIN_RECOVERY) {
             const adminEntry = await this.state.getAdminEntry();
             if (!adminEntry) {
-                throw new SharedValidatorError(
-                    SharedValidatorErrorCode.ROLE_ADMIN_ENTRY_MISSING,
-                    'Admin entry does not exist.'
-                );
+                throw new SharedValidatorRejectionError(ResultCode.ROLE_ADMIN_ENTRY_MISSING, 'Admin entry does not exist.');
             }
 
             const adminAddressBuffer = payload.address;
@@ -112,8 +106,8 @@ class PartialRoleAccessValidator extends PartialOperationValidator {
                 !b4a.equals(payload.rao.iw, adminEntry.wk)
             );
             if (!isRecoveryCase) {
-                throw new SharedValidatorError(
-                    SharedValidatorErrorCode.ROLE_INVALID_RECOVERY_CASE,
+                throw new SharedValidatorRejectionError(
+                    ResultCode.ROLE_INVALID_RECOVERY_CASE,
                     `Node with address ${adminAddress} is not a valid recovery case.`
                 );
             }
@@ -121,8 +115,8 @@ class PartialRoleAccessValidator extends PartialOperationValidator {
             return;
         }
 
-        throw new SharedValidatorError(
-            SharedValidatorErrorCode.ROLE_UNKNOWN_OPERATION,
+        throw new SharedValidatorRejectionError(
+            ResultCode.ROLE_UNKNOWN_OPERATION,
             `Unknown role access operation type: ${type}`
         );
     }
@@ -131,8 +125,8 @@ class PartialRoleAccessValidator extends PartialOperationValidator {
         const requesterAddress = bufferToAddress(payload.address, this.#config.addressPrefix);
         const nodeEntry = await this.state.getNodeEntry(requesterAddress);
         if (!nodeEntry) {
-            throw new SharedValidatorError(
-                SharedValidatorErrorCode.REQUESTER_NOT_FOUND,
+            throw new SharedValidatorRejectionError(
+                ResultCode.REQUESTER_NOT_FOUND,
                 `Node entry not found for address ${requesterAddress}`
             );
         }
@@ -145,8 +139,8 @@ class PartialRoleAccessValidator extends PartialOperationValidator {
             const isOwner = b4a.equals(addressFromRegisteredWritingKey, payload.address);
 
             if (!isCurrentWk || !isOwner) {
-                throw new SharedValidatorError(
-                    SharedValidatorErrorCode.ROLE_INVALID_WRITER_KEY,
+                throw new SharedValidatorRejectionError(
+                    ResultCode.ROLE_INVALID_WRITER_KEY,
                     'Invalid writer key: either not owned by requester or different from assigned key'
                 );
             }
@@ -163,17 +157,14 @@ class PartialRoleAccessValidator extends PartialOperationValidator {
         }
 
         if (!requesterEntry) {
-            throw new SharedValidatorError(
-                SharedValidatorErrorCode.REQUESTER_NOT_FOUND,
-                'Requester address not found in state'
-            );
+            throw new SharedValidatorRejectionError(ResultCode.REQUESTER_NOT_FOUND, 'Requester address not found in state');
         }
         const requesterBalance = bufferToBigInt(requesterEntry.balance);
 
         const requiredBalance = this.fee * 11n;
         if (requesterBalance < requiredBalance) {
-            throw new SharedValidatorError(
-                SharedValidatorErrorCode.ROLE_INSUFFICIENT_FEE_BALANCE,
+            throw new SharedValidatorRejectionError(
+                ResultCode.ROLE_INSUFFICIENT_FEE_BALANCE,
                 'Insufficient requester balance to cover role access operation FEE.'
             );
         }

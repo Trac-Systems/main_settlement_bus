@@ -5,10 +5,6 @@ import {
     V1UnexpectedError,
 } from './V1ProtocolError.js';
 import {ResultCode} from '../../../../utils/constants.js';
-import {
-    SharedValidatorError,
-} from '../shared/validators/SharedValidatorError.js';
-import { sharedValidatorDomainCodeToResultCode } from './utils/SharedValidatorDomainCodeToResultCode.js';
 
 // Temporary logic - delete and refactor validators with Legacy protocol depracation.
 
@@ -80,20 +76,6 @@ const unexpectedPatterns = [
 export function mapValidationErrorToV1Error(error) {
     if (error && typeof error === 'object' && 'resultCode' in error) {
         return error;
-    }
-
-    if (error instanceof SharedValidatorError) {
-        const mappedResultCode = sharedValidatorDomainCodeToResultCode[error.code];
-        if (!mappedResultCode) {
-            return new V1UnexpectedError(error.message, true);
-        }
-        if (mappedResultCode === ResultCode.TX_INVALID_PAYLOAD) {
-            return new V1TxInvalidPayloadError(error.message, true);
-        }
-        if (mappedResultCode === ResultCode.INVALID_PAYLOAD) {
-            return new V1InvalidPayloadError(error.message, true);
-        }
-        return new V1ProtocolError(mappedResultCode, error.message, true);
     }
 
     const message = error?.message ?? 'Unexpected validation error.';

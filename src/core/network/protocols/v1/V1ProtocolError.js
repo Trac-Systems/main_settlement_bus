@@ -1,4 +1,5 @@
 import {ResultCode} from '../../../../utils/constants.js';
+import BaseMSBError from '../shared/errors/BaseMSBError.js';
 
 export function getResultCode(err) {
     return (err && typeof err === 'object' && 'resultCode' in err) ? err.resultCode : ResultCode.UNEXPECTED_ERROR;
@@ -8,12 +9,15 @@ export function shouldEndConnection(err) {
     return Boolean(err && typeof err === 'object' && err.endConnection);
 }
 
-export class V1ProtocolError extends Error {
+/**
+ * v1 protocol error wrapper.
+ *
+ * `V1ProtocolError` is the v1-specific base class used by v1 handlers/validators to attach a stable
+ * `resultCode` (a `ResultCode` enum value) and an optional `endConnection` transport hint.
+ */
+export class V1ProtocolError extends BaseMSBError {
     constructor(resultCode, message, endConnection) {
-        super(message);
-        this.name = this.constructor.name;
-        this.resultCode = resultCode;
-        this.endConnection = endConnection;
+        super(resultCode, message, endConnection);
     }
 }
 

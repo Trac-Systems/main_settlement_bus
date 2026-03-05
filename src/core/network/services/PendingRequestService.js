@@ -1,6 +1,6 @@
 import {NetworkOperationType, ResultCode} from '../../../utils/constants.js';
 import {isHexString} from '../../../utils/helpers.js';
-import {V1TimeoutError, V1UnexpectedError, V1ProtocolError} from "../protocols/v1/V1ProtocolError.js";
+import {V1TimeoutError, V1UnexpectedError} from "../protocols/v1/V1ProtocolError.js";
 import {Config} from '../../../config/config.js';
 import b4a from 'b4a';
 
@@ -134,7 +134,7 @@ class PendingRequestService {
     rejectPendingRequest(id, error) {
         const entry = this.getAndDeletePendingRequest(id);
         if (!entry) return false;
-        const err = error instanceof V1ProtocolError
+        const err = (error && typeof error === 'object' && 'resultCode' in error)
             ? error
             : new V1UnexpectedError(error?.message ?? 'Unexpected error', false);
         entry.reject(err);
