@@ -8,7 +8,7 @@ async function runTests() {
     await import('./V1LivenessResponse.test.js');
     await import('./V1BroadcastTransactionRequest.test.js');
     await import('./V1ResultCode.test.js');
-    await import('./ResultCodePolicy.test.js');
+    await import('./connectionPolicies.test.js');
     await import('./V1BroadcastTransactionResponse.test.js');
     await import('./V1ValidationSchema.test.js');
     await import('./V1BroadcastTransactionOperationHandler.test.js');

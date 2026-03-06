@@ -60,7 +60,7 @@ class V1LivenessOperationHandler extends V1BaseOperationHandler {
                 message.id,
                 connection,
                 error,
-                "failed to process liveness response from sender"
+                "Failed to process liveness response from sender"
             );
         }
     }

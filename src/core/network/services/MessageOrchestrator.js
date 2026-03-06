@@ -6,7 +6,7 @@ import {
     unsafeEncodeApplyOperation
 } from "../../../utils/protobuf/operationHelpers.js";
 import { normalizeMessageByOperationType } from "../../../utils/normalizers.js";
-import ResultCodePolicy from "../protocols/ResultCodePolicy.js";
+import { resultToValidatorAction, SENDER_ACTION } from "../protocols/connectionPolicies.js";
 import { ConnectionManagerError } from './ConnectionManager.js';
 /**
  * MessageOrchestrator coordinates message submission, retry, and validator management.
@@ -127,9 +127,9 @@ class MessageOrchestrator {
                     (resultCode) => {
                         console.log(resultCode);
                         // TODO: When we will deprecate the legacy protocol, we should refactor this scope, to propagate domain-error with result code.
-                        const action = ResultCodePolicy.resolveValidatorAction(resultCode);
+                        const action = resultToValidatorAction(resultCode);
                         switch (action) {
-                            case ResultCodePolicy.senderAction.SUCCESS:
+                            case SENDER_ACTION.SUCCESS:
                                 success = true;
                                 //TODO: Create a function for action below, and replace it also in legacy flow.
                                 this.incrementSentCount(validatorPublicKey);
@@ -137,16 +137,16 @@ class MessageOrchestrator {
                                     this.connectionManager.remove(validatorPublicKey);
                                 }
                                 break;
-                            case ResultCodePolicy.senderAction.ROTATE:
+                            case SENDER_ACTION.ROTATE:
                                 this.connectionManager.remove(validatorPublicKey);
                                 break;
-                            case ResultCodePolicy.senderAction.NO_ROTATE:
+                            case SENDER_ACTION.NO_ROTATE:
                                 // ignore
                                 break;
                             default:
                                 this.connectionManager.remove(validatorPublicKey);
                                 console.warn(
-                                    `MessageOrchestrator: Unrecognized action from ResultCodePolicy: ${action}.
+                                    `MessageOrchestrator: Unrecognized action from connectionPolicies: ${action}.
                                      ResultCode was: ${resultCode}. Removing validator ${publicKeyToAddress(validatorPublicKey, this.#config)}`
                                 );
                                 break;
