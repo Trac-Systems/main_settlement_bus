@@ -1,6 +1,6 @@
 import test from 'brittle';
 import V1BaseOperationHandler from '../../../../../src/core/network/protocols/v1/handlers/V1BaseOperationHandler.js';
-import { V1UnexpectedError } from '../../../../../src/core/network/protocols/v1/V1ProtocolError.js';
+import {V1ProtocolError, V1UnexpectedError} from '../../../../../src/core/network/protocols/v1/V1ProtocolError.js';
 
 class MockRateLimiter {
     constructor() { this.called = false; }
@@ -163,7 +163,7 @@ test('handlePendingResponseError: protocol error with endConnection=true -> clos
         remotePublicKey: Buffer.alloc(32)
     };
 
-    const protocolError = { resultCode: 'FATAL_ERROR', endConnection: true };
+    const protocolError = new V1ProtocolError(999, 'FATAL_ERROR', true);
 
     handler.handlePendingResponseError(
         'msg-123',
@@ -202,7 +202,7 @@ test('handlePendingResponseError: protocol-shaped error -> keeps original error 
     const pendingReq = new MockPendingReqService();
     const handler = new V1BaseOperationHandler(null, pendingReq, mockConfig);
 
-    const protocolError = { resultCode: 123 };
+    const protocolError = new V1ProtocolError(123, 'protocol-shaped', false);
 
     handler.displayError = () => {};
 
@@ -282,4 +282,3 @@ test('handlePendingResponseError: primitive error value -> uses Unexpected error
     t.ok(captured instanceof V1UnexpectedError);
     t.is(captured.message, 'Unexpected error');
 });
-

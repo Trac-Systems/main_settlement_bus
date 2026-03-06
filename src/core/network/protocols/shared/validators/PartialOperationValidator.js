@@ -3,10 +3,11 @@ import PeerWallet from 'trac-wallet';
 import Check from '../../../../../utils/check.js';
 import {bufferToAddress} from "../../../../state/utils/address.js";
 import {createMessage} from "../../../../../utils/buffer.js";
-import {OperationType} from "../../../../../utils/constants.js";
+import {OperationType, ResultCode} from "../../../../../utils/constants.js";
 import {bufferToBigInt} from "../../../../../utils/amountSerialization.js";
 import {FEE} from "../../../../state/utils/transaction.js";
 import * as operationsUtils from '../../../../../utils/applyOperations.js';
+import SharedValidatorRejectionError from '../errors/SharedValidatorRejectionError.js';
 
 const MAX_AMOUNT = BigInt('0xffffffffffffffffffffffffffffffff');
 const FEE_BIGINT = bufferToBigInt(FEE);
@@ -36,18 +37,18 @@ class PartialOperationValidator {
     }
 
     async validate(payload) {
-        throw new Error("Method 'validate()' must be implemented.");
+        throw new SharedValidatorRejectionError(ResultCode.UNEXPECTED_ERROR, "Method 'validate()' must be implemented.");
     }
 
     isPayloadSchemaValid(payload) {
         if (!payload || !payload.type) {
-            throw new Error('Payload or payload type is missing.');
+            throw new SharedValidatorRejectionError(ResultCode.TX_INVALID_PAYLOAD, 'Payload or payload type is missing.');
         }
 
         const selectedValidator = this.#selectCheckSchemaValidator(payload.type);
         const isPayloadValid = selectedValidator(payload);
         if (!isPayloadValid) {
-            throw new Error('Payload is invalid.');
+            throw new SharedValidatorRejectionError(ResultCode.SCHEMA_VALIDATION_FAILED, 'Payload is invalid.');
         }
     }
 
@@ -64,21 +65,24 @@ class PartialOperationValidator {
             case OperationType.TRANSFER:
                 return this.check.validateTransferOperation.bind(this.check);
             default:
-                throw new Error(`Unknown operation type: ${type}`);
+                throw new SharedValidatorRejectionError(
+                    ResultCode.OPERATION_TYPE_UNKNOWN,
+                    `Unknown operation type: ${type}`
+                );
         }
     }
 
     validateRequesterAddress(payload) {
         const incomingAddress = bufferToAddress(payload.address, this.#config.addressPrefix);
         if (!incomingAddress) {
-            throw new Error('Invalid requesting address in payload.');
+            throw new SharedValidatorRejectionError(ResultCode.REQUESTER_ADDRESS_INVALID, 'Invalid requesting address in payload.');
         }
 
         const incomingPublicKey = PeerWallet.decodeBech32mSafe(incomingAddress);
 
         // TODO: We can add check if public key belongs to the Ed25519 curve. Validate signature already checks that but it would be amazing to catch it earlier.
         if (!incomingPublicKey || incomingPublicKey.length !== PUBLIC_KEY_LENGTH) {
-            throw new Error('Invalid requesting public key in payload.');
+            throw new SharedValidatorRejectionError(ResultCode.REQUESTER_PUBLIC_KEY_INVALID, 'Invalid requesting public key in payload.');
         }
     }
 
@@ -127,7 +131,10 @@ class PartialOperationValidator {
                     OperationType.TRANSFER
                 ];
             default:
-                throw new Error(`Unknown operation type: ${payload.type}`);
+                throw new SharedValidatorRejectionError(
+                    ResultCode.OPERATION_TYPE_UNKNOWN,
+                    `Unknown operation type: ${payload.type}`
+                );
         }
     }
 
@@ -143,11 +150,14 @@ class PartialOperationValidator {
         const messageHash = await PeerWallet.blake3(message);
         const payloadHash = operation.tx;
         if (!b4a.equals(payloadHash, messageHash)) {
-            throw new Error('Regenerated transaction does not match incoming transaction in payload.');
+            throw new SharedValidatorRejectionError(
+                ResultCode.TX_HASH_MISMATCH,
+                'Regenerated transaction does not match incoming transaction in payload.'
+            );
         }
 
         if (!PeerWallet.verify(incomingSignature, messageHash, incomingPublicKey)) {
-            throw new Error('Invalid signature in payload.');
+            throw new SharedValidatorRejectionError(ResultCode.TX_SIGNATURE_INVALID, 'Invalid signature in payload.');
         }
     }
 
@@ -158,7 +168,7 @@ class PartialOperationValidator {
         const incomingTxv = operation.txv
 
         if (!b4a.equals(currentTxv, incomingTxv)) {
-            throw new Error('Transaction has expired.');
+            throw new SharedValidatorRejectionError(ResultCode.TX_EXPIRED, 'Transaction has expired.');
         }
     }
 
@@ -169,7 +179,10 @@ class PartialOperationValidator {
         const txHex = tx.toString('hex');
 
         if (await this.state.get(txHex) !== null) {
-            throw new Error(`Transaction with hash ${txHex} already exists in the state.`);
+            throw new SharedValidatorRejectionError(
+                ResultCode.TX_ALREADY_EXISTS,
+                `Transaction with hash ${txHex} already exists in the state.`
+            );
         }
     }
 
@@ -180,7 +193,10 @@ class PartialOperationValidator {
 
         const condition = va === undefined && vn === undefined && vs === undefined
         if (!condition) {
-            throw new Error('Transfer operation must not be completed already (va, vn, vs must be undefined).');
+            throw new SharedValidatorRejectionError(
+                ResultCode.OPERATION_ALREADY_COMPLETED,
+                'Transfer operation must not be completed already (va, vn, vs must be undefined).'
+            );
         }
     }
 
@@ -194,12 +210,12 @@ class PartialOperationValidator {
         }
 
         if (!requesterEntry) {
-            throw new Error('Requester address not found in state');
+            throw new SharedValidatorRejectionError(ResultCode.REQUESTER_NOT_FOUND, 'Requester address not found in state');
         }
 
         const requesterBalance = bufferToBigInt(requesterEntry.balance);
         if (requesterBalance < FEE_BIGINT) {
-            throw new Error('Insufficient balance to cover transaction fee.');
+            throw new SharedValidatorRejectionError(ResultCode.INSUFFICIENT_FEE_BALANCE, 'Insufficient balance to cover transaction fee.');
         }
     }
 
@@ -209,7 +225,10 @@ class PartialOperationValidator {
         const operation = payload[operationKey];
         const bs = operation.bs;
         if (b4a.equals(this.#config.bootstrap, bs)) {
-            throw new Error(`External bootstrap is the same as MSB bootstrap: ${bs.toString('hex')}`);
+            throw new SharedValidatorRejectionError(
+                ResultCode.EXTERNAL_BOOTSTRAP_EQUALS_MSB_BOOTSTRAP,
+                `External bootstrap is the same as MSB bootstrap: ${bs.toString('hex')}`
+            );
         }
     }
 
@@ -223,7 +242,10 @@ class PartialOperationValidator {
 
         const requesterAddress = bufferToAddress(payload.address, this.#config.addressPrefix);
         if (this.#selfAddress === requesterAddress) {
-            throw new Error('Requester address cannot be the same as the validator wallet address.');
+            throw new SharedValidatorRejectionError(
+                ResultCode.SELF_VALIDATION_FORBIDDEN,
+                'Requester address cannot be the same as the validator wallet address.'
+            );
         }
     }
 
