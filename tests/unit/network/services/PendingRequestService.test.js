@@ -85,7 +85,7 @@ test('PendingRequestService rejects and removes pending request', async t => {
     } catch (error) {
         t.ok(error instanceof V1UnexpectedError);
         t.is(error.message, expectedError.message);
-        t.is(error.endConnection, false);
+        t.is(error.endConnection, true);
     }
 
     t.is(service.rejectPendingRequest('missing', new Error('missing')), false);
@@ -382,7 +382,7 @@ test('PendingRequestService.rejectPendingRequest falls back to Unexpected error 
     } catch (error) {
         t.ok(error instanceof V1UnexpectedError);
         t.is(error.message, 'Unexpected error');
-        t.is(error.endConnection, false);
+        t.is(error.endConnection, true);
     }
 });
 

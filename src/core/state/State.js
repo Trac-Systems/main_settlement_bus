@@ -245,7 +245,7 @@ class State extends ReadyResource {
             const appendedAt = new Date();
             const snapshot = core.snapshot(); // consistent view while generating proofs.
             await snapshot.ready();
-
+            // TODO: check state if specific tx has been appened THEN generate a proof.
             try {
                 const receipts = [];
                 let failedProofs = 0;

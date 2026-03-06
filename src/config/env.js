@@ -110,7 +110,7 @@ const configData = {
         enableValidatorObserver: true,
         enableWallet: true,
         maxValidators: 6,
-        maxRetries: 0,
+        maxRetries: 3,
         messageThreshold: 1000,
         messageValidatorRetryDelay: 1000, //How long to wait before retrying (ms) MESSAGE_VALIDATOR_RETRY_DELAY_MS
         messageValidatorResponseTimeout: 3 * 3 * 1000, //Overall timeout for sending a message (ms). This is 3 * maxRetries * messageValidatorRetryDelay;

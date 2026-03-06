@@ -93,7 +93,7 @@ class PendingRequestService {
                 id,
                 new V1TimeoutError(
                     `Pending request with ID ${id} from peer ${peerPubKeyHex} timed out after ${entry.timeoutMs} ms.`,
-                    false
+                    true
                 ));
 
         }, entry.timeoutMs);
@@ -136,7 +136,7 @@ class PendingRequestService {
         if (!entry) return false;
         const err = error instanceof V1ProtocolError
             ? error
-            : new V1UnexpectedError(error?.message ?? 'Unexpected error', false);
+            : new V1UnexpectedError(error?.message ?? 'Unexpected error');
         entry.reject(err);
         return true;
     }

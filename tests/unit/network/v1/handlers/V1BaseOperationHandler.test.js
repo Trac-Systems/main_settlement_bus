@@ -151,7 +151,7 @@ test('handlePendingResponseError: unknown native error -> maps to V1UnexpectedEr
     t.absent(ended, 'V1UnexpectedError should not close the connection by default');
 });
 
-test('handlePendingResponseError: protocol error with endConnection=true -> closes connection', async (t) => {
+test('handlePendingResponseError: protocol error with endConnection=true -> does not close connection directly', async (t) => {
     const pendingReq = new MockPendingReqService();
     const handler = new V1BaseOperationHandler(null, pendingReq, mockConfig);
 
@@ -178,7 +178,7 @@ test('handlePendingResponseError: protocol error with endConnection=true -> clos
         'Should pass protocol error without wrapping'
     );
 
-    t.ok(ended, 'Should call connection.end() when error dictates it');
+    t.absent(ended, 'Connection closing is delegated to ConnectionManager');
 });
 
 test('handlePendingResponseError: delegates logging -> calls displayError', async (t) => {

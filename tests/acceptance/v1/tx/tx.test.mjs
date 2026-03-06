@@ -1,5 +1,24 @@
 import request from "supertest"
 import { buildRpcSelfTransferPayload, waitForConnection } from "../../../helpers/transactionPayloads.mjs"
+import { sleep } from "../../../../src/utils/helpers.js"
+
+const TX_ENDPOINT_TIMEOUT_MS = 4000
+const TX_ENDPOINT_RETRY_INTERVAL_MS = 100
+
+const waitForStatusCode = async (requestFactory, expectedStatusCode, timeoutMs = TX_ENDPOINT_TIMEOUT_MS) => {
+    const startedAt = Date.now()
+    let response = null
+
+    while ((Date.now() - startedAt) < timeoutMs) {
+        response = await requestFactory()
+        if (response.statusCode === expectedStatusCode) {
+            return response
+        }
+        await sleep(TX_ENDPOINT_RETRY_INTERVAL_MS)
+    }
+
+    return response
+}
 
 export const registerTxTests = (context) => {
     describe("GET /v1/tx/:hash", () => {
@@ -17,7 +36,10 @@ export const registerTxTests = (context) => {
                 .send(JSON.stringify({ payload }))
             expect(broadcastRes.statusCode).toBe(200)
 
-            const res = await request(context.server).get(`/v1/tx/${txHashHex}`)
+            const res = await waitForStatusCode(
+                () => request(context.server).get(`/v1/tx/${txHashHex}`),
+                200
+            )
             expect(res.statusCode).toBe(200)
             expect(res.body).toMatchObject({ txDetails: expect.any(Object) })
         })
