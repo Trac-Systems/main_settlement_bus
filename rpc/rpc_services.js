@@ -6,9 +6,20 @@ import {
 } from "../src/utils/normalizers.js";
 import { get_confirmed_tx_info, get_unconfirmed_tx_info } from "../src/utils/cli.js";
 import {OperationType} from "../src/utils/constants.js";
+import { sleep } from "../src/utils/helpers.js";
 import b4a from "b4a";
 import PartialTransactionValidator from "../src/core/network/protocols/shared/validators/PartialTransactionValidator.js";
 import PartialTransferValidator from "../src/core/network/protocols/shared/validators/PartialTransferValidator.js";
+
+const waitForConfirmedTx = async (state, txHash, timeoutMs = 3000) => {
+    const startedAt = Date.now();
+    while ((Date.now() - startedAt) < timeoutMs) {
+        const payload = await state.getSigned(txHash);
+        if (payload) return true;
+        await sleep(100);
+    }
+    return false;
+};
 
 export async function getBalance(msbInstance, address, confirmed) {
     const state = msbInstance.state;
@@ -72,6 +83,14 @@ export async function broadcastTransaction(msbInstance, config, payload) {
     const success = await msbInstance.broadcastPartialTransaction(payload);
 
     if (!success) {
+        throw new Error("Failed to broadcast transaction after multiple attempts.");
+    }
+
+    const confirmedTimeout = Number.isFinite(config?.messageValidatorResponseTimeout)
+        ? config.messageValidatorResponseTimeout
+        : 3000;
+    const isConfirmed = await waitForConfirmedTx(msbInstance.state, hash, confirmedTimeout);
+    if (!isConfirmed) {
         throw new Error("Failed to broadcast transaction after multiple attempts.");
     }
 
