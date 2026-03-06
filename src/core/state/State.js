@@ -1517,6 +1517,8 @@ class State extends ReadyResource {
             this.#safeLogApply(OperationType.ADD_WRITER, "Add writer operation ignored.", node.from.key)
             return Status.IGNORE;
         }
+
+        this.#emitEvent(CustomEventType.WRITABLE, { wk: op.rao.iw });
         return Status.SUCCESS;
     }
 
@@ -1817,6 +1819,10 @@ class State extends ReadyResource {
             return Status.IGNORE;
         }
 
+        this.#emitEvent(CustomEventType.UNWRITABLE, { 
+            publicKey: PeerWallet.decodeBech32mSafe(requesterAddressString), 
+            wk: op.rao.iw 
+        });
         return Status.SUCCESS;
     }
 
@@ -1931,8 +1937,6 @@ class State extends ReadyResource {
         if (this.#config.enableTxApplyLogs) {
             console.info(`Writer removed: addr:wk:tx - ${requesterAddressString}:${op.rao.iw.toString('hex')}:${txHashHexString}`);
         }
-
-        this.#emitEvent(CustomEventType.UNWRITABLE, PeerWallet.decodeBech32mSafe(requesterAddressString))
     }
 
     async #handleApplyAddIndexerOperation(op, view, base, node, batch) {
@@ -2150,7 +2154,10 @@ class State extends ReadyResource {
             console.info(`Indexer added addr:wk:tx - ${pretendingAddressString}:${decodedPretenderNodeEntry.wk.toString('hex')}:${txHashHexString}`);
         }
 
-        this.#emitEvent(CustomEventType.IS_INDEXER, PeerWallet.decodeBech32mSafe(pretendingAddressString))
+        this.#emitEvent(CustomEventType.IS_INDEXER, { 
+            publicKey: PeerWallet.decodeBech32mSafe(pretendingAddressString), 
+            wk: decodedPretenderNodeEntry.wk 
+        });
     }
 
     async #handleApplyRemoveIndexerOperation(op, view, base, node, batch) {
@@ -2267,6 +2274,8 @@ class State extends ReadyResource {
         if (removeIndexerResult === null) {
             return Status.FAILURE;
         };
+
+        this.#emitEvent(CustomEventType.WRITABLE, { wk: decodedNodeEntry.wk });
         return Status.SUCCESS;
     }
 
@@ -2368,6 +2377,11 @@ class State extends ReadyResource {
         if (this.#config.enableTxApplyLogs) {
             console.info(`Indexer has been removed addr:wk:tx - ${toRemoveAddressString}:${decodedNodeEntry.wk.toString('hex')}:${txHashHexString}`);
         }
+
+        this.#emitEvent(CustomEventType.WRITABLE, { 
+            wk: decodedNodeEntry.wk,
+            publicKey: PeerWallet.decodeBech32mSafe(toRemoveAddressString) 
+        });
     }
 
     async #handleApplyBanValidatorOperation(op, view, base, node, batch) {
@@ -2566,7 +2580,10 @@ class State extends ReadyResource {
             console.info(`Node has been banned: addr:wk:tx - ${nodeToBeBannedAddressString}:${decodedToBanNodeEntry.wk.toString('hex')}:${txHashHexString}`);
         }
 
-        this.#emitEvent(CustomEventType.UNWRITABLE, PeerWallet.decodeBech32mSafe(nodeToBeBannedAddressString))
+        this.#emitEvent(CustomEventType.UNWRITABLE, { 
+            publicKey: PeerWallet.decodeBech32mSafe(nodeToBeBannedAddressString), 
+            wk: decodedToBanNodeEntry.wk 
+        });
 
         return Status.SUCCESS;
     }
