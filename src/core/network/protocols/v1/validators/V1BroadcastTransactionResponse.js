@@ -29,26 +29,27 @@ class V1BroadcastTransactionResponse extends V1BaseOperation {
         await this.validateSignature(payload, connection.remotePublicKey);
         const resultCode = payload.broadcast_transaction_response.result;
         // if result code is not OK, we can skip the rest of the validations.
-        if (resultCode !== ResultCode.OK) {
-            return true;
+        this.validateIfResultCodeIsValidatorInternalError(resultCode);
+        if (resultCode === ResultCode.OK) {
+            const proofResult = await this.verifyProofOfPublication(payload, stateInstance);
+            const {
+                validatorDecodedTx,
+                manifest
+            } = await this.assertProofPayloadMatchesRequestPayload(proofResult, pendingRequestServiceEntry);
+            this.validateDecodedCompletePayloadSchema(validatorDecodedTx);
+            const {
+                writerKeyFromManifest,
+                validatorAddressCorrelatedWithManifest
+            } = await this.validateWritingKey(validatorDecodedTx, manifest, stateInstance);
+            await this.validateValidatorCorrectness(
+                validatorDecodedTx,
+                connection.remotePublicKey,
+                writerKeyFromManifest,
+                validatorAddressCorrelatedWithManifest,
+                stateInstance,
+            );
         }
-        const proofResult = await this.verifyProofOfPublication(payload, stateInstance);
-        const {
-            validatorDecodedTx,
-            manifest
-        } = await this.assertProofPayloadMatchesRequestPayload(proofResult, pendingRequestServiceEntry);
-        this.validateDecodedCompletePayloadSchema(validatorDecodedTx);
-        const {
-            writerKeyFromManifest,
-            validatorAddressCorrelatedWithManifest
-        } = await this.validateWritingKey(validatorDecodedTx, manifest, stateInstance);
-        await this.validateValidatorCorrectness(
-            validatorDecodedTx,
-            connection.remotePublicKey,
-            writerKeyFromManifest,
-            validatorAddressCorrelatedWithManifest,
-            stateInstance,
-        );
+
         return true;
     }
 
@@ -211,6 +212,16 @@ class V1BroadcastTransactionResponse extends V1BaseOperation {
                 `Writer key from manifest (${b4a.toString(writerKeyFromManifest, "hex")}) does not match writer key in state for validator address derived from connection public key (${validatorAddressFromConnection}).`,
                 false
             );
+        }
+    }
+
+    validateIfResultCodeIsValidatorInternalError(resultCode) {
+        if (resultCode === ResultCode.TX_COMMITTED_RECEIPT_MISSING) {
+            throw new V1ProtocolError(
+                resultCode,
+                `Validator response indicates an error with result code ${resultCode}, which is an internal error code.`,
+                true
+            )
         }
     }
 }

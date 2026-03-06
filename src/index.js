@@ -305,7 +305,7 @@ export class MainSettlementBus extends ReadyResource {
         const success = await this.broadcastPartialTransaction(adminRecoveryMessage);
 
         if (!success) {
-            throw new Error("Failed to broadcast transaction after multiple attempts.");
+            throw new Error("Failed to broadcast transaction. Try again later.");
         }
 
         console.info(`Transaction hash: ${adminRecoveryMessage.rao.tx}`);
@@ -426,7 +426,7 @@ export class MainSettlementBus extends ReadyResource {
             const success = await this.broadcastPartialTransaction(assembledMessage);
 
             if (!success) {
-                throw new Error("Failed to broadcast transaction after multiple attempts.");
+                throw new Error("Failed to broadcast transaction. Try again later.");
             }
 
             console.info(`Transaction hash: ${assembledMessage.rao.tx}`);
@@ -460,7 +460,7 @@ export class MainSettlementBus extends ReadyResource {
         const success = await this.broadcastPartialTransaction(assembledMessage);
 
         if (!success) {
-            throw new Error("Failed to broadcast transaction after multiple attempts.");
+            throw new Error("Failed to broadcast transaction. Try again later.");
         }
 
         console.info(`Transaction hash: ${assembledMessage.rao.tx}`);
@@ -684,7 +684,7 @@ export class MainSettlementBus extends ReadyResource {
         const success = await this.broadcastPartialTransaction(payload);
 
         if (!success) {
-            throw new Error("Failed to broadcast transaction after multiple attempts.");
+            throw new Error("Failed to broadcast transaction. Try again later.");
         }
 
         console.info(`Transaction hash: ${payload.bdo.tx}`);

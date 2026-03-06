@@ -87,7 +87,6 @@ class NetworkMessageRouterV1 {
 
     #preValidate(incomingMessage) {
         return !(!incomingMessage || !b4a.isBuffer(incomingMessage) || incomingMessage.length === 0 || incomingMessage.length > V1_PROTOCOL_PAYLOAD_MAX_SIZE);
-
     }
 
     #disconnect(connection, reason) {

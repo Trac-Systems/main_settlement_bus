@@ -38,7 +38,6 @@ class V1BaseOperationHandler {
         const protocolError = this.#toProtocolError(error);
         const rejected = this.#pendingRequestService.rejectPendingRequest(messageId, protocolError);
         if (!rejected) return;
-        if (shouldEndConnection(protocolError)) connection.end();
         this.displayError(step, connection.remotePublicKey, error);
     }
 
@@ -50,7 +49,7 @@ class V1BaseOperationHandler {
         if (error instanceof V1ProtocolError) {
             return error;
         }
-        return new V1UnexpectedError(error?.message ?? 'Unexpected error', false);
+        return new V1UnexpectedError(error?.message ?? 'Unexpected error');
     }
 }
 
