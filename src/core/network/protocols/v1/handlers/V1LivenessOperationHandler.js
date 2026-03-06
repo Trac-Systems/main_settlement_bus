@@ -2,7 +2,6 @@ import { networkMessageFactory } from "../../../../../messages/network/v1/networ
 import { NETWORK_CAPABILITIES, ResultCode } from "../../../../../utils/constants.js";
 import V1LivenessRequest from "../validators/V1LivenessRequest.js";
 import {getResultCode, shouldEndConnection, V1UnexpectedError} from "../V1ProtocolError.js";
-import { publicKeyToAddress, sleep } from "../../../../../utils/helpers.js";
 import V1LivenessResponse from "../validators/V1LivenessResponse.js";
 import V1BaseOperationHandler from "./V1BaseOperationHandler.js";
 
@@ -60,7 +59,7 @@ class V1LivenessOperationHandler extends V1BaseOperationHandler {
                 message.id,
                 connection,
                 error,
-                "failed to process liveness response from sender"
+                "Failed to process liveness response from sender"
             );
         }
     }
@@ -73,7 +72,7 @@ class V1LivenessOperationHandler extends V1BaseOperationHandler {
                 resultCode
             );
         } catch (error) {
-            throw new V1UnexpectedError(`Failed to build liveness response: ${error.message}`, true);
+            throw new V1UnexpectedError(`Failed to build liveness response: ${error.message}`);
         }
     }
 
