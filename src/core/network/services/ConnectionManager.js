@@ -142,12 +142,14 @@ class ConnectionManager {
         return entry ? entry.connection : undefined;
     }
 
-    // /**
-    //  * Sends a message through a specific validator without increasing sent messages count.
-    //  * @param {Object} message - The message to send to the validator
-    //  * @param {String | Buffer} publicKey - A validator public key hex string to be fetched from the pool.
-    //  * @returns {Boolean} True if the message was sent, false otherwise.
-    //  */
+    /**
+     * Sends a message through a specific validator without increasing sent messages count.
+     * @param {Object} message - The message to send to the validator.
+     * @param {String | Buffer} publicKey - A validator public key hex string to be fetched from the pool.
+     * @returns {Promise<*>} A promise returned by `validator.connection.protocolSession.send(message)`.
+     * @throws {ConnectionManagerError} If the validator is not connected.
+     * @throws {ConnectionManagerError} If the validator has no valid connection or protocol session.
+     */
     async sendSingleMessage(message, publicKey) {
         let publicKeyHex = this.#toHexString(publicKey);
         if (!this.connected(publicKeyHex)) {
