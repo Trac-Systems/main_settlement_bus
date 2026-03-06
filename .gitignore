@@ -1,5 +1,6 @@
 # IDE configuration files
 .idea
+.DS_Store
 
 # Node modules (dependencies)
 node_modules/

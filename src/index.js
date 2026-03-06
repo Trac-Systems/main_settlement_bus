@@ -198,15 +198,17 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async #stateEventsListener() {
-        this.#state.on(CustomEventType.IS_INDEXER, (publicKey) => {
-            if (this.#network.validatorConnectionManager.exists(publicKey)) {
-                this.#network.validatorConnectionManager.remove(publicKey)
+        this.#state.on(CustomEventType.IS_INDEXER, (data) => {
+            const key = data?.publicKey || data;
+            if (this.#network.validatorConnectionManager.exists(key)) {
+                this.#network.validatorConnectionManager.remove(key)
             }
         })
 
-        this.#state.on(CustomEventType.UNWRITABLE, (publicKey) => {
-            if (this.#network.validatorConnectionManager.exists(publicKey)) {
-                this.#network.validatorConnectionManager.remove(publicKey)
+        this.#state.on(CustomEventType.UNWRITABLE, (data) => {
+            const key = data?.publicKey || data;
+            if (this.#network.validatorConnectionManager.exists(key)) {
+                this.#network.validatorConnectionManager.remove(key)
             }
         })
         this.#state.base.on(EventType.IS_INDEXER, () => {

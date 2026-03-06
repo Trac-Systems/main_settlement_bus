@@ -120,7 +120,8 @@ export const EventType = Object.freeze({
 // Role managment constants
 export const CustomEventType = Object.freeze({
     IS_INDEXER: 'msb:is-indexer',
-    UNWRITABLE: 'msb:unwritable'
+    UNWRITABLE: 'msb:unwritable',
+    WRITABLE: 'msb:writable'
 });
 
 // Token

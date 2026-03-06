@@ -1,10 +1,11 @@
 import PeerWallet from "trac-wallet";
 import b4a from "b4a";
-import { MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION } from '../../../utils/constants.js';
+import { MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION, CustomEventType } from '../../../utils/constants.js';
 import { bufferToAddress } from '../../state/utils/address.js';
 import { sleep } from '../../../utils/helpers.js';
 import Scheduler from "../../../utils/Scheduler.js";
 import Network from "../Network.js";
+
 
 const DELAY_INTERVAL = 50;
 const VALIDATOR_CANDIDATES_PER_CYCLE = 10;
@@ -29,6 +30,8 @@ class ValidatorObserverService {
     #addressIndex = new Map();
     #isSyncing = false;
     #lastSyncedIndex = 0;
+    #cycleCount = 0;
+    #eventHandlers = {};
 
     /**
      * @param {Network} network
@@ -42,13 +45,35 @@ class ValidatorObserverService {
         this.#state = state;
         this.#address = address;
         this.#isInterrupted = false;
-        
+
         if (DEBUG) {
             this.initTimestamp = Date.now();
             this.reachedMax = false;
             this.end = 0;
             this.begin = 0;
         }
+    }
+
+    #setupEventListeners() {
+        this.#eventHandlers.writable = (data) => {
+            const wk = data?.wk || data;
+            debugLog('Event received: Validator Added/Demoted from Indexer');
+            this.#addActiveWriter(wk);
+        };
+        this.#eventHandlers.unwritable = (data) => {
+            const wk = data?.wk || data;
+            debugLog('Event received: Validator Removed/Banned');
+            this.#removeActiveWriter(wk);
+        };
+        this.#eventHandlers.isIndexer = (data) => {
+            const wk = data?.wk || data;
+            debugLog('Event received: Validator Promoted to Indexer');
+            this.#removeActiveWriter(wk);
+        };
+
+        this.state.on(CustomEventType.WRITABLE, this.#eventHandlers.writable);
+        this.state.on(CustomEventType.UNWRITABLE, this.#eventHandlers.unwritable);
+        this.state.on(CustomEventType.IS_INDEXER, this.#eventHandlers.isIndexer);
     }
 
     get state() {
@@ -68,25 +93,32 @@ class ValidatorObserverService {
         this.#isInterrupted = false;
         this.#scheduler = new Scheduler(next => this.#worker(next), POLL_INTERVAL);
         this.#scheduler.start();
+        this.#setupEventListeners();
     }
 
     async stopValidatorObserver(waitForCurrent = true) {
         if (!this.#scheduler) return;
         this.#isInterrupted = true;
         await this.#scheduler.stop(waitForCurrent);
+        if (this.state && this.#eventHandlers.writable) {
+            this.state.off(CustomEventType.WRITABLE, this.#eventHandlers.writable);
+            this.state.off(CustomEventType.UNWRITABLE, this.#eventHandlers.unwritable);
+            this.state.off(CustomEventType.IS_INDEXER, this.#eventHandlers.isIndexer);
+        }
         this.#scheduler = null;
         console.info('ValidatorObserverService: closing gracefully...');
     }
 
     async #worker(next) {
-        this.#scheduleSync();
+        if (this.#cycleCount++ % 100 === 0) this.#scheduleSync();
+
         if (!this.#network.validatorConnectionManager.maxConnectionsReached()) {
             if (DEBUG) this.begin = Date.now();
-            
+
             // Fetch global state once per cycle to prevent I/O bottlenecks
             const adminEntry = await this.state.getAdminEntry();
-            const validatorListLength = await this.#lengthEntry(); 
-            
+            const validatorListLength = await this.#lengthEntry();
+
             const promises = [];
             for (let i = 0; i < VALIDATOR_CANDIDATES_PER_CYCLE; i++) {
                 promises.push(
@@ -94,7 +126,7 @@ class ValidatorObserverService {
                         if (DEBUG) console.error('Validator search error:', err.message);
                     })
                 );
-                await sleep(DELAY_INTERVAL); 
+                await sleep(DELAY_INTERVAL);
             }
             await Promise.all(promises);
 
@@ -115,11 +147,11 @@ class ValidatorObserverService {
 
     async #findValidator(address, adminEntry, validatorListLength) {
         if (!this.#shouldRun()) return;
-        
-        const maxAttempts = 50; 
+
+        const maxAttempts = 50;
         let attempts = 0;
         let isValidatorValid = false;
-        let validatorAddressBuffer = null; 
+        let validatorAddressBuffer = null;
 
         while (attempts < maxAttempts && !isValidatorValid) {
             validatorAddressBuffer = this.#selectActiveWriter();
@@ -235,8 +267,8 @@ class ValidatorObserverService {
 
         // Cleanup: Verify existing pool in chunks to prevent I/O spam
         const currentEntries = [...this.#addressIndex.keys()];
-        const chunkSize = 200; 
-        
+        const chunkSize = 200;
+
         for (let i = 0; i < currentEntries.length; i += chunkSize) {
             const chunk = currentEntries.slice(i, i + chunkSize);
             await Promise.all(chunk.map(async (hex) => {
@@ -263,7 +295,7 @@ class ValidatorObserverService {
                     this.#addActiveWriter(writerBuffer);
                 }
             }
-            this.#lastSyncedIndex = length; 
+            this.#lastSyncedIndex = length;
         }
     }
 
