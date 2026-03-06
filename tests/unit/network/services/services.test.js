@@ -7,6 +7,7 @@ async function runTests() {
     await import('./ValidatorHealthCheckService.test.js');
     await import('./TransactionRateLimiterService.test.js');
     await import('./ConnectionManager.test.js');
+    await import('./MessageOrchestrator.test.js');
     await import('./PendingRequestService.test.js');
     await import('./TransactionCommitService.test.js');
     await import('./TransactionPoolService.test.js');

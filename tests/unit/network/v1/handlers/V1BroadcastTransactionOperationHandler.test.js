@@ -18,6 +18,7 @@ import PartialBootstrapDeploymentValidator from '../../../../../src/core/network
 import PartialTransactionValidator from '../../../../../src/core/network/protocols/shared/validators/PartialTransactionValidator.js';
 import PartialTransferValidator from '../../../../../src/core/network/protocols/shared/validators/PartialTransferValidator.js';
 import { config as testConfig } from '../../../../helpers/config.js';
+import { errorMessageIncludes } from '../../../../helpers/regexHelper.js';
 
 const VALID_ADDR = 'trac123z3gfpr2epjwww7ntm3m6ud2fhmq0tvts27p2f5mx3qkecsutlqfys769';
 const VALID_TO_ADDR = 'trac1mqktwme8fvklrds4hlhfy6lhmsu9qgfn3c3kuhz7c5zwjt8rc3dqj9tx7h';
@@ -147,17 +148,17 @@ test('dispatchTransaction: missing/invalid type -> throws invalid payload error'
 
     await t.exception(
         async () => handler.dispatchTransaction(null),
-        /Decoded transaction type is missing/
+        errorMessageIncludes('Decoded transaction type is missing')
     );
 
     await t.exception(
         async () => handler.dispatchTransaction({ type: 0 }),
-        /Decoded transaction type is missing/
+        errorMessageIncludes('Decoded transaction type is missing')
     );
 
     await t.exception(
         async () => handler.dispatchTransaction({ type: 999 }),
-        /Unsupported transaction type/
+        errorMessageIncludes('Unsupported transaction type')
     );
 });
 
@@ -536,7 +537,7 @@ test('Unsupported role access subtype', async t => {
             rao: roleAccessPayload(),
             // unsupported operation type
         }),
-        /Unsupported transaction type/
+        errorMessageIncludes('Unsupported transaction type')
     );
 });
 
@@ -550,7 +551,7 @@ test('Role access switch default branch', async t => {
             address: VALID_ADDR,
             rao: roleAccessPayload()
         }),
-        /Unsupported transaction type/
+        errorMessageIncludes('Unsupported transaction type')
     );
 });
 
@@ -573,12 +574,15 @@ test('TransactionPoolMissingCommitReceiptError via receipt branch', async t => {
         txo: transactionPayload()
     });
 
+    let capturedResultCode = null;
     await handler.handleRequest(
-        { id: b4a.alloc(32), broadcast_transaction_request: { data: b4a.alloc(1) } },
-        mockConn()
+        { id: 'receipt-missing-id', broadcast_transaction_request: { data: b4a.alloc(1) } },
+        mockConn(res => {
+            capturedResultCode = res.broadcast_transaction_response.result;
+        })
     );
 
-    t.pass();
+    t.is(capturedResultCode, ResultCode.TX_COMMITTED_RECEIPT_MISSING);
 });
 
 test('PendingCommitBufferFullError mapping branch', async t => {
