@@ -1,5 +1,4 @@
 import b4a from 'b4a'
-import PeerWallet from "trac-wallet"
 import {EventType, ResultCode} from '../../../utils/constants.js';
 import {publicKeyToAddress} from "../../../utils/helpers.js";
 
