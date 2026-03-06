@@ -21,5 +21,6 @@ test('ResultCode preserves existing numeric values (append-only)', t => {
     t.is(ResultCode.TX_ALREADY_PENDING, 10);
 
     t.is(ResultCode.OPERATION_TYPE_UNKNOWN, 11);
-});
 
+    t.is(ResultCode.TX_INVALID_PAYLOAD, 61);
+});

@@ -11,6 +11,7 @@ import {
 } from "../../../../../utils/buffer.js";
 import {
     V1InvalidPayloadError,
+    V1ProtocolError,
     V1SignatureInvalidError,
     V1UnexpectedError,
 } from "../V1ProtocolError.js";
@@ -48,7 +49,7 @@ class V1BaseOperation {
             signature = result.signature;
             message = result.message;
         } catch (error) {
-            if (error && typeof error === 'object' && 'resultCode' in error) {
+            if (error instanceof V1ProtocolError) {
                 throw error;
             }
             throw new V1InvalidPayloadError(`Failed to build signature message: ${error.message}`);
