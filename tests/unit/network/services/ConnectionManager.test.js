@@ -2,7 +2,7 @@ import sinon from "sinon";
 import { hook, test } from 'brittle'
 import { default as EventEmitter } from "bare-events"
 import { testKeyPair1, testKeyPair2, testKeyPair3, testKeyPair4, testKeyPair5, testKeyPair6, testKeyPair7, testKeyPair8 } from "../../../fixtures/apply.fixtures.js";
-import ConnectionManager from "../../../../src/core/network/services/ConnectionManager.js";
+import ConnectionManager, { ConnectionManagerError } from "../../../../src/core/network/services/ConnectionManager.js";
 import { tick } from "../../../helpers/setupApplyTests.js";
 import b4a from 'b4a'
 import { createConfig, ENV } from "../../../../src/config/env.js";
@@ -132,6 +132,55 @@ test('ConnectionManager', () => {
             reset()
             const connectionManager = makeManager()
             t.ok(!connectionManager.connected(testKeyPair6.publicKey), 'should respond false')
+        })
+    })
+
+    test('sendSingleMessage', async t => {
+        test('returns exact resultCode from protocolSession.send', async t => {
+            reset()
+            const data = createConnection(testKeyPair1.publicKey)
+            data.connection.protocolSession.send = sinon.stub().resolves(ResultCode.TIMEOUT)
+            const connectionManager = makeManager(6, [data])
+
+            const result = await connectionManager.sendSingleMessage({ payload: 1 }, testKeyPair1.publicKey)
+
+            t.is(result, ResultCode.TIMEOUT, 'should return the exact result code from protocol session')
+            t.ok(data.connection.protocolSession.send.calledOnce, 'should invoke protocolSession.send')
+        })
+
+        test('throws ConnectionManagerError when validator is disconnected', async t => {
+            reset()
+            const connectionManager = makeManager()
+
+            try {
+                await connectionManager.sendSingleMessage({ payload: 1 }, testKeyPair8.publicKey)
+                t.fail('expected sendSingleMessage to throw')
+            } catch (error) {
+                t.ok(error instanceof ConnectionManagerError, 'should throw ConnectionManagerError')
+                t.ok(error.message.includes('is not connected'), 'should include disconnected validator details')
+            }
+        })
+
+        test('throws ConnectionManagerError when protocolSession is missing', async t => {
+            reset()
+            const emitter = new EventEmitter()
+            emitter.connected = true
+            emitter.remotePublicKey = b4a.from(testKeyPair6.publicKey, 'hex')
+            emitter.end = sinon.stub()
+            const data = {
+                key: b4a.from(testKeyPair6.publicKey, 'hex'),
+                connection: emitter,
+            }
+
+            const connectionManager = makeManager(6, [data])
+
+            try {
+                await connectionManager.sendSingleMessage({ payload: 1 }, testKeyPair6.publicKey)
+                t.fail('expected sendSingleMessage to throw')
+            } catch (error) {
+                t.ok(error instanceof ConnectionManagerError, 'should throw ConnectionManagerError')
+                t.ok(error.message.includes('no valid connection found'), 'should include protocol session details')
+            }
         })
     })
 
@@ -301,5 +350,101 @@ test('ConnectionManager', () => {
                 sinon.restore();
             }
         });
+    })
+
+    test('edge branches', async t => {
+        test('pickRandomValidator returns null for empty array', async t => {
+            reset()
+            const connectionManager = makeManager()
+            t.is(connectionManager.pickRandomValidator([]), null)
+        })
+
+        test('pickRandomConnectedValidator returns null when pool is empty', async t => {
+            reset()
+            const connectionManager = makeManager(6, [])
+            t.is(connectionManager.pickRandomConnectedValidator(), null)
+        })
+
+        test('remove missing validator keeps state unchanged', async t => {
+            reset()
+            const connectionManager = makeManager()
+            const before = connectionManager.connectionCount()
+            connectionManager.remove(testKeyPair8.publicKey)
+            t.is(connectionManager.connectionCount(), before)
+        })
+
+        test('remove handles connection.end throwing and still deletes validator', async t => {
+            reset()
+            const data = createConnection(testKeyPair7.publicKey)
+            data.connection.end = sinon.stub().throws(new Error('end boom'))
+            const connectionManager = makeManager(6, [data])
+
+            t.ok(connectionManager.connected(data.key))
+            connectionManager.remove(data.key)
+            t.absent(connectionManager.connected(data.key))
+        })
+
+        test('sent counters handle missing validators safely', async t => {
+            reset()
+            const connectionManager = makeManager()
+            t.is(connectionManager.getSentCount(testKeyPair8.publicKey), 0)
+            connectionManager.incrementSentCount(testKeyPair8.publicKey)
+            t.is(connectionManager.getSentCount(testKeyPair8.publicKey), 0)
+        })
+
+        test('subscribeToHealthChecks validates service interface', async t => {
+            reset()
+            const connectionManager = makeManager()
+
+            await t.exception(
+                () => connectionManager.subscribeToHealthChecks({ on() {} }),
+                /must implement on\/off/
+            )
+        })
+
+        test('health check removes validator when protocolSession is missing', async t => {
+            reset()
+            const emitter = new EventEmitter()
+            emitter.connected = true
+            emitter.remotePublicKey = b4a.from(testKeyPair6.publicKey, 'hex')
+            emitter.end = sinon.stub()
+            const data = {
+                key: b4a.from(testKeyPair6.publicKey, 'hex'),
+                connection: emitter
+            }
+
+            const connectionManager = makeManager(6, [data])
+            const healthCheckService = {
+                on: (_event, fn) => { healthCheckService.handler = fn; },
+                off: () => {},
+                has: sinon.stub().returns(true),
+                stop: sinon.stub(),
+                handler: null,
+            }
+
+            connectionManager.subscribeToHealthChecks(healthCheckService)
+            await healthCheckService.handler(testKeyPair6.publicKey, 'hc-1')
+
+            t.absent(connectionManager.connected(data.key))
+            t.ok(healthCheckService.stop.called)
+        })
+
+        test('remove tolerates health check service errors', async t => {
+            reset()
+            const data = createConnection(testKeyPair5.publicKey)
+            const connectionManager = makeManager(6, [data])
+            const healthCheckService = {
+                on: (_event, fn) => { healthCheckService.handler = fn; },
+                off: () => {},
+                has: sinon.stub().throws(new Error('has boom')),
+                stop: sinon.stub(),
+                handler: null,
+            }
+            connectionManager.subscribeToHealthChecks(healthCheckService)
+
+            connectionManager.remove(data.key)
+
+            t.absent(connectionManager.connected(data.key))
+        })
     })
 })

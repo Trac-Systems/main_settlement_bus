@@ -154,7 +154,7 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
                 appendedAt
             );
         } catch (error) {
-            throw new V1UnexpectedError(`Failed to build broadcast transaction response: ${error.message}`, true);
+            throw new V1UnexpectedError(`Failed to build broadcast transaction response: ${error.message}`);
         }
     }
 
@@ -162,7 +162,7 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
         try {
             return unsafeDecodeApplyOperation(message);
         } catch (error) {
-            throw new V1UnexpectedError(`Failed to decode apply operation from message: ${error.message}`, true);
+            throw new V1UnexpectedError(`Failed to decode apply operation from message: ${error.message}`);
         }
     }
 
@@ -217,7 +217,7 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
             throw new V1TxInvalidPayloadError('Decoded transaction type is missing.', false);
         }
         if (!this.#transactionCommitService) {
-            throw new V1UnexpectedError('TransactionCommitService is not configured.', true);
+            throw new V1UnexpectedError('TransactionCommitService is not configured.');
         }
 
         const type = decodedTransaction.type;
@@ -252,10 +252,10 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
                 throw new V1ProtocolError(ResultCode.TX_HASH_INVALID_FORMAT, error.message, false);
             }
             if (error instanceof PendingCommitAlreadyExistsError) {
-                throw new V1TxAlreadyPendingError(error.message, false);
+                throw new V1TxAlreadyPendingError(error.message);
             }
             if (error instanceof PendingCommitBufferFullError) {
-                throw new V1NodeOverloadedError(error.message, false);
+                throw new V1NodeOverloadedError(error.message);
             }
             throw error;
         }
@@ -287,10 +287,10 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
                 throw new V1TxAcceptedProofUnavailable(error.message, false, error.appendedAt);
             }
             if (error instanceof TransactionPoolMissingCommitReceiptError) {
-                throw new V1ProtocolError(ResultCode.TX_ACCEPTED_RECEIPT_MISSING, error.message, false);
+                throw new V1ProtocolError(ResultCode.TX_COMMITTED_RECEIPT_MISSING, error.message, false);
             }
             if (error instanceof PendingCommitTimeoutError) {
-                throw new V1TimeoutError(error.message, false);
+                throw new V1TimeoutError(error.message);
             }
             throw error;
         }

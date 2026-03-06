@@ -6,10 +6,23 @@ import {
 } from "../src/utils/normalizers.js";
 import { get_confirmed_tx_info, get_unconfirmed_tx_info } from "../src/utils/cli.js";
 import { OperationType } from "../src/utils/constants.js";
+import { sleep } from "../src/utils/helpers.js";
 import b4a from "b4a";
 import { ValidationError, BroadcastError, NotFoundError } from "./utils/helpers.js";
 import PartialTransactionValidator from "../src/core/network/protocols/shared/validators/PartialTransactionValidator.js";
 import PartialTransferValidator from "../src/core/network/protocols/shared/validators/PartialTransferValidator.js";
+
+// This was added because V1 is not waiting for signed/unsigned state. So to include reverse compatibility
+// we need to slow down v1 to legacy case.
+const waitForUnconfirmedTx = async (state, txHash, config) => {
+    const startedAt = Date.now();
+    while ((Date.now() - startedAt) < config.messageValidatorResponseTimeout) {
+        const payload = await state.get(txHash);
+        if (payload) return true;
+        await sleep(100);
+    }
+    return false;
+};
 
 export async function getBalance(msbInstance, address, confirmed) {
     const state = msbInstance.state;
@@ -75,6 +88,11 @@ export async function broadcastTransaction(msbInstance, config, payload) {
 
     if (!success) {
         throw new BroadcastError("Failed to broadcast transaction after multiple attempts.");
+    }
+
+    const isConfirmed = await waitForUnconfirmedTx(msbInstance.state, hash, config);
+    if (!isConfirmed) {
+        throw new Error("Failed to broadcast transaction after multiple attempts.");
     }
 
     const signedLength = msbInstance.state.getSignedLength();

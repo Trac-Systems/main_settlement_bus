@@ -42,7 +42,7 @@ export class V1TxInvalidPayloadError extends V1ProtocolError {
 }
 
 export class V1SignatureInvalidError extends V1ProtocolError {
-    constructor(message = 'Signature invalid', endConnection = false) {
+    constructor(message = 'Signature invalid', endConnection = true) {
         super(ResultCode.SIGNATURE_INVALID, message, endConnection);
     }
 }
@@ -60,7 +60,7 @@ export class V1UnexpectedError extends V1ProtocolError {
 }
 
 export class V1TimeoutError extends V1ProtocolError {
-    constructor(message = 'Request timed out', endConnection = true) {
+    constructor(message = 'Request timed out', endConnection = false) {
         super(ResultCode.TIMEOUT, message, endConnection);
     }
 }
@@ -72,7 +72,7 @@ export class V1NodeHasNoWriteAccess extends V1ProtocolError {
 }
 
 export class V1TxAcceptedProofUnavailable extends V1ProtocolError {
-    constructor(message = 'Transaction accepted but proof is unavailable', endConnection = true, appendedAt = 0) {
+    constructor(message = 'Transaction accepted but proof is unavailable', endConnection = false, appendedAt = 0) {
         super(ResultCode.TX_ACCEPTED_PROOF_UNAVAILABLE, message, endConnection);
         this.appendedAt = Number.isSafeInteger(appendedAt) && appendedAt > 0 ? appendedAt : 0;
     }
@@ -85,7 +85,7 @@ export class V1NodeOverloadedError extends V1ProtocolError {
 }
 
 export class V1TxAlreadyPendingError extends V1ProtocolError {
-    constructor(message = 'Transaction is already pending', endConnection = true) {
+    constructor(message = 'Transaction is already pending', endConnection = false) {
         super(ResultCode.TX_ALREADY_PENDING, message, endConnection);
     }
 }
