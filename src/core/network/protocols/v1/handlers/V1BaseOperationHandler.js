@@ -1,5 +1,5 @@
 import {publicKeyToAddress} from "../../../../../utils/helpers.js";
-import {shouldEndConnection, V1UnexpectedError} from "../V1ProtocolError.js";
+import {shouldEndConnection, V1ProtocolError, V1UnexpectedError} from "../V1ProtocolError.js";
 
 class V1BaseOperationHandler {
     #rateLimiterService;
@@ -47,7 +47,7 @@ class V1BaseOperationHandler {
     }
 
     #toProtocolError(error) {
-        if (error && typeof error === 'object' && 'resultCode' in error) {
+        if (error instanceof V1ProtocolError) {
             return error;
         }
         return new V1UnexpectedError(error?.message ?? 'Unexpected error', false);
