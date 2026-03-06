@@ -1,4 +1,6 @@
 import PartialOperationValidator from './PartialOperationValidator.js';
+import {ResultCode} from "../../../../../utils/constants.js";
+import SharedValidatorRejectionError from '../errors/SharedValidatorRejectionError.js';
 
 class PartialBootstrapDeploymentValidator extends PartialOperationValidator {
     constructor(state, selfAddress , config) {
@@ -26,7 +28,10 @@ class PartialBootstrapDeploymentValidator extends PartialOperationValidator {
     async validateBootstrapRegistration(payload) {
         const bootstrapString = payload.bdo.bs.toString('hex');
         if (null !== await this.state.getRegisteredBootstrapEntryUnsigned(bootstrapString)) {
-            throw new Error(`Bootstrap with hash ${bootstrapString} already exists in the state. Bootstrap must be unique.`);
+            throw new SharedValidatorRejectionError(
+                ResultCode.BOOTSTRAP_ALREADY_EXISTS,
+                `Bootstrap with hash ${bootstrapString} already exists in the state. Bootstrap must be unique.`
+            );
         }
     }
 }
