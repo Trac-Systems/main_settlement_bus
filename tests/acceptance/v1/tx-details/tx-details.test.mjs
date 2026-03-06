@@ -1,5 +1,24 @@
 import request from "supertest"
 import { buildRpcSelfTransferPayload, waitForConnection } from "../../../helpers/transactionPayloads.mjs"
+import { sleep } from "../../../../src/utils/helpers.js"
+
+const TX_DETAILS_TIMEOUT_MS = 4000
+const TX_DETAILS_RETRY_INTERVAL_MS = 100
+
+const waitForStatusCode = async (requestFactory, expectedStatusCode, timeoutMs = TX_DETAILS_TIMEOUT_MS) => {
+    const startedAt = Date.now()
+    let response = null
+
+    while ((Date.now() - startedAt) < timeoutMs) {
+        response = await requestFactory()
+        if (response.statusCode === expectedStatusCode) {
+            return response
+        }
+        await sleep(TX_DETAILS_RETRY_INTERVAL_MS)
+    }
+
+    return response
+}
 
 export const registerTxDetailsTests = (context) => {
     describe("GET /v1/tx/details", () => {
@@ -17,8 +36,11 @@ export const registerTxDetailsTests = (context) => {
                 .send(JSON.stringify({ payload }))
             expect(broadcastRes.statusCode).toBe(200)
 
-            const resConfirmed = await request(context.server)
-                .get(`/v1/tx/details/${txHashHex}?confirmed=true`)
+            const resConfirmed = await waitForStatusCode(
+                () => request(context.server)
+                    .get(`/v1/tx/details/${txHashHex}?confirmed=true`),
+                200
+            )
             expect(resConfirmed.statusCode).toBe(200)
 
             expect(resConfirmed.body).toMatchObject({
@@ -27,8 +49,11 @@ export const registerTxDetailsTests = (context) => {
                 fee: expect.any(String)
             })
 
-            const resUnconfirmed = await request(context.server)
-                .get(`/v1/tx/details/${txHashHex}?confirmed=false`)
+            const resUnconfirmed = await waitForStatusCode(
+                () => request(context.server)
+                    .get(`/v1/tx/details/${txHashHex}?confirmed=false`),
+                200
+            )
             expect(resUnconfirmed.statusCode).toBe(200)
 
             expect(resUnconfirmed.body).toMatchObject({
@@ -57,8 +82,11 @@ export const registerTxDetailsTests = (context) => {
                     .send(JSON.stringify({ payload }))
                 expect(broadcastRes.statusCode).toBe(200)
 
-                const res = await request(context.server)
-                    .get(`/v1/tx/details/${txHashHex}?confirmed=false`)
+                const res = await waitForStatusCode(
+                    () => request(context.server)
+                        .get(`/v1/tx/details/${txHashHex}?confirmed=false`),
+                    200
+                )
                 expect(res.statusCode).toBe(200)
 
                 expect(res.body).toMatchObject({

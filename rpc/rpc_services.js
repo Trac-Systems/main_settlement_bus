@@ -11,10 +11,12 @@ import b4a from "b4a";
 import PartialTransactionValidator from "../src/core/network/protocols/shared/validators/PartialTransactionValidator.js";
 import PartialTransferValidator from "../src/core/network/protocols/shared/validators/PartialTransferValidator.js";
 
-const waitForConfirmedTx = async (state, txHash, timeoutMs = 3000) => {
+// This was added because V1 is not waiting for signed/unsigned state. So to include reverse compatibility
+// we need to slow down v1 to legacy case.
+const waitForUnconfirmedTx = async (state, txHash, config) => {
     const startedAt = Date.now();
-    while ((Date.now() - startedAt) < timeoutMs) {
-        const payload = await state.getSigned(txHash);
+    while ((Date.now() - startedAt) < config.messageValidatorResponseTimeout) {
+        const payload = await state.get(txHash);
         if (payload) return true;
         await sleep(100);
     }
@@ -86,10 +88,7 @@ export async function broadcastTransaction(msbInstance, config, payload) {
         throw new Error("Failed to broadcast transaction after multiple attempts.");
     }
 
-    const confirmedTimeout = Number.isFinite(config?.messageValidatorResponseTimeout)
-        ? config.messageValidatorResponseTimeout
-        : 3000;
-    const isConfirmed = await waitForConfirmedTx(msbInstance.state, hash, confirmedTimeout);
+    const isConfirmed = await waitForUnconfirmedTx(msbInstance.state, hash, config);
     if (!isConfirmed) {
         throw new Error("Failed to broadcast transaction after multiple attempts.");
     }
