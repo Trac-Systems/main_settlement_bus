@@ -6,12 +6,11 @@ import { sleep } from '../../../utils/helpers.js';
 import Scheduler from "../../../utils/Scheduler.js";
 import Network from "../Network.js";
 
-const DELAY_INTERVAL = 50
-const VALIDATOR_CANDIDATES_PER_CYCLE = 10
-const POLL_INTERVAL = (VALIDATOR_CANDIDATES_PER_CYCLE + 1) * DELAY_INTERVAL // This is to avoid more than one instance of the worker running at the same time
+const DELAY_INTERVAL = 50;
+const VALIDATOR_CANDIDATES_PER_CYCLE = 10;
+const POLL_INTERVAL = (VALIDATOR_CANDIDATES_PER_CYCLE + 1) * DELAY_INTERVAL;
+const MAX_POOL_SIZE = 10000;
 
-// -- Debug Mode --
-// TODO: Implement a better debug system in the future. This is just temporary.
 const DEBUG = false;
 const debugLog = (...args) => {
     if (DEBUG) {
@@ -25,7 +24,11 @@ class ValidatorObserverService {
     #network;
     #scheduler;
     #address;
-    #isInterrupted
+    #isInterrupted;
+    #activeWriterArray = [];
+    #addressIndex = new Map();
+    #isSyncing = false;
+    #lastSyncedIndex = 0;
 
     /**
      * @param {Network} network
@@ -34,11 +37,12 @@ class ValidatorObserverService {
      * @param {object} config
      **/
     constructor(network, state, address, config) {
-        this.#config = config
+        this.#config = config;
         this.#network = network;
         this.#state = state;
         this.#address = address;
         this.#isInterrupted = false;
+        
         if (DEBUG) {
             this.initTimestamp = Date.now();
             this.reachedMax = false;
@@ -51,9 +55,6 @@ class ValidatorObserverService {
         return this.#state;
     }
 
-    // Original comment for this:
-    // TODO: AFTER WHILE LOOP SIGNAL TO THE PROCESS THAT VALIDATOR OBSERVER STOPPED OPERATING. 
-    // OS CALLS, ACCUMULATORS, MAYBE THIS IS POSSIBLE TO CHECK I/O QUEUE IF IT COINTAIN IT. FOR NOW WE ARE USING SLEEP.
     async start() {
         if (!this.#shouldRun()) {
             console.info('ValidatorObserverService can not start. Disabled by configuration.');
@@ -78,14 +79,22 @@ class ValidatorObserverService {
     }
 
     async #worker(next) {
+        this.#scheduleSync();
         if (!this.#network.validatorConnectionManager.maxConnectionsReached()) {
             if (DEBUG) this.begin = Date.now();
-            const length = await this.#lengthEntry()
-
+            
+            // Fetch global state once per cycle to prevent I/O bottlenecks
+            const adminEntry = await this.state.getAdminEntry();
+            const validatorListLength = await this.#lengthEntry(); 
+            
             const promises = [];
             for (let i = 0; i < VALIDATOR_CANDIDATES_PER_CYCLE; i++) {
-                promises.push(this.#findValidator(this.#address, length + 1));
-                await sleep(DELAY_INTERVAL); // Low key dangerous as the network progresses
+                promises.push(
+                    this.#findValidator(this.#address, adminEntry, validatorListLength).catch(err => {
+                        if (DEBUG) console.error('Validator search error:', err.message);
+                    })
+                );
+                await sleep(DELAY_INTERVAL); 
             }
             await Promise.all(promises);
 
@@ -104,24 +113,25 @@ class ValidatorObserverService {
         next(POLL_INTERVAL);
     }
 
-    async #findValidator(address, validatorListLength) {
+    async #findValidator(address, adminEntry, validatorListLength) {
         if (!this.#shouldRun()) return;
-        const maxAttempts = 50; // TODO: make configurable
+        
+        const maxAttempts = 50; 
         let attempts = 0;
         let isValidatorValid = false;
-        let validatorAddressBuffer = b4a.alloc(0);
+        let validatorAddressBuffer = null; 
 
         while (attempts < maxAttempts && !isValidatorValid) {
-            const rndIndex = Math.floor(Math.random() * validatorListLength);
-            validatorAddressBuffer = await this.state.getWriterIndex(rndIndex);
-            isValidatorValid = await this.#isValidatorValid(address, validatorAddressBuffer, validatorListLength);
+            validatorAddressBuffer = this.#selectActiveWriter();
+            if (!validatorAddressBuffer) break;
+
+            isValidatorValid = await this.#isValidatorValid(address, validatorAddressBuffer, validatorListLength, adminEntry);
             attempts++;
         }
 
         if (attempts >= maxAttempts) {
             debugLog('Max attempts reached without finding a valid validator.');
-        }
-        else {
+        } else {
             debugLog(`Found valid validator to connect after ${attempts} attempts.`);
         }
 
@@ -130,14 +140,13 @@ class ValidatorObserverService {
         const validatorAddress = bufferToAddress(validatorAddressBuffer, this.#config.addressPrefix);
         const validatorPubKeyBuffer = PeerWallet.decodeBech32m(validatorAddress);
         const validatorPubKeyHex = validatorPubKeyBuffer.toString('hex');
-        const adminEntry = await this.state.getAdminEntry();
 
         if (validatorAddress !== adminEntry?.address || validatorListLength < MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION) {
             this.#network.tryConnect(validatorPubKeyHex, 'validator');
         }
-    };
+    }
 
-    async #isValidatorValid(forbiddenAddress, validatorAddressBuffer, validatorListLength) {
+    async #isValidatorValid(forbiddenAddress, validatorAddressBuffer, validatorListLength, adminEntry) {
         if (validatorAddressBuffer === null || b4a.byteLength(validatorAddressBuffer) !== this.#config.addressLength) return false;
 
         const validatorAddress = bufferToAddress(validatorAddressBuffer, this.#config.addressPrefix);
@@ -145,7 +154,6 @@ class ValidatorObserverService {
 
         const validatorPubKeyBuffer = PeerWallet.decodeBech32m(validatorAddress);
         const validatorEntry = await this.state.getNodeEntry(validatorAddress);
-        const adminEntry = await this.state.getAdminEntry();
 
         if (this.#network.isConnectionPending(validatorPubKeyBuffer.toString('hex'))) {
             return false;
@@ -153,15 +161,10 @@ class ValidatorObserverService {
 
         if (validatorAddress === adminEntry?.address && validatorListLength >= MAX_WRITERS_FOR_ADMIN_INDEXER_CONNECTION) {
             if (this.#network.validatorConnectionManager.exists(validatorPubKeyBuffer)) {
-                this.#network.validatorConnectionManager.remove(validatorPubKeyBuffer)
+                this.#network.validatorConnectionManager.remove(validatorPubKeyBuffer);
             }
         }
 
-        // Connection validation rules:
-        // - Cannot connect if already connected to a validator
-        // - Validator must exist and be a writer
-        // - Cannot connect to indexers, except for admin-indexer
-        // - Admin-indexer connection is allowed only when writers length has less than 10 writers
         if (this.#network.validatorConnectionManager.connected(validatorPubKeyBuffer) ||
             this.#network.validatorConnectionManager.maxConnectionsReached() ||
             validatorEntry === null ||
@@ -175,12 +178,106 @@ class ValidatorObserverService {
     }
 
     #shouldRun() {
-        return this.#config.enableValidatorObserver && !this.#isInterrupted
+        return this.#config.enableValidatorObserver && !this.#isInterrupted;
     }
 
     async #lengthEntry() {
         const lengthEntry = await this.state.getWriterLength();
         return Number.isInteger(lengthEntry) && lengthEntry > 0 ? lengthEntry : 0;
+    }
+
+    #addActiveWriter(addrBuffer) {
+        if (this.#addressIndex.size >= MAX_POOL_SIZE) return;
+
+        const hex = addrBuffer.toString('hex');
+        if (this.#addressIndex.has(hex)) return;
+
+        this.#addressIndex.set(hex, this.#activeWriterArray.length);
+        this.#activeWriterArray.push(addrBuffer);
+    }
+
+    #removeActiveWriter(addrBuffer) {
+        const hex = addrBuffer.toString('hex');
+        const index = this.#addressIndex.get(hex);
+        if (index === undefined) return;
+
+        const lastIndex = this.#activeWriterArray.length - 1;
+        const lastBuffer = this.#activeWriterArray[lastIndex];
+        const lastHex = lastBuffer.toString('hex');
+
+        if (index !== lastIndex) {
+            this.#activeWriterArray[index] = lastBuffer;
+            this.#addressIndex.set(lastHex, index);
+        }
+
+        this.#activeWriterArray.pop();
+        this.#addressIndex.delete(hex);
+    }
+
+    #selectActiveWriter() {
+        const arr = this.#activeWriterArray;
+        return arr.length ? arr[Math.floor(Math.random() * arr.length)] : null;
+    }
+
+    async #syncActiveWriters() {
+        const length = await this.state.getWriterLength();
+
+        if (!length || length <= 0) {
+            this.#activeWriterArray = [];
+            this.#addressIndex.clear();
+            this.#lastSyncedIndex = 0;
+            return;
+        }
+
+        if (length < this.#lastSyncedIndex) {
+            this.#lastSyncedIndex = 0;
+        }
+
+        // Cleanup: Verify existing pool in chunks to prevent I/O spam
+        const currentEntries = [...this.#addressIndex.keys()];
+        const chunkSize = 200; 
+        
+        for (let i = 0; i < currentEntries.length; i += chunkSize) {
+            const chunk = currentEntries.slice(i, i + chunkSize);
+            await Promise.all(chunk.map(async (hex) => {
+                const writerBuffer = b4a.from(hex, 'hex');
+                const writerAddress = bufferToAddress(writerBuffer, this.#config.addressPrefix);
+                const entry = await this.state.getNodeEntry(writerAddress);
+
+                if (!entry?.isWriter) {
+                    this.#removeActiveWriter(writerBuffer);
+                }
+            }));
+        }
+
+        // Growth: Sync new entries from the ledger
+        if (length > this.#lastSyncedIndex) {
+            for (let i = this.#lastSyncedIndex; i < length; i++) {
+                const writerBuffer = await this.state.getWriterIndex(i);
+                if (!writerBuffer) continue;
+
+                const writerAddress = bufferToAddress(writerBuffer, this.#config.addressPrefix);
+                const entry = await this.state.getNodeEntry(writerAddress);
+
+                if (entry?.isWriter) {
+                    this.#addActiveWriter(writerBuffer);
+                }
+            }
+            this.#lastSyncedIndex = length; 
+        }
+    }
+
+    #scheduleSync() {
+        if (this.#isSyncing) return;
+
+        this.#isSyncing = true;
+        this.#syncActiveWriters()
+            .catch(err => {
+                console.error('ValidatorObserverService sync error:', err);
+            })
+            .finally(() => {
+                this.#isSyncing = false;
+            });
     }
 }
 
