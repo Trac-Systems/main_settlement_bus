@@ -96,18 +96,18 @@ class MessageOrchestrator {
         // TODO: After Legacy is deprecated, we don't need to check preferred protocol here.
         const validatorConnection = this.connectionManager.getConnection(validatorPublicKey);
         const preferredProtocol = validatorConnection.protocolSession.preferredProtocol;
-        let result = false;
+        let success = false;
         if (preferredProtocol === validatorConnection.protocolSession.supportedProtocols.LEGACY) {
 
             try {
-                result = await this.#attemptSendMessageForLegacy(validatorPublicKey, message);
+                success = await this.#attemptSendMessageForLegacy(validatorPublicKey, message);
             } catch (error) {
-                result = await this.send(message, retries + 1);
+                success = await this.send(message, retries + 1);
             }
-            if (!result) {
+            if (!success) {
                 // Remove validator and retry
                 this.connectionManager.remove(validatorPublicKey);
-                result = await this.send(message, retries + 1);
+                success = await this.send(message, retries + 1);
             }
         } else if (preferredProtocol === validatorConnection.protocolSession.supportedProtocols.V1) {
             // TODO: This is probably better placed inside the V1 protocol definition.
@@ -130,7 +130,7 @@ class MessageOrchestrator {
                         const action = ResultCodePolicy.resolveValidatorAction(resultCode);
                         switch (action) {
                             case ResultCodePolicy.senderAction.SUCCESS:
-                                result = true;
+                                success = true;
                                 //TODO: Create a function for action below, and replace it also in legacy flow.
                                 this.incrementSentCount(validatorPublicKey);
                                 if (this.shouldRemove(validatorPublicKey)) {
@@ -156,17 +156,17 @@ class MessageOrchestrator {
                 .catch(
                     async (err) => {
                         if (err instanceof ConnectionManagerError) {
-                            result = await this.send(message, retries + 1);
+                            success = await this.send(message, retries + 1);
                             console.warn(`MessageOrchestrator: Connection Error: ${err.message}`);
                         } else {
                             this.connectionManager.remove(validatorPublicKey);
-                            result = await this.send(message, retries + 1);
+                            success = await this.send(message, retries + 1);
                         }
                     }
                 )
 
         }
-        return result;
+        return success;
     }
 
     // TODO: Delete this function after legacy protocol is deprecated
