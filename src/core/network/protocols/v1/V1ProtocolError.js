@@ -1,25 +1,43 @@
 import {ResultCode} from '../../../../utils/constants.js';
 
 export function getResultCode(err) {
-    return (err && typeof err === 'object' && 'resultCode' in err) ? err.resultCode : ResultCode.UNEXPECTED_ERROR;
+    return err instanceof V1ProtocolError ? err.resultCode : ResultCode.UNEXPECTED_ERROR;
 }
 
 export function shouldEndConnection(err) {
-    return Boolean(err && typeof err === 'object' && err.endConnection);
+    return err instanceof V1ProtocolError ? Boolean(err.endConnection) : false;
 }
 
+/** 
+ * V1 protocol error type.
+ *
+ * `V1ProtocolError` is the v1 base class used by handlers/validators to attach:
+ * - `resultCode`: a stable `ResultCode` enum value for programmatic handling
+ * - `endConnection`: a transport hint (close peer connection after responding)
+ */
 export class V1ProtocolError extends Error {
-    constructor(resultCode, message, endConnection) {
+    /**
+     * @param {number} resultCode Stable rejection reason (a `ResultCode` enum value).
+     * @param {string} message Human-readable error message.
+     * @param {boolean} [endConnection=false] Whether the transport should end the connection after responding.
+     */
+    constructor(resultCode, message, endConnection = false) {
         super(message);
         this.name = this.constructor.name;
         this.resultCode = resultCode;
-        this.endConnection = endConnection;
+        this.endConnection = Boolean(endConnection);
     }
 }
 
 export class V1InvalidPayloadError extends V1ProtocolError {
     constructor(message = 'Invalid payload', endConnection = false) {
         super(ResultCode.INVALID_PAYLOAD, message, endConnection);
+    }
+}
+
+export class V1TxInvalidPayloadError extends V1ProtocolError {
+    constructor(message = 'Invalid tx payload', endConnection = false) {
+        super(ResultCode.TX_INVALID_PAYLOAD, message, endConnection);
     }
 }
 

@@ -1,6 +1,6 @@
 import {NetworkOperationType, ResultCode} from '../../../utils/constants.js';
 import {isHexString} from '../../../utils/helpers.js';
-import {V1TimeoutError, V1UnexpectedError, V1ProtocolError} from "../protocols/v1/V1ProtocolError.js";
+import {V1ProtocolError, V1TimeoutError, V1UnexpectedError} from "../protocols/v1/V1ProtocolError.js";
 import {Config} from '../../../config/config.js';
 import b4a from 'b4a';
 

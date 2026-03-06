@@ -7,10 +7,11 @@ import PendingRequestService from '../../../../src/core/network/services/Pending
 import NetworkWalletFactory from '../../../../src/core/network/identity/NetworkWalletFactory.js';
 import NetworkMessageBuilder from '../../../../src/messages/network/v1/NetworkMessageBuilder.js';
 import { V1UnexpectedError } from '../../../../src/core/network/protocols/v1/V1ProtocolError.js';
-import { NetworkOperationType } from '../../../../src/utils/constants.js';
+import { NetworkOperationType, ResultCode } from '../../../../src/utils/constants.js';
 import { errorMessageIncludes } from '../../../helpers/regexHelper.js';
 import { config } from '../../../helpers/config.js';
 import { testKeyPair1, testKeyPair2 } from '../../../fixtures/apply.fixtures.js';
+import SharedValidatorRejectionError from '../../../../src/core/network/protocols/shared/errors/SharedValidatorRejectionError.js';
 
 const validPeerA = testKeyPair1.publicKey;
 const validPeerB = testKeyPair2.publicKey;
@@ -88,6 +89,27 @@ test('PendingRequestService rejects and removes pending request', async t => {
     }
 
     t.is(service.rejectPendingRequest('missing', new Error('missing')), false);
+});
+
+test('PendingRequestService preserves typed result-coded errors', async t => {
+    const service = new PendingRequestService(config);
+    const peer = validPeerA;
+    const request = await buildV1Request();
+
+    const promise = service.registerPendingRequest(peer, request);
+    const expectedError = new SharedValidatorRejectionError(ResultCode.TX_INVALID_PAYLOAD, 'domain-invalid', true);
+
+    t.ok(service.rejectPendingRequest(request.id, expectedError));
+
+    try {
+        await promise;
+        t.fail('Expected pending request promise to reject');
+    } catch (error) {
+        t.is(error, expectedError);
+        t.is(error.resultCode, ResultCode.TX_INVALID_PAYLOAD);
+        t.is(error.message, 'domain-invalid');
+        t.is(error.endConnection, true);
+    }
 });
 
 test('PendingRequestService throws on duplicate request id', async t => {
