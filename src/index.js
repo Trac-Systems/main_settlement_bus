@@ -1,7 +1,7 @@
 /** @typedef {import('pear-interface')} */ /* global Pear */
 import ReadyResource from "ready-resource";
 import Corestore from "corestore";
-import PeerWallet from "trac-wallet";
+import { WalletProvider } from "trac-wallet";
 import tracCryptoApi from "trac-crypto-api";
 import b4a from "b4a";
 import readline from "readline";
@@ -63,7 +63,6 @@ export class MainSettlementBus extends ReadyResource {
         super();
         this.#config = config
         this.#store = new Corestore(this.#config.storesFullPath);
-        this.#wallet = new PeerWallet({ networkPrefix: this.#config.addressPrefix });
         this.#readline_instance = null;
 
         if (this.#config.enableInteractiveMode) {
@@ -101,11 +100,9 @@ export class MainSettlementBus extends ReadyResource {
         await fileUtils.ensureCoresStoreDir(this.#config);
 
         if (this.#config.enableWallet) {
-            await this.#wallet.initKeyPair(
-                this.#config.keyPairPath,
-                this.#readline_instance
-            );
+            await this.#initKeyPair()
         }
+
         this.#state = new State(this.#store, this.#wallet, this.#config);
         this.#network = new Network(this.#state, this.#config, this.#wallet.address);
 
@@ -1056,6 +1053,71 @@ export class MainSettlementBus extends ReadyResource {
         }
 
         if (rl) rl.prompt();
+    }
+
+    async #initKeyPair() {
+        try {
+            if (fs.existsSync(this.#config.keyPairPath)) {
+                this.#wallet = await this.importFromFile(this.#config.keyPairPath)
+            } else {
+                console.log("Key file was not found. How do you wish to proceed?")
+                const wallet = await this.#setupKeypairInteractiveMode()
+                if (!wallet) {
+                    console.error("Invalid response type from keypair setup interactive menu")
+                } else {
+                    this.#wallet = wallet
+                }
+            }
+        } catch (err) {
+            console.error(err);
+        }
+    }
+
+    async #setupKeypairInteractiveMode() {
+        // this would be enable interactive mode (but there is an exception being swallowed so its better to act against the code)
+        if (this.#readline_instance !== null) {
+            console.log("\n[1]. Generate new keypair\n",
+                "[2]. Restore keypair from 12 or 24-word mnemonic\n",
+                "Your choice(1/ 2/):"
+            );
+
+            let choice = '';
+            await this.#awaitInput(async input => choice = input)
+
+            try {
+                switch (choice) {
+                    case '1':
+                        return await new WalletProvider(this.#config).generate()
+                    case '2':
+                        console.log("Enter your mnemonic phrase:");
+
+                        let mnemonicInput = '';
+                        await this.#awaitInput(async input => mnemonicInput = input)
+                        try {
+                            return await new WalletProvider(this.#config).fromMnemonic({ mnemonic })
+                        } catch {
+                            console.log("Invalid mnemonic. Please check your 12 or 24 words and try again.");
+                            return this.#setupKeypairInteractiveMode(rl);
+                        }
+                    default:
+                        console.log("Invalid choice. Please select again.");
+                        return this.#setupKeypairInteractiveMode(readline_instance);
+                }
+            } catch (e) {
+                console.log("Invalid input. Please try again.");
+                return this.#setupKeypairInteractiveMode(readline_instance);
+            }
+        }
+    }
+
+    async #awaitInput(anAction) {
+        this.#readline_instance.on('line', anAction)
+
+        while ('' === choice) {
+            await sleep(1000);
+        }
+
+        this.#readline_instance.off('line', anAction);
     }
 }
 

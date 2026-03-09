@@ -14,7 +14,7 @@ class BaseResponse {
     /**
      * 
      * @param {State} state 
-     * @param {PeerWallet} wallet 
+     * @param {IWallet} wallet
      * @param {Config} config
      */
     constructor(state, wallet, config) {

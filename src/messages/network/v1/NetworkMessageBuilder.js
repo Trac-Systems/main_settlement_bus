@@ -7,7 +7,7 @@ import {encodeCapabilities} from "../../../utils/buffer.js";
 
 /**
  * Builder for v1 internal network protocol messages.
- * @param {PeerWallet} wallet
+ * @param {IWallet} wallet
  * @param {Config} config
  */
 class NetworkMessageBuilder {
@@ -27,7 +27,7 @@ class NetworkMessageBuilder {
     #config;
 
     /**
-     * @param {PeerWallet} wallet
+     * @param {IWallet} wallet
      * @param {Config} config
      */
     constructor(wallet, config) {
