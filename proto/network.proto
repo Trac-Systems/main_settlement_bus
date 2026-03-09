@@ -104,12 +104,12 @@ message BroadcastTransactionRequest {
     bytes nonce = 2;
     bytes signature = 3;
 }
-// TODO: before release change appendedAt to appended_at
+
 message BroadcastTransactionResponse {
     bytes nonce = 1;
     bytes signature = 2;
     bytes proof = 3;
-    uint64 appendedAt = 4;
+    uint64 timestamp = 4;
     ResultCode result = 5;
 }
 

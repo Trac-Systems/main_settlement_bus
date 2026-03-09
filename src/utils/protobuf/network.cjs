@@ -379,8 +379,8 @@ function defineBroadcastTransactionResponse () {
       var len = encodings.bytes.encodingLength(obj.proof)
       length += 1 + len
     }
-    if (defined(obj.appendedAt)) {
-      var len = encodings.varint.encodingLength(obj.appendedAt)
+    if (defined(obj.timestamp)) {
+      var len = encodings.varint.encodingLength(obj.timestamp)
       length += 1 + len
     }
     if (defined(obj.result)) {
@@ -409,9 +409,9 @@ function defineBroadcastTransactionResponse () {
       encodings.bytes.encode(obj.proof, buf, offset)
       offset += encodings.bytes.encode.bytes
     }
-    if (defined(obj.appendedAt)) {
+    if (defined(obj.timestamp)) {
       buf[offset++] = 32
-      encodings.varint.encode(obj.appendedAt, buf, offset)
+      encodings.varint.encode(obj.timestamp, buf, offset)
       offset += encodings.varint.encode.bytes
     }
     if (defined(obj.result)) {
@@ -432,7 +432,7 @@ function defineBroadcastTransactionResponse () {
       nonce: null,
       signature: null,
       proof: null,
-      appendedAt: 0,
+      timestamp: 0,
       result: 0
     }
     while (true) {
@@ -457,7 +457,7 @@ function defineBroadcastTransactionResponse () {
         offset += encodings.bytes.decode.bytes
         break
         case 4:
-        obj.appendedAt = encodings.varint.decode(buf, offset)
+        obj.timestamp = encodings.varint.decode(buf, offset)
         offset += encodings.varint.decode.bytes
         break
         case 5:

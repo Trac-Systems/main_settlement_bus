@@ -187,7 +187,7 @@ class V1ValidationSchema {
                     nonce: {type: 'buffer', length: NONCE_BYTE_LENGTH, required: true},
                     signature: {type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true},
                     proof: {type: 'buffer', allowEmpty: true, allowZero: true, required: true},
-                    appendedAt: {
+                    timestamp: {
                         type: 'number',
                         integer: true,
                         min: 0,

@@ -99,25 +99,25 @@ test('NetworkMessageDirector iterates broadcast transaction response ResultCode 
     const id = uuidv7();
     const caps = ['cap:b', 'cap:a'];
     const proof = b4a.from('deadbeef', 'hex');
-    const appendedAt = Date.now();
+    const timestamp = Date.now();
     const emptyProof = b4a.alloc(0);
 
     for (const code of uniqueResultCodes()) {
         const includeProof = code === NetworkResultCode.OK;
         const proofUnavailable = code === NetworkResultCode.TX_ACCEPTED_PROOF_UNAVAILABLE;
         const responseProof = includeProof ? proof : emptyProof;
-        const responseAppendedAt = includeProof || proofUnavailable ? appendedAt : 0;
+        const responseTimestamp = includeProof || proofUnavailable ? timestamp : 0;
         const payload = await director.buildBroadcastTransactionResponse(
             id,
             caps,
             code,
             responseProof,
-            responseAppendedAt
+            responseTimestamp
         );
         t.is(payload.type, NetworkOperationType.BROADCAST_TRANSACTION_RESPONSE);
         t.is(payload.broadcast_transaction_response.result, code);
         t.alike(payload.broadcast_transaction_response.proof, responseProof);
-        t.is(payload.broadcast_transaction_response.appendedAt, responseAppendedAt);
+        t.is(payload.broadcast_transaction_response.timestamp, responseTimestamp);
 
         const msg = createMessage(
             payload.type,
@@ -125,7 +125,7 @@ test('NetworkMessageDirector iterates broadcast transaction response ResultCode 
             timestampToBuffer(payload.timestamp),
             payload.broadcast_transaction_response.nonce,
             responseProof,
-            timestampToBuffer(responseAppendedAt),
+            timestampToBuffer(responseTimestamp),
             safeWriteUInt32BE(code, 0),
             encodeCapabilities(caps)
         );
@@ -135,29 +135,29 @@ test('NetworkMessageDirector iterates broadcast transaction response ResultCode 
         const decoded = decodeV1networkOperation(encodeV1networkOperation(payload));
         t.is(decoded.broadcast_transaction_response.result, code);
         t.alike(decoded.broadcast_transaction_response.proof, responseProof);
-        t.is(decoded.broadcast_transaction_response.appendedAt, responseAppendedAt);
+        t.is(decoded.broadcast_transaction_response.timestamp, responseTimestamp);
     }
 });
 
-test('NetworkMessageDirector builds broadcast transaction response with proof and appendedAt', async t => {
+test('NetworkMessageDirector builds broadcast transaction response with proof and timestamp', async t => {
     const wallet = createWallet();
     const director = new NetworkMessageDirector(new NetworkMessageBuilder(wallet, config));
 
     const id = uuidv7();
     const caps = ['cap:b', 'cap:a'];
     const proof = b4a.from('deadbeef', 'hex');
-    const appendedAt = Date.now();
+    const timestamp = Date.now();
 
     const payload = await director.buildBroadcastTransactionResponse(
         id,
         caps,
         NetworkResultCode.OK,
         proof,
-        appendedAt
+        timestamp
     );
 
     t.alike(payload.broadcast_transaction_response.proof, proof);
-    t.is(payload.broadcast_transaction_response.appendedAt, appendedAt);
+    t.is(payload.broadcast_transaction_response.timestamp, timestamp);
 
     const msg = createMessage(
         payload.type,
@@ -165,7 +165,7 @@ test('NetworkMessageDirector builds broadcast transaction response with proof an
         timestampToBuffer(payload.timestamp),
         payload.broadcast_transaction_response.nonce,
         proof,
-        timestampToBuffer(appendedAt),
+        timestampToBuffer(timestamp),
         safeWriteUInt32BE(NetworkResultCode.OK, 0),
         encodeCapabilities(caps)
     );
@@ -174,10 +174,10 @@ test('NetworkMessageDirector builds broadcast transaction response with proof an
 
     const decoded = decodeV1networkOperation(encodeV1networkOperation(payload));
     t.alike(decoded.broadcast_transaction_response.proof, proof);
-    t.is(decoded.broadcast_transaction_response.appendedAt, appendedAt);
+    t.is(decoded.broadcast_transaction_response.timestamp, timestamp);
 });
 
-test('NetworkMessageDirector rejects OK response when proof is provided without appendedAt', async t => {
+test('NetworkMessageDirector rejects OK response when proof is provided without timestamp', async t => {
     const wallet = createWallet();
     const director = new NetworkMessageDirector(new NetworkMessageBuilder(wallet, config));
 
@@ -192,17 +192,17 @@ test('NetworkMessageDirector rejects OK response when proof is provided without 
             NetworkResultCode.OK,
             proof
         ),
-        errorMessageIncludes('Result code OK requires non-empty proof and appendedAt > 0.')
+        errorMessageIncludes('Result code OK requires non-empty proof and timestamp > 0.')
     );
 });
 
-test('NetworkMessageDirector rejects OK response when appendedAt is provided without proof', async t => {
+test('NetworkMessageDirector rejects OK response when timestamp is provided without proof', async t => {
     const wallet = createWallet();
     const director = new NetworkMessageDirector(new NetworkMessageBuilder(wallet, config));
 
     const id = uuidv7();
     const caps = ['cap:b', 'cap:a'];
-    const appendedAt = Date.now();
+    const timestamp = Date.now();
 
     await t.exception(
         () => director.buildBroadcastTransactionResponse(
@@ -210,19 +210,19 @@ test('NetworkMessageDirector rejects OK response when appendedAt is provided wit
             caps,
             NetworkResultCode.OK,
             null,
-            appendedAt
+            timestamp
         ),
-        errorMessageIncludes('Result code OK requires non-empty proof and appendedAt > 0.')
+        errorMessageIncludes('Result code OK requires non-empty proof and timestamp > 0.')
     );
 });
 
-test('NetworkMessageDirector allows TX_ACCEPTED_PROOF_UNAVAILABLE response with appendedAt and empty proof', async t => {
+test('NetworkMessageDirector allows TX_ACCEPTED_PROOF_UNAVAILABLE response with timestamp and empty proof', async t => {
     const wallet = createWallet();
     const director = new NetworkMessageDirector(new NetworkMessageBuilder(wallet, config));
 
     const id = uuidv7();
     const caps = ['cap:b', 'cap:a'];
-    const appendedAt = Date.now();
+    const timestamp = Date.now();
     const emptyProof = b4a.alloc(0);
 
     const payload = await director.buildBroadcastTransactionResponse(
@@ -230,11 +230,11 @@ test('NetworkMessageDirector allows TX_ACCEPTED_PROOF_UNAVAILABLE response with 
         caps,
         NetworkResultCode.TX_ACCEPTED_PROOF_UNAVAILABLE,
         emptyProof,
-        appendedAt
+        timestamp
     );
 
     t.alike(payload.broadcast_transaction_response.proof, emptyProof);
-    t.is(payload.broadcast_transaction_response.appendedAt, appendedAt);
+    t.is(payload.broadcast_transaction_response.timestamp, timestamp);
     t.is(payload.broadcast_transaction_response.result, NetworkResultCode.TX_ACCEPTED_PROOF_UNAVAILABLE);
 
     const msg = createMessage(
@@ -243,7 +243,7 @@ test('NetworkMessageDirector allows TX_ACCEPTED_PROOF_UNAVAILABLE response with 
         timestampToBuffer(payload.timestamp),
         payload.broadcast_transaction_response.nonce,
         emptyProof,
-        timestampToBuffer(appendedAt),
+        timestampToBuffer(timestamp),
         safeWriteUInt32BE(NetworkResultCode.TX_ACCEPTED_PROOF_UNAVAILABLE, 0),
         encodeCapabilities(caps)
     );
@@ -251,11 +251,11 @@ test('NetworkMessageDirector allows TX_ACCEPTED_PROOF_UNAVAILABLE response with 
     t.ok(wallet.verify(payload.broadcast_transaction_response.signature, hash, wallet.publicKey));
 
     const decoded = decodeV1networkOperation(encodeV1networkOperation(payload));
-    t.is(decoded.broadcast_transaction_response.appendedAt, appendedAt);
+    t.is(decoded.broadcast_transaction_response.timestamp, timestamp);
     t.is(decoded.broadcast_transaction_response.result, NetworkResultCode.TX_ACCEPTED_PROOF_UNAVAILABLE);
 });
 
-test('NetworkMessageDirector rejects OK response when proof and appendedAt are both missing', async t => {
+test('NetworkMessageDirector rejects OK response when proof and timestamp are both missing', async t => {
     const wallet = createWallet();
     const director = new NetworkMessageDirector(new NetworkMessageBuilder(wallet, config));
 
@@ -268,11 +268,11 @@ test('NetworkMessageDirector rejects OK response when proof and appendedAt are b
             caps,
             NetworkResultCode.OK
         ),
-        errorMessageIncludes('Result code OK requires non-empty proof and appendedAt > 0.')
+        errorMessageIncludes('Result code OK requires non-empty proof and timestamp > 0.')
     );
 });
 
-test('NetworkMessageDirector rejects TX_ACCEPTED_PROOF_UNAVAILABLE response when appendedAt is missing', async t => {
+test('NetworkMessageDirector rejects TX_ACCEPTED_PROOF_UNAVAILABLE response when timestamp is missing', async t => {
     const wallet = createWallet();
     const director = new NetworkMessageDirector(new NetworkMessageBuilder(wallet, config));
 
@@ -285,7 +285,7 @@ test('NetworkMessageDirector rejects TX_ACCEPTED_PROOF_UNAVAILABLE response when
             caps,
             NetworkResultCode.TX_ACCEPTED_PROOF_UNAVAILABLE
         ),
-        errorMessageIncludes('Result code TX_ACCEPTED_PROOF_UNAVAILABLE requires appendedAt > 0.')
+        errorMessageIncludes('Result code TX_ACCEPTED_PROOF_UNAVAILABLE requires timestamp > 0.')
     );
 });
 
@@ -327,7 +327,7 @@ test('NetworkMessageDirector rejects non-OK response when proof is non-empty', a
     );
 });
 
-test('NetworkMessageDirector rejects non-OK response with appendedAt > 0 unless proof is unavailable', async t => {
+test('NetworkMessageDirector rejects non-OK response with timestamp > 0 unless proof is unavailable', async t => {
     const wallet = createWallet();
     const director = new NetworkMessageDirector(new NetworkMessageBuilder(wallet, config));
 
@@ -342,6 +342,6 @@ test('NetworkMessageDirector rejects non-OK response with appendedAt > 0 unless 
             null,
             Date.now()
         ),
-        errorMessageIncludes('Non-OK result code requires appendedAt to be 0, except TX_ACCEPTED_PROOF_UNAVAILABLE.')
+        errorMessageIncludes('Non-OK result code requires timestamp to be 0, except TX_ACCEPTED_PROOF_UNAVAILABLE.')
     );
 });
