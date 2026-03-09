@@ -112,11 +112,6 @@ message BroadcastTransactionResponse {
     uint64 appendedAt = 4;
     ResultCode result = 5;
 }
-// TODO delete ProofData
-message ProofData {
-    bytes proof = 1;
-    uint64 appendedAt = 2;
-}
 
 message MessageHeader {
     MessageType type = 1;
