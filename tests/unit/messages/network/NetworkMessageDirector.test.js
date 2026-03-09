@@ -1,7 +1,6 @@
 import { test } from 'brittle';
 import b4a from 'b4a';
 import tracCryptoApi from 'trac-crypto-api';
-import NetworkWalletFactory from '../../../../src/core/network/identity/NetworkWalletFactory.js';
 import NetworkMessageDirector from '../../../../src/messages/network/v1/NetworkMessageDirector.js';
 import NetworkMessageBuilder from '../../../../src/messages/network/v1/NetworkMessageBuilder.js';
 import { NetworkOperationType, ResultCode as NetworkResultCode } from '../../../../src/utils/constants.js';
@@ -14,29 +13,69 @@ import {
     timestampToBuffer
 } from '../../../../src/utils/buffer.js';
 import { config } from '../../../helpers/config.js';
-import { asAddress } from '../../../helpers/address.js';
 import { testKeyPair1 } from '../../../fixtures/apply.fixtures.js';
 import { v7 as uuidv7 } from 'uuid';
 import { errorMessageIncludes } from '../../../helpers/regexHelper.js';
+import { WalletProvider } from 'trac-wallet';
 
-function createWallet() {
-    const keyPair = {
-        publicKey: b4a.from(testKeyPair1.publicKey, 'hex'),
-        secretKey: b4a.from(testKeyPair1.secretKey, 'hex')
-    };
-    return NetworkWalletFactory.provide({
-        enableWallet: false,
-        keyPair,
-        networkPrefix: config.addressPrefix
-    });
+async function createWallet() {
+    return await new WalletProvider(config).fromSecretKey(testKeyPair1.secretKey)
 }
 
 function uniqueResultCodes() {
     return [...new Set(Object.values(NetworkResultCode))].sort((a, b) => a - b);
 }
 
+test('NetworkMessageDirector builds validator connection request and verifies signature', async t => {
+    const wallet = await createWallet();
+    const director = new NetworkMessageDirector(new NetworkMessageBuilder(wallet, config));
+
+    const id = '1';
+    const caps = ['cap:b', 'cap:a'];
+
+    const payload = await director.buildValidatorConnectionRequest(id, wallet.address, caps);
+    t.is(payload.type, NetworkOperationType.VALIDATOR_CONNECTION_REQUEST);
+    t.is(payload.id, id);
+    t.alike(payload.capabilities, caps);
+
+    const msg = createMessage(
+        payload.type,
+        idToBuffer(payload.id),
+        timestampToBuffer(payload.timestamp),
+        addressToBuffer(wallet.address, config.addressPrefix),
+        payload.validator_connection_request.nonce,
+        encodeCapabilities(caps)
+    );
+    const hash = await tracCryptoApi.hash.blake3(msg);
+    t.ok(wallet.verify(payload.validator_connection_request.signature, hash, wallet.publicKey));
+});
+
+test('NetworkMessageDirector builds liveness request and verifies signature', async t => {
+    const wallet = await createWallet();
+    const director = new NetworkMessageDirector(new NetworkMessageBuilder(wallet, config));
+
+    const id = '1';
+    const caps = ['cap:b', 'cap:a'];
+    const data = b4a.from('ping', 'utf8');
+
+    const payload = await director.buildLivenessRequest(id, data, caps);
+    t.is(payload.type, NetworkOperationType.LIVENESS_REQUEST);
+    t.is(payload.id, id);
+    t.alike(payload.capabilities, caps);
+
+    const msg = createMessage(
+        payload.type,
+        idToBuffer(payload.id),
+        timestampToBuffer(payload.timestamp),
+        payload.liveness_request.nonce,
+        encodeCapabilities(caps)
+    );
+    const hash = await tracCryptoApi.hash.blake3(msg);
+    t.ok(wallet.verify(payload.liveness_request.signature, hash, wallet.publicKey));
+});
+
 test('NetworkMessageDirector iterates liveness response ResultCode values', async t => {
-    const wallet = createWallet();
+    const wallet = await createWallet();
     const director = new NetworkMessageDirector(new NetworkMessageBuilder(wallet, config));
 
     const id = uuidv7();
@@ -64,7 +103,7 @@ test('NetworkMessageDirector iterates liveness response ResultCode values', asyn
 });
 
 test('NetworkMessageDirector builds broadcast transaction request and verifies signature', async t => {
-    const wallet = createWallet();
+    const wallet = await createWallet();
     const director = new NetworkMessageDirector(new NetworkMessageBuilder(wallet, config));
 
     const id = uuidv7();
@@ -93,7 +132,7 @@ test('NetworkMessageDirector builds broadcast transaction request and verifies s
 });
 
 test('NetworkMessageDirector iterates broadcast transaction response ResultCode values', async t => {
-    const wallet = createWallet();
+    const wallet = await createWallet();
     const director = new NetworkMessageDirector(new NetworkMessageBuilder(wallet, config));
 
     const id = uuidv7();

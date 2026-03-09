@@ -22,7 +22,7 @@ import { isHexString } from '../../utils/helpers.js';
 
 /**
  * Builder for partial/complete ApplyState messages.
- * @param {PeerWallet} wallet
+ * @param {IWallet} wallet
  * @param {Config} config
  */
 class ApplyStateMessageBuilder {

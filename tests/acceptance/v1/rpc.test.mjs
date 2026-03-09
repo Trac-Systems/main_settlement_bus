@@ -38,7 +38,7 @@ const setupNetwork = async () => {
         enableInteractiveMode: false,
         disableRateLimit: true,
         enableTxApplyLogs: false,
-        storesDirectory: `${tmpDirectory}/admin/`,
+        storesDirectory: `${tmpDirectory}`
     }
 
     const admin = await setupMsbAdmin(testKeyPair1, tmpDirectory, rpcOpts)

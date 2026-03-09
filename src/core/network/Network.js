@@ -29,7 +29,6 @@ class Network extends ReadyResource {
     #validatorConnectionManager;
     #validatorMessageOrchestrator;
     #config;
-    #identityProvider = null;
     #pendingConnections;
     #connectTimeoutMs;
     #maxPendingConnections;
@@ -168,12 +167,12 @@ class Network extends ReadyResource {
         wallet,
     ) {
         if (!this.#swarm) {
-            const keyPair = await this.initializeNetworkingKeyPair(store, wallet);
-            this.#wallet = this.#getNetworkWalletWrapper(wallet, keyPair);
+            const { wallet: wrappedWallet, keypair } = await this.#getOrGenerateWallet(store, wallet);
+            this.#wallet = wrappedWallet
             this.#validatorMessageOrchestrator.setWallet(this.#wallet);
 
             this.#swarm = new Hyperswarm({
-                keyPair,
+                keypair,
                 bootstrap: this.#config.dhtBootstrap,
                 maxPeers: this.#config.maxPeers,
                 maxParallel: this.#config.maxParallel,
@@ -255,14 +254,14 @@ class Network extends ReadyResource {
         return this.#pendingConnections.size;
     }
 
-    async initializeNetworkingKeyPair(store, wallet) {
+    async #getOrGenerateWallet(store, wallet) {
         if (!this.#config.enableWallet) {
-            return await store.createKeyPair(TRAC_NAMESPACE);
+            const keypair = await store.createKeyPair(TRAC_NAMESPACE);
+            const wallet = await new WalletProvider(this.#config).fromSecretKey(keypair.secretKey)
+            return { keypair, wallet }
         } else {
-            return {
-                publicKey: wallet.publicKey,
-                secretKey: wallet.secretKey
-            };
+            const keypair = { publicKey: wallet.publicKey, secretKey: wallet.secretKey }
+            return { keypair, wallet }
         }
     }
 
@@ -303,19 +302,6 @@ class Network extends ReadyResource {
         this.emit(EventType.VALIDATOR_CONNECTION_READY, { publicKey, type, connection });
         this.#logger.debug(`Network.finalizeConnection: Connected to peer: ${publicKey} as type: ${type}`);
     }
-
-    #getNetworkWalletWrapper(wallet, keyPair) {
-        if (!this.#identityProvider) {
-            this.#identityProvider = NetworkWalletFactory.provide({
-                enableWallet: this.#config.enableWallet,
-                wallet,
-                keyPair,
-                networkPrefix: this.#config.addressPrefix
-            });
-        }
-        return this.#identityProvider;
-    }
-
 }
 
 export default Network;
