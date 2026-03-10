@@ -489,7 +489,7 @@ test('Request validator failure mapping branch', async t => {
 });
 
 test('handleRequest: flushes response before closing when protocol error requests disconnect', async t => {
-    const handler = setupHandler();
+    const handler = setupHandler(t);
     const events = [];
 
     V1BroadcastTransactionRequest.prototype.validate = async () => {
