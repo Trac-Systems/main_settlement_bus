@@ -73,25 +73,25 @@ class NetworkMessageDirector {
      * Build a broadcast transaction response message.
      *
      * Allowed payload variants:
-     * 1) resultCode === OK - proof must be non-empty and appendedAt must be > 0.
-     * 2) resultCode === TX_ACCEPTED_PROOF_UNAVAILABLE - proof must be empty and appendedAt must be > 0.
-     * 3) resultCode !== OK and resultCode !== TX_ACCEPTED_PROOF_UNAVAILABLE - proof must be empty and appendedAt must be 0.
+     * 1) resultCode === OK - proof must be non-empty and timestamp must be > 0.
+     * 2) resultCode === TX_ACCEPTED_PROOF_UNAVAILABLE - proof must be empty and timestamp must be > 0.
+     * 3) resultCode !== OK and resultCode !== TX_ACCEPTED_PROOF_UNAVAILABLE - proof must be empty and timestamp must be 0.
      *
      * @param {string} id
      * @param {string[]} capabilities
      * @param {number} resultCode
      * @param {Buffer|null|undefined} proof
-     * @param {number|Date|null|undefined} appendedAt
+     * @param {number|Date|null|undefined} timestamp - When transaction has been appended by the validator
      * @returns {Promise<object>}
      */
-    async buildBroadcastTransactionResponse(id, capabilities, resultCode, proof = null, appendedAt = null) {
+    async buildBroadcastTransactionResponse(id, capabilities, resultCode, proof = null, timestamp = null) {
         await this.#builder
             .setType(NetworkOperationType.BROADCAST_TRANSACTION_RESPONSE)
             .setId(id)
             .setTimestamp()
             .setCapabilities(capabilities)
             .setProof(proof)
-            .setAppendedAt(appendedAt)
+            .setTimestampLedger(timestamp)
             .setResultCode(resultCode)
             .buildPayload();
 

@@ -41,7 +41,7 @@ function createStateFixture(validatorPeer) {
             const end = await base.append(batch);
             await base.update();
             const start = end - batch.length;
-            const appendedAt = Date.now();
+            const timestamp = Date.now();
             const snapshot = base.local.snapshot();
             await snapshot.ready();
 
@@ -71,7 +71,7 @@ function createStateFixture(validatorPeer) {
                         completeTx,
                         proof,
                         proofError,
-                        appendedAt,
+                        timestamp,
                         blockNumber
                     });
                 }
@@ -224,7 +224,7 @@ test('TransactionPoolService rejects pending commit when proof is unavailable', 
                     proof: null,
                     blockNumber: 123,
                     proofError: 'proof-missing',
-                    appendedAt: new Date(1234)
+                    timestamp: new Date(1234)
                 }];
             }
         },
@@ -246,7 +246,7 @@ test('TransactionPoolService rejects pending commit when proof is unavailable', 
             t.ok(error instanceof TransactionPoolProofUnavailableError);
             t.is(error.txHash, txHash);
             t.is(error.blockNumber, 123);
-            t.is(error.appendedAt, 1234);
+            t.is(error.timestamp, 1234);
             t.is(error.reason, 'proof-missing');
         }
     } finally {
@@ -329,13 +329,13 @@ test('TransactionPoolService rejects all pending commits when appendWithProofOfP
     }
 });
 
-test('TransactionPoolProofUnavailableError normalizes appendedAt values', t => {
+test('TransactionPoolProofUnavailableError normalizes timestamp values', t => {
     const txHash = 'f'.repeat(64);
     const fromDate = new TransactionPoolProofUnavailableError(txHash, 1, 'no-proof', new Date(5000));
     const fromInvalid = new TransactionPoolProofUnavailableError(txHash, 2, 'no-proof', 'invalid');
 
-    t.is(fromDate.appendedAt, 5000);
-    t.is(fromInvalid.appendedAt, 0);
+    t.is(fromDate.timestamp, 5000);
+    t.is(fromInvalid.timestamp, 0);
 });
 
 test('TransactionPoolService.start is idempotent when scheduler is already running', async t => {
@@ -386,7 +386,7 @@ test('TransactionPoolService schedules immediate follow-up run when queue remain
                     txHash,
                     proof: b4a.from('aa', 'hex'),
                     blockNumber: index,
-                    appendedAt: Date.now()
+                    timestamp: Date.now()
                 }));
             }
         },

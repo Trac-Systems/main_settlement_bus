@@ -51,7 +51,7 @@ const buildSignedPayload = async (wallet, type, options = {}) => {
             builder
                 .setResultCode(options.resultCode ?? ResultCode.OK)
                 .setProof(options.proof ?? b4a.from('deadbeef', 'hex'))
-                .setAppendedAt(options.appendedAt ?? Date.now());
+                .setTimestampLedger(options.timestamp ?? Date.now());
             break;
         default:
             throw new Error(`Unsupported type in test helper: ${type}`);
@@ -234,7 +234,7 @@ test('V1BaseOperation.validateSignature handles verify() throw as invalid signat
     }
 });
 
-test('V1BaseOperation.validateSignature enforces BROADCAST_TRANSACTION_RESPONSE proof/appendedAt invariants', async t => {
+test('V1BaseOperation.validateSignature enforces BROADCAST_TRANSACTION_RESPONSE proof/timestamp invariants', async t => {
     const operation = new V1BaseOperation(config);
     const wallet = createWallet();
 
@@ -259,15 +259,15 @@ test('V1BaseOperation.validateSignature enforces BROADCAST_TRANSACTION_RESPONSE 
             mutate: payload => {
                 payload.broadcast_transaction_response.result = ResultCode.TX_ACCEPTED_PROOF_UNAVAILABLE;
                 payload.broadcast_transaction_response.proof = b4a.alloc(0);
-                payload.broadcast_transaction_response.appendedAt = 0;
+                payload.broadcast_transaction_response.timestamp = 0;
             },
-            match: 'TX_ACCEPTED_PROOF_UNAVAILABLE requires appendedAt > 0'
+            match: 'TX_ACCEPTED_PROOF_UNAVAILABLE requires timestamp > 0'
         },
         {
             mutate: payload => {
                 payload.broadcast_transaction_response.result = ResultCode.TIMEOUT;
                 payload.broadcast_transaction_response.proof = b4a.from('aa', 'hex');
-                payload.broadcast_transaction_response.appendedAt = 0;
+                payload.broadcast_transaction_response.timestamp = 0;
             },
             match: 'Non-OK result code requires empty proof'
         },
@@ -275,9 +275,9 @@ test('V1BaseOperation.validateSignature enforces BROADCAST_TRANSACTION_RESPONSE 
             mutate: payload => {
                 payload.broadcast_transaction_response.result = ResultCode.TIMEOUT;
                 payload.broadcast_transaction_response.proof = b4a.alloc(0);
-                payload.broadcast_transaction_response.appendedAt = Date.now();
+                payload.broadcast_transaction_response.timestamp = Date.now();
             },
-            match: 'Non-OK result code requires appendedAt to be 0'
+            match: 'Non-OK result code requires timestamp to be 0'
         },
     ];
 

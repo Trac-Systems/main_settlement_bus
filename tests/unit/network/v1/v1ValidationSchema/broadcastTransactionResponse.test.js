@@ -29,7 +29,7 @@ const validFixture = {
         nonce: b4a.alloc(NONCE_BYTE_LENGTH, 1),
         signature: b4a.alloc(SIGNATURE_BYTE_LENGTH, 2),
         proof: b4a.from('deadbeef', 'hex'),
-        appendedAt: Date.now(),
+        timestamp: Date.now(),
         result: ResultCode.OK,
     },
     capabilities: ['cap:a'],
