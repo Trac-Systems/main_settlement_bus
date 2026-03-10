@@ -112,8 +112,11 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
                 resultCode,
             );
 
-            connection.protocolSession.sendAndForget(response);
-            if (endConnection) connection.end();
+            await this.sendResponseAndMaybeClose(
+                connection,
+                response,
+                endConnection
+            );
         } catch (error) {
             this.displayError(
                 "failed to build/send response to sender",
