@@ -22,6 +22,9 @@ import {
     setupTransferScenario
 } from '../../state/apply/transfer/transferScenarioHelpers.js';
 
+const CONFIG_DEFAULT = { enableWallet: true, txPoolSize: 10, processIntervalMs: 50 }
+const CONFIG_TX_POOL_INCREASE = { enableWallet: true, txPoolSize: 100, processIntervalMs: 50 };
+
 
 // TODO: base in the State.js is private, so I had to create an adapter fixture to expose the necessary methods for TransactionPoolService testing. Refactor State.js to allow better testability without needing this kind of workaround.
 function createStateFixture(validatorPeer) {
@@ -230,7 +233,7 @@ test('TransactionPoolService rejects pending commit when proof is unavailable', 
         },
         'validator-address',
         txCommitService,
-        { enableWallet: true, txPoolSize: 10 }
+        CONFIG_DEFAULT
     );
 
     try {
@@ -268,7 +271,7 @@ test('TransactionPoolService rejects pending commit when commit receipt is missi
         },
         'validator-address',
         txCommitService,
-        { enableWallet: true, txPoolSize: 10 }
+        CONFIG_DEFAULT
     );
 
     try {
@@ -305,7 +308,7 @@ test('TransactionPoolService rejects all pending commits when appendWithProofOfP
         },
         'validator-address',
         txCommitService,
-        { enableWallet: true, txPoolSize: 10 }
+        CONFIG_DEFAULT
     );
 
     try {
@@ -354,7 +357,7 @@ test('TransactionPoolService.start is idempotent when scheduler is already runni
             resolvePendingCommit() { return false; },
             rejectPendingCommit() { return false; }
         },
-        { enableWallet: true, txPoolSize: 10 }
+        CONFIG_DEFAULT
     );
 
     try {
@@ -395,7 +398,7 @@ test('TransactionPoolService schedules immediate follow-up run when queue remain
             resolvePendingCommit() { return true; },
             rejectPendingCommit() { return true; }
         },
-        { enableWallet: true, txPoolSize: 100 }
+        CONFIG_TX_POOL_INCREASE
     );
 
     try {

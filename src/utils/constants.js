@@ -167,10 +167,10 @@ export const BOOTSTRAP_HEXSTRING_LENGTH = 64;
 export const BATCH_SIZE = 10;
 
 // Operation handler constants
+export const MAX_PARTIAL_TX_PAYLOAD_BYTE_SIZE = 3072;
 export const V1_PROTOCOL_PAYLOAD_MAX_SIZE = 4096;
 
 // Transaction Commit Service
-
 export const TRANSACTION_COMMIT_SERVICE_BUFFER_SIZE = 1500;
 
 // Network message constants
