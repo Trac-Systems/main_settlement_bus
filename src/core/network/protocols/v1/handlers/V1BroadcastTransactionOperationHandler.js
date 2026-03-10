@@ -71,7 +71,7 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
         let resultCode = ResultCode.OK;
         let endConnection = false;
         let proof = null
-        let appendedAt = 0;
+        let timestamp = 0;
 
         try {
             this.applyRateLimit(connection);
@@ -82,7 +82,7 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
             this.#sanitizeDecodedPartialTransaction(decodedTransaction);
             const receipt = await this.dispatchTransaction(decodedTransaction);
             proof = receipt.proof;
-            appendedAt = receipt.appendedAt;
+            timestamp = receipt.timestamp;
         } catch (error) {
             const protocolError = error instanceof V1ProtocolError
                 ? error
@@ -90,10 +90,10 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
             resultCode = getResultCode(protocolError);
             if (
                 resultCode === ResultCode.TX_ACCEPTED_PROOF_UNAVAILABLE &&
-                Number.isSafeInteger(protocolError.appendedAt) &&
-                protocolError.appendedAt > 0
+                Number.isSafeInteger(protocolError.timestamp) &&
+                protocolError.timestamp > 0
             ) {
-                appendedAt = protocolError.appendedAt;
+                timestamp = protocolError.timestamp;
             }
             endConnection = shouldEndConnection(protocolError);
             this.displayError(
@@ -108,7 +108,7 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
                 message.id,
                 NETWORK_CAPABILITIES,
                 proof,
-                appendedAt,
+                timestamp,
                 resultCode,
             );
 
@@ -144,14 +144,14 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
         }
     }
 
-    async #buildBroadcastTransactionResponse(id, capabilities, proof, appendedAt = null, resultCode) {
+    async #buildBroadcastTransactionResponse(id, capabilities, proof, timestamp = null, resultCode) {
         try {
             return await networkMessageFactory(this.#wallet, this.config).buildBroadcastTransactionResponse(
                 id,
                 capabilities,
                 resultCode,
                 proof,
-                appendedAt
+                timestamp
             );
         } catch (error) {
             throw new V1UnexpectedError(`Failed to build broadcast transaction response: ${error.message}`);
@@ -284,7 +284,7 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
             receipt = await pendingCommit;
         } catch (error) {
             if (error instanceof TransactionPoolProofUnavailableError) {
-                throw new V1TxAcceptedProofUnavailable(error.message, false, error.appendedAt);
+                throw new V1TxAcceptedProofUnavailable(error.message, false, error.timestamp);
             }
             if (error instanceof TransactionPoolMissingCommitReceiptError) {
                 throw new V1ProtocolError(ResultCode.TX_COMMITTED_RECEIPT_MISSING, error.message, false);
