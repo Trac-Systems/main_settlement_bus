@@ -6,6 +6,7 @@ import {
     NetworkOperationType,
     NONCE_BYTE_LENGTH,
     SIGNATURE_BYTE_LENGTH,
+    MAX_PARTIAL_TX_PAYLOAD_BYTE_SIZE
 } from '../../../../../src/utils/constants.js';
 import {not_allowed_data_types} from '../../../../fixtures/check.fixtures.js';
 
@@ -17,8 +18,7 @@ import {
     valueLevelValidationTests,
 } from './common.test.js';
 
-const MAX_PARTIAL_TX_PAYLOAD_BYTE_SIZE = config.maxPartialTxPayloadByteSize;
-const v = new V1ValidationSchema(config);
+const v = new V1ValidationSchema();
 
 const bytes = (len, fill = 1) => b4a.alloc(len, fill);
 

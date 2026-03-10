@@ -1,13 +1,11 @@
 import V1BaseOperation from "./V1BaseOperation.js";
 import b4a from "b4a";
+import { MAX_PARTIAL_TX_PAYLOAD_BYTE_SIZE } from '../../../../../utils/constants.js';
 import {V1InvalidPayloadError} from "../V1ProtocolError.js";
 
 class V1BroadcastTransactionRequest extends V1BaseOperation {
-    #config;
-
     constructor(config) {
         super(config);
-        this.#config = config;
     }
 
     async validate(payload, remotePublicKey) {
@@ -18,8 +16,8 @@ class V1BroadcastTransactionRequest extends V1BaseOperation {
     }
 
     isDataPropertySizeValid(payload) {
-        if (b4a.byteLength(payload.broadcast_transaction_request.data) > this.#config.maxPartialTxPayloadByteSize) {
-            throw new V1InvalidPayloadError(`The 'data' field exceeds the maximum allowed byte size of ${this.#config.maxPartialTxPayloadByteSize}. Actual size: ${b4a.byteLength(payload.broadcast_transaction_request.data)}`);
+        if (b4a.byteLength(payload.broadcast_transaction_request.data) > MAX_PARTIAL_TX_PAYLOAD_BYTE_SIZE) {
+            throw new V1InvalidPayloadError(`The 'data' field exceeds the maximum allowed byte size of ${MAX_PARTIAL_TX_PAYLOAD_BYTE_SIZE}. Actual size: ${b4a.byteLength(payload.broadcast_transaction_request.data)}`);
         }
     }
 

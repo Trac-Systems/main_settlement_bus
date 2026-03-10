@@ -1,6 +1,5 @@
 import { TRAC_NETWORK_MSB_MAINNET_PREFIX, TRAC_NETWORK_MSB_TESTNET1_PREFIX } from 'trac-wallet/constants.js';
 import { TRAC_NETWORK_TESTNET_ID, TRAC_NETWORK_MAINNET_ID } from 'trac-crypto-api/constants.js';
-import {TRAC_NETWORK_MSB_MAINNET_PREFIX} from 'trac-wallet/constants.js';
 import {Config} from './config.js';
 
 export const ENV = {
@@ -40,7 +39,6 @@ const configData = {
         maxClientConnections: Infinity, // Connectivity constants
         maxWritersForAdminIndexerConnection: 10, // Connectivity constants
         processIntervalMs: 50, // Pool constants
-        maxPartialTxPayloadByteSize: 3072, // Operation handler constants
         transactionPoolSize: 1000, // Operation handler constants
         rateLimitCleanupIntervalMs: 120_000, // Rate limiting constants
         rateLimitConnectionTimeoutMs: 60_000, // Rate limiting constants
@@ -78,7 +76,6 @@ const configData = {
         maxClientConnections: Infinity, // Connectivity constants
         maxWritersForAdminIndexerConnection: 10, // Connectivity constants
         processIntervalMs: 50, // Pool constants
-        maxPartialTxPayloadByteSize: 3072, // Operation handler constants
         transactionPoolSize: 1000, // Operation handler constants
         rateLimitCleanupIntervalMs: 120_000, // Rate limiting constants
         rateLimitConnectionTimeoutMs: 60_000, // Rate limiting constants
@@ -120,7 +117,6 @@ const configData = {
         maxClientConnections: Infinity, // Connectivity constants
         maxWritersForAdminIndexerConnection: 10, // Connectivity constants
         processIntervalMs: 50, // Pool constants
-        maxPartialTxPayloadByteSize: 3072, // Operation handler constants
         transactionPoolSize: 1000, // Operation handler constants
         rateLimitCleanupIntervalMs: 120_000, // Rate limiting constants
         rateLimitConnectionTimeoutMs: 60_000, // Rate limiting constants

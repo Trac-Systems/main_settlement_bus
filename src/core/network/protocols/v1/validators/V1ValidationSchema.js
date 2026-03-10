@@ -4,6 +4,7 @@ import {
     NetworkOperationType,
     NONCE_BYTE_LENGTH,
     SIGNATURE_BYTE_LENGTH,
+    MAX_PARTIAL_TX_PAYLOAD_BYTE_SIZE,
     ResultCode
 } from '../../../../../utils/constants.js';
 
@@ -15,10 +16,8 @@ class V1ValidationSchema {
     #validateV1LivenessResponse;
     #validateV1BroadcastTransactionRequest;
     #validateV1BroadcastTransactionResponse;
-    #config
 
-    constructor(config) {
-        this.#config = config; // TODO: Add config validation
+    constructor() {
         this.#validator = new Validator({
             useNewCustomCheckerFunction: true,
             messages: {
@@ -151,7 +150,7 @@ class V1ValidationSchema {
                     data: {
                         type: 'buffer',
                         min: 1,
-                        max: this.#config.maxPartialTxPayloadByteSize,
+                        max: MAX_PARTIAL_TX_PAYLOAD_BYTE_SIZE,
                         allowZero: true,
                         required: true
                     },
