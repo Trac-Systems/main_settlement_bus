@@ -1,177 +1,116 @@
-import PeerWallet from "trac-wallet";
-import b4a from "b4a";
-import { bufferToAddress } from '../../state/utils/address.js';
-import { sleep } from '../../../utils/helpers.js';
-import Scheduler from "../../../utils/Scheduler.js";
-import Network from "../Network.js";
+import { bufferToAddress } from '../../../core/state/utils/address.js';
+import Scheduler from '../../../utils/Scheduler.js';
 import { Logger } from '../../../utils/logger.js';
 
-const DELAY_INTERVAL = 50
-const VALIDATOR_CANDIDATES_PER_CYCLE = 10
-const POLL_INTERVAL = (VALIDATOR_CANDIDATES_PER_CYCLE + 1) * DELAY_INTERVAL // This is to avoid more than one instance of the worker running at the same time
+const DEFAULT_POLL_INTERVAL = 5000;
 
 class ValidatorObserverService {
-    #config;
-    #state;
     #network;
+    #state;
+    #selfAddress;
+    #config;
     #scheduler;
-    #address;
-    #isInterrupted
     #logger;
 
-    /**
-     * @param {Network} network
-     * @param {State} state
-     * @param {string} address
-     * @param {Config} config
-     **/
-    constructor(network, state, address, config) {
-        this.#config = config
+    constructor(network, state, selfAddress, config) {
         this.#network = network;
         this.#state = state;
-        this.#address = address;
-        this.#isInterrupted = false;
+        this.#selfAddress = selfAddress;
+        this.#config = config;
         this.#logger = new Logger(config);
-        this.initTimestamp = Date.now();
-        this.reachedMax = false;
-        this.end = 0;
-        this.begin = 0;
     }
 
-    get state() {
-        return this.#state;
-    }
-
-    // Original comment for this:
-    // TODO: AFTER WHILE LOOP SIGNAL TO THE PROCESS THAT VALIDATOR OBSERVER STOPPED OPERATING. 
-    // OS CALLS, ACCUMULATORS, MAYBE THIS IS POSSIBLE TO CHECK I/O QUEUE IF IT COINTAIN IT. FOR NOW WE ARE USING SLEEP.
     async start() {
-        if (!this.#shouldRun()) {
-            this.#logger.info('ValidatorObserverService can not start. Disabled by configuration.');
+        if ((this.#scheduler && this.#scheduler.isRunning) || !this.#config.enableValidatorObserver) {
             return;
         }
-        if (this.#scheduler && this.#scheduler.isRunning) {
-            this.#logger.info('ValidatorObserverService is already started');
-            return;
-        }
-
-        this.#isInterrupted = false;
-        this.#scheduler = new Scheduler(next => this.#worker(next), POLL_INTERVAL);
+        
+        const interval = this.#config.pollInterval || DEFAULT_POLL_INTERVAL;
+        this.#scheduler = new Scheduler(next => this.#worker(next), interval);
         this.#scheduler.start();
+        this.#logger.info('ValidatorObserverService started.');
     }
 
     async stopValidatorObserver(waitForCurrent = true) {
         if (!this.#scheduler) return;
-        this.#isInterrupted = true;
         await this.#scheduler.stop(waitForCurrent);
         this.#scheduler = null;
-        this.#logger.info('ValidatorObserverService: closing gracefully...');
+        this.#logger.info('ValidatorObserverService stopped gracefully.');
     }
 
     async #worker(next) {
-        if (!this.#network.validatorConnectionManager.maxConnectionsReached()) {
-            this.begin = Date.now();
-            const length = await this.#lengthEntry()
+        const interval = this.#config.pollInterval || DEFAULT_POLL_INTERVAL;
 
-            const promises = [];
-            for (let i = 0; i < VALIDATOR_CANDIDATES_PER_CYCLE; i++) {
-                promises.push(this.#findValidator(this.#address, length + 1));
-                await sleep(DELAY_INTERVAL); // Low key dangerous as the network progresses
+        try {
+            if (this.#network.validatorConnectionManager.maxConnectionsReached()) {
+                this.#logger.debug('Max validator connections reached. Skipping cycle.');
+                return next(interval);
             }
-            await Promise.all(promises);
 
-            this.end = Date.now();
-            this.#logger.debug(`Worker cycle completed in (ms): ${this.end - this.begin} | Validator Connections: ${this.#network.validatorConnectionManager.connectionCount()} | Pending: ${this.#network.pendingConnectionsCount()}`);
-        }
-        else {
-            if (!this.reachedMax) {
-                this.reachedMax = true;
-                this.#logger.debug('Max validator connections reached. Skipping this cycle.');
-                const now = Date.now();
-                const elapsed = now - this.initTimestamp;
-                this.#logger.debug(`>>> Time elapsed since start (ms): ${elapsed}`);
+            const adminEntry = await this.#state.getAdminEntry();
+            const writers = await this.#getActiveWritersFromAutobase();
+            const writersCount = writers.length;
+
+            if (writersCount > 0) {
+                const randomWriterKey = writers[Math.floor(Math.random() * writersCount)];    
+                await this.#tryConnect(randomWriterKey, writersCount, adminEntry);
             }
+
+            this.#logger.debug(`Worker cycle completed. Pool size: ${writersCount} | Connections: ${this.#network.validatorConnectionManager.connectionCount()} | Pending: ${this.#network.pendingConnectionsCount()}`);
+        } catch (err) {
+            this.#logger.error(`ValidatorObserver worker error: ${err.message}`);
         }
-        next(POLL_INTERVAL);
+
+        next(interval);
     }
 
-    async #findValidator(address, validatorListLength) {
-        if (!this.#shouldRun()) return;
-        const maxAttempts = 50; // TODO: make configurable
-        let attempts = 0;
-        let isValidatorValid = false;
-        let validatorAddressBuffer = b4a.alloc(0);
+    async #getActiveWritersFromAutobase() {
+        const active = [];
+        try {
+            for await (const { key, value } of this.#state.base.system.list()) {            
+                if (this.#scheduler && !this.#scheduler.isRunning) break;
+                
+                // Natively ignore removed or indexer nodes
+                if (value.isRemoved || value.isIndexer) continue;
+                
+                const addr = bufferToAddress(key, this.#config.addressPrefix);
+                if (addr === this.#selfAddress) continue;
 
-        while (attempts < maxAttempts && !isValidatorValid) {
-            const rndIndex = Math.floor(Math.random() * validatorListLength);
-            validatorAddressBuffer = await this.state.getWriterIndex(rndIndex);
-            isValidatorValid = await this.#isValidatorValid(address, validatorAddressBuffer, validatorListLength);
-            attempts++;
-        }
-
-        if (attempts >= maxAttempts) {
-            this.#logger.debug('Max attempts reached without finding a valid validator.');
-        }
-        else {
-            this.#logger.debug(`Found valid validator to connect after ${attempts} attempts.`);
-        }
-
-        if (!isValidatorValid) return;
-
-        const validatorAddress = bufferToAddress(validatorAddressBuffer, this.#config.addressPrefix);
-        const validatorPubKeyBuffer = PeerWallet.decodeBech32m(validatorAddress);
-        const validatorPubKeyHex = validatorPubKeyBuffer.toString('hex');
-        const adminEntry = await this.state.getAdminEntry();
-
-        if (validatorAddress !== adminEntry?.address || validatorListLength < this.#config.maxWritersForAdminIndexerConnection) {
-            this.#network.tryConnect(validatorPubKeyHex, 'validator');
-        }
-    };
-
-    async #isValidatorValid(forbiddenAddress, validatorAddressBuffer, validatorListLength) {
-        if (validatorAddressBuffer === null || b4a.byteLength(validatorAddressBuffer) !== this.#config.addressLength) return false;
-
-        const validatorAddress = bufferToAddress(validatorAddressBuffer, this.#config.addressPrefix);
-        if (validatorAddress === forbiddenAddress) return false;
-
-        const validatorPubKeyBuffer = PeerWallet.decodeBech32m(validatorAddress);
-        const validatorEntry = await this.state.getNodeEntry(validatorAddress);
-        const adminEntry = await this.state.getAdminEntry();
-
-        if (this.#network.isConnectionPending(validatorPubKeyBuffer.toString('hex'))) {
-            return false;
-        }
-
-        if (validatorAddress === adminEntry?.address && validatorListLength >= this.#config.maxWritersForAdminIndexerConnection) {
-            if (this.#network.validatorConnectionManager.exists(validatorPubKeyBuffer)) {
-                this.#network.validatorConnectionManager.remove(validatorPubKeyBuffer)
+                active.push(key);
             }
+        } catch (err) {
+            this.#logger.error(`Error iterating Autobase writers: ${err.message}`);
         }
-
-        // Connection validation rules:
-        // - Cannot connect if already connected to a validator
-        // - Validator must exist and be a writer
-        // - Cannot connect to indexers, except for admin-indexer
-        // - Admin-indexer connection is allowed only when writers length is below maxWritersForAdminIndexerConnection
-        if (this.#network.validatorConnectionManager.connected(validatorPubKeyBuffer) ||
-            this.#network.validatorConnectionManager.maxConnectionsReached() ||
-            validatorEntry === null ||
-            !validatorEntry.isWriter ||
-            (validatorEntry.isIndexer && (validatorAddress !== adminEntry?.address || validatorListLength >= this.#config.maxWritersForAdminIndexerConnection))
-        ) {
-            return false;
-        }
-
-        return true;
+        return active;
     }
 
-    #shouldRun() {
-        return this.#config.enableValidatorObserver && !this.#isInterrupted
-    }
+    async #tryConnect(pubKey, writersCount, adminEntry) {
+        const hex = pubKey.toString('hex');
+        const addr = bufferToAddress(pubKey, this.#config.addressPrefix);
 
-    async #lengthEntry() {
-        const lengthEntry = await this.state.getWriterLength();
-        return Number.isInteger(lengthEntry) && lengthEntry > 0 ? lengthEntry : 0;
+        // 1. Connection Guard
+        if (this.#network.validatorConnectionManager.exists(pubKey) || 
+            this.#network.isConnectionPending(hex)) {
+            return;
+        }
+
+        // 2. Admin-Indexer Rule
+        const isAdmin = addr === adminEntry?.address;
+        const maxWriters = this.#config.maxWritersForAdminIndexerConnection;
+        if (isAdmin && writersCount >= maxWriters) {
+            return;
+        }
+
+        // 3. Final State Check: Safety check to prevent the "null" error on Mainnet
+        const entry = await this.#state.getNodeEntry(addr);
+        
+        // FIX: Blindagem contra o erro de byteLength (entry null)
+        if (entry && entry.isWriter) {
+            this.#logger.info(`Attempting to connect to validator: ${addr}`);
+            this.#network.tryConnect(hex, 'validator');
+        } else {
+            this.#logger.debug(`Skipping ${addr}: Node entry not found or not a writer in state.`);
+        }
     }
 }
 
