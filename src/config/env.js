@@ -41,7 +41,6 @@ const configData = {
         maxClientConnections: Infinity, // Connectivity constants
         maxWritersForAdminIndexerConnection: 10, // Connectivity constants
         processIntervalMs: 50, // Pool constants
-        maxPartialTxPayloadByteSize: 3072, // Operation handler constants
         transactionPoolSize: 1000, // Operation handler constants
         rateLimitCleanupIntervalMs: 120_000, // Rate limiting constants
         rateLimitConnectionTimeoutMs: 60_000, // Rate limiting constants
@@ -80,7 +79,6 @@ const configData = {
         maxClientConnections: Infinity, // Connectivity constants
         maxWritersForAdminIndexerConnection: 10, // Connectivity constants
         processIntervalMs: 50, // Pool constants
-        maxPartialTxPayloadByteSize: 3072, // Operation handler constants
         transactionPoolSize: 1000, // Operation handler constants
         rateLimitCleanupIntervalMs: 120_000, // Rate limiting constants
         rateLimitConnectionTimeoutMs: 60_000, // Rate limiting constants
@@ -123,7 +121,6 @@ const configData = {
         maxClientConnections: Infinity, // Connectivity constants
         maxWritersForAdminIndexerConnection: 10, // Connectivity constants
         processIntervalMs: 50, // Pool constants
-        maxPartialTxPayloadByteSize: 3072, // Operation handler constants
         transactionPoolSize: 1000, // Operation handler constants
         rateLimitCleanupIntervalMs: 120_000, // Rate limiting constants
         rateLimitConnectionTimeoutMs: 60_000, // Rate limiting constants
