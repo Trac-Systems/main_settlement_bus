@@ -45,7 +45,7 @@ const payloadBroadcastTransactionResponse = {
         nonce: b4a.from('0a', 'hex'),
         signature: b4a.from('0b', 'hex'),
         proof: b4a.from('0c', 'hex'),
-        appendedAt: 161719,
+        timestamp: 161719,
         result: NetworkResultCode.OK
     },
     capabilities: ['cap:b']

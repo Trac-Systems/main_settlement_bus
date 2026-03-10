@@ -113,27 +113,27 @@ class V1BaseOperation {
                 const proofRaw = payload.broadcast_transaction_response.proof;
                 const proof = b4a.isBuffer(proofRaw) ? proofRaw : b4a.alloc(0);
                 const hasProof = proof.length > 0;
-                const appendedAtRaw = payload.broadcast_transaction_response.appendedAt;
-                const appendedAt = Number.isSafeInteger(appendedAtRaw) ? appendedAtRaw : 0;
-                const hasAppendedAt = appendedAt > 0;
+                const timestampRaw = payload.broadcast_transaction_response.timestamp;
+                const timestamp = Number.isSafeInteger(timestampRaw) ? timestampRaw : 0;
+                const hasTimestamp = timestamp > 0;
 
                 if (result === ResultCode.OK) {
-                    if (!hasProof || !hasAppendedAt) {
-                        throw new V1InvalidPayloadError('Result code OK requires non-empty proof and appendedAt > 0.');
+                    if (!hasProof || !hasTimestamp) {
+                        throw new V1InvalidPayloadError('Result code OK requires non-empty proof and timestamp > 0.');
                     }
                 } else if (result === ResultCode.TX_ACCEPTED_PROOF_UNAVAILABLE) {
                     if (hasProof) {
                         throw new V1InvalidPayloadError('Result code TX_ACCEPTED_PROOF_UNAVAILABLE requires empty proof.');
                     }
-                    if (!hasAppendedAt) {
-                        throw new V1InvalidPayloadError('Result code TX_ACCEPTED_PROOF_UNAVAILABLE requires appendedAt > 0.');
+                    if (!hasTimestamp) {
+                        throw new V1InvalidPayloadError('Result code TX_ACCEPTED_PROOF_UNAVAILABLE requires timestamp > 0.');
                     }
                 } else {
                     if (hasProof) {
                         throw new V1InvalidPayloadError('Non-OK result code requires empty proof.');
                     }
-                    if (appendedAt !== 0) {
-                        throw new V1InvalidPayloadError('Non-OK result code requires appendedAt to be 0, except TX_ACCEPTED_PROOF_UNAVAILABLE.');
+                    if (timestamp !== 0) {
+                        throw new V1InvalidPayloadError('Non-OK result code requires timestamp to be 0, except TX_ACCEPTED_PROOF_UNAVAILABLE.');
                     }
                 }
 
@@ -143,7 +143,7 @@ class V1BaseOperation {
                     tsBuf,
                     nonce,
                     proof,
-                    timestampToBuffer(appendedAt),
+                    timestampToBuffer(timestamp),
                     safeWriteUInt32BE(result, 0),
                     capsBuf
                 );

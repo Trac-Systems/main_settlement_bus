@@ -7,10 +7,7 @@ import { MAX_PARTIAL_TX_PAYLOAD_BYTE_SIZE } from '../../../../src/utils/constant
 import { config } from '../../../helpers/config.js';
 
 test('V1BroadcastTransactionRequest.validate runs schema, size and signature validation', async t => {
-    const { default: FreshV1BroadcastTransactionRequest } = await import(
-        `../../../../src/core/network/protocols/v1/validators/V1BroadcastTransactionRequest.js?fresh=${Date.now()}`
-    );
-    const validator = new FreshV1BroadcastTransactionRequest(config);
+    const validator = new V1BroadcastTransactionRequest(config);
     const calls = [];
 
     validator.isPayloadSchemaValid = () => calls.push('schema');

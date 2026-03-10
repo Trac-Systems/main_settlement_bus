@@ -20,6 +20,14 @@ import PartialTransferValidator from '../../../../../src/core/network/protocols/
 import { config as testConfig } from '../../../../helpers/config.js';
 import { errorMessageIncludes } from '../../../../helpers/regexHelper.js';
 
+const originalValidatorMethods = new Map([
+    [V1BroadcastTransactionRequest, V1BroadcastTransactionRequest.prototype.validate],
+    [PartialRoleAccessValidator, PartialRoleAccessValidator.prototype.validate],
+    [PartialBootstrapDeploymentValidator, PartialBootstrapDeploymentValidator.prototype.validate],
+    [PartialTransactionValidator, PartialTransactionValidator.prototype.validate],
+    [PartialTransferValidator, PartialTransferValidator.prototype.validate]
+]);
+
 const VALID_ADDR = 'trac123z3gfpr2epjwww7ntm3m6ud2fhmq0tvts27p2f5mx3qkecsutlqfys769';
 const VALID_TO_ADDR = 'trac1mqktwme8fvklrds4hlhfy6lhmsu9qgfn3c3kuhz7c5zwjt8rc3dqj9tx7h';
 const VALID_PUB = b4a.alloc(33, 2);
@@ -56,7 +64,17 @@ const bootstrapDeploymentPayload = () => ({
     ic: b4a.alloc(32)
 });
 
-function setupHandler(overrides = {}) {
+function restoreValidatorMethods() {
+    for (const [Validator, originalValidate] of originalValidatorMethods.entries()) {
+        Validator.prototype.validate = originalValidate;
+    }
+}
+
+function setupHandler(t, overrides = {}) {
+    restoreValidatorMethods();
+    t.teardown(() => {
+        restoreValidatorMethods();
+    });
 
     // Bypass all validation layers
     [
@@ -85,7 +103,7 @@ function setupHandler(overrides = {}) {
 
     const commitService = overrides.commit || {
         registerPendingCommit: () =>
-            Promise.resolve({ proof: b4a.alloc(32), appendedAt: 5 }),
+            Promise.resolve({ proof: b4a.alloc(32), timestamp: 5 }),
         rejectPendingCommit() {}
     };
     const config = overrides.config || testConfig;
@@ -126,7 +144,7 @@ test('handleRequest: dispatches all supported operation types -> sends response'
     ];
 
     for (const s of scenarios) {
-        const handler = setupHandler();
+        const handler = setupHandler(t);
         handler.decodeApplyOperation = () => ({
             type: s.type,
             address: VALID_ADDR,
@@ -144,7 +162,7 @@ test('handleRequest: dispatches all supported operation types -> sends response'
 
 test('dispatchTransaction: missing/invalid type -> throws invalid payload error', async t => {
 
-    const handler = setupHandler();
+    const handler = setupHandler(t);
 
     await t.exception(
         async () => handler.dispatchTransaction(null),
@@ -164,7 +182,7 @@ test('dispatchTransaction: missing/invalid type -> throws invalid payload error'
 
 test('Commit service not configured', async t => {
 
-    const handler = setupHandler({ commit: null });
+    const handler = setupHandler(t, { commit: null });
 
     handler.decodeApplyOperation = () => ({
         type: OperationType.TX,
@@ -185,7 +203,7 @@ test('Commit service not configured', async t => {
 
 test('TxPool validateEnqueue full', async t => {
 
-    const handler = setupHandler({
+    const handler = setupHandler(t, {
         txPool: {
             validateEnqueue() {
                 throw new PoolErrors.TransactionPoolFullError();
@@ -217,7 +235,7 @@ test('Commit registration error mapping', async t => {
 
     for (const Err of errors) {
 
-        const handler = setupHandler({
+        const handler = setupHandler(t, {
             commit: {
                 registerPendingCommit() { throw new Err('x'); },
                 rejectPendingCommit() {}
@@ -249,7 +267,7 @@ test('TxPool addTransaction error mapping', async t => {
 
     for (const Err of poolErrors) {
 
-        const handler = setupHandler({
+        const handler = setupHandler(t, {
             txPool: {
                 validateEnqueue() {},
                 addTransaction() { throw new Err('x'); }
@@ -281,7 +299,7 @@ test('Pending commit rejection branches', async t => {
 
     for (const err of errors) {
 
-        const handler = setupHandler({
+        const handler = setupHandler(t, {
             commit: {
                 registerPendingCommit() {
                     return Promise.reject(err);
@@ -307,7 +325,7 @@ test('Pending commit rejection branches', async t => {
 
 test('Capability validation failure', async t => {
 
-    const handler = setupHandler({
+    const handler = setupHandler(t, {
         state: {
             allowedToValidate: async () => false,
             isAdminAllowedToValidate: async () => false
@@ -330,7 +348,7 @@ test('Capability validation failure', async t => {
 
 test('Response build failure branch', async t => {
 
-    const handler = setupHandler();
+    const handler = setupHandler(t);
     handler.decodeApplyOperation = () => ({
         type: OperationType.TX,
         address: VALID_ADDR,
@@ -355,7 +373,7 @@ test('Response build failure branch', async t => {
 
 test('handleResponse: resolvePendingResponse throws -> delegates to handlePendingResponseError', async t => {
 
-    const handler = setupHandler();
+    const handler = setupHandler(t);
 
     handler.resolvePendingResponse = async () => {
         throw new Error('boom');
@@ -373,7 +391,7 @@ test('handleResponse: resolvePendingResponse throws -> delegates to handlePendin
 
 test('Sanitize removes null completion fields', async t => {
 
-    const handler = setupHandler();
+    const handler = setupHandler(t);
 
     const tx = {
         type: OperationType.TX,
@@ -398,9 +416,9 @@ test('Sanitize removes null completion fields', async t => {
     t.absent(tx.txo.vs);
 });
 
-test('Proof unavailable without appendedAt branch', async t => {
+test('Proof unavailable without timestamp branch', async t => {
 
-    const handler = setupHandler({
+    const handler = setupHandler(t, {
         commit: {
             registerPendingCommit() {
                 return Promise.reject(
@@ -425,9 +443,9 @@ test('Proof unavailable without appendedAt branch', async t => {
     t.pass();
 });
 
-test('Proof unavailable appendedAt <= 0 branch', async t => {
+test('Proof unavailable timestamp <= 0 branch', async t => {
 
-    const handler = setupHandler({
+    const handler = setupHandler(t, {
         commit: {
             registerPendingCommit() {
                 return Promise.reject(
@@ -454,7 +472,7 @@ test('Proof unavailable appendedAt <= 0 branch', async t => {
 
 test('Request validator failure mapping branch', async t => {
 
-    const handler = setupHandler();
+    const handler = setupHandler(t);
 
     V1BroadcastTransactionRequest.prototype.validate = async () => {
         throw new Error('validation boom');
@@ -470,7 +488,7 @@ test('Request validator failure mapping branch', async t => {
 
 test('decodeApplyOperation failure branch', async t => {
 
-    const handler = setupHandler();
+    const handler = setupHandler(t);
 
     handler.decodeApplyOperation = () => {
         throw new Error('decode fail');
@@ -503,7 +521,7 @@ test('Response build internal failure branch', async t => {
         { resolvePendingRequest() {} },
         {
             registerPendingCommit: () =>
-                Promise.resolve({ proof: b4a.alloc(32), appendedAt: 1 }),
+                Promise.resolve({ proof: b4a.alloc(32), timestamp: 1 }),
             rejectPendingCommit() {}
         },
         testConfig
@@ -528,7 +546,7 @@ test('Response build internal failure branch', async t => {
 
 test('Unsupported role access subtype', async t => {
 
-    const handler = setupHandler();
+    const handler = setupHandler(t);
 
     await t.exception(
         async () => handler.dispatchTransaction({
@@ -543,7 +561,7 @@ test('Unsupported role access subtype', async t => {
 
 test('Role access switch default branch', async t => {
 
-    const handler = setupHandler();
+    const handler = setupHandler(t);
 
     await t.exception(
         async () => handler.dispatchTransaction({
@@ -557,7 +575,7 @@ test('Role access switch default branch', async t => {
 
 test('TransactionPoolMissingCommitReceiptError via receipt branch', async t => {
 
-    const handler = setupHandler({
+    const handler = setupHandler(t, {
         commit: {
             registerPendingCommit() {
                 return Promise.reject(
@@ -587,7 +605,7 @@ test('TransactionPoolMissingCommitReceiptError via receipt branch', async t => {
 
 test('PendingCommitBufferFullError mapping branch', async t => {
 
-    const handler = setupHandler({
+    const handler = setupHandler(t, {
         commit: {
             registerPendingCommit() {
                 throw new CommitErrors.PendingCommitBufferFullError('x');
@@ -612,7 +630,7 @@ test('PendingCommitBufferFullError mapping branch', async t => {
 
 test('handleResponse extractor real path', async t => {
 
-    const handler = setupHandler();
+    const handler = setupHandler(t);
 
     handler.resolvePendingResponse = async (msg, conn, validator, extractor) => {
         const result = extractor({
@@ -631,7 +649,7 @@ test('handleResponse extractor real path', async t => {
 
 test('getOperationPayloadKey null branch', async t => {
 
-    const handler = setupHandler();
+    const handler = setupHandler(t);
 
     handler.decodeApplyOperation = () => ({
         type: 9999, // not recognized by isRoleAccess/isTransaction/etc
@@ -648,7 +666,7 @@ test('getOperationPayloadKey null branch', async t => {
 
 test('TransactionPoolInvalidIncomingDataError mapping', async t => {
 
-    const handler = setupHandler({
+    const handler = setupHandler(t, {
         txPool: {
             validateEnqueue() {},
             addTransaction() {
@@ -673,7 +691,7 @@ test('TransactionPoolInvalidIncomingDataError mapping', async t => {
 
 test('Unknown receipt error rethrow branch', async t => {
 
-    const handler = setupHandler({
+    const handler = setupHandler(t, {
         commit: {
             registerPendingCommit() {
                 return Promise.reject(new Error('weird'));
@@ -698,7 +716,7 @@ test('Unknown receipt error rethrow branch', async t => {
 
 test('validateEnqueue rethrow unknown error branch', async t => {
 
-    const handler = setupHandler({
+    const handler = setupHandler(t, {
         txPool: {
             validateEnqueue() { throw new Error('boom'); }
         }
@@ -720,7 +738,7 @@ test('validateEnqueue rethrow unknown error branch', async t => {
 
 test('Capability OR branch admin true', async t => {
 
-    const handler = setupHandler({
+    const handler = setupHandler(t, {
         state: {
             allowedToValidate: async () => false,
             isAdminAllowedToValidate: async () => true
