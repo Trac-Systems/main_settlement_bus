@@ -243,7 +243,7 @@ class State extends ReadyResource {
             const core = this.#base.local;
             const end = await this.#base.append(batch);
             const start = end - batch.length;
-            const appendedAt = new Date();
+            const timestamp = new Date();
             const snapshot = core.snapshot(); // consistent view while generating proofs.
             await snapshot.ready();
             // TODO: check state if specific tx has been appened THEN generate a proof.
@@ -276,7 +276,7 @@ class State extends ReadyResource {
                         completeTx,
                         proof,
                         proofError,
-                        appendedAt,
+                        timestamp,
                         blockNumber
                     });
                 }

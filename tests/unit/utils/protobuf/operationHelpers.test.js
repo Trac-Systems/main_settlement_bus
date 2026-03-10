@@ -252,7 +252,7 @@ test('encodeV1networkOperation/decodeV1networkOperation roundtrip for network v1
         const encoded = encodeV1networkOperation(payload);
         const decoded = decodeV1networkOperation(encoded);
         t.ok(b4a.isBuffer(encoded) && encoded.length > 0, `Payload ${key} encodes to a non-empty buffer`);
-        t.ok(JSON.stringify(decoded) === JSON.stringify(payload), `Payload ${key} decodes back correctly`);
+        t.alike(decoded, payload, `Payload ${key} decodes back correctly`);
     }
 });
 

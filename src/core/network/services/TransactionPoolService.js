@@ -110,7 +110,7 @@ class TransactionPoolService {
                             item.txHash,
                             receipt.blockNumber,
                             receipt.proofError,
-                            receipt.appendedAt
+                            receipt.timestamp
                         )
                     );
                     continue;
@@ -180,13 +180,13 @@ class TransactionPoolService {
 }
 
 export class TransactionPoolProofUnavailableError extends Error {
-    constructor(txHash, blockNumber, reason = 'unknown', appendedAt = 0) {
-        const appendedAtValue = appendedAt instanceof Date ? appendedAt.getTime() : appendedAt;
-        const safeAppendedAt = Number.isSafeInteger(appendedAtValue) ? appendedAtValue : 0;
-        super(`Proof unavailable for txHash ${txHash} at block ${blockNumber} at appendedAt ${safeAppendedAt}. Reason: ${reason}`);
+    constructor(txHash, blockNumber, reason = 'unknown', timestamp = 0) {
+        const timestampValue = timestamp instanceof Date ? timestamp.getTime() : timestamp;
+        const safeTimestamp = Number.isSafeInteger(timestampValue) ? timestampValue : 0;
+        super(`Proof unavailable for txHash ${txHash} at block ${blockNumber} at ${safeTimestamp}. Reason: ${reason}`);
         this.txHash = txHash;
         this.blockNumber = blockNumber;
-        this.appendedAt = safeAppendedAt;
+        this.timestamp = safeTimestamp;
         this.reason = reason;
     }
 }

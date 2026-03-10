@@ -20,7 +20,7 @@ class NetworkMessageBuilder {
     #resultCode;
     #data;
     #proof;
-    #appendedAt;
+    #timestamp_ledger;
     #header;
     #payloadKey;
     #body;
@@ -106,18 +106,18 @@ class NetworkMessageBuilder {
         return this;
     }
 
-    setAppendedAt(appendedAt) {
-        if (appendedAt === undefined || appendedAt === null) {
-            this.#appendedAt = null;
+    setTimestampLedger(timestamp) {
+        if (timestamp === undefined || timestamp === null) {
+            this.#timestamp_ledger = null;
             return this;
         }
 
-        const value = appendedAt instanceof Date ? appendedAt.getTime() : appendedAt;
+        const value = timestamp instanceof Date ? timestamp.getTime() : timestamp;
         if (!Number.isSafeInteger(value) || value < 0) {
-            throw new Error('appendedAt must be a non-negative safe integer or Date.');
+            throw new Error('timestamp must be a non-negative safe integer or Date.');
         }
 
-        this.#appendedAt = value;
+        this.#timestamp_ledger = value;
         return this;
     }
 
@@ -219,26 +219,26 @@ class NetworkMessageBuilder {
         const idBuf = idToBuffer(this.#id);
         const proof = b4a.isBuffer(this.#proof) ? this.#proof : b4a.alloc(0);
         const hasProof = proof.length > 0;
-        const appendedAt = Number.isSafeInteger(this.#appendedAt) ? this.#appendedAt : 0;
-        const hasAppendedAt = appendedAt > 0;
+        const timestamp = Number.isSafeInteger(this.#timestamp_ledger) ? this.#timestamp_ledger : 0;
+        const hasTimestamp = timestamp > 0;
 
         if (this.#resultCode === ResultCode.OK) {
-            if (!hasProof || !hasAppendedAt) {
-                throw new Error('Result code OK requires non-empty proof and appendedAt > 0.');
+            if (!hasProof || !hasTimestamp) {
+                throw new Error('Result code OK requires non-empty proof and timestamp > 0.');
             }
         } else if (this.#resultCode === ResultCode.TX_ACCEPTED_PROOF_UNAVAILABLE) {
             if (hasProof) {
                 throw new Error('Result code TX_ACCEPTED_PROOF_UNAVAILABLE requires empty proof.');
             }
-            if (!hasAppendedAt) {
-                throw new Error('Result code TX_ACCEPTED_PROOF_UNAVAILABLE requires appendedAt > 0.');
+            if (!hasTimestamp) {
+                throw new Error('Result code TX_ACCEPTED_PROOF_UNAVAILABLE requires timestamp > 0.');
             }
         } else {
             if (hasProof) {
                 throw new Error('Non-OK result code requires empty proof.');
             }
-            if (appendedAt !== 0) {
-                throw new Error('Non-OK result code requires appendedAt to be 0, except TX_ACCEPTED_PROOF_UNAVAILABLE.');
+            if (timestamp !== 0) {
+                throw new Error('Non-OK result code requires timestamp to be 0, except TX_ACCEPTED_PROOF_UNAVAILABLE.');
             }
         }
 
@@ -248,7 +248,7 @@ class NetworkMessageBuilder {
             tsBuf,
             nonce,
             proof,
-            timestampToBuffer(appendedAt),
+            timestampToBuffer(timestamp),
             safeWriteUInt32BE(this.#resultCode, 0),
             encodeCapabilities(this.#capabilities),
         );
@@ -260,7 +260,7 @@ class NetworkMessageBuilder {
             nonce,
             signature,
             proof,
-            appendedAt,
+            timestamp: timestamp,
             result: this.#resultCode
         };
     }

@@ -1,7 +1,9 @@
 import { OperationType as ApplyOperationType } from './protobuf/applyOperations.cjs';
-import { MessageType as NetworkMessageType, ResultCode as NetworkResultCode } from './protobuf/network.cjs';
+import networkV1Generated from './protobuf/networkV1.generated.cjs';
 import b4a from 'b4a'
 // TODO: We are going to have a lot of contstants. It would be good, to separate them into different files.
+
+const { MessageType: NetworkMessageType, ResultCode: NetworkResultCode } = networkV1Generated.network.v1;
 
 //ATTENTION - THIS IS USED IN THE APPLY FUNCTION!
 export const EntryType = Object.freeze({
