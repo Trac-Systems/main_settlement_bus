@@ -41,6 +41,14 @@ class V1BaseOperationHandler {
         this.displayError(step, connection.remotePublicKey, error);
     }
 
+    async sendResponseAndMaybeClose(connection, response, endConnection) {
+        connection.protocolSession.sendAndForget(response);
+        if (!endConnection) return;
+
+        await connection.flush();
+        connection.end();
+    }
+
     displayError(step = "undefined step", senderPublicKey, error) {
         console.error(`${this.constructor.name}: ${step} ${publicKeyToAddress(senderPublicKey, this.#config)}: ${error.message}`);
     }

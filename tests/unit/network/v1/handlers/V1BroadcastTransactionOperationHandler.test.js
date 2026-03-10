@@ -3,6 +3,7 @@ import b4a from 'b4a';
 
 import V1BroadcastTransactionOperationHandler from '../../../../../src/core/network/protocols/v1/handlers/V1BroadcastTransactionOperationHandler.js';
 import V1BroadcastTransactionRequest from '../../../../../src/core/network/protocols/v1/validators/V1BroadcastTransactionRequest.js';
+import {V1ProtocolError} from '../../../../../src/core/network/protocols/v1/V1ProtocolError.js';
 
 import {
     ResultCode,
@@ -128,6 +129,7 @@ function mockConn(assertFn) {
         protocolSession: {
             sendAndForget: assertFn || (() => {})
         },
+        async flush() {},
         end() {}
     };
 }
@@ -484,6 +486,38 @@ test('Request validator failure mapping branch', async t => {
     );
 
     t.pass();
+});
+
+test('handleRequest: flushes response before closing when protocol error requests disconnect', async t => {
+    const handler = setupHandler(t);
+    const events = [];
+
+    V1BroadcastTransactionRequest.prototype.validate = async () => {
+        throw new V1ProtocolError(ResultCode.INVALID_PAYLOAD, 'validation boom', true);
+    };
+
+    const connection = {
+        remotePublicKey: b4a.alloc(32),
+        protocolSession: {
+            sendAndForget() {
+                events.push('send');
+            }
+        },
+        async flush() {
+            events.push('flush');
+            return true;
+        },
+        end() {
+            events.push('end');
+        }
+    };
+
+    await handler.handleRequest(
+        { id: 'msg-flush-close', broadcast_transaction_request: { data: b4a.alloc(1) } },
+        connection
+    );
+
+    t.alike(events, ['send', 'flush', 'end']);
 });
 
 test('decodeApplyOperation failure branch', async t => {

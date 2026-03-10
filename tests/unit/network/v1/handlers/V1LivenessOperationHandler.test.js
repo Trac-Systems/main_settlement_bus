@@ -4,6 +4,7 @@ import V1LivenessOperationHandler from '../../../../../src/core/network/protocol
 import V1LivenessRequest from '../../../../../src/core/network/protocols/v1/validators/V1LivenessRequest.js';
 import V1LivenessResponse from '../../../../../src/core/network/protocols/v1/validators/V1LivenessResponse.js';
 import { ResultCode } from '../../../../../src/utils/constants.js';
+import {V1ProtocolError} from '../../../../../src/core/network/protocols/v1/V1ProtocolError.js';
 
 // Backup original validators
 const originalReqValidate = V1LivenessRequest.prototype.validate;
@@ -11,6 +12,7 @@ const originalResValidate = V1LivenessResponse.prototype.validate;
 
 const mockConfig = {
     hrp: 'trac',
+    addressPrefix: 'trac',
     networkId: 1,
     disableRateLimit: true,
     network: { hrp: 'trac' }
@@ -19,8 +21,8 @@ const mockConfig = {
 // Minimal wallet required so constructor does not break
 const mockWallet = {
     getPublicKey: () => b4a.alloc(33, 2),
-    sign: async () => b4a.alloc(64),
-    address: 'trac1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4',
+    sign: () => b4a.alloc(64),
+    address: 'trac123z3gfpr2epjwww7ntm3m6ud2fhmq0tvts27p2f5mx3qkecsutlqfys769',
     networkId: 1
 };
 
@@ -29,9 +31,15 @@ class MockConnection {
         this.remotePublicKey = b4a.alloc(32);
         this.ended = false;
         this.sentPayload = null;
+        this.flushCalled = false;
         this.protocolSession = {
             sendAndForget: () => {}
         };
+    }
+
+    async flush() {
+        this.flushCalled = true;
+        return true;
     }
 
     end() {
@@ -60,7 +68,7 @@ test('handleRequest: request validation and response send -> covers success and 
 
         const conn = new MockConnection();
 
-        await handler.handleRequest({ id: b4a.alloc(32) }, conn);
+        await handler.handleRequest({ id: 'msg-success' }, conn);
 
         // Real factory is not being asserted
         t.pass('Success path executed');
@@ -69,10 +77,7 @@ test('handleRequest: request validation and response send -> covers success and 
     // -------- VALIDATION ERROR + endConnection true --------
     {
         V1LivenessRequest.prototype.validate = async () => {
-            const err = new Error('Validation Fail');
-            err.resultCode = ResultCode.INVALID_PAYLOAD;
-            err.endConnection = true;
-            throw err;
+            throw new V1ProtocolError(ResultCode.INVALID_PAYLOAD, 'Validation Fail', true);
         };
 
         const handler = new V1LivenessOperationHandler(
@@ -86,17 +91,16 @@ test('handleRequest: request validation and response send -> covers success and 
 
         const conn = new MockConnection();
 
-        await handler.handleRequest({ id: b4a.alloc(32) }, conn);
+        await handler.handleRequest({ id: 'msg-end' }, conn);
 
         t.ok(conn.ended);
+        t.ok(conn.flushCalled);
     }
 
     // -------- VALIDATION ERROR without endConnection --------
     {
         V1LivenessRequest.prototype.validate = async () => {
-            const err = new Error('Validation Fail No End');
-            err.resultCode = ResultCode.INVALID_PAYLOAD;
-            throw err;
+            throw new V1ProtocolError(ResultCode.INVALID_PAYLOAD, 'Validation Fail No End', false);
         };
 
         const handler = new V1LivenessOperationHandler(
@@ -110,9 +114,10 @@ test('handleRequest: request validation and response send -> covers success and 
 
         const conn = new MockConnection();
 
-        await handler.handleRequest({ id: b4a.alloc(32) }, conn);
+        await handler.handleRequest({ id: 'msg-no-end' }, conn);
 
-        t.pass('Validation error without endConnection executed');
+        t.absent(conn.ended);
+        t.absent(conn.flushCalled);
     }
 
     // -------- SEND FAILURE (second catch block) --------
@@ -134,7 +139,7 @@ test('handleRequest: request validation and response send -> covers success and 
             throw new Error('send fail');
         };
 
-        await handler.handleRequest({ id: b4a.alloc(32) }, conn);
+        await handler.handleRequest({ id: 'msg-send-fail' }, conn);
 
         t.ok(conn.ended);
     }

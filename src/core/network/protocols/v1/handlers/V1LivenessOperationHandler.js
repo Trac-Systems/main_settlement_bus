@@ -34,8 +34,11 @@ class V1LivenessOperationHandler extends V1BaseOperationHandler {
 
         try {
             const response = await this.#buildLivenessResponsePayload(message.id, NETWORK_CAPABILITIES, resultCode);
-            connection.protocolSession.sendAndForget(response);
-            if (endConnection) connection.end();
+            await this.sendResponseAndMaybeClose(
+                connection,
+                response,
+                endConnection
+            );
         } catch (error) {
             this.displayError("failed to build/send response to sender",
                 connection.remotePublicKey,
