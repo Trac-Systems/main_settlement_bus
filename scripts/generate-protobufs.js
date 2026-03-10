@@ -31,7 +31,15 @@ function generatePbjsModule(pbjsPath, protoRootPath, entryPath, outputPath) {
 
 function transformPbjsForBare(outputPath) {
     let content = fs.readFileSync(outputPath, 'utf-8');
-    content = `if (typeof globalThis !== 'undefined' && typeof globalThis.self === 'undefined') {\n  globalThis.self = globalThis;\n}\n` + content;
+    const shim = `if (typeof globalThis !== 'undefined' && typeof globalThis.self === 'undefined') {\n  globalThis.self = globalThis;\n}\n`;
+    const strictDirective = '"use strict";';
+
+    if (content.includes(strictDirective)) {
+        content = content.replace(strictDirective, `${strictDirective}\n${shim}`);
+    } else {
+        content = `${strictDirective}\n${shim}${content}`;
+    }
+
     fs.writeFileSync(outputPath, content, 'utf-8');
     console.log(`${outputPath} has been modified for bare-compatible protobufjs runtime.`);
 }
