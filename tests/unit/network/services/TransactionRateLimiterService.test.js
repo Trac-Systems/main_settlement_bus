@@ -4,17 +4,12 @@ import b4a from 'b4a';
 
 import TransactionRateLimiterService from '../../../../src/core/network/services/TransactionRateLimiterService.js';
 import { V1RateLimitedError } from '../../../../src/core/network/protocols/v1/V1ProtocolError.js';
-import {
-    CLEANUP_INTERVAL_MS,
-    CONNECTION_TIMEOUT_MS,
-    MAX_TRANSACTIONS_PER_SECOND
-} from '../../../../src/utils/constants.js';
 import { config } from '../../../helpers/config.js';
 import { testKeyPair1, testKeyPair2 } from '../../../fixtures/apply.fixtures.js';
 
 const CLEANUP_INTERVAL_MS = config.rateLimitCleanupIntervalMs;
 const CONNECTION_TIMEOUT_MS = config.rateLimitConnectionTimeoutMs;
-const MAX_TRANSACTIONS_PER_SECOND = rateLimitMaxTransactionsPerSecond;
+const MAX_TRANSACTIONS_PER_SECOND = config.rateLimitMaxTransactionsPerSecond;
 
 const makeConnection = (publicKeyHex) => {
     return {
