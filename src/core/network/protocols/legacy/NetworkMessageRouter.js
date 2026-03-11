@@ -58,8 +58,7 @@ class NetworkMessageRouter {
     }
 
     #preValidate(message) {
-        const type = typeof message;
-        if (message === null || (type !== 'object' && type !== 'string')) {
+        if (!_.isPlainObject(message) && typeof message !== 'string') {
             throw new Error('Invalid message format: expected object or string.');
         }
     }
