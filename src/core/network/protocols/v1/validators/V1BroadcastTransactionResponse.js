@@ -72,21 +72,21 @@ class V1BroadcastTransactionResponse extends V1BaseOperation {
             );
         }
 
-        let selectedValidator;
+        let isValid = false;
         switch (type) {
             case OperationType.ADD_WRITER:
             case OperationType.REMOVE_WRITER:
             case OperationType.ADMIN_RECOVERY:
-                selectedValidator = this.#check.validateRoleAccessOperation.bind(this.#check);
+                isValid =  this.#check.validateRoleAccessOperation(validatorDecodedTx);
                 break;
             case OperationType.BOOTSTRAP_DEPLOYMENT:
-                selectedValidator = this.#check.validateBootstrapDeploymentOperation.bind(this.#check);
+                isValid =  this.#check.validateBootstrapDeploymentOperation(validatorDecodedTx);
                 break;
             case OperationType.TX:
-                selectedValidator = this.#check.validateTransactionOperation.bind(this.#check);
+                isValid = this.#check.validateTransactionOperation(validatorDecodedTx);
                 break;
             case OperationType.TRANSFER:
-                selectedValidator = this.#check.validateTransferOperation.bind(this.#check);
+                isValid = this.#check.validateTransferOperation(validatorDecodedTx);
                 break;
             default:
                 throw new V1ProtocolError(
@@ -96,7 +96,6 @@ class V1BroadcastTransactionResponse extends V1BaseOperation {
                 );
         }
 
-        const isValid = selectedValidator(validatorDecodedTx);
         if (!isValid) {
             throw new V1ProtocolError(
                 ResultCode.VALIDATOR_RESPONSE_SCHEMA_INVALID,
