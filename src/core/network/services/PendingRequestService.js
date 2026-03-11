@@ -12,19 +12,8 @@ class PendingRequestService {
     #config;
 
     constructor(config) {
-        this.#validateConfigMembers(config);
         this.#pendingRequests = new Map(); // Map<id, pendingRequestEntry>
         this.#config = config;
-    }
-
-    #validateConfigMembers(config) {
-        if (!config.maxPendingRequestsInPendingRequestsService || isNaN(config.maxPendingRequestsInPendingRequestsService) || config.maxPendingRequestsInPendingRequestsService <= 0) {
-            throw new Error('Invalid config: maxPendingRequestsInPendingRequestsService must be a positive integer.');
-        }
-
-        if (!config.pendingRequestTimeout || isNaN(config.pendingRequestTimeout) || config.pendingRequestTimeout <= 0) {
-            throw new Error('Invalid config: pendingRequestTimeout must be a positive integer.');
-        }
     }
 
     has(id) {

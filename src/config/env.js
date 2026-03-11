@@ -7,7 +7,6 @@ export const ENV = {
     DEVELOPMENT: 'development',
     TESTNET1: 'testnet1'
 }
-// TODO: CREATE TEST ENV CONFIG SIMILAR TO MAINNET AND USE IT IN TESTS.
 
 const configData = {
     [ENV.TESTNET1]: {

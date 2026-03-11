@@ -60,7 +60,6 @@ export class MainSettlementBus extends ReadyResource {
      **/
     constructor(config) {
         super();
-        Config.validateConfig(config);
         this.#config = config
         this.#store = new Corestore(this.#config.storesFullPath);
         this.#wallet = new PeerWallet({ networkPrefix: this.#config.addressPrefix });
