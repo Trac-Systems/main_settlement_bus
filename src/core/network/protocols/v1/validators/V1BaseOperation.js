@@ -15,7 +15,7 @@ import {
     V1SignatureInvalidError,
     V1UnexpectedError,
 } from "../V1ProtocolError.js";
-
+import _ from 'lodash';
 class V1BaseOperation {
     #v1ValidationSchema
     #config
@@ -30,7 +30,7 @@ class V1BaseOperation {
     }
 
     isPayloadSchemaValid(payload) {
-        if (!payload || payload.type === null || payload.type === undefined) {
+        if (_.isNil(payload?.type)) {
             throw new V1InvalidPayloadError('Payload or payload type is missing.');
         }
 

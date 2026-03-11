@@ -59,12 +59,12 @@ class BaseStateOperationHandler {
         await this.handleOperation(payload, connection);
     }
 
-    enqueueTransaction(txHash, encodedOperation, context = 'OperationHandler') {
+    enqueueTransaction(txHash, encodedOperation) {
         try {
             this.#txPoolService.addTransaction(txHash, encodedOperation);
         } catch (error) {
             throw new Error(
-                `${context}: Failed to add transaction ${txHash} to transaction pool: ${error?.message ?? String(error)}`
+                `${this.constructor.name}: Failed to add transaction ${txHash} to transaction pool: ${error?.message ?? String(error)}`
             );
         }
     }

@@ -22,12 +22,12 @@ class V1BaseOperationHandler {
         }
     }
 
-    async resolvePendingResponse(message, connection, validator, extractResultCode, stateInstance) {
+    async resolvePendingResponse(message, connection, validator, extractResultCode) {
         const pendingRequestServiceEntry = this.#pendingRequestService.getPendingRequest(message.id);
         if (!pendingRequestServiceEntry) return false;
 
         this.#pendingRequestService.stopPendingRequestTimeout(message.id);
-        await validator.validate(message, connection, pendingRequestServiceEntry, stateInstance);
+        await validator.validate(message, connection, pendingRequestServiceEntry);
 
         const resultCode = extractResultCode(message);
         this.#pendingRequestService.resolvePendingRequest(message.id, resultCode);

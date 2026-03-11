@@ -88,7 +88,7 @@ class LegacyRoleOperationHandler extends BaseStateOperationHandler {
 
         const encodedOperation = safeEncodeApplyOperation(completePayload);
         const txHash =  b4a.toString(completePayload.rao.tx, 'hex');
-        this.enqueueTransaction(txHash, encodedOperation, 'RoleOperationHandler');
+        this.enqueueTransaction(txHash, encodedOperation);
     }
 }
 

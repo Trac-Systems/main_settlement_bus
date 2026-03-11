@@ -8,15 +8,8 @@ class TransactionCommitService {
     #config;
 
     constructor(config) {
-        this.#validateConfigMembers(config);
         this.#pendingCommits = new Map(); // Map<txHash, pendingCommitEntry>
         this.#config = config;
-    }
-
-    #validateConfigMembers(config) {
-        if (!config.txCommitTimeout || isNaN(config.txCommitTimeout) || config.txCommitTimeout <= 0) {
-            throw new PendingCommitConfigValidationError('txCommitTimeout must be a positive integer.');
-        }
     }
 
     #assertTxHash(txHash) {
@@ -152,11 +145,5 @@ export class PendingCommitCancelledError extends Error {
 export class PendingCommitUnexpectedError extends Error {
     constructor(message = 'Unexpected commit error') {
         super(message);
-    }
-}
-
-export class PendingCommitConfigValidationError extends Error {
-    constructor(message) {
-        super(`Invalid TransactionCommitService config: ${message}`);
     }
 }
