@@ -7,13 +7,7 @@
 import { networkMessageFactory } from '../../../messages/network/v1/networkMessageFactory.js';
 import { generateUUID } from '../../../utils/helpers.js';
 import { NETWORK_CAPABILITIES, ResultCode } from '../../../utils/constants.js';
-
-const DEBUG = false;
-const debugLog = (...args) => {
-    if (DEBUG) {
-        console.log('DEBUG [ProtocolSession] ==> ', ...args);
-    }
-};
+import { Logger } from '../../../utils/logger.js';
 
 class ProtocolSession {
     #legacyProtocol;
@@ -27,6 +21,7 @@ class ProtocolSession {
     #wallet;
     #config;
     #capabilities;
+    #logger;
 
     constructor(legacyProtocol, v1Protocol, wallet, config) {
         // These are Protomux "message" objects (returned by channel.addMessage).
@@ -38,6 +33,7 @@ class ProtocolSession {
         this.#wallet = wallet;
         this.#config = config;
         this.#capabilities = NETWORK_CAPABILITIES;
+        this.#logger = new Logger(config);
     }
 
     get preferredProtocol() {
@@ -54,23 +50,23 @@ class ProtocolSession {
 
     setLegacyAsPreferredProtocol() {
         if (this.isProbed()) {
-            debugLog('WARNING: ProtocolSession: Preferred protocol is already set and cannot be changed to LEGACY. Current preferred protocol:', this.#preferredProtocol);
+            this.#logger.warn(`ProtocolSession: preferred protocol is already set and cannot be changed to LEGACY. Current preferred protocol: ${this.#preferredProtocol}`);
             return;
         }
         this.#preferredProtocol = this.#supportedProtocols.LEGACY;
         this.#activeProtocol = this.#legacyProtocol;
-        debugLog('ProtocolSession: Set preferred protocol to LEGACY');
+        this.#logger.debug('ProtocolSession: set preferred protocol to LEGACY');
     }
 
     setV1AsPreferredProtocol() {
         if (this.isProbed()) {
-            debugLog('WARNING: ProtocolSession: Preferred protocol is already set and cannot be changed to V1. Current preferred protocol:', this.#preferredProtocol);
+            this.#logger.warn(`ProtocolSession: preferred protocol is already set and cannot be changed to V1. Current preferred protocol: ${this.#preferredProtocol}`);
             return;
         }
 
         this.#preferredProtocol = this.#supportedProtocols.V1;
         this.#activeProtocol = this.#v1Protocol;
-        debugLog('ProtocolSession: Set preferred protocol to V1');
+        this.#logger.debug('ProtocolSession: set preferred protocol to V1');
     }
 
     /**
@@ -85,7 +81,7 @@ class ProtocolSession {
     */
     async probe() {
         if (this.isProbed()) {
-            debugLog('WARNING: ProtocolSession: Preferred protocol is already set. Skipping probe. Current preferred protocol:', this.#preferredProtocol);
+            this.#logger.warn(`ProtocolSession: preferred protocol is already set. Skipping probe. Current preferred protocol: ${this.#preferredProtocol}`);
             return; // TODO: Consider not returning silently
         }
 
@@ -97,13 +93,13 @@ class ProtocolSession {
             const result = await this.#v1Protocol.send(message);
             if (result !== ResultCode.OK) {
                 // TODO: Think about how to handle failure result codes after legacy protocol is retired
-                console.warn('ProtocolSession: v1 protocol probe failed with non-OK result code:', result);
+                this.#logger.warn(`ProtocolSession: v1 protocol probe failed with non-OK result code: ${result}`);
                 this.setLegacyAsPreferredProtocol();
                 return;
             }
             this.setV1AsPreferredProtocol();
         } catch (err) {
-            debugLog('ProtocolSession: v1 protocol probe failed, falling back to legacy: Details:', err);
+            this.#logger.debug(`ProtocolSession: v1 protocol probe failed, falling back to legacy. Details: ${err?.message ?? err}`);
             this.setLegacyAsPreferredProtocol();
         }
     }
@@ -121,14 +117,14 @@ class ProtocolSession {
                     return await this.#v1Protocol.send(message);
                 }
                 catch (err) {
-                    debugLog('ERROR: V1 Health check failed: ', err);
+                    this.#logger.error(`ProtocolSession: v1 health check failed: ${err?.message ?? err}`);
                     return ResultCode.UNEXPECTED_ERROR; // TODO: Consider just propagating the error instead
                 }
             case this.#supportedProtocols.LEGACY:
-                debugLog('WARNING: Health check not supported on LEGACY protocol');
+                this.#logger.warn('ProtocolSession: health check not supported on LEGACY protocol');
                 return ResultCode.OK; // TODO: Consider implementing a new result code (e.g. NOT_SUPPORTED) instead of returning OK
             default:
-                console.warn('ProtocolSession: preferred protocol not set. Call probe() first.');
+                this.#logger.warn('ProtocolSession: preferred protocol not set. Call probe() first.');
                 return ResultCode.UNSPECIFIED; // TODO: Define a more specific result code.
         }
     }
@@ -162,7 +158,7 @@ class ProtocolSession {
             try {
                 this.#legacyProtocol.close();
             } catch (e) {
-                console.error('Failed to close legacy channel:', e); // TODO: Think about throwing instead
+                this.#logger.error(`ProtocolSession: failed to close legacy channel: ${e?.message ?? e}`); // TODO: Think about throwing instead
             }
         }
 
@@ -170,7 +166,7 @@ class ProtocolSession {
             try {
                 this.#v1Protocol.close();
             } catch (e) {
-                console.error('Failed to close v1 channel:', e); // TODO: Think about throwing instead
+                this.#logger.error(`ProtocolSession: failed to close v1 channel: ${e?.message ?? e}`); // TODO: Think about throwing instead
             }
         }
     }

@@ -21,6 +21,19 @@ const remotePublicKey = b4a.from(testKeyPair1.publicKey, 'hex');
 const remoteAddressBuffer = addressToBuffer(publicKeyToAddress(remotePublicKey, config), config.addressPrefix);
 const writerKey = b4a.alloc(32, 2);
 
+const createState = (overrides = {}) => ({
+    verifyProofOfPublication: async () => ({ ok: true }),
+    getRegisteredWriterKey: async () => remoteAddressBuffer,
+    getNodeEntry: async () => ({
+        isWriter: true,
+        wk: writerKey,
+    }),
+    ...overrides
+});
+
+const createValidator = (stateOverrides = {}) =>
+    new V1BroadcastTransactionResponse(createState(stateOverrides), config);
+
 const overrideCheckMethods = (t, overrides) => {
     const originals = {};
     for (const [name, impl] of Object.entries(overrides)) {
@@ -72,7 +85,7 @@ test('extractRequiredVaFromDecodedTx returns va buffer when present', t => {
 });
 
 test('validate skips proof validation when result code is non-OK', async t => {
-    const validator = new V1BroadcastTransactionResponse(config);
+    const validator = createValidator();
     let proofCalled = false;
 
     validator.isPayloadSchemaValid = () => true;
@@ -102,7 +115,7 @@ test('validate skips proof validation when result code is non-OK', async t => {
 });
 
 test('validate runs proof validation pipeline when result code is OK', async t => {
-    const validator = new V1BroadcastTransactionResponse(config);
+    const validator = createValidator();
     const calls = [];
 
     validator.isPayloadSchemaValid = () => calls.push('schema');
@@ -152,7 +165,7 @@ test('validate runs proof validation pipeline when result code is OK', async t =
 });
 
 test('validate rejects TX_COMMITTED_RECEIPT_MISSING as validator internal error', async t => {
-    const validator = new V1BroadcastTransactionResponse(config);
+    const validator = createValidator();
 
     validator.isPayloadSchemaValid = () => true;
     validator.validateResponseType = () => true;
@@ -181,7 +194,7 @@ test('validate rejects TX_COMMITTED_RECEIPT_MISSING as validator internal error'
 });
 
 test('validateDecodedCompletePayloadSchema throws for missing, unknown and unsupported types', t => {
-    const validator = new V1BroadcastTransactionResponse(config);
+    const validator = createValidator();
 
     try {
         validator.validateDecodedCompletePayloadSchema({});
@@ -206,7 +219,7 @@ test('validateDecodedCompletePayloadSchema throws for missing, unknown and unsup
 });
 
 test('validateDecodedCompletePayloadSchema selects proper validators for supported operation types', t => {
-    const validator = new V1BroadcastTransactionResponse(config);
+    const validator = createValidator();
     const called = [];
 
     overrideCheckMethods(t, {
@@ -237,7 +250,7 @@ test('validateDecodedCompletePayloadSchema selects proper validators for support
 });
 
 test('validateDecodedCompletePayloadSchema throws VALIDATOR_RESPONSE_SCHEMA_INVALID when selected validator fails', t => {
-    const validator = new V1BroadcastTransactionResponse(config);
+    const validator = createValidator();
 
     overrideCheckMethods(t, {
         validateTransactionOperation: () => false,
@@ -252,28 +265,25 @@ test('validateDecodedCompletePayloadSchema throws VALIDATOR_RESPONSE_SCHEMA_INVA
 });
 
 test('verifyProofOfPublication delegates verification to state instance', async t => {
-    const validator = new V1BroadcastTransactionResponse(config);
+    const validator = createValidator({
+        verifyProofOfPublication: receivedProof => {
+            t.ok(b4a.equals(receivedProof, proof));
+            return { ok: true };
+        }
+    });
     const proof = b4a.from('deadbeef', 'hex');
 
-    const result = await validator.verifyProofOfPublication(
-        {
-            broadcast_transaction_response: {
-                proof,
-            }
-        },
-        {
-            verifyProofOfPublication: receivedProof => {
-                t.ok(b4a.equals(receivedProof, proof));
-                return { ok: true };
-            }
+    const result = await validator.verifyProofOfPublication({
+        broadcast_transaction_response: {
+            proof,
         }
-    );
+    });
 
     t.alike(result, { ok: true });
 });
 
 test('assertProofPayloadMatchesRequestPayload throws when pending request tx data is missing', async t => {
-    const validator = new V1BroadcastTransactionResponse(config);
+    const validator = createValidator();
 
     try {
         await validator.assertProofPayloadMatchesRequestPayload(
@@ -287,7 +297,7 @@ test('assertProofPayloadMatchesRequestPayload throws when pending request tx dat
 });
 
 test('assertProofPayloadMatchesRequestPayload throws PROOF_PAYLOAD_MISMATCH when decoded payloads differ', async t => {
-    const validator = new V1BroadcastTransactionResponse(config);
+    const validator = createValidator();
 
     const requestTxData = unsafeEncodeApplyOperation(protobufFixtures.validPartialTransactionOperation);
     const responseTxData = unsafeEncodeApplyOperation(protobufFixtures.validPartialTransferOperation);
@@ -311,7 +321,7 @@ test('assertProofPayloadMatchesRequestPayload throws PROOF_PAYLOAD_MISMATCH when
 });
 
 test('assertProofPayloadMatchesRequestPayload strips validator metadata before comparison', async t => {
-    const validator = new V1BroadcastTransactionResponse(config);
+    const validator = createValidator();
 
     const requestPayload = structuredClone(protobufFixtures.validTransactionOperation);
     requestPayload.txo.va = null;
@@ -341,18 +351,14 @@ test('assertProofPayloadMatchesRequestPayload strips validator metadata before c
 });
 
 test('validateWritingKey throws when writer key is not registered', async t => {
-    const validator = new V1BroadcastTransactionResponse(config);
+    const validator = createValidator({
+        getRegisteredWriterKey: async () => null
+    });
 
     overrideFunction(t, Hypercore, 'key', () => writerKey);
 
     try {
-        await validator.validateWritingKey(
-            {},
-            {},
-            {
-                getRegisteredWriterKey: async () => null
-            }
-        );
+        await validator.validateWritingKey({}, {});
         t.fail('expected validateWritingKey to throw');
     } catch (error) {
         t.is(error.resultCode, ResultCode.VALIDATOR_WRITER_KEY_NOT_REGISTERED);
@@ -360,36 +366,33 @@ test('validateWritingKey throws when writer key is not registered', async t => {
 });
 
 test('validateWritingKey returns writer key and correlated validator address', async t => {
-    const validator = new V1BroadcastTransactionResponse(config);
     const registeredAddress = b4a.alloc(39, 7);
+    const validator = createValidator({
+        getRegisteredWriterKey: async writerKeyHex => {
+            t.is(writerKeyHex, b4a.toString(writerKey, 'hex'));
+            return registeredAddress;
+        }
+    });
 
     overrideFunction(t, Hypercore, 'key', () => writerKey);
 
-    const result = await validator.validateWritingKey(
-        {},
-        {},
-        {
-            getRegisteredWriterKey: async writerKeyHex => {
-                t.is(writerKeyHex, b4a.toString(writerKey, 'hex'));
-                return registeredAddress;
-            }
-        }
-    );
+    const result = await validator.validateWritingKey({}, {});
 
     t.ok(b4a.equals(result.writerKeyFromManifest, writerKey));
     t.ok(b4a.equals(result.validatorAddressCorrelatedWithManifest, registeredAddress));
 });
 
 test('validateValidatorCorrectness throws VALIDATOR_ADDRESS_MISMATCH when tx va differs from connection-derived address', async t => {
-    const validator = new V1BroadcastTransactionResponse(config);
+    const validator = createValidator({
+        getNodeEntry: async () => null
+    });
 
     try {
         await validator.validateValidatorCorrectness(
             { txo: { va: b4a.alloc(remoteAddressBuffer.length, 9) } },
             remotePublicKey,
             writerKey,
-            remoteAddressBuffer,
-            { getNodeEntry: async () => null }
+            remoteAddressBuffer
         );
         t.fail('expected address mismatch');
     } catch (error) {
@@ -398,15 +401,16 @@ test('validateValidatorCorrectness throws VALIDATOR_ADDRESS_MISMATCH when tx va 
 });
 
 test('validateValidatorCorrectness throws VALIDATOR_ADDRESS_MISMATCH when tx va differs from manifest-correlated address', async t => {
-    const validator = new V1BroadcastTransactionResponse(config);
+    const validator = createValidator({
+        getNodeEntry: async () => null
+    });
 
     try {
         await validator.validateValidatorCorrectness(
             { txo: { va: remoteAddressBuffer } },
             remotePublicKey,
             writerKey,
-            b4a.alloc(remoteAddressBuffer.length, 8),
-            { getNodeEntry: async () => null }
+            b4a.alloc(remoteAddressBuffer.length, 8)
         );
         t.fail('expected address mismatch');
     } catch (error) {
@@ -415,15 +419,16 @@ test('validateValidatorCorrectness throws VALIDATOR_ADDRESS_MISMATCH when tx va 
 });
 
 test('validateValidatorCorrectness throws VALIDATOR_NODE_ENTRY_NOT_FOUND when state has no node entry', async t => {
-    const validator = new V1BroadcastTransactionResponse(config);
+    const validator = createValidator({
+        getNodeEntry: async () => null
+    });
 
     try {
         await validator.validateValidatorCorrectness(
             { txo: { va: remoteAddressBuffer } },
             remotePublicKey,
             writerKey,
-            remoteAddressBuffer,
-            { getNodeEntry: async () => null }
+            remoteAddressBuffer
         );
         t.fail('expected missing node entry');
     } catch (error) {
@@ -432,20 +437,19 @@ test('validateValidatorCorrectness throws VALIDATOR_NODE_ENTRY_NOT_FOUND when st
 });
 
 test('validateValidatorCorrectness throws VALIDATOR_NODE_NOT_WRITER when node is not a writer', async t => {
-    const validator = new V1BroadcastTransactionResponse(config);
+    const validator = createValidator({
+        getNodeEntry: async () => ({
+            isWriter: false,
+            wk: writerKey,
+        })
+    });
 
     try {
         await validator.validateValidatorCorrectness(
             { txo: { va: remoteAddressBuffer } },
             remotePublicKey,
             writerKey,
-            remoteAddressBuffer,
-            {
-                getNodeEntry: async () => ({
-                    isWriter: false,
-                    wk: writerKey,
-                })
-            }
+            remoteAddressBuffer
         );
         t.fail('expected node-not-writer');
     } catch (error) {
@@ -454,20 +458,19 @@ test('validateValidatorCorrectness throws VALIDATOR_NODE_NOT_WRITER when node is
 });
 
 test('validateValidatorCorrectness throws VALIDATOR_WRITER_KEY_MISMATCH when state writer key differs', async t => {
-    const validator = new V1BroadcastTransactionResponse(config);
+    const validator = createValidator({
+        getNodeEntry: async () => ({
+            isWriter: true,
+            wk: b4a.alloc(32, 99),
+        })
+    });
 
     try {
         await validator.validateValidatorCorrectness(
             { txo: { va: remoteAddressBuffer } },
             remotePublicKey,
             writerKey,
-            remoteAddressBuffer,
-            {
-                getNodeEntry: async () => ({
-                    isWriter: true,
-                    wk: b4a.alloc(32, 99),
-                })
-            }
+            remoteAddressBuffer
         );
         t.fail('expected writer-key mismatch');
     } catch (error) {
@@ -476,26 +479,25 @@ test('validateValidatorCorrectness throws VALIDATOR_WRITER_KEY_MISMATCH when sta
 });
 
 test('validateValidatorCorrectness passes when validator address and writer key are consistent', async t => {
-    const validator = new V1BroadcastTransactionResponse(config);
+    const validator = createValidator({
+        getNodeEntry: async () => ({
+            isWriter: true,
+            wk: writerKey,
+        })
+    });
 
     await validator.validateValidatorCorrectness(
         { txo: { va: remoteAddressBuffer } },
         remotePublicKey,
         writerKey,
-        remoteAddressBuffer,
-        {
-            getNodeEntry: async () => ({
-                isWriter: true,
-                wk: writerKey,
-            })
-        }
+        remoteAddressBuffer
     );
 
     t.pass();
 });
 
 test('validateIfResultCodeIsValidatorInternalError throws only for TX_COMMITTED_RECEIPT_MISSING', t => {
-    const validator = new V1BroadcastTransactionResponse(config);
+    const validator = createValidator();
 
     try {
         validator.validateIfResultCodeIsValidatorInternalError(ResultCode.TX_COMMITTED_RECEIPT_MISSING);

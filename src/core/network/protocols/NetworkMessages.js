@@ -1,4 +1,3 @@
-
 import NetworkMessageRouter from './legacy/NetworkMessageRouter.js';
 import NetworkMessageRouterV1 from './v1/NetworkMessageRouter.js';
 import ProtocolSession from './ProtocolSession.js';
@@ -10,20 +9,20 @@ class NetworkMessages {
     #v1MessageRouter;
     #config;
     #wallet;
-    #pendingRequestsServiceInstance;
+    #pendingRequestsService;
 
     constructor(
         state,
         wallet,
         rateLimiterService,
         txPoolService,
-        pendingRequestsServiceInstance,
+        pendingRequestsService,
         transactionCommitService,
         config
     ) {
         this.#config = config;
         this.#wallet = wallet;
-        this.#pendingRequestsServiceInstance = pendingRequestsServiceInstance;
+        this.#pendingRequestsService = pendingRequestsService;
         this.#legacyMessageRouter = new NetworkMessageRouter(
             state,
             wallet,
@@ -37,7 +36,7 @@ class NetworkMessages {
             wallet,
             rateLimiterService,
             txPoolService,
-            pendingRequestsServiceInstance,
+            pendingRequestsService,
             transactionCommitService,
             this.#config
         );
@@ -47,18 +46,23 @@ class NetworkMessages {
         // Attach a Protomux instance to this Hyperswarm connection.
         // Protomux multiplexes multiple logical protocol channels over a single encrypted stream.
 
-        const legacyProtocol = new LegacyProtocol(this.#legacyMessageRouter, connection, null, this.#config);
+        const legacyProtocol = new LegacyProtocol(
+            this.#legacyMessageRouter,
+            connection,
+            null,
+            this.#config
+        );
+
         const v1Protocol = new V1Protocol(
             this.#v1MessageRouter,
             connection,
-            this.#pendingRequestsServiceInstance,
+            this.#pendingRequestsService,
             this.#config
         );
 
         // ProtocolSession is attached to the Hyperswarm connection so other parts of the system (e.g. tryConnect)
         // can send messages without knowing how Protomux was initialized.
-        const protocolSession = new ProtocolSession(legacyProtocol, v1Protocol, this.#wallet, this.#config);
-        connection.protocolSession = protocolSession;
+        connection.protocolSession = new ProtocolSession(legacyProtocol, v1Protocol, this.#wallet, this.#config);
     }
 }
 

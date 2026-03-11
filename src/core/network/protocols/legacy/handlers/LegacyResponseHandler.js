@@ -8,11 +8,11 @@ class LegacyResponseHandler {
 
     }
 
-    async handle(message, connection, channelString) {
-        await this.#handleValidatorResponse(message, connection, channelString);
+    async handle(message, channelString) {
+        await this.#handleValidatorResponse(message, channelString);
     }
 
-    async #handleValidatorResponse(message, connection, channelString) {
+    async #handleValidatorResponse(message, channelString) {
         const isValid = await this.#responseValidator.validate(message, channelString);
         if (!isValid) {
             throw new Error("Validator response verification failed");

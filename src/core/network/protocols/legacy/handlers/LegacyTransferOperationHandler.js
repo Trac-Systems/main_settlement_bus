@@ -56,7 +56,7 @@ class LegacyTransferOperationHandler extends BaseStateOperationHandler {
             )
         const encodedOperation = safeEncodeApplyOperation(completeTransferOperation);
         const txHash =  b4a.toString(normalizedPayload.tro.tx, 'hex');
-        this.enqueueTransaction(txHash, encodedOperation, 'TransferHandler');
+        this.enqueueTransaction(txHash, encodedOperation);
     }
 }
 

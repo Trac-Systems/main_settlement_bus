@@ -1,6 +1,5 @@
 import b4a from 'b4a';
-
-const isObject = (value) => value !== null && typeof value === 'object';
+import _ from 'lodash';
 
 export const isDeepEqualApplyPayload = (left, right) => {
     if (left === right) return true;
@@ -25,7 +24,7 @@ export const isDeepEqualApplyPayload = (left, right) => {
         return true;
     }
 
-    if (!isObject(left) || !isObject(right)) return false;
+    if (!_.isObject(left) || !_.isObject(right)) return false;
 
     const leftKeys = Object.keys(left);
     const rightKeys = Object.keys(right);
