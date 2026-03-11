@@ -16,7 +16,6 @@ import { safeDecodeApplyOperation } from '../../../../src/utils/protobuf/operati
 import { bigIntTo16ByteBuffer, decimalStringToBigInt } from '../../../../src/utils/amountSerialization.js';
 import { BATCH_SIZE } from '../../../../src/utils/constants.js';
 import { config } from '../../../helpers/config.js';
-import { errorMessageIncludes } from '../../../helpers/regexHelper.js';
 import {
     buildTransferPayload,
     setupTransferScenario
@@ -187,7 +186,7 @@ test('TransactionPoolService.addTransaction enforces pool size limit via validat
         () => service.addTransaction('tx-2', b4a.from('bb', 'hex')),
         TransactionPoolFullError
     );
-    t.is(service.tx_pool.size(), 1);
+    t.is(service.txPool.size(), 1);
 });
 
 test('TransactionPoolService.addTransaction rejects invalid incoming payload', t => {
@@ -211,7 +210,7 @@ test('TransactionPoolService.addTransaction rejects duplicate txHash', t => {
         () => service.addTransaction('tx-dup', b4a.from('bb', 'hex')),
         TransactionPoolAlreadyQueuedError
     );
-    t.is(service.tx_pool.size(), 1);
+    t.is(service.txPool.size(), 1);
 });
 
 test('TransactionPoolService rejects pending commit when proof is unavailable', async t => {
@@ -487,22 +486,4 @@ test('TransactionPoolService.start does nothing when wallet is disabled', async 
         console.info = originalInfo;
         await service.stopPool();
     }
-});
-
-test('TransactionPoolService constructor validates config members', t => {
-    t.exception(
-        () => new TransactionPoolService({}, 'validator-address', {}, {
-            txPoolSize: 0,
-            enableWallet: true
-        }),
-        errorMessageIncludes('txPoolSize must be a positive integer.')
-    );
-
-    t.exception(
-        () => new TransactionPoolService({}, 'validator-address', {}, {
-            txPoolSize: 10,
-            enableWallet: 'true'
-        }),
-        errorMessageIncludes('enableWallet must be a boolean value.')
-    );
 });

@@ -6,8 +6,6 @@ import LegacySubnetworkOperationHandler from "./handlers/LegacySubnetworkOperati
 import LegacyTransferOperationHandler from "./handlers/LegacyTransferOperationHandler.js";
 import { NETWORK_MESSAGE_TYPES } from '../../../../utils/constants.js';
 import * as operation from '../../../../utils/applyOperations.js';
-import State from "../../../state/State.js";
-import PeerWallet from "trac-wallet";
 
 class NetworkMessageRouter {
     #handlers;
@@ -43,7 +41,7 @@ class NetworkMessageRouter {
             await this.#handlers.get.handle(incomingMessage, connection, channelString);
         }
         else if (this.#isResponse(incomingMessage)) {
-            await this.#handlers.response.handle(incomingMessage, connection, channelString);
+            await this.#handlers.response.handle(incomingMessage, channelString);
         }
         else if (this.#isRoleAccessOperation(incomingMessage)) {
             await this.#handlers.roleTransaction.handle(incomingMessage, connection);
@@ -60,8 +58,7 @@ class NetworkMessageRouter {
     }
 
     #preValidate(message) {
-        const type = typeof message;
-        if (message === null || (type !== 'object' && type !== 'string')) {
+        if (!_.isPlainObject(message) && typeof message !== 'string') {
             throw new Error('Invalid message format: expected object or string.');
         }
     }

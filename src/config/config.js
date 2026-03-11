@@ -211,6 +211,10 @@ export class Config {
         return this.#config.maxPendingRequestsInPendingRequestsService
     }
 
+    get debug() {
+        return this.#config.debug
+    }
+
     // Most of these properties are boolean
     #isOverriden(prop) {
         return this.#options.hasOwnProperty(prop) && isDefined(this.#options[prop])
@@ -224,9 +228,4 @@ export class Config {
         }
     }
 
-    static validateConfig(config) {
-        if (!config || typeof config !== 'object' || !config instanceof Config) {
-            throw new Error('Config must be an object and an instance of Config class.');
-        }
-    }
 }
