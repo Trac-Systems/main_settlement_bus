@@ -125,7 +125,6 @@ class MessageOrchestrator {
             await this.connectionManager.sendSingleMessage(v1Message, validatorPublicKey)
                 .then(
                     (resultCode) => {
-                        console.log(resultCode);
                         // TODO: When we will deprecate the legacy protocol, we should refactor this scope, to propagate domain-error with result code.
                         const action = resultToValidatorAction(resultCode);
                         switch (action) {

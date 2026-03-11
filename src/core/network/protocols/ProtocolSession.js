@@ -50,7 +50,8 @@ class ProtocolSession {
 
     setLegacyAsPreferredProtocol() {
         if (this.isProbed()) {
-            this.#logger.warn(`ProtocolSession: preferred protocol is already set and cannot be changed to LEGACY. Current preferred protocol: ${this.#preferredProtocol}`);
+            // TODO:  SOMETIMES WE ARE PROBING NODE FOR MULTIPLE AMOUNT OF TIME, THIS IS BAD. WE NEED TO INVESTIGATE THIS.
+            //this.#logger.warn(`ProtocolSession: preferred protocol is already set and cannot be changed to LEGACY. Current preferred protocol: ${this.#preferredProtocol}`);
             return;
         }
         this.#preferredProtocol = this.#supportedProtocols.LEGACY;
@@ -60,7 +61,8 @@ class ProtocolSession {
 
     setV1AsPreferredProtocol() {
         if (this.isProbed()) {
-            this.#logger.warn(`ProtocolSession: preferred protocol is already set and cannot be changed to V1. Current preferred protocol: ${this.#preferredProtocol}`);
+            // TODO:  SOMETIMES WE ARE PROBING NODE FOR MULTIPLE AMOUNT OF TIME, THIS IS BAD. WE NEED TO INVESTIGATE THIS.
+            //this.#logger.warn(`ProtocolSession: preferred protocol is already set and cannot be changed to V1. Current preferred protocol: ${this.#preferredProtocol}`);
             return;
         }
 
