@@ -1,5 +1,5 @@
 import {publicKeyToAddress} from "../../../../../utils/helpers.js";
-import {shouldEndConnection, V1ProtocolError, V1UnexpectedError} from "../V1ProtocolError.js";
+import {V1ProtocolError, V1UnexpectedError} from "../V1ProtocolError.js";
 
 class V1BaseOperationHandler {
     #rateLimiterService;
@@ -38,7 +38,7 @@ class V1BaseOperationHandler {
         const protocolError = this.#toProtocolError(error);
         const rejected = this.#pendingRequestService.rejectPendingRequest(messageId, protocolError);
         if (!rejected) return;
-        this.displayError(step, connection.remotePublicKey, error);
+        this.displayError(step, connection.remotePublicKey, protocolError);
     }
 
     async sendResponseAndMaybeClose(connection, response, endConnection) {
@@ -50,7 +50,8 @@ class V1BaseOperationHandler {
     }
 
     displayError(step = "undefined step", senderPublicKey, error) {
-        console.error(`${this.constructor.name}: ${step} ${publicKeyToAddress(senderPublicKey, this.#config)}: ${error.message}`);
+        const errorMessage = error?.message ?? 'Unexpected error';
+        console.error(`${this.constructor.name}: ${step} ${publicKeyToAddress(senderPublicKey, this.#config)}: ${errorMessage}`);
     }
 
     #toProtocolError(error) {
