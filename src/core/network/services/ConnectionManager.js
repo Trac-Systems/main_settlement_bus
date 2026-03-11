@@ -20,7 +20,7 @@ class ConnectionManager {
     #maxValidators
     #config
     #healthCheckService
-    #healthCheckHandler
+    #boundedHealthCheckHandler
 
     // Note: #validators is using publicKey (Buffer) as key
     // As Buffers are objects, we will rely on internal conversions done by JS to compare them.
@@ -32,6 +32,7 @@ class ConnectionManager {
         this.#validators = new Map();
         this.#config = config
         this.#maxValidators = config.maxValidators
+        this.#boundedHealthCheckHandler = this.#healthCheckHandler.bind(this);
     }
 
     /**
@@ -56,59 +57,60 @@ class ConnectionManager {
 
         this.#healthCheckService = healthCheckService; // TODO: Maybe this should be handled in the constructor directly?
         // TODO: declare this method outside this function to avoid redeclaring it every time we subscribe to health checks. We can just bind it to 'this' in the constructor.
-        this.#healthCheckHandler = async (publicKey, requestId) => {
-            if (typeof publicKey !== 'string' || typeof requestId !== 'string') {
-                // We can't throw here because this is an event handler, but we should at least log the error and return early to avoid further issues.
-                console.error(`healthCheck: malformed event payload. Typeof publicKey = ${typeof publicKey}. Typeof requestId = ${typeof requestId}`);
-                return;
-            }
 
-            let targetAddress = null;
-            if (DEBUG) {
-                // It is recommended to leave this if(DEBUG) statement here to avoid needlessly
-                // calculating the address from the pubKey during production execution
-                targetAddress = publicKeyToAddress(publicKey, this.#config)
-            }
-
-            if (!this.exists(publicKey) || !this.connected(publicKey)) {
-                debugLog(`healthCheck: validator not connected, stopping checks. Address = ${targetAddress}; Request ID = ${requestId}`);
-                this.#stopHealthCheck(publicKey);
-                return;
-            }
-
-            const connection = this.getConnection(publicKey);
-            if (!connection || !connection.protocolSession || typeof connection.protocolSession.sendHealthCheck !== 'function') {
-                debugLog(`healthCheck: missing protocol session, removing validator. Address = ${targetAddress}; Request ID = ${requestId}`);
-                this.#stopHealthCheck(publicKey);
-                this.remove(publicKey);
-                return;
-            }
-
-            let success = false;
-            try {
-                debugLog(`healthCheck: sending liveness request. Address = ${targetAddress}; Request ID = ${requestId}`);
-
-                const resultCode = await connection.protocolSession.sendHealthCheck();
-                success = resultCode === ResultCode.OK;
-                if (!success) {
-                    debugLog(`healthCheck: non-OK result code. Address = ${targetAddress}; Request ID = ${requestId}`);
-                }
-            } catch {
-                success = false;
-            }
-
-            if (!success) {
-                debugLog(`healthCheck: liveness request failed, removing validator. Address = ${targetAddress}; Request ID = ${requestId}`);
-                this.remove(publicKey);
-                this.#stopHealthCheck(publicKey);
-            } else {
-                debugLog(`healthCheck: success. Address = ${targetAddress}; Request ID = ${requestId}`);
-            }
-        };
-
-        this.#healthCheckService.on(EventType.VALIDATOR_HEALTH_CHECK, this.#healthCheckHandler);
+        this.#healthCheckService.on(EventType.VALIDATOR_HEALTH_CHECK, this.#boundedHealthCheckHandler);
         debugLog('subscribeToHealthChecks: subscribed to health check events');
     }
+
+    async #healthCheckHandler(publicKey, requestId) {
+        if (typeof publicKey !== 'string' || typeof requestId !== 'string') {
+            // We can't throw here because this is an event handler, but we should at least log the error and return early to avoid further issues.
+            console.error(`healthCheck: malformed event payload. Typeof publicKey = ${typeof publicKey}. Typeof requestId = ${typeof requestId}`);
+            return;
+        }
+
+        let targetAddress = null;
+        if (DEBUG) {
+            // It is recommended to leave this if(DEBUG) statement here to avoid needlessly
+            // calculating the address from the pubKey during production execution
+            targetAddress = publicKeyToAddress(publicKey, this.#config)
+        }
+
+        if (!this.exists(publicKey) || !this.connected(publicKey)) {
+            debugLog(`healthCheck: validator not connected, stopping checks. Address = ${targetAddress}; Request ID = ${requestId}`);
+            this.#stopHealthCheck(publicKey);
+            return;
+        }
+
+        const connection = this.getConnection(publicKey);
+        if (!connection || !connection.protocolSession || typeof connection.protocolSession.sendHealthCheck !== 'function') {
+            debugLog(`healthCheck: missing protocol session, removing validator. Address = ${targetAddress}; Request ID = ${requestId}`);
+            this.#stopHealthCheck(publicKey);
+            this.remove(publicKey);
+            return;
+        }
+
+        let success = false;
+        try {
+            debugLog(`healthCheck: sending liveness request. Address = ${targetAddress}; Request ID = ${requestId}`);
+
+            const resultCode = await connection.protocolSession.sendHealthCheck();
+            success = resultCode === ResultCode.OK;
+            if (!success) {
+                debugLog(`healthCheck: non-OK result code. Address = ${targetAddress}; Request ID = ${requestId}`);
+            }
+        } catch {
+            success = false;
+        }
+
+        if (!success) {
+            debugLog(`healthCheck: liveness request failed, removing validator. Address = ${targetAddress}; Request ID = ${requestId}`);
+            this.remove(publicKey);
+            this.#stopHealthCheck(publicKey);
+        } else {
+            debugLog(`healthCheck: success. Address = ${targetAddress}; Request ID = ${requestId}`);
+        }
+    };
 
     #stopHealthCheck(publicKeyHex) {
         let targetAddress = null;
