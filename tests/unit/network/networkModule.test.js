@@ -2,6 +2,7 @@ import { default as test } from 'brittle';
 
 async function runNetworkModuleTests() {
     test.pause();
+    await import('./LegacyNetworkMessageRouter.test.js');
     await import('./NetworkWalletFactory.test.js');
     await import('./ProtocolSession.test.js');
     await import('./services/services.test.js');

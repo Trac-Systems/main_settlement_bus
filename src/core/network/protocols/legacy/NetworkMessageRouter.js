@@ -1,4 +1,5 @@
 import b4a from "b4a";
+import _ from 'lodash';
 import LegacyGetRequestHandler from "./handlers/LegacyGetRequestHandler.js";
 import LegacyResponseHandler from "./handlers/LegacyResponseHandler.js";
 import LegacyRoleOperationHandler from "./handlers/LegacyRoleOperationHandler.js";
