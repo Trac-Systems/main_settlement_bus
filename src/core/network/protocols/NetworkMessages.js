@@ -10,20 +10,20 @@ class NetworkMessages {
     #v1MessageRouter;
     #config;
     #wallet;
-    #pendingRequestsServiceInstance;
+    #pendingRequestsService;
 
     constructor(
         state,
         wallet,
         rateLimiterService,
         txPoolService,
-        pendingRequestsServiceInstance,
+        pendingRequestsService,
         transactionCommitService,
         config
     ) {
         this.#config = config;
         this.#wallet = wallet;
-        this.#pendingRequestsServiceInstance = pendingRequestsServiceInstance;
+        this.#pendingRequestsService = pendingRequestsService;
         this.#legacyMessageRouter = new NetworkMessageRouter(
             state,
             wallet,
@@ -37,7 +37,7 @@ class NetworkMessages {
             wallet,
             rateLimiterService,
             txPoolService,
-            pendingRequestsServiceInstance,
+            pendingRequestsService,
             transactionCommitService,
             this.#config
         );
@@ -51,7 +51,7 @@ class NetworkMessages {
         const v1Protocol = new V1Protocol(
             this.#v1MessageRouter,
             connection,
-            this.#pendingRequestsServiceInstance,
+            this.#pendingRequestsService,
             this.#config
         );
 
