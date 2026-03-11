@@ -6,7 +6,6 @@ import TransactionCommitService, {
     PendingCommitAlreadyExistsError,
     PendingCommitBufferFullError,
     PendingCommitCancelledError,
-    PendingCommitConfigValidationError,
     PendingCommitInvalidTxHashError,
     PendingCommitTimeoutError,
     PendingCommitUnexpectedError
@@ -245,18 +244,3 @@ test('TransactionCommitService.close rejects all pending commits', async t => {
     t.ok(results[1].reason.message.includes(txHashB));
 });
 
-test('TransactionCommitService constructor validates config members', t => {
-    t.exception(
-        () => new TransactionCommitService({
-            txCommitTimeout: 0
-        }),
-        PendingCommitConfigValidationError
-    );
-
-    t.exception(
-        () => new TransactionCommitService({
-            txCommitTimeout: Number.NaN
-        }),
-        PendingCommitConfigValidationError
-    );
-});

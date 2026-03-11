@@ -17,15 +17,7 @@ import TransactionRateLimiterService from './services/TransactionRateLimiterServ
 import PendingRequestService from './services/PendingRequestService.js';
 import TransactionCommitService from "./services/TransactionCommitService.js";
 import ValidatorHealthCheckService from './services/ValidatorHealthCheckService.js';
-
-// -- Debug Mode --
-// TODO: Implement a better debug system in the future. This is just temporary.
-const DEBUG = false;
-const debugLog = (...args) => {
-    if (DEBUG) {
-        console.log('DEBUG [Network] ==> ', ...args);
-    }
-};
+import { Logger } from '../../utils/logger.js';
 
 const wakeup = new w();
 
@@ -46,6 +38,7 @@ class Network extends ReadyResource {
     #transactionCommitService;
     #wallet;
     #validatorHealthCheckService;
+    #logger;
 
     /**
      * @param {State} state
@@ -64,6 +57,7 @@ class Network extends ReadyResource {
         this.#validatorConnectionManager = new ConnectionManager(this.#config);
         this.#validatorMessageOrchestrator = new MessageOrchestrator(this.#validatorConnectionManager, state, this.#config);
         this.#pendingRequestsService = new PendingRequestService(this.#config);
+        this.#logger = new Logger(this.#config);
     }
 
     get swarm() {
@@ -87,7 +81,7 @@ class Network extends ReadyResource {
     }
 
     async _open() {
-        console.log('Network initialization...');
+        this.#logger.info('Network initialization...');
 
         this.setupNetworkListeners();
 
@@ -96,7 +90,7 @@ class Network extends ReadyResource {
     }
 
     async _close() {
-        console.log('Network: closing gracefully...');
+        this.#logger.info('Network: closing gracefully...');
         await this.transactionPoolService.stopPool();
         await sleep(100);
         await this.#validatorObserverService.stopValidatorObserver();
@@ -117,12 +111,12 @@ class Network extends ReadyResource {
 
     setupNetworkListeners() {
         this.on(EventType.VALIDATOR_CONNECTION_TIMEOUT, ({ publicKey, type, timeoutMs }) => {
-            debugLog(`Network Event: VALIDATOR_CONNECTION_TIMEOUT | PublicKey: ${publicKey} | Type: ${type} | TimeoutMs: ${timeoutMs}`);
+            this.#logger.debug(`Network Event: VALIDATOR_CONNECTION_TIMEOUT | PublicKey: ${publicKey} | Type: ${type} | TimeoutMs: ${timeoutMs}`);
             this.#pendingConnections.delete(publicKey);
         });
 
         this.on(EventType.VALIDATOR_CONNECTION_READY, async ({ publicKey, type, connection }) => {
-            debugLog(`Network Event: VALIDATOR_CONNECTION_READY | PublicKey: ${publicKey} | Type: ${type}`);
+            this.#logger.debug(`Network Event: VALIDATOR_CONNECTION_READY | PublicKey: ${publicKey} | Type: ${type}`);
             const { timeoutId } = this.#pendingConnections.get(publicKey);
 
             if (!timeoutId) return;
@@ -134,7 +128,7 @@ class Network extends ReadyResource {
                 try {
                     await connection.protocolSession.probe();
                 } catch (err) {
-                    debugLog(`failed to probe peer with publicKey ${publicKey}`, err);
+                    this.#logger.debug(`failed to probe peer with publicKey ${publicKey}: ${err?.message ?? err}`);
                 }
 
                 this.#validatorConnectionManager.addValidator(publicKey, connection);
@@ -143,7 +137,7 @@ class Network extends ReadyResource {
                 try {
                     healthCheckSupported = connection.protocolSession.isHealthCheckSupported();
                 } catch (err) {
-                    debugLog(`health check support unknown for peer with publicKey ${publicKey}`, err);
+                    this.#logger.debug(`health check support unknown for peer with publicKey ${publicKey}: ${err?.message ?? err}`);
                 }
 
                 if (healthCheckSupported) {
@@ -201,7 +195,7 @@ class Network extends ReadyResource {
             await this.#validatorHealthCheckService.ready();
             this.#validatorConnectionManager.subscribeToHealthChecks(this.#validatorHealthCheckService);
 
-            console.log(`Channel: ${b4a.toString(this.#config.channel)}`);
+            this.#logger.info(`Channel: ${b4a.toString(this.#config.channel)}`);
 
             this.#swarm.on('connection', async (connection) => {
                 // Per-peer connection initialization:
@@ -243,7 +237,7 @@ class Network extends ReadyResource {
                         // TODO: decide if we want to handle this error in a specific way. It generates a lot of logs.
                         return;
                     }
-                    console.error(error.message)
+                    this.#logger.error(error?.message ?? 'Unknown network connection error');
                 });
 
             });
@@ -275,7 +269,7 @@ class Network extends ReadyResource {
     async tryConnect(publicKey, type = null) {
         if (this.#swarm === null) throw new Error('Network swarm is not initialized');
         if (this.#pendingConnections.has(publicKey) || this.#pendingConnections.size >= this.#maxPendingConnections) {
-            debugLog(`Network.tryConnect: Connection to peer: ${publicKey} as type: ${type} is already pending or max pending connections reached.`);
+            this.#logger.debug(`Network.tryConnect: Connection to peer: ${publicKey} as type: ${type} is already pending or max pending connections reached.`);
             return;
         }
 
@@ -307,7 +301,7 @@ class Network extends ReadyResource {
     async #finalizeConnection(publicKey, type, connection) {
         if (!this.#pendingConnections.has(publicKey)) return;
         this.emit(EventType.VALIDATOR_CONNECTION_READY, { publicKey, type, connection });
-        debugLog(`Network.finalizeConnection: Connected to peer: ${publicKey} as type: ${type}`);
+        this.#logger.debug(`Network.finalizeConnection: Connected to peer: ${publicKey} as type: ${type}`);
     }
 
     #getNetworkWalletWrapper(wallet, keyPair) {

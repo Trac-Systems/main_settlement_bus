@@ -7,10 +7,10 @@ export const ENV = {
     DEVELOPMENT: 'development',
     TESTNET1: 'testnet1'
 }
-// TODO: CREATE TEST ENV CONFIG SIMILAR TO MAINNET AND USE IT IN TESTS.
 
 const configData = {
     [ENV.TESTNET1]: {
+        debug: false,
         addressLength: 67,
         addressPrefix: TRAC_NETWORK_MSB_TESTNET1_PREFIX,
         addressPrefixLength: TRAC_NETWORK_MSB_TESTNET1_PREFIX.length,
@@ -52,6 +52,7 @@ const configData = {
         storeName: 'testnet',
     },
     [ENV.MAINNET]: {
+        debug: false,
         addressLength: 63,
         addressPrefix: TRAC_NETWORK_MSB_MAINNET_PREFIX,
         addressPrefixLength: TRAC_NETWORK_MSB_MAINNET_PREFIX.length,
@@ -93,6 +94,7 @@ const configData = {
         storeName: 'mainnet',
     },
     [ENV.DEVELOPMENT]: {
+        debug: true,
         addressLength: 63,
         addressPrefix: TRAC_NETWORK_MSB_MAINNET_PREFIX,
         addressPrefixLength: TRAC_NETWORK_MSB_MAINNET_PREFIX.length,

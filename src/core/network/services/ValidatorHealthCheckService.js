@@ -2,21 +2,14 @@ import ReadyResource from 'ready-resource';
 import b4a from 'b4a';
 import { generateUUID } from '../../../utils/helpers.js';
 import { EventType } from '../../../utils/constants.js';
-
-// -- Debug Mode --
-// TODO: Implement a better debug system in the future. This is just temporary.
-const DEBUG = false;
-const debugLog = (...args) => {
-    if (DEBUG) {
-        console.log('DEBUG [ValidatorHealthCheckService] ==> ', ...args);
-    }
-};
+import { Logger } from '../../../utils/logger.js';
 
 const DEFAULT_HEALTH_CHECK_INTERVAL_MS = 300000; // 5 minutes
 class ValidatorHealthCheckService extends ReadyResource {
     #config;
     #intervalMs;
     #timers;
+    #logger;
 
     /**
      * @param {object} config
@@ -25,11 +18,12 @@ class ValidatorHealthCheckService extends ReadyResource {
         super();
         this.#config = config;
         this.#timers = new Map();
+        this.#logger = new Logger(config);
 
         const interval = this.#config.validatorHealthCheckInterval;
         this.#intervalMs = interval ? this.#checkInterval(interval) : DEFAULT_HEALTH_CHECK_INTERVAL_MS;
 
-        debugLog('initialized with intervalMs', this.#intervalMs);
+        this.#logger.debug(`initialized with intervalMs ${this.#intervalMs}`);
     }
 
     get size() {
@@ -37,11 +31,11 @@ class ValidatorHealthCheckService extends ReadyResource {
     }
 
     async _open() {
-        debugLog('open: health check service ready');
+        this.#logger.debug('open: health check service ready');
     }
 
     async _close() {
-        debugLog('close: stopping all health checks');
+        this.#logger.debug('close: stopping all health checks');
         this.#stopAll();
         this.#timers.clear();
     }
@@ -56,7 +50,7 @@ class ValidatorHealthCheckService extends ReadyResource {
         }
         const publicKeyHex = this.#normalizePublicKey(publicKey);
         if (this.#timers.has(publicKeyHex)) {
-            debugLog('start: already scheduled for', publicKey);
+            this.#logger.debug(`start: already scheduled for ${publicKey}`);
             return false; // TODO: Implement better error handling
         }
 
@@ -65,7 +59,7 @@ class ValidatorHealthCheckService extends ReadyResource {
         }, this.#intervalMs);
 
         this.#timers.set(publicKeyHex, { timerId, intervalMs: this.#intervalMs });
-        debugLog('start: scheduled health checks for', publicKeyHex, 'every', this.#intervalMs, 'ms');
+        this.#logger.debug(`start: scheduled health checks for ${publicKeyHex} every ${this.#intervalMs} ms`);
 
         return true;
     }
@@ -79,12 +73,12 @@ class ValidatorHealthCheckService extends ReadyResource {
         const publicKeyHex = this.#normalizePublicKey(publicKey);
         const entry = this.#timers.get(publicKeyHex);
         if (!entry) {
-            debugLog(`stop: did not find scheduled health check for public key ${publicKey}. Aborting`);
+            this.#logger.debug(`stop: did not find scheduled health check for public key ${publicKey}. Aborting`);
             return false;
         }
         clearInterval(entry.timerId);
         this.#timers.delete(publicKeyHex);
-        debugLog('stop: cancelled health checks for', publicKeyHex);
+        this.#logger.debug(`stop: cancelled health checks for ${publicKeyHex}`);
         return true;
     }
 
@@ -101,14 +95,14 @@ class ValidatorHealthCheckService extends ReadyResource {
         try {
             const requestId = generateUUID();
             this.emit(EventType.VALIDATOR_HEALTH_CHECK, publicKey, requestId);
-            debugLog(`Emitted health check event for ${publicKey} with requestId ${requestId}`);
+            this.#logger.debug(`Emitted health check event for ${publicKey} with requestId ${requestId}`);
         } catch (error) {
-            console.error(`ValidatorHealthCheckService: Failed to emit health check for ${publicKey}: ${error?.message || error}`);
+            this.#logger.error(`ValidatorHealthCheckService: Failed to emit health check for ${publicKey}: ${error?.message || error}`);
         }
     }
 
     #stopAll() {
-        debugLog('stopAll: cancelling health checks for', this.#timers.size, 'validators');
+        this.#logger.debug(`stopAll: cancelling health checks for ${this.#timers.size} validators`);
         for (const publicKey of this.#timers.keys()) {
             this.stop(publicKey);
         }

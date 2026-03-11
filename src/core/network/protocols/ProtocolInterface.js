@@ -6,7 +6,7 @@
 class ProtocolInterface {
     
     // TODO: Refactor this so we don't need to pass a reference for the whole network instance
-    constructor(router, connection, pendingRequestServiceInstance, config) {
+    constructor(router, connection, pendingRequestService, config) {
         if (new.target === ProtocolInterface) {
             throw new Error('ProtocolInterface cannot be instantiated directly');
         }

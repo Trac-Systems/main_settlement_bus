@@ -70,7 +70,7 @@ class LegacySubnetworkOperationHandler extends BaseStateOperationHandler {
             )
         const encodedOperation = safeEncodeApplyOperation(completeTransactionOperation);
         const txHash = b4a.toString(normalizedPayload.txo.tx, 'hex');
-        this.enqueueTransaction(txHash, encodedOperation, 'SubnetworkHandler');
+        this.enqueueTransaction(txHash, encodedOperation);
 
     }
 
@@ -96,7 +96,7 @@ class LegacySubnetworkOperationHandler extends BaseStateOperationHandler {
             )
         const encodedOperation = safeEncodeApplyOperation(completeBootstrapDeploymentOperation);
         const txHash = b4a.toString(normalizedPayload.bdo.tx, 'hex');
-        this.enqueueTransaction(txHash, encodedOperation, 'SubnetworkHandler');
+        this.enqueueTransaction(txHash, encodedOperation);
 
     }
 }
