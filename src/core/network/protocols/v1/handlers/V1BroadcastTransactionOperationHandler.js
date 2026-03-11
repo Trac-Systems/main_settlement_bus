@@ -39,7 +39,7 @@ import {
     PendingCommitAlreadyExistsError,
     PendingCommitBufferFullError, PendingCommitTimeoutError
 } from "../../../services/TransactionCommitService.js";
-
+import b4a from "b4a";
 
 class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
     #state;
@@ -225,6 +225,7 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
         const type = decodedTransaction.type;
         let completeTransactionOperation;
 
+        // TODO: Consider moving logic below to strategy design pattern.
         if (isRoleAccess(type)) {
             await this.#partialRoleAccessValidator.validate(decodedTransaction);
             completeTransactionOperation = await this.#buildCompleteRoleAccessOperation(decodedTransaction);
@@ -240,8 +241,9 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
         } else {
             throw new V1TxInvalidPayloadError(`Unsupported transaction type: ${type}`, false);
         }
+
         const payloadKey = this.#getOperationPayloadKey(type);
-        const txHash = decodedTransaction[payloadKey].tx.toString('hex');
+        const txHash = b4a.toString(decodedTransaction[payloadKey].tx, 'hex');
 
         const encodedCompleteTransaction = unsafeEncodeApplyOperation(completeTransactionOperation);
         let pendingCommit;
