@@ -17,6 +17,7 @@ function transformToUseB4a(outputPath) {
     console.log(`${outputPath} has been modified to use b4a.`);
 }
 
+// TODO: If 729,26
 function generatePbjsModule(pbjsPath, protoRootPath, entryPath, outputPath) {
     execFileSync(pbjsPath, [
         '-t', 'static-module',
