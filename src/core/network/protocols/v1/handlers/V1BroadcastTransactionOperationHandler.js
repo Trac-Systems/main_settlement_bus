@@ -63,7 +63,7 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
         this.#partialBootstrapDeploymentValidator = new PartialBootstrapDeploymentValidator(state, this.#wallet.address, config);
         this.#partialTransactionValidator = new PartialTransactionValidator(state, this.#wallet.address, config);
         this.#partialTransferValidator = new PartialTransferValidator(state, this.#wallet.address, config);
-        this.#broadcastTransactionResponseValidator = new V1BroadcastTransactionResponse(config);
+        this.#broadcastTransactionResponseValidator = new V1BroadcastTransactionResponse(state, config);
         this.#transactionCommitService = transactionCommitService;
     }
 
@@ -135,7 +135,6 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
                 connection,
                 this.#broadcastTransactionResponseValidator,
                 this.#extractBroadcastResultCode,
-                this.#state
             );
         } catch (error) {
             this.handlePendingResponseError(

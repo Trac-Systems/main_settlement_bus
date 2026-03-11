@@ -15,14 +15,16 @@ const VALIDATOR_METADATA_FIELDS = new Set(["va", "vn", "vs"]);
 class V1BroadcastTransactionResponse extends V1BaseOperation {
     #config;
     #check;
+    #state;
 
-    constructor(config) {
+    constructor(state, config) {
         super(config);
+        this.#state = state;
         this.#config = config;
         this.#check = new Check(config);
     }
 
-    async validate(payload, connection, pendingRequestServiceEntry, stateInstance = null) {
+    async validate(payload, connection, pendingRequestServiceEntry) {
         this.isPayloadSchemaValid(payload);
         this.validateResponseType(payload, pendingRequestServiceEntry);
         this.validatePeerCorrectness(connection.remotePublicKey, pendingRequestServiceEntry);
@@ -31,7 +33,7 @@ class V1BroadcastTransactionResponse extends V1BaseOperation {
         // if result code is not OK, we can skip the rest of the validations.
         this.validateIfResultCodeIsValidatorInternalError(resultCode);
         if (resultCode === ResultCode.OK) {
-            const proofResult = await this.verifyProofOfPublication(payload, stateInstance);
+            const proofResult = await this.verifyProofOfPublication(payload);
             const {
                 validatorDecodedTx,
                 manifest
@@ -40,13 +42,12 @@ class V1BroadcastTransactionResponse extends V1BaseOperation {
             const {
                 writerKeyFromManifest,
                 validatorAddressCorrelatedWithManifest
-            } = await this.validateWritingKey(validatorDecodedTx, manifest, stateInstance);
+            } = await this.validateWritingKey(validatorDecodedTx, manifest);
             await this.validateValidatorCorrectness(
                 validatorDecodedTx,
                 connection.remotePublicKey,
                 writerKeyFromManifest,
                 validatorAddressCorrelatedWithManifest,
-                stateInstance,
             );
         }
 
@@ -105,9 +106,9 @@ class V1BroadcastTransactionResponse extends V1BaseOperation {
         }
     }
 
-    async verifyProofOfPublication(payload, stateInstance) {
+    async verifyProofOfPublication(payload) {
         const proof = payload.broadcast_transaction_response.proof;
-        return stateInstance.verifyProofOfPublication(proof);
+        return this.#state.verifyProofOfPublication(proof);
     }
 
     async assertProofPayloadMatchesRequestPayload(proofResult, pendingRequestServiceEntry) {
@@ -137,11 +138,11 @@ class V1BroadcastTransactionResponse extends V1BaseOperation {
         return {validatorDecodedTx: stateTxDecodedFromResponse, manifest};
     }
 
-    async validateWritingKey(validatorDecodedTx, manifest, stateInstance) {
+    async validateWritingKey(validatorDecodedTx, manifest) {
         const writerKeyFromManifest = Hypercore.key(manifest);
         const writerKeyFromManifestHex = b4a.toString(writerKeyFromManifest, "hex");
 
-        const validatorAddressBuffer = await stateInstance.getRegisteredWriterKey(writerKeyFromManifestHex);
+        const validatorAddressBuffer = await this.#state.getRegisteredWriterKey(writerKeyFromManifestHex);
         if (!b4a.isBuffer(validatorAddressBuffer) || validatorAddressBuffer.length === 0) {
             throw new V1ProtocolError(
                 ResultCode.VALIDATOR_WRITER_KEY_NOT_REGISTERED,
@@ -156,7 +157,7 @@ class V1BroadcastTransactionResponse extends V1BaseOperation {
         };
     }
 
-    async validateValidatorCorrectness(validatorDecodedTx, connectionRemotePublicKey, writerKeyFromManifest, validatorAddressCorrelatedWithManifest, stateInstance) {
+    async validateValidatorCorrectness(validatorDecodedTx, connectionRemotePublicKey, writerKeyFromManifest, validatorAddressCorrelatedWithManifest) {
         const validatorAddressFromTx = extractRequiredVaFromDecodedTx(validatorDecodedTx);
         const validatorAddressFromConnectionPublicKey = addressToBuffer(
             publicKeyToAddress(connectionRemotePublicKey, this.#config),
@@ -188,7 +189,7 @@ class V1BroadcastTransactionResponse extends V1BaseOperation {
         }
 
         const validatorAddressFromConnection = bufferToAddress(validatorAddressFromConnectionPublicKey, this.#config.addressPrefix);
-        const account = await stateInstance.getNodeEntry(validatorAddressFromConnection);
+        const account = await this.#state.getNodeEntry(validatorAddressFromConnection);
 
         if (!account) {
             throw new V1ProtocolError(
