@@ -46,7 +46,13 @@ class NetworkMessages {
         // Attach a Protomux instance to this Hyperswarm connection.
         // Protomux multiplexes multiple logical protocol channels over a single encrypted stream.
 
-        const legacyProtocol = new LegacyProtocol(this.#legacyMessageRouter, connection, null, this.#config);
+        const legacyProtocol = new LegacyProtocol(
+            this.#legacyMessageRouter,
+            connection,
+            null,
+            this.#config
+        );
+
         const v1Protocol = new V1Protocol(
             this.#v1MessageRouter,
             connection,
