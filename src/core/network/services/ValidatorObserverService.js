@@ -4,19 +4,11 @@ import { bufferToAddress } from '../../state/utils/address.js';
 import { sleep } from '../../../utils/helpers.js';
 import Scheduler from "../../../utils/Scheduler.js";
 import Network from "../Network.js";
+import { Logger } from '../../../utils/logger.js';
 
 const DELAY_INTERVAL = 50
 const VALIDATOR_CANDIDATES_PER_CYCLE = 10
 const POLL_INTERVAL = (VALIDATOR_CANDIDATES_PER_CYCLE + 1) * DELAY_INTERVAL // This is to avoid more than one instance of the worker running at the same time
-
-// -- Debug Mode --
-// TODO: Implement a better debug system in the future. This is just temporary.
-const DEBUG = false;
-const debugLog = (...args) => {
-    if (DEBUG) {
-        console.log('DEBUG [ValidatorObserverService] ==> ', ...args);
-    }
-};
 
 class ValidatorObserverService {
     #config;
@@ -25,6 +17,7 @@ class ValidatorObserverService {
     #scheduler;
     #address;
     #isInterrupted
+    #logger;
 
     /**
      * @param {Network} network
@@ -38,12 +31,11 @@ class ValidatorObserverService {
         this.#state = state;
         this.#address = address;
         this.#isInterrupted = false;
-        if (DEBUG) {
-            this.initTimestamp = Date.now();
-            this.reachedMax = false;
-            this.end = 0;
-            this.begin = 0;
-        }
+        this.#logger = new Logger(config);
+        this.initTimestamp = Date.now();
+        this.reachedMax = false;
+        this.end = 0;
+        this.begin = 0;
     }
 
     get state() {
@@ -55,11 +47,11 @@ class ValidatorObserverService {
     // OS CALLS, ACCUMULATORS, MAYBE THIS IS POSSIBLE TO CHECK I/O QUEUE IF IT COINTAIN IT. FOR NOW WE ARE USING SLEEP.
     async start() {
         if (!this.#shouldRun()) {
-            console.info('ValidatorObserverService can not start. Disabled by configuration.');
+            this.#logger.info('ValidatorObserverService can not start. Disabled by configuration.');
             return;
         }
         if (this.#scheduler && this.#scheduler.isRunning) {
-            console.info('ValidatorObserverService is already started');
+            this.#logger.info('ValidatorObserverService is already started');
             return;
         }
 
@@ -73,12 +65,12 @@ class ValidatorObserverService {
         this.#isInterrupted = true;
         await this.#scheduler.stop(waitForCurrent);
         this.#scheduler = null;
-        console.info('ValidatorObserverService: closing gracefully...');
+        this.#logger.info('ValidatorObserverService: closing gracefully...');
     }
 
     async #worker(next) {
         if (!this.#network.validatorConnectionManager.maxConnectionsReached()) {
-            if (DEBUG) this.begin = Date.now();
+            this.begin = Date.now();
             const length = await this.#lengthEntry()
 
             const promises = [];
@@ -88,16 +80,16 @@ class ValidatorObserverService {
             }
             await Promise.all(promises);
 
-            if (DEBUG) this.end = Date.now();
-            debugLog('Worker cycle completed in (ms):', this.end - this.begin, '| Validator Connections:', this.#network.validatorConnectionManager.connectionCount(), " | Pending: ", this.#network.pendingConnectionsCount());
+            this.end = Date.now();
+            this.#logger.debug(`Worker cycle completed in (ms): ${this.end - this.begin} | Validator Connections: ${this.#network.validatorConnectionManager.connectionCount()} | Pending: ${this.#network.pendingConnectionsCount()}`);
         }
-        else if (DEBUG) {
+        else {
             if (!this.reachedMax) {
                 this.reachedMax = true;
-                debugLog('Max validator connections reached. Skipping this cycle.');
+                this.#logger.debug('Max validator connections reached. Skipping this cycle.');
                 const now = Date.now();
                 const elapsed = now - this.initTimestamp;
-                debugLog('>>> Time elapsed since start (ms):', elapsed);
+                this.#logger.debug(`>>> Time elapsed since start (ms): ${elapsed}`);
             }
         }
         next(POLL_INTERVAL);
@@ -118,10 +110,10 @@ class ValidatorObserverService {
         }
 
         if (attempts >= maxAttempts) {
-            debugLog('Max attempts reached without finding a valid validator.');
+            this.#logger.debug('Max attempts reached without finding a valid validator.');
         }
         else {
-            debugLog(`Found valid validator to connect after ${attempts} attempts.`);
+            this.#logger.debug(`Found valid validator to connect after ${attempts} attempts.`);
         }
 
         if (!isValidatorValid) return;

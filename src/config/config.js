@@ -211,6 +211,10 @@ export class Config {
         return this.#config.maxPendingRequestsInPendingRequestsService
     }
 
+    get debug() {
+        return this.#config.debug
+    }
+
     // Most of these properties are boolean
     #isOverriden(prop) {
         return this.#options.hasOwnProperty(prop) && isDefined(this.#options[prop])
@@ -223,5 +227,5 @@ export class Config {
             );
         }
     }
-    
+
 }
