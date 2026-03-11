@@ -92,7 +92,7 @@ export async function broadcastTransaction(msbInstance, config, payload) {
 
     const isConfirmed = await waitForUnconfirmedTx(msbInstance.state, hash, config);
     if (!isConfirmed) {
-        throw new Error("Failed to broadcast transaction after multiple attempts.");
+        throw new BroadcastError("Failed to broadcast transaction after multiple attempts.");
     }
 
     const signedLength = msbInstance.state.getSignedLength();
