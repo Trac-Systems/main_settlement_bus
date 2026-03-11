@@ -1,4 +1,3 @@
-
 import NetworkMessageRouter from './legacy/NetworkMessageRouter.js';
 import NetworkMessageRouterV1 from './v1/NetworkMessageRouter.js';
 import ProtocolSession from './ProtocolSession.js';
@@ -57,8 +56,7 @@ class NetworkMessages {
 
         // ProtocolSession is attached to the Hyperswarm connection so other parts of the system (e.g. tryConnect)
         // can send messages without knowing how Protomux was initialized.
-        const protocolSession = new ProtocolSession(legacyProtocol, v1Protocol, this.#wallet, this.#config);
-        connection.protocolSession = protocolSession;
+        connection.protocolSession = new ProtocolSession(legacyProtocol, v1Protocol, this.#wallet, this.#config);
     }
 }
 
