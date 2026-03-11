@@ -8,6 +8,10 @@ node_modules/
 stores/
 stores_/
 
+admin/
+w*/
+
+
 # NPM configuration and lock file
 .npmrc
 
