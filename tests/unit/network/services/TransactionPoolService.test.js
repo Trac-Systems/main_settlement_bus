@@ -187,7 +187,7 @@ test('TransactionPoolService.addTransaction enforces pool size limit via validat
         () => service.addTransaction('tx-2', b4a.from('bb', 'hex')),
         TransactionPoolFullError
     );
-    t.is(service.tx_pool.size(), 1);
+    t.is(service.txPool.size(), 1);
 });
 
 test('TransactionPoolService.addTransaction rejects invalid incoming payload', t => {
@@ -211,7 +211,7 @@ test('TransactionPoolService.addTransaction rejects duplicate txHash', t => {
         () => service.addTransaction('tx-dup', b4a.from('bb', 'hex')),
         TransactionPoolAlreadyQueuedError
     );
-    t.is(service.tx_pool.size(), 1);
+    t.is(service.txPool.size(), 1);
 });
 
 test('TransactionPoolService rejects pending commit when proof is unavailable', async t => {

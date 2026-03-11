@@ -8,7 +8,7 @@ class TransactionPoolService {
     #state;
     #address;
     #config;
-    #tx_pool = new Denque();
+    #txPool = new Denque();
     #transactionCommitService
     #scheduler = null;
     #queuedTxHashes
@@ -38,8 +38,8 @@ class TransactionPoolService {
 
     }
 
-    get tx_pool() {
-        return this.#tx_pool;
+    get txPool() {
+        return this.#txPool;
     }
 
     get state() {
@@ -63,7 +63,7 @@ class TransactionPoolService {
     async #worker(next) {
         try {
             await this.#processTransactions();
-            if (this.#tx_pool.size() > 0) {
+            if (this.#txPool.size() > 0) {
                 next(0);
             } else {
                 next(this.#config.processIntervalMs);
@@ -79,7 +79,7 @@ class TransactionPoolService {
 
     async #processTransactions() {
         const canValidate = await this.#checkValidationPermissions();
-        if (!canValidate || this.#tx_pool.size() === 0) return;
+        if (!canValidate || this.#txPool.size() === 0) return;
 
         const batchItems = this.#prepareBatch();
         const encodedBatch = batchItems.map(item => item.encodedTx);
@@ -136,10 +136,10 @@ class TransactionPoolService {
 
     #prepareBatch() {
         const batch = [];
-        const batchSize = Math.min(this.#tx_pool.size(), BATCH_SIZE);
+        const batchSize = Math.min(this.#txPool.size(), BATCH_SIZE);
 
         for (let i = 0; i < batchSize; i++) {
-            const tx = this.#tx_pool.shift();
+            const tx = this.#txPool.shift();
             this.#queuedTxHashes.delete(tx.txHash);
             batch.push(tx);
         }
@@ -156,7 +156,7 @@ class TransactionPoolService {
         }
         this.#queuedTxHashes.add(txHash);
         const txData = { txHash, encodedTx };
-        this.tx_pool.push(txData);
+        this.txPool.push(txData);
     }
 
     async stopPool(waitForCurrent = true) {
@@ -164,12 +164,12 @@ class TransactionPoolService {
         await this.#scheduler.stop(waitForCurrent);
         this.#scheduler = null;
         this.#queuedTxHashes.clear();
-        this.#tx_pool.clear();
+        this.#txPool.clear();
         console.info('TransactionPoolService: closing gracefully...');
     }
 
     validateEnqueue() {
-        if (this.#tx_pool.size() >= this.#config.txPoolSize) {
+        if (this.#txPool.size() >= this.#config.txPoolSize) {
             throw new TransactionPoolFullError(this.#config.txPoolSize);
         }
     }
