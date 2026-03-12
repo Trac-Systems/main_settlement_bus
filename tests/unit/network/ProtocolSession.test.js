@@ -1,23 +1,13 @@
 import { test } from 'brittle';
 import sinon from 'sinon';
-import b4a from 'b4a';
-
-import NetworkWalletFactory from '../../../src/core/network/identity/NetworkWalletFactory.js';
 import ProtocolSession from '../../../src/core/network/protocols/ProtocolSession.js';
 import { ResultCode } from '../../../src/utils/constants.js';
 import { config } from '../../helpers/config.js';
 import { testKeyPair1 } from '../../fixtures/apply.fixtures.js';
+import { WalletProvider } from 'trac-wallet';
 
-function createWallet() {
-    const keyPair = {
-        publicKey: b4a.from(testKeyPair1.publicKey, 'hex'),
-        secretKey: b4a.from(testKeyPair1.secretKey, 'hex')
-    };
-    return NetworkWalletFactory.provide({
-        enableWallet: false,
-        keyPair,
-        networkPrefix: config.addressPrefix
-    });
+async function createWallet() {
+    return await new WalletProvider(config).fromSecretKey(testKeyPair1.secretKey)
 }
 
 function makeProtocol(sendStub) {
@@ -37,7 +27,7 @@ test('ProtocolSession', (t) => {
         const session = new ProtocolSession(
             makeProtocol(),
             makeProtocol(v1Send),
-            createWallet(),
+            await createWallet(),
             config
         );
 
@@ -51,7 +41,7 @@ test('ProtocolSession', (t) => {
         const session = new ProtocolSession(
             makeProtocol(),
             makeProtocol(v1Send),
-            createWallet(),
+            await createWallet(),
             config
         );
 
@@ -65,7 +55,7 @@ test('ProtocolSession', (t) => {
         const session = new ProtocolSession(
             makeProtocol(),
             makeProtocol(v1Send),
-            createWallet(),
+            await createWallet(),
             config
         );
 
@@ -79,7 +69,7 @@ test('ProtocolSession', (t) => {
         const session = new ProtocolSession(
             makeProtocol(),
             makeProtocol(v1Send),
-            createWallet(),
+            await createWallet(),
             config
         );
 
@@ -93,7 +83,7 @@ test('ProtocolSession', (t) => {
         const session = new ProtocolSession(
             makeProtocol(),
             makeProtocol(),
-            createWallet(),
+            await createWallet(),
             config
         );
 
@@ -106,7 +96,7 @@ test('ProtocolSession', (t) => {
         const session = new ProtocolSession(
             makeProtocol(),
             makeProtocol(),
-            createWallet(),
+            await createWallet(),
             config
         );
 
@@ -118,7 +108,7 @@ test('ProtocolSession', (t) => {
         const session = new ProtocolSession(
             makeProtocol(),
             makeProtocol(),
-            createWallet(),
+            await createWallet(),
             config
         );
 

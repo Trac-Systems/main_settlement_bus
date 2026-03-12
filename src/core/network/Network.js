@@ -12,7 +12,6 @@ import {
 } from '../../utils/constants.js';
 import ConnectionManager from './services/ConnectionManager.js';
 import MessageOrchestrator from './services/MessageOrchestrator.js';
-import NetworkWalletFactory from './identity/NetworkWalletFactory.js';
 import TransactionRateLimiterService from './services/TransactionRateLimiterService.js';
 import PendingRequestService from './services/PendingRequestService.js';
 import TransactionCommitService from "./services/TransactionCommitService.js";
