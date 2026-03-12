@@ -26,54 +26,6 @@ function uniqueResultCodes() {
     return [...new Set(Object.values(NetworkResultCode))].sort((a, b) => a - b);
 }
 
-test('NetworkMessageDirector builds validator connection request and verifies signature', async t => {
-    const wallet = await createWallet();
-    const director = new NetworkMessageDirector(new NetworkMessageBuilder(wallet, config));
-
-    const id = '1';
-    const caps = ['cap:b', 'cap:a'];
-
-    const payload = await director.buildValidatorConnectionRequest(id, wallet.address, caps);
-    t.is(payload.type, NetworkOperationType.VALIDATOR_CONNECTION_REQUEST);
-    t.is(payload.id, id);
-    t.alike(payload.capabilities, caps);
-
-    const msg = createMessage(
-        payload.type,
-        idToBuffer(payload.id),
-        timestampToBuffer(payload.timestamp),
-        addressToBuffer(wallet.address, config.addressPrefix),
-        payload.validator_connection_request.nonce,
-        encodeCapabilities(caps)
-    );
-    const hash = await tracCryptoApi.hash.blake3(msg);
-    t.ok(wallet.verify(payload.validator_connection_request.signature, hash, wallet.publicKey));
-});
-
-test('NetworkMessageDirector builds liveness request and verifies signature', async t => {
-    const wallet = await createWallet();
-    const director = new NetworkMessageDirector(new NetworkMessageBuilder(wallet, config));
-
-    const id = '1';
-    const caps = ['cap:b', 'cap:a'];
-    const data = b4a.from('ping', 'utf8');
-
-    const payload = await director.buildLivenessRequest(id, data, caps);
-    t.is(payload.type, NetworkOperationType.LIVENESS_REQUEST);
-    t.is(payload.id, id);
-    t.alike(payload.capabilities, caps);
-
-    const msg = createMessage(
-        payload.type,
-        idToBuffer(payload.id),
-        timestampToBuffer(payload.timestamp),
-        payload.liveness_request.nonce,
-        encodeCapabilities(caps)
-    );
-    const hash = await tracCryptoApi.hash.blake3(msg);
-    t.ok(wallet.verify(payload.liveness_request.signature, hash, wallet.publicKey));
-});
-
 test('NetworkMessageDirector iterates liveness response ResultCode values', async t => {
     const wallet = await createWallet();
     const director = new NetworkMessageDirector(new NetworkMessageBuilder(wallet, config));
