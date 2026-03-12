@@ -135,6 +135,14 @@ export async function ensureCoresStoreDir(config) {
     }
 }
 
+export function verifyWalletPath(config) {
+    try {
+        return fs.existsSync(config.keyPairPath)
+    } catch (err) {
+        return false
+    }
+}
+
 export async function validateBalanceMigrationData(addresses) {
     const migrationFiles = await getAllMigrationFiles(BALANCE_MIGRATED_DIR);
     const addressSet = new Set(addresses.map(a => a.address));
