@@ -94,7 +94,7 @@ const configData = {
         storeName: 'mainnet',
     },
     [ENV.DEVELOPMENT]: {
-        debug: true,
+        debug: false,
         addressLength: 63,
         addressPrefix: TRAC_NETWORK_MSB_MAINNET_PREFIX,
         addressPrefixLength: TRAC_NETWORK_MSB_MAINNET_PREFIX.length,
