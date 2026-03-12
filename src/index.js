@@ -1,7 +1,7 @@
 /** @typedef {import('pear-interface')} */ /* global Pear */
 import ReadyResource from "ready-resource";
 import Corestore from "corestore";
-import { WalletProvider } from "trac-wallet";
+import { WalletProvider, exportWallet, importFromFile } from "trac-wallet";
 import tracCryptoApi from "trac-crypto-api";
 import b4a from "b4a";
 import readline from "readline";
@@ -23,7 +23,7 @@ import {
 } from "./utils/constants.js";
 import { randomBytes } from "hypercore-crypto";
 import { decimalStringToBigInt, bigIntTo16ByteBuffer, bufferToBigInt, bigIntToDecimalString } from "./utils/amountSerialization.js"
-import fileUtils from './utils/fileUtils.js';
+import fileUtils, { verifyWalletPath } from './utils/fileUtils.js';
 import migrationUtils from './utils/migrationUtils.js';
 import {
     getBalanceCommand,
@@ -1057,8 +1057,8 @@ export class MainSettlementBus extends ReadyResource {
 
     async #initKeyPair() {
         try {
-            if (fs.existsSync(this.#config.keyPairPath)) {
-                this.#wallet = await this.importFromFile(this.#config.keyPairPath)
+            if (verifyWalletPath(this.#config)) {
+                this.#wallet = await importFromFile(this.#config.keyPairPath)
             } else {
                 console.log("Key file was not found. How do you wish to proceed?")
                 const wallet = await this.#setupKeypairInteractiveMode()
@@ -1076,23 +1076,30 @@ export class MainSettlementBus extends ReadyResource {
     async #setupKeypairInteractiveMode() {
         // this would be enable interactive mode (but there is an exception being swallowed so its better to act against the code)
         if (this.#readline_instance !== null) {
-            console.log("\n[1]. Generate new keypair\n",
-                "[2]. Restore keypair from 12 or 24-word mnemonic\n",
+            console.log([
+                "[1]. Generate new keypair",
+                "[2]. Restore keypair from 12 or 24-word mnemonic",
                 "Your choice(1/ 2/):"
-            );
+            ].join("\n"));
 
-            let choice = '';
-            await this.#awaitInput(async input => choice = input)
+            let choice = await this.#awaitInput()
 
             try {
                 switch (choice) {
                     case '1':
-                        return await new WalletProvider(this.#config).generate()
+                        const wallet =  await new WalletProvider(this.#config).generate()
+                        console.log([
+                            "This is your mnemonic:",
+                            wallet.mnemonic, 
+                            "Please back it up in a safe location"
+
+                        ].join("\n"))
+                        exportWallet(wallet, this.#config.keyPairPath)
+                        return wallet
                     case '2':
                         console.log("Enter your mnemonic phrase:");
 
-                        let mnemonicInput = '';
-                        await this.#awaitInput(async input => mnemonicInput = input)
+                        let mnemonic = await this.#awaitInput()
                         try {
                             return await new WalletProvider(this.#config).fromMnemonic({ mnemonic })
                         } catch {
@@ -1101,23 +1108,24 @@ export class MainSettlementBus extends ReadyResource {
                         }
                     default:
                         console.log("Invalid choice. Please select again.");
-                        return this.#setupKeypairInteractiveMode(readline_instance);
+                        return this.#setupKeypairInteractiveMode();
                 }
             } catch (e) {
                 console.log("Invalid input. Please try again.");
-                return this.#setupKeypairInteractiveMode(readline_instance);
+                return this.#setupKeypairInteractiveMode();
             }
         }
     }
 
-    async #awaitInput(anAction) {
+    async #awaitInput() {
+        let choice = '';
+        const anAction = async input => choice = input
+
         this.#readline_instance.on('line', anAction)
-
-        while ('' === choice) {
-            await sleep(1000);
-        }
-
+        while ('' === choice) await sleep(1000);
         this.#readline_instance.off('line', anAction);
+
+        return choice
     }
 }
 
