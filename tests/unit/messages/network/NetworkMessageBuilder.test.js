@@ -19,7 +19,6 @@ import {
 import { config } from '../../../helpers/config.js';
 import { asAddress } from '../../../helpers/address.js';
 import { testKeyPair1 } from '../../../fixtures/apply.fixtures.js';
-import tracCryptoApi from 'trac-crypto-api';
 import { WalletProvider } from 'trac-wallet';
 
 async function createWallet() {
@@ -148,7 +147,7 @@ test('NetworkMessageBuilder iterates broadcast transaction response ResultCode v
 });
 
 test('NetworkMessageBuilder builds broadcast transaction response with proof and timestamp', async t => {
-    const wallet = createWallet();
+    const wallet = await createWallet();
     const builder = new NetworkMessageBuilder(wallet, config);
     const id = uuidv7();
     const caps = ['cap:b', 'cap:a'];
@@ -188,7 +187,7 @@ test('NetworkMessageBuilder builds broadcast transaction response with proof and
 });
 
 test('NetworkMessageBuilder rejects OK response when proof is provided without timestamp', async t => {
-    const wallet = createWallet();
+    const wallet = await createWallet();
     const builder = new NetworkMessageBuilder(wallet, config);
     const id = uuidv7();
     const caps = ['cap:b', 'cap:a'];
@@ -209,7 +208,7 @@ test('NetworkMessageBuilder rejects OK response when proof is provided without t
 });
 
 test('NetworkMessageBuilder rejects OK response when timestamp is provided without proof', async t => {
-    const wallet = createWallet();
+    const wallet = await createWallet();
     const builder = new NetworkMessageBuilder(wallet, config);
     const id = uuidv7();
     const caps = ['cap:b', 'cap:a'];
@@ -230,7 +229,7 @@ test('NetworkMessageBuilder rejects OK response when timestamp is provided witho
 });
 
 test('NetworkMessageBuilder allows TX_ACCEPTED_PROOF_UNAVAILABLE response with timestamp and empty proof', async t => {
-    const wallet = createWallet();
+    const wallet = await createWallet();
     const builder = new NetworkMessageBuilder(wallet, config);
     const id = uuidv7();
     const caps = ['cap:b', 'cap:a'];
@@ -271,7 +270,7 @@ test('NetworkMessageBuilder allows TX_ACCEPTED_PROOF_UNAVAILABLE response with t
 });
 
 test('NetworkMessageBuilder rejects OK response when proof and timestamp are both missing', async t => {
-    const wallet = createWallet();
+    const wallet = await createWallet();
     const builder = new NetworkMessageBuilder(wallet, config);
     const id = uuidv7();
     const caps = ['cap:b', 'cap:a'];
@@ -290,7 +289,7 @@ test('NetworkMessageBuilder rejects OK response when proof and timestamp are bot
 });
 
 test('NetworkMessageBuilder rejects TX_ACCEPTED_PROOF_UNAVAILABLE response when timestamp is missing', async t => {
-    const wallet = createWallet();
+    const wallet = await createWallet();
     const builder = new NetworkMessageBuilder(wallet, config);
     const id = uuidv7();
     const caps = ['cap:b', 'cap:a'];
@@ -309,7 +308,7 @@ test('NetworkMessageBuilder rejects TX_ACCEPTED_PROOF_UNAVAILABLE response when 
 });
 
 test('NetworkMessageBuilder rejects TX_ACCEPTED_PROOF_UNAVAILABLE response when proof is non-empty', async t => {
-    const wallet = createWallet();
+    const wallet = await createWallet();
     const builder = new NetworkMessageBuilder(wallet, config);
     const id = uuidv7();
     const caps = ['cap:b', 'cap:a'];
@@ -330,7 +329,7 @@ test('NetworkMessageBuilder rejects TX_ACCEPTED_PROOF_UNAVAILABLE response when 
 });
 
 test('NetworkMessageBuilder rejects non-OK response when proof is non-empty', async t => {
-    const wallet = createWallet();
+    const wallet = await createWallet();
     const builder = new NetworkMessageBuilder(wallet, config);
     const id = uuidv7();
     const caps = ['cap:b', 'cap:a'];
@@ -351,7 +350,7 @@ test('NetworkMessageBuilder rejects non-OK response when proof is non-empty', as
 });
 
 test('NetworkMessageBuilder rejects non-OK response with timestamp > 0 unless proof is unavailable', async t => {
-    const wallet = createWallet();
+    const wallet = await createWallet();
     const builder = new NetworkMessageBuilder(wallet, config);
     const id = uuidv7();
     const caps = ['cap:b', 'cap:a'];

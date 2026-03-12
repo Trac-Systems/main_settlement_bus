@@ -2,7 +2,6 @@ import test from 'brittle';
 import b4a from 'b4a';
 import tracCryptoApi from 'trac-crypto-api';
 import V1BaseOperation from '../../../../src/core/network/protocols/v1/validators/V1BaseOperation.js';
-import NetworkWalletFactory from '../../../../src/core/network/identity/NetworkWalletFactory.js';
 import NetworkMessageBuilder from '../../../../src/messages/network/v1/NetworkMessageBuilder.js';
 import {
     V1InvalidPayloadError,
@@ -16,19 +15,11 @@ import {
 import { testKeyPair1, testKeyPair2 } from '../../../fixtures/apply.fixtures.js';
 import { config } from '../../../helpers/config.js';
 import { errorMessageIncludes } from '../../../helpers/regexHelper.js';
+import { WalletProvider } from 'trac-wallet';
 
-const createWallet = (fixture = testKeyPair1) => {
-    const keyPair = {
-        publicKey: b4a.from(fixture.publicKey, 'hex'),
-        secretKey: b4a.from(fixture.secretKey, 'hex'),
-    };
-
-    return NetworkWalletFactory.provide({
-        enableWallet: false,
-        keyPair,
-        networkPrefix: config.addressPrefix,
-    });
-};
+async function createWallet(testKeypair = testKeyPair1) {
+    return await new WalletProvider(config).fromSecretKey(testKeypair.secretKey)
+}
 
 const buildSignedPayload = async (wallet, type, options = {}) => {
     const builder = new NetworkMessageBuilder(wallet, config)

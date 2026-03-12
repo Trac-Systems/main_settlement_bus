@@ -1,27 +1,17 @@
 import { test } from 'brittle';
 import b4a from 'b4a';
-import { TRAC_NETWORK_MSB_MAINNET_PREFIX } from 'trac-wallet/constants.js';
 import { config } from '../../../helpers/config.js';
 import { testKeyPair1, testKeyPair2 } from '../../../fixtures/apply.fixtures.js';
-import NetworkWalletFactory from '../../../../src/core/network/identity/NetworkWalletFactory.js';
 import V1BroadcastTransactionOperationHandler from '../../../../src/core/network/protocols/v1/handlers/V1BroadcastTransactionOperationHandler.js';
 import PartialTransactionValidator from '../../../../src/core/network/protocols/shared/validators/PartialTransactionValidator.js';
 import { TransactionPoolFullError } from '../../../../src/core/network/services/TransactionPoolService.js';
 import { V1NodeOverloadedError } from '../../../../src/core/network/protocols/v1/V1ProtocolError.js';
 import { applyStateMessageFactory } from '../../../../src/messages/state/applyStateMessageFactory.js';
+import { WalletProvider } from 'trac-wallet';
 
-const createWallet = (keyPair) => {
-    const normalizedKeyPair = {
-        publicKey: b4a.from(keyPair.publicKey, 'hex'),
-        secretKey: b4a.from(keyPair.secretKey, 'hex')
-    };
-
-    return NetworkWalletFactory.provide({
-        enableWallet: false,
-        keyPair: normalizedKeyPair,
-        networkPrefix: TRAC_NETWORK_MSB_MAINNET_PREFIX
-    });
-};
+async function createWallet(keyPair) {
+    return await new WalletProvider(config).fromSecretKey(keyPair.secretKey)
+}
 
 test('V1BroadcastTransactionOperationHandler dispatchTransaction does not emit unhandledRejection when enqueue fails after pending commit registration', async t => {
     const originalValidate = PartialTransactionValidator.prototype.validate;

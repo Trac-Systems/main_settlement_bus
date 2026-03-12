@@ -1,29 +1,19 @@
 import { hook, test } from 'brittle';
 import sinon from 'sinon';
-import b4a from 'b4a';
-
-import { createConfig, ENV } from '../../../../src/config/env.js';
 import MessageOrchestrator from '../../../../src/core/network/services/MessageOrchestrator.js';
 import { OperationType, ResultCode } from '../../../../src/utils/constants.js';
-import NetworkWalletFactory from '../../../../src/core/network/identity/NetworkWalletFactory.js';
 import { testKeyPair1, testKeyPair2 } from '../../../fixtures/apply.fixtures.js';
 import { publicKeyToAddress } from '../../../../src/utils/helpers.js';
 import { ConnectionManagerError } from '../../../../src/core/network/services/ConnectionManager.js';
 import { V1TimeoutError } from '../../../../src/core/network/protocols/v1/V1ProtocolError.js';
+import { WalletProvider } from 'trac-wallet';
+import { config } from '../../../helpers/config.js';
+
+async function createWallet() {
+    return await new WalletProvider(config).fromSecretKey(testKeyPair1.secretKey)
+}
 
 const VALIDATOR_KEY = testKeyPair2.publicKey;
-
-const createWallet = (config) => {
-    const keyPair = {
-        publicKey: b4a.from(testKeyPair1.publicKey, 'hex'),
-        secretKey: b4a.from(testKeyPair1.secretKey, 'hex'),
-    };
-    return NetworkWalletFactory.provide({
-        enableWallet: false,
-        keyPair,
-        networkPrefix: config.addressPrefix,
-    });
-};
 
 const createTransferMessage = (config, wallet) => ({
     type: OperationType.TRANSFER,
@@ -72,7 +62,6 @@ hook('teardown', () => {
 });
 
 test('MessageOrchestrator.send returns false for unsupported protocol', async t => {
-    const config = createConfig(ENV.DEVELOPMENT, {});
     const connectionManager = createConnectionManager({ preferredProtocol: 'unknown' });
     const orchestrator = new MessageOrchestrator(connectionManager, { get: async () => null }, config);
     const wallet = createWallet(config);
@@ -86,7 +75,6 @@ test('MessageOrchestrator.send returns false for unsupported protocol', async t 
 });
 
 test('MessageOrchestrator.send V1 matrix: OK -> SUCCESS', async t => {
-    const config = createConfig(ENV.DEVELOPMENT, {});
     const connectionManager = createConnectionManager({
         sendSingleMessage: sinon.stub().resolves(ResultCode.OK),
         sentCount: 0,
@@ -104,7 +92,6 @@ test('MessageOrchestrator.send V1 matrix: OK -> SUCCESS', async t => {
 });
 
 test('MessageOrchestrator.send V1 matrix: TIMEOUT -> ROTATE', async t => {
-    const config = createConfig(ENV.DEVELOPMENT, {});
     const connectionManager = createConnectionManager({
         sendSingleMessage: sinon.stub().resolves(ResultCode.TIMEOUT),
     });
@@ -122,7 +109,6 @@ test('MessageOrchestrator.send V1 matrix: TIMEOUT -> ROTATE', async t => {
 });
 
 test('MessageOrchestrator.send V1 matrix: TX_ALREADY_PENDING -> NO_ROTATE', async t => {
-    const config = createConfig(ENV.DEVELOPMENT, {});
     const connectionManager = createConnectionManager({
         sendSingleMessage: sinon.stub().resolves(ResultCode.TX_ALREADY_PENDING),
     });
@@ -140,7 +126,6 @@ test('MessageOrchestrator.send V1 matrix: TX_ALREADY_PENDING -> NO_ROTATE', asyn
 });
 
 test('MessageOrchestrator.send V1 matrix: unknown code -> UNDEFINED', async t => {
-    const config = createConfig(ENV.DEVELOPMENT, {});
     const connectionManager = createConnectionManager({
         sendSingleMessage: sinon.stub().resolves(99999),
     });
@@ -157,7 +142,6 @@ test('MessageOrchestrator.send V1 matrix: unknown code -> UNDEFINED', async t =>
 });
 
 test('MessageOrchestrator.send removes validator when threshold reached on success', async t => {
-    const config = createConfig(ENV.DEVELOPMENT, {});
     const connectionManager = createConnectionManager({
         sendSingleMessage: sinon.stub().resolves(ResultCode.OK),
         sentCount: config.messageThreshold,
@@ -371,7 +355,6 @@ test('MessageOrchestrator.send legacy path catches send error and retries', asyn
 test('MessageOrchestrator.waitForUnsignedState returns true when state entry appears', async t => {
     const clock = sinon.useFakeTimers({ now: 1 });
     try {
-        const config = createConfig(ENV.DEVELOPMENT, {});
         const state = {
             get: sinon.stub()
                 .onFirstCall().resolves(null)
@@ -393,7 +376,6 @@ test('MessageOrchestrator.waitForUnsignedState returns true when state entry app
 test('MessageOrchestrator.waitForUnsignedState returns false on timeout', async t => {
     const clock = sinon.useFakeTimers({ now: 1 });
     try {
-        const config = createConfig(ENV.DEVELOPMENT, {});
         const state = { get: sinon.stub().resolves(null) };
         const orchestrator = new MessageOrchestrator(createConnectionManager(), state, config);
 
@@ -409,7 +391,6 @@ test('MessageOrchestrator.waitForUnsignedState returns false on timeout', async 
 });
 
 test('MessageOrchestrator.send V1 avoids selecting validator with requester address when possible', async t => {
-    const config = createConfig(ENV.DEVELOPMENT, {});
     const requesterValidatorKey = testKeyPair1.publicKey;
     const otherValidatorKey = testKeyPair2.publicKey;
     const sendSingleMessage = sinon.stub().resolves(ResultCode.OK);
