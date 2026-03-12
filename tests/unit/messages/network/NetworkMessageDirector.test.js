@@ -131,7 +131,7 @@ test('NetworkMessageDirector iterates broadcast transaction response ResultCode 
 });
 
 test('NetworkMessageDirector builds broadcast transaction response with proof and timestamp', async t => {
-    const wallet = createWallet();
+    const wallet = await createWallet();
     const director = new NetworkMessageDirector(new NetworkMessageBuilder(wallet, config));
 
     const id = uuidv7();
@@ -169,7 +169,7 @@ test('NetworkMessageDirector builds broadcast transaction response with proof an
 });
 
 test('NetworkMessageDirector rejects OK response when proof is provided without timestamp', async t => {
-    const wallet = createWallet();
+    const wallet = await createWallet();
     const director = new NetworkMessageDirector(new NetworkMessageBuilder(wallet, config));
 
     const id = uuidv7();
@@ -188,7 +188,7 @@ test('NetworkMessageDirector rejects OK response when proof is provided without 
 });
 
 test('NetworkMessageDirector rejects OK response when timestamp is provided without proof', async t => {
-    const wallet = createWallet();
+    const wallet = await createWallet();
     const director = new NetworkMessageDirector(new NetworkMessageBuilder(wallet, config));
 
     const id = uuidv7();
@@ -208,7 +208,7 @@ test('NetworkMessageDirector rejects OK response when timestamp is provided with
 });
 
 test('NetworkMessageDirector allows TX_ACCEPTED_PROOF_UNAVAILABLE response with timestamp and empty proof', async t => {
-    const wallet = createWallet();
+    const wallet = await createWallet();
     const director = new NetworkMessageDirector(new NetworkMessageBuilder(wallet, config));
 
     const id = uuidv7();
@@ -247,7 +247,7 @@ test('NetworkMessageDirector allows TX_ACCEPTED_PROOF_UNAVAILABLE response with 
 });
 
 test('NetworkMessageDirector rejects OK response when proof and timestamp are both missing', async t => {
-    const wallet = createWallet();
+    const wallet = await createWallet();
     const director = new NetworkMessageDirector(new NetworkMessageBuilder(wallet, config));
 
     const id = uuidv7();
@@ -264,7 +264,7 @@ test('NetworkMessageDirector rejects OK response when proof and timestamp are bo
 });
 
 test('NetworkMessageDirector rejects TX_ACCEPTED_PROOF_UNAVAILABLE response when timestamp is missing', async t => {
-    const wallet = createWallet();
+    const wallet = await createWallet();
     const director = new NetworkMessageDirector(new NetworkMessageBuilder(wallet, config));
 
     const id = uuidv7();
@@ -281,7 +281,7 @@ test('NetworkMessageDirector rejects TX_ACCEPTED_PROOF_UNAVAILABLE response when
 });
 
 test('NetworkMessageDirector rejects TX_ACCEPTED_PROOF_UNAVAILABLE response when proof is non-empty', async t => {
-    const wallet = createWallet();
+    const wallet = await createWallet();
     const director = new NetworkMessageDirector(new NetworkMessageBuilder(wallet, config));
 
     const id = uuidv7();
@@ -300,7 +300,7 @@ test('NetworkMessageDirector rejects TX_ACCEPTED_PROOF_UNAVAILABLE response when
 });
 
 test('NetworkMessageDirector rejects non-OK response when proof is non-empty', async t => {
-    const wallet = createWallet();
+    const wallet = await createWallet();
     const director = new NetworkMessageDirector(new NetworkMessageBuilder(wallet, config));
 
     const id = uuidv7();
@@ -319,7 +319,7 @@ test('NetworkMessageDirector rejects non-OK response when proof is non-empty', a
 });
 
 test('NetworkMessageDirector rejects non-OK response with timestamp > 0 unless proof is unavailable', async t => {
-    const wallet = createWallet();
+    const wallet = await createWallet();
     const director = new NetworkMessageDirector(new NetworkMessageBuilder(wallet, config));
 
     const id = uuidv7();
