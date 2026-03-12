@@ -92,7 +92,7 @@ test('V1BaseOperation.isPayloadSchemaValid handles missing/invalid type cases', 
 
 test('V1BaseOperation.isPayloadSchemaValid accepts all supported message schemas', async t => {
     const operation = new V1BaseOperation(config);
-    const wallet = createWallet();
+    const wallet = await createWallet();
 
     const payloads = [
         await buildSignedPayload(wallet, NetworkOperationType.LIVENESS_REQUEST),
@@ -110,7 +110,7 @@ test('V1BaseOperation.isPayloadSchemaValid accepts all supported message schemas
 
 test('V1BaseOperation.validateSignature verifies valid signatures for all supported message types', async t => {
     const operation = new V1BaseOperation(config);
-    const wallet = createWallet();
+    const wallet = await createWallet();
 
     const payloads = [
         await buildSignedPayload(wallet, NetworkOperationType.LIVENESS_REQUEST),
@@ -128,8 +128,8 @@ test('V1BaseOperation.validateSignature verifies valid signatures for all suppor
 
 test('V1BaseOperation.validateSignature throws V1SignatureInvalidError on wrong public key', async t => {
     const operation = new V1BaseOperation(config);
-    const wallet = createWallet(testKeyPair1);
-    const otherWallet = createWallet(testKeyPair2);
+    const wallet = await createWallet(testKeyPair1);
+    const otherWallet = await createWallet(testKeyPair2);
 
     const payload = await buildSignedPayload(wallet, NetworkOperationType.LIVENESS_REQUEST);
 
@@ -181,7 +181,7 @@ test('V1BaseOperation.validateSignature wraps non-protocol build errors as V1Inv
 
 test('V1BaseOperation.validateSignature throws V1InvalidPayloadError when hashing fails', async t => {
     const operation = new V1BaseOperation(config);
-    const wallet = createWallet();
+    const wallet = await createWallet();
     const payload = await buildSignedPayload(wallet, NetworkOperationType.LIVENESS_REQUEST);
 
     const originalBlake3 = tracCryptoApi.hash.blake3;
@@ -204,7 +204,7 @@ test('V1BaseOperation.validateSignature throws V1InvalidPayloadError when hashin
 
 test('V1BaseOperation.validateSignature handles verify() throw as invalid signature', async t => {
     const operation = new V1BaseOperation(config);
-    const wallet = createWallet();
+    const wallet = await createWallet();
     const payload = await buildSignedPayload(wallet, NetworkOperationType.LIVENESS_REQUEST);
 
     const originalVerify = tracCryptoApi.signature.verify;
@@ -227,7 +227,7 @@ test('V1BaseOperation.validateSignature handles verify() throw as invalid signat
 
 test('V1BaseOperation.validateSignature enforces BROADCAST_TRANSACTION_RESPONSE proof/timestamp invariants', async t => {
     const operation = new V1BaseOperation(config);
-    const wallet = createWallet();
+    const wallet = await createWallet();
 
     const validBase = await buildSignedPayload(wallet, NetworkOperationType.BROADCAST_TRANSACTION_RESPONSE);
 

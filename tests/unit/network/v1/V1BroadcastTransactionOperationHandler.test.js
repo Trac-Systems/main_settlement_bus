@@ -40,8 +40,8 @@ test('V1BroadcastTransactionOperationHandler dispatchTransaction does not emit u
             }
         };
 
-        const validatorWallet = createWallet(testKeyPair1);
-        const requesterWallet = createWallet(testKeyPair2);
+        const validatorWallet = await createWallet(testKeyPair1);
+        const requesterWallet = await createWallet(testKeyPair2);
         const externalBootstrap = b4a.alloc(32, 0x11);
 
         const decodedTransaction = await applyStateMessageFactory(requesterWallet, config)

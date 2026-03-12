@@ -19,7 +19,7 @@ async function createWallet() {
     return await new WalletProvider(config).fromSecretKey(testKeyPair1.secretKey)
 }
 async function buildV1Request({ id = uuidv7() } = {}) {
-    const wallet = createWallet();
+    const wallet = await createWallet();
     const builder = new NetworkMessageBuilder(wallet, config);
     await builder
         .setType(NetworkOperationType.LIVENESS_REQUEST)
@@ -31,7 +31,7 @@ async function buildV1Request({ id = uuidv7() } = {}) {
 }
 
 async function buildV1BroadcastRequest({ id = uuidv7(), data = b4a.from('deadbeef', 'hex') } = {}) {
-    const wallet = createWallet();
+    const wallet = await createWallet();
     const builder = new NetworkMessageBuilder(wallet, config);
     await builder
         .setType(NetworkOperationType.BROADCAST_TRANSACTION_REQUEST)
