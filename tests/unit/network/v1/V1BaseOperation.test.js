@@ -1,7 +1,6 @@
 import test from 'brittle';
 import b4a from 'b4a';
 import tracCryptoApi from 'trac-crypto-api';
-
 import V1BaseOperation from '../../../../src/core/network/protocols/v1/validators/V1BaseOperation.js';
 import NetworkWalletFactory from '../../../../src/core/network/identity/NetworkWalletFactory.js';
 import NetworkMessageBuilder from '../../../../src/messages/network/v1/NetworkMessageBuilder.js';
