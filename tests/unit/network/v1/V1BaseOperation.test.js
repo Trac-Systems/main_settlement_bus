@@ -1,6 +1,5 @@
 import test from 'brittle';
 import b4a from 'b4a';
-import PeerWallet from 'trac-wallet';
 import tracCryptoApi from 'trac-crypto-api';
 
 import V1BaseOperation from '../../../../src/core/network/protocols/v1/validators/V1BaseOperation.js';
@@ -217,13 +216,13 @@ test('V1BaseOperation.validateSignature handles verify() throw as invalid signat
     const wallet = createWallet();
     const payload = await buildSignedPayload(wallet, NetworkOperationType.LIVENESS_REQUEST);
 
-    const originalVerify = PeerWallet.verify;
-    PeerWallet.verify = () => {
+    const originalVerify = tracCryptoApi.signature.verify;
+    tracCryptoApi.signature.verify = () => {
         throw new Error('verify fail');
     };
 
     t.teardown(() => {
-        PeerWallet.verify = originalVerify;
+        tracCryptoApi.signature.verify = originalVerify;
     });
 
     try {

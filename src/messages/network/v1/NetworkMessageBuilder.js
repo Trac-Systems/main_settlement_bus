@@ -1,4 +1,3 @@
-import PeerWallet from 'trac-wallet';
 import tracCryptoApi from 'trac-crypto-api';
 import b4a from 'b4a';
 import {createMessage, safeWriteUInt32BE, idToBuffer, timestampToBuffer} from "../../../utils/buffer.js";
@@ -138,7 +137,7 @@ class NetworkMessageBuilder {
     }
 
     async #buildLivenessRequestPayload() {
-        const nonce = PeerWallet.generateNonce();
+        const nonce = tracCryptoApi.nonce.generate();
         const tsBuf = timestampToBuffer(this.#timestamp);
         const idBuf = idToBuffer(this.#id);
         const message = createMessage(
@@ -163,7 +162,7 @@ class NetworkMessageBuilder {
             throw new Error('Result code must be set before building liveness response');
         }
 
-        const nonce = PeerWallet.generateNonce();
+        const nonce = tracCryptoApi.nonce.generate();
         const tsBuf = timestampToBuffer(this.#timestamp);
         const idBuf = idToBuffer(this.#id);
         const message = createMessage(
@@ -189,7 +188,7 @@ class NetworkMessageBuilder {
         if (!b4a.isBuffer(this.#data)) {
             throw new Error('Data must be set before building broadcast transaction request');
         }
-        const nonce = PeerWallet.generateNonce();
+        const nonce = tracCryptoApi.nonce.generate();
         const tsBuf = timestampToBuffer(this.#timestamp);
         const idBuf = idToBuffer(this.#id);
         const message = createMessage(
@@ -215,7 +214,7 @@ class NetworkMessageBuilder {
         if (this.#resultCode === null || this.#resultCode === undefined) {
             throw new Error('Result code must be set before building broadcast transaction response');
         }
-        const nonce = PeerWallet.generateNonce();
+        const nonce = tracCryptoApi.nonce.generate();
         const tsBuf = timestampToBuffer(this.#timestamp);
         const idBuf = idToBuffer(this.#id);
         const proof = b4a.isBuffer(this.#proof) ? this.#proof : b4a.alloc(0);
