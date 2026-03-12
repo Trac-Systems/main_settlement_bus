@@ -2,7 +2,7 @@ import { test } from 'brittle';
 import sinon from 'sinon';
 import b4a from 'b4a';
 
-import PeerWallet from 'trac-wallet';
+import tracCryptoApi from 'trac-crypto-api';
 import NetworkWalletFactory, { EphemeralWallet } from '../../../src/core/network/identity/NetworkWalletFactory.js';
 import { errorMessageIncludes } from '../../helpers/regexHelper.js';
 import { testKeyPair1, testKeyPair2 } from '../../fixtures/apply.fixtures.js';
@@ -10,7 +10,7 @@ import { config } from '../../helpers/config.js';
 
 test('NetworkWalletFactory.provide returns wallet when enabled', async t => {
     const publicKey = b4a.from(testKeyPair2.publicKey, 'hex');
-    const address = PeerWallet.encodeBech32m(config.addressPrefix, publicKey);
+    const address = tracCryptoApi.address.encode(config.addressPrefix, publicKey);
     const signResult = b4a.from('abcd', 'hex');
     const wallet = {
         publicKey,
@@ -86,9 +86,9 @@ test('NetworkWalletFactory.provide derives address and signs payloads from keyPa
 
     t.is(
         provider.address,
-        PeerWallet.encodeBech32m(config.addressPrefix, provider.publicKey)
+        tracCryptoApi.address.encode(config.addressPrefix, provider.publicKey)
     );
-    t.ok(PeerWallet.verify(signature, message, provider.publicKey));
+    t.ok(tracCryptoApi.signature.verify(signature, message, provider.publicKey));
     t.ok(provider.verify(signature, message));
 });
 
@@ -98,7 +98,7 @@ test('NetworkWalletFactory handles falsy address derivation results', async t =>
         secretKey: b4a.from(testKeyPair1.secretKey, 'hex')
     };
 
-    const stub = sinon.stub(PeerWallet, 'encodeBech32m').returns(null);
+    const stub = sinon.stub(tracCryptoApi.address, 'encode').returns(null);
     await t.exception(
         () =>
             NetworkWalletFactory.provide({
@@ -118,7 +118,7 @@ test('NetworkWalletFactory propagates encoder exceptions', async t => {
         secretKey: b4a.from(testKeyPair1.secretKey, 'hex')
     };
 
-    const stub = sinon.stub(PeerWallet, 'encodeBech32m').throws(new Error('test exception'));
+    const stub = sinon.stub(tracCryptoApi.address, 'encode').throws(new Error('test exception'));
     await t.exception(
         () =>
             NetworkWalletFactory.provide({
@@ -142,8 +142,8 @@ test('EphemeralWallet exposes wallet like interface', async t => {
     const signature = wallet.sign(message);
 
     t.alike(wallet.publicKey, keyPair.publicKey);
-    t.is(wallet.address, PeerWallet.encodeBech32m(config.addressPrefix, keyPair.publicKey));
-    t.ok(PeerWallet.verify(signature, message, wallet.publicKey));
+    t.is(wallet.address, tracCryptoApi.address.encode(config.addressPrefix, keyPair.publicKey));
+    t.ok(tracCryptoApi.signature.verify(signature, message, wallet.publicKey));
     t.ok(wallet.verify(signature, message));
 });
 

@@ -18,6 +18,7 @@ import {
 } from '../../src/utils/constants.js';
 import Writer from 'autobase/lib/writer.js';
 import { config } from './config.js';
+import tracCryptoApi from 'trac-crypto-api';
 
 const argv = typeof globalThis.Bare !== 'undefined' ? globalThis.Bare.argv : process.argv;
 
@@ -335,7 +336,7 @@ export function deriveIndexerSequenceState(base) {
 		.map(entry => entry?.key)
 		.filter(key => key && key.length > 0);
 	const concatenated = buffers.length > 0 ? b4a.concat(buffers) : b4a.alloc(0);
-	return PeerWallet.blake3(concatenated);
+	return tracCryptoApi.hash.blake3(concatenated);
 }
 
 let osModule;

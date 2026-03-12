@@ -2,6 +2,7 @@
 import ReadyResource from "ready-resource";
 import Corestore from "corestore";
 import PeerWallet from "trac-wallet";
+import tracCryptoApi from "trac-crypto-api";
 import b4a from "b4a";
 import readline from "readline";
 import tty from "tty";
@@ -256,7 +257,7 @@ export class MainSettlementBus extends ReadyResource {
             );
         }
 
-        const txValidity = await PeerWallet.blake3(this.#config.bootstrap);
+        const txValidity = await tracCryptoApi.hash.blake3(this.#config.bootstrap);
         const addAdminMessage = await applyStateMessageFactory(this.#wallet, this.#config)
             .buildCompleteAddAdminMessage(
                 this.#wallet.address,
