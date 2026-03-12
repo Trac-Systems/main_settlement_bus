@@ -1,5 +1,5 @@
 import { NETWORK_MESSAGE_TYPES } from '../../../../../utils/constants.js';
-import PeerWallet from 'trac-wallet';
+import tracCryptoApi from 'trac-crypto-api';
 import b4a from 'b4a';
 
 class LegacyGetRequestHandler {
@@ -26,7 +26,7 @@ class LegacyGetRequestHandler {
     }
 
     async handleGetValidatorResponse(connection, channelString) {
-        const nonce = PeerWallet.generateNonce().toString('hex');
+        const nonce = b4a.toString(tracCryptoApi.nonce.generate(), 'hex');
         const payload = {
             op: 'validatorResponse',
             wk: this.state.writingKey.toString('hex'),
@@ -39,7 +39,7 @@ class LegacyGetRequestHandler {
 
 
         const hashInput = b4a.from(JSON.stringify(payload), 'utf8');
-        const hash = await PeerWallet.blake3(hashInput);
+        const hash = await tracCryptoApi.hash.blake3(hashInput);
         const sig = this.#wallet.sign(hash);
 
         const responseMessage = {

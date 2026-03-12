@@ -1,6 +1,6 @@
 import { test } from 'brittle';
 import b4a from 'b4a';
-import PeerWallet from 'trac-wallet';
+import tracCryptoApi from 'trac-crypto-api';
 import NetworkWalletFactory from '../../../../src/core/network/identity/NetworkWalletFactory.js';
 import NetworkMessageDirector from '../../../../src/messages/network/v1/NetworkMessageDirector.js';
 import NetworkMessageBuilder from '../../../../src/messages/network/v1/NetworkMessageBuilder.js';
@@ -55,7 +55,7 @@ test('NetworkMessageDirector iterates liveness response ResultCode values', asyn
             safeWriteUInt32BE(code, 0),
             encodeCapabilities(caps)
         );
-        const hash = await PeerWallet.blake3(msg);
+        const hash = await tracCryptoApi.hash.blake3(msg);
         t.ok(wallet.verify(payload.liveness_response.signature, hash, wallet.publicKey));
 
         const decoded = decodeV1networkOperation(encodeV1networkOperation(payload));
@@ -85,7 +85,7 @@ test('NetworkMessageDirector builds broadcast transaction request and verifies s
         payload.broadcast_transaction_request.nonce,
         encodeCapabilities(caps)
     );
-    const hash = await PeerWallet.blake3(message);
+    const hash = await tracCryptoApi.hash.blake3(message);
     t.ok(wallet.verify(payload.broadcast_transaction_request.signature, hash, wallet.publicKey));
 
     const decoded = decodeV1networkOperation(encodeV1networkOperation(payload));
@@ -129,7 +129,7 @@ test('NetworkMessageDirector iterates broadcast transaction response ResultCode 
             safeWriteUInt32BE(code, 0),
             encodeCapabilities(caps)
         );
-        const hash = await PeerWallet.blake3(msg);
+        const hash = await tracCryptoApi.hash.blake3(msg);
         t.ok(wallet.verify(payload.broadcast_transaction_response.signature, hash, wallet.publicKey));
 
         const decoded = decodeV1networkOperation(encodeV1networkOperation(payload));
@@ -169,7 +169,7 @@ test('NetworkMessageDirector builds broadcast transaction response with proof an
         safeWriteUInt32BE(NetworkResultCode.OK, 0),
         encodeCapabilities(caps)
     );
-    const hash = await PeerWallet.blake3(msg);
+    const hash = await tracCryptoApi.hash.blake3(msg);
     t.ok(wallet.verify(payload.broadcast_transaction_response.signature, hash, wallet.publicKey));
 
     const decoded = decodeV1networkOperation(encodeV1networkOperation(payload));
@@ -247,7 +247,7 @@ test('NetworkMessageDirector allows TX_ACCEPTED_PROOF_UNAVAILABLE response with 
         safeWriteUInt32BE(NetworkResultCode.TX_ACCEPTED_PROOF_UNAVAILABLE, 0),
         encodeCapabilities(caps)
     );
-    const hash = await PeerWallet.blake3(msg);
+    const hash = await tracCryptoApi.hash.blake3(msg);
     t.ok(wallet.verify(payload.broadcast_transaction_response.signature, hash, wallet.publicKey));
 
     const decoded = decodeV1networkOperation(encodeV1networkOperation(payload));

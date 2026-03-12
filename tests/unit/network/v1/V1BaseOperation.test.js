@@ -1,6 +1,7 @@
 import test from 'brittle';
 import b4a from 'b4a';
 import PeerWallet from 'trac-wallet';
+import tracCryptoApi from 'trac-crypto-api';
 
 import V1BaseOperation from '../../../../src/core/network/protocols/v1/validators/V1BaseOperation.js';
 import NetworkWalletFactory from '../../../../src/core/network/identity/NetworkWalletFactory.js';
@@ -193,13 +194,13 @@ test('V1BaseOperation.validateSignature throws V1InvalidPayloadError when hashin
     const wallet = createWallet();
     const payload = await buildSignedPayload(wallet, NetworkOperationType.LIVENESS_REQUEST);
 
-    const originalBlake3 = PeerWallet.blake3;
-    PeerWallet.blake3 = async () => {
+    const originalBlake3 = tracCryptoApi.hash.blake3;
+    tracCryptoApi.hash.blake3 = async () => {
         throw new Error('hash fail');
     };
 
     t.teardown(() => {
-        PeerWallet.blake3 = originalBlake3;
+        tracCryptoApi.hash.blake3 = originalBlake3;
     });
 
     try {

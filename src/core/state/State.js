@@ -16,7 +16,7 @@ import {
     CustomEventType
 } from '../../utils/constants.js';
 import { isHexString, sleep, isTransactionRecordPut } from '../../utils/helpers.js';
-import PeerWallet from 'trac-wallet';
+import tracCryptoApi from 'trac-crypto-api';
 import Check from '../../utils/check.js';
 import { safeDecodeApplyOperation } from '../../utils/protobuf/operationHelpers.js';
 import { createMessage, ZERO_WK } from '../../utils/buffer.js';
@@ -301,7 +301,7 @@ class State extends ReadyResource {
         for (const indexer of Object.values(this.#base.system.indexers)) {
             buf.push(indexer.key);
         }
-        return await PeerWallet.blake3(b4a.concat(buf));
+        return await tracCryptoApi.hash.blake3(b4a.concat(buf));
     }
 
     async isInitalizationDisabled() {
@@ -488,7 +488,7 @@ class State extends ReadyResource {
         }
 
         // Verify requester admin public key
-        const requesterAdminPublicKey = PeerWallet.decodeBech32mSafe(adminAddressString);
+        const requesterAdminPublicKey = addressUtils.decodeBech32mSafe(adminAddressString);
         if (requesterAdminPublicKey === null) {
             this.#safeLogApply(OperationType.BALANCE_INITIALIZATION, "Error while decoding requester public key.", node.from.key)
             return Status.FAILURE;
@@ -503,7 +503,7 @@ class State extends ReadyResource {
         };
 
         // Validate recipient public key
-        const recipientPublicKey = PeerWallet.decodeBech32mSafe(recipientAddressString);
+        const recipientPublicKey = addressUtils.decodeBech32mSafe(recipientAddressString);
         if (recipientPublicKey === null) {
             this.#safeLogApply(OperationType.BALANCE_INITIALIZATION, "Failed to decode recipient public key.", node.from.key)
             return Status.FAILURE;
@@ -536,7 +536,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const adminPublicKey = PeerWallet.decodeBech32mSafe(decodedAdminEntry.address);
+        const adminPublicKey = addressUtils.decodeBech32mSafe(decodedAdminEntry.address);
         if (adminPublicKey === null) {
             this.#safeLogApply(OperationType.BALANCE_INITIALIZATION, "Failed to decode admin public key.", node.from.key)
             return Status.FAILURE;
@@ -562,7 +562,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const hash = await PeerWallet.blake3Safe(message);
+        const hash = await tracCryptoApi.hash.blake3Safe(message);
         const txHashHexString = op.bio.tx.toString('hex');
         if (!b4a.equals(hash, op.bio.tx)) {
             this.#safeLogApply(OperationType.BALANCE_INITIALIZATION, "Message hash does not match the tx_hash.", node.from.key)
@@ -639,7 +639,7 @@ class State extends ReadyResource {
         };
 
         // Validate requester admin public key
-        const requesterAdminPublicKey = PeerWallet.decodeBech32mSafe(adminAddressString);
+        const requesterAdminPublicKey = addressUtils.decodeBech32mSafe(adminAddressString);
         if (requesterAdminPublicKey === null) {
             this.#safeLogApply(OperationType.DISABLE_INITIALIZATION, "Failed to decode requester public key.", node.from.key)
             return Status.FAILURE;
@@ -659,7 +659,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const adminPublicKey = PeerWallet.decodeBech32mSafe(decodedAdminEntry.address);
+        const adminPublicKey = addressUtils.decodeBech32mSafe(decodedAdminEntry.address);
         if (adminPublicKey === null) {
             this.#safeLogApply(OperationType.DISABLE_INITIALIZATION, "Failed to decode admin public key.", node.from.key)
             return Status.FAILURE;
@@ -684,7 +684,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const hash = await PeerWallet.blake3Safe(message);
+        const hash = await tracCryptoApi.hash.blake3Safe(message);
         const txHashHexString = op.cao.tx.toString('hex');
         if (!b4a.equals(hash, op.cao.tx)) {
             this.#safeLogApply(OperationType.DISABLE_INITIALIZATION, "Message hash does not match the tx_hash.", node.from.key)
@@ -744,7 +744,7 @@ class State extends ReadyResource {
         };
 
         // Validate requester admin public key (admin)
-        const adminPublicKey = PeerWallet.decodeBech32mSafe(adminAddressString);
+        const adminPublicKey = addressUtils.decodeBech32mSafe(adminAddressString);
         if (adminPublicKey === null) {
             this.#safeLogApply(OperationType.ADD_ADMIN, "Error while decoding requester public key.", node.from.key)
             return Status.FAILURE;
@@ -770,7 +770,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const hash = await PeerWallet.blake3Safe(requesterMessage);
+        const hash = await tracCryptoApi.hash.blake3Safe(requesterMessage);
         if (!b4a.equals(hash, op.cao.tx)) {
             this.#safeLogApply(OperationType.ADD_ADMIN, "Message hash does not match the tx_hash.", node.from.key)
             return Status.FAILURE;
@@ -904,7 +904,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const requesterAdminPublicKey = PeerWallet.decodeBech32mSafe(requesterAdminAddressString);
+        const requesterAdminPublicKey = addressUtils.decodeBech32mSafe(requesterAdminAddressString);
         if (requesterAdminPublicKey === null) {
             this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Error while decoding requester public key.", node.from.key)
             return Status.FAILURE;
@@ -924,7 +924,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const hash = await PeerWallet.blake3Safe(requesterMessage);
+        const hash = await tracCryptoApi.hash.blake3Safe(requesterMessage);
         if (!b4a.equals(hash, op.rao.tx)) {
             this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Message hash does not match the tx_hash.", node.from.key)
             return Status.FAILURE;
@@ -946,7 +946,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const validatorPublicKey = PeerWallet.decodeBech32mSafe(validatorAddressString);
+        const validatorPublicKey = addressUtils.decodeBech32mSafe(validatorAddressString);
         if (validatorPublicKey === null) {
             this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Failed to decode validator public key.", node.from.key)
             return Status.FAILURE;
@@ -966,7 +966,7 @@ class State extends ReadyResource {
         };
 
         // verify validator signature
-        const validatorHash = await PeerWallet.blake3Safe(validatorMessage);
+        const validatorHash = await tracCryptoApi.hash.blake3Safe(validatorMessage);
         const isValidatorMessageVerifed = this.#wallet.verify(op.rao.vs, validatorHash, validatorPublicKey);
         if (!isValidatorMessageVerifed) {
             this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Failed to verify message signature.", node.from.key)
@@ -1009,7 +1009,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const publicKeyAdminEntry = PeerWallet.decodeBech32mSafe(decodedAdminEntry.address);
+        const publicKeyAdminEntry = addressUtils.decodeBech32mSafe(decodedAdminEntry.address);
         if (!b4a.equals(requesterAdminPublicKey, publicKeyAdminEntry)) {
             this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Admin public key does not match the node public key.", node.from.key)
             return Status.FAILURE;
@@ -1131,7 +1131,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
         // Validate recipient public key
-        const requesterAdminPublicKey = PeerWallet.decodeBech32mSafe(adminAddressString);
+        const requesterAdminPublicKey = addressUtils.decodeBech32mSafe(adminAddressString);
         if (requesterAdminPublicKey === null) {
             this.#safeLogApply(OperationType.APPEND_WHITELIST, "Failed to decode recipient public key.", node.from.key)
             return Status.FAILURE;
@@ -1157,7 +1157,7 @@ class State extends ReadyResource {
 
         // Extract admin entry
         const adminAddress = decodedAdminEntry.address;
-        const adminPublicKey = PeerWallet.decodeBech32mSafe(adminAddress);
+        const adminPublicKey = addressUtils.decodeBech32mSafe(adminAddress);
         if (adminPublicKey === null) {
             this.#safeLogApply(OperationType.APPEND_WHITELIST, "Failed to decode admin public key.", node.from.key)
             return Status.FAILURE;
@@ -1177,7 +1177,7 @@ class State extends ReadyResource {
             this.#safeLogApply(OperationType.APPEND_WHITELIST, "Failed to verify node address.", node.from.key)
             return Status.FAILURE;
         };
-        const nodePublicKey = PeerWallet.decodeBech32mSafe(nodeAddressString);
+        const nodePublicKey = addressUtils.decodeBech32mSafe(nodeAddressString);
         if (nodePublicKey === null) {
             this.#safeLogApply(OperationType.APPEND_WHITELIST, "Failed to decode node public key.", node.from.key)
             return Status.FAILURE;
@@ -1197,7 +1197,7 @@ class State extends ReadyResource {
         };
 
         // verify signature
-        const hash = await PeerWallet.blake3Safe(message);
+        const hash = await tracCryptoApi.hash.blake3Safe(message);
         if (!b4a.equals(hash, op.aco.tx)) {
             this.#safeLogApply(OperationType.APPEND_WHITELIST, "Message hash does not match the tx_hash.", node.from.key)
             return Status.FAILURE;
@@ -1404,7 +1404,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const requesterPublicKey = PeerWallet.decodeBech32mSafe(requesterAddressString);
+        const requesterPublicKey = addressUtils.decodeBech32mSafe(requesterAddressString);
         if (requesterPublicKey === null) {
             this.#safeLogApply(OperationType.ADD_WRITER, "Error while decoding requester public key.", node.from.key)
             return Status.FAILURE;
@@ -1430,7 +1430,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const hash = await PeerWallet.blake3Safe(requesterMessage);
+        const hash = await tracCryptoApi.hash.blake3Safe(requesterMessage);
         if (!b4a.equals(hash, op.rao.tx)) {
             this.#safeLogApply(OperationType.ADD_WRITER, "Message hash does not match the tx_hash.", node.from.key)
             return Status.FAILURE;
@@ -1452,7 +1452,7 @@ class State extends ReadyResource {
         };
 
         // validate validator public key
-        const validatorPublicKey = PeerWallet.decodeBech32mSafe(validatorAddressString);
+        const validatorPublicKey = addressUtils.decodeBech32mSafe(validatorAddressString);
         if (validatorPublicKey === null) {
             this.#safeLogApply(OperationType.ADD_WRITER, "Failed to decode validator public key.", node.from.key)
             return Status.FAILURE;
@@ -1471,7 +1471,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const validatorHash = await PeerWallet.blake3Safe(validatorMessage);
+        const validatorHash = await tracCryptoApi.hash.blake3Safe(validatorMessage);
         const isValidatorMessageVerifed = this.#wallet.verify(op.rao.vs, validatorHash, validatorPublicKey);
         if (!isValidatorMessageVerifed) {
             this.#safeLogApply(OperationType.ADD_WRITER, "Failed to verify validator message signature.", node.from.key)
@@ -1709,7 +1709,7 @@ class State extends ReadyResource {
         };
 
         // Validate requester public key
-        const requesterPublicKey = PeerWallet.decodeBech32mSafe(requesterAddressString);
+        const requesterPublicKey = addressUtils.decodeBech32mSafe(requesterAddressString);
         if (requesterPublicKey === null) {
             this.#safeLogApply(OperationType.REMOVE_WRITER, "Error while decoding requester public key.", node.from.key)
             return Status.FAILURE;
@@ -1729,7 +1729,7 @@ class State extends ReadyResource {
         };
 
         // compare hashes
-        const hash = await PeerWallet.blake3Safe(requesterMessage);
+        const hash = await tracCryptoApi.hash.blake3Safe(requesterMessage);
         if (!b4a.equals(hash, op.rao.tx)) {
             this.#safeLogApply(OperationType.REMOVE_WRITER, "Message hash does not match the tx_hash.", node.from.key)
             return Status.FAILURE;
@@ -1751,7 +1751,7 @@ class State extends ReadyResource {
         };
 
         // validate validator public key
-        const validatorPublicKey = PeerWallet.decodeBech32mSafe(validatorAddressString);
+        const validatorPublicKey = addressUtils.decodeBech32mSafe(validatorAddressString);
         if (validatorPublicKey === null) {
             this.#safeLogApply(OperationType.REMOVE_WRITER, "Failed to decode validator public key.", node.from.key)
             return Status.FAILURE;
@@ -1769,7 +1769,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const validatorHash = await PeerWallet.blake3Safe(validatorMessage);
+        const validatorHash = await tracCryptoApi.hash.blake3Safe(validatorMessage);
         const isValidatorMessageVerifed = this.#wallet.verify(op.rao.vs, validatorHash, validatorPublicKey);
         if (!isValidatorMessageVerifed) {
             this.#safeLogApply(OperationType.REMOVE_WRITER, "Failed to verify validator message signature.", node.from.key)
@@ -1931,7 +1931,7 @@ class State extends ReadyResource {
             console.info(`Writer removed: addr:wk:tx - ${requesterAddressString}:${op.rao.iw.toString('hex')}:${txHashHexString}`);
         }
 
-        this.#emitEvent(CustomEventType.UNWRITABLE, PeerWallet.decodeBech32mSafe(requesterAddressString))
+        this.#emitEvent(CustomEventType.UNWRITABLE, addressUtils.decodeBech32mSafe(requesterAddressString))
     }
 
     async #handleApplyAddIndexerOperation(op, view, base, node, batch) {
@@ -1949,7 +1949,7 @@ class State extends ReadyResource {
         };
 
         // Validate requester public key
-        const requesterPublicKey = PeerWallet.decodeBech32mSafe(requesterAddressString);
+        const requesterPublicKey = addressUtils.decodeBech32mSafe(requesterAddressString);
         if (requesterPublicKey === null) {
             this.#safeLogApply(OperationType.ADD_INDEXER, "Error while decoding requester public key.", node.from.key)
             return Status.FAILURE;
@@ -1964,7 +1964,7 @@ class State extends ReadyResource {
         };
 
         // Validate pretending indexer public key
-        const pretentingPublicKey = PeerWallet.decodeBech32mSafe(pretendingAddressString);
+        const pretentingPublicKey = addressUtils.decodeBech32mSafe(pretendingAddressString);
         if (pretentingPublicKey === null) {
             this.#safeLogApply(OperationType.ADD_INDEXER, "Failed to decode pretending indexer public key.", node.from.key)
             return Status.FAILURE;
@@ -1989,7 +1989,7 @@ class State extends ReadyResource {
         };
 
         // Extract admin public key 
-        const adminPublicKey = PeerWallet.decodeBech32mSafe(decodedAdminEntry.address);
+        const adminPublicKey = addressUtils.decodeBech32mSafe(decodedAdminEntry.address);
         if (adminPublicKey === null) {
             this.#safeLogApply(OperationType.ADD_INDEXER, "Failed to decode admin public key.", node.from.key)
             return Status.FAILURE;
@@ -2015,7 +2015,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const hash = await PeerWallet.blake3Safe(message);
+        const hash = await tracCryptoApi.hash.blake3Safe(message);
         if (!b4a.equals(hash, op.aco.tx)) {
             this.#safeLogApply(OperationType.ADD_INDEXER, "Message hash does not match the tx_hash.", node.from.key)
             return Status.FAILURE;
@@ -2149,7 +2149,7 @@ class State extends ReadyResource {
             console.info(`Indexer added addr:wk:tx - ${pretendingAddressString}:${decodedPretenderNodeEntry.wk.toString('hex')}:${txHashHexString}`);
         }
 
-        this.#emitEvent(CustomEventType.IS_INDEXER, PeerWallet.decodeBech32mSafe(pretendingAddressString))
+        this.#emitEvent(CustomEventType.IS_INDEXER, addressUtils.decodeBech32mSafe(pretendingAddressString))
     }
 
     async #handleApplyRemoveIndexerOperation(op, view, base, node, batch) {
@@ -2167,7 +2167,7 @@ class State extends ReadyResource {
         };
 
         // Validate requester public key (admin)
-        const requesterPublicKey = PeerWallet.decodeBech32mSafe(requesterAddressString);
+        const requesterPublicKey = addressUtils.decodeBech32mSafe(requesterAddressString);
         if (requesterPublicKey === null) {
             this.#safeLogApply(OperationType.REMOVE_INDEXER, "Error while decoding requester public key.", node.from.key)
             return Status.FAILURE;
@@ -2181,7 +2181,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const toRemoveAddressPublicKey = PeerWallet.decodeBech32mSafe(toRemoveAddressString);
+        const toRemoveAddressPublicKey = addressUtils.decodeBech32mSafe(toRemoveAddressString);
         if (toRemoveAddressPublicKey === null) {
             this.#safeLogApply(OperationType.REMOVE_INDEXER, "Failed to decode target indexer public key.", node.from.key)
             return Status.FAILURE;
@@ -2205,7 +2205,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const adminPublicKey = PeerWallet.decodeBech32mSafe(decodedAdminEntry.address);
+        const adminPublicKey = addressUtils.decodeBech32mSafe(decodedAdminEntry.address);
         if (adminPublicKey === null) {
             this.#safeLogApply(OperationType.REMOVE_INDEXER, "Failed to decode admin public key.", node.from.key)
             return Status.FAILURE;
@@ -2230,7 +2230,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
         // compare hashes
-        const hash = await PeerWallet.blake3Safe(message);
+        const hash = await tracCryptoApi.hash.blake3Safe(message);
         if (!b4a.equals(hash, op.aco.tx)) {
             this.#safeLogApply(OperationType.REMOVE_INDEXER, "Message hash does not match the tx_hash.", node.from.key)
             return Status.FAILURE;
@@ -2383,7 +2383,7 @@ class State extends ReadyResource {
         };
 
         // Validate requester public key
-        const requesterPublicKey = PeerWallet.decodeBech32mSafe(requesterAddressString);
+        const requesterPublicKey = addressUtils.decodeBech32mSafe(requesterAddressString);
         if (requesterPublicKey === null) {
             this.#safeLogApply(OperationType.BAN_VALIDATOR, "Error while decoding requester public key.", node.from.key)
             return Status.FAILURE;
@@ -2402,7 +2402,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const adminPublicKey = PeerWallet.decodeBech32mSafe(decodedAdminEntry.address);
+        const adminPublicKey = addressUtils.decodeBech32mSafe(decodedAdminEntry.address);
         if (adminPublicKey === null) {
             this.#safeLogApply(OperationType.BAN_VALIDATOR, "Failed to decode admin public key.", node.from.key)
             return Status.FAILURE;
@@ -2433,7 +2433,7 @@ class State extends ReadyResource {
         };
 
         // compare hashes
-        const regeneratedHash = await PeerWallet.blake3Safe(message);
+        const regeneratedHash = await tracCryptoApi.hash.blake3Safe(message);
         if (!b4a.equals(regeneratedHash, op.aco.tx)) {
             this.#safeLogApply(OperationType.BAN_VALIDATOR, "Message hash does not match the tx_hash.", node.from.key)
             return Status.FAILURE;
@@ -2565,7 +2565,7 @@ class State extends ReadyResource {
             console.info(`Node has been banned: addr:wk:tx - ${nodeToBeBannedAddressString}:${decodedToBanNodeEntry.wk.toString('hex')}:${txHashHexString}`);
         }
 
-        this.#emitEvent(CustomEventType.UNWRITABLE, PeerWallet.decodeBech32mSafe(nodeToBeBannedAddressString))
+        this.#emitEvent(CustomEventType.UNWRITABLE, addressUtils.decodeBech32mSafe(nodeToBeBannedAddressString))
 
         return Status.SUCCESS;
     }
@@ -2611,7 +2611,7 @@ class State extends ReadyResource {
         };
 
         // validate requester public key
-        const requesterPublicKey = PeerWallet.decodeBech32mSafe(requesterAddressString);
+        const requesterPublicKey = addressUtils.decodeBech32mSafe(requesterAddressString);
         if (requesterPublicKey === null) {
             this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Failed to decode requester public key.", node.from.key)
             return Status.FAILURE;
@@ -2633,7 +2633,7 @@ class State extends ReadyResource {
         };
 
         // ensure that tx is valid
-        const regeneratedTxHash = await PeerWallet.blake3Safe(requesterMessage);
+        const regeneratedTxHash = await tracCryptoApi.hash.blake3Safe(requesterMessage);
         if (!b4a.equals(regeneratedTxHash, op.bdo.tx)) {
             this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Message hash does not match the tx_hash.", node.from.key)
             return Status.FAILURE;
@@ -2656,7 +2656,7 @@ class State extends ReadyResource {
         };
 
         // validate validator public key
-        const validatorPublicKey = PeerWallet.decodeBech32mSafe(validatorAddressString);
+        const validatorPublicKey = addressUtils.decodeBech32mSafe(validatorAddressString);
         if (validatorPublicKey === null) {
             this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Failed to decode validator public key.", node.from.key)
             return Status.FAILURE;
@@ -2675,7 +2675,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const validatorMessageHash = await PeerWallet.blake3Safe(validatorMessage);
+        const validatorMessageHash = await tracCryptoApi.hash.blake3Safe(validatorMessage);
 
         const isValidatorSignatureValid = this.#wallet.verify(op.bdo.vs, validatorMessageHash, validatorPublicKey);
         if (!isValidatorSignatureValid) {
@@ -2848,7 +2848,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const requesterPublicKey = PeerWallet.decodeBech32mSafe(requesterAddressString);
+        const requesterPublicKey = addressUtils.decodeBech32mSafe(requesterAddressString);
         if (requesterPublicKey === null) {
             this.#safeLogApply(OperationType.TX, "Failed to decode requester public key.", node.from.key)
             return Status.FAILURE;
@@ -2869,7 +2869,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const regeneratedTxHash = await PeerWallet.blake3Safe(requesterMessage);
+        const regeneratedTxHash = await tracCryptoApi.hash.blake3Safe(requesterMessage);
         if (!b4a.equals(regeneratedTxHash, op.txo.tx)) {
             this.#safeLogApply(OperationType.TX, "Message hash does not match the tx_hash.", node.from.key)
             return Status.FAILURE;
@@ -2889,7 +2889,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const validatorPublicKey = PeerWallet.decodeBech32mSafe(validatorAddressString);
+        const validatorPublicKey = addressUtils.decodeBech32mSafe(validatorAddressString);
         if (validatorPublicKey === null) {
             this.#safeLogApply(OperationType.TX, "Failed to decode validator public key.", node.from.key)
             return Status.FAILURE;
@@ -2908,7 +2908,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const validatorMessageHash = await PeerWallet.blake3Safe(validatorMessage);
+        const validatorMessageHash = await tracCryptoApi.hash.blake3Safe(validatorMessage);
         const isValidatorSignatureValid = this.#wallet.verify(op.txo.vs, validatorMessageHash, validatorPublicKey);
         if (!isValidatorSignatureValid) {
             this.#safeLogApply(OperationType.TX, "Failed to verify validator message signature.", node.from.key)
@@ -3052,7 +3052,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const requesterPublicKey = PeerWallet.decodeBech32mSafe(requesterAddressString);
+        const requesterPublicKey = addressUtils.decodeBech32mSafe(requesterAddressString);
         if (requesterPublicKey === null) {
             this.#safeLogApply(OperationType.TRANSFER, "Error while decoding requester public key.", node.from.key)
             return Status.FAILURE;
@@ -3074,7 +3074,7 @@ class State extends ReadyResource {
         };
 
         // ensure that tx is valid
-        const regeneratedTxHash = await PeerWallet.blake3Safe(requesterMessage);
+        const regeneratedTxHash = await tracCryptoApi.hash.blake3Safe(requesterMessage);
         if (!b4a.equals(regeneratedTxHash, op.tro.tx)) {
             this.#safeLogApply(OperationType.TRANSFER, "Message hash does not match the tx_hash.", node.from.key)
             return Status.FAILURE;
@@ -3094,7 +3094,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const validatorPublicKey = PeerWallet.decodeBech32mSafe(validatorAddressString);
+        const validatorPublicKey = addressUtils.decodeBech32mSafe(validatorAddressString);
         if (validatorPublicKey === null) {
             this.#safeLogApply(OperationType.TRANSFER, "Failed to decode validator public key.", node.from.key)
             return Status.FAILURE;
@@ -3112,7 +3112,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const validatorMessageHash = await PeerWallet.blake3Safe(validatorMessage);
+        const validatorMessageHash = await tracCryptoApi.hash.blake3Safe(validatorMessage);
         const isValidatorSignatureValid = this.#wallet.verify(op.tro.vs, validatorMessageHash, validatorPublicKey);
         if (!isValidatorSignatureValid) {
             this.#safeLogApply(OperationType.TRANSFER, "Failed to verify message signature.", node.from.key)
@@ -3156,7 +3156,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const recipientPublicKey = PeerWallet.decodeBech32mSafe(recipientAddressString);
+        const recipientPublicKey = addressUtils.decodeBech32mSafe(recipientAddressString);
         if (recipientPublicKey === null) {
             this.#safeLogApply(OperationType.TRANSFER, "Failed to decode recipient public key.", node.from.key)
             return Status.FAILURE;
@@ -3394,7 +3394,7 @@ class State extends ReadyResource {
             for (const indexer of Object.values(base.system.indexers)) {
                 buf.push(indexer.key);
             }
-            return await PeerWallet.blake3Safe(b4a.concat(buf));
+            return await tracCryptoApi.hash.blake3Safe(b4a.concat(buf));
         } catch (error) {
             console.error(error);
             return null;
@@ -3615,7 +3615,7 @@ class State extends ReadyResource {
             return;
         }
 
-        const validatorPublicKey = PeerWallet.decodeBech32mSafe(validatorAddressString);
+        const validatorPublicKey = addressUtils.decodeBech32mSafe(validatorAddressString);
         if (validatorPublicKey === null) {
             this.#safeLogApply("ValidatorPenalty", `Failed to decode validator public key: ${validatorAddressString}`, writingKeyBuffer);
             return;

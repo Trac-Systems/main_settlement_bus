@@ -1,5 +1,6 @@
 import b4a from 'b4a';
 import PeerWallet from 'trac-wallet';
+import tracCryptoApi from 'trac-crypto-api';
 import Check from '../../../../../utils/check.js';
 import {bufferToAddress} from "../../../../state/utils/address.js";
 import {createMessage} from "../../../../../utils/buffer.js";
@@ -147,7 +148,7 @@ class PartialOperationValidator {
         const messageComponents = this.#getMessageComponents(payload);
 
         const message = createMessage(...messageComponents);
-        const messageHash = await PeerWallet.blake3(message);
+        const messageHash = await tracCryptoApi.hash.blake3(message);
         const payloadHash = operation.tx;
         if (!b4a.equals(payloadHash, messageHash)) {
             throw new SharedValidatorRejectionError(

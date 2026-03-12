@@ -1,4 +1,5 @@
 import PeerWallet from 'trac-wallet';
+import tracCryptoApi from 'trac-crypto-api';
 import b4a from 'b4a';
 import {createMessage, safeWriteUInt32BE, idToBuffer, timestampToBuffer} from "../../../utils/buffer.js";
 import {NetworkOperationType, ResultCode} from '../../../utils/constants.js';
@@ -147,7 +148,7 @@ class NetworkMessageBuilder {
             nonce,
             encodeCapabilities(this.#capabilities),
         );
-        const hash = await PeerWallet.blake3(message);
+        const hash = await tracCryptoApi.hash.blake3(message);
         const signature = this.#wallet.sign(hash);
 
         this.#payloadKey = 'liveness_request';
@@ -173,7 +174,7 @@ class NetworkMessageBuilder {
             safeWriteUInt32BE(this.#resultCode, 0),
             encodeCapabilities(this.#capabilities),
         );
-        const hash = await PeerWallet.blake3(message);
+        const hash = await tracCryptoApi.hash.blake3(message);
         const signature = this.#wallet.sign(hash);
 
         this.#payloadKey = 'liveness_response';
@@ -199,7 +200,7 @@ class NetworkMessageBuilder {
             nonce,
             encodeCapabilities(this.#capabilities),
         );
-        const hash = await PeerWallet.blake3(message);
+        const hash = await tracCryptoApi.hash.blake3(message);
         const signature = this.#wallet.sign(hash);
 
         this.#payloadKey = 'broadcast_transaction_request';
@@ -253,7 +254,7 @@ class NetworkMessageBuilder {
             encodeCapabilities(this.#capabilities),
         );
 
-        const hash = await PeerWallet.blake3(message);
+        const hash = await tracCryptoApi.hash.blake3(message);
         const signature = this.#wallet.sign(hash);
         this.#payloadKey = 'broadcast_transaction_response';
         this.#body = {
