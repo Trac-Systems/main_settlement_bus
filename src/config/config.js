@@ -85,8 +85,12 @@ export class Config {
         return _.endsWith(this.storesDirectory, '/admin')
     }
 
+    get keyPairDirectoryPath() {
+        return `${this.storesFullPath}/db`
+    }
+
     get keyPairPath()  {
-        return `${this.storesFullPath}/db/keypair.json`
+        return `${this.keyPairDirectoryPath}/keypair.json`
     }
 
     get maxRetries() {
