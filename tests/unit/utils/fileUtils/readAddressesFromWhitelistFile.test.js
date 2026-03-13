@@ -2,7 +2,7 @@ import { test, hook } from 'brittle';
 import fileUtils from '../../../../src/utils/fileUtils.js';
 import { errorMessageIncludes } from "../../../helpers/regexHelper.js";
 import fs from 'fs';
-import PeerWallet from 'trac-wallet';
+import { WalletProvider } from 'trac-wallet';
 import { config } from '../../../helpers/config.js';
 import { asAddress } from '../../../helpers/address.js';
 
@@ -30,9 +30,7 @@ hook('Initialize dummy whitelist files', async t => {
     // Edge: large file
     let large = '';
     const randomAddress = async () => {
-        const wallet = new PeerWallet();
-        await wallet.ready;
-        await wallet.generateKeyPair();
+        const wallet = await new WalletProvider(config).generate()
         return wallet.address;
     };
     for (let i = 0; i < 1000; i++) {

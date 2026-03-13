@@ -1,5 +1,5 @@
 import b4a from 'b4a';
-import PeerWallet from 'trac-wallet';
+import tracCryptoApi from 'trac-crypto-api';
 import State from '../../../../../state/State.js';
 
 /*
@@ -14,7 +14,7 @@ class BaseResponse {
     /**
      * 
      * @param {State} state 
-     * @param {PeerWallet} wallet 
+     * @param {IWallet} wallet
      * @param {Config} config
      */
     constructor(state, wallet, config) {
@@ -66,11 +66,11 @@ class BaseResponse {
         switch (type) {
             case 'admin':
                 const adminEntry = await this.state.getAdminEntry();
-                publicKey = PeerWallet.decodeBech32m(adminEntry.address);
+                publicKey = tracCryptoApi.address.decode(adminEntry.address);
 
                 break;
             default:
-                publicKey = PeerWallet.decodeBech32m(message.address);
+                publicKey = tracCryptoApi.address.decode(message.address);
         }
 
         if (!publicKey) {
@@ -80,7 +80,7 @@ class BaseResponse {
         const messageWithoutSig = { ...message };
         delete messageWithoutSig.sig;
         const hashInput = b4a.from(JSON.stringify(messageWithoutSig), 'utf8');
-        const hash = await PeerWallet.blake3(hashInput);
+        const hash = await tracCryptoApi.hash.blake3(hashInput);
         const signature = b4a.from(message.sig, 'hex');
         const verified = this.#wallet.verify(signature, hash, publicKey);
 

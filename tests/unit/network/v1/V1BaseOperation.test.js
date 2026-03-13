@@ -1,9 +1,8 @@
 import test from 'brittle';
 import b4a from 'b4a';
-import PeerWallet from 'trac-wallet';
+import tracCryptoApi from 'trac-crypto-api';
 
 import V1BaseOperation from '../../../../src/core/network/protocols/v1/validators/V1BaseOperation.js';
-import NetworkWalletFactory from '../../../../src/core/network/identity/NetworkWalletFactory.js';
 import NetworkMessageBuilder from '../../../../src/messages/network/v1/NetworkMessageBuilder.js';
 import {
     V1InvalidPayloadError,
@@ -17,19 +16,11 @@ import {
 import { testKeyPair1, testKeyPair2 } from '../../../fixtures/apply.fixtures.js';
 import { config } from '../../../helpers/config.js';
 import { errorMessageIncludes } from '../../../helpers/regexHelper.js';
+import { WalletProvider } from 'trac-wallet';
 
-const createWallet = (fixture = testKeyPair1) => {
-    const keyPair = {
-        publicKey: b4a.from(fixture.publicKey, 'hex'),
-        secretKey: b4a.from(fixture.secretKey, 'hex'),
-    };
-
-    return NetworkWalletFactory.provide({
-        enableWallet: false,
-        keyPair,
-        networkPrefix: config.addressPrefix,
-    });
-};
+async function createWallet(testKeypair = testKeyPair1) {
+    return await new WalletProvider(config).fromSecretKey(testKeypair.secretKey)
+}
 
 const buildSignedPayload = async (wallet, type, options = {}) => {
     const builder = new NetworkMessageBuilder(wallet, config)
@@ -101,7 +92,7 @@ test('V1BaseOperation.isPayloadSchemaValid handles missing/invalid type cases', 
 
 test('V1BaseOperation.isPayloadSchemaValid accepts all supported message schemas', async t => {
     const operation = new V1BaseOperation(config);
-    const wallet = createWallet();
+    const wallet = await createWallet();
 
     const payloads = [
         await buildSignedPayload(wallet, NetworkOperationType.LIVENESS_REQUEST),
@@ -119,7 +110,7 @@ test('V1BaseOperation.isPayloadSchemaValid accepts all supported message schemas
 
 test('V1BaseOperation.validateSignature verifies valid signatures for all supported message types', async t => {
     const operation = new V1BaseOperation(config);
-    const wallet = createWallet();
+    const wallet = await createWallet();
 
     const payloads = [
         await buildSignedPayload(wallet, NetworkOperationType.LIVENESS_REQUEST),
@@ -137,8 +128,8 @@ test('V1BaseOperation.validateSignature verifies valid signatures for all suppor
 
 test('V1BaseOperation.validateSignature throws V1SignatureInvalidError on wrong public key', async t => {
     const operation = new V1BaseOperation(config);
-    const wallet = createWallet(testKeyPair1);
-    const otherWallet = createWallet(testKeyPair2);
+    const wallet = await createWallet(testKeyPair1);
+    const otherWallet = await createWallet(testKeyPair2);
 
     const payload = await buildSignedPayload(wallet, NetworkOperationType.LIVENESS_REQUEST);
 
@@ -190,16 +181,16 @@ test('V1BaseOperation.validateSignature wraps non-protocol build errors as V1Inv
 
 test('V1BaseOperation.validateSignature throws V1InvalidPayloadError when hashing fails', async t => {
     const operation = new V1BaseOperation(config);
-    const wallet = createWallet();
+    const wallet = await createWallet();
     const payload = await buildSignedPayload(wallet, NetworkOperationType.LIVENESS_REQUEST);
 
-    const originalBlake3 = PeerWallet.blake3;
-    PeerWallet.blake3 = async () => {
+    const originalBlake3 = tracCryptoApi.hash.blake3;
+    tracCryptoApi.hash.blake3 = async () => {
         throw new Error('hash fail');
     };
 
     t.teardown(() => {
-        PeerWallet.blake3 = originalBlake3;
+        tracCryptoApi.hash.blake3 = originalBlake3;
     });
 
     try {
@@ -213,16 +204,16 @@ test('V1BaseOperation.validateSignature throws V1InvalidPayloadError when hashin
 
 test('V1BaseOperation.validateSignature handles verify() throw as invalid signature', async t => {
     const operation = new V1BaseOperation(config);
-    const wallet = createWallet();
+    const wallet = await createWallet();
     const payload = await buildSignedPayload(wallet, NetworkOperationType.LIVENESS_REQUEST);
 
-    const originalVerify = PeerWallet.verify;
-    PeerWallet.verify = () => {
+    const originalVerify = tracCryptoApi.signature.verify;
+    tracCryptoApi.signature.verify = () => {
         throw new Error('verify fail');
     };
 
     t.teardown(() => {
-        PeerWallet.verify = originalVerify;
+        tracCryptoApi.signature.verify = originalVerify;
     });
 
     try {
@@ -236,7 +227,7 @@ test('V1BaseOperation.validateSignature handles verify() throw as invalid signat
 
 test('V1BaseOperation.validateSignature enforces BROADCAST_TRANSACTION_RESPONSE proof/timestamp invariants', async t => {
     const operation = new V1BaseOperation(config);
-    const wallet = createWallet();
+    const wallet = await createWallet();
 
     const validBase = await buildSignedPayload(wallet, NetworkOperationType.BROADCAST_TRANSACTION_RESPONSE);
 

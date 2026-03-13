@@ -1,6 +1,4 @@
-import PeerWallet from 'trac-wallet';
-
-import {bufferToAddress} from "../../../../state/utils/address.js";
+import {bufferToAddress, decodeBech32mSafe} from "../../../../state/utils/address.js";
 import {bufferToBigInt} from "../../../../../utils/amountSerialization.js";
 import {ResultCode} from "../../../../../utils/constants.js";
 import PartialOperationValidator from './PartialOperationValidator.js';
@@ -39,7 +37,7 @@ class PartialTransferValidator extends PartialOperationValidator {
             );
         }
 
-        const incomingPublicKey = PeerWallet.decodeBech32mSafe(incomingAddress);
+        const incomingPublicKey = decodeBech32mSafe(incomingAddress);
         if (incomingPublicKey === null) {
             throw new SharedValidatorRejectionError(
                 ResultCode.TRANSFER_RECIPIENT_PUBLIC_KEY_INVALID,

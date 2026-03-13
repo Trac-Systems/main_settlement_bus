@@ -14,7 +14,7 @@ class NetworkMessageRouter {
 
     /**
      * @param {State} state
-     * @param {PeerWallet} wallet
+     * @param {IWallet} wallet
      * @param {TransactionRateLimiterService} rateLimiterService
      * @param {TransactionPoolService} txPoolService
      * @param {Config} config

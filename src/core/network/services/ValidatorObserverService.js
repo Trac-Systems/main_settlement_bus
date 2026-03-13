@@ -1,4 +1,4 @@
-import PeerWallet from "trac-wallet";
+import tracCryptoApi from 'trac-crypto-api';
 import b4a from "b4a";
 import { bufferToAddress } from '../../state/utils/address.js';
 import { sleep } from '../../../utils/helpers.js';
@@ -119,7 +119,7 @@ class ValidatorObserverService {
         if (!isValidatorValid) return;
 
         const validatorAddress = bufferToAddress(validatorAddressBuffer, this.#config.addressPrefix);
-        const validatorPubKeyBuffer = PeerWallet.decodeBech32m(validatorAddress);
+        const validatorPubKeyBuffer = tracCryptoApi.address.decode(validatorAddress);
         const validatorPubKeyHex = validatorPubKeyBuffer.toString('hex');
         const adminEntry = await this.state.getAdminEntry();
 
@@ -134,7 +134,7 @@ class ValidatorObserverService {
         const validatorAddress = bufferToAddress(validatorAddressBuffer, this.#config.addressPrefix);
         if (validatorAddress === forbiddenAddress) return false;
 
-        const validatorPubKeyBuffer = PeerWallet.decodeBech32m(validatorAddress);
+        const validatorPubKeyBuffer = tracCryptoApi.address.decode(validatorAddress);
         const validatorEntry = await this.state.getNodeEntry(validatorAddress);
         const adminEntry = await this.state.getAdminEntry();
 

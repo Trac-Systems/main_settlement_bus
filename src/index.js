@@ -1,7 +1,8 @@
 /** @typedef {import('pear-interface')} */ /* global Pear */
 import ReadyResource from "ready-resource";
 import Corestore from "corestore";
-import PeerWallet from "trac-wallet";
+import { WalletProvider, exportWallet, importFromFile } from "trac-wallet";
+import tracCryptoApi from "trac-crypto-api";
 import b4a from "b4a";
 import readline from "readline";
 import tty from "tty";
@@ -22,7 +23,7 @@ import {
 } from "./utils/constants.js";
 import { randomBytes } from "hypercore-crypto";
 import { decimalStringToBigInt, bigIntTo16ByteBuffer, bufferToBigInt, bigIntToDecimalString } from "./utils/amountSerialization.js"
-import fileUtils from './utils/fileUtils.js';
+import fileUtils, { verifyWalletPath } from './utils/fileUtils.js';
 import migrationUtils from './utils/migrationUtils.js';
 import {
     getBalanceCommand,
@@ -62,7 +63,6 @@ export class MainSettlementBus extends ReadyResource {
         super();
         this.#config = config
         this.#store = new Corestore(this.#config.storesFullPath);
-        this.#wallet = new PeerWallet({ networkPrefix: this.#config.addressPrefix });
         this.#readline_instance = null;
 
         if (this.#config.enableInteractiveMode) {
@@ -97,16 +97,14 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async _open() {
-        await fileUtils.ensureCoresStoreDir(this.#config);
+        await fileUtils.ensureKeyPathDir(this.#config);
 
         if (this.#config.enableWallet) {
-            await this.#wallet.initKeyPair(
-                this.#config.keyPairPath,
-                this.#readline_instance
-            );
+            await this.#initKeyPair()
         }
+
         this.#state = new State(this.#store, this.#wallet, this.#config);
-        this.#network = new Network(this.#state, this.#config, this.#wallet.address);
+        this.#network = new Network(this.#state, this.#config, this.#wallet?.address ?? null);
 
         await this.#state.ready();
         await this.#network.ready();
@@ -132,7 +130,9 @@ export class MainSettlementBus extends ReadyResource {
         console.log("MSB Unsigned Length:", this.#state.getUnsignedLength());
         console.log("MSB Signed Length:", this.#state.getSignedLength());
 
-        await printBalance(this.#wallet.address, this.#state, this.#config.enableWallet);
+        if (this.#config.enableWallet) {
+            await printBalance(this.#wallet.address, this.#state, this.#config.enableWallet);
+        }
     }
 
     async _close() {
@@ -256,7 +256,7 @@ export class MainSettlementBus extends ReadyResource {
             );
         }
 
-        const txValidity = await PeerWallet.blake3(this.#config.bootstrap);
+        const txValidity = await tracCryptoApi.hash.blake3(this.#config.bootstrap);
         const addAdminMessage = await applyStateMessageFactory(this.#wallet, this.#config)
             .buildCompleteAddAdminMessage(
                 this.#wallet.address,
@@ -1055,6 +1055,81 @@ export class MainSettlementBus extends ReadyResource {
         }
 
         if (rl) rl.prompt();
+    }
+
+    async #initKeyPair() {
+        try {
+            if (verifyWalletPath(this.#config)) {
+                this.#wallet = await importFromFile(this.#config.keyPairPath)
+            } else {
+                console.log("Key file was not found. How do you wish to proceed?")
+                const wallet = await this.#setupKeypairInteractiveMode()
+                if (!wallet) {
+                    console.error("Invalid response type from keypair setup interactive menu")
+                } else {
+                    this.#wallet = wallet
+                }
+            }
+        } catch (err) {
+            console.error(err);
+        }
+    }
+
+    async #setupKeypairInteractiveMode() {
+        // this would be enable interactive mode (but there is an exception being swallowed so its better to act against the code)
+        if (this.#readline_instance !== null) {
+            console.log([
+                "[1]. Generate new keypair",
+                "[2]. Restore keypair from 12 or 24-word mnemonic",
+                "Your choice(1/ 2/):"
+            ].join("\n"));
+
+            let choice = await this.#awaitInput()
+
+            try {
+                switch (choice) {
+                    case '1':
+                        const wallet =  await new WalletProvider(this.#config).generate()
+                        console.log([
+                            "This is your mnemonic:",
+                            wallet.mnemonic, 
+                            "Please back it up in a safe location"
+
+                        ].join("\n"))
+                        exportWallet(wallet, this.#config.keyPairPath)
+                        return wallet
+                    case '2':
+                        console.log("Enter your mnemonic phrase:");
+
+                        let mnemonic = await this.#awaitInput()
+                        try {
+                            const wallet = await new WalletProvider(this.#config).fromMnemonic({ mnemonic })
+                            exportWallet(wallet, this.#config.keyPairPath)
+                            return wallet
+                        } catch {
+                            console.log("Invalid mnemonic. Please check your 12 or 24 words and try again.");
+                            return this.#setupKeypairInteractiveMode();
+                        }
+                    default:
+                        console.log("Invalid choice. Please select again.");
+                        return this.#setupKeypairInteractiveMode();
+                }
+            } catch (e) {
+                console.log("Invalid input. Please try again.");
+                return this.#setupKeypairInteractiveMode();
+            }
+        }
+    }
+
+    async #awaitInput() {
+        let choice = '';
+        const anAction = async input => choice = input
+
+        this.#readline_instance.on('line', anAction)
+        while ('' === choice) await sleep(1000);
+        this.#readline_instance.off('line', anAction);
+
+        return choice
     }
 }
 

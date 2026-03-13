@@ -7,7 +7,7 @@ import Corestore from 'corestore';
 import Autobase from 'autobase';
 import Hyperbee from 'hyperbee';
 import b4a from 'b4a';
-import PeerWallet from 'trac-wallet';
+import { WalletProvider } from 'trac-wallet';
 import Hypercore from 'hypercore';
 import {
 	ACK_INTERVAL,
@@ -18,6 +18,7 @@ import {
 } from '../../src/utils/constants.js';
 import Writer from 'autobase/lib/writer.js';
 import { config } from './config.js';
+import tracCryptoApi from 'trac-crypto-api';
 
 const argv = typeof globalThis.Bare !== 'undefined' ? globalThis.Bare.argv : process.argv;
 
@@ -170,9 +171,8 @@ export function defaultOpenHyperbeeView(store) {
 }
 
 export async function createWallet(mnemonic = null) {
-	const wallet = new PeerWallet({ networkPrefix: config.addressPrefix });
-	await wallet.generateKeyPair(mnemonic ?? undefined);
-	return wallet;
+	const provider = new WalletProvider(config)
+	return mnemonic ? await provider.fromMnemonic({ mnemonic }) : await provider.generate()
 }
 
 export function seedIndexerList(base, keys) {
@@ -335,7 +335,7 @@ export function deriveIndexerSequenceState(base) {
 		.map(entry => entry?.key)
 		.filter(key => key && key.length > 0);
 	const concatenated = buffers.length > 0 ? b4a.concat(buffers) : b4a.alloc(0);
-	return PeerWallet.blake3(concatenated);
+	return tracCryptoApi.hash.blake3(concatenated);
 }
 
 let osModule;

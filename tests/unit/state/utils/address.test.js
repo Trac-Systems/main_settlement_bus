@@ -61,3 +61,14 @@ test('bufferToAddress returns null for buffer with invalid chars', t => {
     buf[5] = 0x41; // 'A' (not bech32)
     t.is(addressUtils.bufferToAddress(buf, hrp), null);
 });
+
+test('decodeBech32mSafe handles invalid input gracefully', t => {
+    const invalidAddress = 'invalidaddress';
+
+    try {
+        const result = addressUtils.decodeBech32mSafe(invalidAddress);
+        t.ok(result === null, 'decodeBech32mSafe correctly handles invalid address');
+    } catch (err) {
+        t.fail('Safe function throws error for invalid address');
+    }
+});

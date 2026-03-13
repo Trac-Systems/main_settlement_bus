@@ -2,9 +2,7 @@ import { test } from 'brittle';
 import b4a from 'b4a';
 import { v7 as uuidv7 } from 'uuid';
 import sinon from 'sinon';
-
 import PendingRequestService from '../../../../src/core/network/services/PendingRequestService.js';
-import NetworkWalletFactory from '../../../../src/core/network/identity/NetworkWalletFactory.js';
 import NetworkMessageBuilder from '../../../../src/messages/network/v1/NetworkMessageBuilder.js';
 import { V1UnexpectedError } from '../../../../src/core/network/protocols/v1/V1ProtocolError.js';
 import { NetworkOperationType, ResultCode } from '../../../../src/utils/constants.js';
@@ -12,12 +10,16 @@ import { errorMessageIncludes } from '../../../helpers/regexHelper.js';
 import { config } from '../../../helpers/config.js';
 import { testKeyPair1, testKeyPair2 } from '../../../fixtures/apply.fixtures.js';
 import SharedValidatorRejectionError from '../../../../src/core/network/protocols/shared/errors/SharedValidatorRejectionError.js';
+import { WalletProvider } from 'trac-wallet';
 
 const validPeerA = testKeyPair1.publicKey;
 const validPeerB = testKeyPair2.publicKey;
 
+async function createWallet() {
+    return await new WalletProvider(config).fromSecretKey(testKeyPair1.secretKey)
+}
 async function buildV1Request({ id = uuidv7() } = {}) {
-    const wallet = createWallet();
+    const wallet = await createWallet();
     const builder = new NetworkMessageBuilder(wallet, config);
     await builder
         .setType(NetworkOperationType.LIVENESS_REQUEST)
@@ -29,7 +31,7 @@ async function buildV1Request({ id = uuidv7() } = {}) {
 }
 
 async function buildV1BroadcastRequest({ id = uuidv7(), data = b4a.from('deadbeef', 'hex') } = {}) {
-    const wallet = createWallet();
+    const wallet = await createWallet();
     const builder = new NetworkMessageBuilder(wallet, config);
     await builder
         .setType(NetworkOperationType.BROADCAST_TRANSACTION_REQUEST)
@@ -39,18 +41,6 @@ async function buildV1BroadcastRequest({ id = uuidv7(), data = b4a.from('deadbee
         .setCapabilities([])
         .buildPayload();
     return builder.getResult();
-}
-
-function createWallet() {
-    const keyPair = {
-        publicKey: b4a.from(testKeyPair1.publicKey, 'hex'),
-        secretKey: b4a.from(testKeyPair1.secretKey, 'hex')
-    };
-    return NetworkWalletFactory.provide({
-        enableWallet: false,
-        keyPair,
-        networkPrefix: config.addressPrefix
-    });
 }
 
 test('PendingRequestService registers and resolves v1 request', async t => {

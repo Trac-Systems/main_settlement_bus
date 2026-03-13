@@ -3,7 +3,7 @@
  *
  * Each node gets:
  *  - a Corestore/Autobase pair created via test/testHelpers/autobaseTestHelpers
- *  - a PeerWallet (bootstrap uses the deterministic test mnemonic)
+ *  - a Wallet (trac) (bootstrap uses the deterministic test mnemonic)
  *  - a State instance wired to the same bootstrap key so we can plug its apply handler directly
  *
  * Tests can grab `network.adminBootstrap` (the first node) plus the rest from `network.peers`,
