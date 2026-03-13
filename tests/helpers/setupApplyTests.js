@@ -6,7 +6,7 @@ import { WalletProvider, exportWallet } from "trac-wallet"
 import path from 'path';
 import {MainSettlementBus} from '../../src/index.js'
 import { createConfig, ENV } from '../../src/config/env.js'
-import fileUtils from '../../src/utils/fileUtils.js'
+import fileUtils, { verifyWalletPath } from '../../src/utils/fileUtils.js'
 import {EntryType} from '../../src/utils/constants.js';
 import {sleep} from '../../src/utils/helpers.js'
 import {formatIndexersEntry} from '../../src/utils/helpers.js';
@@ -84,10 +84,9 @@ export async function fundPeer(admin, toFund, amount) {
 
 export async function initMsbPeer(peerName, peerKeyPair, temporaryDirectory, options = {}) {
     const config = createConfig(ENV.DEVELOPMENT, { ...options, storesDirectory: `${temporaryDirectory}/${peerName}` })
-    const peer = await initDirectoryStructure(peerName, peerKeyPair, config.storesFullPath);
-    peer.options = { ...options, storesDirectory: config.storesDirectory }
-    peer.config = config
-    const msb = new MainSettlementBus(peer.config);
+    const wallet = await initDirectoryStructure(peerKeyPair, config);
+    const peerOptions = { ...options, storesDirectory: config.storesDirectory }
+    const msb = new MainSettlementBus(config);
 
     return {
         config,
@@ -261,18 +260,15 @@ export async function initDirectoryStructure(keyPair, config) {
     try {
         await ensureEnvReady();
 
-        await fsp.mkdir(config.storesFullPath, {recursive: true});
-        await fsp.mkdir(path.dirname(config.keyPairPath), { recursive: true });
-        const keypath = config.keyPairPath;
-
         if (!keyPair || !keyPair.publicKey || !keyPair.secretKey) {
-            keyPair = await randomKeypair();
+            keyPair = await new WalletProvider(config).generate();
         }
 
-        const walletProvider = new WalletProvider({ addressPrefix: config.addressPrefix });
-        const secretKey = b4a.isBuffer(keyPair.secretKey) ? b4a.toString(keyPair.secretKey, 'hex') : keyPair.secretKey;
-        const wallet = await walletProvider.fromSecretKey(secretKey)
-        await exportWallet(wallet, keypath)
+        const wallet = await new WalletProvider(config).fromSecretKey(keyPair.secretKey)
+        if (!verifyWalletPath(config.keyPairPath)) {
+            await fsp.mkdir(path.join(config.storesFullPath, 'db'), { recursive: true });
+            await exportWallet(wallet, config.keyPairPath)
+        }
         return wallet
     } catch (error) {
         throw new Error('Error creating directory structure: ' + error)
