@@ -104,7 +104,7 @@ export class MainSettlementBus extends ReadyResource {
         }
 
         this.#state = new State(this.#store, this.#wallet, this.#config);
-        this.#network = new Network(this.#state, this.#config, this.#wallet.address);
+        this.#network = new Network(this.#state, this.#config, this.#wallet?.address ?? null);
 
         await this.#state.ready();
         await this.#network.ready();
@@ -130,7 +130,9 @@ export class MainSettlementBus extends ReadyResource {
         console.log("MSB Unsigned Length:", this.#state.getUnsignedLength());
         console.log("MSB Signed Length:", this.#state.getSignedLength());
 
-        await printBalance(this.#wallet.address, this.#state, this.#config.enableWallet);
+        if (this.#config.enableWallet) {
+            await printBalance(this.#wallet.address, this.#state, this.#config.enableWallet);
+        }
     }
 
     async _close() {
