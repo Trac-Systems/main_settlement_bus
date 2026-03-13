@@ -97,7 +97,7 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async _open() {
-        await fileUtils.ensureCoresStoreDir(this.#config);
+        await fileUtils.ensureKeyPathDir(this.#config);
 
         if (this.#config.enableWallet) {
             await this.#initKeyPair()
@@ -1101,10 +1101,12 @@ export class MainSettlementBus extends ReadyResource {
 
                         let mnemonic = await this.#awaitInput()
                         try {
-                            return await new WalletProvider(this.#config).fromMnemonic({ mnemonic })
+                            const wallet = await new WalletProvider(this.#config).fromMnemonic({ mnemonic })
+                            exportWallet(wallet, this.#config.keyPairPath)
+                            return wallet
                         } catch {
                             console.log("Invalid mnemonic. Please check your 12 or 24 words and try again.");
-                            return this.#setupKeypairInteractiveMode(rl);
+                            return this.#setupKeypairInteractiveMode();
                         }
                     default:
                         console.log("Invalid choice. Please select again.");

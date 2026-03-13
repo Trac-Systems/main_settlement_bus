@@ -17,6 +17,7 @@ import PendingRequestService from './services/PendingRequestService.js';
 import TransactionCommitService from "./services/TransactionCommitService.js";
 import ValidatorHealthCheckService from './services/ValidatorHealthCheckService.js';
 import { Logger } from '../../utils/logger.js';
+import { WalletProvider } from 'trac-wallet';
 
 const wakeup = new w();
 
@@ -166,12 +167,12 @@ class Network extends ReadyResource {
         wallet,
     ) {
         if (!this.#swarm) {
-            const { wallet: wrappedWallet, keypair } = await this.#getOrGenerateWallet(store, wallet);
+            const { wallet: wrappedWallet, keyPair } = await this.#getOrGenerateWallet(store, wallet);
             this.#wallet = wrappedWallet
             this.#validatorMessageOrchestrator.setWallet(this.#wallet);
 
             this.#swarm = new Hyperswarm({
-                keypair,
+                keyPair,
                 bootstrap: this.#config.dhtBootstrap,
                 maxPeers: this.#config.maxPeers,
                 maxParallel: this.#config.maxParallel,
@@ -255,12 +256,12 @@ class Network extends ReadyResource {
 
     async #getOrGenerateWallet(store, wallet) {
         if (!this.#config.enableWallet) {
-            const keypair = await store.createKeyPair(TRAC_NAMESPACE);
-            const wallet = await new WalletProvider(this.#config).fromSecretKey(keypair.secretKey)
-            return { keypair, wallet }
+            const keyPair = await store.createKeyPair(TRAC_NAMESPACE);
+            const wallet = await new WalletProvider(this.#config).fromSecretKey(keyPair.secretKey)
+            return { keyPair, wallet }
         } else {
-            const keypair = { publicKey: wallet.publicKey, secretKey: wallet.secretKey }
-            return { keypair, wallet }
+            const keyPair = { publicKey: wallet.publicKey, secretKey: wallet.secretKey }
+            return { keyPair, wallet }
         }
     }
 

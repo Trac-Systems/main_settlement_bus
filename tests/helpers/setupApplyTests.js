@@ -259,14 +259,14 @@ export async function removeTemporaryDirectory(temporaryDirectory) {
 export async function initDirectoryStructure(keyPair, config) {
     try {
         await ensureEnvReady();
+        await fsp.mkdir(config.keyPairDirectoryPath, { recursive: true });
 
         if (!keyPair || !keyPair.publicKey || !keyPair.secretKey) {
             keyPair = await new WalletProvider(config).generate();
         }
 
         const wallet = await new WalletProvider(config).fromSecretKey(keyPair.secretKey)
-        if (!verifyWalletPath(config.keyPairPath)) {
-            await fsp.mkdir(path.join(config.storesFullPath, 'db'), { recursive: true });
+        if (!verifyWalletPath(config)) {
             await exportWallet(wallet, config.keyPairPath)
         }
         return wallet
