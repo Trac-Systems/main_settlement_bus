@@ -1,8 +1,11 @@
-import {bufferToAddress, decodeBech32mSafe} from "../../../../state/utils/address.js";
+import {bufferToAddress} from "../../../../state/utils/address.js";
 import {bufferToBigInt} from "../../../../../utils/amountSerialization.js";
 import {ResultCode} from "../../../../../utils/constants.js";
+import { NULL_BUFFER } from '../../../../../utils/buffer.js';
 import PartialOperationValidator from './PartialOperationValidator.js';
 import SharedValidatorRejectionError from '../errors/SharedValidatorRejectionError.js';
+import tracCryptoApi from "trac-crypto-api";
+import b4a from 'b4a';
 
 class PartialTransferValidator extends PartialOperationValidator {
     #config
@@ -37,8 +40,8 @@ class PartialTransferValidator extends PartialOperationValidator {
             );
         }
 
-        const incomingPublicKey = decodeBech32mSafe(incomingAddress);
-        if (incomingPublicKey === null) {
+        const incomingPublicKey = tracCryptoApi.address.decodeSafe(incomingAddress);
+        if (b4a.equals(incomingPublicKey, NULL_BUFFER)) {
             throw new SharedValidatorRejectionError(
                 ResultCode.TRANSFER_RECIPIENT_PUBLIC_KEY_INVALID,
                 'Invalid recipient public key in transfer payload.'

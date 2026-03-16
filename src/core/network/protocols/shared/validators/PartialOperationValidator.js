@@ -1,7 +1,7 @@
 import b4a from 'b4a';
 import tracCryptoApi from 'trac-crypto-api';
 import Check from '../../../../../utils/check.js';
-import {bufferToAddress, decodeBech32mSafe} from "../../../../state/utils/address.js";
+import {bufferToAddress} from "../../../../state/utils/address.js";
 import {createMessage} from "../../../../../utils/buffer.js";
 import {OperationType, ResultCode} from "../../../../../utils/constants.js";
 import {bufferToBigInt} from "../../../../../utils/amountSerialization.js";
@@ -78,7 +78,7 @@ class PartialOperationValidator {
             throw new SharedValidatorRejectionError(ResultCode.REQUESTER_ADDRESS_INVALID, 'Invalid requesting address in payload.');
         }
 
-        const incomingPublicKey = decodeBech32mSafe(incomingAddress);
+        const incomingPublicKey = tracCryptoApi.address.decodeSafe(incomingAddress);
 
         // TODO: We can add check if public key belongs to the Ed25519 curve. Validate signature already checks that but it would be amazing to catch it earlier.
         if (!incomingPublicKey || incomingPublicKey.length !== PUBLIC_KEY_LENGTH) {
@@ -142,7 +142,7 @@ class PartialOperationValidator {
         const operationKey = operationsUtils.operationToPayload(payload.type);
         const operation = payload[operationKey];
 
-        const incomingPublicKey = decodeBech32mSafe(bufferToAddress(payload.address, this.#config.addressPrefix));
+        const incomingPublicKey = tracCryptoApi.address.decodeSafe(bufferToAddress(payload.address, this.#config.addressPrefix));
         const incomingSignature = operation.is;
         const messageComponents = this.#getMessageComponents(payload);
 

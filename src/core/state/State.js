@@ -19,7 +19,7 @@ import { isHexString, sleep, isTransactionRecordPut } from '../../utils/helpers.
 import tracCryptoApi from 'trac-crypto-api';
 import Check from '../../utils/check.js';
 import { safeDecodeApplyOperation } from '../../utils/protobuf/operationHelpers.js';
-import { createMessage, ZERO_WK } from '../../utils/buffer.js';
+import { createMessage, ZERO_WK, NULL_BUFFER } from '../../utils/buffer.js';
 import addressUtils from './utils/address.js';
 import adminEntryUtils from './utils/adminEntry.js';
 import nodeEntryUtils, { setWritingKey, NODE_ENTRY_SIZE } from './utils/nodeEntry.js';
@@ -488,8 +488,8 @@ class State extends ReadyResource {
         }
 
         // Verify requester admin public key
-        const requesterAdminPublicKey = addressUtils.decodeBech32mSafe(adminAddressString);
-        if (requesterAdminPublicKey === null) {
+        const requesterAdminPublicKey = tracCryptoApi.address.decodeSafe(adminAddressString);
+        if (b4a.equals(requesterAdminPublicKey, NULL_BUFFER)) {
             this.#safeLogApply(OperationType.BALANCE_INITIALIZATION, "Error while decoding requester public key.", node.from.key)
             return Status.FAILURE;
         };
@@ -503,8 +503,8 @@ class State extends ReadyResource {
         };
 
         // Validate recipient public key
-        const recipientPublicKey = addressUtils.decodeBech32mSafe(recipientAddressString);
-        if (recipientPublicKey === null) {
+        const recipientPublicKey = tracCryptoApi.address.decodeSafe(recipientAddressString);
+        if (b4a.equals(recipientPublicKey, NULL_BUFFER)) {
             this.#safeLogApply(OperationType.BALANCE_INITIALIZATION, "Failed to decode recipient public key.", node.from.key)
             return Status.FAILURE;
         };
@@ -536,8 +536,8 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const adminPublicKey = addressUtils.decodeBech32mSafe(decodedAdminEntry.address);
-        if (adminPublicKey === null) {
+        const adminPublicKey = tracCryptoApi.address.decodeSafe(decodedAdminEntry.address);
+        if (b4a.equals(adminPublicKey, NULL_BUFFER)) {
             this.#safeLogApply(OperationType.BALANCE_INITIALIZATION, "Failed to decode admin public key.", node.from.key)
             return Status.FAILURE;
         };
@@ -639,8 +639,8 @@ class State extends ReadyResource {
         };
 
         // Validate requester admin public key
-        const requesterAdminPublicKey = addressUtils.decodeBech32mSafe(adminAddressString);
-        if (requesterAdminPublicKey === null) {
+        const requesterAdminPublicKey = tracCryptoApi.address.decodeSafe(adminAddressString);
+        if (b4a.equals(requesterAdminPublicKey, NULL_BUFFER)) {
             this.#safeLogApply(OperationType.DISABLE_INITIALIZATION, "Failed to decode requester public key.", node.from.key)
             return Status.FAILURE;
         };
@@ -659,8 +659,8 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const adminPublicKey = addressUtils.decodeBech32mSafe(decodedAdminEntry.address);
-        if (adminPublicKey === null) {
+        const adminPublicKey = tracCryptoApi.address.decodeSafe(decodedAdminEntry.address);
+        if (b4a.equals(adminPublicKey, NULL_BUFFER)) {
             this.#safeLogApply(OperationType.DISABLE_INITIALIZATION, "Failed to decode admin public key.", node.from.key)
             return Status.FAILURE;
         };
@@ -744,8 +744,8 @@ class State extends ReadyResource {
         };
 
         // Validate requester admin public key (admin)
-        const adminPublicKey = addressUtils.decodeBech32mSafe(adminAddressString);
-        if (adminPublicKey === null) {
+        const adminPublicKey = tracCryptoApi.address.decodeSafe(adminAddressString);
+        if (b4a.equals(adminPublicKey, NULL_BUFFER)) {
             this.#safeLogApply(OperationType.ADD_ADMIN, "Error while decoding requester public key.", node.from.key)
             return Status.FAILURE;
         };
@@ -904,8 +904,8 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const requesterAdminPublicKey = addressUtils.decodeBech32mSafe(requesterAdminAddressString);
-        if (requesterAdminPublicKey === null) {
+        const requesterAdminPublicKey = tracCryptoApi.address.decodeSafe(requesterAdminAddressString);
+        if (b4a.equals(requesterAdminPublicKey, NULL_BUFFER)) {
             this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Error while decoding requester public key.", node.from.key)
             return Status.FAILURE;
         };
@@ -946,8 +946,8 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const validatorPublicKey = addressUtils.decodeBech32mSafe(validatorAddressString);
-        if (validatorPublicKey === null) {
+        const validatorPublicKey = tracCryptoApi.address.decodeSafe(validatorAddressString);
+        if (b4a.equals(validatorPublicKey, NULL_BUFFER)) {
             this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Failed to decode validator public key.", node.from.key)
             return Status.FAILURE;
         };
@@ -1009,7 +1009,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const publicKeyAdminEntry = addressUtils.decodeBech32mSafe(decodedAdminEntry.address);
+        const publicKeyAdminEntry = tracCryptoApi.address.decodeSafe(decodedAdminEntry.address);
         if (!b4a.equals(requesterAdminPublicKey, publicKeyAdminEntry)) {
             this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Admin public key does not match the node public key.", node.from.key)
             return Status.FAILURE;
@@ -1131,8 +1131,8 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
         // Validate recipient public key
-        const requesterAdminPublicKey = addressUtils.decodeBech32mSafe(adminAddressString);
-        if (requesterAdminPublicKey === null) {
+        const requesterAdminPublicKey = tracCryptoApi.address.decodeSafe(adminAddressString);
+        if (b4a.equals(requesterAdminPublicKey, NULL_BUFFER)) {
             this.#safeLogApply(OperationType.APPEND_WHITELIST, "Failed to decode recipient public key.", node.from.key)
             return Status.FAILURE;
         };
@@ -1157,8 +1157,8 @@ class State extends ReadyResource {
 
         // Extract admin entry
         const adminAddress = decodedAdminEntry.address;
-        const adminPublicKey = addressUtils.decodeBech32mSafe(adminAddress);
-        if (adminPublicKey === null) {
+        const adminPublicKey = tracCryptoApi.address.decodeSafe(adminAddress);
+        if (b4a.equals(adminPublicKey, NULL_BUFFER)) {
             this.#safeLogApply(OperationType.APPEND_WHITELIST, "Failed to decode admin public key.", node.from.key)
             return Status.FAILURE;
         };
@@ -1177,8 +1177,8 @@ class State extends ReadyResource {
             this.#safeLogApply(OperationType.APPEND_WHITELIST, "Failed to verify node address.", node.from.key)
             return Status.FAILURE;
         };
-        const nodePublicKey = addressUtils.decodeBech32mSafe(nodeAddressString);
-        if (nodePublicKey === null) {
+        const nodePublicKey = tracCryptoApi.address.decodeSafe(nodeAddressString);
+        if (b4a.equals(nodePublicKey, NULL_BUFFER)) {
             this.#safeLogApply(OperationType.APPEND_WHITELIST, "Failed to decode node public key.", node.from.key)
             return Status.FAILURE;
         };
@@ -1404,8 +1404,8 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const requesterPublicKey = addressUtils.decodeBech32mSafe(requesterAddressString);
-        if (requesterPublicKey === null) {
+        const requesterPublicKey = tracCryptoApi.address.decodeSafe(requesterAddressString);
+        if (b4a.equals(requesterPublicKey, NULL_BUFFER)) {
             this.#safeLogApply(OperationType.ADD_WRITER, "Error while decoding requester public key.", node.from.key)
             return Status.FAILURE;
         };
@@ -1452,8 +1452,8 @@ class State extends ReadyResource {
         };
 
         // validate validator public key
-        const validatorPublicKey = addressUtils.decodeBech32mSafe(validatorAddressString);
-        if (validatorPublicKey === null) {
+        const validatorPublicKey = tracCryptoApi.address.decodeSafe(validatorAddressString);
+        if (b4a.equals(validatorPublicKey, NULL_BUFFER)) {
             this.#safeLogApply(OperationType.ADD_WRITER, "Failed to decode validator public key.", node.from.key)
             return Status.FAILURE;
         };
@@ -1709,8 +1709,8 @@ class State extends ReadyResource {
         };
 
         // Validate requester public key
-        const requesterPublicKey = addressUtils.decodeBech32mSafe(requesterAddressString);
-        if (requesterPublicKey === null) {
+        const requesterPublicKey = tracCryptoApi.address.decodeSafe(requesterAddressString);
+        if (b4a.equals(requesterPublicKey, NULL_BUFFER)) {
             this.#safeLogApply(OperationType.REMOVE_WRITER, "Error while decoding requester public key.", node.from.key)
             return Status.FAILURE;
         };
@@ -1751,8 +1751,8 @@ class State extends ReadyResource {
         };
 
         // validate validator public key
-        const validatorPublicKey = addressUtils.decodeBech32mSafe(validatorAddressString);
-        if (validatorPublicKey === null) {
+        const validatorPublicKey = tracCryptoApi.address.decodeSafe(validatorAddressString);
+        if (b4a.equals(validatorPublicKey, NULL_BUFFER)) {
             this.#safeLogApply(OperationType.REMOVE_WRITER, "Failed to decode validator public key.", node.from.key)
             return Status.FAILURE;
         };
@@ -1931,7 +1931,7 @@ class State extends ReadyResource {
             console.info(`Writer removed: addr:wk:tx - ${requesterAddressString}:${op.rao.iw.toString('hex')}:${txHashHexString}`);
         }
 
-        this.#emitEvent(CustomEventType.UNWRITABLE, addressUtils.decodeBech32mSafe(requesterAddressString))
+        this.#emitEvent(CustomEventType.UNWRITABLE, tracCryptoApi.address.decodeSafe(requesterAddressString))
     }
 
     async #handleApplyAddIndexerOperation(op, view, base, node, batch) {
@@ -1949,8 +1949,8 @@ class State extends ReadyResource {
         };
 
         // Validate requester public key
-        const requesterPublicKey = addressUtils.decodeBech32mSafe(requesterAddressString);
-        if (requesterPublicKey === null) {
+        const requesterPublicKey = tracCryptoApi.address.decodeSafe(requesterAddressString);
+        if (b4a.equals(requesterPublicKey, NULL_BUFFER)) {
             this.#safeLogApply(OperationType.ADD_INDEXER, "Error while decoding requester public key.", node.from.key)
             return Status.FAILURE;
         };
@@ -1964,8 +1964,8 @@ class State extends ReadyResource {
         };
 
         // Validate pretending indexer public key
-        const pretentingPublicKey = addressUtils.decodeBech32mSafe(pretendingAddressString);
-        if (pretentingPublicKey === null) {
+        const pretentingPublicKey = tracCryptoApi.address.decodeSafe(pretendingAddressString);
+        if (b4a.equals(pretentingPublicKey, NULL_BUFFER)) {
             this.#safeLogApply(OperationType.ADD_INDEXER, "Failed to decode pretending indexer public key.", node.from.key)
             return Status.FAILURE;
         };
@@ -1989,8 +1989,8 @@ class State extends ReadyResource {
         };
 
         // Extract admin public key 
-        const adminPublicKey = addressUtils.decodeBech32mSafe(decodedAdminEntry.address);
-        if (adminPublicKey === null) {
+        const adminPublicKey = tracCryptoApi.address.decodeSafe(decodedAdminEntry.address);
+        if (b4a.equals(adminPublicKey, NULL_BUFFER)) {
             this.#safeLogApply(OperationType.ADD_INDEXER, "Failed to decode admin public key.", node.from.key)
             return Status.FAILURE;
         };
@@ -2149,7 +2149,7 @@ class State extends ReadyResource {
             console.info(`Indexer added addr:wk:tx - ${pretendingAddressString}:${decodedPretenderNodeEntry.wk.toString('hex')}:${txHashHexString}`);
         }
 
-        this.#emitEvent(CustomEventType.IS_INDEXER, addressUtils.decodeBech32mSafe(pretendingAddressString))
+        this.#emitEvent(CustomEventType.IS_INDEXER, tracCryptoApi.address.decodeSafe(pretendingAddressString))
     }
 
     async #handleApplyRemoveIndexerOperation(op, view, base, node, batch) {
@@ -2167,8 +2167,8 @@ class State extends ReadyResource {
         };
 
         // Validate requester public key (admin)
-        const requesterPublicKey = addressUtils.decodeBech32mSafe(requesterAddressString);
-        if (requesterPublicKey === null) {
+        const requesterPublicKey = tracCryptoApi.address.decodeSafe(requesterAddressString);
+        if (b4a.equals(requesterPublicKey, NULL_BUFFER)) {
             this.#safeLogApply(OperationType.REMOVE_INDEXER, "Error while decoding requester public key.", node.from.key)
             return Status.FAILURE;
         };
@@ -2181,8 +2181,8 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const toRemoveAddressPublicKey = addressUtils.decodeBech32mSafe(toRemoveAddressString);
-        if (toRemoveAddressPublicKey === null) {
+        const toRemoveAddressPublicKey = tracCryptoApi.address.decodeSafe(toRemoveAddressString);
+        if (b4a.equals(toRemoveAddressPublicKey, NULL_BUFFER)) {
             this.#safeLogApply(OperationType.REMOVE_INDEXER, "Failed to decode target indexer public key.", node.from.key)
             return Status.FAILURE;
         };
@@ -2205,8 +2205,8 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const adminPublicKey = addressUtils.decodeBech32mSafe(decodedAdminEntry.address);
-        if (adminPublicKey === null) {
+        const adminPublicKey = tracCryptoApi.address.decodeSafe(decodedAdminEntry.address);
+        if (b4a.equals(adminPublicKey, NULL_BUFFER)) {
             this.#safeLogApply(OperationType.REMOVE_INDEXER, "Failed to decode admin public key.", node.from.key)
             return Status.FAILURE;
         };
@@ -2383,8 +2383,8 @@ class State extends ReadyResource {
         };
 
         // Validate requester public key
-        const requesterPublicKey = addressUtils.decodeBech32mSafe(requesterAddressString);
-        if (requesterPublicKey === null) {
+        const requesterPublicKey = tracCryptoApi.address.decodeSafe(requesterAddressString);
+        if (b4a.equals(requesterPublicKey, NULL_BUFFER)) {
             this.#safeLogApply(OperationType.BAN_VALIDATOR, "Error while decoding requester public key.", node.from.key)
             return Status.FAILURE;
         };
@@ -2402,8 +2402,8 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const adminPublicKey = addressUtils.decodeBech32mSafe(decodedAdminEntry.address);
-        if (adminPublicKey === null) {
+        const adminPublicKey = tracCryptoApi.address.decodeSafe(decodedAdminEntry.address);
+        if (b4a.equals(adminPublicKey, NULL_BUFFER)) {
             this.#safeLogApply(OperationType.BAN_VALIDATOR, "Failed to decode admin public key.", node.from.key)
             return Status.FAILURE;
         };
@@ -2565,7 +2565,7 @@ class State extends ReadyResource {
             console.info(`Node has been banned: addr:wk:tx - ${nodeToBeBannedAddressString}:${decodedToBanNodeEntry.wk.toString('hex')}:${txHashHexString}`);
         }
 
-        this.#emitEvent(CustomEventType.UNWRITABLE, addressUtils.decodeBech32mSafe(nodeToBeBannedAddressString))
+        this.#emitEvent(CustomEventType.UNWRITABLE, tracCryptoApi.address.decodeSafe(nodeToBeBannedAddressString))
 
         return Status.SUCCESS;
     }
@@ -2611,8 +2611,8 @@ class State extends ReadyResource {
         };
 
         // validate requester public key
-        const requesterPublicKey = addressUtils.decodeBech32mSafe(requesterAddressString);
-        if (requesterPublicKey === null) {
+        const requesterPublicKey = tracCryptoApi.address.decodeSafe(requesterAddressString);
+        if (b4a.equals(requesterPublicKey, NULL_BUFFER)) {
             this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Failed to decode requester public key.", node.from.key)
             return Status.FAILURE;
         };
@@ -2656,8 +2656,8 @@ class State extends ReadyResource {
         };
 
         // validate validator public key
-        const validatorPublicKey = addressUtils.decodeBech32mSafe(validatorAddressString);
-        if (validatorPublicKey === null) {
+        const validatorPublicKey = tracCryptoApi.address.decodeSafe(validatorAddressString);
+        if (b4a.equals(validatorPublicKey, NULL_BUFFER)) {
             this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Failed to decode validator public key.", node.from.key)
             return Status.FAILURE;
         };
@@ -2848,8 +2848,8 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const requesterPublicKey = addressUtils.decodeBech32mSafe(requesterAddressString);
-        if (requesterPublicKey === null) {
+        const requesterPublicKey = tracCryptoApi.address.decodeSafe(requesterAddressString);
+        if (b4a.equals(requesterPublicKey, NULL_BUFFER)) {
             this.#safeLogApply(OperationType.TX, "Failed to decode requester public key.", node.from.key)
             return Status.FAILURE;
         };
@@ -2889,8 +2889,8 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const validatorPublicKey = addressUtils.decodeBech32mSafe(validatorAddressString);
-        if (validatorPublicKey === null) {
+        const validatorPublicKey = tracCryptoApi.address.decodeSafe(validatorAddressString);
+        if (b4a.equals(validatorPublicKey, NULL_BUFFER)) {
             this.#safeLogApply(OperationType.TX, "Failed to decode validator public key.", node.from.key)
             return Status.FAILURE;
         };
@@ -3052,8 +3052,8 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const requesterPublicKey = addressUtils.decodeBech32mSafe(requesterAddressString);
-        if (requesterPublicKey === null) {
+        const requesterPublicKey = tracCryptoApi.address.decodeSafe(requesterAddressString);
+        if (b4a.equals(requesterPublicKey, NULL_BUFFER)) {
             this.#safeLogApply(OperationType.TRANSFER, "Error while decoding requester public key.", node.from.key)
             return Status.FAILURE;
         };
@@ -3094,8 +3094,8 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const validatorPublicKey = addressUtils.decodeBech32mSafe(validatorAddressString);
-        if (validatorPublicKey === null) {
+        const validatorPublicKey = tracCryptoApi.address.decodeSafe(validatorAddressString);
+        if (b4a.equals(validatorPublicKey, NULL_BUFFER)) {
             this.#safeLogApply(OperationType.TRANSFER, "Failed to decode validator public key.", node.from.key)
             return Status.FAILURE;
         };
@@ -3156,8 +3156,8 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const recipientPublicKey = addressUtils.decodeBech32mSafe(recipientAddressString);
-        if (recipientPublicKey === null) {
+        const recipientPublicKey = tracCryptoApi.address.decodeSafe(recipientAddressString);
+        if (b4a.equals(recipientPublicKey, NULL_BUFFER)) {
             this.#safeLogApply(OperationType.TRANSFER, "Failed to decode recipient public key.", node.from.key)
             return Status.FAILURE;
         };
@@ -3615,8 +3615,8 @@ class State extends ReadyResource {
             return;
         }
 
-        const validatorPublicKey = addressUtils.decodeBech32mSafe(validatorAddressString);
-        if (validatorPublicKey === null) {
+        const validatorPublicKey = tracCryptoApi.address.decodeSafe(validatorAddressString);
+        if (b4a.equals(validatorPublicKey, NULL_BUFFER)) {
             this.#safeLogApply("ValidatorPenalty", `Failed to decode validator public key: ${validatorAddressString}`, writingKeyBuffer);
             return;
         }
