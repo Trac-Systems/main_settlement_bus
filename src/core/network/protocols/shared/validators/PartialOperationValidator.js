@@ -156,7 +156,7 @@ class PartialOperationValidator {
             );
         }
 
-        if (!verify(incomingSignature, messageHash, incomingPublicKey)) {
+        if (!tracCryptoApi.signature.verify(incomingSignature, messageHash, incomingPublicKey)) {
             throw new SharedValidatorRejectionError(ResultCode.TX_SIGNATURE_INVALID, 'Invalid signature in payload.');
         }
     }
