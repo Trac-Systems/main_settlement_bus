@@ -1,6 +1,6 @@
 import V1ValidationSchema from "./V1ValidationSchema.js";
 import {NetworkOperationType, ResultCode} from "../../../../../utils/constants.js";
-import PeerWallet from "trac-wallet";
+import tracCryptoApi from "trac-crypto-api";
 import b4a from "b4a";
 import {
     createMessage,
@@ -16,6 +16,7 @@ import {
     V1UnexpectedError,
 } from "../V1ProtocolError.js";
 import _ from 'lodash';
+
 class V1BaseOperation {
     #v1ValidationSchema
     #config
@@ -57,14 +58,14 @@ class V1BaseOperation {
 
         let hash;
         try {
-            hash = await PeerWallet.blake3(message);
+            hash = await tracCryptoApi.hash.blake3(message);
         } catch (error) {
             throw new V1InvalidPayloadError('Failed to hash signature message.');
         }
 
         let verified = false;
         try {
-            verified = PeerWallet.verify(signature, hash, remotePublicKey);
+            verified = tracCryptoApi.signature.verify(signature, hash, remotePublicKey);
         } catch (error) {
             verified = false;
         }

@@ -15,7 +15,7 @@ import nodeEntryUtils from '../../../../src/core/state/utils/nodeEntry.js';
 import { safeDecodeApplyOperation } from '../../../../src/utils/protobuf/operationHelpers.js';
 import { bigIntTo16ByteBuffer, decimalStringToBigInt } from '../../../../src/utils/amountSerialization.js';
 import { BATCH_SIZE } from '../../../../src/utils/constants.js';
-import { config } from '../../../helpers/config.js';
+import { overrideConfig } from '../../../helpers/config.js';
 import {
     buildTransferPayload,
     setupTransferScenario
@@ -24,6 +24,8 @@ import {
 const CONFIG_DEFAULT = { enableWallet: true, txPoolSize: 10, processIntervalMs: 50 }
 const CONFIG_TX_POOL_INCREASE = { enableWallet: true, txPoolSize: 100, processIntervalMs: 50 };
 
+const config = overrideConfig(CONFIG_DEFAULT)
+const increasedPoolConfig = overrideConfig(CONFIG_TX_POOL_INCREASE)
 
 // TODO: base in the State.js is private, so I had to create an adapter fixture to expose the necessary methods for TransactionPoolService testing. Refactor State.js to allow better testability without needing this kind of workaround.
 function createStateFixture(validatorPeer) {
@@ -232,7 +234,7 @@ test('TransactionPoolService rejects pending commit when proof is unavailable', 
         },
         'validator-address',
         txCommitService,
-        CONFIG_DEFAULT
+        config
     );
 
     try {
@@ -270,7 +272,7 @@ test('TransactionPoolService rejects pending commit when commit receipt is missi
         },
         'validator-address',
         txCommitService,
-        CONFIG_DEFAULT
+        config
     );
 
     try {
@@ -307,7 +309,7 @@ test('TransactionPoolService rejects all pending commits when appendWithProofOfP
         },
         'validator-address',
         txCommitService,
-        CONFIG_DEFAULT
+        config
     );
 
     try {
@@ -356,7 +358,7 @@ test('TransactionPoolService.start is idempotent when scheduler is already runni
             resolvePendingCommit() { return false; },
             rejectPendingCommit() { return false; }
         },
-        CONFIG_DEFAULT
+        config
     );
 
     try {
@@ -397,7 +399,7 @@ test('TransactionPoolService schedules immediate follow-up run when queue remain
             resolvePendingCommit() { return true; },
             rejectPendingCommit() { return true; }
         },
-        CONFIG_TX_POOL_INCREASE
+        increasedPoolConfig
     );
 
     try {
