@@ -175,6 +175,11 @@ class State extends ReadyResource {
 
         return !!(localWritable && !localIndexer) && (unsignedIsWriter && !unsignedIsIndexer)
     }
+    
+    async isAdmin() {
+        const adminEntry = await this.getAdminEntry();
+        return !!adminEntry && this.#wallet?.address === adminEntry?.address && b4a.equals(adminEntry?.wk, this.writingKey)
+    }
 
     async isAdminAllowedToValidate() {
         const isAdmin = this.writingKey.toString('hex') === this.#config.bootstrap.toString('hex');

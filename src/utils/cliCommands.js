@@ -148,14 +148,8 @@ export async function getLicenseAddressCommand(state, licenseId) {
     }
 }
 
-export async function getLicenseCountCommand(state, isAdminFn) {
-    const adminEntry = await state.getAdminEntry();
-
-    if (!adminEntry) {
-        throw new Error("Cannot read license count. Admin does not exist");
-    }
-
-    if (!isAdminFn(adminEntry)) {
+export async function getLicenseCountCommand(state) {
+    if (!await state.isAdmin()) {
         throw new Error("Cannot perform this operation - you are not the admin!.");
     }
 
