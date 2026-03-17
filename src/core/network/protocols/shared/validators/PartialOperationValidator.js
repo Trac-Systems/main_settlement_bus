@@ -1,7 +1,7 @@
 import b4a from 'b4a';
 import tracCryptoApi from 'trac-crypto-api';
 import Check from '../../../../../utils/check.js';
-import {bufferToAddress, decodeBech32mSafe} from "../../../../state/utils/address.js";
+import {bufferToAddress} from "../../../../state/utils/address.js";
 import {createMessage} from "../../../../../utils/buffer.js";
 import {OperationType, ResultCode} from "../../../../../utils/constants.js";
 import {bufferToBigInt} from "../../../../../utils/amountSerialization.js";
