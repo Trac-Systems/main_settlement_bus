@@ -1,7 +1,7 @@
 import { ZERO_WK } from "./buffer.js";
 import { bigIntToDecimalString, bufferToBigInt } from "./amountSerialization.js";
 import { normalizeDecodedPayloadForJson } from "./normalizers.js";
-import { get_confirmed_tx_info, get_unconfirmed_tx_info } from "./cli.js";
+import { getConfirmedTxInfo, getUnconfirmedTxInfo } from "./cli.js";
 import { EntryType } from "./constants.js";
 import { bufferToAddress } from "../core/state/utils/address.js";
 import deploymentEntryUtils from "../core/state/utils/deploymentEntry.js";
@@ -112,7 +112,7 @@ export async function getDeploymentCommand(state, bootstrapHex, addressLength) {
 }
 
 export async function getTxInfoCommand(state, txHash) {
-    const txInfo = await get_confirmed_tx_info(state, txHash);
+    const txInfo = await getConfirmedTxInfo(state, txHash);
     if (txInfo) {
         console.log(`Payload for transaction hash ${txHash}:`);
         console.log(txInfo.decoded);
@@ -200,7 +200,7 @@ export async function getTxPayloadsBulkCommand(state, hashes, config) {
 
     const res = { results: [], missing: [] };
 
-    const promises = hashes.map(hash => get_confirmed_tx_info(state, hash));
+    const promises = hashes.map(hash => getConfirmedTxInfo(state, hash));
     const results = await Promise.all(promises);
 
     results.forEach((result, index) => {
@@ -227,7 +227,7 @@ export async function getTxHashesCommand(state, start, end) {
 
 export async function getTxDetailsCommand(state, hash, config) {
     try {
-        const rawPayload = await get_confirmed_tx_info(state, hash);
+        const rawPayload = await getConfirmedTxInfo(state, hash);
         if (!rawPayload) {
             console.log(`No payload found for tx hash: ${hash}`);
             return null;
@@ -240,7 +240,7 @@ export async function getTxDetailsCommand(state, hash, config) {
 
 export async function getExtendedTxDetailsCommand(state, hash, confirmed, config) {
     if (confirmed) {
-        const rawPayload = await get_confirmed_tx_info(state, hash);
+        const rawPayload = await getConfirmedTxInfo(state, hash);
         if (!rawPayload) {
             throw new Error(`No payload found for tx hash: ${hash}`);
         }
@@ -257,7 +257,7 @@ export async function getExtendedTxDetailsCommand(state, hash, confirmed, config
         };
     }
 
-    const rawPayload = await get_unconfirmed_tx_info(state, hash);
+    const rawPayload = await getUnconfirmedTxInfo(state, hash);
     if (!rawPayload) {
         throw new Error(`No payload found for tx hash: ${hash}`);
     }

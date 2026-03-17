@@ -4,7 +4,7 @@ import {
     normalizeTransactionOperation,
     normalizeTransferOperation
 } from "../src/utils/normalizers.js";
-import { get_confirmed_tx_info, get_unconfirmed_tx_info } from "../src/utils/cli.js";
+import { getConfirmedTxInfo, getUnconfirmedTxInfo } from "../src/utils/cli.js";
 import { OperationType } from "../src/utils/constants.js";
 import { sleep } from "../src/utils/helpers.js";
 import b4a from "b4a";
@@ -112,7 +112,7 @@ export async function getTxHashes(msbInstance, start, end) {
 }
 
 export async function getTxDetails(msbInstance, hash) {
-    const rawPayload = await get_confirmed_tx_info(msbInstance.state, hash);
+    const rawPayload = await getConfirmedTxInfo(msbInstance.state, hash);
     if (!rawPayload) {
         throw new NotFoundError(`Transaction ${hash} not found.`);
     }
@@ -131,7 +131,7 @@ export async function fetchBulkTxPayloads(msbInstance, hashes) {
 
     const res = { results: [], missing: [] };
 
-    const promises = hashes.map((hash) => get_confirmed_tx_info(msbInstance.state, hash));
+    const promises = hashes.map((hash) => getConfirmedTxInfo(msbInstance.state, hash));
     const results = await Promise.all(promises);
 
     results.forEach((result, index) => {
@@ -152,9 +152,9 @@ export async function getExtendedTxDetails(msbInstance, hash, confirmed) {
     let rawPayload;
 
     if (confirmed) {
-        rawPayload = await get_confirmed_tx_info(state, hash);
+        rawPayload = await getConfirmedTxInfo(state, hash);
     } else {
-        rawPayload = await get_unconfirmed_tx_info(state, hash);
+        rawPayload = await getUnconfirmedTxInfo(state, hash);
     }
 
     if (!rawPayload) {
