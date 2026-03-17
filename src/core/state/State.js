@@ -58,7 +58,7 @@ class State extends ReadyResource {
 
     /**
      * @param {Corestore} store
-     * @param {PeerWallet} wallet
+     * @param {IWallet} wallet
      * @param {Config} config
      **/
     constructor(store, wallet, config) {
@@ -570,7 +570,7 @@ class State extends ReadyResource {
         };
 
         // Verify signature
-        const isMessageVerifed = this.#wallet.verify(op.bio.is, hash, adminPublicKey);
+        const isMessageVerifed = tracCryptoApi.signature.verify(op.bio.is, hash, adminPublicKey);
         if (!isMessageVerifed) {
             this.#safeLogApply(OperationType.BALANCE_INITIALIZATION, "Failed to verify message signature.", node.from.key)
             return Status.FAILURE;
@@ -692,7 +692,7 @@ class State extends ReadyResource {
         };
 
         // Verify signature
-        const isMessageVerifed = this.#wallet.verify(op.cao.is, hash, adminPublicKey);
+        const isMessageVerifed = tracCryptoApi.signature.verify(op.cao.is, hash, adminPublicKey);
         if (!isMessageVerifed) {
             this.#safeLogApply(OperationType.DISABLE_INITIALIZATION, "Failed to verify message signature.", node.from.key)
             return Status.FAILURE;
@@ -777,7 +777,7 @@ class State extends ReadyResource {
         };
 
         // verify signature
-        const isMessageVerifed = this.#wallet.verify(op.cao.is, op.cao.tx, adminPublicKey)
+        const isMessageVerifed = tracCryptoApi.signature.verify(op.cao.is, op.cao.tx, adminPublicKey)
         const txHashHexString = op.cao.tx.toString('hex');
         if (!isMessageVerifed) {
             this.#safeLogApply(OperationType.ADD_ADMIN, "Failed to verify message signature.", node.from.key)
@@ -931,7 +931,7 @@ class State extends ReadyResource {
         };
 
         // verify requester signature
-        const isRequesterMessageVerifed = this.#wallet.verify(op.rao.is, op.rao.tx, requesterAdminPublicKey);
+        const isRequesterMessageVerifed = tracCryptoApi.signature.verify(op.rao.is, op.rao.tx, requesterAdminPublicKey);
         const txHashHexString = op.rao.tx.toString('hex');
         if (!isRequesterMessageVerifed) {
             this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Failed to verify requester message signature.", node.from.key)
@@ -967,7 +967,7 @@ class State extends ReadyResource {
 
         // verify validator signature
         const validatorHash = await tracCryptoApi.hash.blake3Safe(validatorMessage);
-        const isValidatorMessageVerifed = this.#wallet.verify(op.rao.vs, validatorHash, validatorPublicKey);
+        const isValidatorMessageVerifed = tracCryptoApi.signature.verify(op.rao.vs, validatorHash, validatorPublicKey);
         if (!isValidatorMessageVerifed) {
             this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Failed to verify message signature.", node.from.key)
             return Status.FAILURE;
@@ -1203,7 +1203,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const isMessageVerified = this.#wallet.verify(op.aco.is, op.aco.tx, adminPublicKey);
+        const isMessageVerified = tracCryptoApi.signature.verify(op.aco.is, op.aco.tx, adminPublicKey);
         if (!isMessageVerified) {
             this.#safeLogApply(OperationType.APPEND_WHITELIST, "Failed to verify message signature.", node.from.key)
             return Status.FAILURE;
@@ -1436,7 +1436,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const isRequesterMessageVerifed = this.#wallet.verify(op.rao.is, op.rao.tx, requesterPublicKey);
+        const isRequesterMessageVerifed = tracCryptoApi.signature.verify(op.rao.is, op.rao.tx, requesterPublicKey);
         const txHashHexString = op.rao.tx.toString('hex');
         if (!isRequesterMessageVerifed) {
             this.#safeLogApply(OperationType.ADD_WRITER, "Failed to verify message signature.", node.from.key)
@@ -1472,7 +1472,7 @@ class State extends ReadyResource {
         };
 
         const validatorHash = await tracCryptoApi.hash.blake3Safe(validatorMessage);
-        const isValidatorMessageVerifed = this.#wallet.verify(op.rao.vs, validatorHash, validatorPublicKey);
+        const isValidatorMessageVerifed = tracCryptoApi.signature.verify(op.rao.vs, validatorHash, validatorPublicKey);
         if (!isValidatorMessageVerifed) {
             this.#safeLogApply(OperationType.ADD_WRITER, "Failed to verify validator message signature.", node.from.key)
             return Status.FAILURE;
@@ -1735,7 +1735,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const isRequesterMessageVerifed = this.#wallet.verify(op.rao.is, op.rao.tx, requesterPublicKey);
+        const isRequesterMessageVerifed = tracCryptoApi.signature.verify(op.rao.is, op.rao.tx, requesterPublicKey);
         const txHashHexString = op.rao.tx.toString('hex');
         if (!isRequesterMessageVerifed) {
             this.#safeLogApply(OperationType.REMOVE_WRITER, "Failed to verify message signature.", node.from.key)
@@ -1770,7 +1770,7 @@ class State extends ReadyResource {
         };
 
         const validatorHash = await tracCryptoApi.hash.blake3Safe(validatorMessage);
-        const isValidatorMessageVerifed = this.#wallet.verify(op.rao.vs, validatorHash, validatorPublicKey);
+        const isValidatorMessageVerifed = tracCryptoApi.signature.verify(op.rao.vs, validatorHash, validatorPublicKey);
         if (!isValidatorMessageVerifed) {
             this.#safeLogApply(OperationType.REMOVE_WRITER, "Failed to verify validator message signature.", node.from.key)
             return Status.FAILURE;
@@ -2021,7 +2021,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const isMessageVerifed = this.#wallet.verify(op.aco.is, hash, adminPublicKey);
+        const isMessageVerifed = tracCryptoApi.signature.verify(op.aco.is, hash, adminPublicKey);
         const txHashHexString = hash.toString('hex');
         if (!isMessageVerifed) {
             this.#safeLogApply(OperationType.ADD_INDEXER, "Failed to verify message signature.", node.from.key)
@@ -2236,7 +2236,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const isMessageVerifed = this.#wallet.verify(op.aco.is, hash, adminPublicKey);
+        const isMessageVerifed = tracCryptoApi.signature.verify(op.aco.is, hash, adminPublicKey);
         const txHashHexString = hash.toString('hex');
         if (!isMessageVerifed) {
             this.#safeLogApply(OperationType.REMOVE_INDEXER, "Failed to verify message signature.", node.from.key)
@@ -2439,7 +2439,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const isMessageVerifed = this.#wallet.verify(op.aco.is, regeneratedHash, adminPublicKey);
+        const isMessageVerifed = tracCryptoApi.signature.verify(op.aco.is, regeneratedHash, adminPublicKey);
         const txHashHexString = regeneratedHash.toString('hex');
         if (!isMessageVerifed) {
             this.#safeLogApply(OperationType.BAN_VALIDATOR, "Failed to verify message signature.", node.from.key)
@@ -2639,7 +2639,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const isRequesterSignatureValid = this.#wallet.verify(op.bdo.is, regeneratedTxHash, requesterPublicKey);
+        const isRequesterSignatureValid = tracCryptoApi.signature.verify(op.bdo.is, regeneratedTxHash, requesterPublicKey);
         if (!isRequesterSignatureValid) {
             this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Failed to verify message signature.", node.from.key)
             return Status.FAILURE;
@@ -2677,7 +2677,7 @@ class State extends ReadyResource {
 
         const validatorMessageHash = await tracCryptoApi.hash.blake3Safe(validatorMessage);
 
-        const isValidatorSignatureValid = this.#wallet.verify(op.bdo.vs, validatorMessageHash, validatorPublicKey);
+        const isValidatorSignatureValid = tracCryptoApi.signature.verify(op.bdo.vs, validatorMessageHash, validatorPublicKey);
         if (!isValidatorSignatureValid) {
             this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Failed to verify validator message signature.", node.from.key)
             return Status.FAILURE;
@@ -2875,7 +2875,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const isRequesterSignatureValid = this.#wallet.verify(op.txo.is, op.txo.tx, requesterPublicKey); // tx contains already a nonce.
+        const isRequesterSignatureValid = tracCryptoApi.signature.verify(op.txo.is, op.txo.tx, requesterPublicKey); // tx contains already a nonce.
         if (!isRequesterSignatureValid) {
             this.#safeLogApply(OperationType.TX, "Failed to verify message signature.", node.from.key)
             return Status.FAILURE;
@@ -2909,7 +2909,7 @@ class State extends ReadyResource {
         };
 
         const validatorMessageHash = await tracCryptoApi.hash.blake3Safe(validatorMessage);
-        const isValidatorSignatureValid = this.#wallet.verify(op.txo.vs, validatorMessageHash, validatorPublicKey);
+        const isValidatorSignatureValid = tracCryptoApi.signature.verify(op.txo.vs, validatorMessageHash, validatorPublicKey);
         if (!isValidatorSignatureValid) {
             this.#safeLogApply(OperationType.TX, "Failed to verify validator message signature.", node.from.key)
             return Status.FAILURE;
@@ -3080,7 +3080,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const isRequesterSignatureValid = this.#wallet.verify(op.tro.is, regeneratedTxHash, requesterPublicKey);
+        const isRequesterSignatureValid = tracCryptoApi.signature.verify(op.tro.is, regeneratedTxHash, requesterPublicKey);
         if (!isRequesterSignatureValid) {
             this.#safeLogApply(OperationType.TRANSFER, "Failed to verify message signature.", node.from.key)
             return Status.FAILURE;
@@ -3113,7 +3113,7 @@ class State extends ReadyResource {
         };
 
         const validatorMessageHash = await tracCryptoApi.hash.blake3Safe(validatorMessage);
-        const isValidatorSignatureValid = this.#wallet.verify(op.tro.vs, validatorMessageHash, validatorPublicKey);
+        const isValidatorSignatureValid = tracCryptoApi.signature.verify(op.tro.vs, validatorMessageHash, validatorPublicKey);
         if (!isValidatorSignatureValid) {
             this.#safeLogApply(OperationType.TRANSFER, "Failed to verify message signature.", node.from.key)
             return Status.FAILURE;

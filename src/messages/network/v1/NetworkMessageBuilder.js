@@ -2,12 +2,12 @@ import tracCryptoApi from 'trac-crypto-api';
 import b4a from 'b4a';
 import {createMessage, safeWriteUInt32BE, idToBuffer, timestampToBuffer} from "../../../utils/buffer.js";
 import {NetworkOperationType, ResultCode} from '../../../utils/constants.js';
-import {addressToBuffer, isAddressValid} from "../../../core/state/utils/address.js";
+import {isAddressValid} from "../../../core/state/utils/address.js";
 import {encodeCapabilities} from "../../../utils/buffer.js";
 
 /**
  * Builder for v1 internal network protocol messages.
- * @param {PeerWallet} wallet
+ * @param {IWallet} wallet
  * @param {Config} config
  */
 class NetworkMessageBuilder {
@@ -27,7 +27,7 @@ class NetworkMessageBuilder {
     #config;
 
     /**
-     * @param {PeerWallet} wallet
+     * @param {IWallet} wallet
      * @param {Config} config
      */
     constructor(wallet, config) {

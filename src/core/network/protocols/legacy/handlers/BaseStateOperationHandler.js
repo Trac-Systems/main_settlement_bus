@@ -10,7 +10,7 @@ class BaseStateOperationHandler {
 
     /**
      * @param {State} state
-     * @param {PeerWallet} wallet
+     * @param {IWallet} wallet
      * @param {TransactionRateLimiterService} rateLimiter
      * @param {TransactionPoolService} txPoolService
      * @param {Config} config

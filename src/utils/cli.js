@@ -87,12 +87,10 @@ export const printWalletInfo = (address, writingKey) => {
     console.log('#####################################################################################');
 }
 
-export const printBalance = async (address, state, wallet_enabled) => {
-    if (wallet_enabled && state) {
-        const nodeEntry = await state.getNodeEntry(address);
-        const balance = nodeEntry ? bigIntToDecimalString(bufferToBigInt(nodeEntry.balance)) : '0';
-        console.log(`Balance: ${balance}`);
-    }
+export const printBalance = async (address, state) => {
+    const nodeEntry = await state.getNodeEntry(address);
+    const balance = nodeEntry ? bigIntToDecimalString(bufferToBigInt(nodeEntry.balance)) : '0';
+    console.log(`Balance: ${balance}`);
 }
 
 export const get_confirmed_tx_info = async (state_instance, txHash) => {

@@ -7,7 +7,7 @@ import Corestore from 'corestore';
 import Autobase from 'autobase';
 import Hyperbee from 'hyperbee';
 import b4a from 'b4a';
-import PeerWallet from 'trac-wallet';
+import { WalletProvider } from 'trac-wallet';
 import Hypercore from 'hypercore';
 import {
 	ACK_INTERVAL,
@@ -171,9 +171,8 @@ export function defaultOpenHyperbeeView(store) {
 }
 
 export async function createWallet(mnemonic = null) {
-	const wallet = new PeerWallet({ networkPrefix: config.addressPrefix });
-	await wallet.generateKeyPair(mnemonic ?? undefined);
-	return wallet;
+	const provider = new WalletProvider(config)
+	return mnemonic ? await provider.fromMnemonic({ mnemonic }) : await provider.generate()
 }
 
 export function seedIndexerList(base, keys) {

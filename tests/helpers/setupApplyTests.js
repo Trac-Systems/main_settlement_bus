@@ -2,11 +2,11 @@ import sodium from 'sodium-native';
 import {generateMnemonic, mnemonicToSeed} from 'bip39-mnemonic';
 import b4a from 'b4a'
 import tracCryptoApi from 'trac-crypto-api';
-import PeerWallet from "trac-wallet"
+import { WalletProvider, exportWallet } from "trac-wallet"
 import path from 'path';
 import {MainSettlementBus} from '../../src/index.js'
 import { createConfig, ENV } from '../../src/config/env.js'
-import fileUtils from '../../src/utils/fileUtils.js'
+import fileUtils, { verifyWalletPath } from '../../src/utils/fileUtils.js'
 import {EntryType} from '../../src/utils/constants.js';
 import {sleep} from '../../src/utils/helpers.js'
 import {formatIndexersEntry} from '../../src/utils/helpers.js';
@@ -84,16 +84,17 @@ export async function fundPeer(admin, toFund, amount) {
 
 export async function initMsbPeer(peerName, peerKeyPair, temporaryDirectory, options = {}) {
     const config = createConfig(ENV.DEVELOPMENT, { ...options, storesDirectory: `${temporaryDirectory}/${peerName}` })
-    const peer = await initDirectoryStructure(peerName, peerKeyPair, config.storesFullPath);
-    peer.options = { ...options, storesDirectory: config.storesDirectory }
-    peer.config = config
-    const msb = new MainSettlementBus(peer.config);
+    const wallet = await initDirectoryStructure(peerKeyPair, config);
+    const peerOptions = { ...options, storesDirectory: config.storesDirectory }
+    const msb = new MainSettlementBus(config);
 
-    peer.msb = msb;
-    peer.wallet = msb.wallet;
-    peer.name = peerName;
-
-    return peer;
+    return {
+        config,
+        msb,
+        wallet,
+        options: peerOptions,
+        name: peerName
+    }
 }
 
 export async function setupMsbPeer(peerName, peerKeyPair, temporaryDirectory, options = {}) {
@@ -128,39 +129,7 @@ export async function setupMsbAdmin(keyPair, temporaryDirectory, options = {}) {
     return admin;
 }
 
-export async function setupNodeAsWriter(admin, writerCandidate) {
-    try {
-        await setupWhitelist(admin, [writerCandidate.wallet.address]); // ensure if is whitelisted
-
-        const validity = await admin.msb.getIndexerSequenceState()
-        const req = await applyStateMessageFactory(writerCandidate.wallet, admin.config)
-            .buildPartialAddWriterMessage(
-                writerCandidate.wallet.address,
-                b4a.toString(writerCandidate.msb.state.writingKey, 'hex'),
-                b4a.toString(validity, 'hex'),
-                'json'
-            );
-
-        await waitWritable(admin, writerCandidate, async () => {
-            const payload = await applyStateMessageFactory(admin.wallet, admin.config)
-                .buildCompleteAddWriterMessage(
-                    admin.wallet.address,
-                    b4a.from(req.rao.tx, 'hex'),
-                    b4a.from(req.rao.txv, 'hex'),
-                    b4a.from(req.rao.iw, 'hex'),
-                    b4a.from(req.rao.in, 'hex'),
-                    b4a.from(req.rao.is, 'hex')
-                );
-            await admin.msb.state.append(safeEncodeApplyOperation(payload))
-        })
-
-        return writerCandidate;
-    } catch (error) {
-        throw new Error('Error setting up MSB writer: ', error.message || error);
-    }
-}
-
-export async function promoteToWriter(admin, writerCandidate) {
+async function promoteToWriter(admin, writerCandidate) {
     await setupWhitelist(admin, [writerCandidate.wallet.address]);
     await waitForNodeState(writerCandidate,
         writerCandidate.wallet.address,
@@ -276,8 +245,8 @@ export async function initTemporaryDirectory() {
     await ensureEnvReady();
     const tmpDir = os.tmpdir();
     const unique = `tempTestStore-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-    const temporaryDirectory = path.join(tmpDir, unique);
-    await fsp.mkdir(temporaryDirectory, {recursive: true});
+    const temporaryDirectory = path.join(tmpDir, unique, 'stores');
+    await fsp.mkdir(temporaryDirectory, { recursive: true });
     console.log('temporary directory: ', temporaryDirectory);
     return temporaryDirectory;
 }
@@ -287,24 +256,20 @@ export async function removeTemporaryDirectory(temporaryDirectory) {
     await fsp.rm(temporaryDirectory, {recursive: true, force: true})
 }
 
-export async function initDirectoryStructure(peerName, keyPair, temporaryDirectory) {
+export async function initDirectoryStructure(keyPair, config) {
     try {
         await ensureEnvReady();
-        const corestoreDbDirectory = path.join(temporaryDirectory, 'db');
-        await fsp.mkdir(corestoreDbDirectory, {recursive: true});
+        await fsp.mkdir(config.keyPairDirectoryPath, { recursive: true });
 
-        const keypath = path.join(corestoreDbDirectory, 'keypair.json');
         if (!keyPair || !keyPair.publicKey || !keyPair.secretKey) {
-            keyPair = await randomKeypair();
+            keyPair = await new WalletProvider(config).generate();
         }
-        const wallet = new PeerWallet(keyPair)
-        await wallet.ready
-        await wallet.exportToFile(keypath)
-        return {
-            storesDirectory: temporaryDirectory,
-            corestoreDbDirectory,
-            keypath,
+
+        const wallet = await new WalletProvider(config).fromSecretKey(keyPair.secretKey)
+        if (!verifyWalletPath(config)) {
+            await exportWallet(wallet, config.keyPairPath)
         }
+        return wallet
     } catch (error) {
         throw new Error('Error creating directory structure: ' + error)
     }

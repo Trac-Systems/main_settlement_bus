@@ -12,12 +12,12 @@ import {
 } from '../../utils/constants.js';
 import ConnectionManager from './services/ConnectionManager.js';
 import MessageOrchestrator from './services/MessageOrchestrator.js';
-import NetworkWalletFactory from './identity/NetworkWalletFactory.js';
 import TransactionRateLimiterService from './services/TransactionRateLimiterService.js';
 import PendingRequestService from './services/PendingRequestService.js';
 import TransactionCommitService from "./services/TransactionCommitService.js";
 import ValidatorHealthCheckService from './services/ValidatorHealthCheckService.js';
 import { Logger } from '../../utils/logger.js';
+import { WalletProvider } from 'trac-wallet';
 
 const wakeup = new w();
 
@@ -29,7 +29,6 @@ class Network extends ReadyResource {
     #validatorConnectionManager;
     #validatorMessageOrchestrator;
     #config;
-    #identityProvider = null;
     #pendingConnections;
     #connectTimeoutMs;
     #maxPendingConnections;
@@ -168,8 +167,8 @@ class Network extends ReadyResource {
         wallet,
     ) {
         if (!this.#swarm) {
-            const keyPair = await this.initializeNetworkingKeyPair(store, wallet);
-            this.#wallet = this.#getNetworkWalletWrapper(wallet, keyPair);
+            const { wallet: wrappedWallet, keyPair } = await this.#getOrGenerateWallet(store, wallet);
+            this.#wallet = wrappedWallet
             this.#validatorMessageOrchestrator.setWallet(this.#wallet);
 
             this.#swarm = new Hyperswarm({
@@ -255,14 +254,14 @@ class Network extends ReadyResource {
         return this.#pendingConnections.size;
     }
 
-    async initializeNetworkingKeyPair(store, wallet) {
+    async #getOrGenerateWallet(store, wallet) {
         if (!this.#config.enableWallet) {
-            return await store.createKeyPair(TRAC_NAMESPACE);
+            const keyPair = await store.createKeyPair(TRAC_NAMESPACE);
+            const wallet = await new WalletProvider(this.#config).fromSecretKey(keyPair.secretKey)
+            return { keyPair, wallet }
         } else {
-            return {
-                publicKey: wallet.publicKey,
-                secretKey: wallet.secretKey
-            };
+            const keyPair = { publicKey: wallet.publicKey, secretKey: wallet.secretKey }
+            return { keyPair, wallet }
         }
     }
 
@@ -303,19 +302,6 @@ class Network extends ReadyResource {
         this.emit(EventType.VALIDATOR_CONNECTION_READY, { publicKey, type, connection });
         this.#logger.debug(`Network.finalizeConnection: Connected to peer: ${publicKey} as type: ${type}`);
     }
-
-    #getNetworkWalletWrapper(wallet, keyPair) {
-        if (!this.#identityProvider) {
-            this.#identityProvider = NetworkWalletFactory.provide({
-                enableWallet: this.#config.enableWallet,
-                wallet,
-                keyPair,
-                networkPrefix: this.#config.addressPrefix
-            });
-        }
-        return this.#identityProvider;
-    }
-
 }
 
 export default Network;

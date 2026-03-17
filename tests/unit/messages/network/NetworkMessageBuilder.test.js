@@ -2,7 +2,6 @@ import { test } from 'brittle';
 import b4a from 'b4a';
 import tracCryptoApi from 'trac-crypto-api';
 import { v7 as uuidv7 } from 'uuid';
-import NetworkWalletFactory from '../../../../src/core/network/identity/NetworkWalletFactory.js';
 import NetworkMessageBuilder from '../../../../src/messages/network/v1/NetworkMessageBuilder.js';
 import {
     NetworkOperationType,
@@ -20,17 +19,10 @@ import {
 import { config } from '../../../helpers/config.js';
 import { asAddress } from '../../../helpers/address.js';
 import { testKeyPair1 } from '../../../fixtures/apply.fixtures.js';
+import { WalletProvider } from 'trac-wallet';
 
-function createWallet() {
-    const keyPair = {
-        publicKey: b4a.from(testKeyPair1.publicKey, 'hex'),
-        secretKey: b4a.from(testKeyPair1.secretKey, 'hex')
-    };
-    return NetworkWalletFactory.provide({
-        enableWallet: false,
-        keyPair,
-        networkPrefix: config.addressPrefix
-    });
+async function createWallet() {
+    return await new WalletProvider(config).fromSecretKey(testKeyPair1.secretKey)
 }
 
 function uniqueResultCodes() {
@@ -38,7 +30,7 @@ function uniqueResultCodes() {
 }
 
 test('NetworkMessageBuilder iterates liveness response ResultCode values', async t => {
-    const wallet = createWallet();
+    const wallet = await createWallet();
     const builder = new NetworkMessageBuilder(wallet, config);
     const id = uuidv7();
     const caps = ['cap:b', 'cap:a'];
@@ -74,7 +66,7 @@ test('NetworkMessageBuilder iterates liveness response ResultCode values', async
 });
 
 test('NetworkMessageBuilder builds liveness request and verifies signature (data not signed)', async t => {
-    const wallet = createWallet();
+    const wallet = await createWallet();
     const builder = new NetworkMessageBuilder(wallet, config);
 
     const id = uuidv7();
@@ -104,7 +96,7 @@ test('NetworkMessageBuilder builds liveness request and verifies signature (data
 });
 
 test('NetworkMessageBuilder iterates broadcast transaction response ResultCode values', async t => {
-    const wallet = createWallet();
+    const wallet = await createWallet();
     const builder = new NetworkMessageBuilder(wallet, config);
     const id = uuidv7();
     const caps = ['cap:b', 'cap:a'];
@@ -155,7 +147,7 @@ test('NetworkMessageBuilder iterates broadcast transaction response ResultCode v
 });
 
 test('NetworkMessageBuilder builds broadcast transaction response with proof and timestamp', async t => {
-    const wallet = createWallet();
+    const wallet = await createWallet();
     const builder = new NetworkMessageBuilder(wallet, config);
     const id = uuidv7();
     const caps = ['cap:b', 'cap:a'];
@@ -195,7 +187,7 @@ test('NetworkMessageBuilder builds broadcast transaction response with proof and
 });
 
 test('NetworkMessageBuilder rejects OK response when proof is provided without timestamp', async t => {
-    const wallet = createWallet();
+    const wallet = await createWallet();
     const builder = new NetworkMessageBuilder(wallet, config);
     const id = uuidv7();
     const caps = ['cap:b', 'cap:a'];
@@ -216,7 +208,7 @@ test('NetworkMessageBuilder rejects OK response when proof is provided without t
 });
 
 test('NetworkMessageBuilder rejects OK response when timestamp is provided without proof', async t => {
-    const wallet = createWallet();
+    const wallet = await createWallet();
     const builder = new NetworkMessageBuilder(wallet, config);
     const id = uuidv7();
     const caps = ['cap:b', 'cap:a'];
@@ -237,7 +229,7 @@ test('NetworkMessageBuilder rejects OK response when timestamp is provided witho
 });
 
 test('NetworkMessageBuilder allows TX_ACCEPTED_PROOF_UNAVAILABLE response with timestamp and empty proof', async t => {
-    const wallet = createWallet();
+    const wallet = await createWallet();
     const builder = new NetworkMessageBuilder(wallet, config);
     const id = uuidv7();
     const caps = ['cap:b', 'cap:a'];
@@ -278,7 +270,7 @@ test('NetworkMessageBuilder allows TX_ACCEPTED_PROOF_UNAVAILABLE response with t
 });
 
 test('NetworkMessageBuilder rejects OK response when proof and timestamp are both missing', async t => {
-    const wallet = createWallet();
+    const wallet = await createWallet();
     const builder = new NetworkMessageBuilder(wallet, config);
     const id = uuidv7();
     const caps = ['cap:b', 'cap:a'];
@@ -297,7 +289,7 @@ test('NetworkMessageBuilder rejects OK response when proof and timestamp are bot
 });
 
 test('NetworkMessageBuilder rejects TX_ACCEPTED_PROOF_UNAVAILABLE response when timestamp is missing', async t => {
-    const wallet = createWallet();
+    const wallet = await createWallet();
     const builder = new NetworkMessageBuilder(wallet, config);
     const id = uuidv7();
     const caps = ['cap:b', 'cap:a'];
@@ -316,7 +308,7 @@ test('NetworkMessageBuilder rejects TX_ACCEPTED_PROOF_UNAVAILABLE response when 
 });
 
 test('NetworkMessageBuilder rejects TX_ACCEPTED_PROOF_UNAVAILABLE response when proof is non-empty', async t => {
-    const wallet = createWallet();
+    const wallet = await createWallet();
     const builder = new NetworkMessageBuilder(wallet, config);
     const id = uuidv7();
     const caps = ['cap:b', 'cap:a'];
@@ -337,7 +329,7 @@ test('NetworkMessageBuilder rejects TX_ACCEPTED_PROOF_UNAVAILABLE response when 
 });
 
 test('NetworkMessageBuilder rejects non-OK response when proof is non-empty', async t => {
-    const wallet = createWallet();
+    const wallet = await createWallet();
     const builder = new NetworkMessageBuilder(wallet, config);
     const id = uuidv7();
     const caps = ['cap:b', 'cap:a'];
@@ -358,7 +350,7 @@ test('NetworkMessageBuilder rejects non-OK response when proof is non-empty', as
 });
 
 test('NetworkMessageBuilder rejects non-OK response with timestamp > 0 unless proof is unavailable', async t => {
-    const wallet = createWallet();
+    const wallet = await createWallet();
     const builder = new NetworkMessageBuilder(wallet, config);
     const id = uuidv7();
     const caps = ['cap:b', 'cap:a'];
@@ -378,7 +370,7 @@ test('NetworkMessageBuilder rejects non-OK response with timestamp > 0 unless pr
 });
 
 test('NetworkMessageBuilder builds broadcast transaction request and verifies signature', async t => {
-    const wallet = createWallet();
+    const wallet = await createWallet();
     const builder = new NetworkMessageBuilder(wallet, config);
 
     const id = uuidv7();
@@ -410,7 +402,7 @@ test('NetworkMessageBuilder builds broadcast transaction request and verifies si
 });
 
 test('NetworkMessageBuilder validates required inputs', async t => {
-    const wallet = createWallet();
+    const wallet = await createWallet();
     const builder = new NetworkMessageBuilder(wallet, config);
     const id = uuidv7();
     await t.exception(
