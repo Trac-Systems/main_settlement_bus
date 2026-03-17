@@ -93,8 +93,8 @@ export const printBalance = async (address, state) => {
     console.log(`Balance: ${balance}`);
 }
 
-export const get_confirmed_tx_info = async (state_instance, txHash) => {
-    const payload = await state_instance.getSigned(txHash);
+export const getConfirmedTxInfo = async (state, txHash) => {
+    const payload = await state.getSigned(txHash);
     if (!payload) {
         return null
     }
@@ -110,8 +110,8 @@ export const get_confirmed_tx_info = async (state_instance, txHash) => {
     }
 }
 
-export const get_unconfirmed_tx_info = async (state_instance, txHash) => {
-    const payload = await state_instance.get(txHash);
+export const getUnconfirmedTxInfo = async (state, txHash) => {
+    const payload = await state.get(txHash);
     if (!payload) {
         return null
     }
