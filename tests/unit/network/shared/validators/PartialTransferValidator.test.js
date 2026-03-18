@@ -1,18 +1,18 @@
+import test from 'brittle';
+import b4a from 'b4a';
 import tracCryptoApi from 'trac-crypto-api';
 
 import PartialTransferValidator from '../../../../../src/core/network/protocols/shared/validators/PartialTransferValidator.js';
 import { ResultCode } from '../../../../../src/utils/constants.js';
+import { bigIntToBuffer } from '../../../../../src/utils/buffer.js';
+import { config } from '../../../../helpers/config.js';
 import {
-    test,
-    b4a,
-    bigIntToBuffer,
     createNodeEntry,
     createState,
     getWalletSet,
     buildTransferPayload,
     createZeroPublicKeyAddress,
-    expectSharedValidatorError,
-    config
+    expectSharedValidatorError
 } from '../../utils/sharedValidatorTestUtils.js';
 
 const MAX_AMOUNT = BigInt('0xffffffffffffffffffffffffffffffff');

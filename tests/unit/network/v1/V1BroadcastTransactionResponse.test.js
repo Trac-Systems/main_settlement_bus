@@ -14,6 +14,7 @@ import {addressToBuffer} from '../../../../src/core/state/utils/address.js';
 import {publicKeyToAddress} from '../../../../src/utils/helpers.js';
 import {OperationType, ResultCode} from '../../../../src/utils/constants.js';
 import { config } from '../../../helpers/config.js';
+import { createState } from '../utils/createState.js';
 import protobufFixtures from '../../../fixtures/protobuf.fixtures.js';
 import { testKeyPair1 } from '../../../fixtures/apply.fixtures.js';
 
@@ -21,18 +22,22 @@ const remotePublicKey = b4a.from(testKeyPair1.publicKey, 'hex');
 const remoteAddressBuffer = addressToBuffer(publicKeyToAddress(remotePublicKey, config), config.addressPrefix);
 const writerKey = b4a.alloc(32, 2);
 
-const createState = (overrides = {}) => ({
-    verifyProofOfPublication: async () => ({ ok: true }),
-    getRegisteredWriterKey: async () => remoteAddressBuffer,
-    getNodeEntry: async () => ({
-        isWriter: true,
-        wk: writerKey,
-    }),
-    ...overrides
-});
+const defaultStateOverrides = {
+    registeredWriterKeys: new Map([[b4a.toString(writerKey, 'hex'), remoteAddressBuffer]]),
+    signedEntries: new Map([[
+        b4a.toString(remoteAddressBuffer),
+        {
+            isWriter: true,
+            wk: writerKey,
+        }
+    ]]),
+};
 
 const createValidator = (stateOverrides = {}) =>
-    new V1BroadcastTransactionResponse(createState(stateOverrides), config);
+    new V1BroadcastTransactionResponse(createState({
+        ...defaultStateOverrides,
+        ...stateOverrides
+    }), config);
 
 const overrideCheckMethods = (t, overrides) => {
     const originals = {};

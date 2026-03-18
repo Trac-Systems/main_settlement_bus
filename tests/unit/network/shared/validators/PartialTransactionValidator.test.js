@@ -1,9 +1,11 @@
+import test from 'brittle';
+import b4a from 'b4a';
+
 import PartialTransactionValidator from '../../../../../src/core/network/protocols/shared/validators/PartialTransactionValidator.js';
 import { ResultCode } from '../../../../../src/utils/constants.js';
 import { $TNK } from '../../../../../src/core/state/utils/balance.js';
+import { config } from '../../../../helpers/config.js';
 import {
-    test,
-    b4a,
     createNodeEntry,
     createState,
     getWalletSet,
@@ -11,8 +13,7 @@ import {
     buildTransactionPayload,
     createBootstrapTransactionRecord,
     createDeploymentRegistrationEntry,
-    expectSharedValidatorError,
-    config
+    expectSharedValidatorError
 } from '../../utils/sharedValidatorTestUtils.js';
 
 test('PartialTransactionValidator.validate accepts deployed external bootstrap references', async t => {
