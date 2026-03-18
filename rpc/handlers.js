@@ -13,12 +13,7 @@ import {
 import { MAX_SIGNED_LENGTH, ZERO_WK } from "./constants.js";
 import { buildRequestUrl } from "./utils/url.js";
 import {
-    getBalance,
-    getTxv,
-    getConfirmedLength,
-    getUnconfirmedLength,
     broadcastTransaction,
-    getTxHashes,
     getTxDetails,
     fetchBulkTxPayloads,
     getExtendedTxDetails,
@@ -53,14 +48,14 @@ export async function handleBalance({ req, respond, msbInstance }) {
         return;
     }
 
-    const nodeInfo = await getBalance(msbInstance, address, getConfirmedParameter(url, { defaultValue: false }));
+    const nodeInfo = await msbInstance.getBalance(address, getConfirmedParameter(url, { defaultValue: false }));
     const balance = nodeInfo?.balance || "0";
 
     respond(200, { address, balance });
 }
 
 export async function handleTxv({ msbInstance, respond }) {
-    const txv = await getTxv(msbInstance);
+    const txv = await msbInstance.getTxv();
     respond(200, { txv });
 }
 
@@ -70,7 +65,7 @@ export async function handleFee({ msbInstance, respond }) {
 }
 
 export async function handleConfirmedLength({ msbInstance, respond }) {
-    const confirmed_length = await getConfirmedLength(msbInstance);
+    const confirmed_length = await msbInstance.getConfirmedLength();
     respond(200, { confirmed_length });
 }
 
@@ -173,15 +168,15 @@ export async function handleTxHashes({ msbInstance, respond, req }) {
         return respond(400, { error: `The max range for signedLength must be ${MAX_SIGNED_LENGTH}.` });
     }
 
-    const currentConfirmedLength = await getConfirmedLength(msbInstance);
+    const currentConfirmedLength = await msbInstance.getConfirmedLength();
     const adjustedEndLength = Math.min(endSignedLength, currentConfirmedLength)
 
-    const { hashes } = await getTxHashes(msbInstance, startSignedLength, adjustedEndLength);
+    const { hashes } = await msbInstance.getTxHashes(startSignedLength, adjustedEndLength);
     respond(200, { hashes });
 }
 
 export async function handleUnconfirmedLength({ msbInstance, respond }) {
-    const unconfirmed_length = await getUnconfirmedLength(msbInstance);
+    const unconfirmed_length = await msbInstance.getUnconfirmedLength();
     respond(200, { unconfirmed_length });
 }
 

@@ -4,18 +4,11 @@ import { isHexString } from "../src/utils/helpers.js";
 import { printHelp, verifyDag } from "../src/utils/cli.js";
 import {
     coreInfoCommand,
-    getBalanceCommand,
-    getConfirmedLengthCommand,
     getDeploymentCommand,
-    getExtendedTxDetailsCommand,
     getLicenseAddressCommand,
     getLicenseCountCommand,
     getLicenseNumberCommand,
-    getTxDetailsCommand,
-    getTxHashesCommand,
     getTxInfoCommand,
-    getTxvCommand,
-    getUnconfirmedLengthCommand,
     getValidatorAddressCommand,
     nodeStatusCommand
 } from "../src/utils/cliCommands.js";
@@ -162,7 +155,7 @@ export class CommandHandler {
             },
             {
                 evaluate: ({ input }) => input.startsWith("/get_balance"),
-                process: async ({ parts }) => getBalanceCommand(this.#msb.state, parts[0], parts[1])
+                process: async ({ parts }) => this.#handlers.handleBalance(parts[0], parts[1])
             },
             {
                 evaluate: ({ input }) => input.startsWith("/get_license_number"),
@@ -180,7 +173,7 @@ export class CommandHandler {
             },
             {
                 evaluate: ({ input }) => input.startsWith("/get_txv"),
-                process: async () => getTxvCommand(this.#msb.state)
+                process: async () => this.#handlers.handleTxv()
             },
             {
                 evaluate: ({ input }) => input.startsWith("/get_fee"),
@@ -188,32 +181,26 @@ export class CommandHandler {
             },
             {
                 evaluate: ({ input }) => input.startsWith("/confirmed_length"),
-                process: async () => getConfirmedLengthCommand(this.#msb.state)
+                process: async () => this.#handlers.handleConfirmedLength()
             },
             {
                 evaluate: ({ input }) => input.startsWith("/unconfirmed_length"),
-                process: async () => getUnconfirmedLengthCommand(this.#msb.state)
+                process: async () => this.#handlers.handleUnconfirmedLength()
             },
             {
                 evaluate: ({ input }) => input.startsWith("/get_txs_hashes"),
-                process: async ({ parts }) => getTxHashesCommand(
-                    this.#msb.state,
+                process: async ({ parts }) => this.#handlers.handleTxHashes(
                     parseInt(parts[0]),
                     parseInt(parts[1])
                 )
             },
             {
                 evaluate: ({ input }) => input.startsWith("/get_tx_details"),
-                process: async ({ parts }) => getTxDetailsCommand(this.#msb, parts[0], this.#config)
+                process: async ({ parts }) => this.#handlers.handleTxDetails(parts[0])
             },
             {
                 evaluate: ({ input }) => input.startsWith("/get_extended_tx_details"),
-                process: async ({ parts }) => getExtendedTxDetailsCommand(
-                    this.#msb,
-                    parts[0],
-                    parts[1] === "true",
-                    this.#config
-                )
+                process: async ({ parts }) => this.#handlers.handleExtendedTxDetails(parts[0], parts[1] === "true")
             }
         ];
     }
