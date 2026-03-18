@@ -20,6 +20,7 @@ import {
     WHITELIST_MIGRATION_DIR
 } from "./utils/constants.js";
 import { decimalStringToBigInt, bigIntTo16ByteBuffer, bufferToBigInt, bigIntToDecimalString } from "./utils/amountSerialization.js"
+import { normalizeDecodedPayloadForJson } from "./utils/normalizers.js";
 import fileUtils from './utils/fileUtils.js';
 import migrationUtils from './utils/migrationUtils.js';
 import {safeDecodeApplyOperation, safeEncodeApplyOperation} from "./utils/protobuf/operationHelpers.js";
@@ -201,6 +202,75 @@ export class MainSettlementBus extends ReadyResource {
     handleGetFee() {        
         const fee = this.#state.getFee();
         return bufferToBigInt(fee);
+    }
+
+    async getBalance(address, confirmed = true) {
+        const nodeEntry = confirmed
+            ? await this.#state.getNodeEntry(address)
+            : await this.#state.getNodeEntryUnsigned(address);
+
+        if (!nodeEntry) {
+            return undefined;
+        }
+
+        return {
+            address,
+            balance: bufferToBigInt(nodeEntry.balance).toString(),
+        };
+    }
+
+    async getTxv() {
+        const txv = await this.#state.getIndexerSequenceState();
+        return txv.toString("hex");
+    }
+
+    getConfirmedLength() {
+        return this.#state.getSignedLength();
+    }
+
+    getUnconfirmedLength() {
+        return this.#state.getUnsignedLength();
+    }
+
+    async getTxHashes(start, end) {
+        const hashes = await this.#state.confirmedTransactionsBetween(start, end);
+        return { hashes };
+    }
+
+    async getTxDetails(hash) {
+        const rawPayload = await this.getConfirmedTxInfo(hash);
+        if (!rawPayload) {
+            return null;
+        }
+
+        return normalizeDecodedPayloadForJson(rawPayload.decoded, this.#config);
+    }
+
+    async getExtendedTxDetails(hash, confirmed) {
+        const rawPayload = confirmed
+            ? await this.getConfirmedTxInfo(hash)
+            : await this.getUnconfirmedTxInfo(hash);
+
+        if (!rawPayload) {
+            return null;
+        }
+
+        const txDetails = normalizeDecodedPayloadForJson(rawPayload.decoded, this.#config);
+        const confirmedLength = await this.#state.getTransactionConfirmedLength(hash);
+
+        if (confirmedLength === null) {
+            return {
+                txDetails,
+                confirmed_length: 0,
+                fee: "0",
+            };
+        }
+
+        return {
+            txDetails,
+            confirmed_length: confirmedLength,
+            fee: this.handleGetFee().toString(),
+        };
     }
 
     async handleAdminCreation() {

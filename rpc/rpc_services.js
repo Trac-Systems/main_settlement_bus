@@ -1,4 +1,3 @@
-import { bufferToBigInt } from "../src/utils/amountSerialization.js";
 import {
     normalizeDecodedPayloadForJson,
     normalizeTransactionOperation,
@@ -22,36 +21,6 @@ const waitForUnconfirmedTx = async (state, txHash, config) => {
     }
     return false;
 };
-
-export async function getBalance(msbInstance, address, confirmed) {
-    const state = msbInstance.state;
-    const useUnconfirmed = confirmed === false;
-
-    const nodeEntry = useUnconfirmed
-        ? await state.getNodeEntryUnsigned(address)
-        : await state.getNodeEntry(address);
-
-    if (!nodeEntry) return undefined;
-
-    return {
-        address,
-        balance: bufferToBigInt(nodeEntry.balance).toString(),
-    };
-}
-
-export async function getTxv(msbInstance) {
-    const txv = await msbInstance.state.getIndexerSequenceState();
-    return txv.toString("hex");
-}
-
-
-export async function getConfirmedLength(msbInstance) {
-    return msbInstance.state.getSignedLength();
-}
-
-export async function getUnconfirmedLength(msbInstance) {
-    return msbInstance.state.getUnsignedLength();
-}
 
 export async function broadcastTransaction(msbInstance, config, payload) {
     if (!payload) {
@@ -101,18 +70,13 @@ export async function broadcastTransaction(msbInstance, config, payload) {
     };
 }
 
-export async function getTxHashes(msbInstance, start, end) {
-    const hashes = await msbInstance.state.confirmedTransactionsBetween(start, end);
-    return { hashes };
-}
-
 export async function getTxDetails(msbInstance, hash) {
-    const rawPayload = await msbInstance.getConfirmedTxInfo(hash);
-    if (!rawPayload) {
+    const txDetails = await msbInstance.getTxDetails(hash);
+    if (!txDetails) {
         throw new NotFoundError(`Transaction ${hash} not found.`);
     }
 
-    return normalizeDecodedPayloadForJson(rawPayload.decoded, msbInstance.config);
+    return txDetails;
 }
 
 export async function fetchBulkTxPayloads(msbInstance, hashes) {
@@ -143,34 +107,10 @@ export async function fetchBulkTxPayloads(msbInstance, hashes) {
 }
 
 export async function getExtendedTxDetails(msbInstance, hash, confirmed) {
-    const state = msbInstance.state;
-    let rawPayload;
-
-    if (confirmed) {
-        rawPayload = await msbInstance.getConfirmedTxInfo(hash);
-    } else {
-        rawPayload = await msbInstance.getUnconfirmedTxInfo(hash);
-    }
-
-    if (!rawPayload) {
+    const txDetails = await msbInstance.getExtendedTxDetails(hash, confirmed);
+    if (!txDetails) {
         throw new NotFoundError(`No payload found for tx hash: ${hash}`);
     }
 
-    const normalizedPayload = normalizeDecodedPayloadForJson(rawPayload.decoded, msbInstance.config);
-    const length = await state.getTransactionConfirmedLength(hash);
-
-    if (length === null) {
-        return {
-            txDetails: normalizedPayload,
-            confirmed_length: 0,
-            fee: "0",
-        };
-    }
-
-    const feeBuffer = state.getFee();
-    return {
-        txDetails: normalizedPayload,
-        confirmed_length: length,
-        fee: bufferToBigInt(feeBuffer).toString(),
-    };
+    return txDetails;
 }

@@ -6,32 +6,6 @@ import { bufferToAddress } from "../core/state/utils/address.js";
 import deploymentEntryUtils from "../core/state/utils/deploymentEntry.js";
 import { safeDecodeApplyOperation } from "./protobuf/operationHelpers.js";
 
-export async function getBalanceCommand(state, address, confirmedFlag) {
-    const unconfirmedBalance = confirmedFlag === "false";
-    const nodeEntry = unconfirmedBalance
-        ? await state.getNodeEntryUnsigned(address)
-        : await state.getNodeEntry(address);
-
-    if (nodeEntry) {
-        console.log({
-            Address: address,
-            Balance: bigIntToDecimalString(bufferToBigInt(nodeEntry.balance))
-        });
-        return {
-            address,
-            balance: bufferToBigInt(nodeEntry.balance).toString()
-        };
-    }
-
-    console.log("Node Entry:", {
-        WritingKey: ZERO_WK.toString("hex"),
-        IsWhitelisted: false,
-        IsWriter: false,
-        IsIndexer: false,
-        balance: bigIntToDecimalString(0n)
-    });
-}
-
 export async function nodeStatusCommand(state, address) {
     const nodeEntry = await state.getNodeEntry(address);
     if (nodeEntry) {
@@ -158,24 +132,6 @@ export async function getLicenseCountCommand(state) {
     });
 }
 
-export async function getTxvCommand(state) {
-    const txv = await state.getIndexerSequenceState();
-    console.log("Current TXV:", txv.toString("hex"));
-    return txv;
-}
-
-export function getConfirmedLengthCommand(state) {
-    const confirmedLength = state.getSignedLength();
-    console.log("Confirmed_length:", confirmedLength);
-    return confirmedLength;
-}
-
-export function getUnconfirmedLengthCommand(state) {
-    const unconfirmedLength = state.getUnsignedLength();
-    console.log("Unconfirmed_length:", unconfirmedLength);
-    return unconfirmedLength;
-}
-
 export async function getTxPayloadsBulkCommand(msbInstance, hashes, config) {
     if (!Array.isArray(hashes) || hashes.length === 0) {
         throw new Error("Missing hash list.");
@@ -201,69 +157,4 @@ export async function getTxPayloadsBulkCommand(msbInstance, hashes, config) {
     });
 
     return res;
-}
-
-export async function getTxHashesCommand(state, start, end) {
-    try {
-        const hashes = await state.confirmedTransactionsBetween(start, end);
-        return { hashes };
-    } catch (error) {
-        throw new Error("Invalid params to perform the request.", error.message);
-    }
-}
-
-export async function getTxDetailsCommand(msbInstance, hash, config) {
-    try {
-        const rawPayload = await msbInstance.getConfirmedTxInfo(hash);
-        if (!rawPayload) {
-            console.log(`No payload found for tx hash: ${hash}`);
-            return null;
-        }
-        return normalizeDecodedPayloadForJson(rawPayload.decoded, config);
-    } catch (error) {
-        throw new Error("Invalid params to perform the request.", error.message);
-    }
-}
-
-export async function getExtendedTxDetailsCommand(msbInstance, hash, confirmed, config) {
-    const state = msbInstance.state;
-
-    if (confirmed) {
-        const rawPayload = await msbInstance.getConfirmedTxInfo(hash);
-        if (!rawPayload) {
-            throw new Error(`No payload found for tx hash: ${hash}`);
-        }
-        const confirmedLength = await state.getTransactionConfirmedLength(hash);
-        if (confirmedLength === null) {
-            throw new Error(`No confirmed length found for tx hash: ${hash} in confirmed mode`);
-        }
-        const normalizedPayload = normalizeDecodedPayloadForJson(rawPayload.decoded, config);
-        const fee = state.getFee();
-        return {
-            txDetails: normalizedPayload,
-            confirmed_length: confirmedLength,
-            fee: bufferToBigInt(fee).toString()
-        };
-    }
-
-    const rawPayload = await msbInstance.getUnconfirmedTxInfo(hash);
-    if (!rawPayload) {
-        throw new Error(`No payload found for tx hash: ${hash}`);
-    }
-    const normalizedPayload = normalizeDecodedPayloadForJson(rawPayload.decoded, config);
-    const length = await state.getTransactionConfirmedLength(hash);
-    if (length === null) {
-        return {
-            txDetails: normalizedPayload,
-            confirmed_length: 0,
-            fee: "0"
-        };
-    }
-
-    const fee = state.getFee();
-    return {
-        txDetails: normalizedPayload,
-        confirmed_length: length,
-        fee: bufferToBigInt(fee).toString()
-    };
 }
