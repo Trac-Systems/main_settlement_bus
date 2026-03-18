@@ -8,8 +8,7 @@ const msb = new MainSettlementBus(config);
 
 const start = async () => {
     if (isRpcEnabled()) {
-        await msb.ready()
-        startRpcServer(msb, config)
+        await startRpcServer(msb, config)
     } else {
         await startInteractiveMode(msb, config)
     }

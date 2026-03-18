@@ -1,5 +1,4 @@
 import b4a from 'b4a';
-import { safeDecodeApplyOperation } from "./protobuf/operationHelpers.js";
 import { bigIntToDecimalString, bufferToBigInt } from "./amountSerialization.js";
 
 export async function verifyDag(state, network, wallet, writerKey) {
@@ -91,38 +90,4 @@ export const printBalance = async (address, state) => {
     const nodeEntry = await state.getNodeEntry(address);
     const balance = nodeEntry ? bigIntToDecimalString(bufferToBigInt(nodeEntry.balance)) : '0';
     console.log(`Balance: ${balance}`);
-}
-
-export const getConfirmedTxInfo = async (state_instance, txHash) => {
-    const payload = await state_instance.getSigned(txHash);
-    if (!payload) {
-        return null
-    }
-
-    const decoded = safeDecodeApplyOperation(payload);
-    if (!decoded) {
-        throw new Error(`Failed to decode payload for transaction hash: ${txHash}`);
-    }
-
-    return {
-        payload,
-        decoded
-    }
-}
-
-export const getUnconfirmedTxInfo = async (state_instance, txHash) => {
-    const payload = await state_instance.get(txHash);
-    if (!payload) {
-        return null
-    }
-
-    const decoded = safeDecodeApplyOperation(payload);
-    if (!decoded) {
-        throw new Error(`Failed to decode payload for transaction hash: ${txHash}`);
-    }
-
-    return {
-        payload,
-        decoded
-    }
 }

@@ -1,4 +1,5 @@
 import { randomBytes } from "hypercore-crypto";
+import { Handlers } from "./handlers.js";
 import { isHexString } from "../src/utils/helpers.js";
 import { printHelp, verifyDag } from "../src/utils/cli.js";
 import {
@@ -7,7 +8,6 @@ import {
     getConfirmedLengthCommand,
     getDeploymentCommand,
     getExtendedTxDetailsCommand,
-    getFeeCommand,
     getLicenseAddressCommand,
     getLicenseCountCommand,
     getLicenseNumberCommand,
@@ -20,17 +20,19 @@ import {
     nodeStatusCommand
 } from "../src/utils/cliCommands.js";
 
-export class CommandHandlers {
+export class CommandHandler {
     #config;
     #msb;
     #closeCli;
     #wallet;
+    #handlers;
 
     constructor({ config, msb, handleClose, wallet }) {
         this.#config = config;
         this.#msb = msb;
         this.#closeCli = handleClose;
         this.#wallet = wallet;
+        this.#handlers = new Handlers(msb, config);
     }
 
     async handle(input) {
@@ -152,7 +154,7 @@ export class CommandHandlers {
             },
             {
                 evaluate: ({ input }) => input.startsWith("/get_tx_info"),
-                process: async ({ parts }) => getTxInfoCommand(this.#msb.state, parts[0])
+                process: async ({ parts }) => getTxInfoCommand(this.#msb, parts[0])
             },
             {
                 evaluate: ({ input }) => input.startsWith("/transfer"),
@@ -182,7 +184,7 @@ export class CommandHandlers {
             },
             {
                 evaluate: ({ input }) => input.startsWith("/get_fee"),
-                process: async () => getFeeCommand(this.#msb.state)
+                process: async () => this.#handlers.handleFee()
             },
             {
                 evaluate: ({ input }) => input.startsWith("/confirmed_length"),
@@ -202,12 +204,12 @@ export class CommandHandlers {
             },
             {
                 evaluate: ({ input }) => input.startsWith("/get_tx_details"),
-                process: async ({ parts }) => getTxDetailsCommand(this.#msb.state, parts[0], this.#config)
+                process: async ({ parts }) => getTxDetailsCommand(this.#msb, parts[0], this.#config)
             },
             {
                 evaluate: ({ input }) => input.startsWith("/get_extended_tx_details"),
                 process: async ({ parts }) => getExtendedTxDetailsCommand(
-                    this.#msb.state,
+                    this.#msb,
                     parts[0],
                     parts[1] === "true",
                     this.#config
