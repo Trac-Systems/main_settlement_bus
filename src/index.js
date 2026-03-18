@@ -22,7 +22,7 @@ import {
 import { decimalStringToBigInt, bigIntTo16ByteBuffer, bufferToBigInt, bigIntToDecimalString } from "./utils/amountSerialization.js"
 import fileUtils from './utils/fileUtils.js';
 import migrationUtils from './utils/migrationUtils.js';
-import {safeEncodeApplyOperation} from "./utils/protobuf/operationHelpers.js";
+import {safeDecodeApplyOperation, safeEncodeApplyOperation} from "./utils/protobuf/operationHelpers.js";
 import {Config} from "./config/config.js";
 
 export class MainSettlementBus extends ReadyResource {
@@ -172,6 +172,35 @@ export class MainSettlementBus extends ReadyResource {
         this.#state.base.on(EventType.UNWRITABLE, async () => {
             console.log("Current node is unwritable");
         });
+    }
+
+    async getConfirmedTxInfo(txHash) {
+        const payload = await this.#state.getSigned(txHash);
+        if (!payload) return null
+
+        const decoded = safeDecodeApplyOperation(payload);
+        if (!decoded) {
+            throw new Error(`Failed to decode payload for transaction hash: ${txHash}`);
+        }
+
+        return { payload, decoded }
+    }
+
+    async getUnconfirmedTxInfo(txHash) {
+        const payload = await this.#state.get(txHash);
+        if (!payload) return null
+
+        const decoded = safeDecodeApplyOperation(payload);
+        if (!decoded) {
+            throw new Error(`Failed to decode payload for transaction hash: ${txHash}`);
+        }
+
+        return { payload, decoded }
+    }
+
+    handleGetFee() {        
+        const fee = this.#state.getFee();
+        return bufferToBigInt(fee);
     }
 
     async handleAdminCreation() {

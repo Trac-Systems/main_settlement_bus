@@ -15,7 +15,6 @@ import { buildRequestUrl } from "./utils/url.js";
 import {
     getBalance,
     getTxv,
-    getFee,
     getConfirmedLength,
     getUnconfirmedLength,
     broadcastTransaction,
@@ -30,7 +29,7 @@ import { getConfirmedParameter } from "./utils/confirmedParameter.js";
 
 export async function handleHealth({ msbInstance, respond }) {
     try {
-        const isReady = msbInstance && msbInstance.state;
+        const isReady = !!msbInstance?.opened
         if (isReady) return respond(200, { ok: true });
         throw new Error("RPC_OFFLINE");
     } catch (error) {
@@ -54,7 +53,7 @@ export async function handleBalance({ req, respond, msbInstance }) {
         return;
     }
 
-    const nodeInfo = await getBalance(msbInstance, address, getConfirmedParameter(url) ?? false);
+    const nodeInfo = await getBalance(msbInstance, address, getConfirmedParameter(url, { defaultValue: false }));
     const balance = nodeInfo?.balance || "0";
 
     respond(200, { address, balance });
@@ -66,7 +65,7 @@ export async function handleTxv({ msbInstance, respond }) {
 }
 
 export async function handleFee({ msbInstance, respond }) {
-    const fee = await getFee(msbInstance);
+    const fee = await msbInstance.handleGetFee().toString();
     respond(200, { fee });
 }
 

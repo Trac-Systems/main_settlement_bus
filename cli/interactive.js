@@ -5,7 +5,7 @@ import { WalletProvider, exportWallet, importFromFile } from "trac-wallet";
 import { sleep } from "../src/utils/helpers.js";
 import fileUtils from "../src/utils/fileUtils.js";
 import { printHelp } from "../src/utils/cli.js";
-import { CommandHandlers } from "./operationHandlers.js";
+import { CommandHandler } from "./commandHandler.js";
 
 class Cli extends ReadyResource {
     #msb;
@@ -21,16 +21,14 @@ class Cli extends ReadyResource {
     }
 
     async _open() {
-        try {
-            this.#readlineInstance = readline.createInterface({
-                input: new tty.ReadStream(0),
-                output: new tty.WriteStream(1),
-            });
-            if (this.#config.enableWallet) {
-                await fileUtils.ensureKeyPathDir(this.#config);
-                await this.#initKeyPair()
-            }
-        } catch (_ignored) {}
+        this.#readlineInstance = readline.createInterface({
+            input: new tty.ReadStream(0),
+            output: new tty.WriteStream(1),
+        });
+        if (this.#config.enableWallet) {
+            await fileUtils.ensureKeyPathDir(this.#config);
+            await this.#initKeyPair()
+        }
     }
 
     async _close() {
@@ -58,27 +56,25 @@ class Cli extends ReadyResource {
     startInteractiveMode() {
         console.log('RPC server will not be started.');
 
-        this.#commandHandlers = new CommandHandlers({
+        this.#commandHandlers = new CommandHandler({
             config: this.#config,
             msb: this.#msb,
             handleClose: () => this.close(),
             wallet: this.#wallet
         });
 
-        const rl = this.#readlineInstance;
-
         printHelp(this.#config.isAdminMode);
 
         this.#readlineInstance.on("line", async (input) => {
             try {
-                await this.#handleCommand(input.trim(), rl);
+                await this.#handleCommand(input.trim(), this.#readlineInstance);
             } catch (err) {
                 console.error(`${err}`);
             }
-            rl.prompt();
+            this.#readlineInstance.prompt();
         });
 
-        rl.prompt();
+        this.#readlineInstance.prompt();
     }
 
     async #handleCommand(input, rl = null, payload = null) {
@@ -162,8 +158,8 @@ class Cli extends ReadyResource {
 }
 
 export const startInteractiveMode = async (msb, config) => {
+    await msb.ready();
     const cli = new Cli(msb, config);
     await cli.ready();
-    await msb.ready();
     cli.startInteractiveMode();
 };
