@@ -1060,7 +1060,7 @@ export class MainSettlementBus extends ReadyResource {
     async #initKeyPair() {
         try {
             if (verifyWalletPath(this.#config)) {
-                this.#wallet = await importFromFile(this.#config.keyPairPath)
+                this.#wallet = await importFromFile(this.#config.keyPairPath, undefined, this.#config.addressPrefix)
             } else {
                 console.log("Key file was not found. How do you wish to proceed?")
                 const wallet = await this.#setupKeypairInteractiveMode()
