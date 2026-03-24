@@ -17,7 +17,6 @@ import {
     timestampToBuffer
 } from '../../../../src/utils/buffer.js';
 import { config } from '../../../helpers/config.js';
-import { asAddress } from '../../../helpers/address.js';
 import { testKeyPair1 } from '../../../fixtures/apply.fixtures.js';
 import { WalletProvider } from 'trac-wallet';
 

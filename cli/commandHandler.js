@@ -1,7 +1,7 @@
 import { randomBytes } from "hypercore-crypto";
 import { Handlers } from "./handlers.js";
 import { isHexString } from "../src/utils/helpers.js";
-import { printHelp, verifyDag } from "../src/utils/cli.js";
+import { printHelp } from "../src/utils/cli.js";
 import {
     coreInfoCommand,
     getDeploymentCommand,
@@ -88,12 +88,7 @@ export class CommandHandler {
             },
             {
                 evaluate: ({ command }) => command === "/stats",
-                process: async () => verifyDag(
-                    this.#msb.state,
-                    this.#msb.network,
-                    this.#wallet,
-                    this.#msb.state.writingKey
-                )
+                process: async () => this.#msb.verifyDag()
             },
             {
                 evaluate: ({ command }) => command === "/balance_migration",

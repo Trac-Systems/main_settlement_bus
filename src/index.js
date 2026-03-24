@@ -72,7 +72,7 @@ export class MainSettlementBus extends ReadyResource {
         await this.#stateEventsListener();
 
         if (this.#config.enableWallet) {
-            printWalletInfo(this.#wallet.address, this.#state.writingKey, this.#state, this.#config.enableWallet);
+            printWalletInfo(this.#wallet.address, this.#state.writingKey);
         }
 
         await this.#network.replicate(
@@ -230,6 +230,37 @@ export class MainSettlementBus extends ReadyResource {
 
     getUnconfirmedLength() {
         return this.#state.getUnsignedLength();
+    }
+
+    async verifyDag() {
+        try {
+            let dagView = await this.#state.base.view.core.treeHash();
+            let lengthdagView = this.#state.base.view.core.length;
+            let dagSystem = await this.#state.base.system.core.treeHash();
+            let lengthdagSystem = this.#state.base.system.core.length;
+            const wl = await this.#state.getWriterLength();
+            
+            console.log("---------- node & network stats ----------");
+            console.log("wallet.publicKey:", this.#wallet?.publicKey?.toString("hex") ?? "unset");
+            console.log("wallet.address:", this.#wallet?.address ?? "unset");
+            console.log("msb.writerKey:", this.#state?.writingKey ? this.#state.writingKey.toString("hex") : "unset");
+            console.log("swarm.connections.size:", this.#network?.swarm?.connections?.size || 0);
+            console.log("base.view.core.signedLength:", this.#state.base.view.core.signedLength ?? "unset");
+            console.log("base.view.core.length:", this.#state.base.view.core.length ?? "unset");
+            console.log("base.signedLength", this.#state.base.signedLength ?? "unset");
+            console.log("base.indexedLength", this.#state.base.indexedLength ?? "unset");
+            console.log("base.linearizer.indexers.length", this.#state.base.linearizer?.indexers?.length ?? "unset");
+            console.log(`base.key: ${this.#state.base.key ? this.#state.base.key.toString("hex") : "unset"}`);
+            console.log("discoveryKey:", this.#state.base.discoveryKey ? b4a.toString(this.#state.base.discoveryKey, "hex") : "unset");
+            console.log(`VIEW Dag: ${dagView ? dagView.toString("hex") : "unset"} (length: ${lengthdagView || 0})`);
+            console.log(`SYSTEM Dag: ${dagSystem ? dagSystem.toString("hex") : "unset"} (length: ${lengthdagSystem || 0})`);
+            console.log("Total Registered Writers:", wl !== null ? wl : 0);
+            console.log("---------- flags ----------");
+            console.log(`isIndexer: ${this.#state?.isIndexer?.() ?? "unset"}`);
+            console.log(`isWriter: ${this.#state?.isWritable?.() ?? "unset"}`);
+        } catch (error) {
+            console.error("Error during DAG monitoring:", error.message);
+        }
     }
 
     async getTxHashes(start, end) {
