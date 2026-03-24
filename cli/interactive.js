@@ -4,7 +4,6 @@ import tty from "tty";
 import { WalletProvider, exportWallet, importFromFile } from "trac-wallet";
 import { sleep } from "../src/utils/helpers.js";
 import fileUtils from "../src/utils/fileUtils.js";
-import { printHelp } from "../src/utils/cli.js";
 import { CommandHandler } from "./commandHandler.js";
 
 class Cli extends ReadyResource {
@@ -63,7 +62,7 @@ class Cli extends ReadyResource {
             wallet: this.#wallet
         });
 
-        printHelp(this.#config.isAdminMode);
+        this.#msb.printHelp();
 
         this.#readlineInstance.on("line", async (input) => {
             try {
