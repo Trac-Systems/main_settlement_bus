@@ -1,7 +1,6 @@
 import { randomBytes } from "hypercore-crypto";
 import { Handlers } from "./handlers.js";
 import { isHexString } from "../src/utils/helpers.js";
-import { printHelp } from "../src/utils/cli.js";
 import {
     coreInfoCommand,
     getDeploymentCommand,
@@ -44,7 +43,7 @@ export class CommandHandler {
             {
                 evaluate: ({ command }) => command === "/help",
                 process: async () => {
-                    printHelp(this.#config.isAdminMode);
+                    this.#msb.printHelp();
                 }
             },
             {
