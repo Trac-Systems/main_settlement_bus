@@ -16,14 +16,22 @@ import {
     BOOTSTRAP_HEXSTRING_LENGTH,
     CustomEventType,
     BALANCE_MIGRATION_SLEEP_INTERVAL,
-    WHITELIST_MIGRATION_DIR
+    WHITELIST_MIGRATION_DIR,
+    OperationType
 } from "./utils/constants.js";
 import { decimalStringToBigInt, bigIntTo16ByteBuffer, bufferToBigInt, bigIntToDecimalString } from "./utils/amountSerialization.js"
-import { normalizeDecodedPayloadForJson } from "./utils/normalizers.js";
+import {
+    normalizeDecodedPayloadForJson,
+    normalizeTransactionOperation,
+    normalizeTransferOperation
+} from "./utils/normalizers.js";
 import fileUtils from './utils/fileUtils.js';
 import migrationUtils from './utils/migrationUtils.js';
 import {safeDecodeApplyOperation, safeEncodeApplyOperation} from "./utils/protobuf/operationHelpers.js";
 import {Config} from "./config/config.js";
+import PartialTransactionValidator from "./core/network/protocols/shared/validators/PartialTransactionValidator.js";
+import PartialTransferValidator from "./core/network/protocols/shared/validators/PartialTransferValidator.js";
+import { BroadcastError, ValidationError } from "./utils/errors.js";
 
 export class MainSettlementBus extends ReadyResource {
     #store;
@@ -120,6 +128,53 @@ export class MainSettlementBus extends ReadyResource {
 
     async broadcastPartialTransaction(partialTransactionPayload) {
         return await this.#network.validatorMessageOrchestrator.send(partialTransactionPayload);
+    }
+
+    async broadcastTransaction(payload) {
+        if (!payload) {
+            throw new ValidationError("Transaction payload is required for broadcasting.");
+        }
+
+        let normalizedPayload;
+        let isValid = false;
+        let hash;
+
+        const partialTransferValidator = new PartialTransferValidator(this.#state, null, this.#config);
+        const partialTransactionValidator = new PartialTransactionValidator(this.#state, null, this.#config);
+
+        if (payload.type === OperationType.TRANSFER) {
+            normalizedPayload = normalizeTransferOperation(payload, this.#config);
+            isValid = await partialTransferValidator.validate(normalizedPayload);
+            hash = b4a.toString(normalizedPayload.tro.tx, "hex");
+        } else if (payload.type === OperationType.TX) {
+            normalizedPayload = normalizeTransactionOperation(payload, this.#config);
+            isValid = await partialTransactionValidator.validate(normalizedPayload);
+            hash = b4a.toString(normalizedPayload.txo.tx, "hex");
+        }
+
+        if (!isValid) {
+            throw new ValidationError("Invalid transaction payload.");
+        }
+
+        const success = await this.broadcastPartialTransaction(payload);
+        if (!success) {
+            throw new BroadcastError("Failed to broadcast transaction after multiple attempts.");
+        }
+
+        const isConfirmed = await this.#state.waitForUnsigned(
+            hash,
+            this.#config.messageValidatorResponseTimeout,
+            100
+        );
+        if (!isConfirmed) {
+            throw new BroadcastError("Failed to broadcast transaction after multiple attempts.");
+        }
+
+        return {
+            signedLength: this.#state.getSignedLength(),
+            unsignedLength: this.#state.getUnsignedLength(),
+            tx: hash
+        };
     }
 
     async #setUpRoleAutomatically() {
@@ -315,6 +370,24 @@ export class MainSettlementBus extends ReadyResource {
         }
 
         return normalizeDecodedPayloadForJson(rawPayload.decoded, this.#config);
+    }
+
+    async fetchBulkTxPayloads(hashes) {
+        const response = { results: [], missing: [] };
+        const results = await Promise.all(hashes.map((hash) => this.getConfirmedTxInfo(hash)));
+
+        results.forEach((result, index) => {
+            const hash = hashes[index];
+            if (!result) {
+                response.missing.push(hash);
+                return;
+            }
+
+            const decodedResult = normalizeDecodedPayloadForJson(result.decoded, this.#config);
+            response.results.push({ hash, payload: decodedResult });
+        });
+
+        return response;
     }
 
     async getExtendedTxDetails(hash, confirmed) {
