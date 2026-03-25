@@ -43,10 +43,12 @@ export class MainSettlementBus extends ReadyResource {
 
     /**
      * @param {Config} config
+     * @param {import("trac-wallet").Wallet | undefined} wallet
      **/
-    constructor(config) {
+    constructor(config, wallet = undefined) {
         super();
         this.#config = config
+        this.#wallet = wallet;
         this.#store = new Corestore(this.#config.storesFullPath);
         this.check = new Check(this.#config);
     }
@@ -78,7 +80,7 @@ export class MainSettlementBus extends ReadyResource {
         await this.#network.ready();
         await this.#stateEventsListener();
 
-        if (this.#config.enableWallet) {
+        if (this.#wallet) {
             this.#printWalletInfo();
         }
 
@@ -98,7 +100,7 @@ export class MainSettlementBus extends ReadyResource {
         console.log("MSB Unsigned Length:", this.#state.getUnsignedLength());
         console.log("MSB Signed Length:", this.#state.getSignedLength());
 
-        if (this.#config.enableWallet) {
+        if (this.#wallet) {
             await this.#printBalance();
         }
     }
