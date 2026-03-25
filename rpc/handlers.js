@@ -7,16 +7,13 @@ import {
     validatePayloadStructure,
     hasSpacesInUrl,
     BroadcastError, 
-    ValidationError,
-    NotFoundError
+    ValidationError
 } from "./utils/helpers.js"
 import { MAX_SIGNED_LENGTH, ZERO_WK } from "./constants.js";
 import { buildRequestUrl } from "./utils/url.js";
 import {
     broadcastTransaction,
-    getTxDetails,
     fetchBulkTxPayloads,
-    getExtendedTxDetails,
 } from "./rpc_services.js";
 import { bufferToBigInt, licenseBufferToBigInt } from "../src/utils/amountSerialization.js";
 import { isAddressValid } from "../src/core/state/utils/address.js";
@@ -199,18 +196,14 @@ export async function handleTransactionDetails({ msbInstance, respond, req }) {
     }
 
     try {
-        const txDetails = await getTxDetails(msbInstance, normalizedHash);
-        respond(200, { txDetails });
-    } catch (error) {
-        let code = 500;
-        let errorMsg = "Internal error";
-
-        if (error instanceof NotFoundError) {
-            code = 404;
-            errorMsg = error.message;
+        const txDetails = await msbInstance.getTxDetails(normalizedHash);
+        if (!txDetails) {
+            return respond(404, { error: `Transaction ${normalizedHash} not found.` });
         }
 
-        respond(code, { [code === 404 ? 'txDetails' : 'error']: code === 404 ? null : errorMsg });
+        respond(200, { txDetails });
+    } catch (error) {
+        respond(500, { error: "Internal error" });
     }
 }
 
@@ -238,18 +231,14 @@ export async function handleTransactionExtendedDetails({ msbInstance, respond, r
     }
 
     try {
-        const details = await getExtendedTxDetails(msbInstance, hash, confirmed);
-        respond(200, details);
-    } catch (error) {
-        let code = 500;
-        let errorMsg = 'An error occurred processing the request.';
-
-        if (error instanceof NotFoundError) {
-            code = 404;
-            errorMsg = error.message;
+        const details = await msbInstance.getExtendedTxDetails(hash, confirmed);
+        if (!details) {
+            return respond(404, { error: `No payload found for tx hash: ${hash}` });
         }
 
-        respond(code, { error: errorMsg });
+        respond(200, details);
+    } catch (error) {
+        respond(500, { error: 'An error occurred processing the request.' });
     }
 }
 

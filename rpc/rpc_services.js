@@ -6,7 +6,7 @@ import {
 import { OperationType } from "../src/utils/constants.js";
 import { sleep } from "../src/utils/helpers.js";
 import b4a from "b4a";
-import { ValidationError, BroadcastError, NotFoundError } from "./utils/helpers.js";
+import { ValidationError, BroadcastError } from "./utils/helpers.js";
 import PartialTransactionValidator from "../src/core/network/protocols/shared/validators/PartialTransactionValidator.js";
 import PartialTransferValidator from "../src/core/network/protocols/shared/validators/PartialTransferValidator.js";
 
@@ -70,15 +70,6 @@ export async function broadcastTransaction(msbInstance, config, payload) {
     };
 }
 
-export async function getTxDetails(msbInstance, hash) {
-    const txDetails = await msbInstance.getTxDetails(hash);
-    if (!txDetails) {
-        throw new NotFoundError(`Transaction ${hash} not found.`);
-    }
-
-    return txDetails;
-}
-
 export async function fetchBulkTxPayloads(msbInstance, hashes) {
     if (!Array.isArray(hashes) || hashes.length === 0) {
         throw new ValidationError("Missing hash list.");
@@ -104,13 +95,4 @@ export async function fetchBulkTxPayloads(msbInstance, hashes) {
     });
 
     return res;
-}
-
-export async function getExtendedTxDetails(msbInstance, hash, confirmed) {
-    const txDetails = await msbInstance.getExtendedTxDetails(hash, confirmed);
-    if (!txDetails) {
-        throw new NotFoundError(`No payload found for tx hash: ${hash}`);
-    }
-
-    return txDetails;
 }
