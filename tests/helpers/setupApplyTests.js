@@ -86,7 +86,7 @@ export async function initMsbPeer(peerName, peerKeyPair, temporaryDirectory, opt
     const config = createConfig(ENV.DEVELOPMENT, { ...options, storesDirectory: `${temporaryDirectory}/${peerName}` })
     const wallet = await initDirectoryStructure(peerKeyPair, config);
     const peerOptions = { ...options, storesDirectory: config.storesDirectory }
-    const msb = new MainSettlementBus(config);
+    const msb = new MainSettlementBus(config, wallet);
 
     return {
         config,
@@ -112,7 +112,7 @@ export async function initMsbAdmin(keyPair, temporaryDirectory, options = {}) {
     admin.config = new Config(admin.options, admin.config)
     await admin.msb.close();
 
-    admin.msb = new MainSettlementBus(admin.config);
+    admin.msb = new MainSettlementBus(admin.config, admin.wallet);
     await admin.msb.ready();
     await admin.msb.state.append(null); // before initialization system.indexers is empty, we need to initialize first block to create system.indexers array
     return admin;

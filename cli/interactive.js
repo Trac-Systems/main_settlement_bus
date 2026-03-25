@@ -2,6 +2,7 @@ import ReadyResource from "ready-resource";
 import readline from "readline";
 import tty from "tty";
 import { WalletProvider, exportWallet, importFromFile } from "trac-wallet";
+import { MainSettlementBus } from "../src/index.js";
 import { sleep } from "../src/utils/helpers.js";
 import fileUtils from "../src/utils/fileUtils.js";
 import { CommandHandler } from "./commandHandler.js";
@@ -13,9 +14,8 @@ class Cli extends ReadyResource {
     #readlineInstance;
     #wallet
 
-    constructor(msb, config) {
+    constructor(config) {
         super();
-        this.#msb = msb;
         this.#config = config;
     }
 
@@ -28,6 +28,9 @@ class Cli extends ReadyResource {
             await fileUtils.ensureKeyPathDir(this.#config);
             await this.#initKeyPair()
         }
+
+        this.#msb = new MainSettlementBus(this.#config, this.#wallet);
+        await this.#msb.ready();
     }
 
     async _close() {
@@ -156,9 +159,8 @@ class Cli extends ReadyResource {
     }
 }
 
-export const startInteractiveMode = async (msb, config) => {
-    await msb.ready();
-    const cli = new Cli(msb, config);
+export const startInteractiveMode = async (config) => {
+    const cli = new Cli(config);
     await cli.ready();
     cli.startInteractiveMode();
 };

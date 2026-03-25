@@ -48,7 +48,9 @@ export const registerTxTests = (context) => {
             const nonExistentHash = "0b4d1c1dac48af13212f616601d7399457476a0b644850875b7f4b79df6ff89c"
             const res = await request(context.server).get(`/v1/tx/${nonExistentHash}`)
             expect(res.statusCode).toBe(404)
-            expect(res.body).toEqual({ txDetails: null })
+            expect(res.body).toEqual({
+                error: `Transaction ${nonExistentHash} not found.`
+            })
         })
 
         it("returns 400 for invalid hash format (too short)", async () => {
