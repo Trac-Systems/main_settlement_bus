@@ -15,9 +15,7 @@ test('ValidatorHealthCheckService', () => {
     });
 
     test('constructor rejects invalid interval', async (t) => {
-        const badConfig = createConfig(ENV.MAINNET, { validatorHealthCheckInterval: -1 });
-
-        await t.exception.all(() => new ValidatorHealthCheckService(badConfig));
+        await t.exception.all(() => createConfig(ENV.MAINNET, { validatorHealthCheckInterval: -1 }));
     });
 
     test('constructor defaults interval when missing', async (t) => {
