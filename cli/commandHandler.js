@@ -1,16 +1,6 @@
 import { randomBytes } from "hypercore-crypto";
 import { Handlers } from "./handlers.js";
 import { isHexString } from "../src/utils/helpers.js";
-import {
-    coreInfoCommand,
-    getDeploymentCommand,
-    getLicenseAddressCommand,
-    getLicenseCountCommand,
-    getLicenseNumberCommand,
-    getTxInfoCommand,
-    getValidatorAddressCommand,
-    nodeStatusCommand
-} from "../src/utils/cliCommands.js";
 
 export class CommandHandler {
     #config;
@@ -75,7 +65,7 @@ export class CommandHandler {
             },
             {
                 evaluate: ({ command }) => command === "/core",
-                process: async () => coreInfoCommand(this.#msb.state)
+                process: async () => this.#handlers.handleCoreInfo()
             },
             {
                 evaluate: ({ command }) => command === "/indexers_list",
@@ -99,7 +89,7 @@ export class CommandHandler {
             },
             {
                 evaluate: ({ input }) => input.startsWith("/node_status"),
-                process: async ({ parts }) => nodeStatusCommand(this.#msb.state, parts[0])
+                process: async ({ parts }) => this.#handlers.handleNodeStatus(parts[0])
             },
             {
                 evaluate: ({ input }) => input.startsWith("/add_indexer"),
@@ -125,23 +115,15 @@ export class CommandHandler {
             },
             {
                 evaluate: ({ input }) => input.startsWith("/get_validator_addr"),
-                process: async ({ parts }) => getValidatorAddressCommand(
-                    this.#msb.state,
-                    parts[0],
-                    this.#config.addressPrefix
-                )
+                process: async ({ parts }) => this.#handlers.handleValidatorAddress(parts[0])
             },
             {
                 evaluate: ({ input }) => input.startsWith("/get_deployment"),
-                process: async ({ parts }) => getDeploymentCommand(
-                    this.#msb.state,
-                    parts[0],
-                    this.#config.addressLength
-                )
+                process: async ({ parts }) => this.#handlers.handleDeployment(parts[0])
             },
             {
                 evaluate: ({ input }) => input.startsWith("/get_tx_info"),
-                process: async ({ parts }) => getTxInfoCommand(this.#msb, parts[0])
+                process: async ({ parts }) => this.#handlers.handleTxInfo(parts[0])
             },
             {
                 evaluate: ({ input }) => input.startsWith("/transfer"),
@@ -153,17 +135,15 @@ export class CommandHandler {
             },
             {
                 evaluate: ({ input }) => input.startsWith("/get_license_number"),
-                process: async ({ parts }) => getLicenseNumberCommand(this.#msb.state, parts[0])
+                process: async ({ parts }) => this.#handlers.handleLicenseNumber(parts[0])
             },
             {
                 evaluate: ({ input }) => input.startsWith("/get_license_address"),
-                process: async ({ parts }) => getLicenseAddressCommand(this.#msb.state, parseInt(parts[0]))
+                process: async ({ parts }) => this.#handlers.handleLicenseAddress(parseInt(parts[0]))
             },
             {
                 evaluate: ({ input }) => input.startsWith("/get_license_count"),
-                process: async () => getLicenseCountCommand(
-                    this.#msb.state
-                )
+                process: async () => this.#handlers.handleLicenseCount()
             },
             {
                 evaluate: ({ input }) => input.startsWith("/get_txv"),
