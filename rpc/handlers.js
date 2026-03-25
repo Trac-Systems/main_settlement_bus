@@ -5,19 +5,14 @@ import {
     sanitizeBulkPayloadsRequestBody, 
     sanitizeTransferPayload, 
     validatePayloadStructure,
-    hasSpacesInUrl,
-    BroadcastError, 
-    ValidationError
+    hasSpacesInUrl
 } from "./utils/helpers.js"
 import { MAX_SIGNED_LENGTH, ZERO_WK } from "./constants.js";
 import { buildRequestUrl } from "./utils/url.js";
-import {
-    broadcastTransaction,
-    fetchBulkTxPayloads,
-} from "./rpc_services.js";
 import { bufferToBigInt, licenseBufferToBigInt } from "../src/utils/amountSerialization.js";
 import { isAddressValid } from "../src/core/state/utils/address.js";
 import { getConfirmedParameter } from "./utils/confirmedParameter.js";
+import { BroadcastError, ValidationError } from "../src/utils/errors.js";
 
 export async function handleHealth({ msbInstance, respond }) {
     try {
@@ -66,7 +61,7 @@ export async function handleConfirmedLength({ msbInstance, respond }) {
     respond(200, { confirmed_length });
 }
 
-export async function handleBroadcastTransaction({ msbInstance, config, respond, req }) {
+export async function handleBroadcastTransaction({ msbInstance, respond, req }) {
     let body = '';
     const MAX_BODY_SIZE = 2_000_000;
     let limitExceeded = false;
@@ -109,8 +104,8 @@ export async function handleBroadcastTransaction({ msbInstance, config, respond,
             validatePayloadStructure(decodedPayload);
             const sanitizedPayload = sanitizeTransferPayload(decodedPayload);
 
-            const result = await broadcastTransaction(msbInstance, config, sanitizedPayload);
-            respond(200, { result });
+            const result = await msbInstance.broadcastTransaction(sanitizedPayload);
+            respond(200, { result: { ...result, message: 'Transaction broadcasted successfully.' } });
 
         } catch (error) {
             let code = 500;
@@ -265,17 +260,26 @@ export async function handleFetchBulkTxPayloads({ msbInstance, respond, req }) {
 
         try {
             if (!body) {
-                throw new ValidationError("Missing payload.");
+                return respond(400, { error: "Missing payload." });
             }
 
             const sanitizedPayload = sanitizeBulkPayloadsRequestBody(body);
             if (!sanitizedPayload) {
-                throw new ValidationError("Invalid payload.");
+                return respond(400, { error: "Invalid payload." });
             }
 
             const { hashes } = sanitizedPayload;
+
+            if (!Array.isArray(hashes) || hashes.length === 0) {
+                return respond(400, { error: "Missing hash list." });
+            }
+
             const uniqueHashes = [...new Set(hashes)];
-            const commandResult = await fetchBulkTxPayloads(msbInstance, uniqueHashes);
+
+            if (uniqueHashes.length > 1500) {
+                return respond(400, { error: 'Length of input tx hashes exceeded.' });
+            }
+            const commandResult = await msbInstance.fetchBulkTxPayloads(uniqueHashes);
 
             const responseString = JSON.stringify(commandResult);
             if (Buffer.byteLength(responseString, 'utf8') > 2_000_000) {
@@ -287,7 +291,7 @@ export async function handleFetchBulkTxPayloads({ msbInstance, respond, req }) {
             let code = 500;
             let errorMsg = 'An internal error occurred.';
 
-            if (error instanceof ValidationError || error instanceof SyntaxError) {
+            if (error instanceof SyntaxError) {
                 code = 400;
                 errorMsg = error instanceof SyntaxError ? 'Invalid request body format.' : error.message;
             }

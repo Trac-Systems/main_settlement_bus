@@ -138,6 +138,17 @@ class State extends ReadyResource {
         return result.value;
     }
 
+    async waitForUnsigned(txHash, timeout, interval = 200) {
+        const start = Date.now();
+        while (Date.now() - start < timeout) {
+            await sleep(interval);
+            const entry = await this.get(txHash);
+            if (entry) return true;
+        }
+
+        return false;
+    }
+
     async getSigned(key) {
         const view_session = this.#base.view.checkout(this.#base.view.core.signedLength);
         try {
