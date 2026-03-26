@@ -5,7 +5,7 @@ import { WalletProvider, exportWallet, importFromFile } from "trac-wallet";
 import { MainSettlementBus } from "../src/index.js";
 import { sleep } from "../src/utils/helpers.js";
 import fileUtils from "../src/utils/fileUtils.js";
-import { CommandHandler } from "./commandHandler.js";
+import { COMMANDS, CommandHandler } from "./commandHandler.js";
 
 class Cli extends ReadyResource {
     #msb;
@@ -23,7 +23,9 @@ class Cli extends ReadyResource {
         this.#readlineInstance = readline.createInterface({
             input: new tty.ReadStream(0),
             output: new tty.WriteStream(1),
+            completer: line => this.#completeCommand(line) // This only works without Pear.
         });
+
         if (this.#config.enableWallet) {
             await fileUtils.ensureKeyPathDir(this.#config);
             await this.#initKeyPair()
@@ -69,7 +71,7 @@ class Cli extends ReadyResource {
 
         this.#readlineInstance.on("line", async (input) => {
             try {
-                await this.#handleCommand(input.trim(), this.#readlineInstance);
+                await this.#handleCommand(input.trim());
             } catch (err) {
                 console.error(`${err}`);
             }
@@ -79,8 +81,17 @@ class Cli extends ReadyResource {
         this.#readlineInstance.prompt();
     }
 
-    async #handleCommand(input, rl = null, payload = null) {
-        return this.#commandHandlers.handle(input, payload);
+    async #handleCommand(input) {
+        return this.#commandHandlers.handle(input);
+    }
+
+    #completeCommand(line) {
+        const commands = Object.values(COMMANDS);
+        const hits = line
+            ? commands.filter(command => command.startsWith(line))
+            : commands;
+
+        return [hits.length ? hits : commands, line];
     }
 
     async #initKeyPair() {

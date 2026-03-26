@@ -2,6 +2,42 @@ import { randomBytes } from "hypercore-crypto";
 import { Handlers } from "./handlers.js";
 import { isHexString } from "../src/utils/helpers.js";
 
+export const COMMANDS = {
+    HELP: "/help",
+    EXIT: "/exit",
+    ADD_ADMIN: "/add_admin",
+    ADD_ADMIN_RECOVERY: "/add_admin --recovery",
+    ADD_WHITELIST: "/add_whitelist",
+    ADD_WRITER: "/add_writer",
+    REMOVE_WRITER: "/remove_writer",
+    CORE: "/core",
+    INDEXERS_LIST: "/indexers_list",
+    VALIDATOR_POOL: "/validator_pool",
+    STATS: "/stats",
+    BALANCE_MIGRATION: "/balance_migration",
+    DISABLE_INITIALIZATION: "/disable_initialization",
+    NODE_STATUS: "/node_status",
+    ADD_INDEXER: "/add_indexer",
+    REMOVE_INDEXER: "/remove_indexer",
+    BAN_WRITER: "/ban_writer",
+    DEPLOYMENT: "/deployment",
+    GET_VALIDATOR_ADDR: "/get_validator_addr",
+    GET_DEPLOYMENT: "/get_deployment",
+    GET_TX_INFO: "/get_tx_info",
+    TRANSFER: "/transfer",
+    GET_BALANCE: "/get_balance",
+    GET_LICENSE_NUMBER: "/get_license_number",
+    GET_LICENSE_ADDRESS: "/get_license_address",
+    GET_LICENSE_COUNT: "/get_license_count",
+    GET_TXV: "/get_txv",
+    GET_FEE: "/get_fee",
+    CONFIRMED_LENGTH: "/confirmed_length",
+    UNCONFIRMED_LENGTH: "/unconfirmed_length",
+    GET_TXS_HASHES: "/get_txs_hashes",
+    GET_TX_DETAILS: "/get_tx_details",
+    GET_EXTENDED_TX_DETAILS: "/get_extended_tx_details"
+};
+
 export class CommandHandler {
     #config;
     #msb;
@@ -31,80 +67,80 @@ export class CommandHandler {
     #getHandlers() {
         return [
             {
-                evaluate: ({ command }) => command === "/help",
+                evaluate: ({ command }) => command === COMMANDS.HELP,
                 process: async () => {
                     this.#msb.printHelp();
                 }
             },
             {
-                evaluate: ({ command }) => command === "/exit",
+                evaluate: ({ command }) => command === COMMANDS.EXIT,
                 process: async () => {
                     await this.#closeCli();
                     await this.#msb.close();
                 }
             },
             {
-                evaluate: ({ input }) => input === "/add_admin --recovery",
+                evaluate: ({ input }) => input === COMMANDS.ADD_ADMIN_RECOVERY,
                 process: async () => this.#msb.handleAdminRecovery()
             },
             {
-                evaluate: ({ command }) => command === "/add_admin",
+                evaluate: ({ command }) => command === COMMANDS.ADD_ADMIN,
                 process: async () => this.#msb.handleAdminCreation()
             },
             {
-                evaluate: ({ command }) => command === "/add_whitelist",
+                evaluate: ({ command }) => command === COMMANDS.ADD_WHITELIST,
                 process: async () => this.#msb.handleWhitelistOperations()
             },
             {
-                evaluate: ({ command }) => command === "/add_writer",
+                evaluate: ({ command }) => command === COMMANDS.ADD_WRITER,
                 process: async () => this.#msb.requestWriterRole(true)
             },
             {
-                evaluate: ({ command }) => command === "/remove_writer",
+                evaluate: ({ command }) => command === COMMANDS.REMOVE_WRITER,
                 process: async () => this.#msb.requestWriterRole(false)
             },
             {
-                evaluate: ({ command }) => command === "/core",
+                evaluate: ({ command }) => command === COMMANDS.CORE,
                 process: async () => this.#handlers.handleCoreInfo()
             },
             {
-                evaluate: ({ command }) => command === "/indexers_list",
+                evaluate: ({ command }) => command === COMMANDS.INDEXERS_LIST,
                 process: async () => console.log(await this.#msb.state.getIndexersEntry())
             },
             {
-                evaluate: ({ command }) => command === "/validator_pool",
+                evaluate: ({ command }) => command === COMMANDS.VALIDATOR_POOL,
                 process: async () => this.#msb.network.validatorConnectionManager.prettyPrint()
             },
             {
-                evaluate: ({ command }) => command === "/stats",
+                evaluate: ({ command }) => command === COMMANDS.STATS,
                 process: async () => this.#msb.verifyDag()
             },
             {
-                evaluate: ({ command }) => command === "/balance_migration",
+                evaluate: ({ command }) => command === COMMANDS.BALANCE_MIGRATION,
                 process: async () => this.#msb.balanceMigrationOperation()
             },
             {
-                evaluate: ({ command }) => command === "/disable_initialization",
+                evaluate: ({ command }) => command === COMMANDS.DISABLE_INITIALIZATION,
                 process: async () => this.#msb.disableInitialization()
             },
             {
-                evaluate: ({ input }) => input.startsWith("/node_status"),
+                evaluate: ({ input }) => input.startsWith(COMMANDS.NODE_STATUS),
                 process: async ({ parts }) => this.#handlers.handleNodeStatus(parts[0])
             },
             {
-                evaluate: ({ input }) => input.startsWith("/add_indexer"),
+                evaluate: ({ input }) => input.startsWith(COMMANDS.ADD_INDEXER),
                 process: async ({ parts }) => this.#msb.updateWriterToIndexerRole(parts[0], true)
             },
             {
-                evaluate: ({ input }) => input.startsWith("/remove_indexer"),
+                evaluate: ({ input }) => input.startsWith(COMMANDS.REMOVE_INDEXER),
                 process: async ({ parts }) => this.#msb.updateWriterToIndexerRole(parts[0], false)
             },
             {
-                evaluate: ({ input }) => input.startsWith("/ban_writer"),
+                evaluate: ({ input }) => input.startsWith(COMMANDS.BAN_WRITER),
                 process: async ({ parts }) => this.#msb.banValidator(parts[0])
             },
             {
-                evaluate: ({ input }) => input.startsWith("/deployment"),
+                evaluate: ({ input }) => input.startsWith(COMMANDS.DEPLOYMENT),
                 process: async ({ parts }) => {
                     const channel = parts[1] || randomBytes(32).toString("hex");
                     if (!isHexString(channel, 64)) {
@@ -114,66 +150,66 @@ export class CommandHandler {
                 }
             },
             {
-                evaluate: ({ input }) => input.startsWith("/get_validator_addr"),
+                evaluate: ({ input }) => input.startsWith(COMMANDS.GET_VALIDATOR_ADDR),
                 process: async ({ parts }) => this.#handlers.handleValidatorAddress(parts[0])
             },
             {
-                evaluate: ({ input }) => input.startsWith("/get_deployment"),
+                evaluate: ({ input }) => input.startsWith(COMMANDS.GET_DEPLOYMENT),
                 process: async ({ parts }) => this.#handlers.handleDeployment(parts[0])
             },
             {
-                evaluate: ({ input }) => input.startsWith("/get_tx_info"),
+                evaluate: ({ input }) => input.startsWith(COMMANDS.GET_TX_INFO),
                 process: async ({ parts }) => this.#handlers.handleTxInfo(parts[0])
             },
             {
-                evaluate: ({ input }) => input.startsWith("/transfer"),
+                evaluate: ({ input }) => input.startsWith(COMMANDS.TRANSFER),
                 process: async ({ parts }) => this.#msb.handleTransferOperation(parts[0], parts[1])
             },
             {
-                evaluate: ({ input }) => input.startsWith("/get_balance"),
-                process: async ({ parts }) => this.#handlers.handleBalance(parts[0], parts[1])
+                evaluate: ({ input }) => input.startsWith(COMMANDS.GET_BALANCE),
+                process: async ({ parts }) => this.#handlers.handleBalance(parts[0] || this.#wallet?.address, parts[1])
             },
             {
-                evaluate: ({ input }) => input.startsWith("/get_license_number"),
+                evaluate: ({ input }) => input.startsWith(COMMANDS.GET_LICENSE_NUMBER),
                 process: async ({ parts }) => this.#handlers.handleLicenseNumber(parts[0])
             },
             {
-                evaluate: ({ input }) => input.startsWith("/get_license_address"),
+                evaluate: ({ input }) => input.startsWith(COMMANDS.GET_LICENSE_ADDRESS),
                 process: async ({ parts }) => this.#handlers.handleLicenseAddress(parseInt(parts[0]))
             },
             {
-                evaluate: ({ input }) => input.startsWith("/get_license_count"),
+                evaluate: ({ input }) => input.startsWith(COMMANDS.GET_LICENSE_COUNT),
                 process: async () => this.#handlers.handleLicenseCount()
             },
             {
-                evaluate: ({ input }) => input.startsWith("/get_txv"),
+                evaluate: ({ input }) => input.startsWith(COMMANDS.GET_TXV),
                 process: async () => this.#handlers.handleTxv()
             },
             {
-                evaluate: ({ input }) => input.startsWith("/get_fee"),
+                evaluate: ({ input }) => input.startsWith(COMMANDS.GET_FEE),
                 process: async () => this.#handlers.handleFee()
             },
             {
-                evaluate: ({ input }) => input.startsWith("/confirmed_length"),
+                evaluate: ({ input }) => input.startsWith(COMMANDS.CONFIRMED_LENGTH),
                 process: async () => this.#handlers.handleConfirmedLength()
             },
             {
-                evaluate: ({ input }) => input.startsWith("/unconfirmed_length"),
+                evaluate: ({ input }) => input.startsWith(COMMANDS.UNCONFIRMED_LENGTH),
                 process: async () => this.#handlers.handleUnconfirmedLength()
             },
             {
-                evaluate: ({ input }) => input.startsWith("/get_txs_hashes"),
+                evaluate: ({ input }) => input.startsWith(COMMANDS.GET_TXS_HASHES),
                 process: async ({ parts }) => this.#handlers.handleTxHashes(
                     parseInt(parts[0]),
                     parseInt(parts[1])
                 )
             },
             {
-                evaluate: ({ input }) => input.startsWith("/get_tx_details"),
+                evaluate: ({ input }) => input.startsWith(COMMANDS.GET_TX_DETAILS),
                 process: async ({ parts }) => this.#handlers.handleTxDetails(parts[0])
             },
             {
-                evaluate: ({ input }) => input.startsWith("/get_extended_tx_details"),
+                evaluate: ({ input }) => input.startsWith(COMMANDS.GET_EXTENDED_TX_DETAILS),
                 process: async ({ parts }) => this.#handlers.handleExtendedTxDetails(parts[0], parts[1] === "true")
             }
         ];
