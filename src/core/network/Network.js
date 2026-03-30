@@ -8,7 +8,8 @@ import NetworkMessages from './protocols/NetworkMessages.js';
 import { sleep } from '../../utils/helpers.js';
 import {
     TRAC_NAMESPACE,
-    EventType
+    EventType,
+    CONNECTION_STATUS
 } from '../../utils/constants.js';
 import ConnectionManager from './services/ConnectionManager.js';
 import MessageOrchestrator from './services/MessageOrchestrator.js';
@@ -125,7 +126,7 @@ class Network extends ReadyResource {
 
             if (type === 'validator') {
                 try {
-                    await connection.protocolSession.probe();
+                    if (!connection.protocolSession.isProbed()) await connection.protocolSession.probe();
                 } catch (err) {
                     this.#logger.debug(`failed to probe peer with publicKey ${publicKey}: ${err?.message ?? err}`);
                 }
@@ -269,7 +270,7 @@ class Network extends ReadyResource {
         if (this.#swarm === null) throw new Error('Network swarm is not initialized');
         if (this.#pendingConnections.has(publicKey) || this.#pendingConnections.size >= this.#maxPendingConnections) {
             this.#logger.debug(`Network.tryConnect: Connection to peer: ${publicKey} as type: ${type} is already pending or max pending connections reached.`);
-            return;
+            return CONNECTION_STATUS.IGNORED;
         }
 
         const timeoutId = setTimeout(() => {
@@ -289,12 +290,14 @@ class Network extends ReadyResource {
 
             if (connection &&
                 connection.protocolSession &&
-                !connection.protocolSession.isProbed() &&
                 !this.#pendingRequestsService.isProbePending(connection.remotePublicKey.toString('hex'))
             ) {
                 await this.#finalizeConnection(publicKey, type, connection);
+                return CONNECTION_STATUS.CONNECTED;
             }
         }
+        
+        return CONNECTION_STATUS.PENDING;
     }
 
     async #finalizeConnection(publicKey, type, connection) {

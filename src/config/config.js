@@ -218,8 +218,37 @@ export class Config {
     get debug() {
         return this.#config.debug
     }
+    
+    get pollInterval() {
+        if (this.#isOverriden('pollInterval')) return this.#options.pollInterval
+        return this.#config.pollInterval
+    }
 
-    // Most of these properties are boolean
+    get adminCacheTTL() {
+        if (this.#isOverriden('adminCacheTTL')) return this.#options.adminCacheTTL
+        return this.#config.adminCacheTTL
+    }
+    
+    get bootstrapTimeout() {
+        if (this.#isOverriden('bootstrapTimeout')) return this.#options.bootstrapTimeout
+        return this.#config.bootstrapTimeout
+    }
+
+    get writersShortCacheTTL() {
+        if (this.#isOverriden('writersShortCacheTTL')) return this.#options.writersShortCacheTTL
+        return this.#config.writersShortCacheTTL
+    }
+
+    get writersLongCacheTTL() {
+        if (this.#isOverriden('writersLongCacheTTL')) return this.#options.writersLongCacheTTL
+        return this.#config.writersLongCacheTTL
+    }
+    
+    get validatorConnectionAttemptDelay() {
+        if (this.#isOverriden('validatorConnectionAttemptDelay')) return this.#options.validatorConnectionAttemptDelay
+        return this.#config.validatorConnectionAttemptDelay
+    }
+
     #isOverriden(prop) {
         return this.#options.hasOwnProperty(prop) && isDefined(this.#options[prop])
     }
@@ -231,5 +260,4 @@ export class Config {
             );
         }
     }
-
 }

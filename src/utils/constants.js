@@ -189,3 +189,10 @@ export const NETWORK_MESSAGE_TYPES = Object.freeze({
 });
 
 export const NETWORK_CAPABILITIES = Object.freeze(["protocols:v1:legacy"]);
+
+// Network tryConnect status constants
+export const CONNECTION_STATUS = Object.freeze({
+    CONNECTED: 0,
+    PENDING: 1,
+    IGNORED: 2
+});
