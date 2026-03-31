@@ -132,30 +132,44 @@ export class MainSettlementBus extends ReadyResource {
         return await this.#network.validatorMessageOrchestrator.send(partialTransactionPayload);
     }
 
+    async validateTransfer(payload) {
+        const partialTransferValidator = new PartialTransferValidator(this.#state, null, this.#config);
+        return await partialTransferValidator.validate(payload);
+    }
+
+    // Used by peer simulation
+    async validateTransaction(payload) {
+        const partialTransactionValidator = new PartialTransactionValidator(this.#state, null, this.#config);
+        return await partialTransactionValidator.validate(payload);
+    }
+
     async broadcastTransaction(payload) {
         if (!payload) {
             throw new ValidationError("Transaction payload is required for broadcasting.");
         }
 
         let normalizedPayload;
-        let isValid = false;
         let hash;
-
-        const partialTransferValidator = new PartialTransferValidator(this.#state, null, this.#config);
-        const partialTransactionValidator = new PartialTransactionValidator(this.#state, null, this.#config);
 
         if (payload.type === OperationType.TRANSFER) {
             normalizedPayload = normalizeTransferOperation(payload, this.#config);
-            isValid = await partialTransferValidator.validate(normalizedPayload);
+            try {
+                validateTransaction(normalizedPayload)
+            } catch {
+                // We swap exceptions to keep compatibility
+                throw new ValidationError("Invalid transaction payload.");
+            }
+            await validateTransfer(normalizedPayload);
             hash = b4a.toString(normalizedPayload.tro.tx, "hex");
         } else if (payload.type === OperationType.TX) {
             normalizedPayload = normalizeTransactionOperation(payload, this.#config);
-            isValid = await partialTransactionValidator.validate(normalizedPayload);
+            try {
+                await validateTransaction(normalizedPayload);
+            } catch {
+                // We swap exceptions to keep compatibility
+                throw new ValidationError("Invalid transaction payload.");
+            }
             hash = b4a.toString(normalizedPayload.txo.tx, "hex");
-        }
-
-        if (!isValid) {
-            throw new ValidationError("Invalid transaction payload.");
         }
 
         const success = await this.broadcastPartialTransaction(payload);
