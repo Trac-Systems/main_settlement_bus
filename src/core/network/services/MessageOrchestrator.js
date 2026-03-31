@@ -1,4 +1,4 @@
-import { generateUUID, publicKeyToAddress, sleep } from '../../../utils/helpers.js';
+import { generateUUID, publicKeyToAddress } from '../../../utils/helpers.js';
 import { operationToPayload } from '../../../utils/applyOperations.js';
 import { networkMessageFactory } from "../../../messages/network/v1/networkMessageFactory.js";
 import { NETWORK_CAPABILITIES } from "../../../utils/constants.js";
@@ -172,25 +172,16 @@ class MessageOrchestrator {
     async #attemptSendMessageForLegacy(validatorPublicKey, message) {
         const deductedTxType = operationToPayload(message.type);
         await this.connectionManager.sendSingleMessage(message, validatorPublicKey);
-        const appeared = await this.waitForUnsignedState(message[deductedTxType].tx, this.#config.messageValidatorResponseTimeout);
+        const appeared = await this.state.waitForUnsigned(
+            message[deductedTxType].tx,
+            this.#config.messageValidatorResponseTimeout
+        );
         if (appeared) {
             this.incrementSentCount(validatorPublicKey);
             if (this.shouldRemove(validatorPublicKey)) {
                 this.connectionManager.remove(validatorPublicKey);
             }
             return true;
-        }
-        return false;
-    }
-
-    async waitForUnsignedState(txHash, timeout) {
-        // Polls state for the transaction hash for up to timeout ms
-        const start = Date.now();
-        let entry = null;
-        while (Date.now() - start < timeout) {
-            await sleep(200);
-            entry = await this.state.get(txHash)
-            if (entry) return true;
         }
         return false;
     }

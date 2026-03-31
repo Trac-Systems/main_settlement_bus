@@ -214,6 +214,7 @@ export async function createWhitelistEntryFile(addresses, migrationNumber, migra
 }
 
 export default {
+    verifyWalletPath,
     readAddressesFromWhitelistFile,
     readBalanceMigrationFile,
     getAllMigrationFiles,
