@@ -120,6 +120,42 @@ test('Config: rejects invalid numeric limits and timeouts', t => {
         () => overrideConfig({ validatorHealthCheckInterval: -1 }),
         'MainSettlementBus Config: validatorHealthCheckInterval must be an integer greater than or equal to 1.'
     )
+
+    assertConfigError(
+        t,
+        () => overrideConfig({ pollInterval: 0 }),
+        'MainSettlementBus Config: pollInterval must be an integer greater than or equal to 1.'
+    )
+
+    assertConfigError(
+        t,
+        () => overrideConfig({ adminCacheTTL: 0 }),
+        'MainSettlementBus Config: adminCacheTTL must be an integer greater than or equal to 1.'
+    )
+
+    assertConfigError(
+        t,
+        () => overrideConfig({ bootstrapTimeout: 0 }),
+        'MainSettlementBus Config: bootstrapTimeout must be an integer greater than or equal to 1.'
+    )
+
+    assertConfigError(
+        t,
+        () => overrideConfig({ writersShortCacheTTL: 0 }),
+        'MainSettlementBus Config: writersShortCacheTTL must be an integer greater than or equal to 1.'
+    )
+
+    assertConfigError(
+        t,
+        () => overrideConfig({ writersLongCacheTTL: 0 }),
+        'MainSettlementBus Config: writersLongCacheTTL must be an integer greater than or equal to 1.'
+    )
+
+    assertConfigError(
+        t,
+        () => overrideConfig({ validatorConnectionAttemptDelay: 0 }),
+        'MainSettlementBus Config: validatorConnectionAttemptDelay must be an integer greater than or equal to 1.'
+    )
 })
 
 test('Config: accepts valid bootstrap/channel overrides and keeps normalized buffers', t => {
