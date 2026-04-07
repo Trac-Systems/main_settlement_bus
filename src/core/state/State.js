@@ -177,9 +177,12 @@ class State extends ReadyResource {
     }
 
     async isAdminAllowedToValidate() {
+        if (!this.writingKey || !this.#config?.bootstrap) return false;
+
         const isAdmin = this.writingKey.toString('hex') === this.#config.bootstrap.toString('hex');
         const isIndexer = this.isIndexer();
-        const lengthCondition = await this.getWriterLength() <= this.#config.maxWritersForAdminIndexerConnection;
+        const activeWriters = await this.getActiveWriterCount({ excludeAdmin: true });
+        const lengthCondition = activeWriters < this.#config.maxWritersForAdminIndexerConnection;
         return !!(isAdmin && isIndexer && lengthCondition);
     }
 
@@ -191,6 +194,35 @@ class State extends ReadyResource {
 
     async getIndexersEntry() {
         return Object.values(this.#base.system.indexers);
+    }
+
+    async getActiveWriterCount({ excludeAdmin = false } = {}) {
+        const activeAddresses = new Set();
+        const adminAddress = (await this.getAdminEntry())?.address ?? null;
+
+        try {
+            for await (const { key, value } of this.#base.system.list()) {
+                if (!key || !value || value.isRemoved) continue;
+
+                const writerKeyHex = key.toString('hex');
+                const addressBuffer = await this.getRegisteredWriterKey(writerKeyHex);
+                if (!addressBuffer) continue;
+
+                const address = addressUtils.bufferToAddress(addressBuffer, this.#config.addressPrefix);
+                if (!address) continue;
+
+                // Non-admin indexers do not participate in validator capacity decisions.
+                if (value.isIndexer && address !== adminAddress) continue;
+                if (excludeAdmin && address === adminAddress) continue;
+
+                activeAddresses.add(address);
+            }
+        } catch (error) {
+            this.#safeLogApply("ActiveWriterCount", error?.message ?? "Failed to scan active writers");
+            return 0;
+        }
+
+        return activeAddresses.size;
     }
 
     async isWkInIndexersEntry(wk) {
