@@ -15,8 +15,8 @@ async function runStateTests() {
     await import('./apply/state.apply.test.js');
     if (!isBare()) {
         await import('./State.test.js');
+        await import('./stateAdminValidation.test.js');
     }
-
     test.resume();
 }
 
