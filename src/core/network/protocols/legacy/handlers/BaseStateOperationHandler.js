@@ -69,7 +69,7 @@ class BaseStateOperationHandler {
         }
     }
 
-    async handleOperation(payload, connection) {
+    async handleOperation(_payload, _connection) {
         throw new Error('handleOperation must be implemented by child class');
     }
 

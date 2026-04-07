@@ -1,7 +1,8 @@
 import { createConfig, ENV } from './env.js';
 
 const getArguments = () => {
-    const pearApp = typeof Pear !== 'undefined' ? (Pear.app ?? Pear.config) : undefined;
+    const pearRuntime = typeof globalThis !== 'undefined' ? globalThis.Pear : undefined;
+    const pearApp = pearRuntime?.app ?? pearRuntime?.config;
     const runtimeArgs = typeof process !== 'undefined' ? process.argv.slice(2) : [];
     return pearApp?.args ?? runtimeArgs;
 };

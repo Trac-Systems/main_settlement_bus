@@ -40,7 +40,6 @@ export const COMMANDS = {
 };
 
 export class CommandHandler {
-    #config;
     #msb;
     #closeCli;
     #wallet;
@@ -48,7 +47,6 @@ export class CommandHandler {
     #pendingConfirmation = null;
 
     constructor({ config, msb, handleClose, wallet }) {
-        this.#config = config;
         this.#msb = msb;
         this.#closeCli = handleClose;
         this.#wallet = wallet;

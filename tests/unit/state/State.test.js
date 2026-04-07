@@ -10,14 +10,14 @@ import b4a from 'b4a'
 let state
 hook('Initialize state', async () => {
     const checkout = sinon.stub().returns({ get: () => {
-            return { value: encode({
-                wk: randomBuffer(WRITER_BYTE_LENGTH),
-                isWhitelisted: true,
-                isWriter: true,
-                isIndexer: true,
-                balance: ADMIN_INITIAL_BALANCE })
-            }
+        return { value: encode({
+            wk: randomBuffer(WRITER_BYTE_LENGTH),
+            isWhitelisted: true,
+            isWriter: true,
+            isIndexer: true,
+            balance: ADMIN_INITIAL_BALANCE })
         }
+    }
     });
 
     const AutoBaseMock = sinon.stub().returns({ view: { checkout, core: { signedLength: 1 }} });
@@ -48,7 +48,7 @@ test('State#incrementBalance', () => {
     })
 });
 
-test('State#derementBalance', async t => {
+test('State#derementBalance', async () => {
     test('subtract two balances and produce a node entry', async t => {
         const entry = await state.decrementBalance('adminAddress', $TNK(150n))
         t.is(toBalance(decode(entry).balance).asBigInt(), tokenUnits(850n), 'balance matches');

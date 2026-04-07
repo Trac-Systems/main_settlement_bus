@@ -1,7 +1,5 @@
-/** @typedef {import('pear-interface')} */ /* global Pear */
 import ReadyResource from "ready-resource";
 import Corestore from "corestore";
-import { WalletProvider, exportWallet, importFromFile } from "trac-wallet";
 import tracCryptoApi from "trac-crypto-api";
 import b4a from "b4a";
 import { sleep, isHexString } from "./utils/helpers.js";
@@ -28,7 +26,6 @@ import {
 import fileUtils from './utils/fileUtils.js';
 import migrationUtils from './utils/migrationUtils.js';
 import {safeDecodeApplyOperation, safeEncodeApplyOperation} from "./utils/protobuf/operationHelpers.js";
-import {Config} from "./config/config.js";
 import PartialTransactionValidator from "./core/network/protocols/shared/validators/PartialTransactionValidator.js";
 import PartialTransferValidator from "./core/network/protocols/shared/validators/PartialTransferValidator.js";
 import { BroadcastError, ValidationError } from "./utils/errors.js";
@@ -42,7 +39,7 @@ export class MainSettlementBus extends ReadyResource {
     #config
 
     /**
-     * @param {Config} config
+     * @param {import("./config/config.js").Config} config
      * @param {import("trac-wallet").Wallet | undefined} wallet
      **/
     constructor(config, wallet = undefined) {
@@ -944,7 +941,7 @@ export class MainSettlementBus extends ReadyResource {
                 amountBuffer,
                 txValidity,
                 "json"
-            );
+            )
 
         const expectedNewBalance = senderBalance - totalDeductedAmount;
         return {

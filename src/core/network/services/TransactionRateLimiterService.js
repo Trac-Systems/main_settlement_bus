@@ -97,7 +97,7 @@ class TransactionRateLimiterService {
             return;
         }
 
-        for (const [peer, _] of this.#connectionsStatistics.entries()) {
+        for (const [peer] of this.#connectionsStatistics.entries()) {
             if (this.#isConnectionExpired(peer, currentTime)) {
                 this.#connectionsStatistics.delete(peer);
             }

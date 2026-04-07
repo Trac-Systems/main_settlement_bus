@@ -1,6 +1,5 @@
 import b4a from 'b4a';
 import tracCryptoApi from 'trac-crypto-api';
-import State from '../../../../../state/State.js';
 
 /*
     BaseResponse class for handling common validation logic for network responses.
@@ -9,7 +8,6 @@ import State from '../../../../../state/State.js';
 class BaseResponse {
     #wallet;
     #state;
-    #config
 
     /**
      * 
@@ -17,10 +15,9 @@ class BaseResponse {
      * @param {IWallet} wallet
      * @param {Config} config
      */
-    constructor(state, wallet, config) {
+    constructor(state, wallet, _config) {
         this.#state = state;
         this.#wallet = wallet;
-        this.#config = config;
     }
 
     get state() {

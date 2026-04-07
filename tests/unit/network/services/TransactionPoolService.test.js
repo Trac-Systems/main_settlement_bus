@@ -32,7 +32,7 @@ const increasedPoolConfig = overrideConfig(CONFIG_TX_POOL_INCREASE);
 function createStateFixture() {
     return {
         async isAdminAllowedToValidate() { return false; },
-        async allowedToValidate(address) { return true; },
+        async allowedToValidate(_address) { return true; },
         async appendWithProofOfPublication(batch, batchTxHashes) {
             const timestamp = Date.now();
             return batch.map((completeTx, i) => ({

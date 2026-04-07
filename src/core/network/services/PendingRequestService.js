@@ -5,6 +5,13 @@ import b4a from 'b4a';
 
 const PEER_PUBLIC_KEY_HEX_LENGTH = 64;
 
+export class PendingRequestServiceTimeoutError extends Error {
+    constructor(requestId, peerAddress, timeoutMs) {
+        super(`Pending request ${requestId} to peer ${peerAddress} timed out after ${timeoutMs} ms.`);
+        this.name = this.constructor.name;
+    }
+}
+
 export default class PendingRequestService {
     #pendingRequests;
     #requestMessageTypes = [NetworkOperationType.LIVENESS_REQUEST, NetworkOperationType.BROADCAST_TRANSACTION_REQUEST];
@@ -164,13 +171,5 @@ export default class PendingRequestService {
             }
         }
         this.#pendingRequests.clear();
-    }
-}
-
-
-export class PendingRequestServiceTimeoutError extends Error {
-    constructor(requestId, peerAddress, timeoutMs) {
-        super(`Pending request ${requestId} to peer ${peerAddress} timed out after ${timeoutMs} ms.`);
-        this.name = this.constructor.name;
     }
 }

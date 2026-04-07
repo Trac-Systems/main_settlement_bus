@@ -6,6 +6,13 @@ import {Logger} from "../../../utils/logger.js";
  * @typedef {import('hyperswarm').Connection} Connection
  */
 
+export class ConnectionManagerError extends Error {
+    constructor(message) {
+        super(message);
+        this.name = this.constructor.name;
+    }
+}
+
 class ConnectionManager {
     #validators
     #maxValidators
@@ -346,13 +353,6 @@ class ConnectionManager {
 
     #toHexString(publicKey) {
         return b4a.isBuffer(publicKey) ? publicKey.toString('hex') : publicKey;
-    }
-}
-
-export class ConnectionManagerError extends Error {
-    constructor(message) {
-        super(message);
-        this.name = this.constructor.name;
     }
 }
 
