@@ -17,7 +17,6 @@ import {
     EventType,
     WHITELIST_SLEEP_INTERVAL,
     BOOTSTRAP_HEXSTRING_LENGTH,
-    CustomEventType,
     BALANCE_MIGRATION_SLEEP_INTERVAL,
     WHITELIST_MIGRATION_DIR
 } from "./utils/constants.js";
@@ -180,8 +179,6 @@ export class MainSettlementBus extends ReadyResource {
 
     async #setUpRoleAutomatically() {
         if (!this.#state.isWritable() && this.#config.enableRoleRequester) {
-            console.log("Requesting writer role... This may take a moment.");
-            await this.#requestWriterRole(false);
             setTimeout(async () => {
                 await this.#requestWriterRole(true);
             }, 5_000);
@@ -199,17 +196,6 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async #stateEventsListener() {
-        this.#state.on(CustomEventType.IS_INDEXER, (publicKey) => {
-            if (this.#network.validatorConnectionManager.exists(publicKey)) {
-                this.#network.validatorConnectionManager.remove(publicKey)
-            }
-        })
-
-        this.#state.on(CustomEventType.UNWRITABLE, (publicKey) => {
-            if (this.#network.validatorConnectionManager.exists(publicKey)) {
-                this.#network.validatorConnectionManager.remove(publicKey)
-            }
-        })
         this.#state.base.on(EventType.IS_INDEXER, () => {
             console.log("Current node is an indexer");
         });
