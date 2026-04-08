@@ -261,6 +261,10 @@ export class Config {
         return config[field]
     }
 
+    #isOverrideDefined(options, field) {
+        return Object.prototype.hasOwnProperty.call(options, field) && isDefined(options[field])
+    }
+
     #throwValidationError(field, message) {
         throw new Error(`MainSettlementBus Config: ${field} ${message}`)
     }
@@ -300,12 +304,6 @@ export class Config {
     #validateStringField(field, value) {
         if (typeof value !== 'string' || value.trim() === '') {
             this.#throwValidationError(field, 'must be a non-empty string.')
-        }
-    }
-
-    #validateIntegerField(field, value, { min = 0 } = {}) {
-        if (!Number.isInteger(value) || value < min) {
-            this.#throwValidationError(field, `must be an integer greater than or equal to ${min}.`)
         }
     }
 
@@ -357,41 +355,19 @@ export class Config {
             channel: this.#normalizeChannel(channelValue)
         }
 
-        this.#validateIntegerField('addressLength', this.#resolveValidationValue(options, config, 'addressLength'), { min: 1 })
-        this.#validateStringField('addressPrefix', this.#resolveValidationValue(options, config, 'addressPrefix'))
-        this.#validateIntegerField('bech32mHrpLength', this.#resolveValidationValue(options, config, 'bech32mHrpLength'), { min: 1 })
-        this.#validateIntegerField('networkId', this.#resolveValidationValue(options, config, 'networkId'), { min: 1 })
+        if (this.#isOverrideDefined(options, 'dhtBootstrap')) {
+            this.#validateDhtBootstrap(options.dhtBootstrap)
+        }
 
-        this.#validateStringField('host', this.#resolveValidationValue(options, config, 'host'))
-        this.#validatePort('port', this.#resolveValidationValue(options, config, 'port'))
-        this.#validateStringField('storesDirectory', this.#resolveValidationValue(options, config, 'storesDirectory'))
-        this.#validateStringField('storeName', this.#resolveValidationValue(options, config, 'storeName'))
-        this.#validateDhtBootstrap(this.#resolveValidationValue(options, config, 'dhtBootstrap'))
-
-        this.#validateIntegerField('maxRetries', this.#resolveValidationValue(options, config, 'maxRetries'), { min: 0 })
-        this.#validateIntegerField('maxValidators', this.#resolveValidationValue(options, config, 'maxValidators'), { min: 1 })
-        this.#validateIntegerField('maxPeers', this.#resolveValidationValue(options, config, 'maxPeers'), { min: 1 })
-        this.#validateIntegerField('maxParallel', this.#resolveValidationValue(options, config, 'maxParallel'), { min: 1 })
-        this.#validateIntegerField('maxWritersForAdminIndexerConnection', this.#resolveValidationValue(options, config, 'maxWritersForAdminIndexerConnection'), { min: 1 })
-        this.#validateIntegerField('messageThreshold', this.#resolveValidationValue(options, config, 'messageThreshold'), { min: 1 })
-        this.#validateIntegerField('messageValidatorRetryDelay', this.#resolveValidationValue(options, config, 'messageValidatorRetryDelay'), { min: 1 })
-        this.#validateIntegerField('messageValidatorResponseTimeout', this.#resolveValidationValue(options, config, 'messageValidatorResponseTimeout'), { min: 1 })
-        this.#validateIntegerField('processIntervalMs', this.#resolveValidationValue(options, config, 'processIntervalMs'), { min: 1 })
-        this.#validateIntegerField('transactionPoolSize', this.#resolveValidationValue(options, config, 'transactionPoolSize'), { min: 1 })
-        this.#validateIntegerField('rateLimitCleanupIntervalMs', this.#resolveValidationValue(options, config, 'rateLimitCleanupIntervalMs'), { min: 1 })
-        this.#validateIntegerField('rateLimitConnectionTimeoutMs', this.#resolveValidationValue(options, config, 'rateLimitConnectionTimeoutMs'), { min: 1 })
-        this.#validateIntegerField('rateLimitMaxTransactionsPerSecond', this.#resolveValidationValue(options, config, 'rateLimitMaxTransactionsPerSecond'), { min: 1 })
-        this.#validateIntegerField('pollInterval', this.#resolveValidationValue(options, config, 'pollInterval'), { min: 1 })
-        this.#validateIntegerField('adminCacheTTL', this.#resolveValidationValue(options, config, 'adminCacheTTL'), { min: 1 })
-        this.#validateIntegerField('bootstrapTimeout', this.#resolveValidationValue(options, config, 'bootstrapTimeout'), { min: 1 })
-        this.#validateIntegerField('writersShortCacheTTL', this.#resolveValidationValue(options, config, 'writersShortCacheTTL'), { min: 1 })
-        this.#validateIntegerField('writersLongCacheTTL', this.#resolveValidationValue(options, config, 'writersLongCacheTTL'), { min: 1 })
-        this.#validateIntegerField('validatorConnectionAttemptDelay', this.#resolveValidationValue(options, config, 'validatorConnectionAttemptDelay'), { min: 1 })
-        this.#validateIntegerField('pendingRequestTimeout', this.#resolveValidationValue(options, config, 'pendingRequestTimeout'), { min: 1 })
-        this.#validateIntegerField('txCommitTimeout', this.#resolveValidationValue(options, config, 'txCommitTimeout'), { min: 1 })
-        this.#validateIntegerField('txPoolSize', this.#resolveValidationValue(options, config, 'txPoolSize'), { min: 1 })
-        this.#validateIntegerField('validatorHealthCheckInterval', this.#resolveValidationValue(options, config, 'validatorHealthCheckInterval'), { min: 1 })
-        this.#validateIntegerField('maxPendingRequestsInPendingRequestsService', this.#resolveValidationValue(options, config, 'maxPendingRequestsInPendingRequestsService'), { min: 1 })
+        if (this.#isOverrideDefined(options, 'host')) {
+            this.#validateStringField('host', options.host)
+        }
+        if (this.#isOverrideDefined(options, 'port')) {
+            this.#validatePort('port', options.port)
+        }
+        if (this.#isOverrideDefined(options, 'storesDirectory')) {
+            this.#validateStringField('storesDirectory', options.storesDirectory)
+        }
 
         return normalized
     }

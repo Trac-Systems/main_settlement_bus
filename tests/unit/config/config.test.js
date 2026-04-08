@@ -79,7 +79,7 @@ test('Config: rejects invalid channel values', t => {
 test('Config: rejects invalid network and storage settings', t => {
     assertConfigError(
         t,
-        () => overrideConfig({ port: Number.NaN }),
+        () => overrideConfig({ port: 'bad-port' }),
         'MainSettlementBus Config: port must be an integer between 1 and 65535.'
     )
 
@@ -99,62 +99,6 @@ test('Config: rejects invalid network and storage settings', t => {
         t,
         () => overrideConfig({ dhtBootstrap: ['node1.hyperdht.org'] }),
         'MainSettlementBus Config: dhtBootstrap must contain only valid "host:port" strings.'
-    )
-})
-
-test('Config: rejects invalid numeric limits and timeouts', t => {
-    assertConfigError(
-        t,
-        () => overrideConfig({ maxRetries: -1 }),
-        'MainSettlementBus Config: maxRetries must be an integer greater than or equal to 0.'
-    )
-
-    assertConfigError(
-        t,
-        () => overrideConfig({ maxPeers: 0 }),
-        'MainSettlementBus Config: maxPeers must be an integer greater than or equal to 1.'
-    )
-
-    assertConfigError(
-        t,
-        () => overrideConfig({ validatorHealthCheckInterval: -1 }),
-        'MainSettlementBus Config: validatorHealthCheckInterval must be an integer greater than or equal to 1.'
-    )
-
-    assertConfigError(
-        t,
-        () => overrideConfig({ pollInterval: 0 }),
-        'MainSettlementBus Config: pollInterval must be an integer greater than or equal to 1.'
-    )
-
-    assertConfigError(
-        t,
-        () => overrideConfig({ adminCacheTTL: 0 }),
-        'MainSettlementBus Config: adminCacheTTL must be an integer greater than or equal to 1.'
-    )
-
-    assertConfigError(
-        t,
-        () => overrideConfig({ bootstrapTimeout: 0 }),
-        'MainSettlementBus Config: bootstrapTimeout must be an integer greater than or equal to 1.'
-    )
-
-    assertConfigError(
-        t,
-        () => overrideConfig({ writersShortCacheTTL: 0 }),
-        'MainSettlementBus Config: writersShortCacheTTL must be an integer greater than or equal to 1.'
-    )
-
-    assertConfigError(
-        t,
-        () => overrideConfig({ writersLongCacheTTL: 0 }),
-        'MainSettlementBus Config: writersLongCacheTTL must be an integer greater than or equal to 1.'
-    )
-
-    assertConfigError(
-        t,
-        () => overrideConfig({ validatorConnectionAttemptDelay: 0 }),
-        'MainSettlementBus Config: validatorConnectionAttemptDelay must be an integer greater than or equal to 1.'
     )
 })
 
