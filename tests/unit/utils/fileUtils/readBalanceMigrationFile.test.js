@@ -47,9 +47,9 @@ hook('Initialize dummy balance files', async t => {
     // Edge: large file
     let large = '';
     const randomAddress = async () => {
-        const wallet = new PeerWallet();
+        const wallet = new PeerWallet({ derivationPath: config.derivationPath });
         await wallet.ready;
-        await wallet.generateKeyPair();
+        await wallet.generateKeyPair(undefined, config.derivationPath);
         return wallet.address;
     }
     for (let i = 0; i < 1000; i++) {

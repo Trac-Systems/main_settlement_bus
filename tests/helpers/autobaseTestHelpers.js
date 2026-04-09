@@ -174,7 +174,7 @@ export async function createWallet(mnemonic = null) {
 		networkPrefix: config.addressPrefix,
 		derivationPath: config.derivationPath
 	});
-	await wallet.generateKeyPair(mnemonic ?? undefined);
+	await wallet.generateKeyPair(mnemonic, config.derivationPath);
 	return wallet;
 }
 
