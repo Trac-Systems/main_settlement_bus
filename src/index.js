@@ -61,7 +61,10 @@ export class MainSettlementBus extends ReadyResource {
         super();
         this.#config = config
         this.#store = new Corestore(this.#config.storesFullPath);
-        this.#wallet = new PeerWallet({ networkPrefix: this.#config.addressPrefix });
+        this.#wallet = new PeerWallet({
+            networkPrefix: this.#config.addressPrefix,
+            derivationPath: this.#config.derivationPath
+        });
         this.#readline_instance = null;
 
         if (this.#config.enableInteractiveMode) {
