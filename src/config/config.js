@@ -46,6 +46,10 @@ export class Config {
         return this.#config.dhtBootstrap
     }
 
+    get derivationPath() {
+        return this.#config.derivationPath
+    }
+
     get disableRateLimit() {
         if (this.#isOverriden('disableRateLimit')) return !!this.#options.disableRateLimit
         return !!this.#config.disableRateLimit
