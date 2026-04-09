@@ -12,7 +12,11 @@ import { isAddressValid } from '../../../../src/core/state/utils/address.js';
 const hex = (value, bytes) => value.repeat(bytes);
 
 async function createWallet(mnemonic) {
-    const wallet = new PeerWallet({ mnemonic, networkPrefix: config.addressPrefix });
+    const wallet = new PeerWallet({
+        mnemonic,
+        networkPrefix: config.addressPrefix,
+        derivationPath: config.derivationPath
+    });
     await wallet.ready;
     return wallet;
 }

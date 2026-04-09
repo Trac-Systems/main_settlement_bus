@@ -12,7 +12,11 @@ const hex = (value, bytes) => value.repeat(bytes);
 const toBuf = value => b4a.from(value, 'hex');
 
 async function createWallet(mnemonic) {
-    const wallet = new PeerWallet({ mnemonic, networkPrefix: config.addressPrefix });
+    const wallet = new PeerWallet({
+        mnemonic,
+        networkPrefix: config.addressPrefix,
+        derivationPath: config.derivationPath
+    });
     await wallet.ready;
     return wallet;
 }

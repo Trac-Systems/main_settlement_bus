@@ -170,7 +170,10 @@ export function defaultOpenHyperbeeView(store) {
 }
 
 export async function createWallet(mnemonic = null) {
-	const wallet = new PeerWallet({ networkPrefix: config.addressPrefix });
+	const wallet = new PeerWallet({
+		networkPrefix: config.addressPrefix,
+		derivationPath: config.derivationPath
+	});
 	await wallet.generateKeyPair(mnemonic ?? undefined);
 	return wallet;
 }
