@@ -1,7 +1,7 @@
 {
   "name": "trac-msb",
   "main": "msb.mjs",
-  "version": "0.2.14",
+  "version": "0.2.15",
   "pear": {
     "name": "trac-msb",
     "type": "terminal"
@@ -49,7 +49,7 @@
     "readline": "npm:bare-node-readline",
     "ready-resource": "1.1.2",
     "trac-crypto-api": "0.1.5",
-    "trac-wallet": "1.0.3",
+    "trac-wallet": "1.0.4",
     "tty": "npm:bare-node-tty",
     "uuid": "^13.0.0"
   },
