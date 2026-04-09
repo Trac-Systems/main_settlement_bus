@@ -1,6 +1,7 @@
 import { TRAC_NETWORK_MSB_MAINNET_PREFIX, TRAC_NETWORK_MSB_TESTNET1_PREFIX } from 'trac-wallet/constants.js';
 import { Config } from './config.js';
-import { address, MAINNET_ID, TESTNET_ID } from 'trac-crypto-api';
+import { TRAC_NETWORK_TESTNET_ID, TRAC_NETWORK_MAINNET_ID } from 'trac-crypto-api/constants.js';
+import { address } from 'trac-crypto-api';
 
 export const ENV = {
     MAINNET: 'mainnet',
@@ -33,7 +34,7 @@ const configData = {
         messageValidatorResponseTimeout: 3 * 3 * 1000, //Overall timeout for sending a message (ms). This is 3 * maxRetries * messageValidatorRetryDelay;
         host: 'localhost',
         port: 5000,
-        networkId: tracCryptoApi.TESTNET_ID,
+        networkId: TRAC_NETWORK_TESTNET_ID,
         maxPeers: 64, // Connectivity constants
         maxParallel: 64, // Connectivity constants
         maxServerConnections: Infinity, // Connectivity constants
@@ -71,7 +72,7 @@ const configData = {
         messageValidatorResponseTimeout: 3 * 3 * 1000, //Overall timeout for sending a message (ms). This is 3 * maxRetries * messageValidatorRetryDelay;
         host: 'localhost',
         port: 5000,
-        networkId: MAINNET_ID,
+        networkId: TRAC_NETWORK_MAINNET_ID,
         maxPeers: 64, // Connectivity constants
         maxParallel: 64, // Connectivity constants
         maxServerConnections: Infinity, // Connectivity constants
@@ -94,7 +95,7 @@ const configData = {
         bootstrap: 'e90cca53847a12a82f3bf0f67401e45e2ccc1698ee163e61414c2894eb3c6b12',
         channel: '12312313123123',
         dhtBootstrap: ['116.202.214.149:10001', '157.180.12.214:10001', 'node1.hyperdht.org:49737', 'node2.hyperdht.org:49737', 'node3.hyperdht.org:49737'],
-        derivationPath: address.TESNET_DERIVATION_PATH,
+        derivationPath: address.MAINNET_DERIVATION_PATH,
         disableRateLimit: false,
         enableErrorApplyLogs: true,
         enableInteractiveMode: true,
@@ -109,7 +110,7 @@ const configData = {
         messageValidatorResponseTimeout: 3 * 3 * 1000, //Overall timeout for sending a message (ms). This is 3 * maxRetries * messageValidatorRetryDelay;
         host: 'localhost',
         port: 5000,
-        networkId: TESTNET_ID,
+        networkId: TRAC_NETWORK_MAINNET_ID,
         maxPeers: 64, // Connectivity constants
         maxParallel: 64, // Connectivity constants
         maxServerConnections: Infinity, // Connectivity constants
