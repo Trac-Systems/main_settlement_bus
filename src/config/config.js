@@ -218,6 +218,10 @@ export class Config {
     get debug() {
         return this.#config.debug
     }
+
+    get derivationPath() {
+        return this.#config.derivationPath
+    }
     
     get pollInterval() {
         if (this.#isOverriden('pollInterval')) return this.#options.pollInterval
