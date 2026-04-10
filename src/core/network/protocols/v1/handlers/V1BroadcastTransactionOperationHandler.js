@@ -86,7 +86,7 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
         } catch (error) {
             const protocolError = error instanceof V1ProtocolError
                 ? error
-                : new V1UnexpectedError(error?.message ?? 'Unexpected error', true);
+                : new V1UnexpectedError(error?.message ?? 'Unexpected error');
             resultCode = getResultCode(protocolError);
             if (
                 resultCode === ResultCode.TX_ACCEPTED_PROOF_UNAVAILABLE &&

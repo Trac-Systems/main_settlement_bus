@@ -159,7 +159,7 @@ class PendingRequestService {
                 entry.reject(
                     new V1UnexpectedError(
                         `Pending request ${id} cancelled (shutdown).`,
-                        false)
+                        true)
                 );
             } catch (error) {
                 console.error(`PendingRequestService.close: failed to reject pending request ${id}:`, error);
