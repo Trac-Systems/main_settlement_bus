@@ -36,7 +36,7 @@ export class V1InvalidPayloadError extends V1ProtocolError {
 }
 
 export class V1TxInvalidPayloadError extends V1ProtocolError {
-    constructor(message = 'Invalid tx payload', endConnection = false) {
+    constructor(message = 'Invalid tx payload', endConnection = true) {
         super(ResultCode.TX_INVALID_PAYLOAD, message, endConnection);
     }
 }

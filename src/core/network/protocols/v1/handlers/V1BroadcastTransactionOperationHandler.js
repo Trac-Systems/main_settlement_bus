@@ -216,7 +216,7 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
 
     async dispatchTransaction(decodedTransaction) {
         if (!decodedTransaction || !Number.isInteger(decodedTransaction.type) || decodedTransaction.type === 0) {
-            throw new V1TxInvalidPayloadError('Decoded transaction type is missing.', false);
+            throw new V1TxInvalidPayloadError('Decoded transaction type is missing.');
         }
         if (!this.#transactionCommitService) {
             throw new V1UnexpectedError('TransactionCommitService is not configured.');
@@ -239,7 +239,7 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
             await this.#partialTransferValidator.validate(decodedTransaction);
             completeTransactionOperation = await this.#buildCompleteTransferOperation(decodedTransaction);
         } else {
-            throw new V1TxInvalidPayloadError(`Unsupported transaction type: ${type}`, false);
+            throw new V1TxInvalidPayloadError(`Unsupported transaction type: ${type}`);
         }
 
         const payloadKey = this.#getOperationPayloadKey(type);
@@ -336,7 +336,7 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
                     decodedTransaction.rao.is
                 );
             default:
-                throw new V1TxInvalidPayloadError(`Unsupported role access transaction type: ${decodedTransaction.type}`, false);
+                throw new V1TxInvalidPayloadError(`Unsupported role access transaction type: ${decodedTransaction.type}`);
         }
     }
 
