@@ -13,7 +13,6 @@ import {
     V1UnexpectedError,
     V1NodeOverloadedError,
     V1TxAlreadyPendingError,
-    V1TimeoutError,
     V1ProtocolError
 } from "../V1ProtocolError.js";
 import V1BroadcastTransactionRequest from "../validators/V1BroadcastTransactionRequest.js";
@@ -288,13 +287,13 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
             receipt = await pendingCommit;
         } catch (error) {
             if (error instanceof TransactionPoolProofUnavailableError) {
-                throw new V1TxAcceptedProofUnavailable(error.message, false, error.timestamp);
+                throw new V1TxAcceptedProofUnavailable(error.message,  error.timestamp);
             }
             if (error instanceof TransactionPoolMissingCommitReceiptError) {
-                throw new V1ProtocolError(ResultCode.TX_COMMITTED_RECEIPT_MISSING, error.message, false);
+                throw new V1ProtocolError(ResultCode.TX_COMMITTED_RECEIPT_MISSING, error.message);
             }
             if (error instanceof PendingCommitTimeoutError) {
-                throw new V1TimeoutError(error.message);
+                throw new V1ProtocolError(ResultCode.TX_COMMIT_TIMEOUT, error.message);
             }
             throw error;
         }

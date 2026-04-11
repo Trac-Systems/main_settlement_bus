@@ -73,7 +73,8 @@ const ROTATE_CODES = new Set([
     ResultCode.VALIDATOR_WRITER_KEY_MISMATCH,
     ResultCode.VALIDATOR_TX_OBJECT_INVALID,
     ResultCode.VALIDATOR_VA_MISSING,
-    ResultCode.TX_INVALID_PAYLOAD
+    ResultCode.TX_INVALID_PAYLOAD,
+    ResultCode.TX_COMMIT_TIMEOUT
 ]);
 
 const NO_ROTATE_CODES = new Set([

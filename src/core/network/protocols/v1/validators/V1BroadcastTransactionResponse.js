@@ -220,7 +220,7 @@ class V1BroadcastTransactionResponse extends V1BaseOperation {
             throw new V1ProtocolError(
                 resultCode,
                 `Validator response indicates an error with result code ${resultCode}, which is an internal error code.`,
-                true
+                false
             )
         }
     }

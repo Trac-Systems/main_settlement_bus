@@ -72,7 +72,7 @@ export class V1NodeHasNoWriteAccess extends V1ProtocolError {
 }
 
 export class V1TxAcceptedProofUnavailable extends V1ProtocolError {
-    constructor(message = 'Transaction accepted but proof is unavailable', endConnection = false, timestamp = 0) {
+    constructor(message = 'Transaction accepted but proof is unavailable',  timestamp = 0,endConnection = false) {
         super(ResultCode.TX_ACCEPTED_PROOF_UNAVAILABLE, message, endConnection);
         this.timestamp = Number.isSafeInteger(timestamp) && timestamp > 0 ? timestamp : 0;
     }

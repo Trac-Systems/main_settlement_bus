@@ -1026,6 +1026,7 @@ $root.network = (function() {
                     case 59:
                     case 60:
                     case 61:
+                    case 62:
                         break;
                     }
                 return null;
@@ -1308,6 +1309,10 @@ $root.network = (function() {
                 case 61:
                     message.result = 61;
                     break;
+                case "RESULT_CODE_TX_COMMIT_TIMEOUT":
+                case 62:
+                    message.result = 62;
+                    break;
                 }
                 return message;
             };
@@ -1446,6 +1451,7 @@ $root.network = (function() {
          * @property {number} RESULT_CODE_VALIDATOR_TX_OBJECT_INVALID=59 RESULT_CODE_VALIDATOR_TX_OBJECT_INVALID value
          * @property {number} RESULT_CODE_VALIDATOR_VA_MISSING=60 RESULT_CODE_VALIDATOR_VA_MISSING value
          * @property {number} RESULT_CODE_TX_INVALID_PAYLOAD=61 RESULT_CODE_TX_INVALID_PAYLOAD value
+         * @property {number} RESULT_CODE_TX_COMMIT_TIMEOUT=62 RESULT_CODE_TX_COMMIT_TIMEOUT value
          */
         v1.ResultCode = (function() {
             var valuesById = {}, values = Object.create(valuesById);
@@ -1511,6 +1517,7 @@ $root.network = (function() {
             values[valuesById[59] = "RESULT_CODE_VALIDATOR_TX_OBJECT_INVALID"] = 59;
             values[valuesById[60] = "RESULT_CODE_VALIDATOR_VA_MISSING"] = 60;
             values[valuesById[61] = "RESULT_CODE_TX_INVALID_PAYLOAD"] = 61;
+            values[valuesById[62] = "RESULT_CODE_TX_COMMIT_TIMEOUT"] = 62;
             return values;
         })();
 
@@ -2064,6 +2071,7 @@ $root.network = (function() {
                     case 59:
                     case 60:
                     case 61:
+                    case 62:
                         break;
                     }
                 return null;
@@ -2359,6 +2367,10 @@ $root.network = (function() {
                 case "RESULT_CODE_TX_INVALID_PAYLOAD":
                 case 61:
                     message.result = 61;
+                    break;
+                case "RESULT_CODE_TX_COMMIT_TIMEOUT":
+                case 62:
+                    message.result = 62;
                     break;
                 }
                 return message;

@@ -194,7 +194,6 @@ test('validate rejects TX_COMMITTED_RECEIPT_MISSING as validator internal error'
     } catch (error) {
         t.ok(error instanceof V1ProtocolError);
         t.is(error.resultCode, ResultCode.TX_COMMITTED_RECEIPT_MISSING);
-        t.is(error.endConnection, true);
     }
 });
 
@@ -509,7 +508,7 @@ test('validateIfResultCodeIsValidatorInternalError throws only for TX_COMMITTED_
         t.fail('expected internal error result code to throw');
     } catch (error) {
         t.is(error.resultCode, ResultCode.TX_COMMITTED_RECEIPT_MISSING);
-        t.is(error.endConnection, true);
+        t.is(error.endConnection, false);
     }
 
     validator.validateIfResultCodeIsValidatorInternalError(ResultCode.OK);
