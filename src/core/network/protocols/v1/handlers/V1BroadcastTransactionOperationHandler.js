@@ -8,7 +8,6 @@ import {
     getResultCode,
     V1TxInvalidPayloadError,
     V1NodeHasNoWriteAccess,
-    shouldEndConnection,
     V1TxAcceptedProofUnavailable,
     V1UnexpectedError,
     V1NodeOverloadedError,
@@ -39,6 +38,7 @@ import {
     PendingCommitBufferFullError, PendingCommitTimeoutError
 } from "../../../services/TransactionCommitService.js";
 import b4a from "b4a";
+import {shouldEndConnection} from "../../connectionPolicies.js";
 
 class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
     #state;
@@ -94,7 +94,7 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
             ) {
                 timestamp = protocolError.timestamp;
             }
-            endConnection = shouldEndConnection(protocolError);
+            endConnection = shouldEndConnection(resultCode);
             this.displayError(
                 "failed to process broadcast transaction request from sender",
                 connection.remotePublicKey,

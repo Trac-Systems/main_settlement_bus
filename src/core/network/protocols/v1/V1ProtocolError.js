@@ -4,10 +4,6 @@ export function getResultCode(err) {
     return err instanceof V1ProtocolError ? err.resultCode : ResultCode.UNEXPECTED_ERROR;
 }
 
-export function shouldEndConnection(err) {
-    return err instanceof V1ProtocolError ? Boolean(err.endConnection) : false;
-}
-
 /** 
  * V1 protocol error type.
  *

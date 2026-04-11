@@ -97,10 +97,10 @@ test('handleRequest: request validation and response send -> covers success and 
         t.ok(conn.flushCalled);
     }
 
-    // -------- VALIDATION ERROR without endConnection --------
+    // -------- VALIDATION ERROR with keep-open result code --------
     {
         V1LivenessRequest.prototype.validate = async () => {
-            throw new V1ProtocolError(ResultCode.INVALID_PAYLOAD, 'Validation Fail No End', false);
+            throw new V1ProtocolError(ResultCode.TX_ALREADY_PENDING, 'Validation Fail No End', false);
         };
 
         const handler = new V1LivenessOperationHandler(

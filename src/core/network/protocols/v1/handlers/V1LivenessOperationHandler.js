@@ -1,9 +1,10 @@
-import { networkMessageFactory } from "../../../../../messages/network/v1/networkMessageFactory.js";
-import { NETWORK_CAPABILITIES, ResultCode } from "../../../../../utils/constants.js";
+import {networkMessageFactory} from "../../../../../messages/network/v1/networkMessageFactory.js";
+import {NETWORK_CAPABILITIES, ResultCode} from "../../../../../utils/constants.js";
 import V1LivenessRequest from "../validators/V1LivenessRequest.js";
-import {getResultCode, shouldEndConnection, V1UnexpectedError} from "../V1ProtocolError.js";
+import {getResultCode, V1UnexpectedError} from "../V1ProtocolError.js";
 import V1LivenessResponse from "../validators/V1LivenessResponse.js";
 import V1BaseOperationHandler from "./V1BaseOperationHandler.js";
+import {shouldEndConnection} from "../../connectionPolicies.js"
 
 class V1LivenessOperationHandler extends V1BaseOperationHandler {
     #wallet;
@@ -25,7 +26,7 @@ class V1LivenessOperationHandler extends V1BaseOperationHandler {
             await this.#v1LivenessRequestValidator.validate(message, connection.remotePublicKey);
         } catch (error) {
             resultCode = getResultCode(error);
-            endConnection = shouldEndConnection(error);
+            endConnection = shouldEndConnection(resultCode);
             this.displayError("failed to process liveness request from sender",
                 connection.remotePublicKey,
                 error
