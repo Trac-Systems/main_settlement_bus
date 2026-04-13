@@ -1,0 +1,70 @@
+# V1 Result Code Policies
+
+This table shows, for each V1 `ResultCode`, whether the sender rotates the validator and whether the validator closes the connection after sending the response.
+
+`✅` in `Sender` means the sender rotates the validator for that result code, `✅` in `Validator` means the validator closes the connection after sending the response, and `❌` means the action does not happen.
+
+| Sender | Validator | ResultCode | Value |
+| --- | --- | --- | --- |
+| ✅ | ✅ | UNSPECIFIED | 0 |
+| ❌ | ❌ | OK | 1 |
+| ✅ | ✅ | INVALID_PAYLOAD | 2 |
+| ✅ | ✅ | RATE_LIMITED | 3 |
+| ✅ | ✅ | SIGNATURE_INVALID | 4 |
+| ✅ | ✅ | UNEXPECTED_ERROR | 5 |
+| ✅ | ❌ | TIMEOUT | 6 |
+| ✅ | ✅ | NODE_HAS_NO_WRITE_ACCESS | 7 |
+| ✅ | ❌ | TX_ACCEPTED_PROOF_UNAVAILABLE | 8 |
+| ✅ | ✅ | NODE_OVERLOADED | 9 |
+| ❌ | ❌ | TX_ALREADY_PENDING | 10 |
+| ✅ | ✅ | OPERATION_TYPE_UNKNOWN | 11 |
+| ✅ | ✅ | SCHEMA_VALIDATION_FAILED | 12 |
+| ✅ | ✅ | REQUESTER_ADDRESS_INVALID | 13 |
+| ✅ | ✅ | REQUESTER_PUBLIC_KEY_INVALID | 14 |
+| ✅ | ✅ | TX_HASH_MISMATCH | 15 |
+| ✅ | ✅ | TX_SIGNATURE_INVALID | 16 |
+| ✅ | ✅ | TX_EXPIRED | 17 |
+| ✅ | ✅ | TX_ALREADY_EXISTS | 18 |
+| ✅ | ✅ | OPERATION_ALREADY_COMPLETED | 19 |
+| ✅ | ✅ | REQUESTER_NOT_FOUND | 20 |
+| ✅ | ✅ | INSUFFICIENT_FEE_BALANCE | 21 |
+| ✅ | ✅ | EXTERNAL_BOOTSTRAP_EQUALS_MSB_BOOTSTRAP | 22 |
+| ✅ | ✅ | SELF_VALIDATION_FORBIDDEN | 23 |
+| ✅ | ✅ | ROLE_NODE_ENTRY_NOT_FOUND | 24 |
+| ✅ | ✅ | ROLE_NODE_ALREADY_WRITER | 25 |
+| ✅ | ✅ | ROLE_NODE_NOT_WHITELISTED | 26 |
+| ✅ | ✅ | ROLE_NODE_NOT_WRITER | 27 |
+| ✅ | ✅ | ROLE_NODE_IS_INDEXER | 28 |
+| ✅ | ✅ | ROLE_ADMIN_ENTRY_MISSING | 29 |
+| ✅ | ✅ | ROLE_INVALID_RECOVERY_CASE | 30 |
+| ✅ | ✅ | ROLE_UNKNOWN_OPERATION | 31 |
+| ✅ | ✅ | ROLE_INVALID_WRITER_KEY | 32 |
+| ✅ | ✅ | ROLE_INSUFFICIENT_FEE_BALANCE | 33 |
+| ✅ | ✅ | MSB_BOOTSTRAP_MISMATCH | 34 |
+| ✅ | ✅ | EXTERNAL_BOOTSTRAP_NOT_DEPLOYED | 35 |
+| ✅ | ✅ | EXTERNAL_BOOTSTRAP_TX_MISSING | 36 |
+| ✅ | ✅ | EXTERNAL_BOOTSTRAP_MISMATCH | 37 |
+| ✅ | ✅ | BOOTSTRAP_ALREADY_EXISTS | 38 |
+| ✅ | ✅ | TRANSFER_RECIPIENT_ADDRESS_INVALID | 39 |
+| ✅ | ✅ | TRANSFER_RECIPIENT_PUBLIC_KEY_INVALID | 40 |
+| ✅ | ✅ | TRANSFER_AMOUNT_TOO_LARGE | 41 |
+| ✅ | ✅ | TRANSFER_SENDER_NOT_FOUND | 42 |
+| ✅ | ✅ | TRANSFER_INSUFFICIENT_BALANCE | 43 |
+| ✅ | ✅ | TRANSFER_RECIPIENT_BALANCE_OVERFLOW | 44 |
+| ✅ | ❌ | TX_HASH_INVALID_FORMAT | 45 |
+| ✅ | ❌ | INTERNAL_ENQUEUE_VALIDATION_FAILED | 46 |
+| ✅ | ❌ | TX_COMMITTED_RECEIPT_MISSING | 47 |
+| ✅ | ❌ | VALIDATOR_RESPONSE_TX_TYPE_INVALID | 48 |
+| ✅ | ❌ | VALIDATOR_RESPONSE_TX_TYPE_UNKNOWN | 49 |
+| ✅ | ❌ | VALIDATOR_RESPONSE_TX_TYPE_UNSUPPORTED | 50 |
+| ✅ | ❌ | VALIDATOR_RESPONSE_SCHEMA_INVALID | 51 |
+| ✅ | ❌ | PENDING_REQUEST_MISSING_TX_DATA | 52 |
+| ✅ | ❌ | PROOF_PAYLOAD_MISMATCH | 53 |
+| ✅ | ❌ | VALIDATOR_WRITER_KEY_NOT_REGISTERED | 54 |
+| ✅ | ❌ | VALIDATOR_ADDRESS_MISMATCH | 55 |
+| ✅ | ❌ | VALIDATOR_NODE_ENTRY_NOT_FOUND | 56 |
+| ✅ | ❌ | VALIDATOR_NODE_NOT_WRITER | 57 |
+| ✅ | ❌ | VALIDATOR_WRITER_KEY_MISMATCH | 58 |
+| ✅ | ❌ | VALIDATOR_TX_OBJECT_INVALID | 59 |
+| ✅ | ❌ | VALIDATOR_VA_MISSING | 60 |
+| ✅ | ✅ | TX_INVALID_PAYLOAD | 61 |

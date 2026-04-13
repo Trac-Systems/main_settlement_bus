@@ -14,6 +14,7 @@
     "env-rpc": "if [ -f .env ]; then set -a; . ./.env; set +a; fi; NODE_OPTIONS='--max-old-space-size=4096' pear run . --stores-directory ${STORES_DIRECTORY:-stores} --rpc --host ${MSB_HOST:-127.0.0.1} --port ${MSB_PORT:-5000} --network ${NETWORK:-mainnet}",
     "env-rpc-docker": "if [ -f .env ]; then set -a; . ./.env; set +a; fi; NODE_OPTIONS='--max-old-space-size=4096' node msb.mjs --stores-directory ${STORES_DIRECTORY:-stores} --rpc --host 0.0.0.0 --port ${MSB_PORT:-5000} --network ${NETWORK:-mainnet}",
     "protobuf": "node scripts/generate-protobufs.js",
+    "docs:check": "node scripts/docs/docs-checker.js",
     "test:acceptance": "node --experimental-vm-modules node_modules/jest/bin/jest.js --testTimeout=200000 tests/acceptance/v1/rpc.test.mjs --runInBand",
     "test:integration": "brittle-node -t 1200000 tests/integration/integration.test.js",
     "test:unit:node": "brittle-node -t 60000 tests/unit/unit.test.js",
