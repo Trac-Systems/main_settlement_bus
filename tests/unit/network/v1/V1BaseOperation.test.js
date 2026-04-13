@@ -4,9 +4,7 @@ import tracCryptoApi from 'trac-crypto-api';
 import V1BaseOperation from '../../../../src/core/network/protocols/v1/validators/V1BaseOperation.js';
 import NetworkMessageBuilder from '../../../../src/messages/network/v1/NetworkMessageBuilder.js';
 import {
-    V1InvalidPayloadError,
-    V1SignatureInvalidError,
-    V1UnexpectedError
+    V1ProtocolError
 } from '../../../../src/core/network/protocols/v1/V1ProtocolError.js';
 import {
     NetworkOperationType,
@@ -125,7 +123,7 @@ test('V1BaseOperation.validateSignature verifies valid signatures for all suppor
     t.pass();
 });
 
-test('V1BaseOperation.validateSignature throws V1SignatureInvalidError on wrong public key', async t => {
+test('V1BaseOperation.validateSignature throws V1ProtocolError on wrong public key', async t => {
     const operation = new V1BaseOperation(config);
     const wallet = await createWallet(testKeyPair1);
     const otherWallet = await createWallet(testKeyPair2);
@@ -152,13 +150,13 @@ test('V1BaseOperation.validateSignature rethrows protocol-shaped build errors', 
         await operation.validateSignature(payload, b4a.alloc(32, 1));
         t.fail('expected validateSignature to throw');
     } catch (error) {
-        t.ok(error instanceof V1InvalidPayloadError);
+        t.ok(error instanceof V1ProtocolError);
         t.is(error.resultCode, ResultCode.INVALID_PAYLOAD);
         t.ok(error.message.includes('Operation type is unspecified'));
     }
 });
 
-test('V1BaseOperation.validateSignature wraps non-protocol build errors as V1InvalidPayloadError', async t => {
+test('V1BaseOperation.validateSignature wraps non-protocol build errors as V1ProtocolError', async t => {
     const operation = new V1BaseOperation(config);
 
     const payload = {
@@ -172,13 +170,13 @@ test('V1BaseOperation.validateSignature wraps non-protocol build errors as V1Inv
         await operation.validateSignature(payload, b4a.alloc(32, 1));
         t.fail('expected validateSignature to throw');
     } catch (error) {
-        t.ok(error instanceof V1InvalidPayloadError);
+        t.ok(error instanceof V1ProtocolError);
         t.is(error.resultCode, ResultCode.INVALID_PAYLOAD);
         t.ok(error.message.includes('Failed to build signature message'));
     }
 });
 
-test('V1BaseOperation.validateSignature throws V1InvalidPayloadError when hashing fails', async t => {
+test('V1BaseOperation.validateSignature throws V1ProtocolError when hashing fails', async t => {
     const operation = new V1BaseOperation(config);
     const wallet = await createWallet();
     const payload = await buildSignedPayload(wallet, NetworkOperationType.LIVENESS_REQUEST);
@@ -196,7 +194,7 @@ test('V1BaseOperation.validateSignature throws V1InvalidPayloadError when hashin
         await operation.validateSignature(payload, wallet.publicKey);
         t.fail('expected validateSignature to throw');
     } catch (error) {
-        t.ok(error instanceof V1InvalidPayloadError);
+        t.ok(error instanceof V1ProtocolError);
         t.ok(error.message.includes('Failed to hash signature message'));
     }
 });
@@ -219,7 +217,7 @@ test('V1BaseOperation.validateSignature handles verify() throw as invalid signat
         await operation.validateSignature(payload, wallet.publicKey);
         t.fail('expected validateSignature to throw');
     } catch (error) {
-        t.ok(error instanceof V1SignatureInvalidError);
+        t.ok(error instanceof V1ProtocolError);
         t.is(error.resultCode, ResultCode.SIGNATURE_INVALID);
     }
 });
@@ -282,7 +280,7 @@ test('V1BaseOperation.validateSignature enforces BROADCAST_TRANSACTION_RESPONSE 
     }
 });
 
-test('V1BaseOperation.validateSignature throws V1UnexpectedError for unknown operation type', async t => {
+test('V1BaseOperation.validateSignature throws V1ProtocolError for unknown operation type', async t => {
     const operation = new V1BaseOperation(config);
 
     const payload = {
@@ -340,7 +338,7 @@ test('V1BaseOperation.validateResponseType supports expected mappings and reject
         );
         t.fail('expected validateResponseType to throw');
     } catch (error) {
-        t.ok(error instanceof V1UnexpectedError);
+        t.ok(error instanceof V1ProtocolError);
         t.ok(error.message.includes('Unsupported pending request type'));
     }
 });
