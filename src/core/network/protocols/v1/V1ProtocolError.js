@@ -25,12 +25,6 @@ export class V1ProtocolError extends Error {
     }
 }
 
-export class V1SignatureInvalidError extends V1ProtocolError {
-    constructor(message = 'Signature invalid', endConnection = true) {
-        super(ResultCode.SIGNATURE_INVALID, message, endConnection);
-    }
-}
-
 export class V1RateLimitedError extends V1ProtocolError {
     constructor(message = 'Rate limited', endConnection = true) {
         super(ResultCode.RATE_LIMITED, message, endConnection);
