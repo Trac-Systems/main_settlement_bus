@@ -2,6 +2,11 @@ import { ResultCode } from '../../../utils/constants.js';
 
 // TODO: Consider how to behave with ResultCode.UNSPECIFIED
 
+/**
+ * Sender actions are consumed by the message orchestrator after a validator responds.
+ * They define whether the validator should be treated as successful, rotated out, or kept
+ * in the pool without rotation for the current result code.
+ */
 export const SENDER_ACTION = Object.freeze({
     UNDEFINED: 'UNDEFINED',
     SUCCESS: 'SUCCESS',
@@ -9,10 +14,14 @@ export const SENDER_ACTION = Object.freeze({
     NO_ROTATE: 'NO_ROTATE',
 });
 
+// Result codes that mean the validator completed the request successfully.
 const SUCCESS_CODES = new Set([
     ResultCode.OK,
 ]);
 
+// Result codes that should rotate the validator out of the sender pool after the response.
+// In practice these are transport, protocol, validation, or validator-side failures that make
+// the current peer unsuitable to keep as the next sender candidate.
 const ROTATE_CODES = new Set([
     ResultCode.UNSPECIFIED,
     ResultCode.INVALID_PAYLOAD,
