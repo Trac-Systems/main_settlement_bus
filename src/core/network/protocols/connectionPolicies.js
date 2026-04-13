@@ -88,7 +88,30 @@ export function resultToValidatorAction(resultCode) {
     return SENDER_ACTION.UNDEFINED;
 }
 
-const END_CONNECTION_CODES = new Set([
+/**
+ * Keep connection result codes:
+ * - ResultCode.OK
+ * - ResultCode.TX_ACCEPTED_PROOF_UNAVAILABLE
+ * - ResultCode.TX_ALREADY_PENDING
+ * - ResultCode.TX_HASH_INVALID_FORMAT
+ * - ResultCode.INTERNAL_ENQUEUE_VALIDATION_FAILED
+ * - ResultCode.TX_COMMITTED_RECEIPT_MISSING
+ * - ResultCode.TX_COMMIT_TIMEOUT
+ * - ResultCode.VALIDATOR_RESPONSE_TX_TYPE_INVALID
+ * - ResultCode.VALIDATOR_RESPONSE_TX_TYPE_UNKNOWN
+ * - ResultCode.VALIDATOR_RESPONSE_TX_TYPE_UNSUPPORTED
+ * - ResultCode.VALIDATOR_RESPONSE_SCHEMA_INVALID
+ * - ResultCode.PENDING_REQUEST_MISSING_TX_DATA
+ * - ResultCode.PROOF_PAYLOAD_MISMATCH
+ * - ResultCode.VALIDATOR_WRITER_KEY_NOT_REGISTERED
+ * - ResultCode.VALIDATOR_ADDRESS_MISMATCH
+ * - ResultCode.VALIDATOR_NODE_ENTRY_NOT_FOUND
+ * - ResultCode.VALIDATOR_NODE_NOT_WRITER
+ * - ResultCode.VALIDATOR_WRITER_KEY_MISMATCH
+ * - ResultCode.VALIDATOR_TX_OBJECT_INVALID
+ * - ResultCode.VALIDATOR_VA_MISSING
+ */
+const VALIDATOR_SIDE_END_CONNECTION_CODES = new Set([
     // BASE_TRANSPORT_AND_VALIDATOR_STATUS
     ResultCode.UNSPECIFIED,
     ResultCode.INVALID_PAYLOAD,
@@ -140,5 +163,5 @@ const END_CONNECTION_CODES = new Set([
 ]);
 
 export function shouldEndConnection(resultCode) {
-    return END_CONNECTION_CODES.has(resultCode);
+    return VALIDATOR_SIDE_END_CONNECTION_CODES.has(resultCode);
 }
