@@ -126,7 +126,9 @@ class Cli extends ReadyResource {
             try {
                 switch (choice) {
                     case '1':
-                        const wallet =  await new WalletProvider(this.#config).generate()
+                        const wallet = await new WalletProvider(this.#config).generate({
+                            derivationPath: this.#config.derivationPath
+                        })
                         console.log([
                             "This is your mnemonic:",
                             wallet.mnemonic, 
@@ -140,7 +142,10 @@ class Cli extends ReadyResource {
 
                         let mnemonic = await this.#awaitInput()
                         try {
-                            const wallet = await new WalletProvider(this.#config).fromMnemonic({ mnemonic })
+                            const wallet = await new WalletProvider(this.#config).fromMnemonic({
+                                mnemonic,
+                                derivationPath: this.#config.derivationPath
+                            })
                             exportWallet(wallet, this.#config.keyPairPath)
                             return wallet
                         } catch {

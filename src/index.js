@@ -153,18 +153,12 @@ export class MainSettlementBus extends ReadyResource {
 
         if (payload.type === OperationType.TRANSFER) {
             normalizedPayload = normalizeTransferOperation(payload, this.#config);
-            try {
-                validateTransaction(normalizedPayload)
-            } catch {
-                // We swap exceptions to keep compatibility
-                throw new ValidationError("Invalid transaction payload.");
-            }
-            await validateTransfer(normalizedPayload);
+            await this.validateTransfer(normalizedPayload);
             hash = b4a.toString(normalizedPayload.tro.tx, "hex");
         } else if (payload.type === OperationType.TX) {
             normalizedPayload = normalizeTransactionOperation(payload, this.#config);
             try {
-                await validateTransaction(normalizedPayload);
+                await this.validateTransaction(normalizedPayload);
             } catch {
                 // We swap exceptions to keep compatibility
                 throw new ValidationError("Invalid transaction payload.");
