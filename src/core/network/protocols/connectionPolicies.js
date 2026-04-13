@@ -82,8 +82,7 @@ const ROTATE_CODES = new Set([
     ResultCode.VALIDATOR_WRITER_KEY_MISMATCH,
     ResultCode.VALIDATOR_TX_OBJECT_INVALID,
     ResultCode.VALIDATOR_VA_MISSING,
-    ResultCode.TX_INVALID_PAYLOAD,
-    ResultCode.TX_COMMIT_TIMEOUT
+    ResultCode.TX_INVALID_PAYLOAD
 ]);
 
 const NO_ROTATE_CODES = new Set([
@@ -100,12 +99,12 @@ export function resultToValidatorAction(resultCode) {
 /**
  * Keep connection result codes:
  * - ResultCode.OK
+ * - ResultCode.TIMEOUT
  * - ResultCode.TX_ACCEPTED_PROOF_UNAVAILABLE
  * - ResultCode.TX_ALREADY_PENDING
  * - ResultCode.TX_HASH_INVALID_FORMAT
  * - ResultCode.INTERNAL_ENQUEUE_VALIDATION_FAILED
  * - ResultCode.TX_COMMITTED_RECEIPT_MISSING
- * - ResultCode.TX_COMMIT_TIMEOUT
  * - ResultCode.VALIDATOR_RESPONSE_TX_TYPE_INVALID
  * - ResultCode.VALIDATOR_RESPONSE_TX_TYPE_UNKNOWN
  * - ResultCode.VALIDATOR_RESPONSE_TX_TYPE_UNSUPPORTED
@@ -127,7 +126,6 @@ const VALIDATOR_SIDE_END_CONNECTION_CODES = new Set([
     ResultCode.RATE_LIMITED,
     ResultCode.SIGNATURE_INVALID,
     ResultCode.UNEXPECTED_ERROR,
-    ResultCode.TIMEOUT,
     ResultCode.NODE_HAS_NO_WRITE_ACCESS,
     ResultCode.NODE_OVERLOADED,
 

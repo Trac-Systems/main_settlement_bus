@@ -1,6 +1,10 @@
 import { test } from 'brittle';
 
-import { resultToValidatorAction, SENDER_ACTION } from '../../../../src/core/network/protocols/connectionPolicies.js';
+import {
+    resultToValidatorAction,
+    shouldEndConnection,
+    SENDER_ACTION
+} from '../../../../src/core/network/protocols/connectionPolicies.js';
 import { ResultCode } from '../../../../src/utils/constants.js';
 
 test('connectionPolicies maps OK to SUCCESS', t => {
@@ -21,6 +25,20 @@ test('connectionPolicies maps TX_COMMITTED_RECEIPT_MISSING to ROTATE', t => {
     t.is(
         resultToValidatorAction(ResultCode.TX_COMMITTED_RECEIPT_MISSING),
         SENDER_ACTION.ROTATE
+    );
+});
+
+test('connectionPolicies maps TIMEOUT to ROTATE for sender-side retry logic', t => {
+    t.is(
+        resultToValidatorAction(ResultCode.TIMEOUT),
+        SENDER_ACTION.ROTATE
+    );
+});
+
+test('connectionPolicies keeps validator connection open for TIMEOUT responses', t => {
+    t.is(
+        shouldEndConnection(ResultCode.TIMEOUT),
+        false
     );
 });
 

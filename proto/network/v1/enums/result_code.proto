@@ -81,9 +81,4 @@ enum ResultCode {
   RESULT_CODE_VALIDATOR_TX_OBJECT_INVALID = 59;
   RESULT_CODE_VALIDATOR_VA_MISSING = 60;
   RESULT_CODE_TX_INVALID_PAYLOAD = 61;
-
-  // 62-63: [SCOPE: TX_COMMIT_SERVICE]
-  // (SCOPED TO: Tx commit handling on validator, e.g. waiting for commit timeout)
-  RESULT_CODE_TX_COMMIT_TIMEOUT = 62;
-
 }

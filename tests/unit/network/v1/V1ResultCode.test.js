@@ -64,8 +64,7 @@ const expectedResultCodeMap = Object.freeze({
     VALIDATOR_WRITER_KEY_MISMATCH: 58,
     VALIDATOR_TX_OBJECT_INVALID: 59,
     VALIDATOR_VA_MISSING: 60,
-    TX_INVALID_PAYLOAD: 61,
-    TX_COMMIT_TIMEOUT: 62
+    TX_INVALID_PAYLOAD: 61
 });
 
 test('ResultCode values are unique', t => {

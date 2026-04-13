@@ -849,3 +849,49 @@ test('handleRequest builds proof unavailable response with propagated positive t
         })
     );
 });
+
+test('handleRequest keeps connection open for TIMEOUT response', async t => {
+    const handler = setupHandler(t, {
+        commit: {
+            registerPendingCommit() {
+                return Promise.reject(new CommitErrors.PendingCommitTimeoutError('commit timeout'));
+            },
+            rejectPendingCommit() {}
+        }
+    });
+    const events = [];
+
+    handler.decodeApplyOperation = () => ({
+        type: OperationType.TX,
+        address: VALID_ADDR,
+        txo: transactionPayload()
+    });
+
+    const connection = {
+        remotePublicKey: b4a.alloc(32),
+        protocolSession: {
+            sendAndForget(message) {
+                events.push('send');
+                t.is(
+                    message.broadcast_transaction_response.result,
+                    ResultCode.TIMEOUT,
+                    'validator should answer with TIMEOUT on pending commit timeout'
+                );
+            }
+        },
+        async flush() {
+            events.push('flush');
+            return true;
+        },
+        end() {
+            events.push('end');
+        }
+    };
+
+    await handler.handleRequest(
+        { id: 'msg-timeout-keep-open', broadcast_transaction_request: { data: b4a.alloc(1) } },
+        connection
+    );
+
+    t.alike(events, ['send']);
+});

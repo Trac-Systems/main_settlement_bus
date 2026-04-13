@@ -298,7 +298,7 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
                 throw new V1ProtocolError(ResultCode.TX_COMMITTED_RECEIPT_MISSING, error.message);
             }
             if (error instanceof PendingCommitTimeoutError) {
-                throw new V1ProtocolError(ResultCode.TX_COMMIT_TIMEOUT, error.message);
+                throw new V1ProtocolError(ResultCode.TIMEOUT, error.message);
             }
             throw error;
         }
