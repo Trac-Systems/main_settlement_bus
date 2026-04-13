@@ -9,7 +9,6 @@ import { NetworkOperationType, ResultCode } from '../../../../src/utils/constant
 import { errorMessageIncludes } from '../../../helpers/regexHelper.js';
 import { config } from '../../../helpers/config.js';
 import { testKeyPair1, testKeyPair2 } from '../../../fixtures/apply.fixtures.js';
-import SharedValidatorRejectionError from '../../../../src/core/network/protocols/shared/errors/SharedValidatorRejectionError.js';
 import { WalletProvider } from 'trac-wallet';
 
 const validPeerA = testKeyPair1.publicKey;
@@ -87,7 +86,7 @@ test('PendingRequestService preserves typed result-coded errors', async t => {
     const request = await buildV1Request();
 
     const promise = service.registerPendingRequest(peer, request);
-    const expectedError = new SharedValidatorRejectionError(ResultCode.TX_INVALID_PAYLOAD, 'domain-invalid');
+    const expectedError = new V1ProtocolError(ResultCode.TX_INVALID_PAYLOAD, 'domain-invalid');
 
     t.ok(service.rejectPendingRequest(request.id, expectedError));
 
