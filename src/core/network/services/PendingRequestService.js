@@ -65,7 +65,6 @@ class PendingRequestService {
             requestType: message.type,
             requestTxData: this.#extractRequestTxData(message),
             requestedTo: peerPubKeyHex,
-            timeoutMs: this.#config.pendingRequestTimeout,
             timeoutId: null,
             resolve: null,
             reject: null,
@@ -81,10 +80,10 @@ class PendingRequestService {
                 id,
                 new V1ProtocolError(
                     ResultCode.TIMEOUT,
-                    `Pending request with ID ${id} from peer ${peerPubKeyHex} timed out after ${entry.timeoutMs} ms.`
+                    `Pending request with ID ${id} from peer ${peerPubKeyHex} timed out after ${this.#config.pendingRequestTimeout} ms.`
                 ));
 
-        }, entry.timeoutMs);
+        }, this.#config.pendingRequestTimeout);
 
         this.#pendingRequests.set(id, entry);
         return promise;
