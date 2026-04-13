@@ -6,7 +6,6 @@ import {
 } from "../../../../../utils/constants.js";
 import {
     getResultCode,
-    V1TxAcceptedProofUnavailable,
     V1UnexpectedError,
     V1NodeOverloadedError,
     V1TxAlreadyPendingError,
@@ -288,7 +287,16 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
             receipt = await pendingCommit;
         } catch (error) {
             if (error instanceof TransactionPoolProofUnavailableError) {
-                throw new V1TxAcceptedProofUnavailable(error.message,  error.timestamp);
+                // v1 still could expect proof-unavailable responses to carry the ledger timestamp,
+                // so keep it on the base protocol error after removing the scoped v1 error (old approach).
+                const protocolError = new V1ProtocolError(
+                    ResultCode.TX_ACCEPTED_PROOF_UNAVAILABLE,
+                    error.message
+                );
+                protocolError.timestamp = Number.isSafeInteger(error.timestamp) && error.timestamp > 0
+                    ? error.timestamp
+                    : 0;
+                throw protocolError;
             }
             if (error instanceof TransactionPoolMissingCommitReceiptError) {
                 throw new V1ProtocolError(ResultCode.TX_COMMITTED_RECEIPT_MISSING, error.message);

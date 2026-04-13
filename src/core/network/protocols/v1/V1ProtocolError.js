@@ -25,13 +25,6 @@ export class V1ProtocolError extends Error {
     }
 }
 
-export class V1TxAcceptedProofUnavailable extends V1ProtocolError {
-    constructor(message = 'Transaction accepted but proof is unavailable',  timestamp = 0,endConnection = false) {
-        super(ResultCode.TX_ACCEPTED_PROOF_UNAVAILABLE, message, endConnection);
-        this.timestamp = Number.isSafeInteger(timestamp) && timestamp > 0 ? timestamp : 0;
-    }
-}
-
 export class V1NodeOverloadedError extends V1ProtocolError {
     constructor(message = 'Commit queue is full', endConnection = true) {
         super(ResultCode.NODE_OVERLOADED, message, endConnection);
