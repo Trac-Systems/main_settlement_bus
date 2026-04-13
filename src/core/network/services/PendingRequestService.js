@@ -1,7 +1,6 @@
 import {NetworkOperationType, ResultCode} from '../../../utils/constants.js';
 import {isHexString} from '../../../utils/helpers.js';
-import {V1ProtocolError, V1TimeoutError, V1UnexpectedError} from "../protocols/v1/V1ProtocolError.js";
-import {Config} from '../../../config/config.js';
+import {V1ProtocolError, V1UnexpectedError} from "../protocols/v1/V1ProtocolError.js";
 import b4a from 'b4a';
 
 const PEER_PUBLIC_KEY_HEX_LENGTH = 64;
@@ -80,7 +79,8 @@ class PendingRequestService {
         entry.timeoutId = setTimeout(() => {
             this.rejectPendingRequest(
                 id,
-                new V1TimeoutError(
+                new V1ProtocolError(
+                    ResultCode.TIMEOUT,
                     `Pending request with ID ${id} from peer ${peerPubKeyHex} timed out after ${entry.timeoutMs} ms.`,
                     true
                 ));

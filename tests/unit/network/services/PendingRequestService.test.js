@@ -4,7 +4,7 @@ import { v7 as uuidv7 } from 'uuid';
 import sinon from 'sinon';
 import PendingRequestService from '../../../../src/core/network/services/PendingRequestService.js';
 import NetworkMessageBuilder from '../../../../src/messages/network/v1/NetworkMessageBuilder.js';
-import { V1UnexpectedError } from '../../../../src/core/network/protocols/v1/V1ProtocolError.js';
+import { V1ProtocolError, V1UnexpectedError } from '../../../../src/core/network/protocols/v1/V1ProtocolError.js';
 import { NetworkOperationType, ResultCode } from '../../../../src/utils/constants.js';
 import { errorMessageIncludes } from '../../../helpers/regexHelper.js';
 import { config } from '../../../helpers/config.js';
@@ -139,7 +139,10 @@ test('PendingRequestService rejects pending request on timeout', async t => {
             await promise;
             t.fail('Expected pending request to time out');
         } catch (error) {
+            t.ok(error instanceof V1ProtocolError);
+            t.is(error.resultCode, ResultCode.TIMEOUT);
             t.ok(error?.message?.includes(`timed out after ${pendingRequestTimeout} ms`));
+            t.is(error.endConnection, true);
         }
 
         t.is(service.has(request.id), false);
@@ -418,4 +421,3 @@ test('PendingRequestService throws when registerPendingRequest receives null mes
         t.ok(error?.message?.includes('Pending request message must be an object.'));
     }
 });
-

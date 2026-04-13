@@ -25,20 +25,6 @@ export class V1ProtocolError extends Error {
     }
 }
 
-
-
-export class V1UnexpectedError extends V1ProtocolError {
-    constructor(message = 'Unexpected error', endConnection = true) {
-        super(ResultCode.UNEXPECTED_ERROR, message, endConnection);
-    }
-}
-
-export class V1TimeoutError extends V1ProtocolError {
-    constructor(message = 'Request timed out', endConnection = false) {
-        super(ResultCode.TIMEOUT, message, endConnection);
-    }
-}
-
 export class V1NodeHasNoWriteAccess extends V1ProtocolError {
     constructor(message = 'Node has no write access', endConnection = true) {
         super(ResultCode.NODE_HAS_NO_WRITE_ACCESS, message, endConnection);
@@ -61,5 +47,11 @@ export class V1NodeOverloadedError extends V1ProtocolError {
 export class V1TxAlreadyPendingError extends V1ProtocolError {
     constructor(message = 'Transaction is already pending', endConnection = false) {
         super(ResultCode.TX_ALREADY_PENDING, message, endConnection);
+    }
+}
+
+export class V1UnexpectedError extends V1ProtocolError {
+    constructor(message = 'Unexpected error', endConnection = true) {
+        super(ResultCode.UNEXPECTED_ERROR, message, endConnection);
     }
 }

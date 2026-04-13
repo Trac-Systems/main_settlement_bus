@@ -5,7 +5,7 @@ import { OperationType, ResultCode } from '../../../../src/utils/constants.js';
 import { testKeyPair1, testKeyPair2 } from '../../../fixtures/apply.fixtures.js';
 import { publicKeyToAddress } from '../../../../src/utils/helpers.js';
 import { ConnectionManagerError } from '../../../../src/core/network/services/ConnectionManager.js';
-import { V1TimeoutError } from '../../../../src/core/network/protocols/v1/V1ProtocolError.js';
+import { V1ProtocolError } from '../../../../src/core/network/protocols/v1/V1ProtocolError.js';
 import { WalletProvider } from 'trac-wallet';
 import { config, overrideConfig } from '../../../helpers/config.js';
 
@@ -218,7 +218,7 @@ test('MessageOrchestrator.send max retries guard returns false immediately', asy
 test('MessageOrchestrator.send timeout split: pending timeout rejection goes through catch and retries', async t => {
     const config = overrideConfig({ maxRetries: 2 });
     const sendSingleMessage = sinon.stub();
-    sendSingleMessage.onFirstCall().rejects(new V1TimeoutError('pending request timeout', false));
+    sendSingleMessage.onFirstCall().rejects(new V1ProtocolError(ResultCode.TIMEOUT, 'pending request timeout'));
     sendSingleMessage.onSecondCall().resolves(ResultCode.OK);
 
     const connectionManager = createConnectionManager({ sendSingleMessage });
