@@ -25,12 +25,6 @@ export class V1ProtocolError extends Error {
     }
 }
 
-export class V1NodeOverloadedError extends V1ProtocolError {
-    constructor(message = 'Commit queue is full', endConnection = true) {
-        super(ResultCode.NODE_OVERLOADED, message, endConnection);
-    }
-}
-
 export class V1TxAlreadyPendingError extends V1ProtocolError {
     constructor(message = 'Transaction is already pending', endConnection = false) {
         super(ResultCode.TX_ALREADY_PENDING, message, endConnection);

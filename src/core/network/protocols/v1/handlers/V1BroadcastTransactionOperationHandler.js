@@ -7,7 +7,6 @@ import {
 import {
     getResultCode,
     V1UnexpectedError,
-    V1NodeOverloadedError,
     V1TxAlreadyPendingError,
     V1ProtocolError
 } from "../V1ProtocolError.js";
@@ -195,7 +194,7 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
             this.#txPoolService.validateEnqueue();
         } catch (error) {
             if (error instanceof TransactionPoolFullError) {
-                throw new V1NodeOverloadedError('Transaction pool is full, ignoring incoming transaction.');
+                throw new V1ProtocolError(ResultCode.NODE_OVERLOADED, 'Transaction pool is full, ignoring incoming transaction.');
             }
             throw error;
         }
@@ -252,13 +251,13 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
             pendingCommit.catch(() => {});
         } catch (error) {
             if (error instanceof PendingCommitInvalidTxHashError) {
-                throw new V1ProtocolError(ResultCode.TX_HASH_INVALID_FORMAT, error.message, false);
+                throw new V1ProtocolError(ResultCode.TX_HASH_INVALID_FORMAT, error.message);
             }
             if (error instanceof PendingCommitAlreadyExistsError) {
                 throw new V1TxAlreadyPendingError(error.message);
             }
             if (error instanceof PendingCommitBufferFullError) {
-                throw new V1NodeOverloadedError(error.message);
+                throw new V1ProtocolError(ResultCode.NODE_OVERLOADED, error.message);
             }
             throw error;
         }
@@ -268,14 +267,13 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
         } catch (error) {
             let err = error;
             if (error instanceof TransactionPoolFullError) {
-                err = new V1NodeOverloadedError(error.message);
+                err = new V1ProtocolError(ResultCode.NODE_OVERLOADED, error.message);
             } else if (error instanceof TransactionPoolAlreadyQueuedError) {
                 err = new V1TxAlreadyPendingError(error.message);
             } else if (error instanceof TransactionPoolInvalidIncomingDataError) {
                 err = new V1ProtocolError(
                     ResultCode.INTERNAL_ENQUEUE_VALIDATION_FAILED,
-                    `Internal enqueue validation failed: ${error.message}`,
-                    false
+                    `Internal enqueue validation failed: ${error.message}`
                 );
             }
             this.#transactionCommitService.rejectPendingCommit(txHash, err);
