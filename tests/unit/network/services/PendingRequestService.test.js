@@ -6,6 +6,7 @@ import PendingRequestService from '../../../../src/core/network/services/Pending
 import NetworkMessageBuilder from '../../../../src/messages/network/v1/NetworkMessageBuilder.js';
 import { V1ProtocolError } from '../../../../src/core/network/protocols/v1/V1ProtocolError.js';
 import { NetworkOperationType, ResultCode } from '../../../../src/utils/constants.js';
+import { publicKeyToAddress } from '../../../../src/utils/helpers.js';
 import { errorMessageIncludes } from '../../../helpers/regexHelper.js';
 import { config } from '../../../helpers/config.js';
 import { testKeyPair1, testKeyPair2 } from '../../../fixtures/apply.fixtures.js';
@@ -72,8 +73,8 @@ test('PendingRequestService rejects and removes pending request', async t => {
         await promise;
         t.fail('Expected pending request promise to reject');
     } catch (error) {
-        t.ok(error instanceof V1ProtocolError);
-        t.is(error.resultCode, ResultCode.UNEXPECTED_ERROR);
+        t.is(error, expectedError);
+        t.ok(error instanceof Error);
         t.is(error.message, expectedError.message);
     }
 
@@ -121,6 +122,7 @@ test('PendingRequestService rejects pending request on timeout', async t => {
     try {
         const pendingRequestTimeout = 123;
         const service = new PendingRequestService({
+            addressPrefix: config.addressPrefix,
             pendingRequestTimeout,
             maxPendingRequestsInPendingRequestsService: 10
         });
@@ -137,9 +139,10 @@ test('PendingRequestService rejects pending request on timeout', async t => {
             await promise;
             t.fail('Expected pending request to time out');
         } catch (error) {
-            t.ok(error instanceof V1ProtocolError);
-            t.is(error.resultCode, ResultCode.TIMEOUT);
+            t.is(error.name, 'PendingRequestServiceTimeoutError');
+            t.ok(error instanceof Error);
             t.ok(error?.message?.includes(`timed out after ${pendingRequestTimeout} ms`));
+            t.ok(error?.message?.includes(publicKeyToAddress(peer, config)));
         }
 
         t.is(service.has(request.id), false);
@@ -256,6 +259,7 @@ test('PendingRequestService.isProbePending matches peer and liveness type', asyn
 
 test('PendingRequestService enforces global pending request limit', async t => {
     const service = new PendingRequestService({
+        addressPrefix: config.addressPrefix,
         pendingRequestTimeout: config.pendingRequestTimeout,
         maxPendingRequestsInPendingRequestsService: 3
     });
@@ -370,8 +374,7 @@ test('PendingRequestService.rejectPendingRequest falls back to Unexpected error 
         await promise;
         t.fail('Expected pending request promise to reject');
     } catch (error) {
-        t.ok(error instanceof V1ProtocolError);
-        t.is(error.resultCode, ResultCode.UNEXPECTED_ERROR);
+        t.ok(error instanceof Error);
         t.is(error.message, 'Unexpected error');
     }
 });
