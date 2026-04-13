@@ -1,5 +1,6 @@
 import b4a from 'b4a';
-import {V1RateLimitedError} from "../protocols/v1/V1ProtocolError.js";
+import {V1ProtocolError} from "../protocols/v1/V1ProtocolError.js";
+import {ResultCode} from "../../../utils/constants.js";
 import {publicKeyToAddress} from "../../../utils/helpers.js";
 
 class TransactionRateLimiterService {
@@ -64,7 +65,7 @@ class TransactionRateLimiterService {
 
     /*
         Handles rate limiting for a peer connection (v1 protocol).
-        If the peer has exceeded the rate limit, it throws RateLimitedError.
+        If the peer has exceeded the rate limit, it throws V1ProtocolError with RATE_LIMITED result code.
         Otherwise, it updates the connection info with the current timestamp.
     */
     v1HandleRateLimit(connection) {
@@ -75,7 +76,10 @@ class TransactionRateLimiterService {
         this.#initializePeerConnectionInfoEntry(peer, currentTime);
 
         if (this.#hasExceededRateLimit(peer, currentTime)) {
-            throw new V1RateLimitedError(`Rate limit exceeded for peer ${publicKeyToAddress(connection.remotePublicKey, this.#config)}`);
+            throw new V1ProtocolError(
+                ResultCode.RATE_LIMITED,
+                `Rate limit exceeded for peer ${publicKeyToAddress(connection.remotePublicKey, this.#config)}`
+            );
         }
         this.#updatePeerConnectionInfo(peer, currentTime);
     }

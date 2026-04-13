@@ -25,11 +25,7 @@ export class V1ProtocolError extends Error {
     }
 }
 
-export class V1RateLimitedError extends V1ProtocolError {
-    constructor(message = 'Rate limited', endConnection = true) {
-        super(ResultCode.RATE_LIMITED, message, endConnection);
-    }
-}
+
 
 export class V1UnexpectedError extends V1ProtocolError {
     constructor(message = 'Unexpected error', endConnection = true) {
