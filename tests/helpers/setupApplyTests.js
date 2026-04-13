@@ -262,7 +262,7 @@ export async function initDirectoryStructure(keyPair, config) {
         await fsp.mkdir(config.keyPairDirectoryPath, { recursive: true });
 
         if (!keyPair || !keyPair.publicKey || !keyPair.secretKey) {
-            keyPair = await new WalletProvider(config).generate();
+            keyPair = await new WalletProvider(config).generate({ derivationPath: config.derivationPath });
         }
 
         const wallet = await new WalletProvider(config).fromSecretKey(keyPair.secretKey)

@@ -29,7 +29,10 @@ export async function getWallet(fixture) {
         throw new Error('Wallet fixture with mnemonic is required.');
     }
 
-    return await new WalletProvider(config).fromMnemonic({ mnemonic: fixture.mnemonic });
+    return await new WalletProvider(config).fromMnemonic({
+        mnemonic: fixture.mnemonic,
+        derivationPath: config.derivationPath
+    });
 }
 
 export async function getWalletSet() {

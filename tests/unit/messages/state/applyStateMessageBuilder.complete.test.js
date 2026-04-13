@@ -11,7 +11,7 @@ const hex = (value, bytes) => value.repeat(bytes);
 const toBuf = value => b4a.from(value, 'hex');
 
 async function createWallet(mnemonic) {
-    return await new WalletProvider(config).fromMnemonic({ mnemonic })
+    return await new WalletProvider(config).fromMnemonic({ mnemonic, derivationPath: config.derivationPath })
 }
 
 function expectBufferField(t, value, bytes, label) {

@@ -10,7 +10,7 @@ import { isAddressValid } from '../../../../src/core/state/utils/address.js';
 const hex = (value, bytes) => value.repeat(bytes);
 
 async function createWallet(mnemonic) {
-    return await new WalletProvider(config).fromMnemonic({ mnemonic })
+    return await new WalletProvider(config).fromMnemonic({ mnemonic, derivationPath: config.derivationPath })
 }
 
 function expectHexField(t, value, bytes, label) {

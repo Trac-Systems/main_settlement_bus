@@ -1,6 +1,7 @@
 import { TRAC_NETWORK_MSB_MAINNET_PREFIX, TRAC_NETWORK_MSB_TESTNET1_PREFIX } from 'trac-wallet';
 import { TRAC_NETWORK_TESTNET_ID, TRAC_NETWORK_MAINNET_ID } from 'trac-crypto-api/constants.js';
 import { Config } from './config.js';
+import { address } from 'trac-crypto-api';
 
 export const ENV = {
     MAINNET: 'mainnet',
@@ -15,9 +16,10 @@ const configData = {
         addressPrefix: TRAC_NETWORK_MSB_TESTNET1_PREFIX,
         addressPrefixLength: TRAC_NETWORK_MSB_TESTNET1_PREFIX.length,
         bech32mHrpLength: TRAC_NETWORK_MSB_TESTNET1_PREFIX.length + 1, // len(addressPrefix + separator)
-        bootstrap: 'a7c0c2cf8e4722129097f89b2a29a092f23d6268fcca3fd9570ba5b702b99b95',
+        bootstrap: 'c184f4ad8e9cf5e911f9415b60e7dcfb30aed73ebd8a402ef68e1b154624f5ef',
         channel: '1111trac1network1msb1testnet1111',
         dhtBootstrap: ['116.202.214.149:10001','157.180.12.214:10001','node1.hyperdht.org:49737','node2.hyperdht.org:49737','node3.hyperdht.org:49737'], // these are used to peer discovery
+        derivationPath: address.TESNET_DERIVATION_PATH,
         enableValidatorObserver: true,
         pollInterval: 500, // Validator observer poll interval
         adminCacheTTL: 10_000, // Admin cache TTL ms
@@ -66,6 +68,7 @@ const configData = {
         bootstrap: 'acbc3a4344d3a804101d40e53db1dda82b767646425af73599d4cd6577d69685',
         channel: '0000trac0network0msb0mainnet0000',
         dhtBootstrap: ['116.202.214.149:10001','157.180.12.214:10001','node1.hyperdht.org:49737','node2.hyperdht.org:49737','node3.hyperdht.org:49737'],
+        derivationPath: address.MAINNET_DERIVATION_PATH,
         enableValidatorObserver: true,
         pollInterval: 500, // Validator observer poll interval
         adminCacheTTL: 3_600_000, // Admin cache TTL ms
@@ -114,6 +117,7 @@ const configData = {
         bootstrap: '12f7f1668eac2e691e17cbc6a53e509c5cee78cdcac562313091c64e5fd077d6',
         channel: '12312313123123',
         dhtBootstrap: ['116.202.214.149:10001','157.180.12.214:10001','node1.hyperdht.org:49737','node2.hyperdht.org:49737','node3.hyperdht.org:49737'],
+        derivationPath: address.MAINNET_DERIVATION_PATH,
         enableValidatorObserver: true,
         pollInterval: 500, // Validator observer poll interval
         adminCacheTTL: 60_000, // Admin cache TTL ms
@@ -135,7 +139,7 @@ const configData = {
         messageValidatorResponseTimeout: 3 * 3 * 1000, //Overall timeout for sending a message (ms). This is 3 * maxRetries * messageValidatorRetryDelay;
         host: 'localhost',
         port: 5000,
-        networkId: TRAC_NETWORK_TESTNET_ID,
+        networkId: TRAC_NETWORK_MAINNET_ID,
         maxPeers: 64, // Connectivity constants
         maxParallel: 64, // Connectivity constants
         maxServerConnections: Infinity, // Connectivity constants
