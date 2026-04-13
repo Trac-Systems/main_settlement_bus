@@ -1,5 +1,6 @@
+import {ResultCode} from "../../../../../utils/constants.js";
 import {publicKeyToAddress} from "../../../../../utils/helpers.js";
-import {V1ProtocolError, V1UnexpectedError} from "../V1ProtocolError.js";
+import {V1ProtocolError} from "../V1ProtocolError.js";
 
 class V1BaseOperationHandler {
     #rateLimiterService;
@@ -58,7 +59,7 @@ class V1BaseOperationHandler {
         if (error instanceof V1ProtocolError) {
             return error;
         }
-        return new V1UnexpectedError(error?.message ?? 'Unexpected error');
+        return new V1ProtocolError(ResultCode.UNEXPECTED_ERROR, error?.message ?? 'Unexpected error', true);
     }
 }
 

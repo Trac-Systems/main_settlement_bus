@@ -1,6 +1,6 @@
 import {NetworkOperationType, ResultCode} from '../../../utils/constants.js';
 import {isHexString} from '../../../utils/helpers.js';
-import {V1ProtocolError, V1UnexpectedError} from "../protocols/v1/V1ProtocolError.js";
+import {V1ProtocolError} from "../protocols/v1/V1ProtocolError.js";
 import b4a from 'b4a';
 
 const PEER_PUBLIC_KEY_HEX_LENGTH = 64;
@@ -125,7 +125,7 @@ class PendingRequestService {
         if (!entry) return false;
         const err = error instanceof V1ProtocolError
             ? error
-            : new V1UnexpectedError(error?.message ?? 'Unexpected error');
+            : new V1ProtocolError(ResultCode.UNEXPECTED_ERROR, error?.message ?? 'Unexpected error', true);
         entry.reject(err);
         return true;
     }
@@ -157,7 +157,8 @@ class PendingRequestService {
             clearTimeout(entry.timeoutId);
             try {
                 entry.reject(
-                    new V1UnexpectedError(
+                    new V1ProtocolError(
+                        ResultCode.UNEXPECTED_ERROR,
                         `Pending request ${id} cancelled (shutdown).`,
                         true)
                 );

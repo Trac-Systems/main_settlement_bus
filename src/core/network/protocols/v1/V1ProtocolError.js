@@ -24,9 +24,3 @@ export class V1ProtocolError extends Error {
         this.endConnection = Boolean(endConnection);
     }
 }
-
-export class V1UnexpectedError extends V1ProtocolError {
-    constructor(message = 'Unexpected error', endConnection = true) {
-        super(ResultCode.UNEXPECTED_ERROR, message, endConnection);
-    }
-}

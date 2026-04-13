@@ -6,7 +6,6 @@ import {
 } from "../../../../../utils/constants.js";
 import {
     getResultCode,
-    V1UnexpectedError,
     V1ProtocolError
 } from "../V1ProtocolError.js";
 import V1BroadcastTransactionRequest from "../validators/V1BroadcastTransactionRequest.js";
@@ -80,7 +79,7 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
         } catch (error) {
             const protocolError = error instanceof V1ProtocolError
                 ? error
-                : new V1UnexpectedError(error?.message ?? 'Unexpected error');
+                : new V1ProtocolError(ResultCode.UNEXPECTED_ERROR, error?.message ?? 'Unexpected error', true);
             resultCode = getResultCode(protocolError);
             if (
                 resultCode === ResultCode.TX_ACCEPTED_PROOF_UNAVAILABLE &&
@@ -150,7 +149,7 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
                 timestamp
             );
         } catch (error) {
-            throw new V1UnexpectedError(`Failed to build broadcast transaction response: ${error.message}`);
+            throw new V1ProtocolError(ResultCode.UNEXPECTED_ERROR, `Failed to build broadcast transaction response: ${error.message}`, true);
         }
     }
 
@@ -158,7 +157,7 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
         try {
             return unsafeDecodeApplyOperation(message);
         } catch (error) {
-            throw new V1UnexpectedError(`Failed to decode apply operation from message: ${error.message}`);
+            throw new V1ProtocolError(ResultCode.UNEXPECTED_ERROR, `Failed to decode apply operation from message: ${error.message}`, true);
         }
     }
 
@@ -216,7 +215,7 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
             throw new V1ProtocolError(ResultCode.TX_INVALID_PAYLOAD, 'Decoded transaction type is missing.');
         }
         if (!this.#transactionCommitService) {
-            throw new V1UnexpectedError('TransactionCommitService is not configured.');
+            throw new V1ProtocolError(ResultCode.UNEXPECTED_ERROR, 'TransactionCommitService is not configured.', true);
         }
 
         const type = decodedTransaction.type;

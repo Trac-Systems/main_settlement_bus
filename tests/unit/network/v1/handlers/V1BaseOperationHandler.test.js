@@ -1,6 +1,7 @@
 import test from 'brittle';
 import V1BaseOperationHandler from '../../../../../src/core/network/protocols/v1/handlers/V1BaseOperationHandler.js';
-import {V1ProtocolError, V1UnexpectedError} from '../../../../../src/core/network/protocols/v1/V1ProtocolError.js';
+import {ResultCode} from '../../../../../src/utils/constants.js';
+import {V1ProtocolError} from '../../../../../src/core/network/protocols/v1/V1ProtocolError.js';
 
 class MockRateLimiter {
     constructor() { this.called = false; }
@@ -122,7 +123,7 @@ test('handlePendingResponseError: request already rejected -> does not close con
     t.absent(ended, 'Should NOT end the connection if the request was already rejected');
 });
 
-test('handlePendingResponseError: unknown native error -> maps to V1UnexpectedError', async (t) => {
+test('handlePendingResponseError: unknown native error -> maps to V1ProtocolError', async (t) => {
     const pendingReq = new MockPendingReqService();
     const handler = new V1BaseOperationHandler(null, pendingReq, mockConfig);
 
@@ -146,9 +147,10 @@ test('handlePendingResponseError: unknown native error -> maps to V1UnexpectedEr
 
     const capturedError = pendingReq.rejected[0].err;
 
-    t.ok(capturedError instanceof V1UnexpectedError, 'Should map to V1UnexpectedError');
+    t.ok(capturedError instanceof V1ProtocolError, 'Should map to V1ProtocolError');
+    t.is(capturedError.resultCode, ResultCode.UNEXPECTED_ERROR, 'Should map to UNEXPECTED_ERROR');
     t.is(capturedError.message, 'Random native error', 'Should preserve original message');
-    t.absent(ended, 'V1UnexpectedError should not close the connection by default');
+    t.absent(ended, 'Unexpected errors should not close the connection directly in this handler');
 });
 
 test('handlePendingResponseError: protocol error with endConnection=true -> does not close connection directly', async (t) => {
@@ -235,7 +237,8 @@ test('handlePendingResponseError: undefined error -> uses Unexpected error fallb
 
     const captured = pendingReq.rejected[0].err;
 
-    t.ok(captured instanceof V1UnexpectedError);
+    t.ok(captured instanceof V1ProtocolError);
+    t.is(captured.resultCode, ResultCode.UNEXPECTED_ERROR);
     t.is(captured.message, 'Unexpected error');
 });
 
@@ -279,6 +282,7 @@ test('handlePendingResponseError: primitive error value -> uses Unexpected error
 
     const captured = pendingReq.rejected[0].err;
 
-    t.ok(captured instanceof V1UnexpectedError);
+    t.ok(captured instanceof V1ProtocolError);
+    t.is(captured.resultCode, ResultCode.UNEXPECTED_ERROR);
     t.is(captured.message, 'Unexpected error');
 });
