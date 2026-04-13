@@ -7,7 +7,6 @@ import {
 import {
     getResultCode,
     V1UnexpectedError,
-    V1TxAlreadyPendingError,
     V1ProtocolError
 } from "../V1ProtocolError.js";
 import V1BroadcastTransactionRequest from "../validators/V1BroadcastTransactionRequest.js";
@@ -254,7 +253,7 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
                 throw new V1ProtocolError(ResultCode.TX_HASH_INVALID_FORMAT, error.message);
             }
             if (error instanceof PendingCommitAlreadyExistsError) {
-                throw new V1TxAlreadyPendingError(error.message);
+                throw new V1ProtocolError(ResultCode.TX_ALREADY_PENDING, error.message);
             }
             if (error instanceof PendingCommitBufferFullError) {
                 throw new V1ProtocolError(ResultCode.NODE_OVERLOADED, error.message);
@@ -269,7 +268,7 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
             if (error instanceof TransactionPoolFullError) {
                 err = new V1ProtocolError(ResultCode.NODE_OVERLOADED, error.message);
             } else if (error instanceof TransactionPoolAlreadyQueuedError) {
-                err = new V1TxAlreadyPendingError(error.message);
+                err = new V1ProtocolError(ResultCode.TX_ALREADY_PENDING, error.message);
             } else if (error instanceof TransactionPoolInvalidIncomingDataError) {
                 err = new V1ProtocolError(
                     ResultCode.INTERNAL_ENQUEUE_VALIDATION_FAILED,
