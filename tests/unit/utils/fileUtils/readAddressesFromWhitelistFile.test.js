@@ -30,7 +30,7 @@ hook('Initialize dummy whitelist files', async t => {
     // Edge: large file
     let large = '';
     const randomAddress = async () => {
-        const wallet = await new WalletProvider(config).generate()
+        const wallet = await new WalletProvider(config).generate({ derivationPath: config.derivationPath })
         return wallet.address;
     };
     for (let i = 0; i < 1000; i++) {

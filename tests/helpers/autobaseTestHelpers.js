@@ -172,7 +172,9 @@ export function defaultOpenHyperbeeView(store) {
 
 export async function createWallet(mnemonic = null) {
 	const provider = new WalletProvider(config)
-	return mnemonic ? await provider.fromMnemonic({ mnemonic }) : await provider.generate()
+	return mnemonic
+		? await provider.fromMnemonic({ mnemonic, derivationPath: config.derivationPath })
+		: await provider.generate({ derivationPath: config.derivationPath })
 }
 
 export function seedIndexerList(base, keys) {
