@@ -6,7 +6,6 @@ import {
 } from "../../../../../utils/constants.js";
 import {
     getResultCode,
-    V1NodeHasNoWriteAccess,
     V1TxAcceptedProofUnavailable,
     V1UnexpectedError,
     V1NodeOverloadedError,
@@ -208,7 +207,10 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
         const isAdminAllowedToValidate = await this.#state.isAdminAllowedToValidate();
         const canValidate = isAllowedToValidate || isAdminAllowedToValidate;
         if (!canValidate) {
-            throw new V1NodeHasNoWriteAccess('State is not writable or is an indexer without admin privileges.');
+            throw new V1ProtocolError(
+                ResultCode.NODE_HAS_NO_WRITE_ACCESS,
+                'State is not writable or is an indexer without admin privileges.'
+            );
         }
     }
 

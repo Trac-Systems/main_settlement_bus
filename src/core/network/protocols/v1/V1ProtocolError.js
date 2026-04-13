@@ -25,12 +25,6 @@ export class V1ProtocolError extends Error {
     }
 }
 
-export class V1NodeHasNoWriteAccess extends V1ProtocolError {
-    constructor(message = 'Node has no write access', endConnection = true) {
-        super(ResultCode.NODE_HAS_NO_WRITE_ACCESS, message, endConnection);
-    }
-}
-
 export class V1TxAcceptedProofUnavailable extends V1ProtocolError {
     constructor(message = 'Transaction accepted but proof is unavailable',  timestamp = 0,endConnection = false) {
         super(ResultCode.TX_ACCEPTED_PROOF_UNAVAILABLE, message, endConnection);
