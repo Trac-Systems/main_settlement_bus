@@ -79,7 +79,7 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
         } catch (error) {
             const protocolError = error instanceof V1ProtocolError
                 ? error
-                : new V1ProtocolError(ResultCode.UNEXPECTED_ERROR, error?.message ?? 'Unexpected error', true);
+                : new V1ProtocolError(ResultCode.UNEXPECTED_ERROR, error?.message ?? 'Unexpected error');
             resultCode = getResultCode(protocolError);
             if (
                 resultCode === ResultCode.TX_ACCEPTED_PROOF_UNAVAILABLE &&
@@ -149,7 +149,7 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
                 timestamp
             );
         } catch (error) {
-            throw new V1ProtocolError(ResultCode.UNEXPECTED_ERROR, `Failed to build broadcast transaction response: ${error.message}`, true);
+            throw new V1ProtocolError(ResultCode.UNEXPECTED_ERROR, `Failed to build broadcast transaction response: ${error.message}`);
         }
     }
 
@@ -157,7 +157,7 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
         try {
             return unsafeDecodeApplyOperation(message);
         } catch (error) {
-            throw new V1ProtocolError(ResultCode.UNEXPECTED_ERROR, `Failed to decode apply operation from message: ${error.message}`, true);
+            throw new V1ProtocolError(ResultCode.UNEXPECTED_ERROR, `Failed to decode apply operation from message: ${error.message}`);
         }
     }
 
@@ -215,7 +215,7 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
             throw new V1ProtocolError(ResultCode.TX_INVALID_PAYLOAD, 'Decoded transaction type is missing.');
         }
         if (!this.#transactionCommitService) {
-            throw new V1ProtocolError(ResultCode.UNEXPECTED_ERROR, 'TransactionCommitService is not configured.', true);
+            throw new V1ProtocolError(ResultCode.UNEXPECTED_ERROR, 'TransactionCommitService is not configured.');
         }
 
         const type = decodedTransaction.type;

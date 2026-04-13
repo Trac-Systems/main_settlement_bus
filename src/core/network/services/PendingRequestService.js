@@ -81,8 +81,7 @@ class PendingRequestService {
                 id,
                 new V1ProtocolError(
                     ResultCode.TIMEOUT,
-                    `Pending request with ID ${id} from peer ${peerPubKeyHex} timed out after ${entry.timeoutMs} ms.`,
-                    true
+                    `Pending request with ID ${id} from peer ${peerPubKeyHex} timed out after ${entry.timeoutMs} ms.`
                 ));
 
         }, entry.timeoutMs);
@@ -125,7 +124,7 @@ class PendingRequestService {
         if (!entry) return false;
         const err = error instanceof V1ProtocolError
             ? error
-            : new V1ProtocolError(ResultCode.UNEXPECTED_ERROR, error?.message ?? 'Unexpected error', true);
+            : new V1ProtocolError(ResultCode.UNEXPECTED_ERROR, error?.message ?? 'Unexpected error');
         entry.reject(err);
         return true;
     }
@@ -159,8 +158,7 @@ class PendingRequestService {
                 entry.reject(
                     new V1ProtocolError(
                         ResultCode.UNEXPECTED_ERROR,
-                        `Pending request ${id} cancelled (shutdown).`,
-                        true)
+                        `Pending request ${id} cancelled (shutdown).`)
                 );
             } catch (error) {
                 console.error(`PendingRequestService.close: failed to reject pending request ${id}:`, error);

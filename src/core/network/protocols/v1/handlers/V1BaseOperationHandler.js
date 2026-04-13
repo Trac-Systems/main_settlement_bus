@@ -59,7 +59,7 @@ class V1BaseOperationHandler {
         if (error instanceof V1ProtocolError) {
             return error;
         }
-        return new V1ProtocolError(ResultCode.UNEXPECTED_ERROR, error?.message ?? 'Unexpected error', true);
+        return new V1ProtocolError(ResultCode.UNEXPECTED_ERROR, error?.message ?? 'Unexpected error');
     }
 }
 

@@ -153,7 +153,7 @@ test('handlePendingResponseError: unknown native error -> maps to V1ProtocolErro
     t.absent(ended, 'Unexpected errors should not close the connection directly in this handler');
 });
 
-test('handlePendingResponseError: protocol error with endConnection=true -> does not close connection directly', async (t) => {
+test('handlePendingResponseError: protocol error -> does not close connection directly', async (t) => {
     const pendingReq = new MockPendingReqService();
     const handler = new V1BaseOperationHandler(null, pendingReq, mockConfig);
 
@@ -165,7 +165,7 @@ test('handlePendingResponseError: protocol error with endConnection=true -> does
         remotePublicKey: Buffer.alloc(32)
     };
 
-    const protocolError = new V1ProtocolError(999, 'FATAL_ERROR', true);
+    const protocolError = new V1ProtocolError(999, 'FATAL_ERROR');
 
     handler.handlePendingResponseError(
         'msg-123',
@@ -204,7 +204,7 @@ test('handlePendingResponseError: protocol-shaped error -> keeps original error 
     const pendingReq = new MockPendingReqService();
     const handler = new V1BaseOperationHandler(null, pendingReq, mockConfig);
 
-    const protocolError = new V1ProtocolError(123, 'protocol-shaped', false);
+    const protocolError = new V1ProtocolError(123, 'protocol-shaped');
 
     handler.displayError = () => {};
 

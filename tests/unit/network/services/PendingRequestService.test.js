@@ -76,7 +76,7 @@ test('PendingRequestService rejects and removes pending request', async t => {
         t.ok(error instanceof V1ProtocolError);
         t.is(error.resultCode, ResultCode.UNEXPECTED_ERROR);
         t.is(error.message, expectedError.message);
-        t.is(error.endConnection, true);
+        t.is(error.endConnection, false);
     }
 
     t.is(service.rejectPendingRequest('missing', new Error('missing')), false);
@@ -143,7 +143,7 @@ test('PendingRequestService rejects pending request on timeout', async t => {
             t.ok(error instanceof V1ProtocolError);
             t.is(error.resultCode, ResultCode.TIMEOUT);
             t.ok(error?.message?.includes(`timed out after ${pendingRequestTimeout} ms`));
-            t.is(error.endConnection, true);
+            t.is(error.endConnection, false);
         }
 
         t.is(service.has(request.id), false);
@@ -377,7 +377,7 @@ test('PendingRequestService.rejectPendingRequest falls back to Unexpected error 
         t.ok(error instanceof V1ProtocolError);
         t.is(error.resultCode, ResultCode.UNEXPECTED_ERROR);
         t.is(error.message, 'Unexpected error');
-        t.is(error.endConnection, true);
+        t.is(error.endConnection, false);
     }
 });
 

@@ -493,7 +493,7 @@ test('handleRequest: flushes response before closing when protocol error request
     const events = [];
 
     V1BroadcastTransactionRequest.prototype.validate = async () => {
-        throw new V1ProtocolError(ResultCode.INVALID_PAYLOAD, 'validation boom', true);
+        throw new V1ProtocolError(ResultCode.INVALID_PAYLOAD, 'validation boom');
     };
 
     const connection = {

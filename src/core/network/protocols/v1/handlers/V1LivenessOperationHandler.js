@@ -76,7 +76,7 @@ class V1LivenessOperationHandler extends V1BaseOperationHandler {
                 resultCode
             );
         } catch (error) {
-            throw new V1ProtocolError(ResultCode.UNEXPECTED_ERROR, `Failed to build liveness response: ${error.message}`, true);
+            throw new V1ProtocolError(ResultCode.UNEXPECTED_ERROR, `Failed to build liveness response: ${error.message}`);
         }
     }
 
