@@ -76,7 +76,6 @@ test('PendingRequestService rejects and removes pending request', async t => {
         t.ok(error instanceof V1ProtocolError);
         t.is(error.resultCode, ResultCode.UNEXPECTED_ERROR);
         t.is(error.message, expectedError.message);
-        t.is(error.endConnection, false);
     }
 
     t.is(service.rejectPendingRequest('missing', new Error('missing')), false);
@@ -88,7 +87,7 @@ test('PendingRequestService preserves typed result-coded errors', async t => {
     const request = await buildV1Request();
 
     const promise = service.registerPendingRequest(peer, request);
-    const expectedError = new SharedValidatorRejectionError(ResultCode.TX_INVALID_PAYLOAD, 'domain-invalid', true);
+    const expectedError = new SharedValidatorRejectionError(ResultCode.TX_INVALID_PAYLOAD, 'domain-invalid');
 
     t.ok(service.rejectPendingRequest(request.id, expectedError));
 
@@ -99,7 +98,6 @@ test('PendingRequestService preserves typed result-coded errors', async t => {
         t.is(error, expectedError);
         t.is(error.resultCode, ResultCode.TX_INVALID_PAYLOAD);
         t.is(error.message, 'domain-invalid');
-        t.is(error.endConnection, true);
     }
 });
 
@@ -143,7 +141,6 @@ test('PendingRequestService rejects pending request on timeout', async t => {
             t.ok(error instanceof V1ProtocolError);
             t.is(error.resultCode, ResultCode.TIMEOUT);
             t.ok(error?.message?.includes(`timed out after ${pendingRequestTimeout} ms`));
-            t.is(error.endConnection, false);
         }
 
         t.is(service.has(request.id), false);
@@ -377,7 +374,6 @@ test('PendingRequestService.rejectPendingRequest falls back to Unexpected error 
         t.ok(error instanceof V1ProtocolError);
         t.is(error.resultCode, ResultCode.UNEXPECTED_ERROR);
         t.is(error.message, 'Unexpected error');
-        t.is(error.endConnection, false);
     }
 });
 

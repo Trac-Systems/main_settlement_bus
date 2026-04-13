@@ -9,9 +9,6 @@ import {V1ProtocolError} from '../../v1/V1ProtocolError.js';
  * Note: this currently extends `V1ProtocolError` so the v1 protocol can consistently treat shared
  * validator rejections as typed protocol errors. Legacy protocol codepaths remain compatible because
  * this is still an `Error` and preserves `.message`.
- *
- * Default `endConnection = true` because shared-validator rejections are typically triggered
- * by invalid/malicious peer payloads and should terminate the peer connection after responding.
  */
 export class SharedValidatorRejectionError extends V1ProtocolError {
     /**

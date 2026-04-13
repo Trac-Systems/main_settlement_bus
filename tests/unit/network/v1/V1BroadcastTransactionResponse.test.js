@@ -508,7 +508,6 @@ test('validateIfResultCodeIsValidatorInternalError throws only for TX_COMMITTED_
         t.fail('expected internal error result code to throw');
     } catch (error) {
         t.is(error.resultCode, ResultCode.TX_COMMITTED_RECEIPT_MISSING);
-        t.is(error.endConnection, false);
     }
 
     validator.validateIfResultCodeIsValidatorInternalError(ResultCode.OK);
