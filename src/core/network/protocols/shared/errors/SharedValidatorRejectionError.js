@@ -17,10 +17,9 @@ export class SharedValidatorRejectionError extends V1ProtocolError {
     /**
      * @param {number} resultCode Stable rejection reason (a `ResultCode` value).
      * @param {string} message Human-readable error message.
-     * @param {boolean} [endConnection=true] Whether the transport should end the connection after responding.
      */
-    constructor(resultCode, message, endConnection = true) {
-        super(resultCode, message, endConnection);
+    constructor(resultCode, message) {
+        super(resultCode, message);
     }
 }
 
