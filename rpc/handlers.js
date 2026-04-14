@@ -5,32 +5,18 @@ import {
     sanitizeBulkPayloadsRequestBody, 
     sanitizeTransferPayload, 
     validatePayloadStructure,
-    hasSpacesInUrl,
-    BroadcastError, 
-    ValidationError,
-    NotFoundError
+    hasSpacesInUrl
 } from "./utils/helpers.js"
 import { MAX_SIGNED_LENGTH, ZERO_WK } from "./constants.js";
 import { buildRequestUrl } from "./utils/url.js";
-import {
-    getBalance,
-    getTxv,
-    getFee,
-    getConfirmedLength,
-    getUnconfirmedLength,
-    broadcastTransaction,
-    getTxHashes,
-    getTxDetails,
-    fetchBulkTxPayloads,
-    getExtendedTxDetails,
-} from "./rpc_services.js";
 import { bufferToBigInt, licenseBufferToBigInt } from "../src/utils/amountSerialization.js";
 import { isAddressValid } from "../src/core/state/utils/address.js";
 import { getConfirmedParameter } from "./utils/confirmedParameter.js";
+import { BroadcastError, ValidationError } from "../src/utils/errors.js";
 
 export async function handleHealth({ msbInstance, respond }) {
     try {
-        const isReady = msbInstance && msbInstance.state;
+        const isReady = !!msbInstance?.opened
         if (isReady) return respond(200, { ok: true });
         throw new Error("RPC_OFFLINE");
     } catch (error) {
@@ -54,28 +40,28 @@ export async function handleBalance({ req, respond, msbInstance }) {
         return;
     }
 
-    const nodeInfo = await getBalance(msbInstance, address, getConfirmedParameter(url) ?? false);
+    const nodeInfo = await msbInstance.getBalance(address, getConfirmedParameter(url, { defaultValue: false }));
     const balance = nodeInfo?.balance || "0";
 
     respond(200, { address, balance });
 }
 
 export async function handleTxv({ msbInstance, respond }) {
-    const txv = await getTxv(msbInstance);
+    const txv = await msbInstance.getTxv();
     respond(200, { txv });
 }
 
 export async function handleFee({ msbInstance, respond }) {
-    const fee = await getFee(msbInstance);
+    const fee = await msbInstance.handleGetFee().toString();
     respond(200, { fee });
 }
 
 export async function handleConfirmedLength({ msbInstance, respond }) {
-    const confirmed_length = await getConfirmedLength(msbInstance);
+    const confirmed_length = await msbInstance.getConfirmedLength();
     respond(200, { confirmed_length });
 }
 
-export async function handleBroadcastTransaction({ msbInstance, config, respond, req }) {
+export async function handleBroadcastTransaction({ msbInstance, respond, req }) {
     let body = '';
     const MAX_BODY_SIZE = 2_000_000;
     let limitExceeded = false;
@@ -118,8 +104,8 @@ export async function handleBroadcastTransaction({ msbInstance, config, respond,
             validatePayloadStructure(decodedPayload);
             const sanitizedPayload = sanitizeTransferPayload(decodedPayload);
 
-            const result = await broadcastTransaction(msbInstance, config, sanitizedPayload);
-            respond(200, { result });
+            const result = await msbInstance.broadcastTransaction(sanitizedPayload);
+            respond(200, { result: { ...result, message: 'Transaction broadcasted successfully.' } });
 
         } catch (error) {
             let code = 500;
@@ -174,15 +160,15 @@ export async function handleTxHashes({ msbInstance, respond, req }) {
         return respond(400, { error: `The max range for signedLength must be ${MAX_SIGNED_LENGTH}.` });
     }
 
-    const currentConfirmedLength = await getConfirmedLength(msbInstance);
+    const currentConfirmedLength = await msbInstance.getConfirmedLength();
     const adjustedEndLength = Math.min(endSignedLength, currentConfirmedLength)
 
-    const { hashes } = await getTxHashes(msbInstance, startSignedLength, adjustedEndLength);
+    const { hashes } = await msbInstance.getTxHashes(startSignedLength, adjustedEndLength);
     respond(200, { hashes });
 }
 
 export async function handleUnconfirmedLength({ msbInstance, respond }) {
-    const unconfirmed_length = await getUnconfirmedLength(msbInstance);
+    const unconfirmed_length = await msbInstance.getUnconfirmedLength();
     respond(200, { unconfirmed_length });
 }
 
@@ -205,18 +191,14 @@ export async function handleTransactionDetails({ msbInstance, respond, req }) {
     }
 
     try {
-        const txDetails = await getTxDetails(msbInstance, normalizedHash);
-        respond(200, { txDetails });
-    } catch (error) {
-        let code = 500;
-        let errorMsg = "Internal error";
-
-        if (error instanceof NotFoundError) {
-            code = 404;
-            errorMsg = error.message;
+        const txDetails = await msbInstance.getTxDetails(normalizedHash);
+        if (!txDetails) {
+            return respond(404, { error: `Transaction ${normalizedHash} not found.` });
         }
 
-        respond(code, { [code === 404 ? 'txDetails' : 'error']: code === 404 ? null : errorMsg });
+        respond(200, { txDetails });
+    } catch (error) {
+        respond(500, { error: "Internal error" });
     }
 }
 
@@ -244,18 +226,14 @@ export async function handleTransactionExtendedDetails({ msbInstance, respond, r
     }
 
     try {
-        const details = await getExtendedTxDetails(msbInstance, hash, confirmed);
-        respond(200, details);
-    } catch (error) {
-        let code = 500;
-        let errorMsg = 'An error occurred processing the request.';
-
-        if (error instanceof NotFoundError) {
-            code = 404;
-            errorMsg = error.message;
+        const details = await msbInstance.getExtendedTxDetails(hash, confirmed);
+        if (!details) {
+            return respond(404, { error: `No payload found for tx hash: ${hash}` });
         }
 
-        respond(code, { error: errorMsg });
+        respond(200, details);
+    } catch (error) {
+        respond(500, { error: 'An error occurred processing the request.' });
     }
 }
 
@@ -282,17 +260,26 @@ export async function handleFetchBulkTxPayloads({ msbInstance, respond, req }) {
 
         try {
             if (!body) {
-                throw new ValidationError("Missing payload.");
+                return respond(400, { error: "Missing payload." });
             }
 
             const sanitizedPayload = sanitizeBulkPayloadsRequestBody(body);
             if (!sanitizedPayload) {
-                throw new ValidationError("Invalid payload.");
+                return respond(400, { error: "Invalid payload." });
             }
 
             const { hashes } = sanitizedPayload;
+
+            if (!Array.isArray(hashes) || hashes.length === 0) {
+                return respond(400, { error: "Missing hash list." });
+            }
+
             const uniqueHashes = [...new Set(hashes)];
-            const commandResult = await fetchBulkTxPayloads(msbInstance, uniqueHashes);
+
+            if (uniqueHashes.length > 1500) {
+                return respond(400, { error: 'Length of input tx hashes exceeded.' });
+            }
+            const commandResult = await msbInstance.fetchBulkTxPayloads(uniqueHashes);
 
             const responseString = JSON.stringify(commandResult);
             if (Buffer.byteLength(responseString, 'utf8') > 2_000_000) {
@@ -304,7 +291,7 @@ export async function handleFetchBulkTxPayloads({ msbInstance, respond, req }) {
             let code = 500;
             let errorMsg = 'An internal error occurred.';
 
-            if (error instanceof ValidationError || error instanceof SyntaxError) {
+            if (error instanceof SyntaxError) {
                 code = 400;
                 errorMsg = error instanceof SyntaxError ? 'Invalid request body format.' : error.message;
             }

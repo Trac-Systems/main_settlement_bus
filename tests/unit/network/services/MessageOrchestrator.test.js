@@ -1,6 +1,7 @@
 import { hook, test } from 'brittle';
 import sinon from 'sinon';
 import MessageOrchestrator from '../../../../src/core/network/services/MessageOrchestrator.js';
+import State from '../../../../src/core/state/State.js';
 import { OperationType, ResultCode } from '../../../../src/utils/constants.js';
 import { testKeyPair1, testKeyPair2 } from '../../../fixtures/apply.fixtures.js';
 import { publicKeyToAddress } from '../../../../src/utils/helpers.js';
@@ -288,21 +289,22 @@ test('MessageOrchestrator.send validation split: non-OK result code stays in the
 test('MessageOrchestrator.send legacy path succeeds and increments sent count', async t => {
     const config = overrideConfig({ maxRetries: 0 });
     const sendSingleMessage = sinon.stub().resolves(true);
+    const state = { waitForUnsigned: sinon.stub().resolves(true) };
     const connectionManager = createConnectionManager({
         preferredProtocol: 'legacy',
         sendSingleMessage,
         sentCount: 0,
     });
-    const orchestrator = new MessageOrchestrator(connectionManager, { get: async () => null }, config);
+    const orchestrator = new MessageOrchestrator(connectionManager, state, config);
     const wallet = await createWallet(config);
     const message = createTransferMessage(config, wallet);
-    sinon.stub(orchestrator, 'waitForUnsignedState').resolves(true);
 
     orchestrator.setWallet(wallet);
     const result = await orchestrator.send(message);
 
     t.is(result, true);
     t.is(sendSingleMessage.callCount, 1);
+    t.is(state.waitForUnsigned.callCount, 1);
     t.is(connectionManager.incrementSentCount.callCount, 1);
     t.is(connectionManager.remove.callCount, 0);
 });
@@ -310,22 +312,23 @@ test('MessageOrchestrator.send legacy path succeeds and increments sent count', 
 test('MessageOrchestrator.send legacy path false result removes validator and retries', async t => {
     const config = overrideConfig({ maxRetries: 1 });
     const sendSingleMessage = sinon.stub().resolves(true);
+    const state = { waitForUnsigned: sinon.stub() };
+    state.waitForUnsigned.onFirstCall().resolves(false);
+    state.waitForUnsigned.onSecondCall().resolves(true);
     const connectionManager = createConnectionManager({
         preferredProtocol: 'legacy',
         sendSingleMessage,
     });
-    const orchestrator = new MessageOrchestrator(connectionManager, { get: async () => null }, config);
+    const orchestrator = new MessageOrchestrator(connectionManager, state, config);
     const wallet = await createWallet(config);
     const message = createTransferMessage(config, wallet);
-    const waitStub = sinon.stub(orchestrator, 'waitForUnsignedState');
-    waitStub.onFirstCall().resolves(false);
-    waitStub.onSecondCall().resolves(true);
 
     orchestrator.setWallet(wallet);
     const result = await orchestrator.send(message);
 
     t.is(result, true);
     t.is(sendSingleMessage.callCount, 2);
+    t.is(state.waitForUnsigned.callCount, 2);
     t.is(connectionManager.remove.callCount, 1);
 });
 
@@ -334,25 +337,26 @@ test('MessageOrchestrator.send legacy path catches send error and retries', asyn
     const sendSingleMessage = sinon.stub();
     sendSingleMessage.onFirstCall().rejects(new Error('legacy send failed'));
     sendSingleMessage.onSecondCall().resolves(true);
+    const state = { waitForUnsigned: sinon.stub().resolves(true) };
 
     const connectionManager = createConnectionManager({
         preferredProtocol: 'legacy',
         sendSingleMessage,
     });
-    const orchestrator = new MessageOrchestrator(connectionManager, { get: async () => null }, config);
+    const orchestrator = new MessageOrchestrator(connectionManager, state, config);
     const wallet = await createWallet(config);
     const message = createTransferMessage(config, wallet);
-    sinon.stub(orchestrator, 'waitForUnsignedState').resolves(true);
 
     orchestrator.setWallet(wallet);
     const result = await orchestrator.send(message);
 
     t.is(result, true);
     t.is(sendSingleMessage.callCount, 2);
+    t.is(state.waitForUnsigned.callCount, 1);
     t.is(connectionManager.remove.callCount, 0);
 });
 
-test('MessageOrchestrator.waitForUnsignedState returns true when state entry appears', async t => {
+test('State.waitForUnsigned returns true when state entry appears', async t => {
     const clock = sinon.useFakeTimers({ now: 1 });
     try {
         const state = {
@@ -360,9 +364,8 @@ test('MessageOrchestrator.waitForUnsignedState returns true when state entry app
                 .onFirstCall().resolves(null)
                 .onSecondCall().resolves({ tx: 'found' }),
         };
-        const orchestrator = new MessageOrchestrator(createConnectionManager(), state, config);
 
-        const pending = orchestrator.waitForUnsignedState('tx-hash', 500);
+        const pending = State.prototype.waitForUnsigned.call(state, 'tx-hash', 500);
         await clock.tickAsync(450);
         const result = await pending;
 
@@ -373,13 +376,12 @@ test('MessageOrchestrator.waitForUnsignedState returns true when state entry app
     }
 });
 
-test('MessageOrchestrator.waitForUnsignedState returns false on timeout', async t => {
+test('State.waitForUnsigned returns false on timeout', async t => {
     const clock = sinon.useFakeTimers({ now: 1 });
     try {
         const state = { get: sinon.stub().resolves(null) };
-        const orchestrator = new MessageOrchestrator(createConnectionManager(), state, config);
 
-        const pending = orchestrator.waitForUnsignedState('tx-hash', 400);
+        const pending = State.prototype.waitForUnsigned.call(state, 'tx-hash', 400);
         await clock.tickAsync(1000);
         const result = await pending;
 
