@@ -26,10 +26,10 @@ function buildGeneratedProtoResultCodes() {
         }));
 }
 
-function parseBooleanMark(mark, columnName) {
-    if (mark === '✅') return true;
-    if (mark === '❌') return false;
-    throw new Error(`Unsupported ${columnName} marker: ${mark}`);
+function parseBooleanValue(value, columnName) {
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    throw new Error(`Unsupported ${columnName} value: ${value}. Expected true or false.`);
 }
 
 function parsePolicyTable(markdown) {
@@ -54,15 +54,15 @@ function parsePolicyTable(markdown) {
             throw new Error(`Invalid table row format at line ${i + 1}: ${rawLine}`);
         }
 
-        const [senderMark, validatorMark, resultCodeName, valueRaw] = cells;
+        const [senderValue, validatorValue, resultCodeName, valueRaw] = cells;
         const value = Number(valueRaw);
         if (!Number.isInteger(value)) {
             throw new Error(`Invalid numeric value for ${resultCodeName} at line ${i + 1}: ${valueRaw}`);
         }
 
         rows.push({
-            senderRotates: parseBooleanMark(senderMark, 'Sender'),
-            validatorDisconnects: parseBooleanMark(validatorMark, 'Validator'),
+            senderRotates: parseBooleanValue(senderValue, 'Sender'),
+            validatorDisconnects: parseBooleanValue(validatorValue, 'Validator'),
             resultCodeName,
             value
         });
@@ -144,13 +144,13 @@ function compareRows(documentedRows, expectedRows) {
 
         if (row.senderRotates !== expected.senderRotates) {
             errors.push(
-                `${row.resultCodeName} has wrong Sender policy in docs. Expected ${expected.senderRotates ? '✅' : '❌'}.`
+                `${row.resultCodeName} has wrong Sender policy in docs. Expected ${expected.senderRotates}.`
             );
         }
 
         if (row.validatorDisconnects !== expected.validatorDisconnects) {
             errors.push(
-                `${row.resultCodeName} has wrong Validator policy in docs. Expected ${expected.validatorDisconnects ? '✅' : '❌'}.`
+                `${row.resultCodeName} has wrong Validator policy in docs. Expected ${expected.validatorDisconnects}.`
             );
         }
     }
