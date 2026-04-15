@@ -12,9 +12,12 @@ export class Config {
         this.#validate(options, config)
         this.#options = options
         this.#config = config
-        this.#bootstrap = b4a.from(this.#options.bootstrap || this.#config.bootstrap, 'hex')
-        // Ensure a 32-byte channel buffer (repeat-fill from string/Buffer if provided)
-        this.#channel = b4a.alloc(32).fill(this.#options.channel || this.#config.channel)
+        this.#bootstrap = this.#normalizeBootstrap(
+            isDefined(options.bootstrap) ? options.bootstrap : config.bootstrap
+        )
+        this.#channel = this.#normalizeChannel(
+            isDefined(options.channel) ? options.channel : config.channel
+        )
     }
 
     get addressLength() {
@@ -257,11 +260,104 @@ export class Config {
         return this.#options.hasOwnProperty(prop) && isDefined(this.#options[prop])
     }
 
+    #normalizeBootstrap(bootstrap) {
+        if (b4a.isBuffer(bootstrap)) {
+            return b4a.from(bootstrap)
+        }
+
+        return b4a.from(bootstrap, 'hex')
+    }
+
+    #normalizeChannel(channel) {
+        return b4a.alloc(32).fill(channel)
+    }
+
+    #validateStringOverride(field, value) {
+        if (typeof value !== 'string' || value.trim().length === 0) {
+            throw new Error(`MainSettlementBus Config: ${field} must be a non-empty string.`);
+        }
+    }
+
+    #validatePortOverride(port) {
+        if (!Number.isInteger(port) || port < 1 || port > 65535) {
+            throw new Error('MainSettlementBus Config: port must be an integer in range 1-65535.');
+        }
+    }
+
+    #validateBootstrapOverride(bootstrap) {
+        if (b4a.isBuffer(bootstrap)) {
+            if (bootstrap.length !== 32) {
+                throw new Error('MainSettlementBus Config: bootstrap must be a 32-byte hex string or Buffer.');
+            }
+            return;
+        }
+
+        if (typeof bootstrap !== 'string' || !/^[0-9a-fA-F]{64}$/.test(bootstrap)) {
+            throw new Error('MainSettlementBus Config: bootstrap must be a 32-byte hex string or Buffer.');
+        }
+    }
+
+    #validateChannelOverride(channel) {
+        if (!(typeof channel === 'string' || b4a.isBuffer(channel))) {
+            throw new Error('MainSettlementBus Config: channel must be a string or Buffer.');
+        }
+
+        const length = b4a.isBuffer(channel) ? channel.length : b4a.from(channel).length
+
+        if (length === 0 || length > 32) {
+            throw new Error('MainSettlementBus Config: channel must be 1-32 bytes long.');
+        }
+    }
+
+    #validateDhtBootstrapOverride(dhtBootstrap) {
+        if (!Array.isArray(dhtBootstrap) || dhtBootstrap.length === 0) {
+            throw new Error('MainSettlementBus Config: dhtBootstrap must be a non-empty array of strings.');
+        }
+
+        for (const entry of dhtBootstrap) {
+            if (typeof entry !== 'string' || entry.trim().length === 0) {
+                throw new Error('MainSettlementBus Config: dhtBootstrap entries must be non-empty strings.');
+            }
+        }
+    }
+
     #validate(options, config) {
+        if (options === null || typeof options !== 'object') {
+            throw new Error('MainSettlementBus Config: options must be an object.');
+        }
+
+        if (config === null || typeof config !== 'object') {
+            throw new Error('MainSettlementBus Config: config must be an object.');
+        }
+
         if (!options.channel && !config.channel) {
             throw new Error(
                 "MainSettlementBus: Channel is required. Application cannot start without channel."
             );
+        }
+
+        if (isDefined(options.bootstrap)) {
+            this.#validateBootstrapOverride(options.bootstrap);
+        }
+
+        if (isDefined(options.channel)) {
+            this.#validateChannelOverride(options.channel);
+        }
+
+        if (isDefined(options.storesDirectory)) {
+            this.#validateStringOverride('storesDirectory', options.storesDirectory);
+        }
+
+        if (isDefined(options.host)) {
+            this.#validateStringOverride('host', options.host);
+        }
+
+        if (isDefined(options.port)) {
+            this.#validatePortOverride(options.port);
+        }
+
+        if (isDefined(options.dhtBootstrap)) {
+            this.#validateDhtBootstrapOverride(options.dhtBootstrap);
         }
     }
 }

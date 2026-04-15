@@ -31,7 +31,7 @@ const setupNetwork = async () => {
     tmpDirectory = await initTemporaryDirectory()
     const rpcOpts = {
         bootstrap: randomBytes(32).toString('hex'),
-        channel: randomBytes(32).toString('hex'),
+        channel: randomBytes(16).toString('hex'),
         enableRoleRequester: false,
         enableWallet: true,
         enableValidatorObserver: true,
