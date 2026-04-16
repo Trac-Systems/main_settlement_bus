@@ -258,8 +258,8 @@ export class CommandHandler {
             console.info("Self transfer - only fee will be deducted");
         }
         console.info(`Amount: ${bigIntToDecimalString(preparedTransfer.amountBigInt)}`);
-        console.info(`Transaction cost: ${bigIntToDecimalString(preparedTransfer.totalDeductedAmount)}`);
         console.info(`Estimated transaction fee: ${bigIntToDecimalString(preparedTransfer.feeBigInt)}`);
+        console.info(`Total transaction cost: ${bigIntToDecimalString(preparedTransfer.totalDeductedAmount)}`);
         console.info(`Current balance: ${bigIntToDecimalString(preparedTransfer.senderBalance)}`);
         console.info(`Balance after transaction: ${bigIntToDecimalString(preparedTransfer.expectedNewBalance)}`);
 
