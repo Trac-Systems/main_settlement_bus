@@ -969,24 +969,6 @@ export class MainSettlementBus extends ReadyResource {
         return preparedTransfer.payload.tro.tx;
     }
 
-    async handleTransferOperation(recipientAddress, amount) {
-        const preparedTransfer = await this.prepareTransferOperation(recipientAddress, amount);
-
-        console.info('Transfer Details:');
-        console.info(`Transaction hash ${preparedTransfer.payload.tro.tx}`)
-        if (preparedTransfer.isSelfTransfer) {
-            console.info('Self transfer - only fee will be deducted');
-            console.info(`Fee: ${bigIntToDecimalString(preparedTransfer.feeBigInt)}`);
-            console.info(`Total amount to send: ${bigIntToDecimalString(preparedTransfer.totalDeductedAmount)}`);
-        } else {
-            console.info(`Amount: ${bigIntToDecimalString(preparedTransfer.amountBigInt)}`);
-            console.info(`Fee: ${bigIntToDecimalString(preparedTransfer.feeBigInt)}`);
-            console.info(`Total: ${bigIntToDecimalString(preparedTransfer.totalDeductedAmount)}`);
-        }
-        console.log(`Expected Balance After Transfer: ${bigIntToDecimalString(preparedTransfer.expectedNewBalance)}`);
-        await this.submitPreparedTransferOperation(preparedTransfer);
-    }
-
     async balanceMigrationOperation() {
         const isInitDisabled = await this.#state.isInitalizationDisabled()
 
