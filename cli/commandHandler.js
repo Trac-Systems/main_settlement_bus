@@ -231,8 +231,10 @@ export class CommandHandler {
             try {
                 return await pendingConfirmation.onConfirm();
             } catch (error) {
-                const errorMessage = error instanceof Error ? error.message : `${error}`;
-                console.error(`Command failed: ${errorMessage}`);
+                const errorMessage = typeof error === "object" && error !== null && "message" in error
+                    ? error.message
+                    : `${error}`;
+                console.error(`Transaction submission failed: ${errorMessage}`);
                 console.log("Try again or use /help.");
             }
 
@@ -252,7 +254,6 @@ export class CommandHandler {
         const preparedTransfer = await this.#msb.prepareTransferOperation(recipientAddress, amount);
 
         console.info("Transfer Details:");
-        console.info(`Transaction hash ${preparedTransfer.payload.tro.tx}`)
         if (preparedTransfer.isSelfTransfer) {
             console.info("Self transfer - only fee will be deducted");
         }
