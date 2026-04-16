@@ -1,6 +1,7 @@
 import { randomBytes } from "hypercore-crypto";
 import { Handlers } from "./handlers.js";
 import { isHexString } from "../src/utils/helpers.js";
+import { bigIntToDecimalString } from "../src/utils/amountSerialization.js";
 
 export const COMMANDS = {
     HELP: "/help",
@@ -44,6 +45,7 @@ export class CommandHandler {
     #closeCli;
     #wallet;
     #handlers;
+    #pendingConfirmation = null;
 
     constructor({ config, msb, handleClose, wallet }) {
         this.#config = config;
@@ -54,6 +56,10 @@ export class CommandHandler {
     }
 
     async handle(input) {
+        if (this.#pendingConfirmation !== null) {
+            return this.#handlePendingConfirmation(input);
+        }
+
         const [command, ...parts] = input.split(" ");
         const context = { command, input, parts };
         const handlers = this.#getHandlers();
@@ -163,7 +169,7 @@ export class CommandHandler {
             },
             {
                 evaluate: ({ input }) => input.startsWith(COMMANDS.TRANSFER),
-                process: async ({ parts }) => this.#msb.handleTransferOperation(parts[0], parts[1])
+                process: async ({ parts }) => this.#queueTransferConfirmation(parts[0], parts[1])
             },
             {
                 evaluate: ({ input }) => input.startsWith(COMMANDS.GET_BALANCE),
@@ -213,5 +219,55 @@ export class CommandHandler {
                 process: async ({ parts }) => this.#handlers.handleExtendedTxDetails(parts[0], parts[1] === "true")
             }
         ];
+    }
+
+    async #handlePendingConfirmation(input) {
+        const normalizedInput = input.trim().toLowerCase();
+        const pendingConfirmation = this.#pendingConfirmation;
+
+        if (normalizedInput === "y" || normalizedInput === "yes") {
+            this.#pendingConfirmation = null;
+
+            try {
+                return await pendingConfirmation.onConfirm();
+            } catch (error) {
+                const errorMessage = error instanceof Error ? error.message : `${error}`;
+                console.error(`Command failed: ${errorMessage}`);
+                console.log("Try again or use /help.");
+            }
+
+            return;
+        }
+
+        if (normalizedInput === "n" || normalizedInput === "no") {
+            this.#pendingConfirmation = null;
+            return pendingConfirmation.onDecline();
+        }
+
+        console.log('Invalid input. Please answer "y" or "n".');
+        console.log(pendingConfirmation.prompt);
+    }
+
+    async #queueTransferConfirmation(recipientAddress, amount) {
+        const preparedTransfer = await this.#msb.prepareTransferOperation(recipientAddress, amount);
+
+        console.info("Transfer Details:");
+        console.info(`Transaction hash ${preparedTransfer.payload.tro.tx}`)
+        if (preparedTransfer.isSelfTransfer) {
+            console.info("Self transfer - only fee will be deducted");
+        }
+        console.info(`Amount: ${bigIntToDecimalString(preparedTransfer.amountBigInt)}`);
+        console.info(`Transaction cost: ${bigIntToDecimalString(preparedTransfer.totalDeductedAmount)}`);
+        console.info(`Estimated transaction fee: ${bigIntToDecimalString(preparedTransfer.feeBigInt)}`);
+        console.info(`Current balance: ${bigIntToDecimalString(preparedTransfer.senderBalance)}`);
+        console.info(`Balance after transaction: ${bigIntToDecimalString(preparedTransfer.expectedNewBalance)}`);
+
+        this.#pendingConfirmation = {
+            prompt: "Do you want to proceed? (y/n)",
+            onConfirm: async () => this.#msb.submitPreparedTransferOperation(preparedTransfer),
+            onDecline: async () => this.#msb.printHelp()
+        };
+
+        console.log(this.#pendingConfirmation.prompt);
     }
 }
