@@ -3,7 +3,8 @@ import { test } from 'brittle';
 import b4a from 'b4a';
 
 import TransactionRateLimiterService from '../../../../src/core/network/services/TransactionRateLimiterService.js';
-import { V1RateLimitedError } from '../../../../src/core/network/protocols/v1/V1ProtocolError.js';
+import { V1ProtocolError } from '../../../../src/core/network/protocols/v1/V1ProtocolError.js';
+import { ResultCode } from '../../../../src/utils/constants.js';
 import { config } from '../../../helpers/config.js';
 import { testKeyPair1, testKeyPair2 } from '../../../fixtures/apply.fixtures.js';
 
@@ -67,7 +68,7 @@ test('TransactionRateLimiterService', async (t) => {
         }
     });
 
-    test('v1HandleRateLimit throws RateLimitedError after MAX+1 tx in the same second', async (t) => {
+    test('v1HandleRateLimit throws V1ProtocolError after MAX+1 tx in the same second', async (t) => {
         const clock = sinon.useFakeTimers({ now: 0 });
         try {
             const limiter = new TransactionRateLimiterService(makeSwarm(), config);
@@ -84,7 +85,8 @@ test('TransactionRateLimiterService', async (t) => {
                 err = error;
             }
 
-            t.ok(err instanceof V1RateLimitedError);
+            t.ok(err instanceof V1ProtocolError);
+            t.is(err.resultCode, ResultCode.RATE_LIMITED);
             t.ok(err.message.includes('Rate limit exceeded for peer'));
         } finally {
             clock.restore();

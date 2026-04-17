@@ -5,8 +5,9 @@ import { testKeyPair1, testKeyPair2 } from '../../../fixtures/apply.fixtures.js'
 import V1BroadcastTransactionOperationHandler from '../../../../src/core/network/protocols/v1/handlers/V1BroadcastTransactionOperationHandler.js';
 import PartialTransactionValidator from '../../../../src/core/network/protocols/shared/validators/PartialTransactionValidator.js';
 import { TransactionPoolFullError } from '../../../../src/core/network/services/TransactionPoolService.js';
-import { V1NodeOverloadedError } from '../../../../src/core/network/protocols/v1/V1ProtocolError.js';
+import { V1ProtocolError } from '../../../../src/core/network/protocols/v1/V1ProtocolError.js';
 import { applyStateMessageFactory } from '../../../../src/messages/state/applyStateMessageFactory.js';
+import { ResultCode } from '../../../../src/utils/constants.js';
 import { WalletProvider } from 'trac-wallet';
 
 async function createWallet(keyPair) {
@@ -104,7 +105,8 @@ test('V1BroadcastTransactionOperationHandler dispatchTransaction does not emit u
             }
 
             t.ok(thrown, 'dispatchTransaction should throw when enqueue fails');
-            t.ok(thrown instanceof V1NodeOverloadedError, 'should map tx pool full to V1NodeOverloadedError');
+            t.ok(thrown instanceof V1ProtocolError, 'should map tx pool full to V1ProtocolError');
+            t.is(thrown.resultCode, ResultCode.NODE_OVERLOADED);
             await new Promise(resolve => setImmediate(resolve));
         } finally {
             if (detachUnhandled) {

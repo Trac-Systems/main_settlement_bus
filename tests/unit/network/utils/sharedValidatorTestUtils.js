@@ -144,7 +144,7 @@ export function createZeroPublicKeyAddress() {
 export async function expectSharedValidatorError(t, fn, expectedCode, expectedMessage) {
     try {
         await fn();
-        t.fail(`Expected SharedValidatorRejectionError with resultCode ${expectedCode}`);
+        t.fail(`Expected V1ProtocolError with resultCode ${expectedCode}`);
     } catch (error) {
         t.is(error.resultCode, expectedCode);
         if (expectedMessage) {

@@ -6,14 +6,6 @@ import {
 } from "../../../../../utils/constants.js";
 import {
     getResultCode,
-    V1TxInvalidPayloadError,
-    V1NodeHasNoWriteAccess,
-    shouldEndConnection,
-    V1TxAcceptedProofUnavailable,
-    V1UnexpectedError,
-    V1NodeOverloadedError,
-    V1TxAlreadyPendingError,
-    V1TimeoutError,
     V1ProtocolError
 } from "../V1ProtocolError.js";
 import V1BroadcastTransactionRequest from "../validators/V1BroadcastTransactionRequest.js";
@@ -40,6 +32,7 @@ import {
     PendingCommitBufferFullError, PendingCommitTimeoutError
 } from "../../../services/TransactionCommitService.js";
 import b4a from "b4a";
+import {shouldEndConnection} from "../../connectionPolicies.js";
 
 class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
     #state;
@@ -86,7 +79,7 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
         } catch (error) {
             const protocolError = error instanceof V1ProtocolError
                 ? error
-                : new V1UnexpectedError(error?.message ?? 'Unexpected error', true);
+                : new V1ProtocolError(ResultCode.UNEXPECTED_ERROR, error?.message ?? 'Unexpected error');
             resultCode = getResultCode(protocolError);
             if (
                 resultCode === ResultCode.TX_ACCEPTED_PROOF_UNAVAILABLE &&
@@ -95,7 +88,7 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
             ) {
                 timestamp = protocolError.timestamp;
             }
-            endConnection = shouldEndConnection(protocolError);
+            endConnection = shouldEndConnection(resultCode);
             this.displayError(
                 "failed to process broadcast transaction request from sender",
                 connection.remotePublicKey,
@@ -156,7 +149,7 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
                 timestamp
             );
         } catch (error) {
-            throw new V1UnexpectedError(`Failed to build broadcast transaction response: ${error.message}`);
+            throw new V1ProtocolError(ResultCode.UNEXPECTED_ERROR, `Failed to build broadcast transaction response: ${error.message}`);
         }
     }
 
@@ -164,7 +157,7 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
         try {
             return unsafeDecodeApplyOperation(message);
         } catch (error) {
-            throw new V1UnexpectedError(`Failed to decode apply operation from message: ${error.message}`);
+            throw new V1ProtocolError(ResultCode.UNEXPECTED_ERROR, `Failed to decode apply operation from message: ${error.message}`);
         }
     }
 
@@ -199,7 +192,7 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
             this.#txPoolService.validateEnqueue();
         } catch (error) {
             if (error instanceof TransactionPoolFullError) {
-                throw new V1NodeOverloadedError('Transaction pool is full, ignoring incoming transaction.');
+                throw new V1ProtocolError(ResultCode.NODE_OVERLOADED, 'Transaction pool is full, ignoring incoming transaction.');
             }
             throw error;
         }
@@ -210,16 +203,19 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
         const isAdminAllowedToValidate = await this.#state.isAdminAllowedToValidate();
         const canValidate = isAllowedToValidate || isAdminAllowedToValidate;
         if (!canValidate) {
-            throw new V1NodeHasNoWriteAccess('State is not writable or is an indexer without admin privileges.');
+            throw new V1ProtocolError(
+                ResultCode.NODE_HAS_NO_WRITE_ACCESS,
+                'State is not writable or is an indexer without admin privileges.'
+            );
         }
     }
 
     async dispatchTransaction(decodedTransaction) {
         if (!decodedTransaction || !Number.isInteger(decodedTransaction.type) || decodedTransaction.type === 0) {
-            throw new V1TxInvalidPayloadError('Decoded transaction type is missing.', false);
+            throw new V1ProtocolError(ResultCode.TX_INVALID_PAYLOAD, 'Decoded transaction type is missing.');
         }
         if (!this.#transactionCommitService) {
-            throw new V1UnexpectedError('TransactionCommitService is not configured.');
+            throw new V1ProtocolError(ResultCode.UNEXPECTED_ERROR, 'TransactionCommitService is not configured.');
         }
 
         const type = decodedTransaction.type;
@@ -239,7 +235,7 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
             await this.#partialTransferValidator.validate(decodedTransaction);
             completeTransactionOperation = await this.#buildCompleteTransferOperation(decodedTransaction);
         } else {
-            throw new V1TxInvalidPayloadError(`Unsupported transaction type: ${type}`, false);
+            throw new V1ProtocolError(ResultCode.TX_INVALID_PAYLOAD, `Unsupported transaction type: ${type}`);
         }
 
         const payloadKey = this.#getOperationPayloadKey(type);
@@ -253,13 +249,13 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
             pendingCommit.catch(() => {});
         } catch (error) {
             if (error instanceof PendingCommitInvalidTxHashError) {
-                throw new V1ProtocolError(ResultCode.TX_HASH_INVALID_FORMAT, error.message, false);
+                throw new V1ProtocolError(ResultCode.TX_HASH_INVALID_FORMAT, error.message);
             }
             if (error instanceof PendingCommitAlreadyExistsError) {
-                throw new V1TxAlreadyPendingError(error.message);
+                throw new V1ProtocolError(ResultCode.TX_ALREADY_PENDING, error.message);
             }
             if (error instanceof PendingCommitBufferFullError) {
-                throw new V1NodeOverloadedError(error.message);
+                throw new V1ProtocolError(ResultCode.NODE_OVERLOADED, error.message);
             }
             throw error;
         }
@@ -269,14 +265,13 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
         } catch (error) {
             let err = error;
             if (error instanceof TransactionPoolFullError) {
-                err = new V1NodeOverloadedError(error.message);
+                err = new V1ProtocolError(ResultCode.NODE_OVERLOADED, error.message);
             } else if (error instanceof TransactionPoolAlreadyQueuedError) {
-                err = new V1TxAlreadyPendingError(error.message);
+                err = new V1ProtocolError(ResultCode.TX_ALREADY_PENDING, error.message);
             } else if (error instanceof TransactionPoolInvalidIncomingDataError) {
                 err = new V1ProtocolError(
                     ResultCode.INTERNAL_ENQUEUE_VALIDATION_FAILED,
-                    `Internal enqueue validation failed: ${error.message}`,
-                    false
+                    `Internal enqueue validation failed: ${error.message}`
                 );
             }
             this.#transactionCommitService.rejectPendingCommit(txHash, err);
@@ -288,13 +283,22 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
             receipt = await pendingCommit;
         } catch (error) {
             if (error instanceof TransactionPoolProofUnavailableError) {
-                throw new V1TxAcceptedProofUnavailable(error.message, false, error.timestamp);
+                // v1 still could expect proof-unavailable responses to carry the ledger timestamp,
+                // so keep it on the base protocol error after removing the scoped v1 error (old approach).
+                const protocolError = new V1ProtocolError(
+                    ResultCode.TX_ACCEPTED_PROOF_UNAVAILABLE,
+                    error.message
+                );
+                protocolError.timestamp = Number.isSafeInteger(error.timestamp) && error.timestamp > 0
+                    ? error.timestamp
+                    : 0;
+                throw protocolError;
             }
             if (error instanceof TransactionPoolMissingCommitReceiptError) {
-                throw new V1ProtocolError(ResultCode.TX_COMMITTED_RECEIPT_MISSING, error.message, false);
+                throw new V1ProtocolError(ResultCode.TX_COMMITTED_RECEIPT_MISSING, error.message);
             }
             if (error instanceof PendingCommitTimeoutError) {
-                throw new V1TimeoutError(error.message);
+                throw new V1ProtocolError(ResultCode.TIMEOUT, error.message);
             }
             throw error;
         }
@@ -336,7 +340,10 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
                     decodedTransaction.rao.is
                 );
             default:
-                throw new V1TxInvalidPayloadError(`Unsupported role access transaction type: ${decodedTransaction.type}`, false);
+                throw new V1ProtocolError(
+                    ResultCode.TX_INVALID_PAYLOAD,
+                    `Unsupported role access transaction type: ${decodedTransaction.type}`
+                );
         }
     }
 

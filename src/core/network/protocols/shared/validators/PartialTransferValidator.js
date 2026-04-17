@@ -3,7 +3,7 @@ import {bufferToBigInt} from "../../../../../utils/amountSerialization.js";
 import {ResultCode} from "../../../../../utils/constants.js";
 import { NULL_BUFFER } from '../../../../../utils/buffer.js';
 import PartialOperationValidator from './PartialOperationValidator.js';
-import SharedValidatorRejectionError from '../errors/SharedValidatorRejectionError.js';
+import {V1ProtocolError} from '../../v1/V1ProtocolError.js';
 import tracCryptoApi from "trac-crypto-api";
 import b4a from 'b4a';
 
@@ -34,7 +34,7 @@ class PartialTransferValidator extends PartialOperationValidator {
     #validateRecipientAddress(payload) {
         const incomingAddress = bufferToAddress(payload.tro.to, this.#config.addressPrefix);
         if (!incomingAddress) {
-            throw new SharedValidatorRejectionError(
+            throw new V1ProtocolError(
                 ResultCode.TRANSFER_RECIPIENT_ADDRESS_INVALID,
                 'Invalid recipient address in transfer payload.'
             );
@@ -42,7 +42,7 @@ class PartialTransferValidator extends PartialOperationValidator {
 
         const incomingPublicKey = tracCryptoApi.address.decodeSafe(incomingAddress);
         if (b4a.equals(incomingPublicKey, NULL_BUFFER)) {
-            throw new SharedValidatorRejectionError(
+            throw new V1ProtocolError(
                 ResultCode.TRANSFER_RECIPIENT_PUBLIC_KEY_INVALID,
                 'Invalid recipient public key in transfer payload.'
             );
@@ -56,7 +56,7 @@ class PartialTransferValidator extends PartialOperationValidator {
 
         const transferAmount = bufferToBigInt(payload.tro.am);
         if (transferAmount > this.max_amount) {
-            throw new SharedValidatorRejectionError(
+            throw new V1ProtocolError(
                 ResultCode.TRANSFER_AMOUNT_TOO_LARGE,
                 'Transfer amount exceeds maximum allowed value'
             );
@@ -67,12 +67,12 @@ class PartialTransferValidator extends PartialOperationValidator {
 
         const senderEntry = await this.state.getNodeEntryUnsigned(senderAddress);
         if (!senderEntry) {
-            throw new SharedValidatorRejectionError(ResultCode.TRANSFER_SENDER_NOT_FOUND, 'Sender account not found');
+            throw new V1ProtocolError(ResultCode.TRANSFER_SENDER_NOT_FOUND, 'Sender account not found');
         }
 
         const senderBalance = bufferToBigInt(senderEntry.balance);
         if (!(senderBalance >= totalDeductedAmount)) {
-            throw new SharedValidatorRejectionError(
+            throw new V1ProtocolError(
                 ResultCode.TRANSFER_INSUFFICIENT_BALANCE,
                 'Insufficient balance for transfer' + (isSelfTransfer ? ' fee' : ' + fee')
             );
@@ -84,7 +84,7 @@ class PartialTransferValidator extends PartialOperationValidator {
                 const recipientBalance = bufferToBigInt(recipientEntry.balance);
                 const newRecipientBalance = recipientBalance + transferAmount;
                 if (newRecipientBalance > this.max_amount) {
-                    throw new SharedValidatorRejectionError(
+                    throw new V1ProtocolError(
                         ResultCode.TRANSFER_RECIPIENT_BALANCE_OVERFLOW,
                         'Transfer would cause recipient balance to exceed maximum allowed value'
                     );

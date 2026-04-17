@@ -493,7 +493,7 @@ test('handleRequest: flushes response before closing when protocol error request
     const events = [];
 
     V1BroadcastTransactionRequest.prototype.validate = async () => {
-        throw new V1ProtocolError(ResultCode.INVALID_PAYLOAD, 'validation boom', true);
+        throw new V1ProtocolError(ResultCode.INVALID_PAYLOAD, 'validation boom');
     };
 
     const connection = {
@@ -791,4 +791,107 @@ test('Capability OR branch admin true', async t => {
     );
 
     t.pass();
+});
+
+test('dispatchTransaction maps proof unavailable to V1ProtocolError and preserves positive timestamp', async t => {
+
+    const proofUnavailableTimestamp = Date.now();
+    const handler = setupHandler(t, {
+        commit: {
+            registerPendingCommit() {
+                return Promise.reject(
+                    new PoolErrors.TransactionPoolProofUnavailableError('x', 1, 'proof-missing', proofUnavailableTimestamp)
+                );
+            },
+            rejectPendingCommit() {}
+        }
+    });
+
+    try {
+        await handler.dispatchTransaction({
+            type: OperationType.TX,
+            address: VALID_ADDR,
+            txo: transactionPayload()
+        });
+        t.fail('expected dispatchTransaction to throw');
+    } catch (error) {
+        t.ok(error instanceof V1ProtocolError);
+        t.is(error.resultCode, ResultCode.TX_ACCEPTED_PROOF_UNAVAILABLE);
+        t.is(error.timestamp, proofUnavailableTimestamp);
+    }
+});
+
+test('handleRequest builds proof unavailable response with propagated positive timestamp', async t => {
+
+    const proofUnavailableTimestamp = Date.now();
+    const handler = setupHandler(t, {
+        commit: {
+            registerPendingCommit() {
+                return Promise.reject(
+                    new PoolErrors.TransactionPoolProofUnavailableError('x', 1, 'proof-missing', proofUnavailableTimestamp)
+                );
+            },
+            rejectPendingCommit() {}
+        }
+    });
+
+    handler.decodeApplyOperation = () => ({
+        type: OperationType.TX,
+        address: VALID_ADDR,
+        txo: transactionPayload()
+    });
+
+    await handler.handleRequest(
+        { id: b4a.alloc(32), broadcast_transaction_request: { data: b4a.alloc(1) } },
+        mockConn(res => {
+            t.is(res.broadcast_transaction_response.result, ResultCode.TX_ACCEPTED_PROOF_UNAVAILABLE);
+            t.is(res.broadcast_transaction_response.timestamp, proofUnavailableTimestamp);
+        })
+    );
+});
+
+test('handleRequest keeps connection open for TIMEOUT response', async t => {
+    const handler = setupHandler(t, {
+        commit: {
+            registerPendingCommit() {
+                return Promise.reject(new CommitErrors.PendingCommitTimeoutError('commit timeout'));
+            },
+            rejectPendingCommit() {}
+        }
+    });
+    const events = [];
+
+    handler.decodeApplyOperation = () => ({
+        type: OperationType.TX,
+        address: VALID_ADDR,
+        txo: transactionPayload()
+    });
+
+    const connection = {
+        remotePublicKey: b4a.alloc(32),
+        protocolSession: {
+            sendAndForget(message) {
+                events.push('send');
+                t.is(
+                    message.broadcast_transaction_response.result,
+                    ResultCode.TIMEOUT,
+                    'validator should answer with TIMEOUT on pending commit timeout'
+                );
+            }
+        },
+        async flush() {
+            events.push('flush');
+            return true;
+        },
+        end() {
+            events.push('end');
+        }
+    };
+
+    await handler.handleRequest(
+        { id: 'msg-timeout-keep-open', broadcast_transaction_request: { data: b4a.alloc(1) } },
+        connection
+    );
+
+    t.alike(events, ['send']);
 });

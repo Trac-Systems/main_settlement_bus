@@ -4,12 +4,12 @@ import { v7 as uuidv7 } from 'uuid';
 import sinon from 'sinon';
 import PendingRequestService from '../../../../src/core/network/services/PendingRequestService.js';
 import NetworkMessageBuilder from '../../../../src/messages/network/v1/NetworkMessageBuilder.js';
-import { V1UnexpectedError } from '../../../../src/core/network/protocols/v1/V1ProtocolError.js';
+import { V1ProtocolError } from '../../../../src/core/network/protocols/v1/V1ProtocolError.js';
 import { NetworkOperationType, ResultCode } from '../../../../src/utils/constants.js';
+import { publicKeyToAddress } from '../../../../src/utils/helpers.js';
 import { errorMessageIncludes } from '../../../helpers/regexHelper.js';
 import { config } from '../../../helpers/config.js';
 import { testKeyPair1, testKeyPair2 } from '../../../fixtures/apply.fixtures.js';
-import SharedValidatorRejectionError from '../../../../src/core/network/protocols/shared/errors/SharedValidatorRejectionError.js';
 import { WalletProvider } from 'trac-wallet';
 
 const validPeerA = testKeyPair1.publicKey;
@@ -73,9 +73,9 @@ test('PendingRequestService rejects and removes pending request', async t => {
         await promise;
         t.fail('Expected pending request promise to reject');
     } catch (error) {
-        t.ok(error instanceof V1UnexpectedError);
+        t.is(error, expectedError);
+        t.ok(error instanceof Error);
         t.is(error.message, expectedError.message);
-        t.is(error.endConnection, true);
     }
 
     t.is(service.rejectPendingRequest('missing', new Error('missing')), false);
@@ -87,7 +87,7 @@ test('PendingRequestService preserves typed result-coded errors', async t => {
     const request = await buildV1Request();
 
     const promise = service.registerPendingRequest(peer, request);
-    const expectedError = new SharedValidatorRejectionError(ResultCode.TX_INVALID_PAYLOAD, 'domain-invalid', true);
+    const expectedError = new V1ProtocolError(ResultCode.TX_INVALID_PAYLOAD, 'domain-invalid');
 
     t.ok(service.rejectPendingRequest(request.id, expectedError));
 
@@ -98,7 +98,6 @@ test('PendingRequestService preserves typed result-coded errors', async t => {
         t.is(error, expectedError);
         t.is(error.resultCode, ResultCode.TX_INVALID_PAYLOAD);
         t.is(error.message, 'domain-invalid');
-        t.is(error.endConnection, true);
     }
 });
 
@@ -123,6 +122,7 @@ test('PendingRequestService rejects pending request on timeout', async t => {
     try {
         const pendingRequestTimeout = 123;
         const service = new PendingRequestService({
+            addressPrefix: config.addressPrefix,
             pendingRequestTimeout,
             maxPendingRequestsInPendingRequestsService: 10
         });
@@ -139,7 +139,10 @@ test('PendingRequestService rejects pending request on timeout', async t => {
             await promise;
             t.fail('Expected pending request to time out');
         } catch (error) {
+            t.is(error.name, 'PendingRequestServiceTimeoutError');
+            t.ok(error instanceof Error);
             t.ok(error?.message?.includes(`timed out after ${pendingRequestTimeout} ms`));
+            t.ok(error?.message?.includes(publicKeyToAddress(peer, config)));
         }
 
         t.is(service.has(request.id), false);
@@ -256,6 +259,7 @@ test('PendingRequestService.isProbePending matches peer and liveness type', asyn
 
 test('PendingRequestService enforces global pending request limit', async t => {
     const service = new PendingRequestService({
+        addressPrefix: config.addressPrefix,
         pendingRequestTimeout: config.pendingRequestTimeout,
         maxPendingRequestsInPendingRequestsService: 3
     });
@@ -370,9 +374,8 @@ test('PendingRequestService.rejectPendingRequest falls back to Unexpected error 
         await promise;
         t.fail('Expected pending request promise to reject');
     } catch (error) {
-        t.ok(error instanceof V1UnexpectedError);
+        t.ok(error instanceof Error);
         t.is(error.message, 'Unexpected error');
-        t.is(error.endConnection, true);
     }
 });
 
@@ -418,4 +421,3 @@ test('PendingRequestService throws when registerPendingRequest receives null mes
         t.ok(error?.message?.includes('Pending request message must be an object.'));
     }
 });
-

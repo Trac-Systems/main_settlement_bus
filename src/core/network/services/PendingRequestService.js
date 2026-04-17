@@ -1,12 +1,11 @@
 import {NetworkOperationType, ResultCode} from '../../../utils/constants.js';
-import {isHexString} from '../../../utils/helpers.js';
-import {V1ProtocolError, V1TimeoutError, V1UnexpectedError} from "../protocols/v1/V1ProtocolError.js";
-import {Config} from '../../../config/config.js';
+import {isHexString, publicKeyToAddress} from '../../../utils/helpers.js';
+import {V1ProtocolError} from "../protocols/v1/V1ProtocolError.js";
 import b4a from 'b4a';
 
 const PEER_PUBLIC_KEY_HEX_LENGTH = 64;
 
-class PendingRequestService {
+export default class PendingRequestService {
     #pendingRequests;
     #requestMessageTypes = [NetworkOperationType.LIVENESS_REQUEST, NetworkOperationType.BROADCAST_TRANSACTION_REQUEST];
     #config;
@@ -53,6 +52,7 @@ class PendingRequestService {
     registerPendingRequest(peerPubKeyHex, message) {
         this.#validateRegisterInput(peerPubKeyHex, message);
         const id = message.id;
+        const peerAddress = publicKeyToAddress(peerPubKeyHex, this.#config);
         if (this.#pendingRequests.size >= this.#config.maxPendingRequestsInPendingRequestsService) {
             throw new Error('Maximum number of pending requests reached.');
         }
@@ -66,7 +66,6 @@ class PendingRequestService {
             requestType: message.type,
             requestTxData: this.#extractRequestTxData(message),
             requestedTo: peerPubKeyHex,
-            timeoutMs: this.#config.pendingRequestTimeout,
             timeoutId: null,
             resolve: null,
             reject: null,
@@ -80,12 +79,14 @@ class PendingRequestService {
         entry.timeoutId = setTimeout(() => {
             this.rejectPendingRequest(
                 id,
-                new V1TimeoutError(
-                    `Pending request with ID ${id} from peer ${peerPubKeyHex} timed out after ${entry.timeoutMs} ms.`,
-                    true
-                ));
+                new PendingRequestServiceTimeoutError(
+                    id,
+                    peerAddress,
+                    this.#config.pendingRequestTimeout
+                )
+            );
 
-        }, entry.timeoutMs);
+        }, this.#config.pendingRequestTimeout);
 
         this.#pendingRequests.set(id, entry);
         return promise;
@@ -123,10 +124,7 @@ class PendingRequestService {
     rejectPendingRequest(id, error) {
         const entry = this.getAndDeletePendingRequest(id);
         if (!entry) return false;
-        const err = error instanceof V1ProtocolError
-            ? error
-            : new V1UnexpectedError(error?.message ?? 'Unexpected error');
-        entry.reject(err);
+        entry.reject(error instanceof Error ? error : new Error(error?.message ?? 'Unexpected error'));
         return true;
     }
 
@@ -157,9 +155,9 @@ class PendingRequestService {
             clearTimeout(entry.timeoutId);
             try {
                 entry.reject(
-                    new V1UnexpectedError(
-                        `Pending request ${id} cancelled (shutdown).`,
-                        false)
+                    new V1ProtocolError(
+                        ResultCode.UNEXPECTED_ERROR,
+                        `Pending request ${id} cancelled (shutdown).`)
                 );
             } catch (error) {
                 console.error(`PendingRequestService.close: failed to reject pending request ${id}:`, error);
@@ -169,4 +167,10 @@ class PendingRequestService {
     }
 }
 
-export default PendingRequestService;
+
+export class PendingRequestServiceTimeoutError extends Error {
+    constructor(requestId, peerAddress, timeoutMs) {
+        super(`Pending request ${requestId} to peer ${peerAddress} timed out after ${timeoutMs} ms.`);
+        this.name = this.constructor.name;
+    }
+}
