@@ -142,96 +142,42 @@ Supported network values are `mainnet`, `development`, `testnet1`, and `testnet`
 
 ## Docker usage
 
-You can run the RPC node in a containerized environment using the provided `docker-compose.yml` file. The `msb-rpc` service is already wired up. You usually only need to tweak these variables:
+For local Docker usage, build from `dockerfile`. The provided `docker-compose.yml` defines the `msb-rpc` service and is intended for the RPC node. The separate `dockerfile.deploy` is used by the release workflow.
+
+The most relevant variables are:
 
 - `MSB_STORE`: name of the store directory under `./stores`.
-- `MSB_HOST`: host interface to bind (defaults to `127.0.0.1` to avoid exposing everything).
-- `MSB_PORT`: port the RPC server listens on **inside** the container (defaults to `5000`).
-- `MSB_PUBLISH_PORT`: host port to expose (defaults to `MSB_PORT`, so set it only when the host port should differ).
-- `NETWORK`: network environment for the RPC process (defaults to `mainnet`). Supported values are `mainnet`, `development`, `testnet`, and `testnet1`.
+- `MSB_HOST`: host interface to bind. Defaults to `127.0.0.1`.
+- `MSB_PORT`: RPC port inside the container. Defaults to `5000`.
+- `MSB_PUBLISH_PORT`: host port to expose. Defaults to `MSB_PORT`.
+- `NETWORK`: network environment. Supported values are `mainnet`, `development`, `testnet`, and `testnet1`.
 
-Leave `MSB_PORT=5000` if you just want to publish the default RPC port and only bump `MSB_PUBLISH_PORT` when the host side must change. Set both to the same value if you want the RPC server itself to listen on another port.
+### Build the image
 
-Example (keep container port 5000, expose host port 6000):
+```sh
+docker compose build msb-rpc
+```
+
+If you want to run the image with plain `docker run`, build it with an explicit tag:
+
+```sh
+docker build -t msb-rpc -f dockerfile .
+```
+
+### Run the RPC service
 
 ```sh
 MSB_STORE=rpc-node-store \
 MSB_HOST=127.0.0.1 \
 MSB_PORT=5000 \
-NETWORK=mainnet \
 MSB_PUBLISH_PORT=6000 \
+NETWORK=mainnet \
 docker compose up -d msb-rpc
 ```
 
-### Running `msb-rpc` with Docker Compose
+Stop it with `docker compose stop msb-rpc` or remove it with `docker compose down`.
 
-Any of the following launch methods can be applied:
-
-1. **Using a `.env` file** – populate `.env`, then start the service:
-
-   ```sh
-   docker compose up -d msb-rpc
-   ```
-
-   or
-
-   ```sh
-   docker compose --env-file .env up -d msb-rpc
-   ```
-
-   Add any of the variables listed above to `.env`. When the host port needs to differ from the container port, set `MSB_PUBLISH_PORT` without touching `MSB_PORT`.
-
-   Example `.env` (publishes host port 1337, keeps the container on 5000):
-
-   ```dotenv
-   MSB_STORE=rpc-node-store
-   MSB_HOST=127.0.0.1
-   MSB_PORT=5000
-   NETWORK=mainnet
-   MSB_PUBLISH_PORT=1337
-   ```
-
-2. **Passing variables inline** – use this method when environment variables should be provided directly in the command line, without modifying the `.env` file:
-
-   ```sh
-   MSB_STORE=<store_name> MSB_HOST=<host> MSB_PORT=<container_port> NETWORK=<network> MSB_PUBLISH_PORT=<host_port> docker compose up -d msb-rpc
-   ```
-
-   Skip `MSB_PORT` when you just want to keep the container on `5000` and expose a different host port.
-
-3. **Reusing an existing store directory** – mount the path that already holds your store and pin the host binding you need:
-
-   ```sh
-   docker compose run -d --name msb-rpc \
-      -e MSB_STORE=<store_name> \
-      -e MSB_HOST=<host> \
-      -e MSB_PORT=<container_port> \
-      -e NETWORK=<network> \
-      -e MSB_PUBLISH_PORT=<host_port> \
-      -p <host_address>:<host_port>:<container_port> \
-      -v /absolute/path/to/your/store_directory:/msb/stores \
-      msb-rpc
-   ```
-
-   Adjust `/absolute/path/to/your/store_directory` to the directory that already contains the persisted store. Once the container exists, bring it back with `docker compose start msb-rpc`. If the container should stay on `5000`, omit `-e MSB_PORT=<container_port>` and just set `MSB_PUBLISH_PORT` plus the matching `-p` flag.
-
-   Example with specific values:
-
-   ```sh
-   docker compose run -d --name msb-rpc \
-       -e MSB_STORE=rpc-node-store \
-       -e MSB_HOST=127.0.0.1 \
-       -e MSB_PORT=5000 \
-       -e NETWORK=mainnet \
-       -e MSB_PUBLISH_PORT=6000 \
-       -p 127.0.0.1:6000:5000 \
-       -v /absolute/path/to/your/store_directory:/msb/stores \
-       msb-rpc
-   ```
-
-Stop the service with `docker compose stop msb-rpc`, remove the stack entirely with `docker compose down` when you are finished.
-
-> Note: The RPC instance must synchronize with the network after startup, so full readiness may take some time.
+> Note: In RPC mode the node still needs time to synchronize with the network before it is fully ready.
 
 ## Troubleshooting
 
