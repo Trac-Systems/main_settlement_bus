@@ -29,7 +29,9 @@ which pear
 
 Docker is optional and only needed for running the containerized RPC node. Before installing Docker, refer to the official [Docker documentation](https://www.docker.com) for the latest recommended version and installation instructions. For running the containerized RPC node, the latest Docker is recommended. Tested with Docker version 28.3.2, build 578ccf6.
 
-## Install
+## Install from source checkout
+
+Skip this section if you plan to run the Pear-distributed app shown in [Usage](#usage). The steps below are for running MSB from a local repository checkout, contributing, or testing changes.
 
 ```shell
 git clone -b <tag> --single-branch git@github.com:Trac-Systems/main_settlement_bus.git
@@ -37,7 +39,7 @@ cd main_settlement_bus
 npm install
 ```
 
-## Post-install checklist
+## Post-install checklist for source checkout
 
 Before running tests, install bare globally:
 
@@ -47,11 +49,19 @@ npm install -g bare
 
 - ✅ `npm run test:unit:all` – confirms the codebase builds and runs under both supported runtimes.
 - 📋 `npm run test:acceptance` – optional but recommended before upgrades. This suite spins up in-process nodes and may take a few minutes.
-- 🌐 RPC smoke test – start `STORES_DIRECTORY=smoke-store MSB_HOST=127.0.0.1 MSB_PORT=5000 NETWORK=mainnet npm run env-rpc` in one terminal, then execute `curl -s http://127.0.0.1:5000/v1/fee` from another terminal to verify `/v1` routes respond. Stop the node with `Ctrl+C` once finished.
+- 🌐 RPC smoke test – start `npm run rpc --host=127.0.0.1 --port=5000 -- --stores-directory smoke-store --network mainnet` in one terminal, then execute `curl -s http://127.0.0.1:5000/v1/fee` from another terminal to verify `/v1` routes respond. Stop the node with `Ctrl+C` once finished.
 
 ## Usage
 
-Runtime entry points cover CLI-driven runs (`start`, `rpc`) and `.env`-aware runs (`env`, `env-rpc`). Each section below lists the accepted configuration inputs.
+The current recommended way to use MSB for a user is through Pear distribution system which, just like msb, is inherently decentralized. To do so simply run:
+
+```
+pear run pear://6rpmo1bsedagn4u56a85nkzkrxcibab53d7sgds7ukn6kfyzgiwy store1
+```
+
+It may required to run twice and `TRUST` in order to perform the bootup.
+
+Another way, through project checkout, runtime entry points cover CLI-driven runs (`start`, `rpc`) and `.env`-aware runs (`env`, `env-rpc`). Each section below lists the accepted configuration inputs.
 
 ### Startup input validation
 
@@ -96,7 +106,7 @@ The script sources `.env` before invoking program and falls back to `stores` for
 STORES_DIRECTORY=<stores_directory> NETWORK=testnet npm run env
 ```
 
-This run persists data under `${STORES_DIRECTORY}` (defaults to `stores` under the project root), connects to testnet (defaults to `mainnet`) and is intended for inline or CLI-supplied configuration. Each network will have its own store subfolder to avoid collision
+This run persists data under `${STORES_DIRECTORY}` (defaults to `stores` under the project root), connects to testnet (defaults to `mainnet`) and is intended for inline or CLI-supplied configuration. Each network will have its own store subfolder to avoid collision. If `.env` exists, it is prioritized over the inline params.
 
 #### CLI flags
 
@@ -130,7 +140,7 @@ This entry point sources `.env` automatically and defaults to `stores`, `127.0.0
 STORES_DIRECTORY=<stores_directory> MSB_HOST=<host> MSB_PORT=<port> NETWORK=<network> npm run env-rpc
 ```
 
-Override any combination of `STORES_DIRECTORY`, `MSB_HOST`, `MSB_PORT`, or `NETWORK`. Data is persisted under `<stores_directory>/<store_name>` (default `stores/mainnet` for this script).
+Override any combination of `STORES_DIRECTORY`, `MSB_HOST`, `MSB_PORT`, or `NETWORK`. Data is persisted under `<stores_directory>/<store_name>` (default `stores/mainnet` for this script). If `.env` exists, it is sourced first and may override the inline values shown here.
 
 #### CLI flags
 
@@ -146,8 +156,8 @@ For local Docker usage, build from `dockerfile`. The provided `docker-compose.ym
 
 The most relevant variables are:
 
-- `MSB_STORE`: name of the store directory under `./stores`.
-- `MSB_HOST`: host interface to bind. Defaults to `127.0.0.1`.
+- `MSB_STORE`: store root under `./stores`. With `MSB_STORE=rpc-node-store` and `NETWORK=mainnet`, data is written under `./stores/rpc-node-store/mainnet`.
+- `MSB_HOST`: host interface to bind. Defaults to `127.0.0.1`. Use an IP address such as `127.0.0.1`; `localhost` is rejected by Docker Compose port mappings.
 - `MSB_PORT`: RPC port inside the container. Defaults to `5000`.
 - `MSB_PUBLISH_PORT`: host port to expose. Defaults to `MSB_PORT`.
 - `NETWORK`: network environment. Supported values are `mainnet`, `development`, `testnet`, and `testnet1`.

@@ -12,7 +12,7 @@
     "rpc": "NODE_OPTIONS='--max-old-space-size=4096' pear run . --rpc --host ${npm_config_host} --port ${npm_config_port}",
     "env": "if [ -f .env ]; then set -a; . ./.env; set +a; fi; NODE_OPTIONS='--max-old-space-size=4096' pear run . --stores-directory ${STORES_DIRECTORY:-stores} --network ${NETWORK:-mainnet}",
     "env-rpc": "if [ -f .env ]; then set -a; . ./.env; set +a; fi; NODE_OPTIONS='--max-old-space-size=4096' pear run . --stores-directory ${STORES_DIRECTORY:-stores} --rpc --host ${MSB_HOST:-127.0.0.1} --port ${MSB_PORT:-5000} --network ${NETWORK:-mainnet}",
-    "env-rpc-docker": "if [ -f .env ]; then set -a; . ./.env; set +a; fi; NODE_OPTIONS='--max-old-space-size=4096' node msb.mjs --stores-directory ${STORES_DIRECTORY:-stores} --rpc --host 0.0.0.0 --port ${MSB_PORT:-5000} --network ${NETWORK:-mainnet}",
+    "env-rpc-docker": "if [ -f .env ]; then set -a; . ./.env; set +a; fi; NODE_OPTIONS='--max-old-space-size=4096' node msb.mjs --stores-directory ${STORES_DIRECTORY:-stores/${MSB_STORE:-node-store}} --rpc --host 0.0.0.0 --port ${MSB_PORT:-5000} --network ${NETWORK:-mainnet}",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "protobuf": "node scripts/generate-protobufs.js",
