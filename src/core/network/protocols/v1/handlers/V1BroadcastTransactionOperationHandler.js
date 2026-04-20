@@ -1,7 +1,6 @@
 import {networkMessageFactory} from "../../../../../messages/network/v1/networkMessageFactory.js";
 import {
     NETWORK_CAPABILITIES,
-    OperationType,
     ResultCode
 } from "../../../../../utils/constants.js";
 import {
@@ -13,7 +12,6 @@ import {
     unsafeDecodeApplyOperation,
     unsafeEncodeApplyOperation
 } from "../../../../../utils/protobuf/operationHelpers.js";
-import {isBootstrapDeployment, isRoleAccess, isTransaction, isTransfer} from '../../../../../utils/applyOperations.js';
 import PartialRoleAccessValidator from "../../shared/validators/PartialRoleAccessValidator.js";
 import PartialBootstrapDeploymentValidator from "../../shared/validators/PartialBootstrapDeploymentValidator.js";
 import PartialTransactionValidator from "../../shared/validators/PartialTransactionValidator.js";
@@ -22,16 +20,19 @@ import {applyStateMessageFactory} from "../../../../../messages/state/applyState
 import V1BroadcastTransactionResponse from "../validators/V1BroadcastTransactionResponse.js";
 import V1BaseOperationHandler from "./V1BaseOperationHandler.js";
 import {
-    TransactionPoolMissingCommitReceiptError,
-    TransactionPoolProofUnavailableError,
-    TransactionPoolFullError, TransactionPoolInvalidIncomingDataError, TransactionPoolAlreadyQueuedError
-} from "../../../services/TransactionPoolService.js";
+    createBroadcastTransactionOperationStrategies,
+    resolveBroadcastTransactionOperationStrategy
+} from "./broadcastTransaction/BroadcastTransactionOperationStrategies.js";
 import {
-    PendingCommitInvalidTxHashError,
-    PendingCommitAlreadyExistsError,
-    PendingCommitBufferFullError, PendingCommitTimeoutError
-} from "../../../services/TransactionCommitService.js";
-import b4a from "b4a";
+    getTxHashFromDecodedTransaction,
+    sanitizeDecodedPartialTransaction
+} from "./broadcastTransaction/BroadcastTransactionPayloadUtils.js";
+import {
+    mapPendingCommitRegistrationError,
+    mapPendingCommitResolutionError,
+    mapTransactionEnqueueError,
+    mapTxPoolAvailabilityError
+} from "./broadcastTransaction/BroadcastTransactionErrorMapper.js";
 import {shouldEndConnection} from "../../connectionPolicies.js";
 
 class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
@@ -45,6 +46,7 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
     #partialTransactionValidator;
     #partialTransferValidator;
     #transactionCommitService;
+    #operationStrategies;
 
     constructor(state, wallet, rateLimiterService, txPoolService, pendingRequestService, transactionCommitService, config) {
         super(rateLimiterService, pendingRequestService, config);
@@ -58,66 +60,18 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
         this.#partialTransferValidator = new PartialTransferValidator(state, this.#wallet.address, config);
         this.#broadcastTransactionResponseValidator = new V1BroadcastTransactionResponse(state, config);
         this.#transactionCommitService = transactionCommitService;
+        this.#operationStrategies = createBroadcastTransactionOperationStrategies({
+            partialRoleAccessValidator: this.#partialRoleAccessValidator,
+            partialBootstrapDeploymentValidator: this.#partialBootstrapDeploymentValidator,
+            partialTransactionValidator: this.#partialTransactionValidator,
+            partialTransferValidator: this.#partialTransferValidator,
+            createApplyStateMessageFactory: () => applyStateMessageFactory(this.#wallet, this.config)
+        });
     }
 
     async handleRequest(message, connection) {
-        let resultCode = ResultCode.OK;
-        let endConnection = false;
-        let proof = null
-        let timestamp = 0;
-
-        try {
-            this.applyRateLimit(connection);
-            await this.#broadcastTransactionRequestValidator.validate(message, connection.remotePublicKey);
-            await this.#validationCapability();
-            this.#isTxPoolFull();
-            const decodedTransaction = this.decodeApplyOperation(message.broadcast_transaction_request.data);
-            this.#sanitizeDecodedPartialTransaction(decodedTransaction);
-            const receipt = await this.dispatchTransaction(decodedTransaction);
-            proof = receipt.proof;
-            timestamp = receipt.timestamp;
-        } catch (error) {
-            const protocolError = error instanceof V1ProtocolError
-                ? error
-                : new V1ProtocolError(ResultCode.UNEXPECTED_ERROR, error?.message ?? 'Unexpected error');
-            resultCode = getResultCode(protocolError);
-            if (
-                resultCode === ResultCode.TX_ACCEPTED_PROOF_UNAVAILABLE &&
-                Number.isSafeInteger(protocolError.timestamp) &&
-                protocolError.timestamp > 0
-            ) {
-                timestamp = protocolError.timestamp;
-            }
-            endConnection = shouldEndConnection(resultCode);
-            this.displayError(
-                "failed to process broadcast transaction request from sender",
-                connection.remotePublicKey,
-                protocolError
-            );
-        }
-
-        try {
-            const response = await this.#buildBroadcastTransactionResponse(
-                message.id,
-                NETWORK_CAPABILITIES,
-                proof,
-                timestamp,
-                resultCode,
-            );
-
-            await this.sendResponseAndMaybeClose(
-                connection,
-                response,
-                endConnection
-            );
-        } catch (error) {
-            this.displayError(
-                "failed to build/send response to sender",
-                connection.remotePublicKey,
-                error
-            );
-            connection.end();
-        }
+        const outcome = await this.#processBroadcastTransactionRequest(message, connection);
+        await this.#sendBroadcastTransactionResponse(message.id, connection, outcome);
     }
 
     async handleResponse(message, connection) {
@@ -161,44 +115,95 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
         }
     }
 
-    #sanitizeDecodedPartialTransaction(decodedTransaction) {
-        // Protobuf decode sets optional completion fields as null, but partial validators expect those fields to be absent.
-        // Otherwise, the presence of null fields causes validation to fail with "Expected type X but got null" errors.
+    async #processBroadcastTransactionRequest(message, connection) {
+        let proof = null;
+        let timestamp = 0;
 
-        const type = decodedTransaction?.type;
-        const operationKey = this.#getOperationPayloadKey(type);
-
-        if (!operationKey || !decodedTransaction?.[operationKey] || typeof decodedTransaction[operationKey] !== 'object') {
-            return;
+        try {
+            this.applyRateLimit(connection);
+            await this.#broadcastTransactionRequestValidator.validate(message, connection.remotePublicKey);
+            await this.#validateWriteCapability();
+            this.#validateTxPoolAvailability();
+            const decodedTransaction = this.decodeApplyOperation(message.broadcast_transaction_request.data);
+            sanitizeDecodedPartialTransaction(decodedTransaction);
+            const receipt = await this.dispatchTransaction(decodedTransaction);
+            proof = receipt.proof;
+            timestamp = receipt.timestamp;
+        } catch (error) {
+            return this.#buildFailedRequestOutcome(error, connection);
         }
 
-        for (const completionField of ['va', 'vn', 'vs']) {
-            if (decodedTransaction[operationKey][completionField] === null) {
-                delete decodedTransaction[operationKey][completionField];
-            }
+        return {
+            endConnection: false,
+            proof,
+            resultCode: ResultCode.OK,
+            timestamp
+        };
+    }
+
+    #buildFailedRequestOutcome(error, connection) {
+        const protocolError = error instanceof V1ProtocolError
+            ? error
+            : new V1ProtocolError(ResultCode.UNEXPECTED_ERROR, error?.message ?? 'Unexpected error');
+        const resultCode = getResultCode(protocolError);
+        let timestamp = 0;
+
+        if (
+            resultCode === ResultCode.TX_ACCEPTED_PROOF_UNAVAILABLE &&
+            Number.isSafeInteger(protocolError.timestamp) &&
+            protocolError.timestamp > 0
+        ) {
+            timestamp = protocolError.timestamp;
+        }
+
+        this.displayError(
+            "failed to process broadcast transaction request from sender",
+            connection.remotePublicKey,
+            protocolError
+        );
+
+        return {
+            endConnection: shouldEndConnection(resultCode),
+            proof: null,
+            resultCode,
+            timestamp
+        };
+    }
+
+    async #sendBroadcastTransactionResponse(messageId, connection, {proof, timestamp, resultCode, endConnection}) {
+        try {
+            const response = await this.#buildBroadcastTransactionResponse(
+                messageId,
+                NETWORK_CAPABILITIES,
+                proof,
+                timestamp,
+                resultCode,
+            );
+
+            await this.sendResponseAndMaybeClose(
+                connection,
+                response,
+                endConnection
+            );
+        } catch (error) {
+            this.displayError(
+                "failed to build/send response to sender",
+                connection.remotePublicKey,
+                error
+            );
+            connection.end();
         }
     }
 
-    #getOperationPayloadKey(type) {
-        if (isRoleAccess(type)) return 'rao';
-        if (isTransaction(type)) return 'txo';
-        if (isBootstrapDeployment(type)) return 'bdo';
-        if (isTransfer(type)) return 'tro';
-        return null;
-    }
-
-    #isTxPoolFull() {
+    #validateTxPoolAvailability() {
         try {
             this.#txPoolService.validateEnqueue();
         } catch (error) {
-            if (error instanceof TransactionPoolFullError) {
-                throw new V1ProtocolError(ResultCode.NODE_OVERLOADED, 'Transaction pool is full, ignoring incoming transaction.');
-            }
-            throw error;
+            throw mapTxPoolAvailabilityError(error);
         }
     }
 
-    async #validationCapability() {
+    async #validateWriteCapability() {
         const isAllowedToValidate = await this.#state.allowedToValidate(this.#wallet.address);
         const isAdminAllowedToValidate = await this.#state.isAdminAllowedToValidate();
         const canValidate = isAllowedToValidate || isAdminAllowedToValidate;
@@ -218,174 +223,45 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
             throw new V1ProtocolError(ResultCode.UNEXPECTED_ERROR, 'TransactionCommitService is not configured.');
         }
 
-        const type = decodedTransaction.type;
-        let completeTransactionOperation;
-
-        // TODO: Consider moving logic below to strategy design pattern.
-        if (isRoleAccess(type)) {
-            await this.#partialRoleAccessValidator.validate(decodedTransaction);
-            completeTransactionOperation = await this.#buildCompleteRoleAccessOperation(decodedTransaction);
-        } else if (isTransaction(type)) {
-            await this.#partialTransactionValidator.validate(decodedTransaction);
-            completeTransactionOperation = await this.#buildCompleteTransactionOperation(decodedTransaction);
-        } else if (isBootstrapDeployment(type)) {
-            await this.#partialBootstrapDeploymentValidator.validate(decodedTransaction);
-            completeTransactionOperation = await this.#buildCompleteBootstrapDeploymentOperation(decodedTransaction);
-        } else if (isTransfer(type)) {
-            await this.#partialTransferValidator.validate(decodedTransaction);
-            completeTransactionOperation = await this.#buildCompleteTransferOperation(decodedTransaction);
-        } else {
-            throw new V1ProtocolError(ResultCode.TX_INVALID_PAYLOAD, `Unsupported transaction type: ${type}`);
-        }
-
-        const payloadKey = this.#getOperationPayloadKey(type);
-        const txHash = b4a.toString(decodedTransaction[payloadKey].tx, 'hex');
-
+        const operationStrategy = resolveBroadcastTransactionOperationStrategy(
+            decodedTransaction.type,
+            this.#operationStrategies
+        );
+        const completeTransactionOperation = await operationStrategy.build(decodedTransaction);
+        const txHash = getTxHashFromDecodedTransaction(decodedTransaction, operationStrategy.payloadKey);
         const encodedCompleteTransaction = unsafeEncodeApplyOperation(completeTransactionOperation);
-        let pendingCommit;
+        const pendingCommit = this.#registerPendingCommit(txHash);
 
+        this.#enqueueTransaction(txHash, encodedCompleteTransaction);
+        return this.#resolvePendingCommit(pendingCommit);
+    }
+
+    #registerPendingCommit(txHash) {
         try {
-            pendingCommit = this.#transactionCommitService.registerPendingCommit(txHash);
+            const pendingCommit = this.#transactionCommitService.registerPendingCommit(txHash);
             pendingCommit.catch(() => {});
+            return pendingCommit;
         } catch (error) {
-            if (error instanceof PendingCommitInvalidTxHashError) {
-                throw new V1ProtocolError(ResultCode.TX_HASH_INVALID_FORMAT, error.message);
-            }
-            if (error instanceof PendingCommitAlreadyExistsError) {
-                throw new V1ProtocolError(ResultCode.TX_ALREADY_PENDING, error.message);
-            }
-            if (error instanceof PendingCommitBufferFullError) {
-                throw new V1ProtocolError(ResultCode.NODE_OVERLOADED, error.message);
-            }
-            throw error;
+            throw mapPendingCommitRegistrationError(error);
         }
+    }
 
+    #enqueueTransaction(txHash, encodedCompleteTransaction) {
         try {
             this.#txPoolService.addTransaction(txHash, encodedCompleteTransaction);
         } catch (error) {
-            let err = error;
-            if (error instanceof TransactionPoolFullError) {
-                err = new V1ProtocolError(ResultCode.NODE_OVERLOADED, error.message);
-            } else if (error instanceof TransactionPoolAlreadyQueuedError) {
-                err = new V1ProtocolError(ResultCode.TX_ALREADY_PENDING, error.message);
-            } else if (error instanceof TransactionPoolInvalidIncomingDataError) {
-                err = new V1ProtocolError(
-                    ResultCode.INTERNAL_ENQUEUE_VALIDATION_FAILED,
-                    `Internal enqueue validation failed: ${error.message}`
-                );
-            }
-            this.#transactionCommitService.rejectPendingCommit(txHash, err);
-            throw err; // will be mapped anyway on lower level.
+            const mappedError = mapTransactionEnqueueError(error);
+            this.#transactionCommitService.rejectPendingCommit(txHash, mappedError);
+            throw mappedError;
         }
+    }
 
-        let receipt;
+    async #resolvePendingCommit(pendingCommit) {
         try {
-            receipt = await pendingCommit;
+            return await pendingCommit;
         } catch (error) {
-            if (error instanceof TransactionPoolProofUnavailableError) {
-                // v1 still could expect proof-unavailable responses to carry the ledger timestamp,
-                // so keep it on the base protocol error after removing the scoped v1 error (old approach).
-                const protocolError = new V1ProtocolError(
-                    ResultCode.TX_ACCEPTED_PROOF_UNAVAILABLE,
-                    error.message
-                );
-                protocolError.timestamp = Number.isSafeInteger(error.timestamp) && error.timestamp > 0
-                    ? error.timestamp
-                    : 0;
-                throw protocolError;
-            }
-            if (error instanceof TransactionPoolMissingCommitReceiptError) {
-                throw new V1ProtocolError(ResultCode.TX_COMMITTED_RECEIPT_MISSING, error.message);
-            }
-            if (error instanceof PendingCommitTimeoutError) {
-                throw new V1ProtocolError(ResultCode.TIMEOUT, error.message);
-            }
-            throw error;
+            throw mapPendingCommitResolutionError(error);
         }
-
-        return receipt;
-    }
-
-
-    //TODO: Move responsibility to new class (next 4 functions)
-    async #buildCompleteRoleAccessOperation(decodedTransaction) {
-        const factory = applyStateMessageFactory(this.#wallet, this.config);
-
-        switch (decodedTransaction.type) {
-            case OperationType.ADD_WRITER:
-                return factory.buildCompleteAddWriterMessage(
-                    decodedTransaction.address,
-                    decodedTransaction.rao.tx,
-                    decodedTransaction.rao.txv,
-                    decodedTransaction.rao.iw,
-                    decodedTransaction.rao.in,
-                    decodedTransaction.rao.is
-                );
-            case OperationType.REMOVE_WRITER:
-                return factory.buildCompleteRemoveWriterMessage(
-                    decodedTransaction.address,
-                    decodedTransaction.rao.tx,
-                    decodedTransaction.rao.txv,
-                    decodedTransaction.rao.iw,
-                    decodedTransaction.rao.in,
-                    decodedTransaction.rao.is
-                );
-            case OperationType.ADMIN_RECOVERY:
-                return factory.buildCompleteAdminRecoveryMessage(
-                    decodedTransaction.address,
-                    decodedTransaction.rao.tx,
-                    decodedTransaction.rao.txv,
-                    decodedTransaction.rao.iw,
-                    decodedTransaction.rao.in,
-                    decodedTransaction.rao.is
-                );
-            default:
-                throw new V1ProtocolError(
-                    ResultCode.TX_INVALID_PAYLOAD,
-                    `Unsupported role access transaction type: ${decodedTransaction.type}`
-                );
-        }
-    }
-
-    async #buildCompleteTransactionOperation(decodedTransaction) {
-        return applyStateMessageFactory(this.#wallet, this.config)
-            .buildCompleteTransactionOperationMessage(
-                decodedTransaction.address,
-                decodedTransaction.txo.tx,
-                decodedTransaction.txo.txv,
-                decodedTransaction.txo.iw,
-                decodedTransaction.txo.in,
-                decodedTransaction.txo.ch,
-                decodedTransaction.txo.is,
-                decodedTransaction.txo.bs,
-                decodedTransaction.txo.mbs
-            );
-    }
-
-    async #buildCompleteBootstrapDeploymentOperation(decodedTransaction) {
-        return applyStateMessageFactory(this.#wallet, this.config)
-            .buildCompleteBootstrapDeploymentMessage(
-                decodedTransaction.address,
-                decodedTransaction.bdo.tx,
-                decodedTransaction.bdo.txv,
-                decodedTransaction.bdo.bs,
-                decodedTransaction.bdo.ic,
-                decodedTransaction.bdo.in,
-                decodedTransaction.bdo.is
-            );
-    }
-
-    async #buildCompleteTransferOperation(decodedTransaction) {
-        return applyStateMessageFactory(this.#wallet, this.config)
-            .buildCompleteTransferOperationMessage(
-                decodedTransaction.address,
-                decodedTransaction.tro.tx,
-                decodedTransaction.tro.txv,
-                decodedTransaction.tro.in,
-                decodedTransaction.tro.to,
-                decodedTransaction.tro.am,
-                decodedTransaction.tro.is
-            );
     }
 
     #extractBroadcastResultCode(payload) {
