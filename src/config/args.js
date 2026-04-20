@@ -6,14 +6,62 @@ const getArguments = () => {
     return pearApp?.args ?? runtimeArgs;
 };
 
+const getOptionValue = (args, flag) => {
+    const index = args.indexOf(flag);
+    if (index === -1) {
+        return undefined;
+    }
+
+    const value = args[index + 1];
+    if (value === undefined || String(value).startsWith('--')) {
+        throw new Error(`MainSettlementBus CLI: ${flag} requires a value.`);
+    }
+
+    return value;
+};
+
+const parseNonEmptyStringOption = (args, flag) => {
+    const value = getOptionValue(args, flag);
+    if (value === undefined) {
+        return undefined;
+    }
+
+    if (typeof value !== 'string' || value.trim().length === 0) {
+        throw new Error(`MainSettlementBus CLI: ${flag} must be a non-empty string.`);
+    }
+
+    return value;
+};
+
+const parsePortOption = (args) => {
+    const value = getOptionValue(args, '--port');
+    if (value === undefined) {
+        return undefined;
+    }
+
+    if (!/^\d+$/.test(value)) {
+        throw new Error('MainSettlementBus CLI: --port must be an integer in range 1-65535.');
+    }
+
+    const port = Number(value);
+    if (!Number.isInteger(port) || port < 1 || port > 65535) {
+        throw new Error('MainSettlementBus CLI: --port must be an integer in range 1-65535.');
+    }
+
+    return port;
+};
+
 export const resolveEnvironment = (args = []) => {
-    const networkIndex = args.indexOf('--network');
-    const network = (networkIndex !== -1 && args[networkIndex + 1]) ? args[networkIndex + 1] : undefined;
+    const network = getOptionValue(args, '--network');
+    if (network === undefined) {
+        return ENV.MAINNET;
+    }
 
     if (network === ENV.MAINNET) return ENV.MAINNET;
     if (network === ENV.DEVELOPMENT) return ENV.DEVELOPMENT;
     if (network === ENV.TESTNET1 || network === 'testnet') return ENV.TESTNET1;
-    return ENV.MAINNET;
+
+    throw new Error('MainSettlementBus CLI: --network must be one of: mainnet, development, testnet.');
 };
 
 export const isRpcEnabled = () => {
@@ -25,12 +73,9 @@ export const resolveConfig = () => {
     const args = getArguments();
     const runRpc = isRpcEnabled();
     const selectedEnv = resolveEnvironment(args);
-    const storesDirectoryIndex = args.indexOf('--stores-directory');
-    const storesDirectory = (storesDirectoryIndex !== -1 && args[storesDirectoryIndex + 1]) ? args[storesDirectoryIndex + 1] : undefined;
-    const hostIndex = args.indexOf('--host');
-    const host = (hostIndex !== -1 && args[hostIndex + 1]) ? args[hostIndex + 1] : undefined;
-    const portIndex = args.indexOf('--port');
-    const port = (portIndex !== -1 && args[portIndex + 1]) ? parseInt(args[portIndex + 1], 10) : undefined;
+    const storesDirectory = parseNonEmptyStringOption(args, '--stores-directory');
+    const host = runRpc ? parseNonEmptyStringOption(args, '--host') : undefined;
+    const port = runRpc ? parsePortOption(args) : undefined;
 
     const rpc = {
         storesDirectory,

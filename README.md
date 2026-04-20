@@ -53,6 +53,23 @@ npm install -g bare
 
 Runtime entry points cover CLI-driven runs (`start`, `rpc`) and `.env`-aware runs (`env`, `env-rpc`). Each section below lists the accepted configuration inputs.
 
+### Startup input validation
+
+Startup input is validated before MSB finishes booting. This applies to direct CLI flags and to the `.env` / inline environment-variable entry points, because those scripts ultimately pass the same runtime flags into `pear run .`.
+
+- `--network` / `NETWORK` must be one of `mainnet`, `development`, `testnet1`, or `testnet` (`testnet` is treated as an alias for `testnet1`).
+- `--stores-directory` / `STORES_DIRECTORY` must be a non-empty string.
+- `--host` / `MSB_HOST` must be a non-empty string when RPC mode is enabled.
+- `--port` / `MSB_PORT` must be an integer in range `1-65535` when RPC mode is enabled.
+
+MSB also validates the high-risk overrideable config values that are normalized into shared runtime state before startup:
+
+- `bootstrap` must be a 32-byte hex string or `Buffer`.
+- `channel` must be a string or `Buffer` with length `1-32` bytes.
+- `storesDirectory`, `host`, `port`, and `dhtBootstrap` overrides are validated before the node starts.
+
+When one of these values is invalid, startup fails immediately with a field-specific error instead of silently falling back.
+
 ### Interactive regular node
 
 #### Regular node with .env file
@@ -87,6 +104,8 @@ This run persists data under `${STORES_DIRECTORY}` (defaults to `stores` under t
 npm run start -- --stores-directory <stores_directory> --network testnet
 ```
 
+Supported network values are `mainnet`, `development`, `testnet1`, and `testnet` (`testnet` maps to `testnet1`).
+
 ### RPC-enabled node
 
 #### RPC with .env file
@@ -118,6 +137,8 @@ Override any combination of `STORES_DIRECTORY`, `MSB_HOST`, `MSB_PORT`, or `NETW
 ```sh
 npm run rpc --host=<host> --port=<port> -- --stores-directory <stores_directory> --network <network>
 ```
+
+Supported network values are `mainnet`, `development`, `testnet1`, and `testnet` (`testnet` maps to `testnet1`). Invalid `--host`, `--port`, `--stores-directory`, or `--network` values fail before the RPC node starts.
 
 ## Docker usage
 
