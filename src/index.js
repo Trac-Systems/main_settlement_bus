@@ -891,7 +891,7 @@ export class MainSettlementBus extends ReadyResource {
 
     }
 
-    async handleTransferOperation(recipientAddress, amount) {
+    async prepareTransferOperation(recipientAddress, amount) {
         if (!this.#config.enableWallet) {
             throw new Error(
                 "Can not perform transfer - wallet is not enabled."
@@ -939,33 +939,34 @@ export class MainSettlementBus extends ReadyResource {
         const txValidity = await this.#state.getIndexerSequenceState();
         const payload = await applyStateMessageFactory(this.#wallet, this.#config)
             .buildPartialTransferOperationMessage(
-            this.#wallet.address,
-            recipientAddress,
-            amountBuffer,
-            txValidity,
-            "json"
-        )
+                this.#wallet.address,
+                recipientAddress,
+                amountBuffer,
+                txValidity,
+                "json"
+            );
 
         const expectedNewBalance = senderBalance - totalDeductedAmount;
-        console.info('Transfer Details:');
-        console.info(`Transaction hash ${payload.tro.tx}`)
-        if (isSelfTransfer) {
-            console.info('Self transfer - only fee will be deducted');
-            console.info(`Fee: ${bigIntToDecimalString(feeBigInt)}`);
-            console.info(`Total amount to send: ${bigIntToDecimalString(totalDeductedAmount)}`);
-        } else {
-            console.info(`Amount: ${bigIntToDecimalString(amountBigInt)}`);
-            console.info(`Fee: ${bigIntToDecimalString(feeBigInt)}`);
-            console.info(`Total: ${bigIntToDecimalString(totalDeductedAmount)}`);
-        }
-        console.log(`Expected Balance After Transfer: ${bigIntToDecimalString(expectedNewBalance)}`);
-        const success = await this.broadcastPartialTransaction(payload);
+        return {
+            payload,
+            amountBigInt,
+            feeBigInt,
+            senderBalance,
+            totalDeductedAmount,
+            expectedNewBalance,
+            isSelfTransfer
+        };
+    }
+
+    async submitPreparedTransferOperation(preparedTransfer) {
+        const success = await this.broadcastPartialTransaction(preparedTransfer.payload);
         if (!success) {
             throw new Error("Failed to broadcast transfer transaction after multiple attempts.");
         } else {
-            console.log(`Transfer transaction broadcasted successfully. Tx hash: ${payload.tro.tx}`);
+            console.log(`Transfer transaction broadcasted successfully. Tx hash: ${preparedTransfer.payload.tro.tx}`);
         }
 
+        return preparedTransfer.payload.tro.tx;
     }
 
     async balanceMigrationOperation() {
