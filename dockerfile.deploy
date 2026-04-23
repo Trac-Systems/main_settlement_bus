@@ -30,12 +30,9 @@ RUN chown -R node:ops /msb \
 
 USER node
 
-ENV MSB_STORE=node-store \
-    MSB_HOST=0.0.0.0 \
-    MSB_PORT=5000
-
 VOLUME ["/msb/stores"]
 EXPOSE 5000
 
-ENTRYPOINT ["npm", "run"]
-CMD ["env-rpc-docker"]
+ENV NODE_OPTIONS=--max-old-space-size=4096
+
+ENTRYPOINT ["node", "msb.mjs"]

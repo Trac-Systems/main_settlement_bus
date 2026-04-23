@@ -29,7 +29,9 @@ which pear
 
 Docker is optional and only needed for running the containerized RPC node. Before installing Docker, refer to the official [Docker documentation](https://www.docker.com) for the latest recommended version and installation instructions. For running the containerized RPC node, the latest Docker is recommended. Tested with Docker version 28.3.2, build 578ccf6.
 
-## Install
+## Install from source checkout
+
+Skip this section if you plan to run the Pear-distributed app shown in [Usage](#usage). The steps below are for running MSB from a local repository checkout, contributing, or testing changes.
 
 ```shell
 git clone -b <tag> --single-branch git@github.com:Trac-Systems/main_settlement_bus.git
@@ -37,7 +39,7 @@ cd main_settlement_bus
 npm install
 ```
 
-## Post-install checklist
+## Post-install checklist for source checkout
 
 Before running tests, install bare globally:
 
@@ -47,11 +49,19 @@ npm install -g bare
 
 - ✅ `npm run test:unit:all` – confirms the codebase builds and runs under both supported runtimes.
 - 📋 `npm run test:acceptance` – optional but recommended before upgrades. This suite spins up in-process nodes and may take a few minutes.
-- 🌐 RPC smoke test – start `STORES_DIRECTORY=smoke-store MSB_HOST=127.0.0.1 MSB_PORT=5000 NETWORK=mainnet npm run env-rpc` in one terminal, then execute `curl -s http://127.0.0.1:5000/v1/fee` from another terminal to verify `/v1` routes respond. Stop the node with `Ctrl+C` once finished.
+- 🌐 RPC smoke test – start `npm run rpc --host=127.0.0.1 --port=5000 -- --stores-directory smoke-store --network mainnet` in one terminal, then execute `curl -s http://127.0.0.1:5000/v1/fee` from another terminal to verify `/v1` routes respond. Stop the node with `Ctrl+C` once finished.
 
 ## Usage
 
-Runtime entry points cover CLI-driven runs (`start`, `rpc`) and `.env`-aware runs (`env`, `env-rpc`). Each section below lists the accepted configuration inputs.
+The current recommended way to use MSB for a user is through Pear distribution system which, just like msb, is inherently decentralized. To do so simply run:
+
+```
+pear run pear://6rpmo1bsedagn4u56a85nkzkrxcibab53d7sgds7ukn6kfyzgiwy store1
+```
+
+It may required to run twice and `TRUST` in order to perform the bootup.
+
+Another way, through project checkout, runtime entry points cover CLI-driven runs (`start`, `rpc`) and `.env`-aware runs (`env`, `env-rpc`). Each section below lists the accepted configuration inputs.
 
 ### Startup input validation
 
@@ -96,7 +106,7 @@ The script sources `.env` before invoking program and falls back to `stores` for
 STORES_DIRECTORY=<stores_directory> NETWORK=testnet npm run env
 ```
 
-This run persists data under `${STORES_DIRECTORY}` (defaults to `stores` under the project root), connects to testnet (defaults to `mainnet`) and is intended for inline or CLI-supplied configuration. Each network will have its own store subfolder to avoid collision
+This run persists data under `${STORES_DIRECTORY}` (defaults to `stores` under the project root), connects to testnet (defaults to `mainnet`) and is intended for inline or CLI-supplied configuration. Each network will have its own store subfolder to avoid collision. If `.env` exists, it is prioritized over the inline params.
 
 #### CLI flags
 
@@ -130,7 +140,7 @@ This entry point sources `.env` automatically and defaults to `stores`, `127.0.0
 STORES_DIRECTORY=<stores_directory> MSB_HOST=<host> MSB_PORT=<port> NETWORK=<network> npm run env-rpc
 ```
 
-Override any combination of `STORES_DIRECTORY`, `MSB_HOST`, `MSB_PORT`, or `NETWORK`. Data is persisted under `<stores_directory>/<store_name>` (default `stores/mainnet` for this script).
+Override any combination of `STORES_DIRECTORY`, `MSB_HOST`, `MSB_PORT`, or `NETWORK`. Data is persisted under `<stores_directory>/<store_name>` (default `stores/mainnet` for this script). If `.env` exists, it is sourced first and may override the inline values shown here.
 
 #### CLI flags
 
@@ -142,96 +152,42 @@ Supported network values are `mainnet`, `development`, `testnet1`, and `testnet`
 
 ## Docker usage
 
-You can run the RPC node in a containerized environment using the provided `docker-compose.yml` file. The `msb-rpc` service is already wired up. You usually only need to tweak these variables:
+For local Docker usage, build from `dockerfile`. The provided `docker-compose.yml` defines the `msb-rpc` service and is intended for the RPC node. The separate `dockerfile.deploy` is used by the release workflow.
 
-- `MSB_STORE`: name of the store directory under `./stores`.
-- `MSB_HOST`: host interface to bind (defaults to `127.0.0.1` to avoid exposing everything).
-- `MSB_PORT`: port the RPC server listens on **inside** the container (defaults to `5000`).
-- `MSB_PUBLISH_PORT`: host port to expose (defaults to `MSB_PORT`, so set it only when the host port should differ).
-- `NETWORK`: network environment for the RPC process (defaults to `mainnet`). Supported values are `mainnet`, `development`, `testnet`, and `testnet1`.
+The most relevant variables are:
 
-Leave `MSB_PORT=5000` if you just want to publish the default RPC port and only bump `MSB_PUBLISH_PORT` when the host side must change. Set both to the same value if you want the RPC server itself to listen on another port.
+- `MSB_STORE`: store root under `./stores`. With `MSB_STORE=rpc-node-store` and `NETWORK=mainnet`, data is written under `./stores/rpc-node-store/mainnet`.
+- `MSB_HOST`: host interface to bind. Defaults to `127.0.0.1`. Use an IP address such as `127.0.0.1`; `localhost` is rejected by Docker Compose port mappings.
+- `MSB_PORT`: RPC port inside the container. Defaults to `5000`.
+- `MSB_PUBLISH_PORT`: host port to expose. Defaults to `MSB_PORT`.
+- `NETWORK`: network environment. Supported values are `mainnet`, `development`, `testnet`, and `testnet1`.
 
-Example (keep container port 5000, expose host port 6000):
+### Build the image
+
+```sh
+docker compose build msb-rpc
+```
+
+If you want to run the image with plain `docker run`, build it with an explicit tag:
+
+```sh
+docker build -t msb-rpc -f dockerfile .
+```
+
+### Run the RPC service
 
 ```sh
 MSB_STORE=rpc-node-store \
 MSB_HOST=127.0.0.1 \
 MSB_PORT=5000 \
-NETWORK=mainnet \
 MSB_PUBLISH_PORT=6000 \
+NETWORK=mainnet \
 docker compose up -d msb-rpc
 ```
 
-### Running `msb-rpc` with Docker Compose
+Stop it with `docker compose stop msb-rpc` or remove it with `docker compose down`.
 
-Any of the following launch methods can be applied:
-
-1. **Using a `.env` file** – populate `.env`, then start the service:
-
-   ```sh
-   docker compose up -d msb-rpc
-   ```
-
-   or
-
-   ```sh
-   docker compose --env-file .env up -d msb-rpc
-   ```
-
-   Add any of the variables listed above to `.env`. When the host port needs to differ from the container port, set `MSB_PUBLISH_PORT` without touching `MSB_PORT`.
-
-   Example `.env` (publishes host port 1337, keeps the container on 5000):
-
-   ```dotenv
-   MSB_STORE=rpc-node-store
-   MSB_HOST=127.0.0.1
-   MSB_PORT=5000
-   NETWORK=mainnet
-   MSB_PUBLISH_PORT=1337
-   ```
-
-2. **Passing variables inline** – use this method when environment variables should be provided directly in the command line, without modifying the `.env` file:
-
-   ```sh
-   MSB_STORE=<store_name> MSB_HOST=<host> MSB_PORT=<container_port> NETWORK=<network> MSB_PUBLISH_PORT=<host_port> docker compose up -d msb-rpc
-   ```
-
-   Skip `MSB_PORT` when you just want to keep the container on `5000` and expose a different host port.
-
-3. **Reusing an existing store directory** – mount the path that already holds your store and pin the host binding you need:
-
-   ```sh
-   docker compose run -d --name msb-rpc \
-      -e MSB_STORE=<store_name> \
-      -e MSB_HOST=<host> \
-      -e MSB_PORT=<container_port> \
-      -e NETWORK=<network> \
-      -e MSB_PUBLISH_PORT=<host_port> \
-      -p <host_address>:<host_port>:<container_port> \
-      -v /absolute/path/to/your/store_directory:/msb/stores \
-      msb-rpc
-   ```
-
-   Adjust `/absolute/path/to/your/store_directory` to the directory that already contains the persisted store. Once the container exists, bring it back with `docker compose start msb-rpc`. If the container should stay on `5000`, omit `-e MSB_PORT=<container_port>` and just set `MSB_PUBLISH_PORT` plus the matching `-p` flag.
-
-   Example with specific values:
-
-   ```sh
-   docker compose run -d --name msb-rpc \
-       -e MSB_STORE=rpc-node-store \
-       -e MSB_HOST=127.0.0.1 \
-       -e MSB_PORT=5000 \
-       -e NETWORK=mainnet \
-       -e MSB_PUBLISH_PORT=6000 \
-       -p 127.0.0.1:6000:5000 \
-       -v /absolute/path/to/your/store_directory:/msb/stores \
-       msb-rpc
-   ```
-
-Stop the service with `docker compose stop msb-rpc`, remove the stack entirely with `docker compose down` when you are finished.
-
-> Note: The RPC instance must synchronize with the network after startup, so full readiness may take some time.
+> Note: In RPC mode the node still needs time to synchronize with the network before it is fully ready.
 
 ## Troubleshooting
 

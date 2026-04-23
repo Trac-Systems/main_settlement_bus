@@ -1,4 +1,4 @@
-name: Publish trac-msb to npm on release
+name: Publish trac-msb on release
 
 on:
   release:
@@ -9,7 +9,8 @@ permissions:
   contents: read
 
 jobs:
-  publish:
+  publish-npm:
+    name: Publish npm package
     runs-on: ubuntu-latest
     steps:
       - name: Checkout release tag
@@ -31,3 +32,44 @@ jobs:
 
       - name: Publish to npm
         run: npm publish --access public
+
+  publish-docker:
+    name: Publish Docker image
+    runs-on: ubuntu-latest
+    env:
+      # Override with a repository variable if the Docker Hub repo should differ.
+      DOCKERHUB_IMAGE: ${{ vars.DOCKERHUB_IMAGE != '' && vars.DOCKERHUB_IMAGE || format('{0}/trac-msb', vars.DOCKERHUB_USERNAME) }}
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Generate Docker image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.DOCKERHUB_IMAGE }}
+          tags: |
+            type=raw,value=${{ github.event.release.tag_name }}
+            type=semver,pattern={{version}},value=${{ github.event.release.tag_name }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ github.event.release.tag_name }}
+            type=raw,value=latest,enable=${{ !github.event.release.prerelease }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./dockerfile.deploy
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
