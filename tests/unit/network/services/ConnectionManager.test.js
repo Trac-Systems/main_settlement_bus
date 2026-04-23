@@ -39,11 +39,14 @@ const makeHealthCheckService = () => {
     return emitter;
 };
 
-const makeManager = (maxValidators = 6, conns = connections) => {
+let connections
+
+const makeManager = (maxValidators = 6, conns = null) => {
     const merged = createConfig(ENV.DEVELOPMENT, { maxValidators })
     const connectionManager = new ConnectionManager(merged)
+    const activeConnections = conns ?? connections;
 
-    conns.forEach(({ key, connection }) => {
+    activeConnections.forEach(({ key, connection }) => {
         connectionManager.addValidator(key, connection)
     });
 
@@ -56,8 +59,6 @@ const reset = () => {
         connection.connection.protocolSession.send.resetHistory()
     })
 }
-
-let connections
 hook('Initialize state', async () => {
     connections = [
         createConnection(testKeyPair1.publicKey),
@@ -68,7 +69,7 @@ hook('Initialize state', async () => {
 });
 
 test('ConnectionManager', () => {
-    test('addValidator', async t => {
+    test('addValidator', async () => {
         test('adds a validator', async t => {
             reset()
             const connectionManager = makeManager()
@@ -119,7 +120,7 @@ test('ConnectionManager', () => {
         })
     })
 
-    test('connected', async t => {
+    test('connected', async () => {
         test('true', async t => {
             reset()
             const connectionManager = makeManager()
@@ -135,7 +136,7 @@ test('ConnectionManager', () => {
         })
     })
 
-    test('sendSingleMessage', async t => {
+    test('sendSingleMessage', async () => {
         test('returns exact resultCode from protocolSession.send', async t => {
             reset()
             const data = createConnection(testKeyPair1.publicKey)
@@ -216,7 +217,7 @@ test('ConnectionManager', () => {
     //     })
     // })
 
-    test('on close', async t => {
+    test('on close', async () => {
         test('removes from list', async t => {
             reset()
             const connectionManager = makeManager()
@@ -230,7 +231,7 @@ test('ConnectionManager', () => {
         })
     })
 
-    test('remove', async t => {
+    test('remove', async () => {
         test('removes a validator by public key', async t => {
             reset()
             const connectionManager = makeManager()
@@ -245,7 +246,7 @@ test('ConnectionManager', () => {
         })
     })
 
-    test('on close', async t => {
+    test('on close', async () => {
         test('removes from list', async t => {
             reset()
             const connectionManager = makeManager()
@@ -259,7 +260,7 @@ test('ConnectionManager', () => {
         })
     })
 
-    test('health checks (strict)', async t => {
+    test('health checks (strict)', async () => {
         test('keeps validator on OK response', async t => {
             try {
                 const v1Conn = createV1Connection(testKeyPair1.publicKey, sinon.stub().resolves(ResultCode.OK));
@@ -352,7 +353,7 @@ test('ConnectionManager', () => {
         });
     })
 
-    test('edge branches', async t => {
+    test('edge branches', async () => {
         test('pickRandomValidator returns null for empty array', async t => {
             reset()
             const connectionManager = makeManager()

@@ -16,7 +16,7 @@ const DUMMY_PATH_LARGE = './dummy_whitelist_large.csv';
 const ADDR1 = asAddress('6a38e14198866f0fdf4d4495b07e066cfd0a2e8cbe774d11af37d15f741ac984');
 const ADDR2 = asAddress('544514242356432739de9af71deb8d526fb03d6c5c15e0a934d9a20b6710e2fe');
 
-hook('Initialize dummy whitelist files', async t => {
+hook('Initialize dummy whitelist files', async () => {
     // Happy path
     fs.writeFileSync(DUMMY_PATH_OK, `${ADDR1}\n${ADDR2}\n`);
     // Edge: duplicated address
@@ -86,8 +86,8 @@ test('readAddressesFromWhitelistFile - invalid file extension', async (t) => {
         errorMessageIncludes(`Invalid file format: ${invalidExtensionPath}. Balance migration file must be a CSV file.`));
 });
 
-hook('Cleanup dummy whitelist files', async t => {
+hook('Cleanup dummy whitelist files', async () => {
     [DUMMY_PATH_OK, DUMMY_PATH_DUP, DUMMY_PATH_EMPTY, DUMMY_PATH_BLANK, DUMMY_PATH_BOM, DUMMY_PATH_LARGE].forEach(path => {
-            if (fs.existsSync(path)) fs.unlinkSync(path);
-        });
+        if (fs.existsSync(path)) fs.unlinkSync(path);
+    });
 });

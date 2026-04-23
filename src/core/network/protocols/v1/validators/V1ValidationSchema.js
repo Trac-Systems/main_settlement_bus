@@ -30,7 +30,7 @@ class V1ValidationSchema {
             },
         });
         const isBuffer = b4a.isBuffer;
-        this.#validator.add("buffer", function ({schema, messages}, path, context) {
+        this.#validator.add("buffer", function ({schema, messages}, _path, _context) {
             const allowZero = schema.allowZero === true;
             const allowEmpty = schema.allowEmpty === true;
             const exactLength = Number.isInteger(schema.length) ? schema.length : null;

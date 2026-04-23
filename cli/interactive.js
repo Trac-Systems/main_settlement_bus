@@ -156,7 +156,7 @@ class Cli extends ReadyResource {
                         console.log("Invalid choice. Please select again.");
                         return this.#setupKeypairInteractiveMode();
                 }
-            } catch (e) {
+            } catch {
                 console.log("Invalid input. Please try again.");
                 return this.#setupKeypairInteractiveMode();
             }

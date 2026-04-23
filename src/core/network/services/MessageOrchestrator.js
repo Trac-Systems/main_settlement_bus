@@ -101,7 +101,7 @@ class MessageOrchestrator {
 
             try {
                 success = await this.#attemptSendMessageForLegacy(validatorPublicKey, message);
-            } catch (error) {
+            } catch {
                 success = await this.send(message, retries + 1);
             }
             if (!success) {

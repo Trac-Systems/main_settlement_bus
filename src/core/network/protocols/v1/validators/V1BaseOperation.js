@@ -16,14 +16,12 @@ import _ from 'lodash';
 
 class V1BaseOperation {
     #v1ValidationSchema
-    #config
 
-    constructor(config) {
-        this.#config = config;
+    constructor(_config) {
         this.#v1ValidationSchema = new V1ValidationSchema();
     }
 
-    async validate(payload, connection, pendingRequestServiceEntry) {
+    async validate(_payload, _connection, _pendingRequestServiceEntry) {
         throw new Error("Method 'validate()' must be implemented.");
     }
 
@@ -56,14 +54,14 @@ class V1BaseOperation {
         let hash;
         try {
             hash = await tracCryptoApi.hash.blake3(message);
-        } catch (error) {
+        } catch {
             throw new V1ProtocolError(ResultCode.INVALID_PAYLOAD, 'Failed to hash signature message.');
         }
 
         let verified = false;
         try {
             verified = tracCryptoApi.signature.verify(signature, hash, remotePublicKey);
-        } catch (error) {
+        } catch {
             verified = false;
         }
         if (!verified) {

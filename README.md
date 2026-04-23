@@ -237,3 +237,42 @@ Stop the service with `docker compose stop msb-rpc`, remove the stack entirely w
 
 - **Dependency install failures** – confirm you are on Node.js v22.22.0 (LTS) and npm ≥ 11.6.1. If packages still fail to build, clear artifacts (`rm -rf node_modules package-lock.json && npm install`) and rerun `npm run test:unit:all`.
 - **Unit tests fail only in one runtime** – run the targeted commands (`npm run test:unit:node` or `npm run test:unit:bare`) to isolate regressions, then inspect `tests/unit/unit.test.js` for the failing cases.
+
+## Development
+
+### VS Code
+
+Open the repository root in VS Code so the editor can resolve the local `eslint` dependency, the root `eslint.config.js`, and the existing debugger launch configurations in `.vscode/launch.json`.
+
+Install these extensions:
+
+- `dbaeumer.vscode-eslint` (microsoft.com)
+
+For linting, add the following to your workspace or user `.vscode/settings.json`:
+
+```json
+{
+  "editor.formatOnSave": false,
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+  "eslint.useFlatConfig": true,
+  "eslint.workingDirectories": [
+    {
+      "mode": "auto"
+    }
+  ],
+  "[javascript]": {
+    "editor.defaultFormatter": "dbaeumer.vscode-eslint"
+  }
+}
+```
+
+### Linting and tests
+
+Use these commands during development:
+
+- `npm run lint` checks the full repository with ESLint.
+- `npm run lint:fix` applies ESLint autofixes where possible.
+- `npm run test:unit:all` runs both unit suites and is the main pre-commit test command.
+- `npm run test:acceptance` runs the RPC acceptance test suite.

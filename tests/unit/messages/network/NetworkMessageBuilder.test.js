@@ -33,8 +33,6 @@ test('NetworkMessageBuilder iterates liveness response ResultCode values', async
     const builder = new NetworkMessageBuilder(wallet, config);
     const id = uuidv7();
     const caps = ['cap:b', 'cap:a'];
-    const data = b4a.from('ping', 'utf8');
-
     for (const code of uniqueResultCodes()) {
         await builder
             .setType(NetworkOperationType.LIVENESS_RESPONSE)

@@ -8,8 +8,6 @@ import { asAddress } from '../../../helpers/address.js';
 
 const DUMMY_PATH_OK = './dummy_balance_ok.csv';
 const DUMMY_PATH_DUP = './dummy_balance_dup.csv';
-const DUMMY_PATH_INVALID_ADDRESS = './dummy_balance_invalid_address.csv';
-const DUMMY_PATH_ADMIN_ADDRESS = './dummy_balance_admin_address.csv';
 const DUMMY_PATH_EMPTY = './dummy_balance_empty.csv';
 const DUMMY_PATH_WHITESPACE = './dummy_balance_whitespace.csv';
 const DUMMY_PATH_INVALID_BALANCE = './dummy_balance_invalid_balance.csv';
@@ -23,7 +21,7 @@ const DUMMY_PATH_LARGE = './dummy_balance_large.csv';
 const ADDR1 = asAddress('6a38e14198866f0fdf4d4495b07e066cfd0a2e8cbe774d11af37d15f741ac984');
 const ADDR2 = asAddress('544514242356432739de9af71deb8d526fb03d6c5c15e0a934d9a20b6710e2fe');
 
-hook('Initialize dummy balance files', async t => {
+hook('Initialize dummy balance files', async () => {
     // Happy path
     fs.writeFileSync(DUMMY_PATH_OK, `${ADDR1},1.000000000000000001\n${ADDR2},2.000000000000000000\n`);
     // Edge: duplicated address
@@ -94,7 +92,7 @@ test('readBalanceMigrationFile - malformed line', async (t) => {
 });
 
 test('readBalanceMigrationFile - blank lines and whitespace', async (t) => {
-    const { addressBalancePair, totalBalance, totalAddresses } = await fileUtils.readBalanceMigrationFile(DUMMY_PATH_BLANK);
+    const { addressBalancePair, totalAddresses } = await fileUtils.readBalanceMigrationFile(DUMMY_PATH_BLANK);
     t.is(addressBalancePair.size, 1);
     t.is(totalAddresses, 1);
     t.ok(addressBalancePair.has(ADDR1));
@@ -109,14 +107,14 @@ test('readBalanceMigrationFile - zero balance', async (t) => {
 });
 
 test('readBalanceMigrationFile - BOM at start', async (t) => {
-    const { addressBalancePair, totalBalance, totalAddresses } = await fileUtils.readBalanceMigrationFile(DUMMY_PATH_BOM);
+    const { addressBalancePair, totalAddresses } = await fileUtils.readBalanceMigrationFile(DUMMY_PATH_BOM);
     t.is(addressBalancePair.size, 1);
     t.is(totalAddresses, 1);
     t.ok(addressBalancePair.has(ADDR1));
 });
 
 test('readBalanceMigrationFile - large file', async (t) => {
-    const { addressBalancePair, totalBalance, totalAddresses } = await fileUtils.readBalanceMigrationFile(DUMMY_PATH_LARGE);
+    const { addressBalancePair, totalAddresses } = await fileUtils.readBalanceMigrationFile(DUMMY_PATH_LARGE);
     t.is(addressBalancePair.size, 1000);
     t.is(totalAddresses, 1000);
 });
@@ -138,10 +136,10 @@ test('readBalanceMigrationFile - invalid file extension', async (t) => {
         errorMessageIncludes(`Invalid file format: ${invalidExtensionPath}. Balance migration file must be a CSV file.`))
 });
 
-hook('Cleanup dummy balance files', async t => {
+hook('Cleanup dummy balance files', async () => {
     [DUMMY_PATH_OK, DUMMY_PATH_DUP, DUMMY_PATH_EMPTY,
-     DUMMY_PATH_WHITESPACE, DUMMY_PATH_INVALID_BALANCE, DUMMY_PATH_NEGATIVE, DUMMY_PATH_MALFORMED, DUMMY_PATH_BLANK,
-     DUMMY_PATH_ZERO, DUMMY_PATH_BOM, DUMMY_PATH_LARGE].forEach(path => {
+        DUMMY_PATH_WHITESPACE, DUMMY_PATH_INVALID_BALANCE, DUMMY_PATH_NEGATIVE, DUMMY_PATH_MALFORMED, DUMMY_PATH_BLANK,
+        DUMMY_PATH_ZERO, DUMMY_PATH_BOM, DUMMY_PATH_LARGE].forEach(path => {
         if (fs.existsSync(path)) fs.unlinkSync(path);
     });
 });

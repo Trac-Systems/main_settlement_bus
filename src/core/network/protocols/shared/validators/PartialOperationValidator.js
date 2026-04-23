@@ -36,7 +36,7 @@ class PartialOperationValidator {
         return this.#check;
     }
 
-    async validate(payload) {
+    async validate() {
         throw new V1ProtocolError(ResultCode.UNEXPECTED_ERROR, "Method 'validate()' must be implemented.");
     }
 

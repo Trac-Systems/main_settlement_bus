@@ -4,6 +4,45 @@ import Scheduler from '../../../utils/Scheduler.js';
 import Denque from "denque";
 import b4a from "b4a";
 
+export class TransactionPoolProofUnavailableError extends Error {
+    constructor(txHash, blockNumber, reason = 'unknown', timestamp = 0) {
+        const timestampValue = timestamp instanceof Date ? timestamp.getTime() : timestamp;
+        const safeTimestamp = Number.isSafeInteger(timestampValue) ? timestampValue : 0;
+        super(`Proof unavailable for txHash ${txHash} at block ${blockNumber} at ${safeTimestamp}. Reason: ${reason}`);
+        this.txHash = txHash;
+        this.blockNumber = blockNumber;
+        this.timestamp = safeTimestamp;
+        this.reason = reason;
+    }
+}
+
+export class TransactionPoolMissingCommitReceiptError extends Error {
+    constructor(txHash) {
+        super(`Missing commit receipt for txHash ${txHash}`);
+        this.txHash = txHash;
+    }
+}
+
+export class TransactionPoolInvalidIncomingDataError extends Error {
+    constructor(message = 'Invalid transaction pool incoming data') {
+        super(message);
+    }
+}
+
+export class TransactionPoolFullError extends Error {
+    constructor(maxSize) {
+        super(`Transaction pool is full. Maximum size of ${maxSize} reached.`);
+        this.maxSize = maxSize
+    }
+
+}
+
+export class TransactionPoolAlreadyQueuedError extends Error {
+    constructor(txHash) {
+        super(`Transaction with hash ${txHash} is already queued in the transaction pool.`);
+    }
+}
+
 class TransactionPoolService {
     #state;
     #address;
@@ -165,45 +204,6 @@ class TransactionPoolService {
 
     hasTransaction(txHash) {
         return this.#queuedTxHashes.has(txHash);
-    }
-}
-
-export class TransactionPoolProofUnavailableError extends Error {
-    constructor(txHash, blockNumber, reason = 'unknown', timestamp = 0) {
-        const timestampValue = timestamp instanceof Date ? timestamp.getTime() : timestamp;
-        const safeTimestamp = Number.isSafeInteger(timestampValue) ? timestampValue : 0;
-        super(`Proof unavailable for txHash ${txHash} at block ${blockNumber} at ${safeTimestamp}. Reason: ${reason}`);
-        this.txHash = txHash;
-        this.blockNumber = blockNumber;
-        this.timestamp = safeTimestamp;
-        this.reason = reason;
-    }
-}
-
-export class TransactionPoolMissingCommitReceiptError extends Error {
-    constructor(txHash) {
-        super(`Missing commit receipt for txHash ${txHash}`);
-        this.txHash = txHash;
-    }
-}
-
-export class TransactionPoolInvalidIncomingDataError extends Error {
-    constructor(message = 'Invalid transaction pool incoming data') {
-        super(message);
-    }
-}
-
-export class TransactionPoolFullError extends Error {
-    constructor(maxSize) {
-        super(`Transaction pool is full. Maximum size of ${maxSize} reached.`);
-        this.maxSize = maxSize
-    }
-
-}
-
-export class TransactionPoolAlreadyQueuedError extends Error {
-    constructor(txHash) {
-        super(`Transaction with hash ${txHash} is already queued in the transaction pool.`);
     }
 }
 

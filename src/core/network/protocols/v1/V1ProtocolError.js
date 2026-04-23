@@ -1,9 +1,5 @@
 import {ResultCode} from '../../../../utils/constants.js';
 
-export function getResultCode(err) {
-    return err instanceof V1ProtocolError ? err.resultCode : ResultCode.UNEXPECTED_ERROR;
-}
-
 /** 
  * V1 protocol error type.
  *
@@ -20,4 +16,12 @@ export class V1ProtocolError extends Error {
         this.name = this.constructor.name;
         this.resultCode = resultCode;
     }
+}
+
+export function getResultCode(err) {
+    return err instanceof V1ProtocolError ? err.resultCode : ResultCode.UNEXPECTED_ERROR;
+}
+
+export function shouldEndConnection(err) {
+    return err instanceof V1ProtocolError ? Boolean(err.endConnection) : false;
 }

@@ -1,4 +1,4 @@
-import { test, hook } from 'brittle';
+import { test } from 'brittle';
 import migrationUtils from '../../../../src/utils/migrationUtils.js';
 import { errorMessageIncludes } from "../../../helpers/regexHelper.js";
 import { ZERO_LICENSE } from '../../../../src/core/state/utils/nodeEntry.js';

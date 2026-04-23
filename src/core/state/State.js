@@ -52,9 +52,9 @@ class State extends ReadyResource {
     #base;
     #bee;
     #store;
-    #wallet;
     #writingKey;
     #config
+    #wallet
 
     /**
      * @param {Corestore} store
@@ -65,9 +65,8 @@ class State extends ReadyResource {
         super();
 
         this.#config = config
-
+        this.#wallet = wallet
         this.#store = store;
-        this.#wallet = wallet;
 
         this.check = new Check(config);
         this.#base = new Autobase(this.#store, this.#config.bootstrap, {

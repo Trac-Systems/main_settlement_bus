@@ -3,6 +3,42 @@ import {TRANSACTION_COMMIT_SERVICE_BUFFER_SIZE} from '../../../utils/constants.j
 
 const TX_HASH_HEX_STRING_LENGTH = 64;
 
+export class PendingCommitInvalidTxHashError extends Error {
+    constructor(txHash) {
+        super(`Invalid txHash format: ${txHash}`);
+    }
+}
+
+export class PendingCommitBufferFullError extends Error {
+    constructor(limit) {
+        super(`Maximum number of pending commits reached (limit=${limit}).`);
+    }
+}
+
+export class PendingCommitAlreadyExistsError extends Error {
+    constructor(txHash) {
+        super(`Pending commit for txHash ${txHash} already exists.`);
+    }
+}
+
+export class PendingCommitTimeoutError extends Error {
+    constructor(txHash, timeoutMs) {
+        super(`Pending commit for txHash ${txHash} timed out after ${timeoutMs} ms.`);
+    }
+}
+
+export class PendingCommitCancelledError extends Error {
+    constructor(txHash) {
+        super(`Pending commit ${txHash} cancelled (shutdown).`);
+    }
+}
+
+export class PendingCommitUnexpectedError extends Error {
+    constructor(message = 'Unexpected commit error') {
+        super(message);
+    }
+}
+
 class TransactionCommitService {
     #pendingCommits;
     #config;
@@ -111,39 +147,3 @@ class TransactionCommitService {
 }
 
 export default TransactionCommitService;
-
-export class PendingCommitInvalidTxHashError extends Error {
-    constructor(txHash) {
-        super(`Invalid txHash format: ${txHash}`);
-    }
-}
-
-export class PendingCommitBufferFullError extends Error {
-    constructor(limit) {
-        super(`Maximum number of pending commits reached (limit=${limit}).`);
-    }
-}
-
-export class PendingCommitAlreadyExistsError extends Error {
-    constructor(txHash) {
-        super(`Pending commit for txHash ${txHash} already exists.`);
-    }
-}
-
-export class PendingCommitTimeoutError extends Error {
-    constructor(txHash, timeoutMs) {
-        super(`Pending commit for txHash ${txHash} timed out after ${timeoutMs} ms.`);
-    }
-}
-
-export class PendingCommitCancelledError extends Error {
-    constructor(txHash) {
-        super(`Pending commit ${txHash} cancelled (shutdown).`);
-    }
-}
-
-export class PendingCommitUnexpectedError extends Error {
-    constructor(message = 'Unexpected commit error') {
-        super(message);
-    }
-}

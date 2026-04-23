@@ -19,7 +19,7 @@ export async function handleHealth({ msbInstance, respond }) {
         const isReady = !!msbInstance?.opened
         if (isReady) return respond(200, { ok: true });
         throw new Error("RPC_OFFLINE");
-    } catch (error) {
+    } catch {
         respond(503, { error: "Could not connect to RPC server" });
     }
 }
@@ -87,7 +87,7 @@ export async function handleBroadcastTransaction({ msbInstance, respond, req }) 
             let parsedBody;
             try {
                 parsedBody = JSON.parse(body);
-            } catch (e) {
+            } catch {
                 throw new ValidationError("Invalid JSON payload.");
             }
 
@@ -128,7 +128,7 @@ export async function handleBroadcastTransaction({ msbInstance, respond, req }) 
         }
     });
 
-    req.on('error', (err) => {
+    req.on('error', () => {
         if (!limitExceeded) {
             respond(500, { error: 'Request stream failed during body transfer.' });
         }
@@ -197,7 +197,7 @@ export async function handleTransactionDetails({ msbInstance, respond, req }) {
         }
 
         respond(200, { txDetails });
-    } catch (error) {
+    } catch {
         respond(500, { error: "Internal error" });
     }
 }
@@ -232,7 +232,7 @@ export async function handleTransactionExtendedDetails({ msbInstance, respond, r
         }
 
         respond(200, details);
-    } catch (error) {
+    } catch {
         respond(500, { error: 'An error occurred processing the request.' });
     }
 }
@@ -300,7 +300,7 @@ export async function handleFetchBulkTxPayloads({ msbInstance, respond, req }) {
         }
     })
 
-    req.on('error', (err) => {
+    req.on('error', () => {
         respond(500, { error: 'Request stream failed during body transfer.' });
     });
 }

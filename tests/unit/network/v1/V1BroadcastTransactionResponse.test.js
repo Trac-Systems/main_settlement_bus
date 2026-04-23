@@ -269,13 +269,13 @@ test('validateDecodedCompletePayloadSchema throws VALIDATOR_RESPONSE_SCHEMA_INVA
 });
 
 test('verifyProofOfPublication delegates verification to state instance', async t => {
+    const proof = b4a.from('deadbeef', 'hex');
     const validator = createValidator({
         verifyProofOfPublication: receivedProof => {
             t.ok(b4a.equals(receivedProof, proof));
             return { ok: true };
         }
     });
-    const proof = b4a.from('deadbeef', 'hex');
 
     const result = await validator.verifyProofOfPublication({
         broadcast_transaction_response: {

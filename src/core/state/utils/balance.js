@@ -133,7 +133,7 @@ const divBuffers = (dividend, divisor) => {
 
 const mulBuffers = (a, b) => {
     if (a.length !== BALANCE_BYTE_LENGTH || b.length !== BALANCE_BYTE_LENGTH) {
-      return NULL_BUFFER
+        return NULL_BUFFER
     }
   
     const alen = a.length;
@@ -143,14 +143,14 @@ const mulBuffers = (a, b) => {
     for (let i = alen - 1; i >= 0; i--) {
         let carry = 0;
         for (let j = blen - 1; j >= 0; j--) {
-        const ai = a[i];
-        const bj = b[j];
+            const ai = a[i];
+            const bj = b[j];
 
-        const pos = i + j + 1;
-        const mul = ai * bj + result[pos] + carry;
+            const pos = i + j + 1;
+            const mul = ai * bj + result[pos] + carry;
 
-        result[pos] = mul & 0xff;   // low byte
-        carry = mul >>> 8;          // high byte
+            result[pos] = mul & 0xff;   // low byte
+            carry = mul >>> 8;          // high byte
         }
         result[i] += carry;
     }

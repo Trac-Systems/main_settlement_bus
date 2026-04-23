@@ -138,7 +138,7 @@ export async function ensureKeyPathDir(config) {
 export function verifyWalletPath(config) {
     try {
         return fs.existsSync(config.keyPairPath)
-    } catch (err) {
+    } catch {
         return false
     }
 }

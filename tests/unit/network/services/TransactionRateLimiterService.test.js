@@ -25,7 +25,7 @@ const makeSwarm = () => {
     };
 };
 
-test('TransactionRateLimiterService', async (t) => {
+test('TransactionRateLimiterService', async () => {
     test('legacyHandleRateLimit disconnects after MAX+1 tx in the same second', async (t) => {
         const clock = sinon.useFakeTimers({ now: 0 });
         try {
@@ -94,7 +94,7 @@ test('TransactionRateLimiterService', async (t) => {
         }
     });
 
-    test('v1HandleRateLimit resets the window on the next second', async (t) => {
+    test('v1HandleRateLimit resets the window on the next second', async () => {
         const clock = sinon.useFakeTimers({ now: 0 });
         try {
             const limiter = new TransactionRateLimiterService(makeSwarm(), config);

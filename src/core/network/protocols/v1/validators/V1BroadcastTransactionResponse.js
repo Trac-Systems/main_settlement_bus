@@ -12,6 +12,24 @@ import {V1ProtocolError} from "../V1ProtocolError.js";
 
 const VALIDATOR_METADATA_FIELDS = new Set(["va", "vn", "vs"]);
 
+const stripValidatorMetadata = (value) => {
+
+    if (value === null || value === undefined) return value;
+    if (b4a.isBuffer(value)) return value;
+    if (Array.isArray(value)) return value.map(stripValidatorMetadata);
+    if (typeof value !== "object") return value;
+
+    const result = {};
+    for (const [key, nestedValue] of Object.entries(value)) {
+        if (VALIDATOR_METADATA_FIELDS.has(key)) {
+            result[key] = null;
+            continue;
+        }
+        result[key] = stripValidatorMetadata(nestedValue);
+    }
+    return result;
+};
+
 class V1BroadcastTransactionResponse extends V1BaseOperation {
     #config;
     #check;
@@ -211,24 +229,6 @@ class V1BroadcastTransactionResponse extends V1BaseOperation {
         }
     }
 }
-
-const stripValidatorMetadata = (value) => {
-
-    if (value === null || value === undefined) return value;
-    if (b4a.isBuffer(value)) return value;
-    if (Array.isArray(value)) return value.map(stripValidatorMetadata);
-    if (typeof value !== "object") return value;
-
-    const result = {};
-    for (const [key, nestedValue] of Object.entries(value)) {
-        if (VALIDATOR_METADATA_FIELDS.has(key)) {
-            result[key] = null;
-            continue;
-        }
-        result[key] = stripValidatorMetadata(nestedValue);
-    }
-    return result;
-};
 
 export function extractRequiredVaFromDecodedTx(validatorDecodedTx) {
     if (!validatorDecodedTx || typeof validatorDecodedTx !== 'object') {

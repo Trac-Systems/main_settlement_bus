@@ -16,7 +16,6 @@ class NetworkMessageBuilder {
     #capabilities;
     #id;
     #timestamp;
-    #issuerAddress;
     #resultCode;
     #data;
     #proof;
@@ -49,14 +48,6 @@ class NetworkMessageBuilder {
 
     setTimestamp() {
         this.#timestamp = Date.now();
-        return this;
-    }
-
-    setIssuerAddress(issuerAddress) {
-        if (!isAddressValid(issuerAddress, this.#config.addressPrefix)) {
-            throw new Error('Issuer TRAC address must be valid.');
-        }
-        this.#issuerAddress = issuerAddress;
         return this;
     }
 
