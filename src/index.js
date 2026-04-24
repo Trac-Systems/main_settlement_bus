@@ -17,6 +17,7 @@ import {
     EventType,
     WHITELIST_SLEEP_INTERVAL,
     BOOTSTRAP_HEXSTRING_LENGTH,
+    CustomEventType,
     BALANCE_MIGRATION_SLEEP_INTERVAL,
     WHITELIST_MIGRATION_DIR
 } from "./utils/constants.js";
@@ -196,6 +197,16 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async #stateEventsListener() {
+        this.#state.on(CustomEventType.IS_INDEXER, (publicKey) => {
+            if (this.#isClosing) return;
+            this.#network.disconnectValidatorPeer(publicKey, 'peer promoted to indexer');
+        });
+
+        this.#state.on(CustomEventType.UNWRITABLE, (publicKey) => {
+            if (this.#isClosing) return;
+            this.#network.disconnectValidatorPeer(publicKey, 'peer became unwritable');
+        });
+
         this.#state.base.on(EventType.IS_INDEXER, () => {
             console.log("Current node is an indexer");
         });

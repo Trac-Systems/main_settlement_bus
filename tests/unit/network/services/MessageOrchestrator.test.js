@@ -125,6 +125,42 @@ test('MessageOrchestrator.send V1 matrix: TX_ALREADY_PENDING -> NO_ROTATE', asyn
     t.is(connectionManager.incrementSentCount.callCount, 0);
 });
 
+test('MessageOrchestrator.send treats TX_ALREADY_EXISTS as success when tx is already visible locally', async t => {
+    const connectionManager = createConnectionManager({
+        sendSingleMessage: sinon.stub().resolves(ResultCode.TX_ALREADY_EXISTS),
+    });
+    const orchestrator = new MessageOrchestrator(connectionManager, { get: async () => null }, config);
+    const wallet = await createWallet(config);
+    const message = createTransferMessage(config, wallet);
+    sinon.stub(orchestrator, 'waitForUnsignedState').resolves(true);
+
+    orchestrator.setWallet(wallet);
+    const result = await orchestrator.send(message);
+
+    t.is(result, true);
+    t.is(connectionManager.sendSingleMessage.callCount, 1);
+    t.is(connectionManager.remove.callCount, 0);
+    t.is(connectionManager.incrementSentCount.callCount, 0);
+});
+
+test('MessageOrchestrator.send treats OPERATION_ALREADY_COMPLETED as success when tx is already visible locally', async t => {
+    const connectionManager = createConnectionManager({
+        sendSingleMessage: sinon.stub().resolves(ResultCode.OPERATION_ALREADY_COMPLETED),
+    });
+    const orchestrator = new MessageOrchestrator(connectionManager, { get: async () => null }, config);
+    const wallet = await createWallet(config);
+    const message = createTransferMessage(config, wallet);
+    sinon.stub(orchestrator, 'waitForUnsignedState').resolves(true);
+
+    orchestrator.setWallet(wallet);
+    const result = await orchestrator.send(message);
+
+    t.is(result, true);
+    t.is(connectionManager.sendSingleMessage.callCount, 1);
+    t.is(connectionManager.remove.callCount, 0);
+    t.is(connectionManager.incrementSentCount.callCount, 0);
+});
+
 test('MessageOrchestrator.send V1 matrix: unknown code -> UNDEFINED', async t => {
     const connectionManager = createConnectionManager({
         sendSingleMessage: sinon.stub().resolves(99999),

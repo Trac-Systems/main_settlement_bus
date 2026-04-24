@@ -1,7 +1,7 @@
 import { generateUUID, publicKeyToAddress, sleep } from '../../../utils/helpers.js';
 import { operationToPayload } from '../../../utils/applyOperations.js';
 import { networkMessageFactory } from "../../../messages/network/v1/networkMessageFactory.js";
-import { NETWORK_CAPABILITIES } from "../../../utils/constants.js";
+import { NETWORK_CAPABILITIES, ResultCode } from "../../../utils/constants.js";
 import {
     unsafeEncodeApplyOperation
 } from "../../../utils/protobuf/operationHelpers.js";
@@ -15,6 +15,10 @@ import { ConnectionManagerError } from './ConnectionManager.js';
 class MessageOrchestrator {
     #config;
     #wallet;
+    #idempotentSuccessCodes = new Set([
+        ResultCode.TX_ALREADY_EXISTS,
+        ResultCode.OPERATION_ALREADY_COMPLETED,
+    ]);
     /**
      * Attempts to send a message to validators with retries and state checks.
      * @param {ConnectionManager} connectionManager - The connection manager instance
@@ -124,7 +128,12 @@ class MessageOrchestrator {
 
             await this.connectionManager.sendSingleMessage(v1Message, validatorPublicKey)
                 .then(
-                    (resultCode) => {
+                    async (resultCode) => {
+                        if (await this.#isIdempotentSuccess(resultCode, message)) {
+                            success = true;
+                            return;
+                        }
+
                         // TODO: When we will deprecate the legacy protocol, we should refactor this scope, to propagate domain-error with result code.
                         const action = resultToValidatorAction(resultCode);
                         switch (action) {
@@ -166,6 +175,26 @@ class MessageOrchestrator {
 
         }
         return success;
+    }
+
+    async #isIdempotentSuccess(resultCode, message) {
+        if (!this.#idempotentSuccessCodes.has(resultCode)) return false;
+
+        const txHash = this.#extractTxHash(message);
+        if (!txHash) return false;
+
+        // A short wait covers the race where a first validator committed the tx
+        // and a retried validator only observes it as "already exists/completed".
+        const timeout = Math.min(this.#config.messageValidatorResponseTimeout ?? 2000, 2000);
+        return await this.waitForUnsignedState(txHash, timeout);
+    }
+
+    #extractTxHash(message) {
+        if (!message || !Number.isInteger(message.type)) return null;
+
+        const payloadKey = operationToPayload(message.type);
+        const txHash = message?.[payloadKey]?.tx;
+        return typeof txHash === 'string' && txHash.length > 0 ? txHash : null;
     }
 
     // TODO: Delete this function after legacy protocol is deprecated

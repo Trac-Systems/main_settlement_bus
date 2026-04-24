@@ -243,6 +243,17 @@ test('ConnectionManager', () => {
             t.is(connectionManager.connectionCount(), previousCount - 1, 'should reduce the connection count')
             t.ok(!connectionManager.connected(lastValidator.key), 'should be connected')
         })
+
+        test('can detach a validator without ending the socket', async t => {
+            reset()
+            const data = createV1Connection(testKeyPair5.publicKey)
+            const connectionManager = makeManager(6, [data])
+
+            connectionManager.remove(data.key, { endConnection: false })
+
+            t.absent(connectionManager.connected(data.key), 'validator should be removed from the pool')
+            t.is(data.connection.end.callCount, 0, 'socket should remain open for in-flight responses')
+        })
     })
 
     test('on close', async t => {
