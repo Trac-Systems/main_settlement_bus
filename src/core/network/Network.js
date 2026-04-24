@@ -255,6 +255,26 @@ class Network extends ReadyResource {
         return this.#pendingConnections.size;
     }
 
+    disconnectValidatorPeer(publicKey, reason = 'validator peer invalidated') {
+        const publicKeyHex = this.#normalizePublicKey(publicKey);
+        if (!publicKeyHex) return false;
+
+        const hadPendingValidatorConnection = this.#clearPendingValidatorConnection(publicKeyHex);
+        const isTrackedValidator = this.#validatorConnectionManager.exists(publicKeyHex);
+
+        if (isTrackedValidator) {
+            this.#logger.debug(`Network.disconnectValidatorPeer: detaching tracked validator ${publicKeyHex}. Reason: ${reason}`);
+            this.#validatorConnectionManager.remove(publicKeyHex, { endConnection: false });
+        }
+
+        if (hadPendingValidatorConnection && this.#swarm?.peers?.has(publicKeyHex)) {
+            this.#logger.debug(`Network.disconnectValidatorPeer: leaving peer ${publicKeyHex}. Reason: ${reason}`);
+            this.#swarm.leavePeer(b4a.from(publicKeyHex, 'hex'));
+        }
+
+        return hadPendingValidatorConnection || isTrackedValidator;
+    }
+
     async #getOrGenerateWallet(store, wallet) {
         if (!this.#config.enableWallet) {
             const keyPair = await store.createKeyPair(TRAC_NAMESPACE);
@@ -304,6 +324,23 @@ class Network extends ReadyResource {
         if (!this.#pendingConnections.has(publicKey)) return;
         this.emit(EventType.VALIDATOR_CONNECTION_READY, { publicKey, type, connection });
         this.#logger.debug(`Network.finalizeConnection: Connected to peer: ${publicKey} as type: ${type}`);
+    }
+
+    #normalizePublicKey(publicKey) {
+        if (typeof publicKey === 'string') return publicKey;
+        if (b4a.isBuffer(publicKey)) return b4a.toString(publicKey, 'hex');
+        return null;
+    }
+
+    #clearPendingValidatorConnection(publicKeyHex) {
+        if (!this.#pendingConnections.has(publicKeyHex)) return false;
+
+        const { timeoutId, type } = this.#pendingConnections.get(publicKeyHex);
+        if (type !== 'validator') return false;
+
+        clearTimeout(timeoutId);
+        this.#pendingConnections.delete(publicKeyHex);
+        return true;
     }
 }
 
