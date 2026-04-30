@@ -1062,7 +1062,7 @@ class State extends ReadyResource {
         }; // New admin wk is already in indexers entry
 
         // charging fee from the requester (admin)
-        const decodedAdminNodeEntry = nodeEntryUtils.decode(newAdminNodeEntry, this.#config.addressPrefix)
+        const decodedAdminNodeEntry = nodeEntryUtils.decode(newAdminNodeEntry)
         if (decodedAdminNodeEntry === null) {
             this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Failed to decode node entry.", node.from.key)
             return Status.FAILURE;
@@ -1087,7 +1087,7 @@ class State extends ReadyResource {
         const chargedAdminEntry = updatedFee.update(newAdminNodeEntry)
 
         // Reward logic
-        const validatorNodeEntry = nodeEntryUtils.decode(validatorEntryBuffer, this.#config.addressPrefix);
+        const validatorNodeEntry = nodeEntryUtils.decode(validatorEntryBuffer);
         if (validatorNodeEntry === null) {
             this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Invalid validator node entry.", node.from.key)
             return Status.FAILURE;
@@ -1260,7 +1260,7 @@ class State extends ReadyResource {
                 return Status.FAILURE;
             };
 
-            const decodedNodeEntry = nodeEntryUtils.decode(adminNodeEntry, this.#config.addressPrefix)
+            const decodedNodeEntry = nodeEntryUtils.decode(adminNodeEntry)
             if (decodedNodeEntry === null) {
                 this.#safeLogApply(OperationType.APPEND_WHITELIST, "Failed to decode admin entry.", node.from.key)
                 return Status.FAILURE;
@@ -1542,7 +1542,7 @@ class State extends ReadyResource {
             return null;
         };
 
-        const decodedRequesterNodeEntry = nodeEntryUtils.decode(requesterNodeEntry, this.#config.addressPrefix)
+        const decodedRequesterNodeEntry = nodeEntryUtils.decode(requesterNodeEntry)
         if (decodedRequesterNodeEntry === null) {
             this.#safeLogApply(OperationType.ADD_WRITER, "Failed to decode node entry.", node.from.key)
             return null;
@@ -1627,7 +1627,7 @@ class State extends ReadyResource {
 
         // reward the validator
 
-        const decodedValidatorEntry = nodeEntryUtils.decode(validatorEntryBuffer, this.#config.addressPrefix)
+        const decodedValidatorEntry = nodeEntryUtils.decode(validatorEntryBuffer)
         if (decodedValidatorEntry === null) {
             this.#safeLogApply(OperationType.ADD_WRITER, "Failed to decode validator entry.", node.from.key)
             return null;
@@ -1843,7 +1843,7 @@ class State extends ReadyResource {
             return null;
         };
 
-        const decodedNodeEntry = nodeEntryUtils.decode(requesterNodeEntry, this.#config.addressPrefix);
+        const decodedNodeEntry = nodeEntryUtils.decode(requesterNodeEntry);
         if (decodedNodeEntry === null) {
             this.#safeLogApply(OperationType.REMOVE_WRITER, "Failed to decode requester node entry.", node.from.key)
             return null;
@@ -1904,7 +1904,7 @@ class State extends ReadyResource {
         };
 
         // Validator reward logic 
-        const decodedValidatorEntry = nodeEntryUtils.decode(validatorEntryBuffer, this.#config.addressPrefix);
+        const decodedValidatorEntry = nodeEntryUtils.decode(validatorEntryBuffer);
         if (decodedValidatorEntry === null) {
             this.#safeLogApply(OperationType.REMOVE_WRITER, "Failed to decode validator node entry.", node.from.key)
             return null;
@@ -2078,7 +2078,7 @@ class State extends ReadyResource {
             return null;
         };
 
-        const decodedPretenderNodeEntry = nodeEntryUtils.decode(pretenderNodeEntry, this.#config.addressPrefix);
+        const decodedPretenderNodeEntry = nodeEntryUtils.decode(pretenderNodeEntry);
         if (decodedPretenderNodeEntry === null) {
             this.#safeLogApply(OperationType.ADD_INDEXER, "Failed to decode pretender indexer node entry.", node.from.key)
             return null;
@@ -2119,7 +2119,7 @@ class State extends ReadyResource {
             return null;
         };
 
-        const adminNodeEntry = nodeEntryUtils.decode(adminNodeEntryBuffer, this.#config.addressPrefix);
+        const adminNodeEntry = nodeEntryUtils.decode(adminNodeEntryBuffer);
         if (adminNodeEntry === null) {
             this.#safeLogApply(OperationType.ADD_INDEXER, "Failed to decode requester node entry.", node.from.key)
             return null;
@@ -2291,7 +2291,7 @@ class State extends ReadyResource {
             return null;
         };
 
-        const decodedNodeEntry = nodeEntryUtils.decode(toRemoveNodeEntry, this.#config.addressPrefix);
+        const decodedNodeEntry = nodeEntryUtils.decode(toRemoveNodeEntry);
         if (decodedNodeEntry === null) {
             this.#safeLogApply(OperationType.REMOVE_INDEXER, "Failed to decode target indexer node entry.", node.from.key)
             return null;
@@ -2325,7 +2325,7 @@ class State extends ReadyResource {
             return null;
         };
 
-        const decodedAdminNodeEntry = nodeEntryUtils.decode(adminNodeEntry, this.#config.addressPrefix)
+        const decodedAdminNodeEntry = nodeEntryUtils.decode(adminNodeEntry)
         if (decodedAdminNodeEntry === null) {
             this.#safeLogApply(OperationType.REMOVE_INDEXER, "Failed to decode requester node entry.", node.from.key)
             return null;
@@ -2511,7 +2511,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const decodedToBanNodeEntry = nodeEntryUtils.decode(updatedToBanNodeEntry, this.#config.addressPrefix);
+        const decodedToBanNodeEntry = nodeEntryUtils.decode(updatedToBanNodeEntry);
         if (decodedToBanNodeEntry === null) {
             this.#safeLogApply(OperationType.BAN_VALIDATOR, "Failed to decode target node entry.", node.from.key)
             return Status.FAILURE;
@@ -2530,7 +2530,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const adminNodeEntry = nodeEntryUtils.decode(adminNodeEntryBuffer, this.#config.addressPrefix);
+        const adminNodeEntry = nodeEntryUtils.decode(adminNodeEntryBuffer);
         if (adminNodeEntry === null) {
             this.#safeLogApply(OperationType.BAN_VALIDATOR, "Failed to verify admin node entry.", node.from.key)
             return Status.FAILURE;
@@ -2753,7 +2753,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const requesterNodeEntry = nodeEntryUtils.decode(requesterNodeEntryBuffer, this.#config.addressPrefix);
+        const requesterNodeEntry = nodeEntryUtils.decode(requesterNodeEntryBuffer);
         if (requesterNodeEntry === null) {
             this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Invalid requester node entry.", node.from.key)
             return Status.FAILURE;
@@ -2783,7 +2783,7 @@ class State extends ReadyResource {
         };
 
         // reward validator for processing this transaction.
-        const validatorNodeEntry = nodeEntryUtils.decode(validatorEntryBuffer, this.#config.addressPrefix);
+        const validatorNodeEntry = nodeEntryUtils.decode(validatorEntryBuffer);
         if (validatorNodeEntry === null) {
             this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Invalid validator node entry.", node.from.key)
             return Status.FAILURE;
@@ -3272,7 +3272,7 @@ class State extends ReadyResource {
             return null;
         }
 
-        const senderEntry = nodeEntryUtils.decode(senderEntryBuffer, this.#config.addressPrefix);
+        const senderEntry = nodeEntryUtils.decode(senderEntryBuffer);
         if (senderEntry === null) {
             this.#safeLogApply(OperationType.TRANSFER, "Invalid sender node entry.", node.from.key)
             return null;
@@ -3325,7 +3325,7 @@ class State extends ReadyResource {
                 };
                 result.recipientEntry = newRecipientEntry;
             } else {
-                const recipientEntry = nodeEntryUtils.decode(recipientEntryBuffer, this.#config.addressPrefix);
+                const recipientEntry = nodeEntryUtils.decode(recipientEntryBuffer);
                 if (recipientEntry === null) {
                     this.#safeLogApply(OperationType.TRANSFER, "Invalid recipient entry.", node.from.key)
                     return null;
@@ -3352,7 +3352,7 @@ class State extends ReadyResource {
             }
         }
 
-        const validatorEntry = nodeEntryUtils.decode(validatorEntryBuffer, this.#config.addressPrefix);
+        const validatorEntry = nodeEntryUtils.decode(validatorEntryBuffer);
         if (validatorEntry === null) {
             this.#safeLogApply(OperationType.TRANSFER, "Invalid validator entry.", node.from.key)
             return null;
@@ -3431,7 +3431,7 @@ class State extends ReadyResource {
             return false;
         };
 
-        const decodedValidatorEntry = nodeEntryUtils.decode(validatorEntryBuffer, this.#config.addressPrefix);
+        const decodedValidatorEntry = nodeEntryUtils.decode(validatorEntryBuffer);
         if (decodedValidatorEntry === null) {
             this.#safeLogApply(op.type, "Failed to decode validator entry.", node.from.key)
             return false;
@@ -3509,7 +3509,7 @@ class State extends ReadyResource {
             return null;
         }
 
-        const decodedNodeEntry = nodeEntryUtils.decode(nodeEntryBuffer, this.#config.addressPrefix);
+        const decodedNodeEntry = nodeEntryUtils.decode(nodeEntryBuffer);
         if (decodedNodeEntry === null) {
             this.#safeLogApply("StakeBalance", "Failed to decode node entry", node.from.key);
             return null;
@@ -3553,7 +3553,7 @@ class State extends ReadyResource {
             return null;
         }
 
-        const decodedNodeEntry = nodeEntryUtils.decode(nodeEntryBuffer, this.#config.addressPrefix);
+        const decodedNodeEntry = nodeEntryUtils.decode(nodeEntryBuffer);
         if (decodedNodeEntry === null) {
             this.#safeLogApply("withdrawStakedBalanceApply", "Failed to decode node entry", node.from.key);
             return null;
@@ -3642,7 +3642,7 @@ class State extends ReadyResource {
             return;
         }
 
-        const decodedValidatorNodeEntry = nodeEntryUtils.decode(validatorNodeEntryBuffer, this.#config.addressPrefix);
+        const decodedValidatorNodeEntry = nodeEntryUtils.decode(validatorNodeEntryBuffer);
         if (decodedValidatorNodeEntry === null) {
             this.#safeLogApply("ValidatorPenalty", `Failed to decode validator node entry for address: ${validatorAddressString}`, writingKeyBuffer);
             return;
@@ -3776,7 +3776,7 @@ class State extends ReadyResource {
             return null;
         }
 
-        const requesterNodeEntry = nodeEntryUtils.decode(requesterNodeEntryBuffer, this.#config.addressPrefix);
+        const requesterNodeEntry = nodeEntryUtils.decode(requesterNodeEntryBuffer);
         if (requesterNodeEntry === null) {
             this.#safeLogApply("transferFeeTxOperation", "Invalid requester node entry, can not to decode.", node.from.key)
             return null;
@@ -3807,7 +3807,7 @@ class State extends ReadyResource {
 
         // Validator always gets 50% of the fee by the base
 
-        const validatorNodeEntry = nodeEntryUtils.decode(validatorEntryBuffer, this.#config.addressPrefix);
+        const validatorNodeEntry = nodeEntryUtils.decode(validatorEntryBuffer);
         if (validatorNodeEntry === null) {
             this.#safeLogApply("transferFeeTxOperation", "Invalid validator node entry, can not to decode.", node.from.key)
             return null;
@@ -3877,7 +3877,7 @@ class State extends ReadyResource {
             return null;
         }
 
-        const subnetworkCreatorNodeEntry = nodeEntryUtils.decode(subnetworkCreatorNodeEntryBuffer, this.#config.addressPrefix);
+        const subnetworkCreatorNodeEntry = nodeEntryUtils.decode(subnetworkCreatorNodeEntryBuffer);
         if (subnetworkCreatorNodeEntry === null) {
             this.#safeLogApply("transferFeeTxOperation", "Invalid subnetwork creator node entry, can not to decode.", node.from.key)
             return null;
