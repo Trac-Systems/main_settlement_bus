@@ -97,7 +97,7 @@ test('State#getActiveWriterCount deduplicates active writers and ignores removed
     const countTotal = await state.getActiveWriterCount();
     t.is(countTotal, 2, 'counts admin plus one active validator');
 
-    const countWithoutAdmin = await state.getActiveWriterCount({ excludeAdmin: true });
+    const countWithoutAdmin = await state.getActiveWriterCount(true);
     t.is(countWithoutAdmin, 1, 'counts only active non-admin validators');
 
     restore();

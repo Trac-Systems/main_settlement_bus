@@ -55,6 +55,7 @@ class State extends ReadyResource {
     #writingKey;
     #config
     #wallet
+    #activeWriterCountCache = new Map();
 
     /**
      * @param {Corestore} store
@@ -192,11 +193,11 @@ class State extends ReadyResource {
     }
 
     async isAdminAllowedToValidate() {
-        if (!this.writingKey || !this.#config?.bootstrap) return false;
+        if (!this.writingKey) return false;
 
         const isAdmin = this.writingKey.toString('hex') === this.#config.bootstrap.toString('hex');
         const isIndexer = this.isIndexer();
-        const activeWriters = await this.getActiveWriterCount({ excludeAdmin: true });
+        const activeWriters = await this.getActiveWriterCount(true);
         const lengthCondition = activeWriters < this.#config.maxWritersForAdminIndexerConnection;
         return !!(isAdmin && isIndexer && lengthCondition);
     }
@@ -211,7 +212,14 @@ class State extends ReadyResource {
         return Object.values(this.#base.system.indexers);
     }
 
-    async getActiveWriterCount({ excludeAdmin = false } = {}) {
+    async getActiveWriterCount(excludeAdmin = false) {
+        const cached = this.#activeWriterCountCache.get(excludeAdmin);
+        const systemLength = this.#base.system?.core?.length ?? -1;
+
+        if (cached && cached.systemLength === systemLength) {
+            return cached.value;
+        }
+
         const activeAddresses = new Set();
         const adminAddress = (await this.getAdminEntry())?.address ?? null;
 
@@ -237,7 +245,9 @@ class State extends ReadyResource {
             return 0;
         }
 
-        return activeAddresses.size;
+        const count = activeAddresses.size;
+        this.#activeWriterCountCache.set(excludeAdmin, { systemLength, value: count });
+        return count;
     }
 
     async isWkInIndexersEntry(wk) {

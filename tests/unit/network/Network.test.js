@@ -1,9 +1,10 @@
 import { test } from 'brittle';
 import sinon from 'sinon';
-import esmock from 'esmock';
 import b4a from 'b4a';
-import { EventEmitter } from 'events';
+import EventEmitter from 'bare-events';
 import { CONNECTION_STATUS } from '../../../src/utils/constants.js';
+
+const isBareRuntime = typeof globalThis.Bare !== 'undefined';
 
 function normalizePublicKey(publicKey) {
     if (typeof publicKey === 'string') return publicKey;
@@ -12,6 +13,7 @@ function normalizePublicKey(publicKey) {
 }
 
 async function loadNetwork() {
+    const { default: esmock } = await import('esmock');
     let swarmInstance = null;
     let connectionManagerInstance = null;
 
@@ -157,47 +159,53 @@ async function loadNetwork() {
     return { network, swarmInstance, connectionManagerInstance };
 }
 
-test('Network#disconnectValidatorPeer clears pending validator attempts', async t => {
-    const publicKey = 'a'.repeat(64);
-    const { network, swarmInstance } = await loadNetwork();
+if (isBareRuntime) {
+    test('Network#disconnectValidatorPeer coverage is Node-only', t => {
+        t.pass('skipped in Bare because esmock depends on node:module');
+    });
+} else {
+    test('Network#disconnectValidatorPeer clears pending validator attempts', async t => {
+        const publicKey = 'a'.repeat(64);
+        const { network, swarmInstance } = await loadNetwork();
 
-    const status = await network.tryConnect(publicKey, 'validator');
-    t.is(status, CONNECTION_STATUS.PENDING, 'connection attempt should remain pending');
-    t.ok(network.isConnectionPending(publicKey), 'pending connection should be tracked before invalidation');
+        const status = await network.tryConnect(publicKey, 'validator');
+        t.is(status, CONNECTION_STATUS.PENDING, 'connection attempt should remain pending');
+        t.ok(network.isConnectionPending(publicKey), 'pending connection should be tracked before invalidation');
 
-    const disconnected = network.disconnectValidatorPeer(publicKey, 'peer invalidated by state event');
+        const disconnected = network.disconnectValidatorPeer(publicKey, 'peer invalidated by state event');
 
-    t.ok(disconnected, 'disconnect should report work done');
-    t.absent(network.isConnectionPending(publicKey), 'pending connection should be cleared');
-    t.is(swarmInstance.leavePeer.callCount, 1, 'peer discovery should be cancelled');
-});
+        t.ok(disconnected, 'disconnect should report work done');
+        t.absent(network.isConnectionPending(publicKey), 'pending connection should be cleared');
+        t.is(swarmInstance.leavePeer.callCount, 1, 'peer discovery should be cancelled');
+    });
 
-test('Network#disconnectValidatorPeer removes tracked validators from the pool', async t => {
-    const publicKey = 'b'.repeat(64);
-    const { network, swarmInstance, connectionManagerInstance } = await loadNetwork();
+    test('Network#disconnectValidatorPeer removes tracked validators from the pool', async t => {
+        const publicKey = 'b'.repeat(64);
+        const { network, swarmInstance, connectionManagerInstance } = await loadNetwork();
 
-    connectionManagerInstance.addValidator(publicKey);
-    swarmInstance.peers.set(publicKey, { publicKey: b4a.from(publicKey, 'hex') });
+        connectionManagerInstance.addValidator(publicKey);
+        swarmInstance.peers.set(publicKey, { publicKey: b4a.from(publicKey, 'hex') });
 
-    const disconnected = network.disconnectValidatorPeer(publicKey, 'peer no longer valid validator');
+        const disconnected = network.disconnectValidatorPeer(publicKey, 'peer no longer valid validator');
 
-    t.ok(disconnected, 'disconnect should report tracked validator removal');
-    t.absent(connectionManagerInstance.exists(publicKey), 'validator should be removed from connection manager');
-    t.alike(connectionManagerInstance.removed, [{ publicKey, options: { endConnection: false } }], 'tracked validator should be detached without ending the socket');
-    t.is(swarmInstance.leavePeer.callCount, 0, 'tracked validator removal should not tear down generic peer discovery');
-});
+        t.ok(disconnected, 'disconnect should report tracked validator removal');
+        t.absent(connectionManagerInstance.exists(publicKey), 'validator should be removed from connection manager');
+        t.alike(connectionManagerInstance.removed, [{ publicKey, options: { endConnection: false } }], 'tracked validator should be detached without ending the socket');
+        t.is(swarmInstance.leavePeer.callCount, 0, 'tracked validator removal should not tear down generic peer discovery');
+    });
 
-test('Network#disconnectValidatorPeer ignores non-validator pending peers', async t => {
-    const publicKey = 'c'.repeat(64);
-    const { network, swarmInstance } = await loadNetwork();
+    test('Network#disconnectValidatorPeer ignores non-validator pending peers', async t => {
+        const publicKey = 'c'.repeat(64);
+        const { network, swarmInstance } = await loadNetwork();
 
-    const status = await network.tryConnect(publicKey, 'rpc');
-    t.is(status, CONNECTION_STATUS.PENDING, 'non-validator connection attempt should be pending');
-    t.ok(network.isConnectionPending(publicKey), 'non-validator pending connection should be tracked');
+        const status = await network.tryConnect(publicKey, 'rpc');
+        t.is(status, CONNECTION_STATUS.PENDING, 'non-validator connection attempt should be pending');
+        t.ok(network.isConnectionPending(publicKey), 'non-validator pending connection should be tracked');
 
-    const disconnected = network.disconnectValidatorPeer(publicKey, 'state event should not affect generic peer');
+        const disconnected = network.disconnectValidatorPeer(publicKey, 'state event should not affect generic peer');
 
-    t.absent(disconnected, 'non-validator peer should be ignored by validator disconnect helper');
-    t.ok(network.isConnectionPending(publicKey), 'non-validator pending connection should remain tracked');
-    t.is(swarmInstance.leavePeer.callCount, 0, 'generic peer should not be left');
-});
+        t.absent(disconnected, 'non-validator peer should be ignored by validator disconnect helper');
+        t.ok(network.isConnectionPending(publicKey), 'non-validator pending connection should remain tracked');
+        t.is(swarmInstance.leavePeer.callCount, 0, 'generic peer should not be left');
+    });
+}
