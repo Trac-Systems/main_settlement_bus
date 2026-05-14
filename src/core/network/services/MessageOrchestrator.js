@@ -189,6 +189,10 @@ class MessageOrchestrator {
         return await this.waitForUnsignedState(txHash, timeout);
     }
 
+    async waitForUnsignedState(txHash, timeout) {
+        return this.state.waitForUnsigned(txHash, timeout);
+    }
+
     #extractTxHash(message) {
         if (!message || !Number.isInteger(message.type)) return null;
 

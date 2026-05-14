@@ -62,12 +62,6 @@ async function loadMainSettlementBus() {
             sleep: sinon.stub().resolves(),
             isHexString: (value) => /^[0-9a-fA-F]+$/.test(value),
         },
-        '../../src/utils/cli.js': {
-            verifyDag: sinon.stub().resolves(),
-            printHelp: sinon.stub(),
-            printWalletInfo: sinon.stub(),
-            printBalance: sinon.stub().resolves(),
-        },
     });
 
     return {
