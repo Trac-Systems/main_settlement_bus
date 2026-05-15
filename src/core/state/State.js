@@ -242,7 +242,7 @@ class State extends ReadyResource {
             }
         } catch (error) {
             this.#safeLogApply("ActiveWriterCount", error?.message ?? "Failed to scan active writers");
-            return 0;
+            throw error;
         }
 
         const count = activeAddresses.size;

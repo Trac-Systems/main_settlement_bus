@@ -267,7 +267,9 @@ class Network extends ReadyResource {
             this.#validatorConnectionManager.remove(publicKeyHex, { endConnection: false });
         }
 
-        if (hadPendingValidatorConnection && this.#swarm?.peers?.has(publicKeyHex)) {
+        const shouldLeavePeer = hadPendingValidatorConnection || isTrackedValidator;
+
+        if (shouldLeavePeer && this.#swarm?.peers?.has(publicKeyHex)) {
             this.#logger.debug(`Network.disconnectValidatorPeer: leaving peer ${publicKeyHex}. Reason: ${reason}`);
             this.#swarm.leavePeer(b4a.from(publicKeyHex, 'hex'));
         }

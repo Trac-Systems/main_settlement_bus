@@ -191,7 +191,7 @@ if (isBareRuntime) {
         t.ok(disconnected, 'disconnect should report tracked validator removal');
         t.absent(connectionManagerInstance.exists(publicKey), 'validator should be removed from connection manager');
         t.alike(connectionManagerInstance.removed, [{ publicKey, options: { endConnection: false } }], 'tracked validator should be detached without ending the socket');
-        t.is(swarmInstance.leavePeer.callCount, 0, 'tracked validator removal should not tear down generic peer discovery');
+        t.is(swarmInstance.leavePeer.callCount, 1, 'leavePeer should be called to clear explicit peer tracking without closing the socket');
     });
 
     test('Network#disconnectValidatorPeer ignores non-validator pending peers', async t => {

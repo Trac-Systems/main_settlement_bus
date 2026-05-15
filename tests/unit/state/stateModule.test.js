@@ -13,8 +13,8 @@ async function runStateTests() {
     // These tests are skipped temoporarily because the mock library sinon does not work with bare.
     // TODO: replace esmock, sinon is actually fine
     await import('./apply/state.apply.test.js');
-    await import('./stateAdminValidation.test.js');
     if (!isBare()) {
+        await import('./stateAdminValidation.test.js');
         await import('./State.test.js');
     }
     test.resume();

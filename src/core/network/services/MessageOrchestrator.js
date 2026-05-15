@@ -185,7 +185,7 @@ class MessageOrchestrator {
 
         // A short wait covers the race where a first validator committed the tx
         // and a retried validator only observes it as "already exists/completed".
-        const timeout = Math.min(this.#config.messageValidatorResponseTimeout ?? 2000, 2000);
+        const timeout = this.#config.messageValidatorResponseTimeout ?? 2000;
         return await this.waitForUnsignedState(txHash, timeout);
     }
 
