@@ -6,8 +6,10 @@ The following table shows which versions of this project are currently receiving
 
 | Version | Supported          |
 | -------- | ------------------ |
-| 0.2.x    | :white_check_mark: |
-| < 0.2    | :x:                |
+| 0.2.18   | :white_check_mark: |
+| 0.2.17   | :white_check_mark: |
+| main     | :warning: unstable |
+| < 0.2.17 | :x:                |
 
 Older versions (< 0.2.x) are no longer supported.  
 Please upgrade to the latest release to ensure you receive security fixes.
