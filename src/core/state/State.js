@@ -223,26 +223,21 @@ class State extends ReadyResource {
         const activeAddresses = new Set();
         const adminAddress = (await this.getAdminEntry())?.address ?? null;
 
-        try {
-            for await (const { key, value } of this.#base.system.list()) {
-                if (!key || !value || value.isRemoved) continue;
+        for await (const { key, value } of this.#base.system.list()) {
+            if (!key || !value || value.isRemoved) continue;
 
-                const writerKeyHex = key.toString('hex');
-                const addressBuffer = await this.getRegisteredWriterKey(writerKeyHex);
-                if (!addressBuffer) continue;
+            const writerKeyHex = key.toString('hex');
+            const addressBuffer = await this.getRegisteredWriterKey(writerKeyHex);
+            if (!addressBuffer) continue;
 
-                const address = addressUtils.bufferToAddress(addressBuffer, this.#config.addressPrefix);
-                if (!address) continue;
+            const address = addressUtils.bufferToAddress(addressBuffer, this.#config.addressPrefix);
+            if (!address) continue;
 
-                // Non-admin indexers do not participate in validator capacity decisions.
-                if (value.isIndexer && address !== adminAddress) continue;
-                if (excludeAdmin && address === adminAddress) continue;
+            // Non-admin indexers do not participate in validator capacity decisions.
+            if (value.isIndexer && address !== adminAddress) continue;
+            if (excludeAdmin && address === adminAddress) continue;
 
-                activeAddresses.add(address);
-            }
-        } catch (error) {
-            this.#safeLogApply("ActiveWriterCount", error?.message ?? "Failed to scan active writers");
-            throw error;
+            activeAddresses.add(address);
         }
 
         const count = activeAddresses.size;
