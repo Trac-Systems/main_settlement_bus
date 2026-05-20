@@ -262,16 +262,16 @@ class Network extends ReadyResource {
         const hadPendingValidatorConnection = this.#clearPendingValidatorConnection(publicKeyHex);
         const isTrackedValidator = this.#validatorConnectionManager.exists(publicKeyHex);
 
-        if (isTrackedValidator) {
-            this.#logger.debug(`Network.disconnectValidatorPeer: detaching tracked validator ${publicKeyHex}. Reason: ${reason}`);
-            this.#validatorConnectionManager.remove(publicKeyHex, { endConnection: false });
-        }
-
         const shouldLeavePeer = hadPendingValidatorConnection || isTrackedValidator;
 
         if (shouldLeavePeer && this.#swarm?.peers?.has(publicKeyHex)) {
             this.#logger.debug(`Network.disconnectValidatorPeer: leaving peer ${publicKeyHex}. Reason: ${reason}`);
             this.#swarm.leavePeer(b4a.from(publicKeyHex, 'hex'));
+        }
+
+        if (isTrackedValidator) {
+            this.#logger.debug(`Network.disconnectValidatorPeer: detaching tracked validator ${publicKeyHex}. Reason: ${reason}`);
+            this.#validatorConnectionManager.remove(publicKeyHex, { endConnection: false });
         }
 
         return hadPendingValidatorConnection || isTrackedValidator;
