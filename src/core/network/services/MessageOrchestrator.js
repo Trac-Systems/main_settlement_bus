@@ -177,6 +177,18 @@ class MessageOrchestrator {
         return success;
     }
 
+    /**
+     * Determines whether a non-OK result code should be treated as a success due to idempotency.
+     *
+     * This handles the retry scenario where a requester did not receive or accept the response
+     * from the first validator that committed the transaction. On retry, a second validator may
+     * return TX_ALREADY_EXISTS or OPERATION_ALREADY_COMPLETED because the tx was already
+     * processed. Those codes are not errors — they confirm the operation succeeded.
+     *
+     * To safely treat these as success, we check whether the local unsigned state for the tx
+     * has been committed. This ensures we only acknowledge idempotent success when the state
+     * change is actually observable locally, not just because the result code matched.
+     */
     async #isIdempotentSuccess(resultCode, message) {
         if (!this.#idempotentSuccessCodes.has(resultCode)) return false;
 
