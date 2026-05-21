@@ -187,16 +187,15 @@ class ConnectionManager {
     /**
      * Removes a validator from the pool.
      * @param {String | Buffer} publicKey - The public key hex string of the validator to remove
-     * @param {object} [options]
-     * @param {boolean} [options.endConnection=true] - Whether to close the underlying socket.
      */
-    remove(publicKey, { endConnection = true } = {}) {
+    remove(publicKey) {
         this.#logger.debug(`remove: removing validator ${publicKeyToAddress(publicKey, this.#config)}`);
         const publicKeyHex = this.#toHexString(publicKey);
         this.#stopHealthCheck(publicKeyHex);
         if (this.exists(publicKeyHex)) {
+            // Close the connection socket
             const entry = this.#validators.get(publicKeyHex);
-            if (endConnection && entry && entry.connection && typeof entry.connection.end === 'function') {
+            if (entry && entry.connection && typeof entry.connection.end === 'function') {
                 try {
                     entry.connection.end();
                 } catch (e) {
