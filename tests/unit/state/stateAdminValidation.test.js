@@ -85,7 +85,9 @@ async function setupMockedState(config) {
         state, 
         restore: () => {
             stubs.forEach(s => s.restore());
-            try { fs.rmSync(dbPath, { recursive: true, force: true }); } catch (e) {}
+            try { fs.rmSync(dbPath, { recursive: true, force: true }); } catch (e) {
+                console.log(e);
+            }
         } 
     };
 }
