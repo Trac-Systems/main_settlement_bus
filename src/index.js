@@ -186,8 +186,6 @@ export class MainSettlementBus extends ReadyResource {
 
     async #setUpRoleAutomatically() {
         if (!this.#state.isWritable() && this.#config.enableRoleRequester) {
-            console.log("Requesting writer role... This may take a moment.");
-            await this.requestWriterRole(false);
             setTimeout(async () => {
                 await this.requestWriterRole(true);
             }, 5_000);
@@ -206,16 +204,15 @@ export class MainSettlementBus extends ReadyResource {
 
     async #stateEventsListener() {
         this.#state.on(CustomEventType.IS_INDEXER, (publicKey) => {
-            if (this.#network.validatorConnectionManager.exists(publicKey)) {
-                this.#network.validatorConnectionManager.remove(publicKey)
-            }
-        })
+            if (this.#isClosing) return;
+            this.#network.disconnectValidatorPeer(publicKey, 'peer promoted to indexer');
+        });
 
         this.#state.on(CustomEventType.UNWRITABLE, (publicKey) => {
-            if (this.#network.validatorConnectionManager.exists(publicKey)) {
-                this.#network.validatorConnectionManager.remove(publicKey)
-            }
-        })
+            if (this.#isClosing) return;
+            this.#network.disconnectValidatorPeer(publicKey, 'peer became unwritable');
+        });
+
         this.#state.base.on(EventType.IS_INDEXER, () => {
             console.log("Current node is an indexer");
         });
