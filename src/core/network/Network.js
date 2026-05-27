@@ -17,6 +17,7 @@ import TransactionRateLimiterService from './services/TransactionRateLimiterServ
 import PendingRequestService from './services/PendingRequestService.js';
 import TransactionCommitService from "./services/TransactionCommitService.js";
 import ValidatorHealthCheckService from './services/ValidatorHealthCheckService.js';
+import EpochProofProposalService from './services/EpochProofProposalService.js';
 import { Logger } from '../../utils/logger.js';
 import { WalletProvider } from 'trac-wallet';
 
@@ -38,16 +39,21 @@ class Network extends ReadyResource {
     #transactionCommitService;
     #wallet;
     #validatorHealthCheckService;
+    #epochProofProposalService;
     #logger;
+    #state;
+    #store;
 
     /**
      * @param {State} state
      * @param {Config} config
      * @param {string} address
      **/
-    constructor(state, config, address = null) {
+    constructor(state, store, config, address = null) {
         super();
         this.#config = config
+        this.#state = state
+        this.#store = store
         this.#connectTimeoutMs = config.connectTimeoutMs || 5000;
         this.#maxPendingConnections = config.maxPendingConnections || 50;
         this.#pendingConnections = new Map();
@@ -87,6 +93,11 @@ class Network extends ReadyResource {
 
         this.transactionPoolService.start();
         this.validatorObserverService.start();
+        await this.#replicate(
+            this.#state,
+            this.#store,
+            this.#wallet,
+        );
     }
 
     async _close() {
@@ -94,9 +105,11 @@ class Network extends ReadyResource {
         await this.transactionPoolService.stopPool();
         await sleep(100);
         await this.#validatorObserverService.stopValidatorObserver();
-        await sleep(5_000);
         if (this.#validatorHealthCheckService) {
             await this.#validatorHealthCheckService.close();
+        }
+        if (this.#epochProofProposalService) {
+            await this.#epochProofProposalService.close();
         }
 
         this.cleanupNetworkListeners();
@@ -162,7 +175,7 @@ class Network extends ReadyResource {
         this.#pendingConnections.clear();
     }
 
-    async replicate(
+    async #replicate(
         state,
         store,
         wallet,
@@ -193,6 +206,9 @@ class Network extends ReadyResource {
             );
             this.#validatorHealthCheckService = new ValidatorHealthCheckService(this.#config);
             await this.#validatorHealthCheckService.ready();
+            this.#epochProofProposalService = new EpochProofProposalService(state, this.#validatorConnectionManager, this.#wallet, this.#config);
+            await this.#epochProofProposalService.ready();
+            this.#epochProofProposalService.start();
             this.#validatorConnectionManager.subscribeToHealthChecks(this.#validatorHealthCheckService);
 
             this.#logger.info(`Channel: ${b4a.toString(this.#config.channel)}`);

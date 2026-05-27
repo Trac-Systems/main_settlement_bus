@@ -71,7 +71,7 @@ export class MainSettlementBus extends ReadyResource {
 
     async _open() {
         this.#state = new State(this.#store, this.#wallet, this.#config);
-        this.#network = new Network(this.#state, this.#config, this.#wallet?.address ?? null);
+        this.#network = new Network(this.#state, this.#store, this.#config, this.#wallet?.address ?? null);
 
         await this.#state.ready();
         await this.#network.ready();
@@ -80,12 +80,6 @@ export class MainSettlementBus extends ReadyResource {
         if (this.#wallet) {
             this.#printWalletInfo();
         }
-
-        await this.#network.replicate(
-            this.#state,
-            this.#store,
-            this.#wallet,
-        );
 
         const adminEntry = await this.#state.getAdminEntry();
         await this.#setUpRoleAutomatically(adminEntry);
