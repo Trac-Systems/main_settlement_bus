@@ -56,6 +56,8 @@ const configData = {
         txCommitTimeout: 2200,
         txPoolSize: 1000, // size of transaction pool
         validatorHealthCheckInterval: 5 * 60 * 1000, // How often to check validator health (ms)
+        epochInterval: 3 * 60 * 1000, // How often to trigger epoch proof proposal (ms)
+        epochThreshold: 2, // Minimum number of validator confirmations required to append a new epoch
         storesDirectory: 'stores/',
         storeName: 'testnet',
     },
@@ -105,6 +107,8 @@ const configData = {
         txCommitTimeout: 2200,
         txPoolSize: 1000, // size of transaction pool
         validatorHealthCheckInterval: 5 * 60 * 1000, // How often to check validator health (ms)
+        epochInterval: 3 * 60 * 1000, // How often to trigger epoch proof proposal (ms)
+        epochThreshold: 2, // Minimum number of validator confirmations required to append a new epoch
         storesDirectory: 'stores/',
         storeName: 'mainnet',
     },
@@ -154,6 +158,8 @@ const configData = {
         txCommitTimeout: 2200,
         txPoolSize: 1000, // size of transaction pool
         validatorHealthCheckInterval: 1_000, // How often to check validator health (ms)
+        epochInterval: 3 * 60 * 1000, // How often to trigger epoch proof proposal (ms)
+        epochThreshold: 2, // Minimum number of validator confirmations required to append a new epoch
         storesDirectory: 'stores/',
         storeName: 'development',
     }
