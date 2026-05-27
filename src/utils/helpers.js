@@ -49,29 +49,6 @@ export const safeJsonParse = (str) => {
     return undefined;
 }
 
-export async function getFormattedIndexersWithAddresses(state, config) {
-    const indexers = await state.getIndexersEntry();
-    const formatted = indexers.map((entry) => ({
-        writingKey: b4a.toString(entry.key, "hex"),
-    }));
-
-    const results = await Promise.all(
-        formatted.map(async (entry) => {            
-            const address = bufferToAddress(
-                await state.getSigned(EntryType.WRITER_ADDRESS + entry.writingKey),
-                config.addressPrefix
-            );
-
-            return {
-                ...entry,
-                address,
-            };
-        })
-    );
-
-    return results;
-}
-
 export function formatIndexersEntry(indexersEntry, addressLength) {
 
     const count = indexersEntry[0];
