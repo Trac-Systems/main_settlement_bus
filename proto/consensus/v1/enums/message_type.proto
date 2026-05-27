@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package network.v1;
+package consensus.v1;
 
 // Warning: Do not change numeric values of existing enum fields.
 // They are part of the public API.

@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package consensus.v1;
+
+message EpochProofProposalData {
+  uint32 protocol_version = 1;
+  uint64 epoch = 2;
+  bytes previous_epoch_hash = 3;
+  bytes committed_hash = 4;
+  bytes leader_id = 5;
+  bytes vdf_parameters_hash = 6;
+  bytes vdf_output = 7;
+}
+
+message EpochProofProposalRequest {
+  EpochProofProposalData data = 1;
+  bytes hash = 2;
+  bytes signature = 3;
+}

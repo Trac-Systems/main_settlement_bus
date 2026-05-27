@@ -18,6 +18,7 @@ enum OperationType {
     BOOTSTRAP_DEPLOYMENT   = 11; // partial
     TX                     = 12; // partial
     TRANSFER               = 13; // partial
+    SET_EPOCH = 14; // complete
 }
 
 // add admin operation, disable_initialization (complete by default)
@@ -100,6 +101,13 @@ message BootstrapDeploymentOperation {
     bytes vs   = 9; // Validator's signature (optional)
 }
 
+message SetEpochOperation {
+    uint64   pe        = 1; // Epoch to be set
+    bytes    ln        = 2; // Leader's defined nonce
+    repeated bytes ss  = 3; // Array of Signatures
+    repeated bytes pks = 4; // Array of Public keys (positionaly correlatable with the signatures)
+}
+
 // Main structure for the operations where messages are
 message Operation {
     OperationType type = 1;
@@ -113,5 +121,6 @@ message Operation {
         RoleAccessOperation               rao  = 7;
         BootstrapDeploymentOperation      bdo  = 8;
         TxOperation                       txo  = 9;
+        SetEpochOperation                 seo  = 10;
     }
 }
