@@ -4,6 +4,7 @@ import b4a from "b4a";
 import { bufferToAddress } from "../../../core/state/utils/address.js";
 import tracCryptoApi from "trac-crypto-api";
 import { WRITER_BYTE_LENGTH, CONNECTION_STATUS } from "../../../utils/constants.js";
+import { sleep } from "../../../utils/helpers.js";
 
 // Internal constants
 const VALIDATOR_CANDIDATES_PER_CYCLE = 10;
@@ -241,6 +242,7 @@ class ValidatorObserverService {
         await this.#scheduler.stop(waitForCurrent);
         this.#scheduler = null;
         this.#logger.debug("ValidatorObserverService stopped");
+        if (waitForCurrent) await sleep(5000)
     }
 
     /**
