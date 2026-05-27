@@ -1,7 +1,7 @@
-import b4a from 'b4a'
 import {EventType, ResultCode} from '../../../utils/constants.js';
 import {publicKeyToAddress} from "../../../utils/helpers.js";
 import {Logger} from "../../../utils/logger.js";
+import {toHex} from '../../../utils/buffer.js';
 /**
  * @typedef {import('hyperswarm').Connection} Connection
  */
@@ -353,7 +353,7 @@ class ConnectionManager {
     }
 
     #toHexString(publicKey) {
-        return b4a.isBuffer(publicKey) ? publicKey.toString('hex') : publicKey;
+        return toHex(publicKey)
     }
 }
 
