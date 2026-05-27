@@ -42,6 +42,7 @@ import { deepCopyBuffer } from '../../utils/buffer.js';
 import { Status } from './utils/transaction.js';
 import remote from 'hypercore/lib/fully-remote-proof.js'
 import PQueue from 'p-queue';
+import { keys } from '../network/protocols/v1/handlers/epochProposal/proof.js'
 
 const OVERSIZED_BATCH_PENALTY_MULTIPLIER = BATCH_SIZE;
 
@@ -126,6 +127,12 @@ class State extends ReadyResource {
 
     getSignedLength() {
         return this.#base.view.core.signedLength;
+    }
+
+    // TODO: document a epoch data returned
+    async currentEpoch() {
+        const latestEpochNumber = await this.getSigned(keys.CURRENT_INDEX)
+        return await this.getSigned(keys.EPOCH(latestEpochNumber))
     }
 
     getFee() {
@@ -521,6 +528,7 @@ class State extends ReadyResource {
             [OperationType.BOOTSTRAP_DEPLOYMENT]: this.#handleApplyBootstrapDeploymentOperation.bind(this),
             [OperationType.TX]: this.#handleApplyTxOperation.bind(this),
             [OperationType.TRANSFER]: this.#handleApplyTransferOperation.bind(this),
+            [OperationType.SET_EPOCH]: this.#handleApplySetEpochOperation.bind(this),
         };
         return handlers[type] || null;
     }
@@ -3271,6 +3279,17 @@ class State extends ReadyResource {
         if (this.#config.enableTxApplyLogs) {
             console.info(`Transfer operation: ${hashHexString} has been appended.`);
         }
+        return Status.SUCCESS;
+    }
+
+    async #handleApplySetEpochOperation(op, view, base, node, batch) {
+        if (!this.check.validateSetEpochOperation(op)) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "Contract schema validation failed.", node.from.key)
+            return Status.FAILURE;
+        };
+
+        // TODO: Actually program the apply function
+
         return Status.SUCCESS;
     }
 

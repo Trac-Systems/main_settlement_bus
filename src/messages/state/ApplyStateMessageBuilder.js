@@ -1,7 +1,7 @@
 import b4a from 'b4a';
 import tracCryptoApi from 'trac-crypto-api';
 
-import { createMessage } from '../../utils/buffer.js';
+import { createMessage, toHex } from '../../utils/buffer.js';
 import { OperationType } from '../../utils/constants.js';
 import { addressToBuffer, bufferToAddress } from '../../core/state/utils/address.js';
 import { isAddressValid } from "../../core/state/utils/address.js";
@@ -593,7 +593,6 @@ class ApplyStateMessageBuilder {
     }
 
     #encodePayloadJson(payload) {
-        const toHex = buffer => buffer.toString('hex');
         const address = bufferToAddress(payload.address, this.#config.addressPrefix);
         if (!address) {
             throw new Error('Payload address is invalid.');
