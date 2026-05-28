@@ -107,6 +107,24 @@ async function loadNetwork() {
         close() {}
     }
 
+    class EpochProofProposalServiceMock {
+        async ready() {}
+        start() {}
+        async close() {}
+    }
+
+    class WalletProviderMock {
+        constructor() {}
+
+        async fromSecretKey(secretKey) {
+            return {
+                publicKey: b4a.alloc(32, 2),
+                secretKey,
+                address: 'trac_test',
+            };
+        }
+    }
+
     class LoggerMock {
         info() {}
         debug() {}
@@ -129,8 +147,10 @@ async function loadNetwork() {
         '../../../src/core/network/services/PendingRequestService.js': { default: PendingRequestServiceMock },
         '../../../src/core/network/services/TransactionCommitService.js': { default: TransactionCommitServiceMock },
         '../../../src/core/network/services/ValidatorHealthCheckService.js': { default: ValidatorHealthCheckServiceMock },
+        '../../../src/core/consensus/services/EpochProofProposalService.js': { default: EpochProofProposalServiceMock },
         '../../../src/core/network/protocols/NetworkMessages.js': { default: NetworkMessagesMock },
         '../../../src/utils/logger.js': { Logger: LoggerMock },
+        'trac-wallet': { WalletProvider: WalletProviderMock },
     });
 
     const Network = NetworkModule.default;
@@ -153,8 +173,15 @@ async function loadNetwork() {
         address: 'trac_test',
     };
 
-    const network = new Network({}, config, wallet.address);
-    await network.replicate({}, {}, wallet);
+    const store = {
+        createKeyPair: async () => ({
+            publicKey: wallet.publicKey,
+            secretKey: wallet.secretKey,
+        }),
+        replicate: sinon.stub(),
+    };
+    const network = new Network({}, store, config, wallet);
+    await network.ready();
 
     return { network, swarmInstance, connectionManagerInstance };
 }
@@ -167,6 +194,7 @@ if (isBareRuntime) {
     test('Network#disconnectValidatorPeer clears pending validator attempts', async t => {
         const publicKey = 'a'.repeat(64);
         const { network, swarmInstance } = await loadNetwork();
+        t.teardown(async () => network.close());
 
         const status = await network.tryConnect(publicKey, 'validator');
         t.is(status, CONNECTION_STATUS.PENDING, 'connection attempt should remain pending');
@@ -182,6 +210,7 @@ if (isBareRuntime) {
     test('Network#disconnectValidatorPeer removes tracked validators from the pool', async t => {
         const publicKey = 'b'.repeat(64);
         const { network, swarmInstance, connectionManagerInstance } = await loadNetwork();
+        t.teardown(async () => network.close());
 
         connectionManagerInstance.addValidator(publicKey);
         swarmInstance.peers.set(publicKey, { publicKey: b4a.from(publicKey, 'hex') });
@@ -197,6 +226,7 @@ if (isBareRuntime) {
     test('Network#disconnectValidatorPeer ignores non-validator pending peers', async t => {
         const publicKey = 'c'.repeat(64);
         const { network, swarmInstance } = await loadNetwork();
+        t.teardown(async () => network.close());
 
         const status = await network.tryConnect(publicKey, 'rpc');
         t.is(status, CONNECTION_STATUS.PENDING, 'non-validator connection attempt should be pending');

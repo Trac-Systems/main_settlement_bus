@@ -6,6 +6,7 @@ const expectedResultCodeMap = Object.freeze({
     UNSPECIFIED: 0,
     OK: 1,
     INVALID_PAYLOAD: 2,
+    INVALID_EPOCH: 62,
     RATE_LIMITED: 3,
     SIGNATURE_INVALID: 4,
     UNEXPECTED_ERROR: 5,

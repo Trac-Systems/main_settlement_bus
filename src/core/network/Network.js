@@ -17,7 +17,7 @@ import TransactionRateLimiterService from './services/TransactionRateLimiterServ
 import PendingRequestService from './services/PendingRequestService.js';
 import TransactionCommitService from "./services/TransactionCommitService.js";
 import ValidatorHealthCheckService from './services/ValidatorHealthCheckService.js';
-import EpochProofProposalService from './services/EpochProofProposalService.js';
+import EpochProofProposalService from '../consensus/services/EpochProofProposalService.js';
 import { Logger } from '../../utils/logger.js';
 import { WalletProvider } from 'trac-wallet';
 
@@ -46,14 +46,17 @@ class Network extends ReadyResource {
 
     /**
      * @param {State} state
+     * @param {object} store
      * @param {Config} config
-     * @param {string} address
+     * @param {import("trac-wallet").Wallet | undefined | null} wallet
      **/
-    constructor(state, store, config, address = null) {
+    constructor(state, store, config, wallet = null) {
         super();
+        const address = wallet?.address ?? null;
         this.#config = config
         this.#state = state
         this.#store = store
+        this.#wallet = wallet;
         this.#connectTimeoutMs = config.connectTimeoutMs || 5000;
         this.#maxPendingConnections = config.maxPendingConnections || 50;
         this.#pendingConnections = new Map();
