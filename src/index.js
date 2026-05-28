@@ -71,7 +71,7 @@ export class MainSettlementBus extends ReadyResource {
 
     async _open() {
         this.#state = new State(this.#store, this.#wallet, this.#config);
-        this.#network = new Network(this.#state, this.#store, this.#config, this.#wallet ?? null);
+        this.#network = new Network(this.#state, this.#store, this.#config, this.#wallet);
 
         await this.#state.ready();
         await this.#network.ready();

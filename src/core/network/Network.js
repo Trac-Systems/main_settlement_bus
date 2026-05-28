@@ -46,33 +46,23 @@ class Network extends ReadyResource {
 
     /**
      * @param {State} state
+     * @param {object} store
      * @param {Config} config
-     * @param {string} address
+     * @param {object} address
      **/
-    constructor(state, store, config, walletOrAddress = null) {
+    constructor(state, store, config, wallet = null) {
         super();
-        if (arguments.length === 3) {
-            walletOrAddress = config;
-            config = store;
-            store = null;
-        }
-
-        const address = typeof walletOrAddress === 'string'
-            ? walletOrAddress
-            : walletOrAddress?.address ?? null;
 
         this.#config = config
         this.#state = state
         this.#store = store
-        this.#wallet = typeof walletOrAddress === 'object' && walletOrAddress !== null
-            ? walletOrAddress
-            : null;
+        this.#wallet = wallet
         this.#connectTimeoutMs = config.connectTimeoutMs || 5000;
         this.#maxPendingConnections = config.maxPendingConnections || 50;
         this.#pendingConnections = new Map();
         this.#transactionCommitService = new TransactionCommitService(this.#config);
-        this.#transactionPoolService = new TransactionPoolService(state, address, this.#transactionCommitService ,this.#config);
-        this.#validatorObserverService = new ValidatorObserverService(this, state, address, this.#config);
+        this.#transactionPoolService = new TransactionPoolService(state, wallet?.address, this.#transactionCommitService ,this.#config);
+        this.#validatorObserverService = new ValidatorObserverService(this, state, wallet?.address, this.#config);
         this.#validatorConnectionManager = new ConnectionManager(this.#config);
         this.#validatorMessageOrchestrator = new MessageOrchestrator(this.#validatorConnectionManager, state, this.#config);
         this.#pendingRequestsService = new PendingRequestService(this.#config);
@@ -106,7 +96,7 @@ class Network extends ReadyResource {
 
         this.transactionPoolService.start();
         this.validatorObserverService.start();
-        await this.replicate();
+        await this.#replicate();
     }
 
     async _close() {
@@ -184,20 +174,9 @@ class Network extends ReadyResource {
         this.#pendingConnections.clear();
     }
 
-    async replicate(state = this.#state, store = this.#store, wallet = this.#wallet) {
-        this.#state = state;
-        this.#store = store;
-        this.#wallet = wallet;
-        await this.#replicate(this.#state, this.#store, this.#wallet);
-    }
-
-    async #replicate(
-        state,
-        store,
-        wallet,
-    ) {
+    async #replicate() {
         if (!this.#swarm) {
-            const { wallet: wrappedWallet, keyPair } = await this.#getOrGenerateWallet(store, wallet);
+            const { wallet: wrappedWallet, keyPair } = await this.#getOrGenerateWallet();
             this.#wallet = wrappedWallet
             this.#validatorMessageOrchestrator.setWallet(this.#wallet);
 
@@ -212,7 +191,7 @@ class Network extends ReadyResource {
 
             this.#rateLimiter = new TransactionRateLimiterService(this.#swarm, this.#config);
             this.#networkMessages = new NetworkMessages(
-                state,
+                this.#state,
                 this.#wallet,
                 this.#rateLimiter,
                 this.#transactionPoolService,
@@ -222,11 +201,11 @@ class Network extends ReadyResource {
             );
             this.#validatorHealthCheckService = new ValidatorHealthCheckService(this.#config);
             await this.#validatorHealthCheckService.ready();
-            if (this.#shouldStartEpochProofProposalService()) {
-                this.#epochProofProposalService = new EpochProofProposalService(state, this.#validatorConnectionManager, this.#wallet, this.#config);
-                await this.#epochProofProposalService.ready();
-                this.#epochProofProposalService.start();
-            }
+
+            this.#epochProofProposalService = new EpochProofProposalService(this.#state, this.#validatorConnectionManager, this.#wallet, this.#config);
+            await this.#epochProofProposalService.ready();
+            this.#epochProofProposalService.start();
+
             this.#validatorConnectionManager.subscribeToHealthChecks(this.#validatorHealthCheckService);
 
             this.#logger.info(`Channel: ${b4a.toString(this.#config.channel)}`);
@@ -238,7 +217,7 @@ class Network extends ReadyResource {
                 await this.#networkMessages.setupProtomuxMessages(connection);
 
                 // ATTENTION: Must be called AFTER the protomux init above
-                const stream = store.replicate(connection);
+                const stream = this.#store.replicate(connection);
                 wakeup.addStream(stream);
 
                 const publicKey = b4a.toString(connection.remotePublicKey, 'hex');
@@ -311,26 +290,16 @@ class Network extends ReadyResource {
         return hadPendingValidatorConnection || isTrackedValidator;
     }
 
-    async #getOrGenerateWallet(store, wallet) {
-        if (!this.#config.enableWallet) {
-            if (!store?.createKeyPair) {
-                throw new Error('Network store is required to create a wallet when enableWallet is false.');
-            }
-            const keyPair = await store.createKeyPair(TRAC_NAMESPACE);
+    async #getOrGenerateWallet() {
+        if (this.#config.enableWallet) {
+            const keyPair = { publicKey: this.#wallet.publicKey, secretKey: this.#wallet.secretKey }
+            return { keyPair, wallet: this.#wallet }
+        } else {
+            // This creates an ephemeral private key via holepunch facilities
+            const keyPair = await this.#store.createKeyPair(TRAC_NAMESPACE);
             const wallet = await new WalletProvider(this.#config).fromSecretKey(keyPair.secretKey)
             return { keyPair, wallet }
-        } else {
-            if (!wallet?.publicKey || !wallet?.secretKey) {
-                throw new Error('Network wallet is required when enableWallet is true.');
-            }
-            const keyPair = { publicKey: wallet.publicKey, secretKey: wallet.secretKey }
-            return { keyPair, wallet }
         }
-    }
-
-    #shouldStartEpochProofProposalService() {
-        const epochInterval = Number(this.#config.epochInterval);
-        return Number.isFinite(epochInterval) && epochInterval > 0;
     }
 
     async tryConnect(publicKey, type = null) {

@@ -20,7 +20,8 @@ const decode = (buffer) => {
 
     return { protocolVersion, epoch, prevEpochHash, networkId, comiteeHash, leaderId, vdfParamsHash, vdfOutput }
 }
-export class EpochProofData {
+
+class EpochProofData {
     constructor({ protocolVersion, epoch, prevEpochHash, networkId, comiteeHash, leaderId, vdfParamsHash, vdfOutput }) {
         this.protocolVersion = protocolVersion
         this.epoch           = epoch
@@ -65,8 +66,8 @@ export class EpochProofData {
 }
 
 export const buildData = (leaderId, previousEpoch, comissionHash, vdf) => {
-    //return new EpochProofData()
     console.log(leaderId, previousEpoch, comissionHash, vdf)
+    return new EpochProofData()
 }
 
 // profData is buffer
