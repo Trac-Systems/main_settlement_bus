@@ -2,7 +2,8 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import protobufModule from '../../src/utils/protobuf/networkV1.generated.cjs';
+import networkProtobufModule from '../../src/utils/protobuf/networkV1.generated.cjs';
+import consensusProtobufModule from '../../src/utils/protobuf/consensusV1.generated.cjs';
 import { ResultCode } from '../../src/utils/constants.js';
 import {
     resultToValidatorAction,
@@ -15,15 +16,18 @@ const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, '..', '..');
 const docPath = path.join(repoRoot, 'docs', 'v1_result_code_policies.md');
 const headerLine = '| Sender | Validator | ResultCode | Value |';
-const protobufResultCodeEnum = protobufModule.network?.v1?.ResultCode ?? {};
+const protobufResultCodeEnums = [
+    networkProtobufModule.network?.v1?.ResultCode ?? {},
+    consensusProtobufModule.consensus?.v1?.ResultCode ?? {}
+];
 
 function buildGeneratedProtoResultCodes() {
-    return Object.entries(protobufResultCodeEnum)
+    return protobufResultCodeEnums.flatMap((protobufResultCodeEnum) => Object.entries(protobufResultCodeEnum)
         .filter(([, value]) => typeof value === 'number')
         .map(([name, value]) => ({
             resultCodeName: name.replace(/^RESULT_CODE_/, ''),
             value
-        }));
+        })));
 }
 
 function parseBooleanValue(value, columnName) {

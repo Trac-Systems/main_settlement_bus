@@ -9,6 +9,7 @@ This table shows, for each V1 `ResultCode`, the boolean policy flags that determ
 | true | true | UNSPECIFIED | 0 |
 | false | false | OK | 1 |
 | true | true | INVALID_PAYLOAD | 2 |
+| false | false | INVALID_EPOCH | 62 |
 | true | true | RATE_LIMITED | 3 |
 | true | true | SIGNATURE_INVALID | 4 |
 | true | true | UNEXPECTED_ERROR | 5 |

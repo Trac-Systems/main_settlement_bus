@@ -361,7 +361,7 @@ test("bootstrap switches to long TTL after timeout", async (t) => {
         clock.tick(31_000);
         await Promise.resolve();
 
-        await service.stopValidatorObserver(true);
+        await service.stopValidatorObserver(false);
 
         t.ok(scans >= before);
     } finally {
@@ -579,7 +579,7 @@ test("does not start observer if it is already running", async (t) => {
 
     await service.start();
     await service.start();
-    await service.stopValidatorObserver();
+    await service.stopValidatorObserver(false);
 
     t.pass();
 });
@@ -603,7 +603,7 @@ test("gracefully catches exceptions in the worker loop", async (t) => {
             await Promise.resolve();
         }
 
-        await service.stopValidatorObserver();
+        await service.stopValidatorObserver(false);
 
         t.pass();
     } finally {
@@ -636,7 +636,7 @@ test("gracefully catches exceptions in scanAutobaseWriters", async (t) => {
             await Promise.resolve();
         }
 
-        await service.stopValidatorObserver();
+        await service.stopValidatorObserver(false);
 
         t.pass();
     } finally {
@@ -665,7 +665,7 @@ test("gracefully catches exceptions in tryConnect", async (t) => {
             await Promise.resolve();
         }
 
-        await service.stopValidatorObserver();
+        await service.stopValidatorObserver(false);
 
         t.pass();
     } finally {
@@ -694,7 +694,7 @@ test("caches null if the address buffer is invalid or missing", async (t) => {
             await Promise.resolve();
         }
 
-        await service.stopValidatorObserver();
+        await service.stopValidatorObserver(false);
 
         t.pass();
     } finally {
@@ -722,7 +722,7 @@ test("caches null if public key fails to decode", async (t) => {
             await Promise.resolve();
         }
 
-        await service.stopValidatorObserver();
+        await service.stopValidatorObserver(false);
 
         t.pass();
     } finally {
@@ -766,7 +766,7 @@ test("clears memory cache when exceeding MAX_KEY_DECODE_CACHE_SIZE", async (t) =
             await Promise.resolve();
         }
 
-        await service.stopValidatorObserver();
+        await service.stopValidatorObserver(false);
 
         t.pass();
     } finally {
