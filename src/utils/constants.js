@@ -1,9 +1,11 @@
 import { OperationType as ApplyOperationType } from './protobuf/applyOperations.cjs';
 import networkV1Generated from './protobuf/networkV1.generated.cjs';
+import consensusV1Generated from './protobuf/consensusV1.generated.cjs';
 import b4a from 'b4a'
 // TODO: We are going to have a lot of contstants. It would be good, to separate them into different files.
 
 const { MessageType: NetworkMessageType, ResultCode: NetworkResultCode } = networkV1Generated.network.v1;
+const { ResultCode: ConsensusResultCode } = consensusV1Generated.consensus.v1;
 
 //ATTENTION - THIS IS USED IN THE APPLY FUNCTION!
 export const EntryType = Object.freeze({
@@ -49,6 +51,7 @@ export const ResultCode = Object.freeze({
     UNSPECIFIED: NetworkResultCode.RESULT_CODE_UNSPECIFIED,
     OK: NetworkResultCode.RESULT_CODE_OK,
     INVALID_PAYLOAD: NetworkResultCode.RESULT_CODE_INVALID_PAYLOAD,
+    INVALID_EPOCH: ConsensusResultCode.RESULT_CODE_INVALID_EPOCH,
     RATE_LIMITED: NetworkResultCode.RESULT_CODE_RATE_LIMITED,
     SIGNATURE_INVALID: NetworkResultCode.RESULT_CODE_SIGNATURE_INVALID,
     UNEXPECTED_ERROR: NetworkResultCode.RESULT_CODE_UNEXPECTED_ERROR,

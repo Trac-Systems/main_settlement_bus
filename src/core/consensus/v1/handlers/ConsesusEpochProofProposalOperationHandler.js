@@ -1,12 +1,11 @@
 import V1EpochProofProposalRequest from "../validators/V1EpochProofProposalRequest.js";
 import V1EpochProofProposalResponse from "../validators/V1EpochProofProposalResponse.js";
-import V1BaseOperationHandler from "../../../network/protocols/v1/handlers/V1BaseOperationHandler.js";
 import {networkMessageFactory} from "../../../../messages/network/v1/networkMessageFactory.js";
 import { V1ProtocolError } from "../../../network/protocols/v1/V1ProtocolError.js";
 import { ResultCode } from "../../../../utils/constants.js";
 import b4a from "b4a";
 import tracCryptoApi from "trac-crypto-api";
-import { epochProofFromBuffer } from "./epochProposal/proof.js";
+import { epochProofFromBuffer } from "./epochProposal/epochProofData.js";
 
 // Minion interface to verify & sign proposals
 class ConsensusEpochProofProposalOperationHandler {
@@ -116,25 +115,25 @@ class ConsensusEpochProofProposalOperationHandler {
         // TODO: check if more validations are required
         
         // if (proofData.commiteeHash !== previousEpoch.commiteeHash) {
-        //     throw new V1ProtocolError(ResultCode.INVALID_EPOCH, 'There is a mismatch between the proof and the last computed epoch');
+        //     throw new V1ProtocolError(CONSENSUS_RESULT_CODE_INVALID_EPOCH, 'There is a mismatch between the proof and the last computed epoch');
         // }
         
         // if (proofData.leaderId !== previousEpoch.leaderId) {
-        //     throw new V1ProtocolError(ResultCode.INVALID_EPOCH, 'There is a mismatch between the proof and the last computed epoch');
+        //     throw new V1ProtocolError(CONSENSUS_RESULT_CODE_INVALID_EPOCH, 'There is a mismatch between the proof and the last computed epoch');
         // }
         
         // if (proofData.vdfParamsHash !== previousEpoch.vdfParamsHash) {
-        //     throw new V1ProtocolError(ResultCode.INVALID_EPOCH, 'There is a mismatch between the proof and the last computed epoch');
+        //     throw new V1ProtocolError(CONSENSUS_RESULT_CODE_INVALID_EPOCH, 'There is a mismatch between the proof and the last computed epoch');
         // }
         
         // if (proofData.vdfOutput !== previousEpoch.vdfOutput) {
-        //     throw new V1ProtocolError(ResultCode.INVALID_EPOCH, 'There is a mismatch between the proof and the last computed epoch');
+        //     throw new V1ProtocolError(CONSENSUS_RESULT_CODE_INVALID_EPOCH, 'There is a mismatch between the proof and the last computed epoch');
         // }
     }
 
     async #validateVdf(proofData) {
         if (!proofData.vdfOutput) {
-            throw new V1ProtocolError(ResultCode.INVALID_EPOCH, 'Inconsistent vdf data');
+            throw new V1ProtocolError(CONSENSUS_RESULT_CODE_INVALID_EPOCH, 'Inconsistent vdf data');
         }
     }
 

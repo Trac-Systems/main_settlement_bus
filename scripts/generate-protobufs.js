@@ -54,6 +54,8 @@ function main() {
     const applyOutputPath = path.join(outputDir, 'applyOperations.cjs');
     const networkEntryPath = path.join(inputDir, 'network/v1/network_message.proto');
     const generatedNetworkOutputPath = path.join(outputDir, 'networkV1.generated.cjs');
+    const consensusEntryPath = path.join(inputDir, 'consensus/v1/consensus_message.proto');
+    const generatedConsensusOutputPath = path.join(outputDir, 'consensusV1.generated.cjs');
 
     fs.mkdirSync(outputDir, { recursive: true });
 
@@ -62,6 +64,9 @@ function main() {
 
     generatePbjsModule(pbjsPath, inputDir, networkEntryPath, generatedNetworkOutputPath);
     transformPbjsForBare(generatedNetworkOutputPath);
+
+    generatePbjsModule(pbjsPath, inputDir, consensusEntryPath, generatedConsensusOutputPath);
+    transformPbjsForBare(generatedConsensusOutputPath);
 }
 
 main();

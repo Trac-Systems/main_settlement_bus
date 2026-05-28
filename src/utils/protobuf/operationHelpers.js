@@ -1,8 +1,10 @@
 import applyOperations from './applyOperations.cjs';
 import networkV1Generated from './networkV1.generated.cjs';
+import consensusV1Generated from './consensusV1.generated.cjs';
 import b4a from 'b4a';
 
 const networkV1Operations = networkV1Generated.network.v1;
+const consensusV1Operations = consensusV1Generated.consensus.v1;
 const NETWORK_TO_OBJECT_OPTIONS = Object.freeze({
     enums: Number,
     longs: Number,
@@ -76,6 +78,17 @@ export const encodeV1networkOperation = (payload) => {
 export const decodeV1networkOperation = (payload) => {
     return networkV1Operations.MessageHeader.toObject(
         networkV1Operations.MessageHeader.decode(payload),
+        NETWORK_TO_OBJECT_OPTIONS
+    );
+}
+
+export const encodeV1consensusOperation = (payload) => {
+    return b4a.from(consensusV1Operations.MessageHeader.encode(payload).finish());
+}
+
+export const decodeV1consensusOperation = (payload) => {
+    return consensusV1Operations.MessageHeader.toObject(
+        consensusV1Operations.MessageHeader.decode(payload),
         NETWORK_TO_OBJECT_OPTIONS
     );
 }

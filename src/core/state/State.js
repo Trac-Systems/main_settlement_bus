@@ -42,7 +42,7 @@ import { deepCopyBuffer } from '../../utils/buffer.js';
 import { Status } from './utils/transaction.js';
 import remote from 'hypercore/lib/fully-remote-proof.js'
 import PQueue from 'p-queue';
-import { keys } from '../network/protocols/v1/handlers/epochProposal/proof.js'
+import { keys } from '../consensus/v1/handlers/epochProposal/epochProofData.js'
 
 const OVERSIZED_BATCH_PENALTY_MULTIPLIER = BATCH_SIZE;
 

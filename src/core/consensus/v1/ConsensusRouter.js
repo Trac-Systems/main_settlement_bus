@@ -1,8 +1,8 @@
-import { decodeV1networkOperation } from '../../../../utils/protobuf/operationHelpers.js'
+import { decodeV1consensusOperation } from '../../../utils/protobuf/operationHelpers.js'
 import b4a from 'b4a'
-import { NetworkOperationType, V1_PROTOCOL_PAYLOAD_MAX_SIZE } from '../../../../utils/constants.js'
-import { publicKeyToAddress } from '../../../../utils/helpers.js'
-import V1EpochProofProposalOperationHandler from './handlers/V1EpochProofProposalOperationHandler.js'
+import { NetworkOperationType, V1_PROTOCOL_PAYLOAD_MAX_SIZE } from '../../../utils/constants.js'
+import { publicKeyToAddress } from '../../../utils/helpers.js'
+import V1EpochProofProposalOperationHandler from './handlers/ConsesusEpochProofProposalOperationHandler.js'
 
 class ConsensusRouterV1 {
     #config
@@ -29,7 +29,7 @@ class ConsensusRouterV1 {
         let decodedMessage;
 
         try {
-            decodedMessage = decodeV1networkOperation(incomingMessage)
+            decodedMessage = decodeV1consensusOperation(incomingMessage)
         } catch (error) {
             this.#disconnect(connection, `Failed to decode incoming V1 message: ${error.message}`)
             return;

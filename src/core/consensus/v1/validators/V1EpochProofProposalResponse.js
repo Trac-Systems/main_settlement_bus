@@ -1,9 +1,9 @@
-import V1BaseOperation from "../../../network/protocols/v1/validators/V1BaseOperation.js";
 import b4a from "b4a";
 import tracCryptoApi from "trac-crypto-api";
 import { ResultCode, WRITER_BYTE_LENGTH } from "../../../../utils/constants.js";
 import { V1ProtocolError } from "../../../network/protocols/v1/V1ProtocolError.js";
 import { isBufferValid } from "../../../../utils/buffer.js";
+import V1BaseOperation from "../../../network/protocols/v1/validators/V1BaseOperation.js";
 
 class V1EpochProofProposalResponse extends V1BaseOperation {
     constructor(config) {
@@ -16,7 +16,7 @@ class V1EpochProofProposalResponse extends V1BaseOperation {
         this.validatePeerCorrectness(connection.remotePublicKey, pendingRequestServiceEntry);
 
         this.validateMemberId(payload, connection.remotePublicKey);
-        const resultCode = payload.broadcast_transaction_response.result;
+        const resultCode = payload.epoch_proof_proposal_response.result;
         if (resultCode === ResultCode.OK) {
             this.validateProposalSignature(payload, pendingRequestServiceEntry.requestEpochProofProposalHash);
         }
