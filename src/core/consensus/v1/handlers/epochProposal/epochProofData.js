@@ -66,6 +66,7 @@ class EpochProofData {
 }
 
 export const buildData = (leaderId, previousEpoch, comissionHash, vdf) => {
+    console.log(leaderId, previousEpoch, comissionHash, vdf)
     return new EpochProofData()
 }
 

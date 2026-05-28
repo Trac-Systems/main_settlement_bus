@@ -107,6 +107,12 @@ async function loadNetwork() {
         close() {}
     }
 
+    class EpochProofProposalServiceMock {
+        async ready() {}
+        start() {}
+        async close() {}
+    }
+
     class LoggerMock {
         info() {}
         debug() {}
@@ -119,6 +125,13 @@ async function loadNetwork() {
 
     class TransactionRateLimiterServiceMock {}
 
+    class CorestoreMock {
+        constructor() {
+            this.replicate = sinon.stub();
+            this.createKeyPair = sinon.stub();
+        }
+    }
+
     const NetworkModule = await esmock('../../../src/core/network/Network.js', {
         hyperswarm: HyperswarmMock,
         '../../../src/core/network/services/TransactionPoolService.js': { default: TransactionPoolServiceMock },
@@ -129,6 +142,7 @@ async function loadNetwork() {
         '../../../src/core/network/services/PendingRequestService.js': { default: PendingRequestServiceMock },
         '../../../src/core/network/services/TransactionCommitService.js': { default: TransactionCommitServiceMock },
         '../../../src/core/network/services/ValidatorHealthCheckService.js': { default: ValidatorHealthCheckServiceMock },
+        '../../../src/core/consensus/services/EpochProofProposalService.js': { default: EpochProofProposalServiceMock },
         '../../../src/core/network/protocols/NetworkMessages.js': { default: NetworkMessagesMock },
         '../../../src/utils/logger.js': { Logger: LoggerMock },
     });
@@ -153,10 +167,11 @@ async function loadNetwork() {
         address: 'trac_test',
     };
 
-    const network = new Network({}, config, wallet.address);
-    await network.replicate({}, {}, wallet);
+    const store = new CorestoreMock();
+    const network = new Network({}, store, config, wallet);
+    await network.ready()
 
-    return { network, swarmInstance, connectionManagerInstance };
+    return { network, store, swarmInstance, connectionManagerInstance };
 }
 
 if (isBareRuntime) {
@@ -177,6 +192,7 @@ if (isBareRuntime) {
         t.ok(disconnected, 'disconnect should report work done');
         t.absent(network.isConnectionPending(publicKey), 'pending connection should be cleared');
         t.is(swarmInstance.leavePeer.callCount, 1, 'peer discovery should be cancelled');
+        t.teardown(async () => await network.close());
     });
 
     test('Network#disconnectValidatorPeer removes tracked validators from the pool', async t => {
@@ -185,13 +201,14 @@ if (isBareRuntime) {
 
         connectionManagerInstance.addValidator(publicKey);
         swarmInstance.peers.set(publicKey, { publicKey: b4a.from(publicKey, 'hex') });
-
+        
         const disconnected = network.disconnectValidatorPeer(publicKey, 'peer no longer valid validator');
-
+        
         t.ok(disconnected, 'disconnect should report tracked validator removal');
         t.absent(connectionManagerInstance.exists(publicKey), 'validator should be removed from connection manager');
         t.alike(connectionManagerInstance.removed, [{ publicKey, options: { endConnection: false } }], 'tracked validator should be detached without ending the socket');
         t.is(swarmInstance.leavePeer.callCount, 1, 'leavePeer should be called to clear explicit peer tracking without closing the socket');
+        t.teardown(async () => await network.close());
     });
 
     test('Network#disconnectValidatorPeer ignores non-validator pending peers', async t => {
@@ -207,5 +224,6 @@ if (isBareRuntime) {
         t.absent(disconnected, 'non-validator peer should be ignored by validator disconnect helper');
         t.ok(network.isConnectionPending(publicKey), 'non-validator pending connection should remain tracked');
         t.is(swarmInstance.leavePeer.callCount, 0, 'generic peer should not be left');
+        t.teardown(async () => await network.close());
     });
 }
