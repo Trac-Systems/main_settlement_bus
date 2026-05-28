@@ -520,6 +520,12 @@ class Check {
     validateTransferOperation(op) {
         return this.#validateTransferOperationSchema(op) === true;
     }
+
+    validateSetEpochOperation(op) {
+        // Do the deed here
+        console.log(op)
+        return true
+    }
 }
 
 export default Check;

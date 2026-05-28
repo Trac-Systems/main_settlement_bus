@@ -3,7 +3,7 @@ import tracCryptoApi from 'trac-crypto-api';
 import Check from '../../../../../utils/check.js';
 import {bufferToAddress} from "../../../../state/utils/address.js";
 import {createMessage} from "../../../../../utils/buffer.js";
-import {OperationType, ResultCode} from "../../../../../utils/constants.js";
+import {OperationType, ResultCode, PUBLIC_KEY_LENGTH} from "../../../../../utils/constants.js";
 import {bufferToBigInt} from "../../../../../utils/amountSerialization.js";
 import {FEE} from "../../../../state/utils/transaction.js";
 import * as operationsUtils from '../../../../../utils/applyOperations.js';
@@ -11,7 +11,6 @@ import {V1ProtocolError} from '../../v1/V1ProtocolError.js';
 
 const MAX_AMOUNT = BigInt('0xffffffffffffffffffffffffffffffff');
 const FEE_BIGINT = bufferToBigInt(FEE);
-const PUBLIC_KEY_LENGTH = 32;
 
 class PartialOperationValidator {
     #state;

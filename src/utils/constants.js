@@ -33,6 +33,7 @@ export const OperationType = Object.freeze({
     BOOTSTRAP_DEPLOYMENT: ApplyOperationType.BOOTSTRAP_DEPLOYMENT,
     TX: ApplyOperationType.TX,
     TRANSFER: ApplyOperationType.TRANSFER,
+    SET_EPOCH: ApplyOperationType.SET_EPOCH,
 });
 
 export const NetworkOperationType = Object.freeze({
@@ -40,6 +41,8 @@ export const NetworkOperationType = Object.freeze({
     LIVENESS_RESPONSE: NetworkMessageType.MESSAGE_TYPE_LIVENESS_RESPONSE,
     BROADCAST_TRANSACTION_REQUEST: NetworkMessageType.MESSAGE_TYPE_BROADCAST_TRANSACTION_REQUEST,
     BROADCAST_TRANSACTION_RESPONSE: NetworkMessageType.MESSAGE_TYPE_BROADCAST_TRANSACTION_RESPONSE,
+    EPOCH_PROOF_PROPOSAL_REQUEST: NetworkMessageType.MESSAGE_TYPE_EPOCH_PROOF_PROPOSAL_REQUEST,
+    EPOCH_PROOF_PROPOSAL_RESPONSE: NetworkMessageType.MESSAGE_TYPE_EPOCH_PROOF_PROPOSAL_RESPONSE,
 });
 
 export const ResultCode = Object.freeze({
@@ -147,6 +150,7 @@ export const HYPERBEE_VALUE_ENCODING = 'binary';
 // check.js
 
 //ATTENTION - THIS IS USED IN THE APPLY FUNCTION!
+export const PUBLIC_KEY_LENGTH = 32
 export const WRITER_BYTE_LENGTH = 32;
 export const BOOTSTRAP_BYTE_LENGTH = 32;
 export const CHANNEL_BYTE_LENGTH = 32;

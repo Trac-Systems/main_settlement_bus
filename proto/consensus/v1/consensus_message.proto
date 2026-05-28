@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package consensus.v1;
+
+import "consensus/v1/messages/epoch_proof_proposal_request.proto";
+import "consensus/v1/messages/epoch_proof_proposal_response.proto";
+
+message MessageHeader {
+  MessageType type = 1;
+  string id = 2;
+  uint64 timestamp = 3;
+  oneof field {
+    EpochProofProposalRequest             epoch_proof_proposal_request = 1;
+    EpochProofProposalResponse            epoch_proof_proposal_response = 2;
+  }
+  repeated string capabilities = 8;
+}

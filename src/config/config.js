@@ -1,6 +1,7 @@
 import b4a from 'b4a'
 import { isDefined } from '../utils/type.js'
 import _ from 'lodash'
+import { BOOTSTRAP_BYTE_LENGTH, CHANNEL_BYTE_LENGTH } from '../utils/constants.js'
 
 export class Config {
     #options
@@ -214,6 +215,14 @@ export class Config {
         return this.#config.validatorHealthCheckInterval
     }
 
+    get epochInterval() {
+        return this.#config.epochInterval
+    }
+
+    get epochThreshold() {
+        return this.#config.epochThreshold
+    }
+
     get maxPendingRequestsInPendingRequestsService() {
         return this.#config.maxPendingRequestsInPendingRequestsService
     }
@@ -269,7 +278,7 @@ export class Config {
     }
 
     #normalizeChannel(channel) {
-        return b4a.alloc(32).fill(channel)
+        return b4a.alloc(CHANNEL_BYTE_LENGTH).fill(channel)
     }
 
     #validateStringOverride(field, value) {
@@ -286,7 +295,7 @@ export class Config {
 
     #validateBootstrapOverride(bootstrap) {
         if (b4a.isBuffer(bootstrap)) {
-            if (bootstrap.length !== 32) {
+            if (bootstrap.length !== BOOTSTRAP_BYTE_LENGTH) {
                 throw new Error('MainSettlementBus Config: bootstrap must be a 32-byte hex string or Buffer.');
             }
             return;

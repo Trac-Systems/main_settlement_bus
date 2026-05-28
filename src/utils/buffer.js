@@ -1,5 +1,6 @@
 import b4a from 'b4a';
 import { bigIntTo16ByteBuffer } from './amountSerialization.js';
+import _ from 'lodash'
 
 export const ZERO_WK = b4a.alloc(32, 0); // 32 bytes of zeroes, used as a placeholder for writing keys
 export const NULL_BUFFER = b4a.alloc(0) // null buffer (single byte of 0)
@@ -17,6 +18,16 @@ export const safeWriteUInt32BE = (value, offset) => {
         return buf;
     } catch {
         return b4a.alloc(4);
+    }
+}
+
+export const safeWriteUInt8 = (value, offset = 0) => {
+    try {
+        const buf = b4a.alloc(1);
+        buf.writeUInt8(value, offset);
+        return buf;
+    } catch {
+        return b4a.alloc(1);
     }
 }
 
@@ -111,4 +122,17 @@ export function encodeCapabilities(capabilities) {
     }
 
     return parts.length ? b4a.concat(parts) : b4a.alloc(0);
+}
+
+export function toHex(publicKey) {
+    return b4a.isBuffer(publicKey) ? b4a.toString(publicKey, 'hex') : publicKey;
+}
+
+export function convertToArray(input, elementLength, converter) {
+    if (!b4a.isBuffer(input) || input.length % elementLength !== 0) {
+        return null
+    }
+
+    const elements = _.chunk(input, elementLength)
+    return elements.map(converter)
 }

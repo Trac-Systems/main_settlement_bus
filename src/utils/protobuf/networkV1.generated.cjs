@@ -297,6 +297,8 @@ $root.network = (function() {
                     case 2:
                     case 3:
                     case 4:
+                    case 5:
+                    case 6:
                         break;
                     }
                 if (message.id != null && message.hasOwnProperty("id"))
@@ -391,6 +393,14 @@ $root.network = (function() {
                 case "MESSAGE_TYPE_BROADCAST_TRANSACTION_RESPONSE":
                 case 4:
                     message.type = 4;
+                    break;
+                case "MESSAGE_TYPE_EPOCH_PROOF_PROPOSAL_REQUEST":
+                case 5:
+                    message.type = 5;
+                    break;
+                case "MESSAGE_TYPE_EPOCH_PROOF_PROPOSAL_RESPONSE":
+                case 6:
+                    message.type = 6;
                     break;
                 }
                 if (object.id != null)
@@ -533,6 +543,8 @@ $root.network = (function() {
          * @property {number} MESSAGE_TYPE_LIVENESS_RESPONSE=2 MESSAGE_TYPE_LIVENESS_RESPONSE value
          * @property {number} MESSAGE_TYPE_BROADCAST_TRANSACTION_REQUEST=3 MESSAGE_TYPE_BROADCAST_TRANSACTION_REQUEST value
          * @property {number} MESSAGE_TYPE_BROADCAST_TRANSACTION_RESPONSE=4 MESSAGE_TYPE_BROADCAST_TRANSACTION_RESPONSE value
+         * @property {number} MESSAGE_TYPE_EPOCH_PROOF_PROPOSAL_REQUEST=5 MESSAGE_TYPE_EPOCH_PROOF_PROPOSAL_REQUEST value
+         * @property {number} MESSAGE_TYPE_EPOCH_PROOF_PROPOSAL_RESPONSE=6 MESSAGE_TYPE_EPOCH_PROOF_PROPOSAL_RESPONSE value
          */
         v1.MessageType = (function() {
             var valuesById = {}, values = Object.create(valuesById);
@@ -541,6 +553,8 @@ $root.network = (function() {
             values[valuesById[2] = "MESSAGE_TYPE_LIVENESS_RESPONSE"] = 2;
             values[valuesById[3] = "MESSAGE_TYPE_BROADCAST_TRANSACTION_REQUEST"] = 3;
             values[valuesById[4] = "MESSAGE_TYPE_BROADCAST_TRANSACTION_RESPONSE"] = 4;
+            values[valuesById[5] = "MESSAGE_TYPE_EPOCH_PROOF_PROPOSAL_REQUEST"] = 5;
+            values[valuesById[6] = "MESSAGE_TYPE_EPOCH_PROOF_PROPOSAL_RESPONSE"] = 6;
             return values;
         })();
 

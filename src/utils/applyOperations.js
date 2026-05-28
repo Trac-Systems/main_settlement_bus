@@ -48,6 +48,12 @@ const isBalanceInitialization = type => {
     ].includes(type);
 }
 
+const isSetEpoch = type => {
+    return [
+        OperationType.SET_EPOCH
+    ].includes(type);
+}
+
 const operationToPayload = type => {
     const fromTo = [
         {
@@ -77,6 +83,10 @@ const operationToPayload = type => {
         {
             condition: isBalanceInitialization,
             jsonPath: 'bio'
+        },
+        {
+            condition: isSetEpoch,
+            jsonPath: 'seo'
         }
     ]
     const match = fromTo.find(entry => !!entry.condition(type))
@@ -91,5 +101,6 @@ export {
     isBootstrapDeployment,
     operationToPayload,
     isTransfer,
-    isBalanceInitialization
+    isBalanceInitialization,
+    isSetEpoch
 }

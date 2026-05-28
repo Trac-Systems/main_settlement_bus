@@ -1,7 +1,5 @@
 import b4a from "b4a";
 import tracCryptoApi from "trac-crypto-api";
-import {bufferToAddress} from "../core/state/utils/address.js";
-import { EntryType } from "./constants.js";
 import { v7 as uuidv7 } from 'uuid';
 //TODO: change file name or split functions below into multiple files (Remember to update imports and tests accordingly)
 
@@ -47,29 +45,6 @@ export const safeJsonParse = (str) => {
         console.error(error);
     }
     return undefined;
-}
-
-export async function getFormattedIndexersWithAddresses(state, config) {
-    const indexers = await state.getIndexersEntry();
-    const formatted = indexers.map((entry) => ({
-        writingKey: b4a.toString(entry.key, "hex"),
-    }));
-
-    const results = await Promise.all(
-        formatted.map(async (entry) => {            
-            const address = bufferToAddress(
-                await state.getSigned(EntryType.WRITER_ADDRESS + entry.writingKey),
-                config.addressPrefix
-            );
-
-            return {
-                ...entry,
-                address,
-            };
-        })
-    );
-
-    return results;
 }
 
 export function formatIndexersEntry(indexersEntry, addressLength) {
