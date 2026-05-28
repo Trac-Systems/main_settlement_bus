@@ -1,15 +1,11 @@
 import ReadyResource from 'ready-resource';
 import b4a from 'b4a';
 import Scheduler from '../../../utils/Scheduler.js';
-import { HASH_BYTE_LENGTH, NETWORK_CAPABILITIES, OperationType, ResultCode } from '../../../utils/constants.js';
+import { OperationType } from '../../../utils/constants.js';
 import { Logger } from '../../../utils/logger.js';
-import { EntryType } from '../../../utils/constants.js';
-import { networkMessageFactory } from '../../../messages/network/v1/networkMessageFactory.js';
-import { generateUUID } from '../../../utils/helpers.js';
-import _ from 'lodash'
+
 import { safeEncodeApplyOperation } from '../../../utils/protobuf/operationHelpers.js';
 import { addressToBuffer } from '../../state/utils/address.js';
-import { buildData } from '../protocols/v1/handlers/epochProposal/proof.js';
 
 class EpochProofProposalService extends ReadyResource {
     #state;
@@ -83,7 +79,7 @@ class EpochProofProposalService extends ReadyResource {
                 // check signatures
                 // member == leader?
                 // member signed? -> append signature to signatures
-                
+                console.log(member)
                 return this.#appendEpoch(epoch, signatures)
             })
         }

@@ -1,7 +1,5 @@
 import b4a from "b4a";
 import tracCryptoApi from "trac-crypto-api";
-import {bufferToAddress} from "../core/state/utils/address.js";
-import { EntryType } from "./constants.js";
 import { v7 as uuidv7 } from 'uuid';
 //TODO: change file name or split functions below into multiple files (Remember to update imports and tests accordingly)
 

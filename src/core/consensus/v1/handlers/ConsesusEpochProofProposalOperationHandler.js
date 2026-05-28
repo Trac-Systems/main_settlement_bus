@@ -1,12 +1,11 @@
 import V1EpochProofProposalRequest from "../validators/V1EpochProofProposalRequest.js";
 import V1EpochProofProposalResponse from "../validators/V1EpochProofProposalResponse.js";
-import V1BaseOperationHandler from "../../../network/protocols/v1/handlers/V1BaseOperationHandler.js";
 import {networkMessageFactory} from "../../../../messages/network/v1/networkMessageFactory.js";
 import { V1ProtocolError } from "../../../network/protocols/v1/V1ProtocolError.js";
 import { ResultCode } from "../../../../utils/constants.js";
 import b4a from "b4a";
 import tracCryptoApi from "trac-crypto-api";
-import { epochProofFromBuffer } from "./epochProposal/proof.js";
+import { epochProofFromBuffer } from "./epochProposal/epochProofData.js";
 
 // Minion interface to verify & sign proposals
 class ConsensusEpochProofProposalOperationHandler {
@@ -52,6 +51,11 @@ class ConsensusEpochProofProposalOperationHandler {
             );
         } catch (error) {
             // some error handler there
+            this.displayError(
+                "failed to build/send epoch proof proposal response to sender",
+                connection.remotePublicKey,
+                error
+            );
         }
     }
 

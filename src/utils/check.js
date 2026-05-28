@@ -523,6 +523,7 @@ class Check {
 
     validateSetEpochOperation(op) {
         // Do the deed here
+        console.log(op)
         return true
     }
 }
