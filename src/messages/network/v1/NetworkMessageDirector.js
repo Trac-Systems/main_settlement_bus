@@ -98,17 +98,6 @@ class NetworkMessageDirector {
         return this.#builder.getResult();
     }
 
-    async buildEpochProofProposalRequest(id, data, capabilities) {
-        await this.#builder
-            .setType(NetworkOperationType.EPOCH_PROOF_PROPOSAL_REQUEST)
-            .setId(id)
-            .setTimestamp()
-            .setData(data)
-            .setCapabilities(capabilities)
-            .buildPayload();
-
-        return this.#builder.getResult();
-    }
 }
 
 export default NetworkMessageDirector;
