@@ -34,6 +34,7 @@
     "bare-readline": "1.0.7",
     "bare-tty": "5.0.2",
     "bare-utils": "1.5.1",
+    "bare-worker": "^4.1.8",
     "bech32": "2.0.0",
     "compact-encoding": "2.18.0",
     "corestore": "7.5.0",

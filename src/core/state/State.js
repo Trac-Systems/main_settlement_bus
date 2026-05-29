@@ -132,7 +132,11 @@ class State extends ReadyResource {
     // TODO: document a epoch data returned
     async currentEpoch() {
         const latestEpochNumber = await this.getSigned(keys.CURRENT_INDEX)
-        return await this.getSigned(keys.EPOCH(latestEpochNumber))
+        return latestEpochNumber;
+    }
+
+    async getEpochHash(epochId) {
+        return await this.getSigned(keys.EPOCH(epochId))
     }
 
     getFee() {
@@ -2427,6 +2431,9 @@ class State extends ReadyResource {
         if (this.#config.enableTxApplyLogs) {
             console.info(`Indexer has been removed addr:wk:tx - ${toRemoveAddressString}:${decodedNodeEntry.wk.toString('hex')}:${txHashHexString}`);
         }
+
+        this.#emitEvent(CustomEventType.NOT_INDEXER, tracCryptoApi.address.decodeSafe(toRemoveAddressString))
+        return Status.SUCCESS;
     }
 
     async #handleApplyBanValidatorOperation(op, view, base, node, batch) {

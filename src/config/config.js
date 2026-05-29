@@ -265,6 +265,14 @@ export class Config {
         return this.#config.validatorConnectionAttemptDelay
     }
 
+    get vdfDifficulty() {
+      return this.#config.vdfDifficulty
+    }
+
+    get vdfDiscriminantSizeBits() {
+        return this.#config.vdfDiscriminantSizeBits
+    }
+
     #isOverriden(prop) {
         return this.#options.hasOwnProperty(prop) && isDefined(this.#options[prop])
     }

@@ -2,7 +2,8 @@ import b4a from 'b4a'
 
 export const PROTOCOL_VERSION = 1
 
-const TOTAL_SIZE = 1 + 8 + 32 + 2 + 32 + 32 + 32 + 64 // 203 bytes
+// const TOTAL_SIZE = 1 + 8 + 32 + 2 + 32 + 32 + 32 + 64 // 203 bytes
+const TOTAL_SIZE = 1 + 8 + 32 + 2 + 32 + 32 + 64 // 171 bytes
 
 const decode = (buffer) => {
     if (!b4a.isBuffer(buffer) || buffer.length < TOTAL_SIZE) return null
@@ -14,21 +15,21 @@ const decode = (buffer) => {
     const prevEpochHash   = buffer.slice(offset, offset + 32); offset += 32
     const networkId       = buffer.readUInt16BE(offset);    offset += 2
     const comiteeHash     = buffer.slice(offset, offset + 32); offset += 32
-    const leaderId        = buffer.slice(offset, offset + 32); offset += 32
+    // const leaderId        = buffer.slice(offset, offset + 32); offset += 32
     const vdfParamsHash   = buffer.slice(offset, offset + 32); offset += 32
     const vdfOutput       = buffer.slice(offset, offset + 64); offset += 64
 
-    return { protocolVersion, epoch, prevEpochHash, networkId, comiteeHash, leaderId, vdfParamsHash, vdfOutput }
+    return { protocolVersion, epoch, prevEpochHash, networkId, comiteeHash, /*leaderId,*/ vdfParamsHash, vdfOutput }
 }
 
 class EpochProofData {
-    constructor({ protocolVersion, epoch, prevEpochHash, networkId, comiteeHash, leaderId, vdfParamsHash, vdfOutput }) {
+    constructor({ protocolVersion, epoch, prevEpochHash, networkId, comiteeHash, /*leaderId,*/ vdfParamsHash, vdfOutput }) {
         this.protocolVersion = protocolVersion
         this.epoch           = epoch
         this.prevEpochHash   = prevEpochHash
         this.networkId       = networkId
         this.comiteeHash     = comiteeHash
-        this.leaderId        = leaderId
+        // this.leaderId        = leaderId
         this.vdfParamsHash   = vdfParamsHash
         this.vdfOutput       = vdfOutput
     }
@@ -52,8 +53,8 @@ class EpochProofData {
         this.comiteeHash.copy(buf, offset)
         offset += 32
         
-        this.leaderId.copy(buf, offset)
-        offset += 32
+        // this.leaderId.copy(buf, offset)
+        // offset += 32
         
         this.vdfParamsHash.copy(buf, offset)
         offset += 32
@@ -65,8 +66,8 @@ class EpochProofData {
     }
 }
 
-export const buildData = (leaderId, previousEpoch, comissionHash, vdf) => {
-    console.log(leaderId, previousEpoch, comissionHash, vdf)
+export const buildData = (/*leaderId,*/ previousEpoch, comissionHash, vdf) => {
+    console.log(/*leaderId,*/ previousEpoch, comissionHash, vdf)
     return new EpochProofData()
 }
 

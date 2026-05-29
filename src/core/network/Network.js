@@ -160,11 +160,21 @@ class Network extends ReadyResource {
             }
 
         });
+
+        this.#state.on(CustomEventType.IS_INDEXER, () => {
+            this.#epochProofProposalService.start();
+        });
+        
+        this.#state.on(CustomEventType.NOT_INDEXER, () => {
+            this.#epochProofProposalService.stop();
+        });
     }
 
     cleanupNetworkListeners() {
         this.removeAllListeners(EventType.VALIDATOR_CONNECTION_TIMEOUT);
         this.removeAllListeners(EventType.VALIDATOR_CONNECTION_READY);
+        this.#state.removeAllListeners(CustomEventType.IS_INDEXER);
+        this.#state.removeAllListeners(CustomEventType.NOT_INDEXER);
     }
 
     cleanupPendingConnections() {
@@ -204,7 +214,7 @@ class Network extends ReadyResource {
 
             this.#epochProofProposalService = new EpochProofProposalService(this.#state, this.#validatorConnectionManager, this.#wallet, this.#config);
             await this.#epochProofProposalService.ready();
-            this.#epochProofProposalService.start();
+            // this.#epochProofProposalService.start();
 
             this.#validatorConnectionManager.subscribeToHealthChecks(this.#validatorHealthCheckService);
 

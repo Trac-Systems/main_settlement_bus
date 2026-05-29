@@ -102,7 +102,7 @@ class ConsensusValidationSchema {
                             epoch: {type: 'number', integer: true, min: 0, max: Number.MAX_SAFE_INTEGER, required: true},
                             previous_epoch_hash: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true},
                             committed_hash: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true},
-                            leader_id: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true},
+                            // leader_id: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true},
                             vdf_parameters_hash: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true},
                             vdf_output: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true},
                         }
