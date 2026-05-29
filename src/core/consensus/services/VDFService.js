@@ -1,28 +1,37 @@
-import Worker from "bare-worker";
-  
-if (!Worker.isMainThread) {
-    const { loadWasm } = await import('./vdf.wasm.js');
-    const wasm = await loadWasm();
+import Channel from "bare-channel"
+import ReadyResource from "ready-resource";
+
+export class VDFService extends ReadyResource {
+    #thread;
+    #port;
     
-    Worker.parentPort.on("message", ({ discriminantSizeBits, challenge, difficulty }) => {
-        const vdf = new wasm.WesolowskiVDFParams(discriminantSizeBits);
-        const solution = vdf.solve(challenge, difficulty);
-        Worker.parentPort.postMessage({ solution });
-    });
-}
-  
-export class VDFService {
-    #worker;
+    constructor() {} 
 
-    constructor() {
-        this.#worker = new Worker(__filename);
-    } 
+    async _open() {
+        const Thread = Bare.Thread
+        const channel = new Channel()
+        this.#port = channel.connect() // listen port
 
-    calculateVDF(challenge, difficulty, discriminantSizeBits) {
+        this.#thread = new Thread(__filename, { data: channel.handle }, async (handle) => {
+            const channel = Channel.from(handle)
+            const port = channel.connect() // write port
+
+            while(true) {
+                port.write("message")
+                await sleep(1000)
+            }
+        })
+    }
+    
+    async _close() {
+
+    }
+
+    async calculateVDF(challenge, difficulty, discriminantSizeBits) {
         return new Promise((resolve, reject) => {
-            this.#worker.once("message", (result) => resolve(result));
-            this.#worker.once("error", (err) => reject(err));
-            this.#worker.postMessage({ discriminantSizeBits, challenge, difficulty });
+            this.#port.on("message", (result) => console.log(result));
+            this.#port.on("error", (err) => reject(err));
+            await this.#thread.write({ discriminantSizeBits, challenge, difficulty });
         });
     }
 }

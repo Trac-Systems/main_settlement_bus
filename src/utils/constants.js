@@ -43,8 +43,11 @@ export const NetworkOperationType = Object.freeze({
     LIVENESS_RESPONSE: NetworkMessageType.MESSAGE_TYPE_LIVENESS_RESPONSE,
     BROADCAST_TRANSACTION_REQUEST: NetworkMessageType.MESSAGE_TYPE_BROADCAST_TRANSACTION_REQUEST,
     BROADCAST_TRANSACTION_RESPONSE: NetworkMessageType.MESSAGE_TYPE_BROADCAST_TRANSACTION_RESPONSE,
-    EPOCH_PROOF_PROPOSAL_REQUEST: NetworkMessageType.MESSAGE_TYPE_EPOCH_PROOF_PROPOSAL_REQUEST,
-    EPOCH_PROOF_PROPOSAL_RESPONSE: NetworkMessageType.MESSAGE_TYPE_EPOCH_PROOF_PROPOSAL_RESPONSE,
+});
+
+export const ConsensusOperationType = Object.freeze({
+    EPOCH_PROOF_PROPOSAL_REQUEST: ConsensusMessageType.MESSAGE_TYPE_EPOCH_PROOF_PROPOSAL_REQUEST,
+    EPOCH_PROOF_PROPOSAL_RESPONSE: ConsensusMessageType.MESSAGE_TYPE_EPOCH_PROOF_PROPOSAL_RESPONSE,
 });
 
 export const ConsensusOperationType = Object.freeze({
@@ -143,7 +146,7 @@ export const EventType = Object.freeze({
 export const CustomEventType = Object.freeze({
     IS_INDEXER: 'msb:is-indexer',
     UNWRITABLE: 'msb:unwritable',
-    NOT_INDEXER: 'msb:not-indexer'
+    IS_NON_INDEXER: 'msb:is-non-indexer'
 });
 
 // Token

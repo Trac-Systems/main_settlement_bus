@@ -2432,7 +2432,7 @@ class State extends ReadyResource {
             console.info(`Indexer has been removed addr:wk:tx - ${toRemoveAddressString}:${decodedNodeEntry.wk.toString('hex')}:${txHashHexString}`);
         }
 
-        this.#emitEvent(CustomEventType.NOT_INDEXER, tracCryptoApi.address.decodeSafe(toRemoveAddressString))
+        this.#emitEvent(CustomEventType.IS_NON_INDEXER, tracCryptoApi.address.decodeSafe(toRemoveAddressString))
         return Status.SUCCESS;
     }
 

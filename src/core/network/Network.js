@@ -166,7 +166,7 @@ class Network extends ReadyResource {
             this.#epochProofProposalService.start();
         });
         
-        this.#state.on(CustomEventType.NOT_INDEXER, () => {
+        this.#state.on(CustomEventType.IS_NON_INDEXER, () => {
             this.#epochProofProposalService.stop();
         });
     }
