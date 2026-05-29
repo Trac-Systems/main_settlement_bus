@@ -20,6 +20,7 @@ import ValidatorHealthCheckService from './services/ValidatorHealthCheckService.
 import EpochProofProposalService from '../consensus/services/EpochProofProposalService.js';
 import { Logger } from '../../utils/logger.js';
 import { WalletProvider } from 'trac-wallet';
+  import { CustomEventType } from '../../utils/constants.js';
 
 const wakeup = new w();
 

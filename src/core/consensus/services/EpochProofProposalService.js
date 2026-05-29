@@ -15,176 +15,176 @@ import { NETWORK_CAPABILITIES } from '../../../utils/constants.js';
 const PROTOCOL_VERSION = 1;
 
 class EpochProofProposalService extends ReadyResource {
-  #state;
-  #wallet;
-  #config;
-  #intervalMs;
-  #scheduler;
-  #logger;
-  #isInterrupted;
-  #calculatorService;
-  #connectionManager
+    #state;
+    #wallet;
+    #config;
+    #intervalMs;
+    #scheduler;
+    #logger;
+    #isInterrupted;
+    #calculatorService;
+    #connectionManager
 
-  /**
+    /**
    * @param {object} state
    * @param {object} connectionManager
    * @param {object} wallet
    * @param {object} config
    */
-  constructor(state, connectionManager, wallet, config) {
-    super();
-    this.#state = state;
-    this.#wallet = wallet;
-    this.#config = config;
-    this.#intervalMs = this.#config.epochInterval;
-    this.#scheduler = null;
-    this.#logger = new Logger(config);
-    this.#isInterrupted = false;
-    this.#calculatorService = new VDFService();
-    this.#connectionManager = connectionManager;
-  }
-
-  async _open() {
-    this.#scheduler = new Scheduler(
-      (next) => this.#worker(next),
-      this.#intervalMs,
-    );
-  }
-
-  async _close() {
-    this.#isInterrupted = true;
-    await this.#scheduler.stop(true);
-  }
-
-  start() {
-    if (this.#scheduler.isRunning) {
-      return false;
+    constructor(state, connectionManager, wallet, config) {
+        super();
+        this.#state = state;
+        this.#wallet = wallet;
+        this.#config = config;
+        this.#intervalMs = this.#config.epochInterval;
+        this.#scheduler = null;
+        this.#logger = new Logger(config);
+        this.#isInterrupted = false;
+        this.#calculatorService = new VDFService();
+        this.#connectionManager = connectionManager;
     }
 
-    this.#ensureScheduler();
-    return true;
-  }
-
-  async stop(waitForCurrent = true) {
-    if (!this.#scheduler.isRunning) {
-      return false;
+    async _open() {
+        this.#scheduler = new Scheduler(
+            (next) => this.#worker(next),
+            this.#intervalMs,
+        );
     }
 
-    this.#isInterrupted = true;
-    await this.#scheduler.stop(waitForCurrent);
-    return true;
-  }
+    async _close() {
+        this.#isInterrupted = true;
+        await this.#scheduler.stop(true);
+    }
 
-  #ensureScheduler() {
-    if (this.#scheduler.isRunning) return;
-
-    this.#isInterrupted = false;
-    this.#scheduler.start(this.#intervalMs);
-    this.#logger.debug(`scheduler started with intervalMs ${this.#intervalMs}`);
-  }
-
-  async calculateVDF(challenge, difficulty, discriminantSizeBits) {
-    return await this.#calculatorService.calculateVDF(challenge, difficulty, discriminantSizeBits);
-  }
-
-  createProposal(lastEpochId, lastEpochHash, vdf) {
-    const currentEpochId = lastEpochId + 1;
-    return {
-        protocolVersion: PROTOCOL_VERSION,
-        epoch: currentEpochId,
-        prevEpochHash: lastEpochHash,
-        networkId: this.#config.networkId,
-        vdfParamsHash: vdf.solution.slice(0, 258), // y — the first 258 bytes
-        vdfOutput: vdf.solution.slice(258), // proof — the last 258 bytes
-    };
-  }
-
-  async sendToIndexer(member, proofProposal) {
-    const connection = this.#connectionManager.getConnection(member.key);
-    if (!connection) return null;
-
-    const request = await networkMessageFactory(this.#wallet, this.#config)
-      .buildEpochProofProposalRequest(generateUUID(), proofProposal.data, NETWORK_CAPABILITIES);
-
-    const response = await connection.protocolSession.send(request);
-    return response?.result?.signature ?? null;
-  }
-
-  async #worker(next) {
-    if (!this.#isInterrupted) {
-      const threshold = this.#config.epochThreshold;
-      const currentEpochId = await this.#state.currentEpoch();
-      const currentEpochHash = await this.#state.getEpochHash(currentEpochId);
-      let signatures = []; // list of members signatures
-
-      const vdf = await this.calculateVDF(
-        currentEpochHash,
-        this.#config.vdfDifficulty,
-        this.#config.vdfDiscriminantSizeBits
-    );
-
-      const newEpochProofData = this.createProposal(
-        currentEpochId,
-        currentEpochHash,
-        vdf,
-      );
-
-      const toHash = createMessage(...Object.values(newEpochProofData));
-      const hash = await blake3(toHash);
-      const signature = this.#wallet.sign(hash);
-      const members = this.#state.getIndexersEntry();
-      const proofProposal = {
-        data: newEpochProofData,
-        dataHash: hash,
-        signature: signature,
-      };
-
-      for (const member of members) {
-        const memberSignature = await this.sendToIndexer(member, proofProposal);
-        if (!memberSignature) continue;
-
-        signatures.push(memberSignature);
-
-        if (signatures.length >= threshold) {
-          const epoch = {
-            ...proofProposal,
-            signatures: signatures,
-          };
-
-          await this.#appendEpoch(epoch);
-          break;
+    start() {
+        if (this.#scheduler.isRunning) {
+            return false;
         }
-      }
+
+        this.#ensureScheduler();
+        return true;
     }
 
-    next(this.#intervalMs);
-  }
+    async stop(waitForCurrent = true) {
+        if (!this.#scheduler.isRunning) {
+            return false;
+        }
 
-  async #appendEpoch(epoch) {
-    const payload = {
-      type: OperationType.SET_EPOCH,
-      address: addressToBuffer(
-        this.#wallet.address,
-        this.#config.addressPrefix,
-      ),
-      seo: {
-        pe: epoch,
-        ss: epoch.signatures.map(({ signature }) => signature),
-        pks: epoch.signatures.map(({ publicKey }) =>
-          b4a.isBuffer(publicKey) ? publicKey : b4a.from(publicKey, "hex"),
-        ),
-      },
-    };
-
-    const encodedPayload = safeEncodeApplyOperation(payload);
-    if (!b4a.isBuffer(encodedPayload) || encodedPayload.length === 0) {
-      throw new Error(
-        `Failed to encode epoch operation for epoch ${epoch.epoch}.`,
-      );
+        this.#isInterrupted = true;
+        await this.#scheduler.stop(waitForCurrent);
+        return true;
     }
 
-    await this.#state.append(encodedPayload);
-  }
+    #ensureScheduler() {
+        if (this.#scheduler.isRunning) return;
+
+        this.#isInterrupted = false;
+        this.#scheduler.start(this.#intervalMs);
+        this.#logger.debug(`scheduler started with intervalMs ${this.#intervalMs}`);
+    }
+
+    async calculateVDF(challenge, difficulty, discriminantSizeBits) {
+        return await this.#calculatorService.calculateVDF(challenge, difficulty, discriminantSizeBits);
+    }
+
+    createProposal(lastEpochId, lastEpochHash, vdf) {
+        const currentEpochId = lastEpochId + 1;
+        return {
+            protocolVersion: PROTOCOL_VERSION,
+            epoch: currentEpochId,
+            prevEpochHash: lastEpochHash,
+            networkId: this.#config.networkId,
+            vdfParamsHash: vdf.solution.slice(0, 258), // y — the first 258 bytes
+            vdfOutput: vdf.solution.slice(258), // proof — the last 258 bytes
+        };
+    }
+
+    async sendToIndexer(member, proofProposal) {
+        const connection = this.#connectionManager.getConnection(member.key);
+        if (!connection) return null;
+
+        const request = await networkMessageFactory(this.#wallet, this.#config)
+            .buildEpochProofProposalRequest(generateUUID(), proofProposal.data, NETWORK_CAPABILITIES);
+
+        const response = await connection.protocolSession.send(request);
+        return response?.result?.signature ?? null;
+    }
+
+    async #worker(next) {
+        if (!this.#isInterrupted) {
+            const threshold = this.#config.epochThreshold;
+            const currentEpochId = await this.#state.currentEpoch();
+            const currentEpochHash = await this.#state.getEpochHash(currentEpochId);
+            let signatures = []; // list of members signatures
+
+            const vdf = await this.calculateVDF(
+                currentEpochHash,
+                this.#config.vdfDifficulty,
+                this.#config.vdfDiscriminantSizeBits
+            );
+
+            const newEpochProofData = this.createProposal(
+                currentEpochId,
+                currentEpochHash,
+                vdf,
+            );
+
+            const toHash = createMessage(...Object.values(newEpochProofData));
+            const hash = await blake3(toHash);
+            const signature = this.#wallet.sign(hash);
+            const members = this.#state.getIndexersEntry();
+            const proofProposal = {
+                data: newEpochProofData,
+                dataHash: hash,
+                signature: signature,
+            };
+
+            for (const member of members) {
+                const memberSignature = await this.sendToIndexer(member, proofProposal);
+                if (!memberSignature) continue;
+
+                signatures.push(memberSignature);
+
+                if (signatures.length >= threshold) {
+                    const epoch = {
+                        ...proofProposal,
+                        signatures: signatures,
+                    };
+
+                    await this.#appendEpoch(epoch);
+                    break;
+                }
+            }
+        }
+
+        next(this.#intervalMs);
+    }
+
+    async #appendEpoch(epoch) {
+        const payload = {
+            type: OperationType.SET_EPOCH,
+            address: addressToBuffer(
+                this.#wallet.address,
+                this.#config.addressPrefix,
+            ),
+            seo: {
+                pe: epoch,
+                ss: epoch.signatures.map(({ signature }) => signature),
+                pks: epoch.signatures.map(({ publicKey }) =>
+                    b4a.isBuffer(publicKey) ? publicKey : b4a.from(publicKey, "hex"),
+                ),
+            },
+        };
+
+        const encodedPayload = safeEncodeApplyOperation(payload);
+        if (!b4a.isBuffer(encodedPayload) || encodedPayload.length === 0) {
+            throw new Error(
+                `Failed to encode epoch operation for epoch ${epoch.epoch}.`,
+            );
+        }
+
+        await this.#state.append(encodedPayload);
+    }
 }
 
 export default EpochProofProposalService;

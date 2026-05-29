@@ -266,7 +266,7 @@ export class Config {
     }
 
     get vdfDifficulty() {
-      return this.#config.vdfDifficulty
+        return this.#config.vdfDifficulty
     }
 
     get vdfDiscriminantSizeBits() {

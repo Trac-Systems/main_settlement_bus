@@ -256,7 +256,7 @@ class NetworkMessageBuilder {
         };
     }
 
-      async #buildEpochProofProposalRequestPayload() {
+    async #buildEpochProofProposalRequestPayload() {
         const nonce = tracCryptoApi.nonce.generate();
         const tsBuf = timestampToBuffer(this.#timestamp);
         const idBuf = idToBuffer(this.#id);
@@ -276,7 +276,7 @@ class NetworkMessageBuilder {
 
         this.#payloadKey = 'epoch_proof_proposal_request';
         this.#body = {
-              data: {
+            data: {
                 protocol_version: this.#data.protocolVersion,
                 epoch: this.#data.epoch,
                 previous_epoch_hash: this.#data.prevEpochHash,
@@ -310,7 +310,7 @@ class NetworkMessageBuilder {
                 await this.#buildBroadcastTransactionResponse();
                 break;
             }
-              case NetworkOperationType.EPOCH_PROOF_PROPOSAL_REQUEST: {
+            case NetworkOperationType.EPOCH_PROOF_PROPOSAL_REQUEST: {
                 await this.#buildEpochProofProposalRequestPayload();
                 break;
             }
