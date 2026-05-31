@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package apply.operations;
+
+// add admin operation, disable_initialization (complete by default)
+message CoreAdminOperation {
+    bytes tx     = 1; // Transaction hash (unique identifier for the transaction)
+    bytes txv    = 2; // Transaction expiration
+    bytes iw     = 3; // incoming writer key (admin)
+    bytes in     = 4; // Nonce of the invoker (admin)
+    bytes is     = 5; // Signature of the invoker (admin)
+}

@@ -1138,8 +1138,8 @@ function defineSetEpochOperation () {
 
   function encodingLength (obj) {
     var length = 0
-    if (defined(obj.pe)) {
-      var len = encodings.varint.encodingLength(obj.pe)
+    if (defined(obj.cd)) {
+      var len = encodings.varint.encodingLength(obj.cd)
       length += 1 + len
     }
     if (defined(obj.ln)) {
@@ -1167,9 +1167,9 @@ function defineSetEpochOperation () {
     if (!offset) offset = 0
     if (!buf) buf = b4a.allocUnsafe(encodingLength(obj))
     var oldOffset = offset
-    if (defined(obj.pe)) {
+    if (defined(obj.cd)) {
       buf[offset++] = 8
-      encodings.varint.encode(obj.pe, buf, offset)
+      encodings.varint.encode(obj.cd, buf, offset)
       offset += encodings.varint.encode.bytes
     }
     if (defined(obj.ln)) {
@@ -1203,7 +1203,7 @@ function defineSetEpochOperation () {
     if (!(end <= buf.length && offset <= buf.length)) throw new Error("Decoded message is not valid")
     var oldOffset = offset
     var obj = {
-      pe: 0,
+      cd: 0,
       ln: null,
       ss: [],
       pks: []
@@ -1218,7 +1218,7 @@ function defineSetEpochOperation () {
       var tag = prefix >> 3
       switch (tag) {
         case 1:
-        obj.pe = encodings.varint.decode(buf, offset)
+        obj.cd = encodings.varint.decode(buf, offset)
         offset += encodings.varint.decode.bytes
         break
         case 2:

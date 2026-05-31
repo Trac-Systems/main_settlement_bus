@@ -18,7 +18,7 @@ enum OperationType {
     BOOTSTRAP_DEPLOYMENT   = 11; // partial
     TX                     = 12; // partial
     TRANSFER               = 13; // partial
-    SET_EPOCH = 14; // complete
+    SET_EPOCH              = 14; // complete
 }
 
 // add admin operation, disable_initialization (complete by default)
@@ -102,7 +102,7 @@ message BootstrapDeploymentOperation {
 }
 
 message SetEpochOperation {
-    uint64   pe        = 1; // Epoch to be set
+    uint64   cd        = 1; // challange data
     bytes    ln        = 2; // Leader's defined nonce
     repeated bytes ss  = 3; // Array of Signatures
     repeated bytes pks = 4; // Array of Public keys (positionaly correlatable with the signatures)
