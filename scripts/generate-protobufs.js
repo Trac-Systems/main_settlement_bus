@@ -50,18 +50,28 @@ function main() {
     const inputDir = path.join(directoryName, '../proto');
     const outputDir = path.join(directoryName, '../src/utils/protobuf');
     const pbjsPath = path.join(directoryName, '../node_modules/.bin/pbjs');
-    const applyInputPath = path.join(inputDir, 'applyOperations.proto');
+    const legacyApplyInputPath = path.join(inputDir, 'applyOperations.proto');
+    const applyOperationsEntryPath = path.join(inputDir, 'applyOperations/applyOperations.proto');
     const applyOutputPath = path.join(outputDir, 'applyOperations.cjs');
+    const generatedApplyOperationsOutputPath = path.join(outputDir, 'applyOperations.generated.cjs');
     const networkEntryPath = path.join(inputDir, 'network/v1/network_message.proto');
     const generatedNetworkOutputPath = path.join(outputDir, 'networkV1.generated.cjs');
+    const consensusEntryPath = path.join(inputDir, 'consensus/v1/consensus_message_header.proto');
+    const generatedConsensusOutputPath = path.join(outputDir, 'consensusV1.generated.cjs');
 
     fs.mkdirSync(outputDir, { recursive: true });
 
-    generateCJSFromProto(applyInputPath, applyOutputPath);
+    generateCJSFromProto(legacyApplyInputPath, applyOutputPath);
     transformToUseB4a(applyOutputPath);
+
+    generatePbjsModule(pbjsPath, inputDir, applyOperationsEntryPath, generatedApplyOperationsOutputPath);
+    transformPbjsForBare(generatedApplyOperationsOutputPath);
 
     generatePbjsModule(pbjsPath, inputDir, networkEntryPath, generatedNetworkOutputPath);
     transformPbjsForBare(generatedNetworkOutputPath);
+
+    generatePbjsModule(pbjsPath, inputDir, consensusEntryPath, generatedConsensusOutputPath);
+    transformPbjsForBare(generatedConsensusOutputPath);
 }
 
 main();
