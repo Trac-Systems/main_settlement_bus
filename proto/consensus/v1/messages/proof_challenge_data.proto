@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package consensus.v1;
+
+message ProofChallengeData {
+  uint32 protocol_version = 1; // 0x01
+  uint32 network_id = 2;
+  uint64 epoch = 3; // current epoch number
+  bytes previous_epoch_record_hash = 4; // this must be a blob of previous epoch operation
+  bytes proposer = 5; // writingKey of the proposer or address
+  bytes vdf_parameters_hash = 6; // H(difficulty || iterations)
+}

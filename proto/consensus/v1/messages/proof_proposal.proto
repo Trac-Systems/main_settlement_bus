@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package consensus.v1;
+
+import "consensus/v1/messages/proof_challenge_data.proto";
+
+message ProofProposal {
+  ProofChallengeData challenge_data = 1;
+  bytes vdf_proof = 2; // bytes blob  that is actually y || pi
+  bytes signature = 3; // SIG(challenge_data + vdf_proof)
+}

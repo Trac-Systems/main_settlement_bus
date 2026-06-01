@@ -3669,10 +3669,9 @@ $root.apply = (function() {
              * Properties of a SetEpochOperation.
              * @memberof apply.operations
              * @interface ISetEpochOperation
-             * @property {number|Long|null} [cd] SetEpochOperation cd
-             * @property {Uint8Array|null} [ln] SetEpochOperation ln
-             * @property {Array.<Uint8Array>|null} [ss] SetEpochOperation ss
-             * @property {Array.<Uint8Array>|null} [pks] SetEpochOperation pks
+             * @property {number|Long|null} [pd] SetEpochOperation pd
+             * @property {Uint8Array|null} [rs] SetEpochOperation rs
+             * @property {Array.<Uint8Array>|null} [app] SetEpochOperation app
              */
 
             /**
@@ -3684,8 +3683,7 @@ $root.apply = (function() {
              * @param {apply.operations.ISetEpochOperation=} [properties] Properties to set
              */
             function SetEpochOperation(properties) {
-                this.ss = [];
-                this.pks = [];
+                this.app = [];
                 if (properties)
                     for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
                         if (properties[keys[i]] != null)
@@ -3693,36 +3691,28 @@ $root.apply = (function() {
             }
 
             /**
-             * SetEpochOperation cd.
-             * @member {number|Long} cd
+             * SetEpochOperation pd.
+             * @member {number|Long} pd
              * @memberof apply.operations.SetEpochOperation
              * @instance
              */
-            SetEpochOperation.prototype.cd = $util.Long ? $util.Long.fromBits(0,0,true) : 0;
+            SetEpochOperation.prototype.pd = $util.Long ? $util.Long.fromBits(0,0,true) : 0;
 
             /**
-             * SetEpochOperation ln.
-             * @member {Uint8Array} ln
+             * SetEpochOperation rs.
+             * @member {Uint8Array} rs
              * @memberof apply.operations.SetEpochOperation
              * @instance
              */
-            SetEpochOperation.prototype.ln = $util.newBuffer([]);
+            SetEpochOperation.prototype.rs = $util.newBuffer([]);
 
             /**
-             * SetEpochOperation ss.
-             * @member {Array.<Uint8Array>} ss
+             * SetEpochOperation app.
+             * @member {Array.<Uint8Array>} app
              * @memberof apply.operations.SetEpochOperation
              * @instance
              */
-            SetEpochOperation.prototype.ss = $util.emptyArray;
-
-            /**
-             * SetEpochOperation pks.
-             * @member {Array.<Uint8Array>} pks
-             * @memberof apply.operations.SetEpochOperation
-             * @instance
-             */
-            SetEpochOperation.prototype.pks = $util.emptyArray;
+            SetEpochOperation.prototype.app = $util.emptyArray;
 
             /**
              * Creates a new SetEpochOperation instance using the specified properties.
@@ -3748,16 +3738,13 @@ $root.apply = (function() {
             SetEpochOperation.encode = function encode(message, writer) {
                 if (!writer)
                     writer = $Writer.create();
-                if (message.cd != null && Object.hasOwnProperty.call(message, "cd"))
-                    writer.uint32(/* id 1, wireType 0 =*/8).uint64(message.cd);
-                if (message.ln != null && Object.hasOwnProperty.call(message, "ln"))
-                    writer.uint32(/* id 2, wireType 2 =*/18).bytes(message.ln);
-                if (message.ss != null && message.ss.length)
-                    for (var i = 0; i < message.ss.length; ++i)
-                        writer.uint32(/* id 3, wireType 2 =*/26).bytes(message.ss[i]);
-                if (message.pks != null && message.pks.length)
-                    for (var i = 0; i < message.pks.length; ++i)
-                        writer.uint32(/* id 4, wireType 2 =*/34).bytes(message.pks[i]);
+                if (message.pd != null && Object.hasOwnProperty.call(message, "pd"))
+                    writer.uint32(/* id 1, wireType 0 =*/8).uint64(message.pd);
+                if (message.rs != null && Object.hasOwnProperty.call(message, "rs"))
+                    writer.uint32(/* id 2, wireType 2 =*/18).bytes(message.rs);
+                if (message.app != null && message.app.length)
+                    for (var i = 0; i < message.app.length; ++i)
+                        writer.uint32(/* id 3, wireType 2 =*/26).bytes(message.app[i]);
                 return writer;
             };
 
@@ -3795,23 +3782,17 @@ $root.apply = (function() {
                         break;
                     switch (tag >>> 3) {
                     case 1: {
-                            message.cd = reader.uint64();
+                            message.pd = reader.uint64();
                             break;
                         }
                     case 2: {
-                            message.ln = reader.bytes();
+                            message.rs = reader.bytes();
                             break;
                         }
                     case 3: {
-                            if (!(message.ss && message.ss.length))
-                                message.ss = [];
-                            message.ss.push(reader.bytes());
-                            break;
-                        }
-                    case 4: {
-                            if (!(message.pks && message.pks.length))
-                                message.pks = [];
-                            message.pks.push(reader.bytes());
+                            if (!(message.app && message.app.length))
+                                message.app = [];
+                            message.app.push(reader.bytes());
                             break;
                         }
                     default:
@@ -3849,25 +3830,18 @@ $root.apply = (function() {
             SetEpochOperation.verify = function verify(message) {
                 if (typeof message !== "object" || message === null)
                     return "object expected";
-                if (message.cd != null && message.hasOwnProperty("cd"))
-                    if (!$util.isInteger(message.cd) && !(message.cd && $util.isInteger(message.cd.low) && $util.isInteger(message.cd.high)))
-                        return "cd: integer|Long expected";
-                if (message.ln != null && message.hasOwnProperty("ln"))
-                    if (!(message.ln && typeof message.ln.length === "number" || $util.isString(message.ln)))
-                        return "ln: buffer expected";
-                if (message.ss != null && message.hasOwnProperty("ss")) {
-                    if (!Array.isArray(message.ss))
-                        return "ss: array expected";
-                    for (var i = 0; i < message.ss.length; ++i)
-                        if (!(message.ss[i] && typeof message.ss[i].length === "number" || $util.isString(message.ss[i])))
-                            return "ss: buffer[] expected";
-                }
-                if (message.pks != null && message.hasOwnProperty("pks")) {
-                    if (!Array.isArray(message.pks))
-                        return "pks: array expected";
-                    for (var i = 0; i < message.pks.length; ++i)
-                        if (!(message.pks[i] && typeof message.pks[i].length === "number" || $util.isString(message.pks[i])))
-                            return "pks: buffer[] expected";
+                if (message.pd != null && message.hasOwnProperty("pd"))
+                    if (!$util.isInteger(message.pd) && !(message.pd && $util.isInteger(message.pd.low) && $util.isInteger(message.pd.high)))
+                        return "pd: integer|Long expected";
+                if (message.rs != null && message.hasOwnProperty("rs"))
+                    if (!(message.rs && typeof message.rs.length === "number" || $util.isString(message.rs)))
+                        return "rs: buffer expected";
+                if (message.app != null && message.hasOwnProperty("app")) {
+                    if (!Array.isArray(message.app))
+                        return "app: array expected";
+                    for (var i = 0; i < message.app.length; ++i)
+                        if (!(message.app[i] && typeof message.app[i].length === "number" || $util.isString(message.app[i])))
+                            return "app: buffer[] expected";
                 }
                 return null;
             };
@@ -3884,39 +3858,29 @@ $root.apply = (function() {
                 if (object instanceof $root.apply.operations.SetEpochOperation)
                     return object;
                 var message = new $root.apply.operations.SetEpochOperation();
-                if (object.cd != null)
+                if (object.pd != null)
                     if ($util.Long)
-                        (message.cd = $util.Long.fromValue(object.cd)).unsigned = true;
-                    else if (typeof object.cd === "string")
-                        message.cd = parseInt(object.cd, 10);
-                    else if (typeof object.cd === "number")
-                        message.cd = object.cd;
-                    else if (typeof object.cd === "object")
-                        message.cd = new $util.LongBits(object.cd.low >>> 0, object.cd.high >>> 0).toNumber(true);
-                if (object.ln != null)
-                    if (typeof object.ln === "string")
-                        $util.base64.decode(object.ln, message.ln = $util.newBuffer($util.base64.length(object.ln)), 0);
-                    else if (object.ln.length >= 0)
-                        message.ln = object.ln;
-                if (object.ss) {
-                    if (!Array.isArray(object.ss))
-                        throw TypeError(".apply.operations.SetEpochOperation.ss: array expected");
-                    message.ss = [];
-                    for (var i = 0; i < object.ss.length; ++i)
-                        if (typeof object.ss[i] === "string")
-                            $util.base64.decode(object.ss[i], message.ss[i] = $util.newBuffer($util.base64.length(object.ss[i])), 0);
-                        else if (object.ss[i].length >= 0)
-                            message.ss[i] = object.ss[i];
-                }
-                if (object.pks) {
-                    if (!Array.isArray(object.pks))
-                        throw TypeError(".apply.operations.SetEpochOperation.pks: array expected");
-                    message.pks = [];
-                    for (var i = 0; i < object.pks.length; ++i)
-                        if (typeof object.pks[i] === "string")
-                            $util.base64.decode(object.pks[i], message.pks[i] = $util.newBuffer($util.base64.length(object.pks[i])), 0);
-                        else if (object.pks[i].length >= 0)
-                            message.pks[i] = object.pks[i];
+                        (message.pd = $util.Long.fromValue(object.pd)).unsigned = true;
+                    else if (typeof object.pd === "string")
+                        message.pd = parseInt(object.pd, 10);
+                    else if (typeof object.pd === "number")
+                        message.pd = object.pd;
+                    else if (typeof object.pd === "object")
+                        message.pd = new $util.LongBits(object.pd.low >>> 0, object.pd.high >>> 0).toNumber(true);
+                if (object.rs != null)
+                    if (typeof object.rs === "string")
+                        $util.base64.decode(object.rs, message.rs = $util.newBuffer($util.base64.length(object.rs)), 0);
+                    else if (object.rs.length >= 0)
+                        message.rs = object.rs;
+                if (object.app) {
+                    if (!Array.isArray(object.app))
+                        throw TypeError(".apply.operations.SetEpochOperation.app: array expected");
+                    message.app = [];
+                    for (var i = 0; i < object.app.length; ++i)
+                        if (typeof object.app[i] === "string")
+                            $util.base64.decode(object.app[i], message.app[i] = $util.newBuffer($util.base64.length(object.app[i])), 0);
+                        else if (object.app[i].length >= 0)
+                            message.app[i] = object.app[i];
                 }
                 return message;
             };
@@ -3934,40 +3898,33 @@ $root.apply = (function() {
                 if (!options)
                     options = {};
                 var object = {};
-                if (options.arrays || options.defaults) {
-                    object.ss = [];
-                    object.pks = [];
-                }
+                if (options.arrays || options.defaults)
+                    object.app = [];
                 if (options.defaults) {
                     if ($util.Long) {
                         var long = new $util.Long(0, 0, true);
-                        object.cd = options.longs === String ? long.toString() : options.longs === Number ? long.toNumber() : long;
+                        object.pd = options.longs === String ? long.toString() : options.longs === Number ? long.toNumber() : long;
                     } else
-                        object.cd = options.longs === String ? "0" : 0;
+                        object.pd = options.longs === String ? "0" : 0;
                     if (options.bytes === String)
-                        object.ln = "";
+                        object.rs = "";
                     else {
-                        object.ln = [];
+                        object.rs = [];
                         if (options.bytes !== Array)
-                            object.ln = $util.newBuffer(object.ln);
+                            object.rs = $util.newBuffer(object.rs);
                     }
                 }
-                if (message.cd != null && message.hasOwnProperty("cd"))
-                    if (typeof message.cd === "number")
-                        object.cd = options.longs === String ? String(message.cd) : message.cd;
+                if (message.pd != null && message.hasOwnProperty("pd"))
+                    if (typeof message.pd === "number")
+                        object.pd = options.longs === String ? String(message.pd) : message.pd;
                     else
-                        object.cd = options.longs === String ? $util.Long.prototype.toString.call(message.cd) : options.longs === Number ? new $util.LongBits(message.cd.low >>> 0, message.cd.high >>> 0).toNumber(true) : message.cd;
-                if (message.ln != null && message.hasOwnProperty("ln"))
-                    object.ln = options.bytes === String ? $util.base64.encode(message.ln, 0, message.ln.length) : options.bytes === Array ? Array.prototype.slice.call(message.ln) : message.ln;
-                if (message.ss && message.ss.length) {
-                    object.ss = [];
-                    for (var j = 0; j < message.ss.length; ++j)
-                        object.ss[j] = options.bytes === String ? $util.base64.encode(message.ss[j], 0, message.ss[j].length) : options.bytes === Array ? Array.prototype.slice.call(message.ss[j]) : message.ss[j];
-                }
-                if (message.pks && message.pks.length) {
-                    object.pks = [];
-                    for (var j = 0; j < message.pks.length; ++j)
-                        object.pks[j] = options.bytes === String ? $util.base64.encode(message.pks[j], 0, message.pks[j].length) : options.bytes === Array ? Array.prototype.slice.call(message.pks[j]) : message.pks[j];
+                        object.pd = options.longs === String ? $util.Long.prototype.toString.call(message.pd) : options.longs === Number ? new $util.LongBits(message.pd.low >>> 0, message.pd.high >>> 0).toNumber(true) : message.pd;
+                if (message.rs != null && message.hasOwnProperty("rs"))
+                    object.rs = options.bytes === String ? $util.base64.encode(message.rs, 0, message.rs.length) : options.bytes === Array ? Array.prototype.slice.call(message.rs) : message.rs;
+                if (message.app && message.app.length) {
+                    object.app = [];
+                    for (var j = 0; j < message.app.length; ++j)
+                        object.app[j] = options.bytes === String ? $util.base64.encode(message.app[j], 0, message.app[j].length) : options.bytes === Array ? Array.prototype.slice.call(message.app[j]) : message.app[j];
                 }
                 return object;
             };

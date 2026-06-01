@@ -3,8 +3,7 @@ syntax = "proto3";
 package apply.operations;
 
 message SetEpochOperation {
-    uint64         cd  = 1; // challange data
-    bytes          ln  = 2; // Leader's defined nonce
-    repeated bytes ss  = 3; // Array of Signatures
-    repeated bytes pks = 4; // Array of Public keys (positionaly correlatable with the signatures)
+    uint64         pd  = 1; // proof data
+    bytes          rs  = 2; // Requester sig
+    repeated bytes app = 3; // Array of approvals
 }
