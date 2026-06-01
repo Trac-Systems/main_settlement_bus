@@ -21,6 +21,7 @@ import EpochProofProposalService from '../consensus/services/EpochProofProposalS
 import { Logger } from '../../utils/logger.js';
 import { WalletProvider } from 'trac-wallet';
 import { CustomEventType } from '../../utils/constants.js';
+import tracCryptoApi from 'trac-crypto-api'
 
 const wakeup = new w();
 
@@ -99,7 +100,9 @@ class Network extends ReadyResource {
         this.validatorObserverService.start();
         await this.#replicate();
 
-        if (this.#state.isIndexer()) {
+        const isAdmin = await this.#state.isAdmin();
+
+        if (this.#state.isIndexer() && !isAdmin) {
             this.#epochProofProposalService.start();
         }
     }
@@ -166,12 +169,18 @@ class Network extends ReadyResource {
 
         });
 
-        this.#state.on(CustomEventType.IS_INDEXER, () => {
-            this.#epochProofProposalService.start();
+        this.#state.on(CustomEventType.IS_INDEXER, (bufferAddress) => {
+            const address = tracCryptoApi.address.encode(this.#config.addressPrefix, bufferAddress);
+            if (address === this.#wallet.address) {
+                this.#epochProofProposalService.start();
+            }
         });
         
-        this.#state.on(CustomEventType.IS_NON_INDEXER, () => {
-            this.#epochProofProposalService.stop();
+        this.#state.on(CustomEventType.IS_NON_INDEXER, (bufferAddress) => {
+            const address = tracCryptoApi.address.encode(this.#config.addressPrefix, bufferAddress);
+            if (address === this.#wallet.address) {
+                this.#epochProofProposalService.stop();
+            }
         });
     }
 
@@ -179,7 +188,7 @@ class Network extends ReadyResource {
         this.removeAllListeners(EventType.VALIDATOR_CONNECTION_TIMEOUT);
         this.removeAllListeners(EventType.VALIDATOR_CONNECTION_READY);
         this.#state.removeAllListeners(CustomEventType.IS_INDEXER);
-        this.#state.removeAllListeners(CustomEventType.NOT_INDEXER);
+        this.#state.removeAllListeners(CustomEventType.IS_NON_INDEXER);
     }
 
     cleanupPendingConnections() {
