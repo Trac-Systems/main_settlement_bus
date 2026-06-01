@@ -31,7 +31,7 @@ export class VDFService extends ReadyResource {
         return new Promise((resolve, reject) => {
             this.#port.on("message", (result) => console.log(result));
             this.#port.on("error", (err) => reject(err));
-            await this.#thread.write({ discriminantSizeBits, challenge, difficulty });
+            return this.#thread.write({ discriminantSizeBits, challenge, difficulty });
         });
     }
 }
