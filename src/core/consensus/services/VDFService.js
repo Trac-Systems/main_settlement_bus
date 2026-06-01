@@ -1,11 +1,14 @@
-import Channel from "bare-channel"
+import Channel from "bare-channel";
 import ReadyResource from "ready-resource";
+import { sleep } from "../../../utils/helpers.js";
 
 export class VDFService extends ReadyResource {
     #thread;
     #port;
-    
-    constructor() {} 
+
+    constructor() {
+        super();
+    }
 
     async _open() {
         const Thread = Bare.Thread

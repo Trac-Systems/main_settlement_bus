@@ -5,12 +5,12 @@ import { OperationType } from "../../../utils/constants.js";
 import { Logger } from "../../../utils/logger.js";
 import { safeEncodeApplyOperation } from '../../../codecs/apply/applyOperationCodec.js';
 import { addressToBuffer } from "../../state/utils/address.js";
-import { VDFService } from "./VDFService.js";
 import { createMessage } from "../../../utils/buffer.js";
 import { blake3 } from "trac-crypto-api/modules/hash.js";
 import { generateUUID } from '../../../utils/helpers.js';
 import { networkMessageFactory } from '../../../messages/network/v1/networkMessageFactory.js';
 import { NETWORK_CAPABILITIES } from '../../../utils/constants.js';
+import { VDFService } from "./VDFService.js";
 
 const PROTOCOL_VERSION = 1;
 
@@ -40,11 +40,12 @@ class EpochProofProposalService extends ReadyResource {
         this.#scheduler = null;
         this.#logger = new Logger(config);
         this.#isInterrupted = false;
-        this.#calculatorService = new VDFService();
         this.#connectionManager = connectionManager;
+        this.#calculatorService = new VDFService();
     }
 
     async _open() {
+        await this.#calculatorService.ready()
         this.#scheduler = new Scheduler(
             (next) => this.#worker(next),
             this.#intervalMs,
