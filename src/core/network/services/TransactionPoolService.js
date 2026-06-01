@@ -188,8 +188,7 @@ class TransactionPoolService {
     }
 
     async stopPool(waitForCurrent = true) {
-        if (!this.#scheduler) return;
-        await this.#scheduler.stop(waitForCurrent);
+        await this.#scheduler?.stop(waitForCurrent);
         this.#scheduler = null;
         this.#queuedTxHashes.clear();
         this.#txPool.clear();

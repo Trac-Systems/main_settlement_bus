@@ -10,7 +10,7 @@ import { blake3 } from "trac-crypto-api/modules/hash.js";
 import { generateUUID } from '../../../utils/helpers.js';
 import { networkMessageFactory } from '../../../messages/network/v1/networkMessageFactory.js';
 import { NETWORK_CAPABILITIES } from '../../../utils/constants.js';
-import { VDFService } from "./VDFService.js";
+import { createVDFService } from "./createVDFService.js";
 
 const PROTOCOL_VERSION = 1;
 
@@ -41,10 +41,10 @@ class EpochProofProposalService extends ReadyResource {
         this.#logger = new Logger(config);
         this.#isInterrupted = false;
         this.#connectionManager = connectionManager;
-        this.#calculatorService = new VDFService();
     }
 
     async _open() {
+        this.#calculatorService = await createVDFService();
         await this.#calculatorService.ready()
         this.#scheduler = new Scheduler(
             (next) => this.#worker(next),
@@ -55,6 +55,7 @@ class EpochProofProposalService extends ReadyResource {
     async _close() {
         this.#isInterrupted = true;
         await this.#scheduler.stop(true);
+        await this.#calculatorService?.close();
     }
 
     start() {
