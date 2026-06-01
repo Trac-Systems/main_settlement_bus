@@ -426,7 +426,12 @@ $root.consensus = (function() {
              * Properties of a ProofProposal.
              * @memberof consensus.v1
              * @interface IProofProposal
-             * @property {consensus.v1.IProofChallengeData|null} [challenge_data] ProofProposal challenge_data
+             * @property {number|null} [protocol_version] ProofProposal protocol_version
+             * @property {number|null} [network_id] ProofProposal network_id
+             * @property {number|Long|null} [epoch] ProofProposal epoch
+             * @property {Uint8Array|null} [previous_epoch_record_hash] ProofProposal previous_epoch_record_hash
+             * @property {Uint8Array|null} [proposer] ProofProposal proposer
+             * @property {Uint8Array|null} [vdf_parameters_hash] ProofProposal vdf_parameters_hash
              * @property {Uint8Array|null} [vdf_proof] ProofProposal vdf_proof
              * @property {Uint8Array|null} [signature] ProofProposal signature
              */
@@ -447,12 +452,52 @@ $root.consensus = (function() {
             }
 
             /**
-             * ProofProposal challenge_data.
-             * @member {consensus.v1.IProofChallengeData|null|undefined} challenge_data
+             * ProofProposal protocol_version.
+             * @member {number} protocol_version
              * @memberof consensus.v1.ProofProposal
              * @instance
              */
-            ProofProposal.prototype.challenge_data = null;
+            ProofProposal.prototype.protocol_version = 0;
+
+            /**
+             * ProofProposal network_id.
+             * @member {number} network_id
+             * @memberof consensus.v1.ProofProposal
+             * @instance
+             */
+            ProofProposal.prototype.network_id = 0;
+
+            /**
+             * ProofProposal epoch.
+             * @member {number|Long} epoch
+             * @memberof consensus.v1.ProofProposal
+             * @instance
+             */
+            ProofProposal.prototype.epoch = $util.Long ? $util.Long.fromBits(0,0,true) : 0;
+
+            /**
+             * ProofProposal previous_epoch_record_hash.
+             * @member {Uint8Array} previous_epoch_record_hash
+             * @memberof consensus.v1.ProofProposal
+             * @instance
+             */
+            ProofProposal.prototype.previous_epoch_record_hash = $util.newBuffer([]);
+
+            /**
+             * ProofProposal proposer.
+             * @member {Uint8Array} proposer
+             * @memberof consensus.v1.ProofProposal
+             * @instance
+             */
+            ProofProposal.prototype.proposer = $util.newBuffer([]);
+
+            /**
+             * ProofProposal vdf_parameters_hash.
+             * @member {Uint8Array} vdf_parameters_hash
+             * @memberof consensus.v1.ProofProposal
+             * @instance
+             */
+            ProofProposal.prototype.vdf_parameters_hash = $util.newBuffer([]);
 
             /**
              * ProofProposal vdf_proof.
@@ -494,12 +539,22 @@ $root.consensus = (function() {
             ProofProposal.encode = function encode(message, writer) {
                 if (!writer)
                     writer = $Writer.create();
-                if (message.challenge_data != null && Object.hasOwnProperty.call(message, "challenge_data"))
-                    $root.consensus.v1.ProofChallengeData.encode(message.challenge_data, writer.uint32(/* id 1, wireType 2 =*/10).fork()).ldelim();
+                if (message.protocol_version != null && Object.hasOwnProperty.call(message, "protocol_version"))
+                    writer.uint32(/* id 1, wireType 0 =*/8).uint32(message.protocol_version);
+                if (message.network_id != null && Object.hasOwnProperty.call(message, "network_id"))
+                    writer.uint32(/* id 2, wireType 0 =*/16).uint32(message.network_id);
+                if (message.epoch != null && Object.hasOwnProperty.call(message, "epoch"))
+                    writer.uint32(/* id 3, wireType 0 =*/24).uint64(message.epoch);
+                if (message.previous_epoch_record_hash != null && Object.hasOwnProperty.call(message, "previous_epoch_record_hash"))
+                    writer.uint32(/* id 4, wireType 2 =*/34).bytes(message.previous_epoch_record_hash);
+                if (message.proposer != null && Object.hasOwnProperty.call(message, "proposer"))
+                    writer.uint32(/* id 5, wireType 2 =*/42).bytes(message.proposer);
+                if (message.vdf_parameters_hash != null && Object.hasOwnProperty.call(message, "vdf_parameters_hash"))
+                    writer.uint32(/* id 6, wireType 2 =*/50).bytes(message.vdf_parameters_hash);
                 if (message.vdf_proof != null && Object.hasOwnProperty.call(message, "vdf_proof"))
-                    writer.uint32(/* id 2, wireType 2 =*/18).bytes(message.vdf_proof);
+                    writer.uint32(/* id 7, wireType 2 =*/58).bytes(message.vdf_proof);
                 if (message.signature != null && Object.hasOwnProperty.call(message, "signature"))
-                    writer.uint32(/* id 3, wireType 2 =*/26).bytes(message.signature);
+                    writer.uint32(/* id 8, wireType 2 =*/66).bytes(message.signature);
                 return writer;
             };
 
@@ -537,14 +592,34 @@ $root.consensus = (function() {
                         break;
                     switch (tag >>> 3) {
                     case 1: {
-                            message.challenge_data = $root.consensus.v1.ProofChallengeData.decode(reader, reader.uint32());
+                            message.protocol_version = reader.uint32();
                             break;
                         }
                     case 2: {
-                            message.vdf_proof = reader.bytes();
+                            message.network_id = reader.uint32();
                             break;
                         }
                     case 3: {
+                            message.epoch = reader.uint64();
+                            break;
+                        }
+                    case 4: {
+                            message.previous_epoch_record_hash = reader.bytes();
+                            break;
+                        }
+                    case 5: {
+                            message.proposer = reader.bytes();
+                            break;
+                        }
+                    case 6: {
+                            message.vdf_parameters_hash = reader.bytes();
+                            break;
+                        }
+                    case 7: {
+                            message.vdf_proof = reader.bytes();
+                            break;
+                        }
+                    case 8: {
                             message.signature = reader.bytes();
                             break;
                         }
@@ -583,11 +658,24 @@ $root.consensus = (function() {
             ProofProposal.verify = function verify(message) {
                 if (typeof message !== "object" || message === null)
                     return "object expected";
-                if (message.challenge_data != null && message.hasOwnProperty("challenge_data")) {
-                    var error = $root.consensus.v1.ProofChallengeData.verify(message.challenge_data);
-                    if (error)
-                        return "challenge_data." + error;
-                }
+                if (message.protocol_version != null && message.hasOwnProperty("protocol_version"))
+                    if (!$util.isInteger(message.protocol_version))
+                        return "protocol_version: integer expected";
+                if (message.network_id != null && message.hasOwnProperty("network_id"))
+                    if (!$util.isInteger(message.network_id))
+                        return "network_id: integer expected";
+                if (message.epoch != null && message.hasOwnProperty("epoch"))
+                    if (!$util.isInteger(message.epoch) && !(message.epoch && $util.isInteger(message.epoch.low) && $util.isInteger(message.epoch.high)))
+                        return "epoch: integer|Long expected";
+                if (message.previous_epoch_record_hash != null && message.hasOwnProperty("previous_epoch_record_hash"))
+                    if (!(message.previous_epoch_record_hash && typeof message.previous_epoch_record_hash.length === "number" || $util.isString(message.previous_epoch_record_hash)))
+                        return "previous_epoch_record_hash: buffer expected";
+                if (message.proposer != null && message.hasOwnProperty("proposer"))
+                    if (!(message.proposer && typeof message.proposer.length === "number" || $util.isString(message.proposer)))
+                        return "proposer: buffer expected";
+                if (message.vdf_parameters_hash != null && message.hasOwnProperty("vdf_parameters_hash"))
+                    if (!(message.vdf_parameters_hash && typeof message.vdf_parameters_hash.length === "number" || $util.isString(message.vdf_parameters_hash)))
+                        return "vdf_parameters_hash: buffer expected";
                 if (message.vdf_proof != null && message.hasOwnProperty("vdf_proof"))
                     if (!(message.vdf_proof && typeof message.vdf_proof.length === "number" || $util.isString(message.vdf_proof)))
                         return "vdf_proof: buffer expected";
@@ -609,11 +697,34 @@ $root.consensus = (function() {
                 if (object instanceof $root.consensus.v1.ProofProposal)
                     return object;
                 var message = new $root.consensus.v1.ProofProposal();
-                if (object.challenge_data != null) {
-                    if (typeof object.challenge_data !== "object")
-                        throw TypeError(".consensus.v1.ProofProposal.challenge_data: object expected");
-                    message.challenge_data = $root.consensus.v1.ProofChallengeData.fromObject(object.challenge_data);
-                }
+                if (object.protocol_version != null)
+                    message.protocol_version = object.protocol_version >>> 0;
+                if (object.network_id != null)
+                    message.network_id = object.network_id >>> 0;
+                if (object.epoch != null)
+                    if ($util.Long)
+                        (message.epoch = $util.Long.fromValue(object.epoch)).unsigned = true;
+                    else if (typeof object.epoch === "string")
+                        message.epoch = parseInt(object.epoch, 10);
+                    else if (typeof object.epoch === "number")
+                        message.epoch = object.epoch;
+                    else if (typeof object.epoch === "object")
+                        message.epoch = new $util.LongBits(object.epoch.low >>> 0, object.epoch.high >>> 0).toNumber(true);
+                if (object.previous_epoch_record_hash != null)
+                    if (typeof object.previous_epoch_record_hash === "string")
+                        $util.base64.decode(object.previous_epoch_record_hash, message.previous_epoch_record_hash = $util.newBuffer($util.base64.length(object.previous_epoch_record_hash)), 0);
+                    else if (object.previous_epoch_record_hash.length >= 0)
+                        message.previous_epoch_record_hash = object.previous_epoch_record_hash;
+                if (object.proposer != null)
+                    if (typeof object.proposer === "string")
+                        $util.base64.decode(object.proposer, message.proposer = $util.newBuffer($util.base64.length(object.proposer)), 0);
+                    else if (object.proposer.length >= 0)
+                        message.proposer = object.proposer;
+                if (object.vdf_parameters_hash != null)
+                    if (typeof object.vdf_parameters_hash === "string")
+                        $util.base64.decode(object.vdf_parameters_hash, message.vdf_parameters_hash = $util.newBuffer($util.base64.length(object.vdf_parameters_hash)), 0);
+                    else if (object.vdf_parameters_hash.length >= 0)
+                        message.vdf_parameters_hash = object.vdf_parameters_hash;
                 if (object.vdf_proof != null)
                     if (typeof object.vdf_proof === "string")
                         $util.base64.decode(object.vdf_proof, message.vdf_proof = $util.newBuffer($util.base64.length(object.vdf_proof)), 0);
@@ -641,7 +752,34 @@ $root.consensus = (function() {
                     options = {};
                 var object = {};
                 if (options.defaults) {
-                    object.challenge_data = null;
+                    object.protocol_version = 0;
+                    object.network_id = 0;
+                    if ($util.Long) {
+                        var long = new $util.Long(0, 0, true);
+                        object.epoch = options.longs === String ? long.toString() : options.longs === Number ? long.toNumber() : long;
+                    } else
+                        object.epoch = options.longs === String ? "0" : 0;
+                    if (options.bytes === String)
+                        object.previous_epoch_record_hash = "";
+                    else {
+                        object.previous_epoch_record_hash = [];
+                        if (options.bytes !== Array)
+                            object.previous_epoch_record_hash = $util.newBuffer(object.previous_epoch_record_hash);
+                    }
+                    if (options.bytes === String)
+                        object.proposer = "";
+                    else {
+                        object.proposer = [];
+                        if (options.bytes !== Array)
+                            object.proposer = $util.newBuffer(object.proposer);
+                    }
+                    if (options.bytes === String)
+                        object.vdf_parameters_hash = "";
+                    else {
+                        object.vdf_parameters_hash = [];
+                        if (options.bytes !== Array)
+                            object.vdf_parameters_hash = $util.newBuffer(object.vdf_parameters_hash);
+                    }
                     if (options.bytes === String)
                         object.vdf_proof = "";
                     else {
@@ -657,8 +795,21 @@ $root.consensus = (function() {
                             object.signature = $util.newBuffer(object.signature);
                     }
                 }
-                if (message.challenge_data != null && message.hasOwnProperty("challenge_data"))
-                    object.challenge_data = $root.consensus.v1.ProofChallengeData.toObject(message.challenge_data, options);
+                if (message.protocol_version != null && message.hasOwnProperty("protocol_version"))
+                    object.protocol_version = message.protocol_version;
+                if (message.network_id != null && message.hasOwnProperty("network_id"))
+                    object.network_id = message.network_id;
+                if (message.epoch != null && message.hasOwnProperty("epoch"))
+                    if (typeof message.epoch === "number")
+                        object.epoch = options.longs === String ? String(message.epoch) : message.epoch;
+                    else
+                        object.epoch = options.longs === String ? $util.Long.prototype.toString.call(message.epoch) : options.longs === Number ? new $util.LongBits(message.epoch.low >>> 0, message.epoch.high >>> 0).toNumber(true) : message.epoch;
+                if (message.previous_epoch_record_hash != null && message.hasOwnProperty("previous_epoch_record_hash"))
+                    object.previous_epoch_record_hash = options.bytes === String ? $util.base64.encode(message.previous_epoch_record_hash, 0, message.previous_epoch_record_hash.length) : options.bytes === Array ? Array.prototype.slice.call(message.previous_epoch_record_hash) : message.previous_epoch_record_hash;
+                if (message.proposer != null && message.hasOwnProperty("proposer"))
+                    object.proposer = options.bytes === String ? $util.base64.encode(message.proposer, 0, message.proposer.length) : options.bytes === Array ? Array.prototype.slice.call(message.proposer) : message.proposer;
+                if (message.vdf_parameters_hash != null && message.hasOwnProperty("vdf_parameters_hash"))
+                    object.vdf_parameters_hash = options.bytes === String ? $util.base64.encode(message.vdf_parameters_hash, 0, message.vdf_parameters_hash.length) : options.bytes === Array ? Array.prototype.slice.call(message.vdf_parameters_hash) : message.vdf_parameters_hash;
                 if (message.vdf_proof != null && message.hasOwnProperty("vdf_proof"))
                     object.vdf_proof = options.bytes === String ? $util.base64.encode(message.vdf_proof, 0, message.vdf_proof.length) : options.bytes === Array ? Array.prototype.slice.call(message.vdf_proof) : message.vdf_proof;
                 if (message.signature != null && message.hasOwnProperty("signature"))
