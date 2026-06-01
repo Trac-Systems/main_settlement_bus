@@ -128,13 +128,13 @@ class EpochProofProposalService extends ReadyResource {
             const newEpochProofData = this.createProposal(
                 currentEpochId,
                 currentEpochHash,
-                vdf,
+                vdf.result,
             );
-
+            
             const toHash = createMessage(...Object.values(newEpochProofData));
             const hash = await blake3(toHash);
             const signature = this.#wallet.sign(hash);
-            const members = this.#state.getIndexersEntry();
+            const members = await this.#state.getIndexersEntry();
             const proofProposal = {
                 data: newEpochProofData,
                 dataHash: hash,

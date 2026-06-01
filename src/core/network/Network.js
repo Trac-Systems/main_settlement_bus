@@ -98,6 +98,10 @@ class Network extends ReadyResource {
         this.transactionPoolService.start();
         this.validatorObserverService.start();
         await this.#replicate();
+
+        if (this.#state.isIndexer()) {
+            this.#epochProofProposalService.start();
+        }
     }
 
     async _close() {
