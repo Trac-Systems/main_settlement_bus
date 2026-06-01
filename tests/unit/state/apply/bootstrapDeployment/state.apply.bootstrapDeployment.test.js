@@ -47,7 +47,7 @@ import {
     appendInvalidPayload
 } from './bootstrapDeploymentScenarioHelpers.js';
 import bootstrapDeploymentInvalidValidatorNodeEntryScenario from './invalidValidatorNodeEntryScenario.js';
-import { safeDecodeApplyOperation, safeEncodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
+import { safeDecodeApplyOperation, safeEncodeApplyOperation } from '../../../../../src/codecs/apply/applyOperationCodec.js';
 
 bootstrapDeploymentHappyPathScenario();
 bootstrapDeploymentMultipleBootstrapScenario();

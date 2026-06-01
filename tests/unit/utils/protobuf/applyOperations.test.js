@@ -1,5 +1,5 @@
 import test from 'brittle';
-import { safeDecodeApplyOperation, safeEncodeApplyOperation } from '../../../../src/utils/protobuf/operationHelpers.js';
+import { safeDecodeApplyOperation, safeEncodeApplyOperation } from '../../../../src/codecs/apply/applyOperationCodec.js';
 import b4a from 'b4a';
 import fixtures from '../../../fixtures/protobuf.fixtures.js';
 //TODO add missing operations tests and fill fixtures with them

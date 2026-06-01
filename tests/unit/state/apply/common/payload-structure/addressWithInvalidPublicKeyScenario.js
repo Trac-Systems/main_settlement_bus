@@ -3,7 +3,7 @@ import InvalidAddressValidationScenario from './invalidAddressValidationScenario
 import {
     safeDecodeApplyOperation,
     safeEncodeApplyOperation
-} from '../../../../../../src/utils/protobuf/operationHelpers.js';
+} from '../../../../../../src/codecs/apply/applyOperationCodec.js';
 
 export default function createAddressWithInvalidPublicKeyScenario(config, pathOverride) {
     const { addressPath, ...rest } = config ?? {};

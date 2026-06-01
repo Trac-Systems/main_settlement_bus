@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import protobufModule from '../../src/utils/protobuf/networkV1.generated.cjs';
+import protobufModule from '../../src/codecs/network/v1/networkV1.generated.cjs';
 import { ResultCode } from '../../src/utils/constants.js';
 import {
     resultToValidatorAction,

@@ -6,7 +6,7 @@ import { EntryType } from '../../../../../src/utils/constants.js';
 import { decimalStringToBigInt, bigIntTo16ByteBuffer } from '../../../../../src/utils/amountSerialization.js';
 import { deriveIndexerSequenceState, eventFlush } from '../../../../helpers/autobaseTestHelpers.js';
 import { applyStateMessageFactory } from '../../../../../src/messages/state/applyStateMessageFactory.js';
-import { safeEncodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
+import { safeEncodeApplyOperation } from '../../../../../src/codecs/apply/applyOperationCodec.js';
 import {
     setupAdminNetwork,
     initializeBalances,
@@ -16,7 +16,7 @@ import { promotePeerToWriter } from '../addWriter/addWriterScenarioHelpers.js';
 import { buildAddIndexerPayload } from '../addIndexer/addIndexerScenarioHelpers.js';
 import { toBalance, BALANCE_FEE } from '../../../../../src/core/state/utils/balance.js';
 import lengthEntryUtils from '../../../../../src/core/state/utils/lengthEntry.js';
-import { safeDecodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
+import { safeDecodeApplyOperation } from '../../../../../src/codecs/apply/applyOperationCodec.js';
 import { config } from '../../../../helpers/config.js';
 
 export const DEFAULT_FUNDING = bigIntTo16ByteBuffer(decimalStringToBigInt('50'));

@@ -13,7 +13,7 @@ import addressUtils from '../../../../../src/core/state/utils/address.js';
 import transactionUtils from '../../../../../src/core/state/utils/transaction.js';
 import { toBalance, PERCENT_75, BALANCE_ZERO } from '../../../../../src/core/state/utils/balance.js';
 import { decimalStringToBigInt, bigIntTo16ByteBuffer } from '../../../../../src/utils/amountSerialization.js';
-import { safeDecodeApplyOperation, safeEncodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
+import { safeDecodeApplyOperation, safeEncodeApplyOperation } from '../../../../../src/codecs/apply/applyOperationCodec.js';
 import { ZERO_WK } from '../../../../../src/utils/buffer.js';
 import { EntryType, OperationType } from '../../../../../src/utils/constants.js';
 import { createMessage } from '../../../../../src/utils/buffer.js';

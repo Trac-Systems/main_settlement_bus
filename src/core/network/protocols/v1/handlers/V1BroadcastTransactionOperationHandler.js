@@ -11,7 +11,7 @@ import V1BroadcastTransactionRequest from "../validators/V1BroadcastTransactionR
 import {
     unsafeDecodeApplyOperation,
     unsafeEncodeApplyOperation
-} from "../../../../../utils/protobuf/operationHelpers.js";
+} from "../../../../../codecs/apply/applyOperationCodec.js";
 import PartialRoleAccessValidator from "../../shared/validators/PartialRoleAccessValidator.js";
 import PartialBootstrapDeploymentValidator from "../../shared/validators/PartialBootstrapDeploymentValidator.js";
 import PartialTransactionValidator from "../../shared/validators/PartialTransactionValidator.js";

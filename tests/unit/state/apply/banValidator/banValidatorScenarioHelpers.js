@@ -7,7 +7,7 @@ import addressUtils from '../../../../../src/core/state/utils/address.js';
 import lengthEntryUtils from '../../../../../src/core/state/utils/lengthEntry.js';
 import { EntryType } from '../../../../../src/utils/constants.js';
 import { BALANCE_FEE, BALANCE_ZERO, toBalance } from '../../../../../src/core/state/utils/balance.js';
-import { safeDecodeApplyOperation, safeEncodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
+import { safeDecodeApplyOperation, safeEncodeApplyOperation } from '../../../../../src/codecs/apply/applyOperationCodec.js';
 import {
     setupAddWriterScenario,
     selectWriterPeer,

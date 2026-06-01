@@ -5,7 +5,7 @@ import tracCryptoApi from 'trac-crypto-api';
 import { applyStateMessageFactory } from '../../../../src/messages/state/applyStateMessageFactory.js';
 import deploymentEntryUtils from '../../../../src/core/state/utils/deploymentEntry.js';
 import { addressToBuffer } from '../../../../src/core/state/utils/address.js';
-import { safeEncodeApplyOperation } from '../../../../src/utils/protobuf/operationHelpers.js';
+import { safeEncodeApplyOperation } from '../../../../src/codecs/apply/applyOperationCodec.js';
 import { operationToPayload } from '../../../../src/utils/applyOperations.js';
 import { $TNK } from '../../../../src/core/state/utils/balance.js';
 import { OperationType } from '../../../../src/utils/constants.js';

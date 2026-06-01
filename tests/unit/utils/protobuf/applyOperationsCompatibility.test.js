@@ -1,13 +1,13 @@
 import test from 'brittle';
 import b4a from 'b4a';
 
-import legacyApplyOperations from '../../../../src/utils/protobuf/applyOperations.cjs';
-import generatedApplyOperations from '../../../../src/utils/protobuf/applyOperations.generated.cjs';
+import legacyApplyOperations from '../../../../src/codecs/apply/applyOperations.cjs';
+import generatedApplyOperations from '../../../../src/codecs/apply/applyOperations.generated.cjs';
 import { OperationType } from '../../../../src/utils/constants.js';
 import {
     safeDecodeApplyOperation,
     safeEncodeApplyOperation
-} from '../../../../src/utils/protobuf/operationHelpers.js';
+} from '../../../../src/codecs/apply/applyOperationCodec.js';
 import fixtures from '../../../fixtures/protobuf.fixtures.js';
 
 const { Operation } = generatedApplyOperations.apply.operations;

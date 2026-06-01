@@ -1,16 +1,20 @@
 import test from 'brittle';
 import b4a from 'b4a';
 
-import applyOperations from '../../../../src/utils/protobuf/applyOperations.cjs';
+import applyOperations from '../../../../src/codecs/apply/applyOperations.cjs';
 import {
-    decodeV1networkOperation,
-    encodeV1networkOperation,
     normalizeIncomingMessage,
     safeDecodeApplyOperation,
     safeEncodeApplyOperation,
-} from '../../../../src/utils/protobuf/operationHelpers.js';
+} from '../../../../src/codecs/apply/applyOperationCodec.js';
+import {
+    decodeV1networkOperation,
+    encodeV1networkOperation,
+} from '../../../../src/codecs/network/v1/networkV1OperationCodec.js';
 import fixtures from '../../../fixtures/protobuf.fixtures.js';
 import networkV1Fixtures from '../../../fixtures/networkV1.fixtures.js';
+
+// TODO SPLIT IT INTO 3 FILES. APPLY, NETWORK AND CONSENSUS
 
 test('Happy path encode/decode roundtrip for protobuf applyOperation payloads', t => {
     const payloadsHashMap = new Map([

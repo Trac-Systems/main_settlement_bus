@@ -13,7 +13,7 @@ import {
 import { eventFlush } from '../../../../helpers/autobaseTestHelpers.js';
 import { toBalance } from '../../../../../src/core/state/utils/balance.js';
 import transactionUtils from '../../../../../src/core/state/utils/transaction.js';
-import { safeDecodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
+import { safeDecodeApplyOperation } from '../../../../../src/codecs/apply/applyOperationCodec.js';
 
 export default function addIndexerRemoveAndReAddScenario() {
     test('State.apply addIndexer re-promotes writer after removeIndexer cycle', async t => {

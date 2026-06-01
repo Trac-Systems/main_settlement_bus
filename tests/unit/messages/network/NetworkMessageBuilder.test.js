@@ -7,7 +7,7 @@ import {
     NetworkOperationType,
     ResultCode as NetworkResultCode
 } from '../../../../src/utils/constants.js';
-import { decodeV1networkOperation, encodeV1networkOperation } from '../../../../src/utils/protobuf/operationHelpers.js';
+import { decodeV1networkOperation, encodeV1networkOperation } from '../../../../src/codecs/network/v1/networkV1OperationCodec.js';
 import { errorMessageIncludes } from '../../../helpers/regexHelper.js';
 import {
     createMessage,

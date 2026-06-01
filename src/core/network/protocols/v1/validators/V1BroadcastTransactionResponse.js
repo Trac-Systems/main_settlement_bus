@@ -2,7 +2,7 @@ import Autobase from "autobase";
 import b4a from "b4a";
 import Hypercore from 'hypercore';
 import V1BaseOperation from "./V1BaseOperation.js";
-import {unsafeDecodeApplyOperation} from "../../../../../utils/protobuf/operationHelpers.js";
+import {unsafeDecodeApplyOperation} from "../../../../../codecs/apply/applyOperationCodec.js";
 import {isDeepEqualApplyPayload} from "../../../../../utils/deepEqualApplyPayload.js";
 import {addressToBuffer, bufferToAddress} from "../../../../state/utils/address.js";
 import {publicKeyToAddress} from "../../../../../utils/helpers.js";

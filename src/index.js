@@ -25,7 +25,7 @@ import {
 } from "./utils/normalizers.js";
 import fileUtils from './utils/fileUtils.js';
 import migrationUtils from './utils/migrationUtils.js';
-import {safeDecodeApplyOperation, safeEncodeApplyOperation} from "./utils/protobuf/operationHelpers.js";
+import {safeDecodeApplyOperation, safeEncodeApplyOperation} from "./codecs/apply/applyOperationCodec.js";
 import PartialTransactionValidator from "./core/network/protocols/shared/validators/PartialTransactionValidator.js";
 import PartialTransferValidator from "./core/network/protocols/shared/validators/PartialTransferValidator.js";
 import { BroadcastError, ValidationError } from "./utils/errors.js";

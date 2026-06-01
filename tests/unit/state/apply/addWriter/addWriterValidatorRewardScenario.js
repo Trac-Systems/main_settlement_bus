@@ -10,7 +10,7 @@ import {
 } from './addWriterScenarioHelpers.js';
 import { initializeBalances, whitelistAddress } from '../common/commonScenarioHelper.js';
 import { eventFlush } from '../../../../helpers/autobaseTestHelpers.js';
-import { safeDecodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
+import { safeDecodeApplyOperation } from '../../../../../src/codecs/apply/applyOperationCodec.js';
 import addressUtils from '../../../../../src/core/state/utils/address.js';
 import { config } from '../../../../helpers/config.js';
 

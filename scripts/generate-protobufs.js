@@ -48,18 +48,22 @@ function main() {
     const directoryName = path.dirname(fileURLToPath(import.meta.url));
 
     const inputDir = path.join(directoryName, '../proto');
-    const outputDir = path.join(directoryName, '../src/utils/protobuf');
+    const applyOutputDir = path.join(directoryName, '../src/codecs/apply');
+    const networkOutputDir = path.join(directoryName, '../src/codecs/network/v1');
+    const consensusOutputDir = path.join(directoryName, '../src/codecs/consensus/v1');
     const pbjsPath = path.join(directoryName, '../node_modules/.bin/pbjs');
     const legacyApplyInputPath = path.join(inputDir, 'applyOperations.proto');
     const applyOperationsEntryPath = path.join(inputDir, 'applyOperations/applyOperations.proto');
-    const applyOutputPath = path.join(outputDir, 'applyOperations.cjs');
-    const generatedApplyOperationsOutputPath = path.join(outputDir, 'applyOperations.generated.cjs');
+    const applyOutputPath = path.join(applyOutputDir, 'applyOperations.cjs');
+    const generatedApplyOperationsOutputPath = path.join(applyOutputDir, 'applyOperations.generated.cjs');
     const networkEntryPath = path.join(inputDir, 'network/v1/network_message.proto');
-    const generatedNetworkOutputPath = path.join(outputDir, 'networkV1.generated.cjs');
+    const generatedNetworkOutputPath = path.join(networkOutputDir, 'networkV1.generated.cjs');
     const consensusEntryPath = path.join(inputDir, 'consensus/v1/consensus_message_header.proto');
-    const generatedConsensusOutputPath = path.join(outputDir, 'consensusV1.generated.cjs');
+    const generatedConsensusOutputPath = path.join(consensusOutputDir, 'consensusV1.generated.cjs');
 
-    fs.mkdirSync(outputDir, { recursive: true });
+    fs.mkdirSync(applyOutputDir, { recursive: true });
+    fs.mkdirSync(networkOutputDir, { recursive: true });
+    fs.mkdirSync(consensusOutputDir, { recursive: true });
 
     generateCJSFromProto(legacyApplyInputPath, applyOutputPath);
     transformToUseB4a(applyOutputPath);

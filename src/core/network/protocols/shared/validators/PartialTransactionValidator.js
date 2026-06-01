@@ -1,5 +1,5 @@
 import b4a from 'b4a';
-import {safeDecodeApplyOperation} from "../../../../../utils/protobuf/operationHelpers.js";
+import {safeDecodeApplyOperation} from "../../../../../codecs/apply/applyOperationCodec.js";
 import deploymentEntryUtils from "../../../../state/utils/deploymentEntry.js";
 import PartialOperationValidator from './PartialOperationValidator.js';
 import {ResultCode} from "../../../../../utils/constants.js";

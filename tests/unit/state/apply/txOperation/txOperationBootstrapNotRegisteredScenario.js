@@ -1,6 +1,6 @@
 import b4a from 'b4a';
 import OperationValidationScenarioBase from '../common/base/OperationValidationScenarioBase.js';
-import { safeDecodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
+import { safeDecodeApplyOperation } from '../../../../../src/codecs/apply/applyOperationCodec.js';
 import { EntryType } from '../../../../../src/utils/constants.js';
 import { eventFlush } from '../../../../helpers/autobaseTestHelpers.js';
 import {
