@@ -11,6 +11,7 @@ import { generateUUID } from '../../../utils/helpers.js';
 import { networkMessageFactory } from '../../../messages/network/v1/networkMessageFactory.js';
 import { NETWORK_CAPABILITIES } from '../../../utils/constants.js';
 import { createVDFService } from "./createVDFService.js";
+import addressUtils from '../../state/utils/address.js';
 
 const PROTOCOL_VERSION = 1;
 
@@ -142,6 +143,14 @@ class EpochProofProposalService extends ReadyResource {
             };
 
             for (const member of members) {
+                const key = b4a.toString(member.key, "hex");
+                const addressBuffer = await this.#state.getRegisteredWriterKey(key);
+                if (!addressBuffer) continue;
+
+                const address = addressUtils.bufferToAddress(addressBuffer, this.#config.addressPrefix);
+                if (!address) continue;
+
+                if (address === this.#wallet.address) continue;
                 const memberSignature = await this.sendToIndexer(member, proofProposal);
                 if (!memberSignature) continue;
 
