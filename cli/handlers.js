@@ -3,7 +3,6 @@ import { bigIntToDecimalString, bufferToBigInt } from "../src/utils/amountSerial
 import { EntryType } from "../src/utils/constants.js";
 import { bufferToAddress } from "../src/core/state/utils/address.js";
 import deploymentEntryUtils from "../src/core/state/utils/deploymentEntry.js";
-import { safeDecodeApplyOperation } from "../src/utils/protobuf/operationHelpers.js";
 
 export class Handlers {
     #msb
