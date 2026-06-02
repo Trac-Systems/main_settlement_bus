@@ -9,6 +9,6 @@ package consensus.v1;
 // If a value is removed, reserve its number (and preferably its name).
 enum MessageType {
   MESSAGE_TYPE_UNSPECIFIED = 0;
-  MESSAGE_TYPE_PROOF_PROPOSAL= 1;
+  MESSAGE_TYPE_PROOF_PROPOSAL = 1;
   MESSAGE_TYPE_PROOF_PROPOSAL_RESPONSE = 2;
 }
