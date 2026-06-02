@@ -76,7 +76,6 @@ class State extends ReadyResource {
             valueEncoding: AUTOBASE_VALUE_ENCODING,
             bigBatches: false,
             optimistic: false,
-            fastForward: false,
             open: this.#setupHyperbee.bind(this),
             apply: this.applyHandler,
         })
