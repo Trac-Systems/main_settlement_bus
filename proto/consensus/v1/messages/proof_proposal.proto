@@ -2,8 +2,6 @@ syntax = "proto3";
 
 package consensus.v1;
 
-import "consensus/v1/messages/proof_challenge_data.proto";
-
 // Challenge data are from 1 to 6.
 message ProofProposal {
   uint32 protocol_version = 1; // 0x01

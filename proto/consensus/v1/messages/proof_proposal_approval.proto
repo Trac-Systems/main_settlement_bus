@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+package consensus.v1;
+
+// approval sig =  SIG(proof_proposal)
+message ProofProposalApproval {
+  bytes member_id = 1;
+  bytes approval_sig = 2;
+}

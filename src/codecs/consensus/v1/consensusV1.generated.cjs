@@ -846,377 +846,15 @@ $root.consensus = (function() {
             return ProofProposal;
         })();
 
-        v1.ProofChallengeData = (function() {
-
-            /**
-             * Properties of a ProofChallengeData.
-             * @memberof consensus.v1
-             * @interface IProofChallengeData
-             * @property {number|null} [protocol_version] ProofChallengeData protocol_version
-             * @property {number|null} [network_id] ProofChallengeData network_id
-             * @property {number|Long|null} [epoch] ProofChallengeData epoch
-             * @property {Uint8Array|null} [previous_epoch_record_hash] ProofChallengeData previous_epoch_record_hash
-             * @property {Uint8Array|null} [proposer] ProofChallengeData proposer
-             * @property {Uint8Array|null} [vdf_parameters_hash] ProofChallengeData vdf_parameters_hash
-             */
-
-            /**
-             * Constructs a new ProofChallengeData.
-             * @memberof consensus.v1
-             * @classdesc Represents a ProofChallengeData.
-             * @implements IProofChallengeData
-             * @constructor
-             * @param {consensus.v1.IProofChallengeData=} [properties] Properties to set
-             */
-            function ProofChallengeData(properties) {
-                if (properties)
-                    for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
-                        if (properties[keys[i]] != null)
-                            this[keys[i]] = properties[keys[i]];
-            }
-
-            /**
-             * ProofChallengeData protocol_version.
-             * @member {number} protocol_version
-             * @memberof consensus.v1.ProofChallengeData
-             * @instance
-             */
-            ProofChallengeData.prototype.protocol_version = 0;
-
-            /**
-             * ProofChallengeData network_id.
-             * @member {number} network_id
-             * @memberof consensus.v1.ProofChallengeData
-             * @instance
-             */
-            ProofChallengeData.prototype.network_id = 0;
-
-            /**
-             * ProofChallengeData epoch.
-             * @member {number|Long} epoch
-             * @memberof consensus.v1.ProofChallengeData
-             * @instance
-             */
-            ProofChallengeData.prototype.epoch = $util.Long ? $util.Long.fromBits(0,0,true) : 0;
-
-            /**
-             * ProofChallengeData previous_epoch_record_hash.
-             * @member {Uint8Array} previous_epoch_record_hash
-             * @memberof consensus.v1.ProofChallengeData
-             * @instance
-             */
-            ProofChallengeData.prototype.previous_epoch_record_hash = $util.newBuffer([]);
-
-            /**
-             * ProofChallengeData proposer.
-             * @member {Uint8Array} proposer
-             * @memberof consensus.v1.ProofChallengeData
-             * @instance
-             */
-            ProofChallengeData.prototype.proposer = $util.newBuffer([]);
-
-            /**
-             * ProofChallengeData vdf_parameters_hash.
-             * @member {Uint8Array} vdf_parameters_hash
-             * @memberof consensus.v1.ProofChallengeData
-             * @instance
-             */
-            ProofChallengeData.prototype.vdf_parameters_hash = $util.newBuffer([]);
-
-            /**
-             * Creates a new ProofChallengeData instance using the specified properties.
-             * @function create
-             * @memberof consensus.v1.ProofChallengeData
-             * @static
-             * @param {consensus.v1.IProofChallengeData=} [properties] Properties to set
-             * @returns {consensus.v1.ProofChallengeData} ProofChallengeData instance
-             */
-            ProofChallengeData.create = function create(properties) {
-                return new ProofChallengeData(properties);
-            };
-
-            /**
-             * Encodes the specified ProofChallengeData message. Does not implicitly {@link consensus.v1.ProofChallengeData.verify|verify} messages.
-             * @function encode
-             * @memberof consensus.v1.ProofChallengeData
-             * @static
-             * @param {consensus.v1.IProofChallengeData} message ProofChallengeData message or plain object to encode
-             * @param {$protobuf.Writer} [writer] Writer to encode to
-             * @returns {$protobuf.Writer} Writer
-             */
-            ProofChallengeData.encode = function encode(message, writer) {
-                if (!writer)
-                    writer = $Writer.create();
-                if (message.protocol_version != null && Object.hasOwnProperty.call(message, "protocol_version"))
-                    writer.uint32(/* id 1, wireType 0 =*/8).uint32(message.protocol_version);
-                if (message.network_id != null && Object.hasOwnProperty.call(message, "network_id"))
-                    writer.uint32(/* id 2, wireType 0 =*/16).uint32(message.network_id);
-                if (message.epoch != null && Object.hasOwnProperty.call(message, "epoch"))
-                    writer.uint32(/* id 3, wireType 0 =*/24).uint64(message.epoch);
-                if (message.previous_epoch_record_hash != null && Object.hasOwnProperty.call(message, "previous_epoch_record_hash"))
-                    writer.uint32(/* id 4, wireType 2 =*/34).bytes(message.previous_epoch_record_hash);
-                if (message.proposer != null && Object.hasOwnProperty.call(message, "proposer"))
-                    writer.uint32(/* id 5, wireType 2 =*/42).bytes(message.proposer);
-                if (message.vdf_parameters_hash != null && Object.hasOwnProperty.call(message, "vdf_parameters_hash"))
-                    writer.uint32(/* id 6, wireType 2 =*/50).bytes(message.vdf_parameters_hash);
-                return writer;
-            };
-
-            /**
-             * Encodes the specified ProofChallengeData message, length delimited. Does not implicitly {@link consensus.v1.ProofChallengeData.verify|verify} messages.
-             * @function encodeDelimited
-             * @memberof consensus.v1.ProofChallengeData
-             * @static
-             * @param {consensus.v1.IProofChallengeData} message ProofChallengeData message or plain object to encode
-             * @param {$protobuf.Writer} [writer] Writer to encode to
-             * @returns {$protobuf.Writer} Writer
-             */
-            ProofChallengeData.encodeDelimited = function encodeDelimited(message, writer) {
-                return this.encode(message, writer).ldelim();
-            };
-
-            /**
-             * Decodes a ProofChallengeData message from the specified reader or buffer.
-             * @function decode
-             * @memberof consensus.v1.ProofChallengeData
-             * @static
-             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
-             * @param {number} [length] Message length if known beforehand
-             * @returns {consensus.v1.ProofChallengeData} ProofChallengeData
-             * @throws {Error} If the payload is not a reader or valid buffer
-             * @throws {$protobuf.util.ProtocolError} If required fields are missing
-             */
-            ProofChallengeData.decode = function decode(reader, length, error) {
-                if (!(reader instanceof $Reader))
-                    reader = $Reader.create(reader);
-                var end = length === undefined ? reader.len : reader.pos + length, message = new $root.consensus.v1.ProofChallengeData();
-                while (reader.pos < end) {
-                    var tag = reader.uint32();
-                    if (tag === error)
-                        break;
-                    switch (tag >>> 3) {
-                    case 1: {
-                            message.protocol_version = reader.uint32();
-                            break;
-                        }
-                    case 2: {
-                            message.network_id = reader.uint32();
-                            break;
-                        }
-                    case 3: {
-                            message.epoch = reader.uint64();
-                            break;
-                        }
-                    case 4: {
-                            message.previous_epoch_record_hash = reader.bytes();
-                            break;
-                        }
-                    case 5: {
-                            message.proposer = reader.bytes();
-                            break;
-                        }
-                    case 6: {
-                            message.vdf_parameters_hash = reader.bytes();
-                            break;
-                        }
-                    default:
-                        reader.skipType(tag & 7);
-                        break;
-                    }
-                }
-                return message;
-            };
-
-            /**
-             * Decodes a ProofChallengeData message from the specified reader or buffer, length delimited.
-             * @function decodeDelimited
-             * @memberof consensus.v1.ProofChallengeData
-             * @static
-             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
-             * @returns {consensus.v1.ProofChallengeData} ProofChallengeData
-             * @throws {Error} If the payload is not a reader or valid buffer
-             * @throws {$protobuf.util.ProtocolError} If required fields are missing
-             */
-            ProofChallengeData.decodeDelimited = function decodeDelimited(reader) {
-                if (!(reader instanceof $Reader))
-                    reader = new $Reader(reader);
-                return this.decode(reader, reader.uint32());
-            };
-
-            /**
-             * Verifies a ProofChallengeData message.
-             * @function verify
-             * @memberof consensus.v1.ProofChallengeData
-             * @static
-             * @param {Object.<string,*>} message Plain object to verify
-             * @returns {string|null} `null` if valid, otherwise the reason why it is not
-             */
-            ProofChallengeData.verify = function verify(message) {
-                if (typeof message !== "object" || message === null)
-                    return "object expected";
-                if (message.protocol_version != null && message.hasOwnProperty("protocol_version"))
-                    if (!$util.isInteger(message.protocol_version))
-                        return "protocol_version: integer expected";
-                if (message.network_id != null && message.hasOwnProperty("network_id"))
-                    if (!$util.isInteger(message.network_id))
-                        return "network_id: integer expected";
-                if (message.epoch != null && message.hasOwnProperty("epoch"))
-                    if (!$util.isInteger(message.epoch) && !(message.epoch && $util.isInteger(message.epoch.low) && $util.isInteger(message.epoch.high)))
-                        return "epoch: integer|Long expected";
-                if (message.previous_epoch_record_hash != null && message.hasOwnProperty("previous_epoch_record_hash"))
-                    if (!(message.previous_epoch_record_hash && typeof message.previous_epoch_record_hash.length === "number" || $util.isString(message.previous_epoch_record_hash)))
-                        return "previous_epoch_record_hash: buffer expected";
-                if (message.proposer != null && message.hasOwnProperty("proposer"))
-                    if (!(message.proposer && typeof message.proposer.length === "number" || $util.isString(message.proposer)))
-                        return "proposer: buffer expected";
-                if (message.vdf_parameters_hash != null && message.hasOwnProperty("vdf_parameters_hash"))
-                    if (!(message.vdf_parameters_hash && typeof message.vdf_parameters_hash.length === "number" || $util.isString(message.vdf_parameters_hash)))
-                        return "vdf_parameters_hash: buffer expected";
-                return null;
-            };
-
-            /**
-             * Creates a ProofChallengeData message from a plain object. Also converts values to their respective internal types.
-             * @function fromObject
-             * @memberof consensus.v1.ProofChallengeData
-             * @static
-             * @param {Object.<string,*>} object Plain object
-             * @returns {consensus.v1.ProofChallengeData} ProofChallengeData
-             */
-            ProofChallengeData.fromObject = function fromObject(object) {
-                if (object instanceof $root.consensus.v1.ProofChallengeData)
-                    return object;
-                var message = new $root.consensus.v1.ProofChallengeData();
-                if (object.protocol_version != null)
-                    message.protocol_version = object.protocol_version >>> 0;
-                if (object.network_id != null)
-                    message.network_id = object.network_id >>> 0;
-                if (object.epoch != null)
-                    if ($util.Long)
-                        (message.epoch = $util.Long.fromValue(object.epoch)).unsigned = true;
-                    else if (typeof object.epoch === "string")
-                        message.epoch = parseInt(object.epoch, 10);
-                    else if (typeof object.epoch === "number")
-                        message.epoch = object.epoch;
-                    else if (typeof object.epoch === "object")
-                        message.epoch = new $util.LongBits(object.epoch.low >>> 0, object.epoch.high >>> 0).toNumber(true);
-                if (object.previous_epoch_record_hash != null)
-                    if (typeof object.previous_epoch_record_hash === "string")
-                        $util.base64.decode(object.previous_epoch_record_hash, message.previous_epoch_record_hash = $util.newBuffer($util.base64.length(object.previous_epoch_record_hash)), 0);
-                    else if (object.previous_epoch_record_hash.length >= 0)
-                        message.previous_epoch_record_hash = object.previous_epoch_record_hash;
-                if (object.proposer != null)
-                    if (typeof object.proposer === "string")
-                        $util.base64.decode(object.proposer, message.proposer = $util.newBuffer($util.base64.length(object.proposer)), 0);
-                    else if (object.proposer.length >= 0)
-                        message.proposer = object.proposer;
-                if (object.vdf_parameters_hash != null)
-                    if (typeof object.vdf_parameters_hash === "string")
-                        $util.base64.decode(object.vdf_parameters_hash, message.vdf_parameters_hash = $util.newBuffer($util.base64.length(object.vdf_parameters_hash)), 0);
-                    else if (object.vdf_parameters_hash.length >= 0)
-                        message.vdf_parameters_hash = object.vdf_parameters_hash;
-                return message;
-            };
-
-            /**
-             * Creates a plain object from a ProofChallengeData message. Also converts values to other types if specified.
-             * @function toObject
-             * @memberof consensus.v1.ProofChallengeData
-             * @static
-             * @param {consensus.v1.ProofChallengeData} message ProofChallengeData
-             * @param {$protobuf.IConversionOptions} [options] Conversion options
-             * @returns {Object.<string,*>} Plain object
-             */
-            ProofChallengeData.toObject = function toObject(message, options) {
-                if (!options)
-                    options = {};
-                var object = {};
-                if (options.defaults) {
-                    object.protocol_version = 0;
-                    object.network_id = 0;
-                    if ($util.Long) {
-                        var long = new $util.Long(0, 0, true);
-                        object.epoch = options.longs === String ? long.toString() : options.longs === Number ? long.toNumber() : long;
-                    } else
-                        object.epoch = options.longs === String ? "0" : 0;
-                    if (options.bytes === String)
-                        object.previous_epoch_record_hash = "";
-                    else {
-                        object.previous_epoch_record_hash = [];
-                        if (options.bytes !== Array)
-                            object.previous_epoch_record_hash = $util.newBuffer(object.previous_epoch_record_hash);
-                    }
-                    if (options.bytes === String)
-                        object.proposer = "";
-                    else {
-                        object.proposer = [];
-                        if (options.bytes !== Array)
-                            object.proposer = $util.newBuffer(object.proposer);
-                    }
-                    if (options.bytes === String)
-                        object.vdf_parameters_hash = "";
-                    else {
-                        object.vdf_parameters_hash = [];
-                        if (options.bytes !== Array)
-                            object.vdf_parameters_hash = $util.newBuffer(object.vdf_parameters_hash);
-                    }
-                }
-                if (message.protocol_version != null && message.hasOwnProperty("protocol_version"))
-                    object.protocol_version = message.protocol_version;
-                if (message.network_id != null && message.hasOwnProperty("network_id"))
-                    object.network_id = message.network_id;
-                if (message.epoch != null && message.hasOwnProperty("epoch"))
-                    if (typeof message.epoch === "number")
-                        object.epoch = options.longs === String ? String(message.epoch) : message.epoch;
-                    else
-                        object.epoch = options.longs === String ? $util.Long.prototype.toString.call(message.epoch) : options.longs === Number ? new $util.LongBits(message.epoch.low >>> 0, message.epoch.high >>> 0).toNumber(true) : message.epoch;
-                if (message.previous_epoch_record_hash != null && message.hasOwnProperty("previous_epoch_record_hash"))
-                    object.previous_epoch_record_hash = options.bytes === String ? $util.base64.encode(message.previous_epoch_record_hash, 0, message.previous_epoch_record_hash.length) : options.bytes === Array ? Array.prototype.slice.call(message.previous_epoch_record_hash) : message.previous_epoch_record_hash;
-                if (message.proposer != null && message.hasOwnProperty("proposer"))
-                    object.proposer = options.bytes === String ? $util.base64.encode(message.proposer, 0, message.proposer.length) : options.bytes === Array ? Array.prototype.slice.call(message.proposer) : message.proposer;
-                if (message.vdf_parameters_hash != null && message.hasOwnProperty("vdf_parameters_hash"))
-                    object.vdf_parameters_hash = options.bytes === String ? $util.base64.encode(message.vdf_parameters_hash, 0, message.vdf_parameters_hash.length) : options.bytes === Array ? Array.prototype.slice.call(message.vdf_parameters_hash) : message.vdf_parameters_hash;
-                return object;
-            };
-
-            /**
-             * Converts this ProofChallengeData to JSON.
-             * @function toJSON
-             * @memberof consensus.v1.ProofChallengeData
-             * @instance
-             * @returns {Object.<string,*>} JSON object
-             */
-            ProofChallengeData.prototype.toJSON = function toJSON() {
-                return this.constructor.toObject(this, $protobuf.util.toJSONOptions);
-            };
-
-            /**
-             * Gets the default type url for ProofChallengeData
-             * @function getTypeUrl
-             * @memberof consensus.v1.ProofChallengeData
-             * @static
-             * @param {string} [typeUrlPrefix] your custom typeUrlPrefix(default "type.googleapis.com")
-             * @returns {string} The default type url
-             */
-            ProofChallengeData.getTypeUrl = function getTypeUrl(typeUrlPrefix) {
-                if (typeUrlPrefix === undefined) {
-                    typeUrlPrefix = "type.googleapis.com";
-                }
-                return typeUrlPrefix + "/consensus.v1.ProofChallengeData";
-            };
-
-            return ProofChallengeData;
-        })();
-
         v1.ProofProposalResponse = (function() {
 
             /**
              * Properties of a ProofProposalResponse.
              * @memberof consensus.v1
              * @interface IProofProposalResponse
-             * @property {Uint8Array|null} [member_id] ProofProposalResponse member_id
-             * @property {Uint8Array|null} [signature] ProofProposalResponse signature
              * @property {consensus.v1.ResultCode|null} [result] ProofProposalResponse result
+             * @property {consensus.v1.IProofProposalApproval|null} [approval] ProofProposalResponse approval
+             * @property {Uint8Array|null} [response_sig] ProofProposalResponse response_sig
              */
 
             /**
@@ -1235,28 +873,28 @@ $root.consensus = (function() {
             }
 
             /**
-             * ProofProposalResponse member_id.
-             * @member {Uint8Array} member_id
-             * @memberof consensus.v1.ProofProposalResponse
-             * @instance
-             */
-            ProofProposalResponse.prototype.member_id = $util.newBuffer([]);
-
-            /**
-             * ProofProposalResponse signature.
-             * @member {Uint8Array} signature
-             * @memberof consensus.v1.ProofProposalResponse
-             * @instance
-             */
-            ProofProposalResponse.prototype.signature = $util.newBuffer([]);
-
-            /**
              * ProofProposalResponse result.
              * @member {consensus.v1.ResultCode} result
              * @memberof consensus.v1.ProofProposalResponse
              * @instance
              */
             ProofProposalResponse.prototype.result = 0;
+
+            /**
+             * ProofProposalResponse approval.
+             * @member {consensus.v1.IProofProposalApproval|null|undefined} approval
+             * @memberof consensus.v1.ProofProposalResponse
+             * @instance
+             */
+            ProofProposalResponse.prototype.approval = null;
+
+            /**
+             * ProofProposalResponse response_sig.
+             * @member {Uint8Array} response_sig
+             * @memberof consensus.v1.ProofProposalResponse
+             * @instance
+             */
+            ProofProposalResponse.prototype.response_sig = $util.newBuffer([]);
 
             /**
              * Creates a new ProofProposalResponse instance using the specified properties.
@@ -1282,12 +920,12 @@ $root.consensus = (function() {
             ProofProposalResponse.encode = function encode(message, writer) {
                 if (!writer)
                     writer = $Writer.create();
-                if (message.member_id != null && Object.hasOwnProperty.call(message, "member_id"))
-                    writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.member_id);
-                if (message.signature != null && Object.hasOwnProperty.call(message, "signature"))
-                    writer.uint32(/* id 2, wireType 2 =*/18).bytes(message.signature);
                 if (message.result != null && Object.hasOwnProperty.call(message, "result"))
-                    writer.uint32(/* id 3, wireType 0 =*/24).int32(message.result);
+                    writer.uint32(/* id 1, wireType 0 =*/8).int32(message.result);
+                if (message.approval != null && Object.hasOwnProperty.call(message, "approval"))
+                    $root.consensus.v1.ProofProposalApproval.encode(message.approval, writer.uint32(/* id 2, wireType 2 =*/18).fork()).ldelim();
+                if (message.response_sig != null && Object.hasOwnProperty.call(message, "response_sig"))
+                    writer.uint32(/* id 3, wireType 2 =*/26).bytes(message.response_sig);
                 return writer;
             };
 
@@ -1325,15 +963,15 @@ $root.consensus = (function() {
                         break;
                     switch (tag >>> 3) {
                     case 1: {
-                            message.member_id = reader.bytes();
+                            message.result = reader.int32();
                             break;
                         }
                     case 2: {
-                            message.signature = reader.bytes();
+                            message.approval = $root.consensus.v1.ProofProposalApproval.decode(reader, reader.uint32());
                             break;
                         }
                     case 3: {
-                            message.result = reader.int32();
+                            message.response_sig = reader.bytes();
                             break;
                         }
                     default:
@@ -1371,12 +1009,6 @@ $root.consensus = (function() {
             ProofProposalResponse.verify = function verify(message) {
                 if (typeof message !== "object" || message === null)
                     return "object expected";
-                if (message.member_id != null && message.hasOwnProperty("member_id"))
-                    if (!(message.member_id && typeof message.member_id.length === "number" || $util.isString(message.member_id)))
-                        return "member_id: buffer expected";
-                if (message.signature != null && message.hasOwnProperty("signature"))
-                    if (!(message.signature && typeof message.signature.length === "number" || $util.isString(message.signature)))
-                        return "signature: buffer expected";
                 if (message.result != null && message.hasOwnProperty("result"))
                     switch (message.result) {
                     default:
@@ -1385,6 +1017,14 @@ $root.consensus = (function() {
                     case 1:
                         break;
                     }
+                if (message.approval != null && message.hasOwnProperty("approval")) {
+                    var error = $root.consensus.v1.ProofProposalApproval.verify(message.approval);
+                    if (error)
+                        return "approval." + error;
+                }
+                if (message.response_sig != null && message.hasOwnProperty("response_sig"))
+                    if (!(message.response_sig && typeof message.response_sig.length === "number" || $util.isString(message.response_sig)))
+                        return "response_sig: buffer expected";
                 return null;
             };
 
@@ -1400,16 +1040,6 @@ $root.consensus = (function() {
                 if (object instanceof $root.consensus.v1.ProofProposalResponse)
                     return object;
                 var message = new $root.consensus.v1.ProofProposalResponse();
-                if (object.member_id != null)
-                    if (typeof object.member_id === "string")
-                        $util.base64.decode(object.member_id, message.member_id = $util.newBuffer($util.base64.length(object.member_id)), 0);
-                    else if (object.member_id.length >= 0)
-                        message.member_id = object.member_id;
-                if (object.signature != null)
-                    if (typeof object.signature === "string")
-                        $util.base64.decode(object.signature, message.signature = $util.newBuffer($util.base64.length(object.signature)), 0);
-                    else if (object.signature.length >= 0)
-                        message.signature = object.signature;
                 switch (object.result) {
                 default:
                     if (typeof object.result === "number") {
@@ -1426,6 +1056,16 @@ $root.consensus = (function() {
                     message.result = 1;
                     break;
                 }
+                if (object.approval != null) {
+                    if (typeof object.approval !== "object")
+                        throw TypeError(".consensus.v1.ProofProposalResponse.approval: object expected");
+                    message.approval = $root.consensus.v1.ProofProposalApproval.fromObject(object.approval);
+                }
+                if (object.response_sig != null)
+                    if (typeof object.response_sig === "string")
+                        $util.base64.decode(object.response_sig, message.response_sig = $util.newBuffer($util.base64.length(object.response_sig)), 0);
+                    else if (object.response_sig.length >= 0)
+                        message.response_sig = object.response_sig;
                 return message;
             };
 
@@ -1443,28 +1083,22 @@ $root.consensus = (function() {
                     options = {};
                 var object = {};
                 if (options.defaults) {
-                    if (options.bytes === String)
-                        object.member_id = "";
-                    else {
-                        object.member_id = [];
-                        if (options.bytes !== Array)
-                            object.member_id = $util.newBuffer(object.member_id);
-                    }
-                    if (options.bytes === String)
-                        object.signature = "";
-                    else {
-                        object.signature = [];
-                        if (options.bytes !== Array)
-                            object.signature = $util.newBuffer(object.signature);
-                    }
                     object.result = options.enums === String ? "RESULT_CODE_UNSPECIFIED" : 0;
+                    object.approval = null;
+                    if (options.bytes === String)
+                        object.response_sig = "";
+                    else {
+                        object.response_sig = [];
+                        if (options.bytes !== Array)
+                            object.response_sig = $util.newBuffer(object.response_sig);
+                    }
                 }
-                if (message.member_id != null && message.hasOwnProperty("member_id"))
-                    object.member_id = options.bytes === String ? $util.base64.encode(message.member_id, 0, message.member_id.length) : options.bytes === Array ? Array.prototype.slice.call(message.member_id) : message.member_id;
-                if (message.signature != null && message.hasOwnProperty("signature"))
-                    object.signature = options.bytes === String ? $util.base64.encode(message.signature, 0, message.signature.length) : options.bytes === Array ? Array.prototype.slice.call(message.signature) : message.signature;
                 if (message.result != null && message.hasOwnProperty("result"))
                     object.result = options.enums === String ? $root.consensus.v1.ResultCode[message.result] === undefined ? message.result : $root.consensus.v1.ResultCode[message.result] : message.result;
+                if (message.approval != null && message.hasOwnProperty("approval"))
+                    object.approval = $root.consensus.v1.ProofProposalApproval.toObject(message.approval, options);
+                if (message.response_sig != null && message.hasOwnProperty("response_sig"))
+                    object.response_sig = options.bytes === String ? $util.base64.encode(message.response_sig, 0, message.response_sig.length) : options.bytes === Array ? Array.prototype.slice.call(message.response_sig) : message.response_sig;
                 return object;
             };
 
@@ -1509,6 +1143,253 @@ $root.consensus = (function() {
             values[valuesById[0] = "RESULT_CODE_UNSPECIFIED"] = 0;
             values[valuesById[1] = "RESULT_CODE_OK"] = 1;
             return values;
+        })();
+
+        v1.ProofProposalApproval = (function() {
+
+            /**
+             * Properties of a ProofProposalApproval.
+             * @memberof consensus.v1
+             * @interface IProofProposalApproval
+             * @property {Uint8Array|null} [member_id] ProofProposalApproval member_id
+             * @property {Uint8Array|null} [approval_sig] ProofProposalApproval approval_sig
+             */
+
+            /**
+             * Constructs a new ProofProposalApproval.
+             * @memberof consensus.v1
+             * @classdesc Represents a ProofProposalApproval.
+             * @implements IProofProposalApproval
+             * @constructor
+             * @param {consensus.v1.IProofProposalApproval=} [properties] Properties to set
+             */
+            function ProofProposalApproval(properties) {
+                if (properties)
+                    for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
+                        if (properties[keys[i]] != null)
+                            this[keys[i]] = properties[keys[i]];
+            }
+
+            /**
+             * ProofProposalApproval member_id.
+             * @member {Uint8Array} member_id
+             * @memberof consensus.v1.ProofProposalApproval
+             * @instance
+             */
+            ProofProposalApproval.prototype.member_id = $util.newBuffer([]);
+
+            /**
+             * ProofProposalApproval approval_sig.
+             * @member {Uint8Array} approval_sig
+             * @memberof consensus.v1.ProofProposalApproval
+             * @instance
+             */
+            ProofProposalApproval.prototype.approval_sig = $util.newBuffer([]);
+
+            /**
+             * Creates a new ProofProposalApproval instance using the specified properties.
+             * @function create
+             * @memberof consensus.v1.ProofProposalApproval
+             * @static
+             * @param {consensus.v1.IProofProposalApproval=} [properties] Properties to set
+             * @returns {consensus.v1.ProofProposalApproval} ProofProposalApproval instance
+             */
+            ProofProposalApproval.create = function create(properties) {
+                return new ProofProposalApproval(properties);
+            };
+
+            /**
+             * Encodes the specified ProofProposalApproval message. Does not implicitly {@link consensus.v1.ProofProposalApproval.verify|verify} messages.
+             * @function encode
+             * @memberof consensus.v1.ProofProposalApproval
+             * @static
+             * @param {consensus.v1.IProofProposalApproval} message ProofProposalApproval message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            ProofProposalApproval.encode = function encode(message, writer) {
+                if (!writer)
+                    writer = $Writer.create();
+                if (message.member_id != null && Object.hasOwnProperty.call(message, "member_id"))
+                    writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.member_id);
+                if (message.approval_sig != null && Object.hasOwnProperty.call(message, "approval_sig"))
+                    writer.uint32(/* id 2, wireType 2 =*/18).bytes(message.approval_sig);
+                return writer;
+            };
+
+            /**
+             * Encodes the specified ProofProposalApproval message, length delimited. Does not implicitly {@link consensus.v1.ProofProposalApproval.verify|verify} messages.
+             * @function encodeDelimited
+             * @memberof consensus.v1.ProofProposalApproval
+             * @static
+             * @param {consensus.v1.IProofProposalApproval} message ProofProposalApproval message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            ProofProposalApproval.encodeDelimited = function encodeDelimited(message, writer) {
+                return this.encode(message, writer).ldelim();
+            };
+
+            /**
+             * Decodes a ProofProposalApproval message from the specified reader or buffer.
+             * @function decode
+             * @memberof consensus.v1.ProofProposalApproval
+             * @static
+             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @param {number} [length] Message length if known beforehand
+             * @returns {consensus.v1.ProofProposalApproval} ProofProposalApproval
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            ProofProposalApproval.decode = function decode(reader, length, error) {
+                if (!(reader instanceof $Reader))
+                    reader = $Reader.create(reader);
+                var end = length === undefined ? reader.len : reader.pos + length, message = new $root.consensus.v1.ProofProposalApproval();
+                while (reader.pos < end) {
+                    var tag = reader.uint32();
+                    if (tag === error)
+                        break;
+                    switch (tag >>> 3) {
+                    case 1: {
+                            message.member_id = reader.bytes();
+                            break;
+                        }
+                    case 2: {
+                            message.approval_sig = reader.bytes();
+                            break;
+                        }
+                    default:
+                        reader.skipType(tag & 7);
+                        break;
+                    }
+                }
+                return message;
+            };
+
+            /**
+             * Decodes a ProofProposalApproval message from the specified reader or buffer, length delimited.
+             * @function decodeDelimited
+             * @memberof consensus.v1.ProofProposalApproval
+             * @static
+             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @returns {consensus.v1.ProofProposalApproval} ProofProposalApproval
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            ProofProposalApproval.decodeDelimited = function decodeDelimited(reader) {
+                if (!(reader instanceof $Reader))
+                    reader = new $Reader(reader);
+                return this.decode(reader, reader.uint32());
+            };
+
+            /**
+             * Verifies a ProofProposalApproval message.
+             * @function verify
+             * @memberof consensus.v1.ProofProposalApproval
+             * @static
+             * @param {Object.<string,*>} message Plain object to verify
+             * @returns {string|null} `null` if valid, otherwise the reason why it is not
+             */
+            ProofProposalApproval.verify = function verify(message) {
+                if (typeof message !== "object" || message === null)
+                    return "object expected";
+                if (message.member_id != null && message.hasOwnProperty("member_id"))
+                    if (!(message.member_id && typeof message.member_id.length === "number" || $util.isString(message.member_id)))
+                        return "member_id: buffer expected";
+                if (message.approval_sig != null && message.hasOwnProperty("approval_sig"))
+                    if (!(message.approval_sig && typeof message.approval_sig.length === "number" || $util.isString(message.approval_sig)))
+                        return "approval_sig: buffer expected";
+                return null;
+            };
+
+            /**
+             * Creates a ProofProposalApproval message from a plain object. Also converts values to their respective internal types.
+             * @function fromObject
+             * @memberof consensus.v1.ProofProposalApproval
+             * @static
+             * @param {Object.<string,*>} object Plain object
+             * @returns {consensus.v1.ProofProposalApproval} ProofProposalApproval
+             */
+            ProofProposalApproval.fromObject = function fromObject(object) {
+                if (object instanceof $root.consensus.v1.ProofProposalApproval)
+                    return object;
+                var message = new $root.consensus.v1.ProofProposalApproval();
+                if (object.member_id != null)
+                    if (typeof object.member_id === "string")
+                        $util.base64.decode(object.member_id, message.member_id = $util.newBuffer($util.base64.length(object.member_id)), 0);
+                    else if (object.member_id.length >= 0)
+                        message.member_id = object.member_id;
+                if (object.approval_sig != null)
+                    if (typeof object.approval_sig === "string")
+                        $util.base64.decode(object.approval_sig, message.approval_sig = $util.newBuffer($util.base64.length(object.approval_sig)), 0);
+                    else if (object.approval_sig.length >= 0)
+                        message.approval_sig = object.approval_sig;
+                return message;
+            };
+
+            /**
+             * Creates a plain object from a ProofProposalApproval message. Also converts values to other types if specified.
+             * @function toObject
+             * @memberof consensus.v1.ProofProposalApproval
+             * @static
+             * @param {consensus.v1.ProofProposalApproval} message ProofProposalApproval
+             * @param {$protobuf.IConversionOptions} [options] Conversion options
+             * @returns {Object.<string,*>} Plain object
+             */
+            ProofProposalApproval.toObject = function toObject(message, options) {
+                if (!options)
+                    options = {};
+                var object = {};
+                if (options.defaults) {
+                    if (options.bytes === String)
+                        object.member_id = "";
+                    else {
+                        object.member_id = [];
+                        if (options.bytes !== Array)
+                            object.member_id = $util.newBuffer(object.member_id);
+                    }
+                    if (options.bytes === String)
+                        object.approval_sig = "";
+                    else {
+                        object.approval_sig = [];
+                        if (options.bytes !== Array)
+                            object.approval_sig = $util.newBuffer(object.approval_sig);
+                    }
+                }
+                if (message.member_id != null && message.hasOwnProperty("member_id"))
+                    object.member_id = options.bytes === String ? $util.base64.encode(message.member_id, 0, message.member_id.length) : options.bytes === Array ? Array.prototype.slice.call(message.member_id) : message.member_id;
+                if (message.approval_sig != null && message.hasOwnProperty("approval_sig"))
+                    object.approval_sig = options.bytes === String ? $util.base64.encode(message.approval_sig, 0, message.approval_sig.length) : options.bytes === Array ? Array.prototype.slice.call(message.approval_sig) : message.approval_sig;
+                return object;
+            };
+
+            /**
+             * Converts this ProofProposalApproval to JSON.
+             * @function toJSON
+             * @memberof consensus.v1.ProofProposalApproval
+             * @instance
+             * @returns {Object.<string,*>} JSON object
+             */
+            ProofProposalApproval.prototype.toJSON = function toJSON() {
+                return this.constructor.toObject(this, $protobuf.util.toJSONOptions);
+            };
+
+            /**
+             * Gets the default type url for ProofProposalApproval
+             * @function getTypeUrl
+             * @memberof consensus.v1.ProofProposalApproval
+             * @static
+             * @param {string} [typeUrlPrefix] your custom typeUrlPrefix(default "type.googleapis.com")
+             * @returns {string} The default type url
+             */
+            ProofProposalApproval.getTypeUrl = function getTypeUrl(typeUrlPrefix) {
+                if (typeUrlPrefix === undefined) {
+                    typeUrlPrefix = "type.googleapis.com";
+                }
+                return typeUrlPrefix + "/consensus.v1.ProofProposalApproval";
+            };
+
+            return ProofProposalApproval;
         })();
 
         return v1;

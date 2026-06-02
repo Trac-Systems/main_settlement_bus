@@ -175,7 +175,7 @@ function compareRows(documentedRows, expectedRows) {
 export async function checkV1ResultCodePolicies() {
     const protobufMismatchErrors = compareConstantsWithGeneratedProto();
     if (protobufMismatchErrors.length > 0) {
-        console.error('ResultCode constants are out of sync with the generated protobuf enum:');
+        console.error('ResultCode constants are out of sync with the generated codecs enum:');
         for (const error of protobufMismatchErrors) {
             console.error(`- ${error}`);
         }

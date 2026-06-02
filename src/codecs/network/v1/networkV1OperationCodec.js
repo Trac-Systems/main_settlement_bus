@@ -3,6 +3,8 @@ import networkV1Generated from './networkV1.generated.cjs';
 
 const networkV1Operations = networkV1Generated.network.v1;
 
+// Options for converting protobuf messages to plain objects, ensuring that bytes are returned as Buffers and enums as numbers.
+
 const NETWORK_TO_OBJECT_OPTIONS = Object.freeze({
     enums: Number,
     longs: Number,

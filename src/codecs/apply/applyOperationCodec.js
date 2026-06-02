@@ -3,6 +3,7 @@ import applyOperationsGenerated from './applyOperations.generated.cjs';
 
 const { Operation } = applyOperationsGenerated.apply.operations;
 
+// Options for converting protobuf messages to plain objects, ensuring that bytes are returned as Buffers and enums as numbers.
 const APPLY_TO_OBJECT_OPTIONS = Object.freeze({
     enums: Number,
     longs: Number,

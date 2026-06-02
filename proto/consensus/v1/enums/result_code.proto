@@ -8,7 +8,11 @@ package consensus.v1;
 // Use [deprecated = true] while phasing out a value that still remains in the schema.
 // If a value is removed, reserve its number (and preferably its name).
 
+
+// TODO we may need more result code for the future, but for now we only have two: OK and UNSPECIFIED please during
+// the implementation add more result code if needed.
 enum ResultCode {
   RESULT_CODE_UNSPECIFIED = 0;
   RESULT_CODE_OK = 1;
+
 }
