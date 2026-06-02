@@ -9,8 +9,8 @@ package consensus.v1;
 // If a value is removed, reserve its number (and preferably its name).
 
 
-// TODO we may need more result code for the future, but for now we only have two: OK and UNSPECIFIED please during
-// the implementation add more result code if needed.
+// Keep the consensus result codes minimal for now.
+// Add explicit result codes when a consensus flow needs to distinguish failure reasons.
 enum ResultCode {
   RESULT_CODE_UNSPECIFIED = 0;
   RESULT_CODE_OK = 1;
