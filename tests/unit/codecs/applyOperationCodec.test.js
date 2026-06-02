@@ -10,7 +10,6 @@ import {
 import fixtures from '../../fixtures/applyOperation.fixtures.js';
 
 const { Operation } = applyOperationsGenerated.apply.operations;
-// TODO: ADD PAYLOAD FOR SET_EPOCH AND ADD TESTS FOR IT
 
 const APPLY_TO_OBJECT_OPTIONS = Object.freeze({
     enums: Number,
@@ -41,9 +40,10 @@ const applyPayloads = new Map([
     ['transferPartial', fixtures.validPartialTransferOperation],
     ['balanceInitialization', fixtures.validBalanceInitOperation],
     ['disableInitialization', fixtures.validDisableInitialization],
+    ['setEpoch', fixtures.validSetEpochOperation],
 ]);
 
-const APPLY_PAYLOAD_KEYS = Object.freeze(['txo', 'tro', 'aco', 'cao', 'rao', 'bdo', 'bio']);
+const APPLY_PAYLOAD_KEYS = Object.freeze(['txo', 'tro', 'aco', 'cao', 'rao', 'bdo', 'bio', 'seo']);
 
 const formatInvalidPayload = payload => {
     if (typeof payload === 'bigint') return `${payload}n`;
@@ -114,7 +114,7 @@ test('Apply generated codec encodes and decodes operation payloads', t => {
         const encoded = encodeApplyOperation(payload);
         const decoded = decodeApplyOperation(encoded);
 
-        t.ok(JSON.stringify(payload) === JSON.stringify(decoded), `Payload ${key} encodes and decodes correctly`);
+        t.alike(decoded, payload, `Payload ${key} encodes and decodes correctly`);
     }
 });
 
@@ -152,7 +152,7 @@ test('Apply generated codec encode/decode is order-independent for all operation
         const encoded = encodeApplyOperation(shuffledPayload);
         const decoded = decodeApplyOperation(encoded);
 
-        t.ok(JSON.stringify(decoded) === JSON.stringify(payload), `Payload ${key} encodes and decodes correctly with shuffled fields`);
+        t.alike(decoded, payload, `Payload ${key} encodes and decodes correctly with shuffled fields`);
     }
 });
 
@@ -170,7 +170,7 @@ test('safeEncodeApplyOperation and safeDecodeApplyOperation roundtrip operation 
         const decoded = safeDecodeApplyOperation(encoded);
 
         t.ok(b4a.isBuffer(encoded) && encoded.length > 0, `${key} encodes to a non-empty buffer`);
-        t.ok(JSON.stringify(payload) === JSON.stringify(decoded), `${key} decodes back correctly`);
+        t.alike(decoded, payload, `${key} decodes back correctly`);
     }
 });
 
@@ -208,10 +208,10 @@ test('normalizeIncomingMessage decodes buffers and JSON buffers', t => {
     const encoded = encodeApplyOperation(payload);
 
     const decodedFromBuffer = normalizeIncomingMessage(encoded);
-    t.ok(JSON.stringify(decodedFromBuffer) === JSON.stringify(payload));
+    t.alike(decodedFromBuffer, payload);
 
     const decodedFromJsonBuffer = normalizeIncomingMessage({ type: 'Buffer', data: Array.from(encoded) });
-    t.ok(JSON.stringify(decodedFromJsonBuffer) === JSON.stringify(payload));
+    t.alike(decodedFromJsonBuffer, payload);
 
     t.is(normalizeIncomingMessage(null), null);
     t.is(normalizeIncomingMessage({ type: 'nope', data: [] }), null);

@@ -280,8 +280,17 @@ const validCompleteBootstrapDeployment = {
     }
 };
 
-// TODO: ADD PAYLOAD FOR SET_EPOCH AND ADD TESTS FOR IT
-
+const validSetEpochOperation = {
+    type: OperationType.SET_EPOCH,
+    address: addressToBuffer(asAddress('3801ebd1f12462ad335b821807c9d87e4f20d57505222284b2634a7e8e5edac2'), config.addressPrefix),
+    seo: {
+        pd: b4a.alloc(96, 0x14),
+        app: [
+            b4a.alloc(64, 0x15),
+            b4a.alloc(64, 0x16)
+        ]
+    }
+};
 
 const invalidPayloads = [
     null,
@@ -385,6 +394,7 @@ export default {
     validPartialRemoveWriter,
     validPartialBootstrapDeployment,
     validCompleteBootstrapDeployment,
+    validSetEpochOperation,
     invalidPayloads,
     invalidPayloadWithMultipleOneOfKeys
 };

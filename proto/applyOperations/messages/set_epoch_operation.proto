@@ -3,7 +3,6 @@ syntax = "proto3";
 package apply.operations;
 
 message SetEpochOperation {
-    uint64         pd  = 1; // proof data
-    bytes          rs  = 2; // Requester sig
-    repeated bytes app = 3; // Array of approvals
+    bytes          pd  = 1; // proof data that actually containts  challange + proof + sig of the proposer
+    repeated bytes app = 2; // Array of approvals that signed proof data
 }
