@@ -280,6 +280,8 @@ const validCompleteBootstrapDeployment = {
     }
 };
 
+// TODO: ADD PAYLOAD FOR SET_EPOCH AND ADD TESTS FOR IT
+
 
 const invalidPayloads = [
     null,
