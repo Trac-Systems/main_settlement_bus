@@ -78,10 +78,9 @@ export const decodeProofProposalApproval = (payload) => {
  */
 export const safeEncodeProofProposalApproval = (payload) => {
     try {
-        const result = encodeProofProposalApproval(payload);
-        if (b4a.isBuffer(result)) return result;
-    } catch {
-        return b4a.alloc(0);
+        return encodeProofProposalApproval(payload);
+    } catch (error) {
+        console.log("safeEncodeProofProposalApproval error:", error.message);
     }
 
     return b4a.alloc(0);
@@ -98,7 +97,8 @@ export const safeDecodeProofProposalApproval = (payload) => {
     try {
         if (!b4a.isBuffer(payload)) return null;
         return decodeProofProposalApproval(payload);
-    } catch {
-        return null;
+    } catch (error) {
+        console.log("safeDecodeProofProposalApproval error:", error.message);
     }
+    return null;
 }

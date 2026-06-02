@@ -1,5 +1,6 @@
 import test from 'brittle';
 import b4a from 'b4a';
+import sinon from 'sinon';
 
 import {
     decodeConsensusMessage,
@@ -43,6 +44,9 @@ test('Consensus codec safely encodes and decodes ProofProposalApproval', t => {
 });
 
 test('Consensus codec safe ProofProposalApproval helpers handle invalid payloads', t => {
+    const consoleLog = sinon.stub(console, 'log');
+    t.teardown(() => consoleLog.restore());
+
     const invalidEncoded = safeEncodeProofProposalApproval({
         member_id: 67,
         approval_sig: fixtures.proofProposalApproval.approval_sig
@@ -50,8 +54,12 @@ test('Consensus codec safe ProofProposalApproval helpers handle invalid payloads
 
     t.ok(b4a.isBuffer(invalidEncoded));
     t.is(invalidEncoded.length, 0);
+    t.ok(consoleLog.calledOnceWithExactly('safeEncodeProofProposalApproval error:', 'member_id: buffer expected'));
     t.is(safeDecodeProofProposalApproval(null), null);
     t.is(safeDecodeProofProposalApproval({}), null);
     t.is(safeDecodeProofProposalApproval('not-a-buffer'), null);
     t.is(safeDecodeProofProposalApproval(b4a.from([0x0F])), null);
+    t.is(consoleLog.callCount, 2);
+    t.is(consoleLog.secondCall.args[0], 'safeDecodeProofProposalApproval error:');
+    t.ok(typeof consoleLog.secondCall.args[1] === 'string' && consoleLog.secondCall.args[1].length > 0);
 });
