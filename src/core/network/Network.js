@@ -182,6 +182,17 @@ class Network extends ReadyResource {
                 this.#epochProofProposalService.stop();
             }
         });
+
+        this.#state.on(CustomEventType.EPOCH_PROPOSAL_SUBMITTED, async () => {
+            const serviceStopped = await this.#epochProofProposalService.stop(false);
+            if (!serviceStopped) return;
+        });
+
+        this.#state.on(CustomEventType.EPOCH_CREATED, () => {
+            setTimeout(() => {
+                this.#epochProofProposalService.start();
+            }, this.#config.epochInterval);
+        });
     }
 
     cleanupNetworkListeners() {
@@ -189,6 +200,8 @@ class Network extends ReadyResource {
         this.removeAllListeners(EventType.VALIDATOR_CONNECTION_READY);
         this.#state.removeAllListeners(CustomEventType.IS_INDEXER);
         this.#state.removeAllListeners(CustomEventType.IS_NON_INDEXER);
+        this.#state.removeAllListeners(CustomEventType.EPOCH_PROPOSAL_SUBMITTED);
+        this.#state.removeAllListeners(CustomEventType.EPOCH_CREATED);
     }
 
     cleanupPendingConnections() {

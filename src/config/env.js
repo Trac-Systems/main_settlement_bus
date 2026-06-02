@@ -56,7 +56,7 @@ const configData = {
         txCommitTimeout: 2200,
         txPoolSize: 1000, // size of transaction pool
         validatorHealthCheckInterval: 5 * 60 * 1000, // How often to check validator health (ms)
-        epochInterval: 3 * 60 * 1000, // How often to trigger epoch proof proposal (ms)
+        epochInterval: 1000, // How often to trigger epoch proof proposal (ms)
         epochThreshold: 2, // Minimum number of validator confirmations required to append a new epoch
         storesDirectory: 'stores/',
         storeName: 'testnet',
@@ -122,7 +122,7 @@ const configData = {
         addressPrefix: TRAC_NETWORK_MSB_MAINNET_PREFIX,
         addressPrefixLength: TRAC_NETWORK_MSB_MAINNET_PREFIX.length,
         bech32mHrpLength: TRAC_NETWORK_MSB_MAINNET_PREFIX.length + 1, // len(addressPrefix + separator)
-        bootstrap: '12f7f1668eac2e691e17cbc6a53e509c5cee78cdcac562313091c64e5fd077d6',
+        bootstrap: '56c8b189ea7593f76695dfe9eaccfd3716170245aefc628e61caf2f57b307e2b',
         channel: '12312313123123',
         dhtBootstrap: ['116.202.214.149:10001','157.180.12.214:10001','node1.hyperdht.org:49737','node2.hyperdht.org:49737','node3.hyperdht.org:49737'],
         derivationPath: address.MAINNET_DERIVATION_PATH,

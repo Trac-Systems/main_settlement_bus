@@ -2,10 +2,13 @@ import V1EpochProofProposalRequest from "../validators/V1EpochProofProposalReque
 import V1EpochProofProposalResponse from "../validators/V1EpochProofProposalResponse.js";
 import {networkMessageFactory} from "../../../../messages/network/v1/networkMessageFactory.js";
 import { V1ProtocolError } from "../../../network/protocols/v1/V1ProtocolError.js";
-import { ResultCode } from "../../../../utils/constants.js";
+import { CustomEventType, ResultCode } from "../../../../utils/constants.js";
 import b4a from "b4a";
 import tracCryptoApi from "trac-crypto-api";
 import { epochProofFromBuffer } from "./epochProposal/epochProofData.js";
+
+// TODO: this class calls applyRateLimit, displayError, sendResponseAndMaybeClose, resolvePendingResponse,
+// and handlePendingResponseError but does not define them and extends nothing. It should extend a base handler class.
 
 // Minion interface to verify & sign proposals
 class ConsensusEpochProofProposalOperationHandler {
@@ -13,10 +16,12 @@ class ConsensusEpochProofProposalOperationHandler {
     #v1EpochProofProposalResponseValidator;
     #state
     #wallet
+    #config
 
     constructor(state, wallet, config) {
         this.#state = state;
         this.#wallet = wallet;
+        this.#config = config;
         this.#v1EpochProofProposalRequestValidator = new V1EpochProofProposalRequest(config);
         this.#v1EpochProofProposalResponseValidator = new V1EpochProofProposalResponse(config);
     }
@@ -30,8 +35,8 @@ class ConsensusEpochProofProposalOperationHandler {
             const lastEpochProof = await this.#state.currentEpoch()
             const epochProof = epochProofFromBuffer(message.epoch_proof_proposal_request.data)
             
-            this.#validatePreviousEpoch(epochProof, lastEpochProof)
-            this.#validateVdf(epochProof)
+            await this.#validatePreviousEpoch(epochProof, lastEpochProof)
+            await this.#validateVdf(epochProof)
         } catch (error) {
             this.displayError(
                 "failed to process epoch proof proposal request from sender",
@@ -44,11 +49,15 @@ class ConsensusEpochProofProposalOperationHandler {
             const proposalHash = message.epoch_proof_proposal_request.hash
             const signature = this.#wallet.sign(proposalHash)
             const response = await this.#buildEpochResponse(message.id, connection.capabilities, signature)
-            return await this.sendResponseAndMaybeClose(
+            
+            const result = await this.sendResponseAndMaybeClose(
                 connection,
                 response,
                 false
             );
+
+            this.#state.emit(CustomEventType.EPOCH_PROPOSAL_SUBMITTED)
+            return result;
         } catch (error) {
             // some error handler there
             this.displayError(
@@ -93,9 +102,10 @@ class ConsensusEpochProofProposalOperationHandler {
     }
 
     async #validateDataHash(message) {
-        const proposalHash = message.epoch_proof_proposal_request.hash
-        const proofData = message.epoch_proof_proposal_request.data
-        if (!b4a.equals(await tracCryptoApi.hash.blake3(proofData, proposalHash))) {
+        const proposalHash = message.hash
+        const proofData = message.data
+        const computeHash = await tracCryptoApi.hash.blake3(proofData);
+        if (!b4a.equals(computeHash, proposalHash)) {
             throw new V1ProtocolError(ResultCode.INVALID_PAYLOAD, 'There is a hash mismatch for the proof');
         }
     }
@@ -116,24 +126,6 @@ class ConsensusEpochProofProposalOperationHandler {
         if (proofData.networkId !== previousEpoch.networkId) {
             throw new V1ProtocolError(ResultCode.INVALID_EPOCH, 'There is a mismatch between the proof and the last computed epoch');
         }
-        
-        // TODO: check if more validations are required
-        
-        // if (proofData.commiteeHash !== previousEpoch.commiteeHash) {
-        //     throw new V1ProtocolError(ResultCode.INVALID_EPOCH, 'There is a mismatch between the proof and the last computed epoch');
-        // }
-        
-        // if (proofData.leaderId !== previousEpoch.leaderId) {
-        //     throw new V1ProtocolError(ResultCode.INVALID_EPOCH, 'There is a mismatch between the proof and the last computed epoch');
-        // }
-        
-        // if (proofData.vdfParamsHash !== previousEpoch.vdfParamsHash) {
-        //     throw new V1ProtocolError(ResultCode.INVALID_EPOCH, 'There is a mismatch between the proof and the last computed epoch');
-        // }
-        
-        // if (proofData.vdfOutput !== previousEpoch.vdfOutput) {
-        //     throw new V1ProtocolError(ResultCode.INVALID_EPOCH, 'There is a mismatch between the proof and the last computed epoch');
-        // }
     }
 
     async #validateVdf(proofData) {
@@ -144,7 +136,7 @@ class ConsensusEpochProofProposalOperationHandler {
 
     async #buildEpochResponse(id, capabilities, signature) {
         try {
-            return await networkMessageFactory(this.#wallet, this.config).buildEpochProofProposalResponse(
+            return await networkMessageFactory(this.#wallet, this.#config).buildEpochProofProposalResponse(
                 id,
                 capabilities,
                 ResultCode.OK,

@@ -6,6 +6,7 @@ import { Logger } from "../../../utils/logger.js";
 import { safeEncodeApplyOperation } from '../../../codecs/apply/applyOperationCodec.js';
 import { addressToBuffer } from "../../state/utils/address.js";
 import { createMessage } from "../../../utils/buffer.js";
+import tracCryptoApi from "trac-crypto-api";
 import { blake3 } from "trac-crypto-api/modules/hash.js";
 import { generateUUID } from '../../../utils/helpers.js';
 import { networkMessageFactory } from '../../../messages/network/v1/networkMessageFactory.js';
@@ -14,6 +15,10 @@ import { createVDFService } from "./createVDFService.js";
 import addressUtils from '../../state/utils/address.js';
 
 const PROTOCOL_VERSION = 1;
+const withTimeout = (promise, ms) => Promise.race([
+    promise,
+    new Promise(resolve => setTimeout(() => resolve(null), ms))
+]);
 
 class EpochProofProposalService extends ReadyResource {
     #state;
@@ -102,6 +107,14 @@ class EpochProofProposalService extends ReadyResource {
         };
     }
 
+    async verifySignature(signature, hash, publicKey) {
+        try {
+            return tracCryptoApi.signature.verify(signature, hash, publicKey);
+        } catch {
+            return false;
+        }
+    }
+
     async sendToIndexer(member, proofProposal) {
         const connection = this.#connectionManager.getConnection(member.key);
         if (!connection) return null;
@@ -113,12 +126,29 @@ class EpochProofProposalService extends ReadyResource {
         return response?.result?.signature ?? null;
     }
 
+    async #collectSignature(member, proofProposal) {
+        const key = b4a.toString(member.key, "hex");
+        const addressBuffer = await this.#state.getRegisteredWriterKey(key);
+        if (!addressBuffer) return null;
+
+        const address = addressUtils.bufferToAddress(addressBuffer, this.#config.addressPrefix);
+        if (!address) return null;
+
+        if (address === this.#wallet.address) return null;
+        const memberSignature = await this.sendToIndexer(member, proofProposal);
+        if (!memberSignature) return null;
+
+        const isValidSignature = await this.verifySignature(memberSignature, proofProposal.dataHash, member.key);
+        if (!isValidSignature) return null;
+
+        return { signature: memberSignature, publicKey: member.key };
+    }
+
     async #worker(next) {
         if (!this.#isInterrupted) {
             const threshold = this.#config.epochThreshold;
             const currentEpochId = await this.#state.currentEpoch();
             const currentEpochHash = await this.#state.getEpochHash(currentEpochId);
-            let signatures = []; // list of members signatures
 
             const vdf = await this.calculateVDF(
                 currentEpochHash,
@@ -142,29 +172,23 @@ class EpochProofProposalService extends ReadyResource {
                 signature: signature,
             };
 
-            for (const member of members) {
-                const key = b4a.toString(member.key, "hex");
-                const addressBuffer = await this.#state.getRegisteredWriterKey(key);
-                if (!addressBuffer) continue;
+            const tasks = members.map(member =>
+                withTimeout(this.#collectSignature(member, proofProposal), this.#config.epochSignatureTimeout)
+            );
 
-                const address = addressUtils.bufferToAddress(addressBuffer, this.#config.addressPrefix);
-                if (!address) continue;
+            const results = await Promise.allSettled(tasks);
+            const signatures = results
+                .filter(r => r.status === 'fulfilled' && r.value !== null)
+                .map(r => r.value)
+                .slice(0, threshold);
 
-                if (address === this.#wallet.address) continue;
-                const memberSignature = await this.sendToIndexer(member, proofProposal);
-                if (!memberSignature) continue;
+            if (signatures.length >= threshold) {
+                const epoch = {
+                    ...proofProposal,
+                    signatures: signatures,
+                };
 
-                signatures.push(memberSignature);
-
-                if (signatures.length >= threshold) {
-                    const epoch = {
-                        ...proofProposal,
-                        signatures: signatures,
-                    };
-
-                    await this.#appendEpoch(epoch);
-                    break;
-                }
+                await this.#appendEpoch(epoch);
             }
         }
 

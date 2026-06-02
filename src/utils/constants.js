@@ -146,7 +146,9 @@ export const EventType = Object.freeze({
 export const CustomEventType = Object.freeze({
     IS_INDEXER: 'msb:is-indexer',
     UNWRITABLE: 'msb:unwritable',
-    IS_NON_INDEXER: 'msb:is-non-indexer'
+    IS_NON_INDEXER: 'msb:is-non-indexer',
+    EPOCH_PROPOSAL_SUBMITTED: 'msb:epoch_proposal_submitted',
+    EPOCH_CREATED: 'msb:epoch_created'
 });
 
 // Token

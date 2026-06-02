@@ -3289,15 +3289,38 @@ class State extends ReadyResource {
         return Status.SUCCESS;
     }
 
+    // TODO: this is a draft implementation:
+    // - verify op.seo.pe structure matches the final epoch proof schema
+    // - confirm op.seo.pe.dataHash is the correct field being signed by members
+    // - confirm keys.EPOCH and keys.CURRENT_INDEX are the right storage keys
+    // - validate that the leader's own signature (op.seo.pe.signature) is also verified
     async #handleApplySetEpochOperation(op, view, base, node, batch) {
         if (!this.check.validateSetEpochOperation(op)) {
             this.#safeLogApply(OperationType.SET_EPOCH, "Contract schema validation failed.", node.from.key)
             return Status.FAILURE;
         };
-        console.log(batch)
+        
+        const signatures = op.seo.ss;
+        if (signatures.length < this.#config.epochThreshold) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "Insufficient signatures.", node.from.key);
+            return Status.FAILURE;
+        } 
 
-        // TODO: Actually program the apply function
+        for (let i = 0; i < signatures.length; i++) {
+            const valid = tracCryptoApi.signature.verify(op.seo.ss[i], op.seo.pe.dataHash, op.seo.pks[i]);
+            if (!valid) {
+                this.#safeLogApply(OperationType.SET_EPOCH, "Invalid signature.", node.from.key);
+                return Status.FAILURE;
+            }
+        }
 
+        const epochId = op.seo.pe.data.epoch;
+        const epochHash = op.seo.pe.dataHash;
+
+        await batch.put(keys.EPOCH(epochId), epochHash);
+        await batch.put(keys.CURRENT_INDEX, epochId);
+
+        this.emit(CustomEventType.EPOCH_CREATED);
         return Status.SUCCESS;
     }
 
