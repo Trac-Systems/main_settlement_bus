@@ -134,6 +134,7 @@ class EpochProofProposalService extends ReadyResource {
         const address = addressUtils.bufferToAddress(addressBuffer, this.#config.addressPrefix);
         if (!address) return null;
 
+        // I'm the leader now and I want to exclude myself from the list
         if (address === this.#wallet.address) return null;
         const memberSignature = await this.sendToIndexer(member, proofProposal);
         if (!memberSignature) return null;
@@ -143,6 +144,8 @@ class EpochProofProposalService extends ReadyResource {
 
         return { signature: memberSignature, publicKey: member.key };
     }
+
+    // try to use the NETOWRK event LISTENERS here.
 
     async #worker(next) {
         if (!this.#isInterrupted) {

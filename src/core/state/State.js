@@ -3298,20 +3298,26 @@ class State extends ReadyResource {
         if (!this.check.validateSetEpochOperation(op)) {
             this.#safeLogApply(OperationType.SET_EPOCH, "Contract schema validation failed.", node.from.key)
             return Status.FAILURE;
-        };
+        }; // it's ok
         
-        const signatures = op.seo.ss;
+        const signatures = op.seo.ss; // it's fine but will change to a binary serialized
         if (signatures.length < this.#config.epochThreshold) {
             this.#safeLogApply(OperationType.SET_EPOCH, "Insufficient signatures.", node.from.key);
             return Status.FAILURE;
-        } 
+        } // it's ok
 
         for (let i = 0; i < signatures.length; i++) {
-            const valid = tracCryptoApi.signature.verify(op.seo.ss[i], op.seo.pe.dataHash, op.seo.pks[i]);
+            // verify if hash matches the data struct required (barto structure monster)
+            const valid = tracCryptoApi.signature.verify(op.seo.ss[i], op.seo.pe.dataHash, op.seo.pks[i]); // check the params with correct structure
             if (!valid) {
                 this.#safeLogApply(OperationType.SET_EPOCH, "Invalid signature.", node.from.key);
                 return Status.FAILURE;
             }
+
+            // check previous epoch
+            // check the hash of previous epoch is the hash of the last consolidated epoch
+            // id of the epoch is previous epoch id + 1?
+            // does vdf makes sense? 
         }
 
         const epochId = op.seo.pe.data.epoch;
