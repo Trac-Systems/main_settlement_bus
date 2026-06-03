@@ -9,13 +9,13 @@ import Check from '../../../../src/utils/check.js';
 import {
     unsafeEncodeApplyOperation,
     unsafeDecodeApplyOperation,
-} from '../../../../src/utils/protobuf/operationHelpers.js';
+} from '../../../../src/codecs/apply/applyOperationCodec.js';
 import {addressToBuffer} from '../../../../src/core/state/utils/address.js';
 import {publicKeyToAddress} from '../../../../src/utils/helpers.js';
 import {OperationType, ResultCode} from '../../../../src/utils/constants.js';
 import { config } from '../../../helpers/config.js';
 import { createState } from '../utils/createState.js';
-import protobufFixtures from '../../../fixtures/protobuf.fixtures.js';
+import protobufFixtures from '../../../fixtures/applyOperation.fixtures.js';
 import { testKeyPair1 } from '../../../fixtures/apply.fixtures.js';
 
 const remotePublicKey = b4a.from(testKeyPair1.publicKey, 'hex');

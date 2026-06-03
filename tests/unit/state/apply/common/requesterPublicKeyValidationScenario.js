@@ -1,6 +1,6 @@
 import b4a from 'b4a';
 import RequesterAddressValidationScenario from './requesterAddressValidationScenario.js';
-import { safeDecodeApplyOperation, safeEncodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
+import { safeDecodeApplyOperation, safeEncodeApplyOperation } from '../../../../../src/codecs/apply/applyOperationCodec.js';
 
 function mutateRequesterPublicKey(t, validPayload) {
     const decodedPayload = safeDecodeApplyOperation(validPayload);

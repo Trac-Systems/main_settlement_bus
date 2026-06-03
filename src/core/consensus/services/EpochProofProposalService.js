@@ -4,7 +4,7 @@ import Scheduler from '../../../utils/Scheduler.js';
 import { OperationType } from '../../../utils/constants.js';
 import { Logger } from '../../../utils/logger.js';
 
-import { safeEncodeApplyOperation } from '../../../utils/protobuf/operationHelpers.js';
+import { safeEncodeApplyOperation } from '../../../codecs/apply/applyOperationCodec.js';
 import { addressToBuffer } from '../../state/utils/address.js';
 
 class EpochProofProposalService extends ReadyResource {

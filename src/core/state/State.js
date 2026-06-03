@@ -18,7 +18,7 @@ import {
 import { isHexString, sleep, isTransactionRecordPut } from '../../utils/helpers.js';
 import tracCryptoApi from 'trac-crypto-api';
 import Check from '../../utils/check.js';
-import { safeDecodeApplyOperation } from '../../utils/protobuf/operationHelpers.js';
+import { safeDecodeApplyOperation } from '../../codecs/apply/applyOperationCodec.js';
 import { createMessage, ZERO_WK, NULL_BUFFER } from '../../utils/buffer.js';
 import addressUtils from './utils/address.js';
 import adminEntryUtils from './utils/adminEntry.js';

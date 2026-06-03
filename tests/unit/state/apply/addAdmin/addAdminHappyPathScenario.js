@@ -4,7 +4,7 @@ import {
     deriveIndexerSequenceState
 } from '../../../../helpers/autobaseTestHelpers.js';
 import { applyStateMessageFactory } from '../../../../../src/messages/state/applyStateMessageFactory.js';
-import { safeEncodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
+import { safeEncodeApplyOperation } from '../../../../../src/codecs/apply/applyOperationCodec.js';
 import { setupAddAdminScenario, assertAdminState } from './addAdminScenarioHelpers.js';
 import { config } from '../../../../helpers/config.js';
 

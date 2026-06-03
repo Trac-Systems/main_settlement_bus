@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package consensus.v1;
+
+import "consensus/v1/enums/message_type.proto";
+import "consensus/v1/messages/proof_proposal.proto";
+import "consensus/v1/messages/proof_proposal_response.proto";
+
+message ConsensusMessageHeader {
+  MessageType type = 1;
+  string session_id = 2; // uuid
+  uint64 timestamp = 3; // local timestamp
+  oneof field {
+    ProofProposal                         proof_proposal = 4;
+    ProofProposalResponse                 proof_proposal_response = 5;
+  }
+}

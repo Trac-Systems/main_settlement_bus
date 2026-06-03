@@ -1,7 +1,7 @@
 import b4a from 'b4a';
 import { test } from 'brittle';
 import { applyStateMessageFactory } from '../../../../../src/messages/state/applyStateMessageFactory.js';
-import { safeEncodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
+import { safeEncodeApplyOperation } from '../../../../../src/codecs/apply/applyOperationCodec.js';
 import { deriveIndexerSequenceState, eventFlush } from '../../../../helpers/autobaseTestHelpers.js';
 import {
     setupTransferScenario,

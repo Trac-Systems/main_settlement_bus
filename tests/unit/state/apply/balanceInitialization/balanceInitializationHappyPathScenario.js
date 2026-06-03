@@ -4,7 +4,7 @@ import { eventFlush } from '../../../../helpers/autobaseTestHelpers.js';
 import nodeEntryUtils from '../../../../../src/core/state/utils/nodeEntry.js';
 import { toTerm } from '../../../../../src/core/state/utils/balance.js';
 import { ZERO_WK } from '../../../../../src/utils/buffer.js';
-import { safeDecodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
+import { safeDecodeApplyOperation } from '../../../../../src/codecs/apply/applyOperationCodec.js';
 import setupBalanceInitializationScenario, {
     buildBalanceInitializationPayload
 } from './balanceInitializationScenarioHelpers.js';

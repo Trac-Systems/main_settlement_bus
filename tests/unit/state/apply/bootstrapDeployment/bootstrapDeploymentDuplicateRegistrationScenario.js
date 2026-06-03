@@ -8,7 +8,7 @@ import {
 import { initializeBalances, whitelistAddress } from '../common/commonScenarioHelper.js';
 import nodeEntryUtils from '../../../../../src/core/state/utils/nodeEntry.js';
 import deploymentEntryUtils from '../../../../../src/core/state/utils/deploymentEntry.js';
-import { safeDecodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
+import { safeDecodeApplyOperation } from '../../../../../src/codecs/apply/applyOperationCodec.js';
 import { config } from '../../../../helpers/config.js';
 
 async function setupDuplicateBootstrapScenario(t) {

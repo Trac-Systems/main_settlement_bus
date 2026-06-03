@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import protobufModule from '../../src/utils/protobuf/networkV1.generated.cjs';
+import protobufModule from '../../src/codecs/network/v1/networkV1.generated.cjs';
 import { ResultCode } from '../../src/utils/constants.js';
 import {
     resultToValidatorAction,
@@ -175,7 +175,7 @@ function compareRows(documentedRows, expectedRows) {
 export async function checkV1ResultCodePolicies() {
     const protobufMismatchErrors = compareConstantsWithGeneratedProto();
     if (protobufMismatchErrors.length > 0) {
-        console.error('ResultCode constants are out of sync with the generated protobuf enum:');
+        console.error('ResultCode constants are out of sync with the generated codecs enum:');
         for (const error of protobufMismatchErrors) {
             console.error(`- ${error}`);
         }

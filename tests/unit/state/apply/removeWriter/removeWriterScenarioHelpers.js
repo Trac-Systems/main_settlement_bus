@@ -8,12 +8,12 @@ import {
     promotePeerToWriter
 } from '../addWriter/addWriterScenarioHelpers.js';
 import { applyStateMessageFactory } from '../../../../../src/messages/state/applyStateMessageFactory.js';
-import { safeEncodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
+import { safeEncodeApplyOperation } from '../../../../../src/codecs/apply/applyOperationCodec.js';
 import nodeEntryUtils from '../../../../../src/core/state/utils/nodeEntry.js';
 import addressUtils from '../../../../../src/core/state/utils/address.js';
 import { toBalance, BALANCE_FEE, BALANCE_TO_STAKE } from '../../../../../src/core/state/utils/balance.js';
 import { eventFlush } from '../../../../helpers/autobaseTestHelpers.js';
-import { safeDecodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
+import { safeDecodeApplyOperation } from '../../../../../src/codecs/apply/applyOperationCodec.js';
 import { EntryType } from '../../../../../src/utils/constants.js';
 import { config } from '../../../../helpers/config.js';
 

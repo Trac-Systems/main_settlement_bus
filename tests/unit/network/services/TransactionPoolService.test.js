@@ -10,7 +10,7 @@ import TransactionPoolService, {
     TransactionPoolProofUnavailableError
 } from '../../../../src/core/network/services/TransactionPoolService.js';
 import TransactionCommitService from '../../../../src/core/network/services/TransactionCommitService.js';
-import { safeDecodeApplyOperation } from '../../../../src/utils/protobuf/operationHelpers.js';
+import { safeDecodeApplyOperation } from '../../../../src/codecs/apply/applyOperationCodec.js';
 import { bigIntTo16ByteBuffer, decimalStringToBigInt } from '../../../../src/utils/amountSerialization.js';
 import { BATCH_SIZE } from '../../../../src/utils/constants.js';
 import { overrideConfig } from '../../../helpers/config.js';

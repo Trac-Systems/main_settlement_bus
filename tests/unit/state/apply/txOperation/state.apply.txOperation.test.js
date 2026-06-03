@@ -23,7 +23,7 @@ import ValidatorConsistencyScenarioBase, {
 import ValidatorEntryDecodeFailureScenario from '../common/validatorConsistency/validatorEntryDecodeFailureScenario.js';
 import ValidatorInactiveScenario from '../common/validatorConsistency/validatorInactiveScenario.js';
 import ValidatorWriterKeyMismatchScenario from '../common/validatorConsistency/validatorWriterKeyMismatchScenario.js';
-import { safeDecodeApplyOperation, safeEncodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
+import { safeDecodeApplyOperation, safeEncodeApplyOperation } from '../../../../../src/codecs/apply/applyOperationCodec.js';
 import {
     setupTxOperationScenario,
     buildTxOperationPayload,

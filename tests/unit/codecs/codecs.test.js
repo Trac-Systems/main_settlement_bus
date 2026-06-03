@@ -4,8 +4,9 @@ import { default as test } from 'brittle';
 
 async function runTests() {
     test.pause();
-    await import('./applyOperations.test.js');
-    await import('./operationHelpers.test.js');
+    await import('./applyOperationCodec.test.js');
+    await import('./networkV1OperationCodec.test.js');
+    await import('./consensusV1OperationCodec.test.js');
     test.resume();
 }
 

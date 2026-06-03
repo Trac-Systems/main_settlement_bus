@@ -1,8 +1,9 @@
-import { OperationType as ApplyOperationType } from './protobuf/applyOperations.cjs';
-import networkV1Generated from './protobuf/networkV1.generated.cjs';
+import applyOperationsGenerated from '../codecs/apply/applyOperations.generated.cjs';
+import networkV1Generated from '../codecs/network/v1/networkV1.generated.cjs';
 import b4a from 'b4a'
 // TODO: We are going to have a lot of contstants. It would be good, to separate them into different files.
 
+const { OperationType: ApplyOperationType } = applyOperationsGenerated.apply.operations;
 const { MessageType: NetworkMessageType, ResultCode: NetworkResultCode } = networkV1Generated.network.v1;
 
 //ATTENTION - THIS IS USED IN THE APPLY FUNCTION!

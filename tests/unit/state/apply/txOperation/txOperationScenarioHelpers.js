@@ -23,7 +23,7 @@ import {
 import {
     safeDecodeApplyOperation,
     safeEncodeApplyOperation
-} from '../../../../../src/utils/protobuf/operationHelpers.js';
+} from '../../../../../src/codecs/apply/applyOperationCodec.js';
 import { config } from '../../../../helpers/config.js';
 
 const DEFAULT_FUNDING = bigIntTo16ByteBuffer(decimalStringToBigInt('10'));

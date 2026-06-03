@@ -10,7 +10,7 @@ import { applyStateMessageFactory } from '../../../../../src/messages/state/appl
 import {
     safeDecodeApplyOperation,
     safeEncodeApplyOperation
-} from '../../../../../src/utils/protobuf/operationHelpers.js';
+} from '../../../../../src/codecs/apply/applyOperationCodec.js';
 import {
     AUTOBASE_VALUE_ENCODING,
     EntryType,

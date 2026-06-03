@@ -3,7 +3,7 @@ import {OperationType} from '../../../../../utils/constants.js';
 import PartialTransferValidator from "../../shared/validators/PartialTransferValidator.js";
 import {normalizeTransferOperation} from "../../../../../utils/normalizers.js"
 import {applyStateMessageFactory} from "../../../../../messages/state/applyStateMessageFactory.js";
-import {safeEncodeApplyOperation} from "../../../../../utils/protobuf/operationHelpers.js";
+import {safeEncodeApplyOperation} from "../../../../../codecs/apply/applyOperationCodec.js";
 import b4a from "b4a";
 import {publicKeyToAddress} from "../../../../../utils/helpers.js";
 

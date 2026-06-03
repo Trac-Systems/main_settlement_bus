@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package consensus.v1;
+
+// Challenge data are from 1 to 6.
+message ProofProposal {
+  uint32 protocol_version = 1; // 0x01
+  uint32 network_id = 2;
+  uint64 epoch = 3; // current epoch number
+  bytes previous_epoch_record_hash = 4; // this must be a blob of previous epoch operation - TODO we need agree for the spec of the serialization
+  bytes proposer = 5; // writingKey OR address of the proposer or address
+  bytes vdf_parameters_hash = 6; // H(difficulty || iterations)
+  bytes vdf_proof = 7; // bytes blob  that is actually y || pi
+  bytes signature = 8; // SIG(challenge_data + vdf_proof)
+}

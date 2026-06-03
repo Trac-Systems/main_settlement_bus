@@ -1,8 +1,8 @@
-import { decodeV1networkOperation } from '../../../../utils/protobuf/operationHelpers.js'
+import { decodeV1networkOperation } from '../../../codecs/network/v1/networkV1OperationCodec.js'
 import b4a from 'b4a'
-import { NetworkOperationType, V1_PROTOCOL_PAYLOAD_MAX_SIZE } from '../../../../utils/constants.js'
-import { publicKeyToAddress } from '../../../../utils/helpers.js'
-import V1EpochProofProposalOperationHandler from './handlers/V1EpochProofProposalOperationHandler.js'
+import { NetworkOperationType, V1_PROTOCOL_PAYLOAD_MAX_SIZE } from '../../../utils/constants.js'
+import { publicKeyToAddress } from '../../../utils/helpers.js'
+import V1EpochProofProposalOperationHandler from './handlers/ConsesusEpochProofProposalOperationHandler.js'
 
 class ConsensusRouterV1 {
     #config

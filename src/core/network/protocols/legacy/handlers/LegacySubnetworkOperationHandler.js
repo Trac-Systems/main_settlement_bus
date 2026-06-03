@@ -5,7 +5,7 @@ import {
 import PartialBootstrapDeploymentValidator from "../../shared/validators/PartialBootstrapDeploymentValidator.js";
 import PartialTransactionValidator from "../../shared/validators/PartialTransactionValidator.js";
 import {applyStateMessageFactory} from "../../../../../messages/state/applyStateMessageFactory.js";
-import {safeEncodeApplyOperation} from "../../../../../utils/protobuf/operationHelpers.js";
+import {safeEncodeApplyOperation} from "../../../../../codecs/apply/applyOperationCodec.js";
 import {
     normalizeBootstrapDeploymentOperation,
     normalizeTransactionOperation

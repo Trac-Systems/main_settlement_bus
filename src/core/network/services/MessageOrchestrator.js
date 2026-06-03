@@ -4,7 +4,7 @@ import { networkMessageFactory } from "../../../messages/network/v1/networkMessa
 import { NETWORK_CAPABILITIES, ResultCode } from "../../../utils/constants.js";
 import {
     unsafeEncodeApplyOperation
-} from "../../../utils/protobuf/operationHelpers.js";
+} from "../../../codecs/apply/applyOperationCodec.js";
 import { normalizeMessageByOperationType } from "../../../utils/normalizers.js";
 import { resultToValidatorAction, SENDER_ACTION } from "../protocols/connectionPolicies.js";
 import { ConnectionManagerError } from './ConnectionManager.js';

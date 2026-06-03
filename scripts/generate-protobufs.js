@@ -4,19 +4,6 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { execFileSync } from 'child_process';
 
-function generateCJSFromProto(inputPath, outputPath) {
-    execFileSync('protocol-buffers', [inputPath, '-o', outputPath]);
-    console.log(`${outputPath} has been generated.`);
-}
-
-function transformToUseB4a(outputPath) {
-    let content = fs.readFileSync(outputPath, 'utf-8');
-    content = content.replace(/\bBuffer\.([a-zA-Z]+)/g, 'b4a.$1');
-    content = `var b4a = require('b4a');\n` + content;
-    fs.writeFileSync(outputPath, content, 'utf-8');
-    console.log(`${outputPath} has been modified to use b4a.`);
-}
-
 function generatePbjsModule(pbjsPath, protoRootPath, entryPath, outputPath) {
     execFileSync(pbjsPath, [
         '-t', 'static-module',
@@ -48,20 +35,29 @@ function main() {
     const directoryName = path.dirname(fileURLToPath(import.meta.url));
 
     const inputDir = path.join(directoryName, '../proto');
-    const outputDir = path.join(directoryName, '../src/utils/protobuf');
+    const applyOutputDir = path.join(directoryName, '../src/codecs/apply');
+    const networkOutputDir = path.join(directoryName, '../src/codecs/network/v1');
+    const consensusOutputDir = path.join(directoryName, '../src/codecs/consensus/v1');
     const pbjsPath = path.join(directoryName, '../node_modules/.bin/pbjs');
-    const applyInputPath = path.join(inputDir, 'applyOperations.proto');
-    const applyOutputPath = path.join(outputDir, 'applyOperations.cjs');
+    const applyOperationsEntryPath = path.join(inputDir, 'applyOperations/applyOperations.proto');
+    const generatedApplyOperationsOutputPath = path.join(applyOutputDir, 'applyOperations.generated.cjs');
     const networkEntryPath = path.join(inputDir, 'network/v1/network_message.proto');
-    const generatedNetworkOutputPath = path.join(outputDir, 'networkV1.generated.cjs');
+    const generatedNetworkOutputPath = path.join(networkOutputDir, 'networkV1.generated.cjs');
+    const consensusEntryPath = path.join(inputDir, 'consensus/v1/consensus_message_header.proto');
+    const generatedConsensusOutputPath = path.join(consensusOutputDir, 'consensusV1.generated.cjs');
 
-    fs.mkdirSync(outputDir, { recursive: true });
+    fs.mkdirSync(applyOutputDir, { recursive: true });
+    fs.mkdirSync(networkOutputDir, { recursive: true });
+    fs.mkdirSync(consensusOutputDir, { recursive: true });
 
-    generateCJSFromProto(applyInputPath, applyOutputPath);
-    transformToUseB4a(applyOutputPath);
+    generatePbjsModule(pbjsPath, inputDir, applyOperationsEntryPath, generatedApplyOperationsOutputPath);
+    transformPbjsForBare(generatedApplyOperationsOutputPath);
 
     generatePbjsModule(pbjsPath, inputDir, networkEntryPath, generatedNetworkOutputPath);
     transformPbjsForBare(generatedNetworkOutputPath);
+
+    generatePbjsModule(pbjsPath, inputDir, consensusEntryPath, generatedConsensusOutputPath);
+    transformPbjsForBare(generatedConsensusOutputPath);
 }
 
 main();

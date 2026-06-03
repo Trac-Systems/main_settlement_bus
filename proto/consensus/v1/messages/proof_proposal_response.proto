@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package consensus.v1;
+
+import "consensus/v1/enums/result_code.proto";
+import "consensus/v1/messages/proof_proposal_approval.proto";
+
+// response sig = SIG(proof_proposal + approval_sig + result)
+
+message ProofProposalResponse {
+  ResultCode result = 1;
+  ProofProposalApproval approval = 2; // set only when result === OK
+  bytes response_sig = 3; // signs result + approval + request context
+}

@@ -1,7 +1,7 @@
 import Protomux from 'protomux';
 import ProtocolInterface from './ProtocolInterface.js';
 import c from 'compact-encoding';
-import {encodeV1networkOperation, decodeV1networkOperation} from '../../../utils/protobuf/operationHelpers.js';
+import { encodeV1networkOperation, decodeV1networkOperation } from '../../../codecs/network/v1/networkV1OperationCodec.js';
 
 class V1Protocol extends ProtocolInterface {
     #channel;
