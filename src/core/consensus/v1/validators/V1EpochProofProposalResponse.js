@@ -15,7 +15,7 @@ class V1EpochProofProposalResponse extends V1BaseOperation {
         this.validateResponseType(payload, pendingRequestServiceEntry);
         this.validatePeerCorrectness(connection.remotePublicKey, pendingRequestServiceEntry);
 
-        this.validateMemberId(payload, connection.remotePublicKey);
+        this.validateApprover(payload, connection.remotePublicKey);
         const resultCode = payload.broadcast_transaction_response.result;
         if (resultCode === ResultCode.OK) {
             this.validateProposalSignature(payload, pendingRequestServiceEntry.requestEpochProofProposalHash);
@@ -23,12 +23,12 @@ class V1EpochProofProposalResponse extends V1BaseOperation {
         return true;
     }
 
-    validateMemberId(payload, remotePublicKey) {
-        const memberId = payload.epoch_proof_proposal_response?.member_id;
-        if (!isBufferValid(memberId, WRITER_BYTE_LENGTH) || !b4a.equals(memberId, remotePublicKey)) {
+    validateApprover(payload, remotePublicKey) {
+        const approver = payload.epoch_proof_proposal_response?.approver;
+        if (!isBufferValid(approver, WRITER_BYTE_LENGTH) || !b4a.equals(approver, remotePublicKey)) {
             throw new V1ProtocolError(
                 ResultCode.INVALID_PAYLOAD,
-                'Epoch proposal response member_id does not match sender public key.'
+                'Epoch proposal response approver does not match sender public key.'
             );
         }
     }
@@ -40,7 +40,7 @@ class V1EpochProofProposalResponse extends V1BaseOperation {
             verified = tracCryptoApi.signature.verify(
                 response.signature,
                 proposalHash,
-                response.member_id
+                response.approver
             );
         } catch {
             verified = false;

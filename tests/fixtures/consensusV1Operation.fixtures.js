@@ -19,7 +19,7 @@ const proofProposal = Object.freeze({
 });
 
 const proofProposalApproval = Object.freeze({
-    member_id: bytes(67, 32),
+    approver: bytes(67, 32),
     approval_sig: bytes(67, 64)
 });
 

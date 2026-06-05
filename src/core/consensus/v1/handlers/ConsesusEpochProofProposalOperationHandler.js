@@ -60,7 +60,7 @@ class ConsensusEpochProofProposalOperationHandler {
     }
 
     // TODO: validates the response from line 61 to the end
-    // is valid signature and is a valid member id
+    // is valid signature and is a valid approver
     async handleResponse(message, connection) {
         try {
             this.applyRateLimit(connection);
@@ -86,7 +86,7 @@ class ConsensusEpochProofProposalOperationHandler {
         return {
             code: payload.epoch_proof_proposal_response.result,
             result: {
-                memberId: payload.epoch_proof_proposal_response.member_id,
+                approver: payload.epoch_proof_proposal_response.approver,
                 signature: payload.epoch_proof_proposal_response.signature
             }
         };
