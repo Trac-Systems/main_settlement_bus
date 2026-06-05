@@ -3302,6 +3302,12 @@ class State extends ReadyResource {
             return Status.FAILURE;
         }
 
+        const proofHash = await tracCryptoApi.hash.blake3(op.seo.pd); // computes the buffers' blake3 hash - ProofProposal seralized in bytes
+        if (!proofHash || proofHash.length !== 32) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "Failed to decode proposal the proposal hash.", node.from.key);
+            return Status.FAILURE;
+        }
+
         if (op.seo.app.length < this.#config.epochThreshold) { // check raw approval count
             this.#safeLogApply(OperationType.SET_EPOCH, "Insufficient valid signatures after decode.", node.from.key);
             return Status.FAILURE;
@@ -3313,7 +3319,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         }
 
-        const leaderValid = tracCryptoApi.signature.verify(proof.signature, proof.dataHash, proof.proposer); // verify leader signature
+        const leaderValid = tracCryptoApi.signature.verify(proof.signature, proofHash, proof.proposer); // verify leader signature
         if (!leaderValid) {
             this.#safeLogApply(OperationType.SET_EPOCH, "Invalid leader signature.", node.from.key);
             return Status.FAILURE;
@@ -3324,7 +3330,7 @@ class State extends ReadyResource {
                 this.#safeLogApply(OperationType.SET_EPOCH, "Invalid signature.", node.from.key);
                 return Status.FAILURE;
             }
-            const valid = tracCryptoApi.signature.verify(signatures[i].approval_sig, proof.dataHash, signatures[i].member_id); // verify member signature
+            const valid = tracCryptoApi.signature.verify(signatures[i].approval_sig, proofHash, signatures[i].member_id); // verify member signature
             if (!valid) {
                 this.#safeLogApply(OperationType.SET_EPOCH, "Invalid signature.", node.from.key);
                 return Status.FAILURE;
@@ -3351,7 +3357,7 @@ class State extends ReadyResource {
         }
 
         const epochId = proof.epoch;
-        const epochHash = proof.dataHash;
+        const epochHash = proofHash;
 
         await batch.put(keys.EPOCH(epochId), epochHash); // store epoch hash
         await batch.put(keys.CURRENT_INDEX, lengthEntryUtils.encodeBE(epochId)); // update current epoch index
