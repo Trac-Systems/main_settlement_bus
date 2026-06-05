@@ -128,11 +128,3 @@ export function toHex(publicKey) {
     return b4a.isBuffer(publicKey) ? b4a.toString(publicKey, 'hex') : publicKey;
 }
 
-export function convertToArray(input, elementLength, converter) {
-    if (!b4a.isBuffer(input) || input.length % elementLength !== 0) {
-        return null
-    }
-
-    const elements = _.chunk(input, elementLength)
-    return elements.map(converter)
-}
