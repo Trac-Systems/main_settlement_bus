@@ -14,7 +14,8 @@ import { NETWORK_CAPABILITIES } from '../../../utils/constants.js';
 import { createVDFService } from "./createVDFService.js";
 import addressUtils from '../../state/utils/address.js';
 import { CustomEventType } from '../../../utils/constants.js';
-  import { safeEncodeProofProposal, safeEncodeProofProposalApproval } from '../../../codecs/consensus/v1/consensusV1OperationCodec.js';
+import { safeEncodeProofProposal, safeEncodeProofProposalApproval } from '../../../codecs/consensus/v1/consensusV1OperationCodec.js';
+import { EpochProofData } from '../../consensus/v1/handlers/epochProposal/epochProofData.js';
 
 const PROTOCOL_VERSION = 1;
 const withTimeout = (promise, ms) => Promise.race([
@@ -107,16 +108,17 @@ class EpochProofProposalService extends ReadyResource {
         return await this.#calculatorService.calculateVDF(challenge, difficulty, discriminantSizeBits);
     }
 
-    createProposal(lastEpochId, lastEpochHash, vdf) {
+    createProposal(lastEpochId, lastEpochHash, vdf, committeeHash) {
         const currentEpochId = lastEpochId + 1;
-        return {
+        return new EpochProofData ({
             protocolVersion: PROTOCOL_VERSION,
             epoch: currentEpochId,
             prevEpochHash: lastEpochHash,
             networkId: this.#config.networkId,
+            committeeHash: committeeHash,
             vdfParamsHash: vdf.solution.slice(0, 258), // y — the first 258 bytes
-            vdfOutput: vdf.solution.slice(258), // proof — the last 258 bytes
-        };
+            vdfOutput: vdf.solution.slice(258), // proof — the last 258 bytes  
+        });
     }
 
     async verifySignature(signature, hash, publicKey) {
@@ -132,7 +134,7 @@ class EpochProofProposalService extends ReadyResource {
         if (!connection) return null;
 
         const request = await networkMessageFactory(this.#wallet, this.#config)
-            .buildEpochProofProposalRequest(generateUUID(), proofProposal.data, NETWORK_CAPABILITIES);
+            .buildEpochProofProposalRequest(generateUUID(), proofProposal.data, proofProposal.dataHash, NETWORK_CAPABILITIES);
 
         const response = await connection.protocolSession.send(request);
         return response?.result?.signature ?? null;
@@ -171,10 +173,13 @@ class EpochProofProposalService extends ReadyResource {
                 this.#config.vdfDiscriminantSizeBits
             );
 
+            const committeeHash = await this.#state.getIndexerSequenceState();
+
             const newEpochProofData = this.createProposal(
                 currentEpochId,
                 currentEpochHash,
                 vdf.result,
+                committeeHash
             );
             
             const toHash = createMessage(...Object.values(newEpochProofData));
@@ -240,7 +245,7 @@ class EpochProofProposalService extends ReadyResource {
         const encodedPayload = safeEncodeApplyOperation(payload);
         if (!b4a.isBuffer(encodedPayload) || encodedPayload.length === 0) {
             throw new Error(
-                `Failed to encode epoch operation for epoch ${epoch.epoch}.`,
+                `Failed to encode epoch operation for epoch ${epoch.data.epoch}.`,
             );
         }
 

@@ -1,5 +1,12 @@
     
 export default class ConsensusMessageBuilder {
+    #hash;
+
+    setHash(hash) {
+        this.#hash = hash;
+        return this;
+    }
+
     async #buildEpochProofProposalRequestPayload() {
         const nonce = tracCryptoApi.nonce.generate();
         const tsBuf = timestampToBuffer(this.#timestamp);
@@ -20,17 +27,11 @@ export default class ConsensusMessageBuilder {
 
         this.#payloadKey = 'epoch_proof_proposal_request';
         this.#body = {
-            data: {
-                protocol_version: this.#data.protocolVersion,
-                epoch: this.#data.epoch,
-                previous_epoch_hash: this.#data.prevEpochHash,
-                committed_hash: this.#data.prevEpochHash,
-                vdf_parameters_hash: this.#data.vdfParamsHash,
-                vdf_output: this.#data.vdfOutput,
-            },
-            hash,
-            signature,
-        };
+            data: dataBuffer,
+            hash: this.#hash,
+            nonce,
+            signature
+        }
     }
 
     async buildPayload() {

@@ -14,21 +14,21 @@ const decode = (buffer) => {
     const epoch           = buffer.readBigUInt64BE(offset); offset += 8
     const prevEpochHash   = buffer.slice(offset, offset + 32); offset += 32
     const networkId       = buffer.readUInt16BE(offset);    offset += 2
-    const comiteeHash     = buffer.slice(offset, offset + 32); offset += 32
+    const committeeHash     = buffer.slice(offset, offset + 32); offset += 32
     // const leaderId        = buffer.slice(offset, offset + 32); offset += 32
     const vdfParamsHash   = buffer.slice(offset, offset + 32); offset += 32
     const vdfOutput       = buffer.slice(offset, offset + 64); offset += 64
 
-    return { protocolVersion, epoch, prevEpochHash, networkId, comiteeHash, /*leaderId,*/ vdfParamsHash, vdfOutput }
+    return { protocolVersion, epoch, prevEpochHash, networkId, committeeHash, /*leaderId,*/ vdfParamsHash, vdfOutput }
 }
 
-class EpochProofData {
-    constructor({ protocolVersion, epoch, prevEpochHash, networkId, comiteeHash, /*leaderId,*/ vdfParamsHash, vdfOutput }) {
+export class EpochProofData {
+    constructor({ protocolVersion, epoch, prevEpochHash, networkId, committeeHash, /*leaderId,*/ vdfParamsHash, vdfOutput }) {
         this.protocolVersion = protocolVersion
         this.epoch           = epoch
         this.prevEpochHash   = prevEpochHash
         this.networkId       = networkId
-        this.comiteeHash     = comiteeHash
+        this.committeeHash     = committeeHash
         // this.leaderId        = leaderId
         this.vdfParamsHash   = vdfParamsHash
         this.vdfOutput       = vdfOutput
@@ -50,7 +50,7 @@ class EpochProofData {
         buf.writeUInt16BE(this.networkId, offset)
         offset += 2
         
-        this.comiteeHash.copy(buf, offset)
+        this.committeeHash.copy(buf, offset)
         offset += 32
         
         // this.leaderId.copy(buf, offset)
