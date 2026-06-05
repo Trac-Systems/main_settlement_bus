@@ -36,13 +36,14 @@ import {
     BALANCE_ZERO,
     toTerm,
 } from './utils/balance.js';
-import { safeWriteUInt32BE } from '../../utils/buffer.js';
+import { safeWriteUInt32BE, convertToArray } from '../../utils/buffer.js';
 import deploymentEntryUtils from './utils/deploymentEntry.js';
 import { deepCopyBuffer } from '../../utils/buffer.js';
 import { Status } from './utils/transaction.js';
 import remote from 'hypercore/lib/fully-remote-proof.js'
 import PQueue from 'p-queue';
 import { keys } from '../consensus/v1/handlers/epochProposal/epochProofData.js'
+import {safeDecodeProofProposal, safeDecodeProofProposalApproval} from "../../codecs/consensus/v1/consensusV1OperationCodec.js"
 
 const OVERSIZED_BATCH_PENALTY_MULTIPLIER = BATCH_SIZE;
 
@@ -3289,44 +3290,74 @@ class State extends ReadyResource {
         return Status.SUCCESS;
     }
 
-    // TODO: this is a draft implementation:
-    // - verify op.seo.pe structure matches the final epoch proof schema
-    // - confirm op.seo.pe.dataHash is the correct field being signed by members
-    // - confirm keys.EPOCH and keys.CURRENT_INDEX are the right storage keys
-    // - validate that the leader's own signature (op.seo.pe.signature) is also verified
     async #handleApplySetEpochOperation(op, view, base, node, batch) {
-        if (!this.check.validateSetEpochOperation(op)) {
+        if (!this.check.validateSetEpochOperation(op)) { // validate protobuf schema
             this.#safeLogApply(OperationType.SET_EPOCH, "Contract schema validation failed.", node.from.key)
             return Status.FAILURE;
-        }; // it's ok
-        
-        const signatures = op.seo.ss; // it's fine but will change to a binary serialized
-        if (signatures.length < this.#config.epochThreshold) {
+        };
+
+        const proof = safeDecodeProofProposal(op.seo.pd); // decode leader proof
+        if (!proof) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "Failed to decode proof proposal.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        if (op.seo.app.length < this.#config.epochThreshold) { // check raw approval count
+            this.#safeLogApply(OperationType.SET_EPOCH, "Insufficient valid signatures after decode.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        const signatures = op.seo.app.map(sig => safeDecodeProofProposalApproval(sig)).filter(Boolean); // decode member approvals
+        if (signatures.length < this.#config.epochThreshold) { // check decoded approval count
             this.#safeLogApply(OperationType.SET_EPOCH, "Insufficient signatures.", node.from.key);
             return Status.FAILURE;
-        } // it's ok
+        }
+
+        const leaderValid = tracCryptoApi.signature.verify(proof.signature, proof.dataHash, proof.proposer); // verify leader signature
+        if (!leaderValid) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "Invalid leader signature.", node.from.key);
+            return Status.FAILURE;
+        }
 
         for (let i = 0; i < signatures.length; i++) {
-            // verify if hash matches the data struct required (barto structure monster)
-            const valid = tracCryptoApi.signature.verify(op.seo.ss[i], op.seo.pe.dataHash, op.seo.pks[i]); // check the params with correct structure
+            if (!signatures[i].approval_sig || !signatures[i].member_id) { // guard null decoded fields
+                this.#safeLogApply(OperationType.SET_EPOCH, "Invalid signature.", node.from.key);
+                return Status.FAILURE;
+            }
+            const valid = tracCryptoApi.signature.verify(signatures[i].approval_sig, proof.dataHash, signatures[i].member_id); // verify member signature
             if (!valid) {
                 this.#safeLogApply(OperationType.SET_EPOCH, "Invalid signature.", node.from.key);
                 return Status.FAILURE;
             }
-
-            // check previous epoch
-            // check the hash of previous epoch is the hash of the last consolidated epoch
-            // id of the epoch is previous epoch id + 1?
-            // does vdf makes sense? 
         }
 
-        const epochId = op.seo.pe.data.epoch;
-        const epochHash = op.seo.pe.dataHash;
+        const currentEpochIdBuffer = await this.#getEntryApply(keys.CURRENT_INDEX, batch); // read current epoch id
+        const currentEpochId = currentEpochIdBuffer ? lengthEntryUtils.decodeBE(currentEpochIdBuffer) : 0; // decode or default genesis
+        const currentEpochHash = await this.#getEntryApply(keys.EPOCH(currentEpochId), batch); // read current epoch hash
 
-        await batch.put(keys.EPOCH(epochId), epochHash);
-        await batch.put(keys.CURRENT_INDEX, epochId);
+        if (proof.epoch !== currentEpochId + 1) { // enforce sequential epoch
+            this.#safeLogApply(OperationType.SET_EPOCH, "Epoch id mismatch.", node.from.key);
+            return Status.FAILURE;
+        }
 
-        this.emit(CustomEventType.EPOCH_CREATED);
+        if (currentEpochId > 0 && !b4a.equals(proof.previous_epoch_record_hash, currentEpochHash)) { // verify previous hash linkage
+            this.#safeLogApply(OperationType.SET_EPOCH, "Previous epoch hash mismatch.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        if (!proof.vdf_proof) { // require vdf proof present
+            this.#safeLogApply(OperationType.SET_EPOCH, "Missing vdf proof.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        const epochId = proof.epoch;
+        const epochHash = proof.dataHash;
+
+        await batch.put(keys.EPOCH(epochId), epochHash); // store epoch hash
+        await batch.put(keys.CURRENT_INDEX, lengthEntryUtils.encodeBE(epochId)); // update current epoch index
+        await batch.put(keys.EPOCH_DATA(epochId), op.seo.pd); // store full proof bytes
+
+        this.emit(CustomEventType.EPOCH_CREATED); // notify epoch committed
         return Status.SUCCESS;
     }
 

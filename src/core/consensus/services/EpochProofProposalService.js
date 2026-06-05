@@ -13,6 +13,7 @@ import { networkMessageFactory } from '../../../messages/network/v1/networkMessa
 import { NETWORK_CAPABILITIES } from '../../../utils/constants.js';
 import { createVDFService } from "./createVDFService.js";
 import addressUtils from '../../state/utils/address.js';
+import { CustomEventType } from '../../../utils/constants.js';
 
 const PROTOCOL_VERSION = 1;
 const withTimeout = (promise, ms) => Promise.race([
@@ -56,12 +57,22 @@ class EpochProofProposalService extends ReadyResource {
             (next) => this.#worker(next),
             this.#intervalMs,
         );
+
+        this.#state.on(CustomEventType.EPOCH_PROPOSAL_SUBMITTED, async () => {
+            await this.stop(false);
+        });
+
+        this.#state.on(CustomEventType.EPOCH_CREATED, () => {
+            setTimeout(() => this.start(), this.#config.epochInterval);
+        });
     }
 
     async _close() {
         this.#isInterrupted = true;
         await this.#scheduler.stop(true);
         await this.#calculatorService?.close();
+        this.#state.removeAllListeners(CustomEventType.EPOCH_PROPOSAL_SUBMITTED);
+        this.#state.removeAllListeners(CustomEventType.EPOCH_CREATED);
     }
 
     start() {
