@@ -32,17 +32,20 @@ class ConsensusEpochProofProposalOperationHandler {
             this.applyRateLimit(connection);
             await this.#v1EpochProofProposalRequestValidator.validate(message, connection.remotePublicKey);
             await this.#validateDataHash(message.epoch_proof_proposal_request)
-            const lastEpochProof = await this.#state.currentEpoch()
-            const epochProof = epochProofFromBuffer(message.epoch_proof_proposal_request.data)
+
+            const lastEpochProofBuffer = await this.#state.currentEpoch();
+            const lastEpochProof = lastEpochProofBuffer ? epochProofFromBuffer(lastEpochProofBuffer) : null;
+            const epochProof = epochProofFromBuffer(message.epoch_proof_proposal_request.data);
             
-            await this.#validatePreviousEpoch(epochProof, lastEpochProof)
-            await this.#validateVdf(epochProof)
+            this.#validatePreviousEpoch(epochProof, lastEpochProof);
+            this.#validateVdf(epochProof);
         } catch (error) {
             this.displayError(
                 "failed to process epoch proof proposal request from sender",
                 connection.remotePublicKey,
                 error
             );
+            return;
         }
 
         try {
@@ -110,25 +113,25 @@ class ConsensusEpochProofProposalOperationHandler {
         }
     }
 
-    async #validatePreviousEpoch(proofData, previousEpoch) {
-        if (!previousEpoch || proofData.epoch !== previousEpoch.data.epoch + 1) {
-            throw new V1ProtocolError(ResultCode.INVALID_EPOCH, 'There is a mismatch between the proof and the last computed epoch');
+    #validatePreviousEpoch(proofData, previousEpoch) {
+        if (!previousEpoch || proofData.epoch !== previousEpoch.epoch + 1n) {
+            throw new V1ProtocolError(ResultCode.INVALID_EPOCH, 'Epoch sequence mismatch');
         }
         
         if (proofData.protocolVersion !== previousEpoch.protocolVersion) {
-            throw new V1ProtocolError(ResultCode.INVALID_EPOCH, 'There is a mismatch between the proof and the last computed epoch');
+            throw new V1ProtocolError(ResultCode.INVALID_EPOCH, 'Protocol version mismatch');
         }
         
         if (proofData.prevEpochHash !== previousEpoch.prevEpochHash) {
-            throw new V1ProtocolError(ResultCode.INVALID_EPOCH, 'There is a mismatch between the proof and the last computed epoch');
+            throw new V1ProtocolError(ResultCode.INVALID_EPOCH, 'Previous epoch hash mismatch');
         }
         
         if (proofData.networkId !== previousEpoch.networkId) {
-            throw new V1ProtocolError(ResultCode.INVALID_EPOCH, 'There is a mismatch between the proof and the last computed epoch');
+            throw new V1ProtocolError(ResultCode.INVALID_EPOCH, 'Network id mismatch');
         }
     }
 
-    async #validateVdf(proofData) {
+    #validateVdf(proofData) {
         if (!proofData.vdfOutput) {
             throw new V1ProtocolError(ResultCode.INVALID_EPOCH, 'Inconsistent vdf data');
         }

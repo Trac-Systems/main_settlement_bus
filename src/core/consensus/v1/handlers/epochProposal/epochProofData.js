@@ -68,9 +68,9 @@ class EpochProofData {
 
 // TODO: buildData signature and EpochProofData instantiation are broken — decode() result is ignored.
 // Fix: accept the decoded object and pass it to new EpochProofData(decoded).
-export const buildData = (/*leaderId,*/ previousEpoch, comissionHash, vdf) => {
-    console.log(/*leaderId,*/ previousEpoch, comissionHash, vdf)
-    return new EpochProofData()
+export const buildData = (decoded) => {
+    if (!decoded) return null
+    return new EpochProofData(decoded)
 }
 
 // profData is buffer

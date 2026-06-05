@@ -14,6 +14,7 @@ import { NETWORK_CAPABILITIES } from '../../../utils/constants.js';
 import { createVDFService } from "./createVDFService.js";
 import addressUtils from '../../state/utils/address.js';
 import { CustomEventType } from '../../../utils/constants.js';
+  import { safeEncodeProofProposal, safeEncodeProofProposalApproval } from '../../../codecs/consensus/v1/consensusV1OperationCodec.js';
 
 const PROTOCOL_VERSION = 1;
 const withTimeout = (promise, ms) => Promise.race([
@@ -161,7 +162,7 @@ class EpochProofProposalService extends ReadyResource {
     async #worker(next) {
         if (!this.#isInterrupted) {
             const threshold = this.#config.epochThreshold;
-            const currentEpochId = await this.#state.currentEpoch();
+            const currentEpochId = await this.#state.currentEpochId();
             const currentEpochHash = await this.#state.getEpochHash(currentEpochId);
 
             const vdf = await this.calculateVDF(
@@ -217,11 +218,22 @@ class EpochProofProposalService extends ReadyResource {
                 this.#config.addressPrefix,
             ),
             seo: {
-                pe: epoch,
-                ss: epoch.signatures.map(({ signature }) => signature),
-                pks: epoch.signatures.map(({ publicKey }) =>
-                    b4a.isBuffer(publicKey) ? publicKey : b4a.from(publicKey, "hex"),
-                ),
+                pd: safeEncodeProofProposal({
+                    protocol_version: epoch.data.protocolVersion,
+                    network_id: epoch.data.networkId,
+                    epoch: epoch.data.epoch,
+                    previous_epoch_record_hash: epoch.data.prevEpochHash,
+                    proposer: this.#state.writingKey,
+                    vdf_parameters_hash: epoch.data.vdfParamsHash,
+                    vdf_proof: epoch.data.vdfOutput,
+                    signature: epoch.signature,
+                }),
+                app: epoch.signatures.map(({ signature, publicKey}) =>
+                    safeEncodeProofProposalApproval({
+                        approval_sig: signature,
+                        member_id: b4a.isBuffer(publicKey) ? publicKey : b4a.from(publicKey, 'hex'),
+                    })
+                )
             },
         };
 

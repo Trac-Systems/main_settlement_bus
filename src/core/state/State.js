@@ -130,10 +130,16 @@ class State extends ReadyResource {
         return this.#base.view.core.signedLength;
     }
 
-    // TODO: document a epoch data returned
+    async currentEpochId() {
+        const epochIdBuffer = await this.getSigned(keys.CURRENT_INDEX);
+        if (!epochIdBuffer) return 0;
+
+        return lengthEntryUtils.decodeBE(epochIdBuffer)
+    }
+
     async currentEpoch() {
-        const latestEpochNumber = await this.getSigned(keys.CURRENT_INDEX)
-        return latestEpochNumber;
+        const epochId = await this.currentEpochId()
+        return await this.getSigned(keys.EPOCH_DATA(epochId));
     }
 
     async getEpochHash(epochId) {
