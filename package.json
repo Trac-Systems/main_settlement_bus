@@ -26,6 +26,7 @@
     "test:unit:node:cov": "brittle-node -c -t 60000 tests/unit/unit.test.js"
   },
   "dependencies": {
+    "@tracsystems/trac-vdf": "file:tracsystems-trac-vdf-0.0.1.tgz",
     "autobase": "7.20.1",
     "b4a": "1.6.7",
     "bare-channel": "^5.2.3",

@@ -3310,7 +3310,7 @@ class State extends ReadyResource {
 
         const proofHash = await tracCryptoApi.hash.blake3(op.seo.pd); // computes the buffers' blake3 hash - ProofProposal seralized in bytes
         if (!proofHash || proofHash.length !== 32) {
-            this.#safeLogApply(OperationType.SET_EPOCH, "Failed to decode proposal the proposal hash.", node.from.key);
+            this.#safeLogApply(OperationType.SET_EPOCH, "Failed to decode the proposal hash.", node.from.key);
             return Status.FAILURE;
         }
 

@@ -1,7 +1,9 @@
 import Channel from "bare-channel";
 import ReadyResource from "ready-resource";
+import {loadVdfWasm} from "@tracsystems/trac-vdf"
 
 export class VDFService extends ReadyResource {
+    #vdf = null;
     #thread = null;
     #port = null;    
 
@@ -10,6 +12,9 @@ export class VDFService extends ReadyResource {
     }
 
     async _open() {
+
+        this.#vdf = await loadVdfWasm();
+
         const channel = new Channel();
 
         this.#port = channel.connect();
@@ -22,9 +27,8 @@ export class VDFService extends ReadyResource {
                 const { challenge, difficulty, discriminantSizeBits } = request;
 
                 try {
-                    // TODO: replace with real VDF computation.
-                    const solution = new Uint8Array(516);
-
+                    const solution = this.#vdf.solveWesolowski(challenge, difficulty, discriminantSizeBits);
+                    
                     await port.write({
                         result: {
                             challenge,
