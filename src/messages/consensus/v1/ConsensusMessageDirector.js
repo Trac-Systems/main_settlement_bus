@@ -1,4 +1,4 @@
-import {ConsensusOperationType} from '../../../utils/constants.js';
+import {ConsensusOperationType, ConsensusProtocolVersion} from '../../../utils/constants.js';
 
 /**
  * Director for v1 consensus protocol messages.
@@ -17,7 +17,6 @@ class ConsensusMessageDirector {
     /**
      * Build a proof proposal message.
      * @param {string} sessionId
-     * @param {number} protocolVersion
      * @param {number} networkId
      * @param {number} epoch
      * @param {Buffer} previousEpochRecordHash
@@ -28,7 +27,6 @@ class ConsensusMessageDirector {
      */
     async buildProofProposal(
         sessionId,
-        protocolVersion,
         networkId,
         epoch,
         previousEpochRecordHash,
@@ -40,7 +38,7 @@ class ConsensusMessageDirector {
             .setType(ConsensusOperationType.PROOF_PROPOSAL)
             .setSessionId(sessionId)
             .setTimestamp()
-            .setProtocolVersion(protocolVersion)
+            .setProtocolVersion(ConsensusProtocolVersion.V1)
             .setNetworkId(networkId)
             .setEpoch(epoch)
             .setPreviousEpochRecordHash(previousEpochRecordHash)
@@ -55,7 +53,6 @@ class ConsensusMessageDirector {
     /**
      * Build a proof proposal response message.
      * @param {string} sessionId
-     * @param {number} protocolVersion
      * @param {number} networkId
      * @param {number} epoch
      * @param {Buffer} previousEpochRecordHash
@@ -69,7 +66,6 @@ class ConsensusMessageDirector {
      */
     async buildProofProposalResponse(
         sessionId,
-        protocolVersion,
         networkId,
         epoch,
         previousEpochRecordHash,
@@ -84,7 +80,7 @@ class ConsensusMessageDirector {
             .setType(ConsensusOperationType.PROOF_PROPOSAL_RESPONSE)
             .setSessionId(sessionId)
             .setTimestamp()
-            .setProtocolVersion(protocolVersion)
+            .setProtocolVersion(ConsensusProtocolVersion.V1)
             .setNetworkId(networkId)
             .setEpoch(epoch)
             .setPreviousEpochRecordHash(previousEpochRecordHash)

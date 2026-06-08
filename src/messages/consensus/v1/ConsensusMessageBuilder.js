@@ -2,7 +2,7 @@ import b4a from 'b4a';
 import tracCryptoApi from 'trac-crypto-api';
 import {encodeProofProposalApproval} from '../../../codecs/consensus/v1/consensusV1OperationCodec.js';
 import {addressToBuffer, isAddressValid} from "../../../core/state/utils/address.js";
-import {ConsensusOperationType, ConsensusResultCode} from '../../../utils/constants.js';
+import {ConsensusOperationType, ConsensusProtocolVersion, ConsensusResultCode} from '../../../utils/constants.js';
 import {createMessage, safeWriteUInt32BE, validateUint32} from "../../../utils/buffer.js";
 import {
     createProofProposalApprovalSigningMessage,
@@ -111,7 +111,12 @@ class ConsensusMessageBuilder {
     }
 
     setProtocolVersion(protocolVersion) {
-        this.#protocol_version = validateUint32(protocolVersion, 'Protocol version');
+        const value = validateUint32(protocolVersion, 'Protocol version');
+        if (!Object.values(ConsensusProtocolVersion).includes(value)) {
+            throw new Error(`Unsupported consensus protocol version: ${protocolVersion}`);
+        }
+
+        this.#protocol_version = value;
         return this;
     }
 

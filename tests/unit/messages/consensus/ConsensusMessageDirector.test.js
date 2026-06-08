@@ -12,7 +12,11 @@ import {
     createProofProposalApprovalSigningMessage,
     createProofProposalSigningMessage
 } from '../../../../src/core/consensus/v1/consensusSigningMessage.js';
-import {ConsensusOperationType, ConsensusResultCode} from '../../../../src/utils/constants.js';
+import {
+    ConsensusOperationType,
+    ConsensusProtocolVersion,
+    ConsensusResultCode
+} from '../../../../src/utils/constants.js';
 import {
     decodeConsensusMessage,
     encodeConsensusMessage,
@@ -30,7 +34,6 @@ test('ConsensusMessageDirector builds proof proposal and verifies signature', as
     const director = new ConsensusMessageDirector(new ConsensusMessageBuilder(wallet, config));
 
     const sessionId = uuidv7();
-    const protocolVersion = 1;
     const networkId = 67;
     const epoch = 2;
     const previousEpochRecordHash = b4a.alloc(32, 1);
@@ -39,7 +42,6 @@ test('ConsensusMessageDirector builds proof proposal and verifies signature', as
 
     const payload = await director.buildProofProposal(
         sessionId,
-        protocolVersion,
         networkId,
         epoch,
         previousEpochRecordHash,
@@ -53,7 +55,7 @@ test('ConsensusMessageDirector builds proof proposal and verifies signature', as
     t.ok(Number.isSafeInteger(payload.timestamp) && payload.timestamp > 0);
 
     const proofProposal = payload.proof_proposal;
-    t.is(proofProposal.protocol_version, protocolVersion);
+    t.is(proofProposal.protocol_version, ConsensusProtocolVersion.V1);
     t.is(proofProposal.network_id, networkId);
     t.is(proofProposal.epoch, epoch);
     t.alike(proofProposal.previous_epoch_record_hash, previousEpochRecordHash);
@@ -80,7 +82,6 @@ test('ConsensusMessageDirector builds proof proposal response and verifies signa
     const director = new ConsensusMessageDirector(new ConsensusMessageBuilder(wallet, config));
 
     const sessionId = uuidv7();
-    const protocolVersion = 1;
     const networkId = 67;
     const epoch = 2;
     const previousEpochRecordHash = b4a.alloc(32, 1);
@@ -90,7 +91,6 @@ test('ConsensusMessageDirector builds proof proposal response and verifies signa
 
     const payload = await director.buildProofProposalResponse(
         sessionId,
-        protocolVersion,
         networkId,
         epoch,
         previousEpochRecordHash,
@@ -113,7 +113,7 @@ test('ConsensusMessageDirector builds proof proposal response and verifies signa
     t.ok(b4a.isBuffer(proofProposalResponse.response_sig));
 
     const approvalMessage = createProofProposalApprovalSigningMessage(
-        protocolVersion,
+        ConsensusProtocolVersion.V1,
         networkId,
         epoch,
         previousEpochRecordHash,

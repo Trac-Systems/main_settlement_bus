@@ -18,7 +18,11 @@ import {
     safeCreateProofProposalApprovalSigningMessage,
     safeCreateProofProposalSigningMessage
 } from '../../../../src/core/consensus/v1/consensusSigningMessage.js';
-import {ConsensusOperationType, ConsensusResultCode} from '../../../../src/utils/constants.js';
+import {
+    ConsensusOperationType,
+    ConsensusProtocolVersion,
+    ConsensusResultCode
+} from '../../../../src/utils/constants.js';
 import {errorMessageIncludes} from '../../../helpers/regexHelper.js';
 import {config} from '../../../helpers/config.js';
 import {testKeyPair1} from '../../../fixtures/apply.fixtures.js';
@@ -34,7 +38,7 @@ function uniqueResultCodes() {
 function proofProposalFields(wallet) {
     return {
         sessionId: uuidv7(),
-        protocolVersion: 1,
+        protocolVersion: ConsensusProtocolVersion.V1,
         networkId: 67,
         epoch: 2,
         previousEpochRecordHash: b4a.alloc(32, 1),
@@ -181,6 +185,11 @@ test('ConsensusMessageBuilder validates required inputs', async t => {
     );
 
     t.exception(
+        () => builder.setProtocolVersion(0),
+        errorMessageIncludes('Unsupported consensus protocol version: 0')
+    );
+
+    t.exception(
         () => builder.setEpoch(-1),
         errorMessageIncludes('Epoch must be a non-negative safe integer.')
     );
@@ -252,12 +261,12 @@ test('ConsensusMessageBuilder validates required inputs', async t => {
     );
 });
 
-test('ConsensusMessageBuilder signs zero uint32 values and uint64 epochs without dropping fields', async t => {
+test('ConsensusMessageBuilder signs zero network id and uint64 epochs without dropping fields', async t => {
     const wallet = await createWallet();
     const builder = new ConsensusMessageBuilder(wallet, config);
     const fields = {
         ...proofProposalFields(wallet),
-        protocolVersion: 0,
+        protocolVersion: ConsensusProtocolVersion.V1,
         networkId: 0,
         epoch: 0x100000000
     };
@@ -335,7 +344,7 @@ test('consensus signing message helpers expose unsafe and safe variants', t => {
 });
 
 test('createProofProposalSigningMessage encodes fields in deterministic order', t => {
-    const protocolVersion = 0;
+    const protocolVersion = ConsensusProtocolVersion.V1;
     const networkId = 0xFFFFFFFF;
     const epoch = 0x100000000;
     const previousEpochRecordHash = b4a.alloc(32, 1);

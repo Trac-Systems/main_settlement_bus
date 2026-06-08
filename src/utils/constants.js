@@ -52,6 +52,10 @@ export const ConsensusOperationType = Object.freeze({
     PROOF_PROPOSAL_RESPONSE: ConsensusMessageType.MESSAGE_TYPE_PROOF_PROPOSAL_RESPONSE,
 });
 
+export const ConsensusProtocolVersion = Object.freeze({
+    V1: 1,
+});
+
 export const ConsensusResultCode = Object.freeze({
     UNSPECIFIED: ConsensusV1ResultCode.RESULT_CODE_UNSPECIFIED,
     OK: ConsensusV1ResultCode.RESULT_CODE_OK,
