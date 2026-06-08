@@ -1,6 +1,5 @@
 import b4a from 'b4a';
 import { bigIntTo16ByteBuffer } from './amountSerialization.js';
-import _ from 'lodash'
 
 export const ZERO_WK = b4a.alloc(32, 0); // 32 bytes of zeroes, used as a placeholder for writing keys
 export const NULL_BUFFER = b4a.alloc(0) // null buffer (single byte of 0)
