@@ -11,6 +11,7 @@ import {
     isBootstrapDeployment,
     isCoreAdmin,
     isRoleAccess,
+    isSetEpoch,
     isTransaction,
     isTransfer,
     operationToPayload
@@ -28,6 +29,7 @@ import { isHexString } from '../../utils/helpers.js';
 class ApplyStateMessageBuilder {
     #address;
     #amount;
+    #approvals;
     #channel;
     #config
     #contentHash;
@@ -39,6 +41,7 @@ class ApplyStateMessageBuilder {
     #msbBootstrap;
     #operationType;
     #payload;
+    #proofData;
     #txHash;
     #txValidity;
     #wallet;
@@ -159,6 +162,22 @@ class ApplyStateMessageBuilder {
         return this;
     }
 
+    setProofData(proofData) {
+        this.#proofData = this.#normalizeBytesBuffer(proofData, 'Proof data');
+        return this;
+    }
+
+    setApprovals(approvals) {
+        if (!Array.isArray(approvals)) {
+            throw new Error('Approvals must be an array.');
+        }
+
+        this.#approvals = approvals.map((approval, index) => {
+            return this.#normalizeBytesBuffer(approval, `Approval ${index}`);
+        });
+        return this;
+    }
+
     #requireFields(fields) {
         for (const [value, name] of fields) {
             if (!value) {
@@ -238,6 +257,24 @@ class ApplyStateMessageBuilder {
             return b4a.from(value, 'hex');
         }
         throw new Error(`${fieldName} must be a ${expectedBytes}-byte buffer or ${expectedBytes * 2}-length hexstring.`);
+    }
+
+    #normalizeBytesBuffer(value, fieldName) {
+        if (b4a.isBuffer(value)) {
+            if (value.length === 0) {
+                throw new Error(`${fieldName} must be a non-empty buffer.`);
+            }
+            return value;
+        }
+
+        if (typeof value === 'string') {
+            if (!isHexString(value)) {
+                throw new Error(`${fieldName} must be a non-empty hexstring.`);
+            }
+            return b4a.from(value, 'hex');
+        }
+
+        throw new Error(`${fieldName} must be a non-empty buffer or hexstring.`);
     }
 
     #normalizeAddress(address) {
@@ -378,6 +415,17 @@ class ApplyStateMessageBuilder {
     }
 
     async #buildCompleteBody() {
+        if (isSetEpoch(this.#operationType)) {
+            this.#requireFields([
+                [this.#proofData, 'Proof data'],
+                [this.#approvals, 'Approvals']
+            ]);
+            return {
+                pd: this.#proofData,
+                app: this.#approvals
+            };
+        }
+
         const nonce = tracCryptoApi.nonce.generate();
         let msg;
 
