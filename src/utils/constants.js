@@ -1,11 +1,12 @@
 import applyOperationsGenerated from '../codecs/apply/applyOperations.generated.cjs';
 import networkV1Generated from '../codecs/network/v1/networkV1.generated.cjs';
+import consensusV1Generated from '../codecs/consensus/v1/consensusV1.generated.cjs';
 import b4a from 'b4a'
 // TODO: We are going to have a lot of contstants. It would be good, to separate them into different files.
 
 const { OperationType: ApplyOperationType } = applyOperationsGenerated.apply.operations;
 const { MessageType: NetworkMessageType, ResultCode: NetworkResultCode } = networkV1Generated.network.v1;
-
+const { MessageType: ConsensusMessageType, ResultCode: ConsensusV1ResultCode } = consensusV1Generated.consensus.v1;
 //ATTENTION - THIS IS USED IN THE APPLY FUNCTION!
 export const EntryType = Object.freeze({
     ADMIN: 'admin',
@@ -44,6 +45,16 @@ export const NetworkOperationType = Object.freeze({
     BROADCAST_TRANSACTION_RESPONSE: NetworkMessageType.MESSAGE_TYPE_BROADCAST_TRANSACTION_RESPONSE,
     EPOCH_PROOF_PROPOSAL_REQUEST: NetworkMessageType.MESSAGE_TYPE_EPOCH_PROOF_PROPOSAL_REQUEST,
     EPOCH_PROOF_PROPOSAL_RESPONSE: NetworkMessageType.MESSAGE_TYPE_EPOCH_PROOF_PROPOSAL_RESPONSE,
+});
+
+export const ConsensusOperationType = Object.freeze({
+    PROOF_PROPOSAL: ConsensusMessageType.MESSAGE_TYPE_PROOF_PROPOSAL,
+    PROOF_PROPOSAL_RESPONSE: ConsensusMessageType.MESSAGE_TYPE_PROOF_PROPOSAL_RESPONSE,
+});
+
+export const ConsensusResultCode = Object.freeze({
+    UNSPECIFIED: ConsensusV1ResultCode.RESULT_CODE_UNSPECIFIED,
+    OK: ConsensusV1ResultCode.RESULT_CODE_OK,
 });
 
 export const ResultCode = Object.freeze({

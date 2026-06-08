@@ -9,7 +9,7 @@ message ProofProposal {
   uint32 network_id = 2;
   uint64 epoch = 3; // current epoch number
   bytes previous_epoch_record_hash = 4; // this must be a blob of previous epoch operation - TODO we need agree for the spec of the serialization
-  bytes proposer = 5; // address of the proposer or address
+  bytes proposer = 5; // TRAC address of the proposer
   bytes vdf_parameters_hash = 6; // H(difficulty || iterations)
   bytes vdf_proof = 7; // bytes blob  that is actually y || pi
   bytes signature = 8; // SIG(challenge_data + vdf_proof)
