@@ -144,11 +144,17 @@ export function assertBuffer(value, fieldName) {
     return value;
 }
 
-// apply - unsafe version
-export function uint32ToBuffer(value, fieldName) {
+export function validateUint32(value, fieldName) {
     if (!Number.isInteger(value) || value < 0 || value > 0xFFFFFFFF) {
         throw new Error(`${fieldName} must be an unsigned 32-bit integer.`);
     }
+
+    return value;
+}
+
+// unsafe version
+export function uint32ToBuffer(value, fieldName) {
+    validateUint32(value, fieldName);
 
     const buf = b4a.alloc(4);
     buf.writeUInt32BE(value, 0);

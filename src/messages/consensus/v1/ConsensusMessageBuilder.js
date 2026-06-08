@@ -3,7 +3,7 @@ import tracCryptoApi from 'trac-crypto-api';
 import {encodeProofProposalApproval} from '../../../codecs/consensus/v1/consensusV1OperationCodec.js';
 import {addressToBuffer} from "../../../core/state/utils/address.js";
 import {ConsensusOperationType, ConsensusResultCode} from '../../../utils/constants.js';
-import {createMessage, safeWriteUInt32BE} from "../../../utils/buffer.js";
+import {createMessage, safeWriteUInt32BE, validateUint32} from "../../../utils/buffer.js";
 import {
     createProofProposalApprovalSigningMessage,
     createProofProposalSigningMessage
@@ -32,14 +32,6 @@ class ConsensusMessageBuilder {
     constructor(wallet, config) {
         this.#config = config;
         this.#wallet = wallet;
-    }
-
-    #validateUint32(value, fieldName) {
-        if (!Number.isInteger(value) || value < 0 || value > 0xFFFFFFFF) {
-            throw new Error(`${fieldName} must be an unsigned 32-bit integer.`);
-        }
-
-        return value;
     }
 
     #validateSafeUint64(value, fieldName) {
@@ -119,12 +111,12 @@ class ConsensusMessageBuilder {
     }
 
     setProtocolVersion(protocolVersion) {
-        this.#protocol_version = this.#validateUint32(protocolVersion, 'Protocol version');
+        this.#protocol_version = validateUint32(protocolVersion, 'Protocol version');
         return this;
     }
 
     setNetworkId(networkId) {
-        this.#network_id = this.#validateUint32(networkId, 'Network id');
+        this.#network_id = validateUint32(networkId, 'Network id');
         return  this;
     }
 
