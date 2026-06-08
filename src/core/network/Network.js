@@ -22,6 +22,7 @@ import { Logger } from '../../utils/logger.js';
 import { WalletProvider } from 'trac-wallet';
 import { CustomEventType } from '../../utils/constants.js';
 import tracCryptoApi from 'trac-crypto-api'
+import ConsensusMessages from '../consensus/protocols/ConsensusMessages.js';
 
 const wakeup = new w();
 
@@ -45,6 +46,7 @@ class Network extends ReadyResource {
     #logger;
     #state;
     #store;
+    #consensusMessages;
 
     /**
      * @param {State} state
@@ -226,6 +228,8 @@ class Network extends ReadyResource {
             this.#validatorHealthCheckService = new ValidatorHealthCheckService(this.#config);
             await this.#validatorHealthCheckService.ready();
 
+            this.#consensusMessages = new ConsensusMessages(this.#state, this.#wallet, this.#config, this.#pendingRequestsService);
+
             this.#epochProofProposalService = new EpochProofProposalService(this.#state, this.#validatorConnectionManager, this.#wallet, this.#config);
             await this.#epochProofProposalService.ready();
             // this.#epochProofProposalService.start();
@@ -239,6 +243,8 @@ class Network extends ReadyResource {
                 // - attach Protomux (legacy + v1 channels/messages)
                 // - attach connection.protocolSession (used later by tryConnect / orchestrators to send messages)
                 await this.#networkMessages.setupProtomuxMessages(connection);
+
+                this.#consensusMessages.setupProtomuxMessages(connection);
 
                 // ATTENTION: Must be called AFTER the protomux init above
                 const stream = this.#store.replicate(connection);
@@ -258,6 +264,7 @@ class Network extends ReadyResource {
                     this.#swarm.leavePeer(connection.remotePublicKey);
                     this.#validatorConnectionManager.remove(publicKey);
                     connection.protocolSession.close();
+                    connection.consensusProtocolSession?.close();
                 });
 
                 connection.on('error', (error) => {

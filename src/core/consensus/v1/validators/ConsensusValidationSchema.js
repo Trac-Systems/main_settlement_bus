@@ -6,7 +6,7 @@ import {
     PUBLIC_KEY_LENGTH,
     SIGNATURE_BYTE_LENGTH,
     ResultCode
-} from '../../../../../utils/constants.js';
+} from '../../../../utils/constants.js';
 
 const ALLOWED_RESULT_CODES = Object.values(ResultCode);
 

@@ -1,11 +1,11 @@
-import V1BaseOperation from "../../../network/protocols/v1/validators/V1BaseOperation.js";
+import ConsensusBaseOperation from './ConsensusBaseOperation.js';
 import b4a from "b4a";
 import tracCryptoApi from "trac-crypto-api";
 import { ResultCode, WRITER_BYTE_LENGTH } from "../../../../utils/constants.js";
 import { V1ProtocolError } from "../../../network/protocols/v1/V1ProtocolError.js";
 import { isBufferValid } from "../../../../utils/buffer.js";
 
-class V1EpochProofProposalResponse extends V1BaseOperation {
+class V1EpochProofProposalResponse extends ConsensusBaseOperation {
     constructor(config) {
         super(config);
     }

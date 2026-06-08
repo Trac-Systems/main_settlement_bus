@@ -6,9 +6,7 @@ import { CustomEventType, ResultCode } from "../../../../utils/constants.js";
 import b4a from "b4a";
 import tracCryptoApi from "trac-crypto-api";
 import { epochProofFromBuffer } from "./epochProposal/epochProofData.js";
-
-// TODO: this class calls applyRateLimit, displayError, sendResponseAndMaybeClose, resolvePendingResponse,
-// and handlePendingResponseError but does not define them and extends nothing. It should extend a base handler class.
+import {publicKeyToAddress} from "../../../../utils/helpers.js";
 
 // Minion interface to verify & sign proposals
 class ConsensusEpochProofProposalOperationHandler {
@@ -17,19 +15,45 @@ class ConsensusEpochProofProposalOperationHandler {
     #state
     #wallet
     #config
+    #pendingRequestService
 
-    constructor(state, wallet, config) {
+    constructor(state, wallet, config, pendingRequestService) {
         this.#state = state;
         this.#wallet = wallet;
         this.#config = config;
+        this.#pendingRequestService = pendingRequestService;
         this.#v1EpochProofProposalRequestValidator = new V1EpochProofProposalRequest(config);
         this.#v1EpochProofProposalResponseValidator = new V1EpochProofProposalResponse(config);
+    }
+
+    displayError(step = "undefined step", senderPublicKey, error) {
+        const errorMessage = error?.message ?? 'Unexpected error';
+        console.error(`${this.constructor.name}: ${step} ${publicKeyToAddress(senderPublicKey, this.#config)}: ${errorMessage}`);
+    }
+
+    async #resolvePendingResponse(message, connection, validator, extractResult) {
+        const entry = this.#pendingRequestService.getPendingRequest(message.id);
+        if (!entry) return false;
+
+        this.#pendingRequestService.stopPendingRequestTimeout(message.id);
+        await validator.validate(message, connection, entry);
+        const result = extractResult(message);
+        this.#pendingRequestService.resolvePendingRequest(message.id, result);
+        return true;
+    }
+
+    #handlePendingResponseError(messageId, connection, error, step) {
+        const protocolError = error instanceof V1ProtocolError
+            ? error
+            : new V1ProtocolError(ResultCode.UNEXPECTED_ERROR, error?.message ?? "Unexpected Error");
+        const rejected = this.#pendingRequestService.rejectPendingRequest(messageId, protocolError);
+        if (!rejected) return;
+        this.displayError(step, connection.remotePublicKey, protocolError)
     }
 
     // leader requests approval to minion
     async handleRequest(message, connection) {
         try {
-            this.applyRateLimit(connection);
             await this.#v1EpochProofProposalRequestValidator.validate(message, connection.remotePublicKey);
             await this.#validateDataHash(message.epoch_proof_proposal_request)
 
@@ -52,12 +76,7 @@ class ConsensusEpochProofProposalOperationHandler {
             const proposalHash = message.epoch_proof_proposal_request.hash
             const signature = this.#wallet.sign(proposalHash)
             const response = await this.#buildEpochResponse(message.id, connection.capabilities, signature)
-            
-            const result = await this.sendResponseAndMaybeClose(
-                connection,
-                response,
-                false
-            );
+            const result =  await connection.consensusProtocolSession.sendAndForget(response);
 
             this.#state.emit(CustomEventType.EPOCH_PROPOSAL_SUBMITTED)
             return result;
@@ -75,15 +94,14 @@ class ConsensusEpochProofProposalOperationHandler {
     // is valid signature and is a valid approver
     async handleResponse(message, connection) {
         try {
-            this.applyRateLimit(connection);
-            await this.resolvePendingResponse(
+            await this.#resolvePendingResponse(
                 message,
                 connection,
                 this.#v1EpochProofProposalResponseValidator,
                 this.#extractEpochProofProposalResponse
             );
         } catch (error) {
-            this.handlePendingResponseError(
+            this.#handlePendingResponseError(
                 message.id,
                 connection,
                 error,

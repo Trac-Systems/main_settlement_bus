@@ -1,3 +1,5 @@
+import { NetworkOperationType } from '../../../utils/constants.js';
+
 export default class ConsensusMessageDirector {
     #builder
 

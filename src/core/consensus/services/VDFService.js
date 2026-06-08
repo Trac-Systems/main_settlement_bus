@@ -1,41 +1,30 @@
 import Channel from "bare-channel";
 import ReadyResource from "ready-resource";
-import {loadVdfWasm} from "@tracsystems/trac-vdf"
 
 export class VDFService extends ReadyResource {
-    #vdf = null;
     #thread = null;
-    #port = null;    
+    #port = null;
 
     constructor() {
         super();
     }
 
     async _open() {
-
-        this.#vdf = await loadVdfWasm();
-
         const channel = new Channel();
-
         this.#port = channel.connect();
         this.#thread = new Bare.Thread("vdf-worker.js", { data: channel.handle }, async (handle) => {
             const { default: Channel } = await import("bare-channel");
+            const { loadVdfWasm } = await import("@tracsystems/trac-vdf");
+            const vdf = await loadVdfWasm();
             const channel = Channel.from(handle);
             const port = channel.connect();
 
             for await (const request of port) {
                 const { challenge, difficulty, discriminantSizeBits } = request;
-
                 try {
-                    const solution = this.#vdf.solveWesolowski(challenge, difficulty, discriminantSizeBits);
-                    
+                    const solution = vdf.solveWesolowski(challenge, difficulty, discriminantSizeBits);
                     await port.write({
-                        result: {
-                            challenge,
-                            difficulty,
-                            discriminantSizeBits,
-                            solution,
-                        },
+                        result: { challenge, difficulty, discriminantSizeBits, solution },
                     });
                 } catch {}
             }
@@ -49,20 +38,7 @@ export class VDFService extends ReadyResource {
     }
 
     async calculateVDF(challenge, difficulty, discriminantSizeBits) {
-        try {
-            await this.#port.write({
-                challenge,
-                difficulty,
-                discriminantSizeBits,
-            });
-
-            const result = await this.#port.read();
-
-            return result;
-        } catch (error) {
-            throw error;
-        }
-
-        return await response;
+        await this.#port.write({ challenge, difficulty, discriminantSizeBits });
+        return await this.#port.read();
     }
 }

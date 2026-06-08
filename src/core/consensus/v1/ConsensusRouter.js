@@ -2,7 +2,7 @@ import { decodeV1networkOperation } from '../../../codecs/network/v1/networkV1Op
 import b4a from 'b4a'
 import { NetworkOperationType, V1_PROTOCOL_PAYLOAD_MAX_SIZE } from '../../../utils/constants.js'
 import { publicKeyToAddress } from '../../../utils/helpers.js'
-import V1EpochProofProposalOperationHandler from './handlers/ConsesusEpochProofProposalOperationHandler.js'
+import ConsensusEpochProofProposalOperationHandler from './handlers/ConsesusEpochProofProposalOperationHandler.js'
 
 class ConsensusRouterV1 {
     #config
@@ -11,13 +11,15 @@ class ConsensusRouterV1 {
     constructor(
         state,
         wallet,
-        config
+        config,
+        pendingRequestService
     ) {
         this.#config = config
-        this.#epochProofProposalHandler = new V1EpochProofProposalOperationHandler(
+        this.#epochProofProposalHandler = new ConsensusEpochProofProposalOperationHandler(
             state,
             wallet,
-            config
+            config,
+            pendingRequestService,
         );
     }
 
