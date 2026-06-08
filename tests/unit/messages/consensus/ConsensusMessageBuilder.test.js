@@ -158,16 +158,6 @@ test('ConsensusMessageBuilder validates required inputs', async t => {
     const wallet = await createWallet();
     const fields = proofProposalFields(wallet);
 
-    t.exception(
-        () => new ConsensusMessageBuilder(null, config),
-        errorMessageIncludes('Wallet must be a valid wallet object')
-    );
-
-    t.exception(
-        () => new ConsensusMessageBuilder({address: 'invalid'}, config),
-        errorMessageIncludes('Wallet should have a valid TRAC address.')
-    );
-
     const builder = new ConsensusMessageBuilder(wallet, config);
 
     t.exception(

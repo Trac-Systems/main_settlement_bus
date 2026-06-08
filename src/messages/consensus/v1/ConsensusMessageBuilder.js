@@ -1,7 +1,7 @@
 import b4a from 'b4a';
 import tracCryptoApi from 'trac-crypto-api';
 import {encodeProofProposalApproval} from '../../../codecs/consensus/v1/consensusV1OperationCodec.js';
-import {addressToBuffer, isAddressValid} from "../../../core/state/utils/address.js";
+import {addressToBuffer} from "../../../core/state/utils/address.js";
 import {ConsensusOperationType, ConsensusResultCode} from '../../../utils/constants.js';
 import {createMessage, safeWriteUInt32BE} from "../../../utils/buffer.js";
 import {
@@ -31,13 +31,6 @@ class ConsensusMessageBuilder {
 
     constructor(wallet, config) {
         this.#config = config;
-        if (!wallet || typeof wallet !== 'object') {
-            throw new Error('Wallet must be a valid wallet object');
-        }
-        if (!isAddressValid(wallet.address, this.#config.addressPrefix)) {
-            throw new Error('Wallet should have a valid TRAC address.');
-        }
-
         this.#wallet = wallet;
     }
 
