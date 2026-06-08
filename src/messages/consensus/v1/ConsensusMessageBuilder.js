@@ -1,7 +1,7 @@
 import b4a from 'b4a';
 import tracCryptoApi from 'trac-crypto-api';
 import {encodeProofProposalApproval} from '../../../codecs/consensus/v1/consensusV1OperationCodec.js';
-import {addressToBuffer} from "../../../core/state/utils/address.js";
+import {addressToBuffer, isAddressValid} from "../../../core/state/utils/address.js";
 import {ConsensusOperationType, ConsensusResultCode} from '../../../utils/constants.js';
 import {createMessage, safeWriteUInt32BE, validateUint32} from "../../../utils/buffer.js";
 import {
@@ -51,7 +51,7 @@ class ConsensusMessageBuilder {
     }
 
     #validateAddress(address, fieldName) {
-        if (typeof address !== 'string') {
+        if (typeof address !== 'string' || !isAddressValid(address, this.#config.addressPrefix)) {
             throw new Error(`${fieldName} must be a valid TRAC address.`);
         }
 
