@@ -8,6 +8,10 @@ import ConsensusMessageBuilder from '../../../../src/messages/consensus/v1/Conse
 import ConsensusMessageDirector from '../../../../src/messages/consensus/v1/ConsensusMessageDirector.js';
 import {addressToBuffer} from '../../../../src/core/state/utils/address.js';
 import {createMessage, safeWriteUInt32BE} from '../../../../src/utils/buffer.js';
+import {
+    createProofProposalApprovalSigningMessage,
+    createProofProposalSigningMessage
+} from '../../../../src/core/consensus/v1/consensusSigningMessage.js';
 import {ConsensusOperationType, ConsensusResultCode} from '../../../../src/utils/constants.js';
 import {
     decodeConsensusMessage,
@@ -58,7 +62,7 @@ test('ConsensusMessageDirector builds proof proposal and verifies signature', as
     t.alike(proofProposal.vdf_proof, vdfProof);
     t.ok(b4a.isBuffer(proofProposal.signature));
 
-    const message = createMessage(
+    const message = createProofProposalSigningMessage(
         proofProposal.protocol_version,
         proofProposal.network_id,
         proofProposal.epoch,
@@ -108,7 +112,7 @@ test('ConsensusMessageDirector builds proof proposal response and verifies signa
     t.ok(b4a.isBuffer(proofProposalResponse.approval.approval_sig));
     t.ok(b4a.isBuffer(proofProposalResponse.response_sig));
 
-    const approvalMessage = createMessage(
+    const approvalMessage = createProofProposalApprovalSigningMessage(
         protocolVersion,
         networkId,
         epoch,

@@ -1,6 +1,17 @@
 import test from 'brittle';
 import b4a from 'b4a';
-import { createMessage, isBufferValid, safeWriteUInt32BE, deepCopyBuffer, encodeCapabilities, timestampToBuffer, idToBuffer } from '../../../../src/utils/buffer.js';
+import {
+    assertBuffer,
+    createMessage,
+    isBufferValid,
+    safeWriteUInt32BE,
+    uint32ToBuffer,
+    uint64ToBuffer,
+    deepCopyBuffer,
+    encodeCapabilities,
+    timestampToBuffer,
+    idToBuffer
+} from '../../../../src/utils/buffer.js';
 import { errorMessageIncludes } from "../../../helpers/regexHelper.js";
 
 const invalidDataTypes = [
@@ -248,4 +259,65 @@ test('timestampToBuffer and idToBuffer - reject invalid input', t => {
     t.exception(() => timestampToBuffer('1'), errorMessageIncludes('timestamp'));
     t.exception.all(() => idToBuffer(1));
     t.exception.all(() => idToBuffer(null));
+});
+
+test('uint32ToBuffer - encodes uint32 values and throws for invalid input', t => {
+    const zero = uint32ToBuffer(0, 'field');
+    t.ok(b4a.isBuffer(zero), 'returns a buffer for zero');
+    t.is(zero.readUInt32BE(0), 0, 'encodes zero');
+
+    const max = uint32ToBuffer(0xFFFFFFFF, 'field');
+    t.ok(b4a.isBuffer(max), 'returns buffer for max uint32');
+    t.is(max.readUInt32BE(0), 0xFFFFFFFF, 'encodes max uint32');
+
+    t.exception(() => uint32ToBuffer(-1, 'field'), errorMessageIncludes('field'));
+});
+
+test('uint64ToBuffer - encodes uint64 values and throws for invalid input', t => {
+    const zero = uint64ToBuffer(0, 'field');
+    t.ok(b4a.isBuffer(zero), 'returns a buffer for zero');
+    t.is(zero.readBigUInt64BE(0), 0n, 'encodes zero');
+
+    const large = uint64ToBuffer(0x100000000, 'field');
+    t.ok(b4a.isBuffer(large), 'returns buffer for values above uint32');
+    t.is(large.readBigUInt64BE(0), 0x100000000n, 'encodes uint64-range safe integer');
+
+    t.exception(() => uint64ToBuffer(-1, 'field'), errorMessageIncludes('field'));
+    t.exception(() => uint64ToBuffer(Number.MAX_SAFE_INTEGER + 1, 'field'), errorMessageIncludes('field'));
+});
+
+test('assertBuffer - returns buffers and throws for non-buffers', t => {
+    const buffer = b4a.alloc(1);
+    t.is(assertBuffer(buffer, 'field'), buffer, 'returns original buffer');
+    t.exception(() => assertBuffer('not-a-buffer', 'field'), errorMessageIncludes('field'));
+});
+
+test('uint32ToBuffer - rejects non-integer and out-of-range values with field name', t => {
+    const invalidValues = [
+        1.5,
+        NaN,
+        Infinity,
+        -1,
+        0x100000000,
+        '1',
+        1n
+    ];
+
+    for (const value of invalidValues) {
+        t.exception(() => uint32ToBuffer(value, 'counter'), errorMessageIncludes('counter'));
+    }
+});
+
+test('uint64ToBuffer - encodes bigint boundaries and rejects values outside uint64 range', t => {
+    const max = (2n ** 64n) - 1n;
+    const maxBuffer = uint64ToBuffer(max, 'field');
+
+    t.ok(b4a.isBuffer(maxBuffer), 'returns buffer for max uint64');
+    t.is(maxBuffer.readBigUInt64BE(0), max, 'encodes max uint64');
+    t.exception.all(() => uint64ToBuffer(2n ** 64n, 'field'));
+});
+
+test('assertBuffer - rejects missing and null values with field name', t => {
+    t.exception(() => assertBuffer(undefined, 'payload'), errorMessageIncludes('payload'));
+    t.exception(() => assertBuffer(null, 'payload'), errorMessageIncludes('payload'));
 });

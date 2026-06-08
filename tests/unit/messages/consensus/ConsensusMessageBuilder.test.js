@@ -12,6 +12,12 @@ import {
     encodeProofProposalApproval
 } from '../../../../src/codecs/consensus/v1/consensusV1OperationCodec.js';
 import {createMessage, safeWriteUInt32BE} from '../../../../src/utils/buffer.js';
+import {
+    createProofProposalApprovalSigningMessage,
+    createProofProposalSigningMessage,
+    safeCreateProofProposalApprovalSigningMessage,
+    safeCreateProofProposalSigningMessage
+} from '../../../../src/core/consensus/v1/consensusSigningMessage.js';
 import {ConsensusOperationType, ConsensusResultCode} from '../../../../src/utils/constants.js';
 import {errorMessageIncludes} from '../../../helpers/regexHelper.js';
 import {config} from '../../../helpers/config.js';
@@ -78,7 +84,7 @@ test('ConsensusMessageBuilder builds proof proposal and verifies signature', asy
     t.alike(proofProposal.vdf_proof, fields.vdfProof);
     t.ok(b4a.isBuffer(proofProposal.signature));
 
-    const message = createMessage(
+    const message = createProofProposalSigningMessage(
         proofProposal.protocol_version,
         proofProposal.network_id,
         proofProposal.epoch,
@@ -116,7 +122,7 @@ test('ConsensusMessageBuilder iterates proof proposal response ResultCode values
         t.ok(b4a.isBuffer(payload.proof_proposal_response.approval.approval_sig));
         t.ok(b4a.isBuffer(payload.proof_proposal_response.response_sig));
 
-        const approvalMessage = createMessage(
+        const approvalMessage = createProofProposalApprovalSigningMessage(
             fields.protocolVersion,
             fields.networkId,
             fields.epoch,
@@ -254,4 +260,216 @@ test('ConsensusMessageBuilder validates required inputs', async t => {
             .buildPayload(),
         errorMessageIncludes('Result code must be set before build.')
     );
+});
+
+test('ConsensusMessageBuilder signs zero uint32 values and uint64 epochs without dropping fields', async t => {
+    const wallet = await createWallet();
+    const builder = new ConsensusMessageBuilder(wallet, config);
+    const fields = {
+        ...proofProposalFields(wallet),
+        protocolVersion: 0,
+        networkId: 0,
+        epoch: 0x100000000
+    };
+
+    await setProofProposalFields(
+        builder.setType(ConsensusOperationType.PROOF_PROPOSAL),
+        fields
+    ).buildPayload();
+
+    const proofProposal = builder.getResult().proof_proposal;
+    const signedMessage = createProofProposalSigningMessage(
+        proofProposal.protocol_version,
+        proofProposal.network_id,
+        proofProposal.epoch,
+        proofProposal.previous_epoch_record_hash,
+        proofProposal.proposer,
+        proofProposal.vdf_parameters_hash,
+        proofProposal.vdf_proof
+    );
+    const signedHash = await tracCryptoApi.hash.blake3(signedMessage);
+
+    t.ok(wallet.verify(proofProposal.signature, signedHash, wallet.publicKey));
+
+    const legacyMessage = createMessage(
+        proofProposal.protocol_version,
+        proofProposal.network_id,
+        proofProposal.epoch,
+        proofProposal.previous_epoch_record_hash,
+        proofProposal.proposer,
+        proofProposal.vdf_parameters_hash,
+        proofProposal.vdf_proof
+    );
+    const legacyHash = await tracCryptoApi.hash.blake3(legacyMessage);
+    t.not(wallet.verify(proofProposal.signature, legacyHash, wallet.publicKey));
+});
+
+test('consensus signing message helpers expose unsafe and safe variants', t => {
+    const fields = proofProposalFields({
+        address: tracCryptoApi.address.encode(config.addressPrefix, b4a.from(testKeyPair1.publicKey, 'hex'))
+    });
+    const signingFields = {
+        ...fields,
+        proposer: fields.proposerBuffer
+    };
+
+    const valid = createProofProposalSigningMessage(
+        signingFields.protocolVersion,
+        signingFields.networkId,
+        signingFields.epoch,
+        signingFields.previousEpochRecordHash,
+        signingFields.proposer,
+        signingFields.vdfParametersHash,
+        signingFields.vdfProof
+    );
+    t.ok(b4a.isBuffer(valid));
+
+    t.exception(() => createProofProposalSigningMessage(
+        signingFields.protocolVersion,
+        signingFields.networkId,
+        Number.MAX_SAFE_INTEGER + 1,
+        signingFields.previousEpochRecordHash,
+        signingFields.proposer,
+        signingFields.vdfParametersHash,
+        signingFields.vdfProof
+    ));
+    t.is(safeCreateProofProposalSigningMessage(
+        signingFields.protocolVersion,
+        signingFields.networkId,
+        Number.MAX_SAFE_INTEGER + 1,
+        signingFields.previousEpochRecordHash,
+        signingFields.proposer,
+        signingFields.vdfParametersHash,
+        signingFields.vdfProof
+    ), null);
+});
+
+test('createProofProposalSigningMessage encodes fields in deterministic order', t => {
+    const protocolVersion = 0;
+    const networkId = 0xFFFFFFFF;
+    const epoch = 0x100000000;
+    const previousEpochRecordHash = b4a.alloc(32, 1);
+    const proposer = b4a.alloc(32, 2);
+    const vdfParametersHash = b4a.alloc(32, 3);
+    const vdfProof = b4a.alloc(96, 4);
+
+    const message = createProofProposalSigningMessage(
+        protocolVersion,
+        networkId,
+        epoch,
+        previousEpochRecordHash,
+        proposer,
+        vdfParametersHash,
+        vdfProof
+    );
+
+    const prefix = b4a.alloc(16);
+    prefix.writeUInt32BE(protocolVersion, 0);
+    prefix.writeUInt32BE(networkId, 4);
+    prefix.writeBigUInt64BE(BigInt(epoch), 8);
+    const expected = b4a.concat([
+        prefix,
+        previousEpochRecordHash,
+        proposer,
+        vdfParametersHash,
+        vdfProof
+    ]);
+
+    t.is(message.length, expected.length);
+    t.ok(b4a.equals(message, expected));
+});
+
+test('createProofProposalApprovalSigningMessage appends approver and requester signature bytes', t => {
+    const protocolVersion = 1;
+    const networkId = 2;
+    const epoch = 3;
+    const previousEpochRecordHash = b4a.alloc(32, 1);
+    const proposer = b4a.alloc(32, 2);
+    const vdfParametersHash = b4a.alloc(32, 3);
+    const vdfProof = b4a.alloc(96, 4);
+    const approver = b4a.alloc(32, 5);
+    const requesterProofSignature = b4a.alloc(64, 6);
+
+    const message = createProofProposalApprovalSigningMessage(
+        protocolVersion,
+        networkId,
+        epoch,
+        previousEpochRecordHash,
+        proposer,
+        vdfParametersHash,
+        vdfProof,
+        approver,
+        requesterProofSignature
+    );
+
+    const prefix = b4a.alloc(16);
+    prefix.writeUInt32BE(protocolVersion, 0);
+    prefix.writeUInt32BE(networkId, 4);
+    prefix.writeBigUInt64BE(BigInt(epoch), 8);
+    const expected = b4a.concat([
+        prefix,
+        previousEpochRecordHash,
+        proposer,
+        vdfParametersHash,
+        vdfProof,
+        approver,
+        requesterProofSignature
+    ]);
+    const approverOffset = expected.length - approver.length - requesterProofSignature.length;
+    const requesterProofSignatureOffset = expected.length - requesterProofSignature.length;
+
+    t.is(message.length, expected.length);
+    t.ok(b4a.equals(message, expected));
+    t.ok(b4a.equals(message.subarray(approverOffset, requesterProofSignatureOffset), approver));
+    t.ok(b4a.equals(message.subarray(requesterProofSignatureOffset), requesterProofSignature));
+});
+
+test('safe consensus signing helpers return null for invalid uint32 and buffer fields', t => {
+    const fields = proofProposalFields({
+        address: tracCryptoApi.address.encode(config.addressPrefix, b4a.from(testKeyPair1.publicKey, 'hex'))
+    });
+    const proposer = fields.proposerBuffer;
+    const approver = b4a.alloc(32, 7);
+
+    t.exception(() => createProofProposalSigningMessage(
+        fields.protocolVersion,
+        0x100000000,
+        fields.epoch,
+        fields.previousEpochRecordHash,
+        proposer,
+        fields.vdfParametersHash,
+        fields.vdfProof
+    ), errorMessageIncludes('Network id'));
+    t.is(safeCreateProofProposalSigningMessage(
+        fields.protocolVersion,
+        0x100000000,
+        fields.epoch,
+        fields.previousEpochRecordHash,
+        proposer,
+        fields.vdfParametersHash,
+        fields.vdfProof
+    ), null);
+
+    t.exception(() => createProofProposalApprovalSigningMessage(
+        fields.protocolVersion,
+        fields.networkId,
+        fields.epoch,
+        fields.previousEpochRecordHash,
+        proposer,
+        fields.vdfParametersHash,
+        fields.vdfProof,
+        'not-a-buffer',
+        fields.requesterProofSignature
+    ), errorMessageIncludes('Approver'));
+    t.is(safeCreateProofProposalApprovalSigningMessage(
+        fields.protocolVersion,
+        fields.networkId,
+        fields.epoch,
+        fields.previousEpochRecordHash,
+        proposer,
+        fields.vdfParametersHash,
+        fields.vdfProof,
+        approver,
+        'not-a-buffer'
+    ), null);
 });

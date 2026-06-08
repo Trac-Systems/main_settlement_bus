@@ -71,7 +71,7 @@ export function deepCopyBuffer(buffer) {
     return copy;
 }
 
-function uint64ToBuffer(value, fieldName) {
+export function uint64ToBuffer(value, fieldName) {
     if (typeof value === 'number') {
         if (!Number.isSafeInteger(value) || value < 0) {
             throw new Error(`${fieldName} must be a non-negative safe integer`);
@@ -127,3 +127,21 @@ export function toHex(publicKey) {
     return b4a.isBuffer(publicKey) ? b4a.toString(publicKey, 'hex') : publicKey;
 }
 
+export function assertBuffer(value, fieldName) {
+    if (!b4a.isBuffer(value)) {
+        throw new Error(`${fieldName} must be a buffer.`);
+    }
+
+    return value;
+}
+
+// apply - unsafe version
+export function uint32ToBuffer(value, fieldName) {
+    if (!Number.isInteger(value) || value < 0 || value > 0xFFFFFFFF) {
+        throw new Error(`${fieldName} must be an unsigned 32-bit integer.`);
+    }
+
+    const buf = b4a.alloc(4);
+    buf.writeUInt32BE(value, 0);
+    return buf;
+}

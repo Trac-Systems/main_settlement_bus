@@ -4,6 +4,10 @@ import {encodeProofProposalApproval} from '../../../codecs/consensus/v1/consensu
 import {addressToBuffer, isAddressValid} from "../../../core/state/utils/address.js";
 import {ConsensusOperationType, ConsensusResultCode} from '../../../utils/constants.js';
 import {createMessage, safeWriteUInt32BE} from "../../../utils/buffer.js";
+import {
+    createProofProposalApprovalSigningMessage,
+    createProofProposalSigningMessage
+} from "../../../core/consensus/v1/consensusSigningMessage.js";
 
 class ConsensusMessageBuilder {
     #wallet;
@@ -180,7 +184,7 @@ class ConsensusMessageBuilder {
     }
 
     async #buildProofProposalPayload() {
-        const message = createMessage(
+        const message = createProofProposalSigningMessage(
             this.#protocol_version,
             this.#network_id,
             this.#epoch,
@@ -209,7 +213,7 @@ class ConsensusMessageBuilder {
             throw new Error('Result code must be set before build.');
         }
 
-        const messageApproval = createMessage(
+        const messageApproval = createProofProposalApprovalSigningMessage(
             this.#protocol_version,
             this.#network_id,
             this.#epoch,
