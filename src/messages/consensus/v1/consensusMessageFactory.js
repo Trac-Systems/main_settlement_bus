@@ -7,6 +7,6 @@ import ConsensusMessageBuilder from "./ConsensusMessageBuilder.js";
  * @param {object} config
  * @returns {ConsensusMessageDirector}
  */
-export const networkMessageFactory = (wallet, config) => {
+export const consensusMessageFactory = (wallet, config) => {
     return new ConsensusMessageDirector(new ConsensusMessageBuilder(wallet, config))
 }
