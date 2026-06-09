@@ -135,7 +135,7 @@ class ConsensusValidationSchema {
                 strict: true,
                 type: 'object',
                 props: {
-                    member_id: {type: 'buffer', length: PUBLIC_KEY_LENGTH, required: true},
+                    approver: {type: 'buffer', length: PUBLIC_KEY_LENGTH, required: true},
                     signature: {type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true},
                     result: {type: 'enum', values: ALLOWED_RESULT_CODES, required: true},
                 }

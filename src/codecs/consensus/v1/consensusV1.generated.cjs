@@ -1151,7 +1151,7 @@ $root.consensus = (function() {
              * Properties of a ProofProposalApproval.
              * @memberof consensus.v1
              * @interface IProofProposalApproval
-             * @property {Uint8Array|null} [member_id] ProofProposalApproval member_id
+             * @property {Uint8Array|null} [approver] ProofProposalApproval approver
              * @property {Uint8Array|null} [approval_sig] ProofProposalApproval approval_sig
              */
 
@@ -1171,12 +1171,12 @@ $root.consensus = (function() {
             }
 
             /**
-             * ProofProposalApproval member_id.
-             * @member {Uint8Array} member_id
+             * ProofProposalApproval approver.
+             * @member {Uint8Array} approver
              * @memberof consensus.v1.ProofProposalApproval
              * @instance
              */
-            ProofProposalApproval.prototype.member_id = $util.newBuffer([]);
+            ProofProposalApproval.prototype.approver = $util.newBuffer([]);
 
             /**
              * ProofProposalApproval approval_sig.
@@ -1210,8 +1210,8 @@ $root.consensus = (function() {
             ProofProposalApproval.encode = function encode(message, writer) {
                 if (!writer)
                     writer = $Writer.create();
-                if (message.member_id != null && Object.hasOwnProperty.call(message, "member_id"))
-                    writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.member_id);
+                if (message.approver != null && Object.hasOwnProperty.call(message, "approver"))
+                    writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.approver);
                 if (message.approval_sig != null && Object.hasOwnProperty.call(message, "approval_sig"))
                     writer.uint32(/* id 2, wireType 2 =*/18).bytes(message.approval_sig);
                 return writer;
@@ -1251,7 +1251,7 @@ $root.consensus = (function() {
                         break;
                     switch (tag >>> 3) {
                     case 1: {
-                            message.member_id = reader.bytes();
+                            message.approver = reader.bytes();
                             break;
                         }
                     case 2: {
@@ -1293,9 +1293,9 @@ $root.consensus = (function() {
             ProofProposalApproval.verify = function verify(message) {
                 if (typeof message !== "object" || message === null)
                     return "object expected";
-                if (message.member_id != null && message.hasOwnProperty("member_id"))
-                    if (!(message.member_id && typeof message.member_id.length === "number" || $util.isString(message.member_id)))
-                        return "member_id: buffer expected";
+                if (message.approver != null && message.hasOwnProperty("approver"))
+                    if (!(message.approver && typeof message.approver.length === "number" || $util.isString(message.approver)))
+                        return "approver: buffer expected";
                 if (message.approval_sig != null && message.hasOwnProperty("approval_sig"))
                     if (!(message.approval_sig && typeof message.approval_sig.length === "number" || $util.isString(message.approval_sig)))
                         return "approval_sig: buffer expected";
@@ -1314,11 +1314,11 @@ $root.consensus = (function() {
                 if (object instanceof $root.consensus.v1.ProofProposalApproval)
                     return object;
                 var message = new $root.consensus.v1.ProofProposalApproval();
-                if (object.member_id != null)
-                    if (typeof object.member_id === "string")
-                        $util.base64.decode(object.member_id, message.member_id = $util.newBuffer($util.base64.length(object.member_id)), 0);
-                    else if (object.member_id.length >= 0)
-                        message.member_id = object.member_id;
+                if (object.approver != null)
+                    if (typeof object.approver === "string")
+                        $util.base64.decode(object.approver, message.approver = $util.newBuffer($util.base64.length(object.approver)), 0);
+                    else if (object.approver.length >= 0)
+                        message.approver = object.approver;
                 if (object.approval_sig != null)
                     if (typeof object.approval_sig === "string")
                         $util.base64.decode(object.approval_sig, message.approval_sig = $util.newBuffer($util.base64.length(object.approval_sig)), 0);
@@ -1342,11 +1342,11 @@ $root.consensus = (function() {
                 var object = {};
                 if (options.defaults) {
                     if (options.bytes === String)
-                        object.member_id = "";
+                        object.approver = "";
                     else {
-                        object.member_id = [];
+                        object.approver = [];
                         if (options.bytes !== Array)
-                            object.member_id = $util.newBuffer(object.member_id);
+                            object.approver = $util.newBuffer(object.approver);
                     }
                     if (options.bytes === String)
                         object.approval_sig = "";
@@ -1356,8 +1356,8 @@ $root.consensus = (function() {
                             object.approval_sig = $util.newBuffer(object.approval_sig);
                     }
                 }
-                if (message.member_id != null && message.hasOwnProperty("member_id"))
-                    object.member_id = options.bytes === String ? $util.base64.encode(message.member_id, 0, message.member_id.length) : options.bytes === Array ? Array.prototype.slice.call(message.member_id) : message.member_id;
+                if (message.approver != null && message.hasOwnProperty("approver"))
+                    object.approver = options.bytes === String ? $util.base64.encode(message.approver, 0, message.approver.length) : options.bytes === Array ? Array.prototype.slice.call(message.approver) : message.approver;
                 if (message.approval_sig != null && message.hasOwnProperty("approval_sig"))
                     object.approval_sig = options.bytes === String ? $util.base64.encode(message.approval_sig, 0, message.approval_sig.length) : options.bytes === Array ? Array.prototype.slice.call(message.approval_sig) : message.approval_sig;
                 return object;

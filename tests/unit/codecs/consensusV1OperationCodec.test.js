@@ -48,13 +48,13 @@ test('Consensus codec safe ProofProposalApproval helpers handle invalid payloads
     t.teardown(() => consoleLog.restore());
 
     const invalidEncoded = safeEncodeProofProposalApproval({
-        member_id: 67,
+        approver: 67,
         approval_sig: fixtures.proofProposalApproval.approval_sig
     });
 
     t.ok(b4a.isBuffer(invalidEncoded));
     t.is(invalidEncoded.length, 0);
-    t.ok(consoleLog.calledOnceWithExactly('safeEncodeProofProposalApproval error:', 'member_id: buffer expected'));
+    t.ok(consoleLog.calledOnceWithExactly('safeEncodeProofProposalApproval error:', 'approver: buffer expected'));
     t.is(safeDecodeProofProposalApproval(null), null);
     t.is(safeDecodeProofProposalApproval({}), null);
     t.is(safeDecodeProofProposalApproval('not-a-buffer'), null);
