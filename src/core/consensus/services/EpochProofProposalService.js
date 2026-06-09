@@ -15,7 +15,7 @@ import { createVDFService } from "./createVDFService.js";
 import addressUtils from '../../state/utils/address.js';
 import { CustomEventType } from '../../../utils/constants.js';
 import { safeEncodeProofProposal, safeEncodeProofProposalApproval } from '../../../codecs/consensus/v1/consensusV1OperationCodec.js';
-import { EpochProofData } from '../../consensus/v1/handlers/epochProposal/epochProofData.js';
+import { buildProofData } from '../../consensus/v1/handlers/epochProposal/epochProofData.js';
 
 const PROTOCOL_VERSION = 1;
 const withTimeout = (promise, ms) => Promise.race([
@@ -110,7 +110,7 @@ class EpochProofProposalService extends ReadyResource {
 
     createProposal(lastEpochId, lastEpochHash, vdf, committeeHash) {
         const currentEpochId = lastEpochId + 1;
-        return new EpochProofData ({
+        return buildProofData({
             protocolVersion: PROTOCOL_VERSION,
             epoch: currentEpochId,
             prevEpochHash: lastEpochHash,
@@ -181,18 +181,10 @@ class EpochProofProposalService extends ReadyResource {
                 vdf.result,
                 committeeHash
             );
+            const proofProposal = await newEpochProofData.toProposalMessage(this.#wallet)
             
-            const toHash = createMessage(...Object.values(newEpochProofData));
-            const hash = await blake3(toHash);
-            const signature = this.#wallet.sign(hash);
-            const members = await this.#state.getIndexersEntry();
-            const proofProposal = {
-                data: newEpochProofData,
-                dataHash: hash,
-                signature: signature,
-            };
-
-            const tasks = members.map(member =>
+            const approvers = await this.#state.getIndexersEntry();
+            const tasks = approvers.map(member =>
                 withTimeout(this.#collectSignature(member, proofProposal), this.#config.epochSignatureTimeout)
             );
 

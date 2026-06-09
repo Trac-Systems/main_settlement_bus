@@ -1,4 +1,6 @@
 import b4a from 'b4a'
+import { createProofProposalSigningMessage } from '../../consensusSigningMessage.js'
+import tracCryptoApi from "trac-crypto-api";
 
 export const PROTOCOL_VERSION = 1
 
@@ -12,7 +14,8 @@ const decode = (buffer) => {
 
     const protocolVersion = buffer.readUInt8(offset);      offset += 1
     const epoch           = buffer.readBigUInt64BE(offset); offset += 8
-    const prevEpochHash   = buffer.slice(offset, offset + 32); offset += 32
+    const prevEpochHash   = buffer.slice(offset,
+        offset + 32); offset += 32
     const networkId       = buffer.readUInt16BE(offset);    offset += 2
     const committeeHash     = buffer.slice(offset, offset + 32); offset += 32
     // const leaderId        = buffer.slice(offset, offset + 32); offset += 32
@@ -22,60 +25,63 @@ const decode = (buffer) => {
     return { protocolVersion, epoch, prevEpochHash, networkId, committeeHash, /*leaderId,*/ vdfParamsHash, vdfOutput }
 }
 
-export class EpochProofData {
-    constructor({ protocolVersion, epoch, prevEpochHash, networkId, committeeHash, /*leaderId,*/ vdfParamsHash, vdfOutput }) {
+class EpochProofData {
+    constructor({ protocolVersion, epoch, prevEpochHash, networkId, proposer, vdfParamsHash, vdfProof }) {
         this.protocolVersion = protocolVersion
         this.epoch           = epoch
         this.prevEpochHash   = prevEpochHash
         this.networkId       = networkId
-        this.committeeHash     = committeeHash
-        // this.leaderId        = leaderId
+        this.proposer        = proposer
         this.vdfParamsHash   = vdfParamsHash
-        this.vdfOutput       = vdfOutput
+        this.vdfProof        = vdfProof
     }
 
-    toBuffer() {
-        const buf = b4a.alloc(TOTAL_SIZE)
-        let offset = 0
+    async toProposalMessage(signer) {
+        const hash = this.#hash()
+        return {
+            data: {
+                protocolVersion: this.protocolVersion,
+                epoch: this.epoch,
+                prevEpochHash: this.prevEpochHash,
+                networkId: this.networkId,
+                proposer: this.proposer,
+                vdfParamsHash: this.vdfParamsHash,
+                vdfProof: this.vdfProof,
+            },
+            dataHash: hash,
+            signature: await this.#sign(signer, hash),
+        };
+    }
 
-        buf.writeUInt8(this.protocolVersion, offset)
-        offset += 1
-        
-        buf.writeBigUInt64BE(BigInt(this.epoch), offset)
-        offset += 8
-        
-        this.prevEpochHash.copy(buf, offset)
-        offset += 32
-        
-        buf.writeUInt16BE(this.networkId, offset)
-        offset += 2
-        
-        this.committeeHash.copy(buf, offset)
-        offset += 32
-        
-        // this.leaderId.copy(buf, offset)
-        // offset += 32
-        
-        this.vdfParamsHash.copy(buf, offset)
-        offset += 32
-        
-        this.vdfOutput.copy(buf, offset)
-        offset += 64
+    #hash() {
+        return tracCryptoApi.hash.blake3(this.#toBuffer())
+    }
 
-        return buf
+    #toBuffer() {
+        return createProofProposalSigningMessage(
+            this.protocolVersion,
+            this.networkId,
+            this.epoch,
+            this.prevEpochHash,
+            this.vdfParamsHash,
+            this.vdfProof)
+    }
+
+    async #sign(signer, hash) {
+        return signer.sign(hash)
     }
 }
 
 // TODO: buildData signature and EpochProofData instantiation are broken — decode() result is ignored.
 // Fix: accept the decoded object and pass it to new EpochProofData(decoded).
-export const buildData = (decoded) => {
+export const buildProofData = (decoded) => {
     if (!decoded) return null
     return new EpochProofData(decoded)
 }
 
 // profData is buffer
 export const epochProofFromBuffer = (proofData) => {
-    return buildData(decode(proofData))
+    return buildProofData(decode(proofData))
 }
 
 export const keys = {
