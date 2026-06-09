@@ -5,11 +5,9 @@ import { OperationType } from "../../../utils/constants.js";
 import { Logger } from "../../../utils/logger.js";
 import { safeEncodeApplyOperation } from '../../../codecs/apply/applyOperationCodec.js';
 import { addressToBuffer } from "../../state/utils/address.js";
-import { createMessage } from "../../../utils/buffer.js";
 import tracCryptoApi from "trac-crypto-api";
-import { blake3 } from "trac-crypto-api/modules/hash.js";
 import { generateUUID } from '../../../utils/helpers.js';
-import { networkMessageFactory } from '../../../messages/network/v1/networkMessageFactory.js';
+import { consensusMessageFactory } from '../../../messages/consensus/v1/consensusMessageFactory.js';
 import { NETWORK_CAPABILITIES } from '../../../utils/constants.js';
 import { createVDFService } from "./createVDFService.js";
 import addressUtils from '../../state/utils/address.js';
@@ -133,8 +131,8 @@ class EpochProofProposalService extends ReadyResource {
         const connection = this.#connectionManager.getConnection(member.key);
         if (!connection) return null;
 
-        const request = await networkMessageFactory(this.#wallet, this.#config)
-            .buildEpochProofProposalRequest(generateUUID(), proofProposal.data, proofProposal.dataHash, NETWORK_CAPABILITIES);
+        const request = await consensusMessageFactory(this.#wallet, this.#config)
+            .buildProofProposal(generateUUID(), proofProposal.data, proofProposal.dataHash, NETWORK_CAPABILITIES);
 
         const response = await connection.protocolSession.send(request);
         return response?.result?.signature ?? null;
