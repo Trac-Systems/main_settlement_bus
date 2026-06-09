@@ -13,7 +13,8 @@ import {
     BATCH_SIZE,
     ADMIN_INITIAL_STAKED_BALANCE,
     TRAC_NAMESPACE,
-    CustomEventType
+    CustomEventType,
+    HASH_BYTE_LENGTH
 } from '../../utils/constants.js';
 import { isHexString, sleep, isTransactionRecordPut } from '../../utils/helpers.js';
 import tracCryptoApi from 'trac-crypto-api';
@@ -36,7 +37,7 @@ import {
     BALANCE_ZERO,
     toTerm,
 } from './utils/balance.js';
-import { safeWriteUInt32BE, convertToArray } from '../../utils/buffer.js';
+import { safeWriteUInt32BE, isBufferValid } from '../../utils/buffer.js';
 import deploymentEntryUtils from './utils/deploymentEntry.js';
 import { deepCopyBuffer } from '../../utils/buffer.js';
 import { Status } from './utils/transaction.js';
@@ -3309,7 +3310,7 @@ class State extends ReadyResource {
         }
 
         const proofHash = await tracCryptoApi.hash.blake3(op.seo.pd); // computes the buffers' blake3 hash - ProofProposal seralized in bytes
-        if (!proofHash || proofHash.length !== 32) {
+        if (!isBufferValid(proofHash.length, HASH_BYTE_LENGTH)) {
             this.#safeLogApply(OperationType.SET_EPOCH, "Failed to decode the proposal hash.", node.from.key);
             return Status.FAILURE;
         }
@@ -3332,11 +3333,11 @@ class State extends ReadyResource {
         }
 
         for (let i = 0; i < signatures.length; i++) {
-            if (!signatures[i].approval_sig || !signatures[i].member_id) { // guard null decoded fields
+            if (!signatures[i].approval_sig || !signatures[i].proposer) { // guard null decoded fields
                 this.#safeLogApply(OperationType.SET_EPOCH, "Invalid signature.", node.from.key);
                 return Status.FAILURE;
             }
-            const valid = tracCryptoApi.signature.verify(signatures[i].approval_sig, proofHash, signatures[i].member_id); // verify member signature
+            const valid = tracCryptoApi.signature.verify(signatures[i].approval_sig, proofHash, signatures[i].proposer); // verify member signature
             if (!valid) {
                 this.#safeLogApply(OperationType.SET_EPOCH, "Invalid signature.", node.from.key);
                 return Status.FAILURE;
@@ -3344,14 +3345,18 @@ class State extends ReadyResource {
         }
 
         const currentEpochIdBuffer = await this.#getEntryApply(keys.CURRENT_INDEX, batch); // read current epoch id
-        const currentEpochId = currentEpochIdBuffer ? lengthEntryUtils.decodeBE(currentEpochIdBuffer) : 0; // decode or default genesis
-        const currentEpochHash = await this.#getEntryApply(keys.EPOCH(currentEpochId), batch); // read current epoch hash
-
+        if (!currentEpochIdBuffer) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "Invalid previous epoch.", node.from.key);
+            return Status.FAILURE;
+        }
+        const currentEpochId = lengthEntryUtils.decodeBE(currentEpochIdBuffer); // decode or default genesis
+        
         if (proof.epoch !== currentEpochId + 1) { // enforce sequential epoch
             this.#safeLogApply(OperationType.SET_EPOCH, "Epoch id mismatch.", node.from.key);
             return Status.FAILURE;
         }
-
+        
+        const currentEpochHash = await this.#getEntryApply(keys.EPOCH(currentEpochId), batch); // read current epoch hash
         if (currentEpochId > 0 && !b4a.equals(proof.previous_epoch_record_hash, currentEpochHash)) { // verify previous hash linkage
             this.#safeLogApply(OperationType.SET_EPOCH, "Previous epoch hash mismatch.", node.from.key);
             return Status.FAILURE;
