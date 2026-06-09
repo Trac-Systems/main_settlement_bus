@@ -58,13 +58,20 @@ class EpochProofProposalService extends ReadyResource {
             this.#intervalMs,
         );
 
-        this.#state.on(CustomEventType.EPOCH_PROPOSAL_SUBMITTED, async () => {
-            await this.stop(false);
-        });
+        // OS SUBSCRIBERS ESTAO ERRADOS
+        // 1 - se receber epoch proposal o indexer não pode enviar o proposal dele e o worker continua normalmente
+        // 2 - se tiver uma epoch, o indexer restarta o fluxo para gerar nova vdf, não o worker, o continua de onde estava
 
-        this.#state.on(CustomEventType.EPOCH_CREATED, () => {
-            setTimeout(() => this.start(), this.#config.epochInterval);
-        });
+        // this.#state.on(CustomEventType.EPOCH_PROPOSAL_SUBMITTED, async () => {
+        //     await this.stop(false);
+        // });
+
+        // this.#state.on(CustomEventType.EPOCH_CREATED, () => {
+        //     setTimeout(() => this.start(), this.#config.epochInterval);
+        // });
+
+
+        // O WORKER SERÁ INICIADO, MAS O PROCESSO DE GERAÇAO DE PROPOSTA SOMENTE COM UMA EPOCH GENESIS CRIADA
     }
 
     async _close() {
@@ -106,14 +113,14 @@ class EpochProofProposalService extends ReadyResource {
         return await this.#calculatorService.calculateVDF(challenge, difficulty, discriminantSizeBits);
     }
 
-    createProposal(lastEpochId, lastEpochHash, vdf, committeeHash) {
+    createProposal(lastEpochId, lastEpochHash, vdf) {
         const currentEpochId = lastEpochId + 1;
         return buildProofData({
             protocolVersion: PROTOCOL_VERSION,
             epoch: currentEpochId,
             prevEpochHash: lastEpochHash,
             networkId: this.#config.networkId,
-            committeeHash: committeeHash,
+            proposer: this.#wallet.address,
             vdfParamsHash: vdf.solution.slice(0, 258), // y — the first 258 bytes
             vdfOutput: vdf.solution.slice(258), // proof — the last 258 bytes  
         });
@@ -132,7 +139,7 @@ class EpochProofProposalService extends ReadyResource {
         if (!connection) return null;
 
         const request = await consensusMessageFactory(this.#wallet, this.#config)
-            .buildProofProposal(generateUUID(), proofProposal.data, proofProposal.dataHash, NETWORK_CAPABILITIES);
+            .buildProofProposal(generateUUID(), this.#config.networkId, proofProposal.epoch, proofProposal.prevEpochHash, proofProposal.proposer, proofProposal.vdfParamsHash, proofProposal.vdfProof);
 
         const response = await connection.protocolSession.send(request);
         return response?.result?.signature ?? null;

@@ -72,8 +72,7 @@ class EpochProofData {
     }
 }
 
-// TODO: buildData signature and EpochProofData instantiation are broken — decode() result is ignored.
-// Fix: accept the decoded object and pass it to new EpochProofData(decoded).
+// TODO: validate decoded data being received and returned
 export const buildProofData = (decoded) => {
     if (!decoded) return null
     return new EpochProofData(decoded)

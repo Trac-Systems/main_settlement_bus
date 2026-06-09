@@ -1,4 +1,4 @@
-import ConsensusRouterV1 from "../v1/ConsensusRouter.js";
+import ConsensusRouterV1 from "./ConsensusRouter.js";
 import ConsensusV1Protocol from "./ConsensusV1Protocol.js";
 
 class ConsensusMessages {

@@ -50,11 +50,6 @@ export const ConsensusOperationType = Object.freeze({
     EPOCH_PROOF_PROPOSAL_RESPONSE: ConsensusMessageType.MESSAGE_TYPE_EPOCH_PROOF_PROPOSAL_RESPONSE,
 });
 
-export const ConsensusOperationType = Object.freeze({
-    PROOF_PROPOSAL: ConsensusMessageType.MESSAGE_TYPE_PROOF_PROPOSAL,
-    PROOF_PROPOSAL_RESPONSE: ConsensusMessageType.MESSAGE_TYPE_PROOF_PROPOSAL_RESPONSE,
-});
-
 export const ConsensusProtocolVersion = Object.freeze({
     V1: 1,
 });

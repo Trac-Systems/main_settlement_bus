@@ -36,3 +36,7 @@ migration/*
 # Environment files
 .env
 testnet/
+
+store1/
+.claude/
+.DS_STORE

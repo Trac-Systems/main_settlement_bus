@@ -1,6 +1,6 @@
 import V1EpochProofProposalRequest from "../validators/V1EpochProofProposalRequest.js";
 import V1EpochProofProposalResponse from "../validators/V1EpochProofProposalResponse.js";
-import {networkMessageFactory} from "../../../../messages/network/v1/networkMessageFactory.js";
+import {consensusMessageFactory} from "../../../../messages/consensus/v1/consensusMessageFactory.js";
 import { V1ProtocolError } from "../../../network/protocols/v1/V1ProtocolError.js";
 import { CustomEventType, ResultCode } from "../../../../utils/constants.js";
 import b4a from "b4a";
@@ -131,6 +131,7 @@ class ConsensusEpochProofProposalOperationHandler {
         }
     }
 
+    // TODO: validate the validation 
     #validatePreviousEpoch(proofData, previousEpoch) {
         if (!previousEpoch || proofData.epoch !== previousEpoch.epoch + 1n) {
             throw new V1ProtocolError(ResultCode.INVALID_EPOCH, 'Epoch sequence mismatch');
@@ -144,11 +145,13 @@ class ConsensusEpochProofProposalOperationHandler {
             throw new V1ProtocolError(ResultCode.INVALID_EPOCH, 'Previous epoch hash mismatch');
         }
         
+        // this must be proofData.networkId !== this.#config.networkId
         if (proofData.networkId !== previousEpoch.networkId) {
             throw new V1ProtocolError(ResultCode.INVALID_EPOCH, 'Network id mismatch');
         }
     }
 
+    // TODO: import wasm to validate vdf using verify (same thread)
     #validateVdf(proofData) {
         if (!proofData.vdfOutput) {
             throw new V1ProtocolError(ResultCode.INVALID_EPOCH, 'Inconsistent vdf data');
@@ -157,13 +160,15 @@ class ConsensusEpochProofProposalOperationHandler {
 
     async #buildEpochResponse(id, capabilities, signature) {
         try {
-            return await networkMessageFactory(this.#wallet, this.#config).buildEpochProofProposalResponse(
+            // TODO: pass the correct params to the buildProofProposalResponse function
+            return await consensusMessageFactory(this.#wallet, this.#config).buildProofProposalResponse(
                 id,
                 capabilities,
                 ResultCode.OK,
                 signature
             );
         } catch (error) {
+            // TODO: Update or create to use a consensus error
             throw new V1ProtocolError(ResultCode.UNEXPECTED_ERROR, `Failed to build broadcast transaction response: ${error.message}`);
         }
     }
