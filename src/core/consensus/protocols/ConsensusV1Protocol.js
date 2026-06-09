@@ -1,6 +1,6 @@
 import Protomux from 'protomux';
 import c from 'compact-encoding';
-import { encodeV1networkOperation, decodeV1networkOperation} from '../../../codecs/network/v1/networkV1OperationCodec.js';
+import { encodeConsensusMessage } from '../../../codecs/consensus/v1/consensusV1OperationCodec.js';
 
 class ConsensusV1Protocol {
     #channel;
@@ -39,7 +39,7 @@ class ConsensusV1Protocol {
     }
 
     async send(message) {
-        const encodedMessage = encodeV1networkOperation(message);
+        const encodedMessage = encodeConsensusMessage(message);
         const msgReplyPromise = this.#pendingRequestService.registerPendingRequest(this.#publicKeyHex, message);
         try {
             this.#session.send(encodedMessage);
@@ -50,7 +50,7 @@ class ConsensusV1Protocol {
     }
 
     sendAndForget(message) {
-        this.#session.send(encodeV1networkOperation(message));
+        this.#session.send(encodeConsensusMessage(message));
     }
 
     close() {
