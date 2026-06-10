@@ -2,8 +2,18 @@ import b4a from 'b4a';
 import tracCryptoApi from 'trac-crypto-api';
 import {encodeProofProposalApproval} from '../../../codecs/consensus/v1/consensusV1OperationCodec.js';
 import {addressToBuffer, isAddressValid} from "../../../core/state/utils/address.js";
-import {ConsensusOperationType, ConsensusProtocolVersion, ConsensusResultCode} from '../../../utils/constants.js';
-import {createMessage, safeWriteUInt32BE, validateUint32} from "../../../utils/buffer.js";
+import {
+    ConsensusOperationType,
+    ConsensusProtocolVersion,
+    ConsensusResultCode
+} from '../../../utils/constants.js';
+import {
+    createMessage,
+    safeWriteUInt32BE,
+    uint8ToBuffer,
+    uint16ToBuffer,
+    uint64ToBuffer
+} from "../../../utils/buffer.js";
 import {
     createProofProposalApprovalSigningMessage,
     createProofProposalSigningMessage
@@ -32,14 +42,6 @@ class ConsensusMessageBuilder {
     constructor(wallet, config) {
         this.#config = config;
         this.#wallet = wallet;
-    }
-
-    #validateSafeUint64(value, fieldName) {
-        if (!Number.isSafeInteger(value) || value < 0) {
-            throw new Error(`${fieldName} must be a non-negative safe integer.`);
-        }
-
-        return value;
     }
 
     #validateBuffer(value, fieldName) {
@@ -100,19 +102,14 @@ class ConsensusMessageBuilder {
         return this;
     }
 
-    setTimestamp(timestamp = Date.now()) {
-        const value = timestamp instanceof Date ? timestamp.getTime() : timestamp;
-        if (!Number.isSafeInteger(value) || value <= 0) {
-            throw new Error('Timestamp must be a positive safe integer or Date.');
-        }
-
-        this.#timestamp = this.#validateSafeUint64(value, 'Timestamp');
+    setTimestamp() {
+        this.#timestamp = Date.now();
         return this;
     }
 
     setProtocolVersion(protocolVersion) {
-        const value = validateUint32(protocolVersion, 'Protocol version');
-        if (!Object.values(ConsensusProtocolVersion).includes(value)) {
+        const value = uint8ToBuffer(protocolVersion, 'Protocol version');
+        if (!Object.values(ConsensusProtocolVersion).includes(protocolVersion)) {
             throw new Error(`Unsupported consensus protocol version: ${protocolVersion}`);
         }
 
@@ -121,12 +118,12 @@ class ConsensusMessageBuilder {
     }
 
     setNetworkId(networkId) {
-        this.#network_id = validateUint32(networkId, 'Network id');
+        this.#network_id = uint16ToBuffer(networkId, 'Network id');
         return  this;
     }
 
     setEpoch(epoch) {
-        this.#epoch = this.#validateSafeUint64(epoch, 'Epoch');
+        this.#epoch = uint64ToBuffer(epoch, 'Epoch');
         return this;
     }
 
@@ -144,7 +141,10 @@ class ConsensusMessageBuilder {
     }
 
     setVdfParametersHash(vdfParametersHash) {
-        this.#vdf_parameters_hash = this.#validateBuffer(vdfParametersHash, 'VDF parameters hash');
+        this.#vdf_parameters_hash = this.#validateBuffer(
+            vdfParametersHash,
+            'VDF parameters hash'
+        );
         return this;
     }
 
@@ -169,7 +169,10 @@ class ConsensusMessageBuilder {
     }
 
     setRequesterProofSignature(proofSignature) {
-        this.#requester_proof_signature = this.#validateBuffer(proofSignature, 'Requester proof signature');
+        this.#requester_proof_signature = this.#validateBuffer(
+            proofSignature,
+            'Requester proof signature'
+        );
         return this;
     }
 
