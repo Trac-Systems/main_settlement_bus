@@ -2,6 +2,10 @@ import { test } from 'brittle';
 import b4a from 'b4a';
 import { WalletProvider } from 'trac-wallet';
 import ApplyStateMessageBuilder from '../../../../src/messages/state/ApplyStateMessageBuilder.js';
+import {
+    safeDecodeApplyOperation,
+    safeEncodeApplyOperation,
+} from '../../../../src/codecs/apply/applyOperationCodec.js';
 import { OperationType } from '../../../../src/utils/constants.js';
 import { config } from '../../../helpers/config.js';
 import { testKeyPair1, testKeyPair2 } from '../../../fixtures/apply.fixtures.js';
@@ -515,4 +519,69 @@ test('ApplyStateMessageBuilder complete transfer operation (tro)', async t => {
     t.ok(b4a.equals(payload.tro.am, amount));
     t.ok(b4a.equals(payload.tro.in, incomingNonce));
     t.ok(b4a.equals(payload.tro.is, incomingSignature));
+});
+
+test('ApplyStateMessageBuilder complete set epoch operation (seo)', async t => {
+    const wallet = await createWallet(testKeyPair1.mnemonic);
+    const proofData = b4a.alloc(96, 0x14);
+    const approvals = [
+        b4a.alloc(64, 0x15),
+        b4a.alloc(64, 0x16)
+    ];
+
+    const builder = new ApplyStateMessageBuilder(wallet, config);
+    await builder
+        .setPhase('complete')
+        .setOutput('buffer')
+        .setOperationType(OperationType.SET_EPOCH)
+        .setAddress(wallet.address)
+        .setProofData(proofData)
+        .setApprovals(approvals)
+        .build();
+
+    const payload = builder.getPayload();
+    t.is(payload.type, OperationType.SET_EPOCH);
+    expectAddressBuffer(t, payload.address, 'address');
+    t.ok(b4a.equals(payload.address, addressToBuffer(wallet.address, config.addressPrefix)));
+    expectPayloadKeys(t, payload, 'seo');
+    expectKeys(t, payload.seo, ['pd', 'app'], 'seo');
+    expectBufferField(t, payload.seo.pd, 96, 'seo.pd');
+    t.alike(payload.seo.app.map(approval => approval.length), [64, 64]);
+    t.ok(b4a.equals(payload.seo.pd, proofData));
+    t.ok(b4a.equals(payload.seo.app[0], approvals[0]));
+    t.ok(b4a.equals(payload.seo.app[1], approvals[1]));
+});
+
+test('ApplyStateMessageBuilder complete set epoch operation codec roundtrip', async t => {
+    const wallet = await createWallet(testKeyPair1.mnemonic);
+    const proofData = b4a.alloc(96, 0x34);
+    const approvals = [
+        b4a.alloc(64, 0x35),
+        b4a.alloc(64, 0x36)
+    ];
+
+    const builder = new ApplyStateMessageBuilder(wallet, config);
+    await builder
+        .setPhase('complete')
+        .setOutput('buffer')
+        .setOperationType(OperationType.SET_EPOCH)
+        .setAddress(wallet.address)
+        .setProofData(proofData)
+        .setApprovals(approvals)
+        .build();
+
+    const payload = builder.getPayload();
+    const encoded = safeEncodeApplyOperation(payload);
+    const decoded = safeDecodeApplyOperation(encoded);
+
+    t.ok(b4a.isBuffer(encoded));
+    t.ok(encoded.length > 0);
+    t.is(decoded.type, OperationType.SET_EPOCH);
+    t.ok(b4a.equals(decoded.address, addressToBuffer(wallet.address, config.addressPrefix)));
+    t.alike(Object.keys(decoded).sort(), ['address', 'seo', 'type']);
+    t.alike(Object.keys(decoded.seo).sort(), ['app', 'pd']);
+    t.ok(b4a.equals(decoded.seo.pd, proofData));
+    t.is(decoded.seo.app.length, approvals.length);
+    t.ok(b4a.equals(decoded.seo.app[0], approvals[0]));
+    t.ok(b4a.equals(decoded.seo.app[1], approvals[1]));
 });

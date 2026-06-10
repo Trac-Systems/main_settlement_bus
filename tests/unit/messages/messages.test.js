@@ -8,6 +8,7 @@ async function runMsgUtilsTests() {
     await import('./network/NetworkMessageDirector.test.js');
     await import('./consensus/ConsensusMessageBuilder.test.js');
     await import('./consensus/ConsensusMessageDirector.test.js');
+    await import('./state/applyStateMessageDirector.test.js');
     test.resume();
 }
 
