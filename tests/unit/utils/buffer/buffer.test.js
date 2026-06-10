@@ -5,6 +5,8 @@ import {
     createMessage,
     isBufferValid,
     safeWriteUInt32BE,
+    uint8ToBuffer,
+    uint16ToBuffer,
     uint32ToBuffer,
     uint64ToBuffer,
     deepCopyBuffer,
@@ -271,6 +273,64 @@ test('uint32ToBuffer - encodes uint32 values and throws for invalid input', t =>
     t.is(max.readUInt32BE(0), 0xFFFFFFFF, 'encodes max uint32');
 
     t.exception(() => uint32ToBuffer(-1, 'field'), errorMessageIncludes('field'));
+});
+
+test('uint8ToBuffer - encodes boundary values', t => {
+    const zero = uint8ToBuffer(0, 'field');
+    t.ok(b4a.isBuffer(zero), 'returns buffer for zero');
+    t.is(zero.length, 1, 'uint8 is one byte');
+    t.is(zero.readUInt8(0), 0, 'encodes zero');
+
+    const max = uint8ToBuffer(0xFF, 'field');
+    t.ok(b4a.isBuffer(max), 'returns buffer for max uint8');
+    t.is(max.length, 1, 'uint8 max is one byte');
+    t.is(max.readUInt8(0), 0xFF, 'encodes max uint8');
+});
+
+test('uint8ToBuffer - rejects invalid values with field name', t => {
+    const invalidValues = [
+        -1,
+        0x100,
+        1.5,
+        NaN,
+        Infinity,
+        '1',
+        1n,
+        b4a.alloc(1)
+    ];
+
+    for (const value of invalidValues) {
+        t.exception(() => uint8ToBuffer(value, 'counter'), errorMessageIncludes('counter'));
+    }
+});
+
+test('uint16ToBuffer - encodes boundary values', t => {
+    const zero = uint16ToBuffer(0, 'field');
+    t.ok(b4a.isBuffer(zero), 'returns buffer for zero');
+    t.is(zero.length, 2, 'uint16 is two bytes');
+    t.is(zero.readUInt16BE(0), 0, 'encodes zero');
+
+    const max = uint16ToBuffer(0xFFFF, 'field');
+    t.ok(b4a.isBuffer(max), 'returns buffer for max uint16');
+    t.is(max.length, 2, 'uint16 max is two bytes');
+    t.is(max.readUInt16BE(0), 0xFFFF, 'encodes max uint16');
+});
+
+test('uint16ToBuffer - rejects invalid values with field name', t => {
+    const invalidValues = [
+        -1,
+        0x10000,
+        1.5,
+        NaN,
+        Infinity,
+        '1',
+        1n,
+        b4a.alloc(2)
+    ];
+
+    for (const value of invalidValues) {
+        t.exception(() => uint16ToBuffer(value, 'counter'), errorMessageIncludes('counter'));
+    }
 });
 
 test('uint64ToBuffer - encodes uint64 values and throws for invalid input', t => {
