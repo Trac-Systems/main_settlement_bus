@@ -42,6 +42,9 @@ class NetworkMessageBuilder {
     }
 
     setId(id) {
+        if (typeof id !== 'string' || id.length === 0) {
+            throw new Error('Session id must be a non-empty string.');
+        }
         this.#id = id;
         return this;
     }
