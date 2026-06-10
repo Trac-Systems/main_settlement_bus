@@ -8,7 +8,6 @@ import { addressToBuffer } from "../../state/utils/address.js";
 import tracCryptoApi from "trac-crypto-api";
 import { generateUUID } from '../../../utils/helpers.js';
 import { consensusMessageFactory } from '../../../messages/consensus/v1/consensusMessageFactory.js';
-import { NETWORK_CAPABILITIES } from '../../../utils/constants.js';
 import { createVDFService } from "./createVDFService.js";
 import addressUtils from '../../state/utils/address.js';
 import { CustomEventType } from '../../../utils/constants.js';
@@ -58,28 +57,18 @@ class EpochProofProposalService extends ReadyResource {
             this.#intervalMs,
         );
 
-        // OS SUBSCRIBERS ESTAO ERRADOS
-        // 1 - se receber epoch proposal o indexer não pode enviar o proposal dele e o worker continua normalmente
-        // 2 - se tiver uma epoch, o indexer restarta o fluxo para gerar nova vdf, não o worker, o continua de onde estava
-
-        // this.#state.on(CustomEventType.EPOCH_PROPOSAL_SUBMITTED, async () => {
-        //     await this.stop(false);
-        // });
-
-        // this.#state.on(CustomEventType.EPOCH_CREATED, () => {
-        //     setTimeout(() => this.start(), this.#config.epochInterval);
-        // });
-
-
-        // O WORKER SERÁ INICIADO, MAS O PROCESSO DE GERAÇAO DE PROPOSTA SOMENTE COM UMA EPOCH GENESIS CRIADA
+        this.#state.on(CustomEventType.EPOCH_CREATED, async () => {
+            const isAdmin = await this.#state.isAdmin();
+            if (this.#state.isIndexer() && !isAdmin) {
+                
+            }
+        });
     }
 
     async _close() {
         this.#isInterrupted = true;
         await this.#scheduler.stop(true);
         await this.#calculatorService?.close();
-        this.#state.removeAllListeners(CustomEventType.EPOCH_PROPOSAL_SUBMITTED);
-        this.#state.removeAllListeners(CustomEventType.EPOCH_CREATED);
     }
 
     start() {
@@ -164,13 +153,11 @@ class EpochProofProposalService extends ReadyResource {
         return { signature: memberSignature, publicKey: member.key };
     }
 
-    // try to use the NETOWRK event LISTENERS here.
-
     async #worker(next) {
         if (!this.#isInterrupted) {
             const threshold = this.#config.epochThreshold;
-            const currentEpochId = await this.#state.currentEpochId();
-            const currentEpochHash = await this.#state.getEpochHash(currentEpochId);
+            const epochIdBefore = await this.#state.currentEpochId();
+            const currentEpochHash = await this.#state.getEpochHash(epochIdBefore);
 
             const vdf = await this.calculateVDF(
                 currentEpochHash,
@@ -178,16 +165,13 @@ class EpochProofProposalService extends ReadyResource {
                 this.#config.vdfDiscriminantSizeBits
             );
 
-            const committeeHash = await this.#state.getIndexerSequenceState();
-
             const newEpochProofData = this.createProposal(
-                currentEpochId,
+                epochIdBefore,
                 currentEpochHash,
                 vdf.result,
-                committeeHash
             );
             const proofProposal = await newEpochProofData.toProposalMessage(this.#wallet)
-            
+
             const approvers = await this.#state.getIndexersEntry();
             const tasks = approvers.map(member =>
                 withTimeout(this.#collectSignature(member, proofProposal), this.#config.epochSignatureTimeout)

@@ -4,9 +4,10 @@ import {consensusMessageFactory} from "../../../../messages/consensus/v1/consens
 import { V1ProtocolError } from "../../../network/protocols/v1/V1ProtocolError.js";
 import { CustomEventType, ResultCode } from "../../../../utils/constants.js";
 import b4a from "b4a";
-import tracCryptoApi from "trac-crypto-api";
-import { epochProofFromBuffer } from "./epochProposal/epochProofData.js";
 import {publicKeyToAddress} from "../../../../utils/helpers.js";
+import { bufferToAddress } from '../../../../core/state/utils/address.js';
+import { ConsensusResultCode } from '../../../../utils/constants.js';
+import { safeDecodeProofProposal } from '../../../../codecs/consensus/v1/consensusV1OperationCodec.js';
 
 // Minion interface to verify & sign proposals
 class ConsensusEpochProofProposalOperationHandler {
@@ -16,6 +17,7 @@ class ConsensusEpochProofProposalOperationHandler {
     #wallet
     #config
     #pendingRequestService
+    #vdf = null;
 
     constructor(state, wallet, config, pendingRequestService) {
         this.#state = state;
@@ -51,18 +53,24 @@ class ConsensusEpochProofProposalOperationHandler {
         this.displayError(step, connection.remotePublicKey, protocolError)
     }
 
+    async #getVdf() {
+        if (!this.#vdf) {
+            const { loadVdfWasm } = await import('@tracsystems/trac-vdf');
+            this.#vdf = await loadVdfWasm();
+        }
+        return this.#vdf;
+    }
+
     // leader requests approval to minion
     async handleRequest(message, connection) {
         try {
             await this.#v1EpochProofProposalRequestValidator.validate(message, connection.remotePublicKey);
-            await this.#validateDataHash(message.epoch_proof_proposal_request)
 
             const lastEpochProofBuffer = await this.#state.currentEpoch();
-            const lastEpochProof = lastEpochProofBuffer ? epochProofFromBuffer(lastEpochProofBuffer) : null;
-            const epochProof = epochProofFromBuffer(message.epoch_proof_proposal_request.data);
-            
-            this.#validatePreviousEpoch(epochProof, lastEpochProof);
-            this.#validateVdf(epochProof);
+            const lastEpochProof = lastEpochProofBuffer ? safeDecodeProofProposal(lastEpochProofBuffer) : null;
+
+            this.#validatePreviousEpoch(message.proof_proposal, lastEpochProof);
+            await this.#validateVdf(message.proof_proposal);
         } catch (error) {
             this.displayError(
                 "failed to process epoch proof proposal request from sender",
@@ -73,15 +81,9 @@ class ConsensusEpochProofProposalOperationHandler {
         }
 
         try {
-            const proposalHash = message.epoch_proof_proposal_request.hash
-            const signature = this.#wallet.sign(proposalHash)
-            const response = await this.#buildEpochResponse(message.id, connection.capabilities, signature)
-            const result =  await connection.consensusProtocolSession.sendAndForget(response);
-
-            this.#state.emit(CustomEventType.EPOCH_PROPOSAL_SUBMITTED)
-            return result;
+            const response = await this.#buildEpochResponse(message, connection);
+            connection.consensusProtocolSession.sendAndForget(response);
         } catch (error) {
-            // some error handler there
             this.displayError(
                 "failed to build/send epoch proof proposal response to sender",
                 connection.remotePublicKey,
@@ -90,8 +92,6 @@ class ConsensusEpochProofProposalOperationHandler {
         }
     }
 
-    // TODO: validates the response from line 61 to the end
-    // is valid signature and is a valid approver
     async handleResponse(message, connection) {
         try {
             await this.#resolvePendingResponse(
@@ -102,74 +102,73 @@ class ConsensusEpochProofProposalOperationHandler {
             );
         } catch (error) {
             this.#handlePendingResponseError(
-                message.id,
+                message.session_id,
                 connection,
                 error,
                 "Failed to process epoch proof proposal response from sender"
             );
         }
-
-        // handle the response
     }
 
     #extractEpochProofProposalResponse(payload) {
         return {
-            code: payload.epoch_proof_proposal_response.result,
+            code: payload.proof_proposal_response.result,
             result: {
-                approver: payload.epoch_proof_proposal_response.approver,
-                signature: payload.epoch_proof_proposal_response.signature
+                approver: payload.proof_proposal_response.approval.approver,
+                approval_sig: payload.proof_proposal_response.approval.approval_sig
             }
         };
     }
 
-    async #validateDataHash(message) {
-        const proposalHash = message.hash
-        const proofData = message.data
-        const computeHash = await tracCryptoApi.hash.blake3(proofData);
-        if (!b4a.equals(computeHash, proposalHash)) {
-            throw new V1ProtocolError(ResultCode.INVALID_PAYLOAD, 'There is a hash mismatch for the proof');
+    #validatePreviousEpoch(proposal, previousEpoch) {
+        if (!previousEpoch || proposal.epoch !== previousEpoch.epoch + 1) {
+            throw new V1ProtocolError(ResultCode.INVALID_PAYLOAD, 'Epoch sequence mismatch');
+        }
+        if (proposal.protocol_version !== previousEpoch.protocol_version) {
+            throw new V1ProtocolError(ResultCode.INVALID_PAYLOAD, 'Protocol version mismatch');
+        }
+        if (!b4a.equals(proposal.previous_epoch_record_hash, previousEpoch.previous_epoch_record_hash)) {
+            throw new V1ProtocolError(ResultCode.INVALID_PAYLOAD, 'Previous epoch hash mismatch');
+        }
+        if (proposal.network_id !== previousEpoch.network_id) {
+            throw new V1ProtocolError(ResultCode.INVALID_PAYLOAD, 'Network id mismatch');
         }
     }
 
-    // TODO: validate the validation 
-    #validatePreviousEpoch(proofData, previousEpoch) {
-        if (!previousEpoch || proofData.epoch !== previousEpoch.epoch + 1n) {
-            throw new V1ProtocolError(ResultCode.INVALID_EPOCH, 'Epoch sequence mismatch');
+    async #validateVdf(proposal) {
+        if (!proposal.vdf_proof || !b4a.isBuffer(proposal.vdf_proof) || proposal.vdf_proof.length === 0) {
+            throw new V1ProtocolError(ResultCode.INVALID_PAYLOAD, 'Inconsistent vdf data');
         }
-        
-        if (proofData.protocolVersion !== previousEpoch.protocolVersion) {
-            throw new V1ProtocolError(ResultCode.INVALID_EPOCH, 'Protocol version mismatch');
-        }
-        
-        if (proofData.prevEpochHash !== previousEpoch.prevEpochHash) {
-            throw new V1ProtocolError(ResultCode.INVALID_EPOCH, 'Previous epoch hash mismatch');
-        }
-        
-        // this must be proofData.networkId !== this.#config.networkId
-        if (proofData.networkId !== previousEpoch.networkId) {
-            throw new V1ProtocolError(ResultCode.INVALID_EPOCH, 'Network id mismatch');
+        const vdf = await this.#getVdf();
+        const proof = Buffer.concat([proposal.vdf_parameters_hash, proposal.vdf_proof]);
+        const isValid = vdf.verifyWesolowski(
+            proposal.previous_epoch_record_hash,
+            this.#config.vdfDifficulty,
+            proof,
+            this.#config.vdfDiscriminantSizeBits
+        );
+        if (!isValid) {
+            throw new V1ProtocolError(ResultCode.INVALID_PAYLOAD, 'VDF verification failed');
         }
     }
 
-    // TODO: import wasm to validate vdf using verify (same thread)
-    #validateVdf(proofData) {
-        if (!proofData.vdfOutput) {
-            throw new V1ProtocolError(ResultCode.INVALID_EPOCH, 'Inconsistent vdf data');
-        }
-    }
-
-    async #buildEpochResponse(id, capabilities, signature) {
+    async #buildEpochResponse(message, connection) {
+        const p = message.proof_proposal;
         try {
-            // TODO: pass the correct params to the buildProofProposalResponse function
             return await consensusMessageFactory(this.#wallet, this.#config).buildProofProposalResponse(
-                id,
-                capabilities,
-                ResultCode.OK,
-                signature
+                message.session_id,
+                p.network_id,
+                p.epoch,
+                p.previous_epoch_record_hash,
+                bufferToAddress(p.proposer, this.#config.addressPrefix),
+                p.vdf_parameters_hash,
+                p.vdf_proof,
+                p.signature,
+                ConsensusResultCode.OK,
+                this.#wallet.address
             );
         } catch (error) {
-            // TODO: Update or create to use a consensus error
-            throw new V1ProtocolError(ResultCode.UNEXPECTED_ERROR, `Failed to build broadcast transaction response: ${error.message}`);
+            throw new V1ProtocolError(ResultCode.UNEXPECTED_ERROR, `Failed to build proof proposal response: ${error.message}`);
         }
     }
 }
