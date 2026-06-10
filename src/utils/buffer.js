@@ -11,22 +11,6 @@ export function isBufferValid(key, size) {
     return b4a.isBuffer(key) && key.length === size;
 }
 
-export const createMessage = (...args) => {
-
-    if (args.length === 0) return b4a.alloc(0);
-
-    const buffers = args.map(arg => {
-        if (b4a.isBuffer(arg)) {
-            return arg;
-        } else if (typeof arg === 'number' && isUInt32(arg)) {
-            return safeWriteUInt32BE(arg, 0);
-        }
-    }).filter(buf => b4a.isBuffer(buf));
-
-    if (buffers.length === 0) return b4a.alloc(0);
-    return b4a.concat(buffers);
-}
-
 export const bigIntToBuffer = bigIntTo16ByteBuffer
 
 export function deepCopyBuffer(buffer) {
@@ -146,4 +130,20 @@ export function uint64ToBuffer(value, fieldName) {
     const buf = b4a.alloc(8);
     buf.writeBigUInt64BE(uint64Value);
     return buf;
+}
+
+export const createMessage = (...args) => {
+
+    if (args.length === 0) return b4a.alloc(0);
+
+    const buffers = args.map(arg => {
+        if (b4a.isBuffer(arg)) {
+            return arg;
+        } else if (typeof arg === 'number' && isUInt32(arg)) {
+            return safeWriteUInt32BE(arg, 0);
+        }
+    }).filter(buf => b4a.isBuffer(buf));
+
+    if (buffers.length === 0) return b4a.alloc(0);
+    return b4a.concat(buffers);
 }
