@@ -9,10 +9,6 @@ import ConsensusMessageDirector from '../../../../src/messages/consensus/v1/Cons
 import {addressToBuffer} from '../../../../src/core/state/utils/address.js';
 import {createMessage, safeWriteUInt32BE, uint8ToBuffer, uint16ToBuffer, uint64ToBuffer} from '../../../../src/utils/buffer.js';
 import {
-    createProofProposalApprovalSigningMessage,
-    createProofProposalSigningMessage
-} from '../../../../src/core/consensus/v1/consensusSigningMessage.js';
-import {
     ConsensusOperationType,
     ConsensusProtocolVersion,
     ConsensusResultCode,
@@ -68,7 +64,7 @@ test('ConsensusMessageDirector builds proof proposal and verifies signature', as
     t.alike(proofProposal.vdf_proof, vdfProof);
     t.ok(b4a.isBuffer(proofProposal.signature));
 
-    const message = createProofProposalSigningMessage(
+    const message = createMessage(
         proofProposal.protocol_version,
         proofProposal.network_id,
         proofProposal.epoch,
@@ -119,7 +115,7 @@ test('ConsensusMessageDirector builds proof proposal response and verifies signa
     t.ok(b4a.isBuffer(proofProposalResponse.approval.approval_sig));
     t.ok(b4a.isBuffer(proofProposalResponse.response_sig));
 
-    const approvalMessage = createProofProposalApprovalSigningMessage(
+    const approvalMessage = createMessage(
         protocolVersionBuffer,
         networkIdBuffer,
         epochBuffer,

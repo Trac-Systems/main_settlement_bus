@@ -14,10 +14,6 @@ import {
     uint16ToBuffer,
     uint64ToBuffer
 } from "../../../utils/buffer.js";
-import {
-    createProofProposalApprovalSigningMessage,
-    createProofProposalSigningMessage
-} from "../../../core/consensus/v1/consensusSigningMessage.js";
 
 class ConsensusMessageBuilder {
     #wallet;
@@ -177,14 +173,14 @@ class ConsensusMessageBuilder {
     }
 
     async #buildProofProposalPayload() {
-        const message = createProofProposalSigningMessage(
-            this.#protocol_version,
-            this.#network_id,
-            this.#epoch,
-            this.#previous_epoch_record_hash,
-            this.#proposer,
-            this.#vdf_parameters_hash,
-            this.#vdf_proof
+        const message = createMessage(
+            this.#validateBuffer(this.#protocol_version, 'Protocol version'),
+            this.#validateBuffer(this.#network_id, 'Network id'),
+            this.#validateBuffer(this.#epoch, 'Epoch'),
+            this.#validateBuffer(this.#previous_epoch_record_hash, 'Previous epoch record hash'),
+            this.#validateBuffer(this.#proposer, 'Proposer'),
+            this.#validateBuffer(this.#vdf_parameters_hash, 'VDF parameters hash'),
+            this.#validateBuffer(this.#vdf_proof, 'VDF proof')
         );
         const hash = await tracCryptoApi.hash.blake3(message);
         const signature = this.#wallet.sign(hash);
@@ -206,16 +202,16 @@ class ConsensusMessageBuilder {
             throw new Error('Result code must be set before build.');
         }
 
-        const messageApproval = createProofProposalApprovalSigningMessage(
-            this.#protocol_version,
-            this.#network_id,
-            this.#epoch,
-            this.#previous_epoch_record_hash,
-            this.#proposer,
-            this.#vdf_parameters_hash,
-            this.#vdf_proof,
-            this.#approver,
-            this.#requester_proof_signature
+        const messageApproval = createMessage(
+            this.#validateBuffer(this.#protocol_version, 'Protocol version'),
+            this.#validateBuffer(this.#network_id, 'Network id'),
+            this.#validateBuffer(this.#epoch, 'Epoch'),
+            this.#validateBuffer(this.#previous_epoch_record_hash, 'Previous epoch record hash'),
+            this.#validateBuffer(this.#proposer, 'Proposer'),
+            this.#validateBuffer(this.#vdf_parameters_hash, 'VDF parameters hash'),
+            this.#validateBuffer(this.#vdf_proof, 'VDF proof'),
+            this.#validateBuffer(this.#approver, 'Approver'),
+            this.#validateBuffer(this.#requester_proof_signature, 'Requester proof signature')
         );
         const hashApproval = await tracCryptoApi.hash.blake3(messageApproval);
         const signatureApproval = this.#wallet.sign(hashApproval);
