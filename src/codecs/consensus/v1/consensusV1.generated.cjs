@@ -426,9 +426,9 @@ $root.consensus = (function() {
              * Properties of a ProofProposal.
              * @memberof consensus.v1
              * @interface IProofProposal
-             * @property {number|null} [protocol_version] ProofProposal protocol_version
-             * @property {number|null} [network_id] ProofProposal network_id
-             * @property {number|Long|null} [epoch] ProofProposal epoch
+             * @property {Uint8Array|null} [protocol_version] ProofProposal protocol_version
+             * @property {Uint8Array|null} [network_id] ProofProposal network_id
+             * @property {Uint8Array|null} [epoch] ProofProposal epoch
              * @property {Uint8Array|null} [previous_epoch_record_hash] ProofProposal previous_epoch_record_hash
              * @property {Uint8Array|null} [proposer] ProofProposal proposer
              * @property {Uint8Array|null} [vdf_parameters_hash] ProofProposal vdf_parameters_hash
@@ -453,27 +453,27 @@ $root.consensus = (function() {
 
             /**
              * ProofProposal protocol_version.
-             * @member {number} protocol_version
+             * @member {Uint8Array} protocol_version
              * @memberof consensus.v1.ProofProposal
              * @instance
              */
-            ProofProposal.prototype.protocol_version = 0;
+            ProofProposal.prototype.protocol_version = $util.newBuffer([]);
 
             /**
              * ProofProposal network_id.
-             * @member {number} network_id
+             * @member {Uint8Array} network_id
              * @memberof consensus.v1.ProofProposal
              * @instance
              */
-            ProofProposal.prototype.network_id = 0;
+            ProofProposal.prototype.network_id = $util.newBuffer([]);
 
             /**
              * ProofProposal epoch.
-             * @member {number|Long} epoch
+             * @member {Uint8Array} epoch
              * @memberof consensus.v1.ProofProposal
              * @instance
              */
-            ProofProposal.prototype.epoch = $util.Long ? $util.Long.fromBits(0,0,true) : 0;
+            ProofProposal.prototype.epoch = $util.newBuffer([]);
 
             /**
              * ProofProposal previous_epoch_record_hash.
@@ -540,11 +540,11 @@ $root.consensus = (function() {
                 if (!writer)
                     writer = $Writer.create();
                 if (message.protocol_version != null && Object.hasOwnProperty.call(message, "protocol_version"))
-                    writer.uint32(/* id 1, wireType 0 =*/8).uint32(message.protocol_version);
+                    writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.protocol_version);
                 if (message.network_id != null && Object.hasOwnProperty.call(message, "network_id"))
-                    writer.uint32(/* id 2, wireType 0 =*/16).uint32(message.network_id);
+                    writer.uint32(/* id 2, wireType 2 =*/18).bytes(message.network_id);
                 if (message.epoch != null && Object.hasOwnProperty.call(message, "epoch"))
-                    writer.uint32(/* id 3, wireType 0 =*/24).uint64(message.epoch);
+                    writer.uint32(/* id 3, wireType 2 =*/26).bytes(message.epoch);
                 if (message.previous_epoch_record_hash != null && Object.hasOwnProperty.call(message, "previous_epoch_record_hash"))
                     writer.uint32(/* id 4, wireType 2 =*/34).bytes(message.previous_epoch_record_hash);
                 if (message.proposer != null && Object.hasOwnProperty.call(message, "proposer"))
@@ -592,15 +592,15 @@ $root.consensus = (function() {
                         break;
                     switch (tag >>> 3) {
                     case 1: {
-                            message.protocol_version = reader.uint32();
+                            message.protocol_version = reader.bytes();
                             break;
                         }
                     case 2: {
-                            message.network_id = reader.uint32();
+                            message.network_id = reader.bytes();
                             break;
                         }
                     case 3: {
-                            message.epoch = reader.uint64();
+                            message.epoch = reader.bytes();
                             break;
                         }
                     case 4: {
@@ -659,14 +659,14 @@ $root.consensus = (function() {
                 if (typeof message !== "object" || message === null)
                     return "object expected";
                 if (message.protocol_version != null && message.hasOwnProperty("protocol_version"))
-                    if (!$util.isInteger(message.protocol_version))
-                        return "protocol_version: integer expected";
+                    if (!(message.protocol_version && typeof message.protocol_version.length === "number" || $util.isString(message.protocol_version)))
+                        return "protocol_version: buffer expected";
                 if (message.network_id != null && message.hasOwnProperty("network_id"))
-                    if (!$util.isInteger(message.network_id))
-                        return "network_id: integer expected";
+                    if (!(message.network_id && typeof message.network_id.length === "number" || $util.isString(message.network_id)))
+                        return "network_id: buffer expected";
                 if (message.epoch != null && message.hasOwnProperty("epoch"))
-                    if (!$util.isInteger(message.epoch) && !(message.epoch && $util.isInteger(message.epoch.low) && $util.isInteger(message.epoch.high)))
-                        return "epoch: integer|Long expected";
+                    if (!(message.epoch && typeof message.epoch.length === "number" || $util.isString(message.epoch)))
+                        return "epoch: buffer expected";
                 if (message.previous_epoch_record_hash != null && message.hasOwnProperty("previous_epoch_record_hash"))
                     if (!(message.previous_epoch_record_hash && typeof message.previous_epoch_record_hash.length === "number" || $util.isString(message.previous_epoch_record_hash)))
                         return "previous_epoch_record_hash: buffer expected";
@@ -698,18 +698,20 @@ $root.consensus = (function() {
                     return object;
                 var message = new $root.consensus.v1.ProofProposal();
                 if (object.protocol_version != null)
-                    message.protocol_version = object.protocol_version >>> 0;
+                    if (typeof object.protocol_version === "string")
+                        $util.base64.decode(object.protocol_version, message.protocol_version = $util.newBuffer($util.base64.length(object.protocol_version)), 0);
+                    else if (object.protocol_version.length >= 0)
+                        message.protocol_version = object.protocol_version;
                 if (object.network_id != null)
-                    message.network_id = object.network_id >>> 0;
+                    if (typeof object.network_id === "string")
+                        $util.base64.decode(object.network_id, message.network_id = $util.newBuffer($util.base64.length(object.network_id)), 0);
+                    else if (object.network_id.length >= 0)
+                        message.network_id = object.network_id;
                 if (object.epoch != null)
-                    if ($util.Long)
-                        (message.epoch = $util.Long.fromValue(object.epoch)).unsigned = true;
-                    else if (typeof object.epoch === "string")
-                        message.epoch = parseInt(object.epoch, 10);
-                    else if (typeof object.epoch === "number")
+                    if (typeof object.epoch === "string")
+                        $util.base64.decode(object.epoch, message.epoch = $util.newBuffer($util.base64.length(object.epoch)), 0);
+                    else if (object.epoch.length >= 0)
                         message.epoch = object.epoch;
-                    else if (typeof object.epoch === "object")
-                        message.epoch = new $util.LongBits(object.epoch.low >>> 0, object.epoch.high >>> 0).toNumber(true);
                 if (object.previous_epoch_record_hash != null)
                     if (typeof object.previous_epoch_record_hash === "string")
                         $util.base64.decode(object.previous_epoch_record_hash, message.previous_epoch_record_hash = $util.newBuffer($util.base64.length(object.previous_epoch_record_hash)), 0);
@@ -752,13 +754,27 @@ $root.consensus = (function() {
                     options = {};
                 var object = {};
                 if (options.defaults) {
-                    object.protocol_version = 0;
-                    object.network_id = 0;
-                    if ($util.Long) {
-                        var long = new $util.Long(0, 0, true);
-                        object.epoch = options.longs === String ? long.toString() : options.longs === Number ? long.toNumber() : long;
-                    } else
-                        object.epoch = options.longs === String ? "0" : 0;
+                    if (options.bytes === String)
+                        object.protocol_version = "";
+                    else {
+                        object.protocol_version = [];
+                        if (options.bytes !== Array)
+                            object.protocol_version = $util.newBuffer(object.protocol_version);
+                    }
+                    if (options.bytes === String)
+                        object.network_id = "";
+                    else {
+                        object.network_id = [];
+                        if (options.bytes !== Array)
+                            object.network_id = $util.newBuffer(object.network_id);
+                    }
+                    if (options.bytes === String)
+                        object.epoch = "";
+                    else {
+                        object.epoch = [];
+                        if (options.bytes !== Array)
+                            object.epoch = $util.newBuffer(object.epoch);
+                    }
                     if (options.bytes === String)
                         object.previous_epoch_record_hash = "";
                     else {
@@ -796,14 +812,11 @@ $root.consensus = (function() {
                     }
                 }
                 if (message.protocol_version != null && message.hasOwnProperty("protocol_version"))
-                    object.protocol_version = message.protocol_version;
+                    object.protocol_version = options.bytes === String ? $util.base64.encode(message.protocol_version, 0, message.protocol_version.length) : options.bytes === Array ? Array.prototype.slice.call(message.protocol_version) : message.protocol_version;
                 if (message.network_id != null && message.hasOwnProperty("network_id"))
-                    object.network_id = message.network_id;
+                    object.network_id = options.bytes === String ? $util.base64.encode(message.network_id, 0, message.network_id.length) : options.bytes === Array ? Array.prototype.slice.call(message.network_id) : message.network_id;
                 if (message.epoch != null && message.hasOwnProperty("epoch"))
-                    if (typeof message.epoch === "number")
-                        object.epoch = options.longs === String ? String(message.epoch) : message.epoch;
-                    else
-                        object.epoch = options.longs === String ? $util.Long.prototype.toString.call(message.epoch) : options.longs === Number ? new $util.LongBits(message.epoch.low >>> 0, message.epoch.high >>> 0).toNumber(true) : message.epoch;
+                    object.epoch = options.bytes === String ? $util.base64.encode(message.epoch, 0, message.epoch.length) : options.bytes === Array ? Array.prototype.slice.call(message.epoch) : message.epoch;
                 if (message.previous_epoch_record_hash != null && message.hasOwnProperty("previous_epoch_record_hash"))
                     object.previous_epoch_record_hash = options.bytes === String ? $util.base64.encode(message.previous_epoch_record_hash, 0, message.previous_epoch_record_hash.length) : options.bytes === Array ? Array.prototype.slice.call(message.previous_epoch_record_hash) : message.previous_epoch_record_hash;
                 if (message.proposer != null && message.hasOwnProperty("proposer"))

@@ -408,6 +408,16 @@ test('NetworkMessageBuilder validates required inputs', async t => {
     );
 
     await t.exception(
+        () => builder.setId(''),
+        errorMessageIncludes('Session id must be a non-empty string.')
+    );
+
+    await t.exception(
+        () => builder.setId(null),
+        errorMessageIncludes('Session id must be a non-empty string.')
+    );
+
+    await t.exception(
         () => builder.setCapabilities('not-an-array'),
         errorMessageIncludes('Capabilities must be a string array.')
     );

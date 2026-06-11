@@ -7,15 +7,12 @@ import {v7 as uuidv7} from 'uuid';
 import ConsensusMessageBuilder from '../../../../src/messages/consensus/v1/ConsensusMessageBuilder.js';
 import ConsensusMessageDirector from '../../../../src/messages/consensus/v1/ConsensusMessageDirector.js';
 import {addressToBuffer} from '../../../../src/core/state/utils/address.js';
-import {createMessage, safeWriteUInt32BE} from '../../../../src/utils/buffer.js';
-import {
-    createProofProposalApprovalSigningMessage,
-    createProofProposalSigningMessage
-} from '../../../../src/core/consensus/v1/consensusSigningMessage.js';
+import {createMessage, safeWriteUInt32BE, uint8ToBuffer, uint16ToBuffer, uint64ToBuffer} from '../../../../src/utils/buffer.js';
 import {
     ConsensusOperationType,
     ConsensusProtocolVersion,
-    ConsensusResultCode
+    ConsensusResultCode,
+    VDF_BLOB_PROOF_SIZE
 } from '../../../../src/utils/constants.js';
 import {
     decodeConsensusMessage,
@@ -36,9 +33,12 @@ test('ConsensusMessageDirector builds proof proposal and verifies signature', as
     const sessionId = uuidv7();
     const networkId = 67;
     const epoch = 2;
+    const protocolVersionBuffer = uint8ToBuffer(ConsensusProtocolVersion.V1, 'Protocol version');
+    const networkIdBuffer = uint16ToBuffer(networkId, 'Network id');
+    const epochBuffer = uint64ToBuffer(epoch, 'Epoch');
     const previousEpochRecordHash = b4a.alloc(32, 1);
     const vdfParametersHash = b4a.alloc(32, 2);
-    const vdfProof = b4a.alloc(96, 3);
+    const vdfProof = b4a.alloc(VDF_BLOB_PROOF_SIZE, 3);
 
     const payload = await director.buildProofProposal(
         sessionId,
@@ -55,16 +55,16 @@ test('ConsensusMessageDirector builds proof proposal and verifies signature', as
     t.ok(Number.isSafeInteger(payload.timestamp) && payload.timestamp > 0);
 
     const proofProposal = payload.proof_proposal;
-    t.is(proofProposal.protocol_version, ConsensusProtocolVersion.V1);
-    t.is(proofProposal.network_id, networkId);
-    t.is(proofProposal.epoch, epoch);
+    t.alike(proofProposal.protocol_version, protocolVersionBuffer);
+    t.alike(proofProposal.network_id, networkIdBuffer);
+    t.alike(proofProposal.epoch, epochBuffer);
     t.alike(proofProposal.previous_epoch_record_hash, previousEpochRecordHash);
     t.alike(proofProposal.proposer, addressToBuffer(wallet.address, config.addressPrefix));
     t.alike(proofProposal.vdf_parameters_hash, vdfParametersHash);
     t.alike(proofProposal.vdf_proof, vdfProof);
     t.ok(b4a.isBuffer(proofProposal.signature));
 
-    const message = createProofProposalSigningMessage(
+    const message = createMessage(
         proofProposal.protocol_version,
         proofProposal.network_id,
         proofProposal.epoch,
@@ -84,9 +84,12 @@ test('ConsensusMessageDirector builds proof proposal response and verifies signa
     const sessionId = uuidv7();
     const networkId = 67;
     const epoch = 2;
+    const protocolVersionBuffer = uint8ToBuffer(ConsensusProtocolVersion.V1, 'Protocol version');
+    const networkIdBuffer = uint16ToBuffer(networkId, 'Network id');
+    const epochBuffer = uint64ToBuffer(epoch, 'Epoch');
     const previousEpochRecordHash = b4a.alloc(32, 1);
     const vdfParametersHash = b4a.alloc(32, 2);
-    const vdfProof = b4a.alloc(96, 3);
+    const vdfProof = b4a.alloc(VDF_BLOB_PROOF_SIZE, 3);
     const requesterProofSignature = b4a.alloc(64, 4);
 
     const payload = await director.buildProofProposalResponse(
@@ -112,10 +115,10 @@ test('ConsensusMessageDirector builds proof proposal response and verifies signa
     t.ok(b4a.isBuffer(proofProposalResponse.approval.approval_sig));
     t.ok(b4a.isBuffer(proofProposalResponse.response_sig));
 
-    const approvalMessage = createProofProposalApprovalSigningMessage(
-        ConsensusProtocolVersion.V1,
-        networkId,
-        epoch,
+    const approvalMessage = createMessage(
+        protocolVersionBuffer,
+        networkIdBuffer,
+        epochBuffer,
         previousEpochRecordHash,
         addressToBuffer(wallet.address, config.addressPrefix),
         vdfParametersHash,

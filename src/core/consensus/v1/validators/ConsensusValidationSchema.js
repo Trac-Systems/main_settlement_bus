@@ -2,20 +2,25 @@ import Validator from 'fastest-validator';
 import b4a from 'b4a';
 import {
     HASH_BYTE_LENGTH,
-    NetworkOperationType,
-    PUBLIC_KEY_LENGTH,
+    ConsensusOperationType,
     SIGNATURE_BYTE_LENGTH,
-    ResultCode
-} from '../../../../../utils/constants.js';
+    ConsensusResultCode,
+    VDF_BLOB_PROOF_SIZE,
+    PROTOCOL_VERSION_BYTE_LENGTH,
+    NETWORK_ID_BYTE_LENGTH,
+    EPOCH_BYTE_LENGTH
+} from '../../../../utils/constants.js';
 
-const ALLOWED_RESULT_CODES = Object.values(ResultCode);
+const ALLOWED_RESULT_CODES = Object.values(ConsensusResultCode);
 
 class ConsensusValidationSchema {
+    #config;
     #validator;
-    #validateV1EpochProofProposalRequest;
-    #validateV1EpochProofProposalResponse;
+    #validateConsensusV1ProofProposalSchema;
+    #validateConsensusV1ProposalApproval;
 
-    constructor() {
+    constructor(config) {
+        this.#config = config;
         this.#validator = new Validator({
             useNewCustomCheckerFunction: true,
             messages: {
@@ -25,6 +30,7 @@ class ConsensusValidationSchema {
                 bufferMaxLength: "The '{field}' field must be a Buffer with max length {expected}! Actual: {actual}",
                 nonZeroBuffer: "The '{field}' field must not be an empty or zero-filled Buffer!",
                 emptyBuffer: "The '{field}' field must not be an empty Buffer! Actual: {actual}",
+                uint64: "The '{field}' field must be an unsigned 64-bit integer! Actual: {actual}",
             },
         });
         const isBuffer = b4a.isBuffer;
@@ -74,9 +80,41 @@ class ConsensusValidationSchema {
                     `
             };
         });
+        this.#validator.add("uint64", function ({messages}, _path, _context) {
+            return {
+                source:
+                    `
+                        if (typeof value === 'number') {
+                            if (!Number.isSafeInteger(value) || value < 0) {
+                                ${this.makeError({type: "uint64", actual: "value", messages})}
+                            }
+                            return value;
+                        }
+                        if (typeof value === 'bigint') {
+                            if (value < 0n || value > 0xFFFFFFFFFFFFFFFFn) {
+                                ${this.makeError({type: "uint64", actual: "value", messages})}
+                            }
+                            return value;
+                        }
+                        if (typeof value === 'string') {
+                            if (!/^(0|[1-9]\\d*)$/.test(value)) {
+                                ${this.makeError({type: "uint64", actual: "value", messages})}
+                                return value;
+                            }
+                            const uint64Value = BigInt(value);
+                            if (uint64Value > 0xFFFFFFFFFFFFFFFFn) {
+                                ${this.makeError({type: "uint64", actual: "value", messages})}
+                            }
+                            return value;
+                        }
+                        ${this.makeError({type: "uint64", actual: "value", messages})}
+                        return value;
+                    `
+            };
+        });
 
-        this.#validateV1EpochProofProposalRequest = this.#compileV1EpochProofProposalRequestSchema();
-        this.#validateV1EpochProofProposalResponse = this.#compileV1EpochProofProposalResponseSchema();
+        this.#validateConsensusV1ProofProposalSchema = this.#compileV1EpochProofProposalRequestSchema();
+        this.#validateConsensusV1ProposalApproval = this.#compileConsensusV1ProposalApprovalSchema();
     }
 
     #compileV1EpochProofProposalRequestSchema() {
@@ -85,68 +123,77 @@ class ConsensusValidationSchema {
             type: {
                 type: 'number',
                 integer: true,
-                equal: NetworkOperationType.EPOCH_PROOF_PROPOSAL_REQUEST,
+                equal: ConsensusOperationType.PROOF_PROPOSAL,
                 required: true
             },
-            id: {type: 'string', min: 1, max: 64, required: true},
+            session_id: {type: 'string', min: 1, max: 64, required: true},
             timestamp: {type: 'number', integer: true, min: 1, max: Number.MAX_SAFE_INTEGER, required: true},
-            epoch_proof_proposal_request: {
+            proof_proposal: {
                 strict: true,
                 type: 'object',
                 props: {
-                    data: {
-                        strict: true,
-                        type: 'object',
-                        props: {
-                            protocol_version: {type: 'number', integer: true, min: 0, max: 255, required: true},
-                            epoch: {type: 'number', integer: true, min: 0, max: Number.MAX_SAFE_INTEGER, required: true},
-                            previous_epoch_hash: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true},
-                            committed_hash: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true},
-                            leader_id: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true},
-                            vdf_parameters_hash: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true},
-                            vdf_output: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true},
-                        }
-                    },
-                    hash: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true},
+                    protocol_version: {type: 'buffer', length: PROTOCOL_VERSION_BYTE_LENGTH, required: true},
+                    network_id: {type: 'buffer', length: NETWORK_ID_BYTE_LENGTH, allowZero: true, required: true},
+                    epoch: {type: 'buffer', length: EPOCH_BYTE_LENGTH, allowZero: true, required: true},
+                    previous_epoch_record_hash: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true},
+                    proposer: {type: 'buffer', length: this.#config.addressLength, required: true},
+                    vdf_parameters_hash: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true},
+                    vdf_proof: {type: 'buffer', length: VDF_BLOB_PROOF_SIZE, required: true},
                     signature: {type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true},
                 }
             },
-            capabilities: {type: 'array', items: 'string', required: true},
         };
         return this.#validator.compile(schema);
     }
 
-    validateV1EpochProofProposalRequest(operation) {
-        return this.#validateV1EpochProofProposalRequest(operation) === true;
+    validateConsensusV1ProofProposal(operation) {
+        return this.#validateConsensusV1ProofProposalSchema(operation) === true;
     }
 
-    #compileV1EpochProofProposalResponseSchema() {
+    #compileConsensusV1ProposalApprovalSchema() {
         const schema = {
             $$strict: true,
             type: {
                 type: 'number',
                 integer: true,
-                equal: NetworkOperationType.EPOCH_PROOF_PROPOSAL_RESPONSE,
+                equal: ConsensusOperationType.PROOF_PROPOSAL_RESPONSE,
                 required: true
             },
-            id: {type: 'string', min: 1, max: 64, required: true},
+            session_id: {type: 'string', min: 1, max: 64, required: true},
             timestamp: {type: 'number', integer: true, min: 1, max: Number.MAX_SAFE_INTEGER, required: true},
-            epoch_proof_proposal_response: {
+            proof_proposal_response: {
                 strict: true,
                 type: 'object',
                 props: {
-                    approver: {type: 'buffer', length: PUBLIC_KEY_LENGTH, required: true},
-                    signature: {type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true},
                     result: {type: 'enum', values: ALLOWED_RESULT_CODES, required: true},
+                    approval: {
+                        strict: true,
+                        type: 'object',
+                        optional: true,
+                        props: {
+                            approver: {type: 'buffer', length: this.#config.addressLength, required: true},
+                            approval_sig: {type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true},
+                        }
+                    },
+                    response_sig: {type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true},
                 }
             },
-            capabilities: {type: 'array', items: 'string', required: true},
         };
         return this.#validator.compile(schema);
     }
 
     validateV1EpochProofProposalResponse(operation) {
-        return this.#validateV1EpochProofProposalResponse(operation) === true;
+        const isSchemaValid = this.#validateConsensusV1ProposalApproval(operation);
+        if (isSchemaValid !== true) return false;
+
+        const response = operation.proof_proposal_response;
+        if (response.result === ConsensusResultCode.OK && !response.approval) {
+            return false;
+        }
+
+        return !(response.result !== ConsensusResultCode.OK && response.approval);
+
+
     }
 }
 
