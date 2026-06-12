@@ -80,39 +80,6 @@ class ConsensusValidationSchema {
                     `
             };
         });
-        this.#validator.add("uint64", function ({messages}, _path, _context) {
-            return {
-                source:
-                    `
-                        if (typeof value === 'number') {
-                            if (!Number.isSafeInteger(value) || value < 0) {
-                                ${this.makeError({type: "uint64", actual: "value", messages})}
-                            }
-                            return value;
-                        }
-                        if (typeof value === 'bigint') {
-                            if (value < 0n || value > 0xFFFFFFFFFFFFFFFFn) {
-                                ${this.makeError({type: "uint64", actual: "value", messages})}
-                            }
-                            return value;
-                        }
-                        if (typeof value === 'string') {
-                            if (!/^(0|[1-9]\\d*)$/.test(value)) {
-                                ${this.makeError({type: "uint64", actual: "value", messages})}
-                                return value;
-                            }
-                            const uint64Value = BigInt(value);
-                            if (uint64Value > 0xFFFFFFFFFFFFFFFFn) {
-                                ${this.makeError({type: "uint64", actual: "value", messages})}
-                            }
-                            return value;
-                        }
-                        ${this.makeError({type: "uint64", actual: "value", messages})}
-                        return value;
-                    `
-            };
-        });
-
         this.#validateConsensusV1ProofProposalSchema = this.#compileV1EpochProofProposalRequestSchema();
         this.#validateConsensusV1ProposalApproval = this.#compileConsensusV1ProposalApprovalSchema();
     }
