@@ -79,11 +79,11 @@ class Check {
                         }
                         if (value.length !== ${schema.length}) {
                             ${this.makeError({
-                        type: "bufferLength",
-                        expected: schema.length,
-                        actual: "value.length",
-                        messages
-                    })}
+        type: "bufferLength",
+        expected: schema.length,
+        actual: "value.length",
+        messages
+    })}
                         }
                         let isEmpty = true;
                             for (let i = 0; i < value.length; i++) {
@@ -109,11 +109,11 @@ class Check {
                         }
                         if (value.length !== ${schema.length}) {
                             ${this.makeError({
-                        type: "bufferLength",
-                        expected: schema.length,
-                        actual: "value.length",
-                        messages
-                    })}
+        type: "bufferLength",
+        expected: schema.length,
+        actual: "value.length",
+        messages
+    })}
                         }
                         return value;
                     `

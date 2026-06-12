@@ -85,6 +85,14 @@ const encodedApprovalInReverseFieldOrder = () => b4a.concat([
     encodedApprovalSingleField('approver', consensusFixtures.proofProposalApproval.approver)
 ]);
 
+const cloneSetEpochOperation = () => ({
+    ...SEO.valid_set_epoch_operation,
+    seo: {
+        pd: b4a.from(SEO.valid_set_epoch_operation.seo.pd),
+        app: SEO.valid_set_epoch_operation.seo.app.map(approval => b4a.from(approval))
+    }
+});
+
 const withSetEpochProofData = proofData => {
     const operation = cloneSetEpochOperation();
     operation.seo.pd = proofData;
@@ -98,14 +106,6 @@ const withApprovals = approvals => {
 };
 
 const setEpochValueNotAllowedDataTypes = not_allowed_data_types.filter(value => !Array.isArray(value));
-
-const cloneSetEpochOperation = () => ({
-    ...SEO.valid_set_epoch_operation,
-    seo: {
-        pd: b4a.from(SEO.valid_set_epoch_operation.seo.pd),
-        app: SEO.valid_set_epoch_operation.seo.app.map(approval => b4a.from(approval))
-    }
-});
 
 test('validateSetEpochOperation - happy path', t => {
     t.ok(check.validateSetEpochOperation(SEO.valid_set_epoch_operation), 'Valid data for set epoch operation should pass the validation')
@@ -163,7 +163,7 @@ test('validateSetEpochOperation - proof data validation (seo.pd)', t => {
 
     t.absent(
         check.validateSetEpochOperation(withSetEpochProofData(encodedProofDataInReverseFieldOrder())),
-        'proof data encoded in non-canonical field order should fail'
+        'proof data encoded in unexpected field order should fail'
     );
 
     for (const {name} of PROOF_DATA_FIELD_RULES) {
@@ -269,7 +269,7 @@ test('validateSetEpochOperation - approvals validation (seo.app)', t => {
 
     t.absent(
         check.validateSetEpochOperation(withApprovals([encodedApprovalInReverseFieldOrder()])),
-        'approval item encoded in non-canonical field order should fail'
+        'approval item encoded in unexpected field order should fail'
     );
 
     for (const {name} of APPROVAL_FIELD_RULES) {
