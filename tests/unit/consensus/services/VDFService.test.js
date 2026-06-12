@@ -120,4 +120,64 @@ if (!isBareRuntime) {
 
         await service.close(); // close() waits for _close()
     });
+
+    // --- Real thread integration tests (no mocks) ---
+    // Uses low difficulty/discriminant to keep computation fast.
+    const THREAD_TEST_DIFFICULTY = 100;
+    const THREAD_TEST_DISCRIMINANT_BITS = 512;
+
+    test('VDFService real thread: single calculateVDF returns correct response shape', async t => {
+        const threadSpy = sinon.spy(globalThis.Bare, 'Thread');
+        t.teardown(() => sinon.restore());
+
+        const service = new VDFService();
+        await service.ready();
+        t.teardown(() => service.close());
+
+        const spawnedThread = threadSpy.returnValues[0];
+        t.ok(spawnedThread.tid > 0, 'OS thread ID is non-zero — a real thread was created');
+
+        const challenge = Buffer.alloc(32, 1);
+        const response = await service.calculateVDF(challenge, THREAD_TEST_DIFFICULTY, THREAD_TEST_DISCRIMINANT_BITS);
+
+        t.ok(response && response.result, 'response has result field');
+        t.alike(response.result.challenge, challenge, 'result echoes challenge');
+        t.is(response.result.difficulty, THREAD_TEST_DIFFICULTY, 'result echoes difficulty');
+        t.is(response.result.discriminantSizeBits, THREAD_TEST_DISCRIMINANT_BITS, 'result echoes discriminantSizeBits');
+        t.ok(Buffer.isBuffer(response.result.solution), 'solution is a Buffer');
+        t.ok(response.result.solution.length > 0, 'solution is non-empty');
+    });
+
+    test('VDFService real thread: multiple sequential requests all return results', async t => {
+        const service = new VDFService();
+        await service.ready();
+        t.teardown(() => service.close());
+
+        const challenges = [
+            Buffer.alloc(32, 1),
+            Buffer.alloc(32, 2),
+            Buffer.alloc(32, 3),
+        ];
+
+        for (const challenge of challenges) {
+            const response = await service.calculateVDF(challenge, THREAD_TEST_DIFFICULTY, THREAD_TEST_DISCRIMINANT_BITS);
+            t.ok(response && response.result, 'each request returns a result');
+            t.alike(response.result.challenge, challenge, 'each result matches its challenge');
+        }
+    });
+
+    test('VDFService real thread: can be reopened after close', async t => {
+        const service = new VDFService();
+
+        await service.ready();
+        await service.close();
+
+        await service.ready();
+        t.teardown(() => service.close());
+
+        const challenge = Buffer.alloc(32, 5);
+        const response = await service.calculateVDF(challenge, THREAD_TEST_DIFFICULTY, THREAD_TEST_DISCRIMINANT_BITS);
+
+        t.ok(response && response.result, 'service works after reopen');
+    });
 }
