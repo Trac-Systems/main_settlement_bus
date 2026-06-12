@@ -7,6 +7,10 @@ import { addressToBuffer } from '../../../../src/core/state/utils/address.js';
 import { OperationType } from '../../../../src/utils/constants.js';
 import { config } from '../../../helpers/config.js';
 import { testKeyPair1 } from '../../../fixtures/apply.fixtures.js';
+import {
+    proofProposalApproval as approval,
+    proofProposalData
+} from '../../../helpers/proofProposal.js';
 
 async function createWallet(mnemonic) {
     return await new WalletProvider(config).fromMnemonic({ mnemonic, derivationPath: config.derivationPath })
@@ -14,15 +18,15 @@ async function createWallet(mnemonic) {
 
 test('ApplyStateMessageDirector builds complete set epoch message', async t => {
     const wallet = await createWallet(testKeyPair1.mnemonic);
-    const proofData = b4a.alloc(96, 0x24);
+    const proofData = proofProposalData();
     const approvals = [
-        b4a.alloc(64, 0x25),
-        b4a.alloc(64, 0x26)
+        approval(0x25, 0x26),
+        approval(0x27, 0x28)
     ];
 
     const payload = await applyStateMessageFactory(wallet, config)
         .buildCompleteSetEpochMessage(wallet.address, proofData, approvals);
-
+    console.log("payload", payload);
     t.is(payload.type, OperationType.SET_EPOCH);
     t.ok(b4a.equals(payload.address, addressToBuffer(wallet.address, config.addressPrefix)));
     t.alike(Object.keys(payload).sort(), ['address', 'seo', 'type']);
