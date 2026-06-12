@@ -60,6 +60,8 @@ const configData = {
         epochThreshold: 2, // Minimum number of validator confirmations required to append a new epoch
         storesDirectory: 'stores/',
         storeName: 'testnet',
+        vdfDifficulty: 1000000, // number of iterations
+        vdfDiscriminantSizeBits: 2048, // discriminant size
     },
     [ENV.MAINNET]: {
         debug: false,
@@ -111,6 +113,8 @@ const configData = {
         epochThreshold: 2, // Minimum number of validator confirmations required to append a new epoch
         storesDirectory: 'stores/',
         storeName: 'mainnet',
+        vdfDifficulty: 1000000, // number of iterations
+        vdfDiscriminantSizeBits: 2048, // discriminant size
     },
     [ENV.DEVELOPMENT]: {
         debug: false,
@@ -162,6 +166,8 @@ const configData = {
         epochThreshold: 2, // Minimum number of validator confirmations required to append a new epoch
         storesDirectory: 'stores/',
         storeName: 'development',
+        vdfDifficulty: 1000000, // number of iterations
+        vdfDiscriminantSizeBits: 2048, // discriminant size
     }
 }
 

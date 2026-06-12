@@ -26,12 +26,15 @@
     "test:unit:node:cov": "brittle-node -c -t 60000 tests/unit/unit.test.js"
   },
   "dependencies": {
+    "@tracsystems/trac-vdf": "^0.0.1",
     "autobase": "7.20.1",
     "b4a": "1.6.7",
+    "bare-channel": "^5.2.3",
     "bare-crypto": "1.12.0",
     "bare-fs": "4.5.0",
     "bare-http1": "4.1.5",
     "bare-readline": "1.0.7",
+    "bare-thread": "^1.2.2",
     "bare-tty": "5.0.2",
     "bare-utils": "1.5.1",
     "bech32": "2.0.0",
