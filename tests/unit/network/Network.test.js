@@ -17,11 +17,6 @@ async function loadNetwork() {
     let swarmInstance = null;
     let connectionManagerInstance = null;
 
-    class StateMock extends EventEmitter {
-        isAdmin() {return false}
-        isIndexer() {return false}
-    }
-
     class HyperswarmMock extends EventEmitter {
         constructor() {
             super();
@@ -82,12 +77,12 @@ async function loadNetwork() {
 
     class TransactionPoolServiceMock {
         start() {}
-        async stopPool() {}
+        async stop() {}
     }
 
     class ValidatorObserverServiceMock {
         start() {}
-        async stopValidatorObserver() {}
+        async stop() {}
     }
 
     class MessageOrchestratorMock {
@@ -173,7 +168,12 @@ async function loadNetwork() {
     };
 
     const store = new CorestoreMock();
-    const state = new StateMock();
+    const state = {
+        on() {},
+        removeAllListeners() {},
+        isAdmin: async () => false,
+        isIndexer: () => false,
+    };
     const network = new Network(state, store, config, wallet);
     await network.ready()
 

@@ -1,4 +1,4 @@
-import Scheduler from "../../../utils/Scheduler.js";
+import SchedulableService from "../../../utils/scheduler/SchedulableService.js";
 import { Logger } from "../../../utils/logger.js";
 import b4a from "b4a";
 import { bufferToAddress } from "../../../core/state/utils/address.js";
@@ -9,18 +9,16 @@ import { WRITER_BYTE_LENGTH, CONNECTION_STATUS } from "../../../utils/constants.
 const VALIDATOR_CANDIDATES_PER_CYCLE = 10;
 const MAX_KEY_DECODE_CACHE_SIZE = 10_000;
 
-class ValidatorObserverService {
+class ValidatorObserverService extends SchedulableService {
     #network;
     #state;
     #address;
     #config;
-    #scheduler;
     #logger;
     #hasBootstrapped;    // Whether initial connection phase is complete
     #bootstrapStartedAt; // Timestamp to enforce bootstrap timeout
     #adminCache;         // Cached admin entry with TTL
     #writersCache;       // Cached writer list with dynamic TTL
-    #isInterrupted;      // Used to stop execution mid-cycle
     #keyDecodeCache;
 
     /**
@@ -30,6 +28,7 @@ class ValidatorObserverService {
      * @param {Object} config - The application configuration object.
      */
     constructor(network, state, address, config) {
+        super();
         this.#network = network;
         this.#state = state;
         this.#address = address;
@@ -39,18 +38,9 @@ class ValidatorObserverService {
         this.#bootstrapStartedAt = 0;
         this.#adminCache = { entry: null, lastUpdated: 0 };
         this.#writersCache = { list: [], lastUpdated: 0 };
-        this.#isInterrupted = false;
         this.#keyDecodeCache = new Map();
     }
 
-    /**
-     * Returns configurable poll interval.
-     * @returns {number} The poll interval in milliseconds.
-     */
-    #getPollInterval() {
-        return this.#config.pollInterval;
-    }
-    
     /**
      * Selects a subset of valid validator candidates to connect to.
      *
@@ -167,7 +157,7 @@ class ValidatorObserverService {
      * @returns {boolean} True if the observer is enabled and not interrupted.
      */
     #shouldRun() {
-        return this.#config.enableValidatorObserver && !this.#isInterrupted;
+        return this.#config.enableValidatorObserver && !this.isInterrupted;
     }
     
     /**
@@ -213,18 +203,10 @@ class ValidatorObserverService {
             this.#logger.info('ValidatorObserverService can not start. Disabled by configuration.');
             return;
         }
-        
-        if (this.#scheduler && this.#scheduler.isRunning) {
-            this.#logger.info('ValidatorObserverService is already started');
-            return;
-        }
 
-        const interval = this.#getPollInterval();
-        this.#scheduler = new Scheduler((next) => this.#worker(next), interval);
         this.#bootstrapStartedAt = Date.now();
         this.#hasBootstrapped = false;
-        this.#isInterrupted = false;
-        this.#scheduler.start();
+        super.start();
         this.#logger.debug("ValidatorObserverService started");
     }
 
@@ -233,13 +215,9 @@ class ValidatorObserverService {
      * Prevents new work and waits for the current cycle to finish if requested.
      * @param {boolean} [waitForCurrent=true] - Whether to wait for the current worker cycle to finish.
      */
-    async stopValidatorObserver(waitForCurrent = true) {
-        if (!this.#scheduler) return;
-
-        this.#isInterrupted = true;
-
-        await this.#scheduler.stop(waitForCurrent);
-        this.#scheduler = null;
+    async stop(waitForCurrent = true) {
+        const stopped = await super.stop(waitForCurrent);
+        if (!stopped) return;
         this.#logger.debug("ValidatorObserverService stopped");
     }
 
@@ -254,9 +232,16 @@ class ValidatorObserverService {
      * 5. Attempt connections (with pacing).
      * @param {Function} next - Callback to schedule the next execution.
      */
-    async #worker(next) {
-        const interval = this.#getPollInterval();
-        if (!this.#shouldRun()) return next(interval);
+    getScheduleInterval() {
+        return this.#config.pollInterval;
+    }
+
+    async worker(next) {
+        const interval = this.#config.pollInterval;
+        if (!this.#shouldRun()) {
+            next(interval);
+            return;
+        }
 
         try {
             const adminEntry = await this.#getAdminEntryCached();

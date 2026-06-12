@@ -70,7 +70,7 @@ class Scheduler {
 
         this.#currentWorkerRun = this.#worker(scheduleNext);
         try {
-            await this.#currentWorkerRun; // this await is needed here because #worker can be async
+            await this.#currentWorkerRun;
         } catch (error) {
             console.error('Worker error:', error);
             return this.defaultInterval;
@@ -102,7 +102,7 @@ class Scheduler {
         }
 
         if (waitForCurrent && this.#currentWorkerRun) {
-            await this.#currentWorkerRun; // this await is needed here because #worker can be async
+            await this.#currentWorkerRun;
         }
     }
 }

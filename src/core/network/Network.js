@@ -111,9 +111,9 @@ class Network extends ReadyResource {
 
     async _close() {
         this.#logger.info('Network: closing gracefully...');
-        await this.transactionPoolService.stopPool();
+        await this.transactionPoolService.stop();
         await sleep(100);
-        await this.#validatorObserverService.stopValidatorObserver();
+        await this.#validatorObserverService.stop();
         if (this.#validatorHealthCheckService) {
             await this.#validatorHealthCheckService.close();
         }
@@ -230,7 +230,6 @@ class Network extends ReadyResource {
 
             this.#epochProofProposalService = new EpochProofProposalService(this.#state, this.#validatorConnectionManager, this.#wallet, this.#config);
             await this.#epochProofProposalService.ready();
-            // this.#epochProofProposalService.start();
 
             this.#validatorConnectionManager.subscribeToHealthChecks(this.#validatorHealthCheckService);
 

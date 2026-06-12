@@ -26,7 +26,7 @@ const defaultMockDecode = (addr) => {
 async function cleanup(service) {
     tracCryptoApi.address.decode = originalDecode;
     if (service) {
-        await service.stopValidatorObserver(false);
+        await service.stop(false);
     }
 }
 
@@ -107,7 +107,7 @@ test("connects successfully (happy path)", async (t) => {
             await Promise.resolve();
         }
 
-        await service.stopValidatorObserver(false);
+        await service.stop(false);
 
         t.ok(calls > 0);
     } finally {
@@ -156,7 +156,7 @@ test("rotation allows multiple attempts", async (t) => {
             await Promise.resolve();
         }
 
-        await service.stopValidatorObserver(false);
+        await service.stop(false);
 
         t.ok(calls >= 2);
     } finally {
@@ -188,7 +188,7 @@ test("does NOT connect if already connected", async (t) => {
             await Promise.resolve();
         }
 
-        await service.stopValidatorObserver(false);
+        await service.stop(false);
 
         t.is(calls, 0);
     } finally {
@@ -219,7 +219,7 @@ test("does NOT connect if not writer", async (t) => {
             await Promise.resolve();
         }
 
-        await service.stopValidatorObserver(false);
+        await service.stop(false);
 
         t.is(calls, 0);
     } finally {
@@ -251,7 +251,7 @@ test("does NOT connect if max reached", async (t) => {
             await Promise.resolve();
         }
 
-        await service.stopValidatorObserver(false);
+        await service.stop(false);
 
         t.is(calls, 0);
     } finally {
@@ -283,7 +283,7 @@ test("blocks when too many pending", async (t) => {
             await Promise.resolve();
         }
 
-        await service.stopValidatorObserver(false);
+        await service.stop(false);
 
         t.is(calls, 0);
     } finally {
@@ -315,7 +315,7 @@ test("returns early when no candidates available", async (t) => {
             await Promise.resolve();
         }
 
-        await service.stopValidatorObserver(false);
+        await service.stop(false);
 
         t.is(calls, 0);
     } finally {
@@ -361,7 +361,7 @@ test("bootstrap switches to long TTL after timeout", async (t) => {
         clock.tick(31_000);
         await Promise.resolve();
 
-        await service.stopValidatorObserver(true);
+        await service.stop(true);
 
         t.ok(scans >= before);
     } finally {
@@ -407,7 +407,7 @@ test("does NOT drop connections when it is the admin and threshold reached", asy
             await Promise.resolve();
         }
 
-        await service.stopValidatorObserver(false);
+        await service.stop(false);
 
         t.alike(removed, []);
     } finally {
@@ -466,7 +466,7 @@ test("removes admin when threshold exceeded", async (t) => {
             await Promise.resolve();
         }
 
-        await service.stopValidatorObserver(false);
+        await service.stop(false);
 
         t.ok(removed >= 1);
     } finally {
@@ -516,7 +516,7 @@ test("removes stale connections when writer is marked as removed", async (t) => 
             await Promise.resolve();
         }
 
-        await service.stopValidatorObserver(false);
+        await service.stop(false);
 
         t.ok(removed > 0);
     } finally {
@@ -563,7 +563,7 @@ test("does not remove stale connection if not connected", async (t) => {
             await Promise.resolve();
         }
 
-        await service.stopValidatorObserver(false);
+        await service.stop(false);
 
         t.is(removed, 0);
     } finally {
@@ -579,7 +579,7 @@ test("does not start observer if it is already running", async (t) => {
 
     await service.start();
     await service.start();
-    await service.stopValidatorObserver();
+    await service.stop();
 
     t.pass();
 });
@@ -603,7 +603,7 @@ test("gracefully catches exceptions in the worker loop", async (t) => {
             await Promise.resolve();
         }
 
-        await service.stopValidatorObserver();
+        await service.stop();
 
         t.pass();
     } finally {
@@ -636,7 +636,7 @@ test("gracefully catches exceptions in scanAutobaseWriters", async (t) => {
             await Promise.resolve();
         }
 
-        await service.stopValidatorObserver();
+        await service.stop();
 
         t.pass();
     } finally {
@@ -665,7 +665,7 @@ test("gracefully catches exceptions in tryConnect", async (t) => {
             await Promise.resolve();
         }
 
-        await service.stopValidatorObserver();
+        await service.stop();
 
         t.pass();
     } finally {
@@ -694,7 +694,7 @@ test("caches null if the address buffer is invalid or missing", async (t) => {
             await Promise.resolve();
         }
 
-        await service.stopValidatorObserver();
+        await service.stop();
 
         t.pass();
     } finally {
@@ -722,7 +722,7 @@ test("caches null if public key fails to decode", async (t) => {
             await Promise.resolve();
         }
 
-        await service.stopValidatorObserver();
+        await service.stop();
 
         t.pass();
     } finally {
@@ -766,7 +766,7 @@ test("clears memory cache when exceeding MAX_KEY_DECODE_CACHE_SIZE", async (t) =
             await Promise.resolve();
         }
 
-        await service.stopValidatorObserver();
+        await service.stop();
 
         t.pass();
     } finally {

@@ -1,6 +1,6 @@
 import ReadyResource from 'ready-resource';
 import b4a from 'b4a';
-import Scheduler from '../../../utils/Scheduler.js';
+import Scheduler from '../../../utils/scheduler/Scheduler.js';
 import { OperationType } from '../../../utils/constants.js';
 import { Logger } from '../../../utils/logger.js';
 
