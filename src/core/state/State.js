@@ -100,6 +100,9 @@ class State extends ReadyResource {
     }
 
     async _close() {
+        [CustomEventType.IS_INDEXER, CustomEventType.IS_NON_INDEXER].forEach(event => {
+            this.removeAllListeners(event);
+        })
         console.log("State: closing gracefully...");
         if (this.#bee !== null) {
             await this.#bee.close();
@@ -142,7 +145,7 @@ class State extends ReadyResource {
     }
 
     async getEpochHash(epochId) {
-        return await this.getSigned(keys.EPOCH(epochId))
+        return await this.getSigned(keys.EPOCH_HASH(epochId))
     }
 
     getFee() {

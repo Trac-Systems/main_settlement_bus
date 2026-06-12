@@ -78,5 +78,5 @@ export const epochProofFromBuffer = (proofData) => {
 export const keys = {
     CURRENT_INDEX: '/epoch/current',
     EPOCH_HASH: n => `/epoch/${n}`,
-    EPOCH: n => `/epochHash/${n}`
+    EPOCH_DATA: n => `/epochHash/${n}`
 }

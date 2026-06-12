@@ -189,8 +189,6 @@ class Network extends ReadyResource {
     cleanupNetworkListeners() {
         this.removeAllListeners(EventType.VALIDATOR_CONNECTION_TIMEOUT);
         this.removeAllListeners(EventType.VALIDATOR_CONNECTION_READY);
-        this.#state.removeAllListeners(CustomEventType.IS_INDEXER);
-        this.#state.removeAllListeners(CustomEventType.IS_NON_INDEXER);
     }
 
     cleanupPendingConnections() {
