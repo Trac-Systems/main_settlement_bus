@@ -273,32 +273,50 @@ class Check {
 
     }
 
+    #getOperationTypeName(operationType) {
+        for (const [name, value] of Object.entries(OperationType)) {
+            if (value === operationType) return name;
+        }
+
+        return undefined;
+    }
+
+    #operationTypeDomain(...values) {
+        return {
+            type: 'number',
+            required: true,
+            custom: (value, errors) => {
+                if (!values.includes(value)) {
+                    const singleValue = values.length === 1;
+                    const expectedOperationType = values[0];
+                    const expected = singleValue ? expectedOperationType : values;
+                    const operationName = this.#getOperationTypeName(expectedOperationType);
+
+                    errors.push({
+                        type: 'valueNotAllowed',
+                        actual: value,
+                        expected,
+                        field: 'type',
+                        message: singleValue
+                            ? `Operation type must be ${expectedOperationType} (${operationName})`
+                            : `Operation type must be one of: ${values.join(', ')}`
+                    });
+                }
+
+                return value;
+            }
+        };
+    }
+
     // Complete by default - no writer needed
     #compileCoreAdminOperationSchema() {
         const addressLength = this.#config.addressLength
         const schema = {
             $$strict: true,
-            type: {
-                type: 'number',
-                required: true,
-                custom: (value, errors) => {
-                    const allowedTypes = [
-                        OperationType.ADD_ADMIN,
-                        OperationType.DISABLE_INITIALIZATION,
-                    ];
-
-                    if (!allowedTypes.includes(value)) {
-                        errors.push({
-                            type: 'valueNotAllowed',
-                            actual: value,
-                            expected: allowedTypes,
-                            field: 'type',
-                            message: `Operation type must be one of: ${allowedTypes.join(', ')}`
-                        });
-                    }
-                    return value;
-                }
-            },
+            type: this.#operationTypeDomain(
+                OperationType.ADD_ADMIN,
+                OperationType.DISABLE_INITIALIZATION
+            ),
             address: {type: 'buffer', length: addressLength, required: true}, // invoker adddress (admin)
             cao: {
                 strict: true,
@@ -322,22 +340,7 @@ class Check {
     #compileBalanceInitializationSchema() {
         const schema = {
             $$strict: true,
-            type: {
-                type: 'number',
-                required: true,
-                custom: (value, errors) => {
-                    if (value !== OperationType.BALANCE_INITIALIZATION) {
-                        errors.push({
-                            type: 'valueNotAllowed',
-                            actual: value,
-                            expected: OperationType.BALANCE_INITIALIZATION,
-                            field: 'type',
-                            message: `Operation type must be ${OperationType.BALANCE_INITIALIZATION} (BALANCE_INITIALIZATION)`
-                        });
-                    }
-                    return value;
-                }
-            },
+            type: this.#operationTypeDomain(OperationType.BALANCE_INITIALIZATION),
             address: {type: 'buffer', length: this.#config.addressLength, required: true},
             bio: {
                 strict: true,
@@ -363,29 +366,12 @@ class Check {
     #compileAdminControlOperationSchema() {
         const schema = {
             $$strict: true,
-            type: {
-                type: 'number',
-                required: true,
-                custom: (value, errors) => {
-                    const allowedTypes = [
-                        OperationType.APPEND_WHITELIST,
-                        OperationType.ADD_INDEXER,
-                        OperationType.REMOVE_INDEXER,
-                        OperationType.BAN_VALIDATOR
-                    ];
-
-                    if (!allowedTypes.includes(value)) {
-                        errors.push({
-                            type: 'valueNotAllowed',
-                            actual: value,
-                            expected: allowedTypes,
-                            field: 'type',
-                            message: `Operation type must be one of: ${allowedTypes.join(', ')}`
-                        });
-                    }
-                    return value;
-                }
-            },
+            type: this.#operationTypeDomain(
+                OperationType.APPEND_WHITELIST,
+                OperationType.ADD_INDEXER,
+                OperationType.REMOVE_INDEXER,
+                OperationType.BAN_VALIDATOR
+            ),
             address: {type: 'buffer', length: this.#config.addressLength, required: true}, // invoker adddress (admin)
             aco: {
                 strict: true,
@@ -409,28 +395,11 @@ class Check {
     #compileRoleAccessOperationSchema() {
         const schema = {
             $$strict: true,
-            type: {
-                type: 'number',
-                required: true,
-                custom: (value, errors) => {
-                    const allowedTypes = [
-                        OperationType.ADD_WRITER,
-                        OperationType.REMOVE_WRITER,
-                        OperationType.ADMIN_RECOVERY
-                    ];
-
-                    if (!allowedTypes.includes(value)) {
-                        errors.push({
-                            type: 'valueNotAllowed',
-                            actual: value,
-                            expected: allowedTypes,
-                            field: 'type',
-                            message: `Operation type must be one of: ${allowedTypes.join(', ')}`
-                        });
-                    }
-                    return value;
-                }
-            },
+            type: this.#operationTypeDomain(
+                OperationType.ADD_WRITER,
+                OperationType.REMOVE_WRITER,
+                OperationType.ADMIN_RECOVERY
+            ),
             address: {type: 'buffer', length: this.#config.addressLength, required: true},
             rao: {
                 strict: true,
@@ -484,22 +453,7 @@ class Check {
     #compileTransactionOperationSchema() {
         const schema = {
             $$strict: true,
-            type: {
-                type: 'number',
-                required: true,
-                custom: (value, errors) => { // more secure than enum
-                    if (value !== OperationType.TX) {
-                        errors.push({
-                            type: 'valueNotAllowed',
-                            actual: value,
-                            expected: OperationType.TX,
-                            field: 'type',
-                            message: `Operation type must be ${OperationType.TX} (TX)`
-                        });
-                    }
-                    return value;
-                }
-            },
+            type: this.#operationTypeDomain(OperationType.TX),
             address: {type: 'buffer', length: this.#config.addressLength, required: true}, // invoker address
             txo: {
                 strict: true,
@@ -555,22 +509,7 @@ class Check {
     #compileBootstrapDeploymentSchema() {
         const schema = {
             $$strict: true,
-            type: {
-                type: 'number',
-                required: true,
-                custom: (value, errors) => {
-                    if (value !== OperationType.BOOTSTRAP_DEPLOYMENT) {
-                        errors.push({
-                            type: 'valueNotAllowed',
-                            actual: value,
-                            expected: OperationType.BOOTSTRAP_DEPLOYMENT,
-                            field: 'type',
-                            message: `Operation type must be ${OperationType.BOOTSTRAP_DEPLOYMENT} (BOOTSTRAP_DEPLOYMENT)`
-                        });
-                    }
-                    return value;
-                }
-            },
+            type: this.#operationTypeDomain(OperationType.BOOTSTRAP_DEPLOYMENT),
             address: {type: 'buffer', length: this.#config.addressLength, required: true},
             bdo: {
 
@@ -625,22 +564,7 @@ class Check {
     #compileTransferOperationSchema() {
         const schema = {
             $$strict: true,
-            type: {
-                type: 'number',
-                required: true,
-                custom: (value, errors) => {
-                    if (value !== OperationType.TRANSFER) {
-                        errors.push({
-                            type: 'valueNotAllowed',
-                            actual: value,
-                            expected: OperationType.TRANSFER,
-                            field: 'type',
-                            message: `Operation type must be ${OperationType.TRANSFER} (TRANSFER)`
-                        });
-                    }
-                    return value;
-                }
-            },
+            type: this.#operationTypeDomain(OperationType.TRANSFER),
             address: {type: 'buffer', length: this.#config.addressLength, required: true},
             tro: {
                 strict: true,
@@ -695,22 +619,7 @@ class Check {
     #compileSetEpochOperationSchema() {
         const schema = {
             $$strict: true,
-            type: {
-                type: 'number',
-                required: true,
-                custom: (value, errors) => {
-                    if (value !== OperationType.SET_EPOCH) {
-                        errors.push({
-                            type: 'valueNotAllowed',
-                            actual: value,
-                            expected: OperationType.SET_EPOCH,
-                            field: 'type',
-                            message: `Operation type must be ${OperationType.SET_EPOCH} (SET_EPOCH)`
-                        });
-                    }
-                    return value;
-                }
-            },
+            type: this.#operationTypeDomain(OperationType.SET_EPOCH),
             address: {type: 'buffer', length: this.#config.addressLength, required: true},
             seo: {
                 strict: true,
