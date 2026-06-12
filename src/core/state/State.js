@@ -13,7 +13,7 @@ import {
     BATCH_SIZE,
     ADMIN_INITIAL_STAKED_BALANCE,
     TRAC_NAMESPACE,
-    CustomEventType
+    CustomEventType,
 } from '../../utils/constants.js';
 import { isHexString, sleep, isTransactionRecordPut } from '../../utils/helpers.js';
 import tracCryptoApi from 'trac-crypto-api';
@@ -100,6 +100,9 @@ class State extends ReadyResource {
     }
 
     async _close() {
+        [CustomEventType.IS_INDEXER, CustomEventType.IS_NON_INDEXER].forEach(event => {
+            this.removeAllListeners(event);
+        })
         console.log("State: closing gracefully...");
         if (this.#bee !== null) {
             await this.#bee.close();
@@ -129,10 +132,20 @@ class State extends ReadyResource {
         return this.#base.view.core.signedLength;
     }
 
-    // TODO: document a epoch data returned
+    async currentEpochId() {
+        const epochIdBuffer = await this.getSigned(keys.CURRENT_INDEX);
+        if (!epochIdBuffer) return 0;
+
+        return lengthEntryUtils.decodeBE(epochIdBuffer)
+    }
+
     async currentEpoch() {
-        const latestEpochNumber = await this.getSigned(keys.CURRENT_INDEX)
-        return await this.getSigned(keys.EPOCH(latestEpochNumber))
+        const epochId = await this.currentEpochId()
+        return await this.getSigned(keys.EPOCH_DATA(epochId));
+    }
+
+    async getEpochHash(epochId) {
+        return await this.getSigned(keys.EPOCH_HASH(epochId))
     }
 
     getFee() {
@@ -2427,6 +2440,9 @@ class State extends ReadyResource {
         if (this.#config.enableTxApplyLogs) {
             console.info(`Indexer has been removed addr:wk:tx - ${toRemoveAddressString}:${decodedNodeEntry.wk.toString('hex')}:${txHashHexString}`);
         }
+
+        this.#emitEvent(CustomEventType.IS_NON_INDEXER, tracCryptoApi.address.decodeSafe(toRemoveAddressString))
+        return Status.SUCCESS;
     }
 
     async #handleApplyBanValidatorOperation(op, view, base, node, batch) {
@@ -3282,15 +3298,13 @@ class State extends ReadyResource {
         return Status.SUCCESS;
     }
 
-    async #handleApplySetEpochOperation(op, view, base, node, batch) {
+    async #handleApplySetEpochOperation(op, view, base, node) {
         if (!this.check.validateSetEpochOperation(op)) {
             this.#safeLogApply(OperationType.SET_EPOCH, "Contract schema validation failed.", node.from.key)
             return Status.FAILURE;
         };
-        console.log(batch)
-
-        // TODO: Actually program the apply function
-
+        
+        this.emit(CustomEventType.EPOCH_CREATED); // notify epoch committed
         return Status.SUCCESS;
     }
 
