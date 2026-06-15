@@ -3,7 +3,8 @@ import consensusV1Generated from './consensusV1.generated.cjs';
 
 const {
     ConsensusMessageHeader,
-    ProofProposalApproval
+    ProofProposalApproval,
+    ProofProposal
 } = consensusV1Generated.consensus.v1;
 
 // Options for converting protobuf messages to plain objects, ensuring that bytes are returned as Buffers and enums as numbers.
@@ -70,6 +71,26 @@ export const decodeProofProposalApproval = (payload) => {
 }
 
 /**
+ * Encodes a ProofProposal for regular consensus usage.
+ *
+ * @param {Object} payload - ProofProposalApproval payload.
+ * @returns {Buffer} Encoded approval.
+ */
+export const encodeProofProposal = (payload) => {
+    return encodeMessage(ProofProposal, payload);
+}
+
+/**
+ * Decodes a ProofProposal for regular consensus usage.
+ *
+ * @param {Buffer} payload - Encoded ProofProposal buffer.
+ * @returns {Object} Decoded .
+ */
+export const decodeProofProposal = (payload) => {
+    return decodeMessage(ProofProposal, payload);
+}
+
+/**
  * Safely encodes a ProofProposalApproval for apply-function validation paths.
  * Returns an empty buffer when the approval payload is invalid.
  *
@@ -99,6 +120,40 @@ export const safeDecodeProofProposalApproval = (payload) => {
         return decodeProofProposalApproval(payload);
     } catch (error) {
         console.log("safeDecodeProofProposalApproval error:", error.message);
+    }
+    return null;
+}
+
+/**
+ * Safely encodes a ProofProposal for apply-function validation paths.
+ * Returns an empty buffer when the payload is invalid.
+ *
+ * @param {*} payload - Input expected to match ProofProposal.
+ * @returns {Buffer} Encoded or an empty buffer.
+ */
+export const safeEncodeProofProposal = (payload) => {
+    try {
+        return encodeProofProposal(payload);
+    } catch (error) {
+        console.log("safeEncodeProofProposal error:", error.message);
+    }
+
+    return b4a.alloc(0);
+}
+
+/**
+ * Safely decodes a ProofProposal for apply-function validation paths.
+ * Returns null when the input is not a buffer or cannot be decoded.
+ *
+ * @param {*} payload - Encoded ProofProposal buffer.
+ * @returns {Object|null} Decoded or null.
+ */
+export const safeDecodeProofProposal = (payload) => {
+    try {
+        if (!b4a.isBuffer(payload)) return null;
+        return decodeProofProposal(payload);
+    } catch (error) {
+        console.log("safeDecodeProofProposal error:", error.message);
     }
     return null;
 }
