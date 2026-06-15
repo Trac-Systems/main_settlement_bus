@@ -47,7 +47,7 @@ export class VDFService extends ReadyResource {
             if (response.error) return null;
 
             return response.result;
-        } catch (error) {
+        } catch {
             return null;
         }
     }
