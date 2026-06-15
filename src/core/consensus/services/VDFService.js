@@ -25,7 +25,11 @@ export class VDFService extends ReadyResource {
                     await port.write({
                         result: { challenge, difficulty, discriminantSizeBits, solution },
                     });
-                } catch {}
+                } catch(error) {
+                    await port.write({
+                        error: error.message,
+                    })
+                }
             }
         });
     }
@@ -38,6 +42,13 @@ export class VDFService extends ReadyResource {
 
     async calculateVDF(challenge, difficulty, discriminantSizeBits) {
         await this.#port.write({ challenge, difficulty, discriminantSizeBits });
-        return await this.#port.read();
+        try {
+            const response = await this.#port.read();    
+            if (response.error) return null;
+
+            return response.result;
+        } catch (error) {
+            return null;
+        }
     }
 }

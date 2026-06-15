@@ -103,22 +103,56 @@ if (!isBareRuntime) {
         await service.close(); // close() waits for _close()
     });
 
-    test('VDFService.calculateVDF returns the result from port.read', async t => {
+    test('VDFService.calculateVDF returns result field from port.read response', async t => {
         const portMock = makePortMock();
         const expectedResult = { challenge: Buffer.alloc(32), difficulty: 500, solution: 'proof' };
-        portMock.read.resolves(expectedResult);
+        portMock.read.resolves({ result: expectedResult });
 
         const threadMock = makeThreadMock();
         const teardown = setup(portMock, threadMock);
         t.teardown(teardown);
 
         const service = new VDFService();
-        await service.ready();  // ready() waits for _open()
+        await service.ready();
 
         const result = await service.calculateVDF(Buffer.alloc(32), 500, 1024);
-        t.alike(result, expectedResult, 'returns exactly what port.read resolves to');
+        t.alike(result, expectedResult, 'returns the result field, not the full response');
 
-        await service.close(); // close() waits for _close()
+        await service.close();
+    });
+
+    test('VDFService.calculateVDF returns null when response contains error', async t => {
+        const portMock = makePortMock();
+        portMock.read.resolves({ error: 'VDF computation failed' });
+
+        const threadMock = makeThreadMock();
+        const teardown = setup(portMock, threadMock);
+        t.teardown(teardown);
+
+        const service = new VDFService();
+        await service.ready();
+
+        const result = await service.calculateVDF(Buffer.alloc(32), 100, 512);
+        t.is(result, null, 'returns null on worker error');
+
+        await service.close();
+    });
+
+    test('VDFService.calculateVDF returns null when port.read throws', async t => {
+        const portMock = makePortMock();
+        portMock.read.rejects(new Error('port closed unexpectedly'));
+
+        const threadMock = makeThreadMock();
+        const teardown = setup(portMock, threadMock);
+        t.teardown(teardown);
+
+        const service = new VDFService();
+        await service.ready();
+
+        const result = await service.calculateVDF(Buffer.alloc(32), 100, 512);
+        t.is(result, null, 'returns null on read exception');
+
+        await service.close();
     });
 
     // --- Real thread integration tests (no mocks) ---
@@ -138,14 +172,14 @@ if (!isBareRuntime) {
         t.ok(spawnedThread.tid > 0, 'OS thread ID is non-zero — a real thread was created');
 
         const challenge = Buffer.alloc(32, 1);
-        const response = await service.calculateVDF(challenge, THREAD_TEST_DIFFICULTY, THREAD_TEST_DISCRIMINANT_BITS);
+        const result = await service.calculateVDF(challenge, THREAD_TEST_DIFFICULTY, THREAD_TEST_DISCRIMINANT_BITS);
 
-        t.ok(response && response.result, 'response has result field');
-        t.alike(response.result.challenge, challenge, 'result echoes challenge');
-        t.is(response.result.difficulty, THREAD_TEST_DIFFICULTY, 'result echoes difficulty');
-        t.is(response.result.discriminantSizeBits, THREAD_TEST_DISCRIMINANT_BITS, 'result echoes discriminantSizeBits');
-        t.ok(Buffer.isBuffer(response.result.solution), 'solution is a Buffer');
-        t.ok(response.result.solution.length > 0, 'solution is non-empty');
+        t.ok(result, 'result is defined');
+        t.alike(result.challenge, challenge, 'result echoes challenge');
+        t.is(result.difficulty, THREAD_TEST_DIFFICULTY, 'result echoes difficulty');
+        t.is(result.discriminantSizeBits, THREAD_TEST_DISCRIMINANT_BITS, 'result echoes discriminantSizeBits');
+        t.ok(Buffer.isBuffer(result.solution), 'solution is a Buffer');
+        t.ok(result.solution.length > 0, 'solution is non-empty');
     });
 
     test('VDFService real thread: multiple sequential requests all return results', async t => {
@@ -160,9 +194,9 @@ if (!isBareRuntime) {
         ];
 
         for (const challenge of challenges) {
-            const response = await service.calculateVDF(challenge, THREAD_TEST_DIFFICULTY, THREAD_TEST_DISCRIMINANT_BITS);
-            t.ok(response && response.result, 'each request returns a result');
-            t.alike(response.result.challenge, challenge, 'each result matches its challenge');
+            const result = await service.calculateVDF(challenge, THREAD_TEST_DIFFICULTY, THREAD_TEST_DISCRIMINANT_BITS);
+            t.ok(result, 'each request returns a result');
+            t.alike(result.challenge, challenge, 'each result matches its challenge');
         }
     });
 
@@ -178,6 +212,6 @@ if (!isBareRuntime) {
         const challenge = Buffer.alloc(32, 5);
         const response = await service.calculateVDF(challenge, THREAD_TEST_DIFFICULTY, THREAD_TEST_DISCRIMINANT_BITS);
 
-        t.ok(response && response.result, 'service works after reopen');
+        t.ok(response, 'service works after reopen');
     });
 }
