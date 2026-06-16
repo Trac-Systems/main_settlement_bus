@@ -100,9 +100,6 @@ class State extends ReadyResource {
     }
 
     async _close() {
-        [CustomEventType.IS_INDEXER, CustomEventType.IS_NON_INDEXER].forEach(event => {
-            this.removeAllListeners(event);
-        })
         console.log("State: closing gracefully...");
         if (this.#bee !== null) {
             await this.#bee.close();
@@ -140,12 +137,8 @@ class State extends ReadyResource {
     }
 
     async currentEpoch() {
-        const epochId = await this.currentEpochId()
-        return await this.getSigned(keys.EPOCH_DATA(epochId));
-    }
-
-    async getEpochHash(epochId) {
-        return await this.getSigned(keys.EPOCH_HASH(epochId))
+        const latestEpochNumber = await this.getSigned(keys.CURRENT_INDEX)
+        return await this.getSigned(keys.EPOCH(latestEpochNumber))
     }
 
     getFee() {
@@ -3298,7 +3291,7 @@ class State extends ReadyResource {
         return Status.SUCCESS;
     }
 
-    async #handleApplySetEpochOperation(op, view, base, node, batch) {
+    async #handleApplySetEpochOperation(op, view, base, node, _batch) {
         if (!this.stateValidationSchema.validateSetEpochOperation(op)) {
             this.#safeLogApply(OperationType.SET_EPOCH, "Contract schema validation failed.", node.from.key)
             return Status.FAILURE;
