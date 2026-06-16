@@ -9,7 +9,7 @@ const DISCRIMINANT_BITS = 512;
 
 if (isBare) {
     const { default: Channel } = await import('bare-channel');
-    const { VDFService } = await import('../../../../src/core/consensus/services/VDFService.js');
+    const { VDFBareService } = await import('../../../../src/core/consensus/services/VDFBareService.js');
 
     function makePortMock() {
         return {
@@ -43,7 +43,7 @@ if (isBare) {
         t.teardown(teardown);
 
         const ThreadStub = globalThis.Bare.Thread;
-        const service = new VDFService();
+        const service = new VDFBareService();
         await service.ready();
         t.teardown(() => service.close());
 
@@ -58,7 +58,7 @@ if (isBare) {
         const teardown = setup(portMock, threadMock);
         t.teardown(teardown);
 
-        const service = new VDFService();
+        const service = new VDFBareService();
         await service.ready();
         await service.close();
 
@@ -73,7 +73,7 @@ if (isBare) {
         const teardown = setup(portMock, threadMock);
         t.teardown(teardown);
 
-        const service = new VDFService();
+        const service = new VDFBareService();
         await service.ready();
         await service.close();
 
@@ -85,7 +85,7 @@ if (isBare) {
         const teardown = setup(portMock, makeThreadMock());
         t.teardown(teardown);
 
-        const service = new VDFService();
+        const service = new VDFBareService();
         await service.ready();
         t.teardown(() => service.close());
 
@@ -103,7 +103,7 @@ if (isBare) {
         const teardown = setup(portMock, makeThreadMock());
         t.teardown(teardown);
 
-        const service = new VDFService();
+        const service = new VDFBareService();
         await service.ready();
         t.teardown(() => service.close());
 
@@ -117,7 +117,7 @@ if (isBare) {
         const teardown = setup(portMock, makeThreadMock());
         t.teardown(teardown);
 
-        const service = new VDFService();
+        const service = new VDFBareService();
         await service.ready();
         t.teardown(() => service.close());
 
@@ -130,7 +130,7 @@ if (isBare) {
         const teardown = setup(portMock, makeThreadMock());
         t.teardown(teardown);
 
-        const service = new VDFService();
+        const service = new VDFBareService();
         await service.ready();
         t.teardown(() => service.close());
 
@@ -140,7 +140,7 @@ if (isBare) {
     // Bare integration tests
 
     test('[bare] real VDF: returns valid computation result', { timeout: 30000 }, async t => {
-        const service = new VDFService();
+        const service = new VDFBareService();
         await service.ready();
         t.teardown(() => service.close());
 
@@ -156,7 +156,7 @@ if (isBare) {
     });
 
     test('[bare] real VDF: multiple sequential requests all succeed', { timeout: 60000 }, async t => {
-        const service = new VDFService();
+        const service = new VDFBareService();
         await service.ready();
         t.teardown(() => service.close());
 
@@ -169,7 +169,7 @@ if (isBare) {
     });
 
     test('[bare] real VDF: service works after close and reopen', { timeout: 30000 }, async t => {
-        const service = new VDFService();
+        const service = new VDFBareService();
         await service.ready();
         await service.close();
         await service.ready();
@@ -180,7 +180,7 @@ if (isBare) {
     });
 
     test('[bare] real VDF: invalid discriminantSizeBits causes worker to return null', { timeout: 10000 }, async t => {
-        const service = new VDFService();
+        const service = new VDFBareService();
         await service.ready();
         t.teardown(() => service.close());
 
@@ -192,10 +192,10 @@ if (isBare) {
 // ---- Node.js integration tests ----
 
 if (!isBare) {
-    const { VDFService } = await import('../../../../src/core/consensus/services/VDFService.js');
+    const { VDFNodeService } = await import('../../../../src/core/consensus/services/VDFNodeService.js');
 
     test('[node] real VDF: returns valid computation result', { timeout: 30000 }, async t => {
-        const service = new VDFService();
+        const service = new VDFNodeService();
         await service.ready();
         t.teardown(() => service.close());
 
@@ -211,7 +211,7 @@ if (!isBare) {
     });
 
     test('[node] real VDF: invalid args cause worker to return null', { timeout: 10000 }, async t => {
-        const service = new VDFService();
+        const service = new VDFNodeService();
         await service.ready();
         t.teardown(() => service.close());
 
@@ -219,7 +219,7 @@ if (!isBare) {
     });
 
     test('[node] real VDF: multiple sequential requests all succeed', { timeout: 60000 }, async t => {
-        const service = new VDFService();
+        const service = new VDFNodeService();
         await service.ready();
         t.teardown(() => service.close());
 

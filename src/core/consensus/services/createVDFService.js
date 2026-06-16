@@ -1,4 +1,9 @@
 export async function createVDFService() {
-    const { VDFService } = await import("./VDFService.js");
-    return new VDFService();
+    if (typeof globalThis.Bare !== 'undefined') {
+        const { VDFBareService } = await import('./VDFBareService.js');
+        return new VDFBareService();
+    } else {
+        const { VDFNodeService } = await import('./VDFNodeService.js');
+        return new VDFNodeService();
+    }
 }
