@@ -398,33 +398,33 @@ export async function assertWriterRemovalState(
 export async function applyWithRoleAccessBypass(context, invalidPayload) {
     const node = context.bootstrap ?? context.adminBootstrap;
     const state = node.state;
-    const originalValidate = state.check.validateRoleAccessOperation;
-    state.check.validateRoleAccessOperation = () => true;
+    const originalValidate = state.stateValidationSchema.validateRoleAccessOperation;
+    state.stateValidationSchema.validateRoleAccessOperation = () => true;
     try {
         await node.base.append(invalidPayload);
         await node.base.update();
         await eventFlush();
     } finally {
-        state.check.validateRoleAccessOperation = originalValidate;
+        state.stateValidationSchema.validateRoleAccessOperation = originalValidate;
     }
 }
 
 export async function applyWithMissingComponentBypass(context, invalidPayload) {
     const node = context.bootstrap ?? context.adminBootstrap;
     const state = node.state;
-    const originalValidate = state.check.validateRoleAccessOperation;
+    const originalValidate = state.stateValidationSchema.validateRoleAccessOperation;
     const originalHasOwn = Object.hasOwn;
     Object.hasOwn = (obj, prop) => {
         if (prop === 'vs') return false;
         return originalHasOwn(obj, prop);
     };
-    state.check.validateRoleAccessOperation = () => true;
+    state.stateValidationSchema.validateRoleAccessOperation = () => true;
     try {
         await node.base.append(invalidPayload);
         await node.base.update();
         await eventFlush();
     } finally {
-        state.check.validateRoleAccessOperation = originalValidate;
+        state.stateValidationSchema.validateRoleAccessOperation = originalValidate;
         Object.hasOwn = originalHasOwn;
     }
 }

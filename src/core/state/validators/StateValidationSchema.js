@@ -14,15 +14,15 @@ import {
     NETWORK_ID_BYTE_LENGTH,
     EPOCH_BYTE_LENGTH,
     VDF_BLOB_PROOF_SIZE,
-} from './constants.js';
+} from '../../../utils/constants.js';
 import {
     decodeProofProposalApproval,
     decodeProofProposal,
     encodeProofProposalApproval,
     encodeProofProposal
-} from '../codecs/consensus/v1/consensusV1OperationCodec.js';
+} from '../../../codecs/consensus/v1/consensusV1OperationCodec.js';
 
-class Check {
+class StateValidationSchema {
     #validator;
     #validateCoreAdminOperationSchema;
     #validateAdminControlOperationSchema;
@@ -640,4 +640,4 @@ class Check {
     }
 }
 
-export default Check;
+export default StateValidationSchema;

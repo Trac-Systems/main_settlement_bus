@@ -32,14 +32,14 @@ async function bypassSchemaAndApply(context, invalidPayload) {
         throw new Error('Invalid amount scenario requires admin bootstrap context.');
     }
 
-    const originalValidator = adminNode.state.check.validateBalanceInitialization;
-    adminNode.state.check.validateBalanceInitialization = () => true;
+    const originalValidator = adminNode.state.stateValidationSchema.validateBalanceInitialization;
+    adminNode.state.stateValidationSchema.validateBalanceInitialization = () => true;
 
     try {
         await adminNode.base.append(invalidPayload);
         await adminNode.base.update();
         await eventFlush();
     } finally {
-        adminNode.state.check.validateBalanceInitialization = originalValidator;
+        adminNode.state.stateValidationSchema.validateBalanceInitialization = originalValidator;
     }
 }

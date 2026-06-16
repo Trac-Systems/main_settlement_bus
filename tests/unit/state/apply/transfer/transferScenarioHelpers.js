@@ -463,16 +463,16 @@ export async function applyInvalidTransferWithSchemaBypass(context, invalidPaylo
 		context.bootstrap ??
 		context.peers?.[0];
 
-    if (!node?.state?.check) {
+    if (!node?.state?.stateValidationSchema) {
         throw new Error('applyInvalidTransferWithSchemaBypass requires a node with state and check.');
     }
 
-    const originalValidate = node.state.check.validateTransferOperation;
-    node.state.check.validateTransferOperation = () => true;
+    const originalValidate = node.state.stateValidationSchema.validateTransferOperation;
+    node.state.stateValidationSchema.validateTransferOperation = () => true;
     try {
         await appendInvalidTransferPayload(context, invalidPayload, { node });
     } finally {
-        node.state.check.validateTransferOperation = originalValidate;
+        node.state.stateValidationSchema.validateTransferOperation = originalValidate;
     }
 }
 
@@ -483,13 +483,13 @@ export async function applyInvalidTransferMissingValidatorFields(context, invali
 		context.bootstrap ??
 		context.peers?.[0];
 
-    if (!node?.state?.check) {
+    if (!node?.state?.stateValidationSchema) {
         throw new Error('applyInvalidTransferMissingValidatorFields requires a node with state and check.');
     }
 
-    const originalValidate = node.state.check.validateTransferOperation;
+    const originalValidate = node.state.stateValidationSchema.validateTransferOperation;
     const originalHasOwn = Object.hasOwn;
-    node.state.check.validateTransferOperation = () => true;
+    node.state.stateValidationSchema.validateTransferOperation = () => true;
     Object.hasOwn = (obj, prop) => {
         if (prop === 'vs' || prop === 'va' || prop === 'vn') return false;
         return originalHasOwn(obj, prop);
@@ -498,7 +498,7 @@ export async function applyInvalidTransferMissingValidatorFields(context, invali
     try {
         await appendInvalidTransferPayload(context, invalidPayload, { node });
     } finally {
-        node.state.check.validateTransferOperation = originalValidate;
+        node.state.stateValidationSchema.validateTransferOperation = originalValidate;
         Object.hasOwn = originalHasOwn;
     }
 }
