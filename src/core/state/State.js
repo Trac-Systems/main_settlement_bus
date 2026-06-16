@@ -100,9 +100,12 @@ class State extends ReadyResource {
     }
 
     async _close() {
-        [CustomEventType.IS_INDEXER, CustomEventType.IS_NON_INDEXER].forEach(event => {
-            this.removeAllListeners(event);
-        })
+        [
+            CustomEventType.IS_INDEXER,
+            CustomEventType.IS_NON_INDEXER,
+            CustomEventType.EPOCH_PROPOSAL_SUBMITTED,
+            CustomEventType.EPOCH_CREATED,
+        ].forEach(event => this.removeAllListeners(event));
         console.log("State: closing gracefully...");
         if (this.#bee !== null) {
             await this.#bee.close();
