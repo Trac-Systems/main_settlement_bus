@@ -59,7 +59,8 @@ export class EpochProofProposalOperations {
 
     async sendToIndexer(member, proofProposal) {
         const connection = this.#connectionManager.getConnection(member.key);
-        if (!connection) return null;
+        const consensusSession = connection?.consensusProtocolSession;
+        if (!consensusSession) return null;
 
         const request = await consensusMessageFactory(this.#wallet, this.#config)
             .buildProofProposal(
@@ -72,8 +73,8 @@ export class EpochProofProposalOperations {
                 proofProposal.vdfProof
             );
 
-        const response = await connection.protocolSession.send(request);
-        return response?.result?.signature ?? null;
+        const response = await consensusSession.send(request);
+        return response?.result?.approval_sig ?? null;
     }
 
     async collectSignature(member, proofProposal) {
@@ -88,9 +89,6 @@ export class EpochProofProposalOperations {
 
         const memberSignature = await this.sendToIndexer(member, proofProposal);
         if (!memberSignature) return null;
-
-        const isValidSignature = await this.verifySignature(memberSignature, proofProposal.dataHash, member.key);
-        if (!isValidSignature) return null;
 
         return { signature: memberSignature, publicKey: member.key };
     }

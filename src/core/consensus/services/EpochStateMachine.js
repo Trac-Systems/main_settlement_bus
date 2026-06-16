@@ -66,4 +66,15 @@ export class EpochStateMachine extends StateMachine {
     constructor() {
         super(TRANSITIONS, EPOCH_STATES.START_VDF, EPOCH_STATES.START_VDF);
     }
+
+    async send(event, payload = {}) {
+        const prev = this.state;
+        const result = await super.send(event, payload);
+        if (result) {
+            console.log(`[EpochStateMachine] ${prev} --[${event}]--> ${result.next}`);
+        } else {
+            console.log(`[EpochStateMachine] invalid event=${event} in state=${prev}`);
+        }
+        return result;
+    }
 }

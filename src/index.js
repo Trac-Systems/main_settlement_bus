@@ -15,7 +15,10 @@ import {
     CustomEventType,
     BALANCE_MIGRATION_SLEEP_INTERVAL,
     WHITELIST_MIGRATION_DIR,
-    OperationType
+    OperationType,
+    HASH_BYTE_LENGTH,
+    SIGNATURE_BYTE_LENGTH,
+    WRITER_BYTE_LENGTH,
 } from "./utils/constants.js";
 import { decimalStringToBigInt, bigIntTo16ByteBuffer, bufferToBigInt, bigIntToDecimalString } from "./utils/amountSerialization.js"
 import {
@@ -26,9 +29,11 @@ import {
 import fileUtils from './utils/fileUtils.js';
 import migrationUtils from './utils/migrationUtils.js';
 import {safeDecodeApplyOperation, safeEncodeApplyOperation} from "./codecs/apply/applyOperationCodec.js";
+import { safeEncodeProofProposal } from "./codecs/consensus/v1/consensusV1OperationCodec.js";
 import PartialTransactionValidator from "./core/network/protocols/shared/validators/PartialTransactionValidator.js";
 import PartialTransferValidator from "./core/network/protocols/shared/validators/PartialTransferValidator.js";
 import { BroadcastError, ValidationError } from "./utils/errors.js";
+import { uint32ToBuffer, uint64ToBuffer, uint8ToBuffer } from "./utils/buffer.js";
 
 export class MainSettlementBus extends ReadyResource {
     #store;
@@ -338,6 +343,7 @@ export class MainSettlementBus extends ReadyResource {
         console.log("- /get_tx_info <tx_hash>: Get information about a transaction with the given hash.");
         console.log("- /get_validator_addr <writing_key>: Get the validator address mapped to the given writing key.");
         console.log("- /get_balance <address> <confirmed>: Get the balance of the node with specified address (confirmed = true is default)");
+        console.log("- /append_genesis_epoch: Append the synthetic epoch-0 bootstrap record.");
         console.log("- /exit: Exit the program.");
         console.log("- /help: Display this help.");
     }
@@ -413,6 +419,29 @@ export class MainSettlementBus extends ReadyResource {
             confirmed_length: confirmedLength,
             fee: this.handleGetFee().toString(),
         };
+    }
+
+    async appendGenesisEpoch() {
+        const proofData = safeEncodeProofProposal({
+            protocol_version: uint8ToBuffer(1, "protocol"),
+            network_id: uint32ToBuffer(this.#config.networkId, "network id"),
+            epoch: uint64ToBuffer(0, "epoch"),
+            previous_epoch_record_hash: b4a.alloc(HASH_BYTE_LENGTH, 0),
+            proposer: b4a.alloc(WRITER_BYTE_LENGTH, 0),
+            vdf_parameters_hash: b4a.alloc(HASH_BYTE_LENGTH, 0),
+            vdf_proof: b4a.alloc(0),
+            signature: b4a.alloc(SIGNATURE_BYTE_LENGTH, 0),
+        });
+
+        console.log("proofData length", proofData.length)
+
+        const payload = await applyStateMessageFactory(this.#wallet, this.#config)
+            .buildCompleteSetEpochMessage(this.#wallet.address, proofData, []);
+
+        const encodedPayload = safeEncodeApplyOperation(payload);            
+        await this.#state.append(encodedPayload);
+
+        return payload;
     }
 
     async handleAdminCreation() {

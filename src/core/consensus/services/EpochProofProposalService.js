@@ -166,7 +166,7 @@ class EpochProofProposalService extends SchedulableService {
 
     // handler functions
     async #handleVdfPending() {
-        console.log(`[EpochService] state=${EPOCH_STATES.VDF_PENDING}: calculating VDF`);
+        this.#logger.info(`[EpochService] state=${EPOCH_STATES.VDF_PENDING}: calculating VDF`);
         this.#stateMachine.appendContext({
             vdf: await this.#operations.calculateVDF(),
         });
@@ -174,20 +174,20 @@ class EpochProofProposalService extends SchedulableService {
     }
 
     async #handleVdfComputed(context) {
-        console.log(`[EpochService] state=${EPOCH_STATES.VDF_COMPUTED}: VDF computed`);
+        this.#logger.info(`[EpochService] state=${EPOCH_STATES.VDF_COMPUTED}: VDF computed`);
         const { remoteProposalReceived } = context;
         this.#stateMachine.appendContext({ remoteProposalReceived: false });
         if (remoteProposalReceived) {
-            console.log('[EpochService] remote proposal already observed, switching to awaiting mode');
+            this.#logger.info('[EpochService] remote proposal already observed, switching to awaiting mode');
             await this.#stateMachine.send(EPOCH_EVENTS.REMOTE_PROPOSAL_RECEIVED);
         } else {
-            console.log('[EpochService] creating local epoch proposal');
+            this.#logger.info('[EpochService] creating local epoch proposal');
             await this.#stateMachine.send(EPOCH_EVENTS.PROPOSE_EPOCH);
         }
     }
 
     async #handleProposingEpoch(context) {
-        console.log(`[EpochService] state=${EPOCH_STATES.PROPOSING_EPOCH}: building proof proposal and dispatching approvals`);
+        this.#logger.info(`[EpochService] state=${EPOCH_STATES.PROPOSING_EPOCH}: building proof proposal and dispatching approvals`);
         this.#stateMachine.appendContext({
             newEpochProofData: this.#operations.createProposal(
                 context.vdf.prevEpochId,
@@ -205,22 +205,22 @@ class EpochProofProposalService extends SchedulableService {
     }
 
     #handleCollectingConfirmations() {
-        console.log(`[EpochService] state=${EPOCH_STATES.COLLECTING_CONFIRMATIONS}: waiting for approvals`);
+        this.#logger.info(`[EpochService] state=${EPOCH_STATES.COLLECTING_CONFIRMATIONS}: waiting for approvals`);
         this.#scheduleCollectingConfirmationsTimeout();
     }
 
     #handleAwaitingEpoch() {
-        console.log(`[EpochService] state=${EPOCH_STATES.AWAITING_EPOCH}: waiting for remote epoch append`);
+        this.#logger.info(`[EpochService] state=${EPOCH_STATES.AWAITING_EPOCH}: waiting for remote epoch append`);
         this.#scheduleAwaitingEpochTimeout();
     }
 
     async #handleLocalQuorumReached() {
-        console.log(`[EpochService] state=${EPOCH_STATES.LOCAL_QUORUM_REACHED}: quorum reached, submitting epoch`);
+        this.#logger.info(`[EpochService] state=${EPOCH_STATES.LOCAL_QUORUM_REACHED}: quorum reached, submitting epoch`);
         await this.#stateMachine.send(EPOCH_EVENTS.SUBMIT_EPOCH);
     }
 
     async #handleVdfSubmitted(context) {
-        console.log(`[EpochService] state=${EPOCH_STATES.VDF_SUBMITTED}: appending epoch to state`);
+        this.#logger.info(`[EpochService] state=${EPOCH_STATES.VDF_SUBMITTED}: appending epoch to state`);
         await this.#operations.appendEpoch({
             data: context.proofProposal.data,
             signature: context.proofProposal.signature,
@@ -244,7 +244,7 @@ class EpochProofProposalService extends SchedulableService {
     }
 
     async #onTransition(event, _prev, next, context) {
-        console.log(`[EpochService] transition event=${event ?? 'INIT'} -> ${next}`);
+        this.#logger.info(`[EpochService] transition event=${event ?? 'INIT'} -> ${next}`);
         this.#clearAwaitingEpochTimeout();
         this.#clearCollectingConfirmationsTimeout();
         const handler = this.#getTransitionHandler(next);

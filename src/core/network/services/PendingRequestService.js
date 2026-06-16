@@ -1,4 +1,4 @@
-import {NetworkOperationType, ResultCode} from '../../../utils/constants.js';
+import {ConsensusOperationType, NetworkOperationType, ResultCode} from '../../../utils/constants.js';
 import {isHexString, publicKeyToAddress} from '../../../utils/helpers.js';
 import {V1ProtocolError} from "../protocols/v1/V1ProtocolError.js";
 import b4a from 'b4a';
@@ -14,7 +14,11 @@ export class PendingRequestServiceTimeoutError extends Error {
 
 export default class PendingRequestService {
     #pendingRequests;
-    #requestMessageTypes = [NetworkOperationType.LIVENESS_REQUEST, NetworkOperationType.BROADCAST_TRANSACTION_REQUEST];
+    #requestMessageTypes = [
+        NetworkOperationType.LIVENESS_REQUEST,
+        NetworkOperationType.BROADCAST_TRANSACTION_REQUEST,
+        ConsensusOperationType.PROOF_PROPOSAL,
+    ];
     #config;
 
     constructor(config) {
@@ -44,7 +48,8 @@ export default class PendingRequestService {
             throw new Error('Pending request message must be an object.');
         }
 
-        if (typeof message.id !== 'string' || message.id.length === 0) {
+        const messageId = this.#getMessageId(message);
+        if (typeof messageId !== 'string' || messageId.length === 0) {
             throw new Error('Pending request ID must be a non-empty string.');
         }
 
@@ -58,7 +63,7 @@ export default class PendingRequestService {
     */
     registerPendingRequest(peerPubKeyHex, message) {
         this.#validateRegisterInput(peerPubKeyHex, message);
-        const id = message.id;
+        const id = this.#getMessageId(message);
         const peerAddress = publicKeyToAddress(peerPubKeyHex, this.#config);
         if (this.#pendingRequests.size >= this.#config.maxPendingRequestsInPendingRequestsService) {
             throw new Error('Maximum number of pending requests reached.');
@@ -71,6 +76,7 @@ export default class PendingRequestService {
         const entry = {
             id: id,
             requestType: message.type,
+            requestMessage: message,
             requestTxData: this.#extractRequestTxData(message),
             requestedTo: peerPubKeyHex,
             timeoutId: null,
@@ -103,6 +109,12 @@ export default class PendingRequestService {
         if (message.type !== NetworkOperationType.BROADCAST_TRANSACTION_REQUEST) return null;
         const txData = message.broadcast_transaction_request?.data;
         return b4a.isBuffer(txData) ? txData : null;
+    }
+
+    #getMessageId(message) {
+        if (typeof message?.id === 'string' && message.id.length > 0) return message.id;
+        if (typeof message?.session_id === 'string' && message.session_id.length > 0) return message.session_id;
+        return null;
     }
 
     getAndDeletePendingRequest(id) {

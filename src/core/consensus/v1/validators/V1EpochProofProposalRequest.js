@@ -1,6 +1,6 @@
-import V1BaseOperation from "../../../network/protocols/v1/validators/V1BaseOperation.js";
+import ConsensusBaseOperation from './ConsensusBaseOperation.js';
 
-class V1EpochProofProposalRequest extends V1BaseOperation {
+class V1EpochProofProposalRequest extends ConsensusBaseOperation {
     constructor(config) {
         super(config);
     }

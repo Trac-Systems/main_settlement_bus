@@ -207,4 +207,9 @@ export class Handlers {
 
         return txDetails;
     }
+
+    async handleAppendGenesisEpoch() {
+        await this.#msb.appendGenesisEpoch();
+        console.log("Genesis epoch appended.");
+    }
 }

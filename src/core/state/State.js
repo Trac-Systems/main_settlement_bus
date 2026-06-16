@@ -43,6 +43,7 @@ import { Status } from './utils/transaction.js';
 import remote from 'hypercore/lib/fully-remote-proof.js'
 import PQueue from 'p-queue';
 import { keys } from '../consensus/v1/handlers/epochProposal/epochProofData.js'
+import { safeDecodeProofProposal } from '../../codecs/consensus/v1/consensusV1OperationCodec.js';
 
 const OVERSIZED_BATCH_PENALTY_MULTIPLIER = BATCH_SIZE;
 
@@ -3301,12 +3302,22 @@ class State extends ReadyResource {
         return Status.SUCCESS;
     }
 
-    async #handleApplySetEpochOperation(op, view, base, node) {
+    async #handleApplySetEpochOperation(op, view, base, node, batch) {
         if (!this.check.validateSetEpochOperation(op)) {
             this.#safeLogApply(OperationType.SET_EPOCH, "Contract schema validation failed.", node.from.key)
             return Status.FAILURE;
         };
         
+        const proof = safeDecodeProofProposal(op.seo.pd); // decode leader proof
+        const proofHash = await tracCryptoApi.hash.blake3(op.seo.pd); // computes the buffers' blake3 hash - ProofProposal seralized in bytes
+        const epochId = proof.epoch;
+        const epochHash = proofHash;
+
+        await batch.put(keys.EPOCH_HASH(epochId), epochHash); // store epoch hash
+        await batch.put(keys.CURRENT_INDEX, lengthEntryUtils.encodeBE(epochId)); // update current epoch index
+        await batch.put(keys.EPOCH_DATA(epochId), op.seo.pd); // store full proof bytes
+
+
         this.emit(CustomEventType.EPOCH_CREATED); // notify epoch committed
         return Status.SUCCESS;
     }
