@@ -114,12 +114,23 @@ class ConsensusMessageBuilder {
     }
 
     setNetworkId(networkId) {
-        this.#network_id = uint16ToBuffer(networkId, 'Network id');
-        return  this;
+        const value = uint16ToBuffer(networkId, 'Network id');
+        if (networkId === 0) {
+            throw new Error('Network id must be greater than zero.');
+        }
+
+        this.#network_id = value;
+        return this;
     }
 
     setEpoch(epoch) {
-        this.#epoch = uint64ToBuffer(epoch, 'Epoch');
+        const value = uint64ToBuffer(epoch, 'Epoch');
+        const epochValue = typeof epoch === 'bigint' ? epoch : BigInt(epoch);
+        if (epochValue === 0n) {
+            throw new Error('Epoch must be greater than zero.');
+        }
+
+        this.#epoch = value;
         return this;
     }
 

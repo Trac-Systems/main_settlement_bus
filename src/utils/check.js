@@ -42,14 +42,14 @@ class Check {
         this.#config = config
 
         this.#proofDataFields = Object.freeze([
-            {name: 'protocol_version', length: PROTOCOL_VERSION_BYTE_LENGTH, allowZero: false},
-            {name: 'network_id', length: NETWORK_ID_BYTE_LENGTH, allowZero: true},
-            {name: 'epoch', length: EPOCH_BYTE_LENGTH, allowZero: true},
-            {name: 'previous_epoch_record_hash', length: HASH_BYTE_LENGTH, allowZero: false},
-            {name: 'proposer', length: this.#config.addressLength, allowZero: false},
-            {name: 'vdf_parameters_hash', length: HASH_BYTE_LENGTH, allowZero: false},
-            {name: 'vdf_proof', length: VDF_BLOB_PROOF_SIZE, allowZero: false},
-            {name: 'signature', length: SIGNATURE_BYTE_LENGTH, allowZero: false}
+            {name: 'protocol_version', length: PROTOCOL_VERSION_BYTE_LENGTH},
+            {name: 'network_id', length: NETWORK_ID_BYTE_LENGTH},
+            {name: 'epoch', length: EPOCH_BYTE_LENGTH},
+            {name: 'previous_epoch_record_hash', length: HASH_BYTE_LENGTH},
+            {name: 'proposer', length: this.#config.addressLength},
+            {name: 'vdf_parameters_hash', length: HASH_BYTE_LENGTH},
+            {name: 'vdf_proof', length: VDF_BLOB_PROOF_SIZE},
+            {name: 'signature', length: SIGNATURE_BYTE_LENGTH}
         ]);
         this.#validator = new Validator({
             useNewCustomCheckerFunction: true,
@@ -154,19 +154,17 @@ class Check {
                                 return value;
                             }
 
-                            if (!field.allowZero) {
-                                let fieldIsZeroFilled = true;
-                                for (let i = 0; i < fieldValue.length; i++) {
-                                    if (fieldValue[i] !== 0) {
-                                        fieldIsZeroFilled = false;
-                                        break;
-                                    }
+                            let fieldIsZeroFilled = true;
+                            for (let i = 0; i < fieldValue.length; i++) {
+                                if (fieldValue[i] !== 0) {
+                                    fieldIsZeroFilled = false;
+                                    break;
                                 }
+                            }
 
-                                if (fieldIsZeroFilled) {
-                                    ${this.makeError({type: "proofData", actual: "value", messages})}
-                                    return value;
-                                }
+                            if (fieldIsZeroFilled) {
+                                ${this.makeError({type: "proofData", actual: "value", messages})}
+                                return value;
                             }
 
                             reencodedProofDataInput[field.name] = fieldValue;

@@ -23,14 +23,14 @@ const check = new Check(config);
 const UNKNOWN_PROTOBUF_FIELD = b4a.from([0x9a, 0x06, 0x01, 0xff]);
 
 const PROOF_DATA_FIELD_RULES = Object.freeze([
-    {name: 'protocol_version', length: PROTOCOL_VERSION_BYTE_LENGTH, allowZero: false},
-    {name: 'network_id', length: NETWORK_ID_BYTE_LENGTH, allowZero: true},
-    {name: 'epoch', length: EPOCH_BYTE_LENGTH, allowZero: true},
-    {name: 'previous_epoch_record_hash', length: HASH_BYTE_LENGTH, allowZero: false},
-    {name: 'proposer', length: config.addressLength, allowZero: false},
-    {name: 'vdf_parameters_hash', length: HASH_BYTE_LENGTH, allowZero: false},
-    {name: 'vdf_proof', length: VDF_BLOB_PROOF_SIZE, allowZero: false},
-    {name: 'signature', length: SIGNATURE_BYTE_LENGTH, allowZero: false}
+    {name: 'protocol_version', length: PROTOCOL_VERSION_BYTE_LENGTH},
+    {name: 'network_id', length: NETWORK_ID_BYTE_LENGTH},
+    {name: 'epoch', length: EPOCH_BYTE_LENGTH},
+    {name: 'previous_epoch_record_hash', length: HASH_BYTE_LENGTH},
+    {name: 'proposer', length: config.addressLength},
+    {name: 'vdf_parameters_hash', length: HASH_BYTE_LENGTH},
+    {name: 'vdf_proof', length: VDF_BLOB_PROOF_SIZE},
+    {name: 'signature', length: SIGNATURE_BYTE_LENGTH}
 ]);
 
 const APPROVAL_FIELD_RULES = Object.freeze([
@@ -183,7 +183,7 @@ test('validateSetEpochOperation - proof data validation (seo.pd)', t => {
         );
     }
 
-    for (const {name, length, allowZero} of PROOF_DATA_FIELD_RULES) {
+    for (const {name, length} of PROOF_DATA_FIELD_RULES) {
         t.absent(
             check.validateSetEpochOperation(withSetEpochProofData(encodedProofData({
                 [name]: b4a.alloc(0)
@@ -209,17 +209,10 @@ test('validateSetEpochOperation - proof data validation (seo.pd)', t => {
             [name]: b4a.alloc(length)
         }));
 
-        if (allowZero) {
-            t.ok(
-                check.validateSetEpochOperation(proofDataWithZeroField),
-                `proof data with zero-filled ${name} should pass`
-            );
-        } else {
-            t.absent(
-                check.validateSetEpochOperation(proofDataWithZeroField),
-                `proof data with zero-filled ${name} should fail`
-            );
-        }
+        t.absent(
+            check.validateSetEpochOperation(proofDataWithZeroField),
+            `proof data with zero-filled ${name} should fail`
+        );
     }
 });
 
