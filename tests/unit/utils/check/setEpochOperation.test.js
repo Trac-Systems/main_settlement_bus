@@ -1,7 +1,7 @@
 import test from 'brittle';
 import b4a from 'b4a';
 
-import Check from '../../../../src/utils/check.js';
+import StateValidationSchema from '../../../../src/core/state/validators/StateValidationSchema.js';
 import {
     encodeProofProposal,
     encodeProofProposalApproval
@@ -19,7 +19,7 @@ import { topLevelValidationTests, valueLevelValidationTest, addressBufferLengthT
 import { config } from '../../../helpers/config.js';
 import consensusFixtures from '../../../fixtures/consensusV1Operation.fixtures.js';
 
-const check = new Check(config);
+const stateValidationSchema = new StateValidationSchema(config);
 const UNKNOWN_PROTOBUF_FIELD = b4a.from([0x9a, 0x06, 0x01, 0xff]);
 
 const PROOF_DATA_FIELD_RULES = Object.freeze([
@@ -108,13 +108,13 @@ const withApprovals = approvals => {
 const setEpochValueNotAllowedDataTypes = not_allowed_data_types.filter(value => !Array.isArray(value));
 
 test('validateSetEpochOperation - happy path', t => {
-    t.ok(check.validateSetEpochOperation(SEO.valid_set_epoch_operation), 'Valid data for set epoch operation should pass the validation')
+    t.ok(stateValidationSchema.validateSetEpochOperation(SEO.valid_set_epoch_operation), 'Valid data for set epoch operation should pass the validation')
 })
 
 test('validateSetEpochOperation - type level validation (seo)', t => {
     topLevelValidationTests(
         t,
-        check.validateSetEpochOperation.bind(check),
+        stateValidationSchema.validateSetEpochOperation.bind(stateValidationSchema),
         SEO.valid_set_epoch_operation,
         'seo',
         not_allowed_data_types,
@@ -125,7 +125,7 @@ test('validateSetEpochOperation - type level validation (seo)', t => {
 test('validateSetEpochOperation - value level validation (seo)', t => {
     valueLevelValidationTest(
         t,
-        check.validateSetEpochOperation.bind(check),
+        stateValidationSchema.validateSetEpochOperation.bind(stateValidationSchema),
         SEO.valid_set_epoch_operation,
         'seo',
         SEO.set_epoch_value_fields,
@@ -136,7 +136,7 @@ test('validateSetEpochOperation - value level validation (seo)', t => {
 test('validateSetEpochOperation - address buffer length validation - TOP LEVEL', t => {
     addressBufferLengthTest(
         t,
-        check.validateSetEpochOperation.bind(check),
+        stateValidationSchema.validateSetEpochOperation.bind(stateValidationSchema),
         SEO.valid_set_epoch_operation,
     );
 });
@@ -144,36 +144,36 @@ test('validateSetEpochOperation - address buffer length validation - TOP LEVEL',
 test('validateSetEpochOperation - proof data validation (seo.pd)', t => {
     for (const invalidProofData of not_allowed_data_types) {
         t.absent(
-            check.validateSetEpochOperation(withSetEpochProofData(invalidProofData)),
+            stateValidationSchema.validateSetEpochOperation(withSetEpochProofData(invalidProofData)),
             `proof data with invalid data type should fail: ${String(invalidProofData)} (${typeof invalidProofData})`
         );
     }
 
     t.absent(
-        check.validateSetEpochOperation(withSetEpochProofData(b4a.alloc(32, 0x15))),
+        stateValidationSchema.validateSetEpochOperation(withSetEpochProofData(b4a.alloc(32, 0x15))),
         'proof data with invalid encoding should fail'
     );
 
     t.absent(
-        check.validateSetEpochOperation(withSetEpochProofData(
+        stateValidationSchema.validateSetEpochOperation(withSetEpochProofData(
             b4a.concat([b4a.from(SEO.valid_set_epoch_operation.seo.pd), UNKNOWN_PROTOBUF_FIELD])
         )),
         'proof data with unknown protobuf field should fail'
     );
 
     t.absent(
-        check.validateSetEpochOperation(withSetEpochProofData(encodedProofDataInReverseFieldOrder())),
+        stateValidationSchema.validateSetEpochOperation(withSetEpochProofData(encodedProofDataInReverseFieldOrder())),
         'proof data encoded in unexpected field order should fail'
     );
 
     for (const {name} of PROOF_DATA_FIELD_RULES) {
         t.absent(
-            check.validateSetEpochOperation(withSetEpochProofData(encodedProofDataWithoutField(name))),
+            stateValidationSchema.validateSetEpochOperation(withSetEpochProofData(encodedProofDataWithoutField(name))),
             `proof data without ${name} should fail`
         );
 
         t.absent(
-            check.validateSetEpochOperation(withSetEpochProofData(
+            stateValidationSchema.validateSetEpochOperation(withSetEpochProofData(
                 b4a.concat([
                     b4a.from(SEO.valid_set_epoch_operation.seo.pd),
                     encodedProofDataSingleField(name, consensusFixtures.proofProposal[name])
@@ -185,21 +185,21 @@ test('validateSetEpochOperation - proof data validation (seo.pd)', t => {
 
     for (const {name, length} of PROOF_DATA_FIELD_RULES) {
         t.absent(
-            check.validateSetEpochOperation(withSetEpochProofData(encodedProofData({
+            stateValidationSchema.validateSetEpochOperation(withSetEpochProofData(encodedProofData({
                 [name]: b4a.alloc(0)
             }))),
             `proof data with empty ${name} should fail`
         );
 
         t.absent(
-            check.validateSetEpochOperation(withSetEpochProofData(encodedProofData({
+            stateValidationSchema.validateSetEpochOperation(withSetEpochProofData(encodedProofData({
                 [name]: b4a.alloc(length - 1, 0x15)
             }))),
             `proof data with ${name} one byte too short should fail`
         );
 
         t.absent(
-            check.validateSetEpochOperation(withSetEpochProofData(encodedProofData({
+            stateValidationSchema.validateSetEpochOperation(withSetEpochProofData(encodedProofData({
                 [name]: b4a.alloc(length + 1, 0x15)
             }))),
             `proof data with ${name} one byte too long should fail`
@@ -210,30 +210,30 @@ test('validateSetEpochOperation - proof data validation (seo.pd)', t => {
         }));
 
         t.absent(
-            check.validateSetEpochOperation(proofDataWithZeroField),
+            stateValidationSchema.validateSetEpochOperation(proofDataWithZeroField),
             `proof data with zero-filled ${name} should fail`
         );
     }
 });
 
 test('validateSetEpochOperation - approvals validation (seo.app)', t => {
-    t.ok(check.validateSetEpochOperation(cloneSetEpochOperation()), 'valid set epoch operation should pass');
+    t.ok(stateValidationSchema.validateSetEpochOperation(cloneSetEpochOperation()), 'valid set epoch operation should pass');
 
-    t.ok(check.validateSetEpochOperation(withApprovals([])), 'empty approvals should pass schema validation');
+    t.ok(stateValidationSchema.validateSetEpochOperation(withApprovals([])), 'empty approvals should pass schema validation');
 
     t.absent(
-        check.validateSetEpochOperation(withApprovals([b4a.alloc(0)])),
+        stateValidationSchema.validateSetEpochOperation(withApprovals([b4a.alloc(0)])),
         'empty approval value should fail'
     );
 
     t.absent(
-        check.validateSetEpochOperation(withApprovals(b4a.alloc(64, 0x15))),
+        stateValidationSchema.validateSetEpochOperation(withApprovals(b4a.alloc(64, 0x15))),
         'single approval buffer should fail'
     );
 
     for (const invalidItem of not_allowed_data_types) {
         t.absent(
-            check.validateSetEpochOperation(withApprovals([
+            stateValidationSchema.validateSetEpochOperation(withApprovals([
                 b4a.from(SEO.valid_set_epoch_operation.seo.app[0]),
                 invalidItem
             ])),
@@ -244,35 +244,35 @@ test('validateSetEpochOperation - approvals validation (seo.app)', t => {
     const sparseApprovals = [b4a.from(SEO.valid_set_epoch_operation.seo.app[0])];
     sparseApprovals.length = 2;
     t.absent(
-        check.validateSetEpochOperation(withApprovals(sparseApprovals)),
+        stateValidationSchema.validateSetEpochOperation(withApprovals(sparseApprovals)),
         'sparse approvals array should fail'
     );
 
     t.absent(
-        check.validateSetEpochOperation(withApprovals([b4a.alloc(32, 0x15)])),
+        stateValidationSchema.validateSetEpochOperation(withApprovals([b4a.alloc(32, 0x15)])),
         'approval item with invalid encoding should fail'
     );
 
     t.absent(
-        check.validateSetEpochOperation(withApprovals([
+        stateValidationSchema.validateSetEpochOperation(withApprovals([
             b4a.concat([b4a.from(SEO.valid_set_epoch_operation.seo.app[0]), UNKNOWN_PROTOBUF_FIELD])
         ])),
         'approval item with unknown protobuf field should fail'
     );
 
     t.absent(
-        check.validateSetEpochOperation(withApprovals([encodedApprovalInReverseFieldOrder()])),
+        stateValidationSchema.validateSetEpochOperation(withApprovals([encodedApprovalInReverseFieldOrder()])),
         'approval item encoded in unexpected field order should fail'
     );
 
     for (const {name} of APPROVAL_FIELD_RULES) {
         t.absent(
-            check.validateSetEpochOperation(withApprovals([encodedApprovalWithoutField(name)])),
+            stateValidationSchema.validateSetEpochOperation(withApprovals([encodedApprovalWithoutField(name)])),
             `approval without ${name} should fail`
         );
 
         t.absent(
-            check.validateSetEpochOperation(withApprovals([
+            stateValidationSchema.validateSetEpochOperation(withApprovals([
                 b4a.concat([
                     b4a.from(SEO.valid_set_epoch_operation.seo.app[0]),
                     encodedApprovalSingleField(name, consensusFixtures.proofProposalApproval[name])
@@ -284,28 +284,28 @@ test('validateSetEpochOperation - approvals validation (seo.app)', t => {
 
     for (const {name, length} of APPROVAL_FIELD_RULES) {
         t.absent(
-            check.validateSetEpochOperation(withApprovals([encodedApprovalWithOverrides({
+            stateValidationSchema.validateSetEpochOperation(withApprovals([encodedApprovalWithOverrides({
                 [name]: b4a.alloc(0)
             })])),
             `approval with empty ${name} should fail`
         );
 
         t.absent(
-            check.validateSetEpochOperation(withApprovals([encodedApprovalWithOverrides({
+            stateValidationSchema.validateSetEpochOperation(withApprovals([encodedApprovalWithOverrides({
                 [name]: b4a.alloc(length - 1, 0x15)
             })])),
             `approval with ${name} one byte too short should fail`
         );
 
         t.absent(
-            check.validateSetEpochOperation(withApprovals([encodedApprovalWithOverrides({
+            stateValidationSchema.validateSetEpochOperation(withApprovals([encodedApprovalWithOverrides({
                 [name]: b4a.alloc(length + 1, 0x15)
             })])),
             `approval with ${name} one byte too long should fail`
         );
 
         t.absent(
-            check.validateSetEpochOperation(withApprovals([encodedApprovalWithOverrides({
+            stateValidationSchema.validateSetEpochOperation(withApprovals([encodedApprovalWithOverrides({
                 [name]: b4a.alloc(length)
             })])),
             `approval with zero-filled ${name} should fail`

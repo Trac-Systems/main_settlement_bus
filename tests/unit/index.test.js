@@ -45,13 +45,10 @@ async function loadMainSettlementBus() {
         }
     }
 
-    class CheckMock {}
-
     const { MainSettlementBus } = await esmock('../../src/index.js', {
         corestore: CorestoreMock,
         '../../src/core/state/State.js': StateMock,
         '../../src/core/network/Network.js': NetworkMock,
-        '../../src/utils/check.js': CheckMock,
         '../../src/utils/fileUtils.js': {
             default: {
                 ensureKeyPathDir: sinon.stub().resolves(),

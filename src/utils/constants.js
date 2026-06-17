@@ -164,7 +164,7 @@ export const ACK_INTERVAL = 1_000;
 export const AUTOBASE_VALUE_ENCODING = 'binary';
 export const HYPERBEE_KEY_ENCODING = 'ascii';
 export const HYPERBEE_VALUE_ENCODING = 'binary';
-// check.js
+// StateValidationSchema.js
 
 //ATTENTION - THIS IS USED IN THE APPLY FUNCTION!
 export const PUBLIC_KEY_LENGTH = 32

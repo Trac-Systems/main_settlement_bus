@@ -632,33 +632,33 @@ export async function assertAdminRecoveryFailureState(t, context, { skipSync } =
 export async function applyWithRoleAccessBypass(context, invalidPayload) {
     const { validatorPeer1 } = context.adminRecovery;
     const state = validatorPeer1.state;
-    const originalValidate = state.check.validateRoleAccessOperation;
-    state.check.validateRoleAccessOperation = () => true;
+    const originalValidate = state.stateValidationSchema.validateRoleAccessOperation;
+    state.stateValidationSchema.validateRoleAccessOperation = () => true;
     try {
         await validatorPeer1.base.append(invalidPayload);
         await validatorPeer1.base.update();
         await eventFlush();
     } finally {
-        state.check.validateRoleAccessOperation = originalValidate;
+        state.stateValidationSchema.validateRoleAccessOperation = originalValidate;
     }
 }
 
 export async function applyWithMissingComponentBypass(context, invalidPayload, { missingKey = 'vs' } = {}) {
     const { validatorPeer1 } = context.adminRecovery;
     const state = validatorPeer1.state;
-    const originalValidate = state.check.validateRoleAccessOperation;
+    const originalValidate = state.stateValidationSchema.validateRoleAccessOperation;
     const originalHasOwn = Object.hasOwn;
     Object.hasOwn = (obj, prop) => {
         if (prop === missingKey) return false;
         return originalHasOwn(obj, prop);
     };
-    state.check.validateRoleAccessOperation = () => true;
+    state.stateValidationSchema.validateRoleAccessOperation = () => true;
     try {
         await validatorPeer1.base.append(invalidPayload);
         await validatorPeer1.base.update();
         await eventFlush();
     } finally {
-        state.check.validateRoleAccessOperation = originalValidate;
+        state.stateValidationSchema.validateRoleAccessOperation = originalValidate;
         Object.hasOwn = originalHasOwn;
     }
 }

@@ -6,7 +6,6 @@ import { sleep, isHexString } from "./utils/helpers.js";
 import { applyStateMessageFactory } from "./messages/state/applyStateMessageFactory.js";
 import { isAddressValid } from "./core/state/utils/address.js";
 import Network from "./core/network/Network.js";
-import Check from "./utils/check.js";
 import State from "./core/state/State.js";
 import {
     EventType,
@@ -47,7 +46,6 @@ export class MainSettlementBus extends ReadyResource {
         this.#config = config
         this.#wallet = wallet;
         this.#store = new Corestore(this.#config.storesFullPath);
-        this.check = new Check(this.#config);
     }
 
     get config() {

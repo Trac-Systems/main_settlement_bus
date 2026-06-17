@@ -5,7 +5,7 @@ import Hypercore from 'hypercore';
 
 import V1BroadcastTransactionResponse, {extractRequiredVaFromDecodedTx} from '../../../../src/core/network/protocols/v1/validators/V1BroadcastTransactionResponse.js';
 import {V1ProtocolError} from '../../../../src/core/network/protocols/v1/V1ProtocolError.js';
-import Check from '../../../../src/utils/check.js';
+import StateValidationSchema from '../../../../src/core/state/validators/StateValidationSchema.js';
 import {
     unsafeEncodeApplyOperation,
     unsafeDecodeApplyOperation,
@@ -42,13 +42,13 @@ const createValidator = (stateOverrides = {}) =>
 const overrideCheckMethods = (t, overrides) => {
     const originals = {};
     for (const [name, impl] of Object.entries(overrides)) {
-        originals[name] = Check.prototype[name];
-        Check.prototype[name] = impl;
+        originals[name] = StateValidationSchema.prototype[name];
+        StateValidationSchema.prototype[name] = impl;
     }
 
     t.teardown(() => {
         for (const [name, original] of Object.entries(originals)) {
-            Check.prototype[name] = original;
+            StateValidationSchema.prototype[name] = original;
         }
     });
 };

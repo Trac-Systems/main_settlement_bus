@@ -17,7 +17,7 @@ import {
 } from '../../utils/constants.js';
 import { isHexString, sleep, isTransactionRecordPut } from '../../utils/helpers.js';
 import tracCryptoApi from 'trac-crypto-api';
-import Check from '../../utils/check.js';
+import StateValidationSchema from './validators/StateValidationSchema.js';
 import { safeDecodeApplyOperation } from '../../codecs/apply/applyOperationCodec.js';
 import { createMessage, ZERO_WK, NULL_BUFFER } from '../../utils/buffer.js';
 import addressUtils from './utils/address.js';
@@ -56,6 +56,7 @@ class State extends ReadyResource {
     #writingKey;
     #config
     #wallet
+    #stateValidationSchema;
     #activeWriterCountCache = new Map();
 
     /**
@@ -70,7 +71,7 @@ class State extends ReadyResource {
         this.#wallet = wallet
         this.#store = store;
 
-        this.check = new Check(config);
+        this.#stateValidationSchema = new StateValidationSchema(config);
         this.#base = new Autobase(this.#store, this.#config.bootstrap, {
             ackInterval: ACK_INTERVAL,
             valueEncoding: AUTOBASE_VALUE_ENCODING,
@@ -89,6 +90,10 @@ class State extends ReadyResource {
         return this.#writingKey;
     }
 
+    get stateValidationSchema() {
+        return this.#stateValidationSchema;
+    }
+
     get applyHandler() {
         return this.#apply.bind(this);
     }
@@ -100,9 +105,6 @@ class State extends ReadyResource {
     }
 
     async _close() {
-        [CustomEventType.IS_INDEXER, CustomEventType.IS_NON_INDEXER].forEach(event => {
-            this.removeAllListeners(event);
-        })
         console.log("State: closing gracefully...");
         if (this.#bee !== null) {
             await this.#bee.close();
@@ -140,12 +142,8 @@ class State extends ReadyResource {
     }
 
     async currentEpoch() {
-        const epochId = await this.currentEpochId()
-        return await this.getSigned(keys.EPOCH_DATA(epochId));
-    }
-
-    async getEpochHash(epochId) {
-        return await this.getSigned(keys.EPOCH_HASH(epochId))
+        const latestEpochNumber = await this.getSigned(keys.CURRENT_INDEX)
+        return await this.getSigned(keys.EPOCH(latestEpochNumber))
     }
 
     getFee() {
@@ -547,7 +545,7 @@ class State extends ReadyResource {
     }
 
     async #handleApplyInitializeBalanceOperation(op, view, base, node, batch) {
-        if (!this.check.validateBalanceInitialization(op)) {
+        if (!this.#stateValidationSchema.validateBalanceInitialization(op)) {
             this.#safeLogApply(OperationType.BALANCE_INITIALIZATION, "Contract schema validation failed.", node.from.key)
             return Status.FAILURE;
         };
@@ -692,7 +690,7 @@ class State extends ReadyResource {
     }
 
     async #handleApplyDisableBalanceInitializationOperation(op, view, base, node, batch) {
-        if (!this.check.validateCoreAdminOperation(op)) {
+        if (!this.#stateValidationSchema.validateCoreAdminOperation(op)) {
             this.#safeLogApply(OperationType.DISABLE_INITIALIZATION, "Schema validation failed.", node.from.key)
             return Status.FAILURE;
         };
@@ -803,7 +801,7 @@ class State extends ReadyResource {
             INITIALIZATION, THEIR STAKED BALANCE WILL BE REDUCED (PUNISHMENT).
         */
 
-        if (!this.check.validateCoreAdminOperation(op)) {
+        if (!this.#stateValidationSchema.validateCoreAdminOperation(op)) {
             this.#safeLogApply(OperationType.ADD_ADMIN, "Contract schema validation failed.", node.from.key)
             return Status.FAILURE;
         };
@@ -940,7 +938,7 @@ class State extends ReadyResource {
     }
 
     async #handleApplyAdminRecoveryOperation(op, view, base, node, batch) {
-        if (!this.check.validateRoleAccessOperation(op)) {
+        if (!this.#stateValidationSchema.validateRoleAccessOperation(op)) {
             this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Contract schema validation failed.", node.from.key)
             return Status.FAILURE;
         };
@@ -1191,7 +1189,7 @@ class State extends ReadyResource {
     }
 
     async #handleApplyAppendWhitelistOperation(op, view, base, node, batch) {
-        if (!this.check.validateAdminControlOperation(op)) {
+        if (!this.#stateValidationSchema.validateAdminControlOperation(op)) {
             this.#safeLogApply(OperationType.APPEND_WHITELIST, "Contract schema validation failed.", node.from.key)
             return Status.FAILURE;
         };
@@ -1440,7 +1438,7 @@ class State extends ReadyResource {
     }
 
     async #handleApplyAddWriterOperation(op, view, base, node, batch) {
-        if (!this.check.validateRoleAccessOperation(op)) {
+        if (!this.#stateValidationSchema.validateRoleAccessOperation(op)) {
             this.#safeLogApply(OperationType.ADD_WRITER, "Contract schema validation failed.", node.from.key)
             return Status.FAILURE;
         };
@@ -1744,7 +1742,7 @@ class State extends ReadyResource {
     }
 
     async #handleApplyRemoveWriterOperation(op, view, base, node, batch) {
-        if (!this.check.validateRoleAccessOperation(op)) {
+        if (!this.#stateValidationSchema.validateRoleAccessOperation(op)) {
             this.#safeLogApply(OperationType.REMOVE_WRITER, "Contract schema validation failed.", node.from.key)
             return Status.FAILURE;
         };
@@ -2008,7 +2006,7 @@ class State extends ReadyResource {
     }
 
     async #handleApplyAddIndexerOperation(op, view, base, node, batch) {
-        if (!this.check.validateAdminControlOperation(op)) {
+        if (!this.#stateValidationSchema.validateAdminControlOperation(op)) {
             this.#safeLogApply(OperationType.ADD_INDEXER, "Contract schema validation failed.", node.from.key)
             return Status.FAILURE;
         };
@@ -2226,7 +2224,7 @@ class State extends ReadyResource {
     }
 
     async #handleApplyRemoveIndexerOperation(op, view, base, node, batch) {
-        if (!this.check.validateAdminControlOperation(op)) {
+        if (!this.#stateValidationSchema.validateAdminControlOperation(op)) {
             this.#safeLogApply(OperationType.REMOVE_INDEXER, "Contract schema validation failed.", node.from.key)
             return Status.FAILURE;
         };
@@ -2446,7 +2444,7 @@ class State extends ReadyResource {
     }
 
     async #handleApplyBanValidatorOperation(op, view, base, node, batch) {
-        if (!this.check.validateAdminControlOperation(op)) {
+        if (!this.#stateValidationSchema.validateAdminControlOperation(op)) {
             this.#safeLogApply(OperationType.BAN_VALIDATOR, "Contract schema validation failed.", node.from.key)
             return Status.FAILURE;
         };
@@ -2647,7 +2645,7 @@ class State extends ReadyResource {
     }
 
     async #handleApplyBootstrapDeploymentOperation(op, view, base, node, batch) {
-        if (!this.check.validateBootstrapDeploymentOperation(op)) {
+        if (!this.#stateValidationSchema.validateBootstrapDeploymentOperation(op)) {
             this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Contract schema validation failed.", node.from.key)
             return Status.FAILURE;
         };
@@ -2881,7 +2879,7 @@ class State extends ReadyResource {
 
     async #handleApplyTxOperation(op, view, base, node, batch) {
         // ATTENTION: The sanitization should be done before ANY other check, otherwise we risk crashing
-        if (!this.check.validateTransactionOperation(op)) {
+        if (!this.#stateValidationSchema.validateTransactionOperation(op)) {
             this.#safeLogApply(OperationType.TX, "Contract schema validation failed.", node.from.key)
             return Status.FAILURE;
         };
@@ -3095,7 +3093,7 @@ class State extends ReadyResource {
     }
 
     async #handleApplyTransferOperation(op, view, base, node, batch) {
-        if (!this.check.validateTransferOperation(op)) {
+        if (!this.#stateValidationSchema.validateTransferOperation(op)) {
             this.#safeLogApply(OperationType.TRANSFER, "Contract schema validation failed.", node.from.key)
             return Status.FAILURE;
         };
@@ -3298,12 +3296,12 @@ class State extends ReadyResource {
         return Status.SUCCESS;
     }
 
-    async #handleApplySetEpochOperation(op, view, base, node) {
-        if (!this.check.validateSetEpochOperation(op)) {
+    async #handleApplySetEpochOperation(op, view, base, node, _batch) {
+        if (!this.#stateValidationSchema.validateSetEpochOperation(op)) {
             this.#safeLogApply(OperationType.SET_EPOCH, "Contract schema validation failed.", node.from.key)
             return Status.FAILURE;
         };
-        
+
         this.emit(CustomEventType.EPOCH_CREATED); // notify epoch committed
         return Status.SUCCESS;
     }
