@@ -1,0 +1,142 @@
+import sinon from 'sinon';
+import { test } from 'brittle';
+import { default as EventEmitter } from 'bare-events';
+import b4a from 'b4a';
+import { testKeyPair1, testKeyPair2, testKeyPair3 } from '../../../fixtures/apply.fixtures.js';
+import ConsensusConnectionManager from '../../../../src/core/consensus/services/ConsensusConnectionManager.js';
+
+const makeConnection = (publicKeyHex) => {
+    const emitter = new EventEmitter();
+    emitter.consensusProtocolSession = {
+        send: sinon.stub().resolves({ ok: true }),
+        sendAndForget: sinon.stub(),
+    };
+    emitter.remotePublicKey = b4a.from(publicKeyHex, 'hex');
+    return emitter;
+};
+
+const makeManager = (...keys) => {
+    const manager = new ConsensusConnectionManager();
+    for (const key of keys) {
+        manager.add(key, makeConnection(key));
+    }
+    return manager;
+};
+
+test('ConsensusConnectionManager', () => {
+
+    test('add', () => {
+        test('returns true when adding a new indexer', async t => {
+            const manager = new ConsensusConnectionManager();
+            const conn = makeConnection(testKeyPair1.publicKey);
+            t.ok(manager.add(testKeyPair1.publicKey, conn));
+        });
+
+        test('returns false when indexer already exists', async t => {
+            const manager = makeManager(testKeyPair1.publicKey);
+            const conn = makeConnection(testKeyPair1.publicKey);
+            t.absent(manager.add(testKeyPair1.publicKey, conn));
+        });
+    });
+
+    test('remove', () => {
+        test('removes an existing indexer', async t => {
+            const manager = makeManager(testKeyPair1.publicKey);
+            t.ok(manager.connected(testKeyPair1.publicKey));
+            manager.remove(testKeyPair1.publicKey);
+            t.absent(manager.connected(testKeyPair1.publicKey));
+        });
+
+        test('is a no-op for unknown key', async t => {
+            const manager = makeManager(testKeyPair1.publicKey);
+            manager.remove(testKeyPair2.publicKey);
+            t.ok(manager.connected(testKeyPair1.publicKey));
+        });
+    });
+
+    test('connected', () => {
+        test('returns true for added indexer', async t => {
+            const manager = makeManager(testKeyPair1.publicKey);
+            t.ok(manager.connected(testKeyPair1.publicKey));
+        });
+
+        test('returns false for unknown key', async t => {
+            const manager = makeManager(testKeyPair1.publicKey);
+            t.absent(manager.connected(testKeyPair2.publicKey));
+        });
+    });
+
+    test('getConnection', () => {
+        test('returns the connection for a known indexer', async t => {
+            const conn = makeConnection(testKeyPair1.publicKey);
+            const manager = new ConsensusConnectionManager();
+            manager.add(testKeyPair1.publicKey, conn);
+            t.is(manager.getConnection(testKeyPair1.publicKey), conn);
+        });
+
+        test('returns undefined for unknown key', async t => {
+            const manager = makeManager(testKeyPair1.publicKey);
+            t.absent(manager.getConnection(testKeyPair2.publicKey));
+        });
+    });
+
+    test('connectedIndexers', () => {
+        test('returns all connected public key hexes', async t => {
+            const manager = makeManager(testKeyPair1.publicKey, testKeyPair2.publicKey, testKeyPair3.publicKey);
+            const indexers = manager.connectedIndexers();
+            t.is(indexers.length, 3);
+            t.ok(indexers.includes(testKeyPair1.publicKey));
+            t.ok(indexers.includes(testKeyPair2.publicKey));
+            t.ok(indexers.includes(testKeyPair3.publicKey));
+        });
+
+        test('returns empty array when no indexers connected', async t => {
+            const manager = new ConsensusConnectionManager();
+            t.alike(manager.connectedIndexers(), []);
+        });
+    });
+
+    test('send', () => {
+        test('calls consensusProtocolSession.send with the message', async t => {
+            const conn = makeConnection(testKeyPair1.publicKey);
+            const manager = new ConsensusConnectionManager();
+            manager.add(testKeyPair1.publicKey, conn);
+
+            await manager.send(testKeyPair1.publicKey, { type: 'ping' });
+
+            t.ok(conn.consensusProtocolSession.send.calledOnce);
+            t.alike(conn.consensusProtocolSession.send.firstCall.args[0], { type: 'ping' });
+        });
+
+        test('throws when indexer is not connected', async t => {
+            const manager = new ConsensusConnectionManager();
+            await t.exception(() => manager.send(testKeyPair1.publicKey, {}), /no consensus session/);
+        });
+
+        test('throws when consensusProtocolSession is missing', async t => {
+            const conn = new EventEmitter();
+            const manager = new ConsensusConnectionManager();
+            manager.add(testKeyPair1.publicKey, conn);
+            await t.exception(() => manager.send(testKeyPair1.publicKey, {}), /no consensus session/);
+        });
+    });
+
+    test('sendAndForget', () => {
+        test('calls consensusProtocolSession.sendAndForget with the message', async t => {
+            const conn = makeConnection(testKeyPair1.publicKey);
+            const manager = new ConsensusConnectionManager();
+            manager.add(testKeyPair1.publicKey, conn);
+
+            manager.sendAndForget(testKeyPair1.publicKey, { type: 'ping' });
+
+            t.ok(conn.consensusProtocolSession.sendAndForget.calledOnce);
+            t.alike(conn.consensusProtocolSession.sendAndForget.firstCall.args[0], { type: 'ping' });
+        });
+
+        test('is silent when indexer is not connected', async t => {
+            const manager = new ConsensusConnectionManager();
+            manager.sendAndForget(testKeyPair1.publicKey, {});
+            t.pass('did not throw');
+        });
+    });
+});
