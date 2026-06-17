@@ -26,7 +26,6 @@ test('ApplyStateMessageDirector builds complete set epoch message', async t => {
 
     const payload = await applyStateMessageFactory(wallet, config)
         .buildCompleteSetEpochMessage(wallet.address, proofData, approvals);
-    console.log("payload", payload);
     t.is(payload.type, OperationType.SET_EPOCH);
     t.ok(b4a.equals(payload.address, addressToBuffer(wallet.address, config.addressPrefix)));
     t.alike(Object.keys(payload).sort(), ['address', 'seo', 'type']);
