@@ -1,22 +1,21 @@
-// Use this a factory to create the object attached to the swam connection
-class ConsensusMessages {
-    // #config;
-    // #wallet;
-    // #state;
+import ConsensusRouterV1 from "./ConsensusRouter.js";
+import ConsensusV1Protocol from "./ConsensusV1Protocol.js";
 
-    // constructor(
-    //     state,
-    //     wallet,
-    //     config
-    // ) {
-    //     this.#config = config;
-    //     this.#wallet = wallet;
-    //     this.#state = state;
-    // }
+class ConsensusMessages {
+    #consensusRouter;
+    #pendingRequestService;
+
+    constructor(state, wallet, config, pendingRequestService) {
+        this.#pendingRequestService = pendingRequestService;
+        this.#consensusRouter = new ConsensusRouterV1(state, wallet, config, pendingRequestService);
+    }
 
     async setupProtomuxMessages(connection) {
-        // The purpose of this is to grab a hyperswarm connection and enrich with an extra property that handle operations and carry metadata. We will need a specific class whose instnance will be created here.
-        connection.protocolSession;
+        connection.consensusProtocolSession = new ConsensusV1Protocol(
+            this.#consensusRouter,
+            connection,
+            this.#pendingRequestService
+        )
     }
 }
 
