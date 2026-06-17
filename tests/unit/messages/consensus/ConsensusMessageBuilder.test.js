@@ -177,8 +177,8 @@ test('ConsensusMessageBuilder encodes scalar number fields at byte-width boundar
     const protocolVersionBuffer = uint8ToBuffer(protocolVersion, 'Protocol version');
     const cases = [
         {
-            networkId: 0,
-            epoch: 0,
+            networkId: 1,
+            epoch: 1,
         },
         {
             networkId: 0xFFFF,
@@ -287,6 +287,11 @@ test('ConsensusMessageBuilder rejects invalid network id numbers', async t => {
             errorMessageIncludes('Network id must be an unsigned 16-bit integer.')
         );
     }
+
+    t.exception(
+        () => builder.setNetworkId(0),
+        errorMessageIncludes('Network id must be greater than zero.')
+    );
 });
 
 test('ConsensusMessageBuilder rejects invalid epoch numbers', async t => {
@@ -317,6 +322,15 @@ test('ConsensusMessageBuilder rejects invalid epoch numbers', async t => {
             errorMessageIncludes('Epoch must be a number or bigint')
         );
     }
+
+    t.exception(
+        () => builder.setEpoch(0),
+        errorMessageIncludes('Epoch must be greater than zero.')
+    );
+    t.exception(
+        () => builder.setEpoch(0n),
+        errorMessageIncludes('Epoch must be greater than zero.')
+    );
 });
 
 test('ConsensusMessageBuilder rejects invalid buffer and address fields', async t => {
@@ -425,7 +439,7 @@ test('ConsensusMessageBuilder rejects missing fields before build result is avai
     );
 });
 
-test('ConsensusMessageBuilder signs zero network id and uint64 epochs without dropping fields', async t => {
+test('ConsensusMessageBuilder signs non-zero network id and uint64 epochs without dropping fields', async t => {
     const wallet = await createWallet();
     const builder = new ConsensusMessageBuilder(wallet, config);
     const header = consensusV1OperationFixtures.proofProposalHeader;
@@ -433,7 +447,7 @@ test('ConsensusMessageBuilder signs zero network id and uint64 epochs without dr
     const proposer = bufferToAddress(proofProposalFixture.proposer, config.addressPrefix);
     const protocolVersion = ConsensusProtocolVersion.V1;
     const protocolVersionBuffer = uint8ToBuffer(protocolVersion, 'Protocol version');
-    const networkId = 0;
+    const networkId = 1;
     const networkIdBuffer = uint16ToBuffer(networkId, 'Network id');
     const epoch = 0x100000000;
     const epochBuffer = uint64ToBuffer(epoch, 'Epoch');

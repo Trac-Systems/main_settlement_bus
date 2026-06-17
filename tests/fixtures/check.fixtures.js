@@ -11,6 +11,7 @@ import {
 } from '../../src/utils/constants.js';
 import { config } from '../helpers/config.js'
 import { asAddress } from '../helpers/address.js';
+import { proofProposalApproval, proofProposalData } from '../helpers/proofProposal.js';
 
 export const TRO = {
     valid_partial_transfer: {
@@ -400,6 +401,23 @@ export const BIO = {
         am: AMOUNT_BYTE_LENGTH,
         is: SIGNATURE_BYTE_LENGTH
     }
+}
+
+export const SEO = {
+    valid_set_epoch_operation: {
+        type: OperationType.SET_EPOCH,
+        address: addressToBuffer(asAddress('3801ebd1f12462ad335b821807c9d87e4f20d57505222284b2634a7e8e5edac2'), config.addressPrefix),
+        seo: {
+            pd: proofProposalData(),
+            app: [
+                proofProposalApproval(0x15, 0x16),
+                proofProposalApproval(0x17, 0x18)
+            ]
+        }
+    },
+
+    top_fields_set_epoch: ['type', 'address', 'seo'],
+    set_epoch_value_fields: ['pd', 'app']
 }
 
 export const partial_operation_value_type = ['bdo', 'tto', 'txo', 'rao']

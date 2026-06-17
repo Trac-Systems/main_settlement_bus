@@ -10,6 +10,7 @@ async function runCheckTests() {
     await import('./transactionOperation.test.js')
     await import('./transferOperation.test.js')
     await import('./balanceInitializationOperation.test.js')
+    await import('./setEpochOperation.test.js')
 
     test.resume();
 }

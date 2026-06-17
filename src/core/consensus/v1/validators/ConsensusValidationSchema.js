@@ -35,7 +35,6 @@ class ConsensusValidationSchema {
         });
         const isBuffer = b4a.isBuffer;
         this.#validator.add("buffer", function ({schema, messages}, _path, _context) {
-            const allowZero = schema.allowZero === true;
             const allowEmpty = schema.allowEmpty === true;
             const exactLength = Number.isInteger(schema.length) ? schema.length : null;
             const minLength = Number.isInteger(schema.min) ? schema.min : null;
@@ -64,55 +63,20 @@ class ConsensusValidationSchema {
                             ${this.makeError({type: "emptyBuffer", actual: "len", messages})}
                             return value;
                         }
-                        if (!${allowZero}) {
-                            let isZeroFilled = true;
-                            for (let i = 0; i < len; i++) {
-                                if (value[i] !== 0) {
-                                    isZeroFilled = false;
-                                    break;
-                                }
+                        let isZeroFilled = true;
+                        for (let i = 0; i < len; i++) {
+                            if (value[i] !== 0) {
+                                isZeroFilled = false;
+                                break;
                             }
-                            if (isZeroFilled) {
-                                ${this.makeError({type: "nonZeroBuffer", actual: "value", messages})}
-                            }
+                        }
+                        if (isZeroFilled) {
+                            ${this.makeError({type: "nonZeroBuffer", actual: "value", messages})}
                         }
                             return value;
                     `
             };
         });
-        this.#validator.add("uint64", function ({messages}, _path, _context) {
-            return {
-                source:
-                    `
-                        if (typeof value === 'number') {
-                            if (!Number.isSafeInteger(value) || value < 0) {
-                                ${this.makeError({type: "uint64", actual: "value", messages})}
-                            }
-                            return value;
-                        }
-                        if (typeof value === 'bigint') {
-                            if (value < 0n || value > 0xFFFFFFFFFFFFFFFFn) {
-                                ${this.makeError({type: "uint64", actual: "value", messages})}
-                            }
-                            return value;
-                        }
-                        if (typeof value === 'string') {
-                            if (!/^(0|[1-9]\\d*)$/.test(value)) {
-                                ${this.makeError({type: "uint64", actual: "value", messages})}
-                                return value;
-                            }
-                            const uint64Value = BigInt(value);
-                            if (uint64Value > 0xFFFFFFFFFFFFFFFFn) {
-                                ${this.makeError({type: "uint64", actual: "value", messages})}
-                            }
-                            return value;
-                        }
-                        ${this.makeError({type: "uint64", actual: "value", messages})}
-                        return value;
-                    `
-            };
-        });
-
         this.#validateConsensusV1ProofProposalSchema = this.#compileV1EpochProofProposalRequestSchema();
         this.#validateConsensusV1ProposalApproval = this.#compileConsensusV1ProposalApprovalSchema();
     }
@@ -133,8 +97,8 @@ class ConsensusValidationSchema {
                 type: 'object',
                 props: {
                     protocol_version: {type: 'buffer', length: PROTOCOL_VERSION_BYTE_LENGTH, required: true},
-                    network_id: {type: 'buffer', length: NETWORK_ID_BYTE_LENGTH, allowZero: true, required: true},
-                    epoch: {type: 'buffer', length: EPOCH_BYTE_LENGTH, allowZero: true, required: true},
+                    network_id: {type: 'buffer', length: NETWORK_ID_BYTE_LENGTH, required: true},
+                    epoch: {type: 'buffer', length: EPOCH_BYTE_LENGTH, required: true},
                     previous_epoch_record_hash: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true},
                     proposer: {type: 'buffer', length: this.#config.addressLength, required: true},
                     vdf_parameters_hash: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true},

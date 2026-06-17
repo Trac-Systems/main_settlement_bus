@@ -11,7 +11,7 @@ import {
 import {uint8ToBuffer, uint16ToBuffer, uint64ToBuffer} from '../../../src/utils/buffer.js';
 import {config} from '../../helpers/config.js';
 
-const makeProofProposalPayload = (epoch) => ({
+const makeProofProposalPayload = (epoch, proofProposalOverrides = {}) => ({
     type: ConsensusOperationType.PROOF_PROPOSAL,
     session_id: 'session',
     timestamp: 1,
@@ -24,6 +24,7 @@ const makeProofProposalPayload = (epoch) => ({
         vdf_parameters_hash: b4a.alloc(32, 3),
         vdf_proof: b4a.alloc(VDF_BLOB_PROOF_SIZE, 4),
         signature: b4a.alloc(64, 5),
+        ...proofProposalOverrides
     },
 });
 
@@ -47,8 +48,12 @@ test('ConsensusValidationSchema accepts fixed-length proof proposal byte fields'
     const schema = new ConsensusValidationSchema(config);
     const maxUint64 = 0xFFFFFFFFFFFFFFFFn;
 
-    t.is(schema.validateConsensusV1ProofProposal(makeProofProposalPayload(uint64ToBuffer(0, 'Epoch'))), true);
+    t.is(schema.validateConsensusV1ProofProposal(makeProofProposalPayload(uint64ToBuffer(1, 'Epoch'))), true);
     t.is(schema.validateConsensusV1ProofProposal(makeProofProposalPayload(uint64ToBuffer(maxUint64, 'Epoch'))), true);
+    t.is(schema.validateConsensusV1ProofProposal(makeProofProposalPayload(uint64ToBuffer(0, 'Epoch'))), false);
+    t.is(schema.validateConsensusV1ProofProposal(
+        makeProofProposalPayload(uint64ToBuffer(1, 'Epoch'), {network_id: uint16ToBuffer(0, 'Network id')})
+    ), false);
     t.is(schema.validateConsensusV1ProofProposal(makeProofProposalPayload(b4a.alloc(7, 1))), false);
     t.is(schema.validateConsensusV1ProofProposal(makeProofProposalPayload(b4a.alloc(9, 1))), false);
     t.is(schema.validateConsensusV1ProofProposal(makeProofProposalPayload('not-a-buffer')), false);

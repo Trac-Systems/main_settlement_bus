@@ -10,6 +10,10 @@ import { OperationType } from '../../../../src/utils/constants.js';
 import { config } from '../../../helpers/config.js';
 import { testKeyPair1, testKeyPair2 } from '../../../fixtures/apply.fixtures.js';
 import { addressToBuffer } from '../../../../src/core/state/utils/address.js';
+import {
+    proofProposalApproval as approval,
+    proofProposalData
+} from '../../../helpers/proofProposal.js';
 
 const hex = (value, bytes) => value.repeat(bytes);
 const toBuf = value => b4a.from(value, 'hex');
@@ -523,10 +527,10 @@ test('ApplyStateMessageBuilder complete transfer operation (tro)', async t => {
 
 test('ApplyStateMessageBuilder complete set epoch operation (seo)', async t => {
     const wallet = await createWallet(testKeyPair1.mnemonic);
-    const proofData = b4a.alloc(96, 0x14);
+    const proofData = proofProposalData();
     const approvals = [
-        b4a.alloc(64, 0x15),
-        b4a.alloc(64, 0x16)
+        approval(0x15, 0x16),
+        approval(0x17, 0x18)
     ];
 
     const builder = new ApplyStateMessageBuilder(wallet, config);
@@ -545,8 +549,8 @@ test('ApplyStateMessageBuilder complete set epoch operation (seo)', async t => {
     t.ok(b4a.equals(payload.address, addressToBuffer(wallet.address, config.addressPrefix)));
     expectPayloadKeys(t, payload, 'seo');
     expectKeys(t, payload.seo, ['pd', 'app'], 'seo');
-    expectBufferField(t, payload.seo.pd, 96, 'seo.pd');
-    t.alike(payload.seo.app.map(approval => approval.length), [64, 64]);
+    t.ok(b4a.isBuffer(payload.seo.pd), 'seo.pd type');
+    t.alike(payload.seo.app.map(approval => approval.length), approvals.map(approval => approval.length));
     t.ok(b4a.equals(payload.seo.pd, proofData));
     t.ok(b4a.equals(payload.seo.app[0], approvals[0]));
     t.ok(b4a.equals(payload.seo.app[1], approvals[1]));
@@ -554,10 +558,10 @@ test('ApplyStateMessageBuilder complete set epoch operation (seo)', async t => {
 
 test('ApplyStateMessageBuilder complete set epoch operation codec roundtrip', async t => {
     const wallet = await createWallet(testKeyPair1.mnemonic);
-    const proofData = b4a.alloc(96, 0x34);
+    const proofData = proofProposalData();
     const approvals = [
-        b4a.alloc(64, 0x35),
-        b4a.alloc(64, 0x36)
+        approval(0x35, 0x36),
+        approval(0x37, 0x38)
     ];
 
     const builder = new ApplyStateMessageBuilder(wallet, config);
