@@ -484,7 +484,7 @@ export async function applyInvalidTransferMissingValidatorFields(context, invali
 		context.peers?.[0];
 
     if (!node?.state?.stateValidationSchema) {
-        throw new Error('applyInvalidTransferMissingValidatorFields requires a node with state and check.');
+        throw new Error('applyInvalidTransferMissingValidatorFields requires a node with state and stateValidationSchema.');
     }
 
     const originalValidate = node.state.stateValidationSchema.validateTransferOperation;
