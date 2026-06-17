@@ -60,6 +60,8 @@ const configData = {
         validatorHealthCheckInterval: 5 * 60 * 1000, // How often to check validator health (ms)
         epochInterval: 3 * 60 * 1000, // How often to trigger epoch proof proposal (ms)
         epochThreshold: 2, // Minimum number of validator confirmations required to append a new epoch
+        epochSignatureTimeout: 20_000, // Max time delay an indexer have to sign a proposal
+        epochAppendTimeout: 2_000, // Max time a proposer has to append the new epoch in the log
         storesDirectory: 'stores/',
         storeName: 'testnet',
         vdfDifficulty: 1000000, // number of iterations
@@ -115,6 +117,8 @@ const configData = {
         validatorHealthCheckInterval: 5 * 60 * 1000, // How often to check validator health (ms)
         epochInterval: 3 * 60 * 1000, // How often to trigger epoch proof proposal (ms)
         epochThreshold: 2, // Minimum number of validator confirmations required to append a new epoch
+        epochSignatureTimeout: 20_000, // Max time delay an indexer have to sign a proposal
+        epochAppendTimeout: 2_000, // Max time a proposer has to append the new epoch in the log
         storesDirectory: 'stores/',
         storeName: 'mainnet',
         vdfDifficulty: 1000000, // number of iterations
@@ -168,11 +172,13 @@ const configData = {
         txCommitTimeout: 2200,
         txPoolSize: 1000, // size of transaction pool
         validatorHealthCheckInterval: 1_000, // How often to check validator health (ms)
-        epochInterval: 3 * 60 * 1000, // How often to trigger epoch proof proposal (ms)
-        epochThreshold: 2, // Minimum number of validator confirmations required to append a new epoch
+        epochInterval: 3 * 1000, // How often to trigger epoch proof proposal (ms)
+        epochThreshold: 1, // Minimum number of validator confirmations required to append a new epoch
+        epochSignatureTimeout: 40_000, // Max time delay an indexer have to sign a proposal
+        epochAppendTimeout: 10_000, // Max time a proposer has to append the new epoch in the log
         storesDirectory: 'stores/',
         storeName: 'development',
-        vdfDifficulty: 1000000, // number of iterations
+        vdfDifficulty: 10_000, // number of iterations
         vdfDiscriminantSizeBits: 2048, // discriminant size
     }
 }

@@ -72,6 +72,19 @@ export function bufferToBigInt(buff) {
     return res;
 }
 
+export function bufferToUint64(buff) {
+    if (!b4a.isBuffer(buff) || buff.length !== 8) {
+        throw new TypeError('Input must be a 8-byte Buffer');
+    }
+
+    let res = 0n;
+    for (let i = 0; i < 8; i++) {
+        res = (res << 8n) | BigInt(buff[i]);
+    }
+
+    return res;
+}
+
 export function licenseBufferToBigInt(buff) {
     if (!b4a.isBuffer(buff) || buff.length !== LICENSE_BYTE_LENGTH) {
         throw new TypeError('Input must be a 4-byte Buffer');

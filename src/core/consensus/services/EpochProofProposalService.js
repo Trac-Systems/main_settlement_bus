@@ -1,109 +1,202 @@
-import ReadyResource from 'ready-resource';
-import b4a from 'b4a';
-import Scheduler from '../../../utils/scheduler/Scheduler.js';
-import { OperationType } from '../../../utils/constants.js';
-import { Logger } from '../../../utils/logger.js';
+import SchedulableService from "../../../utils/scheduler/SchedulableService.js";
+import { EPOCH_EVENTS, EPOCH_STATES, EpochStateMachine } from "./EpochStateMachine.js";
+import { CustomEventType } from "../../../utils/constants.js";
+import { Logger } from "../../../utils/logger.js";
+import { createVDFService } from "./createVDFService.js";
+import { EpochProofProposalOperations } from './EpochProofProposalOperations.js';
 
-import { safeEncodeApplyOperation } from '../../../codecs/apply/applyOperationCodec.js';
-import { addressToBuffer } from '../../state/utils/address.js';
-
-class EpochProofProposalService extends ReadyResource {
+class EpochProofProposalService extends SchedulableService {
     #state;
     #wallet;
     #config;
     #intervalMs;
-    #scheduler;
     #logger;
-    #isInterrupted;
+    #vdfService;
+    #connectionManager;
+    #operations;
 
     /**
-     * @param {object} state
-     * @param {object} indexerConnectionManager
-     * @param {object} wallet
-     * @param {object} config
-     */
-    constructor(state, indexerConnectionManager, wallet, config) {
+   * @param {object} state
+   * @param {object} connectionManager
+   * @param {object} wallet
+   * @param {object} config
+   */
+    constructor(state, connectionManager, wallet, config) {
         super();
         this.#state = state;
         this.#wallet = wallet;
         this.#config = config;
-        this.#intervalMs = this.#config.epochInterval
-        this.#scheduler = null;
+        this.#intervalMs = this.#config.epochInterval;
         this.#logger = new Logger(config);
-        this.#isInterrupted = false;
+        this.#connectionManager = connectionManager;
     }
 
     async _open() {
-        this.#scheduler = new Scheduler((next) => this.#worker(next), this.#intervalMs);
+        this.#vdfService = await createVDFService();
+        await this.#vdfService.ready();
+
+        this.#operations = new EpochProofProposalOperations(this.#state, this.#vdfService, this.#wallet, this.#connectionManager, this.#config);
     }
 
     async _close() {
-        this.#isInterrupted = true;
-        await this.#scheduler.stop(true);
+        await super._close();
+        await this.#vdfService?.close();
     }
 
-    start() {
-        if (this.#scheduler.isRunning) {
+    async start() {
+        if (this.isSchedulerRunning) {
             return false;
         }
 
-        this.#ensureScheduler();
-        return true;
+        const started = super.start(this.#intervalMs);
+        return started;
     }
 
     async stop(waitForCurrent = true) {
-        if (!this.#scheduler.isRunning) {
-            return false;
+        return super.stop(waitForCurrent);
+    }
+
+    async #handleConfirmation(confirmation, machine) {
+        if (machine.state !== EPOCH_STATES.COLLECTING_CONFIRMATIONS) return;
+
+        const context = machine.context;
+        const confirmations = [...context.confirmations, confirmation];
+        machine.appendContext({ confirmations });
+
+        if (confirmations.length >= this.#config.epochThreshold) {
+            await machine.send(EPOCH_EVENTS.QUORUM_REACHED);
+        }
+    }
+
+    #dispatchApprovalRequests(context, machine) {
+        const { approvers, proofProposal } = context;
+        for (const member of approvers) {
+            this.#operations.collectSignature(member, proofProposal)
+                .then((confirmation) => this.#handleConfirmation(confirmation, machine))
+                .catch(() => {});
+        }
+    }  
+
+    getScheduleInterval() {
+        return this.#intervalMs;
+    }
+
+    async worker(next) {
+        if (!await this.#shouldRun()) {
+            next(this.#intervalMs);
+            return;
         }
 
-        this.#isInterrupted = true;
-        await this.#scheduler.stop(waitForCurrent);
-        return true;
-    }
+        const currentEpoch = await this.#state.currentEpoch();
+        const currentEpochHash = await this.#state.currentEpochHash(currentEpoch);
+        const vdfDifficulty = await this.#state.vdfDifficulty();
+        const vdfSize = await this.#state.vdfSize();
 
-    #ensureScheduler() {
-        if (this.#scheduler.isRunning) return;
+        const machine = new EpochStateMachine(this.#logger);
 
-        this.#isInterrupted = false;
-        this.#scheduler.start(this.#intervalMs);
-        this.#logger.debug(`scheduler started with intervalMs ${this.#intervalMs}`);
-    }
-
-    async #worker(next) {
-        if (!this.#isInterrupted) {            
-            const commiteeMembers = [];
-            const epoch = await this.#state.lastEpoch()
-            let signatures = [] // list of members signatures
-            
-            commiteeMembers.forEach(member => {
-                // check signatures
-                // member == leader?
-                // member signed? -> append signature to signatures
-                console.log(member)
-                return this.#appendEpoch(epoch, signatures)
-            })
+        machine.on('*', async ({ event, prev, next, context, machine }) => {
+            await this.#onTransition({ event, prev, next, context, machine });
+        });
+        
+        const onEpochSubmited = async () => {
+            machine.appendContext({ remoteProposalReceived: true });
+            await machine.send(EPOCH_EVENTS.REMOTE_PROPOSAL_RECEIVED);
         }
 
-        next(this.#intervalMs);
+        const onEpochCreated = async () => {
+            machine.clearListeners();
+            this.#state.removeListener(CustomEventType.EPOCH_PROPOSAL_SUBMITTED, onEpochSubmited)
+            this.#state.removeListener(CustomEventType.EPOCH_CREATED, onEpochCreated)
+            next(this.#intervalMs)
+        }
+
+        this.#state.on(CustomEventType.EPOCH_PROPOSAL_SUBMITTED, onEpochSubmited);
+        this.#state.on(CustomEventType.EPOCH_CREATED, onEpochCreated);
+
+        machine.appendContext({ currentEpoch, currentEpochHash, vdfDifficulty, vdfSize });
+        await machine.send(EPOCH_EVENTS.START);
     }
 
-    async #appendEpoch(epoch, signatures) {
-        const payload = {
-            type: OperationType.SET_EPOCH,
-            address: addressToBuffer(this.#wallet.address, this.#config.addressPrefix),
-            seo: {
-                pe: epoch,
-                ss: signatures.map(({ signature }) => signature),
-                pks: signatures.map(({ publicKey }) => b4a.isBuffer(publicKey) ? publicKey : b4a.from(publicKey, 'hex'))
-            }
+    // handler functions
+    async #handleStartVdf() {}
+
+    async #handleVdfPending(context, machine) {
+        const { currentEpochHash, vdfDifficulty, vdfSize } = context
+        const vdf = await this.#operations.calculateVDF(currentEpochHash, vdfDifficulty, vdfSize);
+        machine.appendContext({ vdf });
+        await machine.send(EPOCH_EVENTS.CALCULATE_VDF);
+    }
+
+    async #handleVdfComputed(context, machine) {
+        const { remoteProposalReceived } = context;
+        
+        if(!remoteProposalReceived) {
+            await machine.send(EPOCH_EVENTS.PROPOSE_EPOCH);
+        } else {
+            await machine.send(EPOCH_EVENTS.REMOTE_PROPOSAL_RECEIVED);
+        }
+    }
+
+    async #handleProposingEpoch(context, machine) {
+        const { currentEpoch, currentEpochHash, vdf } = context;
+        const newProofData = this.#operations.createProposal(currentEpoch, currentEpochHash, vdf);
+        const proofProposal = await newProofData.toProposalMessage(this.#wallet);
+        const approvers = await this.#operations.approvers();
+
+        if (machine.state !== EPOCH_STATES.PROPOSING_EPOCH) return;
+
+        machine.appendContext({ newProofData });
+        machine.appendContext({
+            proofProposal,
+            confirmations: [],
+            approvers,
+        });
+        this.#dispatchApprovalRequests(context, machine);
+        await machine.send(EPOCH_EVENTS.APPROVAL_REQUESTS_DISPATCHED);
+    }
+
+    #handleCollectingConfirmations() {}
+
+    async #handleAwaitingEpoch(context, machine) {
+        if (context.epochAlreadyCommitted) {
+            await machine.send(EPOCH_EVENTS.EPOCH_VERIFIED);
+        }
+    }
+
+    async #handleLocalQuorumReached(_context, machine) {
+        await machine.send(EPOCH_EVENTS.SUBMIT_EPOCH);
+    }
+
+    async #handleVdfSubmitted(context, machine) {
+        await this.#operations.appendEpoch({
+            data: context.proofProposal.data,
+            signature: context.proofProposal.signature,
+            signatures: context.confirmations,
+        });
+        await machine.send(EPOCH_EVENTS.APPEND_LOG);
+    }    
+
+    #getTransitionHandler(state) {
+        const handlers = {
+            [EPOCH_STATES.START_VDF]: this.#handleStartVdf.bind(this),
+            [EPOCH_STATES.VDF_PENDING]: this.#handleVdfPending.bind(this),
+            [EPOCH_STATES.VDF_COMPUTED]: this.#handleVdfComputed.bind(this), 
+            [EPOCH_STATES.PROPOSING_EPOCH]: this.#handleProposingEpoch.bind(this),
+            [EPOCH_STATES.COLLECTING_CONFIRMATIONS]: this.#handleCollectingConfirmations.bind(this),
+            [EPOCH_STATES.AWAITING_EPOCH]: this.#handleAwaitingEpoch.bind(this), 
+            [EPOCH_STATES.LOCAL_QUORUM_REACHED]: this.#handleLocalQuorumReached.bind(this),
+            [EPOCH_STATES.VDF_SUBMITTED]: this.#handleVdfSubmitted.bind(this),
         };
+        return handlers[state] ?? null;
+    }
 
-        const encodedPayload = safeEncodeApplyOperation(payload);
-        if (!b4a.isBuffer(encodedPayload) || encodedPayload.length === 0) {
-            throw new Error(`Failed to encode epoch operation for epoch ${epoch}.`);
-        }
+    async #onTransition({ next, context, machine }) {
+        const handler = this.#getTransitionHandler(next);
+        if (handler) await handler(context, machine);
+    }
 
-        await this.#state.append(encodedPayload);
+    async #shouldRun() {
+        return await this.#state.currentEpoch() >= 1 && !this.isInterrupted
     }
 }
 

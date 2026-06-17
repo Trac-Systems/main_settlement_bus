@@ -22,7 +22,7 @@ import { isHexString, sleep, isTransactionRecordPut } from '../../utils/helpers.
 import tracCryptoApi from 'trac-crypto-api';
 import StateValidationSchema from './validators/StateValidationSchema.js';
 import { safeDecodeApplyOperation } from '../../codecs/apply/applyOperationCodec.js';
-import { createMessage, ZERO_WK, NULL_BUFFER } from '../../utils/buffer.js';
+import { createMessage, ZERO_WK, NULL_BUFFER, uint64ToBuffer } from '../../utils/buffer.js';
 import addressUtils from './utils/address.js';
 import adminEntryUtils from './utils/adminEntry.js';
 import nodeEntryUtils, { setWritingKey, NODE_ENTRY_SIZE } from './utils/nodeEntry.js';
@@ -3386,6 +3386,20 @@ class State extends ReadyResource {
         if (this.#config.enableTxApplyLogs) {
             console.info(`Transfer operation: ${hashHexString} has been appended.`);
         }
+        return Status.SUCCESS;
+    }
+
+    async #handleApplySetEpochGenesisOperation(op, view, base, node, batch) {
+        const difficulty = op.sgo.df;
+        const size = op.sgo.db;
+        const epoch = uint64ToBuffer(1, "epoch");
+        const epochHash = b4a.alloc(32, 0);
+
+        await batch.put(keys.VDF_DIFFICULTY, difficulty);
+        await batch.put(keys.VDF_SIZE, size);
+        await batch.put(keys.CURRENT_INDEX, epoch);        
+        await batch.put(keys.EPOCH_HASH(1), epochHash);
+
         return Status.SUCCESS;
     }
 
