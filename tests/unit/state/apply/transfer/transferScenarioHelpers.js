@@ -464,7 +464,7 @@ export async function applyInvalidTransferWithSchemaBypass(context, invalidPaylo
 		context.peers?.[0];
 
     if (!node?.state?.stateValidationSchema) {
-        throw new Error('applyInvalidTransferWithSchemaBypass requires a node with state and check.');
+        throw new Error('applyInvalidTransferWithSchemaBypass requires a node with state and stateValidationSchema.');
     }
 
     const originalValidate = node.state.stateValidationSchema.validateTransferOperation;
