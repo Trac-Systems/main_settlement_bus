@@ -23,6 +23,7 @@ import { WalletProvider } from 'trac-wallet';
 import { CustomEventType } from '../../utils/constants.js';
 import tracCryptoApi from 'trac-crypto-api'
 import ConsensusMessages from '../consensus/protocols/ConsensusMessages.js';
+import ConsensusConnectionManager from '../consensus/services/ConsensusConnectionManager.js';
 
 const wakeup = new w();
 
@@ -47,6 +48,7 @@ class Network extends ReadyResource {
     #state;
     #store;
     #consensusMessages;
+    #consensusConnectionManager;
 
     /**
      * @param {State} state
@@ -91,6 +93,10 @@ class Network extends ReadyResource {
 
     get validatorMessageOrchestrator() {
         return this.#validatorMessageOrchestrator;
+    }
+
+    get consensusConnectionManager() {
+        return this.#consensusConnectionManager;
     }
 
     async _open() {
@@ -177,7 +183,7 @@ class Network extends ReadyResource {
                 this.#epochProofProposalService.start();
             }
         });
-        
+
         this.#state.on(CustomEventType.IS_NON_INDEXER, (bufferAddress) => {
             const address = tracCryptoApi.address.encode(this.#config.addressPrefix, bufferAddress);
             if (address === this.#wallet.address) {
@@ -227,8 +233,9 @@ class Network extends ReadyResource {
             await this.#validatorHealthCheckService.ready();
 
             this.#consensusMessages = new ConsensusMessages(this.#state, this.#wallet, this.#config, this.#pendingRequestsService);
+            this.#consensusConnectionManager = new ConsensusConnectionManager();
 
-            this.#epochProofProposalService = new EpochProofProposalService(this.#state, this.#validatorConnectionManager, this.#wallet, this.#config);
+            this.#epochProofProposalService = new EpochProofProposalService(this.#state, this.#consensusConnectionManager, this.#wallet, this.#config);
             await this.#epochProofProposalService.ready();
 
             this.#validatorConnectionManager.subscribeToHealthChecks(this.#validatorHealthCheckService);
@@ -240,8 +247,14 @@ class Network extends ReadyResource {
                 // - attach Protomux (legacy + v1 channels/messages)
                 // - attach connection.protocolSession (used later by tryConnect / orchestrators to send messages)
                 await this.#networkMessages.setupProtomuxMessages(connection);
+                await this.#consensusMessages.setupProtomuxMessages(connection);
 
-                this.#consensusMessages.setupProtomuxMessages(connection);
+                // Adds indexers to consensus connection manager
+                const remotePublicKeyHex = b4a.toString(connection.remotePublicKey, 'hex');
+                if (await this.#state.isKnownIndexer(remotePublicKeyHex)) {
+                    this.#consensusConnectionManager.add(remotePublicKeyHex, connection);
+                    console.log('[consensus] indexer connected:', remotePublicKeyHex);
+                }
 
                 // ATTENTION: Must be called AFTER the protomux init above
                 const stream = this.#store.replicate(connection);
@@ -260,6 +273,7 @@ class Network extends ReadyResource {
                     );
                     this.#swarm.leavePeer(connection.remotePublicKey);
                     this.#validatorConnectionManager.remove(publicKey);
+                    this.#consensusConnectionManager.remove(publicKey);
                     connection.protocolSession.close();
                     connection.consensusProtocolSession?.close();
                 });
