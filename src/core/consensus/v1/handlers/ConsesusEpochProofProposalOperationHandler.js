@@ -16,7 +16,6 @@ class ConsensusEpochProofProposalOperationHandler {
     #wallet
     #config
     #pendingRequestService
-    #vdf = null;
 
     constructor(state, wallet, config, pendingRequestService) {
         this.#state = state;
@@ -52,14 +51,6 @@ class ConsensusEpochProofProposalOperationHandler {
         this.displayError(step, connection.remotePublicKey, protocolError)
     }
 
-    async #getVdf() {
-        if (!this.#vdf) {
-            const { loadVdfWasm } = await import('@tracsystems/trac-vdf');
-            this.#vdf = await loadVdfWasm();
-        }
-        return this.#vdf;
-    }
-
     // leader requests approval to minion
     async handleRequest(message, connection) {
         try {
@@ -68,7 +59,7 @@ class ConsensusEpochProofProposalOperationHandler {
             const lastEpochProofBuffer = await this.#state.currentEpoch();
             const lastEpochProof = lastEpochProofBuffer ? safeDecodeProofProposal(lastEpochProofBuffer) : null;
 
-            this.#validatePreviousEpoch(message.proof_proposal, lastEpochProof);
+            await this.#validatePreviousEpoch(message.proof_proposal, lastEpochProof);
             await this.#validateVdf(message.proof_proposal);
             await this.#state.emit(CustomEventType.EPOCH_PROPOSAL_SUBMITTED);
         } catch (error) {
@@ -77,6 +68,10 @@ class ConsensusEpochProofProposalOperationHandler {
                 connection.remotePublicKey,
                 error
             );
+            try {
+                const errorResponse = await this.#buildEpochResponse(message, ConsensusResultCode.UNSPECIFIED);
+                connection.consensusProtocolSession.sendAndForget(errorResponse);
+            } catch (_) {}
             return;
         }
 
@@ -120,17 +115,20 @@ class ConsensusEpochProofProposalOperationHandler {
         };
     }
 
-    #validatePreviousEpoch(proposal, previousEpoch) {
-        if (!previousEpoch || proposal.epoch !== previousEpoch.epoch + 1) {
+    async #validatePreviousEpoch(proposal, previousEpoch) {
+        const proposalEpoch = Number(proposal.epoch.readBigUInt64BE());
+        const prevEpoch = Number(previousEpoch?.epoch?.readBigUInt64BE?.() ?? -1);
+        if (!previousEpoch || proposalEpoch !== prevEpoch + 1) {
             throw new V1ProtocolError(ResultCode.INVALID_PAYLOAD, 'Epoch sequence mismatch');
         }
-        if (proposal.protocol_version !== previousEpoch.protocol_version) {
+        if (!b4a.equals(proposal.protocol_version, previousEpoch.protocol_version)) {
             throw new V1ProtocolError(ResultCode.INVALID_PAYLOAD, 'Protocol version mismatch');
         }
-        if (!b4a.equals(proposal.previous_epoch_record_hash, previousEpoch.previous_epoch_record_hash)) {
+        const expectedPrevHash = await this.#state.getEpochHash(prevEpoch);
+        if (!expectedPrevHash || !b4a.equals(proposal.previous_epoch_record_hash, expectedPrevHash)) {
             throw new V1ProtocolError(ResultCode.INVALID_PAYLOAD, 'Previous epoch hash mismatch');
         }
-        if (proposal.network_id !== previousEpoch.network_id) {
+        if (!b4a.equals(proposal.network_id, previousEpoch.network_id)) {
             throw new V1ProtocolError(ResultCode.INVALID_PAYLOAD, 'Network id mismatch');
         }
     }
@@ -139,9 +137,9 @@ class ConsensusEpochProofProposalOperationHandler {
         if (!proposal.vdf_proof || !b4a.isBuffer(proposal.vdf_proof) || proposal.vdf_proof.length === 0) {
             throw new V1ProtocolError(ResultCode.INVALID_PAYLOAD, 'Inconsistent vdf data');
         }
-        const vdf = await this.#getVdf();
+        const { verifyWesolowski } = await import('@tracsystems/trac-vdf');
         const proof = Buffer.concat([proposal.vdf_parameters_hash, proposal.vdf_proof]);
-        const isValid = vdf.verifyWesolowski(
+        const isValid = verifyWesolowski(
             proposal.previous_epoch_record_hash,
             this.#config.vdfDifficulty,
             proof,
@@ -152,19 +150,19 @@ class ConsensusEpochProofProposalOperationHandler {
         }
     }
 
-    async #buildEpochResponse(message) {
+    async #buildEpochResponse(message, resultCode = ConsensusResultCode.OK) {
         const p = message.proof_proposal;
         try {
             return await consensusMessageFactory(this.#wallet, this.#config).buildProofProposalResponse(
                 message.session_id,
-                p.network_id,
-                p.epoch,
+                p.network_id.readUInt16BE(0),
+                Number(p.epoch.readBigUInt64BE()),
                 p.previous_epoch_record_hash,
                 bufferToAddress(p.proposer, this.#config.addressPrefix),
                 p.vdf_parameters_hash,
                 p.vdf_proof,
                 p.signature,
-                ConsensusResultCode.OK,
+                resultCode,
                 this.#wallet.address
             );
         } catch (error) {

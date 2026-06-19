@@ -137,8 +137,8 @@ class State extends ReadyResource {
     }
 
     async currentEpochId() {
-        const epochIdBuffer = await this.getSigned(keys.CURRENT_INDEX);
-        if (!epochIdBuffer) return 0;
+        const epochIdBuffer = await this.getSigned(keys.CURRENT_INDEX)
+        if (!epochIdBuffer) return null;
 
         return lengthEntryUtils.decodeBE(epochIdBuffer)
     }
@@ -492,7 +492,7 @@ class State extends ReadyResource {
     async #apply(nodes, view, base) {
         const batch = view.batch();
         const batchInvoker = nodes[0].from.key;
-
+        console.log('[#apply] called, nodes:', nodes.length, 'types:', nodes.map(n => { try { return safeDecodeApplyOperation(n.value)?.type; } catch { return 'decode-err'; } }));
 
         if (nodes.length > BATCH_SIZE) {
             await this.#validatorPenaltyApply(batchInvoker, batch, base, OVERSIZED_BATCH_PENALTY_MULTIPLIER);
@@ -3318,22 +3318,26 @@ class State extends ReadyResource {
     }
 
     async #handleApplySetEpochOperation(op, view, base, node, batch) {
+        console.log('[handleApplySetEpochOperation] called, validating...');
         if (!this.check.validateSetEpochOperation(op)) {
             this.#safeLogApply(OperationType.SET_EPOCH, "Contract schema validation failed.", node.from.key)
+            console.log('[handleApplySetEpochOperation] validation FAILED');
             return Status.FAILURE;
         };
-        
+
         const proof = safeDecodeProofProposal(op.seo.pd); // decode leader proof
         const proofHash = await tracCryptoApi.hash.blake3(op.seo.pd); // computes the buffers' blake3 hash - ProofProposal seralized in bytes
-        const epochId = proof.epoch;
+        // proof.epoch is a Buffer (8-byte big-endian uint64 from uint64ToBuffer) — decode to number
+        const epochId = b4a.isBuffer(proof.epoch) ? Number(proof.epoch.readBigUInt64BE()) : Number(proof.epoch ?? 0);
         const epochHash = proofHash;
+        console.log('[handleApplySetEpochOperation] epochId:', epochId, 'hash:', epochHash?.toString('hex')?.slice(0, 16));
 
         await batch.put(keys.EPOCH_HASH(epochId), epochHash); // store epoch hash
         await batch.put(keys.CURRENT_INDEX, lengthEntryUtils.encodeBE(epochId)); // update current epoch index
         await batch.put(keys.EPOCH_DATA(epochId), op.seo.pd); // store full proof bytes
 
 
-        this.emit(CustomEventType.EPOCH_CREATED); // notify epoch committed
+        this.emit(CustomEventType.EPOCH_CREATED, { epochId, epochHash }); // notify epoch committed
         return Status.SUCCESS;
     }
 

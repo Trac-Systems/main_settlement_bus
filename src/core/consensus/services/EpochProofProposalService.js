@@ -21,7 +21,9 @@ class EpochProofProposalService extends SchedulableService {
     #stateMachine
     #awaitingEpochTimeoutId
     #collectingConfirmationsTimeoutId
+    #startVdfTimeoutId
     #operations
+    #vdfComputing
 
     /**
    * @param {object} state
@@ -40,6 +42,8 @@ class EpochProofProposalService extends SchedulableService {
         this.#stateMachine = new EpochStateMachine();
         this.#awaitingEpochTimeoutId = null;
         this.#collectingConfirmationsTimeoutId = null;
+        this.#startVdfTimeoutId = null;
+        this.#vdfComputing = false;
     }
 
     async _open() {
@@ -55,20 +59,28 @@ class EpochProofProposalService extends SchedulableService {
         // These events are removed from State, when the State closes
         // They are singletons in MSB.
         this.#state.on(CustomEventType.EPOCH_PROPOSAL_SUBMITTED, async () => {
-            this.#stateMachine.appendContext({
-                remoteProposalReceived: true,
-            });
+            this.#stateMachine.appendContext({ remoteProposalReceived: true });
             await this.#stateMachine.send(EPOCH_EVENTS.REMOTE_PROPOSAL_RECEIVED);
         });
 
-        this.#state.on(CustomEventType.EPOCH_CREATED, async () => {
+        this.#state.on(CustomEventType.EPOCH_CREATED, async ({ epochId, epochHash } = {}) => {
+            if (epochId !== undefined) {
+                this.#stateMachine.appendContext({ lastCommittedEpochId: epochId, lastCommittedEpochHash: epochHash });
+            }
             if (this.#stateMachine.state === EPOCH_STATES.AWAITING_EPOCH) {
                 await this.#stateMachine.send(EPOCH_EVENTS.EPOCH_VERIFIED);
+            } else if (this.#stateMachine.state === EPOCH_STATES.VDF_SUBMITTED) {
+                await this.#stateMachine.send(EPOCH_EVENTS.APPEND_LOG);
+            }
+            // Re-append after send: EPOCH_VERIFIED → START_VDF zera o contexto (discardState)
+            if (epochId !== undefined) {
+                this.#stateMachine.appendContext({ lastCommittedEpochId: epochId, lastCommittedEpochHash: epochHash });
             }
         });
     }
 
     async _close() {
+        this.#clearStartVdfTimeout();
         this.#clearAwaitingEpochTimeout();
         this.#clearCollectingConfirmationsTimeout();
         await super._close();
@@ -93,6 +105,21 @@ class EpochProofProposalService extends SchedulableService {
         return super.stop(waitForCurrent);
     }
 
+    #clearStartVdfTimeout() {
+        if (this.#startVdfTimeoutId) {
+            clearTimeout(this.#startVdfTimeoutId);
+            this.#startVdfTimeoutId = null;
+        }
+    }
+
+    #scheduleStartVdf() {
+        this.#clearStartVdfTimeout();
+        this.#startVdfTimeoutId = setTimeout(async () => {
+            this.#startVdfTimeoutId = null;
+            await this.#stateMachine.send(EPOCH_EVENTS.START);
+        }, this.#intervalMs);
+    }
+
     #clearAwaitingEpochTimeout() {
         if (this.#awaitingEpochTimeoutId) {
             clearTimeout(this.#awaitingEpochTimeoutId);
@@ -105,14 +132,15 @@ class EpochProofProposalService extends SchedulableService {
             clearTimeout(this.#collectingConfirmationsTimeoutId);
             this.#collectingConfirmationsTimeoutId = null;
         }
-    }    
+    }
 
     // usar timeout do config aqui
     #scheduleAwaitingEpochTimeout() {
         this.#clearAwaitingEpochTimeout();
         this.#awaitingEpochTimeoutId = setTimeout(async () => {
-            this.#awaitingEpochTimeoutId = null; // deletar essa flag
-            await this.#stateMachine.send(EPOCH_EVENTS.EPOCH_TIMEOUT); // isso aqui ainda tem que resetar o estado
+            this.#awaitingEpochTimeoutId = null;
+            this.#stateMachine.appendContext({ remoteProposalReceived: false });
+            await this.#stateMachine.send(EPOCH_EVENTS.EPOCH_TIMEOUT);
         }, this.#config.epochAppendTimeout);
     }
 
@@ -157,7 +185,7 @@ class EpochProofProposalService extends SchedulableService {
         if (this.isInterrupted) return;
 
         const currentEpochId = await this.#state.currentEpochId();
-        if (this.#stateMachine.state === EPOCH_STATES.VDF_PENDING && currentEpochId > 0) {
+        if (this.#stateMachine.state === EPOCH_STATES.VDF_PENDING && currentEpochId > 0 && !this.#vdfComputing) {
             await this.#onTransition(null, null, this.#stateMachine.state, this.#stateMachine.context);
         }
 
@@ -165,17 +193,42 @@ class EpochProofProposalService extends SchedulableService {
     }
 
     // handler functions
+    #handleStartVdf() {
+        this.#logger.info(`[EpochService] state=${EPOCH_STATES.START_VDF}: scheduling next epoch in ${this.#intervalMs}ms`);
+        this.#scheduleStartVdf();
+    }
+
     async #handleVdfPending() {
-        this.#logger.info(`[EpochService] state=${EPOCH_STATES.VDF_PENDING}: calculating VDF`);
-        this.#stateMachine.appendContext({
-            vdf: await this.#operations.calculateVDF(),
-        });
-        await this.#stateMachine.send(EPOCH_EVENTS.CALCULATE_VDF);
+        if (this.#vdfComputing) return;
+        this.#vdfComputing = true;
+        try {
+            this.#logger.info(`[EpochService] state=${EPOCH_STATES.VDF_PENDING}: calculating VDF`);
+            const { lastCommittedEpochId, lastCommittedEpochHash } = this.#stateMachine.context;
+            const vdf = await this.#operations.calculateVDF(lastCommittedEpochId ?? null, lastCommittedEpochHash ?? null);
+            if (this.#stateMachine.state !== EPOCH_STATES.VDF_PENDING) return;
+            this.#stateMachine.appendContext({ vdf });
+            await this.#stateMachine.send(EPOCH_EVENTS.CALCULATE_VDF);
+        } finally {
+            this.#vdfComputing = false;
+        }
     }
 
     async #handleVdfComputed(context) {
         this.#logger.info(`[EpochService] state=${EPOCH_STATES.VDF_COMPUTED}: VDF computed`);
-        const { remoteProposalReceived } = context;
+        const { vdf, remoteProposalReceived } = context;
+
+        const currentEpochId = await this.#state.currentEpochId();
+        if (currentEpochId >= vdf.prevEpochId + 1) {
+            this.#logger.info(`[EpochService] epoch ${vdf.prevEpochId + 1} already committed (current=${currentEpochId}), restarting VDF`);
+            this.#stateMachine.appendContext({
+                lastCommittedEpochId: currentEpochId,
+                lastCommittedEpochHash: await this.#state.getEpochHash(currentEpochId),
+                remoteProposalReceived: false,
+            });
+            await this.#stateMachine.send(EPOCH_EVENTS.REMOTE_PROPOSAL_RECEIVED);
+            return;
+        }
+
         this.#stateMachine.appendContext({ remoteProposalReceived: false });
         if (remoteProposalReceived) {
             this.#logger.info('[EpochService] remote proposal already observed, switching to awaiting mode');
@@ -226,13 +279,14 @@ class EpochProofProposalService extends SchedulableService {
             signature: context.proofProposal.signature,
             signatures: context.confirmations,
         });
-        await this.#stateMachine.send(EPOCH_EVENTS.APPEND_LOG);
+        // APPEND_LOG is sent by the EPOCH_CREATED event handler after the Hyperbee batch commits
     }    
     // end of handler functions
 
     #getTransitionHandler(state) {
         const handlers = {
-            [EPOCH_STATES.VDF_PENDING]: this.#handleVdfPending.bind(this), 
+            [EPOCH_STATES.START_VDF]: this.#handleStartVdf.bind(this),
+            [EPOCH_STATES.VDF_PENDING]: this.#handleVdfPending.bind(this),
             [EPOCH_STATES.VDF_COMPUTED]: this.#handleVdfComputed.bind(this), 
             [EPOCH_STATES.PROPOSING_EPOCH]: this.#handleProposingEpoch.bind(this),
             [EPOCH_STATES.COLLECTING_CONFIRMATIONS]: this.#handleCollectingConfirmations.bind(this),
@@ -245,6 +299,7 @@ class EpochProofProposalService extends SchedulableService {
 
     async #onTransition(event, _prev, next, context) {
         this.#logger.info(`[EpochService] transition event=${event ?? 'INIT'} -> ${next}`);
+        this.#clearStartVdfTimeout();
         this.#clearAwaitingEpochTimeout();
         this.#clearCollectingConfirmationsTimeout();
         const handler = this.#getTransitionHandler(next);

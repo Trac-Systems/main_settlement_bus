@@ -1,6 +1,6 @@
 import { toHex } from '../../../utils/buffer.js';
 
-class ConsensusConnectionManager {
+class IndexerConnectionManager {
     #indexers = new Map();
 
     add(publicKey, connection) {
@@ -29,7 +29,7 @@ class ConsensusConnectionManager {
     async send(publicKey, message) {
         const connection = this.getConnection(publicKey);
         if (!connection?.consensusProtocolSession) {
-            throw new Error(`ConsensusConnectionManager: no consensus session for ${toHex(publicKey)}`);
+            throw new Error(`IndexerConnectionManager: no indexer session for ${toHex(publicKey)}`);
         }
         return connection.consensusProtocolSession.send(message);
     }
@@ -41,4 +41,4 @@ class ConsensusConnectionManager {
     }
 }
 
-export default ConsensusConnectionManager;
+export default IndexerConnectionManager;

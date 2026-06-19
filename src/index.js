@@ -33,7 +33,7 @@ import { safeEncodeProofProposal } from "./codecs/consensus/v1/consensusV1Operat
 import PartialTransactionValidator from "./core/network/protocols/shared/validators/PartialTransactionValidator.js";
 import PartialTransferValidator from "./core/network/protocols/shared/validators/PartialTransferValidator.js";
 import { BroadcastError, ValidationError } from "./utils/errors.js";
-import { uint32ToBuffer, uint64ToBuffer, uint8ToBuffer } from "./utils/buffer.js";
+import { uint16ToBuffer, uint32ToBuffer, uint64ToBuffer, uint8ToBuffer } from "./utils/buffer.js";
 
 export class MainSettlementBus extends ReadyResource {
     #store;
@@ -424,7 +424,7 @@ export class MainSettlementBus extends ReadyResource {
     async appendGenesisEpoch() {
         const proofData = safeEncodeProofProposal({
             protocol_version: uint8ToBuffer(1, "protocol"),
-            network_id: uint32ToBuffer(this.#config.networkId, "network id"),
+            network_id: uint16ToBuffer(this.#config.networkId, "network id"),
             epoch: uint64ToBuffer(0, "epoch"),
             previous_epoch_record_hash: b4a.alloc(HASH_BYTE_LENGTH, 0),
             proposer: b4a.alloc(WRITER_BYTE_LENGTH, 0),

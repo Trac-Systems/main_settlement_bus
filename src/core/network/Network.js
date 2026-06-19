@@ -23,7 +23,7 @@ import { WalletProvider } from 'trac-wallet';
 import { CustomEventType } from '../../utils/constants.js';
 import tracCryptoApi from 'trac-crypto-api'
 import ConsensusMessages from '../consensus/protocols/ConsensusMessages.js';
-import ConsensusConnectionManager from '../consensus/services/ConsensusConnectionManager.js';
+import IndexerConnectionManager from '../consensus/services/IndexerConnectionManager.js';
 
 const wakeup = new w();
 
@@ -48,7 +48,7 @@ class Network extends ReadyResource {
     #state;
     #store;
     #consensusMessages;
-    #consensusConnectionManager;
+    #indexerConnectionManager;
 
     /**
      * @param {State} state
@@ -95,8 +95,8 @@ class Network extends ReadyResource {
         return this.#validatorMessageOrchestrator;
     }
 
-    get consensusConnectionManager() {
-        return this.#consensusConnectionManager;
+    get indexerConnectionManager() {
+        return this.#indexerConnectionManager;
     }
 
     async _open() {
@@ -233,9 +233,9 @@ class Network extends ReadyResource {
             await this.#validatorHealthCheckService.ready();
 
             this.#consensusMessages = new ConsensusMessages(this.#state, this.#wallet, this.#config, this.#pendingRequestsService);
-            this.#consensusConnectionManager = new ConsensusConnectionManager();
+            this.#indexerConnectionManager = new IndexerConnectionManager();
 
-            this.#epochProofProposalService = new EpochProofProposalService(this.#state, this.#consensusConnectionManager, this.#wallet, this.#config);
+            this.#epochProofProposalService = new EpochProofProposalService(this.#state, this.#indexerConnectionManager, this.#wallet, this.#config);
             await this.#epochProofProposalService.ready();
 
             this.#validatorConnectionManager.subscribeToHealthChecks(this.#validatorHealthCheckService);
@@ -252,7 +252,7 @@ class Network extends ReadyResource {
                 // Adds indexers to consensus connection manager
                 const remotePublicKeyHex = b4a.toString(connection.remotePublicKey, 'hex');
                 if (await this.#state.isKnownIndexer(remotePublicKeyHex)) {
-                    this.#consensusConnectionManager.add(remotePublicKeyHex, connection);
+                    this.#indexerConnectionManager.add(remotePublicKeyHex, connection);
                     console.log('[consensus] indexer connected:', remotePublicKeyHex);
                 }
 
@@ -273,7 +273,7 @@ class Network extends ReadyResource {
                     );
                     this.#swarm.leavePeer(connection.remotePublicKey);
                     this.#validatorConnectionManager.remove(publicKey);
-                    this.#consensusConnectionManager.remove(publicKey);
+                    this.#indexerConnectionManager.remove(publicKey);
                     connection.protocolSession.close();
                     connection.consensusProtocolSession?.close();
                 });

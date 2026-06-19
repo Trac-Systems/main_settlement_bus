@@ -7,6 +7,8 @@ import addressUtils from '../../state/utils/address.js';
 import b4a from "b4a";
 import { safeEncodeProofProposal, safeEncodeProofProposalApproval } from '../../../codecs/consensus/v1/consensusV1OperationCodec.js';
 import { applyStateMessageFactory } from '../../../messages/state/applyStateMessageFactory.js';
+import { uint8ToBuffer, uint16ToBuffer, uint64ToBuffer } from '../../../utils/buffer.js';
+import { safeEncodeApplyOperation } from '../../../codecs/apply/applyOperationCodec.js';
 
 const PROTOCOL_VERSION = 1;
 
@@ -25,9 +27,10 @@ export class EpochProofProposalOperations {
         this.#connectionManager = connectionManager;
     }
 
-    async calculateVDF() {
-        const prevEpochId = await this.#state.currentEpochId();
-        const currentEpochHash = await this.#state.getEpochHash(prevEpochId);
+    async calculateVDF(prevEpochId = null, currentEpochHash = null) {
+        if (prevEpochId === null) prevEpochId = await this.#state.currentEpochId();
+        if (currentEpochHash === null) currentEpochHash = await this.#state.getEpochHash(prevEpochId);
+        console.log('[calculateVDF] prevEpochId:', prevEpochId, 'epochHash:', currentEpochHash?.toString('hex') ?? 'null');
         const vdf = await this.#vdfService.calculateVDF(
             currentEpochHash,
             this.#config.vdfDifficulty,
@@ -57,24 +60,42 @@ export class EpochProofProposalOperations {
         }
     }
 
-    async sendToIndexer(member, proofProposal) {
-        const connection = this.#connectionManager.getConnection(member.key);
+    async sendToIndexer(publicKeyHex, proofProposal) {
+        const connection = this.#connectionManager.getConnection(publicKeyHex);
         const consensusSession = connection?.consensusProtocolSession;
         if (!consensusSession) return null;
 
-        const request = await consensusMessageFactory(this.#wallet, this.#config)
-            .buildProofProposal(
-                generateUUID(), 
-                this.#config.networkId, 
-                proofProposal.epoch, 
-                proofProposal.prevEpochHash, 
-                proofProposal.proposer, 
-                proofProposal.vdfParamsHash, 
-                proofProposal.vdfProof
-            );
+        const { data } = proofProposal;
+        console.log('[sendToIndexer] data:', { epoch: data?.epoch, hasProposer: !!data?.proposer, hasPrevHash: !!data?.prevEpochHash });
 
-        const response = await consensusSession.send(request);
-        return response?.result?.approval_sig ?? null;
+        const proposerAddress = addressUtils.bufferToAddress(data.proposer, this.#config.addressPrefix);
+
+        let request;
+        try {
+            request = await consensusMessageFactory(this.#wallet, this.#config)
+                .buildProofProposal(
+                    generateUUID(),
+                    this.#config.networkId,
+                    data.epoch,
+                    data.prevEpochHash,
+                    proposerAddress,
+                    data.vdfParamsHash,
+                    data.vdfProof
+                );
+            console.log('[sendToIndexer] request built ok');
+        } catch (err) {
+            console.error('[sendToIndexer] build failed:', err.message);
+            return null;
+        }
+
+        try {
+            const response = await consensusSession.send(request);
+            console.log('[sendToIndexer] response:', response?.code, !!response?.result?.approval_sig);
+            return response?.result?.approval_sig ?? null;
+        } catch (err) {
+            console.error('[sendToIndexer] send failed:', err.message);
+            return null;
+        }
     }
 
     async collectSignature(member, proofProposal) {
@@ -87,7 +108,13 @@ export class EpochProofProposalOperations {
 
         if (address === this.#wallet.address) return null;
 
-        const memberSignature = await this.sendToIndexer(member, proofProposal);
+        const publicKey = tracCryptoApi.address.decode(address);
+        if (!publicKey) return null;
+
+        const publicKeyHex = b4a.toString(publicKey, 'hex');
+        console.log('[collectSignature] pk:', publicKeyHex.slice(0, 8), 'connected:', !!this.#connectionManager.getConnection(publicKeyHex));
+
+        const memberSignature = await this.sendToIndexer(publicKeyHex, proofProposal);
         if (!memberSignature) return null;
 
         return { signature: memberSignature, publicKey: member.key };
@@ -95,9 +122,9 @@ export class EpochProofProposalOperations {
     
     async appendEpoch(epoch) {
         const proofData = safeEncodeProofProposal({
-            protocol_version: epoch.data.protocolVersion,
-            network_id: epoch.data.networkId,
-            epoch: epoch.data.epoch,
+            protocol_version: uint8ToBuffer(epoch.data.protocolVersion),
+            network_id: uint16ToBuffer(epoch.data.networkId),
+            epoch: uint64ToBuffer(epoch.data.epoch),
             previous_epoch_record_hash: epoch.data.prevEpochHash,
             proposer: this.#state.writingKey,
             vdf_parameters_hash: epoch.data.vdfParamsHash,
@@ -110,8 +137,9 @@ export class EpochProofProposalOperations {
                 member_id: b4a.isBuffer(publicKey) ? publicKey : b4a.from(publicKey, 'hex'),
             })
         );
-        const payload = await applyStateMessageFactory(this.#wallet, this.#config)
+        const message = await applyStateMessageFactory(this.#wallet, this.#config)
             .buildCompleteSetEpochMessage(this.#wallet.address, proofData, approvals);
+        const payload = safeEncodeApplyOperation(message);
         await this.#state.append(payload);
     }    
 }
