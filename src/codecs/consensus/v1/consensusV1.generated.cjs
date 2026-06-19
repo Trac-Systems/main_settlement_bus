@@ -302,7 +302,7 @@ $root.consensus = (function() {
                 case 1:
                     message.type = 1;
                     break;
-                case "MESSAGE_TYPE_PROOF_PROPOSAL_RESPONSE":
+                case "MESSAGE_TYPE_PROOF_PROPOSAL_APPROVAL":
                 case 2:
                     message.type = 2;
                     break;
@@ -410,13 +410,13 @@ $root.consensus = (function() {
          * @enum {number}
          * @property {number} MESSAGE_TYPE_UNSPECIFIED=0 MESSAGE_TYPE_UNSPECIFIED value
          * @property {number} MESSAGE_TYPE_PROOF_PROPOSAL=1 MESSAGE_TYPE_PROOF_PROPOSAL value
-         * @property {number} MESSAGE_TYPE_PROOF_PROPOSAL_RESPONSE=2 MESSAGE_TYPE_PROOF_PROPOSAL_RESPONSE value
+         * @property {number} MESSAGE_TYPE_PROOF_PROPOSAL_APPROVAL=2 MESSAGE_TYPE_PROOF_PROPOSAL_APPROVAL value
          */
         v1.MessageType = (function() {
             var valuesById = {}, values = Object.create(valuesById);
             values[valuesById[0] = "MESSAGE_TYPE_UNSPECIFIED"] = 0;
             values[valuesById[1] = "MESSAGE_TYPE_PROOF_PROPOSAL"] = 1;
-            values[valuesById[2] = "MESSAGE_TYPE_PROOF_PROPOSAL_RESPONSE"] = 2;
+            values[valuesById[2] = "MESSAGE_TYPE_PROOF_PROPOSAL_APPROVAL"] = 2;
             return values;
         })();
 
@@ -1029,6 +1029,7 @@ $root.consensus = (function() {
                     case 0:
                     case 1:
                     case 2:
+                    case 3:
                         break;
                     }
                 if (message.approval != null && message.hasOwnProperty("approval")) {
@@ -1072,6 +1073,10 @@ $root.consensus = (function() {
                 case "RESULT_CODE_UNEXPECTED_ERROR":
                 case 2:
                     message.result = 2;
+                    break;
+                case "RESULT_CODE_INVALID_PAYLOAD":
+                case 3:
+                    message.result = 3;
                     break;
                 }
                 if (object.approval != null) {
@@ -1156,12 +1161,14 @@ $root.consensus = (function() {
          * @property {number} RESULT_CODE_UNSPECIFIED=0 RESULT_CODE_UNSPECIFIED value
          * @property {number} RESULT_CODE_OK=1 RESULT_CODE_OK value
          * @property {number} RESULT_CODE_UNEXPECTED_ERROR=2 RESULT_CODE_UNEXPECTED_ERROR value
+         * @property {number} RESULT_CODE_INVALID_PAYLOAD=3 RESULT_CODE_INVALID_PAYLOAD value
          */
         v1.ResultCode = (function() {
             var valuesById = {}, values = Object.create(valuesById);
             values[valuesById[0] = "RESULT_CODE_UNSPECIFIED"] = 0;
             values[valuesById[1] = "RESULT_CODE_OK"] = 1;
             values[valuesById[2] = "RESULT_CODE_UNEXPECTED_ERROR"] = 2;
+            values[valuesById[3] = "RESULT_CODE_INVALID_PAYLOAD"] = 3;
             return values;
         })();
 
