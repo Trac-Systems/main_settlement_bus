@@ -1,5 +1,5 @@
 import V1EpochProofProposalRequest from "../validators/V1EpochProofProposalRequest.js";
-import V1EpochProofProposalResponse from "../validators/V1EpochProofProposalResponse.js";
+import V1EpochProofProposalApproval from "../validators/V1EpochProofProposalApproval.js";
 import {networkMessageFactory} from "../../../../messages/network/v1/networkMessageFactory.js";
 import { V1ProtocolError } from "../../../network/protocols/v1/V1ProtocolError.js";
 import { ResultCode } from "../../../../utils/constants.js";
@@ -18,7 +18,7 @@ class ConsensusEpochProofProposalOperationHandler {
         this.#state = state;
         this.#wallet = wallet;
         this.#v1EpochProofProposalRequestValidator = new V1EpochProofProposalRequest(config);
-        this.#v1EpochProofProposalResponseValidator = new V1EpochProofProposalResponse(config);
+        this.#v1EpochProofProposalResponseValidator = new V1EpochProofProposalApproval(config);
     }
 
     // leader requests approval to minion

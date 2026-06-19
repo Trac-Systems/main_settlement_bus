@@ -1028,6 +1028,7 @@ $root.consensus = (function() {
                         return "result: enum value expected";
                     case 0:
                     case 1:
+                    case 2:
                         break;
                     }
                 if (message.approval != null && message.hasOwnProperty("approval")) {
@@ -1067,6 +1068,10 @@ $root.consensus = (function() {
                 case "RESULT_CODE_OK":
                 case 1:
                     message.result = 1;
+                    break;
+                case "RESULT_CODE_UNEXPECTED_ERROR":
+                case 2:
+                    message.result = 2;
                     break;
                 }
                 if (object.approval != null) {
@@ -1150,11 +1155,13 @@ $root.consensus = (function() {
          * @enum {number}
          * @property {number} RESULT_CODE_UNSPECIFIED=0 RESULT_CODE_UNSPECIFIED value
          * @property {number} RESULT_CODE_OK=1 RESULT_CODE_OK value
+         * @property {number} RESULT_CODE_UNEXPECTED_ERROR=2 RESULT_CODE_UNEXPECTED_ERROR value
          */
         v1.ResultCode = (function() {
             var valuesById = {}, values = Object.create(valuesById);
             values[valuesById[0] = "RESULT_CODE_UNSPECIFIED"] = 0;
             values[valuesById[1] = "RESULT_CODE_OK"] = 1;
+            values[valuesById[2] = "RESULT_CODE_UNEXPECTED_ERROR"] = 2;
             return values;
         })();
 

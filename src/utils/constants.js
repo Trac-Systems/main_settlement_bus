@@ -57,6 +57,7 @@ export const ConsensusProtocolVersion = Object.freeze({
 export const ConsensusResultCode = Object.freeze({
     UNSPECIFIED: ConsensusV1ResultCode.RESULT_CODE_UNSPECIFIED,
     OK: ConsensusV1ResultCode.RESULT_CODE_OK,
+    UNEXPECTED_ERROR: ConsensusV1ResultCode.RESULT_CODE_UNEXPECTED_ERROR,
 });
 
 export const ResultCode = Object.freeze({
