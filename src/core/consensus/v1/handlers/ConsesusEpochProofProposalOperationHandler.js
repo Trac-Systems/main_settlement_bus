@@ -4,26 +4,30 @@ import {networkMessageFactory} from "../../../../messages/network/v1/networkMess
 import b4a from "b4a";
 import { V1ProtocolError } from "../../../network/protocols/v1/V1ProtocolError.js";
 import { ResultCode } from "../../../../utils/constants.js";
+import DummyVDFVerifier from "../../services/DummyVDFVerifier.js";
 
 // Minion interface to verify & sign proposals
 class ConsensusEpochProofProposalOperationHandler {
     #requestValidator;
     #responseValidator;
     #state;
+    #vdfVerifier;
 
     constructor(state, _wallet, config) {
         this.#state = state;
+        this.#vdfVerifier = new DummyVDFVerifier(); // TODO: Replace with a real VDF Verifier
         this.#requestValidator = new V1EpochProofProposalRequest(config);
         this.#responseValidator = new V1EpochProofProposalApproval(config);
     }
 
     // leader requests approval to minion
     async handleRequest(message, connection) {
-        await this.#requestValidator.validate(message, connection.remotePublicKey);
+        await this.#requestValidator.validate(message, connection);
         const proofProposal = message.proof_proposal;
         const currentEpoch = await this.#state.currentEpoch();
 
         this.#validateEpochContinuity(proofProposal, currentEpoch);
+        await this.#verifyVdf(proofProposal);
 
         return proofProposal;
     }
@@ -95,6 +99,16 @@ class ConsensusEpochProofProposalOperationHandler {
             throw new V1ProtocolError(
                 ResultCode.PROOF_PAYLOAD_MISMATCH,
                 "Previous epoch record hash does not match current epoch state."
+            );
+        }
+    }
+
+    async #verifyVdf(proofProposal) {
+        const vdfIsValid = await this.#vdfVerifier.verify(proofProposal)
+        if (!vdfIsValid) {
+            throw new V1ProtocolError(
+                ResultCode.PROOF_PAYLOAD_MISMATCH,
+                "VDF proof verification failed."
             );
         }
     }

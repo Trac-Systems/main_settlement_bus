@@ -6,6 +6,7 @@ import V1EpochProofProposalRequest from '../../../src/core/consensus/v1/validato
 import consensusV1OperationFixtures from '../../fixtures/consensusV1Operation.fixtures.js';
 import { config } from '../../helpers/config.js';
 import { errorMessageIncludes } from '../../helpers/regexHelper.js';
+import { VDF_BLOB_PROOF_SIZE } from '../../../src/utils/constants.js';
 
 const originalRequestValidate = V1EpochProofProposalRequest.prototype.validate;
 
@@ -26,6 +27,16 @@ function currentEpochFor(proofProposal, overrides = {}) {
         epoch: proofProposal.epoch.readBigUInt64BE(0) - 1n,
         epoch_record_hash: proofProposal.previous_epoch_record_hash,
         ...overrides
+    };
+}
+
+function messageWithProofProposalOverrides(overrides = {}) {
+    return {
+        ...consensusV1OperationFixtures.proofProposalHeader,
+        proof_proposal: {
+            ...consensusV1OperationFixtures.proofProposal,
+            ...overrides
+        }
     };
 }
 
@@ -122,5 +133,21 @@ test('handleRequest rejects proof proposals with a mismatched previous epoch rec
     await t.exception(
         async () => handler.handleRequest(message, conn),
         errorMessageIncludes('Previous epoch record hash does not match')
+    );
+});
+
+test('handleRequest rejects proof proposals with invalid VDF proof data', async t => {
+    const conn = connection();
+    const message = messageWithProofProposalOverrides({
+        vdf_proof: b4a.alloc(VDF_BLOB_PROOF_SIZE)
+    });
+    const state = {
+        currentEpoch: async () => currentEpochFor(message.proof_proposal)
+    };
+    const handler = setupHandler(t, async () => true, state);
+
+    await t.exception(
+        async () => handler.handleRequest(message, conn),
+        errorMessageIncludes('VDF proof verification failed')
     );
 });
