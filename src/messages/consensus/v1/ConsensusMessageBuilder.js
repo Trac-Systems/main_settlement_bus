@@ -185,8 +185,8 @@ class ConsensusMessageBuilder {
         return this;
     }
 
-    async #buildProofProposalPayload() {
-        const proofProposal = {
+    #buildUnsignedProofProposal() {
+        return {
             protocol_version: this.#validateBuffer(this.#protocol_version, 'Protocol version'),
             network_id: this.#validateBuffer(this.#network_id, 'Network id'),
             epoch: this.#validateBuffer(this.#epoch, 'Epoch'),
@@ -195,55 +195,81 @@ class ConsensusMessageBuilder {
             vdf_parameters_hash: this.#validateBuffer(this.#vdf_parameters_hash, 'VDF parameters hash'),
             vdf_proof: this.#validateBuffer(this.#vdf_proof, 'VDF proof')
         };
-        const hash = await hashProofProposal(proofProposal);
-        const signature = this.#wallet.sign(hash);
-        this.#payloadKey = 'proof_proposal';
-        this.#body = {
-            ...proofProposal,
-            signature: signature,
-        };
     }
 
-    async #buildProofProposalResponsePayload() {
+    #getResultCode() {
         if (this.#resultCode === undefined) {
             throw new Error('Result code must be set before build.');
         }
 
-        const proofProposal = {
-            protocol_version: this.#validateBuffer(this.#protocol_version, 'Protocol version'),
-            network_id: this.#validateBuffer(this.#network_id, 'Network id'),
-            epoch: this.#validateBuffer(this.#epoch, 'Epoch'),
-            previous_epoch_record_hash: this.#validateBuffer(this.#previous_epoch_record_hash, 'Previous epoch record hash'),
-            proposer: this.#validateBuffer(this.#proposer, 'Proposer'),
-            vdf_parameters_hash: this.#validateBuffer(this.#vdf_parameters_hash, 'VDF parameters hash'),
-            vdf_proof: this.#validateBuffer(this.#vdf_proof, 'VDF proof')
-        };
-        const approver = this.#validateBuffer(this.#approver, 'Approver');
-        const requesterProofSignature = this.#validateBuffer(
+        return this.#resultCode;
+    }
+
+    #getApprover() {
+        return this.#validateBuffer(this.#approver, 'Approver');
+    }
+
+    #getRequesterProofSignature() {
+        return this.#validateBuffer(
             this.#requester_proof_signature,
             'Requester proof signature'
         );
+    }
+
+    async #signProofProposal(proofProposal) {
+        return this.#wallet.sign(await hashProofProposal(proofProposal));
+    }
+
+    async #buildProofProposalApproval(proofProposal, approver, requesterProofSignature) {
         const hashApproval = await hashProofProposalApproval(
             proofProposal,
             approver,
             requesterProofSignature
         );
-        const signatureApproval = this.#wallet.sign(hashApproval);
 
-        const proofProposalApproval = {
+        return {
             approver,
-            approval_sig: signatureApproval,
+            approval_sig: this.#wallet.sign(hashApproval),
         };
+    }
 
-        const responseHash = await hashProofProposalResponse(this.#resultCode, proofProposalApproval);
-        const responseSig = this.#wallet.sign(responseHash);
+    async #signProofProposalResponse(resultCode, proofProposalApproval) {
+        return this.#wallet.sign(
+            await hashProofProposalResponse(resultCode, proofProposalApproval)
+        );
+    }
 
-        this.#payloadKey = 'proof_proposal_response';
-        this.#body = {
-            result: this.#resultCode,
+    #setPayload(payloadKey, body) {
+        this.#payloadKey = payloadKey;
+        this.#body = body;
+    }
+
+    async #buildProofProposalPayload() {
+        const proofProposal = this.#buildUnsignedProofProposal();
+        const signature = await this.#signProofProposal(proofProposal);
+        this.#setPayload('proof_proposal', {
+            ...proofProposal,
+            signature: signature,
+        });
+    }
+
+    async #buildProofProposalResponsePayload() {
+        const resultCode = this.#getResultCode();
+        const proofProposal = this.#buildUnsignedProofProposal();
+        const approver = this.#getApprover();
+        const requesterProofSignature = this.#getRequesterProofSignature();
+        const proofProposalApproval = await this.#buildProofProposalApproval(
+            proofProposal,
+            approver,
+            requesterProofSignature
+        );
+        const responseSig = await this.#signProofProposalResponse(resultCode, proofProposalApproval);
+
+        this.#setPayload('proof_proposal_response', {
+            result: resultCode,
             approval: proofProposalApproval,
             response_sig: responseSig,
-        };
+        });
     }
 
     async buildPayload() {
