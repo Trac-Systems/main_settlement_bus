@@ -233,7 +233,7 @@ class Network extends ReadyResource {
             await this.#validatorHealthCheckService.ready();
 
             this.#consensusMessages = new ConsensusMessages(this.#state, this.#wallet, this.#config, this.#indexerPendingRequestService);
-            this.#indexerConnectionManager = new IndexerConnectionManager();
+            this.#indexerConnectionManager = new IndexerConnectionManager(this.#config);
 
             this.#epochProofProposalService = new EpochProofProposalService(this.#state, this.#indexerConnectionManager, this.#wallet, this.#config);
             await this.#epochProofProposalService.ready();

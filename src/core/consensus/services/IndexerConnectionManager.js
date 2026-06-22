@@ -2,10 +2,16 @@ import { toHex } from '../../../utils/buffer.js';
 
 class IndexerConnectionManager {
     #indexers = new Map();
+    #config;
+
+    constructor(config) {
+        this.#config = config;
+    }
 
     add(publicKey, connection) {
         const key = toHex(publicKey);
         if (this.#indexers.has(key)) return false;
+        if (this.#indexers.size >= this.#config.maxIndexers) return false;
         this.#indexers.set(key, connection);
         return true;
     }
