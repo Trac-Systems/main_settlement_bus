@@ -256,7 +256,7 @@ class ConsensusMessageBuilder {
                 await this.#buildProofProposalPayload();
                 break;
             }
-            case ConsensusOperationType.PROOF_PROPOSAL_RESPONSE: {
+            case ConsensusOperationType.PROOF_PROPOSAL_APPROVAL: {
                 await this.#buildProofProposalResponsePayload();
                 break;
             }

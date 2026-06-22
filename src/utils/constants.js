@@ -47,6 +47,7 @@ export const NetworkOperationType = Object.freeze({
 
 export const ConsensusOperationType = Object.freeze({
     PROOF_PROPOSAL: ConsensusMessageType.MESSAGE_TYPE_PROOF_PROPOSAL,
+    PROOF_PROPOSAL_RESPONSE: ConsensusMessageType.MESSAGE_TYPE_PROOF_PROPOSAL_APPROVAL,
     PROOF_PROPOSAL_APPROVAL: ConsensusMessageType.MESSAGE_TYPE_PROOF_PROPOSAL_APPROVAL
 });
 

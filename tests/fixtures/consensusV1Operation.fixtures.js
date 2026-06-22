@@ -49,7 +49,7 @@ const proofProposalHeader = Object.freeze({
 });
 
 const proofProposalResponseHeader = Object.freeze({
-    type: MessageType.MESSAGE_TYPE_PROOF_PROPOSAL_RESPONSE,
+    type: MessageType.MESSAGE_TYPE_PROOF_PROPOSAL_APPROVAL,
     session_id: uuidv7(),
     timestamp: 67,
     proof_proposal_response: proofProposalResponse

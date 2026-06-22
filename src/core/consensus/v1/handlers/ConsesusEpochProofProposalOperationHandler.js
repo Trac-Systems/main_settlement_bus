@@ -25,7 +25,7 @@ class ConsensusEpochProofProposalOperationHandler {
     async handleRequest(message, connection) {
         try {
             this.applyRateLimit(connection);
-            await this.#v1EpochProofProposalRequestValidator.validate(message, connection.remotePublicKey);
+            await this.#v1EpochProofProposalRequestValidator.validate(message, connection);
             await this.#validateDataHash(message.epoch_proof_proposal_request)
             const lastEpochProof = await this.#state.currentEpoch()
             const epochProof = epochProofFromBuffer(message.epoch_proof_proposal_request.data)
