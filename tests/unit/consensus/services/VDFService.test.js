@@ -1,23 +1,135 @@
 import test from 'brittle';
 import sinon from 'sinon';
+import { VDFService } from '../../../../src/core/consensus/services/VDFService.js';
 
 const isBare = typeof globalThis.Bare !== 'undefined';
 const DIFFICULTY = 100;
 const DISCRIMINANT_BITS = 512;
 
-// ---- Bare-only: unit tests (mocked) + integration ----
+// ---- VDFService unit tests (mock port, runs in both environments) ----
+
+function makePortMock() {
+    return {
+        write: sinon.stub().resolves(),
+        read: sinon.stub().resolves({ result: null }),
+        close: sinon.stub().resolves(),
+    };
+}
+
+function makeService(portMock) {
+    class TestVDFService extends VDFService {
+        async _open() { this._setPort(portMock); }
+    }
+    return new TestVDFService();
+}
+
+test('calculateVDF writes correct payload to port', async t => {
+    const portMock = makePortMock();
+    const service = makeService(portMock);
+    await service.ready();
+    t.teardown(() => service.close());
+
+    const challenge = Buffer.alloc(32, 1);
+    await service.calculateVDF(challenge, 1000, 2048);
+
+    t.ok(portMock.write.calledOnce);
+    t.alike(portMock.write.firstCall.args[0], { challenge, difficulty: 1000, discriminantSizeBits: 2048 });
+});
+
+test('calculateVDF returns result field from port.read response', async t => {
+    const portMock = makePortMock();
+    const expectedResult = { challenge: Buffer.alloc(32), difficulty: 500, solution: 'proof' };
+    portMock.read.resolves({ result: expectedResult });
+    const service = makeService(portMock);
+    await service.ready();
+    t.teardown(() => service.close());
+
+    const result = await service.calculateVDF(Buffer.alloc(32), 500, 1024);
+    t.alike(result, expectedResult);
+});
+
+test('calculateVDF returns null when response contains error', async t => {
+    const portMock = makePortMock();
+    portMock.read.resolves({ error: 'VDF computation failed' });
+    const service = makeService(portMock);
+    await service.ready();
+    t.teardown(() => service.close());
+
+    t.is(await service.calculateVDF(Buffer.alloc(32), 100, 512), null);
+});
+
+test('calculateVDF returns null when port.read throws', async t => {
+    const portMock = makePortMock();
+    portMock.read.rejects(new Error('port closed unexpectedly'));
+    const service = makeService(portMock);
+    await service.ready();
+    t.teardown(() => service.close());
+
+    t.is(await service.calculateVDF(Buffer.alloc(32), 100, 512), null);
+});
+
+test('concurrent calculateVDF calls are serialized', async t => {
+    let resolveFirst;
+    const firstRead = new Promise(resolve => { resolveFirst = resolve; });
+    const portMock = makePortMock();
+    portMock.read
+        .onFirstCall().returns(firstRead)
+        .onSecondCall().resolves({ result: 'result-B' });
+    const service = makeService(portMock);
+    await service.ready();
+    t.teardown(() => service.close());
+
+    const callA = service.calculateVDF(Buffer.alloc(32, 1), 100, 512);
+    const callB = service.calculateVDF(Buffer.alloc(32, 2), 100, 512);
+
+    await new Promise(r => setTimeout(r, 0));
+    t.is(portMock.write.callCount, 1, 'B has not started while A is pending');
+
+    resolveFirst({ result: 'result-A' });
+    const [resA, resB] = await Promise.all([callA, callB]);
+
+    t.is(portMock.write.callCount, 2);
+    t.is(resA, 'result-A');
+    t.is(resB, 'result-B');
+});
+
+test('queue continues after call returns null (error response)', async t => {
+    const portMock = makePortMock();
+    portMock.read
+        .onFirstCall().resolves({ error: 'failed' })
+        .onSecondCall().resolves({ result: 'ok' });
+    const service = makeService(portMock);
+    await service.ready();
+    t.teardown(() => service.close());
+
+    const resA = await service.calculateVDF(Buffer.alloc(32, 1), 100, 512);
+    const resB = await service.calculateVDF(Buffer.alloc(32, 2), 100, 512);
+
+    t.is(resA, null);
+    t.is(resB, 'ok');
+});
+
+test('queue continues after port.read throws', async t => {
+    const portMock = makePortMock();
+    portMock.read
+        .onFirstCall().rejects(new Error('port error'))
+        .onSecondCall().resolves({ result: 'ok' });
+    const service = makeService(portMock);
+    await service.ready();
+    t.teardown(() => service.close());
+
+    const resA = await service.calculateVDF(Buffer.alloc(32, 1), 100, 512);
+    const resB = await service.calculateVDF(Buffer.alloc(32, 2), 100, 512);
+
+    t.is(resA, null);
+    t.is(resB, 'ok');
+});
+
+// ---- Bare-only tests ----
 
 if (isBare) {
     const { default: Channel } = await import('bare-channel');
-    const { VDFBareService } = await import('../../../../src/core/consensus/services/VDFBareService.js');
-
-    function makePortMock() {
-        return {
-            write: sinon.stub().resolves(),
-            read: sinon.stub().resolves({ result: null }),
-            close: sinon.stub().resolves(),
-        };
-    }
+    const { VDFBare } = await import('../../../../src/core/consensus/services/VDFBare.js');
 
     function makeThreadMock() {
         return {
@@ -26,7 +138,7 @@ if (isBare) {
         };
     }
 
-    function setup(portMock, threadMock) {
+    function setupBare(portMock, threadMock) {
         const savedBare = globalThis.Bare;
         sinon.stub(Channel.prototype, 'connect').returns(portMock);
         globalThis.Bare = { Thread: sinon.stub().returns(threadMock) };
@@ -36,14 +148,14 @@ if (isBare) {
         };
     }
 
-    test('_open creates a Thread with correct worker path and channel handle', async t => {
+    test('VDFBare._open creates a Thread with correct worker path and channel handle', async t => {
         const portMock = makePortMock();
         const threadMock = makeThreadMock();
-        const teardown = setup(portMock, threadMock);
+        const teardown = setupBare(portMock, threadMock);
         t.teardown(teardown);
 
         const ThreadStub = globalThis.Bare.Thread;
-        const service = new VDFBareService();
+        const service = new VDFBare();
         await service.ready();
         t.teardown(() => service.close());
 
@@ -52,13 +164,13 @@ if (isBare) {
         t.is(typeof ThreadStub.firstCall.args[1].data, 'object');
     });
 
-    test('_close terminates thread, joins it, and closes port', async t => {
+    test('VDFBare._close terminates thread, joins it, and closes port', async t => {
         const portMock = makePortMock();
         const threadMock = makeThreadMock();
-        const teardown = setup(portMock, threadMock);
+        const teardown = setupBare(portMock, threadMock);
         t.teardown(teardown);
 
-        const service = new VDFBareService();
+        const service = new VDFBare();
         await service.ready();
         await service.close();
 
@@ -67,80 +179,21 @@ if (isBare) {
         t.ok(portMock.close.calledOnce);
     });
 
-    test('_close calls terminate before join', async t => {
+    test('VDFBare._close calls terminate before join', async t => {
         const portMock = makePortMock();
         const threadMock = makeThreadMock();
-        const teardown = setup(portMock, threadMock);
+        const teardown = setupBare(portMock, threadMock);
         t.teardown(teardown);
 
-        const service = new VDFBareService();
+        const service = new VDFBare();
         await service.ready();
         await service.close();
 
         t.ok(threadMock.terminate.calledBefore(threadMock.join));
     });
 
-    test('calculateVDF writes correct payload to port', async t => {
-        const portMock = makePortMock();
-        const teardown = setup(portMock, makeThreadMock());
-        t.teardown(teardown);
-
-        const service = new VDFBareService();
-        await service.ready();
-        t.teardown(() => service.close());
-
-        const challenge = Buffer.alloc(32, 1);
-        await service.calculateVDF(challenge, 1000, 2048);
-
-        t.ok(portMock.write.calledOnce);
-        t.alike(portMock.write.firstCall.args[0], { challenge, difficulty: 1000, discriminantSizeBits: 2048 });
-    });
-
-    test('calculateVDF returns result field from port.read response', async t => {
-        const portMock = makePortMock();
-        const expectedResult = { challenge: Buffer.alloc(32), difficulty: 500, solution: 'proof' };
-        portMock.read.resolves({ result: expectedResult });
-        const teardown = setup(portMock, makeThreadMock());
-        t.teardown(teardown);
-
-        const service = new VDFBareService();
-        await service.ready();
-        t.teardown(() => service.close());
-
-        const result = await service.calculateVDF(Buffer.alloc(32), 500, 1024);
-        t.alike(result, expectedResult);
-    });
-
-    test('calculateVDF returns null when response contains error', async t => {
-        const portMock = makePortMock();
-        portMock.read.resolves({ error: 'VDF computation failed' });
-        const teardown = setup(portMock, makeThreadMock());
-        t.teardown(teardown);
-
-        const service = new VDFBareService();
-        await service.ready();
-        t.teardown(() => service.close());
-
-        t.is(await service.calculateVDF(Buffer.alloc(32), 100, 512), null);
-    });
-
-    test('calculateVDF returns null when port.read throws', async t => {
-        const portMock = makePortMock();
-        portMock.read.rejects(new Error('port closed unexpectedly'));
-        const teardown = setup(portMock, makeThreadMock());
-        t.teardown(teardown);
-
-        const service = new VDFBareService();
-        await service.ready();
-        t.teardown(() => service.close());
-
-        t.is(await service.calculateVDF(Buffer.alloc(32), 100, 512), null);
-    });
-
-    // Bare integration tests
-
     test('[bare] real VDF: returns valid computation result', { timeout: 30000 }, async t => {
-        const service = new VDFBareService();
+        const service = new VDFBare();
         await service.ready();
         t.teardown(() => service.close());
 
@@ -156,7 +209,7 @@ if (isBare) {
     });
 
     test('[bare] real VDF: multiple sequential requests all succeed', { timeout: 60000 }, async t => {
-        const service = new VDFBareService();
+        const service = new VDFBare();
         await service.ready();
         t.teardown(() => service.close());
 
@@ -169,7 +222,7 @@ if (isBare) {
     });
 
     test('[bare] real VDF: service works after close and reopen', { timeout: 30000 }, async t => {
-        const service = new VDFBareService();
+        const service = new VDFBare();
         await service.ready();
         await service.close();
         await service.ready();
@@ -180,7 +233,7 @@ if (isBare) {
     });
 
     test('[bare] real VDF: invalid discriminantSizeBits causes worker to return null', { timeout: 10000 }, async t => {
-        const service = new VDFBareService();
+        const service = new VDFBare();
         await service.ready();
         t.teardown(() => service.close());
 
@@ -189,13 +242,13 @@ if (isBare) {
     });
 }
 
-// ---- Node.js integration tests ----
+// ---- Node.js tests ----
 
 if (!isBare) {
-    const { VDFNodeService } = await import('../../../../src/core/consensus/services/VDFNodeService.js');
+    const { VDFNode } = await import('../../../../src/core/consensus/services/VDFNode.js');
 
     test('[node] real VDF: returns valid computation result', { timeout: 30000 }, async t => {
-        const service = new VDFNodeService();
+        const service = new VDFNode();
         await service.ready();
         t.teardown(() => service.close());
 
@@ -211,7 +264,7 @@ if (!isBare) {
     });
 
     test('[node] real VDF: invalid args cause worker to return null', { timeout: 10000 }, async t => {
-        const service = new VDFNodeService();
+        const service = new VDFNode();
         await service.ready();
         t.teardown(() => service.close());
 
@@ -219,7 +272,7 @@ if (!isBare) {
     });
 
     test('[node] real VDF: multiple sequential requests all succeed', { timeout: 60000 }, async t => {
-        const service = new VDFNodeService();
+        const service = new VDFNode();
         await service.ready();
         t.teardown(() => service.close());
 
@@ -230,5 +283,4 @@ if (!isBare) {
             t.ok(result.solution instanceof Uint8Array);
         }
     });
-
 }
