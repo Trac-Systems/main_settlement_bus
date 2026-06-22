@@ -23,7 +23,8 @@ import { WalletProvider } from 'trac-wallet';
 import { CustomEventType } from '../../utils/constants.js';
 import tracCryptoApi from 'trac-crypto-api'
 import ConsensusMessages from '../consensus/protocols/ConsensusMessages.js';
-import ConsensusConnectionManager from '../consensus/services/ConsensusConnectionManager.js';
+import IndexerConnectionManager from '../consensus/services/IndexerConnectionManager.js';
+import IndexerPendingRequestService from '../consensus/services/IndexerPendingRequestService.js';
 
 const wakeup = new w();
 
@@ -48,7 +49,8 @@ class Network extends ReadyResource {
     #state;
     #store;
     #consensusMessages;
-    #consensusConnectionManager;
+    #indexerConnectionManager;
+    #indexerPendingRequestService;
 
     /**
      * @param {State} state
@@ -72,6 +74,7 @@ class Network extends ReadyResource {
         this.#validatorConnectionManager = new ConnectionManager(this.#config);
         this.#validatorMessageOrchestrator = new MessageOrchestrator(this.#validatorConnectionManager, state, this.#config);
         this.#pendingRequestsService = new PendingRequestService(this.#config);
+        this.#indexerPendingRequestService = new IndexerPendingRequestService(this.#config);
         this.#logger = new Logger(this.#config);
     }
 
@@ -93,10 +96,6 @@ class Network extends ReadyResource {
 
     get validatorMessageOrchestrator() {
         return this.#validatorMessageOrchestrator;
-    }
-
-    get consensusConnectionManager() {
-        return this.#consensusConnectionManager;
     }
 
     async _open() {
@@ -131,6 +130,7 @@ class Network extends ReadyResource {
         this.cleanupPendingConnections();
         this.#pendingRequestsService.close();
         this.#transactionCommitService.close();
+        this.#indexerPendingRequestService.close();
 
         if (this.#swarm !== null) {
             this.#swarm.destroy();
@@ -232,27 +232,30 @@ class Network extends ReadyResource {
             this.#validatorHealthCheckService = new ValidatorHealthCheckService(this.#config);
             await this.#validatorHealthCheckService.ready();
 
-            this.#consensusMessages = new ConsensusMessages(this.#state, this.#wallet, this.#config, this.#pendingRequestsService);
-            this.#consensusConnectionManager = new ConsensusConnectionManager();
+            this.#consensusMessages = new ConsensusMessages(this.#state, this.#wallet, this.#config, this.#indexerPendingRequestService);
+            this.#indexerConnectionManager = new IndexerConnectionManager();
 
-            this.#epochProofProposalService = new EpochProofProposalService(this.#state, this.#consensusConnectionManager, this.#wallet, this.#config);
+            this.#epochProofProposalService = new EpochProofProposalService(this.#state, this.#indexerConnectionManager, this.#wallet, this.#config);
             await this.#epochProofProposalService.ready();
 
             this.#validatorConnectionManager.subscribeToHealthChecks(this.#validatorHealthCheckService);
 
             this.#logger.info(`Channel: ${b4a.toString(this.#config.channel)}`);
 
+            this.#swarm.prependListener('connection', async (connection) => {
+                await this.#networkMessages.setupProtomuxMessages(connection);
+                await this.#consensusMessages.setupProtomuxMessages(connection);
+            });
+
             this.#swarm.on('connection', async (connection) => {
                 // Per-peer connection initialization:
                 // - attach Protomux (legacy + v1 channels/messages)
                 // - attach connection.protocolSession (used later by tryConnect / orchestrators to send messages)
-                await this.#networkMessages.setupProtomuxMessages(connection);
-                await this.#consensusMessages.setupProtomuxMessages(connection);
 
                 // Adds indexers to consensus connection manager
                 const remotePublicKeyHex = b4a.toString(connection.remotePublicKey, 'hex');
                 if (await this.#state.isKnownIndexer(remotePublicKeyHex)) {
-                    this.#consensusConnectionManager.add(remotePublicKeyHex, connection);
+                    this.#indexerConnectionManager.add(remotePublicKeyHex, connection);
                     console.log('[consensus] indexer connected:', remotePublicKeyHex);
                 }
 
@@ -271,15 +274,23 @@ class Network extends ReadyResource {
                         publicKey,
                         new Error('Connection closed before response')
                     );
+                    this.#indexerPendingRequestService.rejectPendingRequestsForPeer(
+                        publicKey,
+                        new Error('Connection closed before response')
+                    );
                     this.#swarm.leavePeer(connection.remotePublicKey);
                     this.#validatorConnectionManager.remove(publicKey);
-                    this.#consensusConnectionManager.remove(publicKey);
+                    this.#indexerConnectionManager.remove(publicKey);
                     connection.protocolSession.close();
                     connection.consensusProtocolSession?.close();
                 });
 
                 connection.on('error', (error) => {
                     this.#pendingRequestsService.rejectPendingRequestsForPeer(
+                        publicKey,
+                        error ?? new Error('Connection error before response')
+                    );
+                    this.#indexerPendingRequestService.rejectPendingRequestsForPeer(
                         publicKey,
                         error ?? new Error('Connection error before response')
                     );

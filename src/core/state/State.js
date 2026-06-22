@@ -233,11 +233,8 @@ class State extends ReadyResource {
     async isKnownIndexer(publicKeyHex) {
         const entries = await this.getIndexersEntry();
         for (const entry of entries) {
-            if (!entry?.key) continue;
             const addressBuffer = await this.getRegisteredWriterKey(b4a.toString(entry.key, 'hex'));
-            if (!addressBuffer) continue;
             const addr = addressUtils.bufferToAddress(addressBuffer, this.#config.addressPrefix);
-            if (!addr) continue;
             const publicKey = tracCryptoApi.address.decode(addr);
             if (!publicKey) continue;
             if (b4a.toString(publicKey, 'hex') === publicKeyHex) return true;
