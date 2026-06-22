@@ -5,11 +5,6 @@ import { Logger } from "../../../utils/logger.js";
 import { createVDFService } from "./createVDFService.js";
 import { EpochProofProposalOperations } from './EpochProofProposalOperations.js';
 
-const withTimeout = (promise, ms) => Promise.race([
-    promise,
-    new Promise(resolve => setTimeout(() => resolve(null), ms))
-]);
-
 class EpochProofProposalService extends SchedulableService {
     #state;
     #wallet;
@@ -19,11 +14,7 @@ class EpochProofProposalService extends SchedulableService {
     #vdfService;
     #connectionManager
     #stateMachine
-    #awaitingEpochTimeoutId
-    #collectingConfirmationsTimeoutId
-    #startVdfTimeoutId
     #operations
-    #vdfComputing
 
     /**
    * @param {object} state
@@ -40,10 +31,6 @@ class EpochProofProposalService extends SchedulableService {
         this.#logger = new Logger(config);
         this.#connectionManager = connectionManager;
         this.#stateMachine = new EpochStateMachine();
-        this.#awaitingEpochTimeoutId = null;
-        this.#collectingConfirmationsTimeoutId = null;
-        this.#startVdfTimeoutId = null;
-        this.#vdfComputing = false;
     }
 
     async _open() {
@@ -64,25 +51,22 @@ class EpochProofProposalService extends SchedulableService {
         });
 
         this.#state.on(CustomEventType.EPOCH_CREATED, async ({ epochId, epochHash } = {}) => {
-            if (epochId !== undefined) {
-                this.#stateMachine.appendContext({ lastCommittedEpochId: epochId, lastCommittedEpochHash: epochHash });
-            }
+            this.#stateMachine.appendContext({ lastCommittedEpochId: epochId, lastCommittedEpochHash: epochHash });
+        
             if (this.#stateMachine.state === EPOCH_STATES.AWAITING_EPOCH) {
+                this.#stateMachine.appendContext({ currentEpoch: epochId, currentEpochHash: epochHash });
                 await this.#stateMachine.send(EPOCH_EVENTS.EPOCH_VERIFIED);
             } else if (this.#stateMachine.state === EPOCH_STATES.VDF_SUBMITTED) {
+                this.#stateMachine.appendContext({ currentEpoch: epochId, currentEpochHash: epochHash });
                 await this.#stateMachine.send(EPOCH_EVENTS.APPEND_LOG);
             }
             // Re-append after send: EPOCH_VERIFIED → START_VDF zera o contexto (discardState)
-            if (epochId !== undefined) {
-                this.#stateMachine.appendContext({ lastCommittedEpochId: epochId, lastCommittedEpochHash: epochHash });
-            }
+            this.#stateMachine.appendContext({ lastCommittedEpochId: epochId, lastCommittedEpochHash: epochHash });
         });
     }
 
     async _close() {
-        this.#clearStartVdfTimeout();
-        this.#clearAwaitingEpochTimeout();
-        this.#clearCollectingConfirmationsTimeout();
+        // this.#stateMachine.clearActiveTimeout();
         await super._close();
         await this.#vdfService?.close();
     }
@@ -91,8 +75,6 @@ class EpochProofProposalService extends SchedulableService {
         if (this.isSchedulerRunning) {
             return false;
         }
-
-        await this.#stateMachine.send(EPOCH_EVENTS.START);
 
         const started = super.start(this.#intervalMs);
         if (started) {
@@ -105,77 +87,31 @@ class EpochProofProposalService extends SchedulableService {
         return super.stop(waitForCurrent);
     }
 
-    #clearStartVdfTimeout() {
-        if (this.#startVdfTimeoutId) {
-            clearTimeout(this.#startVdfTimeoutId);
-            this.#startVdfTimeoutId = null;
-        }
-    }
-
-    #scheduleStartVdf() {
-        this.#clearStartVdfTimeout();
-        this.#startVdfTimeoutId = setTimeout(async () => {
-            this.#startVdfTimeoutId = null;
-            await this.#stateMachine.send(EPOCH_EVENTS.START);
-        }, this.#intervalMs);
-    }
-
-    #clearAwaitingEpochTimeout() {
-        if (this.#awaitingEpochTimeoutId) {
-            clearTimeout(this.#awaitingEpochTimeoutId);
-            this.#awaitingEpochTimeoutId = null;
-        }
-    }
-
-    #clearCollectingConfirmationsTimeout() {
-        if (this.#collectingConfirmationsTimeoutId) {
-            clearTimeout(this.#collectingConfirmationsTimeoutId);
-            this.#collectingConfirmationsTimeoutId = null;
-        }
-    }
-
-    // usar timeout do config aqui
-    #scheduleAwaitingEpochTimeout() {
-        this.#clearAwaitingEpochTimeout();
-        this.#awaitingEpochTimeoutId = setTimeout(async () => {
-            this.#awaitingEpochTimeoutId = null;
-            this.#stateMachine.appendContext({ remoteProposalReceived: false });
-            await this.#stateMachine.send(EPOCH_EVENTS.EPOCH_TIMEOUT);
-        }, this.#config.epochAppendTimeout);
-    }
-
     async #handleConfirmation(confirmation) {
         if (!confirmation) return;
+        if (this.#stateMachine.state !== EPOCH_STATES.COLLECTING_CONFIRMATIONS) return;
 
         const context = this.#stateMachine.context;
         const confirmations = [...context.confirmations, confirmation];
         this.#stateMachine.appendContext({ confirmations });
 
+        // No momento pegamos as confirmations. O ideal seria mudar para um estado intermediário
+        // onde cada vez que chegar uma resposta da signature collection nós mudassemos o contexto
+        // se a condição abaixo for verdadeira, ai sim quorum reached.
+        // está sem failover para racing conditions tb.
         if (confirmations.length >= this.#config.epochThreshold) {
             await this.#stateMachine.send(EPOCH_EVENTS.QUORUM_REACHED);
         }
     }
 
     #dispatchApprovalRequests(proofProposal) {
-        const approvers = this.#stateMachine.context.approvers ?? [];
-
+        const { approvers } = this.#stateMachine.context;
         for (const member of approvers) {
-            withTimeout(
-                this.#operations.collectSignature(member, proofProposal),
-                this.#config.epochSignatureTimeout,
-            )
+            this.#operations.collectSignature(member, proofProposal)
                 .then((confirmation) => this.#handleConfirmation(confirmation))
                 .catch(() => {});
         }
-    }
-
-    #scheduleCollectingConfirmationsTimeout() {
-        this.#clearCollectingConfirmationsTimeout();
-        this.#collectingConfirmationsTimeoutId = setTimeout(async () => {
-            this.#collectingConfirmationsTimeoutId = null;
-            await this.#stateMachine.send(EPOCH_EVENTS.COLLECTING_TIMEOUT);
-        }, this.#config.epochSignatureTimeout);
-    }    
+    }  
 
     getScheduleInterval() {
         return this.#intervalMs;
@@ -184,87 +120,69 @@ class EpochProofProposalService extends SchedulableService {
     async worker(next) {
         if (this.isInterrupted) return;
 
-        const currentEpochId = await this.#state.currentEpochId();
-        if (this.#stateMachine.state === EPOCH_STATES.VDF_PENDING && currentEpochId > 0 && !this.#vdfComputing) {
-            await this.#onTransition(null, null, this.#stateMachine.state, this.#stateMachine.context);
-        }
-
-        next(this.#intervalMs);
+        const currentEpoch = await this.#state.currentEpochId();
+        const currentEpochHash = await this.#state.getEpochHash(currentEpoch);
+        this.#stateMachine.appendContext({ currentEpoch, currentEpochHash });
+        await this.#stateMachine.send(EPOCH_EVENTS.START);
+        this.#state.once(CustomEventType.EPOCH_CREATED, ({ epochId }) => {
+            // We wait for the consensus to trigger the current view change for the upcoming epoch
+            if (epochId === currentEpoch + 1) {
+                next(this.#intervalMs)
+            }
+        })
     }
 
     // handler functions
-    #handleStartVdf() {
+    async #handleStartVdf() {        
         this.#logger.info(`[EpochService] state=${EPOCH_STATES.START_VDF}: scheduling next epoch in ${this.#intervalMs}ms`);
-        this.#scheduleStartVdf();
     }
 
-    async #handleVdfPending() {
-        if (this.#vdfComputing) return;
-        this.#vdfComputing = true;
-        try {
-            this.#logger.info(`[EpochService] state=${EPOCH_STATES.VDF_PENDING}: calculating VDF`);
-            const { lastCommittedEpochId, lastCommittedEpochHash } = this.#stateMachine.context;
-            const vdf = await this.#operations.calculateVDF(lastCommittedEpochId ?? null, lastCommittedEpochHash ?? null);
-            if (this.#stateMachine.state !== EPOCH_STATES.VDF_PENDING) return;
-            this.#stateMachine.appendContext({ vdf });
-            await this.#stateMachine.send(EPOCH_EVENTS.CALCULATE_VDF);
-        } finally {
-            this.#vdfComputing = false;
-        }
+    async #handleVdfPending(context) {
+        this.#logger.info(`[EpochService] state=${EPOCH_STATES.VDF_PENDING}: calculating VDF`);
+        const epochId = context.currentEpoch
+        const epochHash = context.currentEpochHash
+        this.#stateMachine.appendContext({ currentEpoch: epochId, currentEpochHash: epochHash, remoteProposalReceived: false });
+        const vdf = await this.#operations.calculateVDF(epochHash);
+        this.#stateMachine.appendContext({ vdf });
+        await this.#stateMachine.send(EPOCH_EVENTS.CALCULATE_VDF);
     }
 
     async #handleVdfComputed(context) {
         this.#logger.info(`[EpochService] state=${EPOCH_STATES.VDF_COMPUTED}: VDF computed`);
-        const { vdf, remoteProposalReceived } = context;
 
-        const currentEpochId = await this.#state.currentEpochId();
-        if (currentEpochId >= vdf.prevEpochId + 1) {
-            this.#logger.info(`[EpochService] epoch ${vdf.prevEpochId + 1} already committed (current=${currentEpochId}), restarting VDF`);
-            this.#stateMachine.appendContext({
-                lastCommittedEpochId: currentEpochId,
-                lastCommittedEpochHash: await this.#state.getEpochHash(currentEpochId),
-                remoteProposalReceived: false,
-            });
-            await this.#stateMachine.send(EPOCH_EVENTS.REMOTE_PROPOSAL_RECEIVED);
-            return;
-        }
-
-        this.#stateMachine.appendContext({ remoteProposalReceived: false });
-        if (remoteProposalReceived) {
-            this.#logger.info('[EpochService] remote proposal already observed, switching to awaiting mode');
-            await this.#stateMachine.send(EPOCH_EVENTS.REMOTE_PROPOSAL_RECEIVED);
-        } else {
-            this.#logger.info('[EpochService] creating local epoch proposal');
+        const { remoteProposalReceived } = context;
+        
+        if(remoteProposalReceived) {
+            // This is wrong but lets leave it here for now
+            this.#stateMachine.appendContext({ remoteProposalReceived: false });
             await this.#stateMachine.send(EPOCH_EVENTS.PROPOSE_EPOCH);
+        } else {
+            await this.#stateMachine.send(EPOCH_EVENTS.REMOTE_PROPOSAL_RECEIVED);
         }
     }
 
     async #handleProposingEpoch(context) {
         this.#logger.info(`[EpochService] state=${EPOCH_STATES.PROPOSING_EPOCH}: building proof proposal and dispatching approvals`);
+        const { currentEpoch, currentEpochHash, vdf } = context;
+        const newProofData = this.#operations.createProposal(currentEpoch, currentEpochHash, vdf);
+        const proofProposal = await newProofData.toProposalMessage(this.#wallet);
+
+        this.#stateMachine.appendContext({ newProofData });
         this.#stateMachine.appendContext({
-            newEpochProofData: this.#operations.createProposal(
-                context.vdf.prevEpochId,
-                context.vdf.currentEpochHash,
-                context.vdf,
-            ),
-        });
-        this.#stateMachine.appendContext({
-            proofProposal: await context.newEpochProofData.toProposalMessage(this.#wallet),
+            proofProposal,
             confirmations: [],
-            approvers: await this.#state.getIndexersEntry(),
+            approvers: await this.#operations.approvers(),
         });
-        this.#dispatchApprovalRequests(context.proofProposal);
+        this.#dispatchApprovalRequests(proofProposal);
         await this.#stateMachine.send(EPOCH_EVENTS.APPROVAL_REQUESTS_DISPATCHED);
     }
 
     #handleCollectingConfirmations() {
         this.#logger.info(`[EpochService] state=${EPOCH_STATES.COLLECTING_CONFIRMATIONS}: waiting for approvals`);
-        this.#scheduleCollectingConfirmationsTimeout();
     }
 
     #handleAwaitingEpoch() {
         this.#logger.info(`[EpochService] state=${EPOCH_STATES.AWAITING_EPOCH}: waiting for remote epoch append`);
-        this.#scheduleAwaitingEpochTimeout();
     }
 
     async #handleLocalQuorumReached() {
@@ -299,9 +217,6 @@ class EpochProofProposalService extends SchedulableService {
 
     async #onTransition(event, _prev, next, context) {
         this.#logger.info(`[EpochService] transition event=${event ?? 'INIT'} -> ${next}`);
-        this.#clearStartVdfTimeout();
-        this.#clearAwaitingEpochTimeout();
-        this.#clearCollectingConfirmationsTimeout();
         const handler = this.#getTransitionHandler(next);
         if (handler) await handler(context);
     }

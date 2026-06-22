@@ -27,24 +27,21 @@ export class EpochProofProposalOperations {
         this.#connectionManager = connectionManager;
     }
 
-    async calculateVDF(prevEpochId = null, currentEpochHash = null) {
-        if (prevEpochId === null) prevEpochId = await this.#state.currentEpochId();
-        if (currentEpochHash === null) currentEpochHash = await this.#state.getEpochHash(prevEpochId);
-        console.log('[calculateVDF] prevEpochId:', prevEpochId, 'epochHash:', currentEpochHash?.toString('hex') ?? 'null');
+    async calculateVDF(currentEpochHash) {
         const vdf = await this.#vdfService.calculateVDF(
             currentEpochHash,
             this.#config.vdfDifficulty,
             this.#config.vdfDiscriminantSizeBits,
         );
-        return { prevEpochId, currentEpochHash, solution: vdf.solution };
+        return { solution: vdf.solution };
     }
 
-    createProposal(prevEpochId, lastEpochHash, vdf) {
+    createProposal(prevEpochId, prevEpochHash, vdf) {
         const currentEpochId = prevEpochId + 1;
         return buildProofData({
             protocolVersion: PROTOCOL_VERSION,
             epoch: currentEpochId,
-            prevEpochHash: lastEpochHash,
+            prevEpochHash: prevEpochHash,
             networkId: this.#config.networkId,
             proposer: addressToBuffer(this.#wallet.address, this.#config.addressPrefix),
             vdfParamsHash: vdf.solution.slice(0, 258),
@@ -106,18 +103,18 @@ export class EpochProofProposalOperations {
         const address = addressUtils.bufferToAddress(addressBuffer, this.#config.addressPrefix);
         if (!address) return null;
 
-        if (address === this.#wallet.address) return null;
-
         const publicKey = tracCryptoApi.address.decode(address);
         if (!publicKey) return null;
 
         const publicKeyHex = b4a.toString(publicKey, 'hex');
-        console.log('[collectSignature] pk:', publicKeyHex.slice(0, 8), 'connected:', !!this.#connectionManager.getConnection(publicKeyHex));
+        console.log('[collectSignature] memberKey:', key.slice(0, 8), 'pk:', publicKeyHex.slice(0, 8), 'connected:', !!this.#connectionManager.getConnection(publicKeyHex));
 
         const memberSignature = await this.sendToIndexer(publicKeyHex, proofProposal);
+
+        // tratar esse erro pois é critico, só nulo não resolve, tem que checar a signature antes.
         if (!memberSignature) return null;
 
-        return { signature: memberSignature, publicKey: member.key };
+        return { signature: memberSignature, publicKey };
     }
     
     async appendEpoch(epoch) {
@@ -142,4 +139,11 @@ export class EpochProofProposalOperations {
         const payload = safeEncodeApplyOperation(message);
         await this.#state.append(payload);
     }    
+
+    async approvers() {
+        const indexers = await this.#state.getIndexersEntry();
+        const writingKey = this.#state.writingKey;
+        console.log('[approvers] writingKey:', b4a.toString(writingKey, 'hex').slice(0, 8), 'indexers:', indexers.map(({key}) => b4a.toString(key, 'hex').slice(0, 8)));
+        return indexers.filter(({ key }) => !b4a.equals(key, writingKey));
+    }
 }
