@@ -160,7 +160,8 @@ if (isBare) {
         t.teardown(() => service.close());
 
         t.ok(ThreadStub.calledOnce);
-        t.is(ThreadStub.firstCall.args[0], './vdf-worker.js');
+        t.ok(ThreadStub.firstCall.args[0] instanceof URL);
+        t.ok(ThreadStub.firstCall.args[0].href.endsWith('vdf-worker.js'));
         t.is(typeof ThreadStub.firstCall.args[1].data, 'object');
     });
 
@@ -282,5 +283,14 @@ if (!isBare) {
             t.ok(result !== null, `request ${fill} returned null — lib broken or missing`);
             t.ok(result.solution instanceof Uint8Array);
         }
+    });
+
+    test('[node] calculateVDF returns null when worker exits unexpectedly', { timeout: 5000 }, async t => {
+        const crashWorkerURL = new URL('./fixtures/crash-worker.js', import.meta.url);
+        const service = new VDFNode(crashWorkerURL);
+        await service.ready();
+
+        const result = await service.calculateVDF(Buffer.alloc(32, 1), 100, 512);
+        t.is(result, null);
     });
 }

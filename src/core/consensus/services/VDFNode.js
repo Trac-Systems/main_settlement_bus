@@ -2,14 +2,25 @@ import { VDFService } from './VDFService.js';
 
 export class VDFNode extends VDFService {
     #thread = null;
+    #workerURL; // for test injection
+
+    constructor (workerURL = new URL('./vdf-worker.js', import.meta.url)) {
+        super();
+        this.#workerURL = workerURL;
+    }
 
     async _open() {
         const { Worker, MessageChannel } = await import('worker_threads');
         const { port1, port2 } = new MessageChannel();
-        this._setPort(this.#wrapNodePort(port1));
-        this.#thread = new Worker(new URL('./vdf-worker.js', import.meta.url), {
+        const port = this.#wrapNodePort(port1);
+        this._setPort(port);
+        this.#thread = new Worker(this.#workerURL, {
             workerData: { port: port2 },
             transferList: [port2],
+        });
+        this.#thread.on('error', (err) => port.rejectPending(err));
+        this.#thread.on('exit', (code) => {
+            if (code !== 0) port.rejectPending(new Error(`VDF worker exited with code ${code}`));
         });
     }
 
@@ -40,6 +51,10 @@ export class VDFNode extends VDFService {
                 }
             }),
             close: () => { port.close(); return Promise.resolve(); },
+            rejectPending: (err) => {
+                for (const resolve of resolvers) resolve ({ error: err });
+                resolvers.length = 0;
+            }
         };
     }
 }

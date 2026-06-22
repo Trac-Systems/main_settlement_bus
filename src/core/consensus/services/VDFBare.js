@@ -7,7 +7,7 @@ export class VDFBare extends VDFService {
         const { default: Channel } = await import('bare-channel');
         const channel = new Channel();
         this._setPort(channel.connect());
-        this.#thread = new globalThis.Bare.Thread('./vdf-worker.js', { data: channel.handle });
+        this.#thread = new globalThis.Bare.Thread(new URL('./vdf-worker.js', import.meta.url), { data: channel.handle });
     }
 
     async _close() {
