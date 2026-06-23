@@ -58,6 +58,26 @@ test('V1EpochProofProposalRequest validates proof proposal signature', async t =
     t.pass();
 });
 
+test('V1EpochProofProposalRequest builds proof proposal challenge data from fields one through six', async t => {
+    const wallet = await createWallet();
+    const validator = new V1EpochProofProposalRequest(config);
+    const payload = await buildProofProposalPayload(wallet);
+    const proofProposal = payload.proof_proposal;
+    const challengeData = validator.buildProofProposalChallengeData(proofProposal);
+    const expectedChallengeData = createMessage(
+        proofProposal.protocol_version,
+        proofProposal.network_id,
+        proofProposal.epoch,
+        proofProposal.previous_epoch_record_hash,
+        proofProposal.proposer,
+        proofProposal.vdf_parameters_hash
+    );
+    const signatureMessage = createMessage(expectedChallengeData, proofProposal.vdf_proof);
+
+    t.ok(b4a.equals(challengeData, expectedChallengeData));
+    t.not(b4a.equals(challengeData, signatureMessage));
+});
+
 test('V1EpochProofProposalRequest rejects proof proposal with mismatched signature message', async t => {
     const wallet = await createWallet(testKeyPair1);
     const otherWallet = await createWallet(testKeyPair2);

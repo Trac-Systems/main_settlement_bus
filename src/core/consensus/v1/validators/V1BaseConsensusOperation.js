@@ -35,6 +35,20 @@ class V1BaseConsensusOperation {
     }
 
     /**
+     * Builds proof proposal challenge data from fields 1 through 6.
+     */
+    buildProofProposalChallengeData(proofProposal) {
+        return createMessage(
+            proofProposal.protocol_version,
+            proofProposal.network_id,
+            proofProposal.epoch,
+            proofProposal.previous_epoch_record_hash,
+            proofProposal.proposer,
+            proofProposal.vdf_parameters_hash
+        );
+    }
+
+    /**
      * Selects the schema validator for the consensus operation type.
      */
     #selectCheckSchemaValidator(type) {
@@ -108,30 +122,18 @@ class V1BaseConsensusOperation {
         switch (payload.type) {
             case ConsensusOperationType.PROOF_PROPOSAL: {
                 const proofProposal = payload.proof_proposal;
-
-                const message = createMessage(
-                    proofProposal.protocol_version,
-                    proofProposal.network_id,
-                    proofProposal.epoch,
-                    proofProposal.previous_epoch_record_hash,
-                    proofProposal.proposer,
-                    proofProposal.vdf_parameters_hash,
-                    proofProposal.vdf_proof
-                );
+                const challengeData = this.buildProofProposalChallengeData(proofProposal);
+                const message = createMessage(challengeData, proofProposal.vdf_proof);
 
                 return {signature: proofProposal.signature, message};
             }
             case ConsensusOperationType.PROOF_PROPOSAL_APPROVAL: {
                 const proofProposal = proofProposalContext;
                 const approval = payload.proof_proposal_response.approval;
+                const challengeData = this.buildProofProposalChallengeData(proofProposal);
 
                 const message = createMessage(
-                    proofProposal.protocol_version,
-                    proofProposal.network_id,
-                    proofProposal.epoch,
-                    proofProposal.previous_epoch_record_hash,
-                    proofProposal.proposer,
-                    proofProposal.vdf_parameters_hash,
+                    challengeData,
                     proofProposal.vdf_proof,
                     approval.approver,
                     proofProposal.signature
