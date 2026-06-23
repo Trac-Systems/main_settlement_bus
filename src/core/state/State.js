@@ -20,7 +20,7 @@ import tracCryptoApi from 'trac-crypto-api';
 import StateValidationSchema from './validators/StateValidationSchema.js';
 import { safeDecodeApplyOperation } from '../../codecs/apply/applyOperationCodec.js';
 import { createMessage, ZERO_WK, NULL_BUFFER } from '../../utils/buffer.js';
-import addressUtils from './utils/address.js';
+import addressUtils, { bufferToAddress } from './utils/address.js';
 import adminEntryUtils from './utils/adminEntry.js';
 import nodeEntryUtils, { setWritingKey, NODE_ENTRY_SIZE } from './utils/nodeEntry.js';
 import nodeRoleUtils from './utils/roles.js';
@@ -237,8 +237,11 @@ class State extends ReadyResource {
         const entries = await this.getIndexersEntry();
         for (const entry of entries) {
             const address = await this.get(EntryType.WRITER_ADDRESS + b4a.toString(entry.key, 'hex'));
-            const publicKeyBuffer = tracCryptoApi.address.decodeSafe(address)
-            if (b4a.equals(target, publicKeyBuffer)) return true
+            const addressString = bufferToAddress(address, this.#config.addressPrefix);
+            if (addressString) {
+                const publicKeyBuffer = tracCryptoApi.address.decodeSafe(addressString)
+                if (b4a.equals(target, publicKeyBuffer)) return true
+            }
         }
         return false;
     }
