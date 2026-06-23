@@ -237,8 +237,8 @@ class State extends ReadyResource {
         const entries = await this.getIndexersEntry();
         for (const entry of entries) {
             const address = await this.get(EntryType.WRITER_ADDRESS + b4a.toString(entry.key, 'hex'));
-            const addressString = bufferToAddress(address, this.#config.addressPrefix);
-            if (addressString) {
+            if (address) {
+                const addressString = bufferToAddress(address, this.#config.addressPrefix);
                 const publicKeyBuffer = tracCryptoApi.address.decodeSafe(addressString)
                 if (b4a.equals(target, publicKeyBuffer)) return true
             }

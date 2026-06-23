@@ -10,14 +10,23 @@ class IndexerConnectionManager {
 
     add(publicKey, connection) {
         const key = toHex(publicKey);
-        if (this.#indexers.has(key)) return false;
-        if (this.#indexers.size >= this.#config.maxIndexers) return false;
+        if (this.#indexers.has(key)) {
+            console.log(`[IndexerConnectionManager] add: already connected ${key}`);
+            return false;
+        }
+        if (this.#indexers.size >= this.#config.maxIndexers) {
+            console.log(`[IndexerConnectionManager] add: maxIndexers (${this.#config.maxIndexers}) reached, rejected ${key}`);
+            return false;
+        }
         this.#indexers.set(key, connection);
+        console.log(`[IndexerConnectionManager] add: connected ${key} | total: ${this.#indexers.size}/${this.#config.maxIndexers}`);
         return true;
     }
 
     remove(publicKey) {
-        this.#indexers.delete(toHex(publicKey));
+        const key = toHex(publicKey);
+        this.#indexers.delete(key);
+        console.log(`[IndexerConnectionManager] remove: disconnected ${key} | total: ${this.#indexers.size}/${this.#config.maxIndexers}`);
     }
 
     getConnection(publicKey) {
@@ -44,6 +53,20 @@ class IndexerConnectionManager {
         const connection = this.getConnection(publicKey);
         if (!connection?.consensusProtocolSession) return;
         connection.consensusProtocolSession.sendAndForget(message);
+    }
+
+    /**
+     * Checks if a indexer exists in the pool.
+     * @param {String | Buffer} publicKey - The public key hex string of the indexer to check
+     * @returns {Boolean} - Returns true if the indexer exists, false otherwise
+     */
+    exists(publicKey) {
+        const publicKeyHex = this.#toHexString(publicKey);
+        return this.#indexers.has(publicKeyHex);
+    }
+
+    #toHexString(publicKey) {
+        return toHex(publicKey)
     }
 }
 

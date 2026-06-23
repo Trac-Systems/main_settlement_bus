@@ -133,7 +133,12 @@ class Network extends ReadyResource {
 
     setupNetworkListeners() {
         this.#state.on(CustomEventType.IS_INDEXER, (publicKey) => {
+            this.addIndexerPeer(publicKey);
             this.disconnectValidatorPeer(publicKey, 'peer promoted to indexer');
+        });
+
+        this.#state.on(CustomEventType.IS_NON_INDEXER, (publicKey) => {
+            this.disconnectIndexerPeer(publicKey, 'peer demoted from indexer');
         });
 
         this.#state.on(CustomEventType.UNWRITABLE, (publicKey) => {
@@ -255,9 +260,9 @@ class Network extends ReadyResource {
                 // - attach connection.protocolSession (used later by tryConnect / orchestrators to send messages)
 
                 // Adds indexers to consensus connection manager
-                const remotePublicKeyHex = b4a.toString(connection.remotePublicKey, 'hex');
                 if (await this.#state.isKnownIndexer(connection.remotePublicKey)) {
-                    this.#indexerConnectionManager.add(remotePublicKeyHex, connection);
+                    console.log("indexer manager", this.#indexerConnectionManager);
+                    this.#indexerConnectionManager.add(connection.remotePublicKey, connection);
                 }
 
                 // ATTENTION: Must be called AFTER the protomux init above
@@ -322,6 +327,17 @@ class Network extends ReadyResource {
         return this.#pendingConnections.size;
     }
 
+    addIndexerPeer(publicKey) {
+        const publicKeyHex = this.#normalizePublicKey(publicKey);
+
+        // If swarm does not have the register public key, means that it emits a connection event
+        if (this.#swarm?.peers?.has(publicKeyHex)) {
+            const peerInfo = this.#swarm.peers.get(publicKeyHex);
+            const connection = this.#swarm._allConnections.get(peerInfo.publicKey);
+            this.#indexerConnectionManager.add(publicKeyHex, connection);
+        }
+    }
+
     disconnectValidatorPeer(publicKey, reason = 'validator peer invalidated') {
         const publicKeyHex = this.#normalizePublicKey(publicKey);
         if (!publicKeyHex) return false;
@@ -342,6 +358,20 @@ class Network extends ReadyResource {
         }
 
         return hadPendingValidatorConnection || isTrackedValidator;
+    }
+
+    disconnectIndexerPeer(publicKey, reason = 'validator peer invalidated') {
+        const publicKeyHex = this.#normalizePublicKey(publicKey);
+        if (!publicKeyHex) return false;
+
+        const isTrackedIndexer = this.#indexerConnectionManager.exists(publicKeyHex);
+
+        if (isTrackedIndexer) {
+            this.#logger.debug(`Network.disconnectIndexerPeer: detaching tracked indexer ${publicKeyHex}. Reason: ${reason}`);
+            this.#indexerConnectionManager.remove(publicKeyHex);
+        }
+
+        return isTrackedIndexer;
     }
 
     async #getOrGenerateWallet() {
