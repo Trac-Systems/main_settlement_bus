@@ -119,22 +119,16 @@ class Network extends ReadyResource {
         await this.transactionPoolService.stop();
         await sleep(100);
         await this.#validatorObserverService.stop();
-        if (this.#validatorHealthCheckService) {
-            await this.#validatorHealthCheckService.close();
-        }
-        if (this.#epochProofProposalService) {
-            await this.#epochProofProposalService.close();
-        }
 
         this.cleanupNetworkListeners();
         this.cleanupPendingConnections();
+        await this.#validatorHealthCheckService.close();
+        await this.#epochProofProposalService.close();
         this.#pendingRequestsService.close();
         this.#transactionCommitService.close();
         this.#indexerPendingRequestService.close();
 
-        if (this.#swarm !== null) {
-            this.#swarm.destroy();
-        }
+        await this.#swarm.destroy();
     }
 
     setupNetworkListeners() {
@@ -256,7 +250,6 @@ class Network extends ReadyResource {
                 const remotePublicKeyHex = b4a.toString(connection.remotePublicKey, 'hex');
                 if (await this.#state.isKnownIndexer(remotePublicKeyHex)) {
                     this.#indexerConnectionManager.add(remotePublicKeyHex, connection);
-                    console.log('[consensus] indexer connected:', remotePublicKeyHex);
                 }
 
                 // ATTENTION: Must be called AFTER the protomux init above
