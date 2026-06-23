@@ -177,14 +177,42 @@ test('V1EpochProofProposalRequest rejects invalid VDF proof', async t => {
     );
 });
 
-test('V1EpochProofProposalRequest rejects proof proposal with mismatched remote public key', async t => {
+test('V1EpochProofProposalRequest rejects invalid proof proposal signature', async t => {
+    const wallet = await createWallet();
+    const validator = new V1EpochProofProposalRequest(vdfTestConfig);
+    const payload = await buildProofProposalPayload(wallet);
+    const fakePayload = {
+        ...payload,
+        proof_proposal: {
+            ...payload.proof_proposal,
+            signature: b4a.alloc(64, 9)
+        }
+    };
+
+    await t.exception(
+        async () => validator.validate(fakePayload, {remotePublicKey: wallet.publicKey}),
+        errorMessageIncludes('signature verification failed')
+    );
+});
+
+test('V1EpochProofProposalRequest accepts proposer address matching remote public key', async t => {
+    const wallet = await createWallet(testKeyPair1);
+    const validator = new V1EpochProofProposalRequest(vdfTestConfig);
+    const proposer = addressToBuffer(wallet.address, vdfTestConfig.addressPrefix);
+
+    validator.assertAddressWithRemotePublicKey(proposer, wallet.publicKey);
+
+    t.pass();
+});
+
+test('V1EpochProofProposalRequest rejects proposer address mismatched with remote public key', async t => {
     const wallet = await createWallet(testKeyPair1);
     const otherWallet = await createWallet(testKeyPair2);
     const validator = new V1EpochProofProposalRequest(vdfTestConfig);
-    const payload = await buildProofProposalPayload(wallet);
+    const proposer = addressToBuffer(wallet.address, vdfTestConfig.addressPrefix);
 
-    await t.exception(
-        async () => validator.validate(payload, {remotePublicKey: otherWallet.publicKey}),
-        errorMessageIncludes('signature verification failed')
+    t.exception(
+        () => validator.assertAddressWithRemotePublicKey(proposer, otherWallet.publicKey),
+        errorMessageIncludes('Proposer address does not match remote public key')
     );
 });
