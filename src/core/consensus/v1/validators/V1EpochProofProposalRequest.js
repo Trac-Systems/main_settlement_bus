@@ -1,7 +1,7 @@
 import V1BaseConsensusOperation from "./V1BaseConsensusOperation.js";
 import {V1ConsensusProtocolError} from "../V1ConsensusProtocolError.js";
 import {ConsensusProtocolVersion, ConsensusResultCode} from "../../../../utils/constants.js";
-import {createMessage, safeWriteUInt32BE} from "../../../../utils/buffer.js";
+import {createMessage, safeWriteUInt32BE, uint16ToBuffer} from "../../../../utils/buffer.js";
 import tracCryptoApi from "trac-crypto-api";
 import b4a from "b4a";
 import {verifyWesolowski} from '@tracsystems/trac-vdf';
@@ -23,6 +23,7 @@ class V1EpochProofProposalRequest extends V1BaseConsensusOperation {
     async validate(payload, connection) {
         this.isPayloadSchemaValid(payload);
         this.validateProofProposalProtocolVersion(payload.proof_proposal);
+        this.validateProofProposalNetworkId(payload.proof_proposal);
         this.assertAddressWithRemotePublicKey(payload.proof_proposal.proposer, connection.remotePublicKey, "Proposer");
         await this.validateProofProposalVdfParametersHash(payload.proof_proposal);
         await this.validateProofProposalVdfProof(payload.proof_proposal);
@@ -86,6 +87,16 @@ class V1EpochProofProposalRequest extends V1BaseConsensusOperation {
                 ConsensusResultCode.UNEXPECTED_ERROR,
                 'VDF proof is invalid.'
             );
+        }
+    }
+
+    /**
+     * Validates that the proof proposal targets the configured network.
+     */
+    validateProofProposalNetworkId(proofProposal) {
+        const expectedNetworkId = uint16ToBuffer(this.#config.networkId, 'Network id');
+        if (!b4a.equals(proofProposal.network_id, expectedNetworkId)) {
+            throw new V1ConsensusProtocolError(ConsensusResultCode.UNEXPECTED_ERROR, 'Invalid proof proposal network id.');
         }
     }
 }

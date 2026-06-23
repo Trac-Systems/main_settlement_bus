@@ -60,7 +60,7 @@ async function buildVdfProof(challengeData, vdfConfig = vdfTestConfig) {
 async function buildProofProposalPayload(wallet, vdfConfig = vdfTestConfig) {
     const builder = new ConsensusMessageBuilder(wallet, vdfConfig);
     const protocolVersion = uint8ToBuffer(ConsensusProtocolVersion.V1, 'Protocol version');
-    const networkId = uint16ToBuffer(1, 'Network id');
+    const networkId = uint16ToBuffer(vdfConfig.networkId, 'Network id');
     const epoch = uint64ToBuffer(1, 'Epoch');
     const previousEpochRecordHash = b4a.alloc(32, 1);
     const proposer = addressToBuffer(wallet.address, vdfConfig.addressPrefix);
@@ -80,7 +80,7 @@ async function buildProofProposalPayload(wallet, vdfConfig = vdfTestConfig) {
         .setSessionId('session')
         .setTimestamp()
         .setProtocolVersion(ConsensusProtocolVersion.V1)
-        .setNetworkId(1)
+        .setNetworkId(vdfConfig.networkId)
         .setEpoch(1)
         .setPreviousEpochRecordHash(previousEpochRecordHash)
         .setProposer(wallet.address)
@@ -214,5 +214,24 @@ test('V1EpochProofProposalRequest rejects proposer address mismatched with remot
     t.exception(
         () => validator.assertAddressWithRemotePublicKey(proposer, otherWallet.publicKey, 'Proposer'),
         errorMessageIncludes('Proposer address does not match remote public key')
+    );
+});
+
+test('V1EpochProofProposalRequest rejects invalid proof proposal network id', async t => {
+    const wallet = await createWallet();
+    const validator = new V1EpochProofProposalRequest(vdfTestConfig);
+    const payload = await buildProofProposalPayload(wallet);
+    const fakeNetworkId = vdfTestConfig.networkId === 1 ? 2 : 1;
+    const fakePayload = {
+        ...payload,
+        proof_proposal: {
+            ...payload.proof_proposal,
+            network_id: uint16ToBuffer(fakeNetworkId, 'Network id')
+        }
+    };
+
+    await t.exception(
+        async () => validator.validate(fakePayload, {remotePublicKey: wallet.publicKey}),
+        errorMessageIncludes('Invalid proof proposal network id')
     );
 });
