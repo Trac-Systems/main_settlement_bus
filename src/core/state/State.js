@@ -106,6 +106,9 @@ class State extends ReadyResource {
 
     async _close() {
         console.log("State: closing gracefully...");
+
+        this.removeAllListeners();
+
         if (this.#bee !== null) {
             await this.#bee.close();
         }

@@ -132,6 +132,14 @@ class Network extends ReadyResource {
     }
 
     setupNetworkListeners() {
+        this.#state.on(CustomEventType.IS_INDEXER, (publicKey) => {
+            this.disconnectValidatorPeer(publicKey, 'peer promoted to indexer');
+        });
+
+        this.#state.on(CustomEventType.UNWRITABLE, (publicKey) => {
+            this.disconnectValidatorPeer(publicKey, 'peer became unwritable');
+        });
+
         this.on(EventType.VALIDATOR_CONNECTION_TIMEOUT, ({ publicKey, type, timeoutMs }) => {
             this.#logger.debug(`Network Event: VALIDATOR_CONNECTION_TIMEOUT | PublicKey: ${publicKey} | Type: ${type} | TimeoutMs: ${timeoutMs}`);
             this.#pendingConnections.delete(publicKey);
