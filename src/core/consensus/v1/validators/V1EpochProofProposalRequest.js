@@ -27,6 +27,9 @@ class V1EpochProofProposalRequest extends V1BaseConsensusOperation {
         this.assertAddressWithRemotePublicKey(payload.proof_proposal.proposer, connection.remotePublicKey, "Proposer");
         await this.validateProofProposalVdfParametersHash(payload.proof_proposal);
         await this.validateProofProposalVdfProof(payload.proof_proposal);
+        this.validateIncomingEpoch()
+        this.validatePreviousEpochRecordHash()
+        this.validateAddressIsIndexer()
         await this.validateSignature(payload, connection.remotePublicKey);
     }
 
@@ -98,6 +101,14 @@ class V1EpochProofProposalRequest extends V1BaseConsensusOperation {
         if (!b4a.equals(proofProposal.network_id, expectedNetworkId)) {
             throw new V1ConsensusProtocolError(ConsensusResultCode.UNEXPECTED_ERROR, 'Invalid proof proposal network id.');
         }
+    }
+
+    validateIncomingEpoch() {
+        //TODO: Placeholder - epoch defined in the payload should be current_epoch + 1. Completion depends on genesis being initialized in the ledger. this is not implemented yet.
+    }
+
+    validatePreviousEpochRecordHash() {
+        //TODO: Placeholder - previous_epoch_record_hash should match the latest epoch record hash. Completion depends on genesis being initialized in the ledger. this is not implemented yet.
     }
 }
 

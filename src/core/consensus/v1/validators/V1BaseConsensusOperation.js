@@ -160,6 +160,10 @@ class V1BaseConsensusOperation {
         }
     }
 
+    validateAddressIsIndexer() {
+        //TODO: Placeholder - payload address should have the indexer role in state. Completion depends on genesis being initialized in the ledger. this is not implemented yet.
+    }
+
 }
 
 
