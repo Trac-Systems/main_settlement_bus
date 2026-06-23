@@ -8,15 +8,18 @@ import {
 import {V1ConsensusProtocolError} from "../V1ConsensusProtocolError.js";
 import tracCryptoApi from "trac-crypto-api";
 import {createMessage} from "../../../../utils/buffer.js";
+import {bufferToAddress} from "../../../state/utils/address.js";
+import b4a from "b4a";
 
 class V1BaseConsensusOperation {
     #consensusValidationSchema;
-
+    #config;
     /**
      * Creates the base consensus validator with schema validation support.
      */
     constructor(config) {
         this.#consensusValidationSchema = new ConsensusValidationSchema(config);
+        this.#config = config;
     }
 
     /**
@@ -143,6 +146,17 @@ class V1BaseConsensusOperation {
             }
             default:
                 throw new V1ConsensusProtocolError(ConsensusResultCode.UNEXPECTED_ERROR, `Unknown operation type: ${payload.type}`);
+        }
+    }
+
+    /**
+     * Validates that the payload address resolves to the remote public key.
+     */
+    assertAddressWithRemotePublicKey(binaryAddress, remotePublicKey, context) {
+        const address = bufferToAddress(binaryAddress, this.#config.addressPrefix);
+        const publicKeyFromAddress = tracCryptoApi.address.decode(address);
+        if (!b4a.equals(publicKeyFromAddress, remotePublicKey)) {
+            throw new V1ConsensusProtocolError(ConsensusResultCode.UNEXPECTED_ERROR, `${context} address does not match remote public key.`);
         }
     }
 

@@ -102,43 +102,65 @@ test('V1EpochProofProposalApproval validateSignature does not validate approver 
     t.pass();
 });
 
-test('V1EpochProofProposalApproval rejects response when approval payload is tampered', async t => {
+test('V1EpochProofProposalApproval rejects approver address mismatched with remote public key', async t => {
+    const proposerWallet = await createWallet(testKeyPair1);
+    const approverWallet = await createWallet(testKeyPair2);
+    const otherWallet = await createWallet(testKeyPair3);
+    const validator = new V1EpochProofProposalApproval(config);
+    const proofProposalPayload = await buildProofProposalPayload(proposerWallet);
+    const approvalPayload = await buildProofProposalApprovalPayload(
+        approverWallet,
+        proofProposalPayload,
+        otherWallet.address
+    );
+
+    await t.exception(
+        async () => validator.validate(
+            approvalPayload,
+            {remotePublicKey: approverWallet.publicKey},
+            proofProposalPayload.proof_proposal
+        ),
+        errorMessageIncludes('approver address does not match remote public key')
+    );
+});
+
+test('V1EpochProofProposalApproval rejects fake approval signature message', async t => {
     const proposerWallet = await createWallet(testKeyPair1);
     const approverWallet = await createWallet(testKeyPair2);
     const validator = new V1EpochProofProposalApproval(config);
     const proofProposalPayload = await buildProofProposalPayload(proposerWallet);
     const approvalPayload = await buildProofProposalApprovalPayload(approverWallet, proofProposalPayload);
-    const tamperedApprover = b4a.from(approvalPayload.proof_proposal_response.approval.approver);
-    tamperedApprover[0] ^= 0xff;
+    const fakeApprover = b4a.from(approvalPayload.proof_proposal_response.approval.approver);
+    fakeApprover[0] ^= 0xff;
 
-    const tamperedApprovalPayload = {
+    const fakeApprovalPayload = {
         ...approvalPayload,
         proof_proposal_response: {
             ...approvalPayload.proof_proposal_response,
             approval: {
                 ...approvalPayload.proof_proposal_response.approval,
-                approver: tamperedApprover
+                approver: fakeApprover
             }
         }
     };
 
     await t.exception(
-        async () => validator.validate(
-            tamperedApprovalPayload,
-            {remotePublicKey: approverWallet.publicKey},
+        async () => validator.validateSignature(
+            fakeApprovalPayload,
+            approverWallet.publicKey,
             proofProposalPayload.proof_proposal
         ),
         errorMessageIncludes('signature verification failed')
     );
 });
 
-test('V1EpochProofProposalApproval rejects tampered response signature', async t => {
+test('V1EpochProofProposalApproval rejects fake response signature', async t => {
     const proposerWallet = await createWallet(testKeyPair1);
     const approverWallet = await createWallet(testKeyPair2);
     const validator = new V1EpochProofProposalApproval(config);
     const proofProposalPayload = await buildProofProposalPayload(proposerWallet);
     const approvalPayload = await buildProofProposalApprovalPayload(approverWallet, proofProposalPayload);
-    const tamperedApprovalPayload = {
+    const fakeApprovalPayload = {
         ...approvalPayload,
         proof_proposal_response: {
             ...approvalPayload.proof_proposal_response,
@@ -148,7 +170,7 @@ test('V1EpochProofProposalApproval rejects tampered response signature', async t
 
     await t.exception(
         async () => validator.validateResponseSignature(
-            tamperedApprovalPayload,
+            fakeApprovalPayload,
             approverWallet.publicKey
         ),
         errorMessageIncludes('response signature verification failed')

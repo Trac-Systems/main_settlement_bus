@@ -5,7 +5,6 @@ import {createMessage, safeWriteUInt32BE} from "../../../../utils/buffer.js";
 import tracCryptoApi from "trac-crypto-api";
 import b4a from "b4a";
 import {verifyWesolowski} from '@tracsystems/trac-vdf';
-import {bufferToAddress} from "../../../state/utils/address.js";
 
 class V1EpochProofProposalRequest extends V1BaseConsensusOperation {
     #config;
@@ -24,7 +23,7 @@ class V1EpochProofProposalRequest extends V1BaseConsensusOperation {
     async validate(payload, connection) {
         this.isPayloadSchemaValid(payload);
         this.validateProofProposalProtocolVersion(payload.proof_proposal);
-        this.assertAddressWithRemotePublicKey(payload.proof_proposal.proposer, connection.remotePublicKey);
+        this.assertAddressWithRemotePublicKey(payload.proof_proposal.proposer, connection.remotePublicKey, "Proposer");
         await this.validateProofProposalVdfParametersHash(payload.proof_proposal);
         await this.validateProofProposalVdfProof(payload.proof_proposal);
         await this.validateSignature(payload, connection.remotePublicKey);
@@ -87,17 +86,6 @@ class V1EpochProofProposalRequest extends V1BaseConsensusOperation {
                 ConsensusResultCode.UNEXPECTED_ERROR,
                 'VDF proof is invalid.'
             );
-        }
-    }
-
-    /**
-     * Validates that the proposer address resolves to the remote public key.
-     */
-    assertAddressWithRemotePublicKey(proposer, remotePublicKey) {
-        const address = bufferToAddress(proposer, this.#config.addressPrefix);
-        const publicKeyFromAddress = tracCryptoApi.address.decode(address);
-        if (!b4a.equals(publicKeyFromAddress, remotePublicKey)) {
-            throw new V1ConsensusProtocolError(ConsensusResultCode.UNEXPECTED_ERROR, 'Proposer address does not match remote public key.');
         }
     }
 }

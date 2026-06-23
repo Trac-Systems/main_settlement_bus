@@ -200,7 +200,7 @@ test('V1EpochProofProposalRequest accepts proposer address matching remote publi
     const validator = new V1EpochProofProposalRequest(vdfTestConfig);
     const proposer = addressToBuffer(wallet.address, vdfTestConfig.addressPrefix);
 
-    validator.assertAddressWithRemotePublicKey(proposer, wallet.publicKey);
+    validator.assertAddressWithRemotePublicKey(proposer, wallet.publicKey, 'Proposer');
 
     t.pass();
 });
@@ -212,7 +212,7 @@ test('V1EpochProofProposalRequest rejects proposer address mismatched with remot
     const proposer = addressToBuffer(wallet.address, vdfTestConfig.addressPrefix);
 
     t.exception(
-        () => validator.assertAddressWithRemotePublicKey(proposer, otherWallet.publicKey),
+        () => validator.assertAddressWithRemotePublicKey(proposer, otherWallet.publicKey, 'Proposer'),
         errorMessageIncludes('Proposer address does not match remote public key')
     );
 });
