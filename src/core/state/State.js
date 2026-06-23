@@ -230,12 +230,12 @@ class State extends ReadyResource {
         return Object.values(this.#base.system.indexers);
     }
 
-    async isKnownIndexer(publicKeyHex) {
+    async isKnownIndexer(target) {
         const entries = await this.getIndexersEntry();
         for (const entry of entries) {
-            const publicKeyBuffer = await this.getRegisteredWriterKey(b4a.toString(entry.key, 'hex'));
-            if (!publicKeyBuffer) continue;
-            if (b4a.toString(publicKeyBuffer, 'hex') === publicKeyHex) return true
+            const address = await this.get(EntryType.WRITER_ADDRESS + b4a.toString(entry.key, 'hex'));
+            const publicKeyBuffer = tracCryptoApi.address.decodeSafe(address)
+            if (b4a.equals(target, publicKeyBuffer)) return true
         }
         return false;
     }

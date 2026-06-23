@@ -248,7 +248,7 @@ class Network extends ReadyResource {
 
                 // Adds indexers to consensus connection manager
                 const remotePublicKeyHex = b4a.toString(connection.remotePublicKey, 'hex');
-                if (await this.#state.isKnownIndexer(remotePublicKeyHex)) {
+                if (await this.#state.isKnownIndexer(connection.remotePublicKey)) {
                     this.#indexerConnectionManager.add(remotePublicKeyHex, connection);
                 }
 
