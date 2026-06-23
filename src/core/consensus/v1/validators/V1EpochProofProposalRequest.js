@@ -4,6 +4,7 @@ import {ConsensusProtocolVersion, ConsensusResultCode} from "../../../../utils/c
 import {createMessage, safeWriteUInt32BE} from "../../../../utils/buffer.js";
 import tracCryptoApi from "trac-crypto-api";
 import b4a from "b4a";
+import {verifyWesolowski} from '@tracsystems/trac-vdf';
 
 class V1EpochProofProposalRequest extends V1BaseConsensusOperation {
     #config;
@@ -23,6 +24,7 @@ class V1EpochProofProposalRequest extends V1BaseConsensusOperation {
         this.isPayloadSchemaValid(payload);
         this.validateProofProposalProtocolVersion(payload.proof_proposal);
         await this.validateProofProposalVdfParametersHash(payload.proof_proposal);
+        await this.validateProofProposalVdfProof(payload.proof_proposal);
         await this.validateSignature(payload, connection.remotePublicKey);
     }
 
@@ -57,6 +59,32 @@ class V1EpochProofProposalRequest extends V1BaseConsensusOperation {
 
         if (!b4a.equals(proofProposal.vdf_parameters_hash, expectedHash)) {
             throw new V1ConsensusProtocolError(ConsensusResultCode.UNEXPECTED_ERROR, 'VDF parameters hash is invalid.');
+        }
+    }
+
+    /**
+     * Verifies the proof proposal VDF proof against its challenge data.
+     */
+    async validateProofProposalVdfProof(proofProposal) {
+        const challengeData = this.buildProofProposalChallengeData(proofProposal);
+
+        let verified = false;
+        try {
+            verified = await verifyWesolowski(
+                challengeData,
+                this.#config.vdfDifficulty,
+                proofProposal.vdf_proof,
+                this.#config.vdfDiscriminantSizeBits
+            );
+        } catch {
+            verified = false;
+        }
+
+        if (!verified) {
+            throw new V1ConsensusProtocolError(
+                ConsensusResultCode.UNEXPECTED_ERROR,
+                'VDF proof is invalid.'
+            );
         }
     }
 }
