@@ -1,6 +1,6 @@
 import { decodeConsensusMessage } from '../../../codecs/consensus/v1/consensusV1OperationCodec.js'
 import b4a from 'b4a'
-import { ConsensusOperationType } from '../../../utils/constants.js'
+import { ConsensusOperationType, CONSENSUS_MESSAGE_MAX_BYTE_SIZE } from '../../../utils/constants.js'
 import { publicKeyToAddress } from '../../../utils/helpers.js'
 import ConsensusEpochProofProposalOperationHandler from '../v1/handlers/ConsesusEpochProofProposalOperationHandler.js'
 
@@ -61,7 +61,7 @@ class ConsensusRouterV1 {
     }
 
     #preValidate(incomingMessage) {
-        return !(!incomingMessage || !b4a.isBuffer(incomingMessage) || incomingMessage.length === 0);
+        return !(!incomingMessage || !b4a.isBuffer(incomingMessage) || incomingMessage.length === 0 || incomingMessage.length > CONSENSUS_MESSAGE_MAX_BYTE_SIZE);
     }
 
     #disconnect(connection, reason) {
