@@ -3,24 +3,36 @@ import V1EpochProofProposalApproval from "../validators/V1EpochProofProposalAppr
 import {networkMessageFactory} from "../../../../messages/network/v1/networkMessageFactory.js";
 import b4a from "b4a";
 import { V1ProtocolError } from "../../../network/protocols/v1/V1ProtocolError.js";
-import { ResultCode } from "../../../../utils/constants.js";
+import { ConsensusResultCode, ResultCode } from "../../../../utils/constants.js";
 import DummyVDFVerifier from "../../services/DummyVDFVerifier.js";
+import { consensusMessageFactory } from "../../../../messages/consensus/v1/consensusMessageFactory.js";
+import { bufferToAddress } from "../../../state/utils/address.js";
 
 // Minion interface to verify & sign proposals
 class ConsensusEpochProofProposalOperationHandler {
     #requestValidator;
     #responseValidator;
+    #wallet;
+    #config;
     #state;
     #vdfVerifier;
 
-    constructor(state, _wallet, config) {
+    constructor(state, wallet, config) {
         this.#state = state;
+        this.#wallet = wallet;
+        this.#config = config;
         this.#vdfVerifier = new DummyVDFVerifier(); // TODO: Replace with a real VDF Verifier
         this.#requestValidator = new V1EpochProofProposalRequest(config);
         this.#responseValidator = new V1EpochProofProposalApproval(config);
     }
 
-    // leader requests approval to minion
+    /**
+     * Handles a leader's consensus v1 epoch proof proposal from the minion side.
+     * @param {object} message Decoded consensus v1 message containing `proof_proposal` and `session_id`.
+     * @param {object} connection Peer connection context used by the request validator.
+     * @returns {Promise<object>} Signed consensus v1 proof proposal response.
+     * @throws {V1ProtocolError|Error} If request validation or response building fails.
+     */
     async handleRequest(message, connection) {
         await this.#requestValidator.validate(message, connection);
         const proofProposal = message.proof_proposal;
@@ -29,7 +41,7 @@ class ConsensusEpochProofProposalOperationHandler {
         this.#validateEpochContinuity(proofProposal, currentEpoch);
         await this.#verifyVdf(proofProposal);
 
-        return proofProposal;
+        return await this.#buildProofProposalResponse(message.session_id, proofProposal);
     }
 
     // TODO: validates the response from line 61 to the end
@@ -103,6 +115,7 @@ class ConsensusEpochProofProposalOperationHandler {
         }
     }
 
+    // TODO: update this with trac-vdf
     async #verifyVdf(proofProposal) {
         const vdfIsValid = await this.#vdfVerifier.verify(proofProposal)
         if (!vdfIsValid) {
@@ -111,6 +124,26 @@ class ConsensusEpochProofProposalOperationHandler {
                 "VDF proof verification failed."
             );
         }
+    }
+
+    async #buildProofProposalResponse(sessionId, proofProposal) {
+        const proposer = bufferToAddress(proofProposal.proposer, this.#config.addressPrefix);
+
+        // TODO: In here we are basically getting some fields represented as buffers from
+        // the received proofProposal, converting them to numbers, just to convert them
+        // back to buffers internally. This should be optimized
+        return await consensusMessageFactory(this.#wallet, this.#config).buildProofProposalResponse(
+            sessionId,
+            proofProposal.network_id.readUInt16BE(0),
+            proofProposal.epoch.readBigUInt64BE(0),
+            proofProposal.previous_epoch_record_hash,
+            proposer,
+            proofProposal.vdf_parameters_hash,
+            proofProposal.vdf_proof,
+            proofProposal.signature,
+            ConsensusResultCode.OK,
+            this.#wallet.address
+        );
     }
 }
 

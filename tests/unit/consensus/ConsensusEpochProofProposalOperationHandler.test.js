@@ -1,12 +1,23 @@
 import test from 'brittle';
 import b4a from 'b4a';
+import { WalletProvider } from 'trac-wallet';
 
 import ConsensusEpochProofProposalOperationHandler from '../../../src/core/consensus/v1/handlers/ConsesusEpochProofProposalOperationHandler.js';
 import V1EpochProofProposalRequest from '../../../src/core/consensus/v1/validators/V1EpochProofProposalRequest.js';
 import consensusV1OperationFixtures from '../../fixtures/consensusV1Operation.fixtures.js';
 import { config } from '../../helpers/config.js';
 import { errorMessageIncludes } from '../../helpers/regexHelper.js';
-import { VDF_BLOB_PROOF_SIZE } from '../../../src/utils/constants.js';
+import {
+    ConsensusOperationType,
+    ConsensusResultCode,
+    VDF_BLOB_PROOF_SIZE
+} from '../../../src/utils/constants.js';
+import { addressToBuffer } from '../../../src/core/state/utils/address.js';
+import {
+    verifyProofProposalApprovalSignature,
+    verifyProofProposalResponseSignature
+} from '../../../src/utils/consensus/v1/epochProofProposalSignatureUtils.js';
+import { testKeyPair2 } from '../../fixtures/apply.fixtures.js';
 
 const originalRequestValidate = V1EpochProofProposalRequest.prototype.validate;
 
@@ -14,12 +25,16 @@ function restoreValidator() {
     V1EpochProofProposalRequest.prototype.validate = originalRequestValidate;
 }
 
-function setupHandler(t, validate, state = {}) {
+async function createWallet(keyPair) {
+    return await new WalletProvider(config).fromSecretKey(keyPair.secretKey);
+}
+
+function setupHandler(t, validate, state = {}, wallet = {}) {
     restoreValidator();
     t.teardown(restoreValidator);
     V1EpochProofProposalRequest.prototype.validate = validate;
 
-    return new ConsensusEpochProofProposalOperationHandler(state, {}, config);
+    return new ConsensusEpochProofProposalOperationHandler(state, wallet, config);
 }
 
 function currentEpochFor(proofProposal, overrides = {}) {
@@ -51,14 +66,15 @@ function connection() {
     };
 }
 
-test('handleRequest validates consensus proof proposal and returns the extracted payload', async t => {
+test('handleRequest validates consensus proof proposal and returns a signed approval response', async t => {
+    const wallet = await createWallet(testKeyPair2);
     const conn = connection();
     const message = { ...consensusV1OperationFixtures.proofProposalHeader };
     const state = {
         currentEpoch: async () => currentEpochFor(message.proof_proposal)
     };
     let validatorPayload;
-    let validatorRemotePublicKey;
+    let validatorConnection;
 
     Object.defineProperty(message, 'epoch_proof_proposal_request', {
         get() {
@@ -66,17 +82,27 @@ test('handleRequest validates consensus proof proposal and returns the extracted
         }
     });
 
-    const handler = setupHandler(t, async (payload, remotePublicKey) => {
+    const handler = setupHandler(t, async (payload, connection) => {
         validatorPayload = payload;
-        validatorRemotePublicKey = remotePublicKey;
+        validatorConnection = connection;
         return true;
-    }, state);
+    }, state, wallet);
 
     const result = await handler.handleRequest(message, conn);
 
     t.is(validatorPayload, message);
-    t.alike(validatorRemotePublicKey, conn.remotePublicKey);
-    t.alike(result, message.proof_proposal);
+    t.is(validatorConnection, conn);
+    t.is(result.type, ConsensusOperationType.PROOF_PROPOSAL_RESPONSE);
+    t.is(result.session_id, message.session_id);
+
+    const proofProposalResponse = result.proof_proposal_response;
+    t.is(proofProposalResponse.result, ConsensusResultCode.OK);
+    t.alike(proofProposalResponse.approval.approver, addressToBuffer(wallet.address, config.addressPrefix));
+    t.ok(await verifyProofProposalApprovalSignature(
+        message.proof_proposal,
+        proofProposalResponse.approval
+    ));
+    t.ok(await verifyProofProposalResponseSignature(proofProposalResponse));
 });
 
 test('handleRequest stops when request validation fails', async t => {
