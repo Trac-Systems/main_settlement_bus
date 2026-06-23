@@ -1,6 +1,9 @@
 import V1BaseConsensusOperation from "./V1BaseConsensusOperation.js";
 import {V1ConsensusProtocolError} from "../V1ConsensusProtocolError.js";
 import {ConsensusProtocolVersion, ConsensusResultCode} from "../../../../utils/constants.js";
+import {createMessage, safeWriteUInt32BE} from "../../../../utils/buffer.js";
+import tracCryptoApi from "trac-crypto-api";
+import b4a from "b4a";
 
 class V1EpochProofProposalRequest extends V1BaseConsensusOperation {
     #config;
@@ -19,6 +22,7 @@ class V1EpochProofProposalRequest extends V1BaseConsensusOperation {
     async validate(payload, connection) {
         this.isPayloadSchemaValid(payload);
         this.validateProofProposalProtocolVersion(payload.proof_proposal);
+        await this.validateProofProposalVdfParametersHash(payload.proof_proposal);
         await this.validateSignature(payload, connection.remotePublicKey);
     }
 
@@ -35,5 +39,26 @@ class V1EpochProofProposalRequest extends V1BaseConsensusOperation {
         }
     }
 
+    /**
+     * Validates that the proof proposal VDF parameters hash matches local config.
+     */
+    async validateProofProposalVdfParametersHash(proofProposal) {
+        const message = createMessage(
+            safeWriteUInt32BE(this.#config.vdfDifficulty, 0),
+            safeWriteUInt32BE(this.#config.vdfDiscriminantSizeBits, 0)
+        );
+
+        let expectedHash;
+        try {
+            expectedHash = await tracCryptoApi.hash.blake3(message);
+        } catch {
+            throw new V1ConsensusProtocolError(ConsensusResultCode.UNEXPECTED_ERROR, 'Failed to hash VDF parameters.');
+        }
+
+        if (!b4a.equals(proofProposal.vdf_parameters_hash, expectedHash)) {
+            throw new V1ConsensusProtocolError(ConsensusResultCode.UNEXPECTED_ERROR, 'VDF parameters hash is invalid.');
+        }
+    }
+}
 
 export default V1EpochProofProposalRequest;

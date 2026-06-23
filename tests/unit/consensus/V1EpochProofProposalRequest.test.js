@@ -1,9 +1,11 @@
 import test from 'brittle';
 import b4a from 'b4a';
 import {WalletProvider} from 'trac-wallet';
+import tracCryptoApi from 'trac-crypto-api';
 
 import ConsensusMessageBuilder from '../../../src/messages/consensus/v1/ConsensusMessageBuilder.js';
 import V1EpochProofProposalRequest from '../../../src/core/consensus/v1/validators/V1EpochProofProposalRequest.js';
+import {createMessage, safeWriteUInt32BE} from '../../../src/utils/buffer.js';
 import {
     ConsensusOperationType,
     ConsensusProtocolVersion,
@@ -17,8 +19,18 @@ async function createWallet(keyPair = testKeyPair1) {
     return await new WalletProvider(config).fromSecretKey(keyPair.secretKey);
 }
 
+async function buildVdfParametersHash() {
+    const message = createMessage(
+        safeWriteUInt32BE(config.vdfDifficulty, 0),
+        safeWriteUInt32BE(config.vdfDiscriminantSizeBits, 0)
+    );
+
+    return await tracCryptoApi.hash.blake3(message);
+}
+
 async function buildProofProposalPayload(wallet) {
     const builder = new ConsensusMessageBuilder(wallet, config);
+    const vdfParametersHash = await buildVdfParametersHash();
 
     await builder
         .setType(ConsensusOperationType.PROOF_PROPOSAL)
@@ -29,7 +41,7 @@ async function buildProofProposalPayload(wallet) {
         .setEpoch(1)
         .setPreviousEpochRecordHash(b4a.alloc(32, 1))
         .setProposer(wallet.address)
-        .setVdfParametersHash(b4a.alloc(32, 2))
+        .setVdfParametersHash(vdfParametersHash)
         .setVdfProof(b4a.alloc(VDF_BLOB_PROOF_SIZE, 3))
         .buildPayload();
 
@@ -68,5 +80,41 @@ test('V1EpochProofProposalRequest rejects proof proposal with mismatched signatu
     await t.exception(
         async () => validator.validate(fakePayload, {remotePublicKey: wallet.publicKey}),
         errorMessageIncludes('signature verification failed')
+    );
+});
+
+test('V1EpochProofProposalRequest rejects unsupported proof proposal protocol version', async t => {
+    const wallet = await createWallet();
+    const validator = new V1EpochProofProposalRequest(config);
+    const payload = await buildProofProposalPayload(wallet);
+    const fakePayload = {
+        ...payload,
+        proof_proposal: {
+            ...payload.proof_proposal,
+            protocol_version: b4a.from([2])
+        }
+    };
+
+    await t.exception(
+        async () => validator.validate(fakePayload, {remotePublicKey: wallet.publicKey}),
+        errorMessageIncludes('Unsupported proof proposal protocol version')
+    );
+});
+
+test('V1EpochProofProposalRequest rejects invalid VDF parameters hash', async t => {
+    const wallet = await createWallet();
+    const validator = new V1EpochProofProposalRequest(config);
+    const payload = await buildProofProposalPayload(wallet);
+    const fakePayload = {
+        ...payload,
+        proof_proposal: {
+            ...payload.proof_proposal,
+            vdf_parameters_hash: b4a.alloc(32, 9)
+        }
+    };
+
+    await t.exception(
+        async () => validator.validate(fakePayload, {remotePublicKey: wallet.publicKey}),
+        errorMessageIncludes('VDF parameters hash is invalid')
     );
 });
