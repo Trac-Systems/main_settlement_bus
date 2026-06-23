@@ -1,6 +1,7 @@
 import {ConsensusOperationType, ResultCode} from '../../../utils/constants.js';
 import {isHexString, publicKeyToAddress} from '../../../utils/helpers.js';
 import {V1ProtocolError} from "../../network/protocols/v1/V1ProtocolError.js";
+import b4a from 'b4a';
 
 const PEER_PUBLIC_KEY_HEX_LENGTH = 64;
 
@@ -42,6 +43,12 @@ export default class IndexerPendingRequestService {
         }
     }
 
+    #extractProposalHash(message) {
+        if (message.type !== ConsensusOperationType.PROOF_PROPOSAL) return null;
+        const hash = message.proof_proposal?.hash;
+        return b4a.isBuffer(hash) ? hash : null;
+    }
+
     /*
     @returns {Promise}
     */
@@ -61,12 +68,7 @@ export default class IndexerPendingRequestService {
             id: id,
             requestType: message.type,
             requestedTo: peerPubKeyHex,
-            // TODO: requestEpochProofProposalHash — needed by V1EpochProofProposalResponse.validateProposalSignature.
-            // Hash is computed inside ConsensusMessageBuilder but not exposed in getResult().
-            // Options: 
-            //  (A) expose hash in message via ConsensusMessageBuilder, 
-            //  (B) add as third param to registerPendingRequest.
-            // requestEpochProofProposalHash: /* hash here, depending on option chosed */,
+            requestEpochProofProposalHash: this.#extractProposalHash(message),
             timeoutId: null,
             resolve: null,
             reject: null,
