@@ -334,7 +334,7 @@ class Network extends ReadyResource {
         if (this.#swarm?.peers?.has(publicKeyHex)) {
             const peerInfo = this.#swarm.peers.get(publicKeyHex);
             const connection = this.#swarm._allConnections.get(peerInfo.publicKey);
-            this.#indexerConnectionManager.add(publicKeyHex, connection);
+            this.#indexerConnectionManager.add(peerInfo.publicKey, connection);
         }
     }
 
@@ -368,7 +368,7 @@ class Network extends ReadyResource {
 
         if (isTrackedIndexer) {
             this.#logger.debug(`Network.disconnectIndexerPeer: detaching tracked indexer ${publicKeyHex}. Reason: ${reason}`);
-            this.#indexerConnectionManager.remove(publicKeyHex);
+            this.#indexerConnectionManager.remove(publicKey);
         }
 
         return isTrackedIndexer;
