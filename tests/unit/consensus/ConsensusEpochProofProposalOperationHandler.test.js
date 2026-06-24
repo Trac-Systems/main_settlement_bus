@@ -4,6 +4,7 @@ import { WalletProvider } from 'trac-wallet';
 
 import ConsensusEpochProofProposalOperationHandler from '../../../src/core/consensus/v1/handlers/ConsesusEpochProofProposalOperationHandler.js';
 import V1EpochProofProposalRequest from '../../../src/core/consensus/v1/validators/V1EpochProofProposalRequest.js';
+import V1EpochProofProposalResponse from '../../../src/core/consensus/v1/validators/V1EpochProofProposalResponse.js';
 import consensusV1OperationFixtures from '../../fixtures/consensusV1Operation.fixtures.js';
 import { config } from '../../helpers/config.js';
 import { errorMessageIncludes } from '../../helpers/regexHelper.js';
@@ -20,19 +21,22 @@ import {
 import { testKeyPair2 } from '../../fixtures/apply.fixtures.js';
 
 const originalRequestValidate = V1EpochProofProposalRequest.prototype.validate;
+const originalResponseValidate = V1EpochProofProposalResponse.prototype.validate;
 
 function restoreValidator() {
     V1EpochProofProposalRequest.prototype.validate = originalRequestValidate;
+    V1EpochProofProposalResponse.prototype.validate = originalResponseValidate;
 }
 
 async function createWallet(keyPair) {
     return await new WalletProvider(config).fromSecretKey(keyPair.secretKey);
 }
 
-function setupHandler(t, validate, state = {}, wallet = {}) {
+function setupHandler(t, validate, state = {}, wallet = {}, responseValidate = async () => true) {
     restoreValidator();
     t.teardown(restoreValidator);
     V1EpochProofProposalRequest.prototype.validate = validate;
+    V1EpochProofProposalResponse.prototype.validate = responseValidate;
 
     return new ConsensusEpochProofProposalOperationHandler(state, wallet, config);
 }
@@ -176,4 +180,57 @@ test('handleRequest rejects proof proposals with invalid VDF proof data', async 
         async () => handler.handleRequest(message, conn),
         errorMessageIncludes('VDF proof verification failed')
     );
+});
+
+test('handleResponse validates consensus proof proposal response and returns approval', async t => {
+    const conn = connection();
+    const message = { ...consensusV1OperationFixtures.proofProposalResponseHeader };
+    let validatorPayload;
+    let validatorConnection;
+    const handler = setupHandler(
+        t,
+        async () => true,
+        {},
+        {},
+        async (payload, connection) => {
+            validatorPayload = payload;
+            validatorConnection = connection;
+            return true;
+        }
+    );
+
+    const result = await handler.handleResponse(message, conn);
+
+    t.is(validatorPayload, message);
+    t.is(validatorConnection, conn);
+    t.alike(result, message.proof_proposal_response.approval);
+});
+
+test('handleResponse stops when response validation fails', async t => {
+    const conn = connection();
+    const message = { ...consensusV1OperationFixtures.proofProposalResponseHeader };
+    let approvalRead = false;
+
+    Object.defineProperty(message, 'proof_proposal_response', {
+        get() {
+            approvalRead = true;
+            throw new Error('approval should not be read after validation failure');
+        }
+    });
+
+    const handler = setupHandler(
+        t,
+        async () => true,
+        {},
+        {},
+        async () => {
+            throw new Error('response validation failed');
+        }
+    );
+
+    await t.exception(
+        async () => handler.handleResponse(message, conn),
+        errorMessageIncludes('response validation failed')
+    );
+    t.absent(approvalRead);
 });

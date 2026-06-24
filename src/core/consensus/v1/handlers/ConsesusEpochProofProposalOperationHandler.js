@@ -44,37 +44,17 @@ class ConsensusEpochProofProposalOperationHandler {
         return await this.#buildProofProposalResponse(message.session_id, proofProposal);
     }
 
-    // TODO: validates the response from line 61 to the end
-    // is valid signature and is a valid approver
+    /**
+     * Handles a minion's consensus v1 epoch proof proposal response from the leader side.
+     *
+     * @param {object} message Decoded consensus v1 message containing `proof_proposal_response`.
+     * @param {object} connection Peer connection context used by the response validator.
+     * @returns {Promise<object>} Validated proof proposal approval.
+     * @throws {V1ProtocolError|Error} If response validation fails.
+     */
     async handleResponse(message, connection) {
-        try {
-            this.applyRateLimit(connection);
-            await this.resolvePendingResponse(
-                message,
-                connection,
-                this.#responseValidator,
-                this.#extractEpochProofProposalResponse
-            );
-        } catch (error) {
-            this.handlePendingResponseError(
-                message.id,
-                connection,
-                error,
-                "Failed to process epoch proof proposal response from sender"
-            );
-        }
-
-        // handle the response
-    }
-
-    #extractEpochProofProposalResponse(payload) {
-        return {
-            code: payload.epoch_proof_proposal_response.result,
-            result: {
-                approver: payload.epoch_proof_proposal_response.approver,
-                signature: payload.epoch_proof_proposal_response.signature
-            }
-        };
+        await this.#responseValidator.validate(message, connection);
+        return message.proof_proposal_response.approval;
     }
 
     #validateEpochContinuity(proofProposal, currentEpoch) {
