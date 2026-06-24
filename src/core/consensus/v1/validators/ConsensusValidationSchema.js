@@ -120,7 +120,7 @@ class ConsensusValidationSchema {
             type: {
                 type: 'number',
                 integer: true,
-                equal: ConsensusOperationType.PROOF_PROPOSAL_RESPONSE,
+                equal: ConsensusOperationType.PROOF_PROPOSAL_APPROVAL,
                 required: true
             },
             session_id: {type: 'string', min: 1, max: 64, required: true},

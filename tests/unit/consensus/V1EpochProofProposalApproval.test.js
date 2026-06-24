@@ -72,7 +72,7 @@ async function buildProofProposalRejectionPayload(approverWallet, proofProposalP
     const responseHash = await tracCryptoApi.hash.blake3(responseMessage);
 
     return {
-        type: ConsensusOperationType.PROOF_PROPOSAL_RESPONSE,
+        type: ConsensusOperationType.PROOF_PROPOSAL_APPROVAL,
         session_id: proofProposalPayload.session_id,
         timestamp: Date.now(),
         proof_proposal_response: {

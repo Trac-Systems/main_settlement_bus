@@ -94,7 +94,7 @@ test('ConsensusMessageBuilder iterates proof proposal response ResultCode values
 
     for (const code of uniqueResultCodes()) {
         await builder
-            .setType(ConsensusOperationType.PROOF_PROPOSAL_RESPONSE)
+            .setType(ConsensusOperationType.PROOF_PROPOSAL_APPROVAL)
             .setSessionId(header.session_id)
             .setTimestamp()
             .setProtocolVersion(proofProposalFixture.protocol_version[0])
@@ -110,7 +110,7 @@ test('ConsensusMessageBuilder iterates proof proposal response ResultCode values
             .buildPayload();
 
         const payload = builder.getResult();
-        t.is(payload.type, ConsensusOperationType.PROOF_PROPOSAL_RESPONSE);
+        t.is(payload.type, ConsensusOperationType.PROOF_PROPOSAL_APPROVAL);
         t.is(payload.proof_proposal_response.result, code);
         t.alike(payload.proof_proposal_response.approval.approver, proofProposalFixture.proposer);
         t.ok(b4a.isBuffer(payload.proof_proposal_response.approval.approval_sig));
@@ -153,6 +153,11 @@ test('ConsensusMessageBuilder rejects invalid header fields and premature result
 
     t.exception(
         () => builder.setType(undefined),
+        errorMessageIncludes('Invalid consensus operation type')
+    );
+
+    t.exception(
+        () => builder.setType(ConsensusOperationType.UNSPECIFIED),
         errorMessageIncludes('Invalid consensus operation type')
     );
 
@@ -422,7 +427,7 @@ test('ConsensusMessageBuilder rejects missing fields before build result is avai
     const responseBuilder = new ConsensusMessageBuilder(wallet, config);
     await t.exception(
         () => responseBuilder
-            .setType(ConsensusOperationType.PROOF_PROPOSAL_RESPONSE)
+            .setType(ConsensusOperationType.PROOF_PROPOSAL_APPROVAL)
             .setSessionId(header.session_id)
             .setTimestamp()
             .setProtocolVersion(proofProposalFixture.protocol_version[0])

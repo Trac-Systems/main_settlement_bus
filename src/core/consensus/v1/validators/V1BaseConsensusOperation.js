@@ -67,14 +67,13 @@ class V1BaseConsensusOperation {
                 'Operation type must be an integer.'
             );
         }
-        if (type === 0) {
-            throw new V1ConsensusProtocolError(
-                ConsensusResultCode.UNEXPECTED_ERROR,
-                'Operation type is unspecified.'
-            );
-        }
 
         switch (type) {
+            case ConsensusOperationType.UNSPECIFIED:
+                throw new V1ConsensusProtocolError(
+                    ConsensusResultCode.UNEXPECTED_ERROR,
+                    'Operation type is unspecified.'
+                );
             case ConsensusOperationType.PROOF_PROPOSAL:
                 return this.#consensusValidationSchema.validateConsensusV1ProofProposal.bind(this.#consensusValidationSchema);
             case ConsensusOperationType.PROOF_PROPOSAL_APPROVAL:
@@ -148,14 +147,13 @@ class V1BaseConsensusOperation {
                 'Operation type must be an integer.'
             );
         }
-        if (payload.type === 0) {
-            throw new V1ConsensusProtocolError(
-                ConsensusResultCode.UNEXPECTED_ERROR,
-                'Operation type is unspecified.'
-            );
-        }
 
         switch (payload.type) {
+            case ConsensusOperationType.UNSPECIFIED:
+                throw new V1ConsensusProtocolError(
+                    ConsensusResultCode.UNEXPECTED_ERROR,
+                    'Operation type is unspecified.'
+                );
             case ConsensusOperationType.PROOF_PROPOSAL: {
                 const proofProposal = payload.proof_proposal;
                 const challengeData = this.buildProofProposalChallengeData(proofProposal);
