@@ -2,7 +2,7 @@ import { test } from 'brittle';
 import sinon from 'sinon';
 import b4a from 'b4a';
 import EventEmitter from 'bare-events';
-import { CONNECTION_STATUS } from '../../../src/utils/constants.js';
+import { CONNECTION_STATUS, CustomEventType } from '../../../src/utils/constants.js';
 
 const isBareRuntime = typeof globalThis.Bare !== 'undefined';
 
@@ -150,6 +150,7 @@ async function loadNetwork() {
     const Network = NetworkModule.default;
     const config = {
         enableWallet: true,
+        addressPrefix: 'trac',
         connectTimeoutMs: 1_000,
         maxPendingConnections: 10,
         maxValidators: 5,
@@ -168,16 +169,13 @@ async function loadNetwork() {
     };
 
     const store = new CorestoreMock();
-    const state = {
-        on() {},
-        removeAllListeners() {},
-        isAdmin: async () => false,
-        isIndexer: () => false,
-    };
+    const state = new EventEmitter();
+    state.isAdmin = async () => false;
+    state.isIndexer = () => false;
     const network = new Network(state, store, config, wallet);
     await network.ready()
 
-    return { network, store, swarmInstance, connectionManagerInstance };
+    return { network, store, swarmInstance, connectionManagerInstance, state };
 }
 
 if (isBareRuntime) {
@@ -230,6 +228,27 @@ if (isBareRuntime) {
         t.absent(disconnected, 'non-validator peer should be ignored by validator disconnect helper');
         t.ok(network.isConnectionPending(publicKey), 'non-validator pending connection should remain tracked');
         t.is(swarmInstance.leavePeer.callCount, 0, 'generic peer should not be left');
+        t.teardown(async () => await network.close());
+    });
+
+    test('Network disconnects validator peers when state role events invalidate them', async t => {
+        const publicKey = 'd'.repeat(64);
+        const publicKeyBuffer = b4a.from(publicKey, 'hex');
+        const { network, swarmInstance, connectionManagerInstance, state } = await loadNetwork();
+
+        connectionManagerInstance.addValidator(publicKey);
+        swarmInstance.peers.set(publicKey, { publicKey: publicKeyBuffer });
+
+        state.emit(CustomEventType.UNWRITABLE, publicKeyBuffer);
+        t.absent(connectionManagerInstance.exists(publicKey), 'unwritable peer should be removed from validator pool');
+        t.is(swarmInstance.leavePeer.callCount, 1, 'unwritable peer should be removed from explicit peer tracking');
+
+        connectionManagerInstance.addValidator(publicKey);
+        swarmInstance.peers.set(publicKey, { publicKey: publicKeyBuffer });
+
+        state.emit(CustomEventType.IS_INDEXER, publicKeyBuffer);
+        t.absent(connectionManagerInstance.exists(publicKey), 'promoted indexer should be removed from validator pool');
+        t.is(swarmInstance.leavePeer.callCount, 2, 'promoted indexer should be removed from explicit peer tracking');
         t.teardown(async () => await network.close());
     });
 }
