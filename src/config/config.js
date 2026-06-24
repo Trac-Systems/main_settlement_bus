@@ -108,7 +108,6 @@ export class Config {
     }
 
     get maxIndexers() {
-        if (this.#isOverriden('maxIndexers')) return this.#options.maxIndexers
         return this.#config.maxIndexers
     }
 
