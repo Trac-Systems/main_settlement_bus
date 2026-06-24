@@ -24,11 +24,13 @@ const configData = {
         pollInterval: 500, // Validator observer poll interval
         adminCacheTTL: 10_000, // Admin cache TTL ms
         validatorConnectionAttemptDelay: 5, // Delay between validator connection attempts (ms)
+        connectTimeoutMs: 5_000,
         bootstrapTimeout: 60_000, // time used (ms) to connect to new validators at bootstrap
         writersShortCacheTTL: 10_000, // short TTL during bootstrap
         writersLongCacheTTL: 120_000, // long TTL after bootstrap
         maxValidators: 50,
         maxIndexers: 14,
+        maxPendingConnections: 50,
         maxWritersForAdminIndexerConnection: 10, // Connectivity constants
         disableRateLimit: false,
         enableErrorApplyLogs: true,
@@ -78,11 +80,13 @@ const configData = {
         pollInterval: 500, // Validator observer poll interval
         adminCacheTTL: 3_600_000, // Admin cache TTL ms
         validatorConnectionAttemptDelay: 5, // Delay between validator connection attempts (ms)
+        connectTimeoutMs: 5_000,
         bootstrapTimeout: 120_000, // time used (ms) to connect to new validators at bootstrap
         writersShortCacheTTL: 2_000, // short TTL during bootstrap
         writersLongCacheTTL: 120_000, // long TTL after bootstrap
         maxValidators: 50,
         maxIndexers: 14,
+        maxPendingConnections: 50,
         maxWritersForAdminIndexerConnection: 10, // Connectivity constants
         disableRateLimit: false,
         enableErrorApplyLogs: false,
@@ -132,11 +136,13 @@ const configData = {
         pollInterval: 500, // Validator observer poll interval
         adminCacheTTL: 60_000, // Admin cache TTL ms
         validatorConnectionAttemptDelay: 5, // Delay between validator connection attempts (ms)
+        connectTimeoutMs: 5_000,
         bootstrapTimeout: 30_000,  // time used (ms) to connect to new validators at bootstrap
         writersShortCacheTTL: 1_000, // short TTL during bootstrap
         writersLongCacheTTL: 2_000, // long TTL after bootstrap
         maxValidators: 10,
         maxIndexers: 14,
+        maxPendingConnections: 50,
         maxWritersForAdminIndexerConnection: 10, // Connectivity constants
         disableRateLimit: false,
         enableErrorApplyLogs: true,

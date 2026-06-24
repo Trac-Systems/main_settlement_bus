@@ -37,8 +37,6 @@ class Network extends ReadyResource {
     #validatorMessageOrchestrator;
     #config;
     #pendingConnections;
-    #connectTimeoutMs;
-    #maxPendingConnections;
     #rateLimiter;
     #pendingRequestsService;
     #transactionCommitService;
@@ -65,8 +63,6 @@ class Network extends ReadyResource {
         this.#state = state
         this.#store = store
         this.#wallet = wallet
-        this.#connectTimeoutMs = config.connectTimeoutMs || 5000;
-        this.#maxPendingConnections = config.maxPendingConnections || 50;
         this.#pendingConnections = new Map();
         this.#transactionCommitService = new TransactionCommitService(this.#config);
         this.#transactionPoolService = new TransactionPoolService(state, wallet?.address, this.#transactionCommitService ,this.#config);
@@ -387,15 +383,15 @@ class Network extends ReadyResource {
 
     async tryConnect(publicKey, type = null) {
         if (this.#swarm === null) throw new Error('Network swarm is not initialized');
-        if (this.#pendingConnections.has(publicKey) || this.#pendingConnections.size >= this.#maxPendingConnections) {
+        if (this.#pendingConnections.has(publicKey) || this.#pendingConnections.size >= this.#config.maxPendingConnections) {
             this.#logger.debug(`Network.tryConnect: Connection to peer: ${publicKey} as type: ${type} is already pending or max pending connections reached.`);
             return CONNECTION_STATUS.IGNORED;
         }
 
         const timeoutId = setTimeout(() => {
             if (!this.#pendingConnections.has(publicKey)) return;
-            this.emit(EventType.VALIDATOR_CONNECTION_TIMEOUT, { publicKey, type, timeoutMs: this.#connectTimeoutMs });
-        }, this.#connectTimeoutMs);
+            this.emit(EventType.VALIDATOR_CONNECTION_TIMEOUT, { publicKey, type, timeoutMs: this.#config.connectTimeoutMs });
+        }, this.#config.connectTimeoutMs);
         this.#pendingConnections.set(publicKey, { type, timeoutId });
 
         const target = b4a.from(publicKey, 'hex');
