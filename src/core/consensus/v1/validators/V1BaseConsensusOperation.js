@@ -27,13 +27,19 @@ class V1BaseConsensusOperation {
      */
     isPayloadSchemaValid(payload) {
         if (_.isNil(payload?.type)) {
-            throw new V1ConsensusProtocolError(ConsensusResultCode.UNEXPECTED_ERROR,'Payload or payload type is missing.');
+            throw new V1ConsensusProtocolError(
+                ConsensusResultCode.UNEXPECTED_ERROR,
+                'Payload or payload type is missing.'
+            );
         }
 
         const selectedValidator = this.#selectCheckSchemaValidator(payload.type);
         const isPayloadValid = selectedValidator(payload);
         if (!isPayloadValid) {
-            throw new V1ConsensusProtocolError(ConsensusResultCode.UNEXPECTED_ERROR, 'Payload is invalid.');
+            throw new V1ConsensusProtocolError(
+                ConsensusResultCode.UNEXPECTED_ERROR,
+                'Payload is invalid.'
+            );
         }
     }
 
@@ -56,10 +62,16 @@ class V1BaseConsensusOperation {
      */
     #selectCheckSchemaValidator(type) {
         if (!Number.isInteger(type)) {
-            throw new V1ConsensusProtocolError(ConsensusResultCode.UNEXPECTED_ERROR, 'Operation type must be an integer.');
+            throw new V1ConsensusProtocolError(
+                ConsensusResultCode.UNEXPECTED_ERROR,
+                'Operation type must be an integer.'
+            );
         }
         if (type === 0) {
-            throw new V1ConsensusProtocolError(ConsensusResultCode.UNEXPECTED_ERROR, 'Operation type is unspecified.');
+            throw new V1ConsensusProtocolError(
+                ConsensusResultCode.UNEXPECTED_ERROR,
+                'Operation type is unspecified.'
+            );
         }
 
         switch (type) {
@@ -68,7 +80,10 @@ class V1BaseConsensusOperation {
             case ConsensusOperationType.PROOF_PROPOSAL_APPROVAL:
                 return this.#consensusValidationSchema.validateV1EpochProofProposalResponse.bind(this.#consensusValidationSchema);
             default:
-                throw new V1ConsensusProtocolError(ConsensusResultCode.UNEXPECTED_ERROR, `Unknown operation type: ${type}`);
+                throw new V1ConsensusProtocolError(
+                    ConsensusResultCode.UNEXPECTED_ERROR,
+                    `Unknown operation type: ${type}`
+                );
         }
     }
 
@@ -86,18 +101,27 @@ class V1BaseConsensusOperation {
             if (error instanceof V1ConsensusProtocolError) {
                 throw error;
             }
-            throw new V1ConsensusProtocolError(ConsensusResultCode.UNEXPECTED_ERROR, `Failed to build signature message: ${error.message}`);
+            throw new V1ConsensusProtocolError(
+                ConsensusResultCode.UNEXPECTED_ERROR,
+                `Failed to build signature message: ${error.message}`
+            );
         }
 
         if (!remotePublicKey) {
-            throw new V1ConsensusProtocolError(ConsensusResultCode.UNEXPECTED_ERROR, 'Remote public key is missing.');
+            throw new V1ConsensusProtocolError(
+                ConsensusResultCode.UNEXPECTED_ERROR,
+                'Remote public key is missing.'
+            );
         }
 
         let hash;
         try {
             hash = await tracCryptoApi.hash.blake3(message);
         } catch {
-            throw new V1ConsensusProtocolError(ConsensusResultCode.UNEXPECTED_ERROR, 'Failed to hash signature message.');
+            throw new V1ConsensusProtocolError(
+                ConsensusResultCode.UNEXPECTED_ERROR,
+                'Failed to hash signature message.'
+            );
         }
 
         let verified = false;
@@ -107,7 +131,10 @@ class V1BaseConsensusOperation {
             verified = false;
         }
         if (!verified) {
-            throw new V1ConsensusProtocolError(ConsensusResultCode.UNEXPECTED_ERROR, 'signature verification failed.');
+            throw new V1ConsensusProtocolError(
+                ConsensusResultCode.UNEXPECTED_ERROR,
+                'signature verification failed.'
+            );
         }
     }
 
@@ -116,10 +143,16 @@ class V1BaseConsensusOperation {
      */
     #buildSignatureMessage(payload, proofProposalContext) {
         if (!Number.isInteger(payload.type)) {
-            throw new V1ConsensusProtocolError(ConsensusResultCode.UNEXPECTED_ERROR, 'Operation type must be an integer.');
+            throw new V1ConsensusProtocolError(
+                ConsensusResultCode.UNEXPECTED_ERROR,
+                'Operation type must be an integer.'
+            );
         }
         if (payload.type === 0) {
-            throw new V1ConsensusProtocolError(ConsensusResultCode.UNEXPECTED_ERROR, 'Operation type is unspecified.');
+            throw new V1ConsensusProtocolError(
+                ConsensusResultCode.UNEXPECTED_ERROR,
+                'Operation type is unspecified.'
+            );
         }
 
         switch (payload.type) {
@@ -145,7 +178,10 @@ class V1BaseConsensusOperation {
                 return {signature: approval.approval_sig, message};
             }
             default:
-                throw new V1ConsensusProtocolError(ConsensusResultCode.UNEXPECTED_ERROR, `Unknown operation type: ${payload.type}`);
+                throw new V1ConsensusProtocolError(
+                    ConsensusResultCode.UNEXPECTED_ERROR,
+                    `Unknown operation type: ${payload.type}`
+                );
         }
     }
 
@@ -154,9 +190,18 @@ class V1BaseConsensusOperation {
      */
     assertAddressWithRemotePublicKey(binaryAddress, remotePublicKey, context) {
         const address = bufferToAddress(binaryAddress, this.#config.addressPrefix);
+        if (!address) {
+            throw new V1ConsensusProtocolError(
+                ConsensusResultCode.UNEXPECTED_ERROR,
+                `${context} address is invalid.`
+            );
+        }
         const publicKeyFromAddress = tracCryptoApi.address.decode(address);
         if (!b4a.equals(publicKeyFromAddress, remotePublicKey)) {
-            throw new V1ConsensusProtocolError(ConsensusResultCode.UNEXPECTED_ERROR, `${context} address does not match remote public key.`);
+            throw new V1ConsensusProtocolError(
+                ConsensusResultCode.UNEXPECTED_ERROR,
+                `${context} address does not match remote public key.`
+            );
         }
     }
 

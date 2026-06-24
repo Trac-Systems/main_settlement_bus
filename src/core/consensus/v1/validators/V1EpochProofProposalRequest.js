@@ -24,7 +24,11 @@ class V1EpochProofProposalRequest extends V1BaseConsensusOperation {
         this.isPayloadSchemaValid(payload);
         this.validateProofProposalProtocolVersion(payload.proof_proposal);
         this.validateProofProposalNetworkId(payload.proof_proposal);
-        this.assertAddressWithRemotePublicKey(payload.proof_proposal.proposer, connection.remotePublicKey, "Proposer");
+        this.assertAddressWithRemotePublicKey(
+            payload.proof_proposal.proposer,
+            connection.remotePublicKey,
+            "Proposer"
+        );
         await this.validateProofProposalVdfParametersHash(payload.proof_proposal);
         await this.validateProofProposalVdfProof(payload.proof_proposal);
         this.validateIncomingEpoch()

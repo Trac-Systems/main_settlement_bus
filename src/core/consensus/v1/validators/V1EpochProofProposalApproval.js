@@ -48,17 +48,27 @@ class V1EpochProofProposalApproval extends V1BaseConsensusOperation {
         try {
             hash = await tracCryptoApi.hash.blake3(message);
         } catch {
-            throw new V1ConsensusProtocolError(ConsensusResultCode.UNEXPECTED_ERROR, 'Failed to hash response signature message.');
+            throw new V1ConsensusProtocolError(
+                ConsensusResultCode.UNEXPECTED_ERROR,
+                'Failed to hash response signature message.'
+            );
         }
 
         let verified = false;
         try {
-            verified = tracCryptoApi.signature.verify(proofProposalResponse.response_sig, hash, remotePublicKey);
+            verified = tracCryptoApi.signature.verify(
+                proofProposalResponse.response_sig,
+                hash,
+                remotePublicKey
+            );
         } catch {
             verified = false;
         }
         if (!verified) {
-            throw new V1ConsensusProtocolError(ConsensusResultCode.UNEXPECTED_ERROR, 'response signature verification failed.');
+            throw new V1ConsensusProtocolError(
+                ConsensusResultCode.UNEXPECTED_ERROR,
+                'response signature verification failed.'
+            );
         }
     }
 

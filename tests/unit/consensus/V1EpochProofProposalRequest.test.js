@@ -6,11 +6,13 @@ import {solveWesolowski} from '@tracsystems/trac-vdf';
 
 import ConsensusMessageBuilder from '../../../src/messages/consensus/v1/ConsensusMessageBuilder.js';
 import V1EpochProofProposalRequest from '../../../src/core/consensus/v1/validators/V1EpochProofProposalRequest.js';
+import {V1ConsensusProtocolError} from '../../../src/core/consensus/v1/V1ConsensusProtocolError.js';
 import {addressToBuffer} from '../../../src/core/state/utils/address.js';
 import {createMessage, safeWriteUInt32BE, uint8ToBuffer, uint16ToBuffer, uint64ToBuffer} from '../../../src/utils/buffer.js';
 import {
     ConsensusOperationType,
     ConsensusProtocolVersion,
+    ConsensusResultCode,
     VDF_BLOB_PROOF_SIZE
 } from '../../../src/utils/constants.js';
 import {config} from '../../helpers/config.js';
@@ -215,6 +217,21 @@ test('V1EpochProofProposalRequest rejects proposer address mismatched with remot
         () => validator.assertAddressWithRemotePublicKey(proposer, otherWallet.publicKey, 'Proposer'),
         errorMessageIncludes('Proposer address does not match remote public key')
     );
+});
+
+test('V1EpochProofProposalRequest rejects invalid proposer address as protocol error', async t => {
+    const wallet = await createWallet(testKeyPair1);
+    const validator = new V1EpochProofProposalRequest(vdfTestConfig);
+    const invalidProposer = b4a.alloc(vdfTestConfig.addressLength, 1);
+
+    try {
+        validator.assertAddressWithRemotePublicKey(invalidProposer, wallet.publicKey, 'Proposer');
+        t.fail('should throw');
+    } catch (error) {
+        t.ok(error instanceof V1ConsensusProtocolError);
+        t.is(error.resultCode, ConsensusResultCode.UNEXPECTED_ERROR);
+        t.ok(error.message.includes('Proposer address is invalid'));
+    }
 });
 
 test('V1EpochProofProposalRequest rejects invalid proof proposal network id', async t => {
