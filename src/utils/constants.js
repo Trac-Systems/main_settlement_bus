@@ -59,6 +59,7 @@ export const ConsensusResultCode = Object.freeze({
     UNSPECIFIED: ConsensusV1ResultCode.RESULT_CODE_UNSPECIFIED,
     OK: ConsensusV1ResultCode.RESULT_CODE_OK,
     UNEXPECTED_ERROR: ConsensusV1ResultCode.RESULT_CODE_UNEXPECTED_ERROR,
+    INVALID_PAYLOAD: ConsensusV1ResultCode.RESULT_CODE_INVALID_PAYLOAD,
 });
 
 export const ResultCode = Object.freeze({
