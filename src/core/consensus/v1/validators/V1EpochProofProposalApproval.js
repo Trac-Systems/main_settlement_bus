@@ -31,6 +31,7 @@ class V1EpochProofProposalApproval extends V1BaseConsensusOperation {
 
         this.validateAddressIsIndexer();
         await this.validateResponseSignature(payload, connection.remotePublicKey);
+        return true;
     }
 
     /**
