@@ -4,9 +4,9 @@ import {networkMessageFactory} from "../../../../messages/network/v1/networkMess
 import b4a from "b4a";
 import { V1ProtocolError } from "../../../network/protocols/v1/V1ProtocolError.js";
 import { ConsensusResultCode, ResultCode } from "../../../../utils/constants.js";
-import DummyVDFVerifier from "../../services/DummyVDFVerifier.js";
 import { consensusMessageFactory } from "../../../../messages/consensus/v1/consensusMessageFactory.js";
 import { bufferToAddress } from "../../../state/utils/address.js";
+import { verifyWesolowski } from "@tracsystems/trac-vdf";
 
 // Minion interface to verify & sign proposals
 class ConsensusEpochProofProposalOperationHandler {
@@ -15,13 +15,11 @@ class ConsensusEpochProofProposalOperationHandler {
     #wallet;
     #config;
     #state;
-    #vdfVerifier;
 
     constructor(state, wallet, config) {
         this.#state = state;
         this.#wallet = wallet;
         this.#config = config;
-        this.#vdfVerifier = new DummyVDFVerifier(); // TODO: Replace with a real VDF Verifier
         this.#requestValidator = new V1EpochProofProposalRequest(config);
         this.#responseValidator = new V1EpochProofProposalApproval(config);
     }
@@ -38,6 +36,8 @@ class ConsensusEpochProofProposalOperationHandler {
         const proofProposal = message.proof_proposal;
         const currentEpoch = await this.#state.currentEpoch();
 
+        // verifyVdf() only checks proofProposal directly (no access to state),
+        // so we should ensure epoch continuity is maintained before invoking it
         this.#validateEpochContinuity(proofProposal, currentEpoch);
         await this.#verifyVdf(proofProposal);
 
@@ -95,9 +95,20 @@ class ConsensusEpochProofProposalOperationHandler {
         }
     }
 
-    // TODO: update this with trac-vdf
     async #verifyVdf(proofProposal) {
-        const vdfIsValid = await this.#vdfVerifier.verify(proofProposal)
+        let vdfIsValid = false;
+
+        try {
+            vdfIsValid = await verifyWesolowski(
+                proofProposal.previous_epoch_record_hash,
+                this.#config.vdfDifficulty,
+                proofProposal.vdf_proof,
+                this.#config.vdfDiscriminantSizeBits
+            );
+        } catch {
+            vdfIsValid = false;
+        }
+
         if (!vdfIsValid) {
             throw new V1ProtocolError(
                 ResultCode.PROOF_PAYLOAD_MISMATCH,

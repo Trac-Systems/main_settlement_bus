@@ -1,6 +1,7 @@
 import test from 'brittle';
 import b4a from 'b4a';
 import { WalletProvider } from 'trac-wallet';
+import { solveWesolowski } from '@tracsystems/trac-vdf';
 
 import ConsensusEpochProofProposalOperationHandler from '../../../src/core/consensus/v1/handlers/ConsesusEpochProofProposalOperationHandler.js';
 import V1EpochProofProposalRequest from '../../../src/core/consensus/v1/validators/V1EpochProofProposalRequest.js';
@@ -22,6 +23,11 @@ import { testKeyPair2 } from '../../fixtures/apply.fixtures.js';
 
 const originalRequestValidate = V1EpochProofProposalRequest.prototype.validate;
 const originalResponseValidate = V1EpochProofProposalResponse.prototype.validate;
+const vdfTestConfig = {
+    addressPrefix: config.addressPrefix,
+    vdfDifficulty: 100,
+    vdfDiscriminantSizeBits: 512
+};
 
 function restoreValidator() {
     V1EpochProofProposalRequest.prototype.validate = originalRequestValidate;
@@ -32,13 +38,13 @@ async function createWallet(keyPair) {
     return await new WalletProvider(config).fromSecretKey(keyPair.secretKey);
 }
 
-function setupHandler(t, validate, state = {}, wallet = {}, responseValidate = async () => true) {
+function setupHandler(t, validate, state = {}, wallet = {}, responseValidate = async () => true, handlerConfig = config) {
     restoreValidator();
     t.teardown(restoreValidator);
     V1EpochProofProposalRequest.prototype.validate = validate;
     V1EpochProofProposalResponse.prototype.validate = responseValidate;
 
-    return new ConsensusEpochProofProposalOperationHandler(state, wallet, config);
+    return new ConsensusEpochProofProposalOperationHandler(state, wallet, handlerConfig);
 }
 
 function currentEpochFor(proofProposal, overrides = {}) {
@@ -59,6 +65,24 @@ function messageWithProofProposalOverrides(overrides = {}) {
     };
 }
 
+async function messageWithValidVdfProof(overrides = {}) {
+    const proofProposal = {
+        ...consensusV1OperationFixtures.proofProposal,
+        ...overrides
+    };
+
+    const vdfProof = await solveWesolowski(
+        proofProposal.previous_epoch_record_hash,
+        vdfTestConfig.vdfDifficulty,
+        vdfTestConfig.vdfDiscriminantSizeBits
+    );
+
+    return messageWithProofProposalOverrides({
+        ...overrides,
+        vdf_proof: vdfProof
+    });
+}
+
 function connection() {
     return {
         remotePublicKey: b4a.alloc(32, 1),
@@ -73,7 +97,7 @@ function connection() {
 test('handleRequest validates consensus proof proposal and returns a signed approval response', async t => {
     const wallet = await createWallet(testKeyPair2);
     const conn = connection();
-    const message = { ...consensusV1OperationFixtures.proofProposalHeader };
+    const message = await messageWithValidVdfProof();
     const state = {
         currentEpoch: async () => currentEpochFor(message.proof_proposal)
     };
@@ -90,7 +114,7 @@ test('handleRequest validates consensus proof proposal and returns a signed appr
         validatorPayload = payload;
         validatorConnection = connection;
         return true;
-    }, state, wallet);
+    }, state, wallet, async () => true, vdfTestConfig);
 
     const result = await handler.handleRequest(message, conn);
 
@@ -174,7 +198,7 @@ test('handleRequest rejects proof proposals with invalid VDF proof data', async 
     const state = {
         currentEpoch: async () => currentEpochFor(message.proof_proposal)
     };
-    const handler = setupHandler(t, async () => true, state);
+    const handler = setupHandler(t, async () => true, state, {}, async () => true, vdfTestConfig);
 
     await t.exception(
         async () => handler.handleRequest(message, conn),
