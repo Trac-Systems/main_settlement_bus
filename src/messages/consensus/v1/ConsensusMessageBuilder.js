@@ -204,8 +204,7 @@ class ConsensusMessageBuilder {
             proposer: this.#proposer,
             vdf_parameters_hash: this.#vdf_parameters_hash,
             vdf_proof: this.#vdf_proof,
-            signature: signature,
-            hash: hash,
+            signature: signature
         };
     }
 
