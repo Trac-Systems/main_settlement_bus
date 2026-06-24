@@ -160,25 +160,6 @@ test('V1EpochProofProposalRequest builds proof proposal challenge data from fiel
     t.not(b4a.equals(challengeData, signatureMessage));
 });
 
-test('V1EpochProofProposalRequest rejects invalid VDF proof', async t => {
-    const wallet = await createWallet();
-    const validator = new V1EpochProofProposalRequest(vdfTestConfig);
-    const payload = await buildProofProposalPayload(wallet);
-
-    const fakePayload = {
-        ...payload,
-        proof_proposal: {
-            ...payload.proof_proposal,
-            vdf_proof: b4a.alloc(VDF_BLOB_PROOF_SIZE, 4)
-        }
-    };
-
-    await t.exception(
-        async () => validator.validate(fakePayload, {remotePublicKey: wallet.publicKey}),
-        errorMessageIncludes('VDF proof is invalid')
-    );
-});
-
 test('V1EpochProofProposalRequest rejects invalid proof proposal signature', async t => {
     const wallet = await createWallet();
     const validator = new V1EpochProofProposalRequest(vdfTestConfig);
@@ -194,6 +175,30 @@ test('V1EpochProofProposalRequest rejects invalid proof proposal signature', asy
     await t.exception(
         async () => validator.validate(fakePayload, {remotePublicKey: wallet.publicKey}),
         errorMessageIncludes('signature verification failed')
+    );
+});
+
+test('V1EpochProofProposalRequest rejects invalid VDF proof', async t => {
+    const wallet = await createWallet();
+    const validator = new V1EpochProofProposalRequest(vdfTestConfig);
+    const payload = await buildProofProposalPayload(wallet);
+    const fakeProofProposal = {
+        ...payload.proof_proposal,
+        vdf_proof: b4a.alloc(VDF_BLOB_PROOF_SIZE, 4)
+    };
+    const challengeData = validator.buildProofProposalChallengeData(fakeProofProposal);
+    const signatureMessage = createMessage(challengeData, fakeProofProposal.vdf_proof);
+    const signatureHash = await tracCryptoApi.hash.blake3(signatureMessage);
+    fakeProofProposal.signature = wallet.sign(signatureHash);
+
+    const fakePayload = {
+        ...payload,
+        proof_proposal: fakeProofProposal
+    };
+
+    await t.exception(
+        async () => validator.validate(fakePayload, {remotePublicKey: wallet.publicKey}),
+        errorMessageIncludes('VDF proof is invalid')
     );
 });
 

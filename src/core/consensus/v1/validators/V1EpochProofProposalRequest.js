@@ -30,11 +30,11 @@ class V1EpochProofProposalRequest extends V1BaseConsensusOperation {
             "Proposer"
         );
         await this.validateProofProposalVdfParametersHash(payload.proof_proposal);
+        await this.validateSignature(payload, connection.remotePublicKey);
         await this.validateProofProposalVdfProof(payload.proof_proposal);
         this.validateIncomingEpoch()
         this.validatePreviousEpochRecordHash()
         this.validateAddressIsIndexer()
-        await this.validateSignature(payload, connection.remotePublicKey);
         return true;
     }
 
