@@ -261,7 +261,6 @@ class Network extends ReadyResource {
 
                 // Adds indexers to consensus connection manager
                 if (await this.#state.isKnownIndexer(connection.remotePublicKey)) {
-                    console.log("indexer manager", this.#indexerConnectionManager);
                     this.#indexerConnectionManager.add(connection.remotePublicKey, connection);
                 }
 
