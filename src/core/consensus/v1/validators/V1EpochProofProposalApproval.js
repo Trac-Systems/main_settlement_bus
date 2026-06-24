@@ -14,26 +14,34 @@ class V1EpochProofProposalApproval extends V1BaseConsensusOperation {
     }
 
     /**
-     * Validates proof proposal approval schema and both approval response signatures.
+     * Validates proof proposal response schema and required response signatures.
      */
     async validate(payload, connection, proofProposal) {
         this.isPayloadSchemaValid(payload);
-        this.assertAddressWithRemotePublicKey(payload.proof_proposal_response.approval.approver, connection.remotePublicKey, "approver");
-        await this.validateSignature(payload, connection.remotePublicKey, proofProposal);
-        this.validateAddressIsIndexer()
+
+        const {result, approval} = payload.proof_proposal_response;
+        if (result === ConsensusResultCode.OK) {
+            this.assertAddressWithRemotePublicKey(
+                approval.approver,
+                connection.remotePublicKey,
+                "approver"
+            );
+            await this.validateSignature(payload, connection.remotePublicKey, proofProposal);
+        }
+
+        this.validateAddressIsIndexer();
         await this.validateResponseSignature(payload, connection.remotePublicKey);
     }
 
     /**
-     * Verifies the response signature over result code and encoded approval.
+     * Verifies the response signature over result code and optional encoded approval.
      */
     async validateResponseSignature(payload, remotePublicKey) {
         const proofProposalResponse = payload.proof_proposal_response;
-        const encodedApproval = encodeProofProposalApproval(proofProposalResponse.approval);
-        const message = createMessage(
-            safeWriteUInt32BE(proofProposalResponse.result, 0),
-            encodedApproval
-        );
+        const resultCode = safeWriteUInt32BE(proofProposalResponse.result, 0);
+        const message = proofProposalResponse.result === ConsensusResultCode.OK
+            ? createMessage(resultCode, encodeProofProposalApproval(proofProposalResponse.approval))
+            : createMessage(resultCode);
 
         let hash;
         try {

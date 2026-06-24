@@ -1,10 +1,12 @@
 import test from 'brittle';
 import b4a from 'b4a';
 import {WalletProvider} from 'trac-wallet';
+import tracCryptoApi from 'trac-crypto-api';
 
 import ConsensusMessageBuilder from '../../../src/messages/consensus/v1/ConsensusMessageBuilder.js';
 import V1EpochProofProposalApproval from '../../../src/core/consensus/v1/validators/V1EpochProofProposalApproval.js';
 import {bufferToAddress} from '../../../src/core/state/utils/address.js';
+import {createMessage, safeWriteUInt32BE} from '../../../src/utils/buffer.js';
 import {
     ConsensusOperationType,
     ConsensusProtocolVersion,
@@ -65,6 +67,21 @@ async function buildProofProposalApprovalPayload(approverWallet, proofProposalPa
     return builder.getResult();
 }
 
+async function buildProofProposalRejectionPayload(approverWallet, proofProposalPayload, result = ConsensusResultCode.INVALID_PAYLOAD) {
+    const responseMessage = createMessage(safeWriteUInt32BE(result, 0));
+    const responseHash = await tracCryptoApi.hash.blake3(responseMessage);
+
+    return {
+        type: ConsensusOperationType.PROOF_PROPOSAL_RESPONSE,
+        session_id: proofProposalPayload.session_id,
+        timestamp: Date.now(),
+        proof_proposal_response: {
+            result,
+            response_sig: approverWallet.sign(responseHash),
+        },
+    };
+}
+
 test('V1EpochProofProposalApproval validates approval signature against original proof proposal', async t => {
     const proposerWallet = await createWallet(testKeyPair1);
     const approverWallet = await createWallet(testKeyPair2);
@@ -79,6 +96,46 @@ test('V1EpochProofProposalApproval validates approval signature against original
     );
 
     t.pass();
+});
+
+test('V1EpochProofProposalApproval validates non-OK response without approval', async t => {
+    const proposerWallet = await createWallet(testKeyPair1);
+    const approverWallet = await createWallet(testKeyPair2);
+    const validator = new V1EpochProofProposalApproval(config);
+    const proofProposalPayload = await buildProofProposalPayload(proposerWallet);
+    const approvalPayload = await buildProofProposalRejectionPayload(approverWallet, proofProposalPayload);
+
+    await validator.validate(
+        approvalPayload,
+        {remotePublicKey: approverWallet.publicKey},
+        proofProposalPayload.proof_proposal
+    );
+
+    t.pass();
+});
+
+test('V1EpochProofProposalApproval rejects fake non-OK response signature without approval', async t => {
+    const proposerWallet = await createWallet(testKeyPair1);
+    const approverWallet = await createWallet(testKeyPair2);
+    const validator = new V1EpochProofProposalApproval(config);
+    const proofProposalPayload = await buildProofProposalPayload(proposerWallet);
+    const approvalPayload = await buildProofProposalRejectionPayload(approverWallet, proofProposalPayload);
+    const fakeApprovalPayload = {
+        ...approvalPayload,
+        proof_proposal_response: {
+            ...approvalPayload.proof_proposal_response,
+            response_sig: b4a.alloc(64, 9)
+        }
+    };
+
+    await t.exception(
+        async () => validator.validate(
+            fakeApprovalPayload,
+            {remotePublicKey: approverWallet.publicKey},
+            proofProposalPayload.proof_proposal
+        ),
+        errorMessageIncludes('response signature verification failed')
+    );
 });
 
 test('V1EpochProofProposalApproval validateSignature does not validate approver address correctness', async t => {
