@@ -64,6 +64,11 @@ class IndexerConnectionManager {
     #toHexString(publicKey) {
         return toHex(publicKey)
     }
+
+    prettyPrint() {
+        console.log(`Connection count: ${this.#indexers.size}`);
+        console.log(`Indexer map keys:\n${Array.from(this.#indexers.keys()).join('\n')}`);
+    }
 }
 
 export default IndexerConnectionManager;

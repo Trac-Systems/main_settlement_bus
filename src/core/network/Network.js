@@ -82,6 +82,10 @@ class Network extends ReadyResource {
         return this.#transactionPoolService;
     }
 
+    get indexerConnectionManager() {
+        return this.#indexerConnectionManager
+    }
+
     get validatorObserverService() {
         return this.#validatorObserverService;
     }
@@ -256,7 +260,7 @@ class Network extends ReadyResource {
                 // - attach connection.protocolSession (used later by tryConnect / orchestrators to send messages)
 
                 // Adds indexers to consensus connection manager
-                if (await this.#state.isKnownIndexer(connection.remotePublicKey) && await this.#state.isAdminPublicKey(connection.remotePublicKey)) {
+                if (await this.#state.isKnownIndexer(connection.remotePublicKey) && !await this.#state.isAdminPublicKey(connection.remotePublicKey)) {
                     this.#indexerConnectionManager.add(connection.remotePublicKey, connection);
                 }
 
