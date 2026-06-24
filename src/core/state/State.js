@@ -213,6 +213,11 @@ class State extends ReadyResource {
         return !!adminEntry && this.#wallet?.address === adminEntry?.address && b4a.equals(adminEntry?.wk, this.writingKey)
     }
 
+    async isAdminPublicKey(publicKey) {
+        const adminEntry = await this.getAdminEntry();
+        return !!adminEntry && b4a.equals(publicKey, tracCryptoApi.address.decodeSafe(adminEntry.address));
+    }
+
     async isAdminAllowedToValidate() {
         if (!this.writingKey) return false;
 
