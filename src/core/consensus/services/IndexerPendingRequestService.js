@@ -43,12 +43,6 @@ export default class IndexerPendingRequestService {
         }
     }
 
-    #extractProposalHash(message) {
-        if (message.type !== ConsensusOperationType.PROOF_PROPOSAL) return null;
-        const hash = message.proof_proposal?.hash;
-        return b4a.isBuffer(hash) ? hash : null;
-    }
-
     /*
     @returns {Promise}
     */
@@ -68,7 +62,6 @@ export default class IndexerPendingRequestService {
             id: id,
             requestType: message.type,
             requestedTo: peerPubKeyHex,
-            requestEpochProofProposalHash: this.#extractProposalHash(message),
             timeoutId: null,
             resolve: null,
             reject: null,

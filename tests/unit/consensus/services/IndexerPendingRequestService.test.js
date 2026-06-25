@@ -32,7 +32,7 @@ async function buildProofProposal({ sessionId = uuidv7() } = {}) {
     return builder.getResult();
 }
 
-test('registerPendingRequest stores requestEpochProofProposalHash from proof_proposal', async t => {
+test('registerPendingRequest stores the expected entry shape for proof proposals', async t => {
     const service = new IndexerPendingRequestService(config);
     const message = await buildProofProposal();
 
@@ -41,31 +41,15 @@ test('registerPendingRequest stores requestEpochProofProposalHash from proof_pro
     t.teardown(() => service.close());
 
     const entry = service.getPendingRequest(message.session_id);
-    t.ok(b4a.isBuffer(entry.requestEpochProofProposalHash));
-    t.ok(entry.requestEpochProofProposalHash.length > 0);
-});
-
-test('requestEpochProofProposalHash matches hash in proof_proposal body', async t => {
-    const service = new IndexerPendingRequestService(config);
-    const message = await buildProofProposal();
-
-    const promise = service.registerPendingRequest(validPeerA, message);
-    promise.catch(() => {});
-    t.teardown(() => service.close());
-
-    const entry = service.getPendingRequest(message.session_id);
-    t.alike(entry.requestEpochProofProposalHash, message.proof_proposal.hash);
-});
-
-test('registerPendingRequest stores null hash when proof_proposal.hash is missing', async t => {
-    const service = new IndexerPendingRequestService(config);
-    const message = await buildProofProposal();
-    delete message.proof_proposal.hash;
-
-    const promise = service.registerPendingRequest(validPeerA, message);
-    promise.catch(() => {});
-    t.teardown(() => service.close());
-
-    const entry = service.getPendingRequest(message.session_id);
-    t.is(entry.requestEpochProofProposalHash, null);
+    t.alike(entry, {
+        id: message.session_id,
+        requestType: message.type,
+        requestedTo: validPeerA,
+        timeoutId: entry.timeoutId,
+        resolve: entry.resolve,
+        reject: entry.reject,
+    });
+    t.absent('requestEpochProofProposalHash' in entry);
+    t.is(typeof entry.resolve, 'function');
+    t.is(typeof entry.reject, 'function');
 });
