@@ -46,8 +46,9 @@ export const NetworkOperationType = Object.freeze({
 });
 
 export const ConsensusOperationType = Object.freeze({
+    UNSPECIFIED: ConsensusMessageType.MESSAGE_TYPE_UNSPECIFIED,
     PROOF_PROPOSAL: ConsensusMessageType.MESSAGE_TYPE_PROOF_PROPOSAL,
-    PROOF_PROPOSAL_RESPONSE: ConsensusMessageType.MESSAGE_TYPE_PROOF_PROPOSAL_RESPONSE
+    PROOF_PROPOSAL_APPROVAL: ConsensusMessageType.MESSAGE_TYPE_PROOF_PROPOSAL_APPROVAL
 });
 
 export const ConsensusProtocolVersion = Object.freeze({
@@ -57,6 +58,8 @@ export const ConsensusProtocolVersion = Object.freeze({
 export const ConsensusResultCode = Object.freeze({
     UNSPECIFIED: ConsensusV1ResultCode.RESULT_CODE_UNSPECIFIED,
     OK: ConsensusV1ResultCode.RESULT_CODE_OK,
+    UNEXPECTED_ERROR: ConsensusV1ResultCode.RESULT_CODE_UNEXPECTED_ERROR,
+    INVALID_PAYLOAD: ConsensusV1ResultCode.RESULT_CODE_INVALID_PAYLOAD,
 });
 
 export const ResultCode = Object.freeze({
@@ -185,7 +188,7 @@ export const LICENSE_BYTE_LENGTH = 4;
 export const PROTOCOL_VERSION_BYTE_LENGTH = 1; // 1 BYTE 0-255
 export const NETWORK_ID_BYTE_LENGTH = 2; // 2BYTES - UINT16
 export const EPOCH_BYTE_LENGTH = 8; // 8 BYTES - UINT64
-export const VDF_BLOB_PROOF_SIZE = 512;
+export const VDF_BLOB_PROOF_SIZE = 516;
 
 // index.js
 export const BOOTSTRAP_HEXSTRING_LENGTH = 64;

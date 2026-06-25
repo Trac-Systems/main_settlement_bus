@@ -105,7 +105,7 @@ test('ConsensusMessageDirector builds proof proposal response and verifies signa
         wallet.address
     );
 
-    t.is(payload.type, ConsensusOperationType.PROOF_PROPOSAL_RESPONSE);
+    t.is(payload.type, ConsensusOperationType.PROOF_PROPOSAL_APPROVAL);
     t.is(payload.session_id, sessionId);
     t.ok(Number.isSafeInteger(payload.timestamp) && payload.timestamp > 0);
 

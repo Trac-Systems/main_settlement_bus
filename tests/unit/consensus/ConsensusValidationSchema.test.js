@@ -29,7 +29,7 @@ const makeProofProposalPayload = (epoch, proofProposalOverrides = {}) => ({
 });
 
 const makeProofProposalResponsePayload = (result, approval) => ({
-    type: ConsensusOperationType.PROOF_PROPOSAL_RESPONSE,
+    type: ConsensusOperationType.PROOF_PROPOSAL_APPROVAL,
     session_id: 'session',
     timestamp: 1,
     proof_proposal_response: {

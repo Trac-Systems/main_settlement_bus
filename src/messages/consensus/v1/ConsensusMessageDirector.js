@@ -77,7 +77,7 @@ class ConsensusMessageDirector {
         approver
     ) {
         await this.#builder
-            .setType(ConsensusOperationType.PROOF_PROPOSAL_RESPONSE)
+            .setType(ConsensusOperationType.PROOF_PROPOSAL_APPROVAL)
             .setSessionId(sessionId)
             .setTimestamp()
             .setProtocolVersion(ConsensusProtocolVersion.V1)

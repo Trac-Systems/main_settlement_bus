@@ -82,7 +82,7 @@ class ConsensusMessageBuilder {
     }
 
     setType(type) {
-        if (!Object.values(ConsensusOperationType).includes(type)) {
+        if (!Object.values(ConsensusOperationType).includes(type) || type === ConsensusOperationType.UNSPECIFIED) {
             throw new Error(`Invalid consensus operation type: ${type}`);
         }
         this.#type = type;
@@ -256,7 +256,7 @@ class ConsensusMessageBuilder {
                 await this.#buildProofProposalPayload();
                 break;
             }
-            case ConsensusOperationType.PROOF_PROPOSAL_RESPONSE: {
+            case ConsensusOperationType.PROOF_PROPOSAL_APPROVAL: {
                 await this.#buildProofProposalResponsePayload();
                 break;
             }
