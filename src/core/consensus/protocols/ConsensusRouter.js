@@ -49,7 +49,7 @@ class ConsensusRouterV1 {
                 case ConsensusOperationType.PROOF_PROPOSAL:
                     await this.#epochProofProposalHandler.handleRequest(decodedMessage, connection);
                     break;
-                case ConsensusOperationType.PROOF_PROPOSAL_RESPONSE:
+                case ConsensusOperationType.PROOF_PROPOSAL_APPROVAL:
                     await this.#epochProofProposalHandler.handleResponse(decodedMessage, connection);
                     break;
                 default:
