@@ -223,7 +223,7 @@ test('handleResponse validates consensus proof proposal response and returns app
         }
     );
 
-    const result = await handler.handleResponse(message, conn);
+    const result = await handler.handleApproval(message, conn);
 
     t.is(validatorPayload, message);
     t.is(validatorConnection, conn);
@@ -253,7 +253,7 @@ test('handleResponse stops when response validation fails', async t => {
     );
 
     await t.exception(
-        async () => handler.handleResponse(message, conn),
+        async () => handler.handleApproval(message, conn),
         errorMessageIncludes('response validation failed')
     );
     t.absent(approvalRead);

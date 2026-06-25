@@ -50,7 +50,7 @@ class ConsensusRouterV1 {
                     await this.#epochProofProposalHandler.handleRequest(decodedMessage, connection);
                     break;
                 case ConsensusOperationType.PROOF_PROPOSAL_APPROVAL:
-                    await this.#epochProofProposalHandler.handleResponse(decodedMessage, connection);
+                    await this.#epochProofProposalHandler.handleApproval(decodedMessage, connection);
                     break;
                 default:
                     this.#disconnect(connection, `Unsupported V1 message type: ${decodedMessage.type}`)

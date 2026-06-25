@@ -204,7 +204,13 @@ class V1BaseConsensusOperation {
     }
 
     validateAddressIsIndexer() {
-        //TODO: Placeholder - payload address should have the indexer role in state. Completion depends on genesis being initialized in the ledger. this is not implemented yet.
+        // TODO: Placeholder - payload address should have the indexer role in state. 
+        // Completion depends on genesis being initialized in the ledger. this is not implemented yet.
+
+        // TODO: When we replace UNNEXPECTED_ERROR to INVALID_ADDRESS_ASSERTION, 
+        // we should handle this specific error
+        // to not only drop connection, but also blacklist the specific node.
+        // Such an error would mean that someone is trying to impersonate  an indexer
     }
 
 }

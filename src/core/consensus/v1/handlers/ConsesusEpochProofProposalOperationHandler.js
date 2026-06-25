@@ -3,127 +3,83 @@ import V1EpochProofProposalApproval from "../validators/V1EpochProofProposalAppr
 import {networkMessageFactory} from "../../../../messages/network/v1/networkMessageFactory.js";
 import b4a from "b4a";
 import { V1ProtocolError } from "../../../network/protocols/v1/V1ProtocolError.js";
-import { ConsensusResultCode, ResultCode } from "../../../../utils/constants.js";
+import {getResultCode, V1ConsensusProtocolError} from "../V1ConsensusProtocolError.js"
+import {ConsensusResultCode, NETWORK_CAPABILITIES, ResultCode} from "../../../../utils/constants.js";
 import { consensusMessageFactory } from "../../../../messages/consensus/v1/consensusMessageFactory.js";
 import { bufferToAddress } from "../../../state/utils/address.js";
 import { verifyWesolowski } from "@tracsystems/trac-vdf";
+import {publicKeyToAddress} from "../../../../utils/helpers.js";
+import ConnectionOperationHandler from "../../../network/protocols/shared/ConnectionOperationHandler.js";
 
 // Minion interface to verify & sign proposals
-class ConsensusEpochProofProposalOperationHandler {
-    #requestValidator;
-    #responseValidator;
+
+// Responsibilities:
+// Validate -> close connections -> emit events to notify system-> send responses 
+
+class ConsensusEpochProofProposalOperationHandler extends ConnectionOperationHandler{
+    #proofProposalRequestValidator;
+    #proofProposalApprovalValidator;
     #wallet;
-    #config;
     #state;
 
     constructor(state, wallet, config) {
+        super(config)
         this.#state = state;
         this.#wallet = wallet;
-        this.#config = config;
-        this.#requestValidator = new V1EpochProofProposalRequest(config);
-        this.#responseValidator = new V1EpochProofProposalApproval(config);
+        this.#proofProposalRequestValidator = new V1EpochProofProposalRequest(config);
+        this.#proofProposalApprovalValidator = new V1EpochProofProposalApproval(config);
     }
 
     /**
      * Handles a leader's consensus v1 epoch proof proposal from the minion side.
      * @param {object} message Decoded consensus v1 message containing `proof_proposal` and `session_id`.
-     * @param {object} connection Peer connection context used by the request validator.
+     * @param {object} connection P eer connection context used by the request validator.
      * @returns {Promise<object>} Signed consensus v1 proof proposal response.
      * @throws {V1ProtocolError|Error} If request validation or response building fails.
      */
     async handleRequest(message, connection) {
-        await this.#requestValidator.validate(message, connection);
-        const proofProposal = message.proof_proposal;
-        const currentEpoch = await this.#state.currentEpoch();
-
-        // verifyVdf() only checks proofProposal directly (no access to state),
-        // so we should ensure epoch continuity is maintained before invoking it
-        this.#validateEpochContinuity(proofProposal, currentEpoch);
-        await this.#verifyVdf(proofProposal);
-
-        return await this.#buildProofProposalResponse(message.session_id, proofProposal);
+        // TODO:  -- emit event "epoch_proposal_received"
+        let resultCode = ConsensusResultCode.OK;
+        try {
+            await this.#proofProposalRequestValidator.validate(message, connection);
+            //TODO:  -- emit event "epoch_proposal_validation_success"
+        } catch (e) {
+            resultCode = getResultCode(e);
+            //TODO: -- emit event "epoch_proposal_validation_failure"
+            // TODO: Add contidion if INVALID_ADDRESS_ASSERTION then blacklist specific remogePublicKey
+        } finally {
+            await this.#sendEpochProofProposalApprovalResponse(message.session_id, connection, message.proof_proposal, resultCode);
+        }
     }
 
     /**
-     * Handles a minion's consensus v1 epoch proof proposal response from the leader side.
+     * Handles a minion's consensus v1 epoch proof proposal approval from the requester side.
      *
      * @param {object} message Decoded consensus v1 message containing `proof_proposal_response`.
      * @param {object} connection Peer connection context used by the response validator.
+     * @param proofProposal
      * @returns {Promise<object>} Validated proof proposal approval.
      * @throws {V1ProtocolError|Error} If response validation fails.
      */
-    async handleResponse(message, connection) {
-        await this.#responseValidator.validate(message, connection);
-        return message.proof_proposal_response.approval;
-    }
-
-    #validateEpochContinuity(proofProposal, currentEpoch) {
-        if (!currentEpoch) {
-            throw new V1ProtocolError(
-                ResultCode.PROOF_PAYLOAD_MISMATCH,
-                "Current epoch state is missing."
-            );
-        }
-
-        if (typeof currentEpoch.epoch !== "bigint") {
-            throw new V1ProtocolError(
-                ResultCode.PROOF_PAYLOAD_MISMATCH,
-                "Current epoch state must include epoch as a BigInt."
-            );
-        }
-
-        if (!b4a.isBuffer(currentEpoch.epoch_record_hash)) {
-            throw new V1ProtocolError(
-                ResultCode.PROOF_PAYLOAD_MISMATCH,
-                "Current epoch state must include epoch_record_hash as a buffer."
-            );
-        }
-
-        const proposalEpoch = proofProposal.epoch.readBigUInt64BE(0);
-        if (proposalEpoch !== currentEpoch.epoch + 1n) {
-            throw new V1ProtocolError(
-                ResultCode.PROOF_PAYLOAD_MISMATCH,
-                "Epoch proof proposal is not for the next epoch."
-            );
-        }
-
-        if (!b4a.equals(proofProposal.previous_epoch_record_hash, currentEpoch.epoch_record_hash)) {
-            throw new V1ProtocolError(
-                ResultCode.PROOF_PAYLOAD_MISMATCH,
-                "Previous epoch record hash does not match current epoch state."
-            );
-        }
-    }
-
-    async #verifyVdf(proofProposal) {
-        let vdfIsValid = false;
-
+    async handleApproval(message, connection, proofProposal) {
+        // -- emit event "received_response" (maybe not necessary)
         try {
-            vdfIsValid = await verifyWesolowski(
-                proofProposal.previous_epoch_record_hash,
-                this.#config.vdfDifficulty,
-                proofProposal.vdf_proof,
-                this.#config.vdfDiscriminantSizeBits
-            );
-        } catch {
-            vdfIsValid = false;
-        }
+            await this.#proofProposalApprovalValidator.validate(message, connection, proofProposal);
 
-        if (!vdfIsValid) {
-            throw new V1ProtocolError(
-                ResultCode.PROOF_PAYLOAD_MISMATCH,
-                "VDF proof verification failed."
-            );
+            // -- emit event "response_success"
+        } catch {
+            // -- emit event "response_failure"
         }
+        // return message.proof_proposal_response.approval; -- this will probably be in the emitted success event already
     }
 
-    async #buildProofProposalResponse(sessionId, proofProposal) {
-        const proposer = bufferToAddress(proofProposal.proposer, this.#config.addressPrefix);
+    async #buildProofProposalApproval(sessionId, proofProposal, resultCode) {
+        const proposer = bufferToAddress(proofProposal.proposer, this.config.addressPrefix);
 
         // TODO: In here we are basically getting some fields represented as buffers from
         // the received proofProposal, converting them to numbers, just to convert them
         // back to buffers internally. This should be optimized
-        return await consensusMessageFactory(this.#wallet, this.#config).buildProofProposalResponse(
+        return await consensusMessageFactory(this.#wallet, this.config).buildProofProposalResponse(
             sessionId,
             proofProposal.network_id.readUInt16BE(0),
             proofProposal.epoch.readBigUInt64BE(0),
@@ -132,10 +88,39 @@ class ConsensusEpochProofProposalOperationHandler {
             proofProposal.vdf_parameters_hash,
             proofProposal.vdf_proof,
             proofProposal.signature,
-            ConsensusResultCode.OK,
+            resultCode,
             this.#wallet.address
         );
     }
+
+    async #sendEpochProofProposalApprovalResponse(
+        messageId,
+        connection,
+        proofProposal,
+        resultCode
+    ) {
+        try {
+            const response = await this.#buildProofProposalApproval(
+                messageId,
+                proofProposal,
+                resultCode,
+            );
+
+            await this.sendResponseAndMaybeClose(
+                connection,
+                response,
+            );
+
+        } catch (error) {
+            this.displayError(
+                "failed to build/send response to sender",
+                connection.remotePublicKey,
+                error
+            );
+            connection.end();
+        }
+    }
+
 }
 
 export default ConsensusEpochProofProposalOperationHandler;
