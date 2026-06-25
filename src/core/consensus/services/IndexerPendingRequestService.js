@@ -1,7 +1,6 @@
 import {ConsensusOperationType, ResultCode} from '../../../utils/constants.js';
 import {isHexString, publicKeyToAddress} from '../../../utils/helpers.js';
 import {V1ProtocolError} from "../../network/protocols/v1/V1ProtocolError.js";
-import b4a from 'b4a';
 
 const PEER_PUBLIC_KEY_HEX_LENGTH = 64;
 
