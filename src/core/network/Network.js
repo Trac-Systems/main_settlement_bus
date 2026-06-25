@@ -133,8 +133,8 @@ class Network extends ReadyResource {
 
     setupNetworkListeners() {
         this.#state.on(CustomEventType.IS_INDEXER, (publicKey) => {
-            this.addIndexerPeer(publicKey);
             this.disconnectValidatorPeer(publicKey, 'peer promoted to indexer');
+            this.addIndexerPeer(publicKey);
         });
 
         this.#state.on(CustomEventType.IS_NON_INDEXER, (publicKey) => {
