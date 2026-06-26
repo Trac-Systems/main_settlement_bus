@@ -72,11 +72,11 @@ export default class IndexerPendingRequestService {
                 new IndexerPendingRequestServiceTimeoutError(
                     id,
                     peerAddress,
-                    this.#config.pendingRequestTimeout
+                    this.#config.indexerPendingRequestTimeout
                 )
             );
 
-        }, this.#config.pendingRequestTimeout);
+        }, this.#config.indexerPendingRequestTimeout);
 
         this.#pendingRequests.set(id, entry);
         return promise;

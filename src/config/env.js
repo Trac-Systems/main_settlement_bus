@@ -55,6 +55,7 @@ const configData = {
         rateLimitMaxTransactionsPerSecond: 50, // Rate limiting constants
         maxPendingRequestsInPendingRequestsService: 50_000, // Maximum number of pending requests in PendingRequestService (This value should not exceed 256MB)
         pendingRequestTimeout: 3000, // constant after which time the transaction will be considered invalid
+        indexerPendingRequestTimeout: 20000, // constant after which time the transaction will be considered invalid
         txCommitTimeout: 2200,
         txPoolSize: 1000, // size of transaction pool
         validatorHealthCheckInterval: 5 * 60 * 1000, // How often to check validator health (ms)
@@ -110,6 +111,7 @@ const configData = {
         rateLimitMaxTransactionsPerSecond: 50, // Rate limiting constants
         maxPendingRequestsInPendingRequestsService: 50_000, // Maximum number of pending requests in PendingRequestService (This value should not exceed 256MB)
         pendingRequestTimeout: 3000, // constant after which time the transaction will be considered invalid
+        indexerPendingRequestTimeout: 20000, // constant after which time the transaction will be considered invalid
         txCommitTimeout: 2200,
         txPoolSize: 1000, // size of transaction pool
         validatorHealthCheckInterval: 5 * 60 * 1000, // How often to check validator health (ms)
@@ -165,6 +167,7 @@ const configData = {
         rateLimitMaxTransactionsPerSecond: 50, // Rate limiting constants
         maxPendingRequestsInPendingRequestsService: 50_000, // Maximum number of pending requests in PendingRequestService (This value should not exceed 256MB)
         pendingRequestTimeout: 3000, // constant after which time the transaction will be considered invalid
+        indexerPendingRequestTimeout: 20000, // constant after which time the transaction will be considered invalid
         txCommitTimeout: 2200,
         txPoolSize: 1000, // size of transaction pool
         validatorHealthCheckInterval: 1_000, // How often to check validator health (ms)

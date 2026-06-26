@@ -202,6 +202,10 @@ export class Config {
         return this.#config.pendingRequestTimeout
     }
 
+    get indexerPendingRequestTimeout() {
+        return this.#config.indexerPendingRequestTimeout
+    }
+
     get txCommitTimeout() {
         return this.#config.txCommitTimeout
     }
