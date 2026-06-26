@@ -33,7 +33,7 @@ class ConsensusRouterV1 {
         try {
             decodedMessage = decodeConsensusMessage(incomingMessage)
         } catch (error) {
-            this.#disconnect(connection, `Failed to decode incoming V1 message: ${error.message}`)
+            this.#disconnect(connection, `Failed to decode incoming Consensus message: ${error.message}`)
             return;
         }
 
