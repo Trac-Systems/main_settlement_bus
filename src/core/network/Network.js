@@ -132,12 +132,17 @@ class Network extends ReadyResource {
     }
 
     setupNetworkListeners() {
-        this.#state.on(CustomEventType.IS_INDEXER, (publicKey) => {
+        this.#state.on(CustomEventType.IS_INDEXER, async (publicKey) => {
+            const indexersCount = await this.#state.indexersCount()
+            this.#indexerConnectionManager.setMax(indexersCount);
             this.disconnectValidatorPeer(publicKey, 'peer promoted to indexer');
             this.addIndexerPeer(publicKey);
+            
         });
 
-        this.#state.on(CustomEventType.IS_NON_INDEXER, (publicKey) => {
+        this.#state.on(CustomEventType.IS_NON_INDEXER, async (publicKey) => {
+            const indexersCount = await this.#state.indexersCount()
+            this.#indexerConnectionManager.setMax(indexersCount);
             this.disconnectIndexerPeer(publicKey, 'peer demoted from indexer');
         });
 
@@ -240,7 +245,8 @@ class Network extends ReadyResource {
             await this.#validatorHealthCheckService.ready();
 
             this.#consensusMessages = new ConsensusMessages(this.#state, this.#wallet, this.#config, this.#indexerPendingRequestService);
-            this.#indexerConnectionManager = new IndexerConnectionManager(this.#config);
+            const indexersCount = await this.#state.indexersCount()
+            this.#indexerConnectionManager = new IndexerConnectionManager(this.#config, indexersCount);
 
             this.#epochProofProposalService = new EpochProofProposalService(this.#state, this.#indexerConnectionManager, this.#wallet, this.#config);
             await this.#epochProofProposalService.ready();

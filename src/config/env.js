@@ -29,7 +29,6 @@ const configData = {
         writersShortCacheTTL: 10_000, // short TTL during bootstrap
         writersLongCacheTTL: 120_000, // long TTL after bootstrap
         maxValidators: 50,
-        maxIndexers: 14,
         maxPendingConnections: 50,
         maxWritersForAdminIndexerConnection: 10, // Connectivity constants
         disableRateLimit: false,
@@ -85,7 +84,6 @@ const configData = {
         writersShortCacheTTL: 2_000, // short TTL during bootstrap
         writersLongCacheTTL: 120_000, // long TTL after bootstrap
         maxValidators: 50,
-        maxIndexers: 14,
         maxPendingConnections: 50,
         maxWritersForAdminIndexerConnection: 10, // Connectivity constants
         disableRateLimit: false,
@@ -141,7 +139,6 @@ const configData = {
         writersShortCacheTTL: 1_000, // short TTL during bootstrap
         writersLongCacheTTL: 2_000, // long TTL after bootstrap
         maxValidators: 10,
-        maxIndexers: 14,
         maxPendingConnections: 50,
         maxWritersForAdminIndexerConnection: 10, // Connectivity constants
         disableRateLimit: false,

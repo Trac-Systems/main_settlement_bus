@@ -129,6 +129,10 @@ class State extends ReadyResource {
         return this.#base.isIndexer;
     }
 
+    async indexerCount() {
+        return await this.getIndexersEntry().length;
+    }
+
     getUnsignedLength() {
         return this.#base.view.core.length;
     }

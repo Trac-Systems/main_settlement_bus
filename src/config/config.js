@@ -107,10 +107,6 @@ export class Config {
         return this.#config.maxValidators
     }
 
-    get maxIndexers() {
-        return this.#config.maxIndexers
-    }
-
     get maxPeers() {
         if (this.#isOverriden('maxPeers')) return this.#options.maxPeers
         return this.#config.maxPeers

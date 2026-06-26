@@ -3,9 +3,15 @@ import { toHex } from '../../../utils/buffer.js';
 class IndexerConnectionManager {
     #indexers = new Map();
     #config;
+    #maxIndexers;
 
-    constructor(config) {
+    constructor(config, maxIndexers) {
         this.#config = config;
+        this.#maxIndexers = maxIndexers;
+    }
+
+    setMax(maxIndexers) {
+        this.#maxIndexers = maxIndexers;
     }
 
     add(publicKey, connection) {
@@ -13,7 +19,7 @@ class IndexerConnectionManager {
         if (this.#indexers.has(key)) {
             return false;
         }
-        if (this.#indexers.size >= this.#config.maxIndexers) {
+        if (this.#indexers.size >= this.#maxIndexers) {
             return false;
         }
         this.#indexers.set(key, connection);
