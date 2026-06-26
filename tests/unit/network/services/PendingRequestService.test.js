@@ -326,7 +326,7 @@ test('PendingRequestService rejects invalid registerPendingRequest input', async
 
     t.exception(
         () => service.registerPendingRequest(peer, 'not-an-object'),
-        errorMessageIncludes('Pending request message must be an object.')
+        errorMessageIncludes('Pending request ID must be a non-empty string.')
     );
 
     t.exception(
@@ -418,6 +418,6 @@ test('PendingRequestService throws when registerPendingRequest receives null mes
         service.registerPendingRequest(peer, null);
         t.fail('Expected registerPendingRequest to throw for null message');
     } catch (error) {
-        t.ok(error?.message?.includes('Pending request message must be an object.'));
+        t.ok(error?.message?.includes('Pending request ID must be a non-empty string.'));
     }
 });

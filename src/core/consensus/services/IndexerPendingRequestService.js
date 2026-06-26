@@ -1,8 +1,6 @@
-import {ConsensusOperationType, ResultCode} from '../../../utils/constants.js';
+import {ConsensusOperationType, PEER_PUBLIC_KEY_HEX_LENGTH, ConsensusResultCode} from '../../../utils/constants.js';
 import {isHexString, publicKeyToAddress} from '../../../utils/helpers.js';
-import {V1ProtocolError} from "../../network/protocols/v1/V1ProtocolError.js";
-
-const PEER_PUBLIC_KEY_HEX_LENGTH = 64;
+import {V1ConsensusProtocolError} from "../../../core/consensus/v1/V1ConsensusProtocolError.js";
 
 export class IndexerPendingRequestServiceTimeoutError extends Error {
     constructor(requestId, peerAddress, timeoutMs) {
@@ -29,11 +27,7 @@ export default class IndexerPendingRequestService {
             throw new Error('Invalid peer public key. Expected 32-byte hex string.');
         }
 
-        if (!message || typeof message !== 'object') {
-            throw new Error('Pending request message must be an object.');
-        }
-
-        if (typeof message.session_id !== 'string' || message.session_id.length === 0) {
+        if (typeof message?.session_id !== 'string' || message?.session_id.length === 0) {
             throw new Error('Pending request ID must be a non-empty string.');
         }
 
@@ -103,7 +97,7 @@ export default class IndexerPendingRequestService {
     }
 
     // for now, we are resolving only resultCode, but we can extend it in the future if needed...
-    resolvePendingRequest(id, resultCode = ResultCode.OK) {
+    resolvePendingRequest(id, resultCode = ConsensusResultCode.OK) {
         const entry = this.getAndDeletePendingRequest(id);
         if (!entry) return false;
         entry.resolve(resultCode);
@@ -144,8 +138,8 @@ export default class IndexerPendingRequestService {
             clearTimeout(entry.timeoutId);
             try {
                 entry.reject(
-                    new V1ProtocolError(
-                        ResultCode.UNEXPECTED_ERROR,
+                    new V1ConsensusProtocolError(
+                        ConsensusResultCode.UNEXPECTED_ERROR,
                         `Pending request ${id} cancelled (shutdown).`)
                 );
             } catch (error) {

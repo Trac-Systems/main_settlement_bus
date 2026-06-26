@@ -10,6 +10,15 @@ import { WalletProvider } from 'trac-wallet';
 
 const validPeerA = testKeyPair1.publicKey;
 
+function assertThrowsMessageIncludes(t, fn, expectedMessage) {
+    try {
+        fn();
+        t.fail(`Expected error including: ${expectedMessage}`);
+    } catch (error) {
+        t.ok(error?.message?.includes(expectedMessage));
+    }
+}
+
 async function createWallet() {
     return await new WalletProvider(config).fromSecretKey(testKeyPair1.secretKey);
 }
@@ -52,4 +61,52 @@ test('registerPendingRequest stores the expected entry shape for proof proposals
     t.absent('requestEpochProofProposalHash' in entry);
     t.is(typeof entry.resolve, 'function');
     t.is(typeof entry.reject, 'function');
+});
+
+test('registerPendingRequest rejects invalid proof proposal input', async t => {
+    const service = new IndexerPendingRequestService(config);
+    const validProposal = await buildProofProposal({ sessionId: 'invalid-peer' });
+
+    assertThrowsMessageIncludes(
+        t,
+        () => service.registerPendingRequest(validPeerA, 'not-an-object'),
+        'Pending request ID must be a non-empty string.'
+    );
+
+    assertThrowsMessageIncludes(
+        t,
+        () => service.registerPendingRequest(validPeerA, {
+            session_id: '',
+            type: ConsensusOperationType.PROOF_PROPOSAL
+        }),
+        'Pending request ID must be a non-empty string.'
+    );
+
+    assertThrowsMessageIncludes(
+        t,
+        () => service.registerPendingRequest(validPeerA, {
+            session_id: 'invalid-type',
+            type: 'PROOF_PROPOSAL'
+        }),
+        'Unsupported pending request type'
+    );
+
+    assertThrowsMessageIncludes(
+        t,
+        () => service.registerPendingRequest('deadbeef', validProposal),
+        'Invalid peer public key. Expected 32-byte hex string.'
+    );
+
+    t.is(service.getPendingRequest('invalid-type'), null);
+});
+
+test('registerPendingRequest throws when proof proposal message is null', t => {
+    const service = new IndexerPendingRequestService(config);
+
+    try {
+        service.registerPendingRequest(validPeerA, null);
+        t.fail('Expected registerPendingRequest to throw for null message');
+    } catch (error) {
+        t.ok(error?.message?.includes('Pending request ID must be a non-empty string.'));
+    }
 });

@@ -1,9 +1,7 @@
-import {NetworkOperationType, ResultCode} from '../../../utils/constants.js';
+import {NetworkOperationType, PEER_PUBLIC_KEY_HEX_LENGTH, ResultCode} from '../../../utils/constants.js';
 import {isHexString, publicKeyToAddress} from '../../../utils/helpers.js';
 import {V1ProtocolError} from "../protocols/v1/V1ProtocolError.js";
 import b4a from 'b4a';
-
-const PEER_PUBLIC_KEY_HEX_LENGTH = 64;
 
 export class PendingRequestServiceTimeoutError extends Error {
     constructor(requestId, peerAddress, timeoutMs) {
@@ -40,15 +38,11 @@ export default class PendingRequestService {
             throw new Error('Invalid peer public key. Expected 32-byte hex string.');
         }
 
-        if (!message || typeof message !== 'object') {
-            throw new Error('Pending request message must be an object.');
-        }
-
-        if (typeof message.id !== 'string' || message.id.length === 0) {
+        if (typeof message?.id !== 'string' || message?.id.length === 0) {
             throw new Error('Pending request ID must be a non-empty string.');
         }
 
-        if (!this.#requestMessageTypes.includes(message.type)) {
+        if (!this.#requestMessageTypes.includes(message?.type)) {
             throw new Error('Unsupported pending request type.');
         }
     }
