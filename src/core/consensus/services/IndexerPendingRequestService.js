@@ -55,6 +55,7 @@ export default class IndexerPendingRequestService {
             id: id,
             requestType: message.type,
             requestedTo: peerPubKeyHex,
+            proofProposal: message.proof_proposal,
             timeoutId: null,
             resolve: null,
             reject: null,
