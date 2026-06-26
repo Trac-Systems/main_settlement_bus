@@ -217,9 +217,9 @@ class State extends ReadyResource {
         return !!adminEntry && this.#wallet?.address === adminEntry?.address && b4a.equals(adminEntry?.wk, this.writingKey)
     }
 
-    async isAdminPublicKey(publicKey) {
+    async isAdminAddress(targetAddress) {
         const adminEntry = await this.getAdminEntry();
-        return !!adminEntry && b4a.equals(publicKey, tracCryptoApi.address.decodeSafe(adminEntry.address));
+        return (adminEntry?.address === targetAddress);
     }
 
     async isAdminAllowedToValidate() {
@@ -242,15 +242,11 @@ class State extends ReadyResource {
         return Object.values(this.#base.system.indexers);
     }
 
-    async isKnownIndexer(target) {
+    async isIndexerAddress(targetAddress) {
         const entries = await this.getIndexersEntry();
         for (const entry of entries) {
             const address = await this.get(EntryType.WRITER_ADDRESS + b4a.toString(entry.key, 'hex'));
-            if (address) {
-                const addressString = bufferToAddress(address, this.#config.addressPrefix);
-                const publicKeyBuffer = tracCryptoApi.address.decodeSafe(addressString)
-                if (b4a.equals(target, publicKeyBuffer)) return true
-            }
+            if (address === targetAddress) return true;
         }
         return false;
     }

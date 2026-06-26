@@ -5,7 +5,7 @@ import b4a from 'b4a';
 import TransactionPoolService from './services/TransactionPoolService.js';
 import ValidatorObserverService from './services/ValidatorObserverService.js';
 import NetworkMessages from './protocols/NetworkMessages.js';
-import { sleep } from '../../utils/helpers.js';
+import { publicKeyToAddress, sleep } from '../../utils/helpers.js';
 import {
     TRAC_NAMESPACE,
     EventType,
@@ -266,7 +266,8 @@ class Network extends ReadyResource {
                 // - attach connection.protocolSession (used later by tryConnect / orchestrators to send messages)
 
                 // Adds indexers to consensus connection manager
-                if (await this.#state.isKnownIndexer(connection.remotePublicKey) && !await this.#state.isAdminPublicKey(connection.remotePublicKey)) {
+                const address = publicKeyToAddress(connection.remotePublicKey, this.#config);
+                if (await this.#state.isIndexerAddress(address) && !await this.#state.isAdminAddress(address)) {
                     this.#indexerConnectionManager.add(connection.remotePublicKey, connection);
                 }
 
