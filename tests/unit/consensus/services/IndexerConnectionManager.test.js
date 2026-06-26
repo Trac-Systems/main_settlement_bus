@@ -5,8 +5,6 @@ import b4a from 'b4a';
 import { testKeyPair1, testKeyPair2, testKeyPair3 } from '../../../fixtures/apply.fixtures.js';
 import IndexerConnectionManager from '../../../../src/core/consensus/services/IndexerConnectionManager.js';
 
-const makeConfig = (maxIndexers = 10) => ({ maxIndexers });
-
 const makeConnection = (publicKeyHex) => {
     const emitter = new EventEmitter();
     emitter.consensusProtocolSession = {
@@ -18,7 +16,7 @@ const makeConnection = (publicKeyHex) => {
 };
 
 const makeManager = (...keys) => {
-    const manager = new IndexerConnectionManager(makeConfig());
+    const manager = new IndexerConnectionManager(100);
     for (const key of keys) {
         manager.add(key, makeConnection(key));
     }
@@ -29,7 +27,7 @@ test('IndexerConnectionManager', () => {
 
     test('add', () => {
         test('returns true when adding a new indexer', async t => {
-            const manager = new IndexerConnectionManager(makeConfig());
+            const manager = new IndexerConnectionManager(10);
             const conn = makeConnection(testKeyPair1.publicKey);
             t.ok(manager.add(testKeyPair1.publicKey, conn));
         });
@@ -41,7 +39,7 @@ test('IndexerConnectionManager', () => {
         });
 
         test('returns false when maxIndexers limit is reached', async t => {
-            const manager = new IndexerConnectionManager(makeConfig(1));
+            const manager = new IndexerConnectionManager(1);
             manager.add(testKeyPair1.publicKey, makeConnection(testKeyPair1.publicKey));
             t.absent(manager.add(testKeyPair2.publicKey, makeConnection(testKeyPair2.publicKey)));
         });
@@ -77,7 +75,7 @@ test('IndexerConnectionManager', () => {
     test('getConnection', () => {
         test('returns the connection for a known indexer', async t => {
             const conn = makeConnection(testKeyPair1.publicKey);
-            const manager = new IndexerConnectionManager(makeConfig());
+            const manager = new IndexerConnectionManager();
             manager.add(testKeyPair1.publicKey, conn);
             t.is(manager.getConnection(testKeyPair1.publicKey), conn);
         });
@@ -99,7 +97,7 @@ test('IndexerConnectionManager', () => {
         });
 
         test('returns empty array when no indexers connected', async t => {
-            const manager = new IndexerConnectionManager(makeConfig());
+            const manager = new IndexerConnectionManager();
             t.alike(manager.connectedIndexers(), []);
         });
     });
@@ -107,7 +105,7 @@ test('IndexerConnectionManager', () => {
     test('send', () => {
         test('calls consensusProtocolSession.send with the message', async t => {
             const conn = makeConnection(testKeyPair1.publicKey);
-            const manager = new IndexerConnectionManager(makeConfig());
+            const manager = new IndexerConnectionManager();
             manager.add(testKeyPair1.publicKey, conn);
 
             await manager.send(testKeyPair1.publicKey, { type: 'ping' });
@@ -117,13 +115,13 @@ test('IndexerConnectionManager', () => {
         });
 
         test('throws when indexer is not connected', async t => {
-            const manager = new IndexerConnectionManager(makeConfig());
+            const manager = new IndexerConnectionManager();
             await t.exception(() => manager.send(testKeyPair1.publicKey, {}), /no consensus session/);
         });
 
         test('throws when consensusProtocolSession is missing', async t => {
             const conn = new EventEmitter();
-            const manager = new IndexerConnectionManager(makeConfig());
+            const manager = new IndexerConnectionManager();
             manager.add(testKeyPair1.publicKey, conn);
             await t.exception(() => manager.send(testKeyPair1.publicKey, {}), /no consensus session/);
         });
@@ -132,7 +130,7 @@ test('IndexerConnectionManager', () => {
     test('sendAndForget', () => {
         test('calls consensusProtocolSession.sendAndForget with the message', async t => {
             const conn = makeConnection(testKeyPair1.publicKey);
-            const manager = new IndexerConnectionManager(makeConfig());
+            const manager = new IndexerConnectionManager();
             manager.add(testKeyPair1.publicKey, conn);
 
             manager.sendAndForget(testKeyPair1.publicKey, { type: 'ping' });
@@ -142,9 +140,63 @@ test('IndexerConnectionManager', () => {
         });
 
         test('is silent when indexer is not connected', async t => {
-            const manager = new IndexerConnectionManager(makeConfig());
+            const manager = new IndexerConnectionManager();
             manager.sendAndForget(testKeyPair1.publicKey, {});
             t.pass('did not throw');
+        });
+
+        test('is silent when consensusProtocolSession is missing', async t => {
+            const conn = new EventEmitter();
+            const manager = new IndexerConnectionManager();
+            manager.add(testKeyPair1.publicKey, conn);
+            manager.sendAndForget(testKeyPair1.publicKey, { type: 'ping' });
+            t.pass('did not throw');
+        });
+    });
+
+    test('exists', () => {
+        test('returns true for an added indexer', async t => {
+            const manager = makeManager(testKeyPair1.publicKey);
+            t.ok(manager.exists(testKeyPair1.publicKey));
+        });
+
+        test('returns false for an unknown key', async t => {
+            const manager = makeManager(testKeyPair1.publicKey);
+            t.absent(manager.exists(testKeyPair2.publicKey));
+        });
+
+        test('returns false after removal', async t => {
+            const manager = makeManager(testKeyPair1.publicKey);
+            manager.remove(testKeyPair1.publicKey);
+            t.absent(manager.exists(testKeyPair1.publicKey));
+        });
+
+        test('accepts buffer input', async t => {
+            const manager = makeManager(testKeyPair1.publicKey);
+            const bufferKey = b4a.from(testKeyPair1.publicKey, 'hex');
+            t.ok(manager.exists(bufferKey));
+        });
+    });
+
+    test('setMax', () => {
+        test('increasing max allows more connections', async t => {
+            const manager = new IndexerConnectionManager(1);
+            manager.add(testKeyPair1.publicKey, makeConnection(testKeyPair1.publicKey));
+            t.absent(manager.add(testKeyPair2.publicKey, makeConnection(testKeyPair2.publicKey)), 'blocked at limit=1');
+
+            manager.setMax(2);
+            t.ok(manager.add(testKeyPair2.publicKey, makeConnection(testKeyPair2.publicKey)), 'allowed after setMax(2)');
+        });
+
+        test('decreasing max blocks future additions but keeps existing', async t => {
+            const manager = new IndexerConnectionManager(3);
+            manager.add(testKeyPair1.publicKey, makeConnection(testKeyPair1.publicKey));
+            manager.add(testKeyPair2.publicKey, makeConnection(testKeyPair2.publicKey));
+
+            manager.setMax(2);
+            t.absent(manager.add(testKeyPair3.publicKey, makeConnection(testKeyPair3.publicKey)), 'blocked after setMax(2)');
+            t.ok(manager.connected(testKeyPair1.publicKey), 'existing connections are kept');
+            t.ok(manager.connected(testKeyPair2.publicKey), 'existing connections are kept');
         });
     });
 });

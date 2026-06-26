@@ -2,11 +2,9 @@ import { toHex } from '../../../utils/buffer.js';
 
 class IndexerConnectionManager {
     #indexers = new Map();
-    #config;
     #maxIndexers;
 
-    constructor(config, maxIndexers) {
-        this.#config = config;
+    constructor(maxIndexers) {
         this.#maxIndexers = maxIndexers;
     }
 
