@@ -245,7 +245,7 @@ class State extends ReadyResource {
     async isIndexerAddress(targetAddress) {
         const entries = await this.getIndexersEntry();
         for (const entry of entries) {
-            const address = await this.get(EntryType.WRITER_ADDRESS + b4a.toString(entry.key, 'hex'));
+            const address = await this.getSigned(EntryType.WRITER_ADDRESS + b4a.toString(entry.key, 'hex'));
             if (address === targetAddress) return true;
         }
         return false;
