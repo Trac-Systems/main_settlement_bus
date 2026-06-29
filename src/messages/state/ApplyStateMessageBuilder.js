@@ -30,9 +30,10 @@ class ApplyStateMessageBuilder {
     #address;
     #amount;
     #approvals;
+    #built = false;
     #channel;
-    #config
     #contentHash;
+    #config;
     #externalBootstrap;
     #incomingAddress;
     #incomingNonce;
@@ -40,16 +41,17 @@ class ApplyStateMessageBuilder {
     #incomingWriterKey;
     #msbBootstrap;
     #operationType;
+    #output;
     #payload;
+    #payloadKey;
+    #phase;
     #proofData;
     #txHash;
     #txValidity;
+    #vdfDifficulty;
+    #vdfDiscrimintantSize;
     #wallet;
     #writingKey;
-    #phase;
-    #output;
-    #payloadKey;
-    #built=false;
 
     constructor(wallet, config) {
         this.#config = config;
@@ -361,7 +363,10 @@ class ApplyStateMessageBuilder {
                     nonce,
                     OperationType.TRANSFER
                 );
+            case OperationType.SET_GENESIS_EPOCH:
+                this.#requireFields([])
                 break;
+
             default:
                 throw new Error(`Unsupported operation type: ${this.#operationType}`);
         }
