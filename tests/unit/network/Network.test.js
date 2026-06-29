@@ -139,7 +139,7 @@ async function loadNetwork() {
         '../../../src/core/network/services/ConnectionManager.js': { default: ConnectionManagerMock },
         '../../../src/core/network/services/MessageOrchestrator.js': { default: MessageOrchestratorMock },
         '../../../src/core/network/services/TransactionRateLimiterService.js': { default: TransactionRateLimiterServiceMock },
-        '../../../src/core/network/services/PendingRequestService.js': { default: PendingRequestServiceMock },
+        '../../../src/core/network/services/ValidatorPendingRequestService.js': { default: PendingRequestServiceMock },
         '../../../src/core/network/services/TransactionCommitService.js': { default: TransactionCommitServiceMock },
         '../../../src/core/network/services/ValidatorHealthCheckService.js': { default: ValidatorHealthCheckServiceMock },
         '../../../src/core/consensus/services/EpochProofProposalService.js': { default: EpochProofProposalServiceMock },

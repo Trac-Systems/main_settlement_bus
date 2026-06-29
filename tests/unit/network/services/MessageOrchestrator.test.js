@@ -6,7 +6,7 @@ import { OperationType, ResultCode } from '../../../../src/utils/constants.js';
 import { testKeyPair1, testKeyPair2 } from '../../../fixtures/apply.fixtures.js';
 import { publicKeyToAddress } from '../../../../src/utils/helpers.js';
 import { ConnectionManagerError } from '../../../../src/core/network/services/ConnectionManager.js';
-import { PendingRequestServiceTimeoutError } from '../../../../src/core/network/services/PendingRequestService.js';
+import { ValidatorPendingRequestServiceTimeoutError } from '../../../../src/core/network/services/ValidatorPendingRequestService.js';
 import { WalletProvider } from 'trac-wallet';
 import { config, overrideConfig } from '../../../helpers/config.js';
 
@@ -256,7 +256,7 @@ test('MessageOrchestrator.send timeout split: pending timeout rejection goes thr
     const config = overrideConfig({ maxRetries: 2 });
     const sendSingleMessage = sinon.stub();
     sendSingleMessage.onFirstCall().rejects(
-        new PendingRequestServiceTimeoutError('req-1', publicKeyToAddress(VALIDATOR_KEY, config), config.pendingRequestTimeout)
+        new ValidatorPendingRequestServiceTimeoutError('req-1', publicKeyToAddress(VALIDATOR_KEY, config), config.pendingRequestTimeout)
     );
     sendSingleMessage.onSecondCall().resolves(ResultCode.OK);
 

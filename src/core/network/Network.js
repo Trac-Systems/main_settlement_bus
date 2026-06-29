@@ -14,7 +14,7 @@ import {
 import ConnectionManager from './services/ConnectionManager.js';
 import MessageOrchestrator from './services/MessageOrchestrator.js';
 import TransactionRateLimiterService from './services/TransactionRateLimiterService.js';
-import PendingRequestService from './services/PendingRequestService.js';
+import ValidatorPendingRequestService from './services/ValidatorPendingRequestService.js';
 import TransactionCommitService from "./services/TransactionCommitService.js";
 import ValidatorHealthCheckService from './services/ValidatorHealthCheckService.js';
 import EpochProofProposalService from '../consensus/services/EpochProofProposalService.js';
@@ -69,7 +69,7 @@ class Network extends ReadyResource {
         this.#validatorObserverService = new ValidatorObserverService(this, state, wallet?.address, this.#config);
         this.#validatorConnectionManager = new ConnectionManager(this.#config);
         this.#validatorMessageOrchestrator = new MessageOrchestrator(this.#validatorConnectionManager, state, this.#config);
-        this.#pendingRequestsService = new PendingRequestService(this.#config);
+        this.#pendingRequestsService = new ValidatorPendingRequestService(this.#config);
         this.#indexerPendingRequestService = new IndexerPendingRequestService(this.#config);
         this.#logger = new Logger(this.#config);
     }

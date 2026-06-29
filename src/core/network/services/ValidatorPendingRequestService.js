@@ -3,14 +3,14 @@ import {isHexString, publicKeyToAddress} from '../../../utils/helpers.js';
 import {V1ProtocolError} from "../protocols/v1/V1ProtocolError.js";
 import b4a from 'b4a';
 
-export class PendingRequestServiceTimeoutError extends Error {
+export class ValidatorPendingRequestServiceTimeoutError extends Error {
     constructor(requestId, peerAddress, timeoutMs) {
         super(`Pending request ${requestId} to peer ${peerAddress} timed out after ${timeoutMs} ms.`);
         this.name = this.constructor.name;
     }
 }
 
-export default class PendingRequestService {
+export default class ValidatorPendingRequestService {
     #pendingRequests;
     #requestMessageTypes = [NetworkOperationType.LIVENESS_REQUEST, NetworkOperationType.BROADCAST_TRANSACTION_REQUEST];
     #config;
@@ -80,7 +80,7 @@ export default class PendingRequestService {
         entry.timeoutId = setTimeout(() => {
             this.rejectPendingRequest(
                 id,
-                new PendingRequestServiceTimeoutError(
+                new ValidatorPendingRequestServiceTimeoutError(
                     id,
                     peerAddress,
                     this.#config.pendingRequestTimeout
@@ -161,7 +161,7 @@ export default class PendingRequestService {
                         `Pending request ${id} cancelled (shutdown).`)
                 );
             } catch (error) {
-                console.error(`PendingRequestService.close: failed to reject pending request ${id}:`, error);
+                console.error(`ValidatorPendingRequestService.close: failed to reject pending request ${id}:`, error);
             }
         }
         this.#pendingRequests.clear();
