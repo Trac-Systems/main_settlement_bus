@@ -114,3 +114,128 @@ test('State#isAdminAllowedToValidate blocks admin when active validator threshol
 
     restore();
 });
+
+async function setupQueryState(config) {
+    const dbPath = './.test-db-query-' + Date.now() + Math.floor(Math.random() * 1000);
+    const store = new Corestore(dbPath);
+    const state = new State(store, {}, config);
+    if (typeof state._open === 'function') await state._open();
+    else if (typeof state.ready === 'function') await state.ready();
+    return {
+        state,
+        restore: () => {
+            try { fs.rmSync(dbPath, { recursive: true, force: true }); } catch (e) { console.log(e); }
+        }
+    };
+}
+
+test('State#indexerCount returns 0 when no indexers', async t => {
+    const config = createStateConfig();
+    const { state, restore } = await setupQueryState(config);
+
+    const stub = sinon.stub(state, 'getIndexersEntry').resolves([]);
+    const count = await state.indexerCount();
+    t.is(count, 0, 'returns 0 with empty indexer list');
+
+    stub.restore();
+    restore();
+});
+
+test('State#indexerCount returns correct count when indexers present', async t => {
+    const config = createStateConfig();
+    const { state, restore } = await setupQueryState(config);
+
+    const stub = sinon.stub(state, 'getIndexersEntry').resolves([
+        { key: randomBuffer(WRITER_BYTE_LENGTH) },
+        { key: randomBuffer(WRITER_BYTE_LENGTH) }
+    ]);
+    const count = await state.indexerCount();
+    t.is(count, 2, 'returns 2 with two indexers');
+
+    stub.restore();
+    restore();
+});
+
+test('State#isAdminAddress returns true for the admin address', async t => {
+    const config = createStateConfig();
+    const { state, restore } = await setupQueryState(config);
+    const adminAddress = randomAddress('trac');
+
+    const stub = sinon.stub(state, 'getAdminEntry').resolves({ address: adminAddress, wk: config.bootstrap });
+    const result = await state.isAdminAddress(adminAddress);
+    t.is(result, true, 'returns true when target matches admin address');
+
+    stub.restore();
+    restore();
+});
+
+test('State#isAdminAddress returns false for a non-admin address', async t => {
+    const config = createStateConfig();
+    const { state, restore } = await setupQueryState(config);
+    const adminAddress = randomAddress('trac');
+    const otherAddress = randomAddress('trac');
+
+    const stub = sinon.stub(state, 'getAdminEntry').resolves({ address: adminAddress, wk: config.bootstrap });
+    const result = await state.isAdminAddress(otherAddress);
+    t.is(result, false, 'returns false when target does not match admin address');
+
+    stub.restore();
+    restore();
+});
+
+test('State#isAdminAddress returns false when no admin entry exists', async t => {
+    const config = createStateConfig();
+    const { state, restore } = await setupQueryState(config);
+
+    const stub = sinon.stub(state, 'getAdminEntry').resolves(null);
+    const result = await state.isAdminAddress(randomAddress('trac'));
+    t.is(result, false, 'returns false when admin entry is null');
+
+    stub.restore();
+    restore();
+});
+
+test('State#isIndexerAddress returns true when address belongs to an indexer', async t => {
+    const config = createStateConfig();
+    const { state, restore } = await setupQueryState(config);
+    const indexerKey = randomBuffer(WRITER_BYTE_LENGTH);
+    const indexerAddress = randomAddress('trac');
+
+    const entriesStub = sinon.stub(state, 'getIndexersEntry').resolves([{ key: indexerKey }]);
+    const signedStub = sinon.stub(state, 'getSigned').resolves(indexerAddress);
+    const result = await state.isIndexerAddress(indexerAddress);
+    t.is(result, true, 'returns true when address matches an indexer');
+
+    entriesStub.restore();
+    signedStub.restore();
+    restore();
+});
+
+test('State#isIndexerAddress returns false when address does not match any indexer', async t => {
+    const config = createStateConfig();
+    const { state, restore } = await setupQueryState(config);
+    const indexerKey = randomBuffer(WRITER_BYTE_LENGTH);
+    const indexerAddress = randomAddress('trac');
+    const otherAddress = randomAddress('trac');
+
+    const entriesStub = sinon.stub(state, 'getIndexersEntry').resolves([{ key: indexerKey }]);
+    const signedStub = sinon.stub(state, 'getSigned').resolves(indexerAddress);
+    const result = await state.isIndexerAddress(otherAddress);
+    t.is(result, false, 'returns false when address does not match any indexer');
+
+    entriesStub.restore();
+    signedStub.restore();
+    restore();
+});
+
+test('State#isIndexerAddress returns false when no indexers exist', async t => {
+    const config = createStateConfig();
+    const { state, restore } = await setupQueryState(config);
+
+    const entriesStub = sinon.stub(state, 'getIndexersEntry').resolves([]);
+    const result = await state.isIndexerAddress(randomAddress('trac'));
+    t.is(result, false, 'returns false when indexer list is empty');
+
+    entriesStub.restore();
+    restore();
+});

@@ -130,7 +130,7 @@ class State extends ReadyResource {
     }
 
     async indexerCount() {
-        return await this.getIndexersEntry().length;
+        return (await this.getIndexersEntry()).length;
     }
 
     getUnsignedLength() {
