@@ -38,7 +38,7 @@ class Network extends ReadyResource {
     #config;
     #pendingConnections;
     #rateLimiter;
-    #pendingRequestsService;
+    #validatorPendingRequestService;
     #transactionCommitService;
     #wallet;
     #validatorHealthCheckService;
@@ -69,7 +69,7 @@ class Network extends ReadyResource {
         this.#validatorObserverService = new ValidatorObserverService(this, state, wallet?.address, this.#config);
         this.#validatorConnectionManager = new ConnectionManager(this.#config);
         this.#validatorMessageOrchestrator = new MessageOrchestrator(this.#validatorConnectionManager, state, this.#config);
-        this.#pendingRequestsService = new ValidatorPendingRequestService(this.#config);
+        this.#validatorPendingRequestService = new ValidatorPendingRequestService(this.#config);
         this.#indexerPendingRequestService = new IndexerPendingRequestService(this.#config);
         this.#logger = new Logger(this.#config);
     }
@@ -124,7 +124,7 @@ class Network extends ReadyResource {
         this.cleanupPendingConnections();
         await this.#validatorHealthCheckService.close();
         await this.#epochProofProposalService.close();
-        this.#pendingRequestsService.close();
+        this.#validatorPendingRequestService.close();
         this.#transactionCommitService.close();
         this.#indexerPendingRequestService.close();
 
@@ -237,7 +237,7 @@ class Network extends ReadyResource {
                 this.#wallet,
                 this.#rateLimiter,
                 this.#transactionPoolService,
-                this.#pendingRequestsService,
+                this.#validatorPendingRequestService,
                 this.#transactionCommitService,
                 this.#config
             );
@@ -282,7 +282,7 @@ class Network extends ReadyResource {
                 }
 
                 connection.on('close', () => {
-                    this.#pendingRequestsService.rejectPendingRequestsForPeer(
+                    this.#validatorPendingRequestService.rejectPendingRequestsForPeer(
                         publicKey,
                         new Error('Connection closed before response')
                     );
@@ -298,7 +298,7 @@ class Network extends ReadyResource {
                 });
 
                 connection.on('error', (error) => {
-                    this.#pendingRequestsService.rejectPendingRequestsForPeer(
+                    this.#validatorPendingRequestService.rejectPendingRequestsForPeer(
                         publicKey,
                         error ?? new Error('Connection error before response')
                     );
@@ -416,7 +416,7 @@ class Network extends ReadyResource {
 
             if (connection &&
                 connection.protocolSession &&
-                !this.#pendingRequestsService.isProbePending(connection.remotePublicKey.toString('hex'))
+                !this.#validatorPendingRequestService.isProbePending(connection.remotePublicKey.toString('hex'))
             ) {
                 await this.#finalizeConnection(publicKey, type, connection);
                 return CONNECTION_STATUS.CONNECTED;
