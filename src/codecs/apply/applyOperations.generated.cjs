@@ -47,6 +47,7 @@ $root.apply = (function() {
              * @property {apply.operations.IBootstrapDeploymentOperation|null} [bdo] Operation bdo
              * @property {apply.operations.ITxOperation|null} [txo] Operation txo
              * @property {apply.operations.ISetEpochOperation|null} [seo] Operation seo
+             * @property {apply.operations.ISetGenesisEpochOperation|null} [sgo] Operation sgo
              */
 
             /**
@@ -144,17 +145,25 @@ $root.apply = (function() {
              */
             Operation.prototype.seo = null;
 
+            /**
+             * Operation sgo.
+             * @member {apply.operations.ISetGenesisEpochOperation|null|undefined} sgo
+             * @memberof apply.operations.Operation
+             * @instance
+             */
+            Operation.prototype.sgo = null;
+
             // OneOf field names bound to virtual getters and setters
             var $oneOfFields;
 
             /**
              * Operation value.
-             * @member {"cao"|"aco"|"bio"|"tro"|"rao"|"bdo"|"txo"|"seo"|undefined} value
+             * @member {"cao"|"aco"|"bio"|"tro"|"rao"|"bdo"|"txo"|"seo"|"sgo"|undefined} value
              * @memberof apply.operations.Operation
              * @instance
              */
             Object.defineProperty(Operation.prototype, "value", {
-                get: $util.oneOfGetter($oneOfFields = ["cao", "aco", "bio", "tro", "rao", "bdo", "txo", "seo"]),
+                get: $util.oneOfGetter($oneOfFields = ["cao", "aco", "bio", "tro", "rao", "bdo", "txo", "seo", "sgo"]),
                 set: $util.oneOfSetter($oneOfFields)
             });
 
@@ -202,6 +211,8 @@ $root.apply = (function() {
                     $root.apply.operations.TxOperation.encode(message.txo, writer.uint32(/* id 9, wireType 2 =*/74).fork()).ldelim();
                 if (message.seo != null && Object.hasOwnProperty.call(message, "seo"))
                     $root.apply.operations.SetEpochOperation.encode(message.seo, writer.uint32(/* id 10, wireType 2 =*/82).fork()).ldelim();
+                if (message.sgo != null && Object.hasOwnProperty.call(message, "sgo"))
+                    $root.apply.operations.SetGenesisEpochOperation.encode(message.sgo, writer.uint32(/* id 11, wireType 2 =*/90).fork()).ldelim();
                 return writer;
             };
 
@@ -278,6 +289,10 @@ $root.apply = (function() {
                             message.seo = $root.apply.operations.SetEpochOperation.decode(reader, reader.uint32());
                             break;
                         }
+                    case 11: {
+                            message.sgo = $root.apply.operations.SetGenesisEpochOperation.decode(reader, reader.uint32());
+                            break;
+                        }
                     default:
                         reader.skipType(tag & 7);
                         break;
@@ -333,6 +348,7 @@ $root.apply = (function() {
                     case 12:
                     case 13:
                     case 14:
+                    case 15:
                         break;
                     }
                 if (message.address != null && message.hasOwnProperty("address"))
@@ -414,6 +430,16 @@ $root.apply = (function() {
                         var error = $root.apply.operations.SetEpochOperation.verify(message.seo);
                         if (error)
                             return "seo." + error;
+                    }
+                }
+                if (message.sgo != null && message.hasOwnProperty("sgo")) {
+                    if (properties.value === 1)
+                        return "value: multiple values";
+                    properties.value = 1;
+                    {
+                        var error = $root.apply.operations.SetGenesisEpochOperation.verify(message.sgo);
+                        if (error)
+                            return "sgo." + error;
                     }
                 }
                 return null;
@@ -498,6 +524,10 @@ $root.apply = (function() {
                 case 14:
                     message.type = 14;
                     break;
+                case "SET_GENESIS_EPOCH":
+                case 15:
+                    message.type = 15;
+                    break;
                 }
                 if (object.address != null)
                     if (typeof object.address === "string")
@@ -543,6 +573,11 @@ $root.apply = (function() {
                     if (typeof object.seo !== "object")
                         throw TypeError(".apply.operations.Operation.seo: object expected");
                     message.seo = $root.apply.operations.SetEpochOperation.fromObject(object.seo);
+                }
+                if (object.sgo != null) {
+                    if (typeof object.sgo !== "object")
+                        throw TypeError(".apply.operations.Operation.sgo: object expected");
+                    message.sgo = $root.apply.operations.SetGenesisEpochOperation.fromObject(object.sgo);
                 }
                 return message;
             };
@@ -614,6 +649,11 @@ $root.apply = (function() {
                     if (options.oneofs)
                         object.value = "seo";
                 }
+                if (message.sgo != null && message.hasOwnProperty("sgo")) {
+                    object.sgo = $root.apply.operations.SetGenesisEpochOperation.toObject(message.sgo, options);
+                    if (options.oneofs)
+                        object.value = "sgo";
+                }
                 return object;
             };
 
@@ -665,6 +705,7 @@ $root.apply = (function() {
          * @property {number} TX=12 TX value
          * @property {number} TRANSFER=13 TRANSFER value
          * @property {number} SET_EPOCH=14 SET_EPOCH value
+         * @property {number} SET_GENESIS_EPOCH=15 SET_GENESIS_EPOCH value
          */
         operations.OperationType = (function() {
             var valuesById = {}, values = Object.create(valuesById);
@@ -683,6 +724,7 @@ $root.apply = (function() {
             values[valuesById[12] = "TX"] = 12;
             values[valuesById[13] = "TRANSFER"] = 13;
             values[valuesById[14] = "SET_EPOCH"] = 14;
+            values[valuesById[15] = "SET_GENESIS_EPOCH"] = 15;
             return values;
         })();
 
@@ -3918,6 +3960,381 @@ $root.apply = (function() {
             };
 
             return SetEpochOperation;
+        })();
+
+        operations.SetGenesisEpochOperation = (function() {
+
+            /**
+             * Properties of a SetGenesisEpochOperation.
+             * @memberof apply.operations
+             * @interface ISetGenesisEpochOperation
+             * @property {Uint8Array|null} [tx] SetGenesisEpochOperation tx
+             * @property {Uint8Array|null} [txv] SetGenesisEpochOperation txv
+             * @property {Uint8Array|null} [df] SetGenesisEpochOperation df
+             * @property {Uint8Array|null} [db] SetGenesisEpochOperation db
+             * @property {Uint8Array|null} ["in"] SetGenesisEpochOperation in
+             * @property {Uint8Array|null} [is] SetGenesisEpochOperation is
+             */
+
+            /**
+             * Constructs a new SetGenesisEpochOperation.
+             * @memberof apply.operations
+             * @classdesc Represents a SetGenesisEpochOperation.
+             * @implements ISetGenesisEpochOperation
+             * @constructor
+             * @param {apply.operations.ISetGenesisEpochOperation=} [properties] Properties to set
+             */
+            function SetGenesisEpochOperation(properties) {
+                if (properties)
+                    for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
+                        if (properties[keys[i]] != null)
+                            this[keys[i]] = properties[keys[i]];
+            }
+
+            /**
+             * SetGenesisEpochOperation tx.
+             * @member {Uint8Array} tx
+             * @memberof apply.operations.SetGenesisEpochOperation
+             * @instance
+             */
+            SetGenesisEpochOperation.prototype.tx = $util.newBuffer([]);
+
+            /**
+             * SetGenesisEpochOperation txv.
+             * @member {Uint8Array} txv
+             * @memberof apply.operations.SetGenesisEpochOperation
+             * @instance
+             */
+            SetGenesisEpochOperation.prototype.txv = $util.newBuffer([]);
+
+            /**
+             * SetGenesisEpochOperation df.
+             * @member {Uint8Array} df
+             * @memberof apply.operations.SetGenesisEpochOperation
+             * @instance
+             */
+            SetGenesisEpochOperation.prototype.df = $util.newBuffer([]);
+
+            /**
+             * SetGenesisEpochOperation db.
+             * @member {Uint8Array} db
+             * @memberof apply.operations.SetGenesisEpochOperation
+             * @instance
+             */
+            SetGenesisEpochOperation.prototype.db = $util.newBuffer([]);
+
+            /**
+             * SetGenesisEpochOperation in.
+             * @member {Uint8Array} in
+             * @memberof apply.operations.SetGenesisEpochOperation
+             * @instance
+             */
+            SetGenesisEpochOperation.prototype["in"] = $util.newBuffer([]);
+
+            /**
+             * SetGenesisEpochOperation is.
+             * @member {Uint8Array} is
+             * @memberof apply.operations.SetGenesisEpochOperation
+             * @instance
+             */
+            SetGenesisEpochOperation.prototype.is = $util.newBuffer([]);
+
+            /**
+             * Creates a new SetGenesisEpochOperation instance using the specified properties.
+             * @function create
+             * @memberof apply.operations.SetGenesisEpochOperation
+             * @static
+             * @param {apply.operations.ISetGenesisEpochOperation=} [properties] Properties to set
+             * @returns {apply.operations.SetGenesisEpochOperation} SetGenesisEpochOperation instance
+             */
+            SetGenesisEpochOperation.create = function create(properties) {
+                return new SetGenesisEpochOperation(properties);
+            };
+
+            /**
+             * Encodes the specified SetGenesisEpochOperation message. Does not implicitly {@link apply.operations.SetGenesisEpochOperation.verify|verify} messages.
+             * @function encode
+             * @memberof apply.operations.SetGenesisEpochOperation
+             * @static
+             * @param {apply.operations.ISetGenesisEpochOperation} message SetGenesisEpochOperation message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            SetGenesisEpochOperation.encode = function encode(message, writer) {
+                if (!writer)
+                    writer = $Writer.create();
+                if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
+                    writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.tx);
+                if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
+                    writer.uint32(/* id 2, wireType 2 =*/18).bytes(message.txv);
+                if (message.df != null && Object.hasOwnProperty.call(message, "df"))
+                    writer.uint32(/* id 3, wireType 2 =*/26).bytes(message.df);
+                if (message.db != null && Object.hasOwnProperty.call(message, "db"))
+                    writer.uint32(/* id 4, wireType 2 =*/34).bytes(message.db);
+                if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
+                    writer.uint32(/* id 5, wireType 2 =*/42).bytes(message["in"]);
+                if (message.is != null && Object.hasOwnProperty.call(message, "is"))
+                    writer.uint32(/* id 6, wireType 2 =*/50).bytes(message.is);
+                return writer;
+            };
+
+            /**
+             * Encodes the specified SetGenesisEpochOperation message, length delimited. Does not implicitly {@link apply.operations.SetGenesisEpochOperation.verify|verify} messages.
+             * @function encodeDelimited
+             * @memberof apply.operations.SetGenesisEpochOperation
+             * @static
+             * @param {apply.operations.ISetGenesisEpochOperation} message SetGenesisEpochOperation message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            SetGenesisEpochOperation.encodeDelimited = function encodeDelimited(message, writer) {
+                return this.encode(message, writer).ldelim();
+            };
+
+            /**
+             * Decodes a SetGenesisEpochOperation message from the specified reader or buffer.
+             * @function decode
+             * @memberof apply.operations.SetGenesisEpochOperation
+             * @static
+             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @param {number} [length] Message length if known beforehand
+             * @returns {apply.operations.SetGenesisEpochOperation} SetGenesisEpochOperation
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            SetGenesisEpochOperation.decode = function decode(reader, length, error) {
+                if (!(reader instanceof $Reader))
+                    reader = $Reader.create(reader);
+                var end = length === undefined ? reader.len : reader.pos + length, message = new $root.apply.operations.SetGenesisEpochOperation();
+                while (reader.pos < end) {
+                    var tag = reader.uint32();
+                    if (tag === error)
+                        break;
+                    switch (tag >>> 3) {
+                    case 1: {
+                            message.tx = reader.bytes();
+                            break;
+                        }
+                    case 2: {
+                            message.txv = reader.bytes();
+                            break;
+                        }
+                    case 3: {
+                            message.df = reader.bytes();
+                            break;
+                        }
+                    case 4: {
+                            message.db = reader.bytes();
+                            break;
+                        }
+                    case 5: {
+                            message["in"] = reader.bytes();
+                            break;
+                        }
+                    case 6: {
+                            message.is = reader.bytes();
+                            break;
+                        }
+                    default:
+                        reader.skipType(tag & 7);
+                        break;
+                    }
+                }
+                return message;
+            };
+
+            /**
+             * Decodes a SetGenesisEpochOperation message from the specified reader or buffer, length delimited.
+             * @function decodeDelimited
+             * @memberof apply.operations.SetGenesisEpochOperation
+             * @static
+             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @returns {apply.operations.SetGenesisEpochOperation} SetGenesisEpochOperation
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            SetGenesisEpochOperation.decodeDelimited = function decodeDelimited(reader) {
+                if (!(reader instanceof $Reader))
+                    reader = new $Reader(reader);
+                return this.decode(reader, reader.uint32());
+            };
+
+            /**
+             * Verifies a SetGenesisEpochOperation message.
+             * @function verify
+             * @memberof apply.operations.SetGenesisEpochOperation
+             * @static
+             * @param {Object.<string,*>} message Plain object to verify
+             * @returns {string|null} `null` if valid, otherwise the reason why it is not
+             */
+            SetGenesisEpochOperation.verify = function verify(message) {
+                if (typeof message !== "object" || message === null)
+                    return "object expected";
+                if (message.tx != null && message.hasOwnProperty("tx"))
+                    if (!(message.tx && typeof message.tx.length === "number" || $util.isString(message.tx)))
+                        return "tx: buffer expected";
+                if (message.txv != null && message.hasOwnProperty("txv"))
+                    if (!(message.txv && typeof message.txv.length === "number" || $util.isString(message.txv)))
+                        return "txv: buffer expected";
+                if (message.df != null && message.hasOwnProperty("df"))
+                    if (!(message.df && typeof message.df.length === "number" || $util.isString(message.df)))
+                        return "df: buffer expected";
+                if (message.db != null && message.hasOwnProperty("db"))
+                    if (!(message.db && typeof message.db.length === "number" || $util.isString(message.db)))
+                        return "db: buffer expected";
+                if (message["in"] != null && message.hasOwnProperty("in"))
+                    if (!(message["in"] && typeof message["in"].length === "number" || $util.isString(message["in"])))
+                        return "in: buffer expected";
+                if (message.is != null && message.hasOwnProperty("is"))
+                    if (!(message.is && typeof message.is.length === "number" || $util.isString(message.is)))
+                        return "is: buffer expected";
+                return null;
+            };
+
+            /**
+             * Creates a SetGenesisEpochOperation message from a plain object. Also converts values to their respective internal types.
+             * @function fromObject
+             * @memberof apply.operations.SetGenesisEpochOperation
+             * @static
+             * @param {Object.<string,*>} object Plain object
+             * @returns {apply.operations.SetGenesisEpochOperation} SetGenesisEpochOperation
+             */
+            SetGenesisEpochOperation.fromObject = function fromObject(object) {
+                if (object instanceof $root.apply.operations.SetGenesisEpochOperation)
+                    return object;
+                var message = new $root.apply.operations.SetGenesisEpochOperation();
+                if (object.tx != null)
+                    if (typeof object.tx === "string")
+                        $util.base64.decode(object.tx, message.tx = $util.newBuffer($util.base64.length(object.tx)), 0);
+                    else if (object.tx.length >= 0)
+                        message.tx = object.tx;
+                if (object.txv != null)
+                    if (typeof object.txv === "string")
+                        $util.base64.decode(object.txv, message.txv = $util.newBuffer($util.base64.length(object.txv)), 0);
+                    else if (object.txv.length >= 0)
+                        message.txv = object.txv;
+                if (object.df != null)
+                    if (typeof object.df === "string")
+                        $util.base64.decode(object.df, message.df = $util.newBuffer($util.base64.length(object.df)), 0);
+                    else if (object.df.length >= 0)
+                        message.df = object.df;
+                if (object.db != null)
+                    if (typeof object.db === "string")
+                        $util.base64.decode(object.db, message.db = $util.newBuffer($util.base64.length(object.db)), 0);
+                    else if (object.db.length >= 0)
+                        message.db = object.db;
+                if (object["in"] != null)
+                    if (typeof object["in"] === "string")
+                        $util.base64.decode(object["in"], message["in"] = $util.newBuffer($util.base64.length(object["in"])), 0);
+                    else if (object["in"].length >= 0)
+                        message["in"] = object["in"];
+                if (object.is != null)
+                    if (typeof object.is === "string")
+                        $util.base64.decode(object.is, message.is = $util.newBuffer($util.base64.length(object.is)), 0);
+                    else if (object.is.length >= 0)
+                        message.is = object.is;
+                return message;
+            };
+
+            /**
+             * Creates a plain object from a SetGenesisEpochOperation message. Also converts values to other types if specified.
+             * @function toObject
+             * @memberof apply.operations.SetGenesisEpochOperation
+             * @static
+             * @param {apply.operations.SetGenesisEpochOperation} message SetGenesisEpochOperation
+             * @param {$protobuf.IConversionOptions} [options] Conversion options
+             * @returns {Object.<string,*>} Plain object
+             */
+            SetGenesisEpochOperation.toObject = function toObject(message, options) {
+                if (!options)
+                    options = {};
+                var object = {};
+                if (options.defaults) {
+                    if (options.bytes === String)
+                        object.tx = "";
+                    else {
+                        object.tx = [];
+                        if (options.bytes !== Array)
+                            object.tx = $util.newBuffer(object.tx);
+                    }
+                    if (options.bytes === String)
+                        object.txv = "";
+                    else {
+                        object.txv = [];
+                        if (options.bytes !== Array)
+                            object.txv = $util.newBuffer(object.txv);
+                    }
+                    if (options.bytes === String)
+                        object.df = "";
+                    else {
+                        object.df = [];
+                        if (options.bytes !== Array)
+                            object.df = $util.newBuffer(object.df);
+                    }
+                    if (options.bytes === String)
+                        object.db = "";
+                    else {
+                        object.db = [];
+                        if (options.bytes !== Array)
+                            object.db = $util.newBuffer(object.db);
+                    }
+                    if (options.bytes === String)
+                        object["in"] = "";
+                    else {
+                        object["in"] = [];
+                        if (options.bytes !== Array)
+                            object["in"] = $util.newBuffer(object["in"]);
+                    }
+                    if (options.bytes === String)
+                        object.is = "";
+                    else {
+                        object.is = [];
+                        if (options.bytes !== Array)
+                            object.is = $util.newBuffer(object.is);
+                    }
+                }
+                if (message.tx != null && message.hasOwnProperty("tx"))
+                    object.tx = options.bytes === String ? $util.base64.encode(message.tx, 0, message.tx.length) : options.bytes === Array ? Array.prototype.slice.call(message.tx) : message.tx;
+                if (message.txv != null && message.hasOwnProperty("txv"))
+                    object.txv = options.bytes === String ? $util.base64.encode(message.txv, 0, message.txv.length) : options.bytes === Array ? Array.prototype.slice.call(message.txv) : message.txv;
+                if (message.df != null && message.hasOwnProperty("df"))
+                    object.df = options.bytes === String ? $util.base64.encode(message.df, 0, message.df.length) : options.bytes === Array ? Array.prototype.slice.call(message.df) : message.df;
+                if (message.db != null && message.hasOwnProperty("db"))
+                    object.db = options.bytes === String ? $util.base64.encode(message.db, 0, message.db.length) : options.bytes === Array ? Array.prototype.slice.call(message.db) : message.db;
+                if (message["in"] != null && message.hasOwnProperty("in"))
+                    object["in"] = options.bytes === String ? $util.base64.encode(message["in"], 0, message["in"].length) : options.bytes === Array ? Array.prototype.slice.call(message["in"]) : message["in"];
+                if (message.is != null && message.hasOwnProperty("is"))
+                    object.is = options.bytes === String ? $util.base64.encode(message.is, 0, message.is.length) : options.bytes === Array ? Array.prototype.slice.call(message.is) : message.is;
+                return object;
+            };
+
+            /**
+             * Converts this SetGenesisEpochOperation to JSON.
+             * @function toJSON
+             * @memberof apply.operations.SetGenesisEpochOperation
+             * @instance
+             * @returns {Object.<string,*>} JSON object
+             */
+            SetGenesisEpochOperation.prototype.toJSON = function toJSON() {
+                return this.constructor.toObject(this, $protobuf.util.toJSONOptions);
+            };
+
+            /**
+             * Gets the default type url for SetGenesisEpochOperation
+             * @function getTypeUrl
+             * @memberof apply.operations.SetGenesisEpochOperation
+             * @static
+             * @param {string} [typeUrlPrefix] your custom typeUrlPrefix(default "type.googleapis.com")
+             * @returns {string} The default type url
+             */
+            SetGenesisEpochOperation.getTypeUrl = function getTypeUrl(typeUrlPrefix) {
+                if (typeUrlPrefix === undefined) {
+                    typeUrlPrefix = "type.googleapis.com";
+                }
+                return typeUrlPrefix + "/apply.operations.SetGenesisEpochOperation";
+            };
+
+            return SetGenesisEpochOperation;
         })();
 
         return operations;
