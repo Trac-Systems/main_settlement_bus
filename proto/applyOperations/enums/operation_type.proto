@@ -19,4 +19,5 @@ enum OperationType {
     TX                     = 12; // partial
     TRANSFER               = 13; // partial
     SET_EPOCH              = 14; // complete
+    SET_GENESIS_EPOCH      = 15; // complete
 }

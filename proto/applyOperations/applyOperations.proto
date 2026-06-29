@@ -11,6 +11,7 @@ import "applyOperations/messages/role_access_operation.proto";
 import "applyOperations/messages/bootstrap_deployment_operation.proto";
 import "applyOperations/messages/tx_operation.proto";
 import "applyOperations/messages/set_epoch_operation.proto";
+import "applyOperations/messages/set_genesis_epoch_operation.proto";
 
 // Main structure for the operations where messages are
 message Operation {
@@ -26,5 +27,6 @@ message Operation {
         BootstrapDeploymentOperation      bdo  = 8;
         TxOperation                       txo  = 9;
         SetEpochOperation                 seo  = 10;
+        SetGenesisEpochOperation          sgo  = 11;
     }
 }
