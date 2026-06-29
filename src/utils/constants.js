@@ -36,6 +36,7 @@ export const OperationType = Object.freeze({
     TX: ApplyOperationType.TX,
     TRANSFER: ApplyOperationType.TRANSFER,
     SET_EPOCH: ApplyOperationType.SET_EPOCH,
+    SET_GENESIS_EPOCH: ApplyOperationType.SET_GENESIS_EPOCH,
 });
 
 export const NetworkOperationType = Object.freeze({
