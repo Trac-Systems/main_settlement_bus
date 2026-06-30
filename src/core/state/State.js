@@ -275,15 +275,6 @@ class State extends ReadyResource {
         return Object.values(this.#base.system.indexers);
     }
 
-    async isIndexerAddress(targetAddress) {
-        const entries = await this.getIndexersEntry();
-        for (const entry of entries) {
-            const address = await this.getSigned(EntryType.WRITER_ADDRESS + b4a.toString(entry.key, 'hex'));
-            if (address === targetAddress) return true;
-        }
-        return false;
-    }
-
     async getActiveWriterCount(excludeAdmin = false) {
         const cached = this.#activeWriterCountCache.get(excludeAdmin);
         const systemLength = this.#base.system?.core?.length ?? -1;

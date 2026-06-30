@@ -1,0 +1,113 @@
+import SchedulableService from "../../../utils/scheduler/SchedulableService.js";
+import { Logger } from "../../../utils/logger.js";
+import { CONNECTION_STATUS } from "../../../utils/constants.js"
+import b4a from "b4a";
+import { bufferToAddress } from "../../../core/state/utils/address.js";
+import tracCryptoApi from "trac-crypto-api";
+
+
+class IndexerObserverService extends SchedulableService {
+    #network
+    #state
+    #config
+    #logger
+    #address
+
+    constructor(network, state, address, config) {
+        super();
+
+        this.#network = network;
+        this.#state = state;
+        this.#address = address;
+        this.#config = config;
+        this.#logger = new Logger(config);
+    }
+
+    #shouldRun() {
+        return this.#config.enableIndexerObserver && !this.isInterrupted;
+    }
+
+    getScheduleInterval() {
+        return this.#config.pollInterval;
+    }
+
+    async start() {
+        if (!this.#config.enableIndexerObserver) {
+            this.#logger.info('IndexerObserverService can not start. Disabled by configuration.');
+            return;
+        }
+
+        super.start();
+        this.#logger.info("IndexerObserverService started");
+    }
+
+    async stop(waitForCurrent = true) {
+        const stopped = await super.stop(waitForCurrent);
+        if (!stopped) return;
+        this.#logger.info("IndexerObserverService stopped");
+    }
+
+    async #tryConnect(candidate) {
+        try {
+            const result = await this.#network.tryConnect(candidate.publicKeyHex, "indexer");
+            if (result && result !== CONNECTION_STATUS.IGNORED) {
+                this.#logger.info(`IndexerObserver: connected to indexer ${candidate.publicKeyHex.slice(0, 8)} (${result})`);
+            }
+            return result;
+        } catch (err) {
+            this.#logger.error(`Indexer connection attempt failed: ${err.message}`);
+        }
+    }
+
+    async #getIndexersCandidates() {
+        const entries = await this.#state.getIndexersEntry();
+        const adminEntry = await this.#state.getAdminEntry();
+        const candidates = [];
+
+        for (const entry of entries) {
+            const writerKeyHex = b4a.toString(entry.key, 'hex');
+            const addressBuffer = await this.#state.getRegisteredWriterKey(writerKeyHex);
+            if (!addressBuffer) continue;
+
+            const addr = bufferToAddress(addressBuffer, this.#config.addressPrefix);
+            if (!addr || addr === this.#address || addr === adminEntry?.address) continue;
+
+            const publicKey = tracCryptoApi.address.decodeSafe(addr);
+            if (!publicKey) continue;
+
+            const publicKeyHex = b4a.toString(publicKey, 'hex');
+            candidates.push({ publicKey, publicKeyHex });
+        }
+
+        return candidates;
+    }
+
+    async #processCandidates(candidates) {
+        for (const candidate of candidates) {
+            if (!this.#shouldRun()) break;
+
+            const isConnected = this.#network.indexerConnectionManager.connected(candidate.publicKey);
+            const isPending = this.#network.isConnectionPending(candidate.publicKeyHex);
+
+            if (isConnected || isPending) continue;
+
+            await this.#tryConnect(candidate);
+        }
+    }
+
+    async worker(next) {
+        const interval = this.#config.pollInterval;
+        if (!this.#shouldRun()) return next(interval);
+
+        try {
+            const candidates = await this.#getIndexersCandidates();
+            if (candidates.length > 0) await this.#processCandidates(candidates);
+        } catch (err) {
+            this.#logger.error(`IndexerObserver worker error: ${err.message}`);
+        }
+
+        next(interval);
+    }
+}
+
+export default IndexerObserverService;

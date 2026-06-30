@@ -75,6 +75,11 @@ export class Config {
         return !!this.#config.enableValidatorObserver
     }
 
+    get enableIndexerObserver() {
+        if (this.#isOverriden('enableIndexerObserver')) return !!this.#options.enableIndexerObserver
+        return !!this.#config.enableIndexerObserver
+    }
+
     get enableTxApplyLogs() {
         if (this.#isOverriden('enableTxApplyLogs')) return !!this.#options.enableTxApplyLogs
         return !!this.#config.enableTxApplyLogs
