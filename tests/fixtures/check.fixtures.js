@@ -7,7 +7,10 @@ import {
     WRITER_BYTE_LENGTH,
     BOOTSTRAP_BYTE_LENGTH,
     NONCE_BYTE_LENGTH,
-    OperationType, AMOUNT_BYTE_LENGTH
+    OperationType,
+    AMOUNT_BYTE_LENGTH,
+    VDF_DIFFICULTY_SIZE,
+    VDF_DISCRIMINANT_SIZE
 } from '../../src/utils/constants.js';
 import { config } from '../helpers/config.js'
 import { asAddress } from '../helpers/address.js';
@@ -418,6 +421,32 @@ export const SEO = {
 
     top_fields_set_epoch: ['type', 'address', 'seo'],
     set_epoch_value_fields: ['pd', 'app']
+}
+
+export const SGO = {
+    valid_set_genesis_epoch_operation: {
+        type: OperationType.SET_GENESIS_EPOCH,
+        address: addressToBuffer(asAddress('3801ebd1f12462ad335b821807c9d87e4f20d57505222284b2634a7e8e5edac2'), config.addressPrefix),
+        sgo: {
+            tx: b4a.from('1bd4f96adeffba9c04943a82993c5b19660c3a5f572620d82a67464f381640e2', 'hex'),
+            txv: b4a.from('f24e61cf7941256b080be2133bccb520414c78021215edfcb781622da526c414', 'hex'),
+            df: b4a.from('000f4240', 'hex'),
+            db: b4a.from('0800', 'hex'),
+            in: b4a.from('0ad7fe36a35a27ea4df932b800200823a97d4db31bca247f43ad7523b0493645', 'hex'),
+            is: b4a.from('5b534be7a374148962c271d194c26cf5b1ad705ab218a87709a33fe74f9d1b811772447c939b17b2f803e3da7648f49b666b929fbb20e458ced952f147162c08', 'hex')
+        }
+    },
+
+    top_fields_set_genesis_epoch: ['type', 'address', 'sgo'],
+    set_genesis_epoch_value_fields: ['tx', 'txv', 'df', 'db', 'in', 'is'],
+    required_length_of_fields_for_set_genesis_epoch: {
+        tx: HASH_BYTE_LENGTH,
+        txv: HASH_BYTE_LENGTH,
+        df: VDF_DIFFICULTY_SIZE,
+        db: VDF_DISCRIMINANT_SIZE,
+        in: NONCE_BYTE_LENGTH,
+        is: SIGNATURE_BYTE_LENGTH
+    }
 }
 
 export const partial_operation_value_type = ['bdo', 'tto', 'txo', 'rao']
