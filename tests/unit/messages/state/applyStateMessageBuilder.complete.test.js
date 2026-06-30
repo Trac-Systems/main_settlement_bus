@@ -589,3 +589,72 @@ test('ApplyStateMessageBuilder complete set epoch operation codec roundtrip', as
     t.ok(b4a.equals(decoded.seo.app[0], approvals[0]));
     t.ok(b4a.equals(decoded.seo.app[1], approvals[1]));
 });
+
+test('ApplyStateMessageBuilder complete set genesis epoch operation (sgo)', async t => {
+    const wallet = await createWallet(testKeyPair1.mnemonic);
+    const txValidity = toBuf(hex('11', 32));
+    const vdfDifficulty = toBuf(hex('22', 32));
+    const vdfDiscriminantSize = toBuf(hex('33', 32));
+
+    const builder = new ApplyStateMessageBuilder(wallet, config);
+    await builder
+        .setPhase('complete')
+        .setOutput('buffer')
+        .setOperationType(OperationType.SET_GENESIS_EPOCH)
+        .setAddress(wallet.address)
+        .setTxValidity(txValidity)
+        .setVdfDifficulty(vdfDifficulty)
+        .setVdfDiscriminantSize(vdfDiscriminantSize)
+        .build();
+
+    const payload = builder.getPayload();
+    t.is(payload.type, OperationType.SET_GENESIS_EPOCH);
+    expectAddressBuffer(t, payload.address, 'address');
+    t.ok(b4a.equals(payload.address, addressToBuffer(wallet.address, config.addressPrefix)));
+    expectPayloadKeys(t, payload, 'sgo');
+    expectKeys(t, payload.sgo, ['tx', 'txv', 'df', 'db', 'in', 'is'], 'sgo');
+    expectBufferField(t, payload.sgo.tx, 32, 'sgo.tx');
+    expectBufferField(t, payload.sgo.txv, 32, 'sgo.txv');
+    expectBufferField(t, payload.sgo.df, 32, 'sgo.df');
+    expectBufferField(t, payload.sgo.db, 32, 'sgo.db');
+    expectBufferField(t, payload.sgo.in, 32, 'sgo.in');
+    expectBufferField(t, payload.sgo.is, 64, 'sgo.is');
+    t.ok(b4a.equals(payload.sgo.txv, txValidity));
+    t.ok(b4a.equals(payload.sgo.df, vdfDifficulty));
+    t.ok(b4a.equals(payload.sgo.db, vdfDiscriminantSize));
+});
+
+test('ApplyStateMessageBuilder complete set genesis epoch operation codec roundtrip', async t => {
+    const wallet = await createWallet(testKeyPair1.mnemonic);
+    const txValidity = toBuf(hex('44', 32));
+    const vdfDifficulty = toBuf(hex('55', 32));
+    const vdfDiscriminantSize = toBuf(hex('66', 32));
+
+    const builder = new ApplyStateMessageBuilder(wallet, config);
+    await builder
+        .setPhase('complete')
+        .setOutput('buffer')
+        .setOperationType(OperationType.SET_GENESIS_EPOCH)
+        .setAddress(wallet.address)
+        .setTxValidity(txValidity)
+        .setVdfDifficulty(vdfDifficulty)
+        .setVdfDiscriminantSize(vdfDiscriminantSize)
+        .build();
+
+    const payload = builder.getPayload();
+    const encoded = safeEncodeApplyOperation(payload);
+    const decoded = safeDecodeApplyOperation(encoded);
+
+    t.ok(b4a.isBuffer(encoded));
+    t.ok(encoded.length > 0);
+    t.is(decoded.type, OperationType.SET_GENESIS_EPOCH);
+    t.ok(b4a.equals(decoded.address, addressToBuffer(wallet.address, config.addressPrefix)));
+    t.alike(Object.keys(decoded).sort(), ['address', 'sgo', 'type']);
+    t.alike(Object.keys(decoded.sgo).sort(), ['db', 'df', 'in', 'is', 'tx', 'txv']);
+    t.ok(b4a.equals(decoded.sgo.tx, payload.sgo.tx));
+    t.ok(b4a.equals(decoded.sgo.txv, txValidity));
+    t.ok(b4a.equals(decoded.sgo.df, vdfDifficulty));
+    t.ok(b4a.equals(decoded.sgo.db, vdfDiscriminantSize));
+    t.ok(b4a.equals(decoded.sgo.in, payload.sgo.in));
+    t.ok(b4a.equals(decoded.sgo.is, payload.sgo.is));
+});

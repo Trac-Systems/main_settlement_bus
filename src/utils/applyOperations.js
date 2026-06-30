@@ -54,6 +54,12 @@ const isSetEpoch = type => {
     ].includes(type);
 }
 
+const isSetGenesisEpoch = type => {
+    return [
+        OperationType.SET_GENESIS_EPOCH
+    ].includes(type);
+}
+
 const operationToPayload = type => {
     const fromTo = [
         {
@@ -87,6 +93,10 @@ const operationToPayload = type => {
         {
             condition: isSetEpoch,
             jsonPath: 'seo'
+        },
+        {
+            condition: isSetGenesisEpoch,
+            jsonPath: 'sgo'
         }
     ]
     const match = fromTo.find(entry => !!entry.condition(type))
@@ -102,5 +112,6 @@ export {
     operationToPayload,
     isTransfer,
     isBalanceInitialization,
-    isSetEpoch
+    isSetEpoch,
+    isSetGenesisEpoch
 }
