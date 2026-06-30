@@ -6,7 +6,6 @@ import { bufferToAddress } from "../../../core/state/utils/address.js";
 import tracCryptoApi from "trac-crypto-api";
 import { publicKeyToAddress } from "../../../utils/helpers.js";
 
-
 class IndexerObserverService extends SchedulableService {
     #network
     #state

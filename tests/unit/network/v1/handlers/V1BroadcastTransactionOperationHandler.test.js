@@ -127,7 +127,9 @@ function mockConn(assertFn) {
     return {
         remotePublicKey: b4a.alloc(32),
         protocolSession: {
-            sendAndForget: assertFn || (() => {})
+            validator: { 
+                sendAndForget: assertFn || (() => {}) 
+            },
         },
         async flush() {},
         end() {}
@@ -492,6 +494,12 @@ test('handleRequest: flushes response before closing when protocol error request
     const handler = setupHandler(t);
     const events = [];
 
+    const protocolSession = {
+        sendAndForget() {
+            events.push('send');
+        }
+    }
+
     V1BroadcastTransactionRequest.prototype.validate = async () => {
         throw new V1ProtocolError(ResultCode.INVALID_PAYLOAD, 'validation boom');
     };
@@ -499,9 +507,7 @@ test('handleRequest: flushes response before closing when protocol error request
     const connection = {
         remotePublicKey: b4a.alloc(32),
         protocolSession: {
-            sendAndForget() {
-                events.push('send');
-            }
+            validator: protocolSession
         },
         async flush() {
             events.push('flush');
@@ -514,7 +520,8 @@ test('handleRequest: flushes response before closing when protocol error request
 
     await handler.handleRequest(
         { id: 'msg-flush-close', broadcast_transaction_request: { data: b4a.alloc(1) } },
-        connection
+        connection,
+        protocolSession
     );
 
     t.alike(events, ['send', 'flush', 'end']);
@@ -627,11 +634,12 @@ test('TransactionPoolMissingCommitReceiptError via receipt branch', async t => {
     });
 
     let capturedResultCode = null;
+    const conn = mockConn(res => {
+        capturedResultCode = res.broadcast_transaction_response.result;
+    })
     await handler.handleRequest(
         { id: 'receipt-missing-id', broadcast_transaction_request: { data: b4a.alloc(1) } },
-        mockConn(res => {
-            capturedResultCode = res.broadcast_transaction_response.result;
-        })
+        conn, conn.protocolSession.validator
     );
 
     t.is(capturedResultCode, ResultCode.TX_COMMITTED_RECEIPT_MISSING);
@@ -867,17 +875,21 @@ test('handleRequest keeps connection open for TIMEOUT response', async t => {
         txo: transactionPayload()
     });
 
+    const protocolSession = {
+        sendAndForget(message) {
+            events.push('send');
+            t.is(
+                message.broadcast_transaction_response.result,
+                ResultCode.TIMEOUT,
+                'validator should answer with TIMEOUT on pending commit timeout'
+            );
+        }
+    }
+
     const connection = {
         remotePublicKey: b4a.alloc(32),
         protocolSession: {
-            sendAndForget(message) {
-                events.push('send');
-                t.is(
-                    message.broadcast_transaction_response.result,
-                    ResultCode.TIMEOUT,
-                    'validator should answer with TIMEOUT on pending commit timeout'
-                );
-            }
+            validator: protocolSession
         },
         async flush() {
             events.push('flush');
@@ -890,7 +902,8 @@ test('handleRequest keeps connection open for TIMEOUT response', async t => {
 
     await handler.handleRequest(
         { id: 'msg-timeout-keep-open', broadcast_transaction_request: { data: b4a.alloc(1) } },
-        connection
+        connection, 
+        protocolSession
     );
 
     t.alike(events, ['send']);

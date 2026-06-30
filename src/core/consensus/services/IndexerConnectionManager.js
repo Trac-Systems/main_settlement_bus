@@ -1,81 +1,46 @@
-import { toHex } from '../../../utils/buffer.js';
+import { PeerConnectionManager } from '../../shared/PeerConnectionManager.js'
 
-class IndexerConnectionManager {
-    #indexers = new Map();
-    #maxIndexers;
+class IndexerConnectionManager extends PeerConnectionManager {
+    #messages
 
-    constructor(maxIndexers) {
-        this.#maxIndexers = maxIndexers;
-    }
-
-    setMax(maxIndexers) {
-        this.#maxIndexers = maxIndexers;
+    constructor(maxIndexers, config, logger, messages) {
+        super(maxIndexers, config, logger);
+        this.#messages = messages
     }
 
     add(publicKey, connection) {
-        const key = toHex(publicKey);
-        if (this.#indexers.has(key)) {
-            return false;
-        }
-        if (this.#indexers.size >= this.#maxIndexers) {
-            return false;
-        }
-        this.#indexers.set(key, connection);
-        return true;
+        this.#messages.attachChannel(connection);
+        this._add(publicKey, connection)
     }
 
-    remove(publicKey) {
-        const key = toHex(publicKey);
-        this.#indexers.delete(key);
-    }
+    remove(publicKey, connection = null) {
+        const key = this._toHexString(publicKey);
+        const entry = this._connections.get(key);
+        if (!entry) return;
+        if (connection && entry.connection !== connection) return;
 
-    getConnection(publicKey) {
-        return this.#indexers.get(toHex(publicKey));
-    }
-
-    connected(publicKey) {
-        return this.#indexers.has(toHex(publicKey));
-    }
-
-    connectedIndexers() {
-        return Array.from(this.#indexers.keys());
+        const targetConnection = connection ?? entry.connection;
+        targetConnection.protocolSessions.indexers.close();
+        this._connections.delete(key);
     }
 
     async send(publicKey, message) {
         const connection = this.getConnection(publicKey);
-        if (!connection?.consensusProtocolSession) {
-            throw new Error(`IndexerConnectionManager: no consensus session for ${toHex(publicKey)}`);
+        if (!connection) {
+            throw new Error(`PeerConnectionManager: no session for ${this._toHexString(publicKey)}`);
         }
-        return connection.consensusProtocolSession.send(message);
+        return connection.protocolSessions.indexers.send(message);
     }
 
     sendAndForget(publicKey, message) {
         const connection = this.getConnection(publicKey);
-        if (!connection?.consensusProtocolSession) return;
-        connection.consensusProtocolSession.sendAndForget(message);
-    }
-
-    /**
-     * Checks if a indexer exists in the pool.
-     * @param {String | Buffer} publicKey - The public key hex string of the indexer to check
-     * @returns {Boolean} - Returns true if the indexer exists, false otherwise
-     */
-    exists(publicKey) {
-        const publicKeyHex = this.#toHexString(publicKey);
-        return this.#indexers.has(publicKeyHex);
-    }
-
-    #toHexString(publicKey) {
-        return toHex(publicKey)
+        if (!connection) return;
+        connection.protocolSessions.indexers.sendAndForget(message);
     }
 
     prettyPrint() {
-        console.log(`Connection count: ${this.#indexers.size}`);
-        console.log(`Indexer map keys:\n${Array.from(this.#indexers.keys()).join('\n')}`);
-    }
-
-    clear() {
-        this.#indexers.clear();
+        console.log(`Connection count: ${this._connections.size}`);
+        console.log(`Indexer map keys:\n${Array.from(this._connections.keys()).join('\n')}`);
     }
 }
 

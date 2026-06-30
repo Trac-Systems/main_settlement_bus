@@ -69,9 +69,9 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
         });
     }
 
-    async handleRequest(message, connection) {
+    async handleRequest(message, connection, protocolSession) {
         const outcome = await this.#processBroadcastTransactionRequest(message, connection);
-        await this.#sendBroadcastTransactionResponse(message.id, connection, outcome);
+        await this.#sendBroadcastTransactionResponse(message.id, connection, protocolSession, outcome);
     }
 
     async handleResponse(message, connection) {
@@ -170,7 +170,7 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
         };
     }
 
-    async #sendBroadcastTransactionResponse(messageId, connection, {proof, timestamp, resultCode, endConnection}) {
+    async #sendBroadcastTransactionResponse(messageId, connection, protocolSession, {proof, timestamp, resultCode, endConnection}) {
         try {
             const response = await this.#buildBroadcastTransactionResponse(
                 messageId,
@@ -181,6 +181,7 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
             );
 
             await this.sendResponseAndMaybeClose(
+                protocolSession,
                 connection,
                 response,
                 endConnection

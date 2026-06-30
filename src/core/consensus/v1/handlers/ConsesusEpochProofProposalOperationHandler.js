@@ -27,7 +27,7 @@ class ConsensusEpochProofProposalOperationHandler extends ConnectionOperationHan
      * @param {object} connection Peer connection context used by the request validator.
      * @returns {Promise<void>} Resolves after sending a signed consensus v1 proof proposal response.
      */
-    async handleRequest(message, connection) {
+    async handleRequest(message, connection, protocolSession) {
         const eventContext = this.#buildRequestEventContext(message, connection);
         this.#emitEvent(CustomEventType.EPOCH_PROPOSAL_RECEIVED, eventContext);
 
@@ -56,7 +56,8 @@ class ConsensusEpochProofProposalOperationHandler extends ConnectionOperationHan
             await this.#sendEpochProofProposalApprovalResponse(
                 message?.session_id,
                 connection,
-                proofProposal,
+                protocolSession,
+                message.proof_proposal,
                 resultCode
             );
         }
@@ -71,7 +72,12 @@ class ConsensusEpochProofProposalOperationHandler extends ConnectionOperationHan
      * @returns {Promise<{resultCode: number, approval?: object}>} Approval handling outcome with a ConsensusResultCode value.
      */
 
-    async handleApproval(message, connection, proofProposal) {
+    async handleApproval(
+        message,
+        connection,
+        _protocolSession,
+        proofProposal
+    ) {
         const eventContext = this.#buildApprovalEventContext(message, connection, proofProposal);
         this.#emitEvent(CustomEventType.EPOCH_PROPOSAL_APPROVAL_RECEIVED, eventContext); // NOTE: Maybe not needed. Investigate. For now, this will be only a placeholder
 
@@ -164,6 +170,7 @@ class ConsensusEpochProofProposalOperationHandler extends ConnectionOperationHan
     async #sendEpochProofProposalApprovalResponse(
         messageId,
         connection,
+        protocolSession,
         proofProposal,
         resultCode
     ) {
@@ -185,8 +192,10 @@ class ConsensusEpochProofProposalOperationHandler extends ConnectionOperationHan
                 );
 
             await this.sendResponseAndMaybeClose(
+                protocolSession,
                 connection,
                 response,
+                false
             );
 
         } catch (error) {

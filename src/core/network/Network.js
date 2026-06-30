@@ -8,12 +8,11 @@ import IndexerObserverService from '../consensus/services/IndexerObserverService
 import NetworkMessages from './protocols/NetworkMessages.js';
 import { sleep } from '../../utils/helpers.js';
 import { TRAC_NAMESPACE, CONNECTION_STATUS } from '../../utils/constants.js';
-import ConnectionManager from './services/ConnectionManager.js';
+import ValidatorConnectionManager from './services/ValidatorConnectionManager.js';
 import MessageOrchestrator from './services/MessageOrchestrator.js';
 import TransactionRateLimiterService from './services/TransactionRateLimiterService.js';
 import ValidatorPendingRequestService from './services/ValidatorPendingRequestService.js';
 import TransactionCommitService from "./services/TransactionCommitService.js";
-import ValidatorHealthCheckService from './services/ValidatorHealthCheckService.js';
 import EpochProofProposalService from '../consensus/services/EpochProofProposalService.js';
 import { Logger } from '../../utils/logger.js';
 import { WalletProvider } from 'trac-wallet';
@@ -26,8 +25,7 @@ import IndexerPendingRequestService from '../consensus/services/IndexerPendingRe
 const wakeup = new w();
 
 class Network extends ReadyResource {
-    #swarm = null;
-    #networkMessages;
+    #swarm;
     #transactionPoolService;
     #validatorObserverService;
     #indexerObserverService;
@@ -39,14 +37,14 @@ class Network extends ReadyResource {
     #validatorPendingRequestService;
     #transactionCommitService;
     #wallet;
-    #validatorHealthCheckService;
     #epochProofProposalService;
     #logger;
     #state;
     #store;
-    #consensusMessages;
     #indexerConnectionManager;
     #indexerPendingRequestService;
+    #networkMessages;
+    #consensusMessages;
 
     /**
      * @param {State} state
@@ -66,8 +64,6 @@ class Network extends ReadyResource {
         this.#transactionPoolService = new TransactionPoolService(state, wallet?.address, this.#transactionCommitService ,this.#config);
         this.#validatorObserverService = new ValidatorObserverService(this, state, wallet?.address, this.#config);
         this.#indexerObserverService = new IndexerObserverService(this, state, wallet?.address, this.#config);
-        this.#validatorConnectionManager = new ConnectionManager(this.#config);
-        this.#validatorMessageOrchestrator = new MessageOrchestrator(this.#validatorConnectionManager, state, this.#config);
         this.#validatorPendingRequestService = new ValidatorPendingRequestService(this.#config);
         this.#indexerPendingRequestService = new IndexerPendingRequestService(this.#config);
         this.#logger = new Logger(this.#config);
@@ -98,13 +94,52 @@ class Network extends ReadyResource {
     }
 
     async _open() {
-        this.#logger.info('Network initialization...');
-
-        this.setupNetworkListeners();
-
+        this.#logger.info('Network initialization...');        
         this.transactionPoolService.start();
+
+        const { wallet: wrappedWallet, keyPair } = await this.#getOrGenerateWallet();
+        this.#wallet = wrappedWallet
+
+        this.#swarm = new Hyperswarm({
+            keyPair,
+            bootstrap: this.#config.dhtBootstrap,
+            maxPeers: this.#config.maxPeers,
+            maxParallel: this.#config.maxParallel,
+            maxServerConnections: this.#config.maxServerConnections,
+            maxClientConnections: this.#config.maxClientConnections
+        });
+
+        this.#rateLimiter = new TransactionRateLimiterService(this.#swarm, this.#config);
+        this.#networkMessages = new NetworkMessages(
+            this.#state,
+            this.#wallet,
+            this.#rateLimiter,
+            this.#transactionPoolService,
+            this.#validatorPendingRequestService,
+            this.#transactionCommitService,
+            this.#config
+        );
+
+        this.#validatorConnectionManager = new ValidatorConnectionManager(this.#config.maxValidators, this.#config, this.#logger, this.#networkMessages);
+        await this.#validatorConnectionManager.ready();
+
+        this.#validatorMessageOrchestrator = new MessageOrchestrator(this.#validatorConnectionManager, this.#state, this.#config, this.#wallet);
+
+        this.#consensusMessages = new ConsensusMessages(this.#state, this.#wallet, this.#config, this.#indexerPendingRequestService);
+        const indexersCount = await this.#state.indexerCount()
+
+        this.#indexerConnectionManager = new IndexerConnectionManager(indexersCount, this.#config, this.#logger, this.#consensusMessages);
+        await this.#indexerConnectionManager.ready();
+
+        this.#epochProofProposalService = new EpochProofProposalService(this.#state, this.#indexerConnectionManager, this.#wallet, this.#config);
+        await this.#epochProofProposalService.ready();
+
+        this.#logger.info(`Channel: ${b4a.toString(this.#config.channel)}`);
+        this.#listerners();
+
+        this.#swarm.join(this.#config.channel, { server: true, client: true });
+        this.#swarm.flush();
         this.validatorObserverService.start();
-        await this.#replicate();
 
         if (this.#state.isIndexer()) {
             this.#epochProofProposalService.start();
@@ -118,24 +153,30 @@ class Network extends ReadyResource {
         await sleep(100);
         await this.#validatorObserverService.stop();
         await this.#indexerObserverService.stop();
-
+        
         this.cleanupPendingConnections();
-        await this.#validatorHealthCheckService.close();
-        await this.#epochProofProposalService.close();
         this.#validatorPendingRequestService.close();
         this.#transactionCommitService.close();
         this.#indexerPendingRequestService.close();
-
+        await this.#validatorConnectionManager.close()
+        await this.#indexerConnectionManager.close()
+        
         await this.#swarm.destroy();
     }
 
-    setupNetworkListeners() {
+    #prepareConnection(connection) {
+        connection.protocolSessions = {};
+        const stream = this.#store.replicate(connection);
+        wakeup.addStream(stream);
+    }
+
+    #listerners() {
         this.#state.on(CustomEventType.IS_INDEXER, async (publicKey) => {
             const indexersCount = await this.#state.indexerCount()
             this.#indexerConnectionManager.setMax(indexersCount);
-            this.disconnectValidatorPeer(publicKey, 'peer promoted to indexer');
-            this.addIndexerPeer(publicKey);
-            
+            const publicKeyHex = this.#normalizePublicKey(publicKey);
+            this.#validatorConnectionManager.remove(publicKeyHex);
+            await this.addIndexerPeer(publicKey);
         });
 
         this.#state.on(CustomEventType.IS_NON_INDEXER, async (publicKey) => {
@@ -152,7 +193,6 @@ class Network extends ReadyResource {
             const address = tracCryptoApi.address.encode(this.#config.addressPrefix, bufferAddress);
             if (address === this.#wallet.address) {
                 this.#indexerObserverService.start();
-                this.#epochProofProposalService.start();
             }
         });
 
@@ -164,6 +204,48 @@ class Network extends ReadyResource {
                 this.#indexerConnectionManager.clear();
             }
         });
+
+        this.#swarm.prependListener('connection', async (connection) => {
+            /*
+             Here is the issue:
+             
+             The current session is supposed to be attached as soon as possible (mostly to respond to probe since there is no connection ready signal on this level)
+             Since the connection was started from the other side, this havent gone through "qualification" which happens on tryConnect.
+             Becuase of that, we need to assume the current connection is that of a validator (who responds to probe) and later override it if necessary.
+             This is leaky for two reasons: first we need to keep a reference to messages and disclose the connection structure in this class.
+             second is that the protocol itself doesnt fit the connection life-cycle (this is a bigger problem that also touched on DHT factory structure being "swallowed by swarm")
+             */
+            this.#prepareConnection(connection);
+            this.#networkMessages.prepareConnection(connection);
+            this.#consensusMessages.prepareConnection(connection);
+        })
+        this.#swarm.on('connection', async (connection) => {
+            const publicKey = b4a.toString(connection.remotePublicKey, 'hex');
+            // This function will ignore connections that havent been triggered by the observer. In this case, the promotion will happen during tryConnect when the connection entity will be qualified.
+            await this.#promotePendingConnection(publicKey, connection);
+
+            connection.on('close', () => {
+                this.#rejectAllPendingRequests(publicKey, new Error('Connection closed before response'));
+                this.#swarm.leavePeer(connection.remotePublicKey);
+                this.#validatorConnectionManager.remove(publicKey, connection);
+                this.#indexerConnectionManager.remove(publicKey, connection);
+                connection.end();
+            });
+
+            connection.on('error', (error) => {
+                this.#rejectAllPendingRequests(publicKey, error ?? new Error('Connection error before response'));
+                if (
+                    error && error.message && (
+                        error.message.includes('connection reset by peer') ||
+                        error.message.includes('Duplicate connection') ||
+                        error.message.includes('connection timed out'))
+                ) {
+                    // TODO: decide if we want to handle this error in a specific way. It generates a lot of logs.
+                    return;
+                }
+                this.#logger.error(error?.message ?? 'Unknown network connection error');
+            });
+        });
     }
 
     cleanupPendingConnections() {
@@ -171,89 +253,6 @@ class Network extends ReadyResource {
             clearTimeout(timeoutId);
         }
         this.#pendingConnections.clear();
-    }
-
-    async #replicate() {
-        if (!this.#swarm) {
-            const { wallet: wrappedWallet, keyPair } = await this.#getOrGenerateWallet();
-            this.#wallet = wrappedWallet
-            this.#validatorMessageOrchestrator.setWallet(this.#wallet);
-
-            this.#swarm = new Hyperswarm({
-                keyPair,
-                bootstrap: this.#config.dhtBootstrap,
-                maxPeers: this.#config.maxPeers,
-                maxParallel: this.#config.maxParallel,
-                maxServerConnections: this.#config.maxServerConnections,
-                maxClientConnections: this.#config.maxClientConnections
-            });
-
-            this.#rateLimiter = new TransactionRateLimiterService(this.#swarm, this.#config);
-            this.#networkMessages = new NetworkMessages(
-                this.#state,
-                this.#wallet,
-                this.#rateLimiter,
-                this.#transactionPoolService,
-                this.#validatorPendingRequestService,
-                this.#transactionCommitService,
-                this.#config
-            );
-            this.#validatorHealthCheckService = new ValidatorHealthCheckService(this.#config);
-            await this.#validatorHealthCheckService.ready();
-
-            this.#consensusMessages = new ConsensusMessages(this.#state, this.#wallet, this.#config, this.#indexerPendingRequestService);
-            const indexersCount = await this.#state.indexerCount()
-            this.#indexerConnectionManager = new IndexerConnectionManager(indexersCount);
-
-            this.#epochProofProposalService = new EpochProofProposalService(this.#state, this.#indexerConnectionManager, this.#wallet, this.#config);
-            await this.#epochProofProposalService.ready();
-
-            this.#validatorConnectionManager.subscribeToHealthChecks(this.#validatorHealthCheckService);
-
-            this.#logger.info(`Channel: ${b4a.toString(this.#config.channel)}`);
-
-            this.#swarm.prependListener('connection', connection => {
-                this.#networkMessages.setupProtomuxMessages(connection);
-                this.#consensusMessages.setupProtomuxMessages(connection);
-                // ATTENTION: Must be called AFTER the protomux init above
-                const stream = this.#store.replicate(connection);
-                wakeup.addStream(stream);
-            });
-
-            this.#swarm.on('connection', async (connection) => {
-                const publicKey = b4a.toString(connection.remotePublicKey, 'hex');
-                // This function will ignore connections that havent been triggered by the observer. In this case, the promotion will happen during tryConnect when the connection entity will be qualified.
-                await this.#promotePendingConnection(publicKey, connection);
-                
-
-                connection.on('close', () => {
-                    this.#rejectAllPendingRequests(publicKey, new Error('Connection closed before response'));
-                    this.#swarm.leavePeer(connection.remotePublicKey);
-                    this.#validatorConnectionManager.remove(publicKey);
-                    this.#indexerConnectionManager.remove(publicKey);
-                    connection.protocolSession?.close();
-                    connection.consensusProtocolSession?.close();
-                });
-
-                connection.on('error', (error) => {
-                    this.#rejectAllPendingRequests(publicKey, error ?? new Error('Connection error before response'));
-                    if (
-                        error && error.message && (
-                            error.message.includes('connection reset by peer') ||
-                            error.message.includes('Duplicate connection') ||
-                            error.message.includes('connection timed out'))
-                    ) {
-                        // TODO: decide if we want to handle this error in a specific way. It generates a lot of logs.
-                        return;
-                    }
-                    this.#logger.error(error?.message ?? 'Unknown network connection error');
-                });
-
-            });
-
-            this.#swarm.join(this.#config.channel, { server: true, client: true });
-            this.#swarm.flush();
-        }
     }
 
     isConnectionPending(publicKey) {
@@ -264,14 +263,14 @@ class Network extends ReadyResource {
         return this.#pendingConnections.size;
     }
 
-    addIndexerPeer(publicKey) {
+    async addIndexerPeer(publicKey) {
         const publicKeyHex = this.#normalizePublicKey(publicKey);
 
         // If swarm does not have the register public key, means that it emits a connection event
         if (this.#swarm?.peers?.has(publicKeyHex)) {
             const peerInfo = this.#swarm.peers.get(publicKeyHex);
             const connection = this.#swarm._allConnections.get(peerInfo.publicKey);
-            this.#indexerConnectionManager.add(peerInfo.publicKey, connection);
+            await this.#indexerConnectionManager.add(peerInfo.publicKey, connection);
         }
     }
 
@@ -291,7 +290,7 @@ class Network extends ReadyResource {
 
         if (isTrackedValidator) {
             this.#logger.debug(`Network.disconnectValidatorPeer: detaching tracked validator ${publicKeyHex}. Reason: ${reason}`);
-            this.#validatorConnectionManager.remove(publicKeyHex, { endConnection: false });
+            this.#validatorConnectionManager.remove(publicKeyHex);
         }
 
         return hadPendingValidatorConnection || isTrackedValidator;
@@ -323,8 +322,8 @@ class Network extends ReadyResource {
         }
     }
 
-    async tryConnect(publicKey, type = null) {
-        if (this.#swarm === null) throw new Error('Network swarm is not initialized');
+    async tryConnect(publicKey, type) {
+        if (!this.#swarm) throw new Error('Network swarm is not initialized');
         if (this.#pendingConnections.has(publicKey) || this.#pendingConnections.size >= this.#config.maxPendingConnections) {
             this.#logger.debug(`Network.tryConnect: Connection to peer: ${publicKey} as type: ${type} is already pending or max pending connections reached.`);
             return CONNECTION_STATUS.IGNORED;
@@ -336,6 +335,7 @@ class Network extends ReadyResource {
                 this.#pendingConnections.delete(publicKey)
             }
         }, this.#config.connectTimeoutMs);
+
         this.#pendingConnections.set(publicKey, { type, timeoutId });
 
         const target = b4a.from(publicKey, 'hex');
@@ -351,7 +351,7 @@ class Network extends ReadyResource {
         const connection = this.#swarm._allConnections.get(peerInfo.publicKey);
         if (!connection) return CONNECTION_STATUS.PENDING;
 
-        const isConnectionReady = (connection.protocolSession && !this.#validatorPendingRequestService.isProbePending(connection.remotePublicKey.toString('hex'))) || connection.consensusProtocolSession
+        const isConnectionReady = (type === 'validator' && !this.#validatorPendingRequestService.isProbePending(connection.remotePublicKey.toString('hex'))) || type === 'indexer'
         if (isConnectionReady) {
             await this.#promotePendingConnection(publicKey, connection);
             return CONNECTION_STATUS.CONNECTED;
@@ -367,22 +367,9 @@ class Network extends ReadyResource {
             this.#pendingConnections.delete(publicKey);
 
             if (pending.type === 'indexer') {
-                this.#indexerConnectionManager.add(connection.remotePublicKey, connection);
-            }
-            if (pending.type === 'validator') {
-                try {
-                    if (!connection.protocolSession.isProbed()) await connection.protocolSession.probe();
-                } catch (err) {
-                    this.#logger.debug(`failed to probe peer with publicKey ${publicKey}: ${err?.message ?? err}`);
-                }
-
-                this.#validatorConnectionManager.addValidator(publicKey, connection);
-
-                if (connection.protocolSession.isHealthCheckSupported()) {
-                    this.#validatorHealthCheckService.start(publicKey);
-                } else {
-                    this.#validatorHealthCheckService.stop(publicKey);
-                }
+                await this.#indexerConnectionManager.add(connection.remotePublicKey, connection);
+            } else if (pending.type === 'validator') {
+                await this.#validatorConnectionManager.add(publicKey, connection);
             }
         }
     }

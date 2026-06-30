@@ -47,7 +47,7 @@ class ConsensusRouterV1 {
         try {
             switch (decodedMessage.type) {
                 case ConsensusOperationType.PROOF_PROPOSAL:
-                    await this.#epochProofProposalHandler.handleRequest(decodedMessage, connection);
+                    await this.#epochProofProposalHandler.handleRequest(decodedMessage, connection, connection.protocolSessions.indexers);
                     break;
                 case ConsensusOperationType.PROOF_PROPOSAL_APPROVAL: {
                     const pendingEntry = this.#pendingRequestService.getPendingRequest(decodedMessage.session_id)
@@ -62,13 +62,14 @@ class ConsensusRouterV1 {
                         break;
                     }
 
-                    const { resultCode } = await this.#epochProofProposalHandler.handleApproval(
+                    const response = await this.#epochProofProposalHandler.handleApproval(
                         decodedMessage,
                         connection,
+                        connection.protocolSessions.indexers,
                         pendingEntry.proofProposal
                     );
                     // TODO: Decide if we want to resolve pending requests here or delegate it elsewhere.
-                    this.#pendingRequestService.resolvePendingRequest(decodedMessage.session_id, resultCode);
+                    this.#pendingRequestService.resolvePendingRequest(decodedMessage.session_id, response);
                     break;
                 }
                 default:

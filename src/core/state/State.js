@@ -120,11 +120,6 @@ class State extends ReadyResource {
         }
         await sleep(100);
 
-        if (this.#base !== null) {
-            await this.#base.close();
-        }
-        await sleep(100);
-
         [EventType.IS_INDEXER, 
             EventType.IS_NON_INDEXER,
             EventType.WRITABLE,
@@ -132,6 +127,11 @@ class State extends ReadyResource {
         ].forEach(event => {
             this.#base.removeAllListeners(event)
         })
+
+        if (this.#base !== null) {
+            await this.#base.close();
+        }
+        await sleep(100);
     }
 
 
@@ -387,6 +387,10 @@ class State extends ReadyResource {
 
         const activeAddresses = new Set();
         const adminAddress = (await this.getAdminEntry())?.address ?? null;
+
+        // sometimes autobase swaps _applyState while performing a bump which will generate the system to be "empty" (it is just a proxy getter to applyState with a null check).
+        // since this thing is responsible for permissions, it was opted out to perform a realignment check prior instead of safe navigating to respond the query (especially given that there is a cache in place).
+        await this.#base.update()
 
         for await (const { key, value } of this.#base.system.list()) {
             if (!key || !value || value.isRemoved) continue;

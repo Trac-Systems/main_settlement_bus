@@ -42,7 +42,7 @@ class NetworkMessages {
         );
     }
 
-    setupProtomuxMessages(connection) {
+    createProtomux(connection) {
         // Attach a Protomux instance to this Hyperswarm connection.
         // Protomux multiplexes multiple logical protocol channels over a single encrypted stream.
 
@@ -62,7 +62,17 @@ class NetworkMessages {
 
         // ProtocolSession is attached to the Hyperswarm connection so other parts of the system (e.g. tryConnect)
         // can send messages without knowing how Protomux was initialized.
-        connection.protocolSession = new ProtocolSession(legacyProtocol, v1Protocol, this.#wallet, this.#config);
+        return new ProtocolSession(legacyProtocol, v1Protocol, this.#wallet, this.#config);
+    }
+
+    attachChannel(connection) {
+        connection.protocolSessions ??= {};
+        if (connection.protocolSessions.validator) return;
+        connection.protocolSessions.validator = this.createProtomux(connection);
+    }
+
+    prepareConnection(connection) {
+        this.attachChannel(connection);
     }
 }
 
