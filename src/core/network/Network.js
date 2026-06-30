@@ -8,7 +8,7 @@ import IndexerObserverService from '../consensus/services/IndexerObserverService
 import NetworkMessages from './protocols/NetworkMessages.js';
 import { sleep } from '../../utils/helpers.js';
 import { TRAC_NAMESPACE, CONNECTION_STATUS } from '../../utils/constants.js';
-import ConnectionManager from './services/ConnectionManager.js';
+import ValidatorConnectionManager from './services/ValidatorConnectionManager.js';
 import MessageOrchestrator from './services/MessageOrchestrator.js';
 import TransactionRateLimiterService from './services/TransactionRateLimiterService.js';
 import ValidatorPendingRequestService from './services/ValidatorPendingRequestService.js';
@@ -66,7 +66,7 @@ class Network extends ReadyResource {
         this.#transactionPoolService = new TransactionPoolService(state, wallet?.address, this.#transactionCommitService ,this.#config);
         this.#validatorObserverService = new ValidatorObserverService(this, state, wallet?.address, this.#config);
         this.#indexerObserverService = new IndexerObserverService(this, state, wallet?.address, this.#config);
-        this.#validatorConnectionManager = new ConnectionManager(this.#config);
+        this.#validatorConnectionManager = new ValidatorConnectionManager(this.#config);
         this.#validatorMessageOrchestrator = new MessageOrchestrator(this.#validatorConnectionManager, state, this.#config);
         this.#validatorPendingRequestService = new ValidatorPendingRequestService(this.#config);
         this.#indexerPendingRequestService = new IndexerPendingRequestService(this.#config);

@@ -30,7 +30,7 @@ function createMockConnection(publicKeyHex, { withProtocolSession = true, withCo
 async function loadNetwork() {
     const { default: esmock } = await import('esmock');
     let swarmInstance = null;
-    let connectionManagerInstance = null;
+    let validatorConnectionManagerInstance = null;
 
     class HyperswarmMock extends EventEmitter {
         constructor() {
@@ -49,9 +49,9 @@ async function loadNetwork() {
         }
     }
 
-    class ConnectionManagerMock {
+    class ValidatorConnectionManagerMock {
         constructor() {
-            connectionManagerInstance = this;
+            validatorConnectionManagerInstance = this;
             this.validators = new Set();
             this.removed = [];
         }
@@ -191,7 +191,7 @@ async function loadNetwork() {
         hyperswarm: HyperswarmMock,
         '../../../src/core/network/services/TransactionPoolService.js': { default: TransactionPoolServiceMock },
         '../../../src/core/network/services/ValidatorObserverService.js': { default: ValidatorObserverServiceMock },
-        '../../../src/core/network/services/ConnectionManager.js': { default: ConnectionManagerMock },
+        '../../../src/core/network/services/ValidatorConnectionManager.js': { default: ValidatorConnectionManagerMock },
         '../../../src/core/network/services/MessageOrchestrator.js': { default: MessageOrchestratorMock },
         '../../../src/core/network/services/TransactionRateLimiterService.js': { default: TransactionRateLimiterServiceMock },
         '../../../src/core/network/services/ValidatorPendingRequestService.js': { default: PendingRequestServiceMock },
@@ -236,7 +236,7 @@ async function loadNetwork() {
     const network = new Network(state, store, config, wallet);
     await network.ready()
 
-    return { network, store, swarmInstance, connectionManagerInstance, state };
+    return { network, store, swarmInstance, validatorConnectionManagerInstance, state };
 }
 
 if (isBareRuntime) {
@@ -262,16 +262,16 @@ if (isBareRuntime) {
 
     test('Network#disconnectValidatorPeer removes tracked validators from the pool', async t => {
         const publicKey = 'b'.repeat(64);
-        const { network, swarmInstance, connectionManagerInstance } = await loadNetwork();
+        const { network, swarmInstance, validatorConnectionManagerInstance } = await loadNetwork();
 
-        connectionManagerInstance.addValidator(publicKey);
+        validatorConnectionManagerInstance.addValidator(publicKey);
         swarmInstance.peers.set(publicKey, { publicKey: b4a.from(publicKey, 'hex') });
         
         const disconnected = network.disconnectValidatorPeer(publicKey, 'peer no longer valid validator');
         
         t.ok(disconnected, 'disconnect should report tracked validator removal');
-        t.absent(connectionManagerInstance.exists(publicKey), 'validator should be removed from connection manager');
-        t.alike(connectionManagerInstance.removed, [{ publicKey, options: { endConnection: false } }], 'tracked validator should be detached without ending the socket');
+        t.absent(validatorConnectionManagerInstance.exists(publicKey), 'validator should be removed from connection manager');
+        t.alike(validatorConnectionManagerInstance.removed, [{ publicKey, options: { endConnection: false } }], 'tracked validator should be detached without ending the socket');
         t.is(swarmInstance.leavePeer.callCount, 1, 'leavePeer should be called to clear explicit peer tracking without closing the socket');
         t.teardown(async () => await network.close());
     });
@@ -294,7 +294,7 @@ if (isBareRuntime) {
 
     test('Network#tryConnect returns CONNECTED and tracks already-connected validator', async t => {
         const publicKey = 'e'.repeat(64);
-        const { network, swarmInstance, connectionManagerInstance } = await loadNetwork();
+        const { network, swarmInstance, validatorConnectionManagerInstance } = await loadNetwork();
 
         const publicKeyBuffer = b4a.from(publicKey, 'hex');
         const connection = createMockConnection(publicKey);
@@ -303,7 +303,7 @@ if (isBareRuntime) {
 
         const status = await network.tryConnect(publicKey, 'validator');
         t.is(status, CONNECTION_STATUS.CONNECTED, 'returns CONNECTED for ready validator peer');
-        t.ok(connectionManagerInstance.exists(publicKey), 'validator was added to connection manager');
+        t.ok(validatorConnectionManagerInstance.exists(publicKey), 'validator was added to connection manager');
         t.absent(network.isConnectionPending(publicKey), 'pending validator connection was cleared');
         t.teardown(async () => await network.close());
     });
@@ -340,7 +340,7 @@ if (isBareRuntime) {
 
     test('Network swarm connection event promotes pending connection', async t => {
         const publicKey = '12'.repeat(32);
-        const { network, swarmInstance, connectionManagerInstance } = await loadNetwork();
+        const { network, swarmInstance, validatorConnectionManagerInstance } = await loadNetwork();
 
         const status = await network.tryConnect(publicKey, 'validator');
         t.is(status, CONNECTION_STATUS.PENDING, 'connection is pending after joinPeer');
@@ -348,7 +348,7 @@ if (isBareRuntime) {
         const connection = createMockConnection(publicKey);
         await swarmInstance.emit('connection', connection);
 
-        t.ok(connectionManagerInstance.exists(publicKey), 'validator was added after swarm connection');
+        t.ok(validatorConnectionManagerInstance.exists(publicKey), 'validator was added after swarm connection');
         t.absent(network.isConnectionPending(publicKey), 'pending validator connection was cleared');
         t.teardown(async () => await network.close());
     });
@@ -356,21 +356,21 @@ if (isBareRuntime) {
     test('Network disconnects validator peers when state role events invalidate them', async t => {
         const publicKey = 'd'.repeat(64);
         const publicKeyBuffer = b4a.from(publicKey, 'hex');
-        const { network, swarmInstance, connectionManagerInstance, state } = await loadNetwork();
+        const { network, swarmInstance, validatorConnectionManagerInstance, state } = await loadNetwork();
 
-        connectionManagerInstance.addValidator(publicKey);
+        validatorConnectionManagerInstance.addValidator(publicKey);
         swarmInstance.peers.set(publicKey, { publicKey: publicKeyBuffer });
 
         state.emit(CustomEventType.UNWRITABLE, publicKeyBuffer);
-        t.absent(connectionManagerInstance.exists(publicKey), 'unwritable peer should be removed from validator pool');
+        t.absent(validatorConnectionManagerInstance.exists(publicKey), 'unwritable peer should be removed from validator pool');
         t.is(swarmInstance.leavePeer.callCount, 1, 'unwritable peer should be removed from explicit peer tracking');
 
-        connectionManagerInstance.addValidator(publicKey);
+        validatorConnectionManagerInstance.addValidator(publicKey);
         swarmInstance.peers.set(publicKey, { publicKey: publicKeyBuffer });
 
         state.emit(CustomEventType.IS_INDEXER, publicKeyBuffer);
         await Promise.resolve(); // IS_INDEXER handler is async (awaits indexerCount), must yield
-        t.absent(connectionManagerInstance.exists(publicKey), 'promoted indexer should be removed from validator pool');
+        t.absent(validatorConnectionManagerInstance.exists(publicKey), 'promoted indexer should be removed from validator pool');
         t.is(swarmInstance.leavePeer.callCount, 2, 'promoted indexer should be removed from explicit peer tracking');
         t.teardown(async () => await network.close());
     });

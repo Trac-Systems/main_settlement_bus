@@ -18,11 +18,11 @@ class EpochProofProposalService extends ReadyResource {
 
     /**
      * @param {object} state
-     * @param {object} connectionManager
+     * @param {object} indexerConnectionManager
      * @param {object} wallet
      * @param {object} config
      */
-    constructor(state, connectionManager, wallet, config) {
+    constructor(state, indexerConnectionManager, wallet, config) {
         super();
         this.#state = state;
         this.#wallet = wallet;
