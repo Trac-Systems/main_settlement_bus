@@ -136,10 +136,7 @@ class ProtocolSession {
      * @returns {Boolean} True if health checks are supported in the preferred protocol, false otherwise.
      */
     isHealthCheckSupported() {
-        if (this.#preferredProtocol === null) {
-            throw new Error('ProtocolSession: preferred protocol not set. Call probe() first.');
-        }
-        return this.#preferredProtocol === this.#supportedProtocols.V1;
+        return this.isProbed() && this.#preferredProtocol === this.#supportedProtocols.V1;
     }
 
     // TODO: Consider moving this method to be used only in V1 internally, just like 'encode'

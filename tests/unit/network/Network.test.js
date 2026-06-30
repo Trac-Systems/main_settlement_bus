@@ -143,10 +143,35 @@ async function loadNetwork() {
     }
 
     class IndexerConnectionManagerMock {
-        add() {}
-        remove() {}
-        exists() { return false; }
-        clear() {}
+        constructor(max = 0) {
+            this.max = max;
+            this.indexers = new Set();
+        }
+
+        setMax(max) {
+            this.max = max;
+        }
+
+        add(publicKey) {
+            this.indexers.add(normalizePublicKey(publicKey));
+            return true;
+        }
+
+        remove(publicKey) {
+            this.indexers.delete(normalizePublicKey(publicKey));
+        }
+
+        exists(publicKey) {
+            return this.indexers.has(normalizePublicKey(publicKey));
+        }
+
+        connected(publicKey) {
+            return this.exists(publicKey);
+        }
+
+        clear() {
+            this.indexers.clear();
+        }
     }
 
     class WakeupMock {
@@ -267,27 +292,23 @@ if (isBareRuntime) {
         t.teardown(async () => await network.close());
     });
 
-    test('Network#tryConnect returns CONNECTED and emits VALIDATOR_CONNECTION_READY for already-connected validator', async t => {
+    test('Network#tryConnect returns CONNECTED and tracks already-connected validator', async t => {
         const publicKey = 'e'.repeat(64);
-        const { network, swarmInstance } = await loadNetwork();
+        const { network, swarmInstance, connectionManagerInstance } = await loadNetwork();
 
         const publicKeyBuffer = b4a.from(publicKey, 'hex');
         const connection = createMockConnection(publicKey);
         swarmInstance.peers.set(publicKey, { publicKey: publicKeyBuffer });
         swarmInstance._allConnections.set(publicKeyBuffer, connection);
 
-        let readyEmitted = false;
-        network.on(EventType.VALIDATOR_CONNECTION_READY, ({ publicKey: pk }) => {
-            if (pk === publicKey) readyEmitted = true;
-        });
-
         const status = await network.tryConnect(publicKey, 'validator');
         t.is(status, CONNECTION_STATUS.CONNECTED, 'returns CONNECTED for ready validator peer');
-        t.ok(readyEmitted, 'VALIDATOR_CONNECTION_READY was emitted');
+        t.ok(connectionManagerInstance.exists(publicKey), 'validator was added to connection manager');
+        t.absent(network.isConnectionPending(publicKey), 'pending validator connection was cleared');
         t.teardown(async () => await network.close());
     });
 
-    test('Network#tryConnect returns CONNECTED and emits INDEXER_CONNECTION_READY for already-connected indexer', async t => {
+    test('Network#tryConnect returns CONNECTED and tracks already-connected indexer', async t => {
         const publicKey = 'f'.repeat(64);
         const { network, swarmInstance } = await loadNetwork();
 
@@ -296,14 +317,10 @@ if (isBareRuntime) {
         swarmInstance.peers.set(publicKey, { publicKey: publicKeyBuffer });
         swarmInstance._allConnections.set(publicKeyBuffer, connection);
 
-        let readyEmitted = false;
-        network.on(EventType.INDEXER_CONNECTION_READY, ({ publicKey: pk }) => {
-            if (pk === publicKey) readyEmitted = true;
-        });
-
         const status = await network.tryConnect(publicKey, 'indexer');
         t.is(status, CONNECTION_STATUS.CONNECTED, 'returns CONNECTED for ready indexer peer');
-        t.ok(readyEmitted, 'INDEXER_CONNECTION_READY was emitted');
+        t.ok(network.indexerConnectionManager.connected(publicKey), 'indexer was added to connection manager');
+        t.absent(network.isConnectionPending(publicKey), 'pending indexer connection was cleared');
         t.teardown(async () => await network.close());
     });
 
@@ -323,22 +340,16 @@ if (isBareRuntime) {
 
     test('Network swarm connection event promotes pending connection', async t => {
         const publicKey = '12'.repeat(32);
-        const { network, swarmInstance } = await loadNetwork();
+        const { network, swarmInstance, connectionManagerInstance } = await loadNetwork();
 
         const status = await network.tryConnect(publicKey, 'validator');
         t.is(status, CONNECTION_STATUS.PENDING, 'connection is pending after joinPeer');
 
-        const readyPromise = new Promise(resolve => {
-            network.on(EventType.VALIDATOR_CONNECTION_READY, ({ publicKey: pk }) => {
-                if (pk === publicKey) resolve();
-            });
-        });
-
         const connection = createMockConnection(publicKey);
-        swarmInstance.emit('connection', connection);
-        await readyPromise;
+        await swarmInstance.emit('connection', connection);
 
-        t.pass('VALIDATOR_CONNECTION_READY emitted when swarm fires connection for pending peer');
+        t.ok(connectionManagerInstance.exists(publicKey), 'validator was added after swarm connection');
+        t.absent(network.isConnectionPending(publicKey), 'pending validator connection was cleared');
         t.teardown(async () => await network.close());
     });
 
