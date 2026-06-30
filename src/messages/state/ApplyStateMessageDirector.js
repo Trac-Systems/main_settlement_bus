@@ -531,6 +531,28 @@ class ApplyStateMessageDirector {
             .build();
         return this.#builder.getPayload();
     }
+
+    /**
+     * Build a complete set genesis epoch payload.
+     * @param {string|Buffer} invokerAddress
+     * @param {string|Buffer} txValidity
+     * @param {string|Buffer} vdfDifficulty
+     * @param {string|Buffer} vdfDiscriminantSize
+     * @returns {Promise<object>}
+     */
+    async buildCompleteSetGenesisEpochOperation(invokerAddress, txValidity, vdfDifficulty, vdfDiscriminantSize) {
+        if (!this.#builder) throw new Error('Builder has not been set.');
+        await this.#builder
+            .setPhase('complete')
+            .setOutput('buffer')
+            .setOperationType(OperationType.SET_GENESIS_EPOCH)
+            .setAddress(invokerAddress)
+            .setTxValidity(txValidity)
+            .setVdfDifficulty(vdfDifficulty)
+            .setVdfDiscriminantSize(vdfDiscriminantSize)
+            .build();
+        return this.#builder.getPayload();
+    }
 }
 
 export default ApplyStateMessageDirector;

@@ -112,5 +112,6 @@ export {
     operationToPayload,
     isTransfer,
     isBalanceInitialization,
-    isSetEpoch
+    isSetEpoch,
+    isSetGenesisEpoch
 }

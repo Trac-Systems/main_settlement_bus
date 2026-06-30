@@ -12,6 +12,7 @@ import {
     isCoreAdmin,
     isRoleAccess,
     isSetEpoch,
+    isSetGenesisEpoch,
     isTransaction,
     isTransfer,
     operationToPayload
@@ -177,6 +178,16 @@ class ApplyStateMessageBuilder {
         this.#approvals = approvals.map((approval, index) => {
             return this.#normalizeBytesBuffer(approval, `Approval ${index}`);
         });
+        return this;
+    }
+
+    setVdfDifficulty(vdfDifficulty) {
+        this.#vdfDifficulty = this.#normalizeHexBuffer(vdfDifficulty, 32, 'VDF difficulty');
+        return this;
+    }
+
+    setVdfDiscriminantSize(vdfDiscriminantSize) {
+        this.#vdfDiscrimintantSize = this.#normalizeHexBuffer(vdfDiscriminantSize, 32, 'VDF discriminant size');
         return this;
     }
 
@@ -363,8 +374,6 @@ class ApplyStateMessageBuilder {
                     nonce,
                     OperationType.TRANSFER
                 );
-            case OperationType.SET_GENESIS_EPOCH:
-                this.#requireFields([])
                 break;
 
             default:
@@ -552,6 +561,21 @@ class ApplyStateMessageBuilder {
                     this.#operationType
                 );
                 break;
+            case OperationType.SET_GENESIS_EPOCH:
+                this.#requireFields([
+                    [this.#txValidity, 'Transaction validity'],
+                    [this.#vdfDifficulty, 'Difficulty'],
+                    [this.#vdfDiscrimintantSize, 'Discriminant size']
+                ]);
+                msg = createMessage(
+                    this.#config.networkId,
+                    this.#txValidity,
+                    this.#vdfDifficulty,
+                    this.#vdfDiscrimintantSize,
+                    nonce,
+                    this.#operationType
+                );
+                break;
             default:
                 throw new Error(`Unsupported operation type: ${this.#operationType}`);
         }
@@ -637,6 +661,16 @@ class ApplyStateMessageBuilder {
                 txv: this.#txValidity,
                 ia: this.#incomingAddress,
                 am: this.#amount,
+                in: nonce,
+                is: signature
+            };
+        }
+        if (isSetGenesisEpoch(this.#operationType)) {
+            return {
+                tx,
+                txv: this.#txValidity,
+                df: this.#vdfDifficulty,
+                db: this.#vdfDiscrimintantSize,
                 in: nonce,
                 is: signature
             };
