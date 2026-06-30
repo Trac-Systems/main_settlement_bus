@@ -36,14 +36,14 @@ test('ApplyStateMessageDirector builds complete set epoch message', async t => {
     t.ok(b4a.equals(payload.seo.app[1], approvals[1]));
 });
 
-test('ApplyStateMessageDirector builds complete set genesis epoch operation', async t => {
+test('ApplyStateMessageDirector builds complete set genesis epoch message', async t => {
     const wallet = await createWallet(testKeyPair1.mnemonic);
     const txValidity = b4a.from('11'.repeat(32), 'hex');
     const vdfDifficulty = b4a.from('22'.repeat(32), 'hex');
     const vdfDiscriminantSize = b4a.from('33'.repeat(32), 'hex');
 
     const payload = await applyStateMessageFactory(wallet, config)
-        .buildCompleteSetGenesisEpochOperation(
+        .buildCompleteSetGenesisEpochMessage(
             wallet.address,
             txValidity,
             vdfDifficulty,

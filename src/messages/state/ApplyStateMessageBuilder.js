@@ -50,7 +50,7 @@ class ApplyStateMessageBuilder {
     #txHash;
     #txValidity;
     #vdfDifficulty;
-    #vdfDiscrimintantSize;
+    #vdfDiscriminantSize;
     #wallet;
     #writingKey;
 
@@ -187,7 +187,7 @@ class ApplyStateMessageBuilder {
     }
 
     setVdfDiscriminantSize(vdfDiscriminantSize) {
-        this.#vdfDiscrimintantSize = this.#normalizeHexBuffer(vdfDiscriminantSize, 32, 'VDF discriminant size');
+        this.#vdfDiscriminantSize = this.#normalizeHexBuffer(vdfDiscriminantSize, 32, 'VDF discriminant size');
         return this;
     }
 
@@ -565,13 +565,13 @@ class ApplyStateMessageBuilder {
                 this.#requireFields([
                     [this.#txValidity, 'Transaction validity'],
                     [this.#vdfDifficulty, 'Difficulty'],
-                    [this.#vdfDiscrimintantSize, 'Discriminant size']
+                    [this.#vdfDiscriminantSize, 'Discriminant size']
                 ]);
                 msg = createMessage(
                     this.#config.networkId,
                     this.#txValidity,
                     this.#vdfDifficulty,
-                    this.#vdfDiscrimintantSize,
+                    this.#vdfDiscriminantSize,
                     nonce,
                     this.#operationType
                 );
@@ -670,7 +670,7 @@ class ApplyStateMessageBuilder {
                 tx,
                 txv: this.#txValidity,
                 df: this.#vdfDifficulty,
-                db: this.#vdfDiscrimintantSize,
+                db: this.#vdfDiscriminantSize,
                 in: nonce,
                 is: signature
             };

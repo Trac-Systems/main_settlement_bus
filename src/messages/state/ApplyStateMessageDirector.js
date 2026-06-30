@@ -540,7 +540,7 @@ class ApplyStateMessageDirector {
      * @param {string|Buffer} vdfDiscriminantSize
      * @returns {Promise<object>}
      */
-    async buildCompleteSetGenesisEpochOperation(invokerAddress, txValidity, vdfDifficulty, vdfDiscriminantSize) {
+    async buildCompleteSetGenesisEpochMessage(invokerAddress, txValidity, vdfDifficulty, vdfDiscriminantSize) {
         if (!this.#builder) throw new Error('Builder has not been set.');
         await this.#builder
             .setPhase('complete')
