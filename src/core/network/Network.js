@@ -7,11 +7,7 @@ import ValidatorObserverService from './services/ValidatorObserverService.js';
 import IndexerObserverService from '../consensus/services/IndexerObserverService.js';
 import NetworkMessages from './protocols/NetworkMessages.js';
 import { sleep } from '../../utils/helpers.js';
-import {
-    TRAC_NAMESPACE,
-    EventType,
-    CONNECTION_STATUS
-} from '../../utils/constants.js';
+import { TRAC_NAMESPACE, CONNECTION_STATUS } from '../../utils/constants.js';
 import ConnectionManager from './services/ConnectionManager.js';
 import MessageOrchestrator from './services/MessageOrchestrator.js';
 import TransactionRateLimiterService from './services/TransactionRateLimiterService.js';

@@ -2,7 +2,7 @@ import { test } from 'brittle';
 import sinon from 'sinon';
 import b4a from 'b4a';
 import EventEmitter from 'bare-events';
-import { CONNECTION_STATUS, CustomEventType, EventType } from '../../../src/utils/constants.js';
+import { CONNECTION_STATUS, CustomEventType } from '../../../src/utils/constants.js';
 
 const isBareRuntime = typeof globalThis.Bare !== 'undefined';
 
