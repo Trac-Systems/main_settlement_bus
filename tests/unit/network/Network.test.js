@@ -324,7 +324,7 @@ if (isBareRuntime) {
         t.teardown(async () => await network.close());
     });
 
-    test('Network VALIDATOR_CONNECTION_TIMEOUT clears pending connection', async t => {
+    test('Network tryConnect timeout clears pending connection', async t => {
         const publicKey = 'g'.repeat(64);
         const { network } = await loadNetwork();
 
@@ -332,9 +332,9 @@ if (isBareRuntime) {
         t.is(status, CONNECTION_STATUS.PENDING, 'connection is initially pending');
         t.ok(network.isConnectionPending(publicKey), 'pending is tracked');
 
-        network.emit(EventType.VALIDATOR_CONNECTION_TIMEOUT, { publicKey, type: 'validator', timeoutMs: 1000 });
+        await new Promise(resolve => setTimeout(resolve, 1_100));
 
-        t.absent(network.isConnectionPending(publicKey), 'pending is cleared after timeout event');
+        t.absent(network.isConnectionPending(publicKey), 'pending is cleared after timeout elapses');
         t.teardown(async () => await network.close());
     });
 

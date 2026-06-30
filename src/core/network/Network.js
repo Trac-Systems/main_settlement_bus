@@ -125,7 +125,6 @@ class Network extends ReadyResource {
         await this.#validatorObserverService.stop();
         await this.#indexerObserverService.stop();
 
-        this.cleanupNetworkListeners();
         this.cleanupPendingConnections();
         await this.#validatorHealthCheckService.close();
         await this.#epochProofProposalService.close();
@@ -155,11 +154,6 @@ class Network extends ReadyResource {
             this.disconnectValidatorPeer(publicKey, 'peer became unwritable');
         });
 
-        this.on(EventType.VALIDATOR_CONNECTION_TIMEOUT, ({ publicKey, type, timeoutMs }) => {
-            this.#logger.debug(`Network Event: VALIDATOR_CONNECTION_TIMEOUT | PublicKey: ${publicKey} | Type: ${type} | TimeoutMs: ${timeoutMs}`);
-            this.#pendingConnections.delete(publicKey);
-        });
-
         this.#state.on(CustomEventType.IS_INDEXER, (bufferAddress) => {
             const address = tracCryptoApi.address.encode(this.#config.addressPrefix, bufferAddress);
             if (address === this.#wallet.address) {
@@ -176,10 +170,6 @@ class Network extends ReadyResource {
                 this.#indexerConnectionManager.clear();
             }
         });
-    }
-
-    cleanupNetworkListeners() {
-        this.removeAllListeners(EventType.VALIDATOR_CONNECTION_TIMEOUT);
     }
 
     cleanupPendingConnections() {
@@ -229,21 +219,20 @@ class Network extends ReadyResource {
             this.#logger.info(`Channel: ${b4a.toString(this.#config.channel)}`);
 
             this.#swarm.prependListener('connection', async (connection) => {
+                // Per-peer connection initialization:
+                // - attach Protomux (legacy + v1 channels/messages)
+                // - attach connection.protocolSession (used later by tryConnect / orchestrators to send messages)
                 await this.#networkMessages.setupProtomuxMessages(connection);
                 await this.#consensusMessages.setupProtomuxMessages(connection);
             });
 
             this.#swarm.on('connection', async (connection) => {
-                // Per-peer connection initialization:
-                // - attach Protomux (legacy + v1 channels/messages)
-                // - attach connection.protocolSession (used later by tryConnect / orchestrators to send messages)
-
-
                 // ATTENTION: Must be called AFTER the protomux init above
                 const stream = this.#store.replicate(connection);
                 wakeup.addStream(stream);
 
                 const publicKey = b4a.toString(connection.remotePublicKey, 'hex');
+                // This function will ignore connections that havent been triggered by the observer. In this case, the promotion will happen during tryConnect when the connection entity will be qualified.
                 await this.#promotePendingConnection(publicKey, connection);
                 
 
@@ -352,13 +341,16 @@ class Network extends ReadyResource {
         }
 
         const timeoutId = setTimeout(() => {
-            if (!this.#pendingConnections.has(publicKey)) return;
-            this.emit(EventType.VALIDATOR_CONNECTION_TIMEOUT, { publicKey, type, timeoutMs: this.#config.connectTimeoutMs });
+            // timeout is here to manage the scenario which we will join peer and estabilish a connection (a bit more overhead for validators)
+            if (this.#pendingConnections.has(publicKey)) {
+                this.#pendingConnections.delete(publicKey)
+            }
         }, this.#config.connectTimeoutMs);
         this.#pendingConnections.set(publicKey, { type, timeoutId });
 
         const target = b4a.from(publicKey, 'hex');
         if (!this.#swarm.peers.has(publicKey)) {
+            // if the connection is not managed by the swarm, we actively connect and the flow will be managed by the on('connection') subscriber
             this.#swarm.joinPeer(target);
             return CONNECTION_STATUS.PENDING;
         } 
