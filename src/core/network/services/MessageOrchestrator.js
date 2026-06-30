@@ -7,10 +7,10 @@ import {
 } from "../../../codecs/apply/applyOperationCodec.js";
 import { normalizeMessageByOperationType } from "../../../utils/normalizers.js";
 import { resultToValidatorAction, SENDER_ACTION } from "../protocols/connectionPolicies.js";
-import { ConnectionManagerError } from './ConnectionManager.js';
+import { ValidatorConnectionManagerError } from './ValidatorConnectionManager.js';
 /**
  * MessageOrchestrator coordinates message submission, retry, and validator management.
- * It works with ConnectionManager and ledger state to ensure reliable message delivery.
+ * It works with ValidatorConnectionManager and ledger state to ensure reliable message delivery.
  */
 class MessageOrchestrator {
     #config;
@@ -21,12 +21,12 @@ class MessageOrchestrator {
     ]);
     /**
      * Attempts to send a message to validators with retries and state checks.
-     * @param {ConnectionManager} connectionManager - The connection manager instance
+     * @param {ValidatorConnectionManager} validatorConnectionManager - The connection manager instance
      * @param {object} state - The state to look for the message outcome
      * @param {Config} config - Configuration options:
      */
-    constructor(connectionManager, state, config) {
-        this.connectionManager = connectionManager;
+    constructor(validatorConnectionManager, state, config) {
+        this.validatorConnectionManager = validatorConnectionManager;
         this.state = state;
         this.#config = config;
         this.#wallet = null;
@@ -50,11 +50,11 @@ class MessageOrchestrator {
      */
     #pickValidatorForMessage(message) {
         const requesterAddress = message?.address;
-        if (!requesterAddress || typeof this.connectionManager.connectedValidators !== 'function') {
-            return this.connectionManager.pickRandomConnectedValidator();
+        if (!requesterAddress || typeof this.validatorConnectionManager.connectedValidators !== 'function') {
+            return this.validatorConnectionManager.pickRandomConnectedValidator();
         }
 
-        const connected = this.connectionManager.connectedValidators();
+        const connected = this.validatorConnectionManager.connectedValidators();
         if (!Array.isArray(connected) || connected.length === 0) {
             return null;
         }
@@ -64,8 +64,8 @@ class MessageOrchestrator {
         });
 
         const pool = eligible.length > 0 ? eligible : connected;
-        if (typeof this.connectionManager.pickRandomValidator === 'function') {
-            return this.connectionManager.pickRandomValidator(pool);
+        if (typeof this.validatorConnectionManager.pickRandomValidator === 'function') {
+            return this.validatorConnectionManager.pickRandomValidator(pool);
         }
 
         const index = Math.floor(Math.random() * pool.length);
@@ -98,7 +98,7 @@ class MessageOrchestrator {
         */
 
         // TODO: After Legacy is deprecated, we don't need to check preferred protocol here.
-        const validatorConnection = this.connectionManager.getConnection(validatorPublicKey);
+        const validatorConnection = this.validatorConnectionManager.getConnection(validatorPublicKey);
         const preferredProtocol = validatorConnection.protocolSession.preferredProtocol;
         let success = false;
         if (preferredProtocol === validatorConnection.protocolSession.supportedProtocols.LEGACY) {
@@ -110,7 +110,7 @@ class MessageOrchestrator {
             }
             if (!success) {
                 // Remove validator and retry
-                this.connectionManager.remove(validatorPublicKey);
+                this.validatorConnectionManager.remove(validatorPublicKey);
                 success = await this.send(message, retries + 1);
             }
         } else if (preferredProtocol === validatorConnection.protocolSession.supportedProtocols.V1) {
@@ -126,7 +126,7 @@ class MessageOrchestrator {
                     NETWORK_CAPABILITIES
                 );
 
-            await this.connectionManager.sendSingleMessage(v1Message, validatorPublicKey)
+            await this.validatorConnectionManager.sendSingleMessage(v1Message, validatorPublicKey)
                 .then(
                     async (resultCode) => {
                         if (await this.#isIdempotentSuccess(resultCode, message)) {
@@ -142,17 +142,17 @@ class MessageOrchestrator {
                                 //TODO: Create a function for action below, and replace it also in legacy flow.
                                 this.incrementSentCount(validatorPublicKey);
                                 if (this.shouldRemove(validatorPublicKey)) {
-                                    this.connectionManager.remove(validatorPublicKey);
+                                    this.validatorConnectionManager.remove(validatorPublicKey);
                                 }
                                 break;
                             case SENDER_ACTION.ROTATE:
-                                this.connectionManager.remove(validatorPublicKey);
+                                this.validatorConnectionManager.remove(validatorPublicKey);
                                 break;
                             case SENDER_ACTION.NO_ROTATE:
                                 // ignore
                                 break;
                             default:
-                                this.connectionManager.remove(validatorPublicKey);
+                                this.validatorConnectionManager.remove(validatorPublicKey);
                                 console.warn(
                                     `MessageOrchestrator: Unrecognized action from connectionPolicies: ${action}.
                                      ResultCode was: ${resultCode}. Removing validator ${publicKeyToAddress(validatorPublicKey, this.#config)}`
@@ -163,11 +163,11 @@ class MessageOrchestrator {
                 )
                 .catch(
                     async (err) => {
-                        if (err instanceof ConnectionManagerError) {
+                        if (err instanceof ValidatorConnectionManagerError) {
                             success = await this.send(message, retries + 1);
                             console.warn(`MessageOrchestrator: Connection Error: ${err.message}`);
                         } else {
-                            this.connectionManager.remove(validatorPublicKey);
+                            this.validatorConnectionManager.remove(validatorPublicKey);
                             success = await this.send(message, retries + 1);
                         }
                     }
@@ -216,7 +216,7 @@ class MessageOrchestrator {
     // TODO: Delete this function after legacy protocol is deprecated
     async #attemptSendMessageForLegacy(validatorPublicKey, message) {
         const deductedTxType = operationToPayload(message.type);
-        await this.connectionManager.sendSingleMessage(message, validatorPublicKey);
+        await this.validatorConnectionManager.sendSingleMessage(message, validatorPublicKey);
         const appeared = await this.state.waitForUnsigned(
             message[deductedTxType].tx,
             this.#config.messageValidatorResponseTimeout
@@ -224,7 +224,7 @@ class MessageOrchestrator {
         if (appeared) {
             this.incrementSentCount(validatorPublicKey);
             if (this.shouldRemove(validatorPublicKey)) {
-                this.connectionManager.remove(validatorPublicKey);
+                this.validatorConnectionManager.remove(validatorPublicKey);
             }
             return true;
         }
@@ -232,11 +232,11 @@ class MessageOrchestrator {
     }
 
     incrementSentCount(validatorPubKey) {
-        this.connectionManager.incrementSentCount(validatorPubKey);
+        this.validatorConnectionManager.incrementSentCount(validatorPubKey);
     }
 
     shouldRemove(validatorPubKey) {
-        return this.connectionManager.getSentCount(validatorPubKey) >= this.#config.messageThreshold;
+        return this.validatorConnectionManager.getSentCount(validatorPubKey) >= this.#config.messageThreshold;
     }
 }
 

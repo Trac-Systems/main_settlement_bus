@@ -6,14 +6,14 @@ import {toHex} from '../../../utils/buffer.js';
  * @typedef {import('hyperswarm').Connection} Connection
  */
 
-export class ConnectionManagerError extends Error {
+export class ValidatorConnectionManagerError extends Error {
     constructor(message) {
         super(message);
         this.name = this.constructor.name;
     }
 }
 
-class ConnectionManager {
+class ValidatorConnectionManager {
     #validators
     #maxValidators
     #config
@@ -44,7 +44,7 @@ class ConnectionManager {
     subscribeToHealthChecks(healthCheckService) {
         this.#logger.debug('subscribeToHealthChecks: subscribing to health check events');
         if (!healthCheckService || typeof healthCheckService.on !== 'function' || typeof healthCheckService.off !== 'function') {
-            throw new Error('ConnectionManager: health check service must implement on/off');
+            throw new Error('ValidatorConnectionManager: health check service must implement on/off');
         }
 
         if (this.#healthCheckService && this.#boundedHealthCheckHandler) {
@@ -139,19 +139,19 @@ class ConnectionManager {
      * @param {Object} message - The message to send to the validator.
      * @param {String | Buffer} publicKey - A validator public key hex string to be fetched from the pool.
      * @returns {Promise<*>} A promise returned by `validator.connection.protocolSession.send(message)`.
-     * @throws {ConnectionManagerError} If the validator is not connected.
-     * @throws {ConnectionManagerError} If the validator has no valid connection or protocol session.
+     * @throws {ValidatorConnectionManagerError} If the validator is not connected.
+     * @throws {ValidatorConnectionManagerError} If the validator has no valid connection or protocol session.
      */
     async sendSingleMessage(message, publicKey) {
         let publicKeyHex = this.#toHexString(publicKey);
         if (!this.connected(publicKeyHex)) {
-            throw new ConnectionManagerError(
+            throw new ValidatorConnectionManagerError(
                 `Cannot send message: validator ${publicKeyToAddress(publicKey, this.#config)} is not connected.`
             );
         }
         const validator = this.#validators.get(publicKeyHex);
         if (!validator || !validator.connection || !validator.connection.protocolSession) {
-            throw new ConnectionManagerError(
+            throw new ValidatorConnectionManagerError(
                 `Cannot send message: no valid connection found for validator ${publicKeyToAddress(publicKey, this.#config)}.`
             );
         }
@@ -357,4 +357,4 @@ class ConnectionManager {
     }
 }
 
-export default ConnectionManager;
+export default ValidatorConnectionManager;
