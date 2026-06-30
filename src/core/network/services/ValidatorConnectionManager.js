@@ -1,7 +1,7 @@
 import {EventType, ResultCode} from '../../../utils/constants.js';
 import {publicKeyToAddress} from "../../../utils/helpers.js";
 import {Logger} from "../../../utils/logger.js";
-import {toHex} from '../../../utils/buffer.js';
+import { BaseConnectionManager } from '../../shared/BaseConnectionManager.js'
 /**
  * @typedef {import('hyperswarm').Connection} Connection
  */
@@ -13,23 +13,20 @@ export class ValidatorConnectionManagerError extends Error {
     }
 }
 
-class ValidatorConnectionManager {
-    #validators
-    #maxValidators
+class ValidatorConnectionManager extends BaseConnectionManager {
     #config
     #healthCheckService
     #boundedHealthCheckHandler
     #logger
-    // Note: #validators is using publicKey (Buffer) as key
+    // Note: _connections is using publicKey (Buffer) as key
     // As Buffers are objects, we will rely on internal conversions done by JS to compare them.
     // It would be better to handle these conversions manually by using hex strings as keys to avoid issues
     /**
      * @param {Config} config
      **/
     constructor(config) {
-        this.#validators = new Map();
+        super(config.maxValidators);
         this.#config = config
-        this.#maxValidators = config.maxValidators
         this.#boundedHealthCheckHandler = this.#healthCheckHandler.bind(this);
         this.#logger = new Logger(config)
     }
@@ -124,17 +121,6 @@ class ValidatorConnectionManager {
     }
 
     /**
-     * Retrieves the Hyperswarm connection object for a given validator public key.
-     * @param {String | Buffer} publicKey - The public key (Buffer or hex string) of the validator.
-     * @returns {Connection|undefined} - The connection object if found, otherwise undefined.
-     */
-    getConnection(publicKey) {
-        const publicKeyHex = this.#toHexString(publicKey);
-        const entry = this.#validators.get(publicKeyHex);
-        return entry ? entry.connection : undefined;
-    }
-
-    /**
      * Sends a message through a specific validator without increasing sent messages count.
      * @param {Object} message - The message to send to the validator.
      * @param {String | Buffer} publicKey - A validator public key hex string to be fetched from the pool.
@@ -143,13 +129,13 @@ class ValidatorConnectionManager {
      * @throws {ValidatorConnectionManagerError} If the validator has no valid connection or protocol session.
      */
     async sendSingleMessage(message, publicKey) {
-        let publicKeyHex = this.#toHexString(publicKey);
+        let publicKeyHex = this._toHexString(publicKey);
         if (!this.connected(publicKeyHex)) {
             throw new ValidatorConnectionManagerError(
                 `Cannot send message: validator ${publicKeyToAddress(publicKey, this.#config)} is not connected.`
             );
         }
-        const validator = this.#validators.get(publicKeyHex);
+        const validator = this._connections.get(publicKeyHex);
         if (!validator || !validator.connection || !validator.connection.protocolSession) {
             throw new ValidatorConnectionManagerError(
                 `Cannot send message: no valid connection found for validator ${publicKeyToAddress(publicKey, this.#config)}.`
@@ -165,7 +151,7 @@ class ValidatorConnectionManager {
      * @returns {Boolean} - Returns true if the validator was added or updated, false otherwise
      */
     addValidator(publicKey, connection) {
-        let publicKeyHex = this.#toHexString(publicKey);
+        let publicKeyHex = this._toHexString(publicKey);
         if (this.maxConnectionsReached()) {
             this.#logger.debug('addValidator: max connections reached.');
             return false;
@@ -192,10 +178,10 @@ class ValidatorConnectionManager {
      */
     remove(publicKey, { endConnection = true } = {}) {
         this.#logger.debug(`remove: removing validator ${publicKeyToAddress(publicKey, this.#config)}`);
-        const publicKeyHex = this.#toHexString(publicKey);
+        const publicKeyHex = this._toHexString(publicKey);
         this.#stopHealthCheck(publicKeyHex);
         if (this.exists(publicKeyHex)) {
-            const entry = this.#validators.get(publicKeyHex);
+            const entry = this._connections.get(publicKeyHex);
             if (endConnection && entry && entry.connection && typeof entry.connection.end === 'function') {
                 try {
                     entry.connection.end();
@@ -205,20 +191,10 @@ class ValidatorConnectionManager {
                     // TODO: Consider logging these errors here in verbose mode
                 }
             }
-            this.#logger.debug(`remove: removing validator from map: ${publicKeyToAddress(publicKeyHex, this.#config)}. Map size before removal: ${this.#validators.size}.`);
-            this.#validators.delete(publicKeyHex);
-            this.#logger.debug(`remove: validator removed successfully. Map size is now ${this.#validators.size}.`);
+            this.#logger.debug(`remove: removing validator from map: ${publicKeyToAddress(publicKeyHex, this.#config)}. Map size before removal: ${this._connections.size}.`);
+            this._connections.delete(publicKeyHex);
+            this.#logger.debug(`remove: validator removed successfully. Map size is now ${this._connections.size}.`);
         }
-    }
-
-    /**
-     * Checks if the maximum number of connections has been reached.
-     * @returns {Boolean} - Returns true if the maximum number of connections has been reached, false otherwise.
-     */
-    // Note: this function name is a bit misleading. It checks if we have reached max connections and returns boolean
-    // The name leads to think it returns the number of max connections
-    maxConnectionsReached() {
-        return this.connectionCount() >= this.#maxValidators
     }
 
     /**
@@ -226,35 +202,7 @@ class ValidatorConnectionManager {
      * @returns {Array} - An array of public key hex strings of connected validators
      */
     connectedValidators() {
-        return Array.from(this.#validators.keys()).filter(pk => this.connected(pk));
-    }
-
-    /**
-     * Gets the current number of connected validators.
-     * @returns {Number} - The count of connected validators
-     */
-    connectionCount() {
-        return this.connectedValidators().length;
-    }
-
-    /**
-     * Checks if a validator is currently connected.
-     * @param {String | Buffer} publicKey - The public key hex string of the validator to check
-     * @returns {Boolean} - Returns true if the validator is connected, false otherwise
-     */
-    connected(publicKey) {
-        const publicKeyHex = this.#toHexString(publicKey);
-        return this.exists(publicKeyHex) && this.#validators.get(publicKeyHex).connection !== null;
-    }
-
-    /**
-     * Checks if a validator exists in the pool.
-     * @param {String | Buffer} publicKey - The public key hex string of the validator to check
-     * @returns {Boolean} - Returns true if the validator exists, false otherwise
-     */
-    exists(publicKey) {
-        const publicKeyHex = this.#toHexString(publicKey);
-        return this.#validators.has(publicKeyHex);
+        return Array.from(this._connections.keys()).filter(pk => this.connected(pk));
     }
 
     /**
@@ -263,8 +211,8 @@ class ValidatorConnectionManager {
      * @returns {Number} - The count of messages sent
      */
     getSentCount(publicKey) {
-        const publicKeyHex = this.#toHexString(publicKey);
-        const entry = this.#validators.get(publicKeyHex);
+        const publicKeyHex = this._toHexString(publicKey);
+        const entry = this._connections.get(publicKeyHex);
         return entry ? (entry.sent || 0) : 0;
     }
 
@@ -273,8 +221,8 @@ class ValidatorConnectionManager {
      * @param {String | Buffer} publicKey - The public key hex string of the validator
      */
     incrementSentCount(publicKey) {
-        const publicKeyHex = this.#toHexString(publicKey);
-        const entry = this.#validators.get(publicKeyHex);
+        const publicKeyHex = this._toHexString(publicKey);
+        const entry = this._connections.get(publicKeyHex);
         if (entry) {
             entry.sent = (entry.sent || 0) + 1;
         }
@@ -282,8 +230,8 @@ class ValidatorConnectionManager {
 
     prettyPrint() {
         this.#logger.info(`Connection count: ${this.connectionCount()}`);
-        this.#logger.info(`Validator map keys count: ${this.#validators.size}`);
-        this.#logger.info(`Validator map keys:\n${Array.from(this.#validators.entries()).map(([publicKey, val]) => {
+        this.#logger.info(`Validator map keys count: ${this._connections.size}`);
+        this.#logger.info(`Validator map keys:\n${Array.from(this._connections.entries()).map(([publicKey, val]) => {
             const protocols = val.connection?.protocolSession?.preferredProtocol || 'none';
             return `${publicKeyToAddress(publicKey, this.#config)}: ${protocols}`;
         }).join('\n')}`);
@@ -319,13 +267,13 @@ class ValidatorConnectionManager {
      */
     #append(publicKey, connection) {
         this.#logger.debug(`#append: appending validator ${publicKeyToAddress(publicKey, this.#config)}`);
-        const publicKeyHex = this.#toHexString(publicKey);
-        if (this.#validators.has(publicKeyHex)) {
+        const publicKeyHex = this._toHexString(publicKey);
+        if (this._connections.has(publicKeyHex)) {
             // This should never happen, but just in case, we log it
             this.#logger.debug(`#append: tried to append existing validator: ${publicKeyToAddress(publicKey, this.#config)}`);
             return;
         }
-        this.#validators.set(publicKeyHex, {connection, sent: 0});
+        this._connections.set(publicKeyHex, {connection, sent: 0});
         connection.on('close', () => {
             this.#logger.debug(`#append: connection closing for validator ${publicKeyToAddress(publicKey, this.#config)}`);
             this.remove(publicKeyHex);
@@ -343,17 +291,13 @@ class ValidatorConnectionManager {
         // It seems that both could be merged into a single function that either adds or updates the entry.
         // It would be preferable to keep them separated though, but we would need to review all usages to ensure correctness.
         // Also, we should remove the 'else' branch below if we decide to keep 'update' and 'append' separated.
-        const publicKeyHex = this.#toHexString(publicKey);
+        const publicKeyHex = this._toHexString(publicKey);
         this.#logger.debug(`#update: updating validator ${publicKeyToAddress(publicKey, this.#config)}`);
-        if (this.#validators.has(publicKeyHex)) {
-            this.#validators.get(publicKeyHex).connection = connection;
+        if (this._connections.has(publicKeyHex)) {
+            this._connections.get(publicKeyHex).connection = connection;
         } else {
-            this.#validators.set(publicKeyHex, {connection, sent: 0});
+            this._connections.set(publicKeyHex, {connection, sent: 0});
         }
-    }
-
-    #toHexString(publicKey) {
-        return toHex(publicKey)
     }
 }
 

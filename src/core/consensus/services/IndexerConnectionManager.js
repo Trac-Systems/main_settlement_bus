@@ -1,45 +1,36 @@
 // TODO: ITS HERE
 import { toHex } from '../../../utils/buffer.js';
+import { BaseConnectionManager } from '../../shared/BaseConnectionManager.js'
 
-class IndexerConnectionManager {
-    #indexers = new Map();
-    #maxIndexers;
+class IndexerConnectionManager extends BaseConnectionManager {
 
     constructor(maxIndexers) {
-        this.#maxIndexers = maxIndexers;
+        super(maxIndexers);
     }
 
     setMax(maxIndexers) {
-        this.#maxIndexers = maxIndexers;
+        this._max = maxIndexers;
     }
 
     add(publicKey, connection) {
         const key = toHex(publicKey);
-        if (this.#indexers.has(key)) {
+        if (this._connections.has(key)) {
             return false;
         }
-        if (this.#indexers.size >= this.#maxIndexers) {
+        if (this._connections.size >= this._max) {
             return false;
         }
-        this.#indexers.set(key, connection);
+        this._connections.set(key, { connection });
         return true;
     }
 
     remove(publicKey) {
         const key = toHex(publicKey);
-        this.#indexers.delete(key);
-    }
-
-    getConnection(publicKey) {
-        return this.#indexers.get(toHex(publicKey));
-    }
-
-    connected(publicKey) {
-        return this.#indexers.has(toHex(publicKey));
+        this._connections.delete(key);
     }
 
     connectedIndexers() {
-        return Array.from(this.#indexers.keys());
+        return Array.from(this._connections.keys());
     }
 
     async send(publicKey, message) {
@@ -56,27 +47,9 @@ class IndexerConnectionManager {
         connection.consensusProtocolSession.sendAndForget(message);
     }
 
-    /**
-     * Checks if a indexer exists in the pool.
-     * @param {String | Buffer} publicKey - The public key hex string of the indexer to check
-     * @returns {Boolean} - Returns true if the indexer exists, false otherwise
-     */
-    exists(publicKey) {
-        const publicKeyHex = this.#toHexString(publicKey);
-        return this.#indexers.has(publicKeyHex);
-    }
-
-    #toHexString(publicKey) {
-        return toHex(publicKey)
-    }
-
     prettyPrint() {
-        console.log(`Connection count: ${this.#indexers.size}`);
-        console.log(`Indexer map keys:\n${Array.from(this.#indexers.keys()).join('\n')}`);
-    }
-
-    clear() {
-        this.#indexers.clear();
+        console.log(`Connection count: ${this._connections.size}`);
+        console.log(`Indexer map keys:\n${Array.from(this._connections.keys()).join('\n')}`);
     }
 }
 
