@@ -1,6 +1,7 @@
 import {ConsensusOperationType, PEER_PUBLIC_KEY_HEX_LENGTH, ConsensusResultCode} from '../../../utils/constants.js';
 import {isHexString, publicKeyToAddress} from '../../../utils/helpers.js';
 import {V1ConsensusProtocolError} from "../../../core/consensus/v1/V1ConsensusProtocolError.js";
+import BasePendingRequestService from '../../shared/BasePendingRequestService.js';
 
 export class IndexerPendingRequestServiceTimeoutError extends Error {
     constructor(requestId, peerAddress, timeoutMs) {
@@ -9,17 +10,12 @@ export class IndexerPendingRequestServiceTimeoutError extends Error {
     }
 }
 
-export default class IndexerPendingRequestService {
-    #pendingRequests;
+export default class IndexerPendingRequestService extends BasePendingRequestService {
     #config;
 
     constructor(config) {
-        this.#pendingRequests = new Map(); // Map<id, pendingRequestEntry>
+        super();
         this.#config = config;
-    }
-
-    has(id) {
-        return this.#pendingRequests.has(id);
     }
 
     #validateRegisterInput(peerPubKeyHex, message) {
@@ -43,11 +39,11 @@ export default class IndexerPendingRequestService {
         this.#validateRegisterInput(peerPubKeyHex, message);
         const id = message.session_id;
         const peerAddress = publicKeyToAddress(peerPubKeyHex, this.#config);
-        if (this.#pendingRequests.size >= this.#config.maxPendingRequestsInPendingRequestsService) {
+        if (this._pendingRequests.size >= this.#config.maxPendingRequestsInPendingRequestsService) {
             throw new Error('Maximum number of pending requests reached.');
         }
 
-        if (this.#pendingRequests.has(id)) {
+        if (this._pendingRequests.has(id)) {
             throw new Error(`Pending request with ID ${id} from peer ${peerPubKeyHex} already exists.`);
         }
 
@@ -78,23 +74,8 @@ export default class IndexerPendingRequestService {
 
         }, this.#config.indexerPendingRequestTimeout);
 
-        this.#pendingRequests.set(id, entry);
+        this._pendingRequests.set(id, entry);
         return promise;
-    }
-
-    getAndDeletePendingRequest(id) {
-        const entry = this.#pendingRequests.get(id);
-        if (!entry) return null;
-
-        clearTimeout(entry.timeoutId);
-        this.#pendingRequests.delete(id);
-        return entry;
-    }
-
-    getPendingRequest(id) {
-        const entry = this.#pendingRequests.get(id);
-        if (!entry) return null;
-        return entry;
     }
 
     // for now, we are resolving only resultCode, but we can extend it in the future if needed...
@@ -105,48 +86,10 @@ export default class IndexerPendingRequestService {
         return true;
     }
 
-    rejectPendingRequest(id, error) {
-        const entry = this.getAndDeletePendingRequest(id);
-        if (!entry) return false;
-        entry.reject(error instanceof Error ? error : new Error(error?.message ?? 'Unexpected error'));
-        return true;
-    }
-
-    rejectPendingRequestsForPeer(peerPubKeyHex, error) {
-        const idsToReject = [];
-        for (const [id, entry] of this.#pendingRequests) {
-            if (entry.requestedTo === peerPubKeyHex) idsToReject.push(id);
-        }
-
-        for (const id of idsToReject) {
-            this.rejectPendingRequest(id, error);
-        }
-
-        return idsToReject.length;
-    }
-
-    stopPendingRequestTimeout(id) {
-        const entry = this.#pendingRequests.get(id);
-        if (!entry) return false;
-
-        clearTimeout(entry.timeoutId);
-        entry.timeoutId = null;
-        return true;
-    }
-
-    close() {
-        for (const [id, entry] of this.#pendingRequests) {
-            clearTimeout(entry.timeoutId);
-            try {
-                entry.reject(
-                    new V1ConsensusProtocolError(
-                        ConsensusResultCode.UNEXPECTED_ERROR,
-                        `Pending request ${id} cancelled (shutdown).`)
-                );
-            } catch (error) {
-                console.error(`IndexerPendingRequestService.close: failed to reject pending request ${id}:`, error);
-            }
-        }
-        this.#pendingRequests.clear();
-    }
+    _createShutdownError(id) {
+        return new V1ConsensusProtocolError(
+            ConsensusResultCode.UNEXPECTED_ERROR,
+            `Pending request ${id} cancelled (shutdown).`
+        );
+    }    
 }
