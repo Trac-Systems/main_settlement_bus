@@ -144,6 +144,7 @@ export const EventType = Object.freeze({
     VALIDATOR_CONNECTION_READY: 'validator-connection-ready',
     VALIDATOR_CONNECTION_TIMEOUT: 'validator-connection-timeout',
     VALIDATOR_HEALTH_CHECK: 'validator-health-check',
+    INDEXER_CONNECTION_READY: 'indexer-connection-ready',
 });
 
 // Role managment constants

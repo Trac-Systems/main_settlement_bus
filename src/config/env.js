@@ -21,6 +21,7 @@ const configData = {
         dhtBootstrap: ['116.202.214.149:10001','157.180.12.214:10001','node1.hyperdht.org:49737','node2.hyperdht.org:49737','node3.hyperdht.org:49737'], // these are used to peer discovery
         derivationPath: address.TESNET_DERIVATION_PATH,
         enableValidatorObserver: true,
+        enableIndexerObserver: true,
         pollInterval: 500, // Validator observer poll interval
         adminCacheTTL: 10_000, // Admin cache TTL ms
         validatorConnectionAttemptDelay: 5, // Delay between validator connection attempts (ms)
@@ -77,6 +78,7 @@ const configData = {
         dhtBootstrap: ['116.202.214.149:10001','157.180.12.214:10001','node1.hyperdht.org:49737','node2.hyperdht.org:49737','node3.hyperdht.org:49737'],
         derivationPath: address.MAINNET_DERIVATION_PATH,
         enableValidatorObserver: true,
+        enableIndexerObserver: true,
         pollInterval: 500, // Validator observer poll interval
         adminCacheTTL: 3_600_000, // Admin cache TTL ms
         validatorConnectionAttemptDelay: 5, // Delay between validator connection attempts (ms)
@@ -133,6 +135,7 @@ const configData = {
         dhtBootstrap: ['116.202.214.149:10001','157.180.12.214:10001','node1.hyperdht.org:49737','node2.hyperdht.org:49737','node3.hyperdht.org:49737'],
         derivationPath: address.MAINNET_DERIVATION_PATH,
         enableValidatorObserver: true,
+        enableIndexerObserver: true,
         pollInterval: 500, // Validator observer poll interval
         adminCacheTTL: 60_000, // Admin cache TTL ms
         validatorConnectionAttemptDelay: 5, // Delay between validator connection attempts (ms)
