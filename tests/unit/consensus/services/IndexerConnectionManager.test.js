@@ -136,7 +136,7 @@ test('IndexerConnectionManager', () => {
         });
 
         test('is a no-op on an empty pool', async t => {
-            const manager = new IndexerConnectionManager(makeConfig());
+            const manager = new IndexerConnectionManager(0);
             manager.clear();
             t.is(manager.connectedIndexers().length, 0);
         });

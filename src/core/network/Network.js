@@ -6,7 +6,7 @@ import TransactionPoolService from './services/TransactionPoolService.js';
 import ValidatorObserverService from './services/ValidatorObserverService.js';
 import IndexerObserverService from '../consensus/services/IndexerObserverService.js';
 import NetworkMessages from './protocols/NetworkMessages.js';
-import { publicKeyToAddress, sleep } from '../../utils/helpers.js';
+import { sleep } from '../../utils/helpers.js';
 import {
     TRAC_NAMESPACE,
     EventType,
@@ -160,38 +160,6 @@ class Network extends ReadyResource {
             this.#pendingConnections.delete(publicKey);
         });
 
-        this.on(EventType.INDEXER_CONNECTION_READY, ({ publicKey, connection }) => {
-            this.#logger.debug(`Network Event: INDEXER_CONNECTION_READY | PublicKey: ${publicKey}`);
-            if (!this.#resolvePendingConnection(publicKey)) return;
-            this.#indexerConnectionManager.add(connection.remotePublicKey, connection);
-        });
-
-        this.on(EventType.VALIDATOR_CONNECTION_READY, async ({ publicKey, connection }) => {
-            this.#logger.debug(`Network Event: VALIDATOR_CONNECTION_READY | PublicKey: ${publicKey}`);
-            if (!this.#resolvePendingConnection(publicKey)) return;
-
-            try {
-                if (!connection.protocolSession.isProbed()) await connection.protocolSession.probe();
-            } catch (err) {
-                this.#logger.debug(`failed to probe peer with publicKey ${publicKey}: ${err?.message ?? err}`);
-            }
-
-            this.#validatorConnectionManager.addValidator(publicKey, connection);
-
-            let healthCheckSupported = false;
-            try {
-                healthCheckSupported = connection.protocolSession.isHealthCheckSupported();
-            } catch (err) {
-                this.#logger.debug(`health check support unknown for peer with publicKey ${publicKey}: ${err?.message ?? err}`);
-            }
-
-            if (healthCheckSupported) {
-                this.#validatorHealthCheckService.start(publicKey);
-            } else {
-                this.#validatorHealthCheckService.stop(publicKey);
-            }
-        });
-
         this.#state.on(CustomEventType.IS_INDEXER, (bufferAddress) => {
             const address = tracCryptoApi.address.encode(this.#config.addressPrefix, bufferAddress);
             if (address === this.#wallet.address) {
@@ -212,8 +180,6 @@ class Network extends ReadyResource {
 
     cleanupNetworkListeners() {
         this.removeAllListeners(EventType.VALIDATOR_CONNECTION_TIMEOUT);
-        this.removeAllListeners(EventType.VALIDATOR_CONNECTION_READY);
-        this.removeAllListeners(EventType.INDEXER_CONNECTION_READY);
     }
 
     cleanupPendingConnections() {
@@ -414,11 +380,29 @@ class Network extends ReadyResource {
 
     async #promotePendingConnection(publicKey, connection) {
         const pending = this.#pendingConnections.get(publicKey);
-        if (!pending) return;
+        if (pending) {
+            clearTimeout(pending.timeoutId);
+            this.#pendingConnections.delete(publicKey);
 
-        if (pending.type === 'indexer') this.emit(EventType.INDEXER_CONNECTION_READY, { publicKey, connection });
-        if (pending.type === 'validator') this.emit(EventType.VALIDATOR_CONNECTION_READY, { publicKey, connection });
-        this.#logger.debug(`Network.promotePendingConnection: Connected to peer: ${publicKey} as type: ${pending.type}`);
+            if (pending.type === 'indexer') {
+                this.#indexerConnectionManager.add(connection.remotePublicKey, connection);
+            }
+            if (pending.type === 'validator') {
+                try {
+                    if (!connection.protocolSession.isProbed()) await connection.protocolSession.probe();
+                } catch (err) {
+                    this.#logger.debug(`failed to probe peer with publicKey ${publicKey}: ${err?.message ?? err}`);
+                }
+
+                this.#validatorConnectionManager.addValidator(publicKey, connection);
+
+                if (connection.protocolSession.isHealthCheckSupported()) {
+                    this.#validatorHealthCheckService.start(publicKey);
+                } else {
+                    this.#validatorHealthCheckService.stop(publicKey);
+                }
+            }
+        }
     }
 
     #normalizePublicKey(publicKey) {
@@ -430,14 +414,6 @@ class Network extends ReadyResource {
     #rejectAllPendingRequests(publicKey, error) {
         this.#validatorPendingRequestService.rejectPendingRequestsForPeer(publicKey, error);
         this.#indexerPendingRequestService.rejectPendingRequestsForPeer(publicKey, error);
-    }
-
-    #resolvePendingConnection(publicKey) {
-        const pending = this.#pendingConnections.get(publicKey);
-        if (!pending?.timeoutId) return false;
-        clearTimeout(pending.timeoutId);
-        this.#pendingConnections.delete(publicKey);
-        return true;
     }
 
     #clearPendingValidatorConnection(publicKeyHex) {
