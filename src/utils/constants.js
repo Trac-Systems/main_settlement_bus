@@ -36,6 +36,7 @@ export const OperationType = Object.freeze({
     TX: ApplyOperationType.TX,
     TRANSFER: ApplyOperationType.TRANSFER,
     SET_EPOCH: ApplyOperationType.SET_EPOCH,
+    SET_GENESIS_EPOCH: ApplyOperationType.SET_GENESIS_EPOCH,
 });
 
 export const NetworkOperationType = Object.freeze({
@@ -186,9 +187,11 @@ export const LICENSE_BYTE_LENGTH = 4;
 
 // consensus
 export const PROTOCOL_VERSION_BYTE_LENGTH = 1; // 1 BYTE 0-255
-export const NETWORK_ID_BYTE_LENGTH = 2; // 2BYTES - UINT16
+export const NETWORK_ID_BYTE_LENGTH = 2; // 2 BYTES - UINT16
 export const EPOCH_BYTE_LENGTH = 8; // 8 BYTES - UINT64
 export const VDF_BLOB_PROOF_SIZE = 516;
+export const VDF_DIFFICULTY_SIZE = 4 // 4 BYTES - UINT32
+export const VDF_DISCRIMINANT_SIZE = 2 // 2 BYTES - UINT16
 
 // index.js
 export const BOOTSTRAP_HEXSTRING_LENGTH = 64;

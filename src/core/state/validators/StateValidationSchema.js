@@ -14,6 +14,8 @@ import {
     NETWORK_ID_BYTE_LENGTH,
     EPOCH_BYTE_LENGTH,
     VDF_BLOB_PROOF_SIZE,
+    VDF_DIFFICULTY_SIZE,
+    VDF_DISCRIMINANT_SIZE,
 } from '../../../utils/constants.js';
 import {
     decodeProofProposalApproval,
@@ -32,6 +34,7 @@ class StateValidationSchema {
     #validateTransferOperationSchema;
     #validateBalanceInitializationSchema;
     #validateSetEpochOperationSchema;
+    #validateSetGenesisEpochOperationSchema;
     #proofDataFields;
     #config;
 
@@ -268,6 +271,7 @@ class StateValidationSchema {
         this.#validateTransferOperationSchema = this.#compileTransferOperationSchema();
         this.#validateBalanceInitializationSchema = this.#compileBalanceInitializationSchema();
         this.#validateSetEpochOperationSchema = this.#compileSetEpochOperationSchema();
+        this.#validateSetGenesisEpochOperationSchema = this.#compileSetGenesisEpochOperationSchema();
 
     }
 
@@ -637,6 +641,31 @@ class StateValidationSchema {
 
     validateSetEpochOperation(op) {
         return this.#validateSetEpochOperationSchema(op) === true;
+    }
+
+    #compileSetGenesisEpochOperationSchema() {
+        const schema = {
+            $$strict: true,
+            type: this.#operationTypeDomain(OperationType.SET_GENESIS_EPOCH),
+            address: {type: 'buffer', length: this.#config.addressLength, required: true},
+            sgo: {
+                strict: true,
+                type: 'object',
+                props: {
+                    tx: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true},
+                    txv: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true},
+                    df: {type: 'buffer', length: VDF_DIFFICULTY_SIZE, required: true},
+                    db: {type: 'buffer', length: VDF_DISCRIMINANT_SIZE, required: true},
+                    in: {type: 'buffer', length: NONCE_BYTE_LENGTH, required: true},
+                    is: {type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true},
+                }
+            }
+        };
+        return this.#validator.compile(schema);
+    }
+
+    validateSetGenesisEpochOperation(op) {
+        return this.#validateSetGenesisEpochOperationSchema(op) === true;
     }
 }
 
