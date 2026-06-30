@@ -7,7 +7,7 @@ import ConsensusEpochProofProposalOperationHandler from '../v1/handlers/Consesus
 class ConsensusRouterV1 {
     #config
     #epochProofProposalHandler
-
+    #pendingRequestService
     constructor(
         state,
         wallet,
@@ -19,8 +19,8 @@ class ConsensusRouterV1 {
             state,
             wallet,
             config,
-            pendingRequestService,
         );
+        this.#pendingRequestService = pendingRequestService;
     }
 
     async route(incomingMessage, connection) {
@@ -50,7 +50,11 @@ class ConsensusRouterV1 {
                     await this.#epochProofProposalHandler.handleRequest(decodedMessage, connection);
                     break;
                 case ConsensusOperationType.PROOF_PROPOSAL_APPROVAL:
-                    await this.#epochProofProposalHandler.handleApproval(decodedMessage, connection);
+                    const proofProposal = this.#pendingRequestService.getPendingRequest(decodedMessage.session_id)
+                    if (!proofProposal) {
+                        // TODO ; do something if falsy - this means that message is not stored in the pendingRequestService
+                    }
+                    await this.#epochProofProposalHandler.handleApproval(decodedMessage, connection, proofProposal);
                     break;
                 default:
                     this.#disconnect(connection, `Unsupported V1 message type: ${decodedMessage.type}`)

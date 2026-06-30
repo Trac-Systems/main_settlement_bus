@@ -46,7 +46,7 @@ class ConsensusEpochProofProposalOperationHandler extends ConnectionOperationHan
         } catch (e) {
             resultCode = getResultCode(e);
             //TODO: -- emit event "epoch_proposal_validation_failure"
-            // TODO: Add contidion if INVALID_ADDRESS_ASSERTION then blacklist specific remogePublicKey
+            // TODO: Add condition if INVALID_ADDRESS_ASSERTION then blacklist specific remogePublicKey
         } finally {
             await this.#sendEpochProofProposalApprovalResponse(message.session_id, connection, message.proof_proposal, resultCode);
         }
@@ -61,16 +61,18 @@ class ConsensusEpochProofProposalOperationHandler extends ConnectionOperationHan
      * @returns {Promise<object>} Validated proof proposal approval.
      * @throws {V1ProtocolError|Error} If response validation fails.
      */
+
     async handleApproval(message, connection, proofProposal) {
-        // -- emit event "received_response" (maybe not necessary)
+        // TODO:  emit event "received_response" (maybe not necessary)
+        let resultCode = ConsensusResultCode.OK;
         try {
             await this.#proofProposalApprovalValidator.validate(message, connection, proofProposal);
-
-            // -- emit event "response_success"
-        } catch {
-            // -- emit event "response_failure"
+            const approval = message.proof_proposal_response.approval;
+            // TODO:  emit event "response_success" , include  result code and approval
+        } catch (e) {
+            resultCode = getResultCode(e);
+            // TODO:  emit event "response_failure" include result code without approval because this is invalid
         }
-        // return message.proof_proposal_response.approval; -- this will probably be in the emitted success event already
     }
 
     async #buildProofProposalApproval(sessionId, proofProposal, resultCode) {

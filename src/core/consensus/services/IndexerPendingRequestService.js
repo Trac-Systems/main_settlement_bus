@@ -1,6 +1,6 @@
 import {ConsensusOperationType, PEER_PUBLIC_KEY_HEX_LENGTH, ConsensusResultCode} from '../../../utils/constants.js';
 import {isHexString, publicKeyToAddress} from '../../../utils/helpers.js';
-import {V1ConsensusProtocolError} from "../../../core/consensus/v1/V1ConsensusProtocolError.js";
+import {V1ConsensusProtocolError} from "../v1/V1ConsensusProtocolError.js";
 
 export class IndexerPendingRequestServiceTimeoutError extends Error {
     constructor(requestId, peerAddress, timeoutMs) {

@@ -21,6 +21,7 @@ class V1BaseOperationHandler extends ConnectionOperationHandler{
 
     async resolvePendingResponse(message, connection, validator, extractResultCode) {
         const pendingRequestServiceEntry = this.#pendingRequestService.getPendingRequest(message.id);
+        //TODO: Investigate if this return false shouldn't be a throw.
         if (!pendingRequestServiceEntry) return false;
 
         this.#pendingRequestService.stopPendingRequestTimeout(message.id);
