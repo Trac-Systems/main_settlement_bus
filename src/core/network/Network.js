@@ -5,7 +5,7 @@ import b4a from 'b4a';
 import TransactionPoolService from './services/TransactionPoolService.js';
 import ValidatorObserverService from './services/ValidatorObserverService.js';
 import NetworkMessages from './protocols/NetworkMessages.js';
-import { sleep } from '../../utils/helpers.js';
+import { publicKeyToAddress, sleep } from '../../utils/helpers.js';
 import {
     TRAC_NAMESPACE,
     EventType,
@@ -14,7 +14,7 @@ import {
 import ConnectionManager from './services/ConnectionManager.js';
 import MessageOrchestrator from './services/MessageOrchestrator.js';
 import TransactionRateLimiterService from './services/TransactionRateLimiterService.js';
-import PendingRequestService from './services/PendingRequestService.js';
+import ValidatorPendingRequestService from './services/ValidatorPendingRequestService.js';
 import TransactionCommitService from "./services/TransactionCommitService.js";
 import ValidatorHealthCheckService from './services/ValidatorHealthCheckService.js';
 import EpochProofProposalService from '../consensus/services/EpochProofProposalService.js';
@@ -23,6 +23,8 @@ import { WalletProvider } from 'trac-wallet';
 import { CustomEventType } from '../../utils/constants.js';
 import tracCryptoApi from 'trac-crypto-api'
 import ConsensusMessages from '../consensus/protocols/ConsensusMessages.js';
+import IndexerConnectionManager from '../consensus/services/IndexerConnectionManager.js';
+import IndexerPendingRequestService from '../consensus/services/IndexerPendingRequestService.js';
 
 const wakeup = new w();
 
@@ -35,10 +37,8 @@ class Network extends ReadyResource {
     #validatorMessageOrchestrator;
     #config;
     #pendingConnections;
-    #connectTimeoutMs;
-    #maxPendingConnections;
     #rateLimiter;
-    #pendingRequestsService;
+    #validatorPendingRequestService;
     #transactionCommitService;
     #wallet;
     #validatorHealthCheckService;
@@ -47,6 +47,8 @@ class Network extends ReadyResource {
     #state;
     #store;
     #consensusMessages;
+    #indexerConnectionManager;
+    #indexerPendingRequestService;
 
     /**
      * @param {State} state
@@ -61,15 +63,14 @@ class Network extends ReadyResource {
         this.#state = state
         this.#store = store
         this.#wallet = wallet
-        this.#connectTimeoutMs = config.connectTimeoutMs || 5000;
-        this.#maxPendingConnections = config.maxPendingConnections || 50;
         this.#pendingConnections = new Map();
         this.#transactionCommitService = new TransactionCommitService(this.#config);
         this.#transactionPoolService = new TransactionPoolService(state, wallet?.address, this.#transactionCommitService ,this.#config);
         this.#validatorObserverService = new ValidatorObserverService(this, state, wallet?.address, this.#config);
         this.#validatorConnectionManager = new ConnectionManager(this.#config);
         this.#validatorMessageOrchestrator = new MessageOrchestrator(this.#validatorConnectionManager, state, this.#config);
-        this.#pendingRequestsService = new PendingRequestService(this.#config);
+        this.#validatorPendingRequestService = new ValidatorPendingRequestService(this.#config);
+        this.#indexerPendingRequestService = new IndexerPendingRequestService(this.#config);
         this.#logger = new Logger(this.#config);
     }
 
@@ -79,6 +80,10 @@ class Network extends ReadyResource {
 
     get transactionPoolService() {
         return this.#transactionPoolService;
+    }
+
+    get indexerConnectionManager() {
+        return this.#indexerConnectionManager
     }
 
     get validatorObserverService() {
@@ -114,24 +119,37 @@ class Network extends ReadyResource {
         await this.transactionPoolService.stop();
         await sleep(100);
         await this.#validatorObserverService.stop();
-        if (this.#validatorHealthCheckService) {
-            await this.#validatorHealthCheckService.close();
-        }
-        if (this.#epochProofProposalService) {
-            await this.#epochProofProposalService.close();
-        }
 
         this.cleanupNetworkListeners();
         this.cleanupPendingConnections();
-        this.#pendingRequestsService.close();
+        await this.#validatorHealthCheckService.close();
+        await this.#epochProofProposalService.close();
+        this.#validatorPendingRequestService.close();
         this.#transactionCommitService.close();
+        this.#indexerPendingRequestService.close();
 
-        if (this.#swarm !== null) {
-            this.#swarm.destroy();
-        }
+        await this.#swarm.destroy();
     }
 
     setupNetworkListeners() {
+        this.#state.on(CustomEventType.IS_INDEXER, async (publicKey) => {
+            const indexersCount = await this.#state.indexerCount()
+            this.#indexerConnectionManager.setMax(indexersCount);
+            this.disconnectValidatorPeer(publicKey, 'peer promoted to indexer');
+            this.addIndexerPeer(publicKey);
+            
+        });
+
+        this.#state.on(CustomEventType.IS_NON_INDEXER, async (publicKey) => {
+            const indexersCount = await this.#state.indexerCount()
+            this.#indexerConnectionManager.setMax(indexersCount);
+            this.disconnectIndexerPeer(publicKey, 'peer demoted from indexer');
+        });
+
+        this.#state.on(CustomEventType.UNWRITABLE, (publicKey) => {
+            this.disconnectValidatorPeer(publicKey, 'peer became unwritable');
+        });
+
         this.on(EventType.VALIDATOR_CONNECTION_TIMEOUT, ({ publicKey, type, timeoutMs }) => {
             this.#logger.debug(`Network Event: VALIDATOR_CONNECTION_TIMEOUT | PublicKey: ${publicKey} | Type: ${type} | TimeoutMs: ${timeoutMs}`);
             this.#pendingConnections.delete(publicKey);
@@ -177,7 +195,7 @@ class Network extends ReadyResource {
                 this.#epochProofProposalService.start();
             }
         });
-        
+
         this.#state.on(CustomEventType.IS_NON_INDEXER, (bufferAddress) => {
             const address = tracCryptoApi.address.encode(this.#config.addressPrefix, bufferAddress);
             if (address === this.#wallet.address) {
@@ -219,29 +237,39 @@ class Network extends ReadyResource {
                 this.#wallet,
                 this.#rateLimiter,
                 this.#transactionPoolService,
-                this.#pendingRequestsService,
+                this.#validatorPendingRequestService,
                 this.#transactionCommitService,
                 this.#config
             );
             this.#validatorHealthCheckService = new ValidatorHealthCheckService(this.#config);
             await this.#validatorHealthCheckService.ready();
 
-            this.#consensusMessages = new ConsensusMessages(this.#state, this.#wallet, this.#config, this.#pendingRequestsService);
+            this.#consensusMessages = new ConsensusMessages(this.#state, this.#wallet, this.#config, this.#indexerPendingRequestService);
+            const indexersCount = await this.#state.indexerCount()
+            this.#indexerConnectionManager = new IndexerConnectionManager(indexersCount);
 
-            this.#epochProofProposalService = new EpochProofProposalService(this.#state, this.#validatorConnectionManager, this.#wallet, this.#config);
+            this.#epochProofProposalService = new EpochProofProposalService(this.#state, this.#indexerConnectionManager, this.#wallet, this.#config);
             await this.#epochProofProposalService.ready();
 
             this.#validatorConnectionManager.subscribeToHealthChecks(this.#validatorHealthCheckService);
 
             this.#logger.info(`Channel: ${b4a.toString(this.#config.channel)}`);
 
+            this.#swarm.prependListener('connection', async (connection) => {
+                await this.#networkMessages.setupProtomuxMessages(connection);
+                await this.#consensusMessages.setupProtomuxMessages(connection);
+            });
+
             this.#swarm.on('connection', async (connection) => {
                 // Per-peer connection initialization:
                 // - attach Protomux (legacy + v1 channels/messages)
                 // - attach connection.protocolSession (used later by tryConnect / orchestrators to send messages)
-                await this.#networkMessages.setupProtomuxMessages(connection);
 
-                this.#consensusMessages.setupProtomuxMessages(connection);
+                // Adds indexers to consensus connection manager
+                const address = publicKeyToAddress(connection.remotePublicKey, this.#config);
+                if (await this.#state.isIndexerAddress(address) && !await this.#state.isAdminAddress(address)) {
+                    this.#indexerConnectionManager.add(connection.remotePublicKey, connection);
+                }
 
                 // ATTENTION: Must be called AFTER the protomux init above
                 const stream = this.#store.replicate(connection);
@@ -254,18 +282,27 @@ class Network extends ReadyResource {
                 }
 
                 connection.on('close', () => {
-                    this.#pendingRequestsService.rejectPendingRequestsForPeer(
+                    this.#validatorPendingRequestService.rejectPendingRequestsForPeer(
+                        publicKey,
+                        new Error('Connection closed before response')
+                    );
+                    this.#indexerPendingRequestService.rejectPendingRequestsForPeer(
                         publicKey,
                         new Error('Connection closed before response')
                     );
                     this.#swarm.leavePeer(connection.remotePublicKey);
                     this.#validatorConnectionManager.remove(publicKey);
+                    this.#indexerConnectionManager.remove(publicKey);
                     connection.protocolSession.close();
                     connection.consensusProtocolSession?.close();
                 });
 
                 connection.on('error', (error) => {
-                    this.#pendingRequestsService.rejectPendingRequestsForPeer(
+                    this.#validatorPendingRequestService.rejectPendingRequestsForPeer(
+                        publicKey,
+                        error ?? new Error('Connection error before response')
+                    );
+                    this.#indexerPendingRequestService.rejectPendingRequestsForPeer(
                         publicKey,
                         error ?? new Error('Connection error before response')
                     );
@@ -296,6 +333,17 @@ class Network extends ReadyResource {
         return this.#pendingConnections.size;
     }
 
+    addIndexerPeer(publicKey) {
+        const publicKeyHex = this.#normalizePublicKey(publicKey);
+
+        // If swarm does not have the register public key, means that it emits a connection event
+        if (this.#swarm?.peers?.has(publicKeyHex)) {
+            const peerInfo = this.#swarm.peers.get(publicKeyHex);
+            const connection = this.#swarm._allConnections.get(peerInfo.publicKey);
+            this.#indexerConnectionManager.add(peerInfo.publicKey, connection);
+        }
+    }
+
     disconnectValidatorPeer(publicKey, reason = 'validator peer invalidated') {
         const publicKeyHex = this.#normalizePublicKey(publicKey);
         if (!publicKeyHex) return false;
@@ -318,6 +366,20 @@ class Network extends ReadyResource {
         return hadPendingValidatorConnection || isTrackedValidator;
     }
 
+    disconnectIndexerPeer(publicKey, reason = 'validator peer invalidated') {
+        const publicKeyHex = this.#normalizePublicKey(publicKey);
+        if (!publicKeyHex) return false;
+
+        const isTrackedIndexer = this.#indexerConnectionManager.exists(publicKeyHex);
+
+        if (isTrackedIndexer) {
+            this.#logger.debug(`Network.disconnectIndexerPeer: detaching tracked indexer ${publicKeyHex}. Reason: ${reason}`);
+            this.#indexerConnectionManager.remove(publicKey);
+        }
+
+        return isTrackedIndexer;
+    }
+
     async #getOrGenerateWallet() {
         if (this.#config.enableWallet) {
             const keyPair = { publicKey: this.#wallet.publicKey, secretKey: this.#wallet.secretKey }
@@ -332,15 +394,15 @@ class Network extends ReadyResource {
 
     async tryConnect(publicKey, type = null) {
         if (this.#swarm === null) throw new Error('Network swarm is not initialized');
-        if (this.#pendingConnections.has(publicKey) || this.#pendingConnections.size >= this.#maxPendingConnections) {
+        if (this.#pendingConnections.has(publicKey) || this.#pendingConnections.size >= this.#config.maxPendingConnections) {
             this.#logger.debug(`Network.tryConnect: Connection to peer: ${publicKey} as type: ${type} is already pending or max pending connections reached.`);
             return CONNECTION_STATUS.IGNORED;
         }
 
         const timeoutId = setTimeout(() => {
             if (!this.#pendingConnections.has(publicKey)) return;
-            this.emit(EventType.VALIDATOR_CONNECTION_TIMEOUT, { publicKey, type, timeoutMs: this.#connectTimeoutMs });
-        }, this.#connectTimeoutMs);
+            this.emit(EventType.VALIDATOR_CONNECTION_TIMEOUT, { publicKey, type, timeoutMs: this.#config.connectTimeoutMs });
+        }, this.#config.connectTimeoutMs);
         this.#pendingConnections.set(publicKey, { type, timeoutId });
 
         const target = b4a.from(publicKey, 'hex');
@@ -354,7 +416,7 @@ class Network extends ReadyResource {
 
             if (connection &&
                 connection.protocolSession &&
-                !this.#pendingRequestsService.isProbePending(connection.remotePublicKey.toString('hex'))
+                !this.#validatorPendingRequestService.isProbePending(connection.remotePublicKey.toString('hex'))
             ) {
                 await this.#finalizeConnection(publicKey, type, connection);
                 return CONNECTION_STATUS.CONNECTED;

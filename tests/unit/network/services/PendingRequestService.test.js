@@ -2,7 +2,7 @@ import { test } from 'brittle';
 import b4a from 'b4a';
 import { v7 as uuidv7 } from 'uuid';
 import sinon from 'sinon';
-import PendingRequestService from '../../../../src/core/network/services/PendingRequestService.js';
+import ValidatorPendingRequestService from '../../../../src/core/network/services/ValidatorPendingRequestService.js';
 import NetworkMessageBuilder from '../../../../src/messages/network/v1/NetworkMessageBuilder.js';
 import { V1ProtocolError } from '../../../../src/core/network/protocols/v1/V1ProtocolError.js';
 import { NetworkOperationType, ResultCode } from '../../../../src/utils/constants.js';
@@ -44,7 +44,7 @@ async function buildV1BroadcastRequest({ id = uuidv7(), data = b4a.from('deadbee
 }
 
 test('PendingRequestService registers and resolves v1 request', async t => {
-    const service = new PendingRequestService(config);
+    const service = new ValidatorPendingRequestService(config);
     const peer = validPeerA;
     const request = await buildV1Request();
 
@@ -59,7 +59,7 @@ test('PendingRequestService registers and resolves v1 request', async t => {
 });
 
 test('PendingRequestService rejects and removes pending request', async t => {
-    const service = new PendingRequestService(config);
+    const service = new ValidatorPendingRequestService(config);
     const peer = validPeerA;
     const request = await buildV1Request();
 
@@ -82,7 +82,7 @@ test('PendingRequestService rejects and removes pending request', async t => {
 });
 
 test('PendingRequestService preserves typed result-coded errors', async t => {
-    const service = new PendingRequestService(config);
+    const service = new ValidatorPendingRequestService(config);
     const peer = validPeerA;
     const request = await buildV1Request();
 
@@ -102,7 +102,7 @@ test('PendingRequestService preserves typed result-coded errors', async t => {
 });
 
 test('PendingRequestService throws on duplicate request id', async t => {
-    const service = new PendingRequestService(config);
+    const service = new ValidatorPendingRequestService(config);
     const peer = validPeerA;
     const request = await buildV1Request();
 
@@ -121,7 +121,7 @@ test('PendingRequestService rejects pending request on timeout', async t => {
     const clock = sinon.useFakeTimers({ now: 1 });
     try {
         const pendingRequestTimeout = 123;
-        const service = new PendingRequestService({
+        const service = new ValidatorPendingRequestService({
             addressPrefix: config.addressPrefix,
             pendingRequestTimeout,
             maxPendingRequestsInPendingRequestsService: 10
@@ -139,7 +139,7 @@ test('PendingRequestService rejects pending request on timeout', async t => {
             await promise;
             t.fail('Expected pending request to time out');
         } catch (error) {
-            t.is(error.name, 'PendingRequestServiceTimeoutError');
+            t.is(error.name, 'ValidatorPendingRequestServiceTimeoutError');
             t.ok(error instanceof Error);
             t.ok(error?.message?.includes(`timed out after ${pendingRequestTimeout} ms`));
             t.ok(error?.message?.includes(publicKeyToAddress(peer, config)));
@@ -153,7 +153,7 @@ test('PendingRequestService rejects pending request on timeout', async t => {
 });
 
 test('PendingRequestService.close rejects all pending requests', async t => {
-    const service = new PendingRequestService(config);
+    const service = new ValidatorPendingRequestService(config);
     const peer = validPeerA;
     const request1 = await buildV1Request();
     const request2 = await buildV1Request();
@@ -173,7 +173,7 @@ test('PendingRequestService.close rejects all pending requests', async t => {
 });
 
 test('PendingRequestService rejects all pending requests for a specific peer', async t => {
-    const service = new PendingRequestService(config);
+    const service = new ValidatorPendingRequestService(config);
     const peerA = validPeerA;
     const peerB = validPeerB;
     const requestA1 = await buildV1Request();
@@ -201,7 +201,7 @@ test('PendingRequestService rejects all pending requests for a specific peer', a
 });
 
 test('PendingRequestService stores only transaction data for broadcast requests', async t => {
-    const service = new PendingRequestService(config);
+    const service = new ValidatorPendingRequestService(config);
     const peer = validPeerA;
     const livenessRequest = await buildV1Request();
     const broadcastRequest = await buildV1BroadcastRequest();
@@ -224,7 +224,7 @@ test('PendingRequestService stores only transaction data for broadcast requests'
 });
 
 test('PendingRequestService.isProbePending matches peer and liveness type', async t => {
-    const service = new PendingRequestService(config);
+    const service = new ValidatorPendingRequestService(config);
     const peerA = validPeerA;
     const peerB = validPeerB;
 
@@ -258,7 +258,7 @@ test('PendingRequestService.isProbePending matches peer and liveness type', asyn
 });
 
 test('PendingRequestService enforces global pending request limit', async t => {
-    const service = new PendingRequestService({
+    const service = new ValidatorPendingRequestService({
         addressPrefix: config.addressPrefix,
         pendingRequestTimeout: config.pendingRequestTimeout,
         maxPendingRequestsInPendingRequestsService: 3
@@ -285,7 +285,7 @@ test('PendingRequestService enforces global pending request limit', async t => {
 test('PendingRequestService.stopPendingRequestTimeout stops timeout and handles missing id', async t => {
     const clock = sinon.useFakeTimers({ now: 1 });
     try {
-        const service = new PendingRequestService(config);
+        const service = new ValidatorPendingRequestService(config);
         const peer = validPeerA;
         const request = await buildV1Request();
 
@@ -314,19 +314,19 @@ test('PendingRequestService.stopPendingRequestTimeout stops timeout and handles 
 
 
 test('PendingRequestService.getPendingRequest returns null for missing id', t => {
-    const service = new PendingRequestService(config);
+    const service = new ValidatorPendingRequestService(config);
     t.is(service.getPendingRequest('missing-id'), null);
 });
 
 
 test('PendingRequestService rejects invalid registerPendingRequest input', async t => {
-    const service = new PendingRequestService(config);
+    const service = new ValidatorPendingRequestService(config);
     const peer = validPeerA;
     const validLivenessRequest = await buildV1Request({ id: 'invalid-peer' });
 
     t.exception(
         () => service.registerPendingRequest(peer, 'not-an-object'),
-        errorMessageIncludes('Pending request message must be an object.')
+        errorMessageIncludes('Pending request ID must be a non-empty string.')
     );
 
     t.exception(
@@ -363,7 +363,7 @@ test('PendingRequestService rejects invalid registerPendingRequest input', async
 });
 
 test('PendingRequestService.rejectPendingRequest falls back to Unexpected error message', async t => {
-    const service = new PendingRequestService(config);
+    const service = new ValidatorPendingRequestService(config);
     const peer = validPeerA;
     const request = await buildV1Request();
     const promise = service.registerPendingRequest(peer, request);
@@ -380,7 +380,7 @@ test('PendingRequestService.rejectPendingRequest falls back to Unexpected error 
 });
 
 test('PendingRequestService.close catches reject errors and continues cleanup', async t => {
-    const service = new PendingRequestService(config);
+    const service = new ValidatorPendingRequestService(config);
     const peer = validPeerA;
     const request = await buildV1Request();
     const promise = service.registerPendingRequest(peer, request);
@@ -412,12 +412,12 @@ test('PendingRequestService.close catches reject errors and continues cleanup', 
 });
 
 test('PendingRequestService throws when registerPendingRequest receives null message', t => {
-    const service = new PendingRequestService(config);
+    const service = new ValidatorPendingRequestService(config);
     const peer = validPeerA;
     try {
         service.registerPendingRequest(peer, null);
         t.fail('Expected registerPendingRequest to throw for null message');
     } catch (error) {
-        t.ok(error?.message?.includes('Pending request message must be an object.'));
+        t.ok(error?.message?.includes('Pending request ID must be a non-empty string.'));
     }
 });

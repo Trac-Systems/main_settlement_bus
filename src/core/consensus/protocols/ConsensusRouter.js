@@ -1,8 +1,8 @@
-import { decodeV1networkOperation } from '../../../codecs/network/v1/networkV1OperationCodec.js'
+import { decodeConsensusMessage } from '../../../codecs/consensus/v1/consensusV1OperationCodec.js'
 import b4a from 'b4a'
-import { NetworkOperationType, V1_PROTOCOL_PAYLOAD_MAX_SIZE } from '../../../utils/constants.js'
+import { ConsensusOperationType, CONSENSUS_MESSAGE_MAX_BYTE_SIZE } from '../../../utils/constants.js'
 import { publicKeyToAddress } from '../../../utils/helpers.js'
-import V1EpochProofProposalOperationHandler from './handlers/ConsesusEpochProofProposalOperationHandler.js'
+import ConsensusEpochProofProposalOperationHandler from '../v1/handlers/ConsesusEpochProofProposalOperationHandler.js'
 
 class ConsensusRouterV1 {
     #config
@@ -11,13 +11,15 @@ class ConsensusRouterV1 {
     constructor(
         state,
         wallet,
-        config
+        config,
+        pendingRequestService
     ) {
         this.#config = config
-        this.#epochProofProposalHandler = new V1EpochProofProposalOperationHandler(
+        this.#epochProofProposalHandler = new ConsensusEpochProofProposalOperationHandler(
             state,
             wallet,
-            config
+            config,
+            pendingRequestService,
         );
     }
 
@@ -29,9 +31,9 @@ class ConsensusRouterV1 {
         let decodedMessage;
 
         try {
-            decodedMessage = decodeV1networkOperation(incomingMessage)
+            decodedMessage = decodeConsensusMessage(incomingMessage)
         } catch (error) {
-            this.#disconnect(connection, `Failed to decode incoming V1 message: ${error.message}`)
+            this.#disconnect(connection, `Failed to decode incoming Consensus message: ${error.message}`)
             return;
         }
 
@@ -42,15 +44,12 @@ class ConsensusRouterV1 {
             return;
         }
 
-        // We received a v1 message, so we set the connection protocol accordingly
-        connection.protocolSession.setV1AsPreferredProtocol()
-
         try {
             switch (decodedMessage.type) {
-                case NetworkOperationType.EPOCH_PROOF_PROPOSAL_REQUEST:
+                case ConsensusOperationType.PROOF_PROPOSAL:
                     await this.#epochProofProposalHandler.handleRequest(decodedMessage, connection);
                     break;
-                case NetworkOperationType.EPOCH_PROOF_PROPOSAL_RESPONSE:
+                case ConsensusOperationType.PROOF_PROPOSAL_APPROVAL:
                     await this.#epochProofProposalHandler.handleResponse(decodedMessage, connection);
                     break;
                 default:
@@ -62,7 +61,7 @@ class ConsensusRouterV1 {
     }
 
     #preValidate(incomingMessage) {
-        return !(!incomingMessage || !b4a.isBuffer(incomingMessage) || incomingMessage.length === 0 || incomingMessage.length > V1_PROTOCOL_PAYLOAD_MAX_SIZE);
+        return !(!incomingMessage || !b4a.isBuffer(incomingMessage) || incomingMessage.length === 0 || incomingMessage.length > CONSENSUS_MESSAGE_MAX_BYTE_SIZE);
     }
 
     #disconnect(connection, reason) {

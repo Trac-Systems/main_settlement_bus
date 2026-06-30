@@ -202,6 +202,10 @@ export class Config {
         return this.#config.pendingRequestTimeout
     }
 
+    get indexerPendingRequestTimeout() {
+        return this.#config.indexerPendingRequestTimeout
+    }
+
     get txCommitTimeout() {
         return this.#config.txCommitTimeout
     }
@@ -227,6 +231,10 @@ export class Config {
         return this.#config.maxPendingRequestsInPendingRequestsService
     }
 
+    get maxPendingConnections() {
+        return this.#config.maxPendingConnections
+    }
+
     get debug() {
         return this.#config.debug
     }
@@ -248,6 +256,10 @@ export class Config {
     get bootstrapTimeout() {
         if (this.#isOverriden('bootstrapTimeout')) return this.#options.bootstrapTimeout
         return this.#config.bootstrapTimeout
+    }
+
+    get connectTimeoutMs() {
+        return this.#config.connectTimeoutMs
     }
 
     get writersShortCacheTTL() {

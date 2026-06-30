@@ -106,6 +106,9 @@ class State extends ReadyResource {
 
     async _close() {
         console.log("State: closing gracefully...");
+
+        this.removeAllListeners();
+
         if (this.#bee !== null) {
             await this.#bee.close();
         }
@@ -124,6 +127,10 @@ class State extends ReadyResource {
 
     isIndexer() {
         return this.#base.isIndexer;
+    }
+
+    async indexerCount() {
+        return (await this.getIndexersEntry()).length;
     }
 
     getUnsignedLength() {
@@ -210,6 +217,11 @@ class State extends ReadyResource {
         return !!adminEntry && this.#wallet?.address === adminEntry?.address && b4a.equals(adminEntry?.wk, this.writingKey)
     }
 
+    async isAdminAddress(targetAddress) {
+        const adminEntry = await this.getAdminEntry();
+        return (adminEntry?.address === targetAddress);
+    }
+
     async isAdminAllowedToValidate() {
         if (!this.writingKey) return false;
 
@@ -228,6 +240,15 @@ class State extends ReadyResource {
 
     async getIndexersEntry() {
         return Object.values(this.#base.system.indexers);
+    }
+
+    async isIndexerAddress(targetAddress) {
+        const entries = await this.getIndexersEntry();
+        for (const entry of entries) {
+            const address = await this.getSigned(EntryType.WRITER_ADDRESS + b4a.toString(entry.key, 'hex'));
+            if (address === targetAddress) return true;
+        }
+        return false;
     }
 
     async getActiveWriterCount(excludeAdmin = false) {

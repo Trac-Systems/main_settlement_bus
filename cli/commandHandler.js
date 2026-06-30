@@ -14,6 +14,7 @@ export const COMMANDS = {
     CORE: "/core",
     INDEXERS_LIST: "/indexers_list",
     VALIDATOR_POOL: "/validator_pool",
+    INDEXER_POOL: "/indexer_pool",
     STATS: "/stats",
     BALANCE_MIGRATION: "/balance_migration",
     DISABLE_INITIALIZATION: "/disable_initialization",
@@ -114,6 +115,10 @@ export class CommandHandler {
             {
                 evaluate: ({ command }) => command === COMMANDS.VALIDATOR_POOL,
                 process: async () => this.#msb.network.validatorConnectionManager.prettyPrint()
+            },
+            {
+                evaluate: ({ command }) => command === COMMANDS.INDEXER_POOL,
+                process: async () => this.#msb.network.indexerConnectionManager.prettyPrint()
             },
             {
                 evaluate: ({ command }) => command === COMMANDS.STATS,

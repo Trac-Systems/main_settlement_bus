@@ -11,7 +11,6 @@ import {
     EventType,
     WHITELIST_SLEEP_INTERVAL,
     BOOTSTRAP_HEXSTRING_LENGTH,
-    CustomEventType,
     BALANCE_MIGRATION_SLEEP_INTERVAL,
     WHITELIST_MIGRATION_DIR,
     OperationType
@@ -34,7 +33,6 @@ export class MainSettlementBus extends ReadyResource {
     #wallet;
     #network;
     #state;
-    #isClosing = false;
     #config
 
     /**
@@ -82,8 +80,6 @@ export class MainSettlementBus extends ReadyResource {
         const adminEntry = await this.#state.getAdminEntry();
         await this.#setUpRoleAutomatically(adminEntry);
 
-
-
         console.log(`isIndexer: ${this.#state.isIndexer()}`);
         console.log(`isWriter: ${this.#state.isWritable()}`);
         console.log("MSB Unsigned Length:", this.#state.getUnsignedLength());
@@ -97,7 +93,6 @@ export class MainSettlementBus extends ReadyResource {
     async _close() {
         console.log("Closing everything gracefully... This may take a moment.");
 
-        this.#isClosing = true;
         await this.#network.close();
 
         await sleep(100);
@@ -195,16 +190,6 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async #stateEventsListener() {
-        this.#state.on(CustomEventType.IS_INDEXER, (publicKey) => {
-            if (this.#isClosing) return;
-            this.#network.disconnectValidatorPeer(publicKey, 'peer promoted to indexer');
-        });
-
-        this.#state.on(CustomEventType.UNWRITABLE, (publicKey) => {
-            if (this.#isClosing) return;
-            this.#network.disconnectValidatorPeer(publicKey, 'peer became unwritable');
-        });
-
         this.#state.base.on(EventType.IS_INDEXER, () => {
             console.log("Current node is an indexer");
         });
@@ -212,7 +197,6 @@ export class MainSettlementBus extends ReadyResource {
         this.#state.base.on(EventType.IS_NON_INDEXER, async () => {
             // Prevent further actions if closing is in progress
             // The reason is that getNodeEntry is async and may cause issues if we will access state after closing
-            if (this.#isClosing) return;
             console.log("Current node is not an indexer anymore");
         });
 

@@ -1,18 +1,16 @@
-import {NetworkOperationType, ResultCode} from '../../../utils/constants.js';
+import {NetworkOperationType, PEER_PUBLIC_KEY_HEX_LENGTH, ResultCode} from '../../../utils/constants.js';
 import {isHexString, publicKeyToAddress} from '../../../utils/helpers.js';
 import {V1ProtocolError} from "../protocols/v1/V1ProtocolError.js";
 import b4a from 'b4a';
 
-const PEER_PUBLIC_KEY_HEX_LENGTH = 64;
-
-export class PendingRequestServiceTimeoutError extends Error {
+export class ValidatorPendingRequestServiceTimeoutError extends Error {
     constructor(requestId, peerAddress, timeoutMs) {
         super(`Pending request ${requestId} to peer ${peerAddress} timed out after ${timeoutMs} ms.`);
         this.name = this.constructor.name;
     }
 }
 
-export default class PendingRequestService {
+export default class ValidatorPendingRequestService {
     #pendingRequests;
     #requestMessageTypes = [NetworkOperationType.LIVENESS_REQUEST, NetworkOperationType.BROADCAST_TRANSACTION_REQUEST];
     #config;
@@ -40,15 +38,11 @@ export default class PendingRequestService {
             throw new Error('Invalid peer public key. Expected 32-byte hex string.');
         }
 
-        if (!message || typeof message !== 'object') {
-            throw new Error('Pending request message must be an object.');
-        }
-
-        if (typeof message.id !== 'string' || message.id.length === 0) {
+        if (typeof message?.id !== 'string' || message?.id.length === 0) {
             throw new Error('Pending request ID must be a non-empty string.');
         }
 
-        if (!this.#requestMessageTypes.includes(message.type)) {
+        if (!this.#requestMessageTypes.includes(message?.type)) {
             throw new Error('Unsupported pending request type.');
         }
     }
@@ -86,7 +80,7 @@ export default class PendingRequestService {
         entry.timeoutId = setTimeout(() => {
             this.rejectPendingRequest(
                 id,
-                new PendingRequestServiceTimeoutError(
+                new ValidatorPendingRequestServiceTimeoutError(
                     id,
                     peerAddress,
                     this.#config.pendingRequestTimeout
@@ -167,7 +161,7 @@ export default class PendingRequestService {
                         `Pending request ${id} cancelled (shutdown).`)
                 );
             } catch (error) {
-                console.error(`PendingRequestService.close: failed to reject pending request ${id}:`, error);
+                console.error(`ValidatorPendingRequestService.close: failed to reject pending request ${id}:`, error);
             }
         }
         this.#pendingRequests.clear();

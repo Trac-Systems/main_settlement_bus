@@ -1,8 +1,7 @@
 import { test } from 'brittle';
 import sinon from 'sinon';
-import b4a from 'b4a';
 import EventEmitter from 'bare-events';
-import { CustomEventType } from '../../src/utils/constants.js';
+import { EventType } from '../../src/utils/constants.js';
 
 const isBareRuntime = typeof globalThis.Bare !== 'undefined';
 
@@ -89,7 +88,7 @@ if (isBareRuntime) {
         t.pass('skipped in Bare because esmock depends on node:module');
     });
 } else {
-    test('MainSettlementBus disconnects validator peers when state role events invalidate them', async t => {
+    test('MainSettlementBus logs local autobase role changes', async t => {
         const consoleLog = sinon.stub(console, 'log');
         t.teardown(() => consoleLog.restore());
 
@@ -97,44 +96,13 @@ if (isBareRuntime) {
         const msb = new loaded.MainSettlementBus(buildConfig());
 
         await msb.ready();
-        t.teardown(async () => {
-            if (msb.opened) await msb.close();
-        });
 
-        const publicKey = b4a.alloc(32, 7);
+        loaded.state.base.emit(EventType.IS_INDEXER);
+        loaded.state.base.emit(EventType.UNWRITABLE);
 
-        loaded.state.emit(CustomEventType.UNWRITABLE, publicKey);
-        loaded.state.emit(CustomEventType.IS_INDEXER, publicKey);
-
-        t.is(loaded.network.disconnectValidatorPeer.callCount, 2, 'two state role events should disconnect validator peers');
-        t.alike(
-            loaded.network.disconnectValidatorPeer.firstCall.args,
-            [publicKey, 'peer became unwritable'],
-            'unwritable state event should disconnect with the expected reason'
-        );
-        t.alike(
-            loaded.network.disconnectValidatorPeer.secondCall.args,
-            [publicKey, 'peer promoted to indexer'],
-            'indexer state event should disconnect with the expected reason'
-        );
+        t.ok(consoleLog.calledWith("Current node is an indexer"));
+        t.ok(consoleLog.calledWith("Current node is unwritable"));
 
         await msb.close();
-    });
-
-    test('MainSettlementBus ignores validator invalidation events while closing', async t => {
-        const consoleLog = sinon.stub(console, 'log');
-        t.teardown(() => consoleLog.restore());
-
-        const loaded = await loadMainSettlementBus();
-        const msb = new loaded.MainSettlementBus(buildConfig());
-
-        await msb.ready();
-        await msb.close();
-
-        loaded.network.disconnectValidatorPeer.resetHistory();
-        loaded.state.emit(CustomEventType.UNWRITABLE, b4a.alloc(32, 8));
-        loaded.state.emit(CustomEventType.IS_INDEXER, b4a.alloc(32, 9));
-
-        t.is(loaded.network.disconnectValidatorPeer.callCount, 0, 'closing nodes should not mutate validator connections from late events');
     });
 }

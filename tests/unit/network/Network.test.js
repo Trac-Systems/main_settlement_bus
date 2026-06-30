@@ -2,7 +2,7 @@ import { test } from 'brittle';
 import sinon from 'sinon';
 import b4a from 'b4a';
 import EventEmitter from 'bare-events';
-import { CONNECTION_STATUS } from '../../../src/utils/constants.js';
+import { CONNECTION_STATUS, CustomEventType } from '../../../src/utils/constants.js';
 
 const isBareRuntime = typeof globalThis.Bare !== 'undefined';
 
@@ -139,7 +139,7 @@ async function loadNetwork() {
         '../../../src/core/network/services/ConnectionManager.js': { default: ConnectionManagerMock },
         '../../../src/core/network/services/MessageOrchestrator.js': { default: MessageOrchestratorMock },
         '../../../src/core/network/services/TransactionRateLimiterService.js': { default: TransactionRateLimiterServiceMock },
-        '../../../src/core/network/services/PendingRequestService.js': { default: PendingRequestServiceMock },
+        '../../../src/core/network/services/ValidatorPendingRequestService.js': { default: PendingRequestServiceMock },
         '../../../src/core/network/services/TransactionCommitService.js': { default: TransactionCommitServiceMock },
         '../../../src/core/network/services/ValidatorHealthCheckService.js': { default: ValidatorHealthCheckServiceMock },
         '../../../src/core/consensus/services/EpochProofProposalService.js': { default: EpochProofProposalServiceMock },
@@ -150,6 +150,7 @@ async function loadNetwork() {
     const Network = NetworkModule.default;
     const config = {
         enableWallet: true,
+        addressPrefix: 'trac',
         connectTimeoutMs: 1_000,
         maxPendingConnections: 10,
         maxValidators: 5,
@@ -168,16 +169,16 @@ async function loadNetwork() {
     };
 
     const store = new CorestoreMock();
-    const state = {
-        on() {},
-        removeAllListeners() {},
-        isAdmin: async () => false,
-        isIndexer: () => false,
-    };
+    const state = new EventEmitter();
+    state.isAdmin = async () => false;
+    state.isIndexer = () => false;
+    state.indexerCount = async () => 0;
+    state.isIndexerAddress = async () => false;
+    state.isAdminAddress = async () => false;
     const network = new Network(state, store, config, wallet);
     await network.ready()
 
-    return { network, store, swarmInstance, connectionManagerInstance };
+    return { network, store, swarmInstance, connectionManagerInstance, state };
 }
 
 if (isBareRuntime) {
@@ -230,6 +231,87 @@ if (isBareRuntime) {
         t.absent(disconnected, 'non-validator peer should be ignored by validator disconnect helper');
         t.ok(network.isConnectionPending(publicKey), 'non-validator pending connection should remain tracked');
         t.is(swarmInstance.leavePeer.callCount, 0, 'generic peer should not be left');
+        t.teardown(async () => await network.close());
+    });
+
+    test('Network disconnects validator peers when state role events invalidate them', async t => {
+        const publicKey = 'd'.repeat(64);
+        const publicKeyBuffer = b4a.from(publicKey, 'hex');
+        const { network, swarmInstance, connectionManagerInstance, state } = await loadNetwork();
+
+        connectionManagerInstance.addValidator(publicKey);
+        swarmInstance.peers.set(publicKey, { publicKey: publicKeyBuffer });
+
+        state.emit(CustomEventType.UNWRITABLE, publicKeyBuffer);
+        t.absent(connectionManagerInstance.exists(publicKey), 'unwritable peer should be removed from validator pool');
+        t.is(swarmInstance.leavePeer.callCount, 1, 'unwritable peer should be removed from explicit peer tracking');
+
+        connectionManagerInstance.addValidator(publicKey);
+        swarmInstance.peers.set(publicKey, { publicKey: publicKeyBuffer });
+
+        state.emit(CustomEventType.IS_INDEXER, publicKeyBuffer);
+        await Promise.resolve(); // IS_INDEXER handler is async (awaits indexerCount), must yield
+        t.absent(connectionManagerInstance.exists(publicKey), 'promoted indexer should be removed from validator pool');
+        t.is(swarmInstance.leavePeer.callCount, 2, 'promoted indexer should be removed from explicit peer tracking');
+        t.teardown(async () => await network.close());
+    });
+
+    test('Network#disconnectIndexerPeer removes a tracked indexer', async t => {
+        const publicKey = 'e'.repeat(64);
+        const publicKeyBuffer = b4a.from(publicKey, 'hex');
+        const { network, swarmInstance } = await loadNetwork();
+
+        // indexerCount() returns 0 in mock, so we bump the max before adding
+        network.indexerConnectionManager.setMax(10);
+        network.indexerConnectionManager.add(publicKeyBuffer, {});
+        t.ok(network.indexerConnectionManager.connected(publicKeyBuffer), 'indexer is tracked');
+
+        swarmInstance.peers.set(publicKey, { publicKey: publicKeyBuffer });
+
+        const disconnected = network.disconnectIndexerPeer(publicKeyBuffer, 'demoted from indexer');
+        t.ok(disconnected, 'disconnect reports work done');
+        t.absent(network.indexerConnectionManager.connected(publicKeyBuffer), 'indexer removed from manager');
+        t.teardown(async () => await network.close());
+    });
+
+    test('Network#disconnectIndexerPeer returns false when indexer not tracked', async t => {
+        const publicKey = 'f'.repeat(64);
+        const publicKeyBuffer = b4a.from(publicKey, 'hex');
+        const { network } = await loadNetwork();
+
+        const disconnected = network.disconnectIndexerPeer(publicKeyBuffer, 'never tracked');
+        t.absent(disconnected, 'returns false when not tracked');
+        t.teardown(async () => await network.close());
+    });
+
+    test('Network IS_NON_INDEXER event removes demoted indexer peer', async t => {
+        const publicKey = '1'.repeat(64);
+        const publicKeyBuffer = b4a.from(publicKey, 'hex');
+        const { network, state } = await loadNetwork();
+
+        // indexerCount() returns 0 in mock, so we bump the max before adding
+        network.indexerConnectionManager.setMax(10);
+        network.indexerConnectionManager.add(publicKeyBuffer, {});
+        t.ok(network.indexerConnectionManager.connected(publicKeyBuffer), 'indexer tracked before demotion');
+
+        state.emit(CustomEventType.IS_NON_INDEXER, publicKeyBuffer);
+        await Promise.resolve(); // IS_NON_INDEXER handler is async (awaits indexerCount)
+
+        t.absent(network.indexerConnectionManager.connected(publicKeyBuffer), 'indexer removed after IS_NON_INDEXER');
+        t.teardown(async () => await network.close());
+    });
+
+    test('Network#pendingConnectionsCount reflects active pending connections', async t => {
+        const { network } = await loadNetwork();
+
+        t.is(network.pendingConnectionsCount(), 0, 'starts at 0');
+
+        await network.tryConnect('a'.repeat(64), 'validator');
+        t.is(network.pendingConnectionsCount(), 1, 'increments after tryConnect');
+
+        await network.tryConnect('b'.repeat(64), 'validator');
+        t.is(network.pendingConnectionsCount(), 2, 'increments for each pending');
+
         t.teardown(async () => await network.close());
     });
 }
