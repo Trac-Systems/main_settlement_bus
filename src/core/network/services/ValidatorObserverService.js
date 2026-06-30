@@ -157,7 +157,7 @@ class ValidatorObserverService extends SchedulableService {
      * @returns {boolean} True if the observer is enabled and not interrupted.
      */
     #shouldRun() {
-        return this.#config.enableValidatorObserver && !this.isInterrupted;
+        return !this.isInterrupted;
     }
     
     /**

@@ -42,7 +42,7 @@ class NetworkMessages {
         );
     }
 
-    async setupProtomuxMessages(connection) {
+    setupProtomuxMessages(connection) {
         // Attach a Protomux instance to this Hyperswarm connection.
         // Protomux multiplexes multiple logical protocol channels over a single encrypted stream.
 

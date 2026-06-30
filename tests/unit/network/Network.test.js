@@ -12,6 +12,21 @@ function normalizePublicKey(publicKey) {
     return null;
 }
 
+function createMockConnection(publicKeyHex, { withProtocolSession = true, withConsensusSession = false } = {}) {
+    const remotePublicKey = b4a.from(publicKeyHex, 'hex');
+    return {
+        remotePublicKey,
+        protocolSession: withProtocolSession ? {
+            isProbed: () => true,
+            probe: sinon.stub().resolves(),
+            isHealthCheckSupported: () => false,
+            close: sinon.stub(),
+        } : null,
+        consensusProtocolSession: withConsensusSession ? { close: sinon.stub() } : null,
+        on: sinon.stub(),
+    };
+}
+
 async function loadNetwork() {
     const { default: esmock } = await import('esmock');
     let swarmInstance = null;
@@ -123,6 +138,46 @@ async function loadNetwork() {
         async setupProtomuxMessages() {}
     }
 
+    class ConsensusMessagesMock {
+        async setupProtomuxMessages() {}
+    }
+
+    class IndexerConnectionManagerMock {
+        constructor(max = 0) {
+            this.max = max;
+            this.indexers = new Set();
+        }
+
+        setMax(max) {
+            this.max = max;
+        }
+
+        add(publicKey) {
+            this.indexers.add(normalizePublicKey(publicKey));
+            return true;
+        }
+
+        remove(publicKey) {
+            this.indexers.delete(normalizePublicKey(publicKey));
+        }
+
+        exists(publicKey) {
+            return this.indexers.has(normalizePublicKey(publicKey));
+        }
+
+        connected(publicKey) {
+            return this.exists(publicKey);
+        }
+
+        clear() {
+            this.indexers.clear();
+        }
+    }
+
+    class WakeupMock {
+        addStream() {}
+    }
+
     class TransactionRateLimiterServiceMock {}
 
     class CorestoreMock {
@@ -144,6 +199,9 @@ async function loadNetwork() {
         '../../../src/core/network/services/ValidatorHealthCheckService.js': { default: ValidatorHealthCheckServiceMock },
         '../../../src/core/consensus/services/EpochProofProposalService.js': { default: EpochProofProposalServiceMock },
         '../../../src/core/network/protocols/NetworkMessages.js': { default: NetworkMessagesMock },
+        '../../../src/core/consensus/protocols/ConsensusMessages.js': { default: ConsensusMessagesMock },
+        '../../../src/core/consensus/services/IndexerConnectionManager.js': { default: IndexerConnectionManagerMock },
+        'protomux-wakeup': { default: WakeupMock },
         '../../../src/utils/logger.js': { Logger: LoggerMock },
     });
 
@@ -173,7 +231,6 @@ async function loadNetwork() {
     state.isAdmin = async () => false;
     state.isIndexer = () => false;
     state.indexerCount = async () => 0;
-    state.isIndexerAddress = async () => false;
     state.isAdminAddress = async () => false;
     const network = new Network(state, store, config, wallet);
     await network.ready()
@@ -231,6 +288,67 @@ if (isBareRuntime) {
         t.absent(disconnected, 'non-validator peer should be ignored by validator disconnect helper');
         t.ok(network.isConnectionPending(publicKey), 'non-validator pending connection should remain tracked');
         t.is(swarmInstance.leavePeer.callCount, 0, 'generic peer should not be left');
+        t.teardown(async () => await network.close());
+    });
+
+    test('Network#tryConnect returns CONNECTED and tracks already-connected validator', async t => {
+        const publicKey = 'e'.repeat(64);
+        const { network, swarmInstance, connectionManagerInstance } = await loadNetwork();
+
+        const publicKeyBuffer = b4a.from(publicKey, 'hex');
+        const connection = createMockConnection(publicKey);
+        swarmInstance.peers.set(publicKey, { publicKey: publicKeyBuffer });
+        swarmInstance._allConnections.set(publicKeyBuffer, connection);
+
+        const status = await network.tryConnect(publicKey, 'validator');
+        t.is(status, CONNECTION_STATUS.CONNECTED, 'returns CONNECTED for ready validator peer');
+        t.ok(connectionManagerInstance.exists(publicKey), 'validator was added to connection manager');
+        t.absent(network.isConnectionPending(publicKey), 'pending validator connection was cleared');
+        t.teardown(async () => await network.close());
+    });
+
+    test('Network#tryConnect returns CONNECTED and tracks already-connected indexer', async t => {
+        const publicKey = 'f'.repeat(64);
+        const { network, swarmInstance } = await loadNetwork();
+
+        const publicKeyBuffer = b4a.from(publicKey, 'hex');
+        const connection = createMockConnection(publicKey);
+        swarmInstance.peers.set(publicKey, { publicKey: publicKeyBuffer });
+        swarmInstance._allConnections.set(publicKeyBuffer, connection);
+
+        const status = await network.tryConnect(publicKey, 'indexer');
+        t.is(status, CONNECTION_STATUS.CONNECTED, 'returns CONNECTED for ready indexer peer');
+        t.ok(network.indexerConnectionManager.connected(publicKey), 'indexer was added to connection manager');
+        t.absent(network.isConnectionPending(publicKey), 'pending indexer connection was cleared');
+        t.teardown(async () => await network.close());
+    });
+
+    test('Network tryConnect timeout clears pending connection', async t => {
+        const publicKey = 'g'.repeat(64);
+        const { network } = await loadNetwork();
+
+        const status = await network.tryConnect(publicKey, 'validator');
+        t.is(status, CONNECTION_STATUS.PENDING, 'connection is initially pending');
+        t.ok(network.isConnectionPending(publicKey), 'pending is tracked');
+
+        await new Promise(resolve => setTimeout(resolve, 1_100));
+
+        t.absent(network.isConnectionPending(publicKey), 'pending is cleared after timeout elapses');
+        t.teardown(async () => await network.close());
+    });
+
+    test('Network swarm connection event promotes pending connection', async t => {
+        const publicKey = '12'.repeat(32);
+        const { network, swarmInstance, connectionManagerInstance } = await loadNetwork();
+
+        const status = await network.tryConnect(publicKey, 'validator');
+        t.is(status, CONNECTION_STATUS.PENDING, 'connection is pending after joinPeer');
+
+        const connection = createMockConnection(publicKey);
+        await swarmInstance.emit('connection', connection);
+
+        t.ok(connectionManagerInstance.exists(publicKey), 'validator was added after swarm connection');
+        t.absent(network.isConnectionPending(publicKey), 'pending validator connection was cleared');
         t.teardown(async () => await network.close());
     });
 
