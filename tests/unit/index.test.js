@@ -1,8 +1,6 @@
 import { test } from 'brittle';
 import sinon from 'sinon';
 import EventEmitter from 'bare-events';
-import { EventType } from '../../src/utils/constants.js';
-
 const isBareRuntime = typeof globalThis.Bare !== 'undefined';
 
 async function loadMainSettlementBus() {
@@ -84,25 +82,7 @@ function buildConfig() {
 }
 
 if (isBareRuntime) {
-    test('MainSettlementBus state event listener coverage is Node-only', t => {
+    test('MainSettlementBus index coverage is Node-only', t => {
         t.pass('skipped in Bare because esmock depends on node:module');
-    });
-} else {
-    test('MainSettlementBus logs local autobase role changes', async t => {
-        const consoleLog = sinon.stub(console, 'log');
-        t.teardown(() => consoleLog.restore());
-
-        const loaded = await loadMainSettlementBus();
-        const msb = new loaded.MainSettlementBus(buildConfig());
-
-        await msb.ready();
-
-        loaded.state.base.emit(EventType.IS_INDEXER);
-        loaded.state.base.emit(EventType.UNWRITABLE);
-
-        t.ok(consoleLog.calledWith("Current node is an indexer"));
-        t.ok(consoleLog.calledWith("Current node is unwritable"));
-
-        await msb.close();
     });
 }

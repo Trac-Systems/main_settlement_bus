@@ -13,6 +13,7 @@ import {
     BATCH_SIZE,
     ADMIN_INITIAL_STAKED_BALANCE,
     TRAC_NAMESPACE,
+    EventType,
     CustomEventType,
 } from '../../utils/constants.js';
 import { isHexString, sleep, isTransactionRecordPut } from '../../utils/helpers.js';
@@ -102,6 +103,8 @@ class State extends ReadyResource {
         console.log("State initialization...")
         await this.#base.ready();
         this.#writingKey = this.#base.local.key;
+
+        await this.#listeners()
     }
 
     async _close() {
@@ -119,6 +122,34 @@ class State extends ReadyResource {
         }
         await sleep(100);
 
+        [EventType.IS_INDEXER, 
+            EventType.IS_NON_INDEXER,
+            EventType.WRITABLE,
+            EventType.UNWRITABLE
+        ].forEach(event => {
+            this.#base.removeListener(event)
+        })
+    }
+
+
+    async #listeners() {
+        this.#base.on(EventType.IS_INDEXER, () => {
+            console.log("Current node is an indexer");
+        });
+
+        this.#base.on(EventType.IS_NON_INDEXER, async () => {
+            // Prevent further actions if closing is in progress
+            // The reason is that getNodeEntry is async and may cause issues if we will access state after closing
+            console.log("Current node is not an indexer anymore");
+        });
+
+        this.#base.on(EventType.WRITABLE, async () => {
+            console.log("Current node is writable");
+        });
+
+        this.#base.on(EventType.UNWRITABLE, async () => {
+            console.log("Current node is unwritable");
+        });
     }
 
     isWritable() {
