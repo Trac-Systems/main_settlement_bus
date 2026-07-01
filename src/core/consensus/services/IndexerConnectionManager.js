@@ -3,9 +3,8 @@ import { toHex } from '../../../utils/buffer.js';
 import { BaseConnectionManager } from '../../shared/BaseConnectionManager.js'
 
 class IndexerConnectionManager extends BaseConnectionManager {
-
-    constructor(maxIndexers, config, logger) {
-        super(maxIndexers, config, logger);
+    constructor(maxIndexers, config, logger, messages) {
+        super(maxIndexers, config, logger, messages);
     }
 
     setMax(maxIndexers) {

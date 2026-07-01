@@ -25,14 +25,10 @@ class MessageOrchestrator {
      * @param {object} state - The state to look for the message outcome
      * @param {Config} config - Configuration options:
      */
-    constructor(validatorConnectionManager, state, config) {
+    constructor(validatorConnectionManager, state, config, wallet) {
         this.validatorConnectionManager = validatorConnectionManager;
         this.state = state;
         this.#config = config;
-        this.#wallet = null;
-    }
-
-    setWallet(wallet) {
         this.#wallet = wallet;
     }
 
@@ -51,7 +47,7 @@ class MessageOrchestrator {
     #pickValidatorForMessage(message) {
         const requesterAddress = message?.address;
         
-        const connected = this.validatorConnectionManager.connectedValidators();
+        const connected = this.validatorConnectionManager.connectedPeers();
         if (!Array.isArray(connected) || connected.length === 0) {
             return null;
         }

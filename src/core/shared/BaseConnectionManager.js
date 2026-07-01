@@ -2,13 +2,15 @@ import { toHex } from "../../utils/buffer.js";
 import { publicKeyToAddress } from "../../utils/helpers.js";
 
 export class BaseConnectionManager {
+    #messages
     _connections = new Map();
     _max;
 
-    constructor(max, config, logger) {
+    constructor(max, config, logger, messages) {
         this._max = max;
         this._config = config;
         this._logger = logger
+        this.#messages = messages
     }
 
     _toHexString(publicKey) {
@@ -21,24 +23,25 @@ export class BaseConnectionManager {
      * @param {Object} connection - The connection object associated with the peer
      * @returns {Boolean} - Returns true if the peer was added or updated, false otherwise
      */
-    add(publicKey, connection) {
+    async add(publicKey, connection) {
+        await this.#messages.setupProtomuxMessages(connection)
         const publicKeyHex = this._toHexString(publicKey);
         if (this.maxConnectionsReached()) {
-            this._logger.debug('addValidator: max connections reached.');
+            this._logger.debug('add: max connections reached.');
             return false;
         }
-        this._logger.debug(`addValidator: adding validator ${publicKeyToAddress(publicKeyHex, this._config)}`);
+        this._logger.debug(`add: adding validator ${publicKeyToAddress(publicKeyHex, this._config)}`);
         if (!this.exists(publicKeyHex)) {
-            this._logger.debug(`addValidator: appending validator ${publicKeyToAddress(publicKeyHex, this._config)}`);
+            this._logger.debug(`add: appending validator ${publicKeyToAddress(publicKeyHex, this._config)}`);
             this.#append(publicKeyHex, connection);
             return true;
         } else if (!this.connected(publicKeyHex)) {
-            this._logger.debug(`addValidator: updating validator ${publicKeyToAddress(publicKeyHex, this._config)}`);
+            this._logger.debug(`add: updating validator ${publicKeyToAddress(publicKeyHex, this._config)}`);
             this.#update(publicKeyHex, connection);
             return true;
         }
 
-        this._logger.debug(`addValidator: didn't add validator ${publicKeyToAddress(publicKeyHex, this._config)}`);
+        this._logger.debug(`add: didn't add validator ${publicKeyToAddress(publicKeyHex, this._config)}`);
         return false; // TODO: Implement better success/failure reporting
     }
 
@@ -88,6 +91,14 @@ export class BaseConnectionManager {
      */
     connectionCount() {
         return Array.from(this._connections.keys()).filter(hex => this.connected(hex)).length
+    }
+
+    /**
+     * Gets a list of all currently connected peers' public keys.
+     * @returns {Array} - An array of public key hex strings of connected peers
+     */
+    connectedPeers() {
+        return Array.from(this._connections.keys()).filter(pk => this.connected(pk));
     }
     
     /**

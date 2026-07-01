@@ -22,9 +22,8 @@ class ValidatorConnectionManager extends BaseConnectionManager {
     /**
      * @param {Config} config
      **/
-    constructor(config) {
-        const logger = new Logger(config);
-        super(config.maxValidators, config, logger);
+    constructor(maxValidators, config, logger, messages) {
+        super(maxValidators, config, logger, messages);
         this.#boundedHealthCheckHandler = this.#healthCheckHandler.bind(this);
     }
 
@@ -141,10 +140,6 @@ class ValidatorConnectionManager extends BaseConnectionManager {
         return validator.connection.protocolSession.send(message)
     }
 
-    addValidator(publicKey, connection) {
-        return this.add(publicKey, connection);
-    }
-
     /**
      * Removes a validator from the pool.
      * @param {String | Buffer} publicKey - The public key hex string of the validator to remove
@@ -170,14 +165,6 @@ class ValidatorConnectionManager extends BaseConnectionManager {
             this._connections.delete(publicKeyHex);
             this._logger.debug(`remove: validator removed successfully. Map size is now ${this._connections.size}.`);
         }
-    }
-
-    /**
-     * Gets a list of all currently connected validators' public keys.
-     * @returns {Array} - An array of public key hex strings of connected validators
-     */
-    connectedValidators() {
-        return Array.from(this._connections.keys()).filter(pk => this.connected(pk));
     }
 
     /**
