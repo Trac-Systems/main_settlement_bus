@@ -6,13 +6,6 @@ import { BaseConnectionManager } from '../../shared/BaseConnectionManager.js'
  * @typedef {import('hyperswarm').Connection} Connection
  */
 
-export class ValidatorConnectionManagerError extends Error {
-    constructor(message) {
-        super(message);
-        this.name = this.constructor.name;
-    }
-}
-
 class ValidatorConnectionManager extends BaseConnectionManager {
     #healthCheckService
     #boundedHealthCheckHandler
@@ -117,30 +110,6 @@ class ValidatorConnectionManager extends BaseConnectionManager {
     }
 
     /**
-     * Sends a message through a specific validator without increasing sent messages count.
-     * @param {Object} message - The message to send to the validator.
-     * @param {String | Buffer} publicKey - A validator public key hex string to be fetched from the pool.
-     * @returns {Promise<*>} A promise returned by `validator.connection.protocolSession.send(message)`.
-     * @throws {ValidatorConnectionManagerError} If the validator is not connected.
-     * @throws {ValidatorConnectionManagerError} If the validator has no valid connection or protocol session.
-     */
-    async sendSingleMessage(message, publicKey) {
-        let publicKeyHex = this._toHexString(publicKey);
-        if (!this.connected(publicKeyHex)) {
-            throw new ValidatorConnectionManagerError(
-                `Cannot send message: validator ${publicKeyToAddress(publicKey, this._config)} is not connected.`
-            );
-        }
-        const validator = this._connections.get(publicKeyHex);
-        if (!validator || !validator.connection || !validator.connection.protocolSession) {
-            throw new ValidatorConnectionManagerError(
-                `Cannot send message: no valid connection found for validator ${publicKeyToAddress(publicKey, this._config)}.`
-            );
-        }
-        return validator.connection.protocolSession.send(message)
-    }
-
-    /**
      * Removes a validator from the pool.
      * @param {String | Buffer} publicKey - The public key hex string of the validator to remove
      * @param {object} [options]
@@ -155,6 +124,7 @@ class ValidatorConnectionManager extends BaseConnectionManager {
             if (endConnection && entry && entry.connection && typeof entry.connection.end === 'function') {
                 try {
                     entry.connection.end();
+                    connection.protocolSession.close();
                 } catch (e) {
                     // Ignore errors on connection end
                     this._logger.debug(`remove: failed to end connection: ${e.message}`);

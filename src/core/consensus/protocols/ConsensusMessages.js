@@ -10,8 +10,8 @@ class ConsensusMessages {
         this.#consensusRouter = new ConsensusRouterV1(state, wallet, config, pendingRequestService);
     }
 
-    async setupProtomuxMessages(connection) {
-        connection.consensusProtocolSession = new ConsensusV1Protocol(
+    createProtomux(connection) {
+        return new ConsensusV1Protocol(
             this.#consensusRouter,
             connection,
             this.#pendingRequestService

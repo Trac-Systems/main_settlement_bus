@@ -14,6 +14,7 @@ class IndexerConnectionManager extends BaseConnectionManager {
     remove(publicKey) {
         const key = toHex(publicKey);
         this._connections.delete(key);
+        connection.protocolSession.close();
     }
 
     connectedIndexers() {
