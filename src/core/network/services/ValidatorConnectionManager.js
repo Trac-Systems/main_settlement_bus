@@ -1,14 +1,13 @@
 import {EventType, ResultCode} from '../../../utils/constants.js';
 import {publicKeyToAddress} from "../../../utils/helpers.js";
-import {Logger} from "../../../utils/logger.js";
-import { BaseConnectionManager } from '../../shared/BaseConnectionManager.js'
+import { PeerConnectionManager } from '../../shared/PeerConnectionManager.js'
+import ValidatorHealthCheckService from './ValidatorHealthCheckService.js'
 /**
  * @typedef {import('hyperswarm').Connection} Connection
  */
 
-class ValidatorConnectionManager extends BaseConnectionManager {
+class ValidatorConnectionManager extends PeerConnectionManager {
     #healthCheckService
-    #boundedHealthCheckHandler
     // Note: _connections is using publicKey (Buffer) as key
     // As Buffers are objects, we will rely on internal conversions done by JS to compare them.
     // It would be better to handle these conversions manually by using hex strings as keys to avoid issues
@@ -17,7 +16,16 @@ class ValidatorConnectionManager extends BaseConnectionManager {
      **/
     constructor(maxValidators, config, logger, messages) {
         super(maxValidators, config, logger, messages);
-        this.#boundedHealthCheckHandler = this.#healthCheckHandler.bind(this);
+        this.#healthCheckService = new ValidatorHealthCheckService(config);
+    }
+
+    async _open() {
+        await this.#healthCheckService.ready();
+        this.#subscribeToHealthChecks();
+    }
+
+    async _close() {
+        await this.#healthCheckService.close();
     }
 
     /**
@@ -27,23 +35,10 @@ class ValidatorConnectionManager extends BaseConnectionManager {
     // TODO: We should consider moving this to ValidatorObserver instead.
     // Keep here only if we forsee having health checks for non-validator connections in the future. 
     // For now, it seems that it would be better to keep this logic here.
-    subscribeToHealthChecks(healthCheckService) {
-        this._logger.debug('subscribeToHealthChecks: subscribing to health check events');
-        if (!healthCheckService || typeof healthCheckService.on !== 'function' || typeof healthCheckService.off !== 'function') {
-            throw new Error('ValidatorConnectionManager: health check service must implement on/off');
-        }
-
-        if (this.#healthCheckService && this.#boundedHealthCheckHandler) {
-            this._logger.debug('subscribeToHealthChecks: removing previous health check handler');
-            // Unsubscribe from previous health check service if already subscribed
-            // TODO: Maybe we should not allow switching to a new health check service
-            this.#healthCheckService.off(EventType.VALIDATOR_HEALTH_CHECK, this.#boundedHealthCheckHandler);
-        }
-
-        this.#healthCheckService = healthCheckService; // TODO: Maybe this should be handled in the constructor directly?
-        // TODO: declare this method outside this function to avoid redeclaring it every time we subscribe to health checks. We can just bind it to 'this' in the constructor.
-
-        this.#healthCheckService.on(EventType.VALIDATOR_HEALTH_CHECK, this.#boundedHealthCheckHandler);
+    #subscribeToHealthChecks() {
+        this.#healthCheckService.on(EventType.VALIDATOR_HEALTH_CHECK, (publicKey, requestId) => {
+            this.#healthCheckHandler(publicKey, requestId);
+        });
         this._logger.debug('subscribeToHealthChecks: subscribed to health check events');
     }
 
@@ -109,6 +104,22 @@ class ValidatorConnectionManager extends BaseConnectionManager {
         }
     }
 
+    async add(publicKey, connection) {
+        this._add(publicKey, connection);
+        
+        try {
+            if (!connection.protocolSession.isProbed()) await connection.protocolSession.probe();
+        } catch (err) {
+            this._logger.debug(`failed to probe peer with publicKey ${publicKey}: ${err?.message ?? err}`);
+        }        
+        
+        if (connection.protocolSession.isHealthCheckSupported()) {
+            this.#healthCheckService.start(publicKey);
+        } else {
+            this.#healthCheckService.stop(publicKey);
+        }
+    }
+
     /**
      * Removes a validator from the pool.
      * @param {String | Buffer} publicKey - The public key hex string of the validator to remove
@@ -123,8 +134,8 @@ class ValidatorConnectionManager extends BaseConnectionManager {
             const entry = this._connections.get(publicKeyHex);
             if (endConnection && entry && entry.connection && typeof entry.connection.end === 'function') {
                 try {
+                    entry.connection.protocolSession.close();
                     entry.connection.end();
-                    connection.protocolSession.close();
                 } catch (e) {
                     // Ignore errors on connection end
                     this._logger.debug(`remove: failed to end connection: ${e.message}`);
@@ -134,29 +145,6 @@ class ValidatorConnectionManager extends BaseConnectionManager {
             this._logger.debug(`remove: removing validator from map: ${publicKeyToAddress(publicKeyHex, this._config)}. Map size before removal: ${this._connections.size}.`);
             this._connections.delete(publicKeyHex);
             this._logger.debug(`remove: validator removed successfully. Map size is now ${this._connections.size}.`);
-        }
-    }
-
-    /**
-     * Gets the number of messages sent through a validator.
-     * @param {String | Buffer} publicKey - The public key hex string of the validator
-     * @returns {Number} - The count of messages sent
-     */
-    getSentCount(publicKey) {
-        const publicKeyHex = this._toHexString(publicKey);
-        const entry = this._connections.get(publicKeyHex);
-        return entry ? (entry.sent || 0) : 0;
-    }
-
-    /**
-     * Increments the count of messages sent through a validator.
-     * @param {String | Buffer} publicKey - The public key hex string of the validator
-     */
-    incrementSentCount(publicKey) {
-        const publicKeyHex = this._toHexString(publicKey);
-        const entry = this._connections.get(publicKeyHex);
-        if (entry) {
-            entry.sent = (entry.sent || 0) + 1;
         }
     }
 

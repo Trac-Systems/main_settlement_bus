@@ -2,7 +2,8 @@ import sinon from "sinon";
 import { hook, test } from 'brittle'
 import { default as EventEmitter } from "bare-events"
 import { testKeyPair1, testKeyPair2, testKeyPair3, testKeyPair4, testKeyPair5, testKeyPair6, testKeyPair7, testKeyPair8 } from "../../../fixtures/apply.fixtures.js";
-import ValidatorConnectionManager, { ValidatorConnectionManagerError } from "../../../../src/core/network/services/ValidatorConnectionManager.js";
+import ValidatorConnectionManager from "../../../../src/core/network/services/ValidatorConnectionManager.js";
+import { PeerConnectionManagerError } from "../../../../src/core/shared/PeerConnectionManager.js";
 import { tick } from "../../../helpers/setupApplyTests.js";
 import b4a from 'b4a'
 import { createConfig, ENV } from "../../../../src/config/env.js";
@@ -47,7 +48,7 @@ const makeManager = (maxValidators = 6, conns = null) => {
     const activeConnections = conns ?? connections;
 
     activeConnections.forEach(({ key, connection }) => {
-        validatorConnectionManager.addValidator(key, connection)
+        validatorConnectionManager.add(key, connection)
     });
 
     return validatorConnectionManager
@@ -69,13 +70,13 @@ hook('Initialize state', async () => {
 });
 
 test('ConnectionManager', () => {
-    test('addValidator', async () => {
+    test('add', async () => {
         test('adds a validator', async t => {
             reset()
             const validatorConnectionManager = makeManager()
             t.is(validatorConnectionManager.connectionCount(), connections.length, 'should have the same length')
             const data = createConnection(testKeyPair5.publicKey)
-            validatorConnectionManager.addValidator(data.key, data.connection)
+            validatorConnectionManager.add(data.key, data.connection)
             t.is(validatorConnectionManager.connectionCount(), connections.length + 1, 'should have the same length')
         })
 
@@ -86,11 +87,11 @@ test('ConnectionManager', () => {
             t.is(validatorConnectionManager.connectionCount(), connections.length, 'should have the same length')
 
             const toAdd = createConnection(testKeyPair5.publicKey)
-            validatorConnectionManager.addValidator(toAdd.key, toAdd.connection)
+            validatorConnectionManager.add(toAdd.key, toAdd.connection)
             t.is(validatorConnectionManager.connectionCount(), maxConnections, 'should match the max connections')
 
             const toNotAdd = createConnection(testKeyPair6.publicKey)
-            validatorConnectionManager.addValidator(toNotAdd.key, toNotAdd.connection)
+            validatorConnectionManager.add(toNotAdd.key, toNotAdd.connection)
             t.is(validatorConnectionManager.connectionCount(), maxConnections, 'should not increase length')
         })
 
@@ -104,13 +105,13 @@ test('ConnectionManager', () => {
 
             const validatorConnectionManager = makeManager(maxConnections)
             localConnections.forEach(({ key, connection }) => {
-                validatorConnectionManager.addValidator(key, connection)
+                validatorConnectionManager.add(key, connection)
             })
 
             t.is(validatorConnectionManager.connectionCount(), maxConnections, 'pool should be full')
 
             const newConn = createConnection(testKeyPair3.publicKey)
-            validatorConnectionManager.addValidator(newConn.key, newConn.connection)
+            validatorConnectionManager.add(newConn.key, newConn.connection)
 
             t.is(validatorConnectionManager.connectionCount(), maxConnections, 'should stay at max size')
             t.not(validatorConnectionManager.connected(newConn.key), 'new validator should not be in the pool')
@@ -149,7 +150,7 @@ test('ConnectionManager', () => {
             t.ok(data.connection.protocolSession.send.calledOnce, 'should invoke protocolSession.send')
         })
 
-        test('throws ValidatorConnectionManagerError when validator is disconnected', async t => {
+        test('throws PeerConnectionManagerError when validator is disconnected', async t => {
             reset()
             const validatorConnectionManager = makeManager()
 
@@ -157,12 +158,12 @@ test('ConnectionManager', () => {
                 await validatorConnectionManager.sendSingleMessage({ payload: 1 }, testKeyPair8.publicKey)
                 t.fail('expected sendSingleMessage to throw')
             } catch (error) {
-                t.ok(error instanceof ValidatorConnectionManagerError, 'should throw ValidatorConnectionManagerError')
+                t.ok(error instanceof PeerConnectionManagerError, 'should throw PeerConnectionManagerError')
                 t.ok(error.message.includes('is not connected'), 'should include disconnected validator details')
             }
         })
 
-        test('throws ValidatorConnectionManagerError when protocolSession is missing', async t => {
+        test('throws PeerConnectionManagerError when protocolSession is missing', async t => {
             reset()
             const emitter = new EventEmitter()
             emitter.connected = true
@@ -179,7 +180,7 @@ test('ConnectionManager', () => {
                 await validatorConnectionManager.sendSingleMessage({ payload: 1 }, testKeyPair6.publicKey)
                 t.fail('expected sendSingleMessage to throw')
             } catch (error) {
-                t.ok(error instanceof ValidatorConnectionManagerError, 'should throw ValidatorConnectionManagerError')
+                t.ok(error instanceof PeerConnectionManagerError, 'should throw PeerConnectionManagerError')
                 t.ok(error.message.includes('no valid connection found'), 'should include protocol session details')
             }
         })

@@ -1,3 +1,4 @@
+import ReadyResource from "ready-resource"
 import { toHex } from "../../utils/buffer.js";
 import { publicKeyToAddress } from "../../utils/helpers.js";
 
@@ -8,16 +9,22 @@ export class PeerConnectionManagerError extends Error {
     }
 }
 
-export class PeerConnectionManager {
+export class PeerConnectionManager extends ReadyResource {
     #messages
     _connections = new Map();
     _max;
 
     constructor(max, config, logger, messages) {
+        super();
         this._max = max;
         this._config = config;
         this._logger = logger
         this.#messages = messages
+    }
+    
+
+    setMax(maxPeers) {
+        this._max = maxPeers;
     }
 
     _toHexString(publicKey) {
@@ -30,7 +37,7 @@ export class PeerConnectionManager {
      * @param {Object} connection - The connection object associated with the peer
      * @returns {Boolean} - Returns true if the peer was added or updated, false otherwise
      */
-    add(publicKey, connection) {
+    _add(publicKey, connection) {
         connection.protocolSession = this.#messages.createProtomux(connection);
         
         const publicKeyHex = this._toHexString(publicKey);
@@ -38,18 +45,18 @@ export class PeerConnectionManager {
             this._logger.debug('add: max connections reached.');
             return false;
         }
-        this._logger.debug(`add: adding validator ${publicKeyToAddress(publicKeyHex, this._config)}`);
+        this._logger.debug(`add: adding peer ${publicKeyToAddress(publicKeyHex, this._config)}`);
         if (!this.exists(publicKeyHex)) {
-            this._logger.debug(`add: appending validator ${publicKeyToAddress(publicKeyHex, this._config)}`);
+            this._logger.debug(`add: appending peer ${publicKeyToAddress(publicKeyHex, this._config)}`);
             this.#append(publicKeyHex, connection);
             return true;
         } else if (!this.connected(publicKeyHex)) {
-            this._logger.debug(`add: updating validator ${publicKeyToAddress(publicKeyHex, this._config)}`);
+            this._logger.debug(`add: updating peer ${publicKeyToAddress(publicKeyHex, this._config)}`);
             this.#update(publicKeyHex, connection);
             return true;
         }
 
-        this._logger.debug(`add: didn't add validator ${publicKeyToAddress(publicKeyHex, this._config)}`);
+        this._logger.debug(`add: didn't add peer ${publicKeyToAddress(publicKeyHex, this._config)}`);
         return false; // TODO: Implement better success/failure reporting
     }
 
@@ -89,8 +96,11 @@ export class PeerConnectionManager {
      * @param {String | Buffer} publicKey - The public key hex string of the peer to remove
      */
     remove(publicKey) {
-        const publicKeyHex = this._toHexString(publicKey);
-        this._connections.delete(publicKeyHex);
+        const key = toHex(publicKey);
+        const connection = this.getConnection(key)
+
+        if (connection) connection.protocolSession.close();
+        this._connections.delete(key);
     }
     
     /**
@@ -124,28 +134,28 @@ export class PeerConnectionManager {
     }
 
     /**
-     * Appends a new validator connection.
-     * @param {String|Buffer} publicKey - The public key hex string of the validator
+     * Appends a new peer connection.
+     * @param {String|Buffer} publicKey - The public key hex string of the peer
      * @param {Object} connection - The connection object
      */
     #append(publicKey, connection) {
-        this._logger.debug(`#append: appending validator ${publicKeyToAddress(publicKey, this._config)}`);
+        this._logger.debug(`#append: appending peer ${publicKeyToAddress(publicKey, this._config)}`);
         const publicKeyHex = this._toHexString(publicKey);
         if (this._connections.has(publicKeyHex)) {
-            this._logger.debug(`#append: tried to append existing validator: ${publicKeyToAddress(publicKey, this._config)}`);
+            this._logger.debug(`#append: tried to append existing peer: ${publicKeyToAddress(publicKey, this._config)}`);
             return;
         }
         this._connections.set(publicKeyHex, {connection, sent: 0});
         connection.on('close', () => {
-            this._logger.debug(`#append: connection closing for validator ${publicKeyToAddress(publicKey, this._config)}`);
+            this._logger.debug(`#append: connection closing for peer ${publicKeyToAddress(publicKey, this._config)}`);
             this.remove(publicKeyHex);
-            this._logger.debug(`#append: connection closed for validator ${publicKeyToAddress(publicKey, this._config)}`);
+            this._logger.debug(`#append: connection closed for peer ${publicKeyToAddress(publicKey, this._config)}`);
         });
     }
 
     /**
-     * Updates an existing validator connection or adds it if not present.
-     * @param {String|Buffer} publicKey - The public key hex string of the validator
+     * Updates an existing peer connection or adds it if not present.
+     * @param {String|Buffer} publicKey - The public key hex string of the peer
      * @param {Object} connection - The connection object
      */
     #update(publicKey, connection) {
@@ -154,7 +164,7 @@ export class PeerConnectionManager {
         // It would be preferable to keep them separated though, but we would need to review all usages to ensure correctness.
         // Also, we should remove the 'else' branch below if we decide to keep 'update' and 'append' separated.
         const publicKeyHex = this._toHexString(publicKey);
-        this._logger.debug(`#update: updating validator ${publicKeyToAddress(publicKey, this._config)}`);
+        this._logger.debug(`#update: updating peer ${publicKeyToAddress(publicKey, this._config)}`);
         if (this._connections.has(publicKeyHex)) {
             this._connections.get(publicKeyHex).connection = connection;
         } else {
@@ -163,18 +173,18 @@ export class PeerConnectionManager {
     }
 
     /**
-     * Sends a message through a specific validator without increasing sent messages count.
-     * @param {Object} message - The message to send to the validator.
-     * @param {String | Buffer} publicKey - A validator public key hex string to be fetched from the pool.
-     * @returns {Promise<*>} A promise returned by `validator.connection.protocolSession.send(message)`.
-     * @throws {ValidatorConnectionManagerError} If the validator is not connected.
-     * @throws {ValidatorConnectionManagerError} If the validator has no valid connection or protocol session.
+     * Sends a message through a specific peer without increasing sent messages count.
+     * @param {Object} message - The message to send to the peer.
+     * @param {String | Buffer} publicKey - A peer public key hex string to be fetched from the pool.
+     * @returns {Promise<*>} A promise returned by `peer.connection.protocolSession.send(message)`.
+     * @throws {PeerConnectionManagerError} If the peer is not connected.
+     * @throws {PeerConnectionManagerError} If the peer has no valid connection or protocol session.
      */
     async sendSingleMessage(message, publicKey) {
         let publicKeyHex = this._toHexString(publicKey);
         if (!this.connected(publicKeyHex)) {
             throw new PeerConnectionManagerError(
-                `Cannot send message: validator ${publicKeyToAddress(publicKey, this._config)} is not connected.`
+                `Cannot send message: peer ${publicKeyToAddress(publicKey, this._config)} is not connected.`
             );
         }
         const peer = this._connections.get(publicKeyHex);
@@ -185,4 +195,45 @@ export class PeerConnectionManager {
         }
         return peer.connection.protocolSession.send(message)
     }
+
+    sendAndForget(publicKey, message) {
+        const connection = this.getConnection(publicKey);
+        if (!connection?.protocolSession) return;
+        connection.protocolSession.sendAndForget(message);
+    }
+
+    async send(publicKey, message) {
+        const connection = this.getConnection(publicKey);
+        if (!connection?.protocolSession) {
+            throw new Error(`PeerConnectionManager: no session for ${toHex(publicKey)}`);
+        }
+        return connection.protocolSession.send(message);
+    }
+
+    /**
+     * Gets the number of messages sent through a peer.
+     * @param {String | Buffer} publicKey - The public key hex string of the peer
+     * @returns {Number} - The count of messages sent
+     */
+    getSentCount(publicKey) {
+        const publicKeyHex = this._toHexString(publicKey);
+        const entry = this._connections.get(publicKeyHex);
+        return entry ? (entry.sent || 0) : 0;
+    }
+
+    /**
+     * Increments the count of messages sent through a peer.
+     * @param {String | Buffer} publicKey - The public key hex string of the peer
+     */
+    incrementSentCount(publicKey) {
+        const publicKeyHex = this._toHexString(publicKey);
+        const entry = this._connections.get(publicKeyHex);
+        if (entry) {
+            entry.sent = (entry.sent || 0) + 1;
+        }
+    }
+}
+
+export function isPeerConnectionError(err) {
+    return (err instanceof PeerConnectionManagerError)
 }

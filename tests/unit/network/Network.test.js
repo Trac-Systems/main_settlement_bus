@@ -66,7 +66,7 @@ async function loadNetwork() {
             this.validators.delete(publicKeyHex);
         }
 
-        addValidator(publicKey) {
+        add(publicKey) {
             this.validators.add(normalizePublicKey(publicKey));
             return true;
         }
@@ -88,6 +88,10 @@ async function loadNetwork() {
         }
 
         subscribeToHealthChecks() {}
+
+        ready() {
+            return true
+        }
     }
 
     class TransactionPoolServiceMock {
@@ -171,6 +175,10 @@ async function loadNetwork() {
 
         clear() {
             this.indexers.clear();
+        }
+
+        ready() {
+            return true;
         }
     }
 
@@ -264,7 +272,7 @@ if (isBareRuntime) {
         const publicKey = 'b'.repeat(64);
         const { network, swarmInstance, validatorConnectionManagerInstance } = await loadNetwork();
 
-        validatorConnectionManagerInstance.addValidator(publicKey);
+        validatorConnectionManagerInstance.add(publicKey);
         swarmInstance.peers.set(publicKey, { publicKey: b4a.from(publicKey, 'hex') });
         
         const disconnected = network.disconnectValidatorPeer(publicKey, 'peer no longer valid validator');
@@ -358,14 +366,14 @@ if (isBareRuntime) {
         const publicKeyBuffer = b4a.from(publicKey, 'hex');
         const { network, swarmInstance, validatorConnectionManagerInstance, state } = await loadNetwork();
 
-        validatorConnectionManagerInstance.addValidator(publicKey);
+        validatorConnectionManagerInstance.add(publicKey);
         swarmInstance.peers.set(publicKey, { publicKey: publicKeyBuffer });
 
         state.emit(CustomEventType.UNWRITABLE, publicKeyBuffer);
         t.absent(validatorConnectionManagerInstance.exists(publicKey), 'unwritable peer should be removed from validator pool');
         t.is(swarmInstance.leavePeer.callCount, 1, 'unwritable peer should be removed from explicit peer tracking');
 
-        validatorConnectionManagerInstance.addValidator(publicKey);
+        validatorConnectionManagerInstance.add(publicKey);
         swarmInstance.peers.set(publicKey, { publicKey: publicKeyBuffer });
 
         state.emit(CustomEventType.IS_INDEXER, publicKeyBuffer);

@@ -1,38 +1,12 @@
-// TODO: ITS HERE
-import { toHex } from '../../../utils/buffer.js';
-import { BaseConnectionManager } from '../../shared/BaseConnectionManager.js'
+import { PeerConnectionManager } from '../../shared/PeerConnectionManager.js'
 
-class IndexerConnectionManager extends BaseConnectionManager {
+class IndexerConnectionManager extends PeerConnectionManager {
     constructor(maxIndexers, config, logger, messages) {
         super(maxIndexers, config, logger, messages);
     }
 
-    setMax(maxIndexers) {
-        this._max = maxIndexers;
-    }
-
-    remove(publicKey) {
-        const key = toHex(publicKey);
-        this._connections.delete(key);
-        connection.protocolSession.close();
-    }
-
-    connectedIndexers() {
-        return Array.from(this._connections.keys());
-    }
-
-    async send(publicKey, message) {
-        const connection = this.getConnection(publicKey);
-        if (!connection?.consensusProtocolSession) {
-            throw new Error(`IndexerConnectionManager: no consensus session for ${toHex(publicKey)}`);
-        }
-        return connection.consensusProtocolSession.send(message);
-    }
-
-    sendAndForget(publicKey, message) {
-        const connection = this.getConnection(publicKey);
-        if (!connection?.consensusProtocolSession) return;
-        connection.consensusProtocolSession.sendAndForget(message);
+    add(publicKey, connection) {
+        this._add(publicKey, connection)
     }
 
     prettyPrint() {
