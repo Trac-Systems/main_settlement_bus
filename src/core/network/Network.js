@@ -27,7 +27,6 @@ const wakeup = new w();
 
 class Network extends ReadyResource {
     #swarm = null;
-    #networkMessages;
     #transactionPoolService;
     #validatorObserverService;
     #indexerObserverService;
@@ -44,7 +43,6 @@ class Network extends ReadyResource {
     #logger;
     #state;
     #store;
-    #consensusMessages;
     #indexerConnectionManager;
     #indexerPendingRequestService;
 
@@ -66,8 +64,6 @@ class Network extends ReadyResource {
         this.#transactionPoolService = new TransactionPoolService(state, wallet?.address, this.#transactionCommitService ,this.#config);
         this.#validatorObserverService = new ValidatorObserverService(this, state, wallet?.address, this.#config);
         this.#indexerObserverService = new IndexerObserverService(this, state, wallet?.address, this.#config);
-        this.#validatorConnectionManager = new ValidatorConnectionManager(this.#config);
-        this.#validatorMessageOrchestrator = new MessageOrchestrator(this.#validatorConnectionManager, state, this.#config);
         this.#validatorPendingRequestService = new ValidatorPendingRequestService(this.#config);
         this.#indexerPendingRequestService = new IndexerPendingRequestService(this.#config);
         this.#logger = new Logger(this.#config);
@@ -136,8 +132,7 @@ class Network extends ReadyResource {
             const indexersCount = await this.#state.indexerCount()
             this.#indexerConnectionManager.setMax(indexersCount);
             this.disconnectValidatorPeer(publicKey, 'peer promoted to indexer');
-            this.addIndexerPeer(publicKey);
-            
+            await this.addIndexerPeer(publicKey);
         });
 
         this.#state.on(CustomEventType.IS_NON_INDEXER, async (publicKey) => {
@@ -179,7 +174,6 @@ class Network extends ReadyResource {
         if (!this.#swarm) {
             const { wallet: wrappedWallet, keyPair } = await this.#getOrGenerateWallet();
             this.#wallet = wrappedWallet
-            this.#validatorMessageOrchestrator.setWallet(this.#wallet);
 
             this.#swarm = new Hyperswarm({
                 keyPair,
@@ -191,7 +185,7 @@ class Network extends ReadyResource {
             });
 
             this.#rateLimiter = new TransactionRateLimiterService(this.#swarm, this.#config);
-            this.#networkMessages = new NetworkMessages(
+            const networkMessages = new NetworkMessages(
                 this.#state,
                 this.#wallet,
                 this.#rateLimiter,
@@ -200,12 +194,14 @@ class Network extends ReadyResource {
                 this.#transactionCommitService,
                 this.#config
             );
+            this.#validatorConnectionManager = new ValidatorConnectionManager(this.#config.maxValidators, this.#config, this.#logger, networkMessages);
+            this.#validatorMessageOrchestrator = new MessageOrchestrator(this.#validatorConnectionManager, this.#state, this.#config, this.#wallet);
             this.#validatorHealthCheckService = new ValidatorHealthCheckService(this.#config);
             await this.#validatorHealthCheckService.ready();
 
-            this.#consensusMessages = new ConsensusMessages(this.#state, this.#wallet, this.#config, this.#indexerPendingRequestService);
+            const consensusMessages = new ConsensusMessages(this.#state, this.#wallet, this.#config, this.#indexerPendingRequestService);
             const indexersCount = await this.#state.indexerCount()
-            this.#indexerConnectionManager = new IndexerConnectionManager(indexersCount, this.#config, this.#logger);
+            this.#indexerConnectionManager = new IndexerConnectionManager(indexersCount, this.#config, this.#logger, consensusMessages);
 
             this.#epochProofProposalService = new EpochProofProposalService(this.#state, this.#indexerConnectionManager, this.#wallet, this.#config);
             await this.#epochProofProposalService.ready();
@@ -213,15 +209,6 @@ class Network extends ReadyResource {
             this.#validatorConnectionManager.subscribeToHealthChecks(this.#validatorHealthCheckService);
 
             this.#logger.info(`Channel: ${b4a.toString(this.#config.channel)}`);
-
-            this.#swarm.prependListener('connection', async (connection) => {
-                // Per-peer connection initialization:
-                // - attach Protomux (legacy + v1 channels/messages)
-                // - attach connection.protocolSession (used later by tryConnect / orchestrators to send messages)
-                await this.#networkMessages.setupProtomuxMessages(connection);
-                await this.#consensusMessages.setupProtomuxMessages(connection);
-            });
-
             this.#swarm.on('connection', async (connection) => {
                 // ATTENTION: Must be called AFTER the protomux init above
                 const stream = this.#store.replicate(connection);
@@ -270,14 +257,14 @@ class Network extends ReadyResource {
         return this.#pendingConnections.size;
     }
 
-    addIndexerPeer(publicKey) {
+    async addIndexerPeer(publicKey) {
         const publicKeyHex = this.#normalizePublicKey(publicKey);
 
         // If swarm does not have the register public key, means that it emits a connection event
         if (this.#swarm?.peers?.has(publicKeyHex)) {
             const peerInfo = this.#swarm.peers.get(publicKeyHex);
             const connection = this.#swarm._allConnections.get(peerInfo.publicKey);
-            this.#indexerConnectionManager.add(peerInfo.publicKey, connection);
+            await this.#indexerConnectionManager.add(peerInfo.publicKey, connection);
         }
     }
 
@@ -374,7 +361,7 @@ class Network extends ReadyResource {
             this.#pendingConnections.delete(publicKey);
 
             if (pending.type === 'indexer') {
-                this.#indexerConnectionManager.add(connection.remotePublicKey, connection);
+                await this.#indexerConnectionManager.add(connection.remotePublicKey, connection);
             } else if (pending.type === 'validator') {
                 try {
                     if (!connection.protocolSession.isProbed()) await connection.protocolSession.probe();
@@ -382,7 +369,7 @@ class Network extends ReadyResource {
                     this.#logger.debug(`failed to probe peer with publicKey ${publicKey}: ${err?.message ?? err}`);
                 }
 
-                this.#validatorConnectionManager.addValidator(publicKey, connection);
+                await this.#validatorConnectionManager.add(publicKey, connection);
 
                 if (connection.protocolSession.isHealthCheckSupported()) {
                     this.#validatorHealthCheckService.start(publicKey);
