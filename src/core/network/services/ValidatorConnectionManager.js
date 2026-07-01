@@ -14,10 +14,8 @@ export class ValidatorConnectionManagerError extends Error {
 }
 
 class ValidatorConnectionManager extends BaseConnectionManager {
-    #config
     #healthCheckService
     #boundedHealthCheckHandler
-    #logger
     // Note: _connections is using publicKey (Buffer) as key
     // As Buffers are objects, we will rely on internal conversions done by JS to compare them.
     // It would be better to handle these conversions manually by using hex strings as keys to avoid issues
@@ -25,10 +23,9 @@ class ValidatorConnectionManager extends BaseConnectionManager {
      * @param {Config} config
      **/
     constructor(config) {
-        super(config.maxValidators);
-        this.#config = config
+        const logger = new Logger(config);
+        super(config.maxValidators, config, logger);
         this.#boundedHealthCheckHandler = this.#healthCheckHandler.bind(this);
-        this.#logger = new Logger(config)
     }
 
     /**
@@ -39,13 +36,13 @@ class ValidatorConnectionManager extends BaseConnectionManager {
     // Keep here only if we forsee having health checks for non-validator connections in the future. 
     // For now, it seems that it would be better to keep this logic here.
     subscribeToHealthChecks(healthCheckService) {
-        this.#logger.debug('subscribeToHealthChecks: subscribing to health check events');
+        this._logger.debug('subscribeToHealthChecks: subscribing to health check events');
         if (!healthCheckService || typeof healthCheckService.on !== 'function' || typeof healthCheckService.off !== 'function') {
             throw new Error('ValidatorConnectionManager: health check service must implement on/off');
         }
 
         if (this.#healthCheckService && this.#boundedHealthCheckHandler) {
-            this.#logger.debug('subscribeToHealthChecks: removing previous health check handler');
+            this._logger.debug('subscribeToHealthChecks: removing previous health check handler');
             // Unsubscribe from previous health check service if already subscribed
             // TODO: Maybe we should not allow switching to a new health check service
             this.#healthCheckService.off(EventType.VALIDATOR_HEALTH_CHECK, this.#boundedHealthCheckHandler);
@@ -55,27 +52,27 @@ class ValidatorConnectionManager extends BaseConnectionManager {
         // TODO: declare this method outside this function to avoid redeclaring it every time we subscribe to health checks. We can just bind it to 'this' in the constructor.
 
         this.#healthCheckService.on(EventType.VALIDATOR_HEALTH_CHECK, this.#boundedHealthCheckHandler);
-        this.#logger.debug('subscribeToHealthChecks: subscribed to health check events');
+        this._logger.debug('subscribeToHealthChecks: subscribed to health check events');
     }
 
     async #healthCheckHandler(publicKey, requestId) {
         if (typeof publicKey !== 'string' || typeof requestId !== 'string') {
             // We can't throw here because this is an event handler, but we should at least log the error and return early to avoid further issues.
-            this.#logger.error(`healthCheck: malformed event payload. Typeof publicKey = ${typeof publicKey}. Typeof requestId = ${typeof requestId}`);
+            this._logger.error(`healthCheck: malformed event payload. Typeof publicKey = ${typeof publicKey}. Typeof requestId = ${typeof requestId}`);
             return;
         }
 
-        const targetAddress = publicKeyToAddress(publicKey, this.#config);
+        const targetAddress = publicKeyToAddress(publicKey, this._config);
 
         if (!this.exists(publicKey) || !this.connected(publicKey)) {
-            this.#logger.debug(`healthCheck: validator not connected, stopping checks. Address = ${targetAddress}; Request ID = ${requestId}`);
+            this._logger.debug(`healthCheck: validator not connected, stopping checks. Address = ${targetAddress}; Request ID = ${requestId}`);
             this.#stopHealthCheck(publicKey);
             return;
         }
 
         const connection = this.getConnection(publicKey);
         if (!connection || !connection.protocolSession || typeof connection.protocolSession.sendHealthCheck !== 'function') {
-            this.#logger.debug(`healthCheck: missing protocol session, removing validator. Address = ${targetAddress}; Request ID = ${requestId}`);
+            this._logger.debug(`healthCheck: missing protocol session, removing validator. Address = ${targetAddress}; Request ID = ${requestId}`);
             this.#stopHealthCheck(publicKey);
             this.remove(publicKey);
             return;
@@ -83,40 +80,40 @@ class ValidatorConnectionManager extends BaseConnectionManager {
 
         let success = false;
         try {
-            this.#logger.debug(`healthCheck: sending liveness request. Address = ${targetAddress}; Request ID = ${requestId}`);
+            this._logger.debug(`healthCheck: sending liveness request. Address = ${targetAddress}; Request ID = ${requestId}`);
 
             const resultCode = await connection.protocolSession.sendHealthCheck();
             success = resultCode === ResultCode.OK;
             if (!success) {
-                this.#logger.debug(`healthCheck: non-OK result code. Address = ${targetAddress}; Request ID = ${requestId}`);
+                this._logger.debug(`healthCheck: non-OK result code. Address = ${targetAddress}; Request ID = ${requestId}`);
             }
         } catch {
             success = false;
         }
 
         if (!success) {
-            this.#logger.debug(`healthCheck: liveness request failed, removing validator. Address = ${targetAddress}; Request ID = ${requestId}`);
+            this._logger.debug(`healthCheck: liveness request failed, removing validator. Address = ${targetAddress}; Request ID = ${requestId}`);
             this.remove(publicKey);
             this.#stopHealthCheck(publicKey);
         } else {
-            this.#logger.debug(`healthCheck: success. Address = ${targetAddress}; Request ID = ${requestId}`);
+            this._logger.debug(`healthCheck: success. Address = ${targetAddress}; Request ID = ${requestId}`);
         }
     };
 
     #stopHealthCheck(publicKeyHex) {
-        const targetAddress = publicKeyToAddress(publicKeyHex, this.#config);
+        const targetAddress = publicKeyToAddress(publicKeyHex, this._config);
 
         if (!this.#healthCheckService) {
-            this.#logger.debug(`stopHealthCheck: no health check service, cannot stop checks for ${targetAddress}`);
+            this._logger.debug(`stopHealthCheck: no health check service, cannot stop checks for ${targetAddress}`);
             return;
         }
         try {
             if (this.#healthCheckService.has(publicKeyHex)) {
-                this.#logger.debug(`stopHealthCheck: stopping scheduled checks for ${targetAddress}`);
+                this._logger.debug(`stopHealthCheck: stopping scheduled checks for ${targetAddress}`);
                 this.#healthCheckService.stop(publicKeyHex);
             }
         } catch (error) {
-            this.#logger.debug(`stopHealthCheck: failed to stop health check for validator ${targetAddress}. Error: ${error.message}`);
+            this._logger.debug(`stopHealthCheck: failed to stop health check for validator ${targetAddress}. Error: ${error.message}`);
         }
     }
 
@@ -132,42 +129,20 @@ class ValidatorConnectionManager extends BaseConnectionManager {
         let publicKeyHex = this._toHexString(publicKey);
         if (!this.connected(publicKeyHex)) {
             throw new ValidatorConnectionManagerError(
-                `Cannot send message: validator ${publicKeyToAddress(publicKey, this.#config)} is not connected.`
+                `Cannot send message: validator ${publicKeyToAddress(publicKey, this._config)} is not connected.`
             );
         }
         const validator = this._connections.get(publicKeyHex);
         if (!validator || !validator.connection || !validator.connection.protocolSession) {
             throw new ValidatorConnectionManagerError(
-                `Cannot send message: no valid connection found for validator ${publicKeyToAddress(publicKey, this.#config)}.`
+                `Cannot send message: no valid connection found for validator ${publicKeyToAddress(publicKey, this._config)}.`
             );
         }
         return validator.connection.protocolSession.send(message)
     }
 
-    /**
-     * Adds a validator to the pool if not already present.
-     * @param {String | Buffer} publicKey - The public key hex string of the validator to add
-     * @param {Object} connection - The connection object associated with the validator
-     * @returns {Boolean} - Returns true if the validator was added or updated, false otherwise
-     */
     addValidator(publicKey, connection) {
-        let publicKeyHex = this._toHexString(publicKey);
-        if (this.maxConnectionsReached()) {
-            this.#logger.debug('addValidator: max connections reached.');
-            return false;
-        }
-        this.#logger.debug(`addValidator: adding validator ${publicKeyToAddress(publicKeyHex, this.#config)}`);
-        if (!this.exists(publicKeyHex)) {
-            this.#logger.debug(`addValidator: appending validator ${publicKeyToAddress(publicKeyHex, this.#config)}`);
-            this.#append(publicKeyHex, connection);
-            return true;
-        } else if (!this.connected(publicKeyHex)) {
-            this.#logger.debug(`addValidator: updating validator ${publicKeyToAddress(publicKeyHex, this.#config)}`);
-            this.#update(publicKeyHex, connection);
-            return true;
-        }
-        this.#logger.debug(`addValidator: didn't add validator ${publicKeyToAddress(publicKeyHex, this.#config)}`);
-        return false; // TODO: Implement better success/failure reporting
+        return this.add(publicKey, connection);
     }
 
     /**
@@ -177,7 +152,7 @@ class ValidatorConnectionManager extends BaseConnectionManager {
      * @param {boolean} [options.endConnection=true] - Whether to close the underlying socket.
      */
     remove(publicKey, { endConnection = true } = {}) {
-        this.#logger.debug(`remove: removing validator ${publicKeyToAddress(publicKey, this.#config)}`);
+        this._logger.debug(`remove: removing validator ${publicKeyToAddress(publicKey, this._config)}`);
         const publicKeyHex = this._toHexString(publicKey);
         this.#stopHealthCheck(publicKeyHex);
         if (this.exists(publicKeyHex)) {
@@ -187,13 +162,13 @@ class ValidatorConnectionManager extends BaseConnectionManager {
                     entry.connection.end();
                 } catch (e) {
                     // Ignore errors on connection end
-                    this.#logger.debug(`remove: failed to end connection: ${e.message}`);
+                    this._logger.debug(`remove: failed to end connection: ${e.message}`);
                     // TODO: Consider logging these errors here in verbose mode
                 }
             }
-            this.#logger.debug(`remove: removing validator from map: ${publicKeyToAddress(publicKeyHex, this.#config)}. Map size before removal: ${this._connections.size}.`);
+            this._logger.debug(`remove: removing validator from map: ${publicKeyToAddress(publicKeyHex, this._config)}. Map size before removal: ${this._connections.size}.`);
             this._connections.delete(publicKeyHex);
-            this.#logger.debug(`remove: validator removed successfully. Map size is now ${this._connections.size}.`);
+            this._logger.debug(`remove: validator removed successfully. Map size is now ${this._connections.size}.`);
         }
     }
 
@@ -229,75 +204,12 @@ class ValidatorConnectionManager extends BaseConnectionManager {
     }
 
     prettyPrint() {
-        this.#logger.info(`Connection count: ${this.connectionCount()}`);
-        this.#logger.info(`Validator map keys count: ${this._connections.size}`);
-        this.#logger.info(`Validator map keys:\n${Array.from(this._connections.entries()).map(([publicKey, val]) => {
+        this._logger.info(`Connection count: ${this.connectionCount()}`);
+        this._logger.info(`Validator map keys count: ${this._connections.size}`);
+        this._logger.info(`Validator map keys:\n${Array.from(this._connections.entries()).map(([publicKey, val]) => {
             const protocols = val.connection?.protocolSession?.preferredProtocol || 'none';
-            return `${publicKeyToAddress(publicKey, this.#config)}: ${protocols}`;
+            return `${publicKeyToAddress(publicKey, this._config)}: ${protocols}`;
         }).join('\n')}`);
-    }
-
-    /**
-     * Picks a random validator from the given array of validator public keys.
-     * @param {String[]} validatorPubKeys - An array of validator public key hex strings
-     * @returns {String|null} - A randomly selected validator public key
-     */
-    pickRandomValidator(validatorPubKeys) {
-        if (validatorPubKeys.length === 0) {
-            return null;
-        }
-        const index = Math.floor(Math.random() * validatorPubKeys.length);
-        return validatorPubKeys[index];
-    }
-
-    /**
-     * Picks a random connected validator.
-     * @returns {String|null} - A randomly selected connected validator public key, or null if none are connected
-     */
-    pickRandomConnectedValidator() {
-        const connected = this.connectedValidators();
-        if (connected.length === 0) return null;
-        return this.pickRandomValidator(connected);
-    }
-
-    /**
-     * Appends a new validator connection.
-     * @param {String|Buffer} publicKey - The public key hex string of the validator
-     * @param {Object} connection - The connection object
-     */
-    #append(publicKey, connection) {
-        this.#logger.debug(`#append: appending validator ${publicKeyToAddress(publicKey, this.#config)}`);
-        const publicKeyHex = this._toHexString(publicKey);
-        if (this._connections.has(publicKeyHex)) {
-            // This should never happen, but just in case, we log it
-            this.#logger.debug(`#append: tried to append existing validator: ${publicKeyToAddress(publicKey, this.#config)}`);
-            return;
-        }
-        this._connections.set(publicKeyHex, {connection, sent: 0});
-        connection.on('close', () => {
-            this.#logger.debug(`#append: connection closing for validator ${publicKeyToAddress(publicKey, this.#config)}`);
-            this.remove(publicKeyHex);
-            this.#logger.debug(`#append: connection closed for validator ${publicKeyToAddress(publicKey, this.#config)}`);
-        });
-    }
-
-    /**
-     * Updates an existing validator connection or adds it if not present.
-     * @param {String|Buffer} publicKey - The public key hex string of the validator
-     * @param {Object} connection - The connection object
-     */
-    #update(publicKey, connection) {
-        // Note: Is there a good reason for the function 'update' to exist separately from 'append'?
-        // It seems that both could be merged into a single function that either adds or updates the entry.
-        // It would be preferable to keep them separated though, but we would need to review all usages to ensure correctness.
-        // Also, we should remove the 'else' branch below if we decide to keep 'update' and 'append' separated.
-        const publicKeyHex = this._toHexString(publicKey);
-        this.#logger.debug(`#update: updating validator ${publicKeyToAddress(publicKey, this.#config)}`);
-        if (this._connections.has(publicKeyHex)) {
-            this._connections.get(publicKeyHex).connection = connection;
-        } else {
-            this._connections.set(publicKeyHex, {connection, sent: 0});
-        }
     }
 }
 
