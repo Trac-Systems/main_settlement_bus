@@ -2,7 +2,11 @@ import b4a from 'b4a';
 import tracCryptoApi from 'trac-crypto-api';
 
 import { createMessage, toHex } from '../../utils/buffer.js';
-import { OperationType } from '../../utils/constants.js';
+import {
+    OperationType,
+    VDF_DIFFICULTY_SIZE,
+    VDF_DISCRIMINANT_SIZE
+} from '../../utils/constants.js';
 import { addressToBuffer, bufferToAddress } from '../../core/state/utils/address.js';
 import { isAddressValid } from "../../core/state/utils/address.js";
 import {
@@ -13,6 +17,7 @@ import {
     isRoleAccess,
     isSetEpoch,
     isSetGenesisEpoch,
+    isSetVdfParams,
     isTransaction,
     isTransfer,
     operationToPayload
@@ -182,12 +187,12 @@ class ApplyStateMessageBuilder {
     }
 
     setVdfDifficulty(vdfDifficulty) {
-        this.#vdfDifficulty = this.#normalizeHexBuffer(vdfDifficulty, 32, 'VDF difficulty');
+        this.#vdfDifficulty = this.#normalizeHexBuffer(vdfDifficulty, VDF_DIFFICULTY_SIZE, 'VDF difficulty');
         return this;
     }
 
     setVdfDiscriminantSize(vdfDiscriminantSize) {
-        this.#vdfDiscriminantSize = this.#normalizeHexBuffer(vdfDiscriminantSize, 32, 'VDF discriminant size');
+        this.#vdfDiscriminantSize = this.#normalizeHexBuffer(vdfDiscriminantSize, VDF_DISCRIMINANT_SIZE, 'VDF discriminant size');
         return this;
     }
 
@@ -576,6 +581,21 @@ class ApplyStateMessageBuilder {
                     this.#operationType
                 );
                 break;
+            case OperationType.SET_VDF_PARAMS:
+                this.#requireFields([
+                    [this.#txValidity, 'Transaction validity'],
+                    [this.#vdfDifficulty, 'Difficulty'],
+                    [this.#vdfDiscriminantSize, 'Discriminant size']
+                ]);
+                msg = createMessage(
+                    this.#config.networkId,
+                    this.#txValidity,
+                    this.#vdfDifficulty,
+                    this.#vdfDiscriminantSize,
+                    nonce,
+                    this.#operationType
+                );
+                break;
             default:
                 throw new Error(`Unsupported operation type: ${this.#operationType}`);
         }
@@ -666,6 +686,16 @@ class ApplyStateMessageBuilder {
             };
         }
         if (isSetGenesisEpoch(this.#operationType)) {
+            return {
+                tx,
+                txv: this.#txValidity,
+                df: this.#vdfDifficulty,
+                db: this.#vdfDiscriminantSize,
+                in: nonce,
+                is: signature
+            };
+        }
+        if (isSetVdfParams(this.#operationType)) {
             return {
                 tx,
                 txv: this.#txValidity,
