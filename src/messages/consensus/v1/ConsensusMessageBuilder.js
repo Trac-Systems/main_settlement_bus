@@ -255,21 +255,31 @@ class ConsensusMessageBuilder {
 
     async #buildProofProposalResponsePayload() {
         const resultCode = this.#getResultCode();
-        const proofProposal = this.#buildUnsignedProofProposal();
-        const approver = this.#getApprover();
-        const requesterProofSignature = this.#getRequesterProofSignature();
-        const proofProposalApproval = await this.#buildProofProposalApproval(
-            proofProposal,
-            approver,
-            requesterProofSignature
-        );
+        let proofProposalApproval = null;
+
+        if (resultCode === ConsensusResultCode.OK) {
+            const proofProposal = this.#buildUnsignedProofProposal();
+            const approver = this.#getApprover();
+            const requesterProofSignature = this.#getRequesterProofSignature();
+            proofProposalApproval = await this.#buildProofProposalApproval(
+                proofProposal,
+                approver,
+                requesterProofSignature
+            );
+        }
+
         const responseSig = await this.#signProofProposalResponse(resultCode, proofProposalApproval);
 
-        this.#setPayload('proof_proposal_response', {
+        const response = {
             result: resultCode,
-            approval: proofProposalApproval,
             response_sig: responseSig,
-        });
+        };
+
+        if (proofProposalApproval) {
+            response.approval = proofProposalApproval;
+        }
+
+        this.#setPayload('proof_proposal_response', response);
     }
 
     async buildPayload() {

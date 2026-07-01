@@ -218,6 +218,7 @@ test('handleRequest maps consensus validation errors to signed rejection respons
 
     const proofProposalResponse = connection.sent[0].proof_proposal_response;
     t.is(proofProposalResponse.result, ConsensusResultCode.INVALID_PAYLOAD);
+    t.absent(proofProposalResponse.approval);
     t.ok(await verifyProofProposalResponseSignature(
         proofProposalResponse,
         proofProposalResponse.approval?.approver ?? wallet.publicKey
@@ -243,6 +244,7 @@ test('handleRequest maps unexpected validation errors to UNEXPECTED_ERROR respon
     const proofProposalResponse = connection.sent[0].proof_proposal_response;
     t.is(failureContext.resultCode, ConsensusResultCode.UNEXPECTED_ERROR);
     t.is(proofProposalResponse.result, ConsensusResultCode.UNEXPECTED_ERROR);
+    t.absent(proofProposalResponse.approval);
     t.ok(await verifyProofProposalResponseSignature(
         proofProposalResponse,
         proofProposalResponse.approval?.approver ?? wallet.publicKey
