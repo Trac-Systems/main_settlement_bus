@@ -7,7 +7,7 @@ import {
 } from "../../../codecs/apply/applyOperationCodec.js";
 import { normalizeMessageByOperationType } from "../../../utils/normalizers.js";
 import { resultToValidatorAction, SENDER_ACTION } from "../protocols/connectionPolicies.js";
-import { ValidatorConnectionManagerError } from './ValidatorConnectionManager.js';
+import { isPeerConnectionError } from '../../shared/PeerConnectionManager.js';
 /**
  * MessageOrchestrator coordinates message submission, retry, and validator management.
  * It works with ValidatorConnectionManager and ledger state to ensure reliable message delivery.
@@ -160,7 +160,7 @@ class MessageOrchestrator {
                 )
                 .catch(
                     async (err) => {
-                        if (err instanceof ValidatorConnectionManagerError) {
+                        if (isPeerConnectionError(err)) {
                             success = await this.send(message, retries + 1);
                             console.warn(`MessageOrchestrator: Connection Error: ${err.message}`);
                         } else {

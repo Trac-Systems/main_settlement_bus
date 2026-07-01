@@ -13,7 +13,6 @@ import MessageOrchestrator from './services/MessageOrchestrator.js';
 import TransactionRateLimiterService from './services/TransactionRateLimiterService.js';
 import ValidatorPendingRequestService from './services/ValidatorPendingRequestService.js';
 import TransactionCommitService from "./services/TransactionCommitService.js";
-import ValidatorHealthCheckService from './services/ValidatorHealthCheckService.js';
 import EpochProofProposalService from '../consensus/services/EpochProofProposalService.js';
 import { Logger } from '../../utils/logger.js';
 import { WalletProvider } from 'trac-wallet';
@@ -38,7 +37,6 @@ class Network extends ReadyResource {
     #validatorPendingRequestService;
     #transactionCommitService;
     #wallet;
-    #validatorHealthCheckService;
     #epochProofProposalService;
     #logger;
     #state;
@@ -125,20 +123,20 @@ class Network extends ReadyResource {
             this.#transactionCommitService,
             this.#config
         );
+
         this.#validatorConnectionManager = new ValidatorConnectionManager(this.#config.maxValidators, this.#config, this.#logger, networkMessages);
+        await this.#validatorConnectionManager.ready();
+
         this.#validatorMessageOrchestrator = new MessageOrchestrator(this.#validatorConnectionManager, this.#state, this.#config, this.#wallet);
-        this.#validatorHealthCheckService = new ValidatorHealthCheckService(this.#config);
-        await this.#validatorHealthCheckService.ready();
 
         const consensusMessages = new ConsensusMessages(this.#state, this.#wallet, this.#config, this.#indexerPendingRequestService);
         const indexersCount = await this.#state.indexerCount()
+        
         this.#indexerConnectionManager = new IndexerConnectionManager(indexersCount, this.#config, this.#logger, consensusMessages);
+        await this.#indexerConnectionManager.ready();
 
         this.#epochProofProposalService = new EpochProofProposalService(this.#state, this.#indexerConnectionManager, this.#wallet, this.#config);
         await this.#epochProofProposalService.ready();
-
-        this.#validatorConnectionManager.subscribeToHealthChecks(this.#validatorHealthCheckService);
-
 
         // isso aqui pode entrar no setupNetworkListeners
         this.#logger.info(`Channel: ${b4a.toString(this.#config.channel)}`);
@@ -202,7 +200,6 @@ class Network extends ReadyResource {
         await this.#indexerObserverService.stop();
 
         this.cleanupPendingConnections();
-        await this.#validatorHealthCheckService.close();
         await this.#epochProofProposalService.close();
         this.#validatorPendingRequestService.close();
         this.#transactionCommitService.close();
@@ -368,19 +365,7 @@ class Network extends ReadyResource {
             if (pending.type === 'indexer') {
                 await this.#indexerConnectionManager.add(connection.remotePublicKey, connection);
             } else if (pending.type === 'validator') {
-                try {
-                    if (!connection.protocolSession.isProbed()) await connection.protocolSession.probe();
-                } catch (err) {
-                    this.#logger.debug(`failed to probe peer with publicKey ${publicKey}: ${err?.message ?? err}`);
-                }
-
                 await this.#validatorConnectionManager.add(publicKey, connection);
-
-                if (connection.protocolSession.isHealthCheckSupported()) {
-                    this.#validatorHealthCheckService.start(publicKey);
-                } else {
-                    this.#validatorHealthCheckService.stop(publicKey);
-                }
             }
         }
     }
