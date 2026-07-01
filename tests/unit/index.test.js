@@ -8,6 +8,7 @@ import { safeDecodeApplyOperation } from '../../src/codecs/apply/applyOperationC
 import { addressToBuffer } from '../../src/core/state/utils/address.js';
 import { overrideConfig } from '../helpers/config.js';
 import { testKeyPair1 } from '../fixtures/apply.fixtures.js';
+import { errorMessageIncludes } from '../helpers/regexHelper.js';
 
 const isBareRuntime = typeof globalThis.Bare !== 'undefined';
 
@@ -111,15 +112,6 @@ async function createWallet(config) {
     });
 }
 
-async function assertRejectsMessageIncludes(t, fn, expectedMessage) {
-    try {
-        await fn();
-        t.fail(`Expected error including: ${expectedMessage}`);
-    } catch (error) {
-        t.ok(error?.message?.includes(expectedMessage));
-    }
-}
-
 if (isBareRuntime) {
     test('MainSettlementBus startup role log coverage is Node-only', t => {
         t.pass('skipped in Bare because esmock depends on node:module');
@@ -184,13 +176,12 @@ if (isBareRuntime) {
         const config = buildGenesisConfig({ enableWallet: false });
         const msb = new loaded.MainSettlementBus(config);
 
-        await assertRejectsMessageIncludes(
-            t,
+        await t.exception(
             () => msb.handleEpochGenesisInitialization({
                 vdfDifficulty: '55000000',
                 vdfDiscriminantSize: '2048',
             }),
-            'wallet is not enabled'
+            errorMessageIncludes('wallet is not enabled')
         );
     });
 
@@ -207,13 +198,12 @@ if (isBareRuntime) {
 
         loaded.state.getAdminEntry.resolves(null);
 
-        await assertRejectsMessageIncludes(
-            t,
+        await t.exception(
             () => msb.handleEpochGenesisInitialization({
                 vdfDifficulty: '55000000',
                 vdfDiscriminantSize: '2048',
             }),
-            'admin has been not initialized'
+            errorMessageIncludes('admin has been not initialized')
         );
 
         t.ok(loaded.state.getSignedVDFParams.notCalled);
@@ -234,13 +224,12 @@ if (isBareRuntime) {
 
         loaded.state.getAdminEntry.resolves({ address: 'admin-address' });
 
-        await assertRejectsMessageIncludes(
-            t,
+        await t.exception(
             () => msb.handleEpochGenesisInitialization({
                 vdfDifficulty: '55000000',
                 vdfDiscriminantSize: '2048',
             }),
-            'wallet is not initialized'
+            errorMessageIncludes('wallet is not initialized')
         );
 
         t.ok(loaded.state.getSignedVDFParams.notCalled);
@@ -262,13 +251,12 @@ if (isBareRuntime) {
 
         loaded.state.getAdminEntry.resolves({ address: 'different-admin-address' });
 
-        await assertRejectsMessageIncludes(
-            t,
+        await t.exception(
             () => msb.handleEpochGenesisInitialization({
                 vdfDifficulty: '55000000',
                 vdfDiscriminantSize: '2048',
             }),
-            'you are not the admin'
+            errorMessageIncludes('you are not the admin')
         );
 
         t.ok(loaded.state.getSignedVDFParams.notCalled);
@@ -294,13 +282,12 @@ if (isBareRuntime) {
             vdfDiscriminantSize: 2048,
         });
 
-        await assertRejectsMessageIncludes(
-            t,
+        await t.exception(
             () => msb.handleEpochGenesisInitialization({
                 vdfDifficulty: '55000000',
                 vdfDiscriminantSize: '2048',
             }),
-            'VDF parameters already exist'
+            errorMessageIncludes('VDF parameters already exist')
         );
 
         t.ok(loaded.state.append.notCalled);
