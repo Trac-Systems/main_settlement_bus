@@ -107,35 +107,27 @@ class ConsensusEpochProofProposalOperationHandler extends ConnectionOperationHan
     }
 
     #buildRequestEventContext(message, connection) {
-        const remotePublicKey = connection?.remotePublicKey; // NOTE: Maybe should use address instead
+        const remotePublicKey = connection?.remotePublicKey;
 
         return {
             message,
             connection,
             sessionId: message?.session_id,
             remotePublicKey,
-            remotePublicKeyHex: this.#toRemotePublicKeyHex(remotePublicKey)
         };
     }
 
     // TODO: This function is mostly copy-past from the one above. Refactor
     #buildApprovalEventContext(message, connection, proofProposal) {
-        const remotePublicKey = connection?.remotePublicKey; // NOTE: Maybe should use address instead
+        const remotePublicKey = connection?.remotePublicKey;
 
         return {
             message,
             connection,
             sessionId: message?.session_id,
             remotePublicKey,
-            remotePublicKeyHex: this.#toRemotePublicKeyHex(remotePublicKey),
             proofProposal
         };
-    }
-
-    #toRemotePublicKeyHex(remotePublicKey) {
-        if (b4a.isBuffer(remotePublicKey)) return b4a.toString(remotePublicKey, 'hex');
-        if (typeof remotePublicKey === 'string') return remotePublicKey.toLowerCase();
-        return undefined;
     }
 
     async #buildProofProposalApproval(sessionId, proofProposal, resultCode) {
