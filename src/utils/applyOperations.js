@@ -60,6 +60,12 @@ const isSetGenesisEpoch = type => {
     ].includes(type);
 }
 
+const isSetVdfParams = type => {
+    return [
+        OperationType.SET_VDF_PARAMS
+    ].includes(type);
+}
+
 const operationToPayload = type => {
     const fromTo = [
         {
@@ -97,6 +103,10 @@ const operationToPayload = type => {
         {
             condition: isSetGenesisEpoch,
             jsonPath: 'sgo'
+        },
+        {
+            condition: isSetVdfParams,
+            jsonPath: 'vpo'
         }
     ]
     const match = fromTo.find(entry => !!entry.condition(type))
@@ -113,5 +123,6 @@ export {
     isTransfer,
     isBalanceInitialization,
     isSetEpoch,
-    isSetGenesisEpoch
+    isSetGenesisEpoch,
+    isSetVdfParams
 }
