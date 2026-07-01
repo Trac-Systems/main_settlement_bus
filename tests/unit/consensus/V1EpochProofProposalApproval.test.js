@@ -98,23 +98,24 @@ test('V1EpochProofProposalApproval validates approval signature against original
     t.pass();
 });
 
-test('V1EpochProofProposalApproval validates non-OK response without approval', async t => {
+test('V1EpochProofProposalApproval rejects non-OK response without approval', async t => {
     const proposerWallet = await createWallet(testKeyPair1);
     const approverWallet = await createWallet(testKeyPair2);
     const validator = new V1EpochProofProposalApproval(config);
     const proofProposalPayload = await buildProofProposalPayload(proposerWallet);
     const approvalPayload = await buildProofProposalRejectionPayload(approverWallet, proofProposalPayload);
 
-    await validator.validate(
-        approvalPayload,
-        {remotePublicKey: approverWallet.publicKey},
-        proofProposalPayload.proof_proposal
+    await t.exception(
+        async () => validator.validate(
+            approvalPayload,
+            {remotePublicKey: approverWallet.publicKey},
+            proofProposalPayload.proof_proposal
+        ),
+        errorMessageIncludes(`Proof proposal response result code is not OK: ${ConsensusResultCode.INVALID_PAYLOAD}`)
     );
-
-    t.pass();
 });
 
-test('V1EpochProofProposalApproval rejects fake non-OK response signature without approval', async t => {
+test('V1EpochProofProposalApproval rejects non-OK response before response signature validation', async t => {
     const proposerWallet = await createWallet(testKeyPair1);
     const approverWallet = await createWallet(testKeyPair2);
     const validator = new V1EpochProofProposalApproval(config);
@@ -134,7 +135,7 @@ test('V1EpochProofProposalApproval rejects fake non-OK response signature withou
             {remotePublicKey: approverWallet.publicKey},
             proofProposalPayload.proof_proposal
         ),
-        errorMessageIncludes('response signature verification failed')
+        errorMessageIncludes(`Proof proposal response result code is not OK: ${ConsensusResultCode.INVALID_PAYLOAD}`)
     );
 });
 
@@ -226,9 +227,10 @@ test('V1EpochProofProposalApproval rejects fake response signature', async t => 
     };
 
     await t.exception(
-        async () => validator.validateResponseSignature(
+        async () => validator.validate(
             fakeApprovalPayload,
-            approverWallet.publicKey
+            {remotePublicKey: approverWallet.publicKey},
+            proofProposalPayload.proof_proposal
         ),
         errorMessageIncludes('response signature verification failed')
     );
