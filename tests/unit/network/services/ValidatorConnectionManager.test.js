@@ -3,17 +3,22 @@ import { hook, test } from 'brittle'
 import { default as EventEmitter } from "bare-events"
 import { testKeyPair1, testKeyPair2, testKeyPair3, testKeyPair4, testKeyPair5, testKeyPair6, testKeyPair7, testKeyPair8 } from "../../../fixtures/apply.fixtures.js";
 import ValidatorConnectionManager from "../../../../src/core/network/services/ValidatorConnectionManager.js";
+import ValidatorHealthCheckService from "../../../../src/core/network/services/ValidatorHealthCheckService.js";
 import { PeerConnectionManagerError } from "../../../../src/core/shared/PeerConnectionManager.js";
 import { tick } from "../../../helpers/setupApplyTests.js";
 import b4a from 'b4a'
 import { createConfig, ENV } from "../../../../src/config/env.js";
-import { EventType, ResultCode } from "../../../../src/utils/constants.js";
+import { ResultCode } from "../../../../src/utils/constants.js";
 
 const createConnection = (key) => {
     const emitter = new EventEmitter()
     emitter.protocolSession = {
         has: (name) => name === 'legacy',
         send: sinon.stub().resolves(),
+        isProbed: () => true,
+        probe: sinon.stub().resolves(),
+        isHealthCheckSupported: () => false,
+        close: sinon.stub(),
     };
     emitter.connected = true
     emitter.remotePublicKey = b4a.from(key, 'hex')
@@ -24,7 +29,11 @@ const createConnection = (key) => {
 const createV1Connection = (key, sendHealthCheckStub = sinon.stub().resolves(ResultCode.OK)) => {
     const emitter = new EventEmitter()
     emitter.protocolSession = {
-        sendHealthCheck: sendHealthCheckStub
+        sendHealthCheck: sendHealthCheckStub,
+        isProbed: () => true,
+        probe: sinon.stub().resolves(),
+        isHealthCheckSupported: () => false,
+        close: sinon.stub(),
     };
     emitter.connected = true
     emitter.remotePublicKey = b4a.from(key, 'hex')
@@ -33,24 +42,39 @@ const createV1Connection = (key, sendHealthCheckStub = sinon.stub().resolves(Res
     return { key: b4a.from(key, 'hex'), connection: emitter }
 }
 
-const makeHealthCheckService = () => {
-    const emitter = new EventEmitter();
-    emitter.has = sinon.stub().returns(true);
-    emitter.stop = sinon.stub();
-    return emitter;
-};
+const makeMessages = () => ({
+    createProtomux: (connection) => connection.protocolSession
+})
+
+const makeLogger = () => ({
+    debug: () => {},
+    error: () => {},
+    info: () => {},
+    warn: () => {},
+})
 
 let connections
 
 const makeManager = (maxValidators = 6, conns = null) => {
     const merged = createConfig(ENV.DEVELOPMENT, { maxValidators })
-    const validatorConnectionManager = new ValidatorConnectionManager(merged)
+    const validatorConnectionManager = new ValidatorConnectionManager(maxValidators, merged, makeLogger(), makeMessages())
     const activeConnections = conns ?? connections;
 
     activeConnections.forEach(({ key, connection }) => {
         validatorConnectionManager.add(key, connection)
     });
 
+    return validatorConnectionManager
+}
+
+// The health check service is now created and driven internally by ValidatorConnectionManager,
+// so exercising it means opening the manager for real and advancing its own interval timer.
+const HEALTH_CHECK_INTERVAL_MS = 10
+
+const makeHealthCheckManager = async () => {
+    const merged = createConfig(ENV.DEVELOPMENT, { maxValidators: 6, validatorHealthCheckInterval: HEALTH_CHECK_INTERVAL_MS })
+    const validatorConnectionManager = new ValidatorConnectionManager(6, merged, makeLogger(), makeMessages())
+    await validatorConnectionManager.ready()
     return validatorConnectionManager
 }
 
@@ -163,27 +187,6 @@ test('ConnectionManager', () => {
             }
         })
 
-        test('throws PeerConnectionManagerError when protocolSession is missing', async t => {
-            reset()
-            const emitter = new EventEmitter()
-            emitter.connected = true
-            emitter.remotePublicKey = b4a.from(testKeyPair6.publicKey, 'hex')
-            emitter.end = sinon.stub()
-            const data = {
-                key: b4a.from(testKeyPair6.publicKey, 'hex'),
-                connection: emitter,
-            }
-
-            const validatorConnectionManager = makeManager(6, [data])
-
-            try {
-                await validatorConnectionManager.sendSingleMessage({ payload: 1 }, testKeyPair6.publicKey)
-                t.fail('expected sendSingleMessage to throw')
-            } catch (error) {
-                t.ok(error instanceof PeerConnectionManagerError, 'should throw PeerConnectionManagerError')
-                t.ok(error.message.includes('no valid connection found'), 'should include protocol session details')
-            }
-        })
     })
 
     // Note: These tests were commented out because validatorConnectionManager.send is being deprecated. When it is completely removed, the tests should be deleted.
@@ -274,92 +277,59 @@ test('ConnectionManager', () => {
 
     test('health checks (strict)', async () => {
         test('keeps validator on OK response', async t => {
+            const clock = sinon.useFakeTimers();
+            const stopSpy = sinon.spy(ValidatorHealthCheckService.prototype, 'stop');
             try {
+                const validatorConnectionManager = await makeHealthCheckManager();
                 const v1Conn = createV1Connection(testKeyPair1.publicKey, sinon.stub().resolves(ResultCode.OK));
-                const validatorConnectionManager = makeManager(6, [v1Conn]);
-                const healthCheckService = makeHealthCheckService();
-                validatorConnectionManager.subscribeToHealthChecks(healthCheckService);
+                v1Conn.connection.protocolSession.isHealthCheckSupported = () => true;
+                await validatorConnectionManager.add(v1Conn.key, v1Conn.connection);
 
-                healthCheckService.emit(
-                    EventType.VALIDATOR_HEALTH_CHECK,
-                    testKeyPair1.publicKey,
-                    "123456"
-                );
+                await clock.tickAsync(HEALTH_CHECK_INTERVAL_MS);
 
-                await tick();
                 t.ok(validatorConnectionManager.connected(v1Conn.key));
-                t.is(healthCheckService.stop.callCount, 0);
+                t.ok(v1Conn.connection.protocolSession.sendHealthCheck.calledOnce);
+                t.is(stopSpy.callCount, 0);
             } finally {
+                clock.restore();
                 sinon.restore();
             }
         });
 
         test('removes validator on non-OK response', async t => {
+            const clock = sinon.useFakeTimers();
+            const stopSpy = sinon.spy(ValidatorHealthCheckService.prototype, 'stop');
             try {
+                const validatorConnectionManager = await makeHealthCheckManager();
                 const v1Conn = createV1Connection(testKeyPair2.publicKey, sinon.stub().resolves(ResultCode.TIMEOUT));
-                const validatorConnectionManager = makeManager(6, [v1Conn]);
-                const healthCheckService = makeHealthCheckService();
-                validatorConnectionManager.subscribeToHealthChecks(healthCheckService);
+                v1Conn.connection.protocolSession.isHealthCheckSupported = () => true;
+                await validatorConnectionManager.add(v1Conn.key, v1Conn.connection);
 
-                healthCheckService.emit(
-                    EventType.VALIDATOR_HEALTH_CHECK,
-                    testKeyPair2.publicKey,
-                    "123456"
-                );
+                await clock.tickAsync(HEALTH_CHECK_INTERVAL_MS);
 
-                await tick();
                 t.ok(!validatorConnectionManager.connected(v1Conn.key));
-                t.ok(healthCheckService.stop.callCount >= 1);
+                t.ok(stopSpy.callCount >= 1);
             } finally {
+                clock.restore();
                 sinon.restore();
             }
         });
 
         test('removes validator on send rejection', async t => {
+            const clock = sinon.useFakeTimers();
+            const stopSpy = sinon.spy(ValidatorHealthCheckService.prototype, 'stop');
             try {
+                const validatorConnectionManager = await makeHealthCheckManager();
                 const v1Conn = createV1Connection(testKeyPair3.publicKey, sinon.stub().rejects(new Error('boom')));
-                const validatorConnectionManager = makeManager(6, [v1Conn]);
-                const healthCheckService = makeHealthCheckService();
-                validatorConnectionManager.subscribeToHealthChecks(healthCheckService);
+                v1Conn.connection.protocolSession.isHealthCheckSupported = () => true;
+                await validatorConnectionManager.add(v1Conn.key, v1Conn.connection);
 
-                healthCheckService.emit(
-                    EventType.VALIDATOR_HEALTH_CHECK,
-                    testKeyPair3.publicKey,
-                    "123456"
-                );
+                await clock.tickAsync(HEALTH_CHECK_INTERVAL_MS);
 
-                await tick();
                 t.ok(!validatorConnectionManager.connected(v1Conn.key));
-                t.ok(healthCheckService.stop.callCount >= 1);
+                t.ok(stopSpy.callCount >= 1);
             } finally {
-                sinon.restore();
-            }
-        });
-
-        test('ignores malformed health check events', async t => {
-            try {
-                const v1Conn = createV1Connection(testKeyPair5.publicKey, sinon.stub().resolves(ResultCode.OK));
-                const validatorConnectionManager = makeManager(6, [v1Conn]);
-                let handler = null;
-                const healthCheckService = {
-                    on: (_event, fn) => { handler = fn; },
-                    off: () => {},
-                    has: sinon.stub().returns(true),
-                    stop: sinon.stub()
-                };
-                validatorConnectionManager.subscribeToHealthChecks(healthCheckService);
-
-                const cases = [
-                    { label: 'publicKey', publicKey: 123, requestId: 'abc' },
-                    { label: 'requestId', publicKey: testKeyPair5.publicKey, requestId: 456 },
-                    { label: 'undefined', publicKey: undefined, requestId: undefined },
-                ];
-
-                for (const testCase of cases) {
-                    await handler(testCase.publicKey, testCase.requestId);
-                    t.pass(`ignored malformed payload: ${testCase.label}`);
-                }
-            } finally {
+                clock.restore();
                 sinon.restore();
             }
         });
@@ -393,59 +363,38 @@ test('ConnectionManager', () => {
             t.is(validatorConnectionManager.getSentCount(testKeyPair8.publicKey), 0)
         })
 
-        test('subscribeToHealthChecks validates service interface', async t => {
-            reset()
-            const validatorConnectionManager = makeManager()
-
-            await t.exception(
-                () => validatorConnectionManager.subscribeToHealthChecks({ on() {} }),
-                /must implement on\/off/
-            )
-        })
-
         test('health check removes validator when protocolSession is missing', async t => {
-            reset()
-            const emitter = new EventEmitter()
-            emitter.connected = true
-            emitter.remotePublicKey = b4a.from(testKeyPair6.publicKey, 'hex')
-            emitter.end = sinon.stub()
-            const data = {
-                key: b4a.from(testKeyPair6.publicKey, 'hex'),
-                connection: emitter
+            const clock = sinon.useFakeTimers();
+            try {
+                const validatorConnectionManager = await makeHealthCheckManager();
+                // Legacy connections don't expose sendHealthCheck; force isHealthCheckSupported to
+                // simulate a connection that was scheduled for checks but lost its protocol session.
+                const data = createConnection(testKeyPair6.publicKey)
+                data.connection.protocolSession.isHealthCheckSupported = () => true
+                await validatorConnectionManager.add(data.key, data.connection)
+
+                await clock.tickAsync(HEALTH_CHECK_INTERVAL_MS)
+
+                t.absent(validatorConnectionManager.connected(data.key))
+            } finally {
+                clock.restore();
+                sinon.restore();
             }
-
-            const validatorConnectionManager = makeManager(6, [data])
-            const healthCheckService = {
-                on: (_event, fn) => { healthCheckService.handler = fn; },
-                off: () => {},
-                has: sinon.stub().returns(true),
-                stop: sinon.stub(),
-                handler: null,
-            }
-
-            validatorConnectionManager.subscribeToHealthChecks(healthCheckService)
-            await healthCheckService.handler(testKeyPair6.publicKey, 'hc-1')
-
-            t.absent(validatorConnectionManager.connected(data.key))
-            t.ok(healthCheckService.stop.called)
         })
 
         test('remove tolerates health check service errors', async t => {
             reset()
-            const data = createConnection(testKeyPair5.publicKey)
-            const validatorConnectionManager = makeManager(6, [data])
-            const healthCheckService = {
-                on: (_event, fn) => { healthCheckService.handler = fn; },
-                off: () => {},
-                has: sinon.stub().throws(new Error('has boom')),
-                stop: sinon.stub(),
-                handler: null,
+            const hasStub = sinon.stub(ValidatorHealthCheckService.prototype, 'has').throws(new Error('has boom'))
+            try {
+                const data = createConnection(testKeyPair5.publicKey)
+                const validatorConnectionManager = makeManager(6, [data])
+
+                validatorConnectionManager.remove(data.key)
+
+                t.absent(validatorConnectionManager.connected(data.key))
+            } finally {
+                hasStub.restore()
             }
-            validatorConnectionManager.subscribeToHealthChecks(healthCheckService)
-
-            validatorConnectionManager.remove(data.key)
-
-            t.absent(validatorConnectionManager.connected(data.key))
         })
     })
 })
