@@ -112,6 +112,14 @@ async function createWallet(config) {
     });
 }
 
+function adminEntryFor(wallet, state, overrides = {}) {
+    return {
+        address: wallet.address,
+        wk: state.writingKey,
+        ...overrides,
+    };
+}
+
 if (isBareRuntime) {
     test('MainSettlementBus startup role log coverage is Node-only', t => {
         t.pass('skipped in Bare because esmock depends on node:module');
@@ -144,7 +152,7 @@ if (isBareRuntime) {
 
         await msb.ready();
 
-        loaded.state.getAdminEntry.resolves({ address: wallet.address });
+        loaded.state.getAdminEntry.resolves(adminEntryFor(wallet, loaded.state));
         loaded.state.getSignedVDFParams.resolves(null);
         loaded.state.getIndexerSequenceState.resolves(txValidity);
 
@@ -203,7 +211,7 @@ if (isBareRuntime) {
                 vdfDifficulty: '55000000',
                 vdfDiscriminantSize: '2048',
             }),
-            errorMessageIncludes('admin has been not initialized')
+            errorMessageIncludes('admin has not been initialized')
         );
 
         t.ok(loaded.state.getSignedVDFParams.notCalled);
@@ -249,7 +257,9 @@ if (isBareRuntime) {
 
         await msb.ready();
 
-        loaded.state.getAdminEntry.resolves({ address: 'different-admin-address' });
+        loaded.state.getAdminEntry.resolves(adminEntryFor(wallet, loaded.state, {
+            address: 'different-admin-address',
+        }));
 
         await t.exception(
             () => msb.handleEpochGenesisInitialization({
@@ -260,6 +270,91 @@ if (isBareRuntime) {
         );
 
         t.ok(loaded.state.getSignedVDFParams.notCalled);
+        t.ok(loaded.state.append.notCalled);
+
+        await msb.close();
+    });
+
+    test('MainSettlementBus rejects genesis epoch initialization when admin writing key mismatches', async t => {
+        const consoleLog = sinon.stub(console, 'log');
+        t.teardown(() => consoleLog.restore());
+
+        const loaded = await loadMainSettlementBus();
+        const config = buildGenesisConfig();
+        const wallet = await createWallet(config);
+        const msb = new loaded.MainSettlementBus(config, wallet);
+
+        await msb.ready();
+
+        loaded.state.getAdminEntry.resolves(adminEntryFor(wallet, loaded.state, {
+            wk: b4a.alloc(32, 2),
+        }));
+
+        await t.exception(
+            () => msb.handleEpochGenesisInitialization({
+                vdfDifficulty: '55000000',
+                vdfDiscriminantSize: '2048',
+            }),
+            errorMessageIncludes('you are not the admin')
+        );
+
+        t.ok(loaded.state.getSignedVDFParams.notCalled);
+        t.ok(loaded.state.append.notCalled);
+
+        await msb.close();
+    });
+
+    test('MainSettlementBus rejects genesis epoch initialization when VDF difficulty is not positive', async t => {
+        const consoleLog = sinon.stub(console, 'log');
+        t.teardown(() => consoleLog.restore());
+
+        const loaded = await loadMainSettlementBus();
+        const config = buildGenesisConfig();
+        const wallet = await createWallet(config);
+        const msb = new loaded.MainSettlementBus(config, wallet);
+
+        await msb.ready();
+
+        loaded.state.getAdminEntry.resolves(adminEntryFor(wallet, loaded.state));
+        loaded.state.getSignedVDFParams.resolves(null);
+
+        await t.exception(
+            () => msb.handleEpochGenesisInitialization({
+                vdfDifficulty: '0',
+                vdfDiscriminantSize: '2048',
+            }),
+            errorMessageIncludes('VDF difficulty must be a positive unsigned 32-bit integer.')
+        );
+
+        t.ok(loaded.state.getIndexerSequenceState.notCalled);
+        t.ok(loaded.state.append.notCalled);
+
+        await msb.close();
+    });
+
+    test('MainSettlementBus rejects genesis epoch initialization when VDF discriminant size is not positive', async t => {
+        const consoleLog = sinon.stub(console, 'log');
+        t.teardown(() => consoleLog.restore());
+
+        const loaded = await loadMainSettlementBus();
+        const config = buildGenesisConfig();
+        const wallet = await createWallet(config);
+        const msb = new loaded.MainSettlementBus(config, wallet);
+
+        await msb.ready();
+
+        loaded.state.getAdminEntry.resolves(adminEntryFor(wallet, loaded.state));
+        loaded.state.getSignedVDFParams.resolves(null);
+
+        await t.exception(
+            () => msb.handleEpochGenesisInitialization({
+                vdfDifficulty: '55000000',
+                vdfDiscriminantSize: '0',
+            }),
+            errorMessageIncludes('VDF discriminant size must be a positive unsigned 16-bit integer.')
+        );
+
+        t.ok(loaded.state.getIndexerSequenceState.notCalled);
         t.ok(loaded.state.append.notCalled);
 
         await msb.close();
@@ -276,7 +371,7 @@ if (isBareRuntime) {
 
         await msb.ready();
 
-        loaded.state.getAdminEntry.resolves({ address: wallet.address });
+        loaded.state.getAdminEntry.resolves(adminEntryFor(wallet, loaded.state));
         loaded.state.getSignedVDFParams.resolves({
             vdfDifficulty: 55000000,
             vdfDiscriminantSize: 2048,

@@ -1063,21 +1063,21 @@ export class MainSettlementBus extends ReadyResource {
 
     async handleEpochGenesisInitialization(params) {
         if (!this.#config.enableWallet) {
-            throw new Error("Can not initialize an admin - wallet is not enabled.");
+            throw new Error("Can not initialize genesis epoch - wallet is not enabled.");
         }
 
         const adminEntry = await this.#state.getAdminEntry();
 
         if (!adminEntry) {
             throw new Error(
-                "Can set epoch genesis operation - admin has been not initialized."
+                "Can not initialize genesis epoch - admin has not been initialized."
             );
         }
         if (!this.#wallet) {
-            throw new Error("Can not perform recovery - wallet is not initialized.");
+            throw new Error("Can not initialize genesis epoch - wallet is not initialized.");
         }
-        if (adminEntry.address !== this.#wallet.address) {
-            throw new Error("Can not perform recovery - you are not the admin.");
+        if (!this.isAdmin(adminEntry)) {
+            throw new Error("Can not initialize genesis epoch - you are not the admin.");
         }
 
         const existingVDFParams = await this.#state.getSignedVDFParams();
@@ -1086,8 +1086,18 @@ export class MainSettlementBus extends ReadyResource {
         }
 
         const { vdfDifficulty, vdfDiscriminantSize } = params;
-        const vdfDifficultyBuffer = uint32ToBuffer(Number(vdfDifficulty), "VDF difficulty");
-        const vdfDiscriminantSizeBuffer = uint16ToBuffer(Number(vdfDiscriminantSize), "VDF discriminant size");
+        const difficultyNumber = Number(vdfDifficulty);
+        const discriminantNumber = Number(vdfDiscriminantSize);
+
+        if (!Number.isInteger(difficultyNumber) || difficultyNumber <= 0) {
+            throw new Error("VDF difficulty must be a positive unsigned 32-bit integer.");
+        }
+        if (!Number.isInteger(discriminantNumber) || discriminantNumber <= 0) {
+            throw new Error("VDF discriminant size must be a positive unsigned 16-bit integer.");
+        }
+
+        const vdfDifficultyBuffer = uint32ToBuffer(difficultyNumber, "VDF difficulty");
+        const vdfDiscriminantSizeBuffer = uint16ToBuffer(discriminantNumber, "VDF discriminant size");
 
         const txValidity = await this.#state.getIndexerSequenceState();
         const payload = await applyStateMessageFactory(this.#wallet, this.#config)

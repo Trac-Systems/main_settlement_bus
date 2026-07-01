@@ -523,8 +523,12 @@ class State extends ReadyResource {
         const vdfParamsBuffer = await this.getSigned(keys.VDF_PARAMS);
         if (!vdfParamsBuffer) return null;
 
-        if (!b4a.isBuffer(vdfParamsBuffer) || vdfParamsBuffer.length !== VDF_DIFFICULTY_SIZE + VDF_DISCRIMINANT_SIZE) {
-            return null;
+        const expectedLength = VDF_DIFFICULTY_SIZE + VDF_DISCRIMINANT_SIZE;
+        if (!b4a.isBuffer(vdfParamsBuffer)) {
+            throw new Error("Invalid VDF params value: expected a buffer.");
+        }
+        if (vdfParamsBuffer.length !== expectedLength) {
+            throw new Error(`Invalid VDF params length: expected ${expectedLength}, got ${vdfParamsBuffer.length}.`);
         }
 
         return {
