@@ -1,12 +1,10 @@
 import test from 'brittle';
 import b4a from 'b4a';
 import {WalletProvider} from 'trac-wallet';
-import tracCryptoApi from 'trac-crypto-api';
 
 import ConsensusMessageBuilder from '../../../src/messages/consensus/v1/ConsensusMessageBuilder.js';
 import V1EpochProofProposalApproval from '../../../src/core/consensus/v1/validators/V1EpochProofProposalApproval.js';
 import {bufferToAddress} from '../../../src/core/state/utils/address.js';
-import {createMessage, safeWriteUInt32BE} from '../../../src/utils/buffer.js';
 import {
     ConsensusOperationType,
     ConsensusProtocolVersion,
@@ -16,6 +14,7 @@ import {
 import {config} from '../../helpers/config.js';
 import {testKeyPair1, testKeyPair2, testKeyPair3} from '../../fixtures/apply.fixtures.js';
 import {errorMessageIncludes} from '../../helpers/regexHelper.js';
+import {hashProofProposalResponse} from '../../../src/utils/consensus/v1/epochProofProposalSignatureUtils.js';
 
 const previousEpochRecordHash = b4a.alloc(32, 1);
 const vdfParametersHash = b4a.alloc(32, 2);
@@ -68,8 +67,7 @@ async function buildProofProposalApprovalPayload(approverWallet, proofProposalPa
 }
 
 async function buildProofProposalRejectionPayload(approverWallet, proofProposalPayload, result = ConsensusResultCode.INVALID_PAYLOAD) {
-    const responseMessage = createMessage(safeWriteUInt32BE(result, 0));
-    const responseHash = await tracCryptoApi.hash.blake3(responseMessage);
+    const responseHash = await hashProofProposalResponse(result);
 
     return {
         type: ConsensusOperationType.PROOF_PROPOSAL_APPROVAL,
@@ -115,7 +113,7 @@ test('V1EpochProofProposalApproval rejects non-OK response without approval', as
     );
 });
 
-test('V1EpochProofProposalApproval rejects non-OK response before response signature validation', async t => {
+test('V1EpochProofProposalApproval rejects fake non-OK response signature before result code handling', async t => {
     const proposerWallet = await createWallet(testKeyPair1);
     const approverWallet = await createWallet(testKeyPair2);
     const validator = new V1EpochProofProposalApproval(config);
@@ -135,7 +133,7 @@ test('V1EpochProofProposalApproval rejects non-OK response before response signa
             {remotePublicKey: approverWallet.publicKey},
             proofProposalPayload.proof_proposal
         ),
-        errorMessageIncludes(`Proof proposal response result code is not OK: ${ConsensusResultCode.INVALID_PAYLOAD}`)
+        errorMessageIncludes('response signature verification failed')
     );
 });
 

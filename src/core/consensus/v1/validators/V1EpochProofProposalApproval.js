@@ -1,9 +1,8 @@
 import V1BaseConsensusOperation from "./V1BaseConsensusOperation.js";
 import {ConsensusResultCode} from "../../../../utils/constants.js";
-import {createMessage, safeWriteUInt32BE} from "../../../../utils/buffer.js";
-import {encodeProofProposalApproval} from "../../../../codecs/consensus/v1/consensusV1OperationCodec.js";
 import tracCryptoApi from "trac-crypto-api";
 import {V1ConsensusProtocolError} from "../V1ConsensusProtocolError.js";
+import {hashProofProposalResponse} from "../../../../utils/consensus/v1/epochProofProposalSignatureUtils.js";
 
 class V1EpochProofProposalApproval extends V1BaseConsensusOperation {
     /**
@@ -19,6 +18,7 @@ class V1EpochProofProposalApproval extends V1BaseConsensusOperation {
     async validate(payload, connection, proofProposal) {
         this.isPayloadSchemaValid(payload);
 
+        await this.#validateResponseSignature(payload, connection.remotePublicKey);
         const resultCode = payload.proof_proposal_response.result;
         this.#validateIfResultCodeIsOk(resultCode);
         const approval = payload.proof_proposal_response.approval;
@@ -38,14 +38,13 @@ class V1EpochProofProposalApproval extends V1BaseConsensusOperation {
      */
     async #validateResponseSignature(payload, remotePublicKey) {
         const proofProposalResponse = payload.proof_proposal_response;
-        const resultCode = safeWriteUInt32BE(proofProposalResponse.result, 0);
-        const message = proofProposalResponse.result === ConsensusResultCode.OK
-            ? createMessage(resultCode, encodeProofProposalApproval(proofProposalResponse.approval))
-            : createMessage(resultCode);
 
         let hash;
         try {
-            hash = await tracCryptoApi.hash.blake3(message);
+            hash = await hashProofProposalResponse(
+                proofProposalResponse.result,
+                proofProposalResponse.approval
+            );
         } catch {
             throw new V1ConsensusProtocolError(
                 ConsensusResultCode.UNEXPECTED_ERROR,
