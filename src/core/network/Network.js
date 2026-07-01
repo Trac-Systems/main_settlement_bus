@@ -26,7 +26,7 @@ import IndexerPendingRequestService from '../consensus/services/IndexerPendingRe
 const wakeup = new w();
 
 class Network extends ReadyResource {
-    #swarm = null;
+    #swarm;
     #transactionPoolService;
     #validatorObserverService;
     #indexerObserverService;
@@ -95,12 +95,96 @@ class Network extends ReadyResource {
 
     async _open() {
         this.#logger.info('Network initialization...');
-
         this.setupNetworkListeners();
-
         this.transactionPoolService.start();
         this.validatorObserverService.start();
-        await this.#replicate();
+        
+        // old replicate
+
+        // isso aqui pode ser o index
+        const { wallet: wrappedWallet, keyPair } = await this.#getOrGenerateWallet();
+        this.#wallet = wrappedWallet
+        //
+
+        this.#swarm = new Hyperswarm({
+            keyPair,
+            bootstrap: this.#config.dhtBootstrap,
+            maxPeers: this.#config.maxPeers,
+            maxParallel: this.#config.maxParallel,
+            maxServerConnections: this.#config.maxServerConnections,
+            maxClientConnections: this.#config.maxClientConnections
+        });
+
+        this.#rateLimiter = new TransactionRateLimiterService(this.#swarm, this.#config);
+        const networkMessages = new NetworkMessages(
+            this.#state,
+            this.#wallet,
+            this.#rateLimiter,
+            this.#transactionPoolService,
+            this.#validatorPendingRequestService,
+            this.#transactionCommitService,
+            this.#config
+        );
+        this.#validatorConnectionManager = new ValidatorConnectionManager(this.#config.maxValidators, this.#config, this.#logger, networkMessages);
+        this.#validatorMessageOrchestrator = new MessageOrchestrator(this.#validatorConnectionManager, this.#state, this.#config, this.#wallet);
+        this.#validatorHealthCheckService = new ValidatorHealthCheckService(this.#config);
+        await this.#validatorHealthCheckService.ready();
+
+        const consensusMessages = new ConsensusMessages(this.#state, this.#wallet, this.#config, this.#indexerPendingRequestService);
+        const indexersCount = await this.#state.indexerCount()
+        this.#indexerConnectionManager = new IndexerConnectionManager(indexersCount, this.#config, this.#logger, consensusMessages);
+
+        this.#epochProofProposalService = new EpochProofProposalService(this.#state, this.#indexerConnectionManager, this.#wallet, this.#config);
+        await this.#epochProofProposalService.ready();
+
+        this.#validatorConnectionManager.subscribeToHealthChecks(this.#validatorHealthCheckService);
+
+
+        // isso aqui pode entrar no setupNetworkListeners
+        this.#logger.info(`Channel: ${b4a.toString(this.#config.channel)}`);
+        this.#swarm.on('connection', async (connection) => {
+            // ATTENTION: Must be called AFTER the protomux init above
+            const stream = this.#store.replicate(connection);
+            wakeup.addStream(stream);
+
+            const publicKey = b4a.toString(connection.remotePublicKey, 'hex');
+            // This function will ignore connections that havent been triggered by the observer. In this case, the promotion will happen during tryConnect when the connection entity will be qualified.
+            await this.#promotePendingConnection(publicKey, connection);
+            
+
+            connection.on('close', () => {
+                this.#rejectAllPendingRequests(publicKey, new Error('Connection closed before response'));
+                this.#swarm.leavePeer(connection.remotePublicKey);
+                this.#validatorConnectionManager.remove(publicKey);
+                this.#indexerConnectionManager.remove(publicKey);
+            });
+
+            connection.on('error', (error) => {
+                this.#rejectAllPendingRequests(publicKey, error ?? new Error('Connection error before response'));
+                if (
+                    error && error.message && (
+                        error.message.includes('connection reset by peer') ||
+                        error.message.includes('Duplicate connection') ||
+                        error.message.includes('connection timed out'))
+                ) {
+                    // TODO: decide if we want to handle this error in a specific way. It generates a lot of logs.
+                    return;
+                }
+                this.#logger.error(error?.message ?? 'Unknown network connection error');
+            });
+
+        });
+
+        this.#swarm.join(this.#config.channel, { server: true, client: true });
+        this.#swarm.flush();
+        
+        // end old replicate
+
+
+
+
+
+
 
         const isAdmin = await this.#state.isAdmin();
 
@@ -168,85 +252,6 @@ class Network extends ReadyResource {
             clearTimeout(timeoutId);
         }
         this.#pendingConnections.clear();
-    }
-
-    async #replicate() {
-        if (!this.#swarm) {
-            const { wallet: wrappedWallet, keyPair } = await this.#getOrGenerateWallet();
-            this.#wallet = wrappedWallet
-
-            this.#swarm = new Hyperswarm({
-                keyPair,
-                bootstrap: this.#config.dhtBootstrap,
-                maxPeers: this.#config.maxPeers,
-                maxParallel: this.#config.maxParallel,
-                maxServerConnections: this.#config.maxServerConnections,
-                maxClientConnections: this.#config.maxClientConnections
-            });
-
-            this.#rateLimiter = new TransactionRateLimiterService(this.#swarm, this.#config);
-            const networkMessages = new NetworkMessages(
-                this.#state,
-                this.#wallet,
-                this.#rateLimiter,
-                this.#transactionPoolService,
-                this.#validatorPendingRequestService,
-                this.#transactionCommitService,
-                this.#config
-            );
-            this.#validatorConnectionManager = new ValidatorConnectionManager(this.#config.maxValidators, this.#config, this.#logger, networkMessages);
-            this.#validatorMessageOrchestrator = new MessageOrchestrator(this.#validatorConnectionManager, this.#state, this.#config, this.#wallet);
-            this.#validatorHealthCheckService = new ValidatorHealthCheckService(this.#config);
-            await this.#validatorHealthCheckService.ready();
-
-            const consensusMessages = new ConsensusMessages(this.#state, this.#wallet, this.#config, this.#indexerPendingRequestService);
-            const indexersCount = await this.#state.indexerCount()
-            this.#indexerConnectionManager = new IndexerConnectionManager(indexersCount, this.#config, this.#logger, consensusMessages);
-
-            this.#epochProofProposalService = new EpochProofProposalService(this.#state, this.#indexerConnectionManager, this.#wallet, this.#config);
-            await this.#epochProofProposalService.ready();
-
-            this.#validatorConnectionManager.subscribeToHealthChecks(this.#validatorHealthCheckService);
-
-            this.#logger.info(`Channel: ${b4a.toString(this.#config.channel)}`);
-            this.#swarm.on('connection', async (connection) => {
-                // ATTENTION: Must be called AFTER the protomux init above
-                const stream = this.#store.replicate(connection);
-                wakeup.addStream(stream);
-
-                const publicKey = b4a.toString(connection.remotePublicKey, 'hex');
-                // This function will ignore connections that havent been triggered by the observer. In this case, the promotion will happen during tryConnect when the connection entity will be qualified.
-                await this.#promotePendingConnection(publicKey, connection);
-                
-
-                connection.on('close', () => {
-                    this.#rejectAllPendingRequests(publicKey, new Error('Connection closed before response'));
-                    this.#swarm.leavePeer(connection.remotePublicKey);
-                    this.#validatorConnectionManager.remove(publicKey);
-                    this.#indexerConnectionManager.remove(publicKey);
-                    connection.protocolSession?.close();
-                    connection.consensusProtocolSession?.close();
-                });
-
-                connection.on('error', (error) => {
-                    this.#rejectAllPendingRequests(publicKey, error ?? new Error('Connection error before response'));
-                    if (
-                        error && error.message && (
-                            error.message.includes('connection reset by peer') ||
-                            error.message.includes('Duplicate connection') ||
-                            error.message.includes('connection timed out'))
-                    ) {
-                        // TODO: decide if we want to handle this error in a specific way. It generates a lot of logs.
-                        return;
-                    }
-                    this.#logger.error(error?.message ?? 'Unknown network connection error');
-                });
-
-            });
-
-            this.#swarm.join(this.#config.channel, { server: true, client: true });
-            this.#swarm.flush();
-        }
     }
 
     isConnectionPending(publicKey) {

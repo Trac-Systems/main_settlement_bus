@@ -1,7 +1,14 @@
 import { toHex } from "../../utils/buffer.js";
 import { publicKeyToAddress } from "../../utils/helpers.js";
 
-export class BaseConnectionManager {
+export class PeerConnectionManagerError extends Error {
+    constructor(message) {
+        super(message);
+        this.name = this.constructor.name;
+    }
+}
+
+export class PeerConnectionManager {
     #messages
     _connections = new Map();
     _max;
@@ -23,8 +30,9 @@ export class BaseConnectionManager {
      * @param {Object} connection - The connection object associated with the peer
      * @returns {Boolean} - Returns true if the peer was added or updated, false otherwise
      */
-    async add(publicKey, connection) {
-        await this.#messages.setupProtomuxMessages(connection)
+    add(publicKey, connection) {
+        connection.protocolSession = this.#messages.createProtomux(connection);
+        
         const publicKeyHex = this._toHexString(publicKey);
         if (this.maxConnectionsReached()) {
             this._logger.debug('add: max connections reached.');
@@ -152,5 +160,29 @@ export class BaseConnectionManager {
         } else {
             this._connections.set(publicKeyHex, {connection, sent: 0});
         }
+    }
+
+    /**
+     * Sends a message through a specific validator without increasing sent messages count.
+     * @param {Object} message - The message to send to the validator.
+     * @param {String | Buffer} publicKey - A validator public key hex string to be fetched from the pool.
+     * @returns {Promise<*>} A promise returned by `validator.connection.protocolSession.send(message)`.
+     * @throws {ValidatorConnectionManagerError} If the validator is not connected.
+     * @throws {ValidatorConnectionManagerError} If the validator has no valid connection or protocol session.
+     */
+    async sendSingleMessage(message, publicKey) {
+        let publicKeyHex = this._toHexString(publicKey);
+        if (!this.connected(publicKeyHex)) {
+            throw new PeerConnectionManagerError(
+                `Cannot send message: validator ${publicKeyToAddress(publicKey, this._config)} is not connected.`
+            );
+        }
+        const peer = this._connections.get(publicKeyHex);
+        if (!peer) {
+            throw new PeerConnectionManagerError(
+                `Cannot send message: no valid connection found for peer ${publicKeyToAddress(peer, this._config)}.`
+            );
+        }
+        return peer.connection.protocolSession.send(message)
     }
 }
