@@ -30,9 +30,8 @@ class ConsensusEpochProofProposalOperationHandler extends ConnectionOperationHan
     /**
      * Handles a leader's consensus v1 epoch proof proposal from the minion side.
      * @param {object} message Decoded consensus v1 message containing `proof_proposal` and `session_id`.
-     * @param {object} connection P eer connection context used by the request validator.
-     * @returns {Promise<object>} Signed consensus v1 proof proposal response.
-     * @throws {V1ConsensusProtocolError|Error} If request validation or response building fails.
+     * @param {object} connection Peer connection context used by the request validator.
+     * @returns {Promise<void>} Resolves after sending a signed consensus v1 proof proposal response.
      */
     async handleRequest(message, connection) {
         const eventContext = this.#buildRequestEventContext(message, connection);
