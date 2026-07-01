@@ -190,7 +190,7 @@ export class PeerConnectionManager extends ReadyResource {
         const peer = this._connections.get(publicKeyHex);
         if (!peer) {
             throw new PeerConnectionManagerError(
-                `Cannot send message: no valid connection found for peer ${publicKeyToAddress(peer, this._config)}.`
+                `Cannot send message: no valid connection found for peer ${publicKeyToAddress(publicKeyHex, this._config)}.`
             );
         }
         return peer.connection.protocolSession.send(message)

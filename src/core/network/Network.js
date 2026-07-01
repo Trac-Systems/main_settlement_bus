@@ -96,13 +96,9 @@ class Network extends ReadyResource {
         this.setupNetworkListeners();
         this.transactionPoolService.start();
         this.validatorObserverService.start();
-        
-        // old replicate
 
-        // isso aqui pode ser o index
         const { wallet: wrappedWallet, keyPair } = await this.#getOrGenerateWallet();
         this.#wallet = wrappedWallet
-        //
 
         this.#swarm = new Hyperswarm({
             keyPair,
@@ -138,54 +134,13 @@ class Network extends ReadyResource {
         this.#epochProofProposalService = new EpochProofProposalService(this.#state, this.#indexerConnectionManager, this.#wallet, this.#config);
         await this.#epochProofProposalService.ready();
 
-        // isso aqui pode entrar no setupNetworkListeners
         this.#logger.info(`Channel: ${b4a.toString(this.#config.channel)}`);
-        this.#swarm.on('connection', async (connection) => {
-            // ATTENTION: Must be called AFTER the protomux init above
-            const stream = this.#store.replicate(connection);
-            wakeup.addStream(stream);
-
-            const publicKey = b4a.toString(connection.remotePublicKey, 'hex');
-            // This function will ignore connections that havent been triggered by the observer. In this case, the promotion will happen during tryConnect when the connection entity will be qualified.
-            await this.#promotePendingConnection(publicKey, connection);
-            
-
-            connection.on('close', () => {
-                this.#rejectAllPendingRequests(publicKey, new Error('Connection closed before response'));
-                this.#swarm.leavePeer(connection.remotePublicKey);
-                this.#validatorConnectionManager.remove(publicKey);
-                this.#indexerConnectionManager.remove(publicKey);
-            });
-
-            connection.on('error', (error) => {
-                this.#rejectAllPendingRequests(publicKey, error ?? new Error('Connection error before response'));
-                if (
-                    error && error.message && (
-                        error.message.includes('connection reset by peer') ||
-                        error.message.includes('Duplicate connection') ||
-                        error.message.includes('connection timed out'))
-                ) {
-                    // TODO: decide if we want to handle this error in a specific way. It generates a lot of logs.
-                    return;
-                }
-                this.#logger.error(error?.message ?? 'Unknown network connection error');
-            });
-
-        });
+        this.setupSwarmConnectionListener();
 
         this.#swarm.join(this.#config.channel, { server: true, client: true });
         this.#swarm.flush();
         
-        // end old replicate
-
-
-
-
-
-
-
         const isAdmin = await this.#state.isAdmin();
-
         if (this.#state.isIndexer() && !isAdmin) {
             this.#epochProofProposalService.start();
             this.#indexerObserverService.start();
@@ -241,6 +196,41 @@ class Network extends ReadyResource {
                 this.#epochProofProposalService.stop();
                 this.#indexerConnectionManager.clear();
             }
+        });
+    }
+
+    // Must be called after this.#swarm, this.#validatorConnectionManager and this.#indexerConnectionManager
+    // are initialized, unlike setupNetworkListeners() which only depends on this.#state and can run earlier.
+    setupSwarmConnectionListener() {
+        this.#swarm.on('connection', async (connection) => {
+            // ATTENTION: Must be called AFTER the protomux init above
+            const stream = this.#store.replicate(connection);
+            wakeup.addStream(stream);
+
+            const publicKey = b4a.toString(connection.remotePublicKey, 'hex');
+            // This function will ignore connections that havent been triggered by the observer. In this case, the promotion will happen during tryConnect when the connection entity will be qualified.
+            await this.#promotePendingConnection(publicKey, connection);
+
+            connection.on('close', () => {
+                this.#rejectAllPendingRequests(publicKey, new Error('Connection closed before response'));
+                this.#swarm.leavePeer(connection.remotePublicKey);
+                this.#validatorConnectionManager.remove(publicKey);
+                this.#indexerConnectionManager.remove(publicKey);
+            });
+
+            connection.on('error', (error) => {
+                this.#rejectAllPendingRequests(publicKey, error ?? new Error('Connection error before response'));
+                if (
+                    error && error.message && (
+                        error.message.includes('connection reset by peer') ||
+                        error.message.includes('Duplicate connection') ||
+                        error.message.includes('connection timed out'))
+                ) {
+                    // TODO: decide if we want to handle this error in a specific way. It generates a lot of logs.
+                    return;
+                }
+                this.#logger.error(error?.message ?? 'Unknown network connection error');
+            });
         });
     }
 
