@@ -49,13 +49,28 @@ class ConsensusRouterV1 {
                 case ConsensusOperationType.PROOF_PROPOSAL:
                     await this.#epochProofProposalHandler.handleRequest(decodedMessage, connection);
                     break;
-                case ConsensusOperationType.PROOF_PROPOSAL_APPROVAL:
-                    const proofProposal = this.#pendingRequestService.getPendingRequest(decodedMessage.session_id)
-                    if (!proofProposal) {
-                        // TODO ; do something if falsy - this means that message is not stored in the pendingRequestService
+                case ConsensusOperationType.PROOF_PROPOSAL_APPROVAL: {
+                    const pendingEntry = this.#pendingRequestService.getPendingRequest(decodedMessage.session_id)
+                    if (!pendingEntry) {
+                        this.#disconnect(connection, 'Approval received without matching pending request')
+                        break;
                     }
-                    await this.#epochProofProposalHandler.handleApproval(decodedMessage, connection, proofProposal);
+
+                    const expectedPeer = pendingEntry.requestedTo ? b4a.from(pendingEntry.requestedTo, 'hex') : null;
+                    if (expectedPeer && !b4a.equals(expectedPeer, connection.remotePublicKey)) {
+                        this.#disconnect(connection, 'Approval received from unexpected peer')
+                        break;
+                    }
+
+                    const { resultCode } = await this.#epochProofProposalHandler.handleApproval(
+                        decodedMessage,
+                        connection,
+                        pendingEntry.proofProposal
+                    );
+                    // TODO: Decide if we want to resolve pending requests here or delegate it elsewhere.
+                    this.#pendingRequestService.resolvePendingRequest(decodedMessage.session_id, resultCode);
                     break;
+                }
                 default:
                     this.#disconnect(connection, `Unsupported V1 message type: ${decodedMessage.type}`)
             }
