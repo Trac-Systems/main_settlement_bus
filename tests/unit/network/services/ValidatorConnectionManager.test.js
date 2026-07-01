@@ -365,18 +365,6 @@ test('ConnectionManager', () => {
     })
 
     test('edge branches', async () => {
-        test('pickRandomValidator returns null for empty array', async t => {
-            reset()
-            const validatorConnectionManager = makeManager()
-            t.is(validatorConnectionManager.pickRandomValidator([]), null)
-        })
-
-        test('pickRandomConnectedValidator returns null when pool is empty', async t => {
-            reset()
-            const validatorConnectionManager = makeManager(6, [])
-            t.is(validatorConnectionManager.pickRandomConnectedValidator(), null)
-        })
-
         test('remove missing validator keeps state unchanged', async t => {
             reset()
             const validatorConnectionManager = makeManager()

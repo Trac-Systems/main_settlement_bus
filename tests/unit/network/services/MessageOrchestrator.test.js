@@ -35,8 +35,6 @@ const createValidatorConnectionManager = ({
     sentCount = 0,
     connectedValidators = [VALIDATOR_KEY],
 } = {}) => ({
-    pickRandomConnectedValidator: sinon.stub().returns(VALIDATOR_KEY),
-    pickRandomValidator: sinon.stub().callsFake((validators) => validators[0] ?? null),
     connectedValidators: sinon.stub().returns(connectedValidators),
     getConnection: sinon.stub().returns({
         protocolSession: {
@@ -248,7 +246,7 @@ test('MessageOrchestrator.send max retries guard returns false immediately', asy
     const result = await orchestrator.send(message, 2);
 
     t.is(result, false);
-    t.is(validatorConnectionManager.pickRandomConnectedValidator.callCount, 0);
+    t.is(validatorConnectionManager.connectedValidators.callCount, 0);
     t.is(validatorConnectionManager.sendSingleMessage.callCount, 0);
 });
 

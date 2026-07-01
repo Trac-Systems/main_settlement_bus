@@ -205,7 +205,7 @@ class Network extends ReadyResource {
 
             this.#consensusMessages = new ConsensusMessages(this.#state, this.#wallet, this.#config, this.#indexerPendingRequestService);
             const indexersCount = await this.#state.indexerCount()
-            this.#indexerConnectionManager = new IndexerConnectionManager(indexersCount);
+            this.#indexerConnectionManager = new IndexerConnectionManager(indexersCount, this.#config, this.#logger);
 
             this.#epochProofProposalService = new EpochProofProposalService(this.#state, this.#indexerConnectionManager, this.#wallet, this.#config);
             await this.#epochProofProposalService.ready();
@@ -329,7 +329,7 @@ class Network extends ReadyResource {
         }
     }
 
-    async tryConnect(publicKey, type = null) {
+    async tryConnect(publicKey, type) {
         if (this.#swarm === null) throw new Error('Network swarm is not initialized');
         if (this.#pendingConnections.has(publicKey) || this.#pendingConnections.size >= this.#config.maxPendingConnections) {
             this.#logger.debug(`Network.tryConnect: Connection to peer: ${publicKey} as type: ${type} is already pending or max pending connections reached.`);
@@ -342,6 +342,7 @@ class Network extends ReadyResource {
                 this.#pendingConnections.delete(publicKey)
             }
         }, this.#config.connectTimeoutMs);
+
         this.#pendingConnections.set(publicKey, { type, timeoutId });
 
         const target = b4a.from(publicKey, 'hex');
@@ -357,7 +358,7 @@ class Network extends ReadyResource {
         const connection = this.#swarm._allConnections.get(peerInfo.publicKey);
         if (!connection) return CONNECTION_STATUS.PENDING;
 
-        const isConnectionReady = (connection.protocolSession && !this.#validatorPendingRequestService.isProbePending(connection.remotePublicKey.toString('hex'))) || connection.consensusProtocolSession
+        const isConnectionReady = (type === 'validator' && !this.#validatorPendingRequestService.isProbePending(connection.remotePublicKey.toString('hex'))) || type === 'indexer'
         if (isConnectionReady) {
             await this.#promotePendingConnection(publicKey, connection);
             return CONNECTION_STATUS.CONNECTED;
@@ -374,8 +375,7 @@ class Network extends ReadyResource {
 
             if (pending.type === 'indexer') {
                 this.#indexerConnectionManager.add(connection.remotePublicKey, connection);
-            }
-            if (pending.type === 'validator') {
+            } else if (pending.type === 'validator') {
                 try {
                     if (!connection.protocolSession.isProbed()) await connection.protocolSession.probe();
                 } catch (err) {

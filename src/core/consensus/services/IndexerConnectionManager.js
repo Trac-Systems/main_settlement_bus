@@ -4,24 +4,12 @@ import { BaseConnectionManager } from '../../shared/BaseConnectionManager.js'
 
 class IndexerConnectionManager extends BaseConnectionManager {
 
-    constructor(maxIndexers) {
-        super(maxIndexers);
+    constructor(maxIndexers, config, logger) {
+        super(maxIndexers, config, logger);
     }
 
     setMax(maxIndexers) {
         this._max = maxIndexers;
-    }
-
-    add(publicKey, connection) {
-        const key = toHex(publicKey);
-        if (this._connections.has(key)) {
-            return false;
-        }
-        if (this._connections.size >= this._max) {
-            return false;
-        }
-        this._connections.set(key, { connection });
-        return true;
     }
 
     remove(publicKey) {
