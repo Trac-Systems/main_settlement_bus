@@ -1056,7 +1056,7 @@ export class MainSettlementBus extends ReadyResource {
         await this.#state.append(encodedPayload);
     }
 
-    async handleEpochGenesisInitialization() {
+    async handleEpochGenesisInitialization(_params) {
         // TODO: Implement SET_GENESIS_EPOCH operation handling.
     }
 }
