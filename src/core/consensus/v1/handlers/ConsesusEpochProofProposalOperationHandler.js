@@ -1,18 +1,11 @@
 import V1EpochProofProposalRequest from "../validators/V1EpochProofProposalRequest.js";
 import V1EpochProofProposalApproval from "../validators/V1EpochProofProposalApproval.js";
-import { networkMessageFactory } from "../../../../messages/network/v1/networkMessageFactory.js";
-import b4a from "b4a";
-import { V1ProtocolError } from "../../../network/protocols/v1/V1ProtocolError.js";
-import { getResultCode, V1ConsensusProtocolError } from "../V1ConsensusProtocolError.js"
-import { ConsensusResultCode, NETWORK_CAPABILITIES, ResultCode } from "../../../../utils/constants.js";
+import { getResultCode } from "../V1ConsensusProtocolError.js"
+import { ConsensusResultCode } from "../../../../utils/constants.js";
 import { consensusMessageFactory } from "../../../../messages/consensus/v1/consensusMessageFactory.js";
-import { bufferToAddress } from "../../../state/utils/address.js";
-import { verifyWesolowski } from "@tracsystems/trac-vdf";
-import { publicKeyToAddress } from "../../../../utils/helpers.js";
+import { bufferToAddress } from "../../../state/utils/address.js"
 import ConnectionOperationHandler from "../../../network/protocols/shared/ConnectionOperationHandler.js";
 import ConsensusEpochProofProposalEventHandler from "./ConsensusEpochProofProposalEventHandler.js";
-
-// Minion interface to verify & sign proposals
 
 // Responsibilities:
 // Validate -> close connections -> emit events to notify system-> send responses 
@@ -21,6 +14,7 @@ class ConsensusEpochProofProposalOperationHandler extends ConnectionOperationHan
     #proofProposalRequestValidator;
     #proofProposalApprovalValidator;
     #wallet;
+    // eslint-disable-next-line no-unused-private-class-members
     #state;
     #eventHandler;
 
@@ -38,7 +32,7 @@ class ConsensusEpochProofProposalOperationHandler extends ConnectionOperationHan
      * @param {object} message Decoded consensus v1 message containing `proof_proposal` and `session_id`.
      * @param {object} connection P eer connection context used by the request validator.
      * @returns {Promise<object>} Signed consensus v1 proof proposal response.
-     * @throws {V1ProtocolError|Error} If request validation or response building fails.
+     * @throws {V1ConsensusProtocolError|Error} If request validation or response building fails.
      */
     async handleRequest(message, connection) {
         const eventContext = this.#buildRequestEventContext(message, connection);

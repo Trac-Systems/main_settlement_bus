@@ -1,7 +1,6 @@
- import {ResultCode} from "../../../../../utils/constants.js";
-import {publicKeyToAddress} from "../../../../../utils/helpers.js";
+import {ResultCode} from "../../../../../utils/constants.js";
 import {V1ProtocolError} from "../V1ProtocolError.js";
- import ConnectionOperationHandler from "../../shared/ConnectionOperationHandler.js";
+import ConnectionOperationHandler from "../../shared/ConnectionOperationHandler.js";
 
 class V1BaseOperationHandler extends ConnectionOperationHandler{
     #rateLimiterService;
