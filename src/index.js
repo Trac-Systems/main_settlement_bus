@@ -8,7 +8,6 @@ import { isAddressValid } from "./core/state/utils/address.js";
 import Network from "./core/network/Network.js";
 import State from "./core/state/State.js";
 import {
-    EventType,
     WHITELIST_SLEEP_INTERVAL,
     BOOTSTRAP_HEXSTRING_LENGTH,
     BALANCE_MIGRATION_SLEEP_INTERVAL,
@@ -71,7 +70,6 @@ export class MainSettlementBus extends ReadyResource {
 
         await this.#state.ready();
         await this.#network.ready();
-        await this.#stateEventsListener();
 
         if (this.#wallet) {
             this.#printWalletInfo();
@@ -187,26 +185,6 @@ export class MainSettlementBus extends ReadyResource {
 
     async #isAllowedToRequestRole(adminEntry, nodeEntry) {
         return nodeEntry?.isWhitelisted && !this.isAdmin(adminEntry);
-    }
-
-    async #stateEventsListener() {
-        this.#state.base.on(EventType.IS_INDEXER, () => {
-            console.log("Current node is an indexer");
-        });
-
-        this.#state.base.on(EventType.IS_NON_INDEXER, async () => {
-            // Prevent further actions if closing is in progress
-            // The reason is that getNodeEntry is async and may cause issues if we will access state after closing
-            console.log("Current node is not an indexer anymore");
-        });
-
-        this.#state.base.on(EventType.WRITABLE, async () => {
-            console.log("Current node is writable");
-        });
-
-        this.#state.base.on(EventType.UNWRITABLE, async () => {
-            console.log("Current node is unwritable");
-        });
     }
 
     async getConfirmedTxInfo(txHash) {

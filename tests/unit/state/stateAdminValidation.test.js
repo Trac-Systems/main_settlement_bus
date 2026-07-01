@@ -3,7 +3,7 @@ import sinon from 'sinon';
 import b4a from 'b4a';
 import { address as addressApi } from 'trac-crypto-api';
 import { randomAddress, randomBuffer } from './stateTestUtils.js';
-import { WRITER_BYTE_LENGTH } from '../../../src/utils/constants.js';
+import { WRITER_BYTE_LENGTH, EventType } from '../../../src/utils/constants.js';
 import addressUtils from '../../../src/core/state/utils/address.js';
 
 import fs from 'fs';
@@ -237,5 +237,53 @@ test('State#isIndexerAddress returns false when no indexers exist', async t => {
     t.is(result, false, 'returns false when indexer list is empty');
 
     entriesStub.restore();
+    restore();
+});
+
+test('State#listeners logs IS_INDEXER event on base', async t => {
+    const config = createStateConfig();
+    const { state, restore } = await setupQueryState(config);
+
+    const consoleLog = sinon.stub(console, 'log');
+    state.base.emit(EventType.IS_INDEXER);
+    consoleLog.restore();
+
+    t.ok(consoleLog.calledWith('Current node is an indexer'), 'logs on IS_INDEXER');
+    restore();
+});
+
+test('State#listeners logs IS_NON_INDEXER event on base', async t => {
+    const config = createStateConfig();
+    const { state, restore } = await setupQueryState(config);
+
+    const consoleLog = sinon.stub(console, 'log');
+    state.base.emit(EventType.IS_NON_INDEXER);
+    consoleLog.restore();
+
+    t.ok(consoleLog.calledWith('Current node is not an indexer anymore'), 'logs on IS_NON_INDEXER');
+    restore();
+});
+
+test('State#listeners logs WRITABLE event on base', async t => {
+    const config = createStateConfig();
+    const { state, restore } = await setupQueryState(config);
+
+    const consoleLog = sinon.stub(console, 'log');
+    state.base.emit(EventType.WRITABLE);
+    consoleLog.restore();
+
+    t.ok(consoleLog.calledWith('Current node is writable'), 'logs on WRITABLE');
+    restore();
+});
+
+test('State#listeners logs UNWRITABLE event on base', async t => {
+    const config = createStateConfig();
+    const { state, restore } = await setupQueryState(config);
+
+    const consoleLog = sinon.stub(console, 'log');
+    state.base.emit(EventType.UNWRITABLE);
+    consoleLog.restore();
+
+    t.ok(consoleLog.calledWith('Current node is unwritable'), 'logs on UNWRITABLE');
     restore();
 });

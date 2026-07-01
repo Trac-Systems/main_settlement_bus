@@ -4,7 +4,6 @@ import { default as test } from 'brittle';
 
 async function runTests() {
     test.pause();
-    await import('./index.test.js');
     await import('./codecs/codecs.test.js');
     await import('./config/configModule.test.js');
     await import('./cli/commandHandler.test.js');
