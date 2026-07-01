@@ -22,10 +22,15 @@ import {
 } from "./utils/normalizers.js";
 import fileUtils from './utils/fileUtils.js';
 import migrationUtils from './utils/migrationUtils.js';
-import {safeDecodeApplyOperation, safeEncodeApplyOperation} from "./codecs/apply/applyOperationCodec.js";
+import {
+    encodeApplyOperation,
+    safeDecodeApplyOperation,
+    safeEncodeApplyOperation
+} from "./codecs/apply/applyOperationCodec.js";
 import PartialTransactionValidator from "./core/network/protocols/shared/validators/PartialTransactionValidator.js";
 import PartialTransferValidator from "./core/network/protocols/shared/validators/PartialTransferValidator.js";
 import { BroadcastError, ValidationError } from "./utils/errors.js";
+import { uint16ToBuffer, uint32ToBuffer } from "./utils/buffer.js";
 
 export class MainSettlementBus extends ReadyResource {
     #store;
@@ -211,7 +216,7 @@ export class MainSettlementBus extends ReadyResource {
         return { payload, decoded }
     }
 
-    handleGetFee() {        
+    handleGetFee() {
         const fee = this.#state.getFee();
         return bufferToBigInt(fee);
     }
@@ -251,7 +256,7 @@ export class MainSettlementBus extends ReadyResource {
             let dagSystem = await this.#state.base.system.core.treeHash();
             let lengthdagSystem = this.#state.base.system.core.length;
             const wl = await this.#state.getWriterLength();
-            
+
             console.log("---------- node & network stats ----------");
             console.log("wallet.publicKey:", this.#wallet?.publicKey?.toString("hex") ?? "unset");
             console.log("wallet.address:", this.#wallet?.address ?? "unset");
@@ -1056,8 +1061,44 @@ export class MainSettlementBus extends ReadyResource {
         await this.#state.append(encodedPayload);
     }
 
-    async handleEpochGenesisInitialization(_params) {
-        // TODO: Implement SET_GENESIS_EPOCH operation handling.
+    async handleEpochGenesisInitialization(params) {
+        if (!this.#config.enableWallet) {
+            throw new Error("Can not initialize an admin - wallet is not enabled.");
+        }
+
+        const adminEntry = await this.#state.getAdminEntry();
+
+        if (!adminEntry) {
+            throw new Error(
+                "Can set epoch genesis operation - admin has been not initialized."
+            );
+        }
+        if (!this.#wallet) {
+            throw new Error("Can not perform recovery - wallet is not initialized.");
+        }
+        if (adminEntry.address !== this.#wallet.address) {
+            throw new Error("Can not perform recovery - you are not the admin.");
+        }
+
+        const existingVDFParams = await this.#state.getSignedVDFParams();
+        if (existingVDFParams) {
+            throw new Error("Can not initialize genesis epoch - VDF parameters already exist.");
+        }
+
+        const { vdfDifficulty, vdfDiscriminantSize } = params;
+        const vdfDifficultyBuffer = uint32ToBuffer(Number(vdfDifficulty), "VDF difficulty");
+        const vdfDiscriminantSizeBuffer = uint16ToBuffer(Number(vdfDiscriminantSize), "VDF discriminant size");
+
+        const txValidity = await this.#state.getIndexerSequenceState();
+        const payload = await applyStateMessageFactory(this.#wallet, this.#config)
+            .buildCompleteSetGenesisEpochMessage(
+                this.#wallet.address,
+                txValidity,
+                vdfDifficultyBuffer,
+                vdfDiscriminantSizeBuffer,
+            )
+        const encodedPayload = encodeApplyOperation(payload);
+        await this.#state.append(encodedPayload);
     }
 }
 

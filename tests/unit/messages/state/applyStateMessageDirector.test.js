@@ -62,6 +62,8 @@ test('ApplyStateMessageDirector builds complete set genesis epoch message', asyn
     t.ok(b4a.equals(payload.sgo.df, vdfDifficulty));
     t.ok(b4a.equals(payload.sgo.db, vdfDiscriminantSize));
     t.is(payload.sgo.tx.length, 32);
+    t.is(payload.sgo.df.length, VDF_DIFFICULTY_SIZE);
+    t.is(payload.sgo.db.length, VDF_DISCRIMINANT_SIZE);
     t.is(payload.sgo.in.length, 32);
     t.is(payload.sgo.is.length, 64);
 });
