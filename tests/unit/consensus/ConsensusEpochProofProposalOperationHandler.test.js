@@ -1,131 +1,182 @@
 import test from 'brittle';
 import b4a from 'b4a';
 import { WalletProvider } from 'trac-wallet';
-import { solveWesolowski } from '@tracsystems/trac-vdf';
 
 import ConsensusEpochProofProposalOperationHandler from '../../../src/core/consensus/v1/handlers/ConsesusEpochProofProposalOperationHandler.js';
+import ConsensusEpochProofProposalEventHandler from '../../../src/core/consensus/v1/handlers/ConsensusEpochProofProposalEventHandler.js';
 import V1EpochProofProposalRequest from '../../../src/core/consensus/v1/validators/V1EpochProofProposalRequest.js';
-import V1EpochProofProposalResponse from '../../../src/core/consensus/v1/validators/V1EpochProofProposalResponse.js';
+import V1EpochProofProposalApproval from '../../../src/core/consensus/v1/validators/V1EpochProofProposalApproval.js';
+import { V1ConsensusProtocolError } from '../../../src/core/consensus/v1/V1ConsensusProtocolError.js';
 import consensusV1OperationFixtures from '../../fixtures/consensusV1Operation.fixtures.js';
 import { config } from '../../helpers/config.js';
-import { errorMessageIncludes } from '../../helpers/regexHelper.js';
+import { testKeyPair2 } from '../../fixtures/apply.fixtures.js';
+import { addressToBuffer } from '../../../src/core/state/utils/address.js';
 import {
     ConsensusOperationType,
-    ConsensusResultCode,
-    VDF_BLOB_PROOF_SIZE
+    ConsensusResultCode
 } from '../../../src/utils/constants.js';
-import { addressToBuffer } from '../../../src/core/state/utils/address.js';
 import {
     verifyProofProposalApprovalSignature,
     verifyProofProposalResponseSignature
 } from '../../../src/utils/consensus/v1/epochProofProposalSignatureUtils.js';
-import { testKeyPair2 } from '../../fixtures/apply.fixtures.js';
 
 const originalRequestValidate = V1EpochProofProposalRequest.prototype.validate;
-const originalResponseValidate = V1EpochProofProposalResponse.prototype.validate;
-const vdfTestConfig = {
-    addressPrefix: config.addressPrefix,
-    vdfDifficulty: 100,
-    vdfDiscriminantSizeBits: 512
-};
+const originalApprovalValidate = V1EpochProofProposalApproval.prototype.validate;
+const eventMethodNames = [
+    'onEpochProposalReceived',
+    'onEpochProposalValidationSuccess',
+    'onEpochProposalValidationFailure',
+    'onApprovalResponseReceived',
+    'onApprovalResponseSuccess',
+    'onApprovalResponseFailure',
+    'onApprovalResponseWithoutPendingRequest'
+];
+const originalEventMethods = new Map(
+    eventMethodNames.map(name => [
+        name,
+        ConsensusEpochProofProposalEventHandler.prototype[name]
+    ])
+);
 
-function restoreValidator() {
+function restorePatches() {
     V1EpochProofProposalRequest.prototype.validate = originalRequestValidate;
-    V1EpochProofProposalResponse.prototype.validate = originalResponseValidate;
+    V1EpochProofProposalApproval.prototype.validate = originalApprovalValidate;
+
+    for (const [name, method] of originalEventMethods.entries()) {
+        ConsensusEpochProofProposalEventHandler.prototype[name] = method;
+    }
 }
 
-async function createWallet(keyPair) {
+async function createWallet(keyPair = testKeyPair2) {
     return await new WalletProvider(config).fromSecretKey(keyPair.secretKey);
 }
 
-function setupHandler(t, validate, state = {}, wallet = {}, responseValidate = async () => true, handlerConfig = config) {
-    restoreValidator();
-    t.teardown(restoreValidator);
-    V1EpochProofProposalRequest.prototype.validate = validate;
-    V1EpochProofProposalResponse.prototype.validate = responseValidate;
-
-    return new ConsensusEpochProofProposalOperationHandler(state, wallet, handlerConfig);
-}
-
-function currentEpochFor(proofProposal, overrides = {}) {
-    return {
-        epoch: proofProposal.epoch.readBigUInt64BE(0) - 1n,
-        epoch_record_hash: proofProposal.previous_epoch_record_hash,
-        ...overrides
-    };
-}
-
-function messageWithProofProposalOverrides(overrides = {}) {
+function proofProposalMessage(overrides = {}) {
     return {
         ...consensusV1OperationFixtures.proofProposalHeader,
+        session_id: overrides.session_id ?? consensusV1OperationFixtures.proofProposalHeader.session_id,
         proof_proposal: {
             ...consensusV1OperationFixtures.proofProposal,
-            ...overrides
+            ...overrides.proof_proposal
         }
     };
 }
 
-async function messageWithValidVdfProof(overrides = {}) {
-    const proofProposal = {
-        ...consensusV1OperationFixtures.proofProposal,
-        ...overrides
-    };
-
-    const vdfProof = await solveWesolowski(
-        proofProposal.previous_epoch_record_hash,
-        vdfTestConfig.vdfDifficulty,
-        vdfTestConfig.vdfDiscriminantSizeBits
-    );
-
-    return messageWithProofProposalOverrides({
-        ...overrides,
-        vdf_proof: vdfProof
-    });
-}
-
-function connection() {
+function proofProposalApprovalMessage(responseOverrides = {}) {
     return {
-        remotePublicKey: b4a.alloc(32, 1),
-        protocolSession: {
-            sendAndForget() {
-                throw new Error('response sending is not part of this step');
-            }
+        ...consensusV1OperationFixtures.proofProposalResponseHeader,
+        proof_proposal_response: {
+            ...consensusV1OperationFixtures.proofProposalResponse,
+            ...responseOverrides
         }
     };
 }
 
-test('handleRequest validates consensus proof proposal and returns a signed approval response', async t => {
-    const wallet = await createWallet(testKeyPair2);
-    const conn = connection();
-    const message = await messageWithValidVdfProof();
-    const state = {
-        currentEpoch: async () => currentEpochFor(message.proof_proposal)
+function createConnection(calls, overrides = {}) {
+    const connection = {
+        remotePublicKey: overrides.remotePublicKey ?? b4a.alloc(32, 7),
+        sent: [],
+        ended: false,
+        flushed: false,
+        protocolSession: {
+            sendAndForget(response) {
+                calls.push({ name: 'send', response });
+                if (overrides.sendError) throw overrides.sendError;
+                connection.sent.push(response);
+            }
+        },
+        async flush() {
+            calls.push({ name: 'flush' });
+            connection.flushed = true;
+        },
+        end() {
+            calls.push({ name: 'end' });
+            connection.ended = true;
+        }
     };
+
+    return connection;
+}
+
+function setupHandler(t, calls, options = {}) {
+    restorePatches();
+    t.teardown(restorePatches);
+
+    for (const name of eventMethodNames) {
+        ConsensusEpochProofProposalEventHandler.prototype[name] = async context => {
+            calls.push({ name, context });
+        };
+    }
+
+    V1EpochProofProposalRequest.prototype.validate = options.requestValidate ?? (async () => true);
+    V1EpochProofProposalApproval.prototype.validate = options.approvalValidate ?? (async () => true);
+
+    return new ConsensusEpochProofProposalOperationHandler(
+        options.state ?? {},
+        options.wallet ?? {},
+        options.config ?? config
+    );
+}
+
+function callNames(calls) {
+    return calls.map(call => call.name);
+}
+
+test('handleRequest validates proposal, emits success events, and sends signed OK approval', async t => {
+    const wallet = await createWallet();
+    const calls = [];
+    const message = proofProposalMessage();
+    const connection = createConnection(calls);
     let validatorPayload;
     let validatorConnection;
-
-    Object.defineProperty(message, 'epoch_proof_proposal_request', {
-        get() {
-            throw new Error('legacy epoch proof proposal request field should not be read');
+    const handler = setupHandler(t, calls, {
+        wallet,
+        requestValidate: async (payload, conn) => {
+            calls.push({ name: 'validateRequest' });
+            validatorPayload = payload;
+            validatorConnection = conn;
+            return true;
         }
     });
 
-    const handler = setupHandler(t, async (payload, connection) => {
-        validatorPayload = payload;
-        validatorConnection = connection;
-        return true;
-    }, state, wallet, async () => true, vdfTestConfig);
+    const result = await handler.handleRequest(message, connection);
 
-    const result = await handler.handleRequest(message, conn);
-
+    t.absent(result);
     t.is(validatorPayload, message);
-    t.is(validatorConnection, conn);
-    t.is(result.type, ConsensusOperationType.PROOF_PROPOSAL_RESPONSE);
-    t.is(result.session_id, message.session_id);
+    t.is(validatorConnection, connection);
+    t.alike(callNames(calls), [
+        'onEpochProposalReceived',
+        'validateRequest',
+        'onEpochProposalValidationSuccess',
+        'send',
+        'flush',
+        'end'
+    ]);
 
-    const proofProposalResponse = result.proof_proposal_response;
+    const receivedContext = calls[0].context;
+    t.is(receivedContext.message, message);
+    t.is(receivedContext.connection, connection);
+    t.is(receivedContext.sessionId, message.session_id);
+    t.is(receivedContext.remotePublicKey, connection.remotePublicKey);
+
+    const successContext = calls[2].context;
+    t.is(successContext.proofProposal, message.proof_proposal);
+    t.is(successContext.resultCode, ConsensusResultCode.OK);
+
+    t.is(connection.sent.length, 1);
+    t.ok(connection.flushed);
+    t.ok(connection.ended);
+
+    const response = connection.sent[0];
+    t.is(response.type, ConsensusOperationType.PROOF_PROPOSAL_APPROVAL);
+    t.is(response.session_id, message.session_id);
+
+    const proofProposalResponse = response.proof_proposal_response;
     t.is(proofProposalResponse.result, ConsensusResultCode.OK);
-    t.alike(proofProposalResponse.approval.approver, addressToBuffer(wallet.address, config.addressPrefix));
+    t.alike(
+        proofProposalResponse.approval.approver,
+        addressToBuffer(wallet.address, config.addressPrefix)
+    );
     t.ok(await verifyProofProposalApprovalSignature(
         message.proof_proposal,
         proofProposalResponse.approval
@@ -133,128 +184,218 @@ test('handleRequest validates consensus proof proposal and returns a signed appr
     t.ok(await verifyProofProposalResponseSignature(proofProposalResponse));
 });
 
-test('handleRequest stops when request validation fails', async t => {
-    const conn = connection();
-    const message = { ...consensusV1OperationFixtures.proofProposalHeader };
-    let proofProposalRead = false;
-
-    Object.defineProperty(message, 'proof_proposal', {
-        get() {
-            proofProposalRead = true;
-            throw new Error('proof proposal should not be read after validation failure');
+test('handleRequest maps consensus validation errors to signed rejection responses', async t => {
+    const wallet = await createWallet();
+    const calls = [];
+    const message = proofProposalMessage();
+    const connection = createConnection(calls);
+    const validationError = new V1ConsensusProtocolError(
+        ConsensusResultCode.INVALID_PAYLOAD,
+        'invalid proof proposal'
+    );
+    const handler = setupHandler(t, calls, {
+        wallet,
+        requestValidate: async () => {
+            calls.push({ name: 'validateRequest' });
+            throw validationError;
         }
     });
 
-    const handler = setupHandler(t, async () => {
-        throw new Error('validation failed');
+    await handler.handleRequest(message, connection);
+
+    t.alike(callNames(calls), [
+        'onEpochProposalReceived',
+        'validateRequest',
+        'onEpochProposalValidationFailure',
+        'send',
+        'flush',
+        'end'
+    ]);
+
+    const failureContext = calls[2].context;
+    t.is(failureContext.resultCode, ConsensusResultCode.INVALID_PAYLOAD);
+    t.is(failureContext.error, validationError);
+
+    const proofProposalResponse = connection.sent[0].proof_proposal_response;
+    t.is(proofProposalResponse.result, ConsensusResultCode.INVALID_PAYLOAD);
+    t.ok(await verifyProofProposalResponseSignature(
+        proofProposalResponse,
+        proofProposalResponse.approval?.approver ?? wallet.publicKey
+    ));
+});
+
+test('handleRequest maps unexpected validation errors to UNEXPECTED_ERROR responses', async t => {
+    const wallet = await createWallet();
+    const calls = [];
+    const message = proofProposalMessage();
+    const connection = createConnection(calls);
+    const handler = setupHandler(t, calls, {
+        wallet,
+        requestValidate: async () => {
+            calls.push({ name: 'validateRequest' });
+            throw new Error('boom');
+        }
     });
 
-    await t.exception(
-        async () => handler.handleRequest(message, conn),
-        errorMessageIncludes('validation failed')
-    );
-    t.absent(proofProposalRead);
+    await handler.handleRequest(message, connection);
+
+    const failureContext = calls[2].context;
+    const proofProposalResponse = connection.sent[0].proof_proposal_response;
+    t.is(failureContext.resultCode, ConsensusResultCode.UNEXPECTED_ERROR);
+    t.is(proofProposalResponse.result, ConsensusResultCode.UNEXPECTED_ERROR);
+    t.ok(await verifyProofProposalResponseSignature(
+        proofProposalResponse,
+        proofProposalResponse.approval?.approver ?? wallet.publicKey
+    ));
 });
 
-test('handleRequest rejects proof proposals that skip the next epoch', async t => {
-    const conn = connection();
-    const message = { ...consensusV1OperationFixtures.proofProposalHeader };
-    const state = {
-        currentEpoch: async () => currentEpochFor(
-            message.proof_proposal,
-            { epoch: message.proof_proposal.epoch.readBigUInt64BE(0) - 2n }
-        )
-    };
-    const handler = setupHandler(t, async () => true, state);
-
-    await t.exception(
-        async () => handler.handleRequest(message, conn),
-        errorMessageIncludes('not for the next epoch')
-    );
-});
-
-test('handleRequest rejects proof proposals with a mismatched previous epoch record hash', async t => {
-    const conn = connection();
-    const message = { ...consensusV1OperationFixtures.proofProposalHeader };
-    const state = {
-        currentEpoch: async () => currentEpochFor(
-            message.proof_proposal,
-            { epoch_record_hash: b4a.alloc(32, 9) }
-        )
-    };
-    const handler = setupHandler(t, async () => true, state);
-
-    await t.exception(
-        async () => handler.handleRequest(message, conn),
-        errorMessageIncludes('Previous epoch record hash does not match')
-    );
-});
-
-test('handleRequest rejects proof proposals with invalid VDF proof data', async t => {
-    const conn = connection();
-    const message = messageWithProofProposalOverrides({
-        vdf_proof: b4a.alloc(VDF_BLOB_PROOF_SIZE)
-    });
-    const state = {
-        currentEpoch: async () => currentEpochFor(message.proof_proposal)
-    };
-    const handler = setupHandler(t, async () => true, state, {}, async () => true, vdfTestConfig);
-
-    await t.exception(
-        async () => handler.handleRequest(message, conn),
-        errorMessageIncludes('VDF proof verification failed')
-    );
-});
-
-test('handleResponse validates consensus proof proposal response and returns approval', async t => {
-    const conn = connection();
-    const message = { ...consensusV1OperationFixtures.proofProposalResponseHeader };
-    let validatorPayload;
-    let validatorConnection;
-    const handler = setupHandler(
-        t,
-        async () => true,
-        {},
-        {},
-        async (payload, connection) => {
-            validatorPayload = payload;
-            validatorConnection = connection;
+test('handleRequest ends the connection when response sending fails', async t => {
+    const wallet = await createWallet();
+    const calls = [];
+    const message = proofProposalMessage();
+    const sendError = new Error('send failed');
+    const connection = createConnection(calls, { sendError });
+    const displayErrors = [];
+    const handler = setupHandler(t, calls, {
+        wallet,
+        requestValidate: async () => {
+            calls.push({ name: 'validateRequest' });
             return true;
         }
-    );
+    });
+    handler.displayError = (step, remotePublicKey, error) => {
+        displayErrors.push({ step, remotePublicKey, error });
+    };
 
-    const result = await handler.handleApproval(message, conn);
+    await handler.handleRequest(message, connection);
 
-    t.is(validatorPayload, message);
-    t.is(validatorConnection, conn);
-    t.alike(result, message.proof_proposal_response.approval);
+    t.alike(callNames(calls), [
+        'onEpochProposalReceived',
+        'validateRequest',
+        'onEpochProposalValidationSuccess',
+        'send',
+        'end'
+    ]);
+    t.is(connection.sent.length, 0);
+    t.absent(connection.flushed);
+    t.ok(connection.ended);
+    t.is(displayErrors.length, 1);
+    t.is(displayErrors[0].error, sendError);
+    t.is(displayErrors[0].remotePublicKey, connection.remotePublicKey);
 });
 
-test('handleResponse stops when response validation fails', async t => {
-    const conn = connection();
-    const message = { ...consensusV1OperationFixtures.proofProposalResponseHeader };
-    let approvalRead = false;
-
-    Object.defineProperty(message, 'proof_proposal_response', {
-        get() {
-            approvalRead = true;
-            throw new Error('approval should not be read after validation failure');
+test('handleApproval validates OK responses, emits success, and returns approval', async t => {
+    const wallet = await createWallet();
+    const calls = [];
+    const message = proofProposalApprovalMessage();
+    const proofProposal = consensusV1OperationFixtures.proofProposal;
+    const connection = createConnection(calls);
+    let validatorPayload;
+    let validatorConnection;
+    let validatorProofProposal;
+    const handler = setupHandler(t, calls, {
+        wallet,
+        approvalValidate: async (payload, conn, proposal) => {
+            calls.push({ name: 'validateApproval' });
+            validatorPayload = payload;
+            validatorConnection = conn;
+            validatorProofProposal = proposal;
+            return true;
         }
     });
 
-    const handler = setupHandler(
-        t,
-        async () => true,
-        {},
-        {},
-        async () => {
-            throw new Error('response validation failed');
-        }
-    );
+    const result = await handler.handleApproval(message, connection, proofProposal);
 
-    await t.exception(
-        async () => handler.handleApproval(message, conn),
-        errorMessageIncludes('response validation failed')
+    t.is(validatorPayload, message);
+    t.is(validatorConnection, connection);
+    t.is(validatorProofProposal, proofProposal);
+    t.alike(callNames(calls), [
+        'onApprovalResponseReceived',
+        'validateApproval',
+        'onApprovalResponseSuccess'
+    ]);
+    t.alike(result, {
+        resultCode: ConsensusResultCode.OK,
+        approval: message.proof_proposal_response.approval
+    });
+
+    const receivedContext = calls[0].context;
+    t.is(receivedContext.message, message);
+    t.is(receivedContext.connection, connection);
+    t.is(receivedContext.sessionId, message.session_id);
+    t.is(receivedContext.remotePublicKey, connection.remotePublicKey);
+    t.is(receivedContext.proofProposal, proofProposal);
+
+    const successContext = calls[2].context;
+    t.is(successContext.resultCode, ConsensusResultCode.OK);
+    t.is(successContext.approval, message.proof_proposal_response.approval);
+});
+
+test('handleApproval maps consensus validation failure and does not read approval payload', async t => {
+    const wallet = await createWallet();
+    const calls = [];
+    let proofProposalResponseRead = false;
+    const message = {
+        type: ConsensusOperationType.PROOF_PROPOSAL_APPROVAL,
+        session_id: 'approval-validation-failure',
+        timestamp: 1
+    };
+    Object.defineProperty(message, 'proof_proposal_response', {
+        get() {
+            proofProposalResponseRead = true;
+            throw new Error('approval payload should not be read after validation failure');
+        }
+    });
+    const proofProposal = consensusV1OperationFixtures.proofProposal;
+    const connection = createConnection(calls);
+    const validationError = new V1ConsensusProtocolError(
+        ConsensusResultCode.INVALID_PAYLOAD,
+        'invalid approval response'
     );
-    t.absent(approvalRead);
+    const handler = setupHandler(t, calls, {
+        wallet,
+        approvalValidate: async () => {
+            calls.push({ name: 'validateApproval' });
+            throw validationError;
+        }
+    });
+
+    const result = await handler.handleApproval(message, connection, proofProposal);
+
+    t.alike(callNames(calls), [
+        'onApprovalResponseReceived',
+        'validateApproval',
+        'onApprovalResponseFailure'
+    ]);
+    t.alike(result, { resultCode: ConsensusResultCode.INVALID_PAYLOAD });
+    t.absent(proofProposalResponseRead);
+    t.is(calls[2].context.resultCode, ConsensusResultCode.INVALID_PAYLOAD);
+    t.is(calls[2].context.error, validationError);
+});
+
+test('handleApproval maps unexpected validation errors to UNEXPECTED_ERROR', async t => {
+    const wallet = await createWallet();
+    const calls = [];
+    const message = proofProposalApprovalMessage();
+    const proofProposal = consensusV1OperationFixtures.proofProposal;
+    const connection = createConnection(calls);
+    const validationError = new Error('unexpected approval failure');
+    const handler = setupHandler(t, calls, {
+        wallet,
+        approvalValidate: async () => {
+            calls.push({ name: 'validateApproval' });
+            throw validationError;
+        }
+    });
+
+    const result = await handler.handleApproval(message, connection, proofProposal);
+
+    t.alike(callNames(calls), [
+        'onApprovalResponseReceived',
+        'validateApproval',
+        'onApprovalResponseFailure'
+    ]);
+    t.alike(result, { resultCode: ConsensusResultCode.UNEXPECTED_ERROR });
+    t.is(calls[2].context.resultCode, ConsensusResultCode.UNEXPECTED_ERROR);
+    t.is(calls[2].context.error, validationError);
 });
