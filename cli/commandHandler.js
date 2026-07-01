@@ -37,7 +37,8 @@ export const COMMANDS = {
     UNCONFIRMED_LENGTH: "/unconfirmed_length",
     GET_TXS_HASHES: "/get_txs_hashes",
     GET_TX_DETAILS: "/get_tx_details",
-    GET_EXTENDED_TX_DETAILS: "/get_extended_tx_details"
+    GET_EXTENDED_TX_DETAILS: "/get_extended_tx_details",
+    EPOCH_GENESIS_INITIALIZATION: "/init_genesis"
 };
 
 export class CommandHandler {
@@ -220,6 +221,10 @@ export class CommandHandler {
             {
                 evaluate: ({ input }) => input.startsWith(COMMANDS.GET_EXTENDED_TX_DETAILS),
                 process: async ({ parts }) => this.#handlers.handleExtendedTxDetails(parts[0], parts[1] === "true")
+            },
+            {
+                evaluate: ({ input }) => input.startsWith(COMMANDS.EPOCH_GENESIS_INITIALIZATION),
+                process: async () => this.#handlers.handleEpochGenesisInitialization()
             }
         ];
     }

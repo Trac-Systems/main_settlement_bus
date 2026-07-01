@@ -207,4 +207,8 @@ export class Handlers {
 
         return txDetails;
     }
+
+    async handleEpochGenesisInitialization() {
+        return this.#msb.handleEpochGenesisInitialization();
+    }
 }

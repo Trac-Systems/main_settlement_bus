@@ -286,6 +286,7 @@ export class MainSettlementBus extends ReadyResource {
             console.log("- /add_indexer <address>: Change a role of the selected writer node to indexer role. Charges a fee.");
             console.log("- /remove_indexer <address>: Change a role of the selected indexer node to default role. Charges a fee.");
             console.log("- /ban_writer <address>: Demote a whitelisted writer to default role and remove it from the whitelist. Charges a fee.");
+            console.log("- /init_genesis: Initialize genesis epoch.");
         }
         console.log("Available commands:");
         console.log("- /add_writer: Add yourself as a validator to this MSB once whitelisted. Requires a fee + 10x the fee as a stake in $TNK.");
@@ -1053,6 +1054,10 @@ export class MainSettlementBus extends ReadyResource {
         console.log('Disabling initialization...');
         const encodedPayload = safeEncodeApplyOperation(payload);
         await this.#state.append(encodedPayload);
+    }
+
+    async handleEpochGenesisInitialization() {
+        // TODO: Implement SET_GENESIS_EPOCH operation handling.
     }
 }
 
