@@ -35,6 +35,7 @@ class StateValidationSchema {
     #validateBalanceInitializationSchema;
     #validateSetEpochOperationSchema;
     #validateSetGenesisEpochOperationSchema;
+    #validateSetVdfParamsOperationSchema;
     #proofDataFields;
     #config;
 
@@ -272,6 +273,7 @@ class StateValidationSchema {
         this.#validateBalanceInitializationSchema = this.#compileBalanceInitializationSchema();
         this.#validateSetEpochOperationSchema = this.#compileSetEpochOperationSchema();
         this.#validateSetGenesisEpochOperationSchema = this.#compileSetGenesisEpochOperationSchema();
+        this.#validateSetVdfParamsOperationSchema = this.#compileSetVdfParamsOperationSchema();
 
     }
 
@@ -666,6 +668,31 @@ class StateValidationSchema {
 
     validateSetGenesisEpochOperation(op) {
         return this.#validateSetGenesisEpochOperationSchema(op) === true;
+    }
+
+    #compileSetVdfParamsOperationSchema() {
+        const schema = {
+            $$strict: true,
+            type: this.#operationTypeDomain(OperationType.SET_VDF_PARAMS),
+            address: {type: 'buffer', length: this.#config.addressLength, required: true},
+            vpo: {
+                strict: true,
+                type: 'object',
+                props: {
+                    tx: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true},
+                    txv: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true},
+                    df: {type: 'buffer', length: VDF_DIFFICULTY_SIZE, required: true},
+                    db: {type: 'buffer', length: VDF_DISCRIMINANT_SIZE, required: true},
+                    in: {type: 'buffer', length: NONCE_BYTE_LENGTH, required: true},
+                    is: {type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true},
+                }
+            }
+        };
+        return this.#validator.compile(schema);
+    }
+
+    validateSetVdfParamsOperation(op) {
+        return this.#validateSetVdfParamsOperationSchema(op) === true;
     }
 }
 
