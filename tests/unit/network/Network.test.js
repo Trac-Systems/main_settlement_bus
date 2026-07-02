@@ -75,7 +75,7 @@ async function loadNetwork() {
             return this.exists(publicKey);
         }
 
-        connectedValidators() {
+        connectedPeers() {
             return Array.from(this.validators);
         }
 

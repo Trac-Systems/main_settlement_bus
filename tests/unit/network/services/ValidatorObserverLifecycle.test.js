@@ -52,7 +52,7 @@ function createBaseMocks(overrides = {}) {
             maxConnectionsReached: () => false,
             connected: () => false,
             exists: () => false,
-            connectedValidators: () => [],
+            connectedPeers: () => [],
             remove: () => {},
             destroy: async () => {},
             close: async () => {}
@@ -380,7 +380,7 @@ test("does NOT drop connections when it is the admin and threshold reached", asy
     const { network, state, config } = createBaseMocks({
         network: {
             validatorConnectionManager: {
-                connectedValidators: () => publicKeys,
+                connectedPeers: () => publicKeys,
                 remove: (pk) => removed.push(pk),
             },
         },
