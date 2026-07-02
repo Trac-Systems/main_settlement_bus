@@ -1,8 +1,9 @@
 import V1BaseConsensusOperation from "./V1BaseConsensusOperation.js";
 import {ConsensusResultCode} from "../../../../utils/constants.js";
+import {createMessage, safeWriteUInt32BE} from "../../../../utils/buffer.js";
+import {encodeProofProposalApproval} from "../../../../codecs/consensus/v1/consensusV1OperationCodec.js";
 import tracCryptoApi from "trac-crypto-api";
 import {V1ConsensusProtocolError} from "../V1ConsensusProtocolError.js";
-import {hashProofProposalResponse} from "../../../../utils/consensus/v1/epochProofProposalSignatureUtils.js";
 
 class V1EpochProofProposalApproval extends V1BaseConsensusOperation {
     /**
@@ -37,13 +38,14 @@ class V1EpochProofProposalApproval extends V1BaseConsensusOperation {
      */
     async #validateResponseSignature(payload, remotePublicKey) {
         const proofProposalResponse = payload.proof_proposal_response;
+        const resultCode = safeWriteUInt32BE(proofProposalResponse.result, 0);
+        const message = proofProposalResponse.result === ConsensusResultCode.OK
+            ? createMessage(resultCode, encodeProofProposalApproval(proofProposalResponse.approval))
+            : createMessage(resultCode);
 
         let hash;
         try {
-            hash = await hashProofProposalResponse(
-                proofProposalResponse.result,
-                proofProposalResponse.approval
-            );
+            hash = await tracCryptoApi.hash.blake3(message);
         } catch {
             throw new V1ConsensusProtocolError(
                 ConsensusResultCode.UNEXPECTED_ERROR,
