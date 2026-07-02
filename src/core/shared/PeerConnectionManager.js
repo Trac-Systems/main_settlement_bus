@@ -102,14 +102,6 @@ export class PeerConnectionManager extends ReadyResource {
         if (connection) connection.protocolSession.close();
         this._connections.delete(key);
     }
-    
-    /**
-     * Gets the current number of connected peers.
-     * @returns {Number} - The count of connected peers
-     */
-    connectionCount() {
-        return Array.from(this._connections.keys()).filter(hex => this.connected(hex)).length
-    }
 
     /**
      * Gets a list of all currently connected peers' public keys.
@@ -117,6 +109,14 @@ export class PeerConnectionManager extends ReadyResource {
      */
     connectedPeers() {
         return Array.from(this._connections.keys()).filter(pk => this.connected(pk));
+    }
+
+    /**
+     * Gets the current number of connected peers.
+     * @returns {Number} - The count of connected peers
+     */
+    connectionCount() {
+        return this.connectedPeers().length;
     }
     
     /**
