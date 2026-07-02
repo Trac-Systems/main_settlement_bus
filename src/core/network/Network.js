@@ -92,8 +92,7 @@ class Network extends ReadyResource {
     }
 
     async _open() {
-        this.#logger.info('Network initialization...');
-        this.setupNetworkListeners();
+        this.#logger.info('Network initialization...');        
         this.transactionPoolService.start();
         this.validatorObserverService.start();
 
@@ -135,7 +134,7 @@ class Network extends ReadyResource {
         await this.#epochProofProposalService.ready();
 
         this.#logger.info(`Channel: ${b4a.toString(this.#config.channel)}`);
-        this.setupSwarmConnectionListener();
+        this.#listerners();
 
         this.#swarm.join(this.#config.channel, { server: true, client: true });
         this.#swarm.flush();
@@ -163,7 +162,7 @@ class Network extends ReadyResource {
         await this.#swarm.destroy();
     }
 
-    setupNetworkListeners() {
+    #listerners() {
         this.#state.on(CustomEventType.IS_INDEXER, async (publicKey) => {
             const indexersCount = await this.#state.indexerCount()
             this.#indexerConnectionManager.setMax(indexersCount);
@@ -197,11 +196,7 @@ class Network extends ReadyResource {
                 this.#indexerConnectionManager.clear();
             }
         });
-    }
 
-    // Must be called after this.#swarm, this.#validatorConnectionManager and this.#indexerConnectionManager
-    // are initialized, unlike setupNetworkListeners() which only depends on this.#state and can run earlier.
-    setupSwarmConnectionListener() {
         this.#swarm.on('connection', async (connection) => {
             // ATTENTION: Must be called AFTER the protomux init above
             const stream = this.#store.replicate(connection);
