@@ -1,17 +1,15 @@
 import b4a from 'b4a';
 import tracCryptoApi from 'trac-crypto-api';
+import {encodeProofProposalApproval} from '../../../codecs/consensus/v1/consensusV1OperationCodec.js';
 import {addressToBuffer, isAddressValid} from "../../../core/state/utils/address.js";
-import {
-    hashProofProposal,
-    hashProofProposalApproval,
-    hashProofProposalResponse
-} from '../../../utils/consensus/v1/epochProofProposalSignatureUtils.js';
 import {
     ConsensusOperationType,
     ConsensusProtocolVersion,
     ConsensusResultCode
 } from '../../../utils/constants.js';
 import {
+    createMessage,
+    safeWriteUInt32BE,
     uint8ToBuffer,
     uint16ToBuffer,
     uint64ToBuffer
@@ -216,12 +214,47 @@ class ConsensusMessageBuilder {
         );
     }
 
+    async #hashProofProposal(proofProposal) {
+        return await tracCryptoApi.hash.blake3(createMessage(
+            proofProposal.protocol_version,
+            proofProposal.network_id,
+            proofProposal.epoch,
+            proofProposal.previous_epoch_record_hash,
+            proofProposal.proposer,
+            proofProposal.vdf_parameters_hash,
+            proofProposal.vdf_proof
+        ));
+    }
+
+    async #hashProofProposalApproval(proofProposal, approver, requesterProofSignature) {
+        return await tracCryptoApi.hash.blake3(createMessage(
+            proofProposal.protocol_version,
+            proofProposal.network_id,
+            proofProposal.epoch,
+            proofProposal.previous_epoch_record_hash,
+            proofProposal.proposer,
+            proofProposal.vdf_parameters_hash,
+            proofProposal.vdf_proof,
+            approver,
+            requesterProofSignature
+        ));
+    }
+
+    async #hashProofProposalResponse(resultCode, proofProposalApproval) {
+        const resultCodeBuffer = safeWriteUInt32BE(resultCode, 0);
+        const message = proofProposalApproval
+            ? createMessage(resultCodeBuffer, encodeProofProposalApproval(proofProposalApproval))
+            : createMessage(resultCodeBuffer);
+
+        return await tracCryptoApi.hash.blake3(message);
+    }
+
     async #signProofProposal(proofProposal) {
-        return this.#wallet.sign(await hashProofProposal(proofProposal));
+        return this.#wallet.sign(await this.#hashProofProposal(proofProposal));
     }
 
     async #buildProofProposalApproval(proofProposal, approver, requesterProofSignature) {
-        const hashApproval = await hashProofProposalApproval(
+        const hashApproval = await this.#hashProofProposalApproval(
             proofProposal,
             approver,
             requesterProofSignature
@@ -235,7 +268,7 @@ class ConsensusMessageBuilder {
 
     async #signProofProposalResponse(resultCode, proofProposalApproval) {
         return this.#wallet.sign(
-            await hashProofProposalResponse(resultCode, proofProposalApproval)
+            await this.#hashProofProposalResponse(resultCode, proofProposalApproval)
         );
     }
 

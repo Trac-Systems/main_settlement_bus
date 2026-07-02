@@ -1,6 +1,7 @@
 import test from 'brittle';
 import b4a from 'b4a';
 import EventEmitter from 'bare-events';
+import tracCryptoApi from 'trac-crypto-api';
 import { WalletProvider } from 'trac-wallet';
 
 import ConsensusEpochProofProposalOperationHandler from '../../../src/core/consensus/v1/handlers/ConsesusEpochProofProposalOperationHandler.js';
@@ -11,15 +12,13 @@ import consensusV1OperationFixtures from '../../fixtures/consensusV1Operation.fi
 import { config } from '../../helpers/config.js';
 import { testKeyPair2 } from '../../fixtures/apply.fixtures.js';
 import { addressToBuffer } from '../../../src/core/state/utils/address.js';
+import { encodeProofProposalApproval } from '../../../src/codecs/consensus/v1/consensusV1OperationCodec.js';
+import { createMessage, safeWriteUInt32BE } from '../../../src/utils/buffer.js';
 import {
     CustomEventType,
     ConsensusOperationType,
     ConsensusResultCode
 } from '../../../src/utils/constants.js';
-import {
-    verifyProofProposalApprovalSignature,
-    verifyProofProposalResponseSignature
-} from '../../../src/utils/consensus/v1/epochProofProposalSignatureUtils.js';
 
 const originalRequestValidate = V1EpochProofProposalRequest.prototype.validate;
 const originalApprovalValidate = V1EpochProofProposalApproval.prototype.validate;
@@ -115,6 +114,33 @@ function callNames(calls) {
     return calls.map(call => call.name);
 }
 
+async function verifyProofProposalApprovalSignature(proofProposal, approval, publicKey) {
+    const message = createMessage(
+        proofProposal.protocol_version,
+        proofProposal.network_id,
+        proofProposal.epoch,
+        proofProposal.previous_epoch_record_hash,
+        proofProposal.proposer,
+        proofProposal.vdf_parameters_hash,
+        proofProposal.vdf_proof,
+        approval.approver,
+        proofProposal.signature
+    );
+    const hash = await tracCryptoApi.hash.blake3(message);
+
+    return tracCryptoApi.signature.verify(approval.approval_sig, hash, publicKey);
+}
+
+async function verifyProofProposalResponseSignature(response, publicKey) {
+    const resultCode = safeWriteUInt32BE(response.result, 0);
+    const message = response.approval
+        ? createMessage(resultCode, encodeProofProposalApproval(response.approval))
+        : createMessage(resultCode);
+    const hash = await tracCryptoApi.hash.blake3(message);
+
+    return tracCryptoApi.signature.verify(response.response_sig, hash, publicKey);
+}
+
 test('handleRequest validates proposal, emits success events, and sends signed OK approval', async t => {
     const wallet = await createWallet();
     const calls = [];
@@ -172,9 +198,10 @@ test('handleRequest validates proposal, emits success events, and sends signed O
     );
     t.ok(await verifyProofProposalApprovalSignature(
         message.proof_proposal,
-        proofProposalResponse.approval
+        proofProposalResponse.approval,
+        wallet.publicKey
     ));
-    t.ok(await verifyProofProposalResponseSignature(proofProposalResponse));
+    t.ok(await verifyProofProposalResponseSignature(proofProposalResponse, wallet.publicKey));
 });
 
 test('handleRequest maps consensus validation errors to signed rejection responses', async t => {
@@ -212,10 +239,7 @@ test('handleRequest maps consensus validation errors to signed rejection respons
     const proofProposalResponse = connection.sent[0].proof_proposal_response;
     t.is(proofProposalResponse.result, ConsensusResultCode.INVALID_PAYLOAD);
     t.absent(proofProposalResponse.approval);
-    t.ok(await verifyProofProposalResponseSignature(
-        proofProposalResponse,
-        proofProposalResponse.approval?.approver ?? wallet.publicKey
-    ));
+    t.ok(await verifyProofProposalResponseSignature(proofProposalResponse, wallet.publicKey));
 });
 
 test('handleRequest maps unexpected validation errors to UNEXPECTED_ERROR responses', async t => {
@@ -238,10 +262,7 @@ test('handleRequest maps unexpected validation errors to UNEXPECTED_ERROR respon
     t.is(failureContext.resultCode, ConsensusResultCode.UNEXPECTED_ERROR);
     t.is(proofProposalResponse.result, ConsensusResultCode.UNEXPECTED_ERROR);
     t.absent(proofProposalResponse.approval);
-    t.ok(await verifyProofProposalResponseSignature(
-        proofProposalResponse,
-        proofProposalResponse.approval?.approver ?? wallet.publicKey
-    ));
+    t.ok(await verifyProofProposalResponseSignature(proofProposalResponse, wallet.publicKey));
 });
 
 test('handleRequest ends the connection when response sending fails', async t => {

@@ -1,5 +1,6 @@
 import test from 'brittle';
 import b4a from 'b4a';
+import tracCryptoApi from 'trac-crypto-api';
 import {WalletProvider} from 'trac-wallet';
 
 import ConsensusMessageBuilder from '../../../src/messages/consensus/v1/ConsensusMessageBuilder.js';
@@ -14,7 +15,7 @@ import {
 import {config} from '../../helpers/config.js';
 import {testKeyPair1, testKeyPair2, testKeyPair3} from '../../fixtures/apply.fixtures.js';
 import {errorMessageIncludes} from '../../helpers/regexHelper.js';
-import {hashProofProposalResponse} from '../../../src/utils/consensus/v1/epochProofProposalSignatureUtils.js';
+import {createMessage, safeWriteUInt32BE} from '../../../src/utils/buffer.js';
 
 const previousEpochRecordHash = b4a.alloc(32, 1);
 const vdfParametersHash = b4a.alloc(32, 2);
@@ -67,7 +68,7 @@ async function buildProofProposalApprovalPayload(approverWallet, proofProposalPa
 }
 
 async function buildProofProposalRejectionPayload(approverWallet, proofProposalPayload, result = ConsensusResultCode.INVALID_PAYLOAD) {
-    const responseHash = await hashProofProposalResponse(result);
+    const responseHash = await tracCryptoApi.hash.blake3(createMessage(safeWriteUInt32BE(result, 0)));
 
     return {
         type: ConsensusOperationType.PROOF_PROPOSAL_APPROVAL,
