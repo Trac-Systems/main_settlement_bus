@@ -24,8 +24,7 @@ class V1EpochProofProposalApproval extends V1BaseConsensusOperation {
         const approval = payload.proof_proposal_response.approval;
         this.assertAddressWithRemotePublicKey(
             approval.approver,
-            connection.remotePublicKey,
-            "approver"
+            connection.remotePublicKey
         );
         await this.validateSignature(payload, connection.remotePublicKey, proofProposal);
         this.validateAddressIsIndexer();

@@ -186,19 +186,19 @@ class V1BaseConsensusOperation {
     /**
      * Validates that the payload address resolves to the remote public key.
      */
-    assertAddressWithRemotePublicKey(binaryAddress, remotePublicKey, context) {
+    assertAddressWithRemotePublicKey(binaryAddress, remotePublicKey) {
         const address = bufferToAddress(binaryAddress, this.#config.addressPrefix);
         if (!address) {
             throw new V1ConsensusProtocolError(
                 ConsensusResultCode.UNEXPECTED_ERROR,
-                `${context} address is invalid.`
+                'Address is invalid.'
             );
         }
         const publicKeyFromAddress = tracCryptoApi.address.decode(address);
         if (!b4a.equals(publicKeyFromAddress, remotePublicKey)) {
             throw new V1ConsensusProtocolError(
                 ConsensusResultCode.UNEXPECTED_ERROR,
-                `${context} address does not match remote public key.`
+                'Address does not match remote public key.'
             );
         }
     }

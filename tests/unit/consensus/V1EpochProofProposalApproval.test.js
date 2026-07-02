@@ -176,7 +176,7 @@ test('V1EpochProofProposalApproval rejects approver address mismatched with remo
             {remotePublicKey: approverWallet.publicKey},
             proofProposalPayload.proof_proposal
         ),
-        errorMessageIncludes('approver address does not match remote public key')
+        errorMessageIncludes('Address does not match remote public key')
     );
 });
 
