@@ -46,6 +46,7 @@ import { Status } from './utils/transaction.js';
 import remote from 'hypercore/lib/fully-remote-proof.js'
 import PQueue from 'p-queue';
 import { keys } from '../consensus/v1/handlers/epochProposal/epochProofData.js'
+import {bind} from "lodash";
 
 const OVERSIZED_BATCH_PENALTY_MULTIPLIER = BATCH_SIZE;
 
@@ -612,6 +613,7 @@ class State extends ReadyResource {
             [OperationType.TX]: this.#handleApplyTxOperation.bind(this),
             [OperationType.TRANSFER]: this.#handleApplyTransferOperation.bind(this),
             [OperationType.SET_EPOCH]: this.#handleApplySetEpochOperation.bind(this),
+            [OperationType.SET_GENESIS_EPOCH]: this.#handleApplySetGenesisEpoch(bind(this))
         };
         return handlers[type] || null;
     }
@@ -4049,6 +4051,107 @@ class State extends ReadyResource {
         };
     }
 
+    async #handleApplySetGenesisEpoch(op, view, base, node, batch) {
+
+        if (!this.#stateValidationSchema.validateSetGenesisEpochOperation(op)) {
+            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Contract schema validation failed.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        // Extract and validate the requester address (admin)
+        const requesterAddressBuffer = op.address;
+        const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer, this.#config.addressPrefix);
+        if (requesterAddressString === null) {
+            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Requester address is invalid.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        // Validate requester public key
+        const requesterPublicKey = tracCryptoApi.address.decodeSafe(requesterAddressString);
+        if (b4a.equals(requesterPublicKey, NULL_BUFFER)) {
+            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Failed to decode requester public key.", node.from.key)
+            return Status.FAILURE;
+        }
+        // ensure that an admin invoked this operation
+        const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
+        if (adminEntry === null) {
+            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Invalid admin entry.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        const decodedAdminEntry = adminEntryUtils.decode(adminEntry, this.#config.addressPrefix);
+        if (decodedAdminEntry === null) {
+            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Failed to decode admin entry.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        if (!this.#isAdminApply(decodedAdminEntry, node)) {
+            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Node is not allowed to perform this operation. (ADMIN ONLY)", node.from.key)
+            return Status.FAILURE;
+        }
+
+        // Extract admin public key
+        const adminPublicKey = tracCryptoApi.address.decodeSafe(decodedAdminEntry.address);
+        if (b4a.equals(adminPublicKey, NULL_BUFFER)) {
+            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Failed to decode admin public key.", node.from.key)
+            return Status.FAILURE;
+        }
+        // Admin consistency check
+        if (!b4a.equals(adminPublicKey, requesterPublicKey)) {
+            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "System admin and node public keys do not match.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        // verify requester signature
+        const message = createMessage(
+            this.#config.networkId,
+            op.sgo.txv,
+            op.sgo.df,
+            op.sgo.db,
+            op.sgo.in,
+            OperationType.SET_GENESIS_EPOCH
+        );
+
+        if (message.length === 0) {
+            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Invalid requester message.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        const hash = await tracCryptoApi.hash.blake3Safe(message);
+        if (!b4a.equals(hash, op.sgo.tx)) {
+            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Message hash does not match the tx_hash.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        // verify signature
+        const isMessageVerifed = tracCryptoApi.signature.verify(op.sgo.is, op.sgo.tx, adminPublicKey)
+        const txHashHexString = op.sgo.tx.toString('hex');
+
+        if (!isMessageVerifed) {
+            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Failed to verify message signature.", node.from.key)
+            return Status.FAILURE;
+        }
+
+
+
+        // verify tx validity - prevent deferred execution attack
+        // anti-replay attack
+
+        // check if CurrentEpoch have been initialized if yes -failure
+        // check if Epoch have been initialized if yes - failure
+        // check if EpochHash have been initialized if yes - failure
+        // check if VDF params have been initialized if yes - failure
+
+        // extract diff and dbs in this case we should check if this is not less than 0 and not higer than 4/2 bytes
+        // initialize CurrentEpoch field
+        // initialize Epoch Field
+        // initialize EpochHash Field
+        // initialize VDFParams
+        // Put txHashHexString into the state to avoid replay attack
+
+        return Status.SUCCESS;
+
+    }
 }
 
 export default State;
