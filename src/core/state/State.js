@@ -129,7 +129,7 @@ class State extends ReadyResource {
             EventType.WRITABLE,
             EventType.UNWRITABLE
         ].forEach(event => {
-            this.#base.removeListener(event)
+            this.#base.removeAllListeners(event)
         })
     }
 
