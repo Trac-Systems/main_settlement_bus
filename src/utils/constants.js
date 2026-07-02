@@ -148,6 +148,12 @@ export const CustomEventType = Object.freeze({
     UNWRITABLE: 'msb:unwritable',
     IS_NON_INDEXER: 'msb:is-non-indexer',
     EPOCH_PROPOSAL_SUBMITTED: 'msb:epoch_proposal_submitted',
+    EPOCH_PROPOSAL_RECEIVED: 'msb:epoch_proposal_received',
+    EPOCH_PROPOSAL_VALIDATION_SUCCESS: 'msb:epoch_proposal_validation_success',
+    EPOCH_PROPOSAL_VALIDATION_FAILURE: 'msb:epoch_proposal_validation_failure',
+    EPOCH_PROPOSAL_APPROVAL_RECEIVED: 'msb:epoch_proposal_approval_received',
+    EPOCH_PROPOSAL_APPROVAL_SUCCESS: 'msb:epoch_proposal_approval_success',
+    EPOCH_PROPOSAL_APPROVAL_FAILURE: 'msb:epoch_proposal_approval_failure',
     EPOCH_CREATED: 'msb:epoch_created'
 });
 

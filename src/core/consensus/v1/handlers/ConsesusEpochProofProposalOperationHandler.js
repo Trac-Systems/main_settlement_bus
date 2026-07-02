@@ -1,28 +1,22 @@
 import V1EpochProofProposalRequest from "../validators/V1EpochProofProposalRequest.js";
 import V1EpochProofProposalApproval from "../validators/V1EpochProofProposalApproval.js";
 import { getResultCode } from "../V1ConsensusProtocolError.js"
-import { ConsensusResultCode } from "../../../../utils/constants.js";
+import { ConsensusResultCode, CustomEventType } from "../../../../utils/constants.js";
 import { consensusMessageFactory } from "../../../../messages/consensus/v1/consensusMessageFactory.js";
 import { bufferToAddress } from "../../../state/utils/address.js"
 import ConnectionOperationHandler from "../../../network/protocols/shared/ConnectionOperationHandler.js";
-import ConsensusEpochProofProposalEventHandler from "./ConsensusEpochProofProposalEventHandler.js";
 
-// Responsibilities:
-// Validate -> close connections -> emit events to notify system-> send responses 
 
 class ConsensusEpochProofProposalOperationHandler extends ConnectionOperationHandler {
     #proofProposalRequestValidator;
     #proofProposalApprovalValidator;
     #wallet;
-    // eslint-disable-next-line no-unused-private-class-members
     #state;
-    #eventHandler;
 
     constructor(state, wallet, config) {
         super(config)
         this.#state = state;
         this.#wallet = wallet;
-        this.#eventHandler = new ConsensusEpochProofProposalEventHandler(config);
         this.#proofProposalRequestValidator = new V1EpochProofProposalRequest(config);
         this.#proofProposalApprovalValidator = new V1EpochProofProposalApproval(config);
     }
@@ -35,7 +29,7 @@ class ConsensusEpochProofProposalOperationHandler extends ConnectionOperationHan
      */
     async handleRequest(message, connection) {
         const eventContext = this.#buildRequestEventContext(message, connection);
-        await this.#eventHandler.onEpochProposalReceived(eventContext);
+        this.#emitEvent(CustomEventType.EPOCH_PROPOSAL_RECEIVED, eventContext);
 
         let resultCode = ConsensusResultCode.OK;
         let validationError;
@@ -43,7 +37,7 @@ class ConsensusEpochProofProposalOperationHandler extends ConnectionOperationHan
         try {
             await this.#proofProposalRequestValidator.validate(message, connection);
             proofProposal = message.proof_proposal;
-            await this.#eventHandler.onEpochProposalValidationSuccess({
+            this.#emitEvent(CustomEventType.EPOCH_PROPOSAL_VALIDATION_SUCCESS, {
                 ...eventContext,
                 resultCode,
                 proofProposal
@@ -51,8 +45,8 @@ class ConsensusEpochProofProposalOperationHandler extends ConnectionOperationHan
         } catch (e) {
             validationError = e;
             resultCode = getResultCode(e);
-            // TODO: In the event handler, add condition if INVALID_ADDRESS_ASSERTION, then blacklist specific remote address/pubKey
-            await this.#eventHandler.onEpochProposalValidationFailure({
+            // TODO: If INVALID_ADDRESS_ASSERTION is introduced, blacklist the specific remote address/pubKey.
+            this.#emitEvent(CustomEventType.EPOCH_PROPOSAL_VALIDATION_FAILURE, {
                 ...eventContext,
                 resultCode,
                 error: validationError
@@ -74,7 +68,7 @@ class ConsensusEpochProofProposalOperationHandler extends ConnectionOperationHan
 
     async handleApproval(message, connection, proofProposal) {
         const eventContext = this.#buildApprovalEventContext(message, connection, proofProposal);
-        await this.#eventHandler.onApprovalResponseReceived(eventContext); // NOTE: Maybe not needed. Investigate. For now, this will be only a placeholder
+        this.#emitEvent(CustomEventType.EPOCH_PROPOSAL_APPROVAL_RECEIVED, eventContext); // NOTE: Maybe not needed. Investigate. For now, this will be only a placeholder
 
         let resultCode = ConsensusResultCode.OK;
         let approval;
@@ -83,7 +77,7 @@ class ConsensusEpochProofProposalOperationHandler extends ConnectionOperationHan
             approval = message.proof_proposal_response.approval;
         } catch (e) {
             resultCode = getResultCode(e);
-            await this.#eventHandler.onApprovalResponseFailure({
+            this.#emitEvent(CustomEventType.EPOCH_PROPOSAL_APPROVAL_FAILURE, {
                 ...eventContext,
                 resultCode,
                 error: e
@@ -91,7 +85,7 @@ class ConsensusEpochProofProposalOperationHandler extends ConnectionOperationHan
             return { resultCode };
         }
 
-        await this.#eventHandler.onApprovalResponseSuccess({
+        this.#emitEvent(CustomEventType.EPOCH_PROPOSAL_APPROVAL_SUCCESS, {
             ...eventContext,
             resultCode,
             approval
@@ -121,6 +115,14 @@ class ConsensusEpochProofProposalOperationHandler extends ConnectionOperationHan
             remotePublicKey,
             proofProposal
         };
+    }
+
+    #emitEvent(eventName, context) {
+        try {
+            this.#state.emit(eventName, context);
+        } catch (error) {
+            this.displayError(`failed to emit ${eventName}`, context?.remotePublicKey, error);
+        }
     }
 
     async #buildProofProposalApproval(sessionId, proofProposal, resultCode) {

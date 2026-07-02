@@ -1,9 +1,9 @@
 import test from 'brittle';
 import b4a from 'b4a';
+import EventEmitter from 'bare-events';
 import { WalletProvider } from 'trac-wallet';
 
 import ConsensusEpochProofProposalOperationHandler from '../../../src/core/consensus/v1/handlers/ConsesusEpochProofProposalOperationHandler.js';
-import ConsensusEpochProofProposalEventHandler from '../../../src/core/consensus/v1/handlers/ConsensusEpochProofProposalEventHandler.js';
 import V1EpochProofProposalRequest from '../../../src/core/consensus/v1/validators/V1EpochProofProposalRequest.js';
 import V1EpochProofProposalApproval from '../../../src/core/consensus/v1/validators/V1EpochProofProposalApproval.js';
 import { V1ConsensusProtocolError } from '../../../src/core/consensus/v1/V1ConsensusProtocolError.js';
@@ -12,6 +12,7 @@ import { config } from '../../helpers/config.js';
 import { testKeyPair2 } from '../../fixtures/apply.fixtures.js';
 import { addressToBuffer } from '../../../src/core/state/utils/address.js';
 import {
+    CustomEventType,
     ConsensusOperationType,
     ConsensusResultCode
 } from '../../../src/utils/constants.js';
@@ -22,29 +23,18 @@ import {
 
 const originalRequestValidate = V1EpochProofProposalRequest.prototype.validate;
 const originalApprovalValidate = V1EpochProofProposalApproval.prototype.validate;
-const eventMethodNames = [
-    'onEpochProposalReceived',
-    'onEpochProposalValidationSuccess',
-    'onEpochProposalValidationFailure',
-    'onApprovalResponseReceived',
-    'onApprovalResponseSuccess',
-    'onApprovalResponseFailure',
-    'onApprovalResponseWithoutPendingRequest'
+const consensusEventNames = [
+    [CustomEventType.EPOCH_PROPOSAL_RECEIVED, 'onEpochProposalReceived'],
+    [CustomEventType.EPOCH_PROPOSAL_VALIDATION_SUCCESS, 'onEpochProposalValidationSuccess'],
+    [CustomEventType.EPOCH_PROPOSAL_VALIDATION_FAILURE, 'onEpochProposalValidationFailure'],
+    [CustomEventType.EPOCH_PROPOSAL_APPROVAL_RECEIVED, 'onApprovalResponseReceived'],
+    [CustomEventType.EPOCH_PROPOSAL_APPROVAL_SUCCESS, 'onApprovalResponseSuccess'],
+    [CustomEventType.EPOCH_PROPOSAL_APPROVAL_FAILURE, 'onApprovalResponseFailure']
 ];
-const originalEventMethods = new Map(
-    eventMethodNames.map(name => [
-        name,
-        ConsensusEpochProofProposalEventHandler.prototype[name]
-    ])
-);
 
 function restorePatches() {
     V1EpochProofProposalRequest.prototype.validate = originalRequestValidate;
     V1EpochProofProposalApproval.prototype.validate = originalApprovalValidate;
-
-    for (const [name, method] of originalEventMethods.entries()) {
-        ConsensusEpochProofProposalEventHandler.prototype[name] = method;
-    }
 }
 
 async function createWallet(keyPair = testKeyPair2) {
@@ -102,17 +92,20 @@ function setupHandler(t, calls, options = {}) {
     restorePatches();
     t.teardown(restorePatches);
 
-    for (const name of eventMethodNames) {
-        ConsensusEpochProofProposalEventHandler.prototype[name] = async context => {
+    const state = options.state ?? new EventEmitter();
+    for (const [eventName, name] of consensusEventNames) {
+        const listener = context => {
             calls.push({ name, context });
         };
+        state.on(eventName, listener);
+        t.teardown(() => state.off(eventName, listener));
     }
 
     V1EpochProofProposalRequest.prototype.validate = options.requestValidate ?? (async () => true);
     V1EpochProofProposalApproval.prototype.validate = options.approvalValidate ?? (async () => true);
 
     return new ConsensusEpochProofProposalOperationHandler(
-        options.state ?? {},
+        state,
         options.wallet ?? {},
         options.config ?? config
     );
