@@ -22,10 +22,15 @@ import {
 } from "./utils/normalizers.js";
 import fileUtils from './utils/fileUtils.js';
 import migrationUtils from './utils/migrationUtils.js';
-import {safeDecodeApplyOperation, safeEncodeApplyOperation} from "./codecs/apply/applyOperationCodec.js";
+import {
+    encodeApplyOperation,
+    safeDecodeApplyOperation,
+    safeEncodeApplyOperation
+} from "./codecs/apply/applyOperationCodec.js";
 import PartialTransactionValidator from "./core/network/protocols/shared/validators/PartialTransactionValidator.js";
 import PartialTransferValidator from "./core/network/protocols/shared/validators/PartialTransferValidator.js";
 import { BroadcastError, ValidationError } from "./utils/errors.js";
+import { uint16ToBuffer, uint32ToBuffer } from "./utils/buffer.js";
 
 export class MainSettlementBus extends ReadyResource {
     #store;
@@ -211,7 +216,7 @@ export class MainSettlementBus extends ReadyResource {
         return { payload, decoded }
     }
 
-    handleGetFee() {        
+    handleGetFee() {
         const fee = this.#state.getFee();
         return bufferToBigInt(fee);
     }
@@ -251,7 +256,7 @@ export class MainSettlementBus extends ReadyResource {
             let dagSystem = await this.#state.base.system.core.treeHash();
             let lengthdagSystem = this.#state.base.system.core.length;
             const wl = await this.#state.getWriterLength();
-            
+
             console.log("---------- node & network stats ----------");
             console.log("wallet.publicKey:", this.#wallet?.publicKey?.toString("hex") ?? "unset");
             console.log("wallet.address:", this.#wallet?.address ?? "unset");
@@ -286,6 +291,7 @@ export class MainSettlementBus extends ReadyResource {
             console.log("- /add_indexer <address>: Change a role of the selected writer node to indexer role. Charges a fee.");
             console.log("- /remove_indexer <address>: Change a role of the selected indexer node to default role. Charges a fee.");
             console.log("- /ban_writer <address>: Demote a whitelisted writer to default role and remove it from the whitelist. Charges a fee.");
+            console.log("- /init_genesis: Initialize genesis epoch.");
         }
         console.log("Available commands:");
         console.log("- /add_writer: Add yourself as a validator to this MSB once whitelisted. Requires a fee + 10x the fee as a stake in $TNK.");
@@ -1052,6 +1058,56 @@ export class MainSettlementBus extends ReadyResource {
             )
         console.log('Disabling initialization...');
         const encodedPayload = safeEncodeApplyOperation(payload);
+        await this.#state.append(encodedPayload);
+    }
+
+    async handleEpochGenesisInitialization(params) {
+        if (!this.#config.enableWallet) {
+            throw new Error("Can not initialize genesis epoch - wallet is not enabled.");
+        }
+
+        const adminEntry = await this.#state.getAdminEntry();
+
+        if (!adminEntry) {
+            throw new Error(
+                "Can not initialize genesis epoch - admin has not been initialized."
+            );
+        }
+        if (!this.#wallet) {
+            throw new Error("Can not initialize genesis epoch - wallet is not initialized.");
+        }
+        if (!this.isAdmin(adminEntry)) {
+            throw new Error("Can not initialize genesis epoch - you are not the admin.");
+        }
+
+        const existingVDFParams = await this.#state.getSignedVDFParams();
+        if (existingVDFParams) {
+            throw new Error("Can not initialize genesis epoch - VDF parameters already exist.");
+        }
+
+        const { vdfDifficulty, vdfDiscriminantSize } = params;
+        const difficultyNumber = Number(vdfDifficulty);
+        const discriminantNumber = Number(vdfDiscriminantSize);
+
+        if (!Number.isInteger(difficultyNumber) || difficultyNumber <= 0) {
+            throw new Error("VDF difficulty must be a positive unsigned 32-bit integer.");
+        }
+        if (!Number.isInteger(discriminantNumber) || discriminantNumber <= 0) {
+            throw new Error("VDF discriminant size must be a positive unsigned 16-bit integer.");
+        }
+
+        const vdfDifficultyBuffer = uint32ToBuffer(difficultyNumber, "VDF difficulty");
+        const vdfDiscriminantSizeBuffer = uint16ToBuffer(discriminantNumber, "VDF discriminant size");
+
+        const txValidity = await this.#state.getIndexerSequenceState();
+        const payload = await applyStateMessageFactory(this.#wallet, this.#config)
+            .buildCompleteSetGenesisEpochMessage(
+                this.#wallet.address,
+                txValidity,
+                vdfDifficultyBuffer,
+                vdfDiscriminantSizeBuffer,
+            )
+        const encodedPayload = encodeApplyOperation(payload);
         await this.#state.append(encodedPayload);
     }
 }

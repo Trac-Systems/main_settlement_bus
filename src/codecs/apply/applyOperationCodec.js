@@ -24,7 +24,7 @@ const normalizeDecodedApplyOperation = operation => {
     return operation;
 }
 
-const encodeApplyOperation = (payload) => {
+export const encodeApplyOperation = (payload) => {
     const error = Operation.verify(payload);
     if (error) throw new Error(error);
     return b4a.from(Operation.encode(payload).finish());

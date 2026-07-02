@@ -249,13 +249,15 @@ test('rejectPendingRequestsForPeer rejects all requests for a peer', async t => 
     const pA1 = service.registerPendingRequest(validPeerA, msgA1);
     const pA2 = service.registerPendingRequest(validPeerA, msgA2);
     const pB = service.registerPendingRequest(validPeerB, msgB);
+    const pA1Rejected = t.exception(async () => pA1, /peer gone/);
+    const pA2Rejected = t.exception(async () => pA2, /peer gone/);
 
     const count = service.rejectPendingRequestsForPeer(validPeerA, new Error('peer gone'));
     t.is(count, 2, 'rejected 2 requests for peerA');
     t.ok(service.has(msgB.session_id), 'peerB request untouched');
 
-    await t.exception(async () => pA1, /peer gone/);
-    await t.exception(async () => pA2, /peer gone/);
+    await pA1Rejected;
+    await pA2Rejected;
 
     service.resolvePendingRequest(msgB.session_id);
     await pB;
@@ -297,11 +299,13 @@ test('close rejects all pending requests', async t => {
 
     const p1 = service.registerPendingRequest(validPeerA, msg1);
     const p2 = service.registerPendingRequest(validPeerB, msg2);
+    const p1Rejected = t.exception(async () => p1, /cancelled \(shutdown\)/);
+    const p2Rejected = t.exception(async () => p2, /cancelled \(shutdown\)/);
 
     service.close();
 
-    await t.exception(async () => p1, /cancelled \(shutdown\)/);
-    await t.exception(async () => p2, /cancelled \(shutdown\)/);
+    await p1Rejected;
+    await p2Rejected;
 
     t.absent(service.has(msg1.session_id), 'all entries cleared');
     t.absent(service.has(msg2.session_id), 'all entries cleared');

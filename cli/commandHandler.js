@@ -37,7 +37,8 @@ export const COMMANDS = {
     UNCONFIRMED_LENGTH: "/unconfirmed_length",
     GET_TXS_HASHES: "/get_txs_hashes",
     GET_TX_DETAILS: "/get_tx_details",
-    GET_EXTENDED_TX_DETAILS: "/get_extended_tx_details"
+    GET_EXTENDED_TX_DETAILS: "/get_extended_tx_details",
+    EPOCH_GENESIS_INITIALIZATION: "/init_genesis"
 };
 
 export class CommandHandler {
@@ -46,6 +47,7 @@ export class CommandHandler {
     #wallet;
     #handlers;
     #pendingConfirmation = null;
+    #pendingGenesisInitialization = null;
 
     constructor({ config, msb, handleClose, wallet }) {
         this.#msb = msb;
@@ -57,6 +59,10 @@ export class CommandHandler {
     async handle(input) {
         if (this.#pendingConfirmation !== null) {
             return this.#handlePendingConfirmation(input);
+        }
+
+        if (this.#pendingGenesisInitialization !== null) {
+            return this.#handlePendingGenesisInitialization(input);
         }
 
         const [command, ...parts] = input.split(" ");
@@ -220,6 +226,10 @@ export class CommandHandler {
             {
                 evaluate: ({ input }) => input.startsWith(COMMANDS.GET_EXTENDED_TX_DETAILS),
                 process: async ({ parts }) => this.#handlers.handleExtendedTxDetails(parts[0], parts[1] === "true")
+            },
+            {
+                evaluate: ({ input }) => input.startsWith(COMMANDS.EPOCH_GENESIS_INITIALIZATION),
+                process: async () => this.#queueEpochGenesisInitialization()
             }
         ];
     }
@@ -237,7 +247,8 @@ export class CommandHandler {
                 const errorMessage = typeof error === "object" && error !== null && "message" in error
                     ? error.message
                     : `${error}`;
-                console.error(`Transaction submission failed: ${errorMessage}`);
+                const failureMessage = pendingConfirmation.failureMessage || "Transaction submission failed";
+                console.error(`${failureMessage}: ${errorMessage}`);
                 console.log("Try again or use /help.");
             }
 
@@ -249,7 +260,7 @@ export class CommandHandler {
             return pendingConfirmation.onDecline();
         }
 
-        console.log('Invalid input. Please answer "y" or "n".');
+        console.log(pendingConfirmation.invalidMessage || 'Invalid input. Please answer "y" or "n".');
         console.log(pendingConfirmation.prompt);
     }
 
@@ -273,5 +284,89 @@ export class CommandHandler {
         };
 
         console.log(this.#pendingConfirmation.prompt);
+    }
+
+    #queueEpochGenesisInitialization() {
+        this.#pendingGenesisInitialization = {
+            step: "difficulty"
+        };
+
+        console.log(this.#getGenesisDifficultyPrompt());
+    }
+
+    #handlePendingGenesisInitialization(input) {
+        const pendingGenesisInitialization = this.#pendingGenesisInitialization;
+
+        if (pendingGenesisInitialization.step === "difficulty") {
+            const difficulty = this.#parseGenesisEpochInteger(input);
+            if (!difficulty) {
+                console.log("Invalid difficulty. Please enter a positive integer (example 55_000_000).");
+                console.log(this.#getGenesisDifficultyPrompt());
+                return;
+            }
+
+            pendingGenesisInitialization.difficulty = difficulty;
+            pendingGenesisInitialization.step = "discriminantBitSize";
+            console.log(this.#getGenesisDiscriminantBitSizePrompt());
+            return;
+        }
+
+        const discriminantBitSize = this.#parseGenesisEpochInteger(input);
+        if (!discriminantBitSize) {
+            console.log("Invalid discriminant bit size. Please enter a positive integer (example 2048).");
+            console.log(this.#getGenesisDiscriminantBitSizePrompt());
+            return;
+        }
+
+        const difficulty = pendingGenesisInitialization.difficulty;
+        this.#pendingGenesisInitialization = null;
+
+        return this.#queueEpochGenesisConfirmation({
+            difficulty,
+            discriminantBitSize
+        });
+    }
+
+    #queueEpochGenesisConfirmation({ difficulty, discriminantBitSize }) {
+        const params = {
+            vdfDifficulty: difficulty.value,
+            vdfDiscriminantSize: discriminantBitSize.value
+        };
+
+        console.info("Genesis Epoch Initialization Parameters:");
+        console.info(`VDF difficulty: ${difficulty.display}`);
+        console.info(`VDF discriminant bit size: ${discriminantBitSize.display}`);
+
+        this.#pendingConfirmation = {
+            prompt: "Do you want to proceed? (yes/no)",
+            invalidMessage: 'Invalid input. Please answer "yes" or "no".',
+            failureMessage: "Genesis epoch initialization failed",
+            onConfirm: async () => this.#handlers.handleEpochGenesisInitialization(params),
+            onDecline: async () => console.log("Genesis epoch initialization cancelled.")
+        };
+
+        console.log(this.#pendingConfirmation.prompt);
+    }
+
+    #parseGenesisEpochInteger(input) {
+        const display = input.trim();
+        if (!/^[0-9]+(?:_[0-9]+)*$/.test(display)) {
+            return null;
+        }
+
+        const value = display.replaceAll("_", "");
+        if (BigInt(value) <= 0n) {
+            return null;
+        }
+
+        return { display, value };
+    }
+
+    #getGenesisDifficultyPrompt() {
+        return "Set VDF difficulty (example 55_000_000):";
+    }
+
+    #getGenesisDiscriminantBitSizePrompt() {
+        return "Set VDF discriminant bit size (example 2048):";
     }
 }

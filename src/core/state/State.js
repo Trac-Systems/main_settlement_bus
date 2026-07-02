@@ -15,6 +15,8 @@ import {
     TRAC_NAMESPACE,
     EventType,
     CustomEventType,
+    VDF_DIFFICULTY_SIZE,
+    VDF_DISCRIMINANT_SIZE,
 } from '../../utils/constants.js';
 import { isHexString, sleep, isTransactionRecordPut } from '../../utils/helpers.js';
 import tracCryptoApi from 'trac-crypto-api';
@@ -515,6 +517,24 @@ class State extends ReadyResource {
             valueEncoding: HYPERBEE_VALUE_ENCODING,
         })
         return this.#bee;
+    }
+
+    async getSignedVDFParams() {
+        const vdfParamsBuffer = await this.getSigned(keys.VDF_PARAMS);
+        if (!vdfParamsBuffer) return null;
+
+        const expectedLength = VDF_DIFFICULTY_SIZE + VDF_DISCRIMINANT_SIZE;
+        if (!b4a.isBuffer(vdfParamsBuffer)) {
+            throw new Error("Invalid VDF params value: expected a buffer.");
+        }
+        if (vdfParamsBuffer.length !== expectedLength) {
+            throw new Error(`Invalid VDF params length: expected ${expectedLength}, got ${vdfParamsBuffer.length}.`);
+        }
+
+        return {
+            vdfDifficulty: vdfParamsBuffer.readUInt32BE(0),
+            vdfDiscriminantSize: vdfParamsBuffer.readUInt16BE(VDF_DIFFICULTY_SIZE),
+        };
     }
 
     // ATTENTION: DO NOT USE METHODS ABOVE IN APPLY PART!
