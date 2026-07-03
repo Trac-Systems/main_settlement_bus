@@ -207,7 +207,7 @@ test('V1EpochProofProposalRequest accepts proposer address matching remote publi
     const validator = new V1EpochProofProposalRequest(vdfTestConfig);
     const proposer = addressToBuffer(wallet.address, vdfTestConfig.addressPrefix);
 
-    validator.assertAddressWithRemotePublicKey(proposer, wallet.publicKey, 'Proposer');
+    validator.assertAddressWithRemotePublicKey(proposer, wallet.publicKey);
 
     t.pass();
 });
@@ -219,8 +219,8 @@ test('V1EpochProofProposalRequest rejects proposer address mismatched with remot
     const proposer = addressToBuffer(wallet.address, vdfTestConfig.addressPrefix);
 
     t.exception(
-        () => validator.assertAddressWithRemotePublicKey(proposer, otherWallet.publicKey, 'Proposer'),
-        errorMessageIncludes('Proposer address does not match remote public key')
+        () => validator.assertAddressWithRemotePublicKey(proposer, otherWallet.publicKey),
+        errorMessageIncludes('Address does not match remote public key')
     );
 });
 
@@ -230,12 +230,12 @@ test('V1EpochProofProposalRequest rejects invalid proposer address as protocol e
     const invalidProposer = b4a.alloc(vdfTestConfig.addressLength, 1);
 
     try {
-        validator.assertAddressWithRemotePublicKey(invalidProposer, wallet.publicKey, 'Proposer');
+        validator.assertAddressWithRemotePublicKey(invalidProposer, wallet.publicKey);
         t.fail('should throw');
     } catch (error) {
         t.ok(error instanceof V1ConsensusProtocolError);
         t.is(error.resultCode, ConsensusResultCode.UNEXPECTED_ERROR);
-        t.ok(error.message.includes('Proposer address is invalid'));
+        t.ok(error.message.includes('Address is invalid'));
     }
 });
 

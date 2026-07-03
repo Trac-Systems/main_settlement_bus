@@ -112,29 +112,36 @@ test('ConsensusMessageBuilder iterates proof proposal response ResultCode values
         const payload = builder.getResult();
         t.is(payload.type, ConsensusOperationType.PROOF_PROPOSAL_APPROVAL);
         t.is(payload.proof_proposal_response.result, code);
-        t.alike(payload.proof_proposal_response.approval.approver, proofProposalFixture.proposer);
-        t.ok(b4a.isBuffer(payload.proof_proposal_response.approval.approval_sig));
         t.ok(b4a.isBuffer(payload.proof_proposal_response.response_sig));
 
-        const approvalMessage = createMessage(
-            proofProposalFixture.protocol_version,
-            proofProposalFixture.network_id,
-            proofProposalFixture.epoch,
-            proofProposalFixture.previous_epoch_record_hash,
-            proofProposalFixture.proposer,
-            proofProposalFixture.vdf_parameters_hash,
-            proofProposalFixture.vdf_proof,
-            payload.proof_proposal_response.approval.approver,
-            proofProposalFixture.signature
-        );
-        const approvalHash = await tracCryptoApi.hash.blake3(approvalMessage);
-        t.ok(wallet.verify(
-            payload.proof_proposal_response.approval.approval_sig,
-            approvalHash,
-            wallet.publicKey
-        ));
+        if (code === ConsensusResultCode.OK) {
+            t.alike(payload.proof_proposal_response.approval.approver, proofProposalFixture.proposer);
+            t.ok(b4a.isBuffer(payload.proof_proposal_response.approval.approval_sig));
 
-        const encodedApproval = encodeProofProposalApproval(payload.proof_proposal_response.approval);
+            const approvalMessage = createMessage(
+                proofProposalFixture.protocol_version,
+                proofProposalFixture.network_id,
+                proofProposalFixture.epoch,
+                proofProposalFixture.previous_epoch_record_hash,
+                proofProposalFixture.proposer,
+                proofProposalFixture.vdf_parameters_hash,
+                proofProposalFixture.vdf_proof,
+                payload.proof_proposal_response.approval.approver,
+                proofProposalFixture.signature
+            );
+            const approvalHash = await tracCryptoApi.hash.blake3(approvalMessage);
+            t.ok(wallet.verify(
+                payload.proof_proposal_response.approval.approval_sig,
+                approvalHash,
+                wallet.publicKey
+            ));
+        } else {
+            t.absent(payload.proof_proposal_response.approval);
+        }
+
+        const encodedApproval = payload.proof_proposal_response.approval
+            ? encodeProofProposalApproval(payload.proof_proposal_response.approval)
+            : b4a.alloc(0);
         const responseMessage = createMessage(
             safeWriteUInt32BE(code, 0),
             encodedApproval
@@ -144,7 +151,11 @@ test('ConsensusMessageBuilder iterates proof proposal response ResultCode values
 
         const decoded = decodeConsensusMessage(encodeConsensusMessage(payload));
         t.is(decoded.proof_proposal_response.result, code);
-        t.alike(decoded.proof_proposal_response.approval, payload.proof_proposal_response.approval);
+        if (code === ConsensusResultCode.OK) {
+            t.alike(decoded.proof_proposal_response.approval, payload.proof_proposal_response.approval);
+        } else {
+            t.absent(decoded.proof_proposal_response.approval);
+        }
     }
 });
 

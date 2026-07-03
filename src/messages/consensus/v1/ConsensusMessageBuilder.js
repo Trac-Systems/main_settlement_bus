@@ -183,69 +183,136 @@ class ConsensusMessageBuilder {
         return this;
     }
 
-    async #buildProofProposalPayload() {
-        const message = createMessage(
-            this.#validateBuffer(this.#protocol_version, 'Protocol version'),
-            this.#validateBuffer(this.#network_id, 'Network id'),
-            this.#validateBuffer(this.#epoch, 'Epoch'),
-            this.#validateBuffer(this.#previous_epoch_record_hash, 'Previous epoch record hash'),
-            this.#validateBuffer(this.#proposer, 'Proposer'),
-            this.#validateBuffer(this.#vdf_parameters_hash, 'VDF parameters hash'),
-            this.#validateBuffer(this.#vdf_proof, 'VDF proof')
-        );
-        const hash = await tracCryptoApi.hash.blake3(message);
-        const signature = this.#wallet.sign(hash);
-        this.#payloadKey = 'proof_proposal';
-        this.#body = {
-            protocol_version: this.#protocol_version,
-            network_id: this.#network_id,
-            epoch: this.#epoch,
-            previous_epoch_record_hash: this.#previous_epoch_record_hash,
-            proposer: this.#proposer,
-            vdf_parameters_hash: this.#vdf_parameters_hash,
-            vdf_proof: this.#vdf_proof,
-            signature: signature
+    #buildUnsignedProofProposal() {
+        return {
+            protocol_version: this.#validateBuffer(this.#protocol_version, 'Protocol version'),
+            network_id: this.#validateBuffer(this.#network_id, 'Network id'),
+            epoch: this.#validateBuffer(this.#epoch, 'Epoch'),
+            previous_epoch_record_hash: this.#validateBuffer(this.#previous_epoch_record_hash, 'Previous epoch record hash'),
+            proposer: this.#validateBuffer(this.#proposer, 'Proposer'),
+            vdf_parameters_hash: this.#validateBuffer(this.#vdf_parameters_hash, 'VDF parameters hash'),
+            vdf_proof: this.#validateBuffer(this.#vdf_proof, 'VDF proof')
         };
     }
 
-    async #buildProofProposalResponsePayload() {
+    #getResultCode() {
         if (this.#resultCode === undefined) {
             throw new Error('Result code must be set before build.');
         }
 
-        const messageApproval = createMessage(
-            this.#validateBuffer(this.#protocol_version, 'Protocol version'),
-            this.#validateBuffer(this.#network_id, 'Network id'),
-            this.#validateBuffer(this.#epoch, 'Epoch'),
-            this.#validateBuffer(this.#previous_epoch_record_hash, 'Previous epoch record hash'),
-            this.#validateBuffer(this.#proposer, 'Proposer'),
-            this.#validateBuffer(this.#vdf_parameters_hash, 'VDF parameters hash'),
-            this.#validateBuffer(this.#vdf_proof, 'VDF proof'),
-            this.#validateBuffer(this.#approver, 'Approver'),
-            this.#validateBuffer(this.#requester_proof_signature, 'Requester proof signature')
-        );
-        const hashApproval = await tracCryptoApi.hash.blake3(messageApproval);
-        const signatureApproval = this.#wallet.sign(hashApproval);
+        return this.#resultCode;
+    }
 
-        const proofProposalApproval = {
-            approver: this.#approver,
-            approval_sig: signatureApproval,
+    #getApprover() {
+        return this.#validateBuffer(this.#approver, 'Approver');
+    }
+
+    #getRequesterProofSignature() {
+        return this.#validateBuffer(
+            this.#requester_proof_signature,
+            'Requester proof signature'
+        );
+    }
+
+    async #hashProofProposal(proofProposal) {
+        return await tracCryptoApi.hash.blake3(createMessage(
+            proofProposal.protocol_version,
+            proofProposal.network_id,
+            proofProposal.epoch,
+            proofProposal.previous_epoch_record_hash,
+            proofProposal.proposer,
+            proofProposal.vdf_parameters_hash,
+            proofProposal.vdf_proof
+        ));
+    }
+
+    async #hashProofProposalApproval(proofProposal, approver, requesterProofSignature) {
+        return await tracCryptoApi.hash.blake3(createMessage(
+            proofProposal.protocol_version,
+            proofProposal.network_id,
+            proofProposal.epoch,
+            proofProposal.previous_epoch_record_hash,
+            proofProposal.proposer,
+            proofProposal.vdf_parameters_hash,
+            proofProposal.vdf_proof,
+            approver,
+            requesterProofSignature
+        ));
+    }
+
+    async #hashProofProposalResponse(resultCode, proofProposalApproval) {
+        const resultCodeBuffer = safeWriteUInt32BE(resultCode, 0);
+        const message = proofProposalApproval
+            ? createMessage(resultCodeBuffer, encodeProofProposalApproval(proofProposalApproval))
+            : createMessage(resultCodeBuffer);
+
+        return await tracCryptoApi.hash.blake3(message);
+    }
+
+    async #signProofProposal(proofProposal) {
+        return this.#wallet.sign(await this.#hashProofProposal(proofProposal));
+    }
+
+    async #buildProofProposalApproval(proofProposal, approver, requesterProofSignature) {
+        const hashApproval = await this.#hashProofProposalApproval(
+            proofProposal,
+            approver,
+            requesterProofSignature
+        );
+
+        return {
+            approver,
+            approval_sig: this.#wallet.sign(hashApproval),
         };
+    }
 
-        const encodedApproval = encodeProofProposalApproval(proofProposalApproval);
-        const responseMessage = createMessage(
-            safeWriteUInt32BE(this.#resultCode, 0),
-            encodedApproval
+    async #signProofProposalResponse(resultCode, proofProposalApproval) {
+        return this.#wallet.sign(
+            await this.#hashProofProposalResponse(resultCode, proofProposalApproval)
         );
-        const responseHash = await tracCryptoApi.hash.blake3(responseMessage);
-        const responseSig = this.#wallet.sign(responseHash);
+    }
 
-        this.#payloadKey = 'proof_proposal_response';
-        this.#body = {
-            result: this.#resultCode,
-            approval: proofProposalApproval,
+    #setPayload(payloadKey, body) {
+        this.#payloadKey = payloadKey;
+        this.#body = body;
+    }
+
+    async #buildProofProposalPayload() {
+        const proofProposal = this.#buildUnsignedProofProposal();
+        const signature = await this.#signProofProposal(proofProposal);
+        this.#setPayload('proof_proposal', {
+            ...proofProposal,
+            signature: signature,
+        });
+    }
+
+    async #buildProofProposalResponsePayload() {
+        const resultCode = this.#getResultCode();
+        let proofProposalApproval = null;
+
+        if (resultCode === ConsensusResultCode.OK) {
+            const proofProposal = this.#buildUnsignedProofProposal();
+            const approver = this.#getApprover();
+            const requesterProofSignature = this.#getRequesterProofSignature();
+            proofProposalApproval = await this.#buildProofProposalApproval(
+                proofProposal,
+                approver,
+                requesterProofSignature
+            );
+        }
+
+        const responseSig = await this.#signProofProposalResponse(resultCode, proofProposalApproval);
+
+        const response = {
+            result: resultCode,
             response_sig: responseSig,
         };
+
+        if (proofProposalApproval) {
+            response.approval = proofProposalApproval;
+        }
+
+        this.#setPayload('proof_proposal_response', response);
     }
 
     async buildPayload() {

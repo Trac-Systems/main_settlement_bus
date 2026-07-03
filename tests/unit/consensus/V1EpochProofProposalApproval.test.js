@@ -1,12 +1,11 @@
 import test from 'brittle';
 import b4a from 'b4a';
-import {WalletProvider} from 'trac-wallet';
 import tracCryptoApi from 'trac-crypto-api';
+import {WalletProvider} from 'trac-wallet';
 
 import ConsensusMessageBuilder from '../../../src/messages/consensus/v1/ConsensusMessageBuilder.js';
 import V1EpochProofProposalApproval from '../../../src/core/consensus/v1/validators/V1EpochProofProposalApproval.js';
 import {bufferToAddress} from '../../../src/core/state/utils/address.js';
-import {createMessage, safeWriteUInt32BE} from '../../../src/utils/buffer.js';
 import {
     ConsensusOperationType,
     ConsensusProtocolVersion,
@@ -16,6 +15,7 @@ import {
 import {config} from '../../helpers/config.js';
 import {testKeyPair1, testKeyPair2, testKeyPair3} from '../../fixtures/apply.fixtures.js';
 import {errorMessageIncludes} from '../../helpers/regexHelper.js';
+import {createMessage, safeWriteUInt32BE} from '../../../src/utils/buffer.js';
 
 const previousEpochRecordHash = b4a.alloc(32, 1);
 const vdfParametersHash = b4a.alloc(32, 2);
@@ -68,8 +68,7 @@ async function buildProofProposalApprovalPayload(approverWallet, proofProposalPa
 }
 
 async function buildProofProposalRejectionPayload(approverWallet, proofProposalPayload, result = ConsensusResultCode.INVALID_PAYLOAD) {
-    const responseMessage = createMessage(safeWriteUInt32BE(result, 0));
-    const responseHash = await tracCryptoApi.hash.blake3(responseMessage);
+    const responseHash = await tracCryptoApi.hash.blake3(createMessage(safeWriteUInt32BE(result, 0)));
 
     return {
         type: ConsensusOperationType.PROOF_PROPOSAL_APPROVAL,
@@ -98,23 +97,24 @@ test('V1EpochProofProposalApproval validates approval signature against original
     t.pass();
 });
 
-test('V1EpochProofProposalApproval validates non-OK response without approval', async t => {
+test('V1EpochProofProposalApproval rejects non-OK response without approval', async t => {
     const proposerWallet = await createWallet(testKeyPair1);
     const approverWallet = await createWallet(testKeyPair2);
     const validator = new V1EpochProofProposalApproval(config);
     const proofProposalPayload = await buildProofProposalPayload(proposerWallet);
     const approvalPayload = await buildProofProposalRejectionPayload(approverWallet, proofProposalPayload);
 
-    await validator.validate(
-        approvalPayload,
-        {remotePublicKey: approverWallet.publicKey},
-        proofProposalPayload.proof_proposal
+    await t.exception(
+        async () => validator.validate(
+            approvalPayload,
+            {remotePublicKey: approverWallet.publicKey},
+            proofProposalPayload.proof_proposal
+        ),
+        errorMessageIncludes(`Proof proposal response result code is not OK: ${ConsensusResultCode.INVALID_PAYLOAD}`)
     );
-
-    t.pass();
 });
 
-test('V1EpochProofProposalApproval rejects fake non-OK response signature without approval', async t => {
+test('V1EpochProofProposalApproval rejects fake non-OK response signature before result code handling', async t => {
     const proposerWallet = await createWallet(testKeyPair1);
     const approverWallet = await createWallet(testKeyPair2);
     const validator = new V1EpochProofProposalApproval(config);
@@ -177,7 +177,7 @@ test('V1EpochProofProposalApproval rejects approver address mismatched with remo
             {remotePublicKey: approverWallet.publicKey},
             proofProposalPayload.proof_proposal
         ),
-        errorMessageIncludes('approver address does not match remote public key')
+        errorMessageIncludes('Address does not match remote public key')
     );
 });
 
@@ -226,9 +226,10 @@ test('V1EpochProofProposalApproval rejects fake response signature', async t => 
     };
 
     await t.exception(
-        async () => validator.validateResponseSignature(
+        async () => validator.validate(
             fakeApprovalPayload,
-            approverWallet.publicKey
+            {remotePublicKey: approverWallet.publicKey},
+            proofProposalPayload.proof_proposal
         ),
         errorMessageIncludes('response signature verification failed')
     );

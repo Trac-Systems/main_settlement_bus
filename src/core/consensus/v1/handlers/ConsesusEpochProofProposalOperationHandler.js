@@ -1,159 +1,178 @@
 import V1EpochProofProposalRequest from "../validators/V1EpochProofProposalRequest.js";
 import V1EpochProofProposalApproval from "../validators/V1EpochProofProposalApproval.js";
-import {networkMessageFactory} from "../../../../messages/network/v1/networkMessageFactory.js";
-import { V1ProtocolError } from "../../../network/protocols/v1/V1ProtocolError.js";
-import { ResultCode } from "../../../../utils/constants.js";
-import b4a from "b4a";
-import tracCryptoApi from "trac-crypto-api";
-import { epochProofFromBuffer } from "./epochProposal/epochProofData.js";
+import { getResultCode } from "../V1ConsensusProtocolError.js"
+import { ConsensusResultCode, CustomEventType } from "../../../../utils/constants.js";
+import { consensusMessageFactory } from "../../../../messages/consensus/v1/consensusMessageFactory.js";
+import { bufferToAddress } from "../../../state/utils/address.js"
+import ConnectionOperationHandler from "../../../network/protocols/shared/ConnectionOperationHandler.js";
 
-// Minion interface to verify & sign proposals
-class ConsensusEpochProofProposalOperationHandler {
-    #v1EpochProofProposalRequestValidator;
-    #v1EpochProofProposalResponseValidator;
-    #state
-    #wallet
+
+class ConsensusEpochProofProposalOperationHandler extends ConnectionOperationHandler {
+    #proofProposalRequestValidator;
+    #proofProposalApprovalValidator;
+    #wallet;
+    #state;
 
     constructor(state, wallet, config) {
+        super(config)
         this.#state = state;
         this.#wallet = wallet;
-        this.#v1EpochProofProposalRequestValidator = new V1EpochProofProposalRequest(config);
-        this.#v1EpochProofProposalResponseValidator = new V1EpochProofProposalApproval(config);
+        this.#proofProposalRequestValidator = new V1EpochProofProposalRequest(config);
+        this.#proofProposalApprovalValidator = new V1EpochProofProposalApproval(config);
     }
 
-    // leader requests approval to minion
+    /**
+     * Handles a leader's consensus v1 epoch proof proposal from the minion side.
+     * @param {object} message Decoded consensus v1 message containing `proof_proposal` and `session_id`.
+     * @param {object} connection Peer connection context used by the request validator.
+     * @returns {Promise<void>} Resolves after sending a signed consensus v1 proof proposal response.
+     */
     async handleRequest(message, connection) {
-        try {
-            this.applyRateLimit(connection);
-            await this.#v1EpochProofProposalRequestValidator.validate(message, connection);
-            await this.#validateDataHash(message.epoch_proof_proposal_request)
-            const lastEpochProof = await this.#state.currentEpoch()
-            const epochProof = epochProofFromBuffer(message.epoch_proof_proposal_request.data)
-            
-            this.#validatePreviousEpoch(epochProof, lastEpochProof)
-            this.#validateVdf(epochProof)
-        } catch (error) {
-            this.displayError(
-                "failed to process epoch proof proposal request from sender",
-                connection.remotePublicKey,
-                error
-            );
-        }
+        const eventContext = this.#buildRequestEventContext(message, connection);
+        this.#emitEvent(CustomEventType.EPOCH_PROPOSAL_RECEIVED, eventContext);
 
+        let resultCode = ConsensusResultCode.OK;
+        let validationError;
+        let proofProposal;
         try {
-            const proposalHash = message.epoch_proof_proposal_request.hash
-            const signature = this.#wallet.sign(proposalHash)
-            const response = await this.#buildEpochResponse(message.id, connection.capabilities, signature)
-            return await this.sendResponseAndMaybeClose(
-                connection,
-                response,
-                false
-            );
-        } catch (error) {
-            // some error handler there
-            this.displayError(
-                "failed to build/send epoch proof proposal response to sender",
-                connection.remotePublicKey,
-                error
-            );
+            await this.#proofProposalRequestValidator.validate(message, connection);
+            proofProposal = message.proof_proposal;
+            this.#emitEvent(CustomEventType.EPOCH_PROPOSAL_VALIDATION_SUCCESS, {
+                ...eventContext,
+                resultCode,
+                proofProposal
+            });
+        } catch (e) {
+            validationError = e;
+            resultCode = getResultCode(e);
+            // TODO: If INVALID_ADDRESS_ASSERTION is introduced, blacklist the specific remote address/pubKey.
+            this.#emitEvent(CustomEventType.EPOCH_PROPOSAL_VALIDATION_FAILURE, {
+                ...eventContext,
+                resultCode,
+                error: validationError
+            });
+        }
+        finally {
+            await this.#sendEpochProofProposalApprovalResponse(message.session_id, connection, message.proof_proposal, resultCode);
         }
     }
 
-    // TODO: validates the response from line 61 to the end
-    // is valid signature and is a valid approver
-    async handleResponse(message, connection) {
+    /**
+     * Handles a minion's consensus v1 epoch proof proposal approval from the requester side.
+     *
+     * @param {object} message Decoded consensus v1 message containing `proof_proposal_response`.
+     * @param {object} connection Peer connection context used by the response validator.
+     * @param {object} proofProposal Original proof proposal used by the response validator.
+     * @returns {Promise<{resultCode: number, approval?: object}>} Approval handling outcome.
+     */
+
+    async handleApproval(message, connection, proofProposal) {
+        const eventContext = this.#buildApprovalEventContext(message, connection, proofProposal);
+        this.#emitEvent(CustomEventType.EPOCH_PROPOSAL_APPROVAL_RECEIVED, eventContext); // NOTE: Maybe not needed. Investigate. For now, this will be only a placeholder
+
+        let resultCode = ConsensusResultCode.OK;
+        let approval;
         try {
-            this.applyRateLimit(connection);
-            await this.resolvePendingResponse(
-                message,
-                connection,
-                this.#v1EpochProofProposalResponseValidator,
-                this.#extractEpochProofProposalResponse
-            );
-        } catch (error) {
-            this.handlePendingResponseError(
-                message.id,
-                connection,
-                error,
-                "Failed to process epoch proof proposal response from sender"
-            );
+            await this.#proofProposalApprovalValidator.validate(message, connection, proofProposal);
+            approval = message.proof_proposal_response.approval;
+        } catch (e) {
+            resultCode = getResultCode(e);
+            this.#emitEvent(CustomEventType.EPOCH_PROPOSAL_APPROVAL_FAILURE, {
+                ...eventContext,
+                resultCode,
+                error: e
+            });
+            return { resultCode };
         }
 
-        // handle the response
+        this.#emitEvent(CustomEventType.EPOCH_PROPOSAL_APPROVAL_SUCCESS, {
+            ...eventContext,
+            resultCode,
+            approval
+        });
+        return { resultCode, approval };
     }
 
-    #extractEpochProofProposalResponse(payload) {
+    #buildRequestEventContext(message, connection) {
+        const remotePublicKey = connection?.remotePublicKey;
+
         return {
-            code: payload.epoch_proof_proposal_response.result,
-            result: {
-                approver: payload.epoch_proof_proposal_response.approver,
-                signature: payload.epoch_proof_proposal_response.signature
-            }
+            message,
+            connection,
+            sessionId: message?.session_id,
+            remotePublicKey,
         };
     }
 
-    async #validateDataHash(message) {
-        const proposalHash = message.epoch_proof_proposal_request.hash
-        const proofData = message.epoch_proof_proposal_request.data
-        if (!b4a.equals(await tracCryptoApi.hash.blake3(proofData, proposalHash))) {
-            throw new V1ProtocolError(ResultCode.INVALID_PAYLOAD, 'There is a hash mismatch for the proof');
-        }
+    // TODO: This function is mostly copy-past from the one above. Refactor
+    #buildApprovalEventContext(message, connection, proofProposal) {
+        const remotePublicKey = connection?.remotePublicKey;
+
+        return {
+            message,
+            connection,
+            sessionId: message?.session_id,
+            remotePublicKey,
+            proofProposal
+        };
     }
 
-    async #validatePreviousEpoch(proofData, previousEpoch) {
-        if (!previousEpoch || proofData.epoch !== previousEpoch.data.epoch + 1) {
-            throw new V1ProtocolError(ResultCode.INVALID_EPOCH, 'There is a mismatch between the proof and the last computed epoch');
-        }
-        
-        if (proofData.protocolVersion !== previousEpoch.protocolVersion) {
-            throw new V1ProtocolError(ResultCode.INVALID_EPOCH, 'There is a mismatch between the proof and the last computed epoch');
-        }
-        
-        if (proofData.prevEpochHash !== previousEpoch.prevEpochHash) {
-            throw new V1ProtocolError(ResultCode.INVALID_EPOCH, 'There is a mismatch between the proof and the last computed epoch');
-        }
-        
-        if (proofData.networkId !== previousEpoch.networkId) {
-            throw new V1ProtocolError(ResultCode.INVALID_EPOCH, 'There is a mismatch between the proof and the last computed epoch');
-        }
-        
-        // TODO: check if more validations are required
-        
-        // if (proofData.commiteeHash !== previousEpoch.commiteeHash) {
-        //     throw new V1ProtocolError(ResultCode.INVALID_EPOCH, 'There is a mismatch between the proof and the last computed epoch');
-        // }
-        
-        // if (proofData.leaderId !== previousEpoch.leaderId) {
-        //     throw new V1ProtocolError(ResultCode.INVALID_EPOCH, 'There is a mismatch between the proof and the last computed epoch');
-        // }
-        
-        // if (proofData.vdfParamsHash !== previousEpoch.vdfParamsHash) {
-        //     throw new V1ProtocolError(ResultCode.INVALID_EPOCH, 'There is a mismatch between the proof and the last computed epoch');
-        // }
-        
-        // if (proofData.vdfOutput !== previousEpoch.vdfOutput) {
-        //     throw new V1ProtocolError(ResultCode.INVALID_EPOCH, 'There is a mismatch between the proof and the last computed epoch');
-        // }
-    }
-
-    async #validateVdf(proofData) {
-        if (!proofData.vdfOutput) {
-            throw new V1ProtocolError(ResultCode.INVALID_EPOCH, 'Inconsistent vdf data');
-        }
-    }
-
-    async #buildEpochResponse(id, capabilities, signature) {
+    #emitEvent(eventName, context) {
         try {
-            return await networkMessageFactory(this.#wallet, this.config).buildEpochProofProposalResponse(
-                id,
-                capabilities,
-                ResultCode.OK,
-                signature
-            );
+            this.#state.emit(eventName, context);
         } catch (error) {
-            throw new V1ProtocolError(ResultCode.UNEXPECTED_ERROR, `Failed to build broadcast transaction response: ${error.message}`);
+            this.displayError(`failed to emit ${eventName}`, context?.remotePublicKey, error);
         }
     }
+
+    async #buildProofProposalApproval(sessionId, proofProposal, resultCode) {
+        const proposer = bufferToAddress(proofProposal.proposer, this.config.addressPrefix);
+
+        // TODO: In here we are basically getting some fields represented as buffers from
+        // the received proofProposal, converting them to numbers, just to convert them
+        // back to buffers internally. This should be optimized
+        return await consensusMessageFactory(this.#wallet, this.config).buildProofProposalResponse(
+            sessionId,
+            proofProposal.network_id.readUInt16BE(0),
+            proofProposal.epoch.readBigUInt64BE(0),
+            proofProposal.previous_epoch_record_hash,
+            proposer,
+            proofProposal.vdf_parameters_hash,
+            proofProposal.vdf_proof,
+            proofProposal.signature,
+            resultCode,
+            this.#wallet.address
+        );
+    }
+
+    async #sendEpochProofProposalApprovalResponse(
+        messageId,
+        connection,
+        proofProposal,
+        resultCode
+    ) {
+        try {
+            const response = await this.#buildProofProposalApproval(
+                messageId,
+                proofProposal,
+                resultCode,
+            );
+
+            await this.sendResponseAndMaybeClose(
+                connection,
+                response,
+            );
+
+        } catch (error) {
+            this.displayError(
+                "failed to build/send response to sender",
+                connection.remotePublicKey,
+                error
+            );
+            connection.end();
+        }
+    }
+
 }
 
 export default ConsensusEpochProofProposalOperationHandler;

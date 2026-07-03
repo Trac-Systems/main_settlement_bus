@@ -7,7 +7,7 @@ import ConsensusEpochProofProposalOperationHandler from '../v1/handlers/Consesus
 class ConsensusRouterV1 {
     #config
     #epochProofProposalHandler
-
+    #pendingRequestService
     constructor(
         state,
         wallet,
@@ -19,8 +19,8 @@ class ConsensusRouterV1 {
             state,
             wallet,
             config,
-            pendingRequestService,
         );
+        this.#pendingRequestService = pendingRequestService;
     }
 
     async route(incomingMessage, connection) {
@@ -49,9 +49,28 @@ class ConsensusRouterV1 {
                 case ConsensusOperationType.PROOF_PROPOSAL:
                     await this.#epochProofProposalHandler.handleRequest(decodedMessage, connection);
                     break;
-                case ConsensusOperationType.PROOF_PROPOSAL_APPROVAL:
-                    await this.#epochProofProposalHandler.handleResponse(decodedMessage, connection);
+                case ConsensusOperationType.PROOF_PROPOSAL_APPROVAL: {
+                    const pendingEntry = this.#pendingRequestService.getPendingRequest(decodedMessage.session_id)
+                    if (!pendingEntry) {
+                        this.#disconnect(connection, 'Approval received without matching pending request')
+                        break;
+                    }
+
+                    const expectedPeer = pendingEntry.requestedTo ? b4a.from(pendingEntry.requestedTo, 'hex') : null;
+                    if (expectedPeer && !b4a.equals(expectedPeer, connection.remotePublicKey)) {
+                        this.#disconnect(connection, 'Approval received from unexpected peer')
+                        break;
+                    }
+
+                    const { resultCode } = await this.#epochProofProposalHandler.handleApproval(
+                        decodedMessage,
+                        connection,
+                        pendingEntry.proofProposal
+                    );
+                    // TODO: Decide if we want to resolve pending requests here or delegate it elsewhere.
+                    this.#pendingRequestService.resolvePendingRequest(decodedMessage.session_id, resultCode);
                     break;
+                }
                 default:
                     this.#disconnect(connection, `Unsupported V1 message type: ${decodedMessage.type}`)
             }

@@ -19,25 +19,24 @@ class V1EpochProofProposalApproval extends V1BaseConsensusOperation {
     async validate(payload, connection, proofProposal) {
         this.isPayloadSchemaValid(payload);
 
-        const {result, approval} = payload.proof_proposal_response;
-        if (result === ConsensusResultCode.OK) {
-            this.assertAddressWithRemotePublicKey(
-                approval.approver,
-                connection.remotePublicKey,
-                "approver"
-            );
-            await this.validateSignature(payload, connection.remotePublicKey, proofProposal);
-        }
-
+        await this.#validateResponseSignature(payload, connection.remotePublicKey);
+        const resultCode = payload.proof_proposal_response.result;
+        this.#validateIfResultCodeIsOk(resultCode);
+        const approval = payload.proof_proposal_response.approval;
+        this.assertAddressWithRemotePublicKey(
+            approval.approver,
+            connection.remotePublicKey
+        );
+        await this.validateSignature(payload, connection.remotePublicKey, proofProposal);
         this.validateAddressIsIndexer();
-        await this.validateResponseSignature(payload, connection.remotePublicKey);
+        await this.#validateResponseSignature(payload, connection.remotePublicKey);
         return true;
     }
 
     /**
      * Verifies the response signature over result code and optional encoded approval.
      */
-    async validateResponseSignature(payload, remotePublicKey) {
+    async #validateResponseSignature(payload, remotePublicKey) {
         const proofProposalResponse = payload.proof_proposal_response;
         const resultCode = safeWriteUInt32BE(proofProposalResponse.result, 0);
         const message = proofProposalResponse.result === ConsensusResultCode.OK
@@ -54,7 +53,7 @@ class V1EpochProofProposalApproval extends V1BaseConsensusOperation {
             );
         }
 
-        let verified = false;
+        let verified;
         try {
             verified = tracCryptoApi.signature.verify(
                 proofProposalResponse.response_sig,
@@ -69,6 +68,12 @@ class V1EpochProofProposalApproval extends V1BaseConsensusOperation {
                 ConsensusResultCode.UNEXPECTED_ERROR,
                 'response signature verification failed.'
             );
+        }
+    }
+
+    #validateIfResultCodeIsOk(resultCode) {
+        if (resultCode !== ConsensusResultCode.OK) {
+            throw new V1ConsensusProtocolError(resultCode, `Proof proposal response result code is not OK: ${resultCode}`);
         }
     }
 

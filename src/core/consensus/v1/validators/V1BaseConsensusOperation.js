@@ -186,25 +186,30 @@ class V1BaseConsensusOperation {
     /**
      * Validates that the payload address resolves to the remote public key.
      */
-    assertAddressWithRemotePublicKey(binaryAddress, remotePublicKey, context) {
+    assertAddressWithRemotePublicKey(binaryAddress, remotePublicKey) {
         const address = bufferToAddress(binaryAddress, this.#config.addressPrefix);
         if (!address) {
             throw new V1ConsensusProtocolError(
                 ConsensusResultCode.UNEXPECTED_ERROR,
-                `${context} address is invalid.`
+                'Address is invalid.'
             );
         }
         const publicKeyFromAddress = tracCryptoApi.address.decode(address);
         if (!b4a.equals(publicKeyFromAddress, remotePublicKey)) {
             throw new V1ConsensusProtocolError(
                 ConsensusResultCode.UNEXPECTED_ERROR,
-                `${context} address does not match remote public key.`
+                'Address does not match remote public key.'
             );
         }
     }
 
     validateAddressIsIndexer() {
-        //TODO: Placeholder - payload address should have the indexer role in state. Completion depends on genesis being initialized in the ledger. this is not implemented yet.
+        // TODO: Placeholder - payload address should have the indexer role in state.
+        // Completion depends on genesis being initialized in the ledger. This is not implemented yet.
+        //
+        // TODO: When we replace UNEXPECTED_ERROR with INVALID_ADDRESS_ASSERTION,
+        // we should handle this specific error to not only drop the connection but also blacklist the specific node.
+        // Such an error would mean that someone is trying to impersonate an indexer.
     }
 
 }
