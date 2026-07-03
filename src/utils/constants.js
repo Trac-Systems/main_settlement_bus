@@ -18,6 +18,10 @@ export const EntryType = Object.freeze({
     INITIALIZATION: 'init',
     LICENSE_COUNT: 'lc',
     LICENSE_INDEX: 'li/',
+    EPOCH_CURRENT: '/epoch/current',
+    EPOCH: `/epoch/`,              // To get a specific epoch hash, you still need to provide a count after the string (e.g.: `/epoch/n`)
+    EPOCH_HASH: `/epochHash/`,     // To get a specific epoch data, you still need to provide a count after the string (e.g.: `/epochHash/n`)
+    VDF_PARAMS: '/parameters/vdf'
 });
 
 //ATTENTION - THIS IS USED IN THE APPLY FUNCTION!

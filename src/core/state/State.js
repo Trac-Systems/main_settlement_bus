@@ -22,7 +22,7 @@ import { isHexString, sleep, isTransactionRecordPut } from '../../utils/helpers.
 import tracCryptoApi from 'trac-crypto-api';
 import StateValidationSchema from './validators/StateValidationSchema.js';
 import { safeDecodeApplyOperation } from '../../codecs/apply/applyOperationCodec.js';
-import { createMessage, ZERO_WK, NULL_BUFFER } from '../../utils/buffer.js';
+import { createMessage, ZERO_WK, NULL_BUFFER, safeReadUint32BE, safeReadUint16BE } from '../../utils/buffer.js';
 import addressUtils from './utils/address.js';
 import adminEntryUtils from './utils/adminEntry.js';
 import nodeEntryUtils, { setWritingKey, NODE_ENTRY_SIZE } from './utils/nodeEntry.js';
@@ -45,8 +45,8 @@ import { deepCopyBuffer } from '../../utils/buffer.js';
 import { Status } from './utils/transaction.js';
 import remote from 'hypercore/lib/fully-remote-proof.js'
 import PQueue from 'p-queue';
-import { keys } from '../consensus/v1/handlers/epochProposal/epochProofData.js'
 import {bind} from "lodash";
+import { encodeVdfParameters } from './utils/epochProof.js';
 
 const OVERSIZED_BATCH_PENALTY_MULTIPLIER = BATCH_SIZE;
 
@@ -175,16 +175,16 @@ class State extends ReadyResource {
         return this.#base.view.core.signedLength;
     }
 
-    async currentEpochId() {
-        const epochIdBuffer = await this.getSigned(keys.CURRENT_INDEX);
-        if (!epochIdBuffer) return 0;
-
-        return lengthEntryUtils.decodeBE(epochIdBuffer)
+    async getCurrentEpochId() {
+        // TODO
     }
 
-    async currentEpoch() {
-        const latestEpochNumber = await this.getSigned(keys.CURRENT_INDEX)
-        return await this.getSigned(keys.EPOCH(latestEpochNumber))
+    async getCurrentEpoch() {
+        //TODO
+    }
+
+    async getEpoch(count) {
+        // TODO
     }
 
     getFee() {
@@ -521,7 +521,7 @@ class State extends ReadyResource {
     }
 
     async getSignedVDFParams() {
-        const vdfParamsBuffer = await this.getSigned(keys.VDF_PARAMS);
+        const vdfParamsBuffer = await this.getSigned(EntryType.VDF_PARAMS);
         if (!vdfParamsBuffer) return null;
 
         const expectedLength = VDF_DIFFICULTY_SIZE + VDF_DISCRIMINANT_SIZE;
@@ -4132,17 +4132,55 @@ class State extends ReadyResource {
             return Status.FAILURE;
         }
 
+        // verify tx validity - prevent deferred execution attack        
+        const indexersSequenceState = await this.#getIndexerSequenceStateApply(base);
+        if (indexersSequenceState === null) {
+            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Indexer sequence state is invalid.", node.from.key)
+            return Status.FAILURE;
+        };
 
+        if (!b4a.equals(op.sgo.txv, indexersSequenceState)) {
+            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Transaction was not executed.", node.from.key)
+            return Status.FAILURE;
+        };
 
-        // verify tx validity - prevent deferred execution attack
         // anti-replay attack
+        const opEntry = await this.#getEntryApply(txHashHexString, batch);
+        if (opEntry !== null) {
+            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Operation has already been applied.", node.from.key)
+            return Status.IGNORE;
+        };
 
-        // check if CurrentEpoch have been initialized if yes -failure
-        // check if Epoch have been initialized if yes - failure
-        // check if EpochHash have been initialized if yes - failure
+        // check if CurrentEpoch have been initialized if yes - failure
+        const currentEpoch = await this.#getEntryApply(EntryType.EPOCH_CURRENT, batch);
+        if (currentEpoch !== null) {
+            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Current epoch is set. Cannot set a new genesis epoch", node.from.key)
+            return Status.IGNORE;
+        };
+
+        // check if genesis epoch is initialized. If yes - failure
+        const genesisEpochHash = await this.#getEntryApply(EntryType.EPOCH + "0" , batch);
+        if (genesisEpochHash !== null) {
+            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Genesis epoch is set. Cannot set a new one", node.from.key)
+            return Status.IGNORE;
+        };
+
         // check if VDF params have been initialized if yes - failure
+        const vdfParams = await this.#getEntryApply(EntryType.VDF_PARAMS, batch);
+        if (vdfParams !== null) {
+            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "VDF params are set. Cannot set a new genesis epoch", node.from.key)
+            return Status.IGNORE;
+        };
 
         // extract diff and dbs in this case we should check if this is not less than 0 and not higer than 4/2 bytes
+        const vdfDifficultyBuffer = op.sgo.df;
+        const vdfDiscriminantBitSizeBuffer = op.sgo.db;
+        const encodedVdfParamsEntry = encodeVdfParams(vdfDifficultyBuffer, vdfDiscriminantBitSizeBuffer);
+        if (encodeVdfParameters.length === 0) {
+            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Could not encode vdf parameters. Cannot set a new genesis epoch", node.from.key)
+            return Status.IGNORE;
+        }
+
         // initialize CurrentEpoch field
         // initialize Epoch Field
         // initialize EpochHash Field
