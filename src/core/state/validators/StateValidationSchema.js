@@ -682,7 +682,6 @@ class StateValidationSchema {
                     tx: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true},
                     txv: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true},
                     df: {type: 'buffer', length: VDF_DIFFICULTY_SIZE, required: true},
-                    db: {type: 'buffer', length: VDF_DISCRIMINANT_SIZE, required: true},
                     in: {type: 'buffer', length: NONCE_BYTE_LENGTH, required: true},
                     is: {type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true},
                 }
