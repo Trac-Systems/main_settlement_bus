@@ -1,6 +1,15 @@
 import b4a from 'b4a'
-import { VDF_DIFFICULTY_SIZE, VDF_DISCRIMINANT_SIZE } from '../../../utils/constants'
+import {
+    VDF_DIFFICULTY_SIZE,
+    VDF_DISCRIMINANT_SIZE,
+    VDF_BLOB_PROOF_SIZE,
+    SIGNATURE_BYTE_LENGTH
+} from '../../../utils/constants'
 import { isBufferValid } from '../../../utils/buffer';
+import {
+    safeEncodeProofProposal,
+    safeEncodeProofProposalApproval
+} from "../../../codecs/consensus/v1/consensusV1OperationCodec.js";
 
 export const PROTOCOL_VERSION = 1
 
@@ -49,20 +58,26 @@ export function decodeVdfParameters(vdfParamsEntry) {
     }
 }
 
-export function initGenesisEpoch(config) {
+export function initGenesisEpoch(config, proposerAddress) {
     const proofData = {
-        protocolVersion: PROTOCOL_VERSION,
-        networkId: config.networkId,
-        epoch: 0,
-        
+        protocolVersion: PROTOCOL_VERSION, // PROTOCOL_VERSION_BYTE_LENGTH
+        networkId: config.networkId, // NETWORK_ID_BYTE_LENGTH
+        epoch: 0, // 8 bytes
+        previous_epoch_record_hash: b4a.alloc(32).fill(0), //HASH_BYTE_LENGTH
+        proposer: proposerAddress, // trac address (string), // from config
+        vdf_parameters_hash: b4a.alloc(32).fill(0), // this should be a hash of current vdf params but now placeholder and HASH_BYTE_LENGTH
+        vdf_proof: b4a.alloc(32).fill(VDF_BLOB_PROOF_SIZE), // VDF_BLOB_PROOF_SIZE
+        signature: b4a.alloc(32).fill(SIGNATURE_BYTE_LENGTH), // SIGNATURE_BYTE_LENGTH
     }
 
     const proposalApproval = {
-
+        approver: proposerAddress,
+        signature: b4a.alloc(32).fill(SIGNATURE_BYTE_LENGTH)
     }
 
     const genesisEpochProof = {
-        data: proofData,
-        approvals: [proposalApproval]
+        data: safeEncodeProofProposal(proofData),
+        approvals: [safeEncodeProofProposalApproval(proposalApproval)]
     }
+
 }
