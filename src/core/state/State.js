@@ -4175,8 +4175,8 @@ class State extends ReadyResource {
         // extract diff and dbs in this case we should check if this is not less than 0 and not higer than 4/2 bytes
         const vdfDifficultyBuffer = op.sgo.df;
         const vdfDiscriminantBitSizeBuffer = op.sgo.db;
-        const encodedVdfParamsEntry = encodeVdfParams(vdfDifficultyBuffer, vdfDiscriminantBitSizeBuffer);
-        if (encodeVdfParameters.length === 0) {
+        const encodedVdfParamsEntry = encodeVdfParameters(vdfDifficultyBuffer, vdfDiscriminantBitSizeBuffer);
+        if (encodedVdfParamsEntry.length === 0) {
             this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Could not encode vdf parameters. Cannot set a new genesis epoch", node.from.key)
             return Status.IGNORE;
         }
