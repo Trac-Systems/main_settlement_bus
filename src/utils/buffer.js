@@ -86,6 +86,18 @@ export function uint16ToBuffer(value, fieldName) {
     return buf;
 }
 
+export const safeReadUint16BE = (buffer, offset = 0) => {
+    try {
+        if (!b4a.isBuffer(buffer) || buffer.length < offset + 2) {
+            return null;
+        }
+        buffer.readUInt16BE(offset)
+    }
+    catch {
+        return null;
+    }
+}
+
 export function uint32ToBuffer(value, fieldName) {
     if (!Number.isInteger(value) || value < 0 || value > 0xFFFFFFFF) {
         throw new Error(`${fieldName} must be an unsigned 32-bit integer.`);
@@ -103,6 +115,18 @@ export const safeWriteUInt32BE = (value, offset) => {
         return buf;
     } catch {
         return b4a.alloc(4);
+    }
+}
+
+export const safeReadUint32BE = (buffer, offset = 0) => {
+    try {
+        if (!b4a.isBuffer(buffer) || buffer.length < offset + 4) {
+            return null;
+        }
+        buffer.readUInt32BE(offset)
+    }
+    catch {
+        return null;
     }
 }
 
