@@ -105,7 +105,7 @@ class ValidatorConnectionManager extends PeerConnectionManager {
     }
 
     async add(publicKey, connection) {
-        this._add(publicKey, connection);
+        this._add(publicKey, connection, { initializeProtocolSession: false });
         
         try {
             if (!connection.protocolSession.isProbed()) await connection.protocolSession.probe();

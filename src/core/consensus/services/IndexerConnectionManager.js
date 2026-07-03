@@ -1,11 +1,15 @@
 import { PeerConnectionManager } from '../../shared/PeerConnectionManager.js'
 
 class IndexerConnectionManager extends PeerConnectionManager {
+    #messages
+
     constructor(maxIndexers, config, logger, messages) {
-        super(maxIndexers, config, logger, messages);
+        super(maxIndexers, config, logger);
+        this.#messages = messages
     }
 
     add(publicKey, connection) {
+        connection.protocolSession = this.#messages.createProtomux(connection);
         this._add(publicKey, connection)
     }
 

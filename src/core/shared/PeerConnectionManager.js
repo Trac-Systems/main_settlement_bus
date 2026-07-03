@@ -10,16 +10,14 @@ export class PeerConnectionManagerError extends Error {
 }
 
 export class PeerConnectionManager extends ReadyResource {
-    #messages
     _connections = new Map();
     _max;
 
-    constructor(max, config, logger, messages) {
+    constructor(max, config, logger) {
         super();
         this._max = max;
         this._config = config;
         this._logger = logger
-        this.#messages = messages
     }
     
 
@@ -38,8 +36,6 @@ export class PeerConnectionManager extends ReadyResource {
      * @returns {Boolean} - Returns true if the peer was added or updated, false otherwise
      */
     _add(publicKey, connection) {
-        connection.protocolSession = this.#messages.createProtomux(connection);
-        
         const publicKeyHex = this._toHexString(publicKey);
         if (this.maxConnectionsReached()) {
             this._logger.debug('add: max connections reached.');

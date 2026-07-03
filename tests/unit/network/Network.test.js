@@ -139,7 +139,14 @@ async function loadNetwork() {
     }
 
     class NetworkMessagesMock {
-        async setupProtomuxMessages() {}
+        createProtomux(connection) {
+            return connection.protocolSession ?? {
+                isProbed: () => true,
+                probe: sinon.stub().resolves(),
+                isHealthCheckSupported: () => false,
+                close: sinon.stub(),
+            };
+        }
     }
 
     class ConsensusMessagesMock {

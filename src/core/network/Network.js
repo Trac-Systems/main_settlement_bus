@@ -43,6 +43,7 @@ class Network extends ReadyResource {
     #store;
     #indexerConnectionManager;
     #indexerPendingRequestService;
+    #networkMessages;
 
     /**
      * @param {State} state
@@ -94,7 +95,6 @@ class Network extends ReadyResource {
     async _open() {
         this.#logger.info('Network initialization...');        
         this.transactionPoolService.start();
-        this.validatorObserverService.start();
 
         const { wallet: wrappedWallet, keyPair } = await this.#getOrGenerateWallet();
         this.#wallet = wrappedWallet
@@ -109,7 +109,7 @@ class Network extends ReadyResource {
         });
 
         this.#rateLimiter = new TransactionRateLimiterService(this.#swarm, this.#config);
-        const networkMessages = new NetworkMessages(
+        this.#networkMessages = new NetworkMessages(
             this.#state,
             this.#wallet,
             this.#rateLimiter,
@@ -119,7 +119,7 @@ class Network extends ReadyResource {
             this.#config
         );
 
-        this.#validatorConnectionManager = new ValidatorConnectionManager(this.#config.maxValidators, this.#config, this.#logger, networkMessages);
+        this.#validatorConnectionManager = new ValidatorConnectionManager(this.#config.maxValidators, this.#config, this.#logger, this.#networkMessages);
         await this.#validatorConnectionManager.ready();
 
         this.#validatorMessageOrchestrator = new MessageOrchestrator(this.#validatorConnectionManager, this.#state, this.#config, this.#wallet);
@@ -138,6 +138,7 @@ class Network extends ReadyResource {
 
         this.#swarm.join(this.#config.channel, { server: true, client: true });
         this.#swarm.flush();
+        this.validatorObserverService.start();
         
         const isAdmin = await this.#state.isAdmin();
         if (this.#state.isIndexer() && !isAdmin) {
@@ -197,6 +198,18 @@ class Network extends ReadyResource {
             }
         });
 
+        this.#swarm.prependListener('connection', async (connection) => {
+            /*
+             Here is the issue:
+             
+             The current session is supposed to be attached as soon as possible (mostly to respond to probe since there is no connection ready signal on this level)
+             Since the connection was started from the other side, this havent gone through "qualification" which happens on tryConnect.
+             Becuase of that, we need to assume the current connection is that of a validator (who responds to probe) and later override it if necessary.
+             This is leaky for two reasons: first we need to keep a reference to messages and disclose the connection structure in this class.
+             second is that the protocol itself doesnt fit the connection life-cycle (this is a bigger problem that also touched on DHT factory structure being "swallowed by swarm")
+             */
+            connection.protocolSession = this.#networkMessages.createProtomux(connection);
+        })
         this.#swarm.on('connection', async (connection) => {
             // ATTENTION: Must be called AFTER the protomux init above
             const stream = this.#store.replicate(connection);
@@ -304,7 +317,7 @@ class Network extends ReadyResource {
     }
 
     async tryConnect(publicKey, type) {
-        if (this.#swarm === null) throw new Error('Network swarm is not initialized');
+        if (!this.#swarm) throw new Error('Network swarm is not initialized');
         if (this.#pendingConnections.has(publicKey) || this.#pendingConnections.size >= this.#config.maxPendingConnections) {
             this.#logger.debug(`Network.tryConnect: Connection to peer: ${publicKey} as type: ${type} is already pending or max pending connections reached.`);
             return CONNECTION_STATUS.IGNORED;
