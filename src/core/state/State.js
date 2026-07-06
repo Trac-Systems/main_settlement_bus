@@ -4207,7 +4207,7 @@ class State extends ReadyResource {
         await batch.put(txHashHexString, node.value);
 
         if (this.#config.enableTxApplyLogs) {
-            console.info(`Genesis Epoch has been successfully initialized.`);
+            console.info(`Genesis Epoch initialized addr:wk:tx - ${requesterAddressString}:${decodedAdminEntry.wk.toString('hex')}:${txHashHexString}`);
         }
 
         return Status.SUCCESS;
