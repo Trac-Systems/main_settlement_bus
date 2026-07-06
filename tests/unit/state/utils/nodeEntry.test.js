@@ -81,6 +81,46 @@ test('Node Entry - init - Happy Path with staked balance', t => {
 
 });
 
+test('Node Entry - init - READER role sets no role flags', t => {
+    const wk = randomBuffer(WRITER_BYTE_LENGTH)
+    const initialized = initNodeEntry(wk, NodeRole.READER)
+
+    const decoded = decodeNodeEntry(initialized);
+    t.ok(decoded, 'decoded should not be null');
+    t.is(decoded.isWhitelisted, false, 'isWhitelisted matches');
+    t.is(decoded.isWriter, false, 'isWriter matches');
+    t.is(decoded.isIndexer, false, 'isIndexer matches');
+});
+
+test('Node Entry - init - WRITER role sets isWhitelisted and isWriter only', t => {
+    const wk = randomBuffer(WRITER_BYTE_LENGTH)
+    const initialized = initNodeEntry(wk, NodeRole.WRITER)
+
+    const decoded = decodeNodeEntry(initialized);
+    t.ok(decoded, 'decoded should not be null');
+    t.is(decoded.isWhitelisted, true, 'isWhitelisted matches');
+    t.is(decoded.isWriter, true, 'isWriter matches');
+    t.is(decoded.isIndexer, false, 'isIndexer matches');
+});
+
+test('Node Entry - init - INDEXER role sets all role flags', t => {
+    const wk = randomBuffer(WRITER_BYTE_LENGTH)
+    const initialized = initNodeEntry(wk, NodeRole.INDEXER)
+
+    const decoded = decodeNodeEntry(initialized);
+    t.ok(decoded, 'decoded should not be null');
+    t.is(decoded.isWhitelisted, true, 'isWhitelisted matches');
+    t.is(decoded.isWriter, true, 'isWriter matches');
+    t.is(decoded.isIndexer, true, 'isIndexer matches');
+});
+
+test('Node Entry - init - returns empty buffer on invalid role', t => {
+    const wk = randomBuffer(WRITER_BYTE_LENGTH)
+    const initialized = initNodeEntry(wk, 0x2) // not a valid NodeRole value
+
+    t.is(initialized.length, 0, 'invalid role produces empty buffer');
+});
+
 // Test encode()
 test('Node Entry - encode and decode - Happy Path', t => {
     const node = {

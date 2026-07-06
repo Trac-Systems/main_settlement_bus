@@ -9,9 +9,9 @@ export const ZERO_BALANCE = b4a.alloc(BALANCE_BYTE_LENGTH);
 export const ZERO_LICENSE = b4a.alloc(LICENSE_BYTE_LENGTH);
 
 
-const isWhitelisted = role => [NodeRole.INDEXER, NodeRole.WHITELISTED, NodeRole.WRITER].includes(role);
-const isWriter = role => [NodeRole.INDEXER, NodeRole.WRITER].includes(role);
-const isIndexer = role => [NodeRole.INDEXER].includes(role);
+const roleIsWhitelisted = role => [NodeRole.INDEXER, NodeRole.WHITELISTED, NodeRole.WRITER].includes(role);
+const roleIsWriter = role => [NodeRole.INDEXER, NodeRole.WRITER].includes(role);
+const roleIsIndexer = role => [NodeRole.INDEXER].includes(role);
 
 /**
  * Initializes a new node entry with given writing key and role and the balance is set to zero.
@@ -26,7 +26,12 @@ const isIndexer = role => [NodeRole.INDEXER].includes(role);
  */
 
 export function init(wk, role, balance = ZERO_BALANCE, license = ZERO_LICENSE, stakedBalance = ZERO_BALANCE) {
-    const node = { wk, isWhitelisted: isWhitelisted(role), isWriter: isWriter(role), isIndexer: isIndexer(role), balance, license, stakedBalance };
+    if (!isNodeRoleValid(role)) {
+        console.error('Invalid node role provided');
+        return b4a.alloc(0);
+    }
+    
+    const node = { wk, isWhitelisted: roleIsWhitelisted(role), isWriter: roleIsWriter(role), isIndexer: roleIsIndexer(role), balance, license, stakedBalance };
     return encode(node);
 }
 
