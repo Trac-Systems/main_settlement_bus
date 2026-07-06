@@ -62,14 +62,29 @@ export function decodeVdfParameters(vdfParamsEntry) {
 }
 
 export function initGenesisEpoch(config, proposerAddress) {
-    const proposer = b4a.isBuffer(proposerAddress)
-        ? proposerAddress
-        : addressToBuffer(proposerAddress, config.addressPrefix);
+    const proposer = addressToBuffer(proposerAddress, config.addressPrefix);
+
+    if (proposer.length === 0) {
+        return null;
+    }
+
+    const protocol_version = safeUint8ToBuffer(PROTOCOL_VERSION, 'Protocol version');
+    if (protocol_version.length === 0) {
+        return null;
+    }
+    const  network_id = safeUint16ToBuffer(config.networkId, 'Network id');
+    if (network_id.length === 0) {
+        return null;
+    }
+    const epoch = safeUint64ToBuffer(0, 'Epoch');
+    if (epoch.length === 0) {
+        return null;
+    }
 
     const proofData = {
-        protocol_version: safeUint8ToBuffer(PROTOCOL_VERSION, 'Protocol version'),
-        network_id: safeUint16ToBuffer(config.networkId, 'Network id'),
-        epoch: safeUint64ToBuffer(0, 'Epoch'),
+        protocol_version,
+        network_id,
+        epoch,
         previous_epoch_record_hash: b4a.alloc(HASH_BYTE_LENGTH).fill(0),
         proposer,
         vdf_parameters_hash: b4a.alloc(HASH_BYTE_LENGTH).fill(0),
@@ -82,9 +97,17 @@ export function initGenesisEpoch(config, proposerAddress) {
         approval_sig: b4a.alloc(SIGNATURE_BYTE_LENGTH).fill(0)
     }
 
+    const encodedProof = safeEncodeEpochProof(proofData);
+    if (encodedProof.length === 0) {
+        return null;
+    }
+    const encodedProposalApproval = safeEncodeProofProposalApproval(proposalApproval);
+    if (encodedProposalApproval.length === 0) {
+        return null;
+    }
     const genesisEpochProof = {
-        pd: safeEncodeProofProposal(proofData),
-        app: [safeEncodeProofProposalApproval(proposalApproval)]
+        pd: encodedProof,
+        app: [encodedProposalApproval]
     }
 
     return safeEncodeEpochProof(genesisEpochProof);

@@ -46,7 +46,7 @@ import { Status } from './utils/transaction.js';
 import remote from 'hypercore/lib/fully-remote-proof.js'
 import PQueue from 'p-queue';
 import {bind} from "lodash";
-import { encodeVdfParameters } from './utils/epochProof.js';
+import {encodeVdfParameters, initGenesisEpoch} from './utils/epochProof.js';
 
 const OVERSIZED_BATCH_PENALTY_MULTIPLIER = BATCH_SIZE;
 
@@ -4180,7 +4180,12 @@ class State extends ReadyResource {
             this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Could not encode vdf parameters. Cannot set a new genesis epoch", node.from.key)
             return Status.IGNORE;
         }
+        const genesisEpoch = initGenesisEpoch(this.#config, requesterAddressString);
+        if (!genesisEpoch) {
+            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Could not initialize genesis epoch", node.from.key)
+            return Status.FAILURE;
 
+        }
         // initialize CurrentEpoch field
         // initialize Epoch Field
         // initialize EpochHash Field
