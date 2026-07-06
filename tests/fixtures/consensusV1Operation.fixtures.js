@@ -19,7 +19,7 @@ const bytes = (value, length) => b4a.alloc(length, value);
 const proofProposal = Object.freeze({
     protocol_version: uint8ToBuffer(1, 'Protocol version'),
     network_id: uint16ToBuffer(67, 'Network id'),
-    epoch: uint64ToBuffer(67, 'Epoch'),
+    epoch: uint64ToBuffer(67),
     previous_epoch_record_hash: bytes(1, HASH_BYTE_LENGTH),
     proposer: addressToBuffer(
         asAddress('82f6c1f684f4e251dfe092155b8861a0625b596991810b2b80b9c65ccbec5ad3'),

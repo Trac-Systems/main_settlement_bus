@@ -6,7 +6,7 @@ import {
     VDF_BLOB_PROOF_SIZE,
     SIGNATURE_BYTE_LENGTH
 } from '../../../utils/constants.js'
-import { isBufferValid, safeUint8ToBuffer, safeUint16ToBuffer, safeUint64ToBuffer } from '../../../utils/buffer.js';
+import { isBufferValid, safeUint8ToBuffer, safeUint16ToBuffer } from '../../../utils/buffer.js';
 import { addressToBuffer } from './address.js';
 import { safeEncodeEpochProof } from '../../../codecs/apply/applyOperationCodec.js';
 import {
@@ -76,10 +76,7 @@ export function initGenesisEpoch(config, proposerAddress) {
     if (network_id.length === 0) {
         return null;
     }
-    const epoch = safeUint64ToBuffer(0, 'Epoch');
-    if (epoch.length === 0) {
-        return null;
-    }
+    const epoch = b4a.alloc(8, 0); // Epoch Zero
 
     const proofData = {
         protocol_version,

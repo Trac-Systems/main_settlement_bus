@@ -66,6 +66,7 @@ export function assertBuffer(value, fieldName) {
     return value;
 }
 
+// TODO: Delete "fieldname" as an argument to this function
 export function uint8ToBuffer(value, fieldName) {
     if (!Number.isInteger(value) || value < 0 || value > 0xFF) {
         throw new Error(`${fieldName} must be an unsigned 8-bit integer.`);
@@ -80,10 +81,11 @@ export const safeUint8ToBuffer = (value, fieldName) => {
     try {
         return uint8ToBuffer(value, fieldName);
     } catch {
-        return b4a.alloc(0);
+        return b4a.alloc(1);
     }
 }
 
+// TODO: Delete "fieldname" as an argument to this function
 export function uint16ToBuffer(value, fieldName) {
     if (!Number.isInteger(value) || value < 0 || value > 0xFFFF) {
         throw new Error(`${fieldName} must be an unsigned 16-bit integer.`);
@@ -97,7 +99,9 @@ export function uint16ToBuffer(value, fieldName) {
 export const safeUint16ToBuffer = (value, fieldName) => {
     try {
         return uint16ToBuffer(value, fieldName);
-        return b4a.alloc(0);
+    }
+    catch {
+        return b4a.alloc(2);
     }
 }
 
@@ -129,7 +133,7 @@ export const safeWriteUInt32BE = (value, offset) => {
         buf.writeUInt32BE(value, offset);
         return buf;
     } catch {
-        return b4a.alloc(0);
+        return b4a.alloc(4);
     }
 }
 
@@ -148,22 +152,25 @@ export const safeReadUint32BE = (buffer, offset = 0) => {
 /**
  * Use BigInt because uint64 values can be larger than Number.MAX_SAFE_INTEGER.
  */
-export function uint64ToBuffer(value, fieldName) {
+// ATTENTION: It was decided to not use BigInt inside the apply function, so we can have more
+// control over the calculations. This function should not be used inside apply(). Use buffer
+// arithmetic (further doen this file) instead.
+export function uint64ToBuffer(value) {
     if (typeof value === 'number') {
         if (!Number.isSafeInteger(value) || value < 0) {
-            throw new Error(`${fieldName} must be a non-negative safe integer`);
+            throw new Error(`Value must be a non-negative safe integer`);
         }
     } else if (typeof value !== 'bigint') {
-        throw new Error(`${fieldName} must be a number or bigint`);
+        throw new Error(`Value must be a number or bigint`);
     }
 
     const uint64Value = typeof value === 'bigint' ? value : BigInt(value);
 
     if (uint64Value < 0n) {
-        throw new Error(`${fieldName} must be a non-negative integer`);
+        throw new Error(`Value must be a non-negative integer`);
     }
     if (uint64Value > MAX_UINT64) {
-        throw new Error(`${fieldName} must be an unsigned 64-bit integer`);
+        throw new Error(`Value must be an unsigned 64-bit integer`);
     }
 
     const buf = b4a.alloc(8);
@@ -171,13 +178,6 @@ export function uint64ToBuffer(value, fieldName) {
     return buf;
 }
 
-export const safeUint64ToBuffer = (value, fieldName) => {
-    try {
-        return uint64ToBuffer(value, fieldName);
-    } catch {
-        return b4a.alloc(0);
-    }
-}
 
 export const createMessage = (...args) => {
 

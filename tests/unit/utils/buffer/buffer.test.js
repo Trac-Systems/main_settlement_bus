@@ -384,3 +384,54 @@ test('assertBuffer - rejects missing and null values with field name', t => {
     t.exception(() => assertBuffer(undefined, 'payload'), errorMessageIncludes('payload'));
     t.exception(() => assertBuffer(null, 'payload'), errorMessageIncludes('payload'));
 });
+
+test('safeUint8ToBuffer - returns encoded buffer or zeroed fallback buffer', t => {
+    const max = safeUint8ToBuffer(0xFF, 'field');
+    t.ok(b4a.isBuffer(max), 'returns buffer for max uint8');
+    t.is(max.length, 1, 'uint8 is one byte');
+    t.is(max.readUInt8(0), 0xFF, 'encodes max uint8');
+
+    const invalidValues = [
+        -1,
+        0x100,
+        1.5,
+        NaN,
+        Infinity,
+        '1',
+        1n,
+        b4a.alloc(1)
+    ];
+
+    for (const value of invalidValues) {
+        const encoded = safeUint8ToBuffer(value, 'field');
+        t.ok(b4a.isBuffer(encoded), 'invalid value still returns a buffer');
+        t.is(encoded.length, 1, `invalid value returns uint8-width buffer: ${String(value)}`);
+        t.is(encoded.readUInt8(0), 0, `invalid value returns zeroed buffer: ${String(value)}`);
+    }
+});
+
+test('safeUint16ToBuffer - returns encoded buffer or zeroed fallback buffer', t => {
+    const max = safeUint16ToBuffer(0xFFFF, 'field');
+    t.ok(b4a.isBuffer(max), 'returns buffer for max uint16');
+    t.is(max.length, 2, 'uint16 is two bytes');
+    t.is(max.readUInt16BE(0), 0xFFFF, 'encodes max uint16');
+
+    const invalidValues = [
+        -1,
+        0x10000,
+        1.5,
+        NaN,
+        Infinity,
+        '1',
+        1n,
+        b4a.alloc(2)
+    ];
+
+    for (const value of invalidValues) {
+        const encoded = safeUint16ToBuffer(value, 'field');
+        t.ok(b4a.isBuffer(encoded), 'invalid value still returns a buffer');
+        t.is(encoded.length, 2, `invalid value returns uint16-width buffer: ${String(value)}`);
+        t.is(encoded.readUInt16BE(0), 0, `invalid value returns zeroed buffer: ${String(value)}`);
+    }
+});
+
