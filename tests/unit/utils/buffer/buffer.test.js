@@ -158,50 +158,6 @@ test('isBufferValid - negative case', t => {
     t.not(isBufferValid(b4a.from('abcd', 'utf8'), 2), 'buffer too long');
 });
 
-test('ZERO_WK and NULL_BUFFER constants expose expected buffers', t => {
-    t.ok(b4a.isBuffer(ZERO_WK), 'ZERO_WK is a buffer');
-    t.is(ZERO_WK.length, 32, 'ZERO_WK is 32 bytes');
-    t.ok(b4a.equals(ZERO_WK, b4a.alloc(32)), 'ZERO_WK is zero-filled');
-
-    t.ok(b4a.isBuffer(NULL_BUFFER), 'NULL_BUFFER is a buffer');
-    t.is(NULL_BUFFER.length, 0, 'NULL_BUFFER is empty');
-});
-
-test('bigIntToBuffer delegates to 16-byte bigint encoding', t => {
-    const encoded = bigIntToBuffer(123456789n);
-
-    t.ok(b4a.isBuffer(encoded), 'returns a buffer');
-    t.is(encoded.length, 16, 'encodes to 16 bytes');
-    t.is(encoded.readBigUInt64BE(8), 123456789n, 'low 64 bits encode value');
-});
-
-test('toHex returns hex for buffers and passes through non-buffers', t => {
-    const buffer = b4a.from('abcdef', 'hex');
-
-    t.is(toHex(buffer), 'abcdef', 'converts buffer to hex');
-    t.is(toHex('already-hex'), 'already-hex', 'returns string unchanged');
-    t.is(toHex(null), null, 'returns null unchanged');
-});
-
-test('safeWriteUInt32BE - positive case', t => {
-    const buf = safeWriteUInt32BE(0x01020304, 0);
-    t.ok(b4a.isBuffer(buf), 'returns a buffer');
-    t.is(buf.length, 4, 'buffer is 4 bytes');
-    t.is(buf.readUInt32BE(0), 0x01020304, 'encodes value correctly');
-
-    const edge = safeWriteUInt32BE(0x01020304, 4);
-    t.ok(b4a.isBuffer(edge), 'returns a buffer for offset at buffer end');
-    t.is(edge.length, 4, 'buffer is 4 bytes');
-    t.is(edge.readUInt32BE(0), 0, 'buffer is zeroed for out of bounds offset');
-});
-
-test('safeWriteUInt32BE - negative case', t => {
-    const negOffset = safeWriteUInt32BE(0x01020304, -1);
-    t.ok(b4a.isBuffer(negOffset), 'returns buffer for negative offset');
-    t.is(negOffset.length, 4, 'buffer is 4 bytes');
-    t.is(negOffset.readUInt32BE(0), 0, 'buffer is zeroed for negative offset');
-});
-
 test('deepCopyBuffer - returns null for falsy inputs', t => {
     t.is(deepCopyBuffer(null), null, 'null input returns null');
     t.is(deepCopyBuffer(undefined), null, 'undefined input returns null');
@@ -415,7 +371,58 @@ test('assertBuffer - rejects missing and null values with field name', t => {
     t.exception(() => assertBuffer(null, 'payload'), errorMessageIncludes('payload'));
 });
 
-test('safeUint8ToBuffer - returns encoded buffer or zeroed fallback buffer', t => {
+test('ZERO_WK and NULL_BUFFER constants expose expected buffers', t => {
+    t.ok(b4a.isBuffer(ZERO_WK), 'ZERO_WK is a buffer');
+    t.is(ZERO_WK.length, 32, 'ZERO_WK is 32 bytes');
+    t.ok(b4a.equals(ZERO_WK, b4a.alloc(32)), 'ZERO_WK is zero-filled');
+
+    t.ok(b4a.isBuffer(NULL_BUFFER), 'NULL_BUFFER is a buffer');
+    t.is(NULL_BUFFER.length, 0, 'NULL_BUFFER is empty');
+});
+
+test('bigIntToBuffer delegates to 16-byte bigint encoding', t => {
+    const encoded = bigIntToBuffer(123456789n);
+
+    t.ok(b4a.isBuffer(encoded), 'returns a buffer');
+    t.is(encoded.length, 16, 'encodes to 16 bytes');
+    t.is(encoded.readBigUInt64BE(8), 123456789n, 'low 64 bits encode value');
+});
+
+test('toHex returns hex for buffers and passes through non-buffers', t => {
+    const buffer = b4a.from('abcdef', 'hex');
+
+    t.is(toHex(buffer), 'abcdef', 'converts buffer to hex');
+    t.is(toHex('already-hex'), 'already-hex', 'returns string unchanged');
+    t.is(toHex(null), null, 'returns null unchanged');
+});
+
+test('safeWriteUInt32BE - encodes valid uint32 values', t => {
+    const buf = safeWriteUInt32BE(0x01020304, 0);
+    t.ok(b4a.isBuffer(buf), 'returns a buffer');
+    t.is(buf.length, 4, 'buffer is 4 bytes');
+    t.is(buf.readUInt32BE(0), 0x01020304, 'encodes value correctly');
+});
+
+test('safeWriteUInt32BE - returns empty buffer for invalid writes', t => {
+    const invalidWrites = [
+        {value: 0x01020304, offset: -1, label: 'negative offset'},
+        {value: 0x01020304, offset: 4, label: 'offset at buffer end'},
+        {value: -1, offset: 0, label: 'negative value'},
+        {value: 0x100000000, offset: 0, label: 'value above uint32 max'},
+        {value: 1.5, offset: 0, label: 'non-integer value'},
+        {value: NaN, offset: 0, label: 'NaN value'},
+        {value: Infinity, offset: 0, label: 'Infinity value'},
+        {value: '1', offset: 0, label: 'string value'}
+    ];
+
+    for (const {value, offset, label} of invalidWrites) {
+        const encoded = safeWriteUInt32BE(value, offset);
+        t.ok(b4a.isBuffer(encoded), `${label} returns a buffer`);
+        t.is(encoded.length, 0, `${label} returns empty buffer`);
+    }
+});
+
+test('safeUint8ToBuffer - returns encoded buffer or empty fallback buffer', t => {
     const max = safeUint8ToBuffer(0xFF, 'field');
     t.ok(b4a.isBuffer(max), 'returns buffer for max uint8');
     t.is(max.length, 1, 'uint8 is one byte');
@@ -435,12 +442,11 @@ test('safeUint8ToBuffer - returns encoded buffer or zeroed fallback buffer', t =
     for (const value of invalidValues) {
         const encoded = safeUint8ToBuffer(value, 'field');
         t.ok(b4a.isBuffer(encoded), 'invalid value still returns a buffer');
-        t.is(encoded.length, 1, `invalid value returns uint8-width buffer: ${String(value)}`);
-        t.is(encoded.readUInt8(0), 0, `invalid value returns zeroed buffer: ${String(value)}`);
+        t.is(encoded.length, 0, `invalid value returns empty buffer: ${String(value)}`);
     }
 });
 
-test('safeUint16ToBuffer - returns encoded buffer or zeroed fallback buffer', t => {
+test('safeUint16ToBuffer - returns encoded buffer or empty fallback buffer', t => {
     const max = safeUint16ToBuffer(0xFFFF, 'field');
     t.ok(b4a.isBuffer(max), 'returns buffer for max uint16');
     t.is(max.length, 2, 'uint16 is two bytes');
@@ -460,8 +466,7 @@ test('safeUint16ToBuffer - returns encoded buffer or zeroed fallback buffer', t 
     for (const value of invalidValues) {
         const encoded = safeUint16ToBuffer(value, 'field');
         t.ok(b4a.isBuffer(encoded), 'invalid value still returns a buffer');
-        t.is(encoded.length, 2, `invalid value returns uint16-width buffer: ${String(value)}`);
-        t.is(encoded.readUInt16BE(0), 0, `invalid value returns zeroed buffer: ${String(value)}`);
+        t.is(encoded.length, 0, `invalid value returns empty buffer: ${String(value)}`);
     }
 });
 
