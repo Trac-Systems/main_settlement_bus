@@ -94,7 +94,7 @@ export function initGenesisEpoch(config, proposerAddress) {
         approval_sig: b4a.alloc(SIGNATURE_BYTE_LENGTH).fill(0)
     }
 
-    const encodedProof = safeEncodeEpochProof(proofData);
+    const encodedProof = safeEncodeProofProposal(proofData);
     if (encodedProof.length === 0) {
         return null;
     }
