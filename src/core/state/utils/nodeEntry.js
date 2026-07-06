@@ -1,6 +1,6 @@
 import b4a from 'b4a';
 
-import { WRITER_MASK, INDEXER_MASK, WHITELISTED_MASK, calculateNodeRole, isNodeRoleValid } from './roles.js';
+import { WRITER_MASK, INDEXER_MASK, WHITELISTED_MASK, calculateNodeRole, isNodeRoleValid, NodeRole } from './roles.js';
 import { WRITER_BYTE_LENGTH, BALANCE_BYTE_LENGTH, LICENSE_BYTE_LENGTH } from '../../../utils/constants.js';
 import { isBufferValid } from '../../../utils/buffer.js';
 
@@ -8,6 +8,10 @@ export const NODE_ENTRY_SIZE = LICENSE_BYTE_LENGTH + WRITER_BYTE_LENGTH + 2 * BA
 export const ZERO_BALANCE = b4a.alloc(BALANCE_BYTE_LENGTH);
 export const ZERO_LICENSE = b4a.alloc(LICENSE_BYTE_LENGTH);
 
+
+const isWhitelisted = role => [NodeRole.INDEXER, NodeRole.WHITELISTED, NodeRole.WRITER].includes(role);
+const isWriter = role => [NodeRole.INDEXER, NodeRole.WRITER].includes(role);
+const isIndexer = role => [NodeRole.INDEXER].includes(role);
 
 /**
  * Initializes a new node entry with given writing key and role and the balance is set to zero.
@@ -20,37 +24,10 @@ export const ZERO_LICENSE = b4a.alloc(LICENSE_BYTE_LENGTH);
  * @param {Buffer} stakedBalance - Initial staked balance from node (must be 16 bytes)
  * @returns {Buffer} The initialized node entry buffer, or empty buffer if invalid input
  */
-export function init(writingKey, role, balance = ZERO_BALANCE, license = ZERO_LICENSE, stakedBalance = ZERO_BALANCE) {
-    if (!isBufferValid(writingKey, WRITER_BYTE_LENGTH) ||
-        !isBufferValid(balance, BALANCE_BYTE_LENGTH) ||
-        !isNodeRoleValid(role) ||
-        !isBufferValid(license, LICENSE_BYTE_LENGTH) ||
-        !isBufferValid(stakedBalance, BALANCE_BYTE_LENGTH)) {
-        console.error('Invalid input for node initialization');
-        return b4a.alloc(0);
-    }
 
-    try {
-        const nodeEntry = b4a.alloc(NODE_ENTRY_SIZE);
-        nodeEntry[0] = role;
-        let offset = 1;
-
-        b4a.copy(writingKey, nodeEntry, offset);
-        offset += WRITER_BYTE_LENGTH;
-
-        b4a.copy(balance, nodeEntry, offset);
-        offset += BALANCE_BYTE_LENGTH;
-
-        b4a.copy(license, nodeEntry, offset);
-        offset += LICENSE_BYTE_LENGTH;
-
-        b4a.copy(stakedBalance, nodeEntry, offset);
-
-        return nodeEntry;
-    } catch (error) {
-        console.error('Error initializing node entry:', error);
-        return b4a.alloc(0);
-    }
+export function init(wk, role, balance = ZERO_BALANCE, license = ZERO_LICENSE, stakedBalance = ZERO_BALANCE) {
+    const node = { wk, isWhitelisted: isWhitelisted(role), isWriter: isWriter(role), isIndexer: isIndexer(role), balance, license, stakedBalance };
+    return encode(node);
 }
 
 /**
