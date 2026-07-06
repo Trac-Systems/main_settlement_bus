@@ -45,7 +45,6 @@ import { deepCopyBuffer } from '../../utils/buffer.js';
 import { Status } from './utils/transaction.js';
 import remote from 'hypercore/lib/fully-remote-proof.js'
 import PQueue from 'p-queue';
-import {bind} from "lodash";
 import {encodeVdfParameters, initGenesisEpoch} from './utils/epochProof.js';
 
 const OVERSIZED_BATCH_PENALTY_MULTIPLIER = BATCH_SIZE;
@@ -613,7 +612,7 @@ class State extends ReadyResource {
             [OperationType.TX]: this.#handleApplyTxOperation.bind(this),
             [OperationType.TRANSFER]: this.#handleApplyTransferOperation.bind(this),
             [OperationType.SET_EPOCH]: this.#handleApplySetEpochOperation.bind(this),
-            [OperationType.SET_GENESIS_EPOCH]: this.#handleApplySetGenesisEpoch(bind(this))
+            [OperationType.SET_GENESIS_EPOCH]: this.#handleApplySetGenesisEpoch.bind(this),
         };
         return handlers[type] || null;
     }
@@ -4159,7 +4158,8 @@ class State extends ReadyResource {
         };
 
         // check if genesis epoch is initialized. If yes - failure
-        const genesisEpochHash = await this.#getEntryApply(EntryType.EPOCH + "0" , batch);
+        const epochZero = EntryType.EPOCH + "0";
+        const genesisEpochHash = await this.#getEntryApply(epochZero , batch);
         if (genesisEpochHash !== null) {
             this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Genesis epoch is set. Cannot set a new one", node.from.key)
             return Status.IGNORE;
@@ -4180,20 +4180,37 @@ class State extends ReadyResource {
             this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Could not encode vdf parameters. Cannot set a new genesis epoch", node.from.key)
             return Status.IGNORE;
         }
+
         const genesisEpoch = initGenesisEpoch(this.#config, requesterAddressString);
         if (!genesisEpoch) {
             this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Could not initialize genesis epoch", node.from.key)
             return Status.FAILURE;
-
         }
+
         // initialize CurrentEpoch field
+        const zeroAsUint64Buffer = b4a.alloc(8, 0);
+        await batch.put(EntryType.EPOCH_CURRENT, zeroAsUint64Buffer);
+        
         // initialize Epoch Field
+        const epochProofHash = await tracCryptoApi.hash.blake3Safe(genesisEpoch);
+        await batch.put(EntryType.EPOCH, epochProofHash);
+
         // initialize EpochHash Field
+        const epochProofHashString = epochProofHash.toString('hex');
+        const epochHashLedgerEntry = EntryType.EPOCH_HASH + epochProofHashString;
+        await batch.put(epochHashLedgerEntry, genesisEpoch);
+        
         // initialize VDFParams
+        await batch.put(EntryType.VDF_PARAMS, encodedVdfParamsEntry);
+
         // Put txHashHexString into the state to avoid replay attack
+        await batch.put(txHashHexString, node.value);
+
+        if (this.#config.enableTxApplyLogs) {
+            console.info(`Genesis Epoch has been successfully initialized.`);
+        }
 
         return Status.SUCCESS;
-
     }
 }
 
