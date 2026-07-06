@@ -110,7 +110,7 @@ export const safeReadUint16BE = (buffer, offset = 0) => {
         if (!b4a.isBuffer(buffer) || buffer.length < offset + 2) {
             return null;
         }
-        buffer.readUInt16BE(offset)
+        return buffer.readUInt16BE(offset)
     }
     catch {
         return null;
@@ -142,7 +142,7 @@ export const safeReadUint32BE = (buffer, offset = 0) => {
         if (!b4a.isBuffer(buffer) || buffer.length < offset + 4) {
             return null;
         }
-        buffer.readUInt32BE(offset)
+        return buffer.readUInt32BE(offset)
     }
     catch {
         return null;
@@ -154,7 +154,7 @@ export const safeReadUint32BE = (buffer, offset = 0) => {
  */
 // ATTENTION: It was decided to not use BigInt inside the apply function, so we can have more
 // control over the calculations. This function should not be used inside apply(). Use buffer
-// arithmetic (further doen this file) instead.
+// arithmetic (further down this file) instead.
 export function uint64ToBuffer(value) {
     if (typeof value === 'number') {
         if (!Number.isSafeInteger(value) || value < 0) {

@@ -4,6 +4,8 @@ import {
     assertBuffer,
     createMessage,
     isBufferValid,
+    safeReadUint16BE,
+    safeReadUint32BE,
     safeUint8ToBuffer,
     safeUint16ToBuffer,
     safeWriteUInt32BE,
@@ -14,7 +16,11 @@ import {
     deepCopyBuffer,
     encodeCapabilities,
     timestampToBuffer,
-    idToBuffer
+    idToBuffer,
+    ZERO_WK,
+    NULL_BUFFER,
+    bigIntToBuffer,
+    toHex
 } from '../../../../src/utils/buffer.js';
 import { errorMessageIncludes } from "../../../helpers/regexHelper.js";
 
@@ -150,6 +156,31 @@ test('isBufferValid - negative case', t => {
     t.not(isBufferValid(b4a.alloc(0), 1), 'empty buffer, size 1');
     t.not(isBufferValid(b4a.from('abcd', 'utf8'), 10), 'buffer too short');
     t.not(isBufferValid(b4a.from('abcd', 'utf8'), 2), 'buffer too long');
+});
+
+test('ZERO_WK and NULL_BUFFER constants expose expected buffers', t => {
+    t.ok(b4a.isBuffer(ZERO_WK), 'ZERO_WK is a buffer');
+    t.is(ZERO_WK.length, 32, 'ZERO_WK is 32 bytes');
+    t.ok(b4a.equals(ZERO_WK, b4a.alloc(32)), 'ZERO_WK is zero-filled');
+
+    t.ok(b4a.isBuffer(NULL_BUFFER), 'NULL_BUFFER is a buffer');
+    t.is(NULL_BUFFER.length, 0, 'NULL_BUFFER is empty');
+});
+
+test('bigIntToBuffer delegates to 16-byte bigint encoding', t => {
+    const encoded = bigIntToBuffer(123456789n);
+
+    t.ok(b4a.isBuffer(encoded), 'returns a buffer');
+    t.is(encoded.length, 16, 'encodes to 16 bytes');
+    t.is(encoded.readBigUInt64BE(8), 123456789n, 'low 64 bits encode value');
+});
+
+test('toHex returns hex for buffers and passes through non-buffers', t => {
+    const buffer = b4a.from('abcdef', 'hex');
+
+    t.is(toHex(buffer), 'abcdef', 'converts buffer to hex');
+    t.is(toHex('already-hex'), 'already-hex', 'returns string unchanged');
+    t.is(toHex(null), null, 'returns null unchanged');
 });
 
 test('safeWriteUInt32BE - positive case', t => {
@@ -432,4 +463,33 @@ test('safeUint16ToBuffer - returns encoded buffer or zeroed fallback buffer', t 
         t.is(encoded.length, 2, `invalid value returns uint16-width buffer: ${String(value)}`);
         t.is(encoded.readUInt16BE(0), 0, `invalid value returns zeroed buffer: ${String(value)}`);
     }
+});
+
+test('safeReadUint16BE - returns decoded number or null', t => {
+    const buffer = b4a.from('00010800ffff', 'hex');
+
+    t.is(safeReadUint16BE(buffer, 0), 1, 'reads uint16 at start');
+    t.is(safeReadUint16BE(buffer, 2), 2048, 'reads uint16 at offset');
+    t.is(safeReadUint16BE(buffer, 4), 0xFFFF, 'reads max uint16');
+    t.is(safeReadUint16BE(b4a.alloc(1)), null, 'returns null for short buffer');
+    t.is(safeReadUint16BE(buffer, 5), null, 'returns null for out-of-bounds offset');
+    t.is(safeReadUint16BE(null), null, 'returns null for invalid input');
+});
+
+test('safeReadUint32BE - returns decoded number or null', t => {
+    const buffer = b4a.from('0000000103473bc0ffffffff', 'hex');
+
+    t.is(safeReadUint32BE(buffer, 0), 1, 'reads uint32 at start');
+    t.is(safeReadUint32BE(buffer, 4), 55_000_000, 'reads uint32 at offset');
+    t.is(safeReadUint32BE(buffer, 8), 0xFFFFFFFF, 'reads max uint32');
+    t.is(safeReadUint32BE(b4a.alloc(3)), null, 'returns null for short buffer');
+    t.is(safeReadUint32BE(buffer, 9), null, 'returns null for out-of-bounds offset');
+    t.is(safeReadUint32BE(null), null, 'returns null for invalid input');
+});
+
+test('createMessage ignores invalid values when valid buffers are present', t => {
+    const validBuffer = b4a.from('abcd', 'hex');
+    const message = createMessage(validBuffer, 'invalid', null);
+
+    t.ok(b4a.equals(message, validBuffer), 'returns concat of valid buffers only');
 });
