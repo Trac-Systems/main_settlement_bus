@@ -81,7 +81,7 @@ export const safeUint8ToBuffer = (value, fieldName) => {
     try {
         return uint8ToBuffer(value, fieldName);
     } catch {
-        return b4a.alloc(1);
+        return b4a.alloc(0);
     }
 }
 
@@ -101,7 +101,7 @@ export const safeUint16ToBuffer = (value, fieldName) => {
         return uint16ToBuffer(value, fieldName);
     }
     catch {
-        return b4a.alloc(2);
+        return b4a.alloc(0);
     }
 }
 
@@ -129,11 +129,15 @@ export function uint32ToBuffer(value, fieldName) {
 
 export const safeWriteUInt32BE = (value, offset) => {
     try {
+        if (!Number.isInteger(value) || value < 0 || value > 0xFFFFFFFF) {
+            return b4a.alloc(0);
+        }
+
         const buf = b4a.alloc(4);
         buf.writeUInt32BE(value, offset);
         return buf;
     } catch {
-        return b4a.alloc(4);
+        return b4a.alloc(0);
     }
 }
 
