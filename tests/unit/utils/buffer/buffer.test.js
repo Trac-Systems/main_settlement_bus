@@ -408,6 +408,54 @@ test('safeWriteUInt32BE - returns empty buffer for invalid writes', t => {
         {value: 0x01020304, offset: -1, label: 'negative offset'},
         {value: 0x01020304, offset: 4, label: 'offset at buffer end'},
         {value: -1, offset: 0, label: 'negative value'},
+        {value: 0x100000000, offset: 0, label: 'value above uint32 max'}
+    ];
+
+    for (const {value, offset, label} of invalidWrites) {
+        const encoded = safeWriteUInt32BE(value, offset);
+        t.ok(b4a.isBuffer(encoded), `${label} returns a buffer`);
+        t.is(encoded.length, 0, `${label} returns empty buffer`);
+    }
+});
+
+test('safeUint8ToBuffer - returns encoded buffer or empty fallback buffer', t => {
+test('ZERO_WK and NULL_BUFFER constants expose expected buffers', t => {
+    t.ok(b4a.isBuffer(ZERO_WK), 'ZERO_WK is a buffer');
+    t.is(ZERO_WK.length, 32, 'ZERO_WK is 32 bytes');
+    t.ok(b4a.equals(ZERO_WK, b4a.alloc(32)), 'ZERO_WK is zero-filled');
+
+    t.ok(b4a.isBuffer(NULL_BUFFER), 'NULL_BUFFER is a buffer');
+    t.is(NULL_BUFFER.length, 0, 'NULL_BUFFER is empty');
+});
+
+test('bigIntToBuffer delegates to 16-byte bigint encoding', t => {
+    const encoded = bigIntToBuffer(123456789n);
+
+    t.ok(b4a.isBuffer(encoded), 'returns a buffer');
+    t.is(encoded.length, 16, 'encodes to 16 bytes');
+    t.is(encoded.readBigUInt64BE(8), 123456789n, 'low 64 bits encode value');
+});
+
+test('toHex returns hex for buffers and passes through non-buffers', t => {
+    const buffer = b4a.from('abcdef', 'hex');
+
+    t.is(toHex(buffer), 'abcdef', 'converts buffer to hex');
+    t.is(toHex('already-hex'), 'already-hex', 'returns string unchanged');
+    t.is(toHex(null), null, 'returns null unchanged');
+});
+
+test('safeWriteUInt32BE - encodes valid uint32 values', t => {
+    const buf = safeWriteUInt32BE(0x01020304, 0);
+    t.ok(b4a.isBuffer(buf), 'returns a buffer');
+    t.is(buf.length, 4, 'buffer is 4 bytes');
+    t.is(buf.readUInt32BE(0), 0x01020304, 'encodes value correctly');
+});
+
+test('safeWriteUInt32BE - returns empty buffer for invalid writes', t => {
+    const invalidWrites = [
+        {value: 0x01020304, offset: -1, label: 'negative offset'},
+        {value: 0x01020304, offset: 4, label: 'offset at buffer end'},
+        {value: -1, offset: 0, label: 'negative value'},
         {value: 0x100000000, offset: 0, label: 'value above uint32 max'},
         {value: 1.5, offset: 0, label: 'non-integer value'},
         {value: NaN, offset: 0, label: 'NaN value'},

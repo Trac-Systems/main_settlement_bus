@@ -21,6 +21,19 @@ class V1BaseOperation {
         this.#v1ValidationSchema = new V1ValidationSchema();
     }
 
+    #encodeResultCode(result) {
+        if (!Object.values(ResultCode).includes(result)) {
+            throw new V1ProtocolError(ResultCode.INVALID_PAYLOAD, `Invalid result code: ${String(result)}`);
+        }
+
+        const resultCode = safeWriteUInt32BE(result, 0);
+        if (resultCode.length !== 4) {
+            throw new V1ProtocolError(ResultCode.INVALID_PAYLOAD, `Invalid result code: ${String(result)}`);
+        }
+
+        return resultCode;
+    }
+
     async validate(_payload, _connection, _pendingRequestServiceEntry) {
         throw new Error("Method 'validate()' must be implemented.");
     }
@@ -92,7 +105,8 @@ class V1BaseOperation {
                 const nonce = payload.liveness_response.nonce;
                 const signature = payload.liveness_response.signature;
                 const result = payload.liveness_response.result;
-                const message = createMessage(payload.type, idBuf, tsBuf, nonce, safeWriteUInt32BE(result, 0), capsBuf);
+                const resultCode = this.#encodeResultCode(result);
+                const message = createMessage(payload.type, idBuf, tsBuf, nonce, resultCode, capsBuf);
                 return {signature, message};
             }
             case NetworkOperationType.BROADCAST_TRANSACTION_REQUEST: {
@@ -140,7 +154,7 @@ class V1BaseOperation {
                     nonce,
                     proof,
                     timestampToBuffer(timestamp),
-                    safeWriteUInt32BE(result, 0),
+                    this.#encodeResultCode(result),
                     capsBuf
                 );
 

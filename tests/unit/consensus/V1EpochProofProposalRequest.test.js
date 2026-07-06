@@ -257,3 +257,25 @@ test('V1EpochProofProposalRequest rejects invalid proof proposal network id', as
         errorMessageIncludes('Invalid proof proposal network id')
     );
 });
+
+test('V1EpochProofProposalRequest rejects invalid local VDF params before accepting shortened hash message', async t => {
+    const invalidVdfConfig = new Proxy(vdfTestConfig, {
+        get(target, property) {
+            if (property === 'vdfDifficulty') return -1;
+            return target[property];
+        }
+    });
+    const validator = new V1EpochProofProposalRequest(invalidVdfConfig);
+    const shortenedMessage = createMessage(
+        safeWriteUInt32BE(invalidVdfConfig.vdfDifficulty, 0),
+        safeWriteUInt32BE(invalidVdfConfig.vdfDiscriminantSizeBits, 0)
+    );
+    const shortenedHash = await tracCryptoApi.hash.blake3(shortenedMessage);
+
+    await t.exception(
+        async () => validator.validateProofProposalVdfParametersHash({
+            vdf_parameters_hash: shortenedHash
+        }),
+        errorMessageIncludes('Invalid local VDF parameters')
+    );
+});

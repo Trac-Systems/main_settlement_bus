@@ -54,9 +54,15 @@ class V1EpochProofProposalRequest extends V1BaseConsensusOperation {
      * Validates that the proof proposal VDF parameters hash matches local config.
      */
     async validateProofProposalVdfParametersHash(proofProposal) {
+        const vdfDifficulty = safeWriteUInt32BE(this.#config.vdfDifficulty, 0);
+        const vdfDiscriminantSizeBits = safeWriteUInt32BE(this.#config.vdfDiscriminantSizeBits, 0);
+        if (vdfDifficulty.length !== 4 || vdfDiscriminantSizeBits.length !== 4) {
+            throw new V1ConsensusProtocolError(ConsensusResultCode.UNEXPECTED_ERROR, 'Invalid local VDF parameters.');
+        }
+
         const message = createMessage(
-            safeWriteUInt32BE(this.#config.vdfDifficulty, 0),
-            safeWriteUInt32BE(this.#config.vdfDiscriminantSizeBits, 0)
+            vdfDifficulty,
+            vdfDiscriminantSizeBits
         );
 
         let expectedHash;

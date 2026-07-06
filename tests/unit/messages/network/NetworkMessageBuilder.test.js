@@ -433,3 +433,16 @@ test('NetworkMessageBuilder validates required inputs', async t => {
         errorMessageIncludes('Data must be set before building broadcast transaction request')
     );
 });
+
+test('NetworkMessageBuilder rejects invalid result codes before signing responses', async t => {
+    const wallet = await createWallet();
+    const builder = new NetworkMessageBuilder(wallet, config);
+    const invalidResultCodes = [-1, 0x100000000, 1.5, Number.NaN, Number.POSITIVE_INFINITY, '1'];
+
+    for (const code of invalidResultCodes) {
+        t.exception(
+            () => builder.setResultCode(code),
+            errorMessageIncludes(`Invalid network result code: ${code}`)
+        );
+    }
+});

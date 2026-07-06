@@ -511,3 +511,16 @@ test('ConsensusMessageBuilder signs non-zero network id and uint64 epochs withou
     const legacyHash = await tracCryptoApi.hash.blake3(legacyMessage);
     t.not(wallet.verify(proofProposal.signature, legacyHash, wallet.publicKey));
 });
+
+test('ConsensusMessageBuilder rejects invalid result codes before signing responses', async t => {
+    const wallet = await createWallet();
+    const builder = new ConsensusMessageBuilder(wallet, config);
+    const invalidResultCodes = [-1, 0x100000000, 1.5, Number.NaN, Number.POSITIVE_INFINITY, '1'];
+
+    for (const code of invalidResultCodes) {
+        t.exception(
+            () => builder.setResultCode(code),
+            errorMessageIncludes(`Invalid consensus result code: ${code}`)
+        );
+    }
+});

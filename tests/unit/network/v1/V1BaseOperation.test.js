@@ -14,6 +14,13 @@ import { testKeyPair1, testKeyPair2 } from '../../../fixtures/apply.fixtures.js'
 import { config } from '../../../helpers/config.js';
 import { errorMessageIncludes } from '../../../helpers/regexHelper.js';
 import { WalletProvider } from 'trac-wallet';
+import {
+    createMessage,
+    encodeCapabilities,
+    idToBuffer,
+    safeWriteUInt32BE,
+    timestampToBuffer
+} from '../../../../src/utils/buffer.js';
 
 async function createWallet(testKeypair = testKeyPair1) {
     return await new WalletProvider(config).fromSecretKey(testKeypair.secretKey)
@@ -341,4 +348,70 @@ test('V1BaseOperation.validateResponseType supports expected mappings and reject
         t.ok(error instanceof V1ProtocolError);
         t.ok(error.message.includes('Unsupported pending request type'));
     }
+});
+
+test('V1BaseOperation.validateSignature rejects liveness response with shortened invalid result code message', async t => {
+    const operation = new V1BaseOperation(config);
+    const wallet = await createWallet();
+    const payload = {
+        type: NetworkOperationType.LIVENESS_RESPONSE,
+        id: 'id-invalid-result',
+        timestamp: Date.now(),
+        capabilities: ['cap:a'],
+        liveness_response: {
+            nonce: b4a.alloc(32, 1),
+            result: -1,
+            signature: null
+        }
+    };
+    const shortenedMessage = createMessage(
+        payload.type,
+        idToBuffer(payload.id),
+        timestampToBuffer(payload.timestamp),
+        payload.liveness_response.nonce,
+        safeWriteUInt32BE(payload.liveness_response.result, 0),
+        encodeCapabilities(payload.capabilities)
+    );
+    const shortenedHash = await tracCryptoApi.hash.blake3(shortenedMessage);
+    payload.liveness_response.signature = wallet.sign(shortenedHash);
+
+    await t.exception(
+        async () => operation.validateSignature(payload, wallet.publicKey),
+        errorMessageIncludes('Invalid result code: -1')
+    );
+});
+
+test('V1BaseOperation.validateSignature rejects broadcast response with shortened invalid result code message', async t => {
+    const operation = new V1BaseOperation(config);
+    const wallet = await createWallet();
+    const payload = {
+        type: NetworkOperationType.BROADCAST_TRANSACTION_RESPONSE,
+        id: 'id-invalid-broadcast-result',
+        timestamp: Date.now(),
+        capabilities: ['cap:a'],
+        broadcast_transaction_response: {
+            nonce: b4a.alloc(32, 1),
+            proof: b4a.alloc(0),
+            timestamp: 0,
+            result: -1,
+            signature: null
+        }
+    };
+    const shortenedMessage = createMessage(
+        payload.type,
+        idToBuffer(payload.id),
+        timestampToBuffer(payload.timestamp),
+        payload.broadcast_transaction_response.nonce,
+        payload.broadcast_transaction_response.proof,
+        timestampToBuffer(payload.broadcast_transaction_response.timestamp),
+        safeWriteUInt32BE(payload.broadcast_transaction_response.result, 0),
+        encodeCapabilities(payload.capabilities)
+    );
+    const shortenedHash = await tracCryptoApi.hash.blake3(shortenedMessage);
+    payload.broadcast_transaction_response.signature = wallet.sign(shortenedHash);
+
+    await t.exception(
+        async () => operation.validateSignature(payload, wallet.publicKey),
+        errorMessageIncludes('Invalid result code: -1')
+    );
 });
