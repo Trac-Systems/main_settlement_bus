@@ -39,7 +39,7 @@ export function encodeVdfParameters(difficulty, discriminantBitSize) {
 }
 
 export function decodeVdfParameters(vdfParamsEntry) {
-    if (isBufferValid(vdfParamsEntry, VDF_PARAMS_ENTRY_SIZE)) {
+    if (!isBufferValid(vdfParamsEntry, VDF_PARAMS_ENTRY_SIZE)) {
         return null;
     }
 
