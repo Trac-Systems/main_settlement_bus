@@ -45,7 +45,7 @@ import { deepCopyBuffer } from '../../utils/buffer.js';
 import { Status } from './utils/transaction.js';
 import remote from 'hypercore/lib/fully-remote-proof.js'
 import PQueue from 'p-queue';
-import {encodeVdfParameters, initGenesisEpoch} from './utils/epochProof.js';
+import {decodeVdfParameters, encodeVdfParameters, initGenesisEpoch} from './utils/epochProof.js';
 
 const OVERSIZED_BATCH_PENALTY_MULTIPLIER = BATCH_SIZE;
 
@@ -174,16 +174,41 @@ class State extends ReadyResource {
         return this.#base.view.core.signedLength;
     }
 
-    async getCurrentEpochId() {
-        // TODO
-    }
-
+    /**
+     * Reads the current epoch id from signed state.
+     *
+     * @returns {Promise<bigint|null>} Current epoch id, or null when epoch state is not initialized.
+     */
     async getCurrentEpoch() {
-        //TODO
+        const currentEpoch = await this.getSigned(EntryType.EPOCH_CURRENT);
+        if (currentEpoch === null) return null;
+        return currentEpoch.readBigUInt64BE(0);
     }
 
-    async getEpoch(_count) {
-        // TODO
+    /**
+     * Reads the epoch hash stored under `/epoch/<epoch>`.
+     *
+     * @param {bigint|number|string} count Epoch id.
+     * @returns {Promise<Buffer|null>} Epoch hash, or null when the epoch is not stored.
+     */
+    async getEpoch(count) {
+        if (count === null || count === undefined) return null;
+
+        const epochId = typeof count === 'bigint' ? count : BigInt(count);
+        return await this.getSigned(EntryType.EPOCH + epochId.toString());
+    }
+
+    /**
+     * Reads the encoded epoch proof stored under `/epochHash/<epochHash>`.
+     *
+     * @param {Buffer|string} epochHash Epoch hash as a buffer or hex string.
+     * @returns {Promise<Buffer|null>} Encoded epoch proof, or null when the proof is not stored.
+     */
+    async getEpochProof(epochHash) {
+        if (epochHash === null || epochHash === undefined) return null;
+
+        const epochHashString = b4a.isBuffer(epochHash) ? epochHash.toString('hex') : epochHash.toString();
+        return await this.getSigned(EntryType.EPOCH_HASH + epochHashString);
     }
 
     getFee() {
@@ -530,10 +555,14 @@ class State extends ReadyResource {
         if (vdfParamsBuffer.length !== expectedLength) {
             throw new Error(`Invalid VDF params length: expected ${expectedLength}, got ${vdfParamsBuffer.length}.`);
         }
+        const decodedVdfParams = decodeVdfParameters(vdfParamsBuffer);
+        if (decodedVdfParams === null) {
+            throw new Error("Invalid VDF params value.");
+        }
 
         return {
-            vdfDifficulty: vdfParamsBuffer.readUInt32BE(0),
-            vdfDiscriminantSize: vdfParamsBuffer.readUInt16BE(VDF_DIFFICULTY_SIZE),
+            vdfDifficulty: decodedVdfParams.difficulty.readUInt32BE(0),
+            vdfDiscriminantSize: decodedVdfParams.discriminantBitSize.readUInt16BE(0),
         };
     }
 
@@ -4193,7 +4222,7 @@ class State extends ReadyResource {
         
         // initialize Epoch Field
         const epochProofHash = await tracCryptoApi.hash.blake3Safe(genesisEpoch);
-        await batch.put(EntryType.EPOCH, epochProofHash);
+        await batch.put(epochZero, epochProofHash);
 
         // initialize EpochHash Field
         const epochProofHashString = epochProofHash.toString('hex');
