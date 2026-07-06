@@ -6,7 +6,6 @@ import {
     isBufferValid,
     safeUint8ToBuffer,
     safeUint16ToBuffer,
-    safeUint64ToBuffer,
     safeWriteUInt32BE,
     uint8ToBuffer,
     uint16ToBuffer,
@@ -259,9 +258,9 @@ test('idToBuffer - encodes utf8 string', t => {
 });
 
 test('timestampToBuffer and idToBuffer - reject invalid input', t => {
-    t.exception(() => timestampToBuffer(-1), errorMessageIncludes('timestamp'));
-    t.exception(() => timestampToBuffer(1.5), errorMessageIncludes('timestamp'));
-    t.exception(() => timestampToBuffer('1'), errorMessageIncludes('timestamp'));
+    t.exception(() => timestampToBuffer(-1), errorMessageIncludes('Value must be a non-negative safe integer'));
+    t.exception(() => timestampToBuffer(1.5), errorMessageIncludes('Value must be a non-negative safe integer'));
+    t.exception(() => timestampToBuffer('1'), errorMessageIncludes('Value must be a number or bigint'));
     t.exception.all(() => idToBuffer(1));
     t.exception.all(() => idToBuffer(null));
 });
@@ -337,16 +336,16 @@ test('uint16ToBuffer - rejects invalid values with field name', t => {
 });
 
 test('uint64ToBuffer - encodes uint64 values and throws for invalid input', t => {
-    const zero = uint64ToBuffer(0, 'field');
+    const zero = uint64ToBuffer(0);
     t.ok(b4a.isBuffer(zero), 'returns a buffer for zero');
     t.is(zero.readBigUInt64BE(0), 0n, 'encodes zero');
 
-    const large = uint64ToBuffer(0x100000000, 'field');
+    const large = uint64ToBuffer(0x100000000);
     t.ok(b4a.isBuffer(large), 'returns buffer for values above uint32');
     t.is(large.readBigUInt64BE(0), 0x100000000n, 'encodes uint64-range safe integer');
 
-    t.exception(() => uint64ToBuffer(-1, 'field'), errorMessageIncludes('field'));
-    t.exception(() => uint64ToBuffer(Number.MAX_SAFE_INTEGER + 1, 'field'), errorMessageIncludes('field'));
+    t.exception(() => uint64ToBuffer(-1), errorMessageIncludes('Value must be a non-negative safe integer'));
+    t.exception(() => uint64ToBuffer(0xFFFFFFFFFFFFFFFFn + 1n), errorMessageIncludes('Value must be an unsigned 64-bit integer'));
 });
 
 test('assertBuffer - returns buffers and throws for non-buffers', t => {
@@ -434,4 +433,3 @@ test('safeUint16ToBuffer - returns encoded buffer or zeroed fallback buffer', t 
         t.is(encoded.readUInt16BE(0), 0, `invalid value returns zeroed buffer: ${String(value)}`);
     }
 });
-
