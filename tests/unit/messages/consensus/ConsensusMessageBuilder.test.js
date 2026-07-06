@@ -328,14 +328,14 @@ test('ConsensusMessageBuilder rejects invalid epoch numbers', async t => {
     for (const value of invalidNumberValues) {
         t.exception(
             () => builder.setEpoch(value),
-            errorMessageIncludes('Epoch must be a non-negative safe integer')
+            errorMessageIncludes('Value must be a non-negative safe integer')
         );
     }
 
     for (const value of invalidTypeValues) {
         t.exception(
             () => builder.setEpoch(value),
-            errorMessageIncludes('Epoch must be a number or bigint')
+            errorMessageIncludes('Value must be a number or bigint')
         );
     }
 

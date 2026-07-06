@@ -1,7 +1,7 @@
 import b4a from 'b4a';
 import tracCryptoApi from 'trac-crypto-api';
-import {encodeProofProposalApproval} from '../../../codecs/consensus/v1/consensusV1OperationCodec.js';
-import {addressToBuffer, isAddressValid} from "../../../core/state/utils/address.js";
+import { encodeProofProposalApproval } from '../../../codecs/consensus/v1/consensusV1OperationCodec.js';
+import { addressToBuffer, isAddressValid } from "../../../core/state/utils/address.js";
 import {
     ConsensusOperationType,
     ConsensusProtocolVersion,
@@ -124,7 +124,7 @@ class ConsensusMessageBuilder {
     }
 
     setEpoch(epoch) {
-        const value = uint64ToBuffer(epoch, 'Epoch');
+        const value = uint64ToBuffer(epoch);
         const epochValue = typeof epoch === 'bigint' ? epoch : BigInt(epoch);
         if (epochValue === 0n) {
             throw new Error('Epoch must be greater than zero.');
