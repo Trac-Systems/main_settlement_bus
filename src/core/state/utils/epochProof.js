@@ -1,11 +1,14 @@
 import b4a from 'b4a'
 import {
+    HASH_BYTE_LENGTH,
     VDF_DIFFICULTY_SIZE,
     VDF_DISCRIMINANT_SIZE,
     VDF_BLOB_PROOF_SIZE,
     SIGNATURE_BYTE_LENGTH
-} from '../../../utils/constants'
-import { isBufferValid } from '../../../utils/buffer';
+} from '../../../utils/constants.js'
+import { isBufferValid, safeUint8ToBuffer, safeUint16ToBuffer, safeUint64ToBuffer } from '../../../utils/buffer.js';
+import { addressToBuffer } from './address.js';
+import { safeEncodeEpochProof } from '../../../codecs/apply/applyOperationCodec.js';
 import {
     safeEncodeProofProposal,
     safeEncodeProofProposalApproval
@@ -59,25 +62,30 @@ export function decodeVdfParameters(vdfParamsEntry) {
 }
 
 export function initGenesisEpoch(config, proposerAddress) {
+    const proposer = b4a.isBuffer(proposerAddress)
+        ? proposerAddress
+        : addressToBuffer(proposerAddress, config.addressPrefix);
+
     const proofData = {
-        protocolVersion: PROTOCOL_VERSION, // PROTOCOL_VERSION_BYTE_LENGTH
-        networkId: config.networkId, // NETWORK_ID_BYTE_LENGTH
-        epoch: 0, // 8 bytes
-        previous_epoch_record_hash: b4a.alloc(32).fill(0), //HASH_BYTE_LENGTH
-        proposer: proposerAddress, // trac address (string), // from config
-        vdf_parameters_hash: b4a.alloc(32).fill(0), // this should be a hash of current vdf params but now placeholder and HASH_BYTE_LENGTH
-        vdf_proof: b4a.alloc(32).fill(VDF_BLOB_PROOF_SIZE), // VDF_BLOB_PROOF_SIZE
-        signature: b4a.alloc(32).fill(SIGNATURE_BYTE_LENGTH), // SIGNATURE_BYTE_LENGTH
+        protocol_version: safeUint8ToBuffer(PROTOCOL_VERSION, 'Protocol version'),
+        network_id: safeUint16ToBuffer(config.networkId, 'Network id'),
+        epoch: safeUint64ToBuffer(0, 'Epoch'),
+        previous_epoch_record_hash: b4a.alloc(HASH_BYTE_LENGTH).fill(0),
+        proposer,
+        vdf_parameters_hash: b4a.alloc(HASH_BYTE_LENGTH).fill(0),
+        vdf_proof: b4a.alloc(VDF_BLOB_PROOF_SIZE).fill(0),
+        signature: b4a.alloc(SIGNATURE_BYTE_LENGTH).fill(0),
     }
 
     const proposalApproval = {
-        approver: proposerAddress,
-        signature: b4a.alloc(32).fill(SIGNATURE_BYTE_LENGTH)
+        approver: proposer,
+        approval_sig: b4a.alloc(SIGNATURE_BYTE_LENGTH).fill(0)
     }
 
     const genesisEpochProof = {
-        data: safeEncodeProofProposal(proofData),
-        approvals: [safeEncodeProofProposalApproval(proposalApproval)]
+        pd: safeEncodeProofProposal(proofData),
+        app: [safeEncodeProofProposalApproval(proposalApproval)]
     }
 
+    return safeEncodeEpochProof(genesisEpochProof);
 }

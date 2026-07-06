@@ -76,6 +76,14 @@ export function uint8ToBuffer(value, fieldName) {
     return buf;
 }
 
+export const safeUint8ToBuffer = (value, fieldName) => {
+    try {
+        return uint8ToBuffer(value, fieldName);
+    } catch {
+        return b4a.alloc(1);
+    }
+}
+
 export function uint16ToBuffer(value, fieldName) {
     if (!Number.isInteger(value) || value < 0 || value > 0xFFFF) {
         throw new Error(`${fieldName} must be an unsigned 16-bit integer.`);
@@ -84,6 +92,14 @@ export function uint16ToBuffer(value, fieldName) {
     const buf = b4a.alloc(2);
     buf.writeUInt16BE(value, 0);
     return buf;
+}
+
+export const safeUint16ToBuffer = (value, fieldName) => {
+    try {
+        return uint16ToBuffer(value, fieldName);
+    } catch {
+        return b4a.alloc(2);
+    }
 }
 
 export const safeReadUint16BE = (buffer, offset = 0) => {
@@ -154,6 +170,14 @@ export function uint64ToBuffer(value, fieldName) {
     const buf = b4a.alloc(8);
     buf.writeBigUInt64BE(uint64Value);
     return buf;
+}
+
+export const safeUint64ToBuffer = (value, fieldName) => {
+    try {
+        return uint64ToBuffer(value, fieldName);
+    } catch {
+        return b4a.alloc(8);
+    }
 }
 
 export const createMessage = (...args) => {
