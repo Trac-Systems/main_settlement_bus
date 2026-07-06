@@ -22,7 +22,7 @@ import { isHexString, sleep, isTransactionRecordPut } from '../../utils/helpers.
 import tracCryptoApi from 'trac-crypto-api';
 import StateValidationSchema from './validators/StateValidationSchema.js';
 import { safeDecodeApplyOperation } from '../../codecs/apply/applyOperationCodec.js';
-import { createMessage, ZERO_WK, NULL_BUFFER, safeReadUint32BE, safeReadUint16BE } from '../../utils/buffer.js';
+import { createMessage, ZERO_WK, NULL_BUFFER } from '../../utils/buffer.js';
 import addressUtils from './utils/address.js';
 import adminEntryUtils from './utils/adminEntry.js';
 import nodeEntryUtils, { setWritingKey, NODE_ENTRY_SIZE } from './utils/nodeEntry.js';
@@ -182,7 +182,7 @@ class State extends ReadyResource {
         //TODO
     }
 
-    async getEpoch(count) {
+    async getEpoch(_count) {
         // TODO
     }
 
