@@ -1097,7 +1097,7 @@ export class MainSettlementBus extends ReadyResource {
         }
 
         const vdfDifficultyBuffer = uint32ToBuffer(difficultyNumber, 0);
-        const vdfDiscriminantSizeBuffer = uint16ToBuffer(discriminantNumber, "VDF discriminant size");
+        const vdfDiscriminantSizeBuffer = uint16ToBuffer(discriminantNumber);
 
         const txValidity = await this.#state.getIndexerSequenceState();
         const payload = await applyStateMessageFactory(this.#wallet, this.#config)

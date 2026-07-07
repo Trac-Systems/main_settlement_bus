@@ -114,7 +114,7 @@ class ConsensusMessageBuilder {
     }
 
     setNetworkId(networkId) {
-        const value = uint16ToBuffer(networkId, 'Network id');
+        const value = uint16ToBuffer(networkId);
         if (networkId === 0) {
             throw new Error('Network id must be greater than zero.');
         }

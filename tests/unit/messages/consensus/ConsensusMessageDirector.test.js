@@ -34,7 +34,7 @@ test('ConsensusMessageDirector builds proof proposal and verifies signature', as
     const networkId = 67;
     const epoch = 2;
     const protocolVersionBuffer = uint8ToBuffer(ConsensusProtocolVersion.V1, 0);
-    const networkIdBuffer = uint16ToBuffer(networkId, 'Network id');
+    const networkIdBuffer = uint16ToBuffer(networkId);
     const epochBuffer = uint64ToBuffer(epoch, 'Epoch');
     const previousEpochRecordHash = b4a.alloc(32, 1);
     const vdfParametersHash = b4a.alloc(32, 2);
@@ -85,7 +85,7 @@ test('ConsensusMessageDirector builds proof proposal response and verifies signa
     const networkId = 67;
     const epoch = 2;
     const protocolVersionBuffer = uint8ToBuffer(ConsensusProtocolVersion.V1, 0);
-    const networkIdBuffer = uint16ToBuffer(networkId, 'Network id');
+    const networkIdBuffer = uint16ToBuffer(networkId);
     const epochBuffer = uint64ToBuffer(epoch, 'Epoch');
     const previousEpochRecordHash = b4a.alloc(32, 1);
     const vdfParametersHash = b4a.alloc(32, 2);

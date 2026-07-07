@@ -72,7 +72,7 @@ export function initGenesisEpoch(config, proposerAddress) {
     if (protocol_version.length === 0) {
         return null;
     }
-    const  network_id = safeUint16ToBuffer(config.networkId, 'Network id');
+    const  network_id = safeUint16ToBuffer(config.networkId);
     if (network_id.length === 0) {
         return null;
     }

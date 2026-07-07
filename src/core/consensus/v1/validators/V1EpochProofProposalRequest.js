@@ -101,7 +101,7 @@ class V1EpochProofProposalRequest extends V1BaseConsensusOperation {
      * Validates that the proof proposal targets the configured network.
      */
     validateProofProposalNetworkId(proofProposal) {
-        const expectedNetworkId = uint16ToBuffer(this.#config.networkId, 'Network id');
+        const expectedNetworkId = uint16ToBuffer(this.#config.networkId);
         if (!b4a.equals(proofProposal.network_id, expectedNetworkId)) {
             throw new V1ConsensusProtocolError(ConsensusResultCode.UNEXPECTED_ERROR, 'Invalid proof proposal network id.');
         }

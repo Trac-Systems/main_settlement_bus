@@ -295,18 +295,18 @@ test('uint8ToBuffer - rejects invalid values', t => {
 });
 
 test('uint16ToBuffer - encodes boundary values', t => {
-    const zero = uint16ToBuffer(0, 'field');
+    const zero = uint16ToBuffer(0);
     t.ok(b4a.isBuffer(zero), 'returns buffer for zero');
     t.is(zero.length, 2, 'uint16 is two bytes');
     t.is(zero.readUInt16BE(0), 0, 'encodes zero');
 
-    const max = uint16ToBuffer(0xFFFF, 'field');
+    const max = uint16ToBuffer(0xFFFF);
     t.ok(b4a.isBuffer(max), 'returns buffer for max uint16');
     t.is(max.length, 2, 'uint16 max is two bytes');
     t.is(max.readUInt16BE(0), 0xFFFF, 'encodes max uint16');
 });
 
-test('uint16ToBuffer - rejects invalid values with field name', t => {
+test('uint16ToBuffer - rejects invalid values', t => {
     const invalidValues = [
         -1,
         0x10000,
@@ -319,7 +319,7 @@ test('uint16ToBuffer - rejects invalid values with field name', t => {
     ];
 
     for (const value of invalidValues) {
-        t.exception(() => uint16ToBuffer(value, 'counter'), errorMessageIncludes('counter'));
+        t.exception(() => uint16ToBuffer(value), errorMessageIncludes('Value must be an unsigned 16-bit integer.'));
     }
 });
 
@@ -448,7 +448,7 @@ test('safeUint8ToBuffer - returns encoded buffer or empty fallback buffer', t =>
 });
 
 test('safeUint16ToBuffer - returns encoded buffer or empty fallback buffer', t => {
-    const max = safeUint16ToBuffer(0xFFFF, 'field');
+    const max = safeUint16ToBuffer(0xFFFF);
     t.ok(b4a.isBuffer(max), 'returns buffer for max uint16');
     t.is(max.length, 2, 'uint16 is two bytes');
     t.is(max.readUInt16BE(0), 0xFFFF, 'encodes max uint16');
@@ -465,7 +465,7 @@ test('safeUint16ToBuffer - returns encoded buffer or empty fallback buffer', t =
     ];
 
     for (const value of invalidValues) {
-        const encoded = safeUint16ToBuffer(value, 'field');
+        const encoded = safeUint16ToBuffer(value);
         t.ok(b4a.isBuffer(encoded), 'invalid value still returns a buffer');
         t.is(encoded.length, 0, `invalid value returns empty buffer: ${String(value)}`);
     }

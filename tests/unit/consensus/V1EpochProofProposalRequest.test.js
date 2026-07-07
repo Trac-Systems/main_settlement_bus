@@ -62,7 +62,7 @@ async function buildVdfProof(challengeData, vdfConfig = vdfTestConfig) {
 async function buildProofProposalPayload(wallet, vdfConfig = vdfTestConfig) {
     const builder = new ConsensusMessageBuilder(wallet, vdfConfig);
     const protocolVersion = uint8ToBuffer(ConsensusProtocolVersion.V1, 0);
-    const networkId = uint16ToBuffer(vdfConfig.networkId, 'Network id');
+    const networkId = uint16ToBuffer(vdfConfig.networkId);
     const epoch = uint64ToBuffer(1, 'Epoch');
     const previousEpochRecordHash = b4a.alloc(32, 1);
     const proposer = addressToBuffer(wallet.address, vdfConfig.addressPrefix);
@@ -248,7 +248,7 @@ test('V1EpochProofProposalRequest rejects invalid proof proposal network id', as
         ...payload,
         proof_proposal: {
             ...payload.proof_proposal,
-            network_id: uint16ToBuffer(fakeNetworkId, 'Network id')
+            network_id: uint16ToBuffer(fakeNetworkId)
         }
     };
 

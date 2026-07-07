@@ -207,7 +207,7 @@ test('ConsensusMessageBuilder encodes scalar number fields at byte-width boundar
     ];
 
     for (const testCase of cases) {
-        const networkIdBuffer = uint16ToBuffer(testCase.networkId, 'Network id');
+        const networkIdBuffer = uint16ToBuffer(testCase.networkId);
         const epochBuffer = uint64ToBuffer(testCase.epoch, 'Epoch');
 
         await builder
@@ -300,7 +300,7 @@ test('ConsensusMessageBuilder rejects invalid network id numbers', async t => {
     for (const value of invalidValues) {
         t.exception(
             () => builder.setNetworkId(value),
-            errorMessageIncludes('Network id must be an unsigned 16-bit integer.')
+            errorMessageIncludes('Value must be an unsigned 16-bit integer.')
         );
     }
 
@@ -464,7 +464,7 @@ test('ConsensusMessageBuilder signs non-zero network id and uint64 epochs withou
     const protocolVersion = ConsensusProtocolVersion.V1;
     const protocolVersionBuffer = uint8ToBuffer(protocolVersion, 0);
     const networkId = 1;
-    const networkIdBuffer = uint16ToBuffer(networkId, 'Network id');
+    const networkIdBuffer = uint16ToBuffer(networkId);
     const epoch = 0x100000000;
     const epochBuffer = uint64ToBuffer(epoch, 'Epoch');
 

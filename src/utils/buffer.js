@@ -84,10 +84,9 @@ export const safeUint8ToBuffer = (value, offset = 0) => {
     }
 }
 
-// TODO: Delete "fieldname" as an argument to this function
-export function uint16ToBuffer(value, fieldName) {
+export function uint16ToBuffer(value) {
     if (!Number.isInteger(value) || value < 0 || value > 0xFFFF) {
-        throw new Error(`${fieldName} must be an unsigned 16-bit integer.`);
+        throw new Error(`Value must be an unsigned 16-bit integer.`);
     }
 
     const buf = b4a.alloc(2);
@@ -95,9 +94,9 @@ export function uint16ToBuffer(value, fieldName) {
     return buf;
 }
 
-export const safeUint16ToBuffer = (value, fieldName) => {
+export const safeUint16ToBuffer = (value) => {
     try {
-        return uint16ToBuffer(value, fieldName);
+        return uint16ToBuffer(value);
     }
     catch {
         return NULL_BUFFER;
