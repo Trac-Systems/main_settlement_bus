@@ -1,4 +1,5 @@
 import b4a from 'b4a'
+import tracCryptoApi from 'trac-crypto-api';
 import {
     HASH_BYTE_LENGTH,
     VDF_DIFFICULTY_SIZE,
@@ -61,10 +62,18 @@ export function decodeVdfParameters(vdfParamsEntry) {
     }
 }
 
-export function initGenesisEpoch(config, proposerAddress) {
+export async function initGenesisEpoch(config, proposerAddress, vdfParamsEntry) {
     const proposer = addressToBuffer(proposerAddress, config.addressPrefix);
 
     if (proposer.length === 0) {
+        return null;
+    }
+    if (!isBufferValid(vdfParamsEntry, VDF_PARAMS_ENTRY_SIZE)) {
+        return null;
+    }
+
+    const vdfParametersHash = await tracCryptoApi.hash.blake3Safe(vdfParamsEntry);
+    if (!isBufferValid(vdfParametersHash, HASH_BYTE_LENGTH)) {
         return null;
     }
 
@@ -84,7 +93,7 @@ export function initGenesisEpoch(config, proposerAddress) {
         epoch,
         previous_epoch_record_hash: b4a.alloc(HASH_BYTE_LENGTH).fill(0),
         proposer,
-        vdf_parameters_hash: b4a.alloc(HASH_BYTE_LENGTH).fill(0),
+        vdf_parameters_hash: vdfParametersHash,
         vdf_proof: b4a.alloc(VDF_BLOB_PROOF_SIZE).fill(0),
         signature: b4a.alloc(SIGNATURE_BYTE_LENGTH).fill(0),
     }

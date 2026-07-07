@@ -4210,7 +4210,7 @@ class State extends ReadyResource {
             return Status.IGNORE;
         }
 
-        const genesisEpoch = initGenesisEpoch(this.#config, requesterAddressString);
+        const genesisEpoch = await initGenesisEpoch(this.#config, requesterAddressString, encodedVdfParamsEntry);
         if (!genesisEpoch) {
             this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Could not initialize genesis epoch", node.from.key)
             return Status.FAILURE;
