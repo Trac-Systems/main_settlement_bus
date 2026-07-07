@@ -12,9 +12,8 @@ import { errorMessageIncludes } from '../../../helpers/regexHelper.js';
 import {
     createMessage,
     encodeCapabilities,
-    safeWriteUInt32BE,
     idToBuffer,
-    timestampToBuffer
+    timestampToBuffer, uint32ToBuffer
 } from '../../../../src/utils/buffer.js';
 import { config } from '../../../helpers/config.js';
 import { testKeyPair1 } from '../../../fixtures/apply.fixtures.js';
@@ -51,7 +50,7 @@ test('NetworkMessageBuilder iterates liveness response ResultCode values', async
             idToBuffer(payload.id),
             timestampToBuffer(payload.timestamp),
             payload.liveness_response.nonce,
-            safeWriteUInt32BE(code, 0),
+            uint32ToBuffer(code),
             encodeCapabilities(caps)
         );
         const hash = await tracCryptoApi.hash.blake3(msg);
@@ -129,7 +128,7 @@ test('NetworkMessageBuilder iterates broadcast transaction response ResultCode v
             payload.broadcast_transaction_response.nonce,
             responseProof,
             timestampToBuffer(responseTimestampLedger),
-            safeWriteUInt32BE(code, 0),
+            uint32ToBuffer(code),
             encodeCapabilities(caps)
         );
 
@@ -172,7 +171,7 @@ test('NetworkMessageBuilder builds broadcast transaction response with proof and
         payload.broadcast_transaction_response.nonce,
         proof,
         timestampToBuffer(timestamp),
-        safeWriteUInt32BE(NetworkResultCode.OK, 0),
+        uint32ToBuffer(NetworkResultCode.OK),
         encodeCapabilities(caps)
     );
     const hash = await tracCryptoApi.hash.blake3(msg);
@@ -255,7 +254,7 @@ test('NetworkMessageBuilder allows TX_ACCEPTED_PROOF_UNAVAILABLE response with t
         payload.broadcast_transaction_response.nonce,
         emptyProof,
         timestampToBuffer(timestamp),
-        safeWriteUInt32BE(NetworkResultCode.TX_ACCEPTED_PROOF_UNAVAILABLE, 0),
+        uint32ToBuffer(NetworkResultCode.TX_ACCEPTED_PROOF_UNAVAILABLE),
         encodeCapabilities(caps)
     );
     const hash = await tracCryptoApi.hash.blake3(msg);
@@ -432,4 +431,17 @@ test('NetworkMessageBuilder validates required inputs', async t => {
                 .buildPayload(),
         errorMessageIncludes('Data must be set before building broadcast transaction request')
     );
+});
+
+test('NetworkMessageBuilder rejects invalid result codes before signing responses', async t => {
+    const wallet = await createWallet();
+    const builder = new NetworkMessageBuilder(wallet, config);
+    const invalidResultCodes = [-1, 0x100000000, 1.5, Number.NaN, Number.POSITIVE_INFINITY, '1'];
+
+    for (const code of invalidResultCodes) {
+        t.exception(
+            () => builder.setResultCode(code),
+            errorMessageIncludes(`Invalid network result code: ${code}`)
+        );
+    }
 });

@@ -21,7 +21,7 @@ export function deepCopyBuffer(buffer) {
 }
 
 export function timestampToBuffer(timestamp) {
-    return uint64ToBuffer(timestamp, 'timestamp');
+    return uint64ToBuffer(timestamp);
 }
 
 export function idToBuffer(id) {
@@ -51,57 +51,47 @@ export function encodeCapabilities(capabilities) {
         parts.push(bufferLen, capabilityBuffer);
     }
 
-    return parts.length ? b4a.concat(parts) : b4a.alloc(0);
+    return parts.length ? b4a.concat(parts) : NULL_BUFFER;
 }
 
 export function toHex(publicKey) {
     return b4a.isBuffer(publicKey) ? b4a.toString(publicKey, 'hex') : publicKey;
 }
 
-export function assertBuffer(value, fieldName) {
-    if (!b4a.isBuffer(value)) {
-        throw new Error(`${fieldName} must be a buffer.`);
-    }
-
-    return value;
-}
-
-// TODO: Delete "fieldname" as an argument to this function
-export function uint8ToBuffer(value, fieldName) {
+export function uint8ToBuffer(value, offset = 0) {
     if (!Number.isInteger(value) || value < 0 || value > 0xFF) {
-        throw new Error(`${fieldName} must be an unsigned 8-bit integer.`);
+        throw new Error(`Value must be an unsigned 8-bit integer.`);
     }
 
     const buf = b4a.alloc(1);
-    buf.writeUInt8(value, 0);
+    buf.writeUInt8(value, offset);
     return buf;
 }
 
-export const safeUint8ToBuffer = (value, fieldName) => {
+export const safeUint8ToBuffer = (value, offset = 0) => {
     try {
-        return uint8ToBuffer(value, fieldName);
+        return uint8ToBuffer(value, offset);
     } catch {
-        return b4a.alloc(0);
+        return NULL_BUFFER;
     }
 }
 
-// TODO: Delete "fieldname" as an argument to this function
-export function uint16ToBuffer(value, fieldName) {
+export function uint16ToBuffer(value, offset = 0) {
     if (!Number.isInteger(value) || value < 0 || value > 0xFFFF) {
-        throw new Error(`${fieldName} must be an unsigned 16-bit integer.`);
+        throw new Error(`Value must be an unsigned 16-bit integer.`);
     }
 
     const buf = b4a.alloc(2);
-    buf.writeUInt16BE(value, 0);
+    buf.writeUInt16BE(value, offset);
     return buf;
 }
 
-export const safeUint16ToBuffer = (value, fieldName) => {
+export const safeUint16ToBuffer = (value, offset = 0) => {
     try {
-        return uint16ToBuffer(value, fieldName);
+        return uint16ToBuffer(value, offset);
     }
     catch {
-        return b4a.alloc(0);
+        return NULL_BUFFER;
     }
 }
 
@@ -117,27 +107,21 @@ export const safeReadUint16BE = (buffer, offset = 0) => {
     }
 }
 
-export function uint32ToBuffer(value, fieldName) {
+export function uint32ToBuffer(value, offset = 0) {
     if (!Number.isInteger(value) || value < 0 || value > 0xFFFFFFFF) {
-        throw new Error(`${fieldName} must be an unsigned 32-bit integer.`);
+        throw new Error(`Value must be an unsigned 32-bit integer.`);
     }
 
     const buf = b4a.alloc(4);
-    buf.writeUInt32BE(value, 0);
+    buf.writeUInt32BE(value, offset);
     return buf;
 }
 
-export const safeWriteUInt32BE = (value, offset) => {
+export const safeWriteUInt32BE = (value, offset = 0) => {
     try {
-        if (!Number.isInteger(value) || value < 0 || value > 0xFFFFFFFF) {
-            return b4a.alloc(0);
-        }
-
-        const buf = b4a.alloc(4);
-        buf.writeUInt32BE(value, offset);
-        return buf;
+        return uint32ToBuffer(value, offset);
     } catch {
-        return b4a.alloc(0);
+        return NULL_BUFFER;
     }
 }
 
@@ -185,16 +169,16 @@ export function uint64ToBuffer(value) {
 
 export const createMessage = (...args) => {
 
-    if (args.length === 0) return b4a.alloc(0);
+    if (args.length === 0) return NULL_BUFFER;
 
     const buffers = args.map(arg => {
         if (b4a.isBuffer(arg)) {
             return arg;
         } else if (typeof arg === 'number' && isUInt32(arg)) {
-            return safeWriteUInt32BE(arg, 0);
+            return safeWriteUInt32BE(arg);
         }
     }).filter(buf => b4a.isBuffer(buf));
 
-    if (buffers.length === 0) return b4a.alloc(0);
+    if (buffers.length === 0) return NULL_BUFFER;
     return b4a.concat(buffers);
 }

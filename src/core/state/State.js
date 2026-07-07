@@ -460,7 +460,7 @@ class State extends ReadyResource {
         if (initialization === null) {
             return false
         } else {
-            return b4a.equals(initialization, safeWriteUInt32BE(0, 0))
+            return b4a.equals(initialization, safeWriteUInt32BE(0))
         }
     }
 
@@ -890,7 +890,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        await batch.put(EntryType.INITIALIZATION, safeWriteUInt32BE(0, 0));
+        await batch.put(EntryType.INITIALIZATION, safeWriteUInt32BE(0));
         await batch.put(txHashHexString, node.value);
 
         return Status.SUCCESS;
@@ -1029,7 +1029,7 @@ class State extends ReadyResource {
 
         // initialize admin entry and initialization flag
         await batch.put(EntryType.ADMIN, newAdminEntry);
-        await batch.put(EntryType.INITIALIZATION, safeWriteUInt32BE(1, 0));
+        await batch.put(EntryType.INITIALIZATION, safeWriteUInt32BE(1));
         await batch.put(txHashHexString, node.value);
 
         if (this.#config.enableTxApplyLogs) {
@@ -3641,7 +3641,7 @@ class State extends ReadyResource {
         if (initialization === null) {
             return false
         } else {
-            return b4a.equals(initialization, safeWriteUInt32BE(0, 0))
+            return b4a.equals(initialization, safeWriteUInt32BE(0))
         }
     }
 

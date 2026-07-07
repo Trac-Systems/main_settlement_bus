@@ -1,6 +1,11 @@
 import tracCryptoApi from 'trac-crypto-api';
 import b4a from 'b4a';
-import {createMessage, safeWriteUInt32BE, idToBuffer, timestampToBuffer} from "../../../utils/buffer.js";
+import {
+    createMessage,
+    idToBuffer,
+    timestampToBuffer,
+    uint32ToBuffer
+} from "../../../utils/buffer.js";
 import {NetworkOperationType, ResultCode} from '../../../utils/constants.js';
 import {isAddressValid} from "../../../core/state/utils/address.js";
 import {encodeCapabilities} from "../../../utils/buffer.js";
@@ -164,7 +169,7 @@ class NetworkMessageBuilder {
             idBuf,
             tsBuf,
             nonce,
-            safeWriteUInt32BE(this.#resultCode, 0),
+            uint32ToBuffer(this.#resultCode),
             encodeCapabilities(this.#capabilities),
         );
         const hash = await tracCryptoApi.hash.blake3(message);
@@ -243,7 +248,7 @@ class NetworkMessageBuilder {
             nonce,
             proof,
             timestampToBuffer(timestamp),
-            safeWriteUInt32BE(this.#resultCode, 0),
+            uint32ToBuffer(this.#resultCode),
             encodeCapabilities(this.#capabilities),
         );
 
