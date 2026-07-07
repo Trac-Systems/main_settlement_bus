@@ -1,6 +1,6 @@
 import b4a from 'b4a';
 import applyOperationsGenerated from './applyOperations.generated.cjs';
-
+import _ from 'lodash';
 const { Operation, SetEpochOperation } = applyOperationsGenerated.apply.operations;
 
 // Options for converting protobuf messages to plain objects, ensuring that bytes are returned as Buffers and enums as numbers.
@@ -96,14 +96,7 @@ export const normalizeIncomingMessage = (message) => {
 };
 
 const getValidatedEpochProofPayload = (payload) => {
-    const isObjectRecord = value => {
-        return value !== null &&
-            typeof value === 'object' &&
-            !Array.isArray(value) &&
-            !b4a.isBuffer(value);
-    }
-
-    if (!isObjectRecord(payload)) {
+    if (!_.isPlainObject(payload)) {
         throw new Error('EpochProof payload must be an object.');
     }
 
