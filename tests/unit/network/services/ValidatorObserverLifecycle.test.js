@@ -204,7 +204,10 @@ test("does NOT connect if not writer", async (t) => {
 
     const { network, state, config } = createBaseMocks({
         network: { tryConnect: () => calls++ },
-        state: { getNodeEntry: async () => ({ isWriter: false }) }
+        state: { 
+            getNodeEntry: async () => ({ isWriter: false }),
+            getRegisteredWriterKey: async () => null
+         }
     });
 
     const service = new ValidatorObserverService(network, state, "self", config);
