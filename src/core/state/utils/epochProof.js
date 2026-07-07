@@ -68,7 +68,7 @@ export function initGenesisEpoch(config, proposerAddress) {
         return null;
     }
 
-    const protocol_version = safeUint8ToBuffer(PROTOCOL_VERSION, 'Protocol version');
+    const protocol_version = safeUint8ToBuffer(PROTOCOL_VERSION, 0);
     if (protocol_version.length === 0) {
         return null;
     }

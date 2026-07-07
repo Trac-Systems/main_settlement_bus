@@ -190,7 +190,7 @@ test('ConsensusMessageBuilder encodes scalar number fields at byte-width boundar
     const proofProposalFixture = consensusV1OperationFixtures.proofProposal;
     const proposer = bufferToAddress(proofProposalFixture.proposer, config.addressPrefix);
     const protocolVersion = ConsensusProtocolVersion.V1;
-    const protocolVersionBuffer = uint8ToBuffer(protocolVersion, 'Protocol version');
+    const protocolVersionBuffer = uint8ToBuffer(protocolVersion, 0);
     const cases = [
         {
             networkId: 1,
@@ -271,7 +271,7 @@ test('ConsensusMessageBuilder rejects invalid protocol version numbers', async t
     for (const value of invalidUint8Values) {
         t.exception(
             () => builder.setProtocolVersion(value),
-            errorMessageIncludes('Protocol version must be an unsigned 8-bit integer.')
+            errorMessageIncludes('Value must be an unsigned 8-bit integer.')
         );
     }
 
@@ -462,7 +462,7 @@ test('ConsensusMessageBuilder signs non-zero network id and uint64 epochs withou
     const proofProposalFixture = consensusV1OperationFixtures.proofProposal;
     const proposer = bufferToAddress(proofProposalFixture.proposer, config.addressPrefix);
     const protocolVersion = ConsensusProtocolVersion.V1;
-    const protocolVersionBuffer = uint8ToBuffer(protocolVersion, 'Protocol version');
+    const protocolVersionBuffer = uint8ToBuffer(protocolVersion, 0);
     const networkId = 1;
     const networkIdBuffer = uint16ToBuffer(networkId, 'Network id');
     const epoch = 0x100000000;

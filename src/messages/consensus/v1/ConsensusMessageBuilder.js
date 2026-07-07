@@ -104,7 +104,7 @@ class ConsensusMessageBuilder {
     }
 
     setProtocolVersion(protocolVersion) {
-        const value = uint8ToBuffer(protocolVersion, 'Protocol version');
+        const value = uint8ToBuffer(protocolVersion, 0);
         if (!Object.values(ConsensusProtocolVersion).includes(protocolVersion)) {
             throw new Error(`Unsupported consensus protocol version: ${protocolVersion}`);
         }

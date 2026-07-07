@@ -17,7 +17,7 @@ const { MessageType, ResultCode } = consensusV1Generated.consensus.v1;
 const bytes = (value, length) => b4a.alloc(length, value);
 
 const proofProposal = Object.freeze({
-    protocol_version: uint8ToBuffer(1, 'Protocol version'),
+    protocol_version: uint8ToBuffer(1, 0),
     network_id: uint16ToBuffer(67, 'Network id'),
     epoch: uint64ToBuffer(67),
     previous_epoch_record_hash: bytes(1, HASH_BYTE_LENGTH),

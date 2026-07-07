@@ -266,18 +266,18 @@ test('uint32ToBuffer - encodes uint32 values and throws for invalid input', t =>
 });
 
 test('uint8ToBuffer - encodes boundary values', t => {
-    const zero = uint8ToBuffer(0, 'field');
+    const zero = uint8ToBuffer(0, 0);
     t.ok(b4a.isBuffer(zero), 'returns buffer for zero');
     t.is(zero.length, 1, 'uint8 is one byte');
     t.is(zero.readUInt8(0), 0, 'encodes zero');
 
-    const max = uint8ToBuffer(0xFF, 'field');
+    const max = uint8ToBuffer(0xFF, 0);
     t.ok(b4a.isBuffer(max), 'returns buffer for max uint8');
     t.is(max.length, 1, 'uint8 max is one byte');
     t.is(max.readUInt8(0), 0xFF, 'encodes max uint8');
 });
 
-test('uint8ToBuffer - rejects invalid values with field name', t => {
+test('uint8ToBuffer - rejects invalid values', t => {
     const invalidValues = [
         -1,
         0x100,
@@ -290,7 +290,7 @@ test('uint8ToBuffer - rejects invalid values with field name', t => {
     ];
 
     for (const value of invalidValues) {
-        t.exception(() => uint8ToBuffer(value, 'counter'), errorMessageIncludes('counter'));
+        t.exception(() => uint8ToBuffer(value, 0), errorMessageIncludes('Value must be an unsigned 8-bit integer.'));
     }
 });
 
@@ -424,7 +424,7 @@ test('safeWriteUInt32BE - returns empty buffer for invalid writes', t => {
 });
 
 test('safeUint8ToBuffer - returns encoded buffer or empty fallback buffer', t => {
-    const max = safeUint8ToBuffer(0xFF, 'field');
+    const max = safeUint8ToBuffer(0xFF, 0);
     t.ok(b4a.isBuffer(max), 'returns buffer for max uint8');
     t.is(max.length, 1, 'uint8 is one byte');
     t.is(max.readUInt8(0), 0xFF, 'encodes max uint8');
@@ -441,7 +441,7 @@ test('safeUint8ToBuffer - returns encoded buffer or empty fallback buffer', t =>
     ];
 
     for (const value of invalidValues) {
-        const encoded = safeUint8ToBuffer(value, 'field');
+        const encoded = safeUint8ToBuffer(value, 0);
         t.ok(b4a.isBuffer(encoded), 'invalid value still returns a buffer');
         t.is(encoded.length, 0, `invalid value returns empty buffer: ${String(value)}`);
     }

@@ -66,20 +66,19 @@ export function assertBuffer(value, fieldName) {
     return value;
 }
 
-// TODO: Delete "fieldname" as an argument to this function
-export function uint8ToBuffer(value, fieldName) {
+export function uint8ToBuffer(value, offset = 0) {
     if (!Number.isInteger(value) || value < 0 || value > 0xFF) {
-        throw new Error(`${fieldName} must be an unsigned 8-bit integer.`);
+        throw new Error(`Value must be an unsigned 8-bit integer.`);
     }
 
     const buf = b4a.alloc(1);
-    buf.writeUInt8(value, 0);
+    buf.writeUInt8(value, offset);
     return buf;
 }
 
-export const safeUint8ToBuffer = (value, fieldName) => {
+export const safeUint8ToBuffer = (value, offset = 0) => {
     try {
-        return uint8ToBuffer(value, fieldName);
+        return uint8ToBuffer(value, offset);
     } catch {
         return NULL_BUFFER;
     }

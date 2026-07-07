@@ -61,7 +61,7 @@ async function buildVdfProof(challengeData, vdfConfig = vdfTestConfig) {
 
 async function buildProofProposalPayload(wallet, vdfConfig = vdfTestConfig) {
     const builder = new ConsensusMessageBuilder(wallet, vdfConfig);
-    const protocolVersion = uint8ToBuffer(ConsensusProtocolVersion.V1, 'Protocol version');
+    const protocolVersion = uint8ToBuffer(ConsensusProtocolVersion.V1, 0);
     const networkId = uint16ToBuffer(vdfConfig.networkId, 'Network id');
     const epoch = uint64ToBuffer(1, 'Epoch');
     const previousEpochRecordHash = b4a.alloc(32, 1);

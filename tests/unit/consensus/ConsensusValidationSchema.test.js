@@ -16,7 +16,7 @@ const makeProofProposalPayload = (epoch, proofProposalOverrides = {}) => ({
     session_id: 'session',
     timestamp: 1,
     proof_proposal: {
-        protocol_version: uint8ToBuffer(ConsensusProtocolVersion.V1, 'Protocol version'),
+        protocol_version: uint8ToBuffer(ConsensusProtocolVersion.V1, 0),
         network_id: uint16ToBuffer(0xFFFF, 'Network id'),
         epoch,
         previous_epoch_record_hash: b4a.alloc(32, 1),
