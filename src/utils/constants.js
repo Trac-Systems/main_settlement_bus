@@ -19,8 +19,8 @@ export const EntryType = Object.freeze({
     LICENSE_COUNT: 'lc',
     LICENSE_INDEX: 'li/',
     EPOCH_CURRENT: '/epoch/current',
-    EPOCH: `/epoch/`,              // To get a specific epoch hash, you still need to provide a count after the string (e.g.: `/epoch/n`)
-    EPOCH_HASH: `/epochHash/`,     // To get a specific epoch data, you still need to provide a count after the string (e.g.: `/epochHash/n`)
+    EPOCH: `/epoch/`,              // Epoch hashes are stored under `/epoch/<n>`
+    EPOCH_HASH: `/epochHash/`,     // Epoch proof payloads are stored under `/epochHash/<epochHashHex>`
     VDF_PARAMS: '/parameters/vdf'
 });
 
