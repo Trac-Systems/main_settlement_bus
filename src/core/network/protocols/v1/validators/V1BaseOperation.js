@@ -6,8 +6,8 @@ import {
     createMessage,
     encodeCapabilities,
     idToBuffer,
-    safeWriteUInt32BE,
-    timestampToBuffer
+    timestampToBuffer,
+    uint32ToBuffer
 } from "../../../../../utils/buffer.js";
 import {
     V1ProtocolError,
@@ -19,19 +19,6 @@ class V1BaseOperation {
 
     constructor(_config) {
         this.#v1ValidationSchema = new V1ValidationSchema();
-    }
-
-    #encodeResultCode(result) {
-        if (!Object.values(ResultCode).includes(result)) {
-            throw new V1ProtocolError(ResultCode.INVALID_PAYLOAD, `Invalid result code: ${String(result)}`);
-        }
-
-        const resultCode = safeWriteUInt32BE(result, 0);
-        if (resultCode.length !== 4) {
-            throw new V1ProtocolError(ResultCode.INVALID_PAYLOAD, `Invalid result code: ${String(result)}`);
-        }
-
-        return resultCode;
     }
 
     async validate(_payload, _connection, _pendingRequestServiceEntry) {
@@ -105,8 +92,7 @@ class V1BaseOperation {
                 const nonce = payload.liveness_response.nonce;
                 const signature = payload.liveness_response.signature;
                 const result = payload.liveness_response.result;
-                const resultCode = this.#encodeResultCode(result);
-                const message = createMessage(payload.type, idBuf, tsBuf, nonce, resultCode, capsBuf);
+                const message = createMessage(payload.type, idBuf, tsBuf, nonce, uint32ToBuffer(result, 0), capsBuf);
                 return {signature, message};
             }
             case NetworkOperationType.BROADCAST_TRANSACTION_REQUEST: {
@@ -154,7 +140,7 @@ class V1BaseOperation {
                     nonce,
                     proof,
                     timestampToBuffer(timestamp),
-                    this.#encodeResultCode(result),
+                    uint32ToBuffer(result, 0),
                     capsBuf
                 );
 
