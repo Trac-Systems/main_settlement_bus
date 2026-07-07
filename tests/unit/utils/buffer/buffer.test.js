@@ -1,7 +1,6 @@
 import test from 'brittle';
 import b4a from 'b4a';
 import {
-    assertBuffer,
     createMessage,
     isBufferValid,
     safeReadUint16BE,
@@ -336,12 +335,6 @@ test('uint64ToBuffer - encodes uint64 values and throws for invalid input', t =>
     t.exception(() => uint64ToBuffer(0xFFFFFFFFFFFFFFFFn + 1n), errorMessageIncludes('Value must be an unsigned 64-bit integer'));
 });
 
-test('assertBuffer - returns buffers and throws for non-buffers', t => {
-    const buffer = b4a.alloc(1);
-    t.is(assertBuffer(buffer, 'field'), buffer, 'returns original buffer');
-    t.exception(() => assertBuffer('not-a-buffer', 'field'), errorMessageIncludes('field'));
-});
-
 test('uint32ToBuffer - rejects non-integer and out-of-range values with field name', t => {
     const invalidValues = [
         1.5,
@@ -365,11 +358,6 @@ test('uint64ToBuffer - encodes bigint boundaries and rejects values outside uint
     t.ok(b4a.isBuffer(maxBuffer), 'returns buffer for max uint64');
     t.is(maxBuffer.readBigUInt64BE(0), max, 'encodes max uint64');
     t.exception.all(() => uint64ToBuffer(2n ** 64n, 'field'));
-});
-
-test('assertBuffer - rejects missing and null values with field name', t => {
-    t.exception(() => assertBuffer(undefined, 'payload'), errorMessageIncludes('payload'));
-    t.exception(() => assertBuffer(null, 'payload'), errorMessageIncludes('payload'));
 });
 
 test('ZERO_WK and NULL_BUFFER constants expose expected buffers', t => {

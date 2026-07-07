@@ -58,14 +58,6 @@ export function toHex(publicKey) {
     return b4a.isBuffer(publicKey) ? b4a.toString(publicKey, 'hex') : publicKey;
 }
 
-export function assertBuffer(value, fieldName) {
-    if (!b4a.isBuffer(value)) {
-        throw new Error(`${fieldName} must be a buffer.`);
-    }
-
-    return value;
-}
-
 export function uint8ToBuffer(value, offset = 0) {
     if (!Number.isInteger(value) || value < 0 || value > 0xFF) {
         throw new Error(`Value must be an unsigned 8-bit integer.`);
