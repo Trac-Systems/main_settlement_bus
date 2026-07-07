@@ -253,15 +253,16 @@ test('timestampToBuffer and idToBuffer - reject invalid input', t => {
 });
 
 test('uint32ToBuffer - encodes uint32 values and throws for invalid input', t => {
-    const zero = uint32ToBuffer(0, 'field');
+    const zero = uint32ToBuffer(0, 0);
     t.ok(b4a.isBuffer(zero), 'returns a buffer for zero');
     t.is(zero.readUInt32BE(0), 0, 'encodes zero');
 
-    const max = uint32ToBuffer(0xFFFFFFFF, 'field');
+    const max = uint32ToBuffer(0xFFFFFFFF, 0);
     t.ok(b4a.isBuffer(max), 'returns buffer for max uint32');
     t.is(max.readUInt32BE(0), 0xFFFFFFFF, 'encodes max uint32');
 
-    t.exception(() => uint32ToBuffer(-1, 'field'), errorMessageIncludes('field'));
+    t.exception(() => uint32ToBuffer(-1, 0), errorMessageIncludes('Value must be an unsigned 32-bit integer.'));
+    t.exception(() => uint32ToBuffer(0xFFFFFFFFFF, 0), errorMessageIncludes('Value must be an unsigned 32-bit integer.'));
 });
 
 test('uint8ToBuffer - encodes boundary values', t => {
@@ -353,7 +354,7 @@ test('uint32ToBuffer - rejects non-integer and out-of-range values with field na
     ];
 
     for (const value of invalidValues) {
-        t.exception(() => uint32ToBuffer(value, 'counter'), errorMessageIncludes('counter'));
+        t.exception(() => uint32ToBuffer(value, 0), errorMessageIncludes('Value must be an unsigned 32-bit integer.'));
     }
 });
 

@@ -51,7 +51,7 @@ export function encodeCapabilities(capabilities) {
         parts.push(bufferLen, capabilityBuffer);
     }
 
-    return parts.length ? b4a.concat(parts) : b4a.alloc(0);
+    return parts.length ? b4a.concat(parts) : NULL_BUFFER;
 }
 
 export function toHex(publicKey) {
@@ -81,7 +81,7 @@ export const safeUint8ToBuffer = (value, fieldName) => {
     try {
         return uint8ToBuffer(value, fieldName);
     } catch {
-        return b4a.alloc(0);
+        return NULL_BUFFER;
     }
 }
 
@@ -101,7 +101,7 @@ export const safeUint16ToBuffer = (value, fieldName) => {
         return uint16ToBuffer(value, fieldName);
     }
     catch {
-        return b4a.alloc(0);
+        return NULL_BUFFER;
     }
 }
 
@@ -117,27 +117,21 @@ export const safeReadUint16BE = (buffer, offset = 0) => {
     }
 }
 
-export function uint32ToBuffer(value, fieldName) {
+export function uint32ToBuffer(value, offset) {
     if (!Number.isInteger(value) || value < 0 || value > 0xFFFFFFFF) {
-        throw new Error(`${fieldName} must be an unsigned 32-bit integer.`);
+        throw new Error(`Value must be an unsigned 32-bit integer.`);
     }
 
     const buf = b4a.alloc(4);
-    buf.writeUInt32BE(value, 0);
+    buf.writeUInt32BE(value, offset);
     return buf;
 }
 
 export const safeWriteUInt32BE = (value, offset) => {
     try {
-        if (!Number.isInteger(value) || value < 0 || value > 0xFFFFFFFF) {
-            return b4a.alloc(0);
-        }
-
-        const buf = b4a.alloc(4);
-        buf.writeUInt32BE(value, offset);
-        return buf;
+        return uint32ToBuffer(value, offset);
     } catch {
-        return b4a.alloc(0);
+        return NULL_BUFFER;
     }
 }
 
@@ -185,7 +179,7 @@ export function uint64ToBuffer(value) {
 
 export const createMessage = (...args) => {
 
-    if (args.length === 0) return b4a.alloc(0);
+    if (args.length === 0) return NULL_BUFFER;
 
     const buffers = args.map(arg => {
         if (b4a.isBuffer(arg)) {
@@ -195,6 +189,6 @@ export const createMessage = (...args) => {
         }
     }).filter(buf => b4a.isBuffer(buf));
 
-    if (buffers.length === 0) return b4a.alloc(0);
+    if (buffers.length === 0) return NULL_BUFFER;
     return b4a.concat(buffers);
 }
