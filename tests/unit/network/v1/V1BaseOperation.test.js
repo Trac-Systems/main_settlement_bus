@@ -14,13 +14,6 @@ import { testKeyPair1, testKeyPair2 } from '../../../fixtures/apply.fixtures.js'
 import { config } from '../../../helpers/config.js';
 import { errorMessageIncludes } from '../../../helpers/regexHelper.js';
 import { WalletProvider } from 'trac-wallet';
-import {
-    createMessage,
-    encodeCapabilities,
-    idToBuffer,
-    safeWriteUInt32BE,
-    timestampToBuffer
-} from '../../../../src/utils/buffer.js';
 
 async function createWallet(testKeypair = testKeyPair1) {
     return await new WalletProvider(config).fromSecretKey(testKeypair.secretKey)
