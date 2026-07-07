@@ -68,11 +68,11 @@ export function initGenesisEpoch(config, proposerAddress) {
         return null;
     }
 
-    const protocol_version = safeUint8ToBuffer(PROTOCOL_VERSION, 'Protocol version');
+    const protocol_version = safeUint8ToBuffer(PROTOCOL_VERSION);
     if (protocol_version.length === 0) {
         return null;
     }
-    const  network_id = safeUint16ToBuffer(config.networkId, 'Network id');
+    const  network_id = safeUint16ToBuffer(config.networkId);
     if (network_id.length === 0) {
         return null;
     }

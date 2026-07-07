@@ -1096,8 +1096,8 @@ export class MainSettlementBus extends ReadyResource {
             throw new Error("VDF discriminant size must be a positive unsigned 16-bit integer.");
         }
 
-        const vdfDifficultyBuffer = uint32ToBuffer(difficultyNumber, "VDF difficulty");
-        const vdfDiscriminantSizeBuffer = uint16ToBuffer(discriminantNumber, "VDF discriminant size");
+        const vdfDifficultyBuffer = uint32ToBuffer(difficultyNumber);
+        const vdfDiscriminantSizeBuffer = uint16ToBuffer(discriminantNumber);
 
         const txValidity = await this.#state.getIndexerSequenceState();
         const payload = await applyStateMessageFactory(this.#wallet, this.#config)

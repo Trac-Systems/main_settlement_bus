@@ -16,8 +16,8 @@ const makeProofProposalPayload = (epoch, proofProposalOverrides = {}) => ({
     session_id: 'session',
     timestamp: 1,
     proof_proposal: {
-        protocol_version: uint8ToBuffer(ConsensusProtocolVersion.V1, 'Protocol version'),
-        network_id: uint16ToBuffer(0xFFFF, 'Network id'),
+        protocol_version: uint8ToBuffer(ConsensusProtocolVersion.V1),
+        network_id: uint16ToBuffer(0xFFFF),
         epoch,
         previous_epoch_record_hash: b4a.alloc(32, 1),
         proposer: b4a.alloc(config.addressLength, 2),
@@ -48,11 +48,11 @@ test('ConsensusValidationSchema accepts fixed-length proof proposal byte fields'
     const schema = new ConsensusValidationSchema(config);
     const maxUint64 = 0xFFFFFFFFFFFFFFFFn;
 
-    t.is(schema.validateConsensusV1ProofProposal(makeProofProposalPayload(uint64ToBuffer(1, 'Epoch'))), true);
-    t.is(schema.validateConsensusV1ProofProposal(makeProofProposalPayload(uint64ToBuffer(maxUint64, 'Epoch'))), true);
-    t.is(schema.validateConsensusV1ProofProposal(makeProofProposalPayload(uint64ToBuffer(0, 'Epoch'))), false);
+    t.is(schema.validateConsensusV1ProofProposal(makeProofProposalPayload(uint64ToBuffer(1))), true);
+    t.is(schema.validateConsensusV1ProofProposal(makeProofProposalPayload(uint64ToBuffer(maxUint64))), true);
+    t.is(schema.validateConsensusV1ProofProposal(makeProofProposalPayload(uint64ToBuffer(0))), false);
     t.is(schema.validateConsensusV1ProofProposal(
-        makeProofProposalPayload(uint64ToBuffer(1, 'Epoch'), {network_id: uint16ToBuffer(0, 'Network id')})
+        makeProofProposalPayload(uint64ToBuffer(1), {network_id: uint16ToBuffer(0)})
     ), false);
     t.is(schema.validateConsensusV1ProofProposal(makeProofProposalPayload(b4a.alloc(7, 1))), false);
     t.is(schema.validateConsensusV1ProofProposal(makeProofProposalPayload(b4a.alloc(9, 1))), false);
