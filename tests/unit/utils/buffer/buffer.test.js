@@ -252,25 +252,25 @@ test('timestampToBuffer and idToBuffer - reject invalid input', t => {
 });
 
 test('uint32ToBuffer - encodes uint32 values and throws for invalid input', t => {
-    const zero = uint32ToBuffer(0, 0);
+    const zero = uint32ToBuffer(0);
     t.ok(b4a.isBuffer(zero), 'returns a buffer for zero');
     t.is(zero.readUInt32BE(0), 0, 'encodes zero');
 
-    const max = uint32ToBuffer(0xFFFFFFFF, 0);
+    const max = uint32ToBuffer(0xFFFFFFFF);
     t.ok(b4a.isBuffer(max), 'returns buffer for max uint32');
     t.is(max.readUInt32BE(0), 0xFFFFFFFF, 'encodes max uint32');
 
-    t.exception(() => uint32ToBuffer(-1, 0), errorMessageIncludes('Value must be an unsigned 32-bit integer.'));
-    t.exception(() => uint32ToBuffer(0xFFFFFFFFFF, 0), errorMessageIncludes('Value must be an unsigned 32-bit integer.'));
+    t.exception(() => uint32ToBuffer(-1), errorMessageIncludes('Value must be an unsigned 32-bit integer.'));
+    t.exception(() => uint32ToBuffer(0xFFFFFFFFFF), errorMessageIncludes('Value must be an unsigned 32-bit integer.'));
 });
 
 test('uint8ToBuffer - encodes boundary values', t => {
-    const zero = uint8ToBuffer(0, 0);
+    const zero = uint8ToBuffer(0);
     t.ok(b4a.isBuffer(zero), 'returns buffer for zero');
     t.is(zero.length, 1, 'uint8 is one byte');
     t.is(zero.readUInt8(0), 0, 'encodes zero');
 
-    const max = uint8ToBuffer(0xFF, 0);
+    const max = uint8ToBuffer(0xFF);
     t.ok(b4a.isBuffer(max), 'returns buffer for max uint8');
     t.is(max.length, 1, 'uint8 max is one byte');
     t.is(max.readUInt8(0), 0xFF, 'encodes max uint8');
@@ -289,7 +289,7 @@ test('uint8ToBuffer - rejects invalid values', t => {
     ];
 
     for (const value of invalidValues) {
-        t.exception(() => uint8ToBuffer(value, 0), errorMessageIncludes('Value must be an unsigned 8-bit integer.'));
+        t.exception(() => uint8ToBuffer(value), errorMessageIncludes('Value must be an unsigned 8-bit integer.'));
     }
 });
 
@@ -347,17 +347,17 @@ test('uint32ToBuffer - rejects non-integer and out-of-range values with field na
     ];
 
     for (const value of invalidValues) {
-        t.exception(() => uint32ToBuffer(value, 0), errorMessageIncludes('Value must be an unsigned 32-bit integer.'));
+        t.exception(() => uint32ToBuffer(value), errorMessageIncludes('Value must be an unsigned 32-bit integer.'));
     }
 });
 
 test('uint64ToBuffer - encodes bigint boundaries and rejects values outside uint64 range', t => {
     const max = (2n ** 64n) - 1n;
-    const maxBuffer = uint64ToBuffer(max, 'field');
+    const maxBuffer = uint64ToBuffer(max);
 
     t.ok(b4a.isBuffer(maxBuffer), 'returns buffer for max uint64');
     t.is(maxBuffer.readBigUInt64BE(0), max, 'encodes max uint64');
-    t.exception.all(() => uint64ToBuffer(2n ** 64n, 'field'));
+    t.exception.all(() => uint64ToBuffer(2n ** 64n));
 });
 
 test('ZERO_WK and NULL_BUFFER constants expose expected buffers', t => {
@@ -386,7 +386,7 @@ test('toHex returns hex for buffers and passes through non-buffers', t => {
 });
 
 test('safeWriteUInt32BE - encodes valid uint32 values', t => {
-    const buf = safeWriteUInt32BE(0x01020304, 0);
+    const buf = safeWriteUInt32BE(0x01020304);
     t.ok(b4a.isBuffer(buf), 'returns a buffer');
     t.is(buf.length, 4, 'buffer is 4 bytes');
     t.is(buf.readUInt32BE(0), 0x01020304, 'encodes value correctly');
@@ -412,7 +412,7 @@ test('safeWriteUInt32BE - returns empty buffer for invalid writes', t => {
 });
 
 test('safeUint8ToBuffer - returns encoded buffer or empty fallback buffer', t => {
-    const max = safeUint8ToBuffer(0xFF, 0);
+    const max = safeUint8ToBuffer(0xFF);
     t.ok(b4a.isBuffer(max), 'returns buffer for max uint8');
     t.is(max.length, 1, 'uint8 is one byte');
     t.is(max.readUInt8(0), 0xFF, 'encodes max uint8');
@@ -429,7 +429,7 @@ test('safeUint8ToBuffer - returns encoded buffer or empty fallback buffer', t =>
     ];
 
     for (const value of invalidValues) {
-        const encoded = safeUint8ToBuffer(value, 0);
+        const encoded = safeUint8ToBuffer(value);
         t.ok(b4a.isBuffer(encoded), 'invalid value still returns a buffer');
         t.is(encoded.length, 0, `invalid value returns empty buffer: ${String(value)}`);
     }

@@ -8,7 +8,13 @@ import ConsensusMessageBuilder from '../../../src/messages/consensus/v1/Consensu
 import V1EpochProofProposalRequest from '../../../src/core/consensus/v1/validators/V1EpochProofProposalRequest.js';
 import {V1ConsensusProtocolError} from '../../../src/core/consensus/v1/V1ConsensusProtocolError.js';
 import {addressToBuffer} from '../../../src/core/state/utils/address.js';
-import {createMessage, safeWriteUInt32BE, uint8ToBuffer, uint16ToBuffer, uint64ToBuffer} from '../../../src/utils/buffer.js';
+import {
+    createMessage,
+    uint8ToBuffer,
+    uint16ToBuffer,
+    uint64ToBuffer,
+    uint32ToBuffer
+} from '../../../src/utils/buffer.js';
 import {
     ConsensusOperationType,
     ConsensusProtocolVersion,
@@ -34,8 +40,8 @@ async function createWallet(keyPair = testKeyPair1) {
 
 async function buildVdfParametersHash(vdfConfig = vdfTestConfig) {
     const message = createMessage(
-        safeWriteUInt32BE(vdfConfig.vdfDifficulty, 0),
-        safeWriteUInt32BE(vdfConfig.vdfDiscriminantSizeBits, 0)
+        uint32ToBuffer(vdfConfig.vdfDifficulty),
+        uint32ToBuffer(vdfConfig.vdfDiscriminantSizeBits)
     );
 
     return await tracCryptoApi.hash.blake3(message);
@@ -61,9 +67,9 @@ async function buildVdfProof(challengeData, vdfConfig = vdfTestConfig) {
 
 async function buildProofProposalPayload(wallet, vdfConfig = vdfTestConfig) {
     const builder = new ConsensusMessageBuilder(wallet, vdfConfig);
-    const protocolVersion = uint8ToBuffer(ConsensusProtocolVersion.V1, 0);
+    const protocolVersion = uint8ToBuffer(ConsensusProtocolVersion.V1);
     const networkId = uint16ToBuffer(vdfConfig.networkId);
-    const epoch = uint64ToBuffer(1, 'Epoch');
+    const epoch = uint64ToBuffer(1);
     const previousEpochRecordHash = b4a.alloc(32, 1);
     const proposer = addressToBuffer(wallet.address, vdfConfig.addressPrefix);
     const vdfParametersHash = await buildVdfParametersHash(vdfConfig);

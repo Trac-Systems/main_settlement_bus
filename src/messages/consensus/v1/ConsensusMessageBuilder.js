@@ -9,10 +9,9 @@ import {
 } from '../../../utils/constants.js';
 import {
     createMessage,
-    safeWriteUInt32BE,
     uint8ToBuffer,
     uint16ToBuffer,
-    uint64ToBuffer
+    uint64ToBuffer, uint32ToBuffer
 } from "../../../utils/buffer.js";
 
 class ConsensusMessageBuilder {
@@ -104,7 +103,7 @@ class ConsensusMessageBuilder {
     }
 
     setProtocolVersion(protocolVersion) {
-        const value = uint8ToBuffer(protocolVersion, 0);
+        const value = uint8ToBuffer(protocolVersion);
         if (!Object.values(ConsensusProtocolVersion).includes(protocolVersion)) {
             throw new Error(`Unsupported consensus protocol version: ${protocolVersion}`);
         }
@@ -241,7 +240,7 @@ class ConsensusMessageBuilder {
     }
 
     async #hashProofProposalResponse(resultCode, proofProposalApproval) {
-        const resultCodeBuffer = safeWriteUInt32BE(resultCode, 0);
+        const resultCodeBuffer = uint32ToBuffer(resultCode);
         const message = proofProposalApproval
             ? createMessage(resultCodeBuffer, encodeProofProposalApproval(proofProposalApproval))
             : createMessage(resultCodeBuffer);

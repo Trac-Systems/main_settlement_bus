@@ -1,6 +1,6 @@
 import V1BaseConsensusOperation from "./V1BaseConsensusOperation.js";
 import {ConsensusResultCode} from "../../../../utils/constants.js";
-import {createMessage, safeWriteUInt32BE} from "../../../../utils/buffer.js";
+import {createMessage , uint32ToBuffer} from "../../../../utils/buffer.js";
 import {encodeProofProposalApproval} from "../../../../codecs/consensus/v1/consensusV1OperationCodec.js";
 import tracCryptoApi from "trac-crypto-api";
 import {V1ConsensusProtocolError} from "../V1ConsensusProtocolError.js";
@@ -38,7 +38,7 @@ class V1EpochProofProposalApproval extends V1BaseConsensusOperation {
      */
     async #validateResponseSignature(payload, remotePublicKey) {
         const proofProposalResponse = payload.proof_proposal_response;
-        const resultCode = safeWriteUInt32BE(proofProposalResponse.result, 0);
+        const resultCode = uint32ToBuffer(proofProposalResponse.result);
         const message = proofProposalResponse.result === ConsensusResultCode.OK
             ? createMessage(resultCode, encodeProofProposalApproval(proofProposalResponse.approval))
             : createMessage(resultCode);

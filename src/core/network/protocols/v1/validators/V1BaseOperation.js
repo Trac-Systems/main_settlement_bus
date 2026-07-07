@@ -92,7 +92,7 @@ class V1BaseOperation {
                 const nonce = payload.liveness_response.nonce;
                 const signature = payload.liveness_response.signature;
                 const result = payload.liveness_response.result;
-                const message = createMessage(payload.type, idBuf, tsBuf, nonce, uint32ToBuffer(result, 0), capsBuf);
+                const message = createMessage(payload.type, idBuf, tsBuf, nonce, uint32ToBuffer(result), capsBuf);
                 return {signature, message};
             }
             case NetworkOperationType.BROADCAST_TRANSACTION_REQUEST: {
@@ -140,7 +140,7 @@ class V1BaseOperation {
                     nonce,
                     proof,
                     timestampToBuffer(timestamp),
-                    uint32ToBuffer(result, 0),
+                    uint32ToBuffer(result),
                     capsBuf
                 );
 

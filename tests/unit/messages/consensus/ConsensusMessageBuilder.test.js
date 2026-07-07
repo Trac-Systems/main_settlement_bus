@@ -12,10 +12,9 @@ import {
 } from '../../../../src/codecs/consensus/v1/consensusV1OperationCodec.js';
 import {
     createMessage,
-    safeWriteUInt32BE,
     uint8ToBuffer,
     uint16ToBuffer,
-    uint64ToBuffer
+    uint64ToBuffer, uint32ToBuffer
 } from '../../../../src/utils/buffer.js';
 import {
     ConsensusOperationType,
@@ -143,7 +142,7 @@ test('ConsensusMessageBuilder iterates proof proposal response ResultCode values
             ? encodeProofProposalApproval(payload.proof_proposal_response.approval)
             : b4a.alloc(0);
         const responseMessage = createMessage(
-            safeWriteUInt32BE(code, 0),
+            uint32ToBuffer(code),
             encodedApproval
         );
         const responseHash = await tracCryptoApi.hash.blake3(responseMessage);
@@ -190,7 +189,7 @@ test('ConsensusMessageBuilder encodes scalar number fields at byte-width boundar
     const proofProposalFixture = consensusV1OperationFixtures.proofProposal;
     const proposer = bufferToAddress(proofProposalFixture.proposer, config.addressPrefix);
     const protocolVersion = ConsensusProtocolVersion.V1;
-    const protocolVersionBuffer = uint8ToBuffer(protocolVersion, 0);
+    const protocolVersionBuffer = uint8ToBuffer(protocolVersion);
     const cases = [
         {
             networkId: 1,
@@ -208,7 +207,7 @@ test('ConsensusMessageBuilder encodes scalar number fields at byte-width boundar
 
     for (const testCase of cases) {
         const networkIdBuffer = uint16ToBuffer(testCase.networkId);
-        const epochBuffer = uint64ToBuffer(testCase.epoch, 'Epoch');
+        const epochBuffer = uint64ToBuffer(testCase.epoch);
 
         await builder
             .setType(ConsensusOperationType.PROOF_PROPOSAL)
@@ -462,11 +461,11 @@ test('ConsensusMessageBuilder signs non-zero network id and uint64 epochs withou
     const proofProposalFixture = consensusV1OperationFixtures.proofProposal;
     const proposer = bufferToAddress(proofProposalFixture.proposer, config.addressPrefix);
     const protocolVersion = ConsensusProtocolVersion.V1;
-    const protocolVersionBuffer = uint8ToBuffer(protocolVersion, 0);
+    const protocolVersionBuffer = uint8ToBuffer(protocolVersion);
     const networkId = 1;
     const networkIdBuffer = uint16ToBuffer(networkId);
     const epoch = 0x100000000;
-    const epochBuffer = uint64ToBuffer(epoch, 'Epoch');
+    const epochBuffer = uint64ToBuffer(epoch);
 
     await builder
         .setType(ConsensusOperationType.PROOF_PROPOSAL)

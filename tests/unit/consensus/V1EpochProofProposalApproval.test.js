@@ -15,7 +15,7 @@ import {
 import {config} from '../../helpers/config.js';
 import {testKeyPair1, testKeyPair2, testKeyPair3} from '../../fixtures/apply.fixtures.js';
 import {errorMessageIncludes} from '../../helpers/regexHelper.js';
-import {createMessage, safeWriteUInt32BE} from '../../../src/utils/buffer.js';
+import {createMessage, uint32ToBuffer} from '../../../src/utils/buffer.js';
 
 const previousEpochRecordHash = b4a.alloc(32, 1);
 const vdfParametersHash = b4a.alloc(32, 2);
@@ -68,7 +68,7 @@ async function buildProofProposalApprovalPayload(approverWallet, proofProposalPa
 }
 
 async function buildProofProposalRejectionPayload(approverWallet, proofProposalPayload, result = ConsensusResultCode.INVALID_PAYLOAD) {
-    const responseHash = await tracCryptoApi.hash.blake3(createMessage(safeWriteUInt32BE(result, 0)));
+    const responseHash = await tracCryptoApi.hash.blake3(createMessage(uint32ToBuffer(result)));
 
     return {
         type: ConsensusOperationType.PROOF_PROPOSAL_APPROVAL,
@@ -241,7 +241,7 @@ test('V1EpochProofProposalApproval rejects invalid result code before shortened 
     const validator = new V1EpochProofProposalApproval(config);
     const proofProposalPayload = await buildProofProposalPayload(proposerWallet);
     const invalidResult = -1;
-    const shortenedHash = await tracCryptoApi.hash.blake3(createMessage(safeWriteUInt32BE(invalidResult, 0)));
+    const shortenedHash = await tracCryptoApi.hash.blake3(createMessage(uint32ToBuffer(invalidResult)));
     const approvalPayload = {
         type: ConsensusOperationType.PROOF_PROPOSAL_APPROVAL,
         session_id: proofProposalPayload.session_id,

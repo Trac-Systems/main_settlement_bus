@@ -21,7 +21,7 @@ export function deepCopyBuffer(buffer) {
 }
 
 export function timestampToBuffer(timestamp) {
-    return uint64ToBuffer(timestamp, 'timestamp');
+    return uint64ToBuffer(timestamp);
 }
 
 export function idToBuffer(id) {
@@ -76,19 +76,19 @@ export const safeUint8ToBuffer = (value, offset = 0) => {
     }
 }
 
-export function uint16ToBuffer(value) {
+export function uint16ToBuffer(value, offset = 0) {
     if (!Number.isInteger(value) || value < 0 || value > 0xFFFF) {
         throw new Error(`Value must be an unsigned 16-bit integer.`);
     }
 
     const buf = b4a.alloc(2);
-    buf.writeUInt16BE(value, 0);
+    buf.writeUInt16BE(value, offset);
     return buf;
 }
 
-export const safeUint16ToBuffer = (value) => {
+export const safeUint16ToBuffer = (value, offset = 0) => {
     try {
-        return uint16ToBuffer(value);
+        return uint16ToBuffer(value, offset);
     }
     catch {
         return NULL_BUFFER;
@@ -107,7 +107,7 @@ export const safeReadUint16BE = (buffer, offset = 0) => {
     }
 }
 
-export function uint32ToBuffer(value, offset) {
+export function uint32ToBuffer(value, offset = 0) {
     if (!Number.isInteger(value) || value < 0 || value > 0xFFFFFFFF) {
         throw new Error(`Value must be an unsigned 32-bit integer.`);
     }
@@ -117,7 +117,7 @@ export function uint32ToBuffer(value, offset) {
     return buf;
 }
 
-export const safeWriteUInt32BE = (value, offset) => {
+export const safeWriteUInt32BE = (value, offset = 0) => {
     try {
         return uint32ToBuffer(value, offset);
     } catch {
@@ -175,7 +175,7 @@ export const createMessage = (...args) => {
         if (b4a.isBuffer(arg)) {
             return arg;
         } else if (typeof arg === 'number' && isUInt32(arg)) {
-            return safeWriteUInt32BE(arg, 0);
+            return safeWriteUInt32BE(arg);
         }
     }).filter(buf => b4a.isBuffer(buf));
 

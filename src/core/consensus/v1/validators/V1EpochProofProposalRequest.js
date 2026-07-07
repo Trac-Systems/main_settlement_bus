@@ -55,8 +55,8 @@ class V1EpochProofProposalRequest extends V1BaseConsensusOperation {
      */
     async validateProofProposalVdfParametersHash(proofProposal) {
         const message = createMessage(
-            uint32ToBuffer(this.#config.vdfDifficulty, 0),
-            uint32ToBuffer(this.#config.vdfDiscriminantSizeBits, 0)
+            uint32ToBuffer(this.#config.vdfDifficulty),
+            uint32ToBuffer(this.#config.vdfDiscriminantSizeBits)
         );
 
         let expectedHash;

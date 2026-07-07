@@ -13,7 +13,7 @@ import { config } from '../../helpers/config.js';
 import { testKeyPair2 } from '../../fixtures/apply.fixtures.js';
 import { addressToBuffer } from '../../../src/core/state/utils/address.js';
 import { encodeProofProposalApproval } from '../../../src/codecs/consensus/v1/consensusV1OperationCodec.js';
-import { createMessage, safeWriteUInt32BE } from '../../../src/utils/buffer.js';
+import {createMessage, uint32ToBuffer} from '../../../src/utils/buffer.js';
 import {
     CustomEventType,
     ConsensusOperationType,
@@ -132,7 +132,7 @@ async function verifyProofProposalApprovalSignature(proofProposal, approval, pub
 }
 
 async function verifyProofProposalResponseSignature(response, publicKey) {
-    const resultCode = safeWriteUInt32BE(response.result, 0);
+    const resultCode = uint32ToBuffer(response.result);
     const message = response.approval
         ? createMessage(resultCode, encodeProofProposalApproval(response.approval))
         : createMessage(resultCode);
