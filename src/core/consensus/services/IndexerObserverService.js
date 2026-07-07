@@ -24,7 +24,7 @@ class IndexerObserverService extends SchedulableService {
     }
 
     #shouldRun() {
-        return this.#config.enableIndexerObserver && !this.isInterrupted;
+        return !this.isInterrupted;
     }
 
     getScheduleInterval() {
@@ -32,11 +32,6 @@ class IndexerObserverService extends SchedulableService {
     }
 
     async start() {
-        if (!this.#config.enableIndexerObserver) {
-            this.#logger.info('IndexerObserverService can not start. Disabled by configuration.');
-            return;
-        }
-
         super.start();
         this.#logger.info("IndexerObserverService started");
     }

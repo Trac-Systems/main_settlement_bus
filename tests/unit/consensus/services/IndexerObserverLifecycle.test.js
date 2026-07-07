@@ -49,7 +49,6 @@ function createBaseMocks(overrides = {}) {
             ...(overrides.state || {}),
         },
         config: {
-            enableIndexerObserver: true,
             pollInterval: 10,
             addressPrefix: "trac",
             ...(overrides.config || {}),
