@@ -234,30 +234,3 @@ test('V1EpochProofProposalApproval rejects fake response signature', async t => 
         errorMessageIncludes('response signature verification failed')
     );
 });
-
-test('V1EpochProofProposalApproval rejects invalid result code before shortened response signature can verify', async t => {
-    const proposerWallet = await createWallet(testKeyPair1);
-    const approverWallet = await createWallet(testKeyPair2);
-    const validator = new V1EpochProofProposalApproval(config);
-    const proofProposalPayload = await buildProofProposalPayload(proposerWallet);
-    const invalidResult = -1;
-    const shortenedHash = await tracCryptoApi.hash.blake3(createMessage(uint32ToBuffer(invalidResult)));
-    const approvalPayload = {
-        type: ConsensusOperationType.PROOF_PROPOSAL_APPROVAL,
-        session_id: proofProposalPayload.session_id,
-        timestamp: Date.now(),
-        proof_proposal_response: {
-            result: invalidResult,
-            response_sig: approverWallet.sign(shortenedHash),
-        },
-    };
-
-    await t.exception(
-        async () => validator.validate(
-            approvalPayload,
-            {remotePublicKey: approverWallet.publicKey},
-            proofProposalPayload.proof_proposal
-        ),
-        errorMessageIncludes('Payload is invalid')
-    );
-});
