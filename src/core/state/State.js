@@ -743,8 +743,8 @@ class State extends ReadyResource {
         };
 
         // Verify signature
-        const isMessageVerifed = tracCryptoApi.signature.verify(op.bio.is, hash, adminPublicKey);
-        if (!isMessageVerifed) {
+        const isMessageVerified = tracCryptoApi.signature.verify(op.bio.is, hash, adminPublicKey);
+        if (!isMessageVerified) {
             this.#safeLogApply(OperationType.BALANCE_INITIALIZATION, "Failed to verify message signature.", node.from.key)
             return Status.FAILURE;
         };
@@ -865,8 +865,8 @@ class State extends ReadyResource {
         };
 
         // Verify signature
-        const isMessageVerifed = tracCryptoApi.signature.verify(op.cao.is, hash, adminPublicKey);
-        if (!isMessageVerifed) {
+        const isMessageVerified = tracCryptoApi.signature.verify(op.cao.is, hash, adminPublicKey);
+        if (!isMessageVerified) {
             this.#safeLogApply(OperationType.DISABLE_INITIALIZATION, "Failed to verify message signature.", node.from.key)
             return Status.FAILURE;
         };
@@ -950,9 +950,9 @@ class State extends ReadyResource {
         };
 
         // verify signature
-        const isMessageVerifed = tracCryptoApi.signature.verify(op.cao.is, op.cao.tx, adminPublicKey)
+        const isMessageVerified = tracCryptoApi.signature.verify(op.cao.is, op.cao.tx, adminPublicKey)
         const txHashHexString = op.cao.tx.toString('hex');
-        if (!isMessageVerifed) {
+        if (!isMessageVerified) {
             this.#safeLogApply(OperationType.ADD_ADMIN, "Failed to verify message signature.", node.from.key)
             return Status.FAILURE;
         };
@@ -2194,9 +2194,9 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const isMessageVerifed = tracCryptoApi.signature.verify(op.aco.is, hash, adminPublicKey);
+        const isMessageVerified = tracCryptoApi.signature.verify(op.aco.is, hash, adminPublicKey);
         const txHashHexString = hash.toString('hex');
-        if (!isMessageVerifed) {
+        if (!isMessageVerified) {
             this.#safeLogApply(OperationType.ADD_INDEXER, "Failed to verify message signature.", node.from.key)
             return Status.FAILURE;
         };
@@ -2409,9 +2409,9 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const isMessageVerifed = tracCryptoApi.signature.verify(op.aco.is, hash, adminPublicKey);
+        const isMessageVerified = tracCryptoApi.signature.verify(op.aco.is, hash, adminPublicKey);
         const txHashHexString = hash.toString('hex');
-        if (!isMessageVerifed) {
+        if (!isMessageVerified) {
             this.#safeLogApply(OperationType.REMOVE_INDEXER, "Failed to verify message signature.", node.from.key)
             return Status.FAILURE;
         };
@@ -2615,9 +2615,9 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const isMessageVerifed = tracCryptoApi.signature.verify(op.aco.is, regeneratedHash, adminPublicKey);
+        const isMessageVerified = tracCryptoApi.signature.verify(op.aco.is, regeneratedHash, adminPublicKey);
         const txHashHexString = regeneratedHash.toString('hex');
-        if (!isMessageVerifed) {
+        if (!isMessageVerified) {
             this.#safeLogApply(OperationType.BAN_VALIDATOR, "Failed to verify message signature.", node.from.key)
             return Status.FAILURE;
         }
@@ -4152,10 +4152,10 @@ class State extends ReadyResource {
         }
 
         // verify signature
-        const isMessageVerifed = tracCryptoApi.signature.verify(op.sgo.is, op.sgo.tx, adminPublicKey)
+        const isMessageVerified = tracCryptoApi.signature.verify(op.sgo.is, op.sgo.tx, adminPublicKey)
         const txHashHexString = op.sgo.tx.toString('hex');
 
-        if (!isMessageVerifed) {
+        if (!isMessageVerified) {
             this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Failed to verify message signature.", node.from.key)
             return Status.FAILURE;
         }
