@@ -57,14 +57,6 @@ export class CommandHandler {
     }
 
     async handle(input) {
-        if (this.#pendingConfirmation !== null) {
-            return this.#handlePendingConfirmation(input);
-        }
-
-        if (this.#pendingGenesisInitialization !== null) {
-            return this.#handlePendingGenesisInitialization(input);
-        }
-
         const [command, ...parts] = input.split(" ");
         const context = { command, input, parts };
         const handlers = this.#getHandlers();
@@ -77,6 +69,14 @@ export class CommandHandler {
 
     #getHandlers() {
         return [
+            {
+                evaluate: () => this.#pendingConfirmation !== null,
+                process: async (context) => this.#handlePendingConfirmation(context.input),
+            },
+            {
+                evaluate: () => this.#pendingGenesisInitialization !== null,
+                process: async (context) => this.#handlePendingGenesisInitialization(context.input),
+            },
             {
                 evaluate: ({ command }) => command === COMMANDS.HELP,
                 process: async () => {
