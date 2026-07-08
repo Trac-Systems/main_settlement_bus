@@ -45,7 +45,7 @@ import { deepCopyBuffer } from '../../utils/buffer.js';
 import { Status } from './utils/transaction.js';
 import remote from 'hypercore/lib/fully-remote-proof.js'
 import PQueue from 'p-queue';
-import {decodeVdfParameters, encodeVdfParameters, initGenesisEpoch} from './utils/epochProof.js';
+import {decodeVdfParameters, encodeVdfParameters, createGenesisEpochProof} from './utils/epochProof.js';
 
 const OVERSIZED_BATCH_PENALTY_MULTIPLIER = BATCH_SIZE;
 
@@ -4211,7 +4211,7 @@ class State extends ReadyResource {
             return Status.IGNORE;
         }
 
-        const genesisEpoch = await initGenesisEpoch(this.#config, requesterAddressString, encodedVdfParamsEntry);
+        const genesisEpoch = await createGenesisEpochProof(this.#config, requesterAddressString, encodedVdfParamsEntry);
         if (!genesisEpoch) {
             this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Could not initialize genesis epoch", node.from.key)
             return Status.FAILURE;

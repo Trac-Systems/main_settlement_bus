@@ -62,7 +62,7 @@ export function decodeVdfParameters(vdfParamsEntry) {
     }
 }
 
-export async function initGenesisEpoch(config, proposerAddress, vdfParamsEntry) {
+export async function createGenesisEpochProof(config, proposerAddress, vdfParamsEntry) {
     const proposer = addressToBuffer(proposerAddress, config.addressPrefix);
 
     if (proposer.length === 0) {
