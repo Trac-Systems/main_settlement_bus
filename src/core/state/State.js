@@ -3389,20 +3389,6 @@ class State extends ReadyResource {
         return Status.SUCCESS;
     }
 
-    async #handleApplySetEpochGenesisOperation(op, view, base, node, batch) {
-        const difficulty = op.sgo.df;
-        const size = op.sgo.db;
-        const epoch = uint64ToBuffer(1, "epoch");
-        const epochHash = b4a.alloc(32, 0);
-
-        await batch.put(keys.VDF_DIFFICULTY, difficulty);
-        await batch.put(keys.VDF_SIZE, size);
-        await batch.put(keys.CURRENT_INDEX, epoch);        
-        await batch.put(keys.EPOCH_HASH(1), epochHash);
-
-        return Status.SUCCESS;
-    }
-
     async #handleApplySetEpochOperation(op, view, base, node, _batch) {
         if (!this.#stateValidationSchema.validateSetEpochOperation(op)) {
             this.#safeLogApply(OperationType.SET_EPOCH, "Contract schema validation failed.", node.from.key)

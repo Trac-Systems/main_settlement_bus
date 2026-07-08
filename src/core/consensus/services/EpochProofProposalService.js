@@ -87,10 +87,9 @@ class EpochProofProposalService extends SchedulableService {
             return;
         }
 
-        const currentEpoch = await this.#state.currentEpoch();
-        const currentEpochHash = await this.#state.currentEpochHash(currentEpoch);
-        const vdfDifficulty = await this.#state.vdfDifficulty();
-        const vdfSize = await this.#state.vdfSize();
+        const currentEpoch = await this.#state.getCurrentEpoch();
+        const currentEpochHash = await this.#state.getEpoch(currentEpoch);
+        const { vdfDifficulty, vdfDiscriminantSize } = await this.#state.getSignedVDFParams();
 
         const machine = new EpochStateMachine(this.#logger);
 
@@ -113,7 +112,7 @@ class EpochProofProposalService extends SchedulableService {
         this.#state.on(CustomEventType.EPOCH_PROPOSAL_SUBMITTED, onEpochSubmited);
         this.#state.on(CustomEventType.EPOCH_CREATED, onEpochCreated);
 
-        machine.appendContext({ currentEpoch, currentEpochHash, vdfDifficulty, vdfSize });
+        machine.appendContext({ currentEpoch, currentEpochHash, vdfDifficulty, vdfDiscriminantSize });
         await machine.send(EPOCH_EVENTS.START);
     }
 
@@ -121,8 +120,8 @@ class EpochProofProposalService extends SchedulableService {
     async #handleStartVdf() {}
 
     async #handleVdfPending(context, machine) {
-        const { currentEpochHash, vdfDifficulty, vdfSize } = context
-        const vdf = await this.#operations.calculateVDF(currentEpochHash, vdfDifficulty, vdfSize);
+        const { currentEpochHash, vdfDifficulty, vdfDiscriminantSize } = context
+        const vdf = await this.#operations.calculateVDF(currentEpochHash, vdfDifficulty, vdfDiscriminantSize);
         machine.appendContext({ vdf });
         await machine.send(EPOCH_EVENTS.CALCULATE_VDF);
     }
@@ -139,13 +138,11 @@ class EpochProofProposalService extends SchedulableService {
 
     async #handleProposingEpoch(context, machine) {
         const { currentEpoch, currentEpochHash, vdf } = context;
-        const newProofData = this.#operations.createProposal(currentEpoch, currentEpochHash, vdf);
-        const proofProposal = await newProofData.toProposalMessage(this.#wallet);
+        const proofProposal = await this.#operations.createProposal(currentEpoch, currentEpochHash, vdf);
         const approvers = await this.#operations.approvers();
 
         if (machine.state !== EPOCH_STATES.PROPOSING_EPOCH) return;
 
-        machine.appendContext({ newProofData });
         machine.appendContext({
             proofProposal,
             confirmations: [],
@@ -196,7 +193,7 @@ class EpochProofProposalService extends SchedulableService {
     }
 
     async #shouldRun() {
-        return await this.#state.currentEpoch() >= 1 && !this.isInterrupted
+        return await this.#state.getCurrentEpoch() >= 0n && !this.isInterrupted
     }
 }
 

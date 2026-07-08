@@ -1,4 +1,3 @@
-import { buildProofData } from '../../consensus/v1/handlers/epochProposal/epochProofData.js';
 import { addressToBuffer } from "../../state/utils/address.js";
 import tracCryptoApi from "trac-crypto-api";
 import { generateUUID } from '../../../utils/helpers.js';
@@ -7,8 +6,11 @@ import addressUtils from '../../state/utils/address.js';
 import b4a from "b4a";
 import { safeEncodeProofProposal, safeEncodeProofProposalApproval } from '../../../codecs/consensus/v1/consensusV1OperationCodec.js';
 import { applyStateMessageFactory } from '../../../messages/state/applyStateMessageFactory.js';
-import { uint8ToBuffer, uint16ToBuffer, uint64ToBuffer } from '../../../utils/buffer.js';
+import { uint8ToBuffer, uint16ToBuffer, uint64ToBuffer, uint32ToBuffer } from '../../../utils/buffer.js';
 import { safeEncodeApplyOperation } from '../../../codecs/apply/applyOperationCodec.js';
+import { encodeVdfParameters } from '../../state/utils/epochProof.js';
+import { blake3 } from 'trac-crypto-api/modules/hash.js';
+import { createMessage } from '../../../utils/buffer.js';
 
 const PROTOCOL_VERSION = 1;
 
@@ -33,20 +35,37 @@ export class EpochProofProposalOperations {
             difficulty,
             discriminantSizeBits,
         );
-        return { solution: vdf.solution };
+        return { solution: vdf.solution, difficulty, discriminantSizeBits };
     }
 
-    createProposal(prevEpochId, prevEpochHash, vdf) {
-        const currentEpochId = prevEpochId + 1n;
-        return buildProofData({
+    async createProposal(prevEpochId, prevEpochHash, vdf) {
+        const currentEpoch = prevEpochId + 1n;
+        const difficulty = uint32ToBuffer(vdf.difficulty)
+        const discriminantSizeBits = uint16ToBuffer(vdf.discriminantSizeBits)
+        const vdfData = encodeVdfParameters(difficulty, discriminantSizeBits)
+        const vdfHash = await blake3(vdfData)
+        const challengeData = createMessage(
+            PROTOCOL_VERSION,
+            this.#config.networkId,
+            currentEpoch,
+            prevEpochHash,
+            addressToBuffer(this.#wallet.address, this.#config.addressPrefix),
+            vdfHash
+        );
+        const toHash = createMessage(challengeData, vdf.solution);
+        const toSign =await tracCryptoApi.hash.blake3(toHash)
+        const signature = this.#wallet.sign(toSign)
+
+        return safeEncodeProofProposal({
             protocolVersion: PROTOCOL_VERSION,
-            epoch: currentEpochId,
-            prevEpochHash: prevEpochHash,
             networkId: this.#config.networkId,
+            epoch: uint64ToBuffer(currentEpoch),
+            prevEpochHash: prevEpochHash,
             proposer: addressToBuffer(this.#wallet.address, this.#config.addressPrefix),
-            vdfParamsHash: vdf.solution.slice(0, 258),
-            vdfProof: vdf.solution.slice(258),
-        });
+            vdfParamsHash: vdfHash,
+            vdfProof: vdf.solution,
+            signature: signature
+        })
     }
 
     async verifySignature(signature, hash, publicKey) {
