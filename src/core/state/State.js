@@ -4080,7 +4080,6 @@ class State extends ReadyResource {
     }
 
     async #handleApplySetGenesisEpoch(op, view, base, node, batch) {
-
         if (!this.#stateValidationSchema.validateSetGenesisEpochOperation(op)) {
             this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Contract schema validation failed.", node.from.key)
             return Status.FAILURE;
