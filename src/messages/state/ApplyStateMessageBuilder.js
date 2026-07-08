@@ -584,14 +584,12 @@ class ApplyStateMessageBuilder {
             case OperationType.SET_VDF_PARAMS:
                 this.#requireFields([
                     [this.#txValidity, 'Transaction validity'],
-                    [this.#vdfDifficulty, 'Difficulty'],
-                    [this.#vdfDiscriminantSize, 'Discriminant size']
+                    [this.#vdfDifficulty, 'Difficulty']
                 ]);
                 msg = createMessage(
                     this.#config.networkId,
                     this.#txValidity,
                     this.#vdfDifficulty,
-                    this.#vdfDiscriminantSize,
                     nonce,
                     this.#operationType
                 );
@@ -700,7 +698,6 @@ class ApplyStateMessageBuilder {
                 tx,
                 txv: this.#txValidity,
                 df: this.#vdfDifficulty,
-                db: this.#vdfDiscriminantSize,
                 in: nonce,
                 is: signature
             };

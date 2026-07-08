@@ -12,8 +12,9 @@ async function runCheckTests() {
     await import('./balanceInitializationOperation.test.js')
     await import('./setEpochOperation.test.js')
     await import('./setGenesisEpochOperation.test.js')
+    await import('./setVdfParamsOperation.test.js')
 
     test.resume();
 }
 
-runCheckTests();
+await runCheckTests();

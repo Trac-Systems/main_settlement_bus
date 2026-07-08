@@ -559,10 +559,9 @@ class ApplyStateMessageDirector {
      * @param {string|Buffer} invokerAddress
      * @param {string|Buffer} txValidity
      * @param {string|Buffer} vdfDifficulty
-     * @param {string|Buffer} vdfDiscriminantSize
      * @returns {Promise<object>}
      */
-    async buildCompleteSetVdfParamsMessage(invokerAddress, txValidity, vdfDifficulty, vdfDiscriminantSize) {
+    async buildCompleteSetVdfParamsMessage(invokerAddress, txValidity, vdfDifficulty) {
         if (!this.#builder) throw new Error('Builder has not been set.');
         await this.#builder
             .setPhase('complete')
@@ -571,7 +570,6 @@ class ApplyStateMessageDirector {
             .setAddress(invokerAddress)
             .setTxValidity(txValidity)
             .setVdfDifficulty(vdfDifficulty)
-            .setVdfDiscriminantSize(vdfDiscriminantSize)
             .build();
         return this.#builder.getPayload();
     }

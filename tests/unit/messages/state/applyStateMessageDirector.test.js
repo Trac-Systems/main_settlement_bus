@@ -72,25 +72,21 @@ test('ApplyStateMessageDirector builds complete set VDF params message', async t
     const wallet = await createWallet(testKeyPair1.mnemonic);
     const txValidity = b4a.from('44'.repeat(32), 'hex');
     const vdfDifficulty = b4a.from('55'.repeat(VDF_DIFFICULTY_SIZE), 'hex');
-    const vdfDiscriminantSize = b4a.from('66'.repeat(VDF_DISCRIMINANT_SIZE), 'hex');
 
     const payload = await applyStateMessageFactory(wallet, config)
         .buildCompleteSetVdfParamsMessage(
             wallet.address,
             txValidity,
-            vdfDifficulty,
-            vdfDiscriminantSize
+            vdfDifficulty
         );
 
     t.is(payload.type, OperationType.SET_VDF_PARAMS);
     t.ok(b4a.equals(payload.address, addressToBuffer(wallet.address, config.addressPrefix)));
     t.alike(Object.keys(payload).sort(), ['address', 'type', 'vpo']);
-    t.alike(Object.keys(payload.vpo).sort(), ['db', 'df', 'in', 'is', 'tx', 'txv']);
+    t.alike(Object.keys(payload.vpo).sort(), ['df', 'in', 'is', 'tx', 'txv']);
     t.ok(b4a.equals(payload.vpo.txv, txValidity));
     t.ok(b4a.equals(payload.vpo.df, vdfDifficulty));
-    t.ok(b4a.equals(payload.vpo.db, vdfDiscriminantSize));
     t.is(payload.vpo.df.length, VDF_DIFFICULTY_SIZE);
-    t.is(payload.vpo.db.length, VDF_DISCRIMINANT_SIZE);
     t.is(payload.vpo.tx.length, 32);
     t.is(payload.vpo.in.length, 32);
     t.is(payload.vpo.is.length, 64);
