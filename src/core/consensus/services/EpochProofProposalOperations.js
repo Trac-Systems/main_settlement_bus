@@ -39,33 +39,17 @@ export class EpochProofProposalOperations {
     }
 
     async createProposal(prevEpochId, prevEpochHash, vdf) {
-        const currentEpoch = prevEpochId + 1n;
+        const epoch = prevEpochId + 1n;
         const difficulty = uint32ToBuffer(vdf.difficulty)
         const discriminantSizeBits = uint16ToBuffer(vdf.discriminantSizeBits)
         const vdfData = encodeVdfParameters(difficulty, discriminantSizeBits)
-        const vdfHash = await blake3(vdfData)
-        const challengeData = createMessage(
-            PROTOCOL_VERSION,
-            this.#config.networkId,
-            currentEpoch,
+        const vdfParamsHash = await blake3(vdfData)
+        return { data: {
+            epoch,
             prevEpochHash,
-            addressToBuffer(this.#wallet.address, this.#config.addressPrefix),
-            vdfHash
-        );
-        const toHash = createMessage(challengeData, vdf.solution);
-        const toSign =await tracCryptoApi.hash.blake3(toHash)
-        const signature = this.#wallet.sign(toSign)
-
-        return safeEncodeProofProposal({
-            protocolVersion: PROTOCOL_VERSION,
-            networkId: this.#config.networkId,
-            epoch: uint64ToBuffer(currentEpoch),
-            prevEpochHash: prevEpochHash,
-            proposer: addressToBuffer(this.#wallet.address, this.#config.addressPrefix),
-            vdfParamsHash: vdfHash,
-            vdfProof: vdf.solution,
-            signature: signature
-        })
+            vdfParamsHash,
+            vdfProof: vdf.solution
+        }}
     }
 
     async verifySignature(signature, hash, publicKey) {
@@ -78,7 +62,6 @@ export class EpochProofProposalOperations {
 
     async sendToIndexer(publicKeyHex, { data }) {
         if (!this.#connectionManager.connected(publicKeyHex)) throw new Error('Validator not in the manager');
-        const proposerAddress = addressUtils.bufferToAddress(data.proposer, this.#config.addressPrefix);
 
         let request = await consensusMessageFactory(this.#wallet, this.#config)
             .buildProofProposal(
@@ -86,12 +69,12 @@ export class EpochProofProposalOperations {
                 this.#config.networkId,
                 data.epoch,
                 data.prevEpochHash,
-                proposerAddress,
+                this.#wallet.address,
                 data.vdfParamsHash,
                 data.vdfProof
             );
 
-        const response = await this.#connectionManager.send(request);
+        const response = await this.#connectionManager.send(publicKeyHex, request);
         return response?.result?.approval_sig
     }
 

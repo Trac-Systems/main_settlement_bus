@@ -73,7 +73,9 @@ class EpochProofProposalService extends SchedulableService {
         for (const member of approvers) {
             this.#operations.collectSignature(member, proofProposal)
                 .then((confirmation) => this.#handleConfirmation(confirmation, machine))
-                .catch(() => {});
+                .catch((err) => {
+                    console.log(err)
+                });
         }
     }  
 
