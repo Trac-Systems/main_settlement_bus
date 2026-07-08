@@ -390,4 +390,168 @@ if (isBareRuntime) {
 
         await msb.close();
     });
+
+    test('MainSettlementBus appends set VDF params with encoded difficulty', async t => {
+        const consoleLog = sinon.stub(console, 'log');
+        t.teardown(() => consoleLog.restore());
+
+        const loaded = await loadMainSettlementBus();
+        const config = buildGenesisConfig();
+        const wallet = await createWallet(config);
+        const txValidity = b4a.from('bb'.repeat(32), 'hex');
+        const msb = new loaded.MainSettlementBus(config, wallet);
+
+        await msb.ready();
+
+        loaded.state.getAdminEntry.resolves(adminEntryFor(wallet, loaded.state));
+        loaded.state.getSignedVDFParams.resolves({
+            vdfDifficulty: 55000000,
+            vdfDiscriminantSize: 2048,
+        });
+        loaded.state.getIndexerSequenceState.resolves(txValidity);
+
+        await msb.handleSetVdfParams({
+            vdfDifficulty: '60000000',
+        });
+
+        t.ok(loaded.state.getSignedVDFParams.calledOnce);
+        t.ok(loaded.state.getIndexerSequenceState.calledOnce);
+        t.ok(loaded.state.append.calledOnce);
+
+        const encodedPayload = loaded.state.append.firstCall.args[0];
+        const decoded = safeDecodeApplyOperation(encodedPayload);
+
+        t.is(decoded.type, OperationType.SET_VDF_PARAMS);
+        t.ok(b4a.equals(decoded.address, addressToBuffer(wallet.address, config.addressPrefix)));
+        t.ok(b4a.equals(decoded.vpo.txv, txValidity));
+        t.is(decoded.vpo.df.length, 4);
+        t.is(decoded.vpo.df.readUInt32BE(0), 60000000);
+        t.absent(decoded.vpo.db);
+
+        await msb.close();
+    });
+
+    test('MainSettlementBus rejects set VDF params when wallet is disabled', async t => {
+        const loaded = await loadMainSettlementBus();
+        const config = buildGenesisConfig({ enableWallet: false });
+        const msb = new loaded.MainSettlementBus(config);
+
+        await t.exception(
+            () => msb.handleSetVdfParams({
+                vdfDifficulty: '60000000',
+            }),
+            errorMessageIncludes('wallet is not enabled')
+        );
+    });
+
+    test('MainSettlementBus rejects set VDF params when admin is missing', async t => {
+        const consoleLog = sinon.stub(console, 'log');
+        t.teardown(() => consoleLog.restore());
+
+        const loaded = await loadMainSettlementBus();
+        const config = buildGenesisConfig();
+        const wallet = await createWallet(config);
+        const msb = new loaded.MainSettlementBus(config, wallet);
+
+        await msb.ready();
+
+        loaded.state.getAdminEntry.resolves(null);
+
+        await t.exception(
+            () => msb.handleSetVdfParams({
+                vdfDifficulty: '60000000',
+            }),
+            errorMessageIncludes('admin has not been initialized')
+        );
+
+        t.ok(loaded.state.getSignedVDFParams.notCalled);
+        t.ok(loaded.state.append.notCalled);
+
+        await msb.close();
+    });
+
+    test('MainSettlementBus rejects set VDF params for non-admin wallet', async t => {
+        const consoleLog = sinon.stub(console, 'log');
+        t.teardown(() => consoleLog.restore());
+
+        const loaded = await loadMainSettlementBus();
+        const config = buildGenesisConfig();
+        const wallet = await createWallet(config);
+        const msb = new loaded.MainSettlementBus(config, wallet);
+
+        await msb.ready();
+
+        loaded.state.getAdminEntry.resolves(adminEntryFor(wallet, loaded.state, {
+            address: 'different-admin-address',
+        }));
+
+        await t.exception(
+            () => msb.handleSetVdfParams({
+                vdfDifficulty: '60000000',
+            }),
+            errorMessageIncludes('you are not the admin')
+        );
+
+        t.ok(loaded.state.getSignedVDFParams.notCalled);
+        t.ok(loaded.state.append.notCalled);
+
+        await msb.close();
+    });
+
+    test('MainSettlementBus rejects set VDF params before VDF params are initialized', async t => {
+        const consoleLog = sinon.stub(console, 'log');
+        t.teardown(() => consoleLog.restore());
+
+        const loaded = await loadMainSettlementBus();
+        const config = buildGenesisConfig();
+        const wallet = await createWallet(config);
+        const msb = new loaded.MainSettlementBus(config, wallet);
+
+        await msb.ready();
+
+        loaded.state.getAdminEntry.resolves(adminEntryFor(wallet, loaded.state));
+        loaded.state.getSignedVDFParams.resolves(null);
+
+        await t.exception(
+            () => msb.handleSetVdfParams({
+                vdfDifficulty: '60000000',
+            }),
+            errorMessageIncludes('VDF parameters have not been initialized')
+        );
+
+        t.ok(loaded.state.getIndexerSequenceState.notCalled);
+        t.ok(loaded.state.append.notCalled);
+
+        await msb.close();
+    });
+
+    test('MainSettlementBus rejects set VDF params when VDF difficulty is not positive', async t => {
+        const consoleLog = sinon.stub(console, 'log');
+        t.teardown(() => consoleLog.restore());
+
+        const loaded = await loadMainSettlementBus();
+        const config = buildGenesisConfig();
+        const wallet = await createWallet(config);
+        const msb = new loaded.MainSettlementBus(config, wallet);
+
+        await msb.ready();
+
+        loaded.state.getAdminEntry.resolves(adminEntryFor(wallet, loaded.state));
+        loaded.state.getSignedVDFParams.resolves({
+            vdfDifficulty: 55000000,
+            vdfDiscriminantSize: 2048,
+        });
+
+        await t.exception(
+            () => msb.handleSetVdfParams({
+                vdfDifficulty: '0',
+            }),
+            errorMessageIncludes('VDF difficulty must be a positive unsigned 32-bit integer.')
+        );
+
+        t.ok(loaded.state.getIndexerSequenceState.notCalled);
+        t.ok(loaded.state.append.notCalled);
+
+        await msb.close();
+    });
 }

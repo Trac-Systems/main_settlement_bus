@@ -292,6 +292,7 @@ export class MainSettlementBus extends ReadyResource {
             console.log("- /remove_indexer <address>: Change a role of the selected indexer node to default role. Charges a fee.");
             console.log("- /ban_writer <address>: Demote a whitelisted writer to default role and remove it from the whitelist. Charges a fee.");
             console.log("- /init_genesis: Initialize genesis epoch.");
+            console.log("- /set_vdf_params: Update VDF difficulty.");
         }
         console.log("Available commands:");
         console.log("- /add_writer: Add yourself as a validator to this MSB once whitelisted. Requires a fee + 10x the fee as a stake in $TNK.");
@@ -1107,6 +1108,46 @@ export class MainSettlementBus extends ReadyResource {
                 vdfDifficultyBuffer,
                 vdfDiscriminantSizeBuffer,
             )
+        const encodedPayload = encodeApplyOperation(payload);
+        await this.#state.append(encodedPayload);
+    }
+
+    async handleSetVdfParams(params) {
+        if (!this.#config.enableWallet) {
+            throw new Error("Can not set VDF params - wallet is not enabled.");
+        }
+
+        const adminEntry = await this.#state.getAdminEntry();
+
+        if (!adminEntry) {
+            throw new Error("Can not set VDF params - admin has not been initialized.");
+        }
+        if (!this.#wallet) {
+            throw new Error("Can not set VDF params - wallet is not initialized.");
+        }
+        if (!this.isAdmin(adminEntry)) {
+            throw new Error("Can not set VDF params - you are not the admin.");
+        }
+
+        const existingVDFParams = await this.#state.getSignedVDFParams();
+        if (!existingVDFParams) {
+            throw new Error("Can not set VDF params - VDF parameters have not been initialized.");
+        }
+
+        const difficultyNumber = Number(params.vdfDifficulty);
+        if (!Number.isInteger(difficultyNumber) || difficultyNumber <= 0) {
+            throw new Error("VDF difficulty must be a positive unsigned 32-bit integer.");
+        }
+
+        const vdfDifficultyBuffer = uint32ToBuffer(difficultyNumber, "VDF difficulty");
+
+        const txValidity = await this.#state.getIndexerSequenceState();
+        const payload = await applyStateMessageFactory(this.#wallet, this.#config)
+            .buildCompleteSetVdfParamsMessage(
+                this.#wallet.address,
+                txValidity,
+                vdfDifficultyBuffer,
+            );
         const encodedPayload = encodeApplyOperation(payload);
         await this.#state.append(encodedPayload);
     }

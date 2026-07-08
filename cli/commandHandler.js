@@ -38,7 +38,8 @@ export const COMMANDS = {
     GET_TXS_HASHES: "/get_txs_hashes",
     GET_TX_DETAILS: "/get_tx_details",
     GET_EXTENDED_TX_DETAILS: "/get_extended_tx_details",
-    EPOCH_GENESIS_INITIALIZATION: "/init_genesis"
+    EPOCH_GENESIS_INITIALIZATION: "/init_genesis",
+    SET_VDF_PARAMS: "/set_vdf_params"
 };
 
 export class CommandHandler {
@@ -48,6 +49,7 @@ export class CommandHandler {
     #handlers;
     #pendingConfirmation = null;
     #pendingGenesisInitialization = null;
+    #pendingSetVdfParams = null;
 
     constructor({ config, msb, handleClose, wallet }) {
         this.#msb = msb;
@@ -63,6 +65,10 @@ export class CommandHandler {
 
         if (this.#pendingGenesisInitialization !== null) {
             return this.#handlePendingGenesisInitialization(input);
+        }
+
+        if (this.#pendingSetVdfParams !== null) {
+            return this.#handlePendingSetVdfParams(input);
         }
 
         const [command, ...parts] = input.split(" ");
@@ -230,6 +236,10 @@ export class CommandHandler {
             {
                 evaluate: ({ input }) => input.startsWith(COMMANDS.EPOCH_GENESIS_INITIALIZATION),
                 process: async () => this.#queueEpochGenesisInitialization()
+            },
+            {
+                evaluate: ({ input }) => input.startsWith(COMMANDS.SET_VDF_PARAMS),
+                process: async () => this.#queueSetVdfParams()
             }
         ];
     }
@@ -349,6 +359,49 @@ export class CommandHandler {
     }
 
     #parseGenesisEpochInteger(input) {
+        return this.#parsePositiveInteger(input);
+    }
+
+    #queueSetVdfParams() {
+        this.#pendingSetVdfParams = {
+            step: "difficulty"
+        };
+
+        console.log(this.#getSetVdfParamsDifficultyPrompt());
+    }
+
+    #handlePendingSetVdfParams(input) {
+        const difficulty = this.#parsePositiveInteger(input);
+        if (!difficulty) {
+            console.log("Invalid difficulty. Please enter a positive integer (example 55_000_000).");
+            console.log(this.#getSetVdfParamsDifficultyPrompt());
+            return;
+        }
+
+        this.#pendingSetVdfParams = null;
+        return this.#queueSetVdfParamsConfirmation({ difficulty });
+    }
+
+    #queueSetVdfParamsConfirmation({ difficulty }) {
+        const params = {
+            vdfDifficulty: difficulty.value
+        };
+
+        console.info("VDF Params Update:");
+        console.info(`VDF difficulty: ${difficulty.display}`);
+
+        this.#pendingConfirmation = {
+            prompt: "Do you want to proceed? (yes/no)",
+            invalidMessage: 'Invalid input. Please answer "yes" or "no".',
+            failureMessage: "VDF params update failed",
+            onConfirm: async () => this.#handlers.handleSetVdfParams(params),
+            onDecline: async () => console.log("VDF params update cancelled.")
+        };
+
+        console.log(this.#pendingConfirmation.prompt);
+    }
+
+    #parsePositiveInteger(input) {
         const display = input.trim();
         if (!/^[0-9]+(?:_[0-9]+)*$/.test(display)) {
             return null;
@@ -368,5 +421,9 @@ export class CommandHandler {
 
     #getGenesisDiscriminantBitSizePrompt() {
         return "Set VDF discriminant bit size (example 2048):";
+    }
+
+    #getSetVdfParamsDifficultyPrompt() {
+        return "Set new VDF difficulty (example 55_000_000):";
     }
 }
