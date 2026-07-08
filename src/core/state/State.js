@@ -4164,26 +4164,26 @@ class State extends ReadyResource {
         if (indexersSequenceState === null) {
             this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Indexer sequence state is invalid.", node.from.key)
             return Status.FAILURE;
-        };
+        }
 
         if (!b4a.equals(op.sgo.txv, indexersSequenceState)) {
             this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Transaction was not executed.", node.from.key)
             return Status.FAILURE;
-        };
+        }
 
         // anti-replay attack
         const opEntry = await this.#getEntryApply(txHashHexString, batch);
         if (opEntry !== null) {
             this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Operation has already been applied.", node.from.key)
             return Status.IGNORE;
-        };
+        }
 
         // check if CurrentEpoch have been initialized if yes - failure
         const currentEpoch = await this.#getEntryApply(EntryType.EPOCH_CURRENT, batch);
         if (currentEpoch !== null) {
             this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Current epoch is set. Cannot set a new genesis epoch", node.from.key)
             return Status.IGNORE;
-        };
+        }
 
         // check if genesis epoch is initialized. If yes - failure
         const epochZero = EntryType.EPOCH + "0";
@@ -4191,18 +4191,20 @@ class State extends ReadyResource {
         if (genesisEpochHash !== null) {
             this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Genesis epoch is set. Cannot set a new one", node.from.key)
             return Status.IGNORE;
-        };
+        }
 
         // check if VDF params have been initialized if yes - failure
         const vdfParams = await this.#getEntryApply(EntryType.VDF_PARAMS, batch);
         if (vdfParams !== null) {
             this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "VDF params are set. Cannot set a new genesis epoch", node.from.key)
             return Status.IGNORE;
-        };
+        }
 
         // extract diff and dbs in this case we should check if this is not less than 0 and not higer than 4/2 bytes
         const vdfDifficultyBuffer = op.sgo.df;
+        // can not be zero
         const vdfDiscriminantBitSizeBuffer = op.sgo.db;
+        // can not be zero
         const encodedVdfParamsEntry = encodeVdfParameters(vdfDifficultyBuffer, vdfDiscriminantBitSizeBuffer);
         if (encodedVdfParamsEntry.length === 0) {
             this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Could not encode vdf parameters. Cannot set a new genesis epoch", node.from.key)

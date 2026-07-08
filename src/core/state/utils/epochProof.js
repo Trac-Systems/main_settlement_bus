@@ -77,19 +77,19 @@ export async function initGenesisEpoch(config, proposerAddress, vdfParamsEntry) 
         return null;
     }
 
-    const protocol_version = safeUint8ToBuffer(PROTOCOL_VERSION);
-    if (protocol_version.length === 0) {
+    const protocolVersion = safeUint8ToBuffer(PROTOCOL_VERSION);
+    if (protocolVersion.length === 0) {
         return null;
     }
-    const  network_id = safeUint16ToBuffer(config.networkId);
-    if (network_id.length === 0) {
+    const  networkId = safeUint16ToBuffer(config.networkId);
+    if (networkId.length === 0) {
         return null;
     }
     const epoch = b4a.alloc(8, 0); // Epoch Zero
 
     const proofData = {
-        protocol_version,
-        network_id,
+        protocol_version: protocolVersion,
+        network_id: networkId,
         epoch,
         previous_epoch_record_hash: b4a.alloc(HASH_BYTE_LENGTH).fill(0),
         proposer,
