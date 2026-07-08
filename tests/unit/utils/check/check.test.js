@@ -17,4 +17,4 @@ async function runCheckTests() {
     test.resume();
 }
 
-runCheckTests();
+await runCheckTests();
