@@ -5,7 +5,8 @@ import {
     VDF_DIFFICULTY_SIZE,
     VDF_DISCRIMINANT_SIZE,
     VDF_BLOB_PROOF_SIZE,
-    SIGNATURE_BYTE_LENGTH
+    SIGNATURE_BYTE_LENGTH,
+    ConsensusProtocolVersion
 } from '../../../utils/constants.js'
 import { isBufferValid, safeUint8ToBuffer, safeUint16ToBuffer } from '../../../utils/buffer.js';
 import { addressToBuffer } from './address.js';
@@ -14,8 +15,6 @@ import {
     safeEncodeProofProposal,
     safeEncodeProofProposalApproval
 } from "../../../codecs/consensus/v1/consensusV1OperationCodec.js";
-
-export const PROTOCOL_VERSION = 1
 
 const VDF_PARAMS_ENTRY_SIZE = VDF_DIFFICULTY_SIZE + VDF_DISCRIMINANT_SIZE;
 
@@ -77,7 +76,7 @@ export async function createGenesisEpochProof(config, proposerAddress, vdfParams
         return null;
     }
 
-    const protocolVersion = safeUint8ToBuffer(PROTOCOL_VERSION);
+    const protocolVersion = safeUint8ToBuffer(ConsensusProtocolVersion.V1);
     if (protocolVersion.length === 0) {
         return null;
     }
