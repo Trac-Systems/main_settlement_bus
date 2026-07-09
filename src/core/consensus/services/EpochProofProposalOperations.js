@@ -75,7 +75,7 @@ export class EpochProofProposalOperations {
             );
 
         const response = await this.#connectionManager.send(publicKeyHex, request);
-        return response?.result?.approval_sig
+        return response?.approval?.approval_sig
     }
 
     async collectSignature(member, proofProposal) {
