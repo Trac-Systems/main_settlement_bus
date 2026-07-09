@@ -196,7 +196,8 @@ class EpochProofProposalService extends SchedulableService {
     }
 
     async #shouldRun() {
-        return await this.#state.getCurrentEpoch() >= 0n && !this.isInterrupted
+        const epoch = await this.#state.getCurrentEpoch()
+        return epoch !== null && epoch >= 0n && !this.isInterrupted
     }
 }
 

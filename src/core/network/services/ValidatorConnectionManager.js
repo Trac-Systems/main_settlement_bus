@@ -8,6 +8,7 @@ import ValidatorHealthCheckService from './ValidatorHealthCheckService.js'
 
 class ValidatorConnectionManager extends PeerConnectionManager {
     #healthCheckService
+    #messages
     // Note: _connections is using publicKey (Buffer) as key
     // As Buffers are objects, we will rely on internal conversions done by JS to compare them.
     // It would be better to handle these conversions manually by using hex strings as keys to avoid issues
@@ -16,6 +17,7 @@ class ValidatorConnectionManager extends PeerConnectionManager {
      **/
     constructor(maxValidators, config, logger, messages) {
         super(maxValidators, config, logger, messages);
+        this.#messages = messages
         this.#healthCheckService = new ValidatorHealthCheckService(config);
     }
 
@@ -105,6 +107,7 @@ class ValidatorConnectionManager extends PeerConnectionManager {
     }
 
     async add(publicKey, connection) {
+        if (!connection.protocolSession) connection.protocolSession = this.#messages.createProtomux(connection);
         this._add(publicKey, connection, { initializeProtocolSession: false });
         
         try {

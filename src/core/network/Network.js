@@ -154,13 +154,15 @@ class Network extends ReadyResource {
         await sleep(100);
         await this.#validatorObserverService.stop();
         await this.#indexerObserverService.stop();
-
+        
         this.cleanupPendingConnections();
-        await this.#epochProofProposalService.close();
+        // await this.#epochProofProposalService.close();
         this.#validatorPendingRequestService.close();
         this.#transactionCommitService.close();
         this.#indexerPendingRequestService.close();
-
+        await this.#validatorConnectionManager.close()
+        await this.#indexerConnectionManager.close()
+        
         await this.#swarm.destroy();
     }
 
