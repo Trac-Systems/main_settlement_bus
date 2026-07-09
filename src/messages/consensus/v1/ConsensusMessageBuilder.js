@@ -1,7 +1,7 @@
 import b4a from 'b4a';
 import tracCryptoApi from 'trac-crypto-api';
-import {encodeProofProposalApproval} from '../../../codecs/consensus/v1/consensusV1OperationCodec.js';
-import {addressToBuffer, isAddressValid} from "../../../core/state/utils/address.js";
+import { encodeProofProposalApproval } from '../../../codecs/consensus/v1/consensusV1OperationCodec.js';
+import { addressToBuffer, isAddressValid } from "../../../core/state/utils/address.js";
 import {
     ConsensusOperationType,
     ConsensusProtocolVersion,
@@ -9,10 +9,9 @@ import {
 } from '../../../utils/constants.js';
 import {
     createMessage,
-    safeWriteUInt32BE,
     uint8ToBuffer,
     uint16ToBuffer,
-    uint64ToBuffer
+    uint64ToBuffer, uint32ToBuffer
 } from "../../../utils/buffer.js";
 
 class ConsensusMessageBuilder {
@@ -104,7 +103,7 @@ class ConsensusMessageBuilder {
     }
 
     setProtocolVersion(protocolVersion) {
-        const value = uint8ToBuffer(protocolVersion, 'Protocol version');
+        const value = uint8ToBuffer(protocolVersion);
         if (!Object.values(ConsensusProtocolVersion).includes(protocolVersion)) {
             throw new Error(`Unsupported consensus protocol version: ${protocolVersion}`);
         }
@@ -114,7 +113,7 @@ class ConsensusMessageBuilder {
     }
 
     setNetworkId(networkId) {
-        const value = uint16ToBuffer(networkId, 'Network id');
+        const value = uint16ToBuffer(networkId);
         if (networkId === 0) {
             throw new Error('Network id must be greater than zero.');
         }
@@ -124,7 +123,7 @@ class ConsensusMessageBuilder {
     }
 
     setEpoch(epoch) {
-        const value = uint64ToBuffer(epoch, 'Epoch');
+        const value = uint64ToBuffer(epoch);
         const epochValue = typeof epoch === 'bigint' ? epoch : BigInt(epoch);
         if (epochValue === 0n) {
             throw new Error('Epoch must be greater than zero.');
@@ -241,7 +240,7 @@ class ConsensusMessageBuilder {
     }
 
     async #hashProofProposalResponse(resultCode, proofProposalApproval) {
-        const resultCodeBuffer = safeWriteUInt32BE(resultCode, 0);
+        const resultCodeBuffer = uint32ToBuffer(resultCode);
         const message = proofProposalApproval
             ? createMessage(resultCodeBuffer, encodeProofProposalApproval(proofProposalApproval))
             : createMessage(resultCodeBuffer);

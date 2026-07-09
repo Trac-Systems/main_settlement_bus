@@ -1,7 +1,7 @@
 import V1BaseConsensusOperation from "./V1BaseConsensusOperation.js";
 import {V1ConsensusProtocolError} from "../V1ConsensusProtocolError.js";
 import {ConsensusProtocolVersion, ConsensusResultCode} from "../../../../utils/constants.js";
-import {createMessage, safeWriteUInt32BE, uint16ToBuffer} from "../../../../utils/buffer.js";
+import {createMessage, uint16ToBuffer, uint32ToBuffer} from "../../../../utils/buffer.js";
 import tracCryptoApi from "trac-crypto-api";
 import b4a from "b4a";
 import {verifyWesolowski} from '@tracsystems/trac-vdf';
@@ -55,8 +55,8 @@ class V1EpochProofProposalRequest extends V1BaseConsensusOperation {
      */
     async validateProofProposalVdfParametersHash(proofProposal) {
         const message = createMessage(
-            safeWriteUInt32BE(this.#config.vdfDifficulty, 0),
-            safeWriteUInt32BE(this.#config.vdfDiscriminantSizeBits, 0)
+            uint32ToBuffer(this.#config.vdfDifficulty),
+            uint32ToBuffer(this.#config.vdfDiscriminantSizeBits)
         );
 
         let expectedHash;
@@ -101,7 +101,7 @@ class V1EpochProofProposalRequest extends V1BaseConsensusOperation {
      * Validates that the proof proposal targets the configured network.
      */
     validateProofProposalNetworkId(proofProposal) {
-        const expectedNetworkId = uint16ToBuffer(this.#config.networkId, 'Network id');
+        const expectedNetworkId = uint16ToBuffer(this.#config.networkId);
         if (!b4a.equals(proofProposal.network_id, expectedNetworkId)) {
             throw new V1ConsensusProtocolError(ConsensusResultCode.UNEXPECTED_ERROR, 'Invalid proof proposal network id.');
         }

@@ -18,6 +18,10 @@ export const EntryType = Object.freeze({
     INITIALIZATION: 'init',
     LICENSE_COUNT: 'lc',
     LICENSE_INDEX: 'li/',
+    EPOCH_CURRENT: '/epoch/current',
+    EPOCH: `/epoch/`,              // Epoch hashes are stored under `/epoch/<n>`
+    EPOCH_HASH: `/epochHash/`,     // Epoch proof payloads are stored under `/epochHash/<epochHashHex>`
+    VDF_PARAMS: '/parameters/vdf'
 });
 
 //ATTENTION - THIS IS USED IN THE APPLY FUNCTION!

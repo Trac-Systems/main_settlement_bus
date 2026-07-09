@@ -12,10 +12,9 @@ import {
 } from '../../../../src/codecs/consensus/v1/consensusV1OperationCodec.js';
 import {
     createMessage,
-    safeWriteUInt32BE,
     uint8ToBuffer,
     uint16ToBuffer,
-    uint64ToBuffer
+    uint64ToBuffer, uint32ToBuffer
 } from '../../../../src/utils/buffer.js';
 import {
     ConsensusOperationType,
@@ -143,7 +142,7 @@ test('ConsensusMessageBuilder iterates proof proposal response ResultCode values
             ? encodeProofProposalApproval(payload.proof_proposal_response.approval)
             : b4a.alloc(0);
         const responseMessage = createMessage(
-            safeWriteUInt32BE(code, 0),
+            uint32ToBuffer(code),
             encodedApproval
         );
         const responseHash = await tracCryptoApi.hash.blake3(responseMessage);
@@ -190,7 +189,7 @@ test('ConsensusMessageBuilder encodes scalar number fields at byte-width boundar
     const proofProposalFixture = consensusV1OperationFixtures.proofProposal;
     const proposer = bufferToAddress(proofProposalFixture.proposer, config.addressPrefix);
     const protocolVersion = ConsensusProtocolVersion.V1;
-    const protocolVersionBuffer = uint8ToBuffer(protocolVersion, 'Protocol version');
+    const protocolVersionBuffer = uint8ToBuffer(protocolVersion);
     const cases = [
         {
             networkId: 1,
@@ -207,8 +206,8 @@ test('ConsensusMessageBuilder encodes scalar number fields at byte-width boundar
     ];
 
     for (const testCase of cases) {
-        const networkIdBuffer = uint16ToBuffer(testCase.networkId, 'Network id');
-        const epochBuffer = uint64ToBuffer(testCase.epoch, 'Epoch');
+        const networkIdBuffer = uint16ToBuffer(testCase.networkId);
+        const epochBuffer = uint64ToBuffer(testCase.epoch);
 
         await builder
             .setType(ConsensusOperationType.PROOF_PROPOSAL)
@@ -271,7 +270,7 @@ test('ConsensusMessageBuilder rejects invalid protocol version numbers', async t
     for (const value of invalidUint8Values) {
         t.exception(
             () => builder.setProtocolVersion(value),
-            errorMessageIncludes('Protocol version must be an unsigned 8-bit integer.')
+            errorMessageIncludes('Value must be an unsigned 8-bit integer.')
         );
     }
 
@@ -300,7 +299,7 @@ test('ConsensusMessageBuilder rejects invalid network id numbers', async t => {
     for (const value of invalidValues) {
         t.exception(
             () => builder.setNetworkId(value),
-            errorMessageIncludes('Network id must be an unsigned 16-bit integer.')
+            errorMessageIncludes('Value must be an unsigned 16-bit integer.')
         );
     }
 
@@ -328,14 +327,14 @@ test('ConsensusMessageBuilder rejects invalid epoch numbers', async t => {
     for (const value of invalidNumberValues) {
         t.exception(
             () => builder.setEpoch(value),
-            errorMessageIncludes('Epoch must be a non-negative safe integer')
+            errorMessageIncludes('Value must be a non-negative safe integer')
         );
     }
 
     for (const value of invalidTypeValues) {
         t.exception(
             () => builder.setEpoch(value),
-            errorMessageIncludes('Epoch must be a number or bigint')
+            errorMessageIncludes('Value must be a number or bigint')
         );
     }
 
@@ -462,11 +461,11 @@ test('ConsensusMessageBuilder signs non-zero network id and uint64 epochs withou
     const proofProposalFixture = consensusV1OperationFixtures.proofProposal;
     const proposer = bufferToAddress(proofProposalFixture.proposer, config.addressPrefix);
     const protocolVersion = ConsensusProtocolVersion.V1;
-    const protocolVersionBuffer = uint8ToBuffer(protocolVersion, 'Protocol version');
+    const protocolVersionBuffer = uint8ToBuffer(protocolVersion);
     const networkId = 1;
-    const networkIdBuffer = uint16ToBuffer(networkId, 'Network id');
+    const networkIdBuffer = uint16ToBuffer(networkId);
     const epoch = 0x100000000;
-    const epochBuffer = uint64ToBuffer(epoch, 'Epoch');
+    const epochBuffer = uint64ToBuffer(epoch);
 
     await builder
         .setType(ConsensusOperationType.PROOF_PROPOSAL)
@@ -510,4 +509,17 @@ test('ConsensusMessageBuilder signs non-zero network id and uint64 epochs withou
     );
     const legacyHash = await tracCryptoApi.hash.blake3(legacyMessage);
     t.not(wallet.verify(proofProposal.signature, legacyHash, wallet.publicKey));
+});
+
+test('ConsensusMessageBuilder rejects invalid result codes before signing responses', async t => {
+    const wallet = await createWallet();
+    const builder = new ConsensusMessageBuilder(wallet, config);
+    const invalidResultCodes = [-1, 0x100000000, 1.5, Number.NaN, Number.POSITIVE_INFINITY, '1'];
+
+    for (const code of invalidResultCodes) {
+        t.exception(
+            () => builder.setResultCode(code),
+            errorMessageIncludes(`Invalid consensus result code: ${code}`)
+        );
+    }
 });

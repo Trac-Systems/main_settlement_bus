@@ -7,7 +7,13 @@ import {v7 as uuidv7} from 'uuid';
 import ConsensusMessageBuilder from '../../../../src/messages/consensus/v1/ConsensusMessageBuilder.js';
 import ConsensusMessageDirector from '../../../../src/messages/consensus/v1/ConsensusMessageDirector.js';
 import {addressToBuffer} from '../../../../src/core/state/utils/address.js';
-import {createMessage, safeWriteUInt32BE, uint8ToBuffer, uint16ToBuffer, uint64ToBuffer} from '../../../../src/utils/buffer.js';
+import {
+    createMessage,
+    uint8ToBuffer,
+    uint16ToBuffer,
+    uint64ToBuffer,
+    uint32ToBuffer
+} from '../../../../src/utils/buffer.js';
 import {
     ConsensusOperationType,
     ConsensusProtocolVersion,
@@ -33,9 +39,9 @@ test('ConsensusMessageDirector builds proof proposal and verifies signature', as
     const sessionId = uuidv7();
     const networkId = 67;
     const epoch = 2;
-    const protocolVersionBuffer = uint8ToBuffer(ConsensusProtocolVersion.V1, 'Protocol version');
-    const networkIdBuffer = uint16ToBuffer(networkId, 'Network id');
-    const epochBuffer = uint64ToBuffer(epoch, 'Epoch');
+    const protocolVersionBuffer = uint8ToBuffer(ConsensusProtocolVersion.V1);
+    const networkIdBuffer = uint16ToBuffer(networkId);
+    const epochBuffer = uint64ToBuffer(epoch);
     const previousEpochRecordHash = b4a.alloc(32, 1);
     const vdfParametersHash = b4a.alloc(32, 2);
     const vdfProof = b4a.alloc(VDF_BLOB_PROOF_SIZE, 3);
@@ -84,9 +90,9 @@ test('ConsensusMessageDirector builds proof proposal response and verifies signa
     const sessionId = uuidv7();
     const networkId = 67;
     const epoch = 2;
-    const protocolVersionBuffer = uint8ToBuffer(ConsensusProtocolVersion.V1, 'Protocol version');
-    const networkIdBuffer = uint16ToBuffer(networkId, 'Network id');
-    const epochBuffer = uint64ToBuffer(epoch, 'Epoch');
+    const protocolVersionBuffer = uint8ToBuffer(ConsensusProtocolVersion.V1);
+    const networkIdBuffer = uint16ToBuffer(networkId);
+    const epochBuffer = uint64ToBuffer(epoch);
     const previousEpochRecordHash = b4a.alloc(32, 1);
     const vdfParametersHash = b4a.alloc(32, 2);
     const vdfProof = b4a.alloc(VDF_BLOB_PROOF_SIZE, 3);
@@ -131,7 +137,7 @@ test('ConsensusMessageDirector builds proof proposal response and verifies signa
 
     const encodedApproval = encodeProofProposalApproval(proofProposalResponse.approval);
     const responseMessage = createMessage(
-        safeWriteUInt32BE(ConsensusResultCode.OK, 0),
+        uint32ToBuffer(ConsensusResultCode.OK),
         encodedApproval
     );
     const responseHash = await tracCryptoApi.hash.blake3(responseMessage);

@@ -45,7 +45,7 @@ import { deepCopyBuffer } from '../../utils/buffer.js';
 import { Status } from './utils/transaction.js';
 import remote from 'hypercore/lib/fully-remote-proof.js'
 import PQueue from 'p-queue';
-import { keys } from '../consensus/v1/handlers/epochProposal/epochProofData.js'
+import {decodeVdfParameters, encodeVdfParameters, createGenesisEpochProof} from './utils/epochProof.js';
 
 const OVERSIZED_BATCH_PENALTY_MULTIPLIER = BATCH_SIZE;
 
@@ -174,16 +174,41 @@ class State extends ReadyResource {
         return this.#base.view.core.signedLength;
     }
 
-    async currentEpochId() {
-        const epochIdBuffer = await this.getSigned(keys.CURRENT_INDEX);
-        if (!epochIdBuffer) return 0;
-
-        return lengthEntryUtils.decodeBE(epochIdBuffer)
+    /**
+     * Reads the current epoch id from signed state.
+     *
+     * @returns {Promise<bigint|null>} Current epoch id, or null when epoch state is not initialized.
+     */
+    async getCurrentEpoch() {
+        const currentEpoch = await this.getSigned(EntryType.EPOCH_CURRENT);
+        if (currentEpoch === null) return null;
+        return currentEpoch.readBigUInt64BE(0);
     }
 
-    async currentEpoch() {
-        const latestEpochNumber = await this.getSigned(keys.CURRENT_INDEX)
-        return await this.getSigned(keys.EPOCH(latestEpochNumber))
+    /**
+     * Reads the epoch hash stored under `/epoch/<epoch>`.
+     *
+     * @param {bigint|number|string} count Epoch id.
+     * @returns {Promise<Buffer|null>} Epoch hash, or null when the epoch is not stored.
+     */
+    async getEpoch(count) {
+        if (count === null || count === undefined) return null;
+
+        const epochId = typeof count === 'bigint' ? count : BigInt(count);
+        return await this.getSigned(EntryType.EPOCH + epochId.toString());
+    }
+
+    /**
+     * Reads the encoded epoch proof stored under `/epochHash/<epochHash>`.
+     *
+     * @param {Buffer|string} epochHash Epoch hash as a buffer or hex string.
+     * @returns {Promise<Buffer|null>} Encoded epoch proof, or null when the proof is not stored.
+     */
+    async getEpochProof(epochHash) {
+        if (epochHash === null || epochHash === undefined) return null;
+
+        const epochHashString = b4a.isBuffer(epochHash) ? epochHash.toString('hex') : epochHash.toString();
+        return await this.getSigned(EntryType.EPOCH_HASH + epochHashString);
     }
 
     getFee() {
@@ -435,7 +460,7 @@ class State extends ReadyResource {
         if (initialization === null) {
             return false
         } else {
-            return b4a.equals(initialization, safeWriteUInt32BE(0, 0))
+            return b4a.equals(initialization, safeWriteUInt32BE(0))
         }
     }
 
@@ -520,7 +545,7 @@ class State extends ReadyResource {
     }
 
     async getSignedVDFParams() {
-        const vdfParamsBuffer = await this.getSigned(keys.VDF_PARAMS);
+        const vdfParamsBuffer = await this.getSigned(EntryType.VDF_PARAMS);
         if (!vdfParamsBuffer) return null;
 
         const expectedLength = VDF_DIFFICULTY_SIZE + VDF_DISCRIMINANT_SIZE;
@@ -530,10 +555,14 @@ class State extends ReadyResource {
         if (vdfParamsBuffer.length !== expectedLength) {
             throw new Error(`Invalid VDF params length: expected ${expectedLength}, got ${vdfParamsBuffer.length}.`);
         }
+        const decodedVdfParams = decodeVdfParameters(vdfParamsBuffer);
+        if (decodedVdfParams === null) {
+            throw new Error("Invalid VDF params value.");
+        }
 
         return {
-            vdfDifficulty: vdfParamsBuffer.readUInt32BE(0),
-            vdfDiscriminantSize: vdfParamsBuffer.readUInt16BE(VDF_DIFFICULTY_SIZE),
+            vdfDifficulty: decodedVdfParams.difficulty.readUInt32BE(0),
+            vdfDiscriminantSize: decodedVdfParams.discriminantBitSize.readUInt16BE(0),
         };
     }
 
@@ -612,6 +641,7 @@ class State extends ReadyResource {
             [OperationType.TX]: this.#handleApplyTxOperation.bind(this),
             [OperationType.TRANSFER]: this.#handleApplyTransferOperation.bind(this),
             [OperationType.SET_EPOCH]: this.#handleApplySetEpochOperation.bind(this),
+            [OperationType.SET_GENESIS_EPOCH]: this.#handleApplySetGenesisEpoch.bind(this),
         };
         return handlers[type] || null;
     }
@@ -713,8 +743,8 @@ class State extends ReadyResource {
         };
 
         // Verify signature
-        const isMessageVerifed = tracCryptoApi.signature.verify(op.bio.is, hash, adminPublicKey);
-        if (!isMessageVerifed) {
+        const isMessageVerified = tracCryptoApi.signature.verify(op.bio.is, hash, adminPublicKey);
+        if (!isMessageVerified) {
             this.#safeLogApply(OperationType.BALANCE_INITIALIZATION, "Failed to verify message signature.", node.from.key)
             return Status.FAILURE;
         };
@@ -835,8 +865,8 @@ class State extends ReadyResource {
         };
 
         // Verify signature
-        const isMessageVerifed = tracCryptoApi.signature.verify(op.cao.is, hash, adminPublicKey);
-        if (!isMessageVerifed) {
+        const isMessageVerified = tracCryptoApi.signature.verify(op.cao.is, hash, adminPublicKey);
+        if (!isMessageVerified) {
             this.#safeLogApply(OperationType.DISABLE_INITIALIZATION, "Failed to verify message signature.", node.from.key)
             return Status.FAILURE;
         };
@@ -860,7 +890,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        await batch.put(EntryType.INITIALIZATION, safeWriteUInt32BE(0, 0));
+        await batch.put(EntryType.INITIALIZATION, safeWriteUInt32BE(0));
         await batch.put(txHashHexString, node.value);
 
         return Status.SUCCESS;
@@ -920,9 +950,9 @@ class State extends ReadyResource {
         };
 
         // verify signature
-        const isMessageVerifed = tracCryptoApi.signature.verify(op.cao.is, op.cao.tx, adminPublicKey)
+        const isMessageVerified = tracCryptoApi.signature.verify(op.cao.is, op.cao.tx, adminPublicKey)
         const txHashHexString = op.cao.tx.toString('hex');
-        if (!isMessageVerifed) {
+        if (!isMessageVerified) {
             this.#safeLogApply(OperationType.ADD_ADMIN, "Failed to verify message signature.", node.from.key)
             return Status.FAILURE;
         };
@@ -999,7 +1029,7 @@ class State extends ReadyResource {
 
         // initialize admin entry and initialization flag
         await batch.put(EntryType.ADMIN, newAdminEntry);
-        await batch.put(EntryType.INITIALIZATION, safeWriteUInt32BE(1, 0));
+        await batch.put(EntryType.INITIALIZATION, safeWriteUInt32BE(1));
         await batch.put(txHashHexString, node.value);
 
         if (this.#config.enableTxApplyLogs) {
@@ -2164,9 +2194,9 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const isMessageVerifed = tracCryptoApi.signature.verify(op.aco.is, hash, adminPublicKey);
+        const isMessageVerified = tracCryptoApi.signature.verify(op.aco.is, hash, adminPublicKey);
         const txHashHexString = hash.toString('hex');
-        if (!isMessageVerifed) {
+        if (!isMessageVerified) {
             this.#safeLogApply(OperationType.ADD_INDEXER, "Failed to verify message signature.", node.from.key)
             return Status.FAILURE;
         };
@@ -2379,9 +2409,9 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const isMessageVerifed = tracCryptoApi.signature.verify(op.aco.is, hash, adminPublicKey);
+        const isMessageVerified = tracCryptoApi.signature.verify(op.aco.is, hash, adminPublicKey);
         const txHashHexString = hash.toString('hex');
-        if (!isMessageVerifed) {
+        if (!isMessageVerified) {
             this.#safeLogApply(OperationType.REMOVE_INDEXER, "Failed to verify message signature.", node.from.key)
             return Status.FAILURE;
         };
@@ -2585,9 +2615,9 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const isMessageVerifed = tracCryptoApi.signature.verify(op.aco.is, regeneratedHash, adminPublicKey);
+        const isMessageVerified = tracCryptoApi.signature.verify(op.aco.is, regeneratedHash, adminPublicKey);
         const txHashHexString = regeneratedHash.toString('hex');
-        if (!isMessageVerifed) {
+        if (!isMessageVerified) {
             this.#safeLogApply(OperationType.BAN_VALIDATOR, "Failed to verify message signature.", node.from.key)
             return Status.FAILURE;
         }
@@ -3611,7 +3641,7 @@ class State extends ReadyResource {
         if (initialization === null) {
             return false
         } else {
-            return b4a.equals(initialization, safeWriteUInt32BE(0, 0))
+            return b4a.equals(initialization, safeWriteUInt32BE(0))
         }
     }
 
@@ -4049,6 +4079,169 @@ class State extends ReadyResource {
         };
     }
 
+    async #handleApplySetGenesisEpoch(op, view, base, node, batch) {
+        if (!this.#stateValidationSchema.validateSetGenesisEpochOperation(op)) {
+            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Contract schema validation failed.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        // Extract and validate the requester address (admin)
+        const requesterAddressBuffer = op.address;
+        const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer, this.#config.addressPrefix);
+        if (requesterAddressString === null) {
+            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Requester address is invalid.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        // Validate requester public key
+        const requesterPublicKey = tracCryptoApi.address.decodeSafe(requesterAddressString);
+        if (b4a.equals(requesterPublicKey, NULL_BUFFER)) {
+            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Failed to decode requester public key.", node.from.key)
+            return Status.FAILURE;
+        }
+        // ensure that an admin invoked this operation
+        const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
+        if (adminEntry === null) {
+            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Invalid admin entry.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        const decodedAdminEntry = adminEntryUtils.decode(adminEntry, this.#config.addressPrefix);
+        if (decodedAdminEntry === null) {
+            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Failed to decode admin entry.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        if (!this.#isAdminApply(decodedAdminEntry, node)) {
+            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Node is not allowed to perform this operation. (ADMIN ONLY)", node.from.key)
+            return Status.FAILURE;
+        }
+
+        // Extract admin public key
+        const adminPublicKey = tracCryptoApi.address.decodeSafe(decodedAdminEntry.address);
+        if (b4a.equals(adminPublicKey, NULL_BUFFER)) {
+            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Failed to decode admin public key.", node.from.key)
+            return Status.FAILURE;
+        }
+        // Admin consistency check
+        if (!b4a.equals(adminPublicKey, requesterPublicKey)) {
+            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "System admin and node public keys do not match.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        // verify requester signature
+        const message = createMessage(
+            this.#config.networkId,
+            op.sgo.txv,
+            op.sgo.df,
+            op.sgo.db,
+            op.sgo.in,
+            OperationType.SET_GENESIS_EPOCH
+        );
+
+        if (message.length === 0) {
+            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Invalid requester message.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        const hash = await tracCryptoApi.hash.blake3Safe(message);
+        if (!b4a.equals(hash, op.sgo.tx)) {
+            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Message hash does not match the tx_hash.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        // verify signature
+        const isMessageVerified = tracCryptoApi.signature.verify(op.sgo.is, op.sgo.tx, adminPublicKey)
+        const txHashHexString = op.sgo.tx.toString('hex');
+
+        if (!isMessageVerified) {
+            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Failed to verify message signature.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        // verify tx validity - prevent deferred execution attack        
+        const indexersSequenceState = await this.#getIndexerSequenceStateApply(base);
+        if (indexersSequenceState === null) {
+            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Indexer sequence state is invalid.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        if (!b4a.equals(op.sgo.txv, indexersSequenceState)) {
+            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Transaction was not executed.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        // anti-replay attack
+        const opEntry = await this.#getEntryApply(txHashHexString, batch);
+        if (opEntry !== null) {
+            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Operation has already been applied.", node.from.key)
+            return Status.IGNORE;
+        }
+
+        // check if CurrentEpoch have been initialized if yes - failure
+        const currentEpoch = await this.#getEntryApply(EntryType.EPOCH_CURRENT, batch);
+        if (currentEpoch !== null) {
+            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Current epoch is set. Cannot set a new genesis epoch", node.from.key)
+            return Status.IGNORE;
+        }
+
+        // check if genesis epoch is initialized. If yes - failure
+        const epochZero = EntryType.EPOCH + "0";
+        const genesisEpochHash = await this.#getEntryApply(epochZero , batch);
+        if (genesisEpochHash !== null) {
+            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Genesis epoch is set. Cannot set a new one", node.from.key)
+            return Status.IGNORE;
+        }
+
+        // check if VDF params have been initialized if yes - failure
+        const vdfParams = await this.#getEntryApply(EntryType.VDF_PARAMS, batch);
+        if (vdfParams !== null) {
+            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "VDF params are set. Cannot set a new genesis epoch", node.from.key)
+            return Status.IGNORE;
+        }
+
+        // extract diff and dbs in this case we should check if this is not less than 0 and not higer than 4/2 bytes
+        const vdfDifficultyBuffer = op.sgo.df;
+        // can not be zero
+        const vdfDiscriminantBitSizeBuffer = op.sgo.db;
+        // can not be zero
+        const encodedVdfParamsEntry = encodeVdfParameters(vdfDifficultyBuffer, vdfDiscriminantBitSizeBuffer);
+        if (encodedVdfParamsEntry.length === 0) {
+            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Could not encode vdf parameters. Cannot set a new genesis epoch", node.from.key)
+            return Status.IGNORE;
+        }
+
+        const genesisEpoch = await createGenesisEpochProof(this.#config, requesterAddressString, encodedVdfParamsEntry);
+        if (!genesisEpoch) {
+            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Could not initialize genesis epoch", node.from.key)
+            return Status.FAILURE;
+        }
+
+        // initialize CurrentEpoch field
+        const zeroAsUint64Buffer = b4a.alloc(8, 0);
+        await batch.put(EntryType.EPOCH_CURRENT, zeroAsUint64Buffer);
+        
+        // initialize Epoch Field
+        const epochProofHash = await tracCryptoApi.hash.blake3Safe(genesisEpoch);
+        await batch.put(epochZero, epochProofHash);
+
+        // initialize EpochHash Field
+        const epochProofHashString = epochProofHash.toString('hex');
+        const epochHashLedgerEntry = EntryType.EPOCH_HASH + epochProofHashString;
+        await batch.put(epochHashLedgerEntry, genesisEpoch);
+        
+        // initialize VDFParams
+        await batch.put(EntryType.VDF_PARAMS, encodedVdfParamsEntry);
+
+        // Put txHashHexString into the state to avoid replay attack
+        await batch.put(txHashHexString, node.value);
+
+        if (this.#config.enableTxApplyLogs) {
+            console.info(`Genesis Epoch initialized addr:wk:tx - ${requesterAddressString}:${decodedAdminEntry.wk.toString('hex')}:${txHashHexString}`);
+        }
+
+        return Status.SUCCESS;
+    }
 }
 
 export default State;
