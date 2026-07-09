@@ -62,13 +62,13 @@ class ConsensusRouterV1 {
                         break;
                     }
 
-                    const { resultCode } = await this.#epochProofProposalHandler.handleApproval(
+                    const response = await this.#epochProofProposalHandler.handleApproval(
                         decodedMessage,
                         connection,
                         pendingEntry.proofProposal
                     );
                     // TODO: Decide if we want to resolve pending requests here or delegate it elsewhere.
-                    this.#pendingRequestService.resolvePendingRequest(decodedMessage.session_id, resultCode);
+                    this.#pendingRequestService.resolvePendingRequest(decodedMessage.session_id, response);
                     break;
                 }
                 default:
