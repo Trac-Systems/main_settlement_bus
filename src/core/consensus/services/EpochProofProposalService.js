@@ -84,6 +84,7 @@ class EpochProofProposalService extends SchedulableService {
     }
 
     async worker(next) {
+        next(1000000)
         if (!await this.#shouldRun()) {
             next(this.#intervalMs);
             return;

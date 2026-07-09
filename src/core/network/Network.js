@@ -142,8 +142,9 @@ class Network extends ReadyResource {
         
         const isAdmin = await this.#state.isAdmin();
         if (this.#state.isIndexer() && !isAdmin) {
-            this.#epochProofProposalService.start();
             this.#indexerObserverService.start();
+            await sleep(10000)
+            this.#epochProofProposalService.start();
         }
     }
 
