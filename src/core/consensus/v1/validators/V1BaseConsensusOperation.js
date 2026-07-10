@@ -13,17 +13,66 @@ import b4a from "b4a";
 
 class V1BaseConsensusOperation {
     #consensusValidationSchema;
-    #config;
+    _config;
+    _state;
     /**
-     * Creates the base consensus validator with schema validation support.
+     * Creates the base validator shared by consensus v1 operations.
+     *
+     * Initializes operation schemas and stores the shared dependencies used by
+     * address, signature, and state-backed validation.
+     *
+     * @param {Config} config Application configuration. The base validator uses
+     * `addressLength` for schemas and `addressPrefix` for address conversion.
+     * @param {State} state Ledger state. It must expose `isIndexerAddress(address)`
+     * for indexer membership validation.
+     * @throws {Error} When consensus schemas cannot be initialized from the configuration.
      */
-    constructor(config) {
+    constructor(config, state) {
         this.#consensusValidationSchema = new ConsensusValidationSchema(config);
-        this.#config = config;
+        this._config = config;
+        this._state = state;
     }
 
     /**
-     * Validates the consensus payload shape for its declared operation type.
+     * Runs a validator behind the consensus protocol error boundary.
+     *
+     * Expected protocol errors keep their result code and identity. Unexpected
+     * errors from state, codecs, crypto APIs, or malformed runtime values are
+     * exposed as a stable protocol error while remaining available as `cause`.
+     *
+     * @param {function(): (Promise<*>|*)} validation Validation operation to execute.
+     * @returns {Promise<*>} Result returned by the validation operation.
+     * @throws {V1ConsensusProtocolError} Re-throws protocol errors or wraps unexpected failures.
+     */
+    async validateAsProtocolError(validation) {
+        try {
+            return await validation();
+        } catch (error) {
+            if (error instanceof V1ConsensusProtocolError) {
+                throw error;
+            }
+
+            const reason = error instanceof Error
+                ? error.message
+                : typeof error === 'string' ? error : '';
+            const protocolError = new V1ConsensusProtocolError(
+                ConsensusResultCode.UNEXPECTED_ERROR,
+                reason
+            );
+            protocolError.cause = error;
+            throw protocolError;
+        }
+    }
+
+    /**
+     * Validates the payload against the schema selected by its operation type.
+     *
+     * Checks that the operation type is present, supported, and that all fields
+     * required by the corresponding request or approval schema are valid.
+     *
+     * @param {object} payload Decoded consensus operation payload.
+     * @returns {void}
+     * @throws {V1ConsensusProtocolError} When the type or payload schema is invalid.
      */
     isPayloadSchemaValid(payload) {
         if (_.isNil(payload?.type)) {
@@ -44,7 +93,13 @@ class V1BaseConsensusOperation {
     }
 
     /**
-     * Builds proof proposal challenge data from fields 1 through 6.
+     * Builds canonical VDF challenge data from proof proposal fields 1 through 6.
+     *
+     * The message contains protocol version, network id, epoch, previous epoch
+     * record hash, proposer address, and VDF parameters hash in protocol order.
+     *
+     * @param {object} proofProposal Decoded proof proposal.
+     * @returns {Buffer} Canonically encoded challenge data.
      */
     buildProofProposalChallengeData(proofProposal) {
         return createMessage(
@@ -59,6 +114,10 @@ class V1BaseConsensusOperation {
 
     /**
      * Selects the schema validator for the consensus operation type.
+     *
+     * @param {number} type Consensus operation type.
+     * @returns {function(object): boolean} Bound schema validation function.
+     * @throws {V1ConsensusProtocolError} When the operation type is not an integer or is unsupported.
      */
     #selectCheckSchemaValidator(type) {
         if (!Number.isInteger(type)) {
@@ -87,7 +146,16 @@ class V1BaseConsensusOperation {
     }
 
     /**
-     * Builds and verifies the operation signature against the remote public key.
+     * Verifies the operation signature against the remote peer public key.
+     *
+     * Builds the canonical request or approval signature message, hashes it with
+     * BLAKE3, and verifies the signature using the supplied public key.
+     *
+     * @param {object} payload Decoded proof proposal request or approval payload.
+     * @param {Buffer} remotePublicKey Public key received from the peer connection.
+     * @param {object} [proofProposal] Original proof proposal required for approval verification.
+     * @returns {Promise<void>}
+     * @throws {V1ConsensusProtocolError} When message construction, hashing, or signature verification fails.
      */
     async validateSignature(payload, remotePublicKey, proofProposal) {
         let signature;
@@ -139,6 +207,14 @@ class V1BaseConsensusOperation {
 
     /**
      * Builds the canonical signature message for the internal consensus operation.
+     *
+     * A proposal message covers the VDF challenge and proof. An approval message
+     * additionally covers the approver and the original proposal signature.
+     *
+     * @param {object} payload Decoded consensus operation payload.
+     * @param {object} [proofProposalContext] Original proposal used for an approval message.
+     * @returns {{signature: Buffer, message: Buffer}} Signature and canonical message to verify.
+     * @throws {V1ConsensusProtocolError} When the operation type is invalid or unsupported.
      */
     #buildSignatureMessage(payload, proofProposalContext) {
         if (!Number.isInteger(payload.type)) {
@@ -184,10 +260,18 @@ class V1BaseConsensusOperation {
     }
 
     /**
-     * Validates that the payload address resolves to the remote public key.
+     * Validates that a binary protocol address belongs to the connected peer.
+     *
+     * Converts the binary address to its configured textual representation,
+     * decodes its public key, and compares it with the remote connection key.
+     *
+     * @param {Buffer} binaryAddress Binary proposer or approver address from the payload.
+     * @param {Buffer} remotePublicKey Public key received from the peer connection.
+     * @returns {void}
+     * @throws {V1ConsensusProtocolError} When the address is invalid or belongs to another key.
      */
     assertAddressWithRemotePublicKey(binaryAddress, remotePublicKey) {
-        const address = bufferToAddress(binaryAddress, this.#config.addressPrefix);
+        const address = bufferToAddress(binaryAddress, this._config.addressPrefix);
         if (!address) {
             throw new V1ConsensusProtocolError(
                 ConsensusResultCode.UNEXPECTED_ERROR,
@@ -203,15 +287,29 @@ class V1BaseConsensusOperation {
         }
     }
 
-    validateAddressIsIndexer() {
-        // TODO: Placeholder - payload address should have the indexer role in state.
-        // Completion depends on genesis being initialized in the ledger. This is not implemented yet.
-        //
+    /**
+     * Validates that the connected peer is registered as an indexer in state.
+     *
+     * Encodes the remote public key as a configured network address and checks
+     * that address against the current indexer set.
+     *
+     * @param {Buffer} remotePublicKey Public key received from the peer connection.
+     * @returns {Promise<void>}
+     * @throws {V1ConsensusProtocolError} When the remote address is not an indexer.
+     */
+    async validateAddressIsIndexer(remotePublicKey) {
         // TODO: When we replace UNEXPECTED_ERROR with INVALID_ADDRESS_ASSERTION,
         // we should handle this specific error to not only drop the connection but also blacklist the specific node.
         // Such an error would mean that someone is trying to impersonate an indexer.
+        const address = tracCryptoApi.address.encode(this._config.addressPrefix, remotePublicKey);
+        const isIndexer  =  await this._state.isIndexerAddress(address);
+        if (!isIndexer) {
+            throw new V1ConsensusProtocolError(
+                ConsensusResultCode.UNEXPECTED_ERROR,
+                'Incoming address is not an indexer.'
+            )
+        }
     }
-
 }
 
 
