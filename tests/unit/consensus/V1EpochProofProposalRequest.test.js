@@ -5,6 +5,7 @@ import tracCryptoApi from 'trac-crypto-api';
 import {solveWesolowski} from '@tracsystems/trac-vdf';
 
 import ConsensusMessageBuilder from '../../../src/messages/consensus/v1/ConsensusMessageBuilder.js';
+import V1BaseConsensusOperation from '../../../src/core/consensus/v1/validators/V1BaseConsensusOperation.js';
 import V1EpochProofProposalRequest from '../../../src/core/consensus/v1/validators/V1EpochProofProposalRequest.js';
 import {V1ConsensusProtocolError} from '../../../src/core/consensus/v1/V1ConsensusProtocolError.js';
 import {addressToBuffer} from '../../../src/core/state/utils/address.js';
@@ -35,6 +36,23 @@ const TEST_VDF_PARAMS = Object.freeze({
 });
 const vdfProofCache = new Map();
 const defaultPreviousEpochRecordHash = b4a.alloc(32, 1);
+
+test('V1BaseConsensusOperation stringifies non-Error failures', async t => {
+    const thrownValue = {reason: 'state unavailable'};
+    const validator = new V1BaseConsensusOperation(config, {});
+
+    try {
+        await validator.validateAsProtocolError(() => {
+            throw thrownValue;
+        });
+        t.fail('should reject');
+    } catch (error) {
+        t.ok(error instanceof V1ConsensusProtocolError);
+        t.is(error.resultCode, ConsensusResultCode.UNEXPECTED_ERROR);
+        t.is(error.message, String(thrownValue));
+        t.is(error.cause, thrownValue);
+    }
+});
 
 function createState({
     currentEpoch = 0n,

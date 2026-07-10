@@ -54,7 +54,7 @@ class V1BaseConsensusOperation {
 
             const reason = error instanceof Error
                 ? error.message
-                : typeof error === 'string' ? error : '';
+                : typeof error === 'string' ? error : String(error);
             const protocolError = new V1ConsensusProtocolError(
                 ConsensusResultCode.UNEXPECTED_ERROR,
                 reason
