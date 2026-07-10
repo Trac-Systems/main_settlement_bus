@@ -53,7 +53,7 @@ export class EpochProofProposalOperations {
     }
 
     async sendToIndexer(publicKeyHex, request) {
-        if (!this.#connectionManager.connected(publicKeyHex)) throw new Error('Validator not in the manager');
+        if (!this.#connectionManager.connected(publicKeyHex)) throw new Error('Indexer not in the manager');
 
         const response = await this.#connectionManager.send(publicKeyHex, request);
         return response?.approval?.approval_sig
