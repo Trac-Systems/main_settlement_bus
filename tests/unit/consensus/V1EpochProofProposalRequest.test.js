@@ -29,12 +29,9 @@ import {config} from '../../helpers/config.js';
 import {testKeyPair1, testKeyPair2} from '../../fixtures/apply.fixtures.js';
 import {errorMessageIncludes} from '../../helpers/regexHelper.js';
 
-const vdfTestConfig = new Proxy(config, {
-    get(target, property) {
-        if (property === 'vdfDifficulty') return 1;
-        if (property === 'vdfDiscriminantSizeBits') return 2048;
-        return target[property];
-    }
+const TEST_VDF_PARAMS = Object.freeze({
+    vdfDifficulty: 1,
+    vdfDiscriminantSize: 2048
 });
 const vdfProofCache = new Map();
 const defaultPreviousEpochRecordHash = b4a.alloc(32, 1);
@@ -42,8 +39,8 @@ const defaultPreviousEpochRecordHash = b4a.alloc(32, 1);
 function createState({
     currentEpoch = 0n,
     currentEpochHash = defaultPreviousEpochRecordHash,
-    vdfDifficulty = vdfTestConfig.vdfDifficulty,
-    vdfDiscriminantSize = vdfTestConfig.vdfDiscriminantSizeBits
+    vdfDifficulty = TEST_VDF_PARAMS.vdfDifficulty,
+    vdfDiscriminantSize = TEST_VDF_PARAMS.vdfDiscriminantSize
 } = {}) {
     return {
         getCurrentEpoch: async () => currentEpoch,
@@ -60,53 +57,54 @@ async function createWallet(keyPair = testKeyPair1) {
     return await new WalletProvider(config).fromSecretKey(keyPair.secretKey);
 }
 
-async function buildGenesisEpochHash(wallet, vdfConfig = vdfTestConfig) {
+async function buildGenesisEpochHash(wallet, vdfParams = TEST_VDF_PARAMS) {
     const vdfParamsEntry = encodeVdfParameters(
-        uint32ToBuffer(vdfConfig.vdfDifficulty),
-        uint16ToBuffer(vdfConfig.vdfDiscriminantSizeBits)
+        uint32ToBuffer(vdfParams.vdfDifficulty),
+        uint16ToBuffer(vdfParams.vdfDiscriminantSize)
     );
-    const genesisEpoch = await createGenesisEpochProof(vdfConfig, wallet.address, vdfParamsEntry);
+    const genesisEpoch = await createGenesisEpochProof(config, wallet.address, vdfParamsEntry);
 
     return await tracCryptoApi.hash.blake3(genesisEpoch);
 }
 
-async function buildVdfParametersHash(vdfConfig = vdfTestConfig) {
+async function buildVdfParametersHash(vdfParams = TEST_VDF_PARAMS) {
     const message = createMessage(
-        uint32ToBuffer(vdfConfig.vdfDifficulty),
-        uint16ToBuffer(vdfConfig.vdfDiscriminantSizeBits)
+        uint32ToBuffer(vdfParams.vdfDifficulty),
+        uint16ToBuffer(vdfParams.vdfDiscriminantSize)
     );
 
     return await tracCryptoApi.hash.blake3(message);
 }
 
-async function buildVdfProof(challengeData, vdfConfig = vdfTestConfig) {
+async function buildVdfProof(challengeData, vdfParams = TEST_VDF_PARAMS) {
     const cacheKey = [
-        vdfConfig.vdfDifficulty,
-        vdfConfig.vdfDiscriminantSizeBits,
+        vdfParams.vdfDifficulty,
+        vdfParams.vdfDiscriminantSize,
         b4a.toString(challengeData, 'hex')
     ].join(':');
 
     if (!vdfProofCache.has(cacheKey)) {
         vdfProofCache.set(cacheKey, await solveWesolowski(
             challengeData,
-            vdfConfig.vdfDifficulty,
-            vdfConfig.vdfDiscriminantSizeBits
+            vdfParams.vdfDifficulty,
+            vdfParams.vdfDiscriminantSize
         ));
     }
 
     return b4a.from(vdfProofCache.get(cacheKey));
 }
 
-async function buildProofProposalPayload(wallet, vdfConfig = vdfTestConfig, {
+async function buildProofProposalPayload(wallet, {
     epoch = 1,
-    previousEpochRecordHash = defaultPreviousEpochRecordHash
+    previousEpochRecordHash = defaultPreviousEpochRecordHash,
+    vdfParams = TEST_VDF_PARAMS
 } = {}) {
-    const builder = new ConsensusMessageBuilder(wallet, vdfConfig);
+    const builder = new ConsensusMessageBuilder(wallet, config);
     const protocolVersion = uint8ToBuffer(ConsensusProtocolVersion.V1);
-    const networkId = uint16ToBuffer(vdfConfig.networkId);
+    const networkId = uint16ToBuffer(config.networkId);
     const epochBuffer = uint64ToBuffer(epoch);
-    const proposer = addressToBuffer(wallet.address, vdfConfig.addressPrefix);
-    const vdfParametersHash = await buildVdfParametersHash(vdfConfig);
+    const proposer = addressToBuffer(wallet.address, config.addressPrefix);
+    const vdfParametersHash = await buildVdfParametersHash(vdfParams);
     const challengeData = createMessage(
         protocolVersion,
         networkId,
@@ -115,14 +113,14 @@ async function buildProofProposalPayload(wallet, vdfConfig = vdfTestConfig, {
         proposer,
         vdfParametersHash
     );
-    const vdfProof = await buildVdfProof(challengeData, vdfConfig);
+    const vdfProof = await buildVdfProof(challengeData, vdfParams);
 
     await builder
         .setType(ConsensusOperationType.PROOF_PROPOSAL)
         .setSessionId('session')
         .setTimestamp()
         .setProtocolVersion(ConsensusProtocolVersion.V1)
-        .setNetworkId(vdfConfig.networkId)
+        .setNetworkId(config.networkId)
         .setEpoch(epoch)
         .setPreviousEpochRecordHash(previousEpochRecordHash)
         .setProposer(wallet.address)
@@ -152,8 +150,8 @@ test('V1EpochProofProposalRequest validates proof proposal signature', async t =
         vdfParamsReads++;
         return await getSignedVDFParams();
     };
-    const validator = new V1EpochProofProposalRequest(vdfTestConfig, state);
-    const payload = await buildProofProposalPayload(wallet, vdfTestConfig, {
+    const validator = new V1EpochProofProposalRequest(config, state);
+    const payload = await buildProofProposalPayload(wallet, {
         epoch: 1,
         previousEpochRecordHash: genesisEpochHash
     });
@@ -168,7 +166,7 @@ test('V1EpochProofProposalRequest validates proof proposal signature', async t =
 
 test('V1EpochProofProposalRequest rejects unsupported proof proposal protocol version', async t => {
     const wallet = await createWallet();
-    const validator = new V1EpochProofProposalRequest(vdfTestConfig, createState());
+    const validator = new V1EpochProofProposalRequest(config, createState());
     const payload = await buildProofProposalPayload(wallet);
     const fakePayload = {
         ...payload,
@@ -186,7 +184,7 @@ test('V1EpochProofProposalRequest rejects unsupported proof proposal protocol ve
 
 test('V1EpochProofProposalRequest rejects invalid VDF parameters hash', async t => {
     const wallet = await createWallet();
-    const validator = new V1EpochProofProposalRequest(vdfTestConfig, createState());
+    const validator = new V1EpochProofProposalRequest(config, createState());
     const payload = await buildProofProposalPayload(wallet);
     const fakePayload = {
         ...payload,
@@ -204,7 +202,7 @@ test('V1EpochProofProposalRequest rejects invalid VDF parameters hash', async t 
 
 test('V1EpochProofProposalRequest builds proof proposal challenge data from fields one through six', async t => {
     const wallet = await createWallet();
-    const validator = new V1EpochProofProposalRequest(vdfTestConfig, createState());
+    const validator = new V1EpochProofProposalRequest(config, createState());
     const payload = await buildProofProposalPayload(wallet);
     const proofProposal = payload.proof_proposal;
     const challengeData = validator.buildProofProposalChallengeData(proofProposal);
@@ -224,7 +222,7 @@ test('V1EpochProofProposalRequest builds proof proposal challenge data from fiel
 
 test('V1EpochProofProposalRequest rejects invalid proof proposal signature', async t => {
     const wallet = await createWallet();
-    const validator = new V1EpochProofProposalRequest(vdfTestConfig, createState());
+    const validator = new V1EpochProofProposalRequest(config, createState());
     const payload = await buildProofProposalPayload(wallet);
     const fakePayload = {
         ...payload,
@@ -242,7 +240,7 @@ test('V1EpochProofProposalRequest rejects invalid proof proposal signature', asy
 
 test('V1EpochProofProposalRequest rejects invalid VDF proof', async t => {
     const wallet = await createWallet();
-    const validator = new V1EpochProofProposalRequest(vdfTestConfig, createState());
+    const validator = new V1EpochProofProposalRequest(config, createState());
     const payload = await buildProofProposalPayload(wallet);
     const fakeProofProposal = {
         ...payload.proof_proposal,
@@ -266,8 +264,8 @@ test('V1EpochProofProposalRequest rejects invalid VDF proof', async t => {
 
 test('V1EpochProofProposalRequest accepts proposer address matching remote public key', async t => {
     const wallet = await createWallet(testKeyPair1);
-    const validator = new V1EpochProofProposalRequest(vdfTestConfig, createState());
-    const proposer = addressToBuffer(wallet.address, vdfTestConfig.addressPrefix);
+    const validator = new V1EpochProofProposalRequest(config, createState());
+    const proposer = addressToBuffer(wallet.address, config.addressPrefix);
 
     validator.assertAddressWithRemotePublicKey(proposer, wallet.publicKey);
 
@@ -277,8 +275,8 @@ test('V1EpochProofProposalRequest accepts proposer address matching remote publi
 test('V1EpochProofProposalRequest rejects proposer address mismatched with remote public key', async t => {
     const wallet = await createWallet(testKeyPair1);
     const otherWallet = await createWallet(testKeyPair2);
-    const validator = new V1EpochProofProposalRequest(vdfTestConfig, createState());
-    const proposer = addressToBuffer(wallet.address, vdfTestConfig.addressPrefix);
+    const validator = new V1EpochProofProposalRequest(config, createState());
+    const proposer = addressToBuffer(wallet.address, config.addressPrefix);
 
     t.exception(
         () => validator.assertAddressWithRemotePublicKey(proposer, otherWallet.publicKey),
@@ -288,8 +286,8 @@ test('V1EpochProofProposalRequest rejects proposer address mismatched with remot
 
 test('V1EpochProofProposalRequest rejects invalid proposer address as protocol error', async t => {
     const wallet = await createWallet(testKeyPair1);
-    const validator = new V1EpochProofProposalRequest(vdfTestConfig, createState());
-    const invalidProposer = b4a.alloc(vdfTestConfig.addressLength, 1);
+    const validator = new V1EpochProofProposalRequest(config, createState());
+    const invalidProposer = b4a.alloc(config.addressLength, 1);
 
     try {
         validator.assertAddressWithRemotePublicKey(invalidProposer, wallet.publicKey);
@@ -303,9 +301,9 @@ test('V1EpochProofProposalRequest rejects invalid proposer address as protocol e
 
 test('V1EpochProofProposalRequest rejects invalid proof proposal network id', async t => {
     const wallet = await createWallet();
-    const validator = new V1EpochProofProposalRequest(vdfTestConfig, createState());
+    const validator = new V1EpochProofProposalRequest(config, createState());
     const payload = await buildProofProposalPayload(wallet);
-    const fakeNetworkId = vdfTestConfig.networkId === 1 ? 2 : 1;
+    const fakeNetworkId = config.networkId === 1 ? 2 : 1;
     const fakePayload = {
         ...payload,
         proof_proposal: {
@@ -322,8 +320,8 @@ test('V1EpochProofProposalRequest rejects invalid proof proposal network id', as
 
 test('V1EpochProofProposalRequest rejects proof proposal epoch that is not next epoch', async t => {
     const wallet = await createWallet();
-    const validator = new V1EpochProofProposalRequest(vdfTestConfig, createState({currentEpoch: 0n}));
-    const payload = await buildProofProposalPayload(wallet, vdfTestConfig, {epoch: 2});
+    const validator = new V1EpochProofProposalRequest(config, createState({currentEpoch: 0n}));
+    const payload = await buildProofProposalPayload(wallet, {epoch: 2});
 
     try {
         await validator.validate(payload, {remotePublicKey: wallet.publicKey});
@@ -339,11 +337,11 @@ test('V1EpochProofProposalRequest rejects previous epoch record hash mismatch', 
     const wallet = await createWallet();
     const expectedHash = await buildGenesisEpochHash(wallet);
     const payloadHash = b4a.alloc(32, 2);
-    const validator = new V1EpochProofProposalRequest(vdfTestConfig, createState({
+    const validator = new V1EpochProofProposalRequest(config, createState({
         currentEpoch: 0n,
         currentEpochHash: expectedHash
     }));
-    const payload = await buildProofProposalPayload(wallet, vdfTestConfig, {
+    const payload = await buildProofProposalPayload(wallet, {
         previousEpochRecordHash: payloadHash
     });
     const expectedMessage = `Previous epoch record hash mismatch for epoch 0: expected ${expectedHash.toString('hex')}, got ${payloadHash.toString('hex')}`;
@@ -361,7 +359,7 @@ test('V1EpochProofProposalRequest rejects previous epoch record hash mismatch', 
 test('V1EpochProofProposalRequest wraps state failures as protocol errors', async t => {
     const wallet = await createWallet();
     const stateError = new Error('State storage is unavailable.');
-    const validator = new V1EpochProofProposalRequest(vdfTestConfig, {
+    const validator = new V1EpochProofProposalRequest(config, {
         ...createState(),
         getCurrentEpoch: async () => {
             throw stateError;

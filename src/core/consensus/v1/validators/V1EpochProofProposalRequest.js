@@ -11,11 +11,10 @@ class V1EpochProofProposalRequest extends V1BaseConsensusOperation {
     /**
      * Creates the proof proposal request validator.
      *
-     * @param {Config} config Application configuration. In addition to base
-     * fields, request validation uses `networkId`, `vdfDifficulty`, and
-     * `vdfDiscriminantSizeBits`.
+     * @param {Config} config Application configuration used by base validation
+     * and network identity checks.
      * @param {State} state Ledger state. It must expose `getCurrentEpoch()`,
-     * `getEpoch(epoch)`, and `isIndexerAddress(address)`.
+     * `getEpoch(epoch)`, `getSignedVDFParams()`, and `isIndexerAddress(address)`.
      * @throws {Error} When consensus schemas cannot be initialized from the configuration.
      */
     constructor(config, state) {
@@ -79,9 +78,9 @@ class V1EpochProofProposalRequest extends V1BaseConsensusOperation {
     }
 
     /**
-     * Validates that the proof proposal VDF parameters hash matches local config.
+     * Validates that the proof proposal VDF parameters hash matches signed state.
      *
-     * Reconstructs the configured difficulty and discriminant-size message,
+     * Reconstructs the signed difficulty and discriminant-size message,
      * hashes it with BLAKE3, and compares it with `vdf_parameters_hash`.
      *
      * @param {object} proofProposal Decoded proof proposal.
