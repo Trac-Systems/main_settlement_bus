@@ -11,7 +11,7 @@ package common.v1;
 enum ResultCode {
   // Registry ranges:
   // 0-99: generic/shared and existing network V1 codes.
-  // 100-199: consensus V1 codes.
+  // 100-199: epoch consensus V1 codes.
   // 200-299: reserved for future protocol families.
 
   // 0-10: [SCOPE: BASE_TRANSPORT_AND_VALIDATOR_STATUS]
@@ -88,8 +88,8 @@ enum ResultCode {
   RESULT_CODE_VALIDATOR_VA_MISSING = 60;
   RESULT_CODE_TX_INVALID_PAYLOAD = 61;
 
-  // 100-199: [SCOPE: CONSENSUS_V1]
-  // 100-114: consensus proof proposal validation outcomes.
+  // 100-199: [SCOPE: EPOCH_CONSENSUS_V1]
+  // 100-114: epoch consensus proof proposal validation outcomes.
   RESULT_CODE_CONSENSUS_SCHEMA_VALIDATION_FAILED = 100;
   RESULT_CODE_CONSENSUS_BAD_PROTOCOL_VERSION = 101;
   RESULT_CODE_CONSENSUS_WRONG_NETWORK_ID = 102;
@@ -106,6 +106,6 @@ enum ResultCode {
   RESULT_CODE_CONSENSUS_PREVIOUS_EPOCH_RECORD_HASH_INVALID = 113;
   RESULT_CODE_CONSENSUS_INDEXER_ROLE_INVALID = 114;
 
-  // 115-199: reserved for future consensus V1 outcomes.
+  // 115-199: reserved for future epoch consensus V1 outcomes.
   // 200-299: reserved for future protocol families.
 }
