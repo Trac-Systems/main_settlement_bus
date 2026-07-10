@@ -68,10 +68,9 @@ class EpochProofProposalService extends SchedulableService {
         }
     }
 
-    #dispatchApprovalRequests(context, machine) {
-        const { approvers, proofProposal } = context;
+    #dispatchApprovalRequests(approvers, proposalRequest, machine) {
         for (const member of approvers) {
-            this.#operations.collectSignature(member, proofProposal)
+            this.#operations.collectSignature(member, proposalRequest)
                 .then((confirmation) => this.#handleConfirmation(confirmation, machine))
                 .catch((err) => {
                     console.log(err)
@@ -141,17 +140,17 @@ class EpochProofProposalService extends SchedulableService {
 
     async #handleProposingEpoch(context, machine) {
         const { currentEpoch, currentEpochHash, vdf } = context;
-        const proofProposal = await this.#operations.createProposal(currentEpoch, currentEpochHash, vdf);
+        const proposalRequest = await this.#operations.createProofProposal(currentEpoch, currentEpochHash, vdf);
         const approvers = await this.#operations.approvers();
 
         if (machine.state !== EPOCH_STATES.PROPOSING_EPOCH) return;
 
         machine.appendContext({
-            proofProposal,
+            proposalRequest,
             confirmations: [],
             approvers,
         });
-        this.#dispatchApprovalRequests(context, machine);
+        this.#dispatchApprovalRequests(approvers, proposalRequest, machine);
         await machine.send(EPOCH_EVENTS.APPROVAL_REQUESTS_DISPATCHED);
     }
 
@@ -168,11 +167,10 @@ class EpochProofProposalService extends SchedulableService {
     }
 
     async #handleVdfSubmitted(context, machine) {
-        await this.#operations.appendEpoch({
-            data: context.proofProposal.data,
-            signature: context.proofProposal.signature,
-            signatures: context.confirmations,
-        });
+        await this.#operations.appendEpoch(
+            context.proposalRequest.proof_proposal,
+            context.confirmations,
+        );
         await machine.send(EPOCH_EVENTS.APPEND_LOG);
     }    
 
