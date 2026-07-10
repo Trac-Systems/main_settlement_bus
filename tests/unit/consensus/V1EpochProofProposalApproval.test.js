@@ -5,6 +5,7 @@ import {WalletProvider} from 'trac-wallet';
 
 import ConsensusMessageBuilder from '../../../src/messages/consensus/v1/ConsensusMessageBuilder.js';
 import V1EpochProofProposalApproval from '../../../src/core/consensus/v1/validators/V1EpochProofProposalApproval.js';
+import {V1ConsensusProtocolError} from '../../../src/core/consensus/v1/V1ConsensusProtocolError.js';
 import {bufferToAddress} from '../../../src/core/state/utils/address.js';
 import {
     ConsensusOperationType,
@@ -20,6 +21,9 @@ import {createMessage, uint32ToBuffer} from '../../../src/utils/buffer.js';
 const previousEpochRecordHash = b4a.alloc(32, 1);
 const vdfParametersHash = b4a.alloc(32, 2);
 const vdfProof = b4a.alloc(VDF_BLOB_PROOF_SIZE, 3);
+const state = {
+    isIndexerAddress: async () => true
+};
 
 async function createWallet(keyPair) {
     return await new WalletProvider(config).fromSecretKey(keyPair.secretKey);
@@ -84,7 +88,7 @@ async function buildProofProposalRejectionPayload(approverWallet, proofProposalP
 test('V1EpochProofProposalApproval validates approval signature against original proof proposal', async t => {
     const proposerWallet = await createWallet(testKeyPair1);
     const approverWallet = await createWallet(testKeyPair2);
-    const validator = new V1EpochProofProposalApproval(config);
+    const validator = new V1EpochProofProposalApproval(config, state);
     const proofProposalPayload = await buildProofProposalPayload(proposerWallet);
     const approvalPayload = await buildProofProposalApprovalPayload(approverWallet, proofProposalPayload);
 
@@ -100,7 +104,7 @@ test('V1EpochProofProposalApproval validates approval signature against original
 test('V1EpochProofProposalApproval rejects non-OK response without approval', async t => {
     const proposerWallet = await createWallet(testKeyPair1);
     const approverWallet = await createWallet(testKeyPair2);
-    const validator = new V1EpochProofProposalApproval(config);
+    const validator = new V1EpochProofProposalApproval(config, state);
     const proofProposalPayload = await buildProofProposalPayload(proposerWallet);
     const approvalPayload = await buildProofProposalRejectionPayload(approverWallet, proofProposalPayload);
 
@@ -117,7 +121,7 @@ test('V1EpochProofProposalApproval rejects non-OK response without approval', as
 test('V1EpochProofProposalApproval rejects fake non-OK response signature before result code handling', async t => {
     const proposerWallet = await createWallet(testKeyPair1);
     const approverWallet = await createWallet(testKeyPair2);
-    const validator = new V1EpochProofProposalApproval(config);
+    const validator = new V1EpochProofProposalApproval(config, state);
     const proofProposalPayload = await buildProofProposalPayload(proposerWallet);
     const approvalPayload = await buildProofProposalRejectionPayload(approverWallet, proofProposalPayload);
     const fakeApprovalPayload = {
@@ -142,7 +146,7 @@ test('V1EpochProofProposalApproval validateSignature does not validate approver 
     const proposerWallet = await createWallet(testKeyPair1);
     const approverWallet = await createWallet(testKeyPair2);
     const otherWallet = await createWallet(testKeyPair3);
-    const validator = new V1EpochProofProposalApproval(config);
+    const validator = new V1EpochProofProposalApproval(config, state);
     const proofProposalPayload = await buildProofProposalPayload(proposerWallet);
     const approvalPayload = await buildProofProposalApprovalPayload(
         approverWallet,
@@ -163,7 +167,7 @@ test('V1EpochProofProposalApproval rejects approver address mismatched with remo
     const proposerWallet = await createWallet(testKeyPair1);
     const approverWallet = await createWallet(testKeyPair2);
     const otherWallet = await createWallet(testKeyPair3);
-    const validator = new V1EpochProofProposalApproval(config);
+    const validator = new V1EpochProofProposalApproval(config, state);
     const proofProposalPayload = await buildProofProposalPayload(proposerWallet);
     const approvalPayload = await buildProofProposalApprovalPayload(
         approverWallet,
@@ -184,7 +188,7 @@ test('V1EpochProofProposalApproval rejects approver address mismatched with remo
 test('V1EpochProofProposalApproval rejects fake approval signature message', async t => {
     const proposerWallet = await createWallet(testKeyPair1);
     const approverWallet = await createWallet(testKeyPair2);
-    const validator = new V1EpochProofProposalApproval(config);
+    const validator = new V1EpochProofProposalApproval(config, state);
     const proofProposalPayload = await buildProofProposalPayload(proposerWallet);
     const approvalPayload = await buildProofProposalApprovalPayload(approverWallet, proofProposalPayload);
     const fakeApprover = b4a.from(approvalPayload.proof_proposal_response.approval.approver);
@@ -214,7 +218,7 @@ test('V1EpochProofProposalApproval rejects fake approval signature message', asy
 test('V1EpochProofProposalApproval rejects fake response signature', async t => {
     const proposerWallet = await createWallet(testKeyPair1);
     const approverWallet = await createWallet(testKeyPair2);
-    const validator = new V1EpochProofProposalApproval(config);
+    const validator = new V1EpochProofProposalApproval(config, state);
     const proofProposalPayload = await buildProofProposalPayload(proposerWallet);
     const approvalPayload = await buildProofProposalApprovalPayload(approverWallet, proofProposalPayload);
     const fakeApprovalPayload = {
@@ -233,4 +237,31 @@ test('V1EpochProofProposalApproval rejects fake response signature', async t => 
         ),
         errorMessageIncludes('response signature verification failed')
     );
+});
+
+test('V1EpochProofProposalApproval wraps state failures as protocol errors', async t => {
+    const proposerWallet = await createWallet(testKeyPair1);
+    const approverWallet = await createWallet(testKeyPair2);
+    const stateError = new Error('Indexer state is unavailable.');
+    const validator = new V1EpochProofProposalApproval(config, {
+        isIndexerAddress: async () => {
+            throw stateError;
+        }
+    });
+    const proofProposalPayload = await buildProofProposalPayload(proposerWallet);
+    const approvalPayload = await buildProofProposalApprovalPayload(approverWallet, proofProposalPayload);
+
+    try {
+        await validator.validate(
+            approvalPayload,
+            {remotePublicKey: approverWallet.publicKey},
+            proofProposalPayload.proof_proposal
+        );
+        t.fail('should reject');
+    } catch (error) {
+        t.ok(error instanceof V1ConsensusProtocolError);
+        t.is(error.resultCode, ConsensusResultCode.UNEXPECTED_ERROR);
+        t.is(error.message, 'Indexer state is unavailable.');
+        t.is(error.cause, stateError);
+    }
 });
