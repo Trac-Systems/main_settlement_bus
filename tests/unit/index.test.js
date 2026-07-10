@@ -510,13 +510,15 @@ if (isBareRuntime) {
         await msb.ready();
 
         loaded.state.getAdminEntry.resolves(adminEntryFor(wallet, loaded.state));
-        loaded.state.getSignedVDFParams.resolves(null);
+        loaded.state.getSignedVDFParams.rejects(
+            new Error('VDF parameters are not initialized.')
+        );
 
         await t.exception(
             () => msb.handleSetVdfParams({
                 vdfDifficulty: '60000000',
             }),
-            errorMessageIncludes('VDF parameters have not been initialized')
+            errorMessageIncludes('VDF parameters are not initialized.')
         );
 
         t.ok(loaded.state.getIndexerSequenceState.notCalled);
