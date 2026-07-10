@@ -211,4 +211,8 @@ export class Handlers {
     async handleEpochGenesisInitialization(params) {
         return this.#msb.handleEpochGenesisInitialization(params);
     }
+
+    async handleSetVdfParams(params) {
+        return this.#msb.handleSetVdfParams(params);
+    }
 }
