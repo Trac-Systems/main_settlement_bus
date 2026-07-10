@@ -35,6 +35,7 @@ async function loadMainSettlementBus() {
             this.close = sinon.stub().resolves();
             this.getAdminEntry = sinon.stub().resolves(null);
             this.getNodeEntry = sinon.stub().resolves(null);
+            this.getSigned = sinon.stub().resolves(null);
             this.getSignedVDFParams = sinon.stub().resolves(null);
             this.getIndexerSequenceState = sinon.stub().resolves(b4a.from('11'.repeat(32), 'hex'));
             this.append = sinon.stub().resolves();
@@ -153,7 +154,7 @@ if (isBareRuntime) {
         await msb.ready();
 
         loaded.state.getAdminEntry.resolves(adminEntryFor(wallet, loaded.state));
-        loaded.state.getSignedVDFParams.resolves(null);
+        loaded.state.getSigned.resolves(null);
         loaded.state.getIndexerSequenceState.resolves(txValidity);
 
         await msb.handleEpochGenesisInitialization({
@@ -161,7 +162,7 @@ if (isBareRuntime) {
             vdfDiscriminantSize: '2048',
         });
 
-        t.ok(loaded.state.getSignedVDFParams.calledOnce);
+        t.ok(loaded.state.getSigned.calledOnce);
         t.ok(loaded.state.getIndexerSequenceState.calledOnce);
         t.ok(loaded.state.append.calledOnce);
 
@@ -214,7 +215,7 @@ if (isBareRuntime) {
             errorMessageIncludes('admin has not been initialized')
         );
 
-        t.ok(loaded.state.getSignedVDFParams.notCalled);
+        t.ok(loaded.state.getSigned.notCalled);
         t.ok(loaded.state.append.notCalled);
 
         await msb.close();
@@ -240,7 +241,7 @@ if (isBareRuntime) {
             errorMessageIncludes('wallet is not initialized')
         );
 
-        t.ok(loaded.state.getSignedVDFParams.notCalled);
+        t.ok(loaded.state.getSigned.notCalled);
         t.ok(loaded.state.append.notCalled);
 
         await msb.close();
@@ -269,7 +270,7 @@ if (isBareRuntime) {
             errorMessageIncludes('you are not the admin')
         );
 
-        t.ok(loaded.state.getSignedVDFParams.notCalled);
+        t.ok(loaded.state.getSigned.notCalled);
         t.ok(loaded.state.append.notCalled);
 
         await msb.close();
@@ -298,7 +299,7 @@ if (isBareRuntime) {
             errorMessageIncludes('you are not the admin')
         );
 
-        t.ok(loaded.state.getSignedVDFParams.notCalled);
+        t.ok(loaded.state.getSigned.notCalled);
         t.ok(loaded.state.append.notCalled);
 
         await msb.close();
@@ -316,7 +317,7 @@ if (isBareRuntime) {
         await msb.ready();
 
         loaded.state.getAdminEntry.resolves(adminEntryFor(wallet, loaded.state));
-        loaded.state.getSignedVDFParams.resolves(null);
+        loaded.state.getSigned.resolves(null);
 
         await t.exception(
             () => msb.handleEpochGenesisInitialization({
@@ -344,7 +345,7 @@ if (isBareRuntime) {
         await msb.ready();
 
         loaded.state.getAdminEntry.resolves(adminEntryFor(wallet, loaded.state));
-        loaded.state.getSignedVDFParams.resolves(null);
+        loaded.state.getSigned.resolves(null);
 
         await t.exception(
             () => msb.handleEpochGenesisInitialization({
@@ -372,10 +373,7 @@ if (isBareRuntime) {
         await msb.ready();
 
         loaded.state.getAdminEntry.resolves(adminEntryFor(wallet, loaded.state));
-        loaded.state.getSignedVDFParams.resolves({
-            vdfDifficulty: 55000000,
-            vdfDiscriminantSize: 2048,
-        });
+        loaded.state.getSigned.resolves(b4a.alloc(6, 1));
 
         await t.exception(
             () => msb.handleEpochGenesisInitialization({

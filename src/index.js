@@ -12,7 +12,8 @@ import {
     BOOTSTRAP_HEXSTRING_LENGTH,
     BALANCE_MIGRATION_SLEEP_INTERVAL,
     WHITELIST_MIGRATION_DIR,
-    OperationType
+    OperationType,
+    EntryType
 } from "./utils/constants.js";
 import { decimalStringToBigInt, bigIntTo16ByteBuffer, bufferToBigInt, bigIntToDecimalString } from "./utils/amountSerialization.js"
 import {
@@ -1081,7 +1082,9 @@ export class MainSettlementBus extends ReadyResource {
             throw new Error("Can not initialize genesis epoch - you are not the admin.");
         }
 
-        const existingVDFParams = await this.#state.getSignedVDFParams();
+        // Read the raw entry because missing VDF params are expected before genesis,
+        // while getSignedVDFParams() intentionally throws when they are not initialized.
+        const existingVDFParams = await this.#state.getSigned(EntryType.VDF_PARAMS);
         if (existingVDFParams) {
             throw new Error("Can not initialize genesis epoch - VDF parameters already exist.");
         }
