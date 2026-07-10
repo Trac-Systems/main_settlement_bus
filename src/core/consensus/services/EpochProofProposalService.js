@@ -82,12 +82,13 @@ class EpochProofProposalService extends SchedulableService {
         return this.#intervalMs;
     }
 
-    async worker(next) {
-        next(1000000)
+    async worker(next, hold) {
         if (!await this.#shouldRun()) {
             next(this.#intervalMs);
             return;
         }
+
+        hold();
 
         const currentEpoch = await this.#state.getCurrentEpoch();
         const currentEpochHash = await this.#state.getEpoch(currentEpoch);

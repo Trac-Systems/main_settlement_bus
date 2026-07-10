@@ -32,7 +32,7 @@ class SchedulableService extends ReadyResource {
      * @param {(delayMs: number) => void} _next
      * @returns {Promise<void>|void}
      */
-    worker(_next) {}
+    worker(_next, _hold) {}
 
     /**
      * Indicates whether the service has requested interruption of scheduled work.

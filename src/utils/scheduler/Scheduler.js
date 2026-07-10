@@ -63,12 +63,16 @@ class Scheduler {
         let scheduleCalled = false;
         let nextDelay = null;
 
-        const scheduleNext = (ms) => {
+        const hold = () => {
             scheduleCalled = true;
+        }
+
+        const scheduleNext = (ms) => {
+            hold();
             nextDelay = Scheduler.#validateDelay(ms, 'scheduleNext delayMs');
         };
 
-        this.#currentWorkerRun = this.#worker(scheduleNext);
+        this.#currentWorkerRun = this.#worker(scheduleNext, hold);
         try {
             await this.#currentWorkerRun;
         } catch (error) {
