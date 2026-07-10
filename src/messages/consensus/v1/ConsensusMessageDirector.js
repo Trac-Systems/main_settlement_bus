@@ -94,6 +94,23 @@ class ConsensusMessageDirector {
 
         return this.#builder.getResult();
     }
+
+    /**
+     * Build a non-OK proof proposal response without requiring proof proposal fields.
+     * @param {string} sessionId
+     * @param {number} resultCode
+     * @returns {Promise<object>}
+     */
+    async buildProofProposalRejectionResponse(sessionId, resultCode) {
+        await this.#builder
+            .setType(ConsensusOperationType.PROOF_PROPOSAL_APPROVAL)
+            .setSessionId(sessionId)
+            .setTimestamp()
+            .setResultCode(resultCode)
+            .buildPayload();
+
+        return this.#builder.getResult();
+    }
 }
 
 export default ConsensusMessageDirector;

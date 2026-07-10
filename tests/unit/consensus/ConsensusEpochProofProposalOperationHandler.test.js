@@ -265,6 +265,85 @@ test('handleRequest maps unexpected validation errors to UNEXPECTED_ERROR respon
     t.ok(await verifyProofProposalResponseSignature(proofProposalResponse, wallet.publicKey));
 });
 
+test('handleRequest sends signed rejection for malformed proof proposal with valid session id', async t => {
+    const wallet = await createWallet();
+    const calls = [];
+    let proofProposalRead = false;
+    const message = {
+        type: ConsensusOperationType.PROOF_PROPOSAL,
+        session_id: 'malformed-proof-proposal',
+        timestamp: 1
+    };
+    Object.defineProperty(message, 'proof_proposal', {
+        get() {
+            proofProposalRead = true;
+            throw new Error('proof proposal should not be read after validation failure');
+        }
+    });
+    const connection = createConnection(calls);
+    const validationError = new V1ConsensusProtocolError(
+        ConsensusResultCode.SCHEMA_VALIDATION_FAILED,
+        'invalid proof proposal schema'
+    );
+    const handler = setupHandler(t, calls, {
+        wallet,
+        requestValidate: async () => {
+            calls.push({ name: 'validateRequest' });
+            throw validationError;
+        }
+    });
+
+    await handler.handleRequest(message, connection);
+
+    t.alike(callNames(calls), [
+        'onEpochProposalReceived',
+        'validateRequest',
+        'onEpochProposalValidationFailure',
+        'send',
+        'flush',
+        'end'
+    ]);
+    t.absent(proofProposalRead);
+
+    const response = connection.sent[0];
+    t.is(response.session_id, message.session_id);
+
+    const proofProposalResponse = response.proof_proposal_response;
+    t.is(proofProposalResponse.result, ConsensusResultCode.SCHEMA_VALIDATION_FAILED);
+    t.absent(proofProposalResponse.approval);
+    t.ok(await verifyProofProposalResponseSignature(proofProposalResponse, wallet.publicKey));
+});
+
+test('handleRequest ends connection without response when session id is invalid', async t => {
+    const wallet = await createWallet();
+    const calls = [];
+    const message = proofProposalMessage({ session_id: '' });
+    const connection = createConnection(calls);
+    const validationError = new V1ConsensusProtocolError(
+        ConsensusResultCode.INVALID_PAYLOAD,
+        'invalid proof proposal'
+    );
+    const handler = setupHandler(t, calls, {
+        wallet,
+        requestValidate: async () => {
+            calls.push({ name: 'validateRequest' });
+            throw validationError;
+        }
+    });
+
+    await handler.handleRequest(message, connection);
+
+    t.alike(callNames(calls), [
+        'onEpochProposalReceived',
+        'validateRequest',
+        'onEpochProposalValidationFailure',
+        'end'
+    ]);
+    t.is(connection.sent.length, 0);
+    t.absent(connection.flushed);
+    t.ok(connection.ended);
+});
+
 test('handleRequest ends the connection when response sending fails', async t => {
     const wallet = await createWallet();
     const calls = [];
