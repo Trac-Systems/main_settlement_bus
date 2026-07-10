@@ -25,8 +25,8 @@ class V1EpochProofProposalRequest extends V1BaseConsensusOperation {
      * Validates a complete incoming epoch proof proposal request.
      *
      * Checks the payload schema, protocol version, network id, proposer identity,
-     * VDF parameters hash, proposal signature, VDF proof, next epoch number,
-     * previous epoch record hash, and proposer indexer membership.
+     * proposal signature, proposer indexer membership, next epoch number,
+     * previous epoch record hash, VDF parameters hash, and VDF proof.
      *
      * @param {object} payload Decoded proof proposal request payload.
      * @param {object} connection Peer connection containing `remotePublicKey`.
@@ -42,14 +42,14 @@ class V1EpochProofProposalRequest extends V1BaseConsensusOperation {
                 payload.proof_proposal.proposer,
                 connection.remotePublicKey
             );
-            await this.validateAddressIsIndexer(connection.remotePublicKey);
-            const vdfParams = await this._state.getSignedVDFParams();
-            await this.validateProofProposalVdfParametersHash(payload.proof_proposal, vdfParams);
             await this.validateSignature(payload, connection.remotePublicKey);
-            await this.validateProofProposalVdfProof(payload.proof_proposal, vdfParams);
+            await this.validateAddressIsIndexer(connection.remotePublicKey);
             const currentEpoch = await this._state.getCurrentEpoch();
             this.validateIncomingEpoch(payload.proof_proposal, currentEpoch);
             await this.validatePreviousEpochRecordHash(payload.proof_proposal, currentEpoch);
+            const vdfParams = await this._state.getSignedVDFParams();
+            await this.validateProofProposalVdfParametersHash(payload.proof_proposal, vdfParams);
+            await this.validateProofProposalVdfProof(payload.proof_proposal, vdfParams);
             return true;
         });
     }
@@ -199,7 +199,7 @@ class V1EpochProofProposalRequest extends V1BaseConsensusOperation {
             throw new V1ConsensusProtocolError(
                 ConsensusResultCode.UNEXPECTED_ERROR,
                 `Previous epoch record hash mismatch for epoch ${currentEpoch}: expected ${currentEpochHash.toString('hex')}, got ${epochHashInProofProposal.toString('hex')}`
-            )
+            );
         }
 
     }

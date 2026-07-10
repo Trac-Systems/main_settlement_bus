@@ -204,12 +204,17 @@ test('V1EpochProofProposalRequest rejects invalid VDF parameters hash', async t 
     const wallet = await createWallet();
     const validator = new V1EpochProofProposalRequest(config, createState());
     const payload = await buildProofProposalPayload(wallet);
+    const fakeProofProposal = {
+        ...payload.proof_proposal,
+        vdf_parameters_hash: b4a.alloc(32, 9)
+    };
+    const challengeData = validator.buildProofProposalChallengeData(fakeProofProposal);
+    const signatureMessage = createMessage(challengeData, fakeProofProposal.vdf_proof);
+    const signatureHash = await tracCryptoApi.hash.blake3(signatureMessage);
+    fakeProofProposal.signature = wallet.sign(signatureHash);
     const fakePayload = {
         ...payload,
-        proof_proposal: {
-            ...payload.proof_proposal,
-            vdf_parameters_hash: b4a.alloc(32, 9)
-        }
+        proof_proposal: fakeProofProposal
     };
 
     await t.exception(
