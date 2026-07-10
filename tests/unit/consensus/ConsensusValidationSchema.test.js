@@ -6,6 +6,7 @@ import {
     ConsensusOperationType,
     ConsensusProtocolVersion,
     ConsensusResultCode,
+    NetworkResultCode,
     VDF_BLOB_PROOF_SIZE
 } from '../../../src/utils/constants.js';
 import {uint8ToBuffer, uint16ToBuffer, uint64ToBuffer} from '../../../src/utils/buffer.js';
@@ -83,6 +84,17 @@ test('ConsensusValidationSchema requires approval only for OK proof proposal res
     t.is(
         schema.validateV1EpochProofProposalResponse(
             makeProofProposalResponsePayload(ConsensusResultCode.UNSPECIFIED, approval())
+        ),
+        false
+    );
+});
+
+test('ConsensusValidationSchema rejects network-only result codes in proof proposal responses', t => {
+    const schema = new ConsensusValidationSchema(config);
+
+    t.is(
+        schema.validateV1EpochProofProposalResponse(
+            makeProofProposalResponsePayload(NetworkResultCode.TX_INVALID_PAYLOAD)
         ),
         false
     );
