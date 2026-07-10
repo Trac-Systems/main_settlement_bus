@@ -574,7 +574,9 @@ class State extends ReadyResource {
 
     async getSignedVDFParams() {
         const vdfParamsBuffer = await this.getSigned(EntryType.VDF_PARAMS);
-        if (!vdfParamsBuffer) return null;
+        if (!vdfParamsBuffer) {
+            throw new Error("VDF parameters are not initialized.");
+        }
 
         const expectedLength = VDF_DIFFICULTY_SIZE + VDF_DISCRIMINANT_SIZE;
         if (!b4a.isBuffer(vdfParamsBuffer)) {
