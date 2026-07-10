@@ -58,18 +58,23 @@ class Scheduler {
     }
 
     async run() {
-        if (!this.isRunning) return null;
+        if (!this.isRunning) return;
 
-        let scheduleCalled = false;
-        let nextDelay = null;
+        // `hold()` means the worker has taken responsibility for scheduling the next run itself,
+        // by calling `scheduleNext(ms)` later - possibly long after this `run()` call has already
+        // returned (e.g. from an event listener waiting on external confirmation). Because of that,
+        // `scheduleNext` arms the timer directly instead of returning a delay for `run()` to hand
+        // back to its caller - a delay handed back here would be meaningless once `run()` has
+        // already resolved.
+        let handedOff = false;
 
         const hold = () => {
-            scheduleCalled = true;
+            handedOff = true;
         }
 
         const scheduleNext = (ms) => {
-            hold();
-            nextDelay = Scheduler.#validateDelay(ms, 'scheduleNext delayMs');
+            handedOff = true;
+            this.#next(Scheduler.#validateDelay(ms, 'scheduleNext delayMs'));
         };
 
         this.#currentWorkerRun = this.#worker(scheduleNext, hold);
@@ -77,22 +82,25 @@ class Scheduler {
             await this.#currentWorkerRun;
         } catch (error) {
             console.error('Worker error:', error);
-            return this.defaultInterval;
+            this.#next(this.defaultInterval);
+            return;
         } finally {
             this.#currentWorkerRun = null;
         }
 
-        return scheduleCalled ? nextDelay : this.defaultInterval;
+        if (!handedOff) {
+            this.#next(this.defaultInterval);
+        }
     }
 
     #next(delayMs) {
         if (!this.isRunning) return;
         const ms = Scheduler.#validateDelay(delayMs, 'next delayMs');
-        this.#timer = setTimeout(async () => {
-            const nextDelay = await this.run();
-            if (this.isRunning) {
-                this.#next(nextDelay);
-            }
+        if (this.#timer) {
+            clearTimeout(this.#timer);
+        }
+        this.#timer = setTimeout(() => {
+            this.run();
         }, ms);
     }
 

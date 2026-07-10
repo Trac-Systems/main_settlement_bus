@@ -161,6 +161,7 @@ class ConsensusEpochProofProposalOperationHandler extends ConnectionOperationHan
             await this.sendResponseAndMaybeClose(
                 connection,
                 response,
+                false,
             );
 
         } catch (error) {

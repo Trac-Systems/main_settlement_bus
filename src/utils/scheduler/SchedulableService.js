@@ -93,7 +93,7 @@ class SchedulableService extends ReadyResource {
     #ensureScheduler() {
         if (this.#scheduler) return;
         this.#scheduler = new Scheduler(
-            (next) => this.worker(next),
+            (next, hold) => this.worker(next, hold),
             this.getScheduleInterval(),
         );
     }

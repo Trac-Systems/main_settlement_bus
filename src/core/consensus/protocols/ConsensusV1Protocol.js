@@ -56,6 +56,10 @@ class ConsensusV1Protocol {
     close() {
         this.#channel.close();
     }
+
+    get isClosed() {
+        return this.#channel?.closed ?? true;
+    }
 }
 
 export default ConsensusV1Protocol;

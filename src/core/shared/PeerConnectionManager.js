@@ -90,12 +90,18 @@ export class PeerConnectionManager extends ReadyResource {
     /**
      * Removes a peer from the pool.
      * @param {String | Buffer} publicKey - The public key hex string of the peer to remove
+     * @param {Object} [options]
+     * @param {Object} [options.connection] - If provided, only removes the entry when it still
+     *   points to this exact connection. Guards against a stale/duplicate connection's `close`
+     *   event evicting a newer connection that has since replaced it in the pool.
      */
-    remove(publicKey) {
+    remove(publicKey, { connection = null } = {}) {
         const key = toHex(publicKey);
-        const connection = this.getConnection(key)
+        const entry = this._connections.get(key);
+        if (!entry) return;
+        if (connection && entry.connection !== connection) return;
 
-        if (connection) connection.protocolSession.close();
+        if (entry.connection) entry.connection.protocolSession.close();
         this._connections.delete(key);
     }
 
@@ -144,7 +150,7 @@ export class PeerConnectionManager extends ReadyResource {
         this._connections.set(publicKeyHex, {connection, sent: 0});
         connection.on('close', () => {
             this._logger.debug(`#append: connection closing for peer ${publicKeyToAddress(publicKey, this._config)}`);
-            this.remove(publicKeyHex);
+            this.remove(publicKeyHex, { connection });
             this._logger.debug(`#append: connection closed for peer ${publicKeyToAddress(publicKey, this._config)}`);
         });
     }

@@ -143,7 +143,7 @@ class Network extends ReadyResource {
         const isAdmin = await this.#state.isAdmin();
         if (this.#state.isIndexer() && !isAdmin) {
             this.#indexerObserverService.start();
-            await sleep(10000)
+            await sleep(5000)
             this.#epochProofProposalService.start();
         }
     }
@@ -170,7 +170,8 @@ class Network extends ReadyResource {
         this.#state.on(CustomEventType.IS_INDEXER, async (publicKey) => {
             const indexersCount = await this.#state.indexerCount()
             this.#indexerConnectionManager.setMax(indexersCount);
-            this.disconnectValidatorPeer(publicKey, 'peer promoted to indexer');
+            const publicKeyHex = this.#normalizePublicKey(publicKey);
+            this.#validatorConnectionManager.remove(publicKeyHex, { endConnection: false });
             await this.addIndexerPeer(publicKey);
         });
 
@@ -188,7 +189,7 @@ class Network extends ReadyResource {
             const address = tracCryptoApi.address.encode(this.#config.addressPrefix, bufferAddress);
             if (address === this.#wallet.address) {
                 this.#indexerObserverService.start();
-                this.#epochProofProposalService.start();
+                // this.#epochProofProposalService.start();
             }
         });
 
@@ -212,6 +213,10 @@ class Network extends ReadyResource {
              second is that the protocol itself doesnt fit the connection life-cycle (this is a bigger problem that also touched on DHT factory structure being "swallowed by swarm")
              */
             connection.protocolSession = this.#networkMessages.createProtomux(connection);
+            // React to the remote opening a consensus/v1 channel even if we haven't promoted
+            // this peer to indexer ourselves yet - otherwise whichever side gets there first
+            // wins the Protomux pairing race and the other side's channel gets silently rejected.
+            this.#indexerConnectionManager.prepareConnection(connection);
         })
         this.#swarm.on('connection', async (connection) => {
             // ATTENTION: Must be called AFTER the protomux init above
@@ -225,8 +230,8 @@ class Network extends ReadyResource {
             connection.on('close', () => {
                 this.#rejectAllPendingRequests(publicKey, new Error('Connection closed before response'));
                 this.#swarm.leavePeer(connection.remotePublicKey);
-                this.#validatorConnectionManager.remove(publicKey);
-                this.#indexerConnectionManager.remove(publicKey);
+                this.#validatorConnectionManager.remove(publicKey, { connection });
+                this.#indexerConnectionManager.remove(publicKey, { connection });
             });
 
             connection.on('error', (error) => {
@@ -357,7 +362,7 @@ class Network extends ReadyResource {
         return CONNECTION_STATUS.PENDING;
     }
 
-    async #promotePendingConnection(publicKey, connection) {
+    async #promotePendingConnection(publicKey, connection, type) {
         const pending = this.#pendingConnections.get(publicKey);
         if (pending) {
             clearTimeout(pending.timeoutId);

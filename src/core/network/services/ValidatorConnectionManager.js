@@ -115,6 +115,7 @@ class ValidatorConnectionManager extends PeerConnectionManager {
         } catch (err) {
             this._logger.debug(`failed to probe peer with publicKey ${publicKey}: ${err?.message ?? err}`);
         }        
+        this._add(publicKey, connection, { initializeProtocolSession: false });
         
         if (connection.protocolSession.isHealthCheckSupported()) {
             this.#healthCheckService.start(publicKey);
@@ -129,26 +130,32 @@ class ValidatorConnectionManager extends PeerConnectionManager {
      * @param {object} [options]
      * @param {boolean} [options.endConnection=true] - Whether to close the underlying socket.
      */
-    remove(publicKey, { endConnection = true } = {}) {
-        this._logger.debug(`remove: removing validator ${publicKeyToAddress(publicKey, this._config)}`);
+    remove(publicKey, { endConnection = true, connection = null } = {}) {
         const publicKeyHex = this._toHexString(publicKey);
-        this.#stopHealthCheck(publicKeyHex);
-        if (this.exists(publicKeyHex)) {
-            const entry = this._connections.get(publicKeyHex);
-            if (endConnection && entry && entry.connection && typeof entry.connection.end === 'function') {
-                try {
-                    entry.connection.protocolSession.close();
-                    entry.connection.end();
-                } catch (e) {
-                    // Ignore errors on connection end
-                    this._logger.debug(`remove: failed to end connection: ${e.message}`);
-                    // TODO: Consider logging these errors here in verbose mode
-                }
-            }
-            this._logger.debug(`remove: removing validator from map: ${publicKeyToAddress(publicKeyHex, this._config)}. Map size before removal: ${this._connections.size}.`);
-            this._connections.delete(publicKeyHex);
-            this._logger.debug(`remove: validator removed successfully. Map size is now ${this._connections.size}.`);
+        if (!this.exists(publicKeyHex)) return;
+
+        const entry = this._connections.get(publicKeyHex);
+        if (connection && entry.connection !== connection) {
+            // Stale/duplicate connection closing after a newer one has already replaced it. Ignore.
+            this._logger.debug(`remove: ignoring close of stale/duplicate connection for ${publicKeyToAddress(publicKeyHex, this._config)}`);
+            return;
         }
+
+        this._logger.debug(`remove: removing validator ${publicKeyToAddress(publicKey, this._config)}`);
+        this.#stopHealthCheck(publicKeyHex);
+        if (endConnection && entry.connection && typeof entry.connection.end === 'function') {
+            try {
+                entry.connection.protocolSession.close();
+                entry.connection.end();
+            } catch (e) {
+                // Ignore errors on connection end
+                this._logger.debug(`remove: failed to end connection: ${e.message}`);
+                // TODO: Consider logging these errors here in verbose mode
+            }
+        }
+        this._logger.debug(`remove: removing validator from map: ${publicKeyToAddress(publicKeyHex, this._config)}. Map size before removal: ${this._connections.size}.`);
+        this._connections.delete(publicKeyHex);
+        this._logger.debug(`remove: validator removed successfully. Map size is now ${this._connections.size}.`);
     }
 
     prettyPrint() {
