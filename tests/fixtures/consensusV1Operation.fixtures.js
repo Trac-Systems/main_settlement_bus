@@ -12,7 +12,8 @@ import {
     VDF_BLOB_PROOF_SIZE,
 } from '../../src/utils/constants.js';
 
-const { MessageType, ResultCode } = consensusV1Generated.consensus.v1;
+const { MessageType } = consensusV1Generated.consensus.v1;
+const { ResultCode } = consensusV1Generated.common.v1;
 
 const bytes = (value, length) => b4a.alloc(length, value);
 
