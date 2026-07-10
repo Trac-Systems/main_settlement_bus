@@ -4,6 +4,7 @@ import tracCryptoApi from 'trac-crypto-api';
 import { v7 as uuidv7 } from 'uuid';
 import NetworkMessageBuilder from '../../../../src/messages/network/v1/NetworkMessageBuilder.js';
 import {
+    ConsensusResultCode,
     NetworkOperationType,
     ResultCode as NetworkResultCode
 } from '../../../../src/utils/constants.js';
@@ -419,6 +420,11 @@ test('NetworkMessageBuilder validates required inputs', async t => {
     await t.exception(
         () => builder.setCapabilities('not-an-array'),
         errorMessageIncludes('Capabilities must be a string array.')
+    );
+
+    await t.exception(
+        () => builder.setResultCode(ConsensusResultCode.BAD_PROTOCOL_VERSION),
+        errorMessageIncludes(`Invalid network result code: ${ConsensusResultCode.BAD_PROTOCOL_VERSION}`)
     );
 
     await t.exception(

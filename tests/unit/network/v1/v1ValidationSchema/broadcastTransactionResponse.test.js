@@ -3,6 +3,7 @@ import b4a from 'b4a';
 
 import V1ValidationSchema from '../../../../../src/core/network/protocols/v1/validators/V1ValidationSchema.js';
 import {
+    ConsensusResultCode,
     NetworkOperationType,
     NONCE_BYTE_LENGTH,
     ResultCode,
@@ -106,6 +107,10 @@ test('V1ValidationSchema.validateV1BroadcastTransactionResponse - result value v
 
     const unknownCode = Math.max(...Object.values(ResultCode)) + 1;
     t.absent(v.validateV1BroadcastTransactionResponse(buildWithResult(unknownCode)), 'unknown result code should fail');
+    t.absent(
+        v.validateV1BroadcastTransactionResponse(buildWithResult(ConsensusResultCode.BAD_PROTOCOL_VERSION)),
+        'consensus-only result code should fail'
+    );
 });
 
 test('V1ValidationSchema.validateV1BroadcastTransactionResponse - buffer lengths', t => {
