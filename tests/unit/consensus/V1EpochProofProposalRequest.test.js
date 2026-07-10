@@ -41,11 +41,17 @@ const defaultPreviousEpochRecordHash = b4a.alloc(32, 1);
 
 function createState({
     currentEpoch = 0n,
-    currentEpochHash = defaultPreviousEpochRecordHash
+    currentEpochHash = defaultPreviousEpochRecordHash,
+    vdfDifficulty = vdfTestConfig.vdfDifficulty,
+    vdfDiscriminantSize = vdfTestConfig.vdfDiscriminantSizeBits
 } = {}) {
     return {
         getCurrentEpoch: async () => currentEpoch,
         getEpoch: async () => currentEpochHash,
+        getSignedVDFParams: async () => ({
+            vdfDifficulty,
+            vdfDiscriminantSize
+        }),
         isIndexerAddress: async () => true
     };
 }
@@ -135,10 +141,16 @@ test('V1EpochProofProposalRequest validates proof proposal signature', async t =
         currentEpochHash: genesisEpochHash
     });
     const getCurrentEpoch = state.getCurrentEpoch;
+    const getSignedVDFParams = state.getSignedVDFParams;
     let currentEpochReads = 0;
+    let vdfParamsReads = 0;
     state.getCurrentEpoch = async () => {
         currentEpochReads++;
         return await getCurrentEpoch();
+    };
+    state.getSignedVDFParams = async () => {
+        vdfParamsReads++;
+        return await getSignedVDFParams();
     };
     const validator = new V1EpochProofProposalRequest(vdfTestConfig, state);
     const payload = await buildProofProposalPayload(wallet, vdfTestConfig, {
@@ -150,6 +162,7 @@ test('V1EpochProofProposalRequest validates proof proposal signature', async t =
     await validator.validate(payload, {remotePublicKey: wallet.publicKey});
 
     t.is(currentEpochReads, 1);
+    t.is(vdfParamsReads, 1);
     t.pass();
 });
 

@@ -44,9 +44,10 @@ class V1EpochProofProposalRequest extends V1BaseConsensusOperation {
                 connection.remotePublicKey
             );
             await this.validateAddressIsIndexer(connection.remotePublicKey);
-            await this.validateProofProposalVdfParametersHash(payload.proof_proposal);
+            const vdfParams = await this._state.getSignedVDFParams();
+            await this.validateProofProposalVdfParametersHash(payload.proof_proposal, vdfParams);
             await this.validateSignature(payload, connection.remotePublicKey);
-            await this.validateProofProposalVdfProof(payload.proof_proposal);
+            await this.validateProofProposalVdfProof(payload.proof_proposal, vdfParams);
             const currentEpoch = await this._state.getCurrentEpoch();
             this.validateIncomingEpoch(payload.proof_proposal, currentEpoch);
             await this.validatePreviousEpochRecordHash(payload.proof_proposal, currentEpoch);
@@ -84,13 +85,14 @@ class V1EpochProofProposalRequest extends V1BaseConsensusOperation {
      * hashes it with BLAKE3, and compares it with `vdf_parameters_hash`.
      *
      * @param {object} proofProposal Decoded proof proposal.
+     * @param {object} vdfParams Signed VDF parameters read from ledger state.
      * @returns {Promise<void>}
      * @throws {V1ConsensusProtocolError} When hashing fails or the hash does not match.
      */
-    async validateProofProposalVdfParametersHash(proofProposal) {
+    async validateProofProposalVdfParametersHash(proofProposal, vdfParams) {
         const message = createMessage(
-            uint32ToBuffer(this._config.vdfDifficulty),
-            uint16ToBuffer(this._config.vdfDiscriminantSizeBits)
+            uint32ToBuffer(vdfParams.vdfDifficulty),
+            uint16ToBuffer(vdfParams.vdfDiscriminantSize)
         );
 
         let expectedHash;
@@ -114,23 +116,24 @@ class V1EpochProofProposalRequest extends V1BaseConsensusOperation {
     /**
      * Verifies the proof proposal VDF proof against its challenge data.
      *
-     * Uses the canonical challenge fields and locally configured VDF difficulty
-     * and discriminant size for Wesolowski proof verification.
+     * Uses the canonical challenge fields and signed-state VDF difficulty and
+     * discriminant size for Wesolowski proof verification.
      *
      * @param {object} proofProposal Decoded proof proposal.
+     * @param {object} vdfParams Signed VDF parameters read from ledger state.
      * @returns {Promise<void>}
      * @throws {V1ConsensusProtocolError} When VDF verification fails or returns false.
      */
-    async validateProofProposalVdfProof(proofProposal) {
+    async validateProofProposalVdfProof(proofProposal, vdfParams) {
         const challengeData = this.buildProofProposalChallengeData(proofProposal);
 
         let verified = false;
         try {
             verified = await verifyWesolowski(
                 challengeData,
-                this._config.vdfDifficulty,
+                vdfParams.vdfDifficulty,
                 proofProposal.vdf_proof,
-                this._config.vdfDiscriminantSizeBits
+                vdfParams.vdfDiscriminantSize
             );
         } catch {
             verified = false;

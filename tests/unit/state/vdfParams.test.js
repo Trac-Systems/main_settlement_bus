@@ -25,10 +25,13 @@ async function createStateWithSignedValue(value) {
     return new State(null, null, config);
 }
 
-test('State#getSignedVDFParams returns null when params are missing', async t => {
+test('State#getSignedVDFParams rejects when params are missing', async t => {
     const state = await createStateWithSignedValue(undefined);
 
-    t.is(await state.getSignedVDFParams(), null);
+    await t.exception(
+        () => state.getSignedVDFParams(),
+        errorMessageIncludes('VDF parameters are not initialized.')
+    );
 });
 
 test('State#getSignedVDFParams decodes stored VDF params', async t => {
