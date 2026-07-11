@@ -36,10 +36,16 @@ function createSubject(overrides = {}) {
 }
 
 function stubConsole(t) {
-    sinon.stub(console, "info");
-    sinon.stub(console, "log");
-    sinon.stub(console, "error");
-    t.teardown(() => sinon.restore());
+    // A dedicated sandbox instead of sinon's global default one: sinon.stub/sinon.restore()
+    // operate on shared global state, so another test's (or another file's) teardown calling
+    // sinon.restore() while this test is still mid-flight can yank the stub out from under it -
+    // console.error etc revert to the native function and .calledWith throws. Each test gets
+    // its own sandbox so its restore() can only ever affect its own stubs.
+    const sandbox = sinon.createSandbox();
+    sandbox.stub(console, "info");
+    sandbox.stub(console, "log");
+    sandbox.stub(console, "error");
+    t.teardown(() => sandbox.restore());
 }
 
 test("CommandHandler queues transfer preview without submitting immediately", async (t) => {

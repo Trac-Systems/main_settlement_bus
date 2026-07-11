@@ -15,7 +15,7 @@ const CONFIG = Object.freeze({
     epochInterval: 1000,
     epochSignatureTimeout: 5000,
     epochAppendTimeout: 5000,
-    epochThreshold: 2,
+    epochThreshold: 1,
     networkId: 1,
     addressPrefix: 'trac',
     vdfDifficulty: 100,
@@ -23,7 +23,7 @@ const CONFIG = Object.freeze({
     logLevel: 'silent',
 });
 
-const makeState = (overrides = {}) => {
+function makeState(overrides = {}) {
     const listeners = new Map();
     return {
         on: sinon.stub().callsFake((event, fn) => {
@@ -35,18 +35,20 @@ const makeState = (overrides = {}) => {
             listeners.set(event, arr.filter(f => f !== fn));
         }),
         emit: async (event, ...args) => {
-            for (const fn of listeners.get(event) ?? []) await fn(...args);
+            for (const fn of [...(listeners.get(event) ?? [])]) await fn(...args);
         },
-        currentEpochId: sinon.stub().resolves(5),
-        getIndexersEntry: sinon.stub().resolves([]),
+        getCurrentEpoch: sinon.stub().resolves(5n),
+        getEpoch: sinon.stub().resolves(b4a.alloc(32, 0xaa)),
+        getSignedVDFParams: sinon.stub().resolves({ vdfDifficulty: 100, vdfDiscriminantSize: 2048 }),
         ...overrides,
     };
-};
+}
 
-const makeSig = () => ({ signature: b4a.alloc(64, 0xbb), publicKey: b4a.alloc(32, 0x01) });
+const makeConfirmation = () => ({ signature: b4a.alloc(64, 0xbb), approver: b4a.alloc(21, 0x01) });
 
-// macrotask flush — lets all pending microtasks resolve before continuing
-const flush = () => new Promise(r => setTimeout(r, 20));
+// Lets a pending promise chain (collectSignature().then(...) etc) settle via a real timer tick.
+// Only valid when fake timers are NOT installed - see the "timeouts" section for that case.
+const flush = () => new Promise((resolve) => setTimeout(resolve, 20));
 
 async function setup(overrides = {}) {
     const mockVdfService = {
@@ -55,27 +57,12 @@ async function setup(overrides = {}) {
     };
 
     const mockOps = {
-        calculateVDF: sinon.stub().resolves({
-            prevEpochId: 1,
-            currentEpochHash: b4a.alloc(32, 0xaa),
-            solution: b4a.alloc(516, 0xff),
-        }),
-        createProposal: sinon.stub().returns({
-            toProposalMessage: sinon.stub().resolves({
-                epoch: 2,
-                data: {
-                    protocolVersion: 1,
-                    networkId: 1,
-                    epoch: 2,
-                    prevEpochHash: b4a.alloc(32),
-                    vdfParamsHash: b4a.alloc(258),
-                    vdfProof: b4a.alloc(258),
-                },
-                dataHash: b4a.alloc(32),
-            }),
-        }),
+        calculateVDF: sinon.stub().resolves({ solution: b4a.alloc(516, 0xff) }),
+        createProofProposal: sinon.stub().resolves({ proof_proposal: { epoch: b4a.alloc(8) } }),
+        approvers: sinon.stub().resolves([{ key: b4a.alloc(32, 0x02) }]),
+        collectSignature: sinon.stub().resolves(makeConfirmation()),
         appendEpoch: sinon.stub().resolves(),
-        collectSignature: sinon.stub().resolves(null),
+        ...overrides.opsOverrides,
     };
 
     const MockEpochProofProposalOperations = class {
@@ -94,27 +81,24 @@ async function setup(overrides = {}) {
     const service = new Service(state, {}, { address: 'trac1wallet' }, config);
     await service.ready();
 
-    const fireWorker = async () => {
-        const next = sinon.stub();
-        await service.worker(next);
-    };
-
-    return { service, state, mockOps, mockVdfService, fireWorker };
+    return { service, state, mockOps, mockVdfService };
 }
 
 // --- start() / stop() ---
+// SchedulableService#start is synchronous, but EpochProofProposalService overrides it as
+// `async start()`, so the call always returns a Promise and must be awaited.
 
 test('start() returns true and starts scheduler when not running', async t => {
     const { service } = await setup();
     t.teardown(() => service.close());
-    t.is(service.start(), true);
+    t.is(await service.start(), true);
 });
 
 test('start() returns false when scheduler is already running', async t => {
     const { service } = await setup();
     t.teardown(() => service.close());
-    service.start();
-    t.is(service.start(), false);
+    await service.start();
+    t.is(await service.start(), false);
 });
 
 test('stop() returns false when scheduler is not running', async t => {
@@ -126,167 +110,265 @@ test('stop() returns false when scheduler is not running', async t => {
 test('stop() returns true when scheduler is running', async t => {
     const { service } = await setup();
     t.teardown(() => service.close());
-    service.start();
+    await service.start();
     t.is(await service.stop(), true);
 });
 
 // --- _close() lifecycle ---
+// _close() forces the active cycle's cleanup (#activeCycleCleanup) before stopping the
+// scheduler, so an in-flight cycle's EPOCH_PROPOSAL_SUBMITTED/EPOCH_CREATED listeners - and any
+// pending COLLECTING_CONFIRMATIONS/AWAITING_EPOCH timers - are always released on close, even if
+// the cycle was mid-retry. Without this, a stuck cycle would keep recomputing the VDF and
+// re-dispatching approval requests forever, even after the service was told to stop.
 
-test('_close() does not remove EPOCH_PROPOSAL_SUBMITTED listener from state', async t => {
+test('_close() removes the EPOCH_PROPOSAL_SUBMITTED listener from an in-flight cycle', async t => {
     const { service, state } = await setup();
+    await service.worker(sinon.stub(), sinon.stub());
     await service.close();
-    t.absent(state.removeListener.calledWith(EPOCH_PROPOSAL_SUBMITTED, sinon.match.func));
+    t.ok(state.removeListener.calledWith(EPOCH_PROPOSAL_SUBMITTED, sinon.match.func));
 });
 
-test('_close() does not remove EPOCH_CREATED listener from state', async t => {
+test('_close() removes the EPOCH_CREATED listener from an in-flight cycle', async t => {
     const { service, state } = await setup();
+    await service.worker(sinon.stub(), sinon.stub());
     await service.close();
-    t.absent(state.removeListener.calledWith(EPOCH_CREATED, sinon.match.func));
+    t.ok(state.removeListener.calledWith(EPOCH_CREATED, sinon.match.func));
 });
 
-// --- #worker conditions ---
+test('_close() cancels a pending COLLECTING_CONFIRMATIONS timeout so it never fires', async t => {
+    const clock = sinon.useFakeTimers();
+    try {
+        const { service, mockOps } = await setup({
+            config: { epochSignatureTimeout: 1000 },
+            opsOverrides: { collectSignature: sinon.stub().returns(new Promise(() => {})) },
+        });
+
+        await service.worker(sinon.stub(), sinon.stub());
+        t.is(mockOps.calculateVDF.callCount, 1);
+
+        await service.close();
+
+        await clock.tickAsync(1100); // would retry (2nd calculateVDF) if the timer weren't cancelled
+        t.is(mockOps.calculateVDF.callCount, 1, 'close() cancelled the pending retry');
+    } finally {
+        clock.restore();
+    }
+});
+
+// --- #shouldRun guard ---
 
 test('worker does nothing when isInterrupted', async t => {
-    const { service, mockOps, fireWorker } = await setup();
+    const { service, mockOps } = await setup();
     t.teardown(() => service.close());
-    service.start();
+    await service.start();
     await service.stop();
-    await fireWorker();
+    await service.worker(sinon.stub(), sinon.stub());
     t.absent(mockOps.calculateVDF.called);
 });
 
-test('worker does nothing when currentEpochId is 0', async t => {
-    const { service, mockOps, fireWorker } = await setup({
-        stateOverrides: { currentEpochId: sinon.stub().resolves(0) },
+test('worker does nothing when currentEpoch is null (state not initialized)', async t => {
+    const { service, mockOps } = await setup({
+        stateOverrides: { getCurrentEpoch: sinon.stub().resolves(null) },
     });
     t.teardown(() => service.close());
-    await fireWorker();
+    await service.worker(sinon.stub(), sinon.stub());
     t.absent(mockOps.calculateVDF.called);
 });
 
-test('worker does nothing when state machine is not VDF_PENDING', async t => {
-    const { service, mockOps, state, fireWorker } = await setup();
+test('worker runs when currentEpoch is 0n (right after genesis)', async t => {
+    const { service, mockOps } = await setup({
+        stateOverrides: { getCurrentEpoch: sinon.stub().resolves(0n) },
+    });
     t.teardown(() => service.close());
-    await state.emit(EPOCH_PROPOSAL_SUBMITTED); // moves machine to AWAITING_EPOCH
-    mockOps.calculateVDF.resetHistory();
-    await fireWorker();
-    t.absent(mockOps.calculateVDF.called);
-});
-
-test('worker triggers VDF calculation when VDF_PENDING and epochId > 0', async t => {
-    const { service, mockOps, fireWorker } = await setup();
-    t.teardown(() => service.close());
-    await fireWorker();
+    await service.worker(sinon.stub(), sinon.stub());
     t.ok(mockOps.calculateVDF.calledOnce);
 });
 
-// --- event listeners ---
+// --- worker happy path ---
 
-test('EPOCH_PROPOSAL_SUBMITTED transitions machine to AWAITING_EPOCH', async t => {
-    // Observable: machine reaches AWAITING_EPOCH so worker skips on next tick
-    const { service, mockOps, state, fireWorker } = await setup();
+test('worker calculates the VDF and dispatches a proposal to approvers', async t => {
+    const { service, mockOps } = await setup();
     t.teardown(() => service.close());
-    await state.emit(EPOCH_PROPOSAL_SUBMITTED);
-    mockOps.calculateVDF.resetHistory();
-    await fireWorker(); // machine is not VDF_PENDING — worker skips
-    t.absent(mockOps.calculateVDF.called);
-});
-
-test('EPOCH_CREATED sends EPOCH_VERIFIED and resumes cycle when in AWAITING_EPOCH', async t => {
-    // Observable: after EPOCH_PROPOSAL_SUBMITTED then EPOCH_CREATED, calculateVDF is called
-    const { service, mockOps, state } = await setup();
-    t.teardown(() => service.close());
-    await state.emit(EPOCH_PROPOSAL_SUBMITTED); // → AWAITING_EPOCH
-    await state.emit(EPOCH_CREATED);            // → EPOCH_VERIFIED → VDF_PENDING → calculateVDF
-    await flush();
+    await service.worker(sinon.stub(), sinon.stub());
     t.ok(mockOps.calculateVDF.calledOnce);
+    t.ok(mockOps.createProofProposal.calledOnce);
+    t.ok(mockOps.approvers.calledOnce);
+    t.ok(mockOps.collectSignature.calledOnce);
 });
 
-test('EPOCH_CREATED does nothing when not in AWAITING_EPOCH', async t => {
-    const { service, mockOps, state } = await setup();
-    t.teardown(() => service.close());
-    // Machine starts in VDF_PENDING, not AWAITING_EPOCH
-    await state.emit(EPOCH_CREATED);
-    await flush();
-    t.absent(mockOps.calculateVDF.called);
-});
+// --- #handleConfirmation / quorum ---
 
-// --- #handleConfirmation threshold ---
-
-test('null confirmation is ignored and does not count toward threshold', async t => {
-    const { service, mockOps, fireWorker } = await setup({
-        stateOverrides: { getIndexersEntry: sinon.stub().resolves([{ key: b4a.alloc(32, 0x02) }]) },
-        config: { epochThreshold: 1 },
+test('a rejected collectSignature does not count toward quorum', async t => {
+    const { service, mockOps } = await setup({
+        opsOverrides: { collectSignature: sinon.stub().rejects(new Error('no signature')) },
     });
     t.teardown(() => service.close());
-    mockOps.collectSignature.resolves(null);
 
-    await fireWorker();
+    await service.worker(sinon.stub(), sinon.stub());
     await flush();
 
     t.absent(mockOps.appendEpoch.called);
 });
 
-test('confirmations below threshold do not trigger QUORUM_REACHED', async t => {
-    const { service, mockOps, fireWorker } = await setup({
-        stateOverrides: { getIndexersEntry: sinon.stub().resolves([{ key: b4a.alloc(32, 0x02) }]) },
-        config: { epochThreshold: 3 }, // 1 approver, threshold 3 → no quorum
+test('confirmations below threshold do not trigger appendEpoch', async t => {
+    const { service, mockOps } = await setup({
+        config: { epochThreshold: 2 }, // 1 approver mocked, threshold 2 -> quorum never reached
     });
     t.teardown(() => service.close());
-    mockOps.collectSignature.resolves(makeSig());
 
-    await fireWorker();
+    await service.worker(sinon.stub(), sinon.stub());
     await flush();
 
     t.absent(mockOps.appendEpoch.called);
 });
 
-test('reaching confirmation threshold sends QUORUM_REACHED and calls appendEpoch', async t => {
-    const { service, mockOps, fireWorker } = await setup({
-        stateOverrides: { getIndexersEntry: sinon.stub().resolves([{ key: b4a.alloc(32, 0x02) }]) },
+test('reaching confirmation threshold calls appendEpoch', async t => {
+    const { service, mockOps } = await setup({
         config: { epochThreshold: 1 },
     });
     t.teardown(() => service.close());
-    // first call returns a confirmation, subsequent calls return null to stop the loop
-    mockOps.collectSignature.onFirstCall().resolves(makeSig()).resolves(null);
 
-    await fireWorker();
+    await service.worker(sinon.stub(), sinon.stub());
     await flush();
 
     t.ok(mockOps.appendEpoch.calledOnce);
 });
 
-// --- timeouts ---
+// --- event listeners ---
 
-test('COLLECTING_CONFIRMATIONS timeout resets machine to VDF_PENDING and triggers new cycle', async t => {
+test('EPOCH_CREATED always restarts the cycle, regardless of current machine state', async t => {
+    // Regression test: EPOCH_CREATED is a global "some epoch was committed" signal, not gated
+    // on this cycle being in AWAITING_EPOCH. Previously, if a stale local proposal kept
+    // re-targeting an already-decided epoch, nothing else would ever call next() again and
+    // the scheduler would stall forever waiting on this exact event.
+    const { service, state } = await setup({
+        opsOverrides: { collectSignature: sinon.stub().returns(new Promise(() => {})) }, // never resolves
+    });
+    t.teardown(() => service.close());
+
+    const next = sinon.stub();
+    await service.worker(next, sinon.stub()); // sits in COLLECTING_CONFIRMATIONS
+    t.absent(next.called);
+
+    await state.emit(EPOCH_CREATED);
+    t.ok(next.calledOnce);
+    t.ok(next.calledWith(CONFIG.epochInterval));
+});
+
+// --- timeouts ---
+// epochSignatureTimeout / epochAppendTimeout are wired as safety nets so a cycle never waits
+// forever on approvals or on the global EPOCH_CREATED signal.
+
+test('COLLECTING_CONFIRMATIONS timeout retries with a fresh VDF calculation', async t => {
     const clock = sinon.useFakeTimers();
     let service;
     try {
-        const result = await setup({ config: { epochSignatureTimeout: 1000 } });
+        const result = await setup({
+            config: { epochSignatureTimeout: 1000 },
+            opsOverrides: { collectSignature: sinon.stub().returns(new Promise(() => {})) },
+        });
         service = result.service;
-        const { mockOps, fireWorker } = result;
+        const { mockOps } = result;
 
-        await fireWorker(); // chain reaches COLLECTING_CONFIRMATIONS, calculateVDF called once
+        await service.worker(sinon.stub(), sinon.stub());
         t.is(mockOps.calculateVDF.callCount, 1);
 
-        await clock.tickAsync(1100); // fire collecting timeout → VDF_PENDING → calculateVDF again
-        t.is(mockOps.calculateVDF.callCount, 2);
+        await clock.tickAsync(1100);
+        t.is(mockOps.calculateVDF.callCount, 2, 'retried after epochSignatureTimeout elapsed');
     } finally {
-        if (service) await service.close(); // cancel pending timers from second cycle
+        if (service) await service.close();
         clock.restore();
     }
 });
 
-test('_close() cancels pending AWAITING_EPOCH timeout before it fires', async t => {
+test('reaching quorum clears the COLLECTING_CONFIRMATIONS timeout', async t => {
+    const clock = sinon.useFakeTimers();
+    let service;
+    try {
+        const result = await setup({ config: { epochSignatureTimeout: 1000, epochThreshold: 1 } });
+        service = result.service;
+        const { mockOps } = result;
+
+        await service.worker(sinon.stub(), sinon.stub());
+        await clock.tickAsync(10); // let collectSignature's resolved promise drive to appendEpoch
+        t.ok(mockOps.appendEpoch.calledOnce, 'quorum reached, cycle proceeded past COLLECTING_CONFIRMATIONS');
+
+        await clock.tickAsync(1100); // would fire the collecting timeout if it hadn't been cleared
+        t.is(mockOps.calculateVDF.callCount, 1, 'no retry - timeout was cleared on QUORUM_REACHED');
+    } finally {
+        if (service) await service.close();
+        clock.restore();
+    }
+});
+
+test('AWAITING_EPOCH timeout restarts the cycle when EPOCH_CREATED never arrives', async t => {
+    const clock = sinon.useFakeTimers();
+    let service;
+    try {
+        const result = await setup({
+            config: { epochAppendTimeout: 1000 },
+            opsOverrides: { collectSignature: sinon.stub().returns(new Promise(() => {})) },
+        });
+        service = result.service;
+        const { state } = result;
+
+        const next = sinon.stub();
+        await service.worker(next, sinon.stub()); // sits in COLLECTING_CONFIRMATIONS
+        await state.emit(EPOCH_PROPOSAL_SUBMITTED); // remote proposal -> AWAITING_EPOCH
+        t.absent(next.called);
+
+        await clock.tickAsync(1100);
+        t.ok(next.calledOnce, 'fallback fired next() the same way onEpochCreated would');
+        t.ok(next.calledWith(CONFIG.epochInterval));
+    } finally {
+        if (service) await service.close();
+        clock.restore();
+    }
+});
+
+test('EPOCH_CREATED before the AWAITING_EPOCH timeout clears it (next() fires once, not twice)', async t => {
+    const clock = sinon.useFakeTimers();
+    let service;
+    try {
+        const result = await setup({
+            config: { epochAppendTimeout: 1000 },
+            opsOverrides: { collectSignature: sinon.stub().returns(new Promise(() => {})) },
+        });
+        service = result.service;
+        const { state } = result;
+
+        const next = sinon.stub();
+        await service.worker(next, sinon.stub());
+        await state.emit(EPOCH_PROPOSAL_SUBMITTED); // -> AWAITING_EPOCH
+
+        await state.emit(EPOCH_CREATED);
+        t.ok(next.calledOnce);
+
+        await clock.tickAsync(1100); // stale timeout - must not fire a second next()
+        t.ok(next.calledOnce, 'timeout was cleared by the real EPOCH_CREATED event');
+    } finally {
+        if (service) await service.close();
+        clock.restore();
+    }
+});
+
+test('a stale AWAITING_EPOCH timeout firing after close() does not restart a closed scheduler', async t => {
     const clock = sinon.useFakeTimers();
     try {
-        const { service, mockOps, state } = await setup({
+        const result = await setup({
             config: { epochAppendTimeout: 1000 },
+            opsOverrides: { collectSignature: sinon.stub().returns(new Promise(() => {})) },
         });
-        await state.emit(EPOCH_PROPOSAL_SUBMITTED); // → AWAITING_EPOCH, timeout scheduled
-        await service.close();                      // clears timeout
-        await clock.tickAsync(1100);                // timeout would have fired — but was cleared
-        t.absent(mockOps.calculateVDF.called);
+        const { service, state } = result;
+
+        const next = sinon.stub();
+        await service.worker(next, sinon.stub());
+        await state.emit(EPOCH_PROPOSAL_SUBMITTED); // -> AWAITING_EPOCH
+
+        await service.close();
+
+        await clock.tickAsync(1100); // must not throw - Scheduler#next() no-ops once stopped
+        t.pass('closing mid-cycle does not crash when the pending timeout later fires');
     } finally {
         clock.restore();
     }

@@ -92,6 +92,8 @@ async function loadNetwork() {
         ready() {
             return true
         }
+
+        async close() {}
     }
 
     class TransactionPoolServiceMock {
@@ -187,6 +189,10 @@ async function loadNetwork() {
         ready() {
             return true;
         }
+
+        async close() {}
+
+        prepareConnection() {}
     }
 
     class WakeupMock {
@@ -386,7 +392,9 @@ if (isBareRuntime) {
         state.emit(CustomEventType.IS_INDEXER, publicKeyBuffer);
         await Promise.resolve(); // IS_INDEXER handler is async (awaits indexerCount), must yield
         t.absent(validatorConnectionManagerInstance.exists(publicKey), 'promoted indexer should be removed from validator pool');
-        t.is(swarmInstance.leavePeer.callCount, 2, 'promoted indexer should be removed from explicit peer tracking');
+        // Promotion keeps the underlying connection alive (endConnection: false) so it can be
+        // reused for the indexer role, so it must NOT leave the peer - unlike a hard disconnect.
+        t.is(swarmInstance.leavePeer.callCount, 1, 'promoted indexer should not leave the peer, connection is reused');
         t.teardown(async () => await network.close());
     });
 

@@ -144,7 +144,9 @@ test('ConsensusRouter resolves proof proposal approval through pending request e
     t.is(calls.handleApproval[0][0].session_id, sessionId);
     t.is(calls.handleApproval[0][1], connection);
     t.is(calls.handleApproval[0][2], proofProposal);
-    t.alike(calls.resolvePendingRequest, [[sessionId, resultCode]]);
+    // resolvePendingRequest receives the whole handleApproval result, not just the code -
+    // EpochProofProposalOperations.sendToIndexer relies on response.approval.approval_sig.
+    t.alike(calls.resolvePendingRequest, [[sessionId, { resultCode }]]);
     t.absent(connection.ended);
 });
 
@@ -159,7 +161,7 @@ test('ConsensusRouter allows proof proposal approval when pending entry has no e
     await router.route(buildApprovalMessage(sessionId), connection);
 
     t.is(calls.handleApproval.length, 1);
-    t.alike(calls.resolvePendingRequest, [[sessionId, ConsensusResultCode.OK]]);
+    t.alike(calls.resolvePendingRequest, [[sessionId, { resultCode: ConsensusResultCode.OK }]]);
     t.absent(connection.ended);
 });
 

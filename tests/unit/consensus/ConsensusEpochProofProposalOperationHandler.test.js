@@ -167,9 +167,7 @@ test('handleRequest validates proposal, emits success events, and sends signed O
         'onEpochProposalReceived',
         'validateRequest',
         'onEpochProposalValidationSuccess',
-        'send',
-        'flush',
-        'end'
+        'send'
     ]);
 
     const receivedContext = calls[0].context;
@@ -183,8 +181,10 @@ test('handleRequest validates proposal, emits success events, and sends signed O
     t.is(successContext.resultCode, ConsensusResultCode.OK);
 
     t.is(connection.sent.length, 1);
-    t.ok(connection.flushed);
-    t.ok(connection.ended);
+    // The indexer-to-indexer connection is long-lived across epoch cycles, so it must stay
+    // open after responding - unlike the legacy request/response protocols.
+    t.absent(connection.flushed);
+    t.absent(connection.ended);
 
     const response = connection.sent[0];
     t.is(response.type, ConsensusOperationType.PROOF_PROPOSAL_APPROVAL);
@@ -227,14 +227,17 @@ test('handleRequest maps consensus validation errors to signed rejection respons
         'onEpochProposalReceived',
         'validateRequest',
         'onEpochProposalValidationFailure',
-        'send',
-        'flush',
-        'end'
+        'send'
     ]);
 
     const failureContext = calls[2].context;
     t.is(failureContext.resultCode, ConsensusResultCode.INVALID_PAYLOAD);
     t.is(failureContext.error, validationError);
+
+    // The connection stays open even for a rejected proposal - only a real transport-level
+    // error (see 'handleRequest ends the connection when response sending fails') closes it.
+    t.absent(connection.flushed);
+    t.absent(connection.ended);
 
     const proofProposalResponse = connection.sent[0].proof_proposal_response;
     t.is(proofProposalResponse.result, ConsensusResultCode.INVALID_PAYLOAD);
