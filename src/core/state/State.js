@@ -22,6 +22,7 @@ import { isHexString, sleep, isTransactionRecordPut } from '../../utils/helpers.
 import tracCryptoApi from 'trac-crypto-api';
 import StateValidationSchema from './validators/StateValidationSchema.js';
 import { safeDecodeApplyOperation } from '../../codecs/apply/applyOperationCodec.js';
+import { safeDecodeProofProposal } from '../../codecs/consensus/v1/consensusV1OperationCodec.js';
 import { createMessage, ZERO_WK, NULL_BUFFER, uint64ToBuffer } from '../../utils/buffer.js';
 import addressUtils from './utils/address.js';
 import adminEntryUtils from './utils/adminEntry.js';
@@ -3389,12 +3390,60 @@ class State extends ReadyResource {
         return Status.SUCCESS;
     }
 
-    async #handleApplySetEpochOperation(op, view, base, node, _batch) {
+    // NOTE: Minimal apply logic to unblock epoch progression - deliberately skips the full
+    // validation battery the genesis handler does (previous-hash chain check, approval
+    // signature/quorum verification). Follow-up work should bring this in line with
+    // #handleApplySetGenesisEpoch before this is relied on for real consensus guarantees.
+    async #handleApplySetEpochOperation(op, view, base, node, batch) {
         if (!this.#stateValidationSchema.validateSetEpochOperation(op)) {
             this.#safeLogApply(OperationType.SET_EPOCH, "Contract schema validation failed.", node.from.key)
             return Status.FAILURE;
         };
 
+        const proofData = op.seo.pd;
+        const decodedProposal = safeDecodeProofProposal(proofData);
+        if (!decodedProposal) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "Failed to decode proof proposal.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        const newEpoch = decodedProposal.epoch.readBigUInt64BE(0);
+
+        // Enforce strict sequential progression: only the first valid proposal for a given
+        // epoch number wins. Every indexer proposes independently and concurrently (there's
+        // no leader election), so two different, individually valid proposals can legitimately
+        // target the same next epoch at the same time. Whichever one Autobase's deterministic
+        // ordering applies first occupies the slot; anyone else proposing that same (now
+        // already-decided) epoch number is ignored instead of overwriting the winner's entry.
+        const currentEpochBuffer = await this.#getEntryApply(EntryType.EPOCH_CURRENT, batch);
+        if (currentEpochBuffer === null) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "Current epoch is not initialized. Cannot set epoch before genesis.", node.from.key)
+            return Status.FAILURE;
+        }
+        const expectedNextEpoch = currentEpochBuffer.readBigUInt64BE(0) + 1n;
+        if (newEpoch !== expectedNextEpoch) {
+            this.#safeLogApply(OperationType.SET_EPOCH, `Epoch ${newEpoch} is not the expected next epoch (${expectedNextEpoch}). Ignoring.`, node.from.key)
+            return Status.IGNORE;
+        }
+
+        const epochProofHash = await tracCryptoApi.hash.blake3Safe(proofData);
+        const epochProofHashString = epochProofHash.toString('hex');
+
+        // anti-replay: skip if this exact epoch proof was already applied
+        const existingEntry = await this.#getEntryApply(epochProofHashString, batch);
+        if (existingEntry !== null) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "Operation has already been applied.", node.from.key)
+            return Status.IGNORE;
+        }
+
+        await batch.put(EntryType.EPOCH_CURRENT, uint64ToBuffer(newEpoch));
+        await batch.put(EntryType.EPOCH + newEpoch.toString(), epochProofHash);
+        await batch.put(EntryType.EPOCH_HASH + epochProofHashString, proofData);
+        await batch.put(epochProofHashString, node.value);
+
+        // Not logged here: apply() can run multiple times for the same operation across
+        // Autobase reboots/reorders before the outcome is final. EpochProofProposalService
+        // logs the epoch transition once it observes it via the signed read (getCurrentEpoch).
         this.emit(CustomEventType.EPOCH_CREATED); // notify epoch committed
         return Status.SUCCESS;
     }

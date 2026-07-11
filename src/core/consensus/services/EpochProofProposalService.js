@@ -14,6 +14,12 @@ class EpochProofProposalService extends SchedulableService {
     #vdfService;
     #connectionManager;
     #operations;
+    #lastLoggedEpoch = null;
+    // Cancels the currently in-flight worker() cycle's timers/listeners (see worker()).
+    // SchedulableService only stops the Scheduler on close - it has no visibility into these,
+    // so without this, a cycle stuck retrying (e.g. COLLECTING_CONFIRMATIONS timeout) would
+    // keep recomputing the VDF and re-dispatching approval requests forever, even after close().
+    #activeCycleCleanup = null;
 
     /**
    * @param {object} state
@@ -39,6 +45,7 @@ class EpochProofProposalService extends SchedulableService {
     }
 
     async _close() {
+        this.#activeCycleCleanup?.();
         await super._close();
         await this.#vdfService?.close();
     }
@@ -91,26 +98,89 @@ class EpochProofProposalService extends SchedulableService {
         hold();
 
         const currentEpoch = await this.#state.getCurrentEpoch();
+        // getCurrentEpoch() reads signed state only, so this only fires once the epoch
+        // transition is actually final - unlike the apply-time log, which can run multiple
+        // times per operation across Autobase reboots/reorders before the outcome settles.
+        if (this.#lastLoggedEpoch !== null && currentEpoch > this.#lastLoggedEpoch) {
+            console.info(`Epoch advanced to ${currentEpoch}.`);
+        }
+        this.#lastLoggedEpoch = currentEpoch;
+
         const currentEpochHash = await this.#state.getEpoch(currentEpoch);
         const { vdfDifficulty, vdfDiscriminantSize } = await this.#state.getSignedVDFParams();
 
         const machine = new EpochStateMachine(this.#logger);
 
-        machine.on('*', async ({ event, prev, next, context, machine }) => {
-            await this.#onTransition({ event, prev, next, context, machine });
-        });
-        
+        // Safety nets so a cycle can never wait forever on an external signal that might not
+        // come (e.g. another indexer's proposal wins the race for the same epoch number - see
+        // State.js's sequential-epoch guard - and our own currentEpoch read above goes stale
+        // without anything ever telling us to re-check it).
+        let collectingTimer = null;
+        let awaitingEpochTimer = null;
+
+        const clearCollectingTimer = () => {
+            if (collectingTimer) {
+                clearTimeout(collectingTimer);
+                collectingTimer = null;
+            }
+        };
+
+        const clearAwaitingEpochTimer = () => {
+            if (awaitingEpochTimer) {
+                clearTimeout(awaitingEpochTimer);
+                awaitingEpochTimer = null;
+            }
+        };
+
         const onEpochSubmited = async () => {
             machine.appendContext({ remoteProposalReceived: true });
             await machine.send(EPOCH_EVENTS.REMOTE_PROPOSAL_RECEIVED);
         }
 
-        const onEpochCreated = async () => {
+        const cleanupCycle = () => {
+            clearCollectingTimer();
+            clearAwaitingEpochTimer();
             machine.clearListeners();
             this.#state.removeListener(CustomEventType.EPOCH_PROPOSAL_SUBMITTED, onEpochSubmited)
             this.#state.removeListener(CustomEventType.EPOCH_CREATED, onEpochCreated)
+            this.#activeCycleCleanup = null;
+        }
+
+        const onEpochCreated = async () => {
+            cleanupCycle();
             next(this.#intervalMs)
         }
+
+        this.#activeCycleCleanup = cleanupCycle;
+
+        machine.on('*', async ({ event, prev, next: nextState, context, machine }) => {
+            // Waiting for approvals from other indexers: if epochSignatureTimeout elapses
+            // without reaching quorum, retry with a fresh VDF/proposal (same epoch number -
+            // this is just a hedge against a lost approval message, not a stale epoch read).
+            if (nextState === EPOCH_STATES.COLLECTING_CONFIRMATIONS) {
+                clearCollectingTimer();
+                collectingTimer = setTimeout(() => {
+                    machine.send(EPOCH_EVENTS.COLLECTING_TIMEOUT).catch((err) => console.log(err));
+                }, this.#config.epochSignatureTimeout);
+            } else {
+                clearCollectingTimer();
+            }
+
+            // Waiting for the epoch to be committed (ours or someone else's): if
+            // epochAppendTimeout elapses with no EPOCH_CREATED, don't retry in place - our
+            // currentEpoch context could be stale by now. Restart the whole cycle instead, the
+            // same way onEpochCreated does, so the next attempt re-reads currentEpoch fresh.
+            if (nextState === EPOCH_STATES.AWAITING_EPOCH) {
+                clearAwaitingEpochTimer();
+                awaitingEpochTimer = setTimeout(() => {
+                    onEpochCreated().catch((err) => console.log(err));
+                }, this.#config.epochAppendTimeout);
+            } else {
+                clearAwaitingEpochTimer();
+            }
+
+            await this.#onTransition({ event, prev, next: nextState, context, machine });
+        });
 
         this.#state.on(CustomEventType.EPOCH_PROPOSAL_SUBMITTED, onEpochSubmited);
         this.#state.on(CustomEventType.EPOCH_CREATED, onEpochCreated);
