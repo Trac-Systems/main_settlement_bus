@@ -667,6 +667,8 @@ export class MainSettlementBus extends ReadyResource {
                 !nodeEntry.isIndexer &&
                 !indexerListHasAddress;
 
+            console.log("node entry", nodeEntry);
+
             if (!canAddIndexer) {
                 throw new Error(
                     `Can not request indexer role for: ${addressToUpdate} - node is not whitelisted, not a writer or already an indexer.`

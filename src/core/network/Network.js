@@ -44,6 +44,7 @@ class Network extends ReadyResource {
     #indexerConnectionManager;
     #indexerPendingRequestService;
     #networkMessages;
+    #consensusMessages;
 
     /**
      * @param {State} state
@@ -124,10 +125,10 @@ class Network extends ReadyResource {
 
         this.#validatorMessageOrchestrator = new MessageOrchestrator(this.#validatorConnectionManager, this.#state, this.#config, this.#wallet);
 
-        const consensusMessages = new ConsensusMessages(this.#state, this.#wallet, this.#config, this.#indexerPendingRequestService);
+        this.#consensusMessages = new ConsensusMessages(this.#state, this.#wallet, this.#config, this.#indexerPendingRequestService);
         const indexersCount = await this.#state.indexerCount()
-        
-        this.#indexerConnectionManager = new IndexerConnectionManager(indexersCount, this.#config, this.#logger, consensusMessages);
+
+        this.#indexerConnectionManager = new IndexerConnectionManager(indexersCount, this.#config, this.#logger, this.#consensusMessages);
         await this.#indexerConnectionManager.ready();
 
         this.#epochProofProposalService = new EpochProofProposalService(this.#state, this.#indexerConnectionManager, this.#wallet, this.#config);
@@ -171,7 +172,7 @@ class Network extends ReadyResource {
             const indexersCount = await this.#state.indexerCount()
             this.#indexerConnectionManager.setMax(indexersCount);
             const publicKeyHex = this.#normalizePublicKey(publicKey);
-            this.#validatorConnectionManager.remove(publicKeyHex, { endConnection: false });
+            this.#validatorConnectionManager.remove(publicKeyHex);
             await this.addIndexerPeer(publicKey);
         });
 
@@ -212,14 +213,12 @@ class Network extends ReadyResource {
              This is leaky for two reasons: first we need to keep a reference to messages and disclose the connection structure in this class.
              second is that the protocol itself doesnt fit the connection life-cycle (this is a bigger problem that also touched on DHT factory structure being "swallowed by swarm")
              */
-            connection.protocolSession = this.#networkMessages.createProtomux(connection);
-            // React to the remote opening a consensus/v1 channel even if we haven't promoted
-            // this peer to indexer ourselves yet - otherwise whichever side gets there first
-            // wins the Protomux pairing race and the other side's channel gets silently rejected.
-            this.#indexerConnectionManager.prepareConnection(connection);
+            connection.protocolSession = this.#networkMessages.createProtomux(connection); // só pra validador
+            this.#consensusMessages.prepareConnection(connection); // só pra indexer
         })
         this.#swarm.on('connection', async (connection) => {
             // ATTENTION: Must be called AFTER the protomux init above
+
             const stream = this.#store.replicate(connection);
             wakeup.addStream(stream);
 
@@ -232,6 +231,8 @@ class Network extends ReadyResource {
                 this.#swarm.leavePeer(connection.remotePublicKey);
                 this.#validatorConnectionManager.remove(publicKey, { connection });
                 this.#indexerConnectionManager.remove(publicKey, { connection });
+                connection.protocolSession.close();
+                connection.end();
             });
 
             connection.on('error', (error) => {

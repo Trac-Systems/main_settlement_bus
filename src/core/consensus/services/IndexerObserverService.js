@@ -46,7 +46,7 @@ class IndexerObserverService extends SchedulableService {
         try {
             const result = await this.#network.tryConnect(candidate.publicKeyHex, "indexer");
             if (result && result !== CONNECTION_STATUS.IGNORED) {
-                this.#logger.info(`IndexerObserver: connected to indexer ${candidate.publicKeyHex.slice(0, 8)} (${result})`);
+                this.#logger.debug(`IndexerObserver: connected to indexer ${candidate.publicKeyHex.slice(0, 8)} (${result})`);
             }
             return result;
         } catch (err) {

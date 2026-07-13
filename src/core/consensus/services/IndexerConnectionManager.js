@@ -38,11 +38,7 @@ class IndexerConnectionManager extends PeerConnectionManager {
     }
 
     add(publicKey, connection) {
-        const needsChannel = !this.#consensusInitialized.has(connection) || connection.protocolSession?.isClosed;
-        if (needsChannel) {
-            connection.protocolSession = this.#messages.createProtomux(connection);
-            this.#consensusInitialized.add(connection);
-        }
+        this.#messages.attachChannel(connection);
         this._add(publicKey, connection)
     }
 

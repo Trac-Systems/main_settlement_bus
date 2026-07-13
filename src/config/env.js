@@ -130,7 +130,7 @@ const configData = {
         addressPrefix: TRAC_NETWORK_MSB_MAINNET_PREFIX,
         addressPrefixLength: TRAC_NETWORK_MSB_MAINNET_PREFIX.length,
         bech32mHrpLength: TRAC_NETWORK_MSB_MAINNET_PREFIX.length + 1, // len(addressPrefix + separator)
-        bootstrap: 'a1de987e20b993374c1e3db5b1a12eff2d75774728eb8033ca2854650db8d44f',
+        bootstrap: '06ad99cbd86f4b2b345f3e54475d938d993fd33c7d2e83ca9ba5f39fe8413dcf',
         channel: '12312313123123',
         dhtBootstrap: ['116.202.214.149:10001','157.180.12.214:10001','node1.hyperdht.org:49737','node2.hyperdht.org:49737','node3.hyperdht.org:49737'],
         derivationPath: address.MAINNET_DERIVATION_PATH,

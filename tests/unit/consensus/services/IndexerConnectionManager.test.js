@@ -7,7 +7,12 @@ import IndexerConnectionManager from '../../../../src/core/consensus/services/In
 
 const mockConfig = { addressPrefix: 'trac' };
 const mockLogger = { debug() {} };
-const mockMessages = { createProtomux: (connection) => connection.protocolSession };
+const mockMessages = {
+    createProtomux: (connection) => connection.protocolSession,
+    attachChannel(connection) {
+        connection.protocolSession = this.createProtomux(connection);
+    },
+};
 
 const makeConnection = (publicKeyHex) => {
     const emitter = new EventEmitter();

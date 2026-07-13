@@ -153,6 +153,8 @@ async function loadNetwork() {
 
     class ConsensusMessagesMock {
         async setupProtomuxMessages() {}
+        prepareConnection() {}
+        attachChannel() {}
     }
 
     class IndexerConnectionManagerMock {
@@ -191,8 +193,6 @@ async function loadNetwork() {
         }
 
         async close() {}
-
-        prepareConnection() {}
     }
 
     class WakeupMock {

@@ -130,7 +130,7 @@ class ValidatorConnectionManager extends PeerConnectionManager {
      * @param {object} [options]
      * @param {boolean} [options.endConnection=true] - Whether to close the underlying socket.
      */
-    remove(publicKey, { endConnection = true, connection = null } = {}) {
+    remove(publicKey, { connection = null } = {}) {
         const publicKeyHex = this._toHexString(publicKey);
         if (!this.exists(publicKeyHex)) return;
 
@@ -143,16 +143,6 @@ class ValidatorConnectionManager extends PeerConnectionManager {
 
         this._logger.debug(`remove: removing validator ${publicKeyToAddress(publicKey, this._config)}`);
         this.#stopHealthCheck(publicKeyHex);
-        if (endConnection && entry.connection && typeof entry.connection.end === 'function') {
-            try {
-                entry.connection.protocolSession.close();
-                entry.connection.end();
-            } catch (e) {
-                // Ignore errors on connection end
-                this._logger.debug(`remove: failed to end connection: ${e.message}`);
-                // TODO: Consider logging these errors here in verbose mode
-            }
-        }
         this._logger.debug(`remove: removing validator from map: ${publicKeyToAddress(publicKeyHex, this._config)}. Map size before removal: ${this._connections.size}.`);
         this._connections.delete(publicKeyHex);
         this._logger.debug(`remove: validator removed successfully. Map size is now ${this._connections.size}.`);
