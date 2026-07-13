@@ -2,6 +2,7 @@ import test from 'brittle';
 import b4a from 'b4a';
 
 import ConsensusValidationSchema from '../../../src/core/consensus/v1/validators/ConsensusValidationSchema.js';
+import {V1ConsensusProtocolError} from '../../../src/core/consensus/v1/V1ConsensusProtocolError.js';
 import {
     ConsensusOperationType,
     ConsensusProtocolVersion,
@@ -45,6 +46,21 @@ const approval = () => ({
     approval_sig: b4a.alloc(64, 3),
 });
 
+function assertProtocolError(t, action, resultCode, messageIncludes) {
+    let error;
+    try {
+        action();
+    } catch (err) {
+        error = err;
+    }
+
+    t.ok(error instanceof V1ConsensusProtocolError);
+    t.is(error.resultCode, resultCode);
+    if (messageIncludes) {
+        t.ok(error.message.includes(messageIncludes));
+    }
+}
+
 test('ConsensusValidationSchema accepts fixed-length proof proposal byte fields', t => {
     const schema = new ConsensusValidationSchema(config);
     const maxUint64 = 0xFFFFFFFFFFFFFFFFn;
@@ -69,11 +85,13 @@ test('ConsensusValidationSchema requires approval only for OK proof proposal res
         ),
         true
     );
-    t.is(
-        schema.validateV1EpochProofProposalResponse(
+    assertProtocolError(
+        t,
+        () => schema.validateV1EpochProofProposalResponse(
             makeProofProposalResponsePayload(ConsensusResultCode.OK)
         ),
-        false
+        ConsensusResultCode.RESPONSE_APPROVAL_INVALID,
+        'approval is required'
     );
     t.is(
         schema.validateV1EpochProofProposalResponse(
@@ -81,11 +99,13 @@ test('ConsensusValidationSchema requires approval only for OK proof proposal res
         ),
         true
     );
-    t.is(
-        schema.validateV1EpochProofProposalResponse(
+    assertProtocolError(
+        t,
+        () => schema.validateV1EpochProofProposalResponse(
             makeProofProposalResponsePayload(ConsensusResultCode.UNSPECIFIED, approval())
         ),
-        false
+        ConsensusResultCode.RESPONSE_APPROVAL_INVALID,
+        'approval is only allowed'
     );
 });
 

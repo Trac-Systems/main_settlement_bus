@@ -10,6 +10,7 @@ import {
     NETWORK_ID_BYTE_LENGTH,
     EPOCH_BYTE_LENGTH
 } from '../../../../utils/constants.js';
+import {V1ConsensusProtocolError} from '../V1ConsensusProtocolError.js';
 
 const ALLOWED_RESULT_CODES = Object.values(ConsensusResultCode);
 
@@ -148,16 +149,29 @@ class ConsensusValidationSchema {
 
     validateV1EpochProofProposalResponse(operation) {
         const isSchemaValid = this.#validateConsensusV1ProposalApproval(operation);
-        if (isSchemaValid !== true) return false;
+        if (isSchemaValid !== true) {
+            throw new V1ConsensusProtocolError(
+                    ConsensusResultCode.SCHEMA_VALIDATION_FAILED,
+                    'Proof proposal response schema validation failed.'
+            );
+        }
 
         const response = operation.proof_proposal_response;
         if (response.result === ConsensusResultCode.OK && !response.approval) {
-            return false;
+            throw new V1ConsensusProtocolError(
+                ConsensusResultCode.RESPONSE_APPROVAL_INVALID,
+                'Proof proposal response approval is required when result code is OK.'
+            );
         }
 
-        return !(response.result !== ConsensusResultCode.OK && response.approval);
+        if (response.result !== ConsensusResultCode.OK && response.approval) {
+            throw new V1ConsensusProtocolError(
+                ConsensusResultCode.RESPONSE_APPROVAL_INVALID,
+                'Proof proposal response approval is only allowed when result code is OK.'
+            );
+        }
 
-
+        return true;
     }
 }
 
