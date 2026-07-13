@@ -63,7 +63,7 @@ function createState({
     return {
         getCurrentEpoch: async () => currentEpoch,
         getEpoch: async () => currentEpochHash,
-        getSignedVDFParams: async () => ({
+        requireSignedVDFParams: async () => ({
             vdfDifficulty,
             vdfDiscriminantSize
         }),
@@ -157,16 +157,16 @@ test('V1EpochProofProposalRequest validates proof proposal signature', async t =
         currentEpochHash: genesisEpochHash
     });
     const getCurrentEpoch = state.getCurrentEpoch;
-    const getSignedVDFParams = state.getSignedVDFParams;
+    const requireSignedVDFParams = state.requireSignedVDFParams;
     let currentEpochReads = 0;
     let vdfParamsReads = 0;
     state.getCurrentEpoch = async () => {
         currentEpochReads++;
         return await getCurrentEpoch();
     };
-    state.getSignedVDFParams = async () => {
+    state.requireSignedVDFParams = async () => {
         vdfParamsReads++;
-        return await getSignedVDFParams();
+        return await requireSignedVDFParams();
     };
     const validator = new V1EpochProofProposalRequest(config, state);
     const payload = await buildProofProposalPayload(wallet, {

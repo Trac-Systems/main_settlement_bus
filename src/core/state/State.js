@@ -574,9 +574,7 @@ class State extends ReadyResource {
 
     async getSignedVDFParams() {
         const vdfParamsBuffer = await this.getSigned(EntryType.VDF_PARAMS);
-        if (!vdfParamsBuffer) {
-            throw new Error("VDF parameters are not initialized.");
-        }
+        if (_.isNil(vdfParamsBuffer)) return null;
 
         const expectedLength = VDF_DIFFICULTY_SIZE + VDF_DISCRIMINANT_SIZE;
         if (!b4a.isBuffer(vdfParamsBuffer)) {
@@ -594,6 +592,14 @@ class State extends ReadyResource {
             vdfDifficulty: decodedVdfParams.difficulty.readUInt32BE(0),
             vdfDiscriminantSize: decodedVdfParams.discriminantBitSize.readUInt16BE(0),
         };
+    }
+
+    async requireSignedVDFParams() {
+        const params = await this.getSignedVDFParams();
+        if (_.isNil(params)) {
+            throw new Error("VDF parameters are not initialized.");
+        }
+        return params;
     }
 
     // ATTENTION: DO NOT USE METHODS ABOVE IN APPLY PART!
