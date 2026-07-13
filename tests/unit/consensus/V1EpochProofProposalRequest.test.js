@@ -58,7 +58,8 @@ function createState({
     currentEpoch = 0n,
     currentEpochHash = defaultPreviousEpochRecordHash,
     vdfDifficulty = TEST_VDF_PARAMS.vdfDifficulty,
-    vdfDiscriminantSize = TEST_VDF_PARAMS.vdfDiscriminantSize
+    vdfDiscriminantSize = TEST_VDF_PARAMS.vdfDiscriminantSize,
+    isIndexer = true
 } = {}) {
     return {
         requireCurrentEpoch: async () => currentEpoch,
@@ -67,7 +68,7 @@ function createState({
             vdfDifficulty,
             vdfDiscriminantSize
         }),
-        isIndexerAddress: async () => true
+        isIndexerAddress: async () => isIndexer
     };
 }
 
@@ -180,6 +181,17 @@ test('V1EpochProofProposalRequest validates proof proposal signature', async t =
     t.is(currentEpochReads, 1);
     t.is(vdfParamsReads, 1);
     t.pass();
+});
+
+test('V1EpochProofProposalRequest rejects proposer that is not an indexer', async t => {
+    const wallet = await createWallet();
+    const validator = new V1EpochProofProposalRequest(config, createState({isIndexer: false}));
+    const payload = await buildProofProposalPayload(wallet);
+
+    await t.exception(
+        async () => validator.validate(payload, {remotePublicKey: wallet.publicKey}),
+        errorMessageIncludes('Incoming address is not an indexer.')
+    );
 });
 
 test('V1EpochProofProposalRequest rejects unsupported proof proposal protocol version', async t => {

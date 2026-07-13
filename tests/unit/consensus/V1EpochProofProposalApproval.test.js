@@ -101,6 +101,25 @@ test('V1EpochProofProposalApproval validates approval signature against original
     t.pass();
 });
 
+test('V1EpochProofProposalApproval rejects approver that is not an indexer', async t => {
+    const proposerWallet = await createWallet(testKeyPair1);
+    const approverWallet = await createWallet(testKeyPair2);
+    const validator = new V1EpochProofProposalApproval(config, {
+        isIndexerAddress: async () => false
+    });
+    const proofProposalPayload = await buildProofProposalPayload(proposerWallet);
+    const approvalPayload = await buildProofProposalApprovalPayload(approverWallet, proofProposalPayload);
+
+    await t.exception(
+        async () => validator.validate(
+            approvalPayload,
+            {remotePublicKey: approverWallet.publicKey},
+            proofProposalPayload.proof_proposal
+        ),
+        errorMessageIncludes('Incoming address is not an indexer.')
+    );
+});
+
 test('V1EpochProofProposalApproval rejects non-OK response without approval', async t => {
     const proposerWallet = await createWallet(testKeyPair1);
     const approverWallet = await createWallet(testKeyPair2);
