@@ -302,7 +302,7 @@ class V1BaseConsensusOperation {
         // we should handle this specific error to not only drop the connection but also blacklist the specific node.
         // Such an error would mean that someone is trying to impersonate an indexer.
         const address = tracCryptoApi.address.encode(this._config.addressPrefix, remotePublicKey);
-        const isIndexer  =  await this._state.isIndexerAddress(address);
+        const isIndexer = await this._state.isIndexerAddress(address);
         if (!isIndexer) {
             throw new V1ConsensusProtocolError(
                 ConsensusResultCode.UNEXPECTED_ERROR,
