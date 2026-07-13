@@ -61,8 +61,8 @@ function createState({
     vdfDiscriminantSize = TEST_VDF_PARAMS.vdfDiscriminantSize
 } = {}) {
     return {
-        getCurrentEpoch: async () => currentEpoch,
-        getEpoch: async () => currentEpochHash,
+        requireCurrentEpoch: async () => currentEpoch,
+        requireEpoch: async () => currentEpochHash,
         requireSignedVDFParams: async () => ({
             vdfDifficulty,
             vdfDiscriminantSize
@@ -156,13 +156,13 @@ test('V1EpochProofProposalRequest validates proof proposal signature', async t =
         currentEpoch: 0n,
         currentEpochHash: genesisEpochHash
     });
-    const getCurrentEpoch = state.getCurrentEpoch;
+    const requireCurrentEpoch = state.requireCurrentEpoch;
     const requireSignedVDFParams = state.requireSignedVDFParams;
     let currentEpochReads = 0;
     let vdfParamsReads = 0;
-    state.getCurrentEpoch = async () => {
+    state.requireCurrentEpoch = async () => {
         currentEpochReads++;
-        return await getCurrentEpoch();
+        return await requireCurrentEpoch();
     };
     state.requireSignedVDFParams = async () => {
         vdfParamsReads++;
@@ -384,7 +384,7 @@ test('V1EpochProofProposalRequest wraps state failures as protocol errors', asyn
     const stateError = new Error('State storage is unavailable.');
     const validator = new V1EpochProofProposalRequest(config, {
         ...createState(),
-        getCurrentEpoch: async () => {
+        requireCurrentEpoch: async () => {
             throw stateError;
         }
     });

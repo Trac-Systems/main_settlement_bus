@@ -178,25 +178,36 @@ class State extends ReadyResource {
     /**
      * Reads the current epoch id from signed state.
      *
-     * @returns {Promise<bigint>} Current epoch id.
-     * @throws {Error} When genesis epoch state has not been initialized.
+     * @returns {Promise<bigint|null>} Current epoch id, or `null` when genesis
+     * epoch state has not been initialized.
      */
     async getCurrentEpoch() {
         const currentEpoch = await this.getSigned(EntryType.EPOCH_CURRENT);
+        return _.isNil(currentEpoch) ? null : currentEpoch.readBigUInt64BE(0);
+    }
+
+    /**
+     * Reads the required current epoch id from signed state.
+     *
+     * @returns {Promise<bigint>} Current epoch id.
+     * @throws {Error} When genesis epoch state has not been initialized.
+     */
+    async requireCurrentEpoch() {
+        const currentEpoch = await this.getCurrentEpoch();
         if (_.isNil(currentEpoch)) {
             throw new Error(
                 'Current epoch is not initialized. Genesis epoch has not been set.'
             );
         }
-        return currentEpoch.readBigUInt64BE(0);
+        return currentEpoch;
     }
 
     /**
      * Reads the epoch hash stored under `/epoch/<epoch>`.
      *
      * @param {bigint|number|string} count Epoch id.
-     * @returns {Promise<Buffer>} Epoch hash.
-     * @throws {Error} When epoch id is missing or the epoch is not stored.
+     * @returns {Promise<Buffer|null>} Epoch hash, or `null` when the epoch is not stored.
+     * @throws {Error} When epoch id is missing or invalid.
      */
     async getEpoch(count) {
         if (_.isNil(count)) {
@@ -206,13 +217,24 @@ class State extends ReadyResource {
         }
 
         const epochId = typeof count === 'bigint' ? count : BigInt(count);
-        const epochHash = await this.getSigned(EntryType.EPOCH + epochId.toString());
+        return await this.getSigned(EntryType.EPOCH + epochId.toString());
+    }
+
+    /**
+     * Reads the required epoch hash stored under `/epoch/<epoch>`.
+     *
+     * @param {bigint|number|string} count Epoch id.
+     * @returns {Promise<Buffer>} Epoch hash.
+     * @throws {Error} When epch id is missing or invalid, or the epoch is not stored.
+     */
+    async requireEpoch(count) {
+        const epochHash = await this.getEpoch(count);
         if (_.isNil(epochHash)) {
+            const epochId = typeof count === 'bigint' ? count : BigInt(count);
             throw new Error(
                 `Cannot read epoch ${epochId}: epoch is not initialized or does not exist.`
             );
         }
-
         return epochHash;
     }
 
@@ -220,8 +242,8 @@ class State extends ReadyResource {
      * Reads the encoded epoch proof stored under `/epochHash/<epochHash>`.
      *
      * @param {Buffer|string} epochHash Epoch hash as a buffer or hex string.
-     * @returns {Promise<Buffer>} Encoded epoch proof.
-     * @throws {Error} When epoch hash is missing or the epoch proof is not stored.
+     * @returns {Promise<Buffer|null>} Encoded epoch proof, or `null` when it is not stored.
+     * @throws {Error} When epoch hash is missing.
      */
     async getEpochProof(epochHash) {
         if (_.isNil(epochHash)) {
@@ -229,13 +251,24 @@ class State extends ReadyResource {
         }
 
         const epochHashString = b4a.isBuffer(epochHash) ? epochHash.toString('hex') : epochHash.toString();
-        const epochProof = await this.getSigned(EntryType.EPOCH_HASH + epochHashString);
+        return await this.getSigned(EntryType.EPOCH_HASH + epochHashString);
+    }
+
+    /**
+     * Reads the required encoded epoch proof stored under `/epochHash/<epochHash>`.
+     *
+     * @param {Buffer|string} epochHash Epoch hash as a buffer or hex string.
+     * @returns {Promise<Buffer>} Encoded epoch proof.
+     * @throws {Error} When epoch hash is missing or the epoch proof is not stored.
+     */
+    async requireEpochProof(epochHash) {
+        const epochProof = await this.getEpochProof(epochHash);
         if (_.isNil(epochProof)) {
+            const epochHashString = b4a.isBuffer(epochHash) ? epochHash.toString('hex') : epochHash.toString();
             throw new Error(
                 `Cannot read epoch proof ${epochHashString}: epoch proof is not initialized or does not exist.`
             );
         }
-
         return epochProof;
     }
 

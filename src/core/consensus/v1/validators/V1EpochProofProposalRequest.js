@@ -13,8 +13,8 @@ class V1EpochProofProposalRequest extends V1BaseConsensusOperation {
      *
      * @param {Config} config Application configuration used by base validation
      * and network identity checks.
-     * @param {State} state Ledger state. It must expose `getCurrentEpoch()`,
-     * `getEpoch(epoch)`, `requireSignedVDFParams()`, and `isIndexerAddress(address)`.
+     * @param {State} state Ledger state. It must expose `requireCurrentEpoch()`,
+     * `requireEpoch(epoch)`, `requireSignedVDFParams()`, and `isIndexerAddress(address)`.
      * @throws {Error} When consensus schemas cannot be initialized from the configuration.
      */
     constructor(config, state) {
@@ -44,7 +44,7 @@ class V1EpochProofProposalRequest extends V1BaseConsensusOperation {
             );
             await this.validateSignature(payload, connection.remotePublicKey);
             await this.validateAddressIsIndexer(connection.remotePublicKey);
-            const currentEpoch = await this._state.getCurrentEpoch();
+            const currentEpoch = await this._state.requireCurrentEpoch();
             this.validateIncomingEpoch(payload.proof_proposal, currentEpoch);
             await this.validatePreviousEpochRecordHash(payload.proof_proposal, currentEpoch);
             const vdfParams = await this._state.requireSignedVDFParams();
@@ -193,7 +193,7 @@ class V1EpochProofProposalRequest extends V1BaseConsensusOperation {
      * @throws {V1ConsensusProtocolError} When the previous epoch record hash does not match state.
      */
     async validatePreviousEpochRecordHash(proofProposal, currentEpoch) {
-        const currentEpochHash = await this._state.getEpoch(currentEpoch);
+        const currentEpochHash = await this._state.requireEpoch(currentEpoch);
         const epochHashInProofProposal = proofProposal.previous_epoch_record_hash;
         if (!b4a.equals(currentEpochHash, epochHashInProofProposal)) {
             throw new V1ConsensusProtocolError(
