@@ -68,7 +68,7 @@ class ConsensusEpochProofProposalOperationHandler extends ConnectionOperationHan
      * @param {object} message Decoded consensus v1 message containing `proof_proposal_response`.
      * @param {object} connection Peer connection context used by the response validator.
      * @param {object} proofProposal Original proof proposal used by the response validator.
-     * @returns {Promise<{resultCode: number, approval?: object}>} Approval handling outcome.
+     * @returns {Promise<{resultCode: number, approval?: object}>} Approval handling outcome with a ConsensusResultCode value.
      */
 
     async handleApproval(message, connection, proofProposal) {
