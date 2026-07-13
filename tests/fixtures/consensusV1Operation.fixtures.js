@@ -7,13 +7,13 @@ import { config } from '../helpers/config.js';
 import { asAddress } from '../helpers/address.js';
 import { uint8ToBuffer, uint16ToBuffer, uint64ToBuffer } from '../../src/utils/buffer.js';
 import {
+    ConsensusResultCode,
     HASH_BYTE_LENGTH,
     SIGNATURE_BYTE_LENGTH,
     VDF_BLOB_PROOF_SIZE,
 } from '../../src/utils/constants.js';
 
 const { MessageType } = consensusV1Generated.consensus.v1;
-const { ResultCode } = consensusV1Generated.common.v1;
 
 const bytes = (value, length) => b4a.alloc(length, value);
 
@@ -37,7 +37,7 @@ const proofProposalApproval = Object.freeze({
 });
 
 const proofProposalResponse = Object.freeze({
-    result: ResultCode.RESULT_CODE_OK,
+    result: ConsensusResultCode.OK,
     approval: proofProposalApproval,
     response_sig: bytes(67, 64)
 });

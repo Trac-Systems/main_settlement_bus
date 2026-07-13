@@ -85,7 +85,7 @@ test('ConsensusMessageBuilder builds proof proposal and verifies signature', asy
     t.alike(decoded.proof_proposal, proofProposal);
 });
 
-test('ConsensusMessageBuilder iterates proof proposal response ResultCode values', async t => {
+test('ConsensusMessageBuilder iterates proof proposal response ConsensusResultCode values', async t => {
     const wallet = await createWallet();
     const builder = new ConsensusMessageBuilder(wallet, config);
     const header = consensusV1OperationFixtures.proofProposalHeader;
