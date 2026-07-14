@@ -16,7 +16,6 @@ import {
 } from '../../../src/utils/constants.js';
 import {config} from '../../helpers/config.js';
 import {testKeyPair1, testKeyPair2, testKeyPair3} from '../../fixtures/apply.fixtures.js';
-import {errorMessageIncludes} from '../../helpers/regexHelper.js';
 import {createMessage, uint32ToBuffer} from '../../../src/utils/buffer.js';
 
 const previousEpochRecordHash = b4a.alloc(32, 1);

@@ -10,7 +10,7 @@ import {
     NETWORK_ID_BYTE_LENGTH,
     EPOCH_BYTE_LENGTH
 } from '../../../../utils/constants.js';
-import {V1ConsensusProtocolError} from '../V1ConsensusProtocolError.js';
+import { V1ConsensusProtocolError } from '../V1ConsensusProtocolError.js';
 
 const ALLOWED_RESULT_CODES = Object.values(ConsensusResultCode);
 
@@ -35,7 +35,7 @@ class ConsensusValidationSchema {
             },
         });
         const isBuffer = b4a.isBuffer;
-        this.#validator.add("buffer", function ({schema, messages}, _path, _context) {
+        this.#validator.add("buffer", function ({ schema, messages }, _path, _context) {
             const allowEmpty = schema.allowEmpty === true;
             const exactLength = Number.isInteger(schema.length) ? schema.length : null;
             const minLength = Number.isInteger(schema.min) ? schema.min : null;
@@ -44,24 +44,24 @@ class ConsensusValidationSchema {
                 source:
                     `
                         if (!${isBuffer}(value)) {
-                            ${this.makeError({type: "buffer", actual: "value", messages})}
+                            ${this.makeError({ type: "buffer", actual: "value", messages })}
                             return value;
                         }
                         const len = value.length;
                         ${exactLength === null ? '' : `
                         if (len !== ${exactLength}) {
-                            ${this.makeError({type: "bufferLength", expected: exactLength, actual: "len", messages})}
+                            ${this.makeError({ type: "bufferLength", expected: exactLength, actual: "len", messages })}
                         }`}
                         ${minLength === null ? '' : `
                         if (len < ${minLength}) {
-                            ${this.makeError({type: "bufferMinLength", expected: minLength, actual: "len", messages})}
+                            ${this.makeError({ type: "bufferMinLength", expected: minLength, actual: "len", messages })}
                         }`}
                         ${maxLength === null ? '' : `
                         if (len > ${maxLength}) {
-                            ${this.makeError({type: "bufferMaxLength", expected: maxLength, actual: "len", messages})}
+                            ${this.makeError({ type: "bufferMaxLength", expected: maxLength, actual: "len", messages })}
                         }`}
                         if (len === 0 && !${allowEmpty}) {
-                            ${this.makeError({type: "emptyBuffer", actual: "len", messages})}
+                            ${this.makeError({ type: "emptyBuffer", actual: "len", messages })}
                             return value;
                         }
                         let isZeroFilled = true;
@@ -72,7 +72,7 @@ class ConsensusValidationSchema {
                             }
                         }
                         if (isZeroFilled) {
-                            ${this.makeError({type: "nonZeroBuffer", actual: "value", messages})}
+                            ${this.makeError({ type: "nonZeroBuffer", actual: "value", messages })}
                         }
                             return value;
                     `
@@ -91,20 +91,20 @@ class ConsensusValidationSchema {
                 equal: ConsensusOperationType.PROOF_PROPOSAL,
                 required: true
             },
-            session_id: {type: 'string', min: 1, max: 64, required: true},
-            timestamp: {type: 'number', integer: true, min: 1, max: Number.MAX_SAFE_INTEGER, required: true},
+            session_id: { type: 'string', min: 1, max: 64, required: true },
+            timestamp: { type: 'number', integer: true, min: 1, max: Number.MAX_SAFE_INTEGER, required: true },
             proof_proposal: {
                 strict: true,
                 type: 'object',
                 props: {
-                    protocol_version: {type: 'buffer', length: PROTOCOL_VERSION_BYTE_LENGTH, required: true},
-                    network_id: {type: 'buffer', length: NETWORK_ID_BYTE_LENGTH, required: true},
-                    epoch: {type: 'buffer', length: EPOCH_BYTE_LENGTH, required: true},
-                    previous_epoch_record_hash: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true},
-                    proposer: {type: 'buffer', length: this.#config.addressLength, required: true},
-                    vdf_parameters_hash: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true},
-                    vdf_proof: {type: 'buffer', length: VDF_BLOB_PROOF_SIZE, required: true},
-                    signature: {type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true},
+                    protocol_version: { type: 'buffer', length: PROTOCOL_VERSION_BYTE_LENGTH, required: true },
+                    network_id: { type: 'buffer', length: NETWORK_ID_BYTE_LENGTH, required: true },
+                    epoch: { type: 'buffer', length: EPOCH_BYTE_LENGTH, required: true },
+                    previous_epoch_record_hash: { type: 'buffer', length: HASH_BYTE_LENGTH, required: true },
+                    proposer: { type: 'buffer', length: this.#config.addressLength, required: true },
+                    vdf_parameters_hash: { type: 'buffer', length: HASH_BYTE_LENGTH, required: true },
+                    vdf_proof: { type: 'buffer', length: VDF_BLOB_PROOF_SIZE, required: true },
+                    signature: { type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true },
                 }
             },
         };
@@ -124,23 +124,23 @@ class ConsensusValidationSchema {
                 equal: ConsensusOperationType.PROOF_PROPOSAL_APPROVAL,
                 required: true
             },
-            session_id: {type: 'string', min: 1, max: 64, required: true},
-            timestamp: {type: 'number', integer: true, min: 1, max: Number.MAX_SAFE_INTEGER, required: true},
+            session_id: { type: 'string', min: 1, max: 64, required: true },
+            timestamp: { type: 'number', integer: true, min: 1, max: Number.MAX_SAFE_INTEGER, required: true },
             proof_proposal_response: {
                 strict: true,
                 type: 'object',
                 props: {
-                    result: {type: 'enum', values: ALLOWED_RESULT_CODES, required: true},
+                    result: { type: 'enum', values: ALLOWED_RESULT_CODES, required: true },
                     approval: {
                         strict: true,
                         type: 'object',
                         optional: true,
                         props: {
-                            approver: {type: 'buffer', length: this.#config.addressLength, required: true},
-                            approval_sig: {type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true},
+                            approver: { type: 'buffer', length: this.#config.addressLength, required: true },
+                            approval_sig: { type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true },
                         }
                     },
-                    response_sig: {type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true},
+                    response_sig: { type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true },
                 }
             },
         };
@@ -151,8 +151,8 @@ class ConsensusValidationSchema {
         const isSchemaValid = this.#validateConsensusV1ProposalApproval(operation);
         if (isSchemaValid !== true) {
             throw new V1ConsensusProtocolError(
-                    ConsensusResultCode.SCHEMA_VALIDATION_FAILED,
-                    'Proof proposal response schema validation failed.'
+                ConsensusResultCode.SCHEMA_VALIDATION_FAILED,
+                'Proof proposal response schema validation failed.'
             );
         }
 
