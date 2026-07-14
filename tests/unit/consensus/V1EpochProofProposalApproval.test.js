@@ -17,6 +17,7 @@ import {
 import {config} from '../../helpers/config.js';
 import {testKeyPair1, testKeyPair2, testKeyPair3} from '../../fixtures/apply.fixtures.js';
 import {createMessage, uint32ToBuffer} from '../../../src/utils/buffer.js';
+import { errorMessageIncludes } from '../../helpers/regexHelper.js';
 
 const previousEpochRecordHash = b4a.alloc(32, 1);
 const vdfParametersHash = b4a.alloc(32, 2);

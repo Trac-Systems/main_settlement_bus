@@ -27,6 +27,7 @@ import {
 } from '../../../src/utils/constants.js';
 import {config} from '../../helpers/config.js';
 import {testKeyPair1, testKeyPair2} from '../../fixtures/apply.fixtures.js';
+import { errorMessageIncludes } from '../../helpers/regexHelper.js';
 
 const TEST_VDF_PARAMS = Object.freeze({
     vdfDifficulty: 1,
@@ -362,7 +363,7 @@ test('V1EpochProofProposalRequest rejects invalid proof proposal network id', as
 });
 
 test('V1EpochProofProposalRequest rejects missing payload type as invalid payload', async t => {
-    const validator = new V1EpochProofProposalRequest(vdfTestConfig);
+    const validator = new V1EpochProofProposalRequest(config, createState());
 
     await assertProtocolError(
         t,
@@ -374,7 +375,7 @@ test('V1EpochProofProposalRequest rejects missing payload type as invalid payloa
 
 test('V1EpochProofProposalRequest rejects invalid operation type', async t => {
     const wallet = await createWallet();
-    const validator = new V1EpochProofProposalRequest(vdfTestConfig);
+    const validator = new V1EpochProofProposalRequest(config, createState());
     const payload = await buildProofProposalPayload(wallet);
 
     await assertProtocolError(
@@ -401,7 +402,7 @@ test('V1EpochProofProposalRequest rejects invalid operation type', async t => {
 
 test('V1EpochProofProposalRequest rejects invalid proof proposal schema with schema result code', async t => {
     const wallet = await createWallet();
-    const validator = new V1EpochProofProposalRequest(vdfTestConfig);
+    const validator = new V1EpochProofProposalRequest(config, createState());
     const payload = await buildProofProposalPayload(wallet);
     const invalidPayload = {
         ...payload,
