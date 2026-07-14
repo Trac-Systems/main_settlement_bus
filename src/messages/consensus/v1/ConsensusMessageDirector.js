@@ -60,7 +60,7 @@ class ConsensusMessageDirector {
      * @param {Buffer} vdfParametersHash
      * @param {Buffer} vdfProof
      * @param {Buffer} requesterProofSignature
-     * @param {number} ConsensusResultCode
+     * @param {number} consensusResultCode
      * @param {string} approver
      * @returns {Promise<object>}
      */
@@ -73,7 +73,7 @@ class ConsensusMessageDirector {
         vdfParametersHash,
         vdfProof,
         requesterProofSignature,
-        ConsensusResultCode,
+        consensusResultCode,
         approver
     ) {
         await this.#builder
@@ -88,7 +88,7 @@ class ConsensusMessageDirector {
             .setVdfParametersHash(vdfParametersHash)
             .setVdfProof(vdfProof)
             .setRequesterProofSignature(requesterProofSignature)
-            .setResultCode(ConsensusResultCode)
+            .setResultCode(consensusResultCode)
             .setApprover(approver)
             .buildPayload();
 
@@ -98,15 +98,15 @@ class ConsensusMessageDirector {
     /**
      * Build a non-OK proof proposal response without requiring proof proposal fields.
      * @param {string} sessionId
-     * @param {number} ConsensusResultCode
+     * @param {number} consensusResultCode
      * @returns {Promise<object>}
      */
-    async buildProofProposalRejectionResponse(sessionId, ConsensusResultCode) {
+    async buildProofProposalRejectionResponse(sessionId, consensusResultCode) {
         await this.#builder
             .setType(ConsensusOperationType.PROOF_PROPOSAL_APPROVAL)
             .setSessionId(sessionId)
             .setTimestamp()
-            .setResultCode(ConsensusResultCode)
+            .setResultCode(consensusResultCode)
             .buildPayload();
 
         return this.#builder.getResult();
