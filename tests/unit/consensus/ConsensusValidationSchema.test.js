@@ -112,10 +112,12 @@ test('ConsensusValidationSchema requires approval only for OK proof proposal res
 test('ConsensusValidationSchema rejects network-only result codes in proof proposal responses', t => {
     const schema = new ConsensusValidationSchema(config);
 
-    t.is(
-        schema.validateV1EpochProofProposalResponse(
+    assertProtocolError(
+        t,
+        () => schema.validateV1EpochProofProposalResponse(
             makeProofProposalResponsePayload(NetworkResultCode.TX_INVALID_PAYLOAD)
         ),
-        false
+        ConsensusResultCode.SCHEMA_VALIDATION_FAILED,
+        'schema validation failed'
     );
 });

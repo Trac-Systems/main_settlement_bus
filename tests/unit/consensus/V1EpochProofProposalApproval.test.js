@@ -87,7 +87,7 @@ async function buildProofProposalRejectionPayload(approverWallet, proofProposalP
 }
 
 async function signProofProposalResponse(approverWallet, proofProposalResponse) {
-    const resultCode = safeWriteUInt32BE(proofProposalResponse.result, 0);
+    const resultCode = uint32ToBuffer(proofProposalResponse.result, 0);
     const message = proofProposalResponse.result === ConsensusResultCode.OK
         ? createMessage(resultCode, encodeProofProposalApproval(proofProposalResponse.approval))
         : createMessage(resultCode);

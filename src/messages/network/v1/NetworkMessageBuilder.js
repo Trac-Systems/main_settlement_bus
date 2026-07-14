@@ -6,7 +6,6 @@ import {
     timestampToBuffer,
     uint32ToBuffer
 } from "../../../utils/buffer.js";
-import {NetworkOperationType, ResultCode} from '../../../utils/constants.js';
 import {NetworkOperationType, NetworkResultCode} from '../../../utils/constants.js';
 import {isAddressValid} from "../../../core/state/utils/address.js";
 import {encodeCapabilities} from "../../../utils/buffer.js";
