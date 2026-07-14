@@ -31,6 +31,15 @@ test('State#getSignedVDFParams returns null when params are missing', async t =>
     t.is(await state.getSignedVDFParams(), null);
 });
 
+test('State#requireSignedVDFParams rejects when params are missing', async t => {
+    const state = await createStateWithSignedValue(undefined);
+
+    await t.exception(
+        () => state.requireSignedVDFParams(),
+        errorMessageIncludes('VDF parameters are not initialized.')
+    );
+});
+
 test('State#getSignedVDFParams decodes stored VDF params', async t => {
     const vdfParams = b4a.alloc(6);
     vdfParams.writeUInt32BE(55_000_000, 0);
@@ -38,6 +47,18 @@ test('State#getSignedVDFParams decodes stored VDF params', async t => {
     const state = await createStateWithSignedValue(vdfParams);
 
     t.alike(await state.getSignedVDFParams(), {
+        vdfDifficulty: 55_000_000,
+        vdfDiscriminantSize: 2048,
+    });
+});
+
+test('State#requireSignedVDFParams returns decoded stored VDF params', async t => {
+    const vdfParams = b4a.alloc(6);
+    vdfParams.writeUInt32BE(55_000_000, 0);
+    vdfParams.writeUInt16BE(2048, 4);
+    const state = await createStateWithSignedValue(vdfParams);
+
+    t.alike(await state.requireSignedVDFParams(), {
         vdfDifficulty: 55_000_000,
         vdfDiscriminantSize: 2048,
     });

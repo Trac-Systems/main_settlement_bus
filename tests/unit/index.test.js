@@ -35,7 +35,12 @@ async function loadMainSettlementBus() {
             this.close = sinon.stub().resolves();
             this.getAdminEntry = sinon.stub().resolves(null);
             this.getNodeEntry = sinon.stub().resolves(null);
+            this.getSigned = sinon.stub().resolves(null);
             this.getSignedVDFParams = sinon.stub().resolves(null);
+            this.requireSignedVDFParams = sinon.stub().resolves({
+                vdfDifficulty: 55_000_000,
+                vdfDiscriminantSize: 2048,
+            });
             this.getIndexerSequenceState = sinon.stub().resolves(b4a.from('11'.repeat(32), 'hex'));
             this.append = sinon.stub().resolves();
             this.isWritable = sinon.stub().returns(false);
@@ -153,7 +158,7 @@ if (isBareRuntime) {
         await msb.ready();
 
         loaded.state.getAdminEntry.resolves(adminEntryFor(wallet, loaded.state));
-        loaded.state.getSignedVDFParams.resolves(null);
+        loaded.state.getSigned.resolves(null);
         loaded.state.getIndexerSequenceState.resolves(txValidity);
 
         await msb.handleEpochGenesisInitialization({
@@ -373,8 +378,8 @@ if (isBareRuntime) {
 
         loaded.state.getAdminEntry.resolves(adminEntryFor(wallet, loaded.state));
         loaded.state.getSignedVDFParams.resolves({
-            vdfDifficulty: 55000000,
-            vdfDiscriminantSize: 2048,
+            vdfDifficulty: 16_843_009,
+            vdfDiscriminantSize: 257,
         });
 
         await t.exception(
@@ -404,7 +409,7 @@ if (isBareRuntime) {
         await msb.ready();
 
         loaded.state.getAdminEntry.resolves(adminEntryFor(wallet, loaded.state));
-        loaded.state.getSignedVDFParams.resolves({
+        loaded.state.requireSignedVDFParams.resolves({
             vdfDifficulty: 55000000,
             vdfDiscriminantSize: 2048,
         });
@@ -414,7 +419,7 @@ if (isBareRuntime) {
             vdfDifficulty: '60000000',
         });
 
-        t.ok(loaded.state.getSignedVDFParams.calledOnce);
+        t.ok(loaded.state.requireSignedVDFParams.calledOnce);
         t.ok(loaded.state.getIndexerSequenceState.calledOnce);
         t.ok(loaded.state.append.calledOnce);
 
@@ -464,7 +469,7 @@ if (isBareRuntime) {
             errorMessageIncludes('admin has not been initialized')
         );
 
-        t.ok(loaded.state.getSignedVDFParams.notCalled);
+        t.ok(loaded.state.requireSignedVDFParams.notCalled);
         t.ok(loaded.state.append.notCalled);
 
         await msb.close();
@@ -492,7 +497,7 @@ if (isBareRuntime) {
             errorMessageIncludes('you are not the admin')
         );
 
-        t.ok(loaded.state.getSignedVDFParams.notCalled);
+        t.ok(loaded.state.requireSignedVDFParams.notCalled);
         t.ok(loaded.state.append.notCalled);
 
         await msb.close();
@@ -510,13 +515,15 @@ if (isBareRuntime) {
         await msb.ready();
 
         loaded.state.getAdminEntry.resolves(adminEntryFor(wallet, loaded.state));
-        loaded.state.getSignedVDFParams.resolves(null);
+        loaded.state.requireSignedVDFParams.rejects(
+            new Error('VDF parameters are not initialized.')
+        );
 
         await t.exception(
             () => msb.handleSetVdfParams({
                 vdfDifficulty: '60000000',
             }),
-            errorMessageIncludes('VDF parameters have not been initialized')
+            errorMessageIncludes('VDF parameters are not initialized.')
         );
 
         t.ok(loaded.state.getIndexerSequenceState.notCalled);
@@ -537,7 +544,7 @@ if (isBareRuntime) {
         await msb.ready();
 
         loaded.state.getAdminEntry.resolves(adminEntryFor(wallet, loaded.state));
-        loaded.state.getSignedVDFParams.resolves({
+        loaded.state.requireSignedVDFParams.resolves({
             vdfDifficulty: 55000000,
             vdfDiscriminantSize: 2048,
         });

@@ -1129,17 +1129,14 @@ export class MainSettlementBus extends ReadyResource {
             throw new Error("Can not set VDF params - you are not the admin.");
         }
 
-        const existingVDFParams = await this.#state.getSignedVDFParams();
-        if (!existingVDFParams) {
-            throw new Error("Can not set VDF params - VDF parameters have not been initialized.");
-        }
+        await this.#state.requireSignedVDFParams();
 
         const difficultyNumber = Number(params.vdfDifficulty);
         if (!Number.isInteger(difficultyNumber) || difficultyNumber <= 0) {
             throw new Error("VDF difficulty must be a positive unsigned 32-bit integer.");
         }
 
-        const vdfDifficultyBuffer = uint32ToBuffer(difficultyNumber, "VDF difficulty");
+        const vdfDifficultyBuffer = uint32ToBuffer(difficultyNumber);
 
         const txValidity = await this.#state.getIndexerSequenceState();
         const payload = await applyStateMessageFactory(this.#wallet, this.#config)

@@ -17,8 +17,8 @@ class ConsensusEpochProofProposalOperationHandler extends ConnectionOperationHan
         super(config)
         this.#state = state;
         this.#wallet = wallet;
-        this.#proofProposalRequestValidator = new V1EpochProofProposalRequest(config);
-        this.#proofProposalApprovalValidator = new V1EpochProofProposalApproval(config);
+        this.#proofProposalRequestValidator = new V1EpochProofProposalRequest(config, state);
+        this.#proofProposalApprovalValidator = new V1EpochProofProposalApproval(config, state);
     }
 
     /**

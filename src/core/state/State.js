@@ -46,6 +46,7 @@ import { Status } from './utils/transaction.js';
 import remote from 'hypercore/lib/fully-remote-proof.js'
 import PQueue from 'p-queue';
 import {decodeVdfParameters, encodeVdfParameters, createGenesisEpochProof} from './utils/epochProof.js';
+import _ from 'lodash';
 
 const OVERSIZED_BATCH_PENALTY_MULTIPLIER = BATCH_SIZE;
 
@@ -177,38 +178,98 @@ class State extends ReadyResource {
     /**
      * Reads the current epoch id from signed state.
      *
-     * @returns {Promise<bigint|null>} Current epoch id, or null when epoch state is not initialized.
+     * @returns {Promise<bigint|null>} Current epoch id, or `null` when genesis
+     * epoch state has not been initialized.
      */
     async getCurrentEpoch() {
         const currentEpoch = await this.getSigned(EntryType.EPOCH_CURRENT);
-        if (currentEpoch === null) return null;
-        return currentEpoch.readBigUInt64BE(0);
+        return _.isNil(currentEpoch) ? null : currentEpoch.readBigUInt64BE(0);
+    }
+
+    /**
+     * Reads the required current epoch id from signed state.
+     *
+     * @returns {Promise<bigint>} Current epoch id.
+     * @throws {Error} When genesis epoch state has not been initialized.
+     */
+    async requireCurrentEpoch() {
+        const currentEpoch = await this.getCurrentEpoch();
+        if (_.isNil(currentEpoch)) {
+            throw new Error(
+                'Current epoch is not initialized. Genesis epoch has not been set.'
+            );
+        }
+        return currentEpoch;
     }
 
     /**
      * Reads the epoch hash stored under `/epoch/<epoch>`.
      *
      * @param {bigint|number|string} count Epoch id.
-     * @returns {Promise<Buffer|null>} Epoch hash, or null when the epoch is not stored.
+     * @returns {Promise<Buffer|null>} Epoch hash, or `null` when the epoch is not stored.
+     * @throws {Error} When epoch id is missing or invalid.
      */
     async getEpoch(count) {
-        if (count === null || count === undefined) return null;
+        if (_.isNil(count)) {
+            throw new Error(
+                'Cannot read epoch: epoch id is required.'
+            );
+        }
 
         const epochId = typeof count === 'bigint' ? count : BigInt(count);
         return await this.getSigned(EntryType.EPOCH + epochId.toString());
     }
 
     /**
+     * Reads the required epoch hash stored under `/epoch/<epoch>`.
+     *
+     * @param {bigint|number|string} count Epoch id.
+     * @returns {Promise<Buffer>} Epoch hash.
+     * @throws {Error} When epch id is missing or invalid, or the epoch is not stored.
+     */
+    async requireEpoch(count) {
+        const epochHash = await this.getEpoch(count);
+        if (_.isNil(epochHash)) {
+            const epochId = typeof count === 'bigint' ? count : BigInt(count);
+            throw new Error(
+                `Cannot read epoch ${epochId}: epoch is not initialized or does not exist.`
+            );
+        }
+        return epochHash;
+    }
+
+    /**
      * Reads the encoded epoch proof stored under `/epochHash/<epochHash>`.
      *
      * @param {Buffer|string} epochHash Epoch hash as a buffer or hex string.
-     * @returns {Promise<Buffer|null>} Encoded epoch proof, or null when the proof is not stored.
+     * @returns {Promise<Buffer|null>} Encoded epoch proof, or `null` when it is not stored.
+     * @throws {Error} When epoch hash is missing.
      */
     async getEpochProof(epochHash) {
-        if (epochHash === null || epochHash === undefined) return null;
+        if (_.isNil(epochHash)) {
+            throw new Error('Cannot read epoch proof: epoch hash is required.');
+        }
 
         const epochHashString = b4a.isBuffer(epochHash) ? epochHash.toString('hex') : epochHash.toString();
         return await this.getSigned(EntryType.EPOCH_HASH + epochHashString);
+    }
+
+    /**
+     * Reads the required encoded epoch proof stored under `/epochHash/<epochHash>`.
+     *
+     * @param {Buffer|string} epochHash Epoch hash as a buffer or hex string.
+     * @returns {Promise<Buffer>} Encoded epoch proof.
+     * @throws {Error} When epoch hash is missing or the epoch proof is not stored.
+     */
+    async requireEpochProof(epochHash) {
+        const epochProof = await this.getEpochProof(epochHash);
+        if (_.isNil(epochProof)) {
+            const epochHashString = b4a.isBuffer(epochHash) ? epochHash.toString('hex') : epochHash.toString();
+            throw new Error(
+                `Cannot read epoch proof ${epochHashString}: epoch proof is not initialized or does not exist.`
+            );
+        }
+        return epochProof;
     }
 
     getFee() {
@@ -546,7 +607,7 @@ class State extends ReadyResource {
 
     async getSignedVDFParams() {
         const vdfParamsBuffer = await this.getSigned(EntryType.VDF_PARAMS);
-        if (!vdfParamsBuffer) return null;
+        if (_.isNil(vdfParamsBuffer)) return null;
 
         const expectedLength = VDF_DIFFICULTY_SIZE + VDF_DISCRIMINANT_SIZE;
         if (!b4a.isBuffer(vdfParamsBuffer)) {
@@ -564,6 +625,14 @@ class State extends ReadyResource {
             vdfDifficulty: decodedVdfParams.difficulty.readUInt32BE(0),
             vdfDiscriminantSize: decodedVdfParams.discriminantBitSize.readUInt16BE(0),
         };
+    }
+
+    async requireSignedVDFParams() {
+        const params = await this.getSignedVDFParams();
+        if (_.isNil(params)) {
+            throw new Error("VDF parameters are not initialized.");
+        }
+        return params;
     }
 
     // ATTENTION: DO NOT USE METHODS ABOVE IN APPLY PART!
