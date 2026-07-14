@@ -39,6 +39,7 @@ class V1BaseConsensusOperation {
      * Expected protocol errors keep their result code and identity. Unexpected
      * errors from state, codecs, crypto APIs, or malformed runtime values are
      * exposed as a stable protocol error while remaining available as `cause`.
+     * Validation operations are expected to throw `Error` instances.
      *
      * @param {function(): (Promise<*>|*)} validation Validation operation to execute.
      * @returns {Promise<*>} Result returned by the validation operation.
@@ -52,17 +53,11 @@ class V1BaseConsensusOperation {
                 throw error;
             }
 
-            let validationError = error;
-            if (!(validationError instanceof Error)) {
-                validationError = new TypeError('Validation threw a non-Error value.');
-                validationError.cause = error;
-            }
-
             const protocolError = new V1ConsensusProtocolError(
                 ConsensusResultCode.UNEXPECTED_ERROR,
-                validationError.message
+                error.message
             );
-            protocolError.cause = validationError;
+            protocolError.cause = error;
             throw protocolError;
         }
     }
