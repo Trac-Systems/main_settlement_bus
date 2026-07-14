@@ -52,14 +52,17 @@ class V1BaseConsensusOperation {
                 throw error;
             }
 
-            const reason = error instanceof Error
-                ? error.message
-                : typeof error === 'string' ? error : String(error);
+            let validationError = error;
+            if (!(validationError instanceof Error)) {
+                validationError = new TypeError('Validation threw a non-Error value.');
+                validationError.cause = error;
+            }
+
             const protocolError = new V1ConsensusProtocolError(
                 ConsensusResultCode.UNEXPECTED_ERROR,
-                reason
+                validationError.message
             );
-            protocolError.cause = error;
+            protocolError.cause = validationError;
             throw protocolError;
         }
     }

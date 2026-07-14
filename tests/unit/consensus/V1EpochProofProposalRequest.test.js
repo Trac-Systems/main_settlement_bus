@@ -37,7 +37,7 @@ const TEST_VDF_PARAMS = Object.freeze({
 const vdfProofCache = new Map();
 const defaultPreviousEpochRecordHash = b4a.alloc(32, 1);
 
-test('V1BaseConsensusOperation stringifies non-Error failures', async t => {
+test('V1BaseConsensusOperation normalizes non-Error failures', async t => {
     const thrownValue = {reason: 'state unavailable'};
     const validator = new V1BaseConsensusOperation(config, {});
 
@@ -49,8 +49,9 @@ test('V1BaseConsensusOperation stringifies non-Error failures', async t => {
     } catch (error) {
         t.ok(error instanceof V1ConsensusProtocolError);
         t.is(error.resultCode, ConsensusResultCode.UNEXPECTED_ERROR);
-        t.is(error.message, String(thrownValue));
-        t.is(error.cause, thrownValue);
+        t.is(error.message, 'Validation threw a non-Error value.');
+        t.ok(error.cause instanceof TypeError);
+        t.is(error.cause.cause, thrownValue);
     }
 });
 
