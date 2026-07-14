@@ -21,8 +21,10 @@ export const makeConnection = (stubSource) => {
     const stub = resolveStub(stubSource);
     return {
         remotePublicKey: b4a.alloc(32, 0x01),
-        protocolSession: {
-            setV1AsPreferredProtocol: stub()
+        protocolSessions: {
+            validator: {
+                setV1AsPreferredProtocol: stub()
+            }
         },
         end: stub()
     };
@@ -115,11 +117,11 @@ export const assertDisconnected = (t, connection, message = 'should end connecti
 };
 
 export const assertPreferredSet = (t, connection, message = 'should set preferred protocol') => {
-    t.ok(connection.protocolSession.setV1AsPreferredProtocol.calledOnce, message);
+    t.ok(connection.protocolSessions.validator.setV1AsPreferredProtocol.calledOnce, message);
 };
 
 export const assertPreferredNotSet = (t, connection, message = 'should not set preferred protocol') => {
-    t.ok(connection.protocolSession.setV1AsPreferredProtocol.notCalled, message);
+    t.ok(connection.protocolSessions.validator.setV1AsPreferredProtocol.notCalled, message);
 };
 
 export const assertNoHandlersCalled = (t, handlerStubs) => {

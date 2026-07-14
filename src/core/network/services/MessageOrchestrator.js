@@ -96,9 +96,9 @@ class MessageOrchestrator {
 
         // TODO: After Legacy is deprecated, we don't need to check preferred protocol here.
         const validatorConnection = this.validatorConnectionManager.getConnection(validatorPublicKey);
-        const preferredProtocol = validatorConnection.protocolSession.preferredProtocol;
+        const preferredProtocol = validatorConnection.protocolSessions.validator.preferredProtocol;
         let success = false;
-        if (preferredProtocol === validatorConnection.protocolSession.supportedProtocols.LEGACY) {
+        if (preferredProtocol === validatorConnection.protocolSessions.validator.supportedProtocols.LEGACY) {
 
             try {
                 success = await this.#attemptSendMessageForLegacy(validatorPublicKey, message);
@@ -110,7 +110,7 @@ class MessageOrchestrator {
                 this.validatorConnectionManager.remove(validatorPublicKey);
                 success = await this.send(message, retries + 1);
             }
-        } else if (preferredProtocol === validatorConnection.protocolSession.supportedProtocols.V1) {
+        } else if (preferredProtocol === validatorConnection.protocolSessions.validator.supportedProtocols.V1) {
             // TODO: This is probably better placed inside the V1 protocol definition.
             // Both protocols should receive a 'canonical' message and solve the encodings internally
             // Refactor 

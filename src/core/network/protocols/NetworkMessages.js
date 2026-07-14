@@ -66,13 +66,12 @@ class NetworkMessages {
     }
 
     attachChannel(connection) {
-        if (connection.protocolSession) return connection.protocolSession;
-        connection.protocolSession = this.createProtomux(connection);
-        return connection.protocolSession;
+        if (connection.protocolSessions.validator) return;
+        connection.protocolSessions.validator = this.createProtomux(connection);
     }
 
     prepareConnection(connection) {
-        return this.attachChannel(connection);
+        this.attachChannel(connection);
     }
 }
 

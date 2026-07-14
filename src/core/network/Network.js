@@ -167,6 +167,12 @@ class Network extends ReadyResource {
         await this.#swarm.destroy();
     }
 
+    #prepareConnection(connection) {
+        connection.protocolSessions = {};
+        const stream = this.#store.replicate(connection);
+        wakeup.addStream(stream);
+    }
+
     #listerners() {
         this.#state.on(CustomEventType.IS_INDEXER, async (publicKey) => {
             const indexersCount = await this.#state.indexerCount()
@@ -213,8 +219,7 @@ class Network extends ReadyResource {
              This is leaky for two reasons: first we need to keep a reference to messages and disclose the connection structure in this class.
              second is that the protocol itself doesnt fit the connection life-cycle (this is a bigger problem that also touched on DHT factory structure being "swallowed by swarm")
              */
-            const stream = this.#store.replicate(connection);
-            wakeup.addStream(stream);
+            this.#prepareConnection(connection);
             this.#networkMessages.prepareConnection(connection);
             this.#consensusMessages.prepareConnection(connection);
         })
@@ -226,9 +231,8 @@ class Network extends ReadyResource {
             connection.on('close', () => {
                 this.#rejectAllPendingRequests(publicKey, new Error('Connection closed before response'));
                 this.#swarm.leavePeer(connection.remotePublicKey);
-                this.#validatorConnectionManager.remove(publicKey, { connection });
-                this.#indexerConnectionManager.remove(publicKey, { connection });
-                connection.protocolSession.close();
+                this.#validatorConnectionManager.remove(publicKey, connection);
+                this.#indexerConnectionManager.remove(publicKey, connection);
                 connection.end();
             });
 
@@ -290,7 +294,7 @@ class Network extends ReadyResource {
 
         if (isTrackedValidator) {
             this.#logger.debug(`Network.disconnectValidatorPeer: detaching tracked validator ${publicKeyHex}. Reason: ${reason}`);
-            this.#validatorConnectionManager.remove(publicKeyHex, { endConnection: false });
+            this.#validatorConnectionManager.remove(publicKeyHex);
         }
 
         return hadPendingValidatorConnection || isTrackedValidator;

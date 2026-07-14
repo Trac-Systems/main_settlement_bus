@@ -1,4 +1,3 @@
-import Protomux from 'protomux';
 import { PeerConnectionManager } from '../../shared/PeerConnectionManager.js'
 
 class IndexerConnectionManager extends PeerConnectionManager {
@@ -14,32 +13,40 @@ class IndexerConnectionManager extends PeerConnectionManager {
     // *same* underlying connection - remove() only closes our consensus/v1 channel, not the whole
     // connection. So "already initialized" alone isn't enough: if that channel was since closed,
     // we must open a fresh one instead of re-registering the dead one.
-    #consensusInitialized = new WeakSet();
 
     constructor(maxIndexers, config, logger, messages) {
         super(maxIndexers, config, logger);
         this.#messages = messages
     }
 
-    /**
-     * Registers a reactive pairing callback for the consensus/v1 protocol on this connection.
-     *
-     * Protomux channels only pair up if both sides have a matching channel open at roughly the
-     * same time - if the remote's "open channel" request arrives before we've called add() for
-     * this peer ourselves, Protomux rejects it outright and nothing here ever retries. pair()
-     * lets us react to that request just in time instead of losing the race silently.
-     * See: node_modules/hypercore/lib/replicator.js (attachTo) for the same pattern.
-     */
-    prepareConnection(connection) {
-        const mux = Protomux.from(connection);
-        mux.pair({ protocol: 'consensus/v1' }, () => {
-            this.add(connection.remotePublicKey, connection);
-        });
-    }
-
     add(publicKey, connection) {
         this.#messages.attachChannel(connection);
         this._add(publicKey, connection)
+    }
+
+    remove(publicKey, connection = null) {
+        const key = this._toHexString(publicKey);
+        const entry = this._connections.get(key);
+        if (!entry) return;
+        if (connection && entry.connection !== connection) return;
+
+        const targetConnection = connection ?? entry.connection;
+        targetConnection.protocolSessions.indexers.close();
+        this._connections.delete(key);
+    }
+
+    async send(publicKey, message) {
+        const connection = this.getConnection(publicKey);
+        if (!connection) {
+            throw new Error(`PeerConnectionManager: no session for ${this._toHexString(publicKey)}`);
+        }
+        return connection.protocolSessions.indexers.send(message);
+    }
+
+    sendAndForget(publicKey, message) {
+        const connection = this.getConnection(publicKey);
+        if (!connection) return;
+        connection.protocolSessions.indexers.sendAndForget(message);
     }
 
     prettyPrint() {

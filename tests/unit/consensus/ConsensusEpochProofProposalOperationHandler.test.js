@@ -62,17 +62,20 @@ function proofProposalApprovalMessage(responseOverrides = {}) {
 }
 
 function createConnection(calls, overrides = {}) {
+    const protocolSession = {
+        sendAndForget(response) {
+            calls.push({ name: 'send', response });
+            if (overrides.sendError) throw overrides.sendError;
+            connection.sent.push(response);
+        }
+    };
     const connection = {
         remotePublicKey: overrides.remotePublicKey ?? b4a.alloc(32, 7),
         sent: [],
         ended: false,
         flushed: false,
-        protocolSession: {
-            sendAndForget(response) {
-                calls.push({ name: 'send', response });
-                if (overrides.sendError) throw overrides.sendError;
-                connection.sent.push(response);
-            }
+        protocolSessions: {
+            indexers: protocolSession
         },
         async flush() {
             calls.push({ name: 'flush' });
@@ -158,7 +161,7 @@ test('handleRequest validates proposal, emits success events, and sends signed O
         }
     });
 
-    const result = await handler.handleRequest(message, connection);
+    const result = await handler.handleRequest(message, connection, connection.protocolSessions.indexers);
 
     t.absent(result);
     t.is(validatorPayload, message);
@@ -221,7 +224,7 @@ test('handleRequest maps consensus validation errors to signed rejection respons
         }
     });
 
-    await handler.handleRequest(message, connection);
+    await handler.handleRequest(message, connection, connection.protocolSessions.indexers);
 
     t.alike(callNames(calls), [
         'onEpochProposalReceived',
@@ -258,7 +261,7 @@ test('handleRequest maps unexpected validation errors to UNEXPECTED_ERROR respon
         }
     });
 
-    await handler.handleRequest(message, connection);
+    await handler.handleRequest(message, connection, connection.protocolSessions.indexers);
 
     const failureContext = calls[2].context;
     const proofProposalResponse = connection.sent[0].proof_proposal_response;
@@ -286,7 +289,7 @@ test('handleRequest ends the connection when response sending fails', async t =>
         displayErrors.push({ step, remotePublicKey, error });
     };
 
-    await handler.handleRequest(message, connection);
+    await handler.handleRequest(message, connection, connection.protocolSessions.indexers);
 
     t.alike(callNames(calls), [
         'onEpochProposalReceived',
@@ -323,7 +326,7 @@ test('handleApproval validates OK responses, emits success, and returns approval
         }
     });
 
-    const result = await handler.handleApproval(message, connection, proofProposal);
+    const result = await handler.handleApproval(message, connection, connection.protocolSessions.indexers, proofProposal);
 
     t.is(validatorPayload, message);
     t.is(validatorConnection, connection);
@@ -379,7 +382,7 @@ test('handleApproval maps consensus validation failure and does not read approva
         }
     });
 
-    const result = await handler.handleApproval(message, connection, proofProposal);
+    const result = await handler.handleApproval(message, connection, connection.protocolSessions.indexers, proofProposal);
 
     t.alike(callNames(calls), [
         'onApprovalResponseReceived',
@@ -407,7 +410,7 @@ test('handleApproval maps unexpected validation errors to UNEXPECTED_ERROR', asy
         }
     });
 
-    const result = await handler.handleApproval(message, connection, proofProposal);
+    const result = await handler.handleApproval(message, connection, connection.protocolSessions.indexers, proofProposal);
 
     t.alike(callNames(calls), [
         'onApprovalResponseReceived',

@@ -59,19 +59,19 @@ class NetworkMessageRouterV1 {
         }
 
         // We received a v1 message, so we set the connection protocol accordingly
-        connection.protocolSession.setV1AsPreferredProtocol()
+        connection.protocolSessions.validator.setV1AsPreferredProtocol()
 
         try {
             switch (decodedMessage.type) {
                 case NetworkOperationType.LIVENESS_REQUEST:
-                    await this.#livenessRequestHandler.handleRequest(decodedMessage, connection);
+                    await this.#livenessRequestHandler.handleRequest(decodedMessage, connection, connection.protocolSessions.validator);
                     break;
                 case NetworkOperationType.LIVENESS_RESPONSE:
                     await this.#livenessRequestHandler.handleResponse(decodedMessage, connection);
                     break;
 
                 case NetworkOperationType.BROADCAST_TRANSACTION_REQUEST:
-                    await this.#broadcastTransactionHandler.handleRequest(decodedMessage, connection);
+                    await this.#broadcastTransactionHandler.handleRequest(decodedMessage, connection, connection.protocolSessions.validator);
                     break;
 
                 case NetworkOperationType.BROADCAST_TRANSACTION_RESPONSE:

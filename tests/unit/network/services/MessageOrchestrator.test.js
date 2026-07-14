@@ -37,11 +37,13 @@ const createValidatorConnectionManager = ({
 } = {}) => ({
     connectedPeers: sinon.stub().returns(connectedPeers),
     getConnection: sinon.stub().returns({
-        protocolSession: {
-            preferredProtocol,
-            supportedProtocols: {
-                LEGACY: 'legacy',
-                V1: 'v1',
+        protocolSessions: {
+            validator: {
+                preferredProtocol,
+                supportedProtocols: {
+                    LEGACY: 'legacy',
+                    V1: 'v1',
+                }
             }
         }
     }),
@@ -409,11 +411,13 @@ test('MessageOrchestrator.send V1 avoids selecting validator with requester addr
         connectedPeers: [requesterValidatorKey, otherValidatorKey],
     });
     validatorConnectionManager.getConnection = sinon.stub().returns({
-        protocolSession: {
-            preferredProtocol: 'v1',
-            supportedProtocols: {
-                LEGACY: 'legacy',
-                V1: 'v1',
+        protocolSessions: {
+            validator: {
+                preferredProtocol: 'v1',
+                supportedProtocols: {
+                    LEGACY: 'legacy',
+                    V1: 'v1',
+                }
             }
         }
     });

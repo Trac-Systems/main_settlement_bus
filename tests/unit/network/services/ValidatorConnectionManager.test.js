@@ -12,7 +12,8 @@ import { ResultCode } from "../../../../src/utils/constants.js";
 
 const createConnection = (key) => {
     const emitter = new EventEmitter()
-    emitter.protocolSession = {
+    emitter.protocolSessions = {}
+    emitter.protocolSessions.validator = {
         has: (name) => name === 'legacy',
         send: sinon.stub().resolves(),
         isProbed: () => true,
@@ -28,7 +29,8 @@ const createConnection = (key) => {
 
 const createV1Connection = (key, sendHealthCheckStub = sinon.stub().resolves(ResultCode.OK)) => {
     const emitter = new EventEmitter()
-    emitter.protocolSession = {
+    emitter.protocolSessions = {}
+    emitter.protocolSessions.validator = {
         sendHealthCheck: sendHealthCheckStub,
         isProbed: () => true,
         probe: sinon.stub().resolves(),
@@ -43,12 +45,10 @@ const createV1Connection = (key, sendHealthCheckStub = sinon.stub().resolves(Res
 }
 
 const makeMessages = () => ({
-    createProtomux: (connection) => connection.protocolSession,
+    createProtomux: (connection) => connection.protocolSessions.validator,
     attachChannel(connection) {
-        if (!connection.protocolSession) {
-            connection.protocolSession = this.createProtomux(connection);
-        }
-        return connection.protocolSession;
+        connection.protocolSessions ??= {};
+        connection.protocolSessions.validator = this.createProtomux(connection);
     }
 })
 
@@ -87,7 +87,7 @@ const makeHealthCheckManager = async () => {
 const reset = () => {
     sinon.restore()
     connections.forEach(connection => {
-        connection.connection.protocolSession.send.resetHistory()
+        connection.connection.protocolSessions.validator.send.resetHistory()
     })
 }
 hook('Initialize state', async () => {
@@ -171,13 +171,13 @@ test('ConnectionManager', () => {
         test('returns exact resultCode from protocolSession.send', async t => {
             reset()
             const data = createConnection(testKeyPair1.publicKey)
-            data.connection.protocolSession.send = sinon.stub().resolves(ResultCode.TIMEOUT)
+            data.connection.protocolSessions.validator.send = sinon.stub().resolves(ResultCode.TIMEOUT)
             const validatorConnectionManager = makeManager(6, [data])
 
             const result = await validatorConnectionManager.sendSingleMessage({ payload: 1 }, testKeyPair1.publicKey)
 
             t.is(result, ResultCode.TIMEOUT, 'should return the exact result code from protocol session')
-            t.ok(data.connection.protocolSession.send.calledOnce, 'should invoke protocolSession.send')
+            t.ok(data.connection.protocolSessions.validator.send.calledOnce, 'should invoke protocolSession.send')
         })
 
         test('throws PeerConnectionManagerError when validator is disconnected', async t => {
@@ -260,7 +260,7 @@ test('ConnectionManager', () => {
             const data = createV1Connection(testKeyPair5.publicKey)
             const validatorConnectionManager = makeManager(6, [data])
 
-            validatorConnectionManager.remove(data.key, { endConnection: false })
+            validatorConnectionManager.remove(data.key)
 
             t.absent(validatorConnectionManager.connected(data.key), 'validator should be removed from the pool')
             t.is(data.connection.end.callCount, 0, 'socket should remain open for in-flight responses')
@@ -288,13 +288,13 @@ test('ConnectionManager', () => {
             try {
                 const validatorConnectionManager = await makeHealthCheckManager();
                 const v1Conn = createV1Connection(testKeyPair1.publicKey, sinon.stub().resolves(ResultCode.OK));
-                v1Conn.connection.protocolSession.isHealthCheckSupported = () => true;
+                v1Conn.connection.protocolSessions.validator.isHealthCheckSupported = () => true;
                 await validatorConnectionManager.add(v1Conn.key, v1Conn.connection);
 
                 await clock.tickAsync(HEALTH_CHECK_INTERVAL_MS);
 
                 t.ok(validatorConnectionManager.connected(v1Conn.key));
-                t.ok(v1Conn.connection.protocolSession.sendHealthCheck.calledOnce);
+                t.ok(v1Conn.connection.protocolSessions.validator.sendHealthCheck.calledOnce);
                 t.is(stopSpy.callCount, 0);
             } finally {
                 clock.restore();
@@ -308,7 +308,7 @@ test('ConnectionManager', () => {
             try {
                 const validatorConnectionManager = await makeHealthCheckManager();
                 const v1Conn = createV1Connection(testKeyPair2.publicKey, sinon.stub().resolves(ResultCode.TIMEOUT));
-                v1Conn.connection.protocolSession.isHealthCheckSupported = () => true;
+                v1Conn.connection.protocolSessions.validator.isHealthCheckSupported = () => true;
                 await validatorConnectionManager.add(v1Conn.key, v1Conn.connection);
 
                 await clock.tickAsync(HEALTH_CHECK_INTERVAL_MS);
@@ -327,7 +327,7 @@ test('ConnectionManager', () => {
             try {
                 const validatorConnectionManager = await makeHealthCheckManager();
                 const v1Conn = createV1Connection(testKeyPair3.publicKey, sinon.stub().rejects(new Error('boom')));
-                v1Conn.connection.protocolSession.isHealthCheckSupported = () => true;
+                v1Conn.connection.protocolSessions.validator.isHealthCheckSupported = () => true;
                 await validatorConnectionManager.add(v1Conn.key, v1Conn.connection);
 
                 await clock.tickAsync(HEALTH_CHECK_INTERVAL_MS);
@@ -376,7 +376,7 @@ test('ConnectionManager', () => {
                 // Legacy connections don't expose sendHealthCheck; force isHealthCheckSupported to
                 // simulate a connection that was scheduled for checks but lost its protocol session.
                 const data = createConnection(testKeyPair6.publicKey)
-                data.connection.protocolSession.isHealthCheckSupported = () => true
+                data.connection.protocolSessions.validator.isHealthCheckSupported = () => true
                 await validatorConnectionManager.add(data.key, data.connection)
 
                 await clock.tickAsync(HEALTH_CHECK_INTERVAL_MS)

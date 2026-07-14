@@ -1,6 +1,6 @@
 import {EventType, ResultCode} from '../../../utils/constants.js';
 import {publicKeyToAddress} from "../../../utils/helpers.js";
-import { PeerConnectionManager } from '../../shared/PeerConnectionManager.js'
+import { PeerConnectionManager, PeerConnectionManagerError } from '../../shared/PeerConnectionManager.js'
 import ValidatorHealthCheckService from './ValidatorHealthCheckService.js'
 /**
  * @typedef {import('hyperswarm').Connection} Connection
@@ -38,120 +38,112 @@ class ValidatorConnectionManager extends PeerConnectionManager {
     // Keep here only if we forsee having health checks for non-validator connections in the future. 
     // For now, it seems that it would be better to keep this logic here.
     #subscribeToHealthChecks() {
-        this.#healthCheckService.on(EventType.VALIDATOR_HEALTH_CHECK, (publicKey, requestId) => {
-            this.#healthCheckHandler(publicKey, requestId);
+        this.#healthCheckService.on(EventType.VALIDATOR_HEALTH_CHECK, async publicKey => {
+            if (!this.exists(publicKey) || !this.connected(publicKey)) {
+                this.#stopHealthCheck(publicKey);
+                return;
+            }
+
+            const connection = this.getConnection(publicKey);
+            if (!connection) {
+                this.#stopHealthCheck(publicKey);
+                this.remove(publicKey);
+                return;
+            }
+
+            let success = false;
+            try {
+                const resultCode = await connection.protocolSessions.validator.sendHealthCheck();
+                success = resultCode === ResultCode.OK;
+            } catch {
+                success = false;
+            }
+
+            if (!success) {
+                this.remove(publicKey);
+                this.#stopHealthCheck(publicKey);
+            }
         });
-        this._logger.debug('subscribeToHealthChecks: subscribed to health check events');
     }
 
-    async #healthCheckHandler(publicKey, requestId) {
-        if (typeof publicKey !== 'string' || typeof requestId !== 'string') {
-            // We can't throw here because this is an event handler, but we should at least log the error and return early to avoid further issues.
-            this._logger.error(`healthCheck: malformed event payload. Typeof publicKey = ${typeof publicKey}. Typeof requestId = ${typeof requestId}`);
-            return;
-        }
-
-        const targetAddress = publicKeyToAddress(publicKey, this._config);
-
-        if (!this.exists(publicKey) || !this.connected(publicKey)) {
-            this._logger.debug(`healthCheck: validator not connected, stopping checks. Address = ${targetAddress}; Request ID = ${requestId}`);
-            this.#stopHealthCheck(publicKey);
-            return;
-        }
-
-        const connection = this.getConnection(publicKey);
-        if (!connection || !connection.protocolSession || typeof connection.protocolSession.sendHealthCheck !== 'function') {
-            this._logger.debug(`healthCheck: missing protocol session, removing validator. Address = ${targetAddress}; Request ID = ${requestId}`);
-            this.#stopHealthCheck(publicKey);
-            this.remove(publicKey);
-            return;
-        }
-
-        let success = false;
-        try {
-            this._logger.debug(`healthCheck: sending liveness request. Address = ${targetAddress}; Request ID = ${requestId}`);
-
-            const resultCode = await connection.protocolSession.sendHealthCheck();
-            success = resultCode === ResultCode.OK;
-            if (!success) {
-                this._logger.debug(`healthCheck: non-OK result code. Address = ${targetAddress}; Request ID = ${requestId}`);
-            }
-        } catch {
-            success = false;
-        }
-
-        if (!success) {
-            this._logger.debug(`healthCheck: liveness request failed, removing validator. Address = ${targetAddress}; Request ID = ${requestId}`);
-            this.remove(publicKey);
-            this.#stopHealthCheck(publicKey);
-        } else {
-            this._logger.debug(`healthCheck: success. Address = ${targetAddress}; Request ID = ${requestId}`);
-        }
-    };
-
     #stopHealthCheck(publicKeyHex) {
-        const targetAddress = publicKeyToAddress(publicKeyHex, this._config);
-
-        if (!this.#healthCheckService) {
-            this._logger.debug(`stopHealthCheck: no health check service, cannot stop checks for ${targetAddress}`);
-            return;
-        }
         try {
             if (this.#healthCheckService.has(publicKeyHex)) {
-                this._logger.debug(`stopHealthCheck: stopping scheduled checks for ${targetAddress}`);
                 this.#healthCheckService.stop(publicKeyHex);
             }
-        } catch (error) {
-            this._logger.debug(`stopHealthCheck: failed to stop health check for validator ${targetAddress}. Error: ${error.message}`);
-        }
+        } catch {}
     }
 
     async add(publicKey, connection) {
         this.#messages.attachChannel(connection);
-        
         try {
-            if (!connection.protocolSession.isProbed()) await connection.protocolSession.probe();
+            if (!connection.protocolSessions.validator.isProbed()) {
+                await connection.protocolSessions.validator.probe();
+            }
         } catch (err) {
-            this._logger.debug(`failed to probe peer with publicKey ${publicKey}: ${err?.message ?? err}`);
+            this._logger.error(`failed to probe peer with publicKey ${publicKey}: ${err?.message ?? err}`);
         }        
         this._add(publicKey, connection);
         
-        if (connection.protocolSession.isHealthCheckSupported()) {
+        if (connection.protocolSessions.validator.isHealthCheckSupported()) {
             this.#healthCheckService.start(publicKey);
         } else {
             this.#healthCheckService.stop(publicKey);
         }
     }
 
-    /**
-     * Removes a validator from the pool.
-     * @param {String | Buffer} publicKey - The public key hex string of the validator to remove
-     * @param {object} [options]
-     * @param {boolean} [options.endConnection=true] - Whether to close the underlying socket.
-     */
-    remove(publicKey, { connection = null } = {}) {
+    remove(publicKey, connection = null) {
         const publicKeyHex = this._toHexString(publicKey);
         if (!this.exists(publicKeyHex)) return;
 
         const entry = this._connections.get(publicKeyHex);
         if (connection && entry.connection !== connection) {
-            // Stale/duplicate connection closing after a newer one has already replaced it. Ignore.
-            this._logger.debug(`remove: ignoring close of stale/duplicate connection for ${publicKeyToAddress(publicKeyHex, this._config)}`);
             return;
         }
 
-        this._logger.debug(`remove: removing validator ${publicKeyToAddress(publicKey, this._config)}`);
+        const targetConnection = connection ?? entry.connection;
         this.#stopHealthCheck(publicKeyHex);
-        this._logger.debug(`remove: removing validator from map: ${publicKeyToAddress(publicKeyHex, this._config)}. Map size before removal: ${this._connections.size}.`);
         this._connections.delete(publicKeyHex);
-        this._logger.debug(`remove: validator removed successfully. Map size is now ${this._connections.size}.`);
+        targetConnection.protocolSessions.validator.close()
+    }
+
+    async sendSingleMessage(message, publicKey) {
+        const publicKeyHex = this._toHexString(publicKey);
+        if (!this.connected(publicKeyHex)) {
+            throw new PeerConnectionManagerError(
+                `Cannot send message: peer ${publicKeyToAddress(publicKey, this._config)} is not connected.`
+            );
+        }
+
+        const connection = this.getConnection(publicKeyHex);
+        if (!connection) {
+            throw new PeerConnectionManagerError(
+                `Cannot send message: no valid connection found for peer ${publicKeyToAddress(publicKeyHex, this._config)}.`
+            );
+        }
+
+        return connection.protocolSessions.validator.send(message);
+    }
+
+    sendAndForget(publicKey, message) {
+        const connection = this.getConnection(publicKey);
+        if (!connection) return;
+        connection.protocolSessions.validator.sendAndForget(message);
+    }
+
+    async send(publicKey, message) {
+        const connection = this.getConnection(publicKey);
+        if (!connection) {
+            throw new Error(`PeerConnectionManager: no session for ${this._toHexString(publicKey)}`);
+        }
+        return connection.protocolSessions.validator.send(message);
     }
 
     prettyPrint() {
         this._logger.info(`Connection count: ${this.connectionCount()}`);
         this._logger.info(`Validator map keys count: ${this._connections.size}`);
         this._logger.info(`Validator map keys:\n${Array.from(this._connections.entries()).map(([publicKey, val]) => {
-            const protocols = val.connection?.protocolSession?.preferredProtocol || 'none';
+            const protocols = val.connection?.protocolSessions?.validator?.preferredProtocol || 'none';
             return `${publicKeyToAddress(publicKey, this._config)}: ${protocols}`;
         }).join('\n')}`);
     }

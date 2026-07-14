@@ -16,13 +16,15 @@ function createMockConnection(publicKeyHex, { withProtocolSession = true, withCo
     const remotePublicKey = b4a.from(publicKeyHex, 'hex');
     return {
         remotePublicKey,
-        protocolSession: withProtocolSession ? {
-            isProbed: () => true,
-            probe: sinon.stub().resolves(),
-            isHealthCheckSupported: () => false,
-            close: sinon.stub(),
-        } : null,
-        consensusProtocolSession: withConsensusSession ? { close: sinon.stub() } : null,
+        protocolSessions: {
+            validator: withProtocolSession ? {
+                isProbed: () => true,
+                probe: sinon.stub().resolves(),
+                isHealthCheckSupported: () => false,
+                close: sinon.stub(),
+            } : null,
+            indexers: withConsensusSession ? { close: sinon.stub() } : null,
+        },
         on: sinon.stub(),
     };
 }
@@ -142,7 +144,7 @@ async function loadNetwork() {
 
     class NetworkMessagesMock {
         createProtomux(connection) {
-            return connection.protocolSession ?? {
+            return connection.protocolSessions?.validator ?? {
                 isProbed: () => true,
                 probe: sinon.stub().resolves(),
                 isHealthCheckSupported: () => false,
@@ -151,14 +153,12 @@ async function loadNetwork() {
         }
 
         attachChannel(connection) {
-            if (!connection.protocolSession) {
-                connection.protocolSession = this.createProtomux(connection);
-            }
-            return connection.protocolSession;
+            connection.protocolSessions ??= {};
+            connection.protocolSessions.validator = this.createProtomux(connection);
         }
 
         prepareConnection(connection) {
-            return this.attachChannel(connection);
+            this.attachChannel(connection);
         }
     }
 

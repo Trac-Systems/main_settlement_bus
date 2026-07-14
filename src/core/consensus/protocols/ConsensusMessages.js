@@ -27,9 +27,8 @@ class ConsensusMessages {
      * even though `connection.protocolSession` is shared with the validator protocol.
      */
     attachChannel(connection) {
-        const mux = Protomux.from(connection);
-        if (mux.opened({ protocol: PROTOCOL })) return;
-        connection.protocolSession = this.createProtomux(connection);
+        if (connection.protocolSessions.indexers) return;
+        connection.protocolSessions.indexers = this.createProtomux(connection);
     }
 
     /**

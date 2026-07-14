@@ -43,6 +43,9 @@ function buildUnsupportedMessage(sessionId = 'unsupported-session') {
 function createConnection(publicKeyHex = testKeyPair1.publicKey) {
     return {
         remotePublicKey: b4a.from(publicKeyHex, 'hex'),
+        protocolSessions: {
+            indexers: { sendAndForget() {} }
+        },
         ended: false,
         endCalls: 0,
         end() {
@@ -117,6 +120,7 @@ test('ConsensusRouter routes proof proposal requests to the request handler', as
     t.is(calls.handleRequest.length, 1);
     t.is(calls.handleRequest[0][0].session_id, sessionId);
     t.is(calls.handleRequest[0][1], connection);
+    t.is(calls.handleRequest[0][2], connection.protocolSessions.indexers);
     t.is(calls.handleApproval.length, 0);
     t.is(calls.getPendingRequest.length, 0);
     t.is(calls.resolvePendingRequest.length, 0);
@@ -143,7 +147,8 @@ test('ConsensusRouter resolves proof proposal approval through pending request e
     t.is(calls.handleApproval.length, 1);
     t.is(calls.handleApproval[0][0].session_id, sessionId);
     t.is(calls.handleApproval[0][1], connection);
-    t.is(calls.handleApproval[0][2], proofProposal);
+    t.is(calls.handleApproval[0][2], connection.protocolSessions.indexers);
+    t.is(calls.handleApproval[0][3], proofProposal);
     // resolvePendingRequest receives the whole handleApproval result, not just the code -
     // EpochProofProposalOperations.sendToIndexer relies on response.approval.approval_sig.
     t.alike(calls.resolvePendingRequest, [[sessionId, { resultCode }]]);

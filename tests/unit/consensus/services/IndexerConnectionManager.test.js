@@ -8,15 +8,17 @@ import IndexerConnectionManager from '../../../../src/core/consensus/services/In
 const mockConfig = { addressPrefix: 'trac' };
 const mockLogger = { debug() {} };
 const mockMessages = {
-    createProtomux: (connection) => connection.protocolSession,
+    createProtomux: (connection) => connection.protocolSessions.indexers,
     attachChannel(connection) {
-        connection.protocolSession = this.createProtomux(connection);
+        connection.protocolSessions ??= {};
+        connection.protocolSessions.indexers = this.createProtomux(connection);
     },
 };
 
 const makeConnection = (publicKeyHex) => {
     const emitter = new EventEmitter();
-    emitter.protocolSession = {
+    emitter.protocolSessions = {};
+    emitter.protocolSessions.indexers = {
         send: sinon.stub().resolves({ ok: true }),
         sendAndForget: sinon.stub(),
         close: sinon.stub(),
@@ -124,8 +126,8 @@ test('IndexerConnectionManager', () => {
 
             await manager.send(testKeyPair1.publicKey, { type: 'ping' });
 
-            t.ok(conn.protocolSession.send.calledOnce);
-            t.alike(conn.protocolSession.send.firstCall.args[0], { type: 'ping' });
+            t.ok(conn.protocolSessions.indexers.send.calledOnce);
+            t.alike(conn.protocolSessions.indexers.send.firstCall.args[0], { type: 'ping' });
         });
 
         test('throws when indexer is not connected', async t => {
@@ -133,12 +135,6 @@ test('IndexerConnectionManager', () => {
             await t.exception(() => manager.send(testKeyPair1.publicKey, {}), /no session for/);
         });
 
-        test('throws when protocolSession is missing', async t => {
-            const conn = new EventEmitter();
-            const manager = new IndexerConnectionManager(undefined, mockConfig, mockLogger, mockMessages);
-            manager.add(testKeyPair1.publicKey, conn);
-            await t.exception(() => manager.send(testKeyPair1.publicKey, {}), /no session for/);
-        });
     });
 
     test('clear', () => {
@@ -164,8 +160,8 @@ test('IndexerConnectionManager', () => {
 
             manager.sendAndForget(testKeyPair1.publicKey, { type: 'ping' });
 
-            t.ok(conn.protocolSession.sendAndForget.calledOnce);
-            t.alike(conn.protocolSession.sendAndForget.firstCall.args[0], { type: 'ping' });
+            t.ok(conn.protocolSessions.indexers.sendAndForget.calledOnce);
+            t.alike(conn.protocolSessions.indexers.sendAndForget.firstCall.args[0], { type: 'ping' });
         });
 
         test('is silent when indexer is not connected', async t => {
@@ -174,13 +170,6 @@ test('IndexerConnectionManager', () => {
             t.pass('did not throw');
         });
 
-        test('is silent when protocolSession is missing', async t => {
-            const conn = new EventEmitter();
-            const manager = new IndexerConnectionManager(undefined, mockConfig, mockLogger, mockMessages);
-            manager.add(testKeyPair1.publicKey, conn);
-            manager.sendAndForget(testKeyPair1.publicKey, { type: 'ping' });
-            t.pass('did not throw');
-        });
     });
 
     test('exists', () => {

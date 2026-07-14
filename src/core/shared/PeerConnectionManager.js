@@ -88,24 +88,6 @@ export class PeerConnectionManager extends ReadyResource {
     }
     
     /**
-     * Removes a peer from the pool.
-     * @param {String | Buffer} publicKey - The public key hex string of the peer to remove
-     * @param {Object} [options]
-     * @param {Object} [options.connection] - If provided, only removes the entry when it still
-     *   points to this exact connection. Guards against a stale/duplicate connection's `close`
-     *   event evicting a newer connection that has since replaced it in the pool.
-     */
-    remove(publicKey, { connection = null } = {}) {
-        const key = toHex(publicKey);
-        const entry = this._connections.get(key);
-        if (!entry) return;
-        if (connection && entry.connection !== connection) return;
-
-        if (entry.connection) entry.connection.protocolSession.close();
-        this._connections.delete(key);
-    }
-
-    /**
      * Gets a list of all currently connected peers' public keys.
      * @returns {Array} - An array of public key hex strings of connected peers
      */
@@ -150,7 +132,7 @@ export class PeerConnectionManager extends ReadyResource {
         this._connections.set(publicKeyHex, {connection, sent: 0});
         connection.on('close', () => {
             this._logger.debug(`#append: connection closing for peer ${publicKeyToAddress(publicKey, this._config)}`);
-            this.remove(publicKeyHex, { connection });
+            this.remove(publicKeyHex, connection);
             this._logger.debug(`#append: connection closed for peer ${publicKeyToAddress(publicKey, this._config)}`);
         });
     }
@@ -172,44 +154,6 @@ export class PeerConnectionManager extends ReadyResource {
         } else {
             this._connections.set(publicKeyHex, {connection, sent: 0});
         }
-    }
-
-    /**
-     * Sends a message through a specific peer without increasing sent messages count.
-     * @param {Object} message - The message to send to the peer.
-     * @param {String | Buffer} publicKey - A peer public key hex string to be fetched from the pool.
-     * @returns {Promise<*>} A promise returned by `peer.connection.protocolSession.send(message)`.
-     * @throws {PeerConnectionManagerError} If the peer is not connected.
-     * @throws {PeerConnectionManagerError} If the peer has no valid connection or protocol session.
-     */
-    async sendSingleMessage(message, publicKey) {
-        let publicKeyHex = this._toHexString(publicKey);
-        if (!this.connected(publicKeyHex)) {
-            throw new PeerConnectionManagerError(
-                `Cannot send message: peer ${publicKeyToAddress(publicKey, this._config)} is not connected.`
-            );
-        }
-        const peer = this._connections.get(publicKeyHex);
-        if (!peer) {
-            throw new PeerConnectionManagerError(
-                `Cannot send message: no valid connection found for peer ${publicKeyToAddress(publicKeyHex, this._config)}.`
-            );
-        }
-        return peer.connection.protocolSession.send(message)
-    }
-
-    sendAndForget(publicKey, message) {
-        const connection = this.getConnection(publicKey);
-        if (!connection?.protocolSession) return;
-        connection.protocolSession.sendAndForget(message);
-    }
-
-    async send(publicKey, message) {
-        const connection = this.getConnection(publicKey);
-        if (!connection?.protocolSession) {
-            throw new Error(`PeerConnectionManager: no session for ${toHex(publicKey)}`);
-        }
-        return connection.protocolSession.send(message);
     }
 
     /**
