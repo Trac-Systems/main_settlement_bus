@@ -149,6 +149,17 @@ async function loadNetwork() {
                 close: sinon.stub(),
             };
         }
+
+        attachChannel(connection) {
+            if (!connection.protocolSession) {
+                connection.protocolSession = this.createProtomux(connection);
+            }
+            return connection.protocolSession;
+        }
+
+        prepareConnection(connection) {
+            return this.attachChannel(connection);
+        }
     }
 
     class ConsensusMessagesMock {

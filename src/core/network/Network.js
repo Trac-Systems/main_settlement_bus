@@ -213,15 +213,12 @@ class Network extends ReadyResource {
              This is leaky for two reasons: first we need to keep a reference to messages and disclose the connection structure in this class.
              second is that the protocol itself doesnt fit the connection life-cycle (this is a bigger problem that also touched on DHT factory structure being "swallowed by swarm")
              */
-            connection.protocolSession = this.#networkMessages.createProtomux(connection); // só pra validador
-            this.#consensusMessages.prepareConnection(connection); // só pra indexer
-        })
-        this.#swarm.on('connection', async (connection) => {
-            // ATTENTION: Must be called AFTER the protomux init above
-
             const stream = this.#store.replicate(connection);
             wakeup.addStream(stream);
-
+            this.#networkMessages.prepareConnection(connection);
+            this.#consensusMessages.prepareConnection(connection);
+        })
+        this.#swarm.on('connection', async (connection) => {
             const publicKey = b4a.toString(connection.remotePublicKey, 'hex');
             // This function will ignore connections that havent been triggered by the observer. In this case, the promotion will happen during tryConnect when the connection entity will be qualified.
             await this.#promotePendingConnection(publicKey, connection);

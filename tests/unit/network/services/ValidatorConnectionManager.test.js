@@ -43,7 +43,13 @@ const createV1Connection = (key, sendHealthCheckStub = sinon.stub().resolves(Res
 }
 
 const makeMessages = () => ({
-    createProtomux: (connection) => connection.protocolSession
+    createProtomux: (connection) => connection.protocolSession,
+    attachChannel(connection) {
+        if (!connection.protocolSession) {
+            connection.protocolSession = this.createProtomux(connection);
+        }
+        return connection.protocolSession;
+    }
 })
 
 const makeLogger = () => ({

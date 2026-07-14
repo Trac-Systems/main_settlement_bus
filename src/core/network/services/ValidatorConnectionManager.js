@@ -107,15 +107,14 @@ class ValidatorConnectionManager extends PeerConnectionManager {
     }
 
     async add(publicKey, connection) {
-        if (!connection.protocolSession) connection.protocolSession = this.#messages.createProtomux(connection);
-        this._add(publicKey, connection, { initializeProtocolSession: false });
+        this.#messages.attachChannel(connection);
         
         try {
             if (!connection.protocolSession.isProbed()) await connection.protocolSession.probe();
         } catch (err) {
             this._logger.debug(`failed to probe peer with publicKey ${publicKey}: ${err?.message ?? err}`);
         }        
-        this._add(publicKey, connection, { initializeProtocolSession: false });
+        this._add(publicKey, connection);
         
         if (connection.protocolSession.isHealthCheckSupported()) {
             this.#healthCheckService.start(publicKey);

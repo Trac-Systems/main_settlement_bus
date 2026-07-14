@@ -64,6 +64,16 @@ class NetworkMessages {
         // can send messages without knowing how Protomux was initialized.
         return new ProtocolSession(legacyProtocol, v1Protocol, this.#wallet, this.#config);
     }
+
+    attachChannel(connection) {
+        if (connection.protocolSession) return connection.protocolSession;
+        connection.protocolSession = this.createProtomux(connection);
+        return connection.protocolSession;
+    }
+
+    prepareConnection(connection) {
+        return this.attachChannel(connection);
+    }
 }
 
 export default NetworkMessages;
