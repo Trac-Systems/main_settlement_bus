@@ -200,9 +200,10 @@ test('State#isIndexerAddress returns true when address belongs to an indexer', a
     const { state, restore } = await setupQueryState(config);
     const indexerKey = randomBuffer(WRITER_BYTE_LENGTH);
     const indexerAddress = randomAddress('trac');
+    const indexerAddressBuffer = addressUtils.addressToBuffer(indexerAddress, config.addressPrefix);
 
     const entriesStub = sinon.stub(state, 'getIndexersEntry').resolves([{ key: indexerKey }]);
-    const signedStub = sinon.stub(state, 'getSigned').resolves(indexerAddress);
+    const signedStub = sinon.stub(state, 'getSigned').resolves(indexerAddressBuffer);
     const result = await state.isIndexerAddress(indexerAddress);
     t.is(result, true, 'returns true when address matches an indexer');
 
@@ -216,12 +217,28 @@ test('State#isIndexerAddress returns false when address does not match any index
     const { state, restore } = await setupQueryState(config);
     const indexerKey = randomBuffer(WRITER_BYTE_LENGTH);
     const indexerAddress = randomAddress('trac');
+    const indexerAddressBuffer = addressUtils.addressToBuffer(indexerAddress, config.addressPrefix);
     const otherAddress = randomAddress('trac');
 
     const entriesStub = sinon.stub(state, 'getIndexersEntry').resolves([{ key: indexerKey }]);
-    const signedStub = sinon.stub(state, 'getSigned').resolves(indexerAddress);
+    const signedStub = sinon.stub(state, 'getSigned').resolves(indexerAddressBuffer);
     const result = await state.isIndexerAddress(otherAddress);
     t.is(result, false, 'returns false when address does not match any indexer');
+
+    entriesStub.restore();
+    signedStub.restore();
+    restore();
+});
+
+test('State#isIndexerAddress returns false when indexer address entry is missing', async t => {
+    const config = createStateConfig();
+    const { state, restore } = await setupQueryState(config);
+    const indexerKey = randomBuffer(WRITER_BYTE_LENGTH);
+
+    const entriesStub = sinon.stub(state, 'getIndexersEntry').resolves([{ key: indexerKey }]);
+    const signedStub = sinon.stub(state, 'getSigned').resolves(null);
+    const result = await state.isIndexerAddress(randomAddress('trac'));
+    t.is(result, false, 'returns false when indexer writer address is missing');
 
     entriesStub.restore();
     signedStub.restore();
