@@ -4,13 +4,10 @@ import w from 'protomux-wakeup';
 import b4a from 'b4a';
 import TransactionPoolService from './services/TransactionPoolService.js';
 import ValidatorObserverService from './services/ValidatorObserverService.js';
+import IndexerObserverService from '../consensus/services/IndexerObserverService.js';
 import NetworkMessages from './protocols/NetworkMessages.js';
-import { publicKeyToAddress, sleep } from '../../utils/helpers.js';
-import {
-    TRAC_NAMESPACE,
-    EventType,
-    CONNECTION_STATUS
-} from '../../utils/constants.js';
+import { sleep } from '../../utils/helpers.js';
+import { TRAC_NAMESPACE, CONNECTION_STATUS } from '../../utils/constants.js';
 import ConnectionManager from './services/ConnectionManager.js';
 import MessageOrchestrator from './services/MessageOrchestrator.js';
 import TransactionRateLimiterService from './services/TransactionRateLimiterService.js';
@@ -33,6 +30,7 @@ class Network extends ReadyResource {
     #networkMessages;
     #transactionPoolService;
     #validatorObserverService;
+    #indexerObserverService;
     #validatorConnectionManager;
     #validatorMessageOrchestrator;
     #config;
@@ -67,6 +65,7 @@ class Network extends ReadyResource {
         this.#transactionCommitService = new TransactionCommitService(this.#config);
         this.#transactionPoolService = new TransactionPoolService(state, wallet?.address, this.#transactionCommitService ,this.#config);
         this.#validatorObserverService = new ValidatorObserverService(this, state, wallet?.address, this.#config);
+        this.#indexerObserverService = new IndexerObserverService(this, state, wallet?.address, this.#config);
         this.#validatorConnectionManager = new ConnectionManager(this.#config);
         this.#validatorMessageOrchestrator = new MessageOrchestrator(this.#validatorConnectionManager, state, this.#config);
         this.#validatorPendingRequestService = new ValidatorPendingRequestService(this.#config);
@@ -107,10 +106,9 @@ class Network extends ReadyResource {
         this.validatorObserverService.start();
         await this.#replicate();
 
-        const isAdmin = await this.#state.isAdmin();
-
-        if (this.#state.isIndexer() && !isAdmin) {
+        if (this.#state.isIndexer()) {
             this.#epochProofProposalService.start();
+            this.#indexerObserverService.start();
         }
     }
 
@@ -119,8 +117,8 @@ class Network extends ReadyResource {
         await this.transactionPoolService.stop();
         await sleep(100);
         await this.#validatorObserverService.stop();
+        await this.#indexerObserverService.stop();
 
-        this.cleanupNetworkListeners();
         this.cleanupPendingConnections();
         await this.#validatorHealthCheckService.close();
         await this.#epochProofProposalService.close();
@@ -150,48 +148,10 @@ class Network extends ReadyResource {
             this.disconnectValidatorPeer(publicKey, 'peer became unwritable');
         });
 
-        this.on(EventType.VALIDATOR_CONNECTION_TIMEOUT, ({ publicKey, type, timeoutMs }) => {
-            this.#logger.debug(`Network Event: VALIDATOR_CONNECTION_TIMEOUT | PublicKey: ${publicKey} | Type: ${type} | TimeoutMs: ${timeoutMs}`);
-            this.#pendingConnections.delete(publicKey);
-        });
-
-        this.on(EventType.VALIDATOR_CONNECTION_READY, async ({ publicKey, type, connection }) => {
-            this.#logger.debug(`Network Event: VALIDATOR_CONNECTION_READY | PublicKey: ${publicKey} | Type: ${type}`);
-            const { timeoutId } = this.#pendingConnections.get(publicKey);
-
-            if (!timeoutId) return;
-
-            clearTimeout(timeoutId);
-            this.#pendingConnections.delete(publicKey);
-
-            if (type === 'validator') {
-                try {
-                    if (!connection.protocolSession.isProbed()) await connection.protocolSession.probe();
-                } catch (err) {
-                    this.#logger.debug(`failed to probe peer with publicKey ${publicKey}: ${err?.message ?? err}`);
-                }
-
-                this.#validatorConnectionManager.addValidator(publicKey, connection);
-
-                let healthCheckSupported = false;
-                try {
-                    healthCheckSupported = connection.protocolSession.isHealthCheckSupported();
-                } catch (err) {
-                    this.#logger.debug(`health check support unknown for peer with publicKey ${publicKey}: ${err?.message ?? err}`);
-                }
-
-                if (healthCheckSupported) {
-                    this.#validatorHealthCheckService.start(publicKey);
-                } else {
-                    this.#validatorHealthCheckService.stop(publicKey);
-                }
-            }
-
-        });
-
-        this.#state.on(CustomEventType.IS_INDEXER, (bufferAddress) => {
+        this.#state.on(CustomEventType.IS_INDEXER, bufferAddress => {
             const address = tracCryptoApi.address.encode(this.#config.addressPrefix, bufferAddress);
             if (address === this.#wallet.address) {
+                this.#indexerObserverService.start();
                 this.#epochProofProposalService.start();
             }
         });
@@ -199,14 +159,11 @@ class Network extends ReadyResource {
         this.#state.on(CustomEventType.IS_NON_INDEXER, (bufferAddress) => {
             const address = tracCryptoApi.address.encode(this.#config.addressPrefix, bufferAddress);
             if (address === this.#wallet.address) {
+                this.#indexerObserverService.stop();
                 this.#epochProofProposalService.stop();
+                this.#indexerConnectionManager.clear();
             }
         });
-    }
-
-    cleanupNetworkListeners() {
-        this.removeAllListeners(EventType.VALIDATOR_CONNECTION_TIMEOUT);
-        this.removeAllListeners(EventType.VALIDATOR_CONNECTION_READY);
     }
 
     cleanupPendingConnections() {
@@ -255,57 +212,31 @@ class Network extends ReadyResource {
 
             this.#logger.info(`Channel: ${b4a.toString(this.#config.channel)}`);
 
-            this.#swarm.prependListener('connection', async (connection) => {
-                await this.#networkMessages.setupProtomuxMessages(connection);
-                await this.#consensusMessages.setupProtomuxMessages(connection);
-            });
-
-            this.#swarm.on('connection', async (connection) => {
-                // Per-peer connection initialization:
-                // - attach Protomux (legacy + v1 channels/messages)
-                // - attach connection.protocolSession (used later by tryConnect / orchestrators to send messages)
-
-                // Adds indexers to consensus connection manager
-                const address = publicKeyToAddress(connection.remotePublicKey, this.#config);
-                if (await this.#state.isIndexerAddress(address) && !await this.#state.isAdminAddress(address)) {
-                    this.#indexerConnectionManager.add(connection.remotePublicKey, connection);
-                }
-
+            this.#swarm.prependListener('connection', connection => {
+                this.#networkMessages.setupProtomuxMessages(connection);
+                this.#consensusMessages.setupProtomuxMessages(connection);
                 // ATTENTION: Must be called AFTER the protomux init above
                 const stream = this.#store.replicate(connection);
                 wakeup.addStream(stream);
+            });
 
+            this.#swarm.on('connection', async (connection) => {
                 const publicKey = b4a.toString(connection.remotePublicKey, 'hex');
-                if (this.#pendingConnections.has(publicKey)) {
-                    const { type } = this.#pendingConnections.get(publicKey);
-                    await this.#finalizeConnection(publicKey, type, connection);
-                }
+                // This function will ignore connections that havent been triggered by the observer. In this case, the promotion will happen during tryConnect when the connection entity will be qualified.
+                await this.#promotePendingConnection(publicKey, connection);
+                
 
                 connection.on('close', () => {
-                    this.#validatorPendingRequestService.rejectPendingRequestsForPeer(
-                        publicKey,
-                        new Error('Connection closed before response')
-                    );
-                    this.#indexerPendingRequestService.rejectPendingRequestsForPeer(
-                        publicKey,
-                        new Error('Connection closed before response')
-                    );
+                    this.#rejectAllPendingRequests(publicKey, new Error('Connection closed before response'));
                     this.#swarm.leavePeer(connection.remotePublicKey);
                     this.#validatorConnectionManager.remove(publicKey);
                     this.#indexerConnectionManager.remove(publicKey);
-                    connection.protocolSession.close();
+                    connection.protocolSession?.close();
                     connection.consensusProtocolSession?.close();
                 });
 
                 connection.on('error', (error) => {
-                    this.#validatorPendingRequestService.rejectPendingRequestsForPeer(
-                        publicKey,
-                        error ?? new Error('Connection error before response')
-                    );
-                    this.#indexerPendingRequestService.rejectPendingRequestsForPeer(
-                        publicKey,
-                        error ?? new Error('Connection error before response')
-                    );
+                    this.#rejectAllPendingRequests(publicKey, error ?? new Error('Connection error before response'));
                     if (
                         error && error.message && (
                             error.message.includes('connection reset by peer') ||
@@ -400,42 +331,71 @@ class Network extends ReadyResource {
         }
 
         const timeoutId = setTimeout(() => {
-            if (!this.#pendingConnections.has(publicKey)) return;
-            this.emit(EventType.VALIDATOR_CONNECTION_TIMEOUT, { publicKey, type, timeoutMs: this.#config.connectTimeoutMs });
+            // timeout is here to manage the scenario which we will join peer and estabilish a connection (a bit more overhead for validators)
+            if (this.#pendingConnections.has(publicKey)) {
+                this.#pendingConnections.delete(publicKey)
+            }
         }, this.#config.connectTimeoutMs);
         this.#pendingConnections.set(publicKey, { type, timeoutId });
 
         const target = b4a.from(publicKey, 'hex');
         if (!this.#swarm.peers.has(publicKey)) {
+            // if the connection is not managed by the swarm, we actively connect and the flow will be managed by the on('connection') subscriber
             this.#swarm.joinPeer(target);
-        }
+            return CONNECTION_STATUS.PENDING;
+        } 
 
         const peerInfo = this.#swarm.peers.get(publicKey);
-        if (peerInfo) {
-            const connection = this.#swarm._allConnections.get(peerInfo.publicKey);
+        if (!peerInfo) return;
 
-            if (connection &&
-                connection.protocolSession &&
-                !this.#validatorPendingRequestService.isProbePending(connection.remotePublicKey.toString('hex'))
-            ) {
-                await this.#finalizeConnection(publicKey, type, connection);
-                return CONNECTION_STATUS.CONNECTED;
-            }
-        }
+        const connection = this.#swarm._allConnections.get(peerInfo.publicKey);
+        if (!connection) return CONNECTION_STATUS.PENDING;
+
+        const isConnectionReady = (connection.protocolSession && !this.#validatorPendingRequestService.isProbePending(connection.remotePublicKey.toString('hex'))) || connection.consensusProtocolSession
+        if (isConnectionReady) {
+            await this.#promotePendingConnection(publicKey, connection);
+            return CONNECTION_STATUS.CONNECTED;
+        } 
         
         return CONNECTION_STATUS.PENDING;
     }
 
-    async #finalizeConnection(publicKey, type, connection) {
-        if (!this.#pendingConnections.has(publicKey)) return;
-        this.emit(EventType.VALIDATOR_CONNECTION_READY, { publicKey, type, connection });
-        this.#logger.debug(`Network.finalizeConnection: Connected to peer: ${publicKey} as type: ${type}`);
+    async #promotePendingConnection(publicKey, connection) {
+        const pending = this.#pendingConnections.get(publicKey);
+        if (pending) {
+            clearTimeout(pending.timeoutId);
+            this.#pendingConnections.delete(publicKey);
+
+            if (pending.type === 'indexer') {
+                this.#indexerConnectionManager.add(connection.remotePublicKey, connection);
+            }
+            if (pending.type === 'validator') {
+                try {
+                    if (!connection.protocolSession.isProbed()) await connection.protocolSession.probe();
+                } catch (err) {
+                    this.#logger.debug(`failed to probe peer with publicKey ${publicKey}: ${err?.message ?? err}`);
+                }
+
+                this.#validatorConnectionManager.addValidator(publicKey, connection);
+
+                if (connection.protocolSession.isHealthCheckSupported()) {
+                    this.#validatorHealthCheckService.start(publicKey);
+                } else {
+                    this.#validatorHealthCheckService.stop(publicKey);
+                }
+            }
+        }
     }
 
     #normalizePublicKey(publicKey) {
         if (typeof publicKey === 'string') return publicKey;
         if (b4a.isBuffer(publicKey)) return b4a.toString(publicKey, 'hex');
         return null;
+    }
+
+    #rejectAllPendingRequests(publicKey, error) {
+        this.#validatorPendingRequestService.rejectPendingRequestsForPeer(publicKey, error);
+        this.#indexerPendingRequestService.rejectPendingRequestsForPeer(publicKey, error);
     }
 
     #clearPendingValidatorConnection(publicKeyHex) {

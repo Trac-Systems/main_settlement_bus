@@ -73,6 +73,10 @@ class IndexerConnectionManager {
         console.log(`Connection count: ${this.#indexers.size}`);
         console.log(`Indexer map keys:\n${Array.from(this.#indexers.keys()).join('\n')}`);
     }
+
+    clear() {
+        this.#indexers.clear();
+    }
 }
 
 export default IndexerConnectionManager;

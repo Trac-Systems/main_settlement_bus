@@ -53,13 +53,20 @@ const createConnectionManager = ({
     getSentCount: sinon.stub().returns(sentCount),
 });
 
+// A dedicated sandbox instead of sinon's global default one: sinon.stub/sinon.restore()
+// operate on shared global state, so another test file's teardown calling sinon.restore()
+// while this file's console stubs are still active (or vice versa) can yank them out from
+// under each other mid-run. A sandbox's restore() only ever touches its own stubs.
+let consoleSandbox;
+
 hook('setup', () => {
-    sinon.stub(console, 'log');
-    sinon.stub(console, 'warn');
+    consoleSandbox = sinon.createSandbox();
+    consoleSandbox.stub(console, 'log');
+    consoleSandbox.stub(console, 'warn');
 });
 
 hook('teardown', () => {
-    sinon.restore();
+    consoleSandbox.restore();
 });
 
 test('MessageOrchestrator.send returns false for unsupported protocol', async t => {

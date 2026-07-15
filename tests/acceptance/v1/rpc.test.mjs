@@ -34,7 +34,6 @@ const setupNetwork = async () => {
         channel: randomBytes(16).toString('hex'),
         enableRoleRequester: false,
         enableWallet: true,
-        enableValidatorObserver: true,
         enableInteractiveMode: false,
         disableRateLimit: true,
         enableTxApplyLogs: false,

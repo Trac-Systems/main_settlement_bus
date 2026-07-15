@@ -127,6 +127,21 @@ test('IndexerConnectionManager', () => {
         });
     });
 
+    test('clear', () => {
+        test('removes all indexers from the pool', async t => {
+            const manager = makeManager(testKeyPair1.publicKey, testKeyPair2.publicKey, testKeyPair3.publicKey);
+            t.is(manager.connectedIndexers().length, 3);
+            manager.clear();
+            t.is(manager.connectedIndexers().length, 0);
+        });
+
+        test('is a no-op on an empty pool', async t => {
+            const manager = new IndexerConnectionManager(0);
+            manager.clear();
+            t.is(manager.connectedIndexers().length, 0);
+        });
+    });
+
     test('sendAndForget', () => {
         test('calls consensusProtocolSession.sendAndForget with the message', async t => {
             const conn = makeConnection(testKeyPair1.publicKey);

@@ -104,7 +104,7 @@ test('ProtocolSession', (t) => {
         t.is(result, ResultCode.UNSPECIFIED);
     });
 
-    test('isHealthCheckSupported throws when not probed', async (t) => {
+    test('isHealthCheckSupported returns false when not probed', async (t) => {
         const session = new ProtocolSession(
             makeProtocol(),
             makeProtocol(),
@@ -112,6 +112,6 @@ test('ProtocolSession', (t) => {
             config
         );
 
-        await t.exception.all(() => session.isHealthCheckSupported());
+        t.is(session.isHealthCheckSupported(), false);
     });
 });
