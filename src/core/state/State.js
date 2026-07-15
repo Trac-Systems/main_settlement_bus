@@ -362,10 +362,12 @@ class State extends ReadyResource {
     }
 
     async isIndexerAddress(targetAddress) {
+        const targetAddressBuffer = addressUtils.addressToBuffer(targetAddress, this.#config.addressPrefix);
+        if (targetAddressBuffer.length === 0) return false;
         const entries = await this.getIndexersEntry();
         for (const entry of entries) {
             const address = await this.getSigned(EntryType.WRITER_ADDRESS + b4a.toString(entry.key, 'hex'));
-            if (address === targetAddress) return true;
+            if (address && b4a.equals(targetAddressBuffer, address)) return true;
         }
         return false;
     }
