@@ -361,6 +361,11 @@ class State extends ReadyResource {
         return Object.values(this.#base.system.indexers);
     }
 
+    /**
+     * Checks whether a bech32m address belongs to a registered indexer.
+     * @param {string} targetAddress Address to check.
+     * @returns {Promise<boolean>} True when the address belongs to an indexer in signed state.
+     */
     async isIndexerAddress(targetAddress) {
         const targetAddressBuffer = addressUtils.addressToBuffer(targetAddress, this.#config.addressPrefix);
         if (targetAddressBuffer.length === 0) return false;
