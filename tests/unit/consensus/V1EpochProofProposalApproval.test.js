@@ -7,6 +7,7 @@ import ConsensusMessageBuilder from '../../../src/messages/consensus/v1/Consensu
 import V1EpochProofProposalApproval from '../../../src/core/consensus/v1/validators/V1EpochProofProposalApproval.js';
 import {V1ConsensusProtocolError} from '../../../src/core/consensus/v1/V1ConsensusProtocolError.js';
 import {bufferToAddress} from '../../../src/core/state/utils/address.js';
+import {encodeProofProposalApproval} from '../../../src/codecs/consensus/v1/consensusV1OperationCodec.js';
 import {
     ConsensusOperationType,
     ConsensusProtocolVersion,
@@ -15,7 +16,6 @@ import {
 } from '../../../src/utils/constants.js';
 import {config} from '../../helpers/config.js';
 import {testKeyPair1, testKeyPair2, testKeyPair3} from '../../fixtures/apply.fixtures.js';
-import {errorMessageIncludes} from '../../helpers/regexHelper.js';
 import {createMessage, uint32ToBuffer} from '../../../src/utils/buffer.js';
 
 const previousEpochRecordHash = b4a.alloc(32, 1);
@@ -85,6 +85,31 @@ async function buildProofProposalRejectionPayload(approverWallet, proofProposalP
     };
 }
 
+async function signProofProposalResponse(approverWallet, proofProposalResponse) {
+    const resultCode = uint32ToBuffer(proofProposalResponse.result, 0);
+    const message = proofProposalResponse.result === ConsensusResultCode.OK
+        ? createMessage(resultCode, encodeProofProposalApproval(proofProposalResponse.approval))
+        : createMessage(resultCode);
+    const responseHash = await tracCryptoApi.hash.blake3(message);
+
+    return approverWallet.sign(responseHash);
+}
+
+async function assertProtocolError(t, action, resultCode, messageIncludes) {
+    let error;
+    try {
+        await action();
+    } catch (err) {
+        error = err;
+    }
+
+    t.ok(error instanceof V1ConsensusProtocolError);
+    t.is(error.resultCode, resultCode);
+    if (messageIncludes) {
+        t.ok(error.message.includes(messageIncludes));
+    }
+}
+
 test('V1EpochProofProposalApproval validates approval signature against original proof proposal', async t => {
     const proposerWallet = await createWallet(testKeyPair1);
     const approverWallet = await createWallet(testKeyPair2);
@@ -110,13 +135,15 @@ test('V1EpochProofProposalApproval rejects approver that is not an indexer', asy
     const proofProposalPayload = await buildProofProposalPayload(proposerWallet);
     const approvalPayload = await buildProofProposalApprovalPayload(approverWallet, proofProposalPayload);
 
-    await t.exception(
+    await assertProtocolError(
+        t,
         async () => validator.validate(
             approvalPayload,
             {remotePublicKey: approverWallet.publicKey},
             proofProposalPayload.proof_proposal
         ),
-        errorMessageIncludes('Incoming address is not an indexer.')
+        ConsensusResultCode.INDEXER_ROLE_INVALID,
+        'Incoming address is not an indexer.'
     );
 });
 
@@ -127,13 +154,15 @@ test('V1EpochProofProposalApproval rejects non-OK response without approval', as
     const proofProposalPayload = await buildProofProposalPayload(proposerWallet);
     const approvalPayload = await buildProofProposalRejectionPayload(approverWallet, proofProposalPayload);
 
-    await t.exception(
+    await assertProtocolError(
+        t,
         async () => validator.validate(
             approvalPayload,
             {remotePublicKey: approverWallet.publicKey},
             proofProposalPayload.proof_proposal
         ),
-        errorMessageIncludes(`Proof proposal response result code is not OK: ${ConsensusResultCode.INVALID_PAYLOAD}`)
+        ConsensusResultCode.INVALID_PAYLOAD,
+        `Proof proposal response result code is not OK: ${ConsensusResultCode.INVALID_PAYLOAD}`
     );
 });
 
@@ -151,13 +180,15 @@ test('V1EpochProofProposalApproval rejects fake non-OK response signature before
         }
     };
 
-    await t.exception(
+    await assertProtocolError(
+        t,
         async () => validator.validate(
             fakeApprovalPayload,
             {remotePublicKey: approverWallet.publicKey},
             proofProposalPayload.proof_proposal
         ),
-        errorMessageIncludes('response signature verification failed')
+        ConsensusResultCode.RESPONSE_SIGNATURE_INVALID,
+        'response signature verification failed'
     );
 });
 
@@ -194,24 +225,24 @@ test('V1EpochProofProposalApproval rejects approver address mismatched with remo
         otherWallet.address
     );
 
-    await t.exception(
+    await assertProtocolError(
+        t,
         async () => validator.validate(
             approvalPayload,
             {remotePublicKey: approverWallet.publicKey},
             proofProposalPayload.proof_proposal
         ),
-        errorMessageIncludes('Address does not match remote public key')
+        ConsensusResultCode.PUBLIC_KEY_MISMATCH,
+        'Address does not match remote public key'
     );
 });
 
-test('V1EpochProofProposalApproval rejects fake approval signature message', async t => {
+test('V1EpochProofProposalApproval rejects fake approval signature', async t => {
     const proposerWallet = await createWallet(testKeyPair1);
     const approverWallet = await createWallet(testKeyPair2);
     const validator = new V1EpochProofProposalApproval(config, state);
     const proofProposalPayload = await buildProofProposalPayload(proposerWallet);
     const approvalPayload = await buildProofProposalApprovalPayload(approverWallet, proofProposalPayload);
-    const fakeApprover = b4a.from(approvalPayload.proof_proposal_response.approval.approver);
-    fakeApprover[0] ^= 0xff;
 
     const fakeApprovalPayload = {
         ...approvalPayload,
@@ -219,18 +250,24 @@ test('V1EpochProofProposalApproval rejects fake approval signature message', asy
             ...approvalPayload.proof_proposal_response,
             approval: {
                 ...approvalPayload.proof_proposal_response.approval,
-                approver: fakeApprover
+                approval_sig: b4a.alloc(64, 9)
             }
         }
     };
+    fakeApprovalPayload.proof_proposal_response.response_sig = await signProofProposalResponse(
+        approverWallet,
+        fakeApprovalPayload.proof_proposal_response
+    );
 
-    await t.exception(
-        async () => validator.validateSignature(
+    await assertProtocolError(
+        t,
+        async () => validator.validate(
             fakeApprovalPayload,
-            approverWallet.publicKey,
+            {remotePublicKey: approverWallet.publicKey},
             proofProposalPayload.proof_proposal
         ),
-        errorMessageIncludes('signature verification failed')
+        ConsensusResultCode.APPROVAL_SIGNATURE_INVALID,
+        'signature verification failed'
     );
 });
 
@@ -248,13 +285,15 @@ test('V1EpochProofProposalApproval rejects fake response signature', async t => 
         }
     };
 
-    await t.exception(
+    await assertProtocolError(
+        t,
         async () => validator.validate(
             fakeApprovalPayload,
             {remotePublicKey: approverWallet.publicKey},
             proofProposalPayload.proof_proposal
         ),
-        errorMessageIncludes('response signature verification failed')
+        ConsensusResultCode.RESPONSE_SIGNATURE_INVALID,
+        'response signature verification failed'
     );
 });
 

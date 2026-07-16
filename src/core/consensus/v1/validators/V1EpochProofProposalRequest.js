@@ -1,10 +1,10 @@
 import V1BaseConsensusOperation from "./V1BaseConsensusOperation.js";
-import {V1ConsensusProtocolError} from "../V1ConsensusProtocolError.js";
-import {ConsensusProtocolVersion, ConsensusResultCode} from "../../../../utils/constants.js";
-import {createMessage, uint16ToBuffer, uint32ToBuffer} from "../../../../utils/buffer.js";
+import { V1ConsensusProtocolError } from "../V1ConsensusProtocolError.js";
+import { ConsensusProtocolVersion, ConsensusResultCode } from "../../../../utils/constants.js";
+import { createMessage, uint16ToBuffer, uint32ToBuffer } from "../../../../utils/buffer.js";
 import tracCryptoApi from "trac-crypto-api";
 import b4a from "b4a";
-import {verifyWesolowski} from '@tracsystems/trac-vdf';
+import { verifyWesolowski } from '@tracsystems/trac-vdf';
 
 class V1EpochProofProposalRequest extends V1BaseConsensusOperation {
 
@@ -42,7 +42,7 @@ class V1EpochProofProposalRequest extends V1BaseConsensusOperation {
                 payload.proof_proposal.proposer,
                 connection.remotePublicKey
             );
-            await this.validateSignature(payload, connection.remotePublicKey);
+            await this.validateSignature(payload, connection.remotePublicKey, undefined, ConsensusResultCode.PROPOSAL_SIGNATURE_INVALID);
             await this.validateAddressIsIndexer(connection.remotePublicKey);
             const currentEpoch = await this._state.requireCurrentEpoch();
             this.validateIncomingEpoch(payload.proof_proposal, currentEpoch);
@@ -64,14 +64,14 @@ class V1EpochProofProposalRequest extends V1BaseConsensusOperation {
     validateProofProposalProtocolVersion(proofProposal) {
         if (!proofProposal?.protocol_version) {
             throw new V1ConsensusProtocolError(
-                ConsensusResultCode.UNEXPECTED_ERROR,
+                ConsensusResultCode.INVALID_PAYLOAD,
                 'Proof proposal protocol version is missing.'
             );
         }
 
         if (proofProposal.protocol_version[0] !== ConsensusProtocolVersion.V1) {
             throw new V1ConsensusProtocolError(
-                ConsensusResultCode.UNEXPECTED_ERROR,
+                ConsensusResultCode.BAD_PROTOCOL_VERSION,
                 'Unsupported proof proposal protocol version.'
             );
         }
@@ -106,7 +106,7 @@ class V1EpochProofProposalRequest extends V1BaseConsensusOperation {
 
         if (!b4a.equals(proofProposal.vdf_parameters_hash, expectedHash)) {
             throw new V1ConsensusProtocolError(
-                ConsensusResultCode.UNEXPECTED_ERROR,
+                ConsensusResultCode.VDF_PARAMETERS_HASH_INVALID,
                 'VDF parameters hash is invalid.'
             );
         }
@@ -140,7 +140,7 @@ class V1EpochProofProposalRequest extends V1BaseConsensusOperation {
 
         if (!verified) {
             throw new V1ConsensusProtocolError(
-                ConsensusResultCode.UNEXPECTED_ERROR,
+                ConsensusResultCode.VDF_PROOF_INVALID,
                 'VDF proof is invalid.'
             );
         }
@@ -157,7 +157,7 @@ class V1EpochProofProposalRequest extends V1BaseConsensusOperation {
         const expectedNetworkId = uint16ToBuffer(this._config.networkId);
         if (!b4a.equals(proofProposal.network_id, expectedNetworkId)) {
             throw new V1ConsensusProtocolError(
-                ConsensusResultCode.UNEXPECTED_ERROR,
+                ConsensusResultCode.WRONG_NETWORK_ID,
                 'Invalid proof proposal network id.'
             );
         }
@@ -175,7 +175,7 @@ class V1EpochProofProposalRequest extends V1BaseConsensusOperation {
         const proofProposalEpoch = proofProposal.epoch.readBigUInt64BE(0);
         if (proofProposalEpoch !== currentEpoch + 1n) {
             throw new V1ConsensusProtocolError(
-                ConsensusResultCode.UNEXPECTED_ERROR,
+                ConsensusResultCode.EPOCH_INVALID,
                 `Unexpected epoch. Proof proposal must be ${currentEpoch + 1n} but got ${proofProposalEpoch}`
             );
         }
@@ -197,7 +197,7 @@ class V1EpochProofProposalRequest extends V1BaseConsensusOperation {
         const epochHashInProofProposal = proofProposal.previous_epoch_record_hash;
         if (!b4a.equals(currentEpochHash, epochHashInProofProposal)) {
             throw new V1ConsensusProtocolError(
-                ConsensusResultCode.UNEXPECTED_ERROR,
+                ConsensusResultCode.PREVIOUS_EPOCH_RECORD_HASH_INVALID,
                 `Previous epoch record hash mismatch for epoch ${currentEpoch}: expected ${currentEpochHash.toString('hex')}, got ${epochHashInProofProposal.toString('hex')}`
             );
         }

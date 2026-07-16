@@ -19,7 +19,8 @@ import {
 import {
     ConsensusOperationType,
     ConsensusProtocolVersion,
-    ConsensusResultCode
+    ConsensusResultCode,
+    NetworkResultCode
 } from '../../../../src/utils/constants.js';
 import {errorMessageIncludes} from '../../../helpers/regexHelper.js';
 import {config} from '../../../helpers/config.js';
@@ -84,7 +85,7 @@ test('ConsensusMessageBuilder builds proof proposal and verifies signature', asy
     t.alike(decoded.proof_proposal, proofProposal);
 });
 
-test('ConsensusMessageBuilder iterates proof proposal response ResultCode values', async t => {
+test('ConsensusMessageBuilder iterates proof proposal response ConsensusResultCode values', async t => {
     const wallet = await createWallet();
     const builder = new ConsensusMessageBuilder(wallet, config);
     const header = consensusV1OperationFixtures.proofProposalHeader;
@@ -399,6 +400,11 @@ test('ConsensusMessageBuilder rejects invalid buffer and address fields', async 
     t.exception(
         () => builder.setResultCode(67),
         errorMessageIncludes('Invalid consensus result code: 67')
+    );
+
+    t.exception(
+        () => builder.setResultCode(NetworkResultCode.TX_INVALID_PAYLOAD),
+        errorMessageIncludes(`Invalid consensus result code: ${NetworkResultCode.TX_INVALID_PAYLOAD}`)
     );
 });
 

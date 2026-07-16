@@ -197,7 +197,7 @@ test('Commit service not configured', async t => {
         mockConn(res => {
             t.is(
                 res.broadcast_transaction_response.result,
-                ResultCode.INTERNAL_ERROR
+                ResultCode.UNEXPECTED_ERROR
             );
         })
     );
@@ -718,7 +718,7 @@ test('TransactionPoolInvalidIncomingDataError mapping', async t => {
     await handler.handleRequest(
         { id: b4a.alloc(32), broadcast_transaction_request: { data: b4a.alloc(1) } },
         mockConn(res => {
-            t.is(res.broadcast_transaction_response.result, ResultCode.INTERNAL_ERROR);
+            t.is(res.broadcast_transaction_response.result, ResultCode.UNEXPECTED_ERROR);
         })
     );
 });

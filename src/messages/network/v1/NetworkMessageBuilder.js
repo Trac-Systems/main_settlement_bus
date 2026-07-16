@@ -6,7 +6,7 @@ import {
     timestampToBuffer,
     uint32ToBuffer
 } from "../../../utils/buffer.js";
-import {NetworkOperationType, ResultCode} from '../../../utils/constants.js';
+import {NetworkOperationType, NetworkResultCode} from '../../../utils/constants.js';
 import {isAddressValid} from "../../../core/state/utils/address.js";
 import {encodeCapabilities} from "../../../utils/buffer.js";
 
@@ -77,7 +77,7 @@ class NetworkMessageBuilder {
     }
 
     setResultCode(code) {
-        if (!Object.values(ResultCode).includes(code)) {
+        if (!Object.values(NetworkResultCode).includes(code)) {
             throw new Error(`Invalid network result code: ${code}`);
         }
 
@@ -221,11 +221,11 @@ class NetworkMessageBuilder {
         const timestamp = Number.isSafeInteger(this.#timestamp_ledger) ? this.#timestamp_ledger : 0;
         const hasTimestamp = timestamp > 0;
 
-        if (this.#resultCode === ResultCode.OK) {
+        if (this.#resultCode === NetworkResultCode.OK) {
             if (!hasProof || !hasTimestamp) {
                 throw new Error('Result code OK requires non-empty proof and timestamp > 0.');
             }
-        } else if (this.#resultCode === ResultCode.TX_ACCEPTED_PROOF_UNAVAILABLE) {
+        } else if (this.#resultCode === NetworkResultCode.TX_ACCEPTED_PROOF_UNAVAILABLE) {
             if (hasProof) {
                 throw new Error('Result code TX_ACCEPTED_PROOF_UNAVAILABLE requires empty proof.');
             }

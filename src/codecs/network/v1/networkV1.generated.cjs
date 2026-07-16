@@ -799,7 +799,7 @@ $root.network = (function() {
              * @interface ILivenessResponse
              * @property {Uint8Array|null} [nonce] LivenessResponse nonce
              * @property {Uint8Array|null} [signature] LivenessResponse signature
-             * @property {network.v1.ResultCode|null} [result] LivenessResponse result
+             * @property {common.v1.ResultCode|null} [result] LivenessResponse result
              */
 
             /**
@@ -835,7 +835,7 @@ $root.network = (function() {
 
             /**
              * LivenessResponse result.
-             * @member {network.v1.ResultCode} result
+             * @member {common.v1.ResultCode} result
              * @memberof network.v1.LivenessResponse
              * @instance
              */
@@ -1026,6 +1026,21 @@ $root.network = (function() {
                     case 59:
                     case 60:
                     case 61:
+                    case 100:
+                    case 101:
+                    case 102:
+                    case 103:
+                    case 104:
+                    case 105:
+                    case 106:
+                    case 107:
+                    case 108:
+                    case 109:
+                    case 110:
+                    case 111:
+                    case 112:
+                    case 113:
+                    case 114:
                         break;
                     }
                 return null;
@@ -1308,6 +1323,66 @@ $root.network = (function() {
                 case 61:
                     message.result = 61;
                     break;
+                case "RESULT_CODE_CONSENSUS_SCHEMA_VALIDATION_FAILED":
+                case 100:
+                    message.result = 100;
+                    break;
+                case "RESULT_CODE_CONSENSUS_BAD_PROTOCOL_VERSION":
+                case 101:
+                    message.result = 101;
+                    break;
+                case "RESULT_CODE_CONSENSUS_WRONG_NETWORK_ID":
+                case 102:
+                    message.result = 102;
+                    break;
+                case "RESULT_CODE_CONSENSUS_VDF_PARAMETERS_HASH_INVALID":
+                case 103:
+                    message.result = 103;
+                    break;
+                case "RESULT_CODE_CONSENSUS_VDF_PROOF_INVALID":
+                case 104:
+                    message.result = 104;
+                    break;
+                case "RESULT_CODE_CONSENSUS_ADDRESS_INVALID":
+                case 105:
+                    message.result = 105;
+                    break;
+                case "RESULT_CODE_CONSENSUS_PUBLIC_KEY_MISMATCH":
+                case 106:
+                    message.result = 106;
+                    break;
+                case "RESULT_CODE_CONSENSUS_PROPOSAL_SIGNATURE_INVALID":
+                case 107:
+                    message.result = 107;
+                    break;
+                case "RESULT_CODE_CONSENSUS_RESPONSE_SIGNATURE_INVALID":
+                case 108:
+                    message.result = 108;
+                    break;
+                case "RESULT_CODE_CONSENSUS_APPROVAL_SIGNATURE_INVALID":
+                case 109:
+                    message.result = 109;
+                    break;
+                case "RESULT_CODE_CONSENSUS_OPERATION_TYPE_INVALID":
+                case 110:
+                    message.result = 110;
+                    break;
+                case "RESULT_CODE_CONSENSUS_RESPONSE_APPROVAL_INVALID":
+                case 111:
+                    message.result = 111;
+                    break;
+                case "RESULT_CODE_CONSENSUS_EPOCH_INVALID":
+                case 112:
+                    message.result = 112;
+                    break;
+                case "RESULT_CODE_CONSENSUS_PREVIOUS_EPOCH_RECORD_HASH_INVALID":
+                case 113:
+                    message.result = 113;
+                    break;
+                case "RESULT_CODE_CONSENSUS_INDEXER_ROLE_INVALID":
+                case 114:
+                    message.result = 114;
+                    break;
                 }
                 return message;
             };
@@ -1347,7 +1422,7 @@ $root.network = (function() {
                 if (message.signature != null && message.hasOwnProperty("signature"))
                     object.signature = options.bytes === String ? $util.base64.encode(message.signature, 0, message.signature.length) : options.bytes === Array ? Array.prototype.slice.call(message.signature) : message.signature;
                 if (message.result != null && message.hasOwnProperty("result"))
-                    object.result = options.enums === String ? $root.network.v1.ResultCode[message.result] === undefined ? message.result : $root.network.v1.ResultCode[message.result] : message.result;
+                    object.result = options.enums === String ? $root.common.v1.ResultCode[message.result] === undefined ? message.result : $root.common.v1.ResultCode[message.result] : message.result;
                 return object;
             };
 
@@ -1378,140 +1453,6 @@ $root.network = (function() {
             };
 
             return LivenessResponse;
-        })();
-
-        /**
-         * ResultCode enum.
-         * @name network.v1.ResultCode
-         * @enum {number}
-         * @property {number} RESULT_CODE_UNSPECIFIED=0 RESULT_CODE_UNSPECIFIED value
-         * @property {number} RESULT_CODE_OK=1 RESULT_CODE_OK value
-         * @property {number} RESULT_CODE_INVALID_PAYLOAD=2 RESULT_CODE_INVALID_PAYLOAD value
-         * @property {number} RESULT_CODE_RATE_LIMITED=3 RESULT_CODE_RATE_LIMITED value
-         * @property {number} RESULT_CODE_SIGNATURE_INVALID=4 RESULT_CODE_SIGNATURE_INVALID value
-         * @property {number} RESULT_CODE_UNEXPECTED_ERROR=5 RESULT_CODE_UNEXPECTED_ERROR value
-         * @property {number} RESULT_CODE_TIMEOUT=6 RESULT_CODE_TIMEOUT value
-         * @property {number} RESULT_CODE_NODE_HAS_NO_WRITE_ACCESS=7 RESULT_CODE_NODE_HAS_NO_WRITE_ACCESS value
-         * @property {number} RESULT_CODE_TX_ACCEPTED_PROOF_UNAVAILABLE=8 RESULT_CODE_TX_ACCEPTED_PROOF_UNAVAILABLE value
-         * @property {number} RESULT_CODE_NODE_OVERLOADED=9 RESULT_CODE_NODE_OVERLOADED value
-         * @property {number} RESULT_CODE_TX_ALREADY_PENDING=10 RESULT_CODE_TX_ALREADY_PENDING value
-         * @property {number} RESULT_CODE_OPERATION_TYPE_UNKNOWN=11 RESULT_CODE_OPERATION_TYPE_UNKNOWN value
-         * @property {number} RESULT_CODE_SCHEMA_VALIDATION_FAILED=12 RESULT_CODE_SCHEMA_VALIDATION_FAILED value
-         * @property {number} RESULT_CODE_REQUESTER_ADDRESS_INVALID=13 RESULT_CODE_REQUESTER_ADDRESS_INVALID value
-         * @property {number} RESULT_CODE_REQUESTER_PUBLIC_KEY_INVALID=14 RESULT_CODE_REQUESTER_PUBLIC_KEY_INVALID value
-         * @property {number} RESULT_CODE_TX_HASH_MISMATCH=15 RESULT_CODE_TX_HASH_MISMATCH value
-         * @property {number} RESULT_CODE_TX_SIGNATURE_INVALID=16 RESULT_CODE_TX_SIGNATURE_INVALID value
-         * @property {number} RESULT_CODE_TX_EXPIRED=17 RESULT_CODE_TX_EXPIRED value
-         * @property {number} RESULT_CODE_TX_ALREADY_EXISTS=18 RESULT_CODE_TX_ALREADY_EXISTS value
-         * @property {number} RESULT_CODE_OPERATION_ALREADY_COMPLETED=19 RESULT_CODE_OPERATION_ALREADY_COMPLETED value
-         * @property {number} RESULT_CODE_REQUESTER_NOT_FOUND=20 RESULT_CODE_REQUESTER_NOT_FOUND value
-         * @property {number} RESULT_CODE_INSUFFICIENT_FEE_BALANCE=21 RESULT_CODE_INSUFFICIENT_FEE_BALANCE value
-         * @property {number} RESULT_CODE_EXTERNAL_BOOTSTRAP_EQUALS_MSB_BOOTSTRAP=22 RESULT_CODE_EXTERNAL_BOOTSTRAP_EQUALS_MSB_BOOTSTRAP value
-         * @property {number} RESULT_CODE_SELF_VALIDATION_FORBIDDEN=23 RESULT_CODE_SELF_VALIDATION_FORBIDDEN value
-         * @property {number} RESULT_CODE_ROLE_NODE_ENTRY_NOT_FOUND=24 RESULT_CODE_ROLE_NODE_ENTRY_NOT_FOUND value
-         * @property {number} RESULT_CODE_ROLE_NODE_ALREADY_WRITER=25 RESULT_CODE_ROLE_NODE_ALREADY_WRITER value
-         * @property {number} RESULT_CODE_ROLE_NODE_NOT_WHITELISTED=26 RESULT_CODE_ROLE_NODE_NOT_WHITELISTED value
-         * @property {number} RESULT_CODE_ROLE_NODE_NOT_WRITER=27 RESULT_CODE_ROLE_NODE_NOT_WRITER value
-         * @property {number} RESULT_CODE_ROLE_NODE_IS_INDEXER=28 RESULT_CODE_ROLE_NODE_IS_INDEXER value
-         * @property {number} RESULT_CODE_ROLE_ADMIN_ENTRY_MISSING=29 RESULT_CODE_ROLE_ADMIN_ENTRY_MISSING value
-         * @property {number} RESULT_CODE_ROLE_INVALID_RECOVERY_CASE=30 RESULT_CODE_ROLE_INVALID_RECOVERY_CASE value
-         * @property {number} RESULT_CODE_ROLE_UNKNOWN_OPERATION=31 RESULT_CODE_ROLE_UNKNOWN_OPERATION value
-         * @property {number} RESULT_CODE_ROLE_INVALID_WRITER_KEY=32 RESULT_CODE_ROLE_INVALID_WRITER_KEY value
-         * @property {number} RESULT_CODE_ROLE_INSUFFICIENT_FEE_BALANCE=33 RESULT_CODE_ROLE_INSUFFICIENT_FEE_BALANCE value
-         * @property {number} RESULT_CODE_MSB_BOOTSTRAP_MISMATCH=34 RESULT_CODE_MSB_BOOTSTRAP_MISMATCH value
-         * @property {number} RESULT_CODE_EXTERNAL_BOOTSTRAP_NOT_DEPLOYED=35 RESULT_CODE_EXTERNAL_BOOTSTRAP_NOT_DEPLOYED value
-         * @property {number} RESULT_CODE_EXTERNAL_BOOTSTRAP_TX_MISSING=36 RESULT_CODE_EXTERNAL_BOOTSTRAP_TX_MISSING value
-         * @property {number} RESULT_CODE_EXTERNAL_BOOTSTRAP_MISMATCH=37 RESULT_CODE_EXTERNAL_BOOTSTRAP_MISMATCH value
-         * @property {number} RESULT_CODE_BOOTSTRAP_ALREADY_EXISTS=38 RESULT_CODE_BOOTSTRAP_ALREADY_EXISTS value
-         * @property {number} RESULT_CODE_TRANSFER_RECIPIENT_ADDRESS_INVALID=39 RESULT_CODE_TRANSFER_RECIPIENT_ADDRESS_INVALID value
-         * @property {number} RESULT_CODE_TRANSFER_RECIPIENT_PUBLIC_KEY_INVALID=40 RESULT_CODE_TRANSFER_RECIPIENT_PUBLIC_KEY_INVALID value
-         * @property {number} RESULT_CODE_TRANSFER_AMOUNT_TOO_LARGE=41 RESULT_CODE_TRANSFER_AMOUNT_TOO_LARGE value
-         * @property {number} RESULT_CODE_TRANSFER_SENDER_NOT_FOUND=42 RESULT_CODE_TRANSFER_SENDER_NOT_FOUND value
-         * @property {number} RESULT_CODE_TRANSFER_INSUFFICIENT_BALANCE=43 RESULT_CODE_TRANSFER_INSUFFICIENT_BALANCE value
-         * @property {number} RESULT_CODE_TRANSFER_RECIPIENT_BALANCE_OVERFLOW=44 RESULT_CODE_TRANSFER_RECIPIENT_BALANCE_OVERFLOW value
-         * @property {number} RESULT_CODE_TX_HASH_INVALID_FORMAT=45 RESULT_CODE_TX_HASH_INVALID_FORMAT value
-         * @property {number} RESULT_CODE_INTERNAL_ENQUEUE_VALIDATION_FAILED=46 RESULT_CODE_INTERNAL_ENQUEUE_VALIDATION_FAILED value
-         * @property {number} RESULT_CODE_TX_COMMITTED_RECEIPT_MISSING=47 RESULT_CODE_TX_COMMITTED_RECEIPT_MISSING value
-         * @property {number} RESULT_CODE_VALIDATOR_RESPONSE_TX_TYPE_INVALID=48 RESULT_CODE_VALIDATOR_RESPONSE_TX_TYPE_INVALID value
-         * @property {number} RESULT_CODE_VALIDATOR_RESPONSE_TX_TYPE_UNKNOWN=49 RESULT_CODE_VALIDATOR_RESPONSE_TX_TYPE_UNKNOWN value
-         * @property {number} RESULT_CODE_VALIDATOR_RESPONSE_TX_TYPE_UNSUPPORTED=50 RESULT_CODE_VALIDATOR_RESPONSE_TX_TYPE_UNSUPPORTED value
-         * @property {number} RESULT_CODE_VALIDATOR_RESPONSE_SCHEMA_INVALID=51 RESULT_CODE_VALIDATOR_RESPONSE_SCHEMA_INVALID value
-         * @property {number} RESULT_CODE_PENDING_REQUEST_MISSING_TX_DATA=52 RESULT_CODE_PENDING_REQUEST_MISSING_TX_DATA value
-         * @property {number} RESULT_CODE_PROOF_PAYLOAD_MISMATCH=53 RESULT_CODE_PROOF_PAYLOAD_MISMATCH value
-         * @property {number} RESULT_CODE_VALIDATOR_WRITER_KEY_NOT_REGISTERED=54 RESULT_CODE_VALIDATOR_WRITER_KEY_NOT_REGISTERED value
-         * @property {number} RESULT_CODE_VALIDATOR_ADDRESS_MISMATCH=55 RESULT_CODE_VALIDATOR_ADDRESS_MISMATCH value
-         * @property {number} RESULT_CODE_VALIDATOR_NODE_ENTRY_NOT_FOUND=56 RESULT_CODE_VALIDATOR_NODE_ENTRY_NOT_FOUND value
-         * @property {number} RESULT_CODE_VALIDATOR_NODE_NOT_WRITER=57 RESULT_CODE_VALIDATOR_NODE_NOT_WRITER value
-         * @property {number} RESULT_CODE_VALIDATOR_WRITER_KEY_MISMATCH=58 RESULT_CODE_VALIDATOR_WRITER_KEY_MISMATCH value
-         * @property {number} RESULT_CODE_VALIDATOR_TX_OBJECT_INVALID=59 RESULT_CODE_VALIDATOR_TX_OBJECT_INVALID value
-         * @property {number} RESULT_CODE_VALIDATOR_VA_MISSING=60 RESULT_CODE_VALIDATOR_VA_MISSING value
-         * @property {number} RESULT_CODE_TX_INVALID_PAYLOAD=61 RESULT_CODE_TX_INVALID_PAYLOAD value
-         */
-        v1.ResultCode = (function() {
-            var valuesById = {}, values = Object.create(valuesById);
-            values[valuesById[0] = "RESULT_CODE_UNSPECIFIED"] = 0;
-            values[valuesById[1] = "RESULT_CODE_OK"] = 1;
-            values[valuesById[2] = "RESULT_CODE_INVALID_PAYLOAD"] = 2;
-            values[valuesById[3] = "RESULT_CODE_RATE_LIMITED"] = 3;
-            values[valuesById[4] = "RESULT_CODE_SIGNATURE_INVALID"] = 4;
-            values[valuesById[5] = "RESULT_CODE_UNEXPECTED_ERROR"] = 5;
-            values[valuesById[6] = "RESULT_CODE_TIMEOUT"] = 6;
-            values[valuesById[7] = "RESULT_CODE_NODE_HAS_NO_WRITE_ACCESS"] = 7;
-            values[valuesById[8] = "RESULT_CODE_TX_ACCEPTED_PROOF_UNAVAILABLE"] = 8;
-            values[valuesById[9] = "RESULT_CODE_NODE_OVERLOADED"] = 9;
-            values[valuesById[10] = "RESULT_CODE_TX_ALREADY_PENDING"] = 10;
-            values[valuesById[11] = "RESULT_CODE_OPERATION_TYPE_UNKNOWN"] = 11;
-            values[valuesById[12] = "RESULT_CODE_SCHEMA_VALIDATION_FAILED"] = 12;
-            values[valuesById[13] = "RESULT_CODE_REQUESTER_ADDRESS_INVALID"] = 13;
-            values[valuesById[14] = "RESULT_CODE_REQUESTER_PUBLIC_KEY_INVALID"] = 14;
-            values[valuesById[15] = "RESULT_CODE_TX_HASH_MISMATCH"] = 15;
-            values[valuesById[16] = "RESULT_CODE_TX_SIGNATURE_INVALID"] = 16;
-            values[valuesById[17] = "RESULT_CODE_TX_EXPIRED"] = 17;
-            values[valuesById[18] = "RESULT_CODE_TX_ALREADY_EXISTS"] = 18;
-            values[valuesById[19] = "RESULT_CODE_OPERATION_ALREADY_COMPLETED"] = 19;
-            values[valuesById[20] = "RESULT_CODE_REQUESTER_NOT_FOUND"] = 20;
-            values[valuesById[21] = "RESULT_CODE_INSUFFICIENT_FEE_BALANCE"] = 21;
-            values[valuesById[22] = "RESULT_CODE_EXTERNAL_BOOTSTRAP_EQUALS_MSB_BOOTSTRAP"] = 22;
-            values[valuesById[23] = "RESULT_CODE_SELF_VALIDATION_FORBIDDEN"] = 23;
-            values[valuesById[24] = "RESULT_CODE_ROLE_NODE_ENTRY_NOT_FOUND"] = 24;
-            values[valuesById[25] = "RESULT_CODE_ROLE_NODE_ALREADY_WRITER"] = 25;
-            values[valuesById[26] = "RESULT_CODE_ROLE_NODE_NOT_WHITELISTED"] = 26;
-            values[valuesById[27] = "RESULT_CODE_ROLE_NODE_NOT_WRITER"] = 27;
-            values[valuesById[28] = "RESULT_CODE_ROLE_NODE_IS_INDEXER"] = 28;
-            values[valuesById[29] = "RESULT_CODE_ROLE_ADMIN_ENTRY_MISSING"] = 29;
-            values[valuesById[30] = "RESULT_CODE_ROLE_INVALID_RECOVERY_CASE"] = 30;
-            values[valuesById[31] = "RESULT_CODE_ROLE_UNKNOWN_OPERATION"] = 31;
-            values[valuesById[32] = "RESULT_CODE_ROLE_INVALID_WRITER_KEY"] = 32;
-            values[valuesById[33] = "RESULT_CODE_ROLE_INSUFFICIENT_FEE_BALANCE"] = 33;
-            values[valuesById[34] = "RESULT_CODE_MSB_BOOTSTRAP_MISMATCH"] = 34;
-            values[valuesById[35] = "RESULT_CODE_EXTERNAL_BOOTSTRAP_NOT_DEPLOYED"] = 35;
-            values[valuesById[36] = "RESULT_CODE_EXTERNAL_BOOTSTRAP_TX_MISSING"] = 36;
-            values[valuesById[37] = "RESULT_CODE_EXTERNAL_BOOTSTRAP_MISMATCH"] = 37;
-            values[valuesById[38] = "RESULT_CODE_BOOTSTRAP_ALREADY_EXISTS"] = 38;
-            values[valuesById[39] = "RESULT_CODE_TRANSFER_RECIPIENT_ADDRESS_INVALID"] = 39;
-            values[valuesById[40] = "RESULT_CODE_TRANSFER_RECIPIENT_PUBLIC_KEY_INVALID"] = 40;
-            values[valuesById[41] = "RESULT_CODE_TRANSFER_AMOUNT_TOO_LARGE"] = 41;
-            values[valuesById[42] = "RESULT_CODE_TRANSFER_SENDER_NOT_FOUND"] = 42;
-            values[valuesById[43] = "RESULT_CODE_TRANSFER_INSUFFICIENT_BALANCE"] = 43;
-            values[valuesById[44] = "RESULT_CODE_TRANSFER_RECIPIENT_BALANCE_OVERFLOW"] = 44;
-            values[valuesById[45] = "RESULT_CODE_TX_HASH_INVALID_FORMAT"] = 45;
-            values[valuesById[46] = "RESULT_CODE_INTERNAL_ENQUEUE_VALIDATION_FAILED"] = 46;
-            values[valuesById[47] = "RESULT_CODE_TX_COMMITTED_RECEIPT_MISSING"] = 47;
-            values[valuesById[48] = "RESULT_CODE_VALIDATOR_RESPONSE_TX_TYPE_INVALID"] = 48;
-            values[valuesById[49] = "RESULT_CODE_VALIDATOR_RESPONSE_TX_TYPE_UNKNOWN"] = 49;
-            values[valuesById[50] = "RESULT_CODE_VALIDATOR_RESPONSE_TX_TYPE_UNSUPPORTED"] = 50;
-            values[valuesById[51] = "RESULT_CODE_VALIDATOR_RESPONSE_SCHEMA_INVALID"] = 51;
-            values[valuesById[52] = "RESULT_CODE_PENDING_REQUEST_MISSING_TX_DATA"] = 52;
-            values[valuesById[53] = "RESULT_CODE_PROOF_PAYLOAD_MISMATCH"] = 53;
-            values[valuesById[54] = "RESULT_CODE_VALIDATOR_WRITER_KEY_NOT_REGISTERED"] = 54;
-            values[valuesById[55] = "RESULT_CODE_VALIDATOR_ADDRESS_MISMATCH"] = 55;
-            values[valuesById[56] = "RESULT_CODE_VALIDATOR_NODE_ENTRY_NOT_FOUND"] = 56;
-            values[valuesById[57] = "RESULT_CODE_VALIDATOR_NODE_NOT_WRITER"] = 57;
-            values[valuesById[58] = "RESULT_CODE_VALIDATOR_WRITER_KEY_MISMATCH"] = 58;
-            values[valuesById[59] = "RESULT_CODE_VALIDATOR_TX_OBJECT_INVALID"] = 59;
-            values[valuesById[60] = "RESULT_CODE_VALIDATOR_VA_MISSING"] = 60;
-            values[valuesById[61] = "RESULT_CODE_TX_INVALID_PAYLOAD"] = 61;
-            return values;
         })();
 
         v1.BroadcastTransactionRequest = (function() {
@@ -1803,7 +1744,7 @@ $root.network = (function() {
              * @property {Uint8Array|null} [signature] BroadcastTransactionResponse signature
              * @property {Uint8Array|null} [proof] BroadcastTransactionResponse proof
              * @property {number|Long|null} [timestamp] BroadcastTransactionResponse timestamp
-             * @property {network.v1.ResultCode|null} [result] BroadcastTransactionResponse result
+             * @property {common.v1.ResultCode|null} [result] BroadcastTransactionResponse result
              */
 
             /**
@@ -1855,7 +1796,7 @@ $root.network = (function() {
 
             /**
              * BroadcastTransactionResponse result.
-             * @member {network.v1.ResultCode} result
+             * @member {common.v1.ResultCode} result
              * @memberof network.v1.BroadcastTransactionResponse
              * @instance
              */
@@ -2064,6 +2005,21 @@ $root.network = (function() {
                     case 59:
                     case 60:
                     case 61:
+                    case 100:
+                    case 101:
+                    case 102:
+                    case 103:
+                    case 104:
+                    case 105:
+                    case 106:
+                    case 107:
+                    case 108:
+                    case 109:
+                    case 110:
+                    case 111:
+                    case 112:
+                    case 113:
+                    case 114:
                         break;
                     }
                 return null;
@@ -2360,6 +2316,66 @@ $root.network = (function() {
                 case 61:
                     message.result = 61;
                     break;
+                case "RESULT_CODE_CONSENSUS_SCHEMA_VALIDATION_FAILED":
+                case 100:
+                    message.result = 100;
+                    break;
+                case "RESULT_CODE_CONSENSUS_BAD_PROTOCOL_VERSION":
+                case 101:
+                    message.result = 101;
+                    break;
+                case "RESULT_CODE_CONSENSUS_WRONG_NETWORK_ID":
+                case 102:
+                    message.result = 102;
+                    break;
+                case "RESULT_CODE_CONSENSUS_VDF_PARAMETERS_HASH_INVALID":
+                case 103:
+                    message.result = 103;
+                    break;
+                case "RESULT_CODE_CONSENSUS_VDF_PROOF_INVALID":
+                case 104:
+                    message.result = 104;
+                    break;
+                case "RESULT_CODE_CONSENSUS_ADDRESS_INVALID":
+                case 105:
+                    message.result = 105;
+                    break;
+                case "RESULT_CODE_CONSENSUS_PUBLIC_KEY_MISMATCH":
+                case 106:
+                    message.result = 106;
+                    break;
+                case "RESULT_CODE_CONSENSUS_PROPOSAL_SIGNATURE_INVALID":
+                case 107:
+                    message.result = 107;
+                    break;
+                case "RESULT_CODE_CONSENSUS_RESPONSE_SIGNATURE_INVALID":
+                case 108:
+                    message.result = 108;
+                    break;
+                case "RESULT_CODE_CONSENSUS_APPROVAL_SIGNATURE_INVALID":
+                case 109:
+                    message.result = 109;
+                    break;
+                case "RESULT_CODE_CONSENSUS_OPERATION_TYPE_INVALID":
+                case 110:
+                    message.result = 110;
+                    break;
+                case "RESULT_CODE_CONSENSUS_RESPONSE_APPROVAL_INVALID":
+                case 111:
+                    message.result = 111;
+                    break;
+                case "RESULT_CODE_CONSENSUS_EPOCH_INVALID":
+                case 112:
+                    message.result = 112;
+                    break;
+                case "RESULT_CODE_CONSENSUS_PREVIOUS_EPOCH_RECORD_HASH_INVALID":
+                case 113:
+                    message.result = 113;
+                    break;
+                case "RESULT_CODE_CONSENSUS_INDEXER_ROLE_INVALID":
+                case 114:
+                    message.result = 114;
+                    break;
                 }
                 return message;
             };
@@ -2418,7 +2434,7 @@ $root.network = (function() {
                     else
                         object.timestamp = options.longs === String ? $util.Long.prototype.toString.call(message.timestamp) : options.longs === Number ? new $util.LongBits(message.timestamp.low >>> 0, message.timestamp.high >>> 0).toNumber(true) : message.timestamp;
                 if (message.result != null && message.hasOwnProperty("result"))
-                    object.result = options.enums === String ? $root.network.v1.ResultCode[message.result] === undefined ? message.result : $root.network.v1.ResultCode[message.result] : message.result;
+                    object.result = options.enums === String ? $root.common.v1.ResultCode[message.result] === undefined ? message.result : $root.common.v1.ResultCode[message.result] : message.result;
                 return object;
             };
 
@@ -2455,6 +2471,194 @@ $root.network = (function() {
     })();
 
     return network;
+})();
+
+$root.common = (function() {
+
+    /**
+     * Namespace common.
+     * @exports common
+     * @namespace
+     */
+    var common = {};
+
+    common.v1 = (function() {
+
+        /**
+         * Namespace v1.
+         * @memberof common
+         * @namespace
+         */
+        var v1 = {};
+
+        /**
+         * ResultCode enum.
+         * @name common.v1.ResultCode
+         * @enum {number}
+         * @property {number} RESULT_CODE_UNSPECIFIED=0 RESULT_CODE_UNSPECIFIED value
+         * @property {number} RESULT_CODE_OK=1 RESULT_CODE_OK value
+         * @property {number} RESULT_CODE_INVALID_PAYLOAD=2 RESULT_CODE_INVALID_PAYLOAD value
+         * @property {number} RESULT_CODE_RATE_LIMITED=3 RESULT_CODE_RATE_LIMITED value
+         * @property {number} RESULT_CODE_SIGNATURE_INVALID=4 RESULT_CODE_SIGNATURE_INVALID value
+         * @property {number} RESULT_CODE_UNEXPECTED_ERROR=5 RESULT_CODE_UNEXPECTED_ERROR value
+         * @property {number} RESULT_CODE_TIMEOUT=6 RESULT_CODE_TIMEOUT value
+         * @property {number} RESULT_CODE_NODE_HAS_NO_WRITE_ACCESS=7 RESULT_CODE_NODE_HAS_NO_WRITE_ACCESS value
+         * @property {number} RESULT_CODE_TX_ACCEPTED_PROOF_UNAVAILABLE=8 RESULT_CODE_TX_ACCEPTED_PROOF_UNAVAILABLE value
+         * @property {number} RESULT_CODE_NODE_OVERLOADED=9 RESULT_CODE_NODE_OVERLOADED value
+         * @property {number} RESULT_CODE_TX_ALREADY_PENDING=10 RESULT_CODE_TX_ALREADY_PENDING value
+         * @property {number} RESULT_CODE_OPERATION_TYPE_UNKNOWN=11 RESULT_CODE_OPERATION_TYPE_UNKNOWN value
+         * @property {number} RESULT_CODE_SCHEMA_VALIDATION_FAILED=12 RESULT_CODE_SCHEMA_VALIDATION_FAILED value
+         * @property {number} RESULT_CODE_REQUESTER_ADDRESS_INVALID=13 RESULT_CODE_REQUESTER_ADDRESS_INVALID value
+         * @property {number} RESULT_CODE_REQUESTER_PUBLIC_KEY_INVALID=14 RESULT_CODE_REQUESTER_PUBLIC_KEY_INVALID value
+         * @property {number} RESULT_CODE_TX_HASH_MISMATCH=15 RESULT_CODE_TX_HASH_MISMATCH value
+         * @property {number} RESULT_CODE_TX_SIGNATURE_INVALID=16 RESULT_CODE_TX_SIGNATURE_INVALID value
+         * @property {number} RESULT_CODE_TX_EXPIRED=17 RESULT_CODE_TX_EXPIRED value
+         * @property {number} RESULT_CODE_TX_ALREADY_EXISTS=18 RESULT_CODE_TX_ALREADY_EXISTS value
+         * @property {number} RESULT_CODE_OPERATION_ALREADY_COMPLETED=19 RESULT_CODE_OPERATION_ALREADY_COMPLETED value
+         * @property {number} RESULT_CODE_REQUESTER_NOT_FOUND=20 RESULT_CODE_REQUESTER_NOT_FOUND value
+         * @property {number} RESULT_CODE_INSUFFICIENT_FEE_BALANCE=21 RESULT_CODE_INSUFFICIENT_FEE_BALANCE value
+         * @property {number} RESULT_CODE_EXTERNAL_BOOTSTRAP_EQUALS_MSB_BOOTSTRAP=22 RESULT_CODE_EXTERNAL_BOOTSTRAP_EQUALS_MSB_BOOTSTRAP value
+         * @property {number} RESULT_CODE_SELF_VALIDATION_FORBIDDEN=23 RESULT_CODE_SELF_VALIDATION_FORBIDDEN value
+         * @property {number} RESULT_CODE_ROLE_NODE_ENTRY_NOT_FOUND=24 RESULT_CODE_ROLE_NODE_ENTRY_NOT_FOUND value
+         * @property {number} RESULT_CODE_ROLE_NODE_ALREADY_WRITER=25 RESULT_CODE_ROLE_NODE_ALREADY_WRITER value
+         * @property {number} RESULT_CODE_ROLE_NODE_NOT_WHITELISTED=26 RESULT_CODE_ROLE_NODE_NOT_WHITELISTED value
+         * @property {number} RESULT_CODE_ROLE_NODE_NOT_WRITER=27 RESULT_CODE_ROLE_NODE_NOT_WRITER value
+         * @property {number} RESULT_CODE_ROLE_NODE_IS_INDEXER=28 RESULT_CODE_ROLE_NODE_IS_INDEXER value
+         * @property {number} RESULT_CODE_ROLE_ADMIN_ENTRY_MISSING=29 RESULT_CODE_ROLE_ADMIN_ENTRY_MISSING value
+         * @property {number} RESULT_CODE_ROLE_INVALID_RECOVERY_CASE=30 RESULT_CODE_ROLE_INVALID_RECOVERY_CASE value
+         * @property {number} RESULT_CODE_ROLE_UNKNOWN_OPERATION=31 RESULT_CODE_ROLE_UNKNOWN_OPERATION value
+         * @property {number} RESULT_CODE_ROLE_INVALID_WRITER_KEY=32 RESULT_CODE_ROLE_INVALID_WRITER_KEY value
+         * @property {number} RESULT_CODE_ROLE_INSUFFICIENT_FEE_BALANCE=33 RESULT_CODE_ROLE_INSUFFICIENT_FEE_BALANCE value
+         * @property {number} RESULT_CODE_MSB_BOOTSTRAP_MISMATCH=34 RESULT_CODE_MSB_BOOTSTRAP_MISMATCH value
+         * @property {number} RESULT_CODE_EXTERNAL_BOOTSTRAP_NOT_DEPLOYED=35 RESULT_CODE_EXTERNAL_BOOTSTRAP_NOT_DEPLOYED value
+         * @property {number} RESULT_CODE_EXTERNAL_BOOTSTRAP_TX_MISSING=36 RESULT_CODE_EXTERNAL_BOOTSTRAP_TX_MISSING value
+         * @property {number} RESULT_CODE_EXTERNAL_BOOTSTRAP_MISMATCH=37 RESULT_CODE_EXTERNAL_BOOTSTRAP_MISMATCH value
+         * @property {number} RESULT_CODE_BOOTSTRAP_ALREADY_EXISTS=38 RESULT_CODE_BOOTSTRAP_ALREADY_EXISTS value
+         * @property {number} RESULT_CODE_TRANSFER_RECIPIENT_ADDRESS_INVALID=39 RESULT_CODE_TRANSFER_RECIPIENT_ADDRESS_INVALID value
+         * @property {number} RESULT_CODE_TRANSFER_RECIPIENT_PUBLIC_KEY_INVALID=40 RESULT_CODE_TRANSFER_RECIPIENT_PUBLIC_KEY_INVALID value
+         * @property {number} RESULT_CODE_TRANSFER_AMOUNT_TOO_LARGE=41 RESULT_CODE_TRANSFER_AMOUNT_TOO_LARGE value
+         * @property {number} RESULT_CODE_TRANSFER_SENDER_NOT_FOUND=42 RESULT_CODE_TRANSFER_SENDER_NOT_FOUND value
+         * @property {number} RESULT_CODE_TRANSFER_INSUFFICIENT_BALANCE=43 RESULT_CODE_TRANSFER_INSUFFICIENT_BALANCE value
+         * @property {number} RESULT_CODE_TRANSFER_RECIPIENT_BALANCE_OVERFLOW=44 RESULT_CODE_TRANSFER_RECIPIENT_BALANCE_OVERFLOW value
+         * @property {number} RESULT_CODE_TX_HASH_INVALID_FORMAT=45 RESULT_CODE_TX_HASH_INVALID_FORMAT value
+         * @property {number} RESULT_CODE_INTERNAL_ENQUEUE_VALIDATION_FAILED=46 RESULT_CODE_INTERNAL_ENQUEUE_VALIDATION_FAILED value
+         * @property {number} RESULT_CODE_TX_COMMITTED_RECEIPT_MISSING=47 RESULT_CODE_TX_COMMITTED_RECEIPT_MISSING value
+         * @property {number} RESULT_CODE_VALIDATOR_RESPONSE_TX_TYPE_INVALID=48 RESULT_CODE_VALIDATOR_RESPONSE_TX_TYPE_INVALID value
+         * @property {number} RESULT_CODE_VALIDATOR_RESPONSE_TX_TYPE_UNKNOWN=49 RESULT_CODE_VALIDATOR_RESPONSE_TX_TYPE_UNKNOWN value
+         * @property {number} RESULT_CODE_VALIDATOR_RESPONSE_TX_TYPE_UNSUPPORTED=50 RESULT_CODE_VALIDATOR_RESPONSE_TX_TYPE_UNSUPPORTED value
+         * @property {number} RESULT_CODE_VALIDATOR_RESPONSE_SCHEMA_INVALID=51 RESULT_CODE_VALIDATOR_RESPONSE_SCHEMA_INVALID value
+         * @property {number} RESULT_CODE_PENDING_REQUEST_MISSING_TX_DATA=52 RESULT_CODE_PENDING_REQUEST_MISSING_TX_DATA value
+         * @property {number} RESULT_CODE_PROOF_PAYLOAD_MISMATCH=53 RESULT_CODE_PROOF_PAYLOAD_MISMATCH value
+         * @property {number} RESULT_CODE_VALIDATOR_WRITER_KEY_NOT_REGISTERED=54 RESULT_CODE_VALIDATOR_WRITER_KEY_NOT_REGISTERED value
+         * @property {number} RESULT_CODE_VALIDATOR_ADDRESS_MISMATCH=55 RESULT_CODE_VALIDATOR_ADDRESS_MISMATCH value
+         * @property {number} RESULT_CODE_VALIDATOR_NODE_ENTRY_NOT_FOUND=56 RESULT_CODE_VALIDATOR_NODE_ENTRY_NOT_FOUND value
+         * @property {number} RESULT_CODE_VALIDATOR_NODE_NOT_WRITER=57 RESULT_CODE_VALIDATOR_NODE_NOT_WRITER value
+         * @property {number} RESULT_CODE_VALIDATOR_WRITER_KEY_MISMATCH=58 RESULT_CODE_VALIDATOR_WRITER_KEY_MISMATCH value
+         * @property {number} RESULT_CODE_VALIDATOR_TX_OBJECT_INVALID=59 RESULT_CODE_VALIDATOR_TX_OBJECT_INVALID value
+         * @property {number} RESULT_CODE_VALIDATOR_VA_MISSING=60 RESULT_CODE_VALIDATOR_VA_MISSING value
+         * @property {number} RESULT_CODE_TX_INVALID_PAYLOAD=61 RESULT_CODE_TX_INVALID_PAYLOAD value
+         * @property {number} RESULT_CODE_CONSENSUS_SCHEMA_VALIDATION_FAILED=100 RESULT_CODE_CONSENSUS_SCHEMA_VALIDATION_FAILED value
+         * @property {number} RESULT_CODE_CONSENSUS_BAD_PROTOCOL_VERSION=101 RESULT_CODE_CONSENSUS_BAD_PROTOCOL_VERSION value
+         * @property {number} RESULT_CODE_CONSENSUS_WRONG_NETWORK_ID=102 RESULT_CODE_CONSENSUS_WRONG_NETWORK_ID value
+         * @property {number} RESULT_CODE_CONSENSUS_VDF_PARAMETERS_HASH_INVALID=103 RESULT_CODE_CONSENSUS_VDF_PARAMETERS_HASH_INVALID value
+         * @property {number} RESULT_CODE_CONSENSUS_VDF_PROOF_INVALID=104 RESULT_CODE_CONSENSUS_VDF_PROOF_INVALID value
+         * @property {number} RESULT_CODE_CONSENSUS_ADDRESS_INVALID=105 RESULT_CODE_CONSENSUS_ADDRESS_INVALID value
+         * @property {number} RESULT_CODE_CONSENSUS_PUBLIC_KEY_MISMATCH=106 RESULT_CODE_CONSENSUS_PUBLIC_KEY_MISMATCH value
+         * @property {number} RESULT_CODE_CONSENSUS_PROPOSAL_SIGNATURE_INVALID=107 RESULT_CODE_CONSENSUS_PROPOSAL_SIGNATURE_INVALID value
+         * @property {number} RESULT_CODE_CONSENSUS_RESPONSE_SIGNATURE_INVALID=108 RESULT_CODE_CONSENSUS_RESPONSE_SIGNATURE_INVALID value
+         * @property {number} RESULT_CODE_CONSENSUS_APPROVAL_SIGNATURE_INVALID=109 RESULT_CODE_CONSENSUS_APPROVAL_SIGNATURE_INVALID value
+         * @property {number} RESULT_CODE_CONSENSUS_OPERATION_TYPE_INVALID=110 RESULT_CODE_CONSENSUS_OPERATION_TYPE_INVALID value
+         * @property {number} RESULT_CODE_CONSENSUS_RESPONSE_APPROVAL_INVALID=111 RESULT_CODE_CONSENSUS_RESPONSE_APPROVAL_INVALID value
+         * @property {number} RESULT_CODE_CONSENSUS_EPOCH_INVALID=112 RESULT_CODE_CONSENSUS_EPOCH_INVALID value
+         * @property {number} RESULT_CODE_CONSENSUS_PREVIOUS_EPOCH_RECORD_HASH_INVALID=113 RESULT_CODE_CONSENSUS_PREVIOUS_EPOCH_RECORD_HASH_INVALID value
+         * @property {number} RESULT_CODE_CONSENSUS_INDEXER_ROLE_INVALID=114 RESULT_CODE_CONSENSUS_INDEXER_ROLE_INVALID value
+         */
+        v1.ResultCode = (function() {
+            var valuesById = {}, values = Object.create(valuesById);
+            values[valuesById[0] = "RESULT_CODE_UNSPECIFIED"] = 0;
+            values[valuesById[1] = "RESULT_CODE_OK"] = 1;
+            values[valuesById[2] = "RESULT_CODE_INVALID_PAYLOAD"] = 2;
+            values[valuesById[3] = "RESULT_CODE_RATE_LIMITED"] = 3;
+            values[valuesById[4] = "RESULT_CODE_SIGNATURE_INVALID"] = 4;
+            values[valuesById[5] = "RESULT_CODE_UNEXPECTED_ERROR"] = 5;
+            values[valuesById[6] = "RESULT_CODE_TIMEOUT"] = 6;
+            values[valuesById[7] = "RESULT_CODE_NODE_HAS_NO_WRITE_ACCESS"] = 7;
+            values[valuesById[8] = "RESULT_CODE_TX_ACCEPTED_PROOF_UNAVAILABLE"] = 8;
+            values[valuesById[9] = "RESULT_CODE_NODE_OVERLOADED"] = 9;
+            values[valuesById[10] = "RESULT_CODE_TX_ALREADY_PENDING"] = 10;
+            values[valuesById[11] = "RESULT_CODE_OPERATION_TYPE_UNKNOWN"] = 11;
+            values[valuesById[12] = "RESULT_CODE_SCHEMA_VALIDATION_FAILED"] = 12;
+            values[valuesById[13] = "RESULT_CODE_REQUESTER_ADDRESS_INVALID"] = 13;
+            values[valuesById[14] = "RESULT_CODE_REQUESTER_PUBLIC_KEY_INVALID"] = 14;
+            values[valuesById[15] = "RESULT_CODE_TX_HASH_MISMATCH"] = 15;
+            values[valuesById[16] = "RESULT_CODE_TX_SIGNATURE_INVALID"] = 16;
+            values[valuesById[17] = "RESULT_CODE_TX_EXPIRED"] = 17;
+            values[valuesById[18] = "RESULT_CODE_TX_ALREADY_EXISTS"] = 18;
+            values[valuesById[19] = "RESULT_CODE_OPERATION_ALREADY_COMPLETED"] = 19;
+            values[valuesById[20] = "RESULT_CODE_REQUESTER_NOT_FOUND"] = 20;
+            values[valuesById[21] = "RESULT_CODE_INSUFFICIENT_FEE_BALANCE"] = 21;
+            values[valuesById[22] = "RESULT_CODE_EXTERNAL_BOOTSTRAP_EQUALS_MSB_BOOTSTRAP"] = 22;
+            values[valuesById[23] = "RESULT_CODE_SELF_VALIDATION_FORBIDDEN"] = 23;
+            values[valuesById[24] = "RESULT_CODE_ROLE_NODE_ENTRY_NOT_FOUND"] = 24;
+            values[valuesById[25] = "RESULT_CODE_ROLE_NODE_ALREADY_WRITER"] = 25;
+            values[valuesById[26] = "RESULT_CODE_ROLE_NODE_NOT_WHITELISTED"] = 26;
+            values[valuesById[27] = "RESULT_CODE_ROLE_NODE_NOT_WRITER"] = 27;
+            values[valuesById[28] = "RESULT_CODE_ROLE_NODE_IS_INDEXER"] = 28;
+            values[valuesById[29] = "RESULT_CODE_ROLE_ADMIN_ENTRY_MISSING"] = 29;
+            values[valuesById[30] = "RESULT_CODE_ROLE_INVALID_RECOVERY_CASE"] = 30;
+            values[valuesById[31] = "RESULT_CODE_ROLE_UNKNOWN_OPERATION"] = 31;
+            values[valuesById[32] = "RESULT_CODE_ROLE_INVALID_WRITER_KEY"] = 32;
+            values[valuesById[33] = "RESULT_CODE_ROLE_INSUFFICIENT_FEE_BALANCE"] = 33;
+            values[valuesById[34] = "RESULT_CODE_MSB_BOOTSTRAP_MISMATCH"] = 34;
+            values[valuesById[35] = "RESULT_CODE_EXTERNAL_BOOTSTRAP_NOT_DEPLOYED"] = 35;
+            values[valuesById[36] = "RESULT_CODE_EXTERNAL_BOOTSTRAP_TX_MISSING"] = 36;
+            values[valuesById[37] = "RESULT_CODE_EXTERNAL_BOOTSTRAP_MISMATCH"] = 37;
+            values[valuesById[38] = "RESULT_CODE_BOOTSTRAP_ALREADY_EXISTS"] = 38;
+            values[valuesById[39] = "RESULT_CODE_TRANSFER_RECIPIENT_ADDRESS_INVALID"] = 39;
+            values[valuesById[40] = "RESULT_CODE_TRANSFER_RECIPIENT_PUBLIC_KEY_INVALID"] = 40;
+            values[valuesById[41] = "RESULT_CODE_TRANSFER_AMOUNT_TOO_LARGE"] = 41;
+            values[valuesById[42] = "RESULT_CODE_TRANSFER_SENDER_NOT_FOUND"] = 42;
+            values[valuesById[43] = "RESULT_CODE_TRANSFER_INSUFFICIENT_BALANCE"] = 43;
+            values[valuesById[44] = "RESULT_CODE_TRANSFER_RECIPIENT_BALANCE_OVERFLOW"] = 44;
+            values[valuesById[45] = "RESULT_CODE_TX_HASH_INVALID_FORMAT"] = 45;
+            values[valuesById[46] = "RESULT_CODE_INTERNAL_ENQUEUE_VALIDATION_FAILED"] = 46;
+            values[valuesById[47] = "RESULT_CODE_TX_COMMITTED_RECEIPT_MISSING"] = 47;
+            values[valuesById[48] = "RESULT_CODE_VALIDATOR_RESPONSE_TX_TYPE_INVALID"] = 48;
+            values[valuesById[49] = "RESULT_CODE_VALIDATOR_RESPONSE_TX_TYPE_UNKNOWN"] = 49;
+            values[valuesById[50] = "RESULT_CODE_VALIDATOR_RESPONSE_TX_TYPE_UNSUPPORTED"] = 50;
+            values[valuesById[51] = "RESULT_CODE_VALIDATOR_RESPONSE_SCHEMA_INVALID"] = 51;
+            values[valuesById[52] = "RESULT_CODE_PENDING_REQUEST_MISSING_TX_DATA"] = 52;
+            values[valuesById[53] = "RESULT_CODE_PROOF_PAYLOAD_MISMATCH"] = 53;
+            values[valuesById[54] = "RESULT_CODE_VALIDATOR_WRITER_KEY_NOT_REGISTERED"] = 54;
+            values[valuesById[55] = "RESULT_CODE_VALIDATOR_ADDRESS_MISMATCH"] = 55;
+            values[valuesById[56] = "RESULT_CODE_VALIDATOR_NODE_ENTRY_NOT_FOUND"] = 56;
+            values[valuesById[57] = "RESULT_CODE_VALIDATOR_NODE_NOT_WRITER"] = 57;
+            values[valuesById[58] = "RESULT_CODE_VALIDATOR_WRITER_KEY_MISMATCH"] = 58;
+            values[valuesById[59] = "RESULT_CODE_VALIDATOR_TX_OBJECT_INVALID"] = 59;
+            values[valuesById[60] = "RESULT_CODE_VALIDATOR_VA_MISSING"] = 60;
+            values[valuesById[61] = "RESULT_CODE_TX_INVALID_PAYLOAD"] = 61;
+            values[valuesById[100] = "RESULT_CODE_CONSENSUS_SCHEMA_VALIDATION_FAILED"] = 100;
+            values[valuesById[101] = "RESULT_CODE_CONSENSUS_BAD_PROTOCOL_VERSION"] = 101;
+            values[valuesById[102] = "RESULT_CODE_CONSENSUS_WRONG_NETWORK_ID"] = 102;
+            values[valuesById[103] = "RESULT_CODE_CONSENSUS_VDF_PARAMETERS_HASH_INVALID"] = 103;
+            values[valuesById[104] = "RESULT_CODE_CONSENSUS_VDF_PROOF_INVALID"] = 104;
+            values[valuesById[105] = "RESULT_CODE_CONSENSUS_ADDRESS_INVALID"] = 105;
+            values[valuesById[106] = "RESULT_CODE_CONSENSUS_PUBLIC_KEY_MISMATCH"] = 106;
+            values[valuesById[107] = "RESULT_CODE_CONSENSUS_PROPOSAL_SIGNATURE_INVALID"] = 107;
+            values[valuesById[108] = "RESULT_CODE_CONSENSUS_RESPONSE_SIGNATURE_INVALID"] = 108;
+            values[valuesById[109] = "RESULT_CODE_CONSENSUS_APPROVAL_SIGNATURE_INVALID"] = 109;
+            values[valuesById[110] = "RESULT_CODE_CONSENSUS_OPERATION_TYPE_INVALID"] = 110;
+            values[valuesById[111] = "RESULT_CODE_CONSENSUS_RESPONSE_APPROVAL_INVALID"] = 111;
+            values[valuesById[112] = "RESULT_CODE_CONSENSUS_EPOCH_INVALID"] = 112;
+            values[valuesById[113] = "RESULT_CODE_CONSENSUS_PREVIOUS_EPOCH_RECORD_HASH_INVALID"] = 113;
+            values[valuesById[114] = "RESULT_CODE_CONSENSUS_INDEXER_ROLE_INVALID"] = 114;
+            return values;
+        })();
+
+        return v1;
+    })();
+
+    return common;
 })();
 
 module.exports = $root;

@@ -5,10 +5,10 @@ import {
     NONCE_BYTE_LENGTH,
     SIGNATURE_BYTE_LENGTH,
     MAX_PARTIAL_TX_PAYLOAD_BYTE_SIZE,
-    ResultCode
+    NetworkResultCode
 } from '../../../../../utils/constants.js';
 
-const ALLOWED_RESULT_CODES = Object.values(ResultCode);
+const ALLOWED_RESULT_CODES = Object.values(NetworkResultCode);
 
 class V1ValidationSchema {
     #validator;

@@ -1,8 +1,13 @@
 import {test} from 'brittle';
 
-import {ResultCode} from '../../../../src/utils/constants.js';
+import networkV1Generated from '../../../../src/codecs/network/v1/networkV1.generated.cjs';
+import {
+    ConsensusResultCode,
+    NetworkResultCode,
+    ResultCode
+} from '../../../../src/utils/constants.js';
 
-const expectedResultCodeMap = Object.freeze({
+const expectedNetworkResultCodeMap = Object.freeze({
     UNSPECIFIED: 0,
     OK: 1,
     INVALID_PAYLOAD: 2,
@@ -67,13 +72,78 @@ const expectedResultCodeMap = Object.freeze({
     TX_INVALID_PAYLOAD: 61
 });
 
-test('ResultCode values are unique', t => {
-    const values = Object.values(ResultCode);
+const expectedConsensusResultCodeMap = Object.freeze({
+    UNSPECIFIED: 0,
+    OK: 1,
+    INVALID_PAYLOAD: 2,
+    UNEXPECTED_ERROR: 5,
+    SCHEMA_VALIDATION_FAILED: 100,
+    BAD_PROTOCOL_VERSION: 101,
+    WRONG_NETWORK_ID: 102,
+    VDF_PARAMETERS_HASH_INVALID: 103,
+    VDF_PROOF_INVALID: 104,
+    ADDRESS_INVALID: 105,
+    PUBLIC_KEY_MISMATCH: 106,
+    PROPOSAL_SIGNATURE_INVALID: 107,
+    RESPONSE_SIGNATURE_INVALID: 108,
+    APPROVAL_SIGNATURE_INVALID: 109,
+    OPERATION_TYPE_INVALID: 110,
+    RESPONSE_APPROVAL_INVALID: 111,
+    EPOCH_INVALID: 112,
+    PREVIOUS_EPOCH_RECORD_HASH_INVALID: 113,
+    INDEXER_ROLE_INVALID: 114
+});
+
+const sharedResultCode = networkV1Generated.common.v1.ResultCode;
+
+test('NetworkResultCode values are unique', t => {
+    const values = Object.values(NetworkResultCode);
     t.is(new Set(values).size, values.length);
 });
 
-test('ResultCode preserves existing numeric values (append-only)', t => {
-    t.alike(ResultCode, expectedResultCodeMap);
+test('NetworkResultCode preserves existing numeric values (append-only)', t => {
+    t.alike(NetworkResultCode, expectedNetworkResultCodeMap);
+});
+
+test('ResultCode remains a compatibility alias for NetworkResultCode', t => {
+    t.is(ResultCode, NetworkResultCode);
+});
+
+test('NetworkResultCode values are backed by the shared protobuf enum', t => {
+    for (const [name, value] of Object.entries(NetworkResultCode)) {
+        t.is(sharedResultCode[`RESULT_CODE_${name}`], value);
+    }
+});
+
+test('ConsensusResultCode values are unique', t => {
+    const values = Object.values(ConsensusResultCode);
+    t.is(new Set(values).size, values.length);
+});
+
+test('ConsensusResultCode uses the consensus range from the shared protobuf enum', t => {
+    t.alike(ConsensusResultCode, expectedConsensusResultCodeMap);
+    t.is(
+        sharedResultCode.RESULT_CODE_CONSENSUS_BAD_PROTOCOL_VERSION,
+        ConsensusResultCode.BAD_PROTOCOL_VERSION
+    );
+    t.is(
+        sharedResultCode.RESULT_CODE_CONSENSUS_INDEXER_ROLE_INVALID,
+        ConsensusResultCode.INDEXER_ROLE_INVALID
+    );
+});
+
+test('protocol-specific result-code subsets share only generic codes', t => {
+    const networkValues = new Set(Object.values(NetworkResultCode));
+    const sharedValues = Object.entries(ConsensusResultCode)
+        .filter(([, value]) => networkValues.has(value))
+        .map(([name]) => name);
+
+    t.alike(sharedValues, [
+        'UNSPECIFIED',
+        'OK',
+        'INVALID_PAYLOAD',
+        'UNEXPECTED_ERROR'
+    ]);
 });
 
 test('ResultCode does not expose deprecated alias', t => {

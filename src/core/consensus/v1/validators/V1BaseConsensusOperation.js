@@ -75,7 +75,7 @@ class V1BaseConsensusOperation {
     isPayloadSchemaValid(payload) {
         if (_.isNil(payload?.type)) {
             throw new V1ConsensusProtocolError(
-                ConsensusResultCode.UNEXPECTED_ERROR,
+                ConsensusResultCode.INVALID_PAYLOAD,
                 'Payload or payload type is missing.'
             );
         }
@@ -84,7 +84,7 @@ class V1BaseConsensusOperation {
         const isPayloadValid = selectedValidator(payload);
         if (!isPayloadValid) {
             throw new V1ConsensusProtocolError(
-                ConsensusResultCode.UNEXPECTED_ERROR,
+                ConsensusResultCode.SCHEMA_VALIDATION_FAILED,
                 'Payload is invalid.'
             );
         }
@@ -120,7 +120,7 @@ class V1BaseConsensusOperation {
     #selectCheckSchemaValidator(type) {
         if (!Number.isInteger(type)) {
             throw new V1ConsensusProtocolError(
-                ConsensusResultCode.UNEXPECTED_ERROR,
+                ConsensusResultCode.OPERATION_TYPE_INVALID,
                 'Operation type must be an integer.'
             );
         }
@@ -128,7 +128,7 @@ class V1BaseConsensusOperation {
         switch (type) {
             case ConsensusOperationType.UNSPECIFIED:
                 throw new V1ConsensusProtocolError(
-                    ConsensusResultCode.UNEXPECTED_ERROR,
+                    ConsensusResultCode.OPERATION_TYPE_INVALID,
                     'Operation type is unspecified.'
                 );
             case ConsensusOperationType.PROOF_PROPOSAL:
@@ -137,7 +137,7 @@ class V1BaseConsensusOperation {
                 return this.#consensusValidationSchema.validateV1EpochProofProposalResponse.bind(this.#consensusValidationSchema);
             default:
                 throw new V1ConsensusProtocolError(
-                    ConsensusResultCode.UNEXPECTED_ERROR,
+                    ConsensusResultCode.OPERATION_TYPE_INVALID,
                     `Unknown operation type: ${type}`
                 );
         }
@@ -155,7 +155,12 @@ class V1BaseConsensusOperation {
      * @returns {Promise<void>}
      * @throws {V1ConsensusProtocolError} When message construction, hashing, or signature verification fails.
      */
-    async validateSignature(payload, remotePublicKey, proofProposal) {
+    async validateSignature(
+        payload,
+        remotePublicKey,
+        proofProposal,
+        invalidSignatureResultCode = ConsensusResultCode.UNEXPECTED_ERROR
+    ) {
         let signature;
         let message;
         try {
@@ -197,7 +202,7 @@ class V1BaseConsensusOperation {
         }
         if (!verified) {
             throw new V1ConsensusProtocolError(
-                ConsensusResultCode.UNEXPECTED_ERROR,
+                invalidSignatureResultCode,
                 'signature verification failed.'
             );
         }
@@ -217,7 +222,7 @@ class V1BaseConsensusOperation {
     #buildSignatureMessage(payload, proofProposalContext) {
         if (!Number.isInteger(payload.type)) {
             throw new V1ConsensusProtocolError(
-                ConsensusResultCode.UNEXPECTED_ERROR,
+                ConsensusResultCode.OPERATION_TYPE_INVALID,
                 'Operation type must be an integer.'
             );
         }
@@ -225,7 +230,7 @@ class V1BaseConsensusOperation {
         switch (payload.type) {
             case ConsensusOperationType.UNSPECIFIED:
                 throw new V1ConsensusProtocolError(
-                    ConsensusResultCode.UNEXPECTED_ERROR,
+                    ConsensusResultCode.OPERATION_TYPE_INVALID,
                     'Operation type is unspecified.'
                 );
             case ConsensusOperationType.PROOF_PROPOSAL: {
@@ -251,7 +256,7 @@ class V1BaseConsensusOperation {
             }
             default:
                 throw new V1ConsensusProtocolError(
-                    ConsensusResultCode.UNEXPECTED_ERROR,
+                    ConsensusResultCode.OPERATION_TYPE_INVALID,
                     `Unknown operation type: ${payload.type}`
                 );
         }
@@ -272,14 +277,30 @@ class V1BaseConsensusOperation {
         const address = bufferToAddress(binaryAddress, this._config.addressPrefix);
         if (!address) {
             throw new V1ConsensusProtocolError(
-                ConsensusResultCode.UNEXPECTED_ERROR,
+                ConsensusResultCode.ADDRESS_INVALID,
                 'Address is invalid.'
             );
         }
-        const publicKeyFromAddress = tracCryptoApi.address.decode(address);
-        if (!b4a.equals(publicKeyFromAddress, remotePublicKey)) {
+        let publicKeyFromAddress;
+        try {
+            publicKeyFromAddress = tracCryptoApi.address.decode(address);
+        } catch {
+            throw new V1ConsensusProtocolError(
+                ConsensusResultCode.ADDRESS_INVALID,
+                'Address is invalid.'
+            );
+        }
+
+        if (!remotePublicKey) {
             throw new V1ConsensusProtocolError(
                 ConsensusResultCode.UNEXPECTED_ERROR,
+                'Remote public key is missing.'
+            );
+        }
+
+        if (!b4a.equals(publicKeyFromAddress, remotePublicKey)) {
+            throw new V1ConsensusProtocolError(
+                ConsensusResultCode.PUBLIC_KEY_MISMATCH,
                 'Address does not match remote public key.'
             );
         }
@@ -296,14 +317,14 @@ class V1BaseConsensusOperation {
      * @throws {V1ConsensusProtocolError} When the remote address is not an indexer.
      */
     async validateAddressIsIndexer(remotePublicKey) {
-        // TODO: When we replace UNEXPECTED_ERROR with INVALID_ADDRESS_ASSERTION,
-        // we should handle this specific error to not only drop the connection but also blacklist the specific node.
+        // TODO: In the future, we should handle this specific error to not only drop the connection
+        // but also blacklist the specific node.
         // Such an error would mean that someone is trying to impersonate an indexer.
         const address = tracCryptoApi.address.encode(this._config.addressPrefix, remotePublicKey);
         const isIndexer = await this._state.isIndexerAddress(address);
         if (!isIndexer) {
             throw new V1ConsensusProtocolError(
-                ConsensusResultCode.UNEXPECTED_ERROR,
+                ConsensusResultCode.INDEXER_ROLE_INVALID,
                 'Incoming address is not an indexer.'
             )
         }

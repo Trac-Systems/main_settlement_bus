@@ -44,7 +44,7 @@ class V1EpochProofProposalApproval extends V1BaseConsensusOperation {
                 approval.approver,
                 connection.remotePublicKey
             );
-            await this.validateSignature(payload, connection.remotePublicKey, proofProposal);
+            await this.validateSignature(payload, connection.remotePublicKey, proofProposal, ConsensusResultCode.APPROVAL_SIGNATURE_INVALID);
             await this.validateAddressIsIndexer(connection.remotePublicKey);
             return true;
         });
@@ -78,6 +78,13 @@ class V1EpochProofProposalApproval extends V1BaseConsensusOperation {
             );
         }
 
+        if (!remotePublicKey) {
+            throw new V1ConsensusProtocolError(
+                ConsensusResultCode.UNEXPECTED_ERROR,
+                'Remote public key is missing.'
+            );
+        }
+
         let verified;
         try {
             verified = tracCryptoApi.signature.verify(
@@ -90,7 +97,7 @@ class V1EpochProofProposalApproval extends V1BaseConsensusOperation {
         }
         if (!verified) {
             throw new V1ConsensusProtocolError(
-                ConsensusResultCode.UNEXPECTED_ERROR,
+                ConsensusResultCode.RESPONSE_SIGNATURE_INVALID,
                 'response signature verification failed.'
             );
         }

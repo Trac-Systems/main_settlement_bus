@@ -53,7 +53,12 @@ class ConsensusEpochProofProposalOperationHandler extends ConnectionOperationHan
             });
         }
         finally {
-            await this.#sendEpochProofProposalApprovalResponse(message.session_id, connection, message.proof_proposal, resultCode);
+            await this.#sendEpochProofProposalApprovalResponse(
+                message?.session_id,
+                connection,
+                proofProposal,
+                resultCode
+            );
         }
     }
 
@@ -63,7 +68,7 @@ class ConsensusEpochProofProposalOperationHandler extends ConnectionOperationHan
      * @param {object} message Decoded consensus v1 message containing `proof_proposal_response`.
      * @param {object} connection Peer connection context used by the response validator.
      * @param {object} proofProposal Original proof proposal used by the response validator.
-     * @returns {Promise<{resultCode: number, approval?: object}>} Approval handling outcome.
+     * @returns {Promise<{resultCode: number, approval?: object}>} Approval handling outcome with a ConsensusResultCode value.
      */
 
     async handleApproval(message, connection, proofProposal) {
@@ -145,6 +150,17 @@ class ConsensusEpochProofProposalOperationHandler extends ConnectionOperationHan
         );
     }
 
+    async #buildProofProposalRejection(sessionId, resultCode) {
+        return await consensusMessageFactory(this.#wallet, this.config).buildProofProposalRejectionResponse(
+            sessionId,
+            resultCode
+        );
+    }
+
+    #isValidResponseSessionId(sessionId) {
+        return typeof sessionId === 'string' && sessionId.length > 0 && sessionId.length <= 64;
+    }
+
     async #sendEpochProofProposalApprovalResponse(
         messageId,
         connection,
@@ -152,11 +168,21 @@ class ConsensusEpochProofProposalOperationHandler extends ConnectionOperationHan
         resultCode
     ) {
         try {
-            const response = await this.#buildProofProposalApproval(
-                messageId,
-                proofProposal,
-                resultCode,
-            );
+            if (!this.#isValidResponseSessionId(messageId)) {
+                connection.end();
+                return;
+            }
+
+            const response = resultCode === ConsensusResultCode.OK
+                ? await this.#buildProofProposalApproval(
+                    messageId,
+                    proofProposal,
+                    resultCode,
+                )
+                : await this.#buildProofProposalRejection(
+                    messageId,
+                    resultCode
+                );
 
             await this.sendResponseAndMaybeClose(
                 connection,

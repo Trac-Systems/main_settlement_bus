@@ -27,7 +27,6 @@ import {
 } from '../../../src/utils/constants.js';
 import {config} from '../../helpers/config.js';
 import {testKeyPair1, testKeyPair2} from '../../fixtures/apply.fixtures.js';
-import {errorMessageIncludes} from '../../helpers/regexHelper.js';
 
 const TEST_VDF_PARAMS = Object.freeze({
     vdfDifficulty: 1,
@@ -132,6 +131,21 @@ async function buildProofProposalPayload(wallet, {
     return builder.getResult();
 }
 
+async function assertProtocolError(t, action, resultCode, messageIncludes) {
+    let error;
+    try {
+        await action();
+    } catch (err) {
+        error = err;
+    }
+
+    t.ok(error instanceof V1ConsensusProtocolError);
+    t.is(error.resultCode, resultCode);
+    if (messageIncludes) {
+        t.ok(error.message.includes(messageIncludes));
+    }
+}
+
 test('V1EpochProofProposalRequest validates proof proposal signature', async t => {
     const wallet = await createWallet();
     const genesisEpochHash = await buildGenesisEpochHash(wallet);
@@ -170,9 +184,11 @@ test('V1EpochProofProposalRequest rejects proposer that is not an indexer', asyn
     const validator = new V1EpochProofProposalRequest(config, createState({isIndexer: false}));
     const payload = await buildProofProposalPayload(wallet);
 
-    await t.exception(
+    await assertProtocolError(
+        t,
         async () => validator.validate(payload, {remotePublicKey: wallet.publicKey}),
-        errorMessageIncludes('Incoming address is not an indexer.')
+        ConsensusResultCode.INDEXER_ROLE_INVALID,
+        'Incoming address is not an indexer.'
     );
 });
 
@@ -188,9 +204,11 @@ test('V1EpochProofProposalRequest rejects unsupported proof proposal protocol ve
         }
     };
 
-    await t.exception(
+    await assertProtocolError(
+        t,
         async () => validator.validate(fakePayload, {remotePublicKey: wallet.publicKey}),
-        errorMessageIncludes('Unsupported proof proposal protocol version')
+        ConsensusResultCode.BAD_PROTOCOL_VERSION,
+        'Unsupported proof proposal protocol version'
     );
 });
 
@@ -211,9 +229,11 @@ test('V1EpochProofProposalRequest rejects invalid VDF parameters hash', async t 
         proof_proposal: fakeProofProposal
     };
 
-    await t.exception(
+    await assertProtocolError(
+        t,
         async () => validator.validate(fakePayload, {remotePublicKey: wallet.publicKey}),
-        errorMessageIncludes('VDF parameters hash is invalid')
+        ConsensusResultCode.VDF_PARAMETERS_HASH_INVALID,
+        'VDF parameters hash is invalid'
     );
 });
 
@@ -249,9 +269,11 @@ test('V1EpochProofProposalRequest rejects invalid proof proposal signature', asy
         }
     };
 
-    await t.exception(
+    await assertProtocolError(
+        t,
         async () => validator.validate(fakePayload, {remotePublicKey: wallet.publicKey}),
-        errorMessageIncludes('signature verification failed')
+        ConsensusResultCode.PROPOSAL_SIGNATURE_INVALID,
+        'signature verification failed'
     );
 });
 
@@ -273,9 +295,11 @@ test('V1EpochProofProposalRequest rejects invalid VDF proof', async t => {
         proof_proposal: fakeProofProposal
     };
 
-    await t.exception(
+    await assertProtocolError(
+        t,
         async () => validator.validate(fakePayload, {remotePublicKey: wallet.publicKey}),
-        errorMessageIncludes('VDF proof is invalid')
+        ConsensusResultCode.VDF_PROOF_INVALID,
+        'VDF proof is invalid'
     );
 });
 
@@ -295,9 +319,11 @@ test('V1EpochProofProposalRequest rejects proposer address mismatched with remot
     const validator = new V1EpochProofProposalRequest(config, createState());
     const proposer = addressToBuffer(wallet.address, config.addressPrefix);
 
-    t.exception(
+    await assertProtocolError(
+        t,
         () => validator.assertAddressWithRemotePublicKey(proposer, otherWallet.publicKey),
-        errorMessageIncludes('Address does not match remote public key')
+        ConsensusResultCode.PUBLIC_KEY_MISMATCH,
+        'Address does not match remote public key'
     );
 });
 
@@ -311,7 +337,7 @@ test('V1EpochProofProposalRequest rejects invalid proposer address as protocol e
         t.fail('should throw');
     } catch (error) {
         t.ok(error instanceof V1ConsensusProtocolError);
-        t.is(error.resultCode, ConsensusResultCode.UNEXPECTED_ERROR);
+        t.is(error.resultCode, ConsensusResultCode.ADDRESS_INVALID);
         t.ok(error.message.includes('Address is invalid'));
     }
 });
@@ -329,9 +355,69 @@ test('V1EpochProofProposalRequest rejects invalid proof proposal network id', as
         }
     };
 
-    await t.exception(
+    await assertProtocolError(
+        t,
         async () => validator.validate(fakePayload, {remotePublicKey: wallet.publicKey}),
-        errorMessageIncludes('Invalid proof proposal network id')
+        ConsensusResultCode.WRONG_NETWORK_ID,
+        'Invalid proof proposal network id'
+    );
+});
+
+test('V1EpochProofProposalRequest rejects missing payload type as invalid payload', async t => {
+    const validator = new V1EpochProofProposalRequest(config, createState());
+
+    await assertProtocolError(
+        t,
+        () => validator.isPayloadSchemaValid(undefined),
+        ConsensusResultCode.INVALID_PAYLOAD,
+        'Payload or payload type is missing'
+    );
+});
+
+test('V1EpochProofProposalRequest rejects invalid operation type', async t => {
+    const wallet = await createWallet();
+    const validator = new V1EpochProofProposalRequest(config, createState());
+    const payload = await buildProofProposalPayload(wallet);
+
+    await assertProtocolError(
+        t,
+        () => validator.isPayloadSchemaValid({...payload, type: 'proof'}),
+        ConsensusResultCode.OPERATION_TYPE_INVALID,
+        'Operation type must be an integer'
+    );
+
+    await assertProtocolError(
+        t,
+        () => validator.isPayloadSchemaValid({...payload, type: ConsensusOperationType.UNSPECIFIED}),
+        ConsensusResultCode.OPERATION_TYPE_INVALID,
+        'Operation type is unspecified'
+    );
+
+    await assertProtocolError(
+        t,
+        () => validator.isPayloadSchemaValid({...payload, type: 999}),
+        ConsensusResultCode.OPERATION_TYPE_INVALID,
+        'Unknown operation type'
+    );
+});
+
+test('V1EpochProofProposalRequest rejects invalid proof proposal schema with schema result code', async t => {
+    const wallet = await createWallet();
+    const validator = new V1EpochProofProposalRequest(config, createState());
+    const payload = await buildProofProposalPayload(wallet);
+    const invalidPayload = {
+        ...payload,
+        proof_proposal: {
+            ...payload.proof_proposal,
+            signature: b4a.alloc(63, 1)
+        }
+    };
+
+    await assertProtocolError(
+        t,
+        () => validator.isPayloadSchemaValid(invalidPayload),
+        ConsensusResultCode.SCHEMA_VALIDATION_FAILED,
+        'Payload is invalid'
     );
 });
 
@@ -345,7 +431,7 @@ test('V1EpochProofProposalRequest rejects proof proposal epoch that is not next 
         t.fail('should reject');
     } catch (error) {
         t.ok(error instanceof V1ConsensusProtocolError);
-        t.is(error.resultCode, ConsensusResultCode.UNEXPECTED_ERROR);
+        t.is(error.resultCode, ConsensusResultCode.EPOCH_INVALID);
         t.is(error.message, 'Unexpected epoch. Proof proposal must be 1 but got 2');
     }
 });
@@ -368,7 +454,7 @@ test('V1EpochProofProposalRequest rejects previous epoch record hash mismatch', 
         t.fail('should reject');
     } catch (error) {
         t.ok(error instanceof V1ConsensusProtocolError);
-        t.is(error.resultCode, ConsensusResultCode.UNEXPECTED_ERROR);
+        t.is(error.resultCode, ConsensusResultCode.PREVIOUS_EPOCH_RECORD_HASH_INVALID);
         t.is(error.message, expectedMessage);
     }
 });
