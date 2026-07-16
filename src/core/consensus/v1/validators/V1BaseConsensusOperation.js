@@ -317,14 +317,14 @@ class V1BaseConsensusOperation {
      * @throws {V1ConsensusProtocolError} When the remote address is not an indexer.
      */
     async validateAddressIsIndexer(remotePublicKey) {
-        // TODO: When we replace UNEXPECTED_ERROR with INVALID_ADDRESS_ASSERTION,
-        // we should handle this specific error to not only drop the connection but also blacklist the specific node.
+        // TODO: In the future, we should handle this specific error to not only drop the connection
+        // but also blacklist the specific node.
         // Such an error would mean that someone is trying to impersonate an indexer.
         const address = tracCryptoApi.address.encode(this._config.addressPrefix, remotePublicKey);
         const isIndexer = await this._state.isIndexerAddress(address);
         if (!isIndexer) {
             throw new V1ConsensusProtocolError(
-                ConsensusResultCode.UNEXPECTED_ERROR,
+                ConsensusResultCode.INDEXER_ROLE_INVALID,
                 'Incoming address is not an indexer.'
             )
         }

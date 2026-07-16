@@ -17,7 +17,6 @@ import {
 import {config} from '../../helpers/config.js';
 import {testKeyPair1, testKeyPair2, testKeyPair3} from '../../fixtures/apply.fixtures.js';
 import {createMessage, uint32ToBuffer} from '../../../src/utils/buffer.js';
-import { errorMessageIncludes } from '../../helpers/regexHelper.js';
 
 const previousEpochRecordHash = b4a.alloc(32, 1);
 const vdfParametersHash = b4a.alloc(32, 2);
@@ -136,13 +135,15 @@ test('V1EpochProofProposalApproval rejects approver that is not an indexer', asy
     const proofProposalPayload = await buildProofProposalPayload(proposerWallet);
     const approvalPayload = await buildProofProposalApprovalPayload(approverWallet, proofProposalPayload);
 
-    await t.exception(
+    await assertProtocolError(
+        t,
         async () => validator.validate(
             approvalPayload,
             {remotePublicKey: approverWallet.publicKey},
             proofProposalPayload.proof_proposal
         ),
-        errorMessageIncludes('Incoming address is not an indexer.')
+        ConsensusResultCode.INDEXER_ROLE_INVALID,
+        'Incoming address is not an indexer.'
     );
 });
 

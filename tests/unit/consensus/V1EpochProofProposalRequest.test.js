@@ -27,7 +27,6 @@ import {
 } from '../../../src/utils/constants.js';
 import {config} from '../../helpers/config.js';
 import {testKeyPair1, testKeyPair2} from '../../fixtures/apply.fixtures.js';
-import { errorMessageIncludes } from '../../helpers/regexHelper.js';
 
 const TEST_VDF_PARAMS = Object.freeze({
     vdfDifficulty: 1,
@@ -185,9 +184,11 @@ test('V1EpochProofProposalRequest rejects proposer that is not an indexer', asyn
     const validator = new V1EpochProofProposalRequest(config, createState({isIndexer: false}));
     const payload = await buildProofProposalPayload(wallet);
 
-    await t.exception(
+    await assertProtocolError(
+        t,
         async () => validator.validate(payload, {remotePublicKey: wallet.publicKey}),
-        errorMessageIncludes('Incoming address is not an indexer.')
+        ConsensusResultCode.INDEXER_ROLE_INVALID,
+        'Incoming address is not an indexer.'
     );
 });
 
@@ -430,7 +431,7 @@ test('V1EpochProofProposalRequest rejects proof proposal epoch that is not next 
         t.fail('should reject');
     } catch (error) {
         t.ok(error instanceof V1ConsensusProtocolError);
-        t.is(error.resultCode, ConsensusResultCode.UNEXPECTED_ERROR);
+        t.is(error.resultCode, ConsensusResultCode.EPOCH_INVALID);
         t.is(error.message, 'Unexpected epoch. Proof proposal must be 1 but got 2');
     }
 });
@@ -453,7 +454,7 @@ test('V1EpochProofProposalRequest rejects previous epoch record hash mismatch', 
         t.fail('should reject');
     } catch (error) {
         t.ok(error instanceof V1ConsensusProtocolError);
-        t.is(error.resultCode, ConsensusResultCode.UNEXPECTED_ERROR);
+        t.is(error.resultCode, ConsensusResultCode.PREVIOUS_EPOCH_RECORD_HASH_INVALID);
         t.is(error.message, expectedMessage);
     }
 });

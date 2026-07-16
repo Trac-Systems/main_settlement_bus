@@ -175,7 +175,7 @@ class V1EpochProofProposalRequest extends V1BaseConsensusOperation {
         const proofProposalEpoch = proofProposal.epoch.readBigUInt64BE(0);
         if (proofProposalEpoch !== currentEpoch + 1n) {
             throw new V1ConsensusProtocolError(
-                ConsensusResultCode.UNEXPECTED_ERROR,
+                ConsensusResultCode.EPOCH_INVALID,
                 `Unexpected epoch. Proof proposal must be ${currentEpoch + 1n} but got ${proofProposalEpoch}`
             );
         }
@@ -197,7 +197,7 @@ class V1EpochProofProposalRequest extends V1BaseConsensusOperation {
         const epochHashInProofProposal = proofProposal.previous_epoch_record_hash;
         if (!b4a.equals(currentEpochHash, epochHashInProofProposal)) {
             throw new V1ConsensusProtocolError(
-                ConsensusResultCode.UNEXPECTED_ERROR,
+                ConsensusResultCode.PREVIOUS_EPOCH_RECORD_HASH_INVALID,
                 `Previous epoch record hash mismatch for epoch ${currentEpoch}: expected ${currentEpochHash.toString('hex')}, got ${epochHashInProofProposal.toString('hex')}`
             );
         }

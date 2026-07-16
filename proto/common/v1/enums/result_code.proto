@@ -8,6 +8,10 @@ package common.v1;
 // Use [deprecated = true] while phasing out a value that still remains in the schema.
 // If a value is removed, reserve its number (and preferably its name).
 
+// NOTE: These result codes should be simplified and reorganized in a future cleanup.
+// Until then, existing numeric values must remain unchanged for backward compatibility.
+// Changing them is a breaking protocol change and may require a hard fork.
+
 enum ResultCode {
   // Registry ranges:
   // 0-99: generic/shared and existing network V1 codes.
