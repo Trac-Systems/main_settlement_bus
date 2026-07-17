@@ -8,17 +8,17 @@ import IndexerConnectionManager from '../../../../src/core/consensus/services/In
 const mockConfig = { addressPrefix: 'trac' };
 const mockLogger = { debug() {} };
 const mockMessages = {
-    createProtomux: (connection) => connection.protocolSessions.indexers,
+    createProtomux: (connection) => connection.protocolSessions.indexer,
     attachChannel(connection) {
         connection.protocolSessions ??= {};
-        connection.protocolSessions.indexers = this.createProtomux(connection);
+        connection.protocolSessions.indexer = this.createProtomux(connection);
     },
 };
 
 const makeConnection = (publicKeyHex) => {
     const emitter = new EventEmitter();
     emitter.protocolSessions = {};
-    emitter.protocolSessions.indexers = {
+    emitter.protocolSessions.indexer = {
         send: sinon.stub().resolves({ ok: true }),
         sendAndForget: sinon.stub(),
         close: sinon.stub(),
@@ -126,8 +126,8 @@ test('IndexerConnectionManager', () => {
 
             await manager.send(testKeyPair1.publicKey, { type: 'ping' });
 
-            t.ok(conn.protocolSessions.indexers.send.calledOnce);
-            t.alike(conn.protocolSessions.indexers.send.firstCall.args[0], { type: 'ping' });
+            t.ok(conn.protocolSessions.indexer.send.calledOnce);
+            t.alike(conn.protocolSessions.indexer.send.firstCall.args[0], { type: 'ping' });
         });
 
         test('throws when indexer is not connected', async t => {
@@ -175,8 +175,8 @@ test('IndexerConnectionManager', () => {
 
             manager.sendAndForget(testKeyPair1.publicKey, { type: 'ping' });
 
-            t.ok(conn.protocolSessions.indexers.sendAndForget.calledOnce);
-            t.alike(conn.protocolSessions.indexers.sendAndForget.firstCall.args[0], { type: 'ping' });
+            t.ok(conn.protocolSessions.indexer.sendAndForget.calledOnce);
+            t.alike(conn.protocolSessions.indexer.sendAndForget.firstCall.args[0], { type: 'ping' });
         });
 
         test('is silent when indexer is not connected', async t => {

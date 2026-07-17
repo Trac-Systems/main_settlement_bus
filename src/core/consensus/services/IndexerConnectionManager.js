@@ -20,7 +20,7 @@ class IndexerConnectionManager extends PeerConnectionManager {
         if (connection && entry.connection !== connection) return;
 
         const targetConnection = connection ?? entry.connection;
-        targetConnection.protocolSessions.indexers.close();
+        targetConnection.protocolSessions.indexer.close();
         this._connections.delete(key);
     }
 
@@ -29,13 +29,13 @@ class IndexerConnectionManager extends PeerConnectionManager {
         if (!connection) {
             throw new Error(`PeerConnectionManager: no session for ${this._toHexString(publicKey)}`);
         }
-        return connection.protocolSessions.indexers.send(message);
+        return connection.protocolSessions.indexer.send(message);
     }
 
     sendAndForget(publicKey, message) {
         const connection = this.getConnection(publicKey);
         if (!connection) return;
-        connection.protocolSessions.indexers.sendAndForget(message);
+        connection.protocolSessions.indexer.sendAndForget(message);
     }
 
     prettyPrint() {

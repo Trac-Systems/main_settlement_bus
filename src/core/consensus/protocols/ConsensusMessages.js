@@ -28,8 +28,8 @@ class ConsensusMessages {
      */
     attachChannel(connection) {
         connection.protocolSessions ??= {};
-        if (connection.protocolSessions.indexers) return;
-        connection.protocolSessions.indexers = this.createProtomux(connection);
+        if (connection.protocolSessions.indexer) return;
+        connection.protocolSessions.indexer = this.createProtomux(connection);
     }
 
     /**
