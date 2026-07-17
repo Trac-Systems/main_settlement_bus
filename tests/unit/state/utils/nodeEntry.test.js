@@ -121,6 +121,38 @@ test('Node Entry - init - returns empty buffer on invalid role', t => {
     t.is(initialized.length, 0, 'invalid role produces empty buffer');
 });
 
+test('Node Entry - init - returns empty buffer on invalid wk', t => {
+    const invalidWk = randomBuffer(10) // invalid size
+    const initialized = initNodeEntry(invalidWk, NodeRole.WHITELISTED)
+
+    t.is(initialized.length, 0, 'invalid wk produces empty buffer');
+});
+
+test('Node Entry - init - returns empty buffer on invalid balance', t => {
+    const wk = randomBuffer(WRITER_BYTE_LENGTH)
+    const invalidBalance = randomBuffer(10) // invalid size
+    const initialized = initNodeEntry(wk, NodeRole.WHITELISTED, invalidBalance)
+
+    t.is(initialized.length, 0, 'invalid balance produces empty buffer');
+});
+
+test('Node Entry - init - returns empty buffer on invalid license', t => {
+    const wk = randomBuffer(WRITER_BYTE_LENGTH)
+    const invalidLicense = randomBuffer(10) // invalid size
+    const initialized = initNodeEntry(wk, NodeRole.WHITELISTED, TEN_THOUSAND_VALUE, invalidLicense)
+
+    t.is(initialized.length, 0, 'invalid license produces empty buffer');
+});
+
+test('Node Entry - init - returns empty buffer on invalid staked balance', t => {
+    const wk = randomBuffer(WRITER_BYTE_LENGTH)
+    const license = randomBuffer(LICENSE_BYTE_LENGTH)
+    const invalidStakedBalance = randomBuffer(10) // invalid size
+    const initialized = initNodeEntry(wk, NodeRole.WHITELISTED, TEN_THOUSAND_VALUE, license, invalidStakedBalance)
+
+    t.is(initialized.length, 0, 'invalid staked balance produces empty buffer');
+});
+
 // Test encode()
 test('Node Entry - encode and decode - Happy Path', t => {
     const node = {

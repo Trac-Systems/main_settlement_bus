@@ -17,8 +17,8 @@ const roleIsIndexer = role => [NodeRole.INDEXER].includes(role);
  * Initializes a new node entry with given writing key and role and the balance is set to zero.
  * Creates a buffer in format: [NODE_ROLE_MASK(1)][WRITING_KEY(32)][BALANCE(16)][LICENSE(4)][STAKED_BALANCE(16)]
  *
- * @param {Buffer} writingKey - The writing key for the node (must be 32 bytes)
- * @param {number} role - Initial role from NodeRole enum 
+ * @param {Buffer} wk - The writing key for the node (must be 32 bytes)
+ * @param {number} role - Initial role from NodeRole enum
  * @param {Buffer} balance - Initial balance from node (must be 16 bytes)
  * @param {Buffer} license - Initial license from node (must be 4 bytes)
  * @param {Buffer} stakedBalance - Initial staked balance from node (must be 16 bytes)
@@ -29,8 +29,7 @@ export function init(wk, role, balance = ZERO_BALANCE, license = ZERO_LICENSE, s
     if (!isNodeRoleValid(role)) {
         console.error('Invalid node role provided');
         return b4a.alloc(0);
-    }
-    
+    }    
     const node = { wk, isWhitelisted: roleIsWhitelisted(role), isWriter: roleIsWriter(role), isIndexer: roleIsIndexer(role), balance, license, stakedBalance };
     return encode(node);
 }
@@ -178,15 +177,12 @@ export function isIndexer(nodeEntry) {
 }
 
 /**
- * Updates the role flags (writer/indexer) of an existing node entry buffer in-place.
- * Does not decode or reallocate memory; only updates the first byte (role mask).
- * If the buffer is not the expected size, the function does nothing.
+ * Sets the role mask of an existing node entry buffer, returning a new buffer.
+ * Does not decode the rest of the entry; only the first byte (role mask) changes.
  *
  * @param {Buffer} nodeEntry - The encoded node entry buffer to update.
- * @param {boolean} isWhitelisted - Whether the node should be marked as whitelisted.
- * @param {boolean} isWriter - Whether the node should be marked as a writer.
- * @param {boolean} isIndexer - Whether the node should be marked as an indexer.
- * @returns {Buffer | null} The updated node entry buffer or null if the input is invalid.
+ * @param {number} nodeRole - The new role bitmask (from NodeRole enum).
+ * @returns {Buffer | null} A new node entry buffer with the updated role, or null if the input is invalid.
  */
 export function setRole(nodeEntry, nodeRole) {
     if (!isNodeRoleValid(nodeRole)) {
@@ -244,7 +240,8 @@ export function setBalance(nodeEntry, balance) {
     }
 }
 
-/** Sets the license ID.
+/**
+ * Sets the license ID.
  * @param {Buffer} nodeEntry - The node entry buffer.
  * @param {Buffer} license - The buffer representation of the license ID
  * @returns {Buffer|null} The updated node entry buffer, or null if invalid.
