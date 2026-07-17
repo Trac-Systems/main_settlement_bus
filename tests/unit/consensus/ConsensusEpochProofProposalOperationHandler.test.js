@@ -19,6 +19,7 @@ import {
     ConsensusOperationType,
     ConsensusResultCode
 } from '../../../src/utils/constants.js';
+import {PROOF_OF_TIME_SCHEMA_ID} from '../../../src/core/ledger-config/index.js';
 
 const originalRequestValidate = V1EpochProofProposalRequest.prototype.validate;
 const originalApprovalValidate = V1EpochProofProposalApproval.prototype.validate;
@@ -92,6 +93,18 @@ function setupHandler(t, calls, options = {}) {
     t.teardown(restorePatches);
 
     const state = options.state ?? new EventEmitter();
+    if (typeof state.requireLedgerConfigConsensusReady !== 'function') {
+        state.requireLedgerConfigConsensusReady = async () => ({
+            descriptor: {
+                schemaId: PROOF_OF_TIME_SCHEMA_ID,
+                configId: consensusV1OperationFixtures.proofProposal.config_id
+            },
+            adapterConfig: {
+                vdfDifficulty: 1,
+                vdfDiscriminantSize: 2048
+            }
+        });
+    }
     for (const [eventName, name] of consensusEventNames) {
         const listener = context => {
             calls.push({ name, context });
@@ -121,7 +134,7 @@ async function verifyProofProposalApprovalSignature(proofProposal, approval, pub
         proofProposal.epoch,
         proofProposal.previous_epoch_record_hash,
         proofProposal.proposer,
-        proofProposal.vdf_parameters_hash,
+        proofProposal.config_id,
         proofProposal.vdf_proof,
         approval.approver,
         proofProposal.signature
@@ -202,6 +215,67 @@ test('handleRequest validates proposal, emits success events, and sends signed O
         wallet.publicKey
     ));
     t.ok(await verifyProofProposalResponseSignature(proofProposalResponse, wallet.publicKey));
+});
+
+test('handleRequest does not sign an OK approval after the active config changes', async t => {
+    const wallet = await createWallet();
+    const calls = [];
+    const message = proofProposalMessage();
+    const connection = createConnection(calls);
+    const state = new EventEmitter();
+    const matchingActiveConfig = {
+        descriptor: {
+            schemaId: PROOF_OF_TIME_SCHEMA_ID,
+            configId: message.proof_proposal.config_id
+        },
+        adapterConfig: {
+            vdfDifficulty: 1,
+            vdfDiscriminantSize: 2048
+        }
+    };
+    const changedActiveConfig = {
+        ...matchingActiveConfig,
+        descriptor: {
+            ...matchingActiveConfig.descriptor,
+            configId: b4a.alloc(32, 9)
+        }
+    };
+    let configReads = 0;
+    state.requireLedgerConfigConsensusReady = async () => {
+        configReads++;
+        return configReads === 1 ? matchingActiveConfig : changedActiveConfig;
+    };
+    const displayErrors = [];
+    const handler = setupHandler(t, calls, {
+        state,
+        wallet,
+        requestValidate: async () => {
+            calls.push({ name: 'validateRequest' });
+            const activeConfig = await state.requireLedgerConfigConsensusReady();
+            t.ok(b4a.equals(
+                message.proof_proposal.config_id,
+                activeConfig.descriptor.configId
+            ));
+            return true;
+        }
+    });
+    handler.displayError = (step, remotePublicKey, error) => {
+        displayErrors.push({step, remotePublicKey, error});
+    };
+
+    await handler.handleRequest(message, connection);
+
+    t.is(configReads, 2, 'config is checked during validation and immediately before approval signing');
+    t.alike(callNames(calls), [
+        'onEpochProposalReceived',
+        'validateRequest',
+        'onEpochProposalValidationSuccess',
+        'end'
+    ]);
+    t.is(connection.sent.length, 0, 'no stale approval is sent');
+    t.ok(connection.ended);
+    t.is(displayErrors.length, 1);
+    t.ok(displayErrors[0].error.message.includes('changed before signing'));
 });
 
 test('handleRequest maps consensus validation errors to signed rejection responses', async t => {

@@ -21,7 +21,8 @@ export const EntryType = Object.freeze({
     EPOCH_CURRENT: '/epoch/current',
     EPOCH: `/epoch/`,              // Epoch hashes are stored under `/epoch/<n>`
     EPOCH_HASH: `/epochHash/`,     // Epoch proof payloads are stored under `/epochHash/<epochHashHex>`
-    VDF_PARAMS: '/parameters/vdf'
+    LEDGER_CONFIG_CURRENT: '/ledger-config/current',
+    LEDGER_CONFIG_ROOT: '/ledger-config/roots/'
 });
 
 //ATTENTION - THIS IS USED IN THE APPLY FUNCTION!
@@ -41,7 +42,7 @@ export const OperationType = Object.freeze({
     TRANSFER: ApplyOperationType.TRANSFER,
     SET_EPOCH: ApplyOperationType.SET_EPOCH,
     SET_GENESIS_EPOCH: ApplyOperationType.SET_GENESIS_EPOCH,
-    SET_VDF_PARAMS: ApplyOperationType.SET_VDF_PARAMS,
+    SET_LEDGER_CONFIG: ApplyOperationType.SET_LEDGER_CONFIG,
 });
 
 export const NetworkOperationType = Object.freeze({
@@ -156,7 +157,8 @@ export const CustomEventType = Object.freeze({
     EPOCH_PROPOSAL_APPROVAL_RECEIVED: 'msb:epoch_proposal_approval_received',
     EPOCH_PROPOSAL_APPROVAL_SUCCESS: 'msb:epoch_proposal_approval_success',
     EPOCH_PROPOSAL_APPROVAL_FAILURE: 'msb:epoch_proposal_approval_failure',
-    EPOCH_CREATED: 'msb:epoch_created'
+    EPOCH_CREATED: 'msb:epoch_created',
+    LEDGER_CONFIG_WITNESS: 'msb:ledger_config_witness'
 });
 
 // Token
@@ -200,8 +202,6 @@ export const PROTOCOL_VERSION_BYTE_LENGTH = 1; // 1 BYTE 0-255
 export const NETWORK_ID_BYTE_LENGTH = 2; // 2 BYTES - UINT16
 export const EPOCH_BYTE_LENGTH = 8; // 8 BYTES - UINT64
 export const VDF_BLOB_PROOF_SIZE = 516;
-export const VDF_DIFFICULTY_SIZE = 4; // 4 BYTES - UINT32
-export const VDF_DISCRIMINANT_SIZE = 2; // 2 BYTES - UINT16
 
 // index.js
 export const BOOTSTRAP_HEXSTRING_LENGTH = 64;

@@ -18,7 +18,9 @@ async function runStateTests() {
     await import('./txOperation/state.apply.txOperation.test.js');
     await import('./transfer/state.apply.transfer.test.js');
     await import('./adminRecovery/state.apply.adminRecovery.test.js');
-    await import('./setVdfParams/state.apply.setVdfParams.test.js');
+    await import('./setLedgerConfig/state.apply.setLedgerConfig.test.js');
+    await import('./setGenesisEpoch/state.apply.setGenesisEpoch.test.js');
+    await import('./setEpoch/state.apply.setEpoch.test.js');
     test.resume();
 }
 

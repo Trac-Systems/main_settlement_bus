@@ -9,15 +9,13 @@ import V1EpochProofProposalRequest from '../../../src/core/consensus/v1/validato
 import {V1ConsensusProtocolError} from '../../../src/core/consensus/v1/V1ConsensusProtocolError.js';
 import {addressToBuffer} from '../../../src/core/state/utils/address.js';
 import {
-    createGenesisEpochProof,
-    encodeVdfParameters
+    createGenesisEpochProof
 } from '../../../src/core/state/utils/epochProof.js';
 import {
     createMessage,
     uint8ToBuffer,
     uint16ToBuffer,
-    uint64ToBuffer,
-    uint32ToBuffer
+    uint64ToBuffer
 } from '../../../src/utils/buffer.js';
 import {
     ConsensusOperationType,
@@ -28,6 +26,7 @@ import {
 import {config} from '../../helpers/config.js';
 import {testKeyPair1, testKeyPair2} from '../../fixtures/apply.fixtures.js';
 import {errorMessageIncludes} from '../../helpers/regexHelper.js';
+import {PROOF_OF_TIME_SCHEMA_ID} from '../../../src/core/ledger-config/index.js';
 
 const TEST_VDF_PARAMS = Object.freeze({
     vdfDifficulty: 1,
@@ -35,20 +34,28 @@ const TEST_VDF_PARAMS = Object.freeze({
 });
 const vdfProofCache = new Map();
 const defaultPreviousEpochRecordHash = b4a.alloc(32, 1);
+const TEST_CONFIG_ID = b4a.alloc(32, 7);
 
 function createState({
     currentEpoch = 0n,
     currentEpochHash = defaultPreviousEpochRecordHash,
     vdfDifficulty = TEST_VDF_PARAMS.vdfDifficulty,
     vdfDiscriminantSize = TEST_VDF_PARAMS.vdfDiscriminantSize,
+    configId = TEST_CONFIG_ID,
     isIndexer = true
 } = {}) {
     return {
         requireCurrentEpoch: async () => currentEpoch,
         requireEpoch: async () => currentEpochHash,
-        requireSignedVDFParams: async () => ({
-            vdfDifficulty,
-            vdfDiscriminantSize
+        requireLedgerConfigConsensusReady: async () => ({
+            descriptor: {
+                schemaId: PROOF_OF_TIME_SCHEMA_ID,
+                configId
+            },
+            adapterConfig: {
+                vdfDifficulty,
+                vdfDiscriminantSize
+            }
         }),
         isIndexerAddress: async () => isIndexer
     };
@@ -58,23 +65,10 @@ async function createWallet(keyPair = testKeyPair1) {
     return await new WalletProvider(config).fromSecretKey(keyPair.secretKey);
 }
 
-async function buildGenesisEpochHash(wallet, vdfParams = TEST_VDF_PARAMS) {
-    const vdfParamsEntry = encodeVdfParameters(
-        uint32ToBuffer(vdfParams.vdfDifficulty),
-        uint16ToBuffer(vdfParams.vdfDiscriminantSize)
-    );
-    const genesisEpoch = await createGenesisEpochProof(config, wallet.address, vdfParamsEntry);
+async function buildGenesisEpochHash(wallet, configId = TEST_CONFIG_ID) {
+    const genesisEpoch = createGenesisEpochProof(config, wallet.address, configId);
 
     return await tracCryptoApi.hash.blake3(genesisEpoch);
-}
-
-async function buildVdfParametersHash(vdfParams = TEST_VDF_PARAMS) {
-    const message = createMessage(
-        uint32ToBuffer(vdfParams.vdfDifficulty),
-        uint16ToBuffer(vdfParams.vdfDiscriminantSize)
-    );
-
-    return await tracCryptoApi.hash.blake3(message);
 }
 
 async function buildVdfProof(challengeData, vdfParams = TEST_VDF_PARAMS) {
@@ -98,6 +92,7 @@ async function buildVdfProof(challengeData, vdfParams = TEST_VDF_PARAMS) {
 async function buildProofProposalPayload(wallet, {
     epoch = 1,
     previousEpochRecordHash = defaultPreviousEpochRecordHash,
+    configId = TEST_CONFIG_ID,
     vdfParams = TEST_VDF_PARAMS
 } = {}) {
     const builder = new ConsensusMessageBuilder(wallet, config);
@@ -105,14 +100,13 @@ async function buildProofProposalPayload(wallet, {
     const networkId = uint16ToBuffer(config.networkId);
     const epochBuffer = uint64ToBuffer(epoch);
     const proposer = addressToBuffer(wallet.address, config.addressPrefix);
-    const vdfParametersHash = await buildVdfParametersHash(vdfParams);
     const challengeData = createMessage(
         protocolVersion,
         networkId,
         epochBuffer,
         previousEpochRecordHash,
         proposer,
-        vdfParametersHash
+        configId
     );
     const vdfProof = await buildVdfProof(challengeData, vdfParams);
 
@@ -125,7 +119,7 @@ async function buildProofProposalPayload(wallet, {
         .setEpoch(epoch)
         .setPreviousEpochRecordHash(previousEpochRecordHash)
         .setProposer(wallet.address)
-        .setVdfParametersHash(vdfParametersHash)
+        .setConfigId(configId)
         .setVdfProof(vdfProof)
         .buildPayload();
 
@@ -140,16 +134,16 @@ test('V1EpochProofProposalRequest validates proof proposal signature', async t =
         currentEpochHash: genesisEpochHash
     });
     const requireCurrentEpoch = state.requireCurrentEpoch;
-    const requireSignedVDFParams = state.requireSignedVDFParams;
+    const requireLedgerConfigConsensusReady = state.requireLedgerConfigConsensusReady;
     let currentEpochReads = 0;
-    let vdfParamsReads = 0;
+    let ledgerConfigReads = 0;
     state.requireCurrentEpoch = async () => {
         currentEpochReads++;
         return await requireCurrentEpoch();
     };
-    state.requireSignedVDFParams = async () => {
-        vdfParamsReads++;
-        return await requireSignedVDFParams();
+    state.requireLedgerConfigConsensusReady = async () => {
+        ledgerConfigReads++;
+        return await requireLedgerConfigConsensusReady();
     };
     const validator = new V1EpochProofProposalRequest(config, state);
     const payload = await buildProofProposalPayload(wallet, {
@@ -161,7 +155,7 @@ test('V1EpochProofProposalRequest validates proof proposal signature', async t =
     await validator.validate(payload, {remotePublicKey: wallet.publicKey});
 
     t.is(currentEpochReads, 1);
-    t.is(vdfParamsReads, 1);
+    t.is(ledgerConfigReads, 1);
     t.pass();
 });
 
@@ -194,13 +188,13 @@ test('V1EpochProofProposalRequest rejects unsupported proof proposal protocol ve
     );
 });
 
-test('V1EpochProofProposalRequest rejects invalid VDF parameters hash', async t => {
+test('V1EpochProofProposalRequest rejects a stale ledger config id', async t => {
     const wallet = await createWallet();
     const validator = new V1EpochProofProposalRequest(config, createState());
     const payload = await buildProofProposalPayload(wallet);
     const fakeProofProposal = {
         ...payload.proof_proposal,
-        vdf_parameters_hash: b4a.alloc(32, 9)
+        config_id: b4a.alloc(32, 9)
     };
     const challengeData = validator.buildProofProposalChallengeData(fakeProofProposal);
     const signatureMessage = createMessage(challengeData, fakeProofProposal.vdf_proof);
@@ -213,7 +207,7 @@ test('V1EpochProofProposalRequest rejects invalid VDF parameters hash', async t 
 
     await t.exception(
         async () => validator.validate(fakePayload, {remotePublicKey: wallet.publicKey}),
-        errorMessageIncludes('VDF parameters hash is invalid')
+        errorMessageIncludes('config id does not match the active ledger config')
     );
 });
 
@@ -229,7 +223,7 @@ test('V1EpochProofProposalRequest builds proof proposal challenge data from fiel
         proofProposal.epoch,
         proofProposal.previous_epoch_record_hash,
         proofProposal.proposer,
-        proofProposal.vdf_parameters_hash
+        proofProposal.config_id
     );
     const signatureMessage = createMessage(expectedChallengeData, proofProposal.vdf_proof);
 

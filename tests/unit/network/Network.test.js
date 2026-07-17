@@ -3,6 +3,7 @@ import sinon from 'sinon';
 import b4a from 'b4a';
 import EventEmitter from 'bare-events';
 import { CONNECTION_STATUS, CustomEventType } from '../../../src/utils/constants.js';
+import { PROOF_OF_TIME_SCHEMA_ID } from '../../../src/core/ledger-config/index.js';
 
 const isBareRuntime = typeof globalThis.Bare !== 'undefined';
 
@@ -27,10 +28,15 @@ function createMockConnection(publicKeyHex, { withProtocolSession = true, withCo
     };
 }
 
-async function loadNetwork() {
+async function loadNetwork({
+    isIndexer = false,
+    ledgerConfigSynchronizer = null,
+    requireLedgerConfigConsensusReady = sinon.stub().resolves(null),
+} = {}) {
     const { default: esmock } = await import('esmock');
     let swarmInstance = null;
     let connectionManagerInstance = null;
+    let epochProofProposalServiceInstance = null;
 
     class HyperswarmMock extends EventEmitter {
         constructor() {
@@ -100,6 +106,11 @@ async function loadNetwork() {
         async stop() {}
     }
 
+    class IndexerObserverServiceMock {
+        start() {}
+        async stop() {}
+    }
+
     class MessageOrchestratorMock {
         setWallet() {}
     }
@@ -123,9 +134,13 @@ async function loadNetwork() {
     }
 
     class EpochProofProposalServiceMock {
+        constructor() {
+            this.start = sinon.stub();
+            this.stop = sinon.stub().resolves();
+            this.close = sinon.stub().resolves();
+            epochProofProposalServiceInstance = this;
+        }
         async ready() {}
-        start() {}
-        async close() {}
     }
 
     class LoggerMock {
@@ -191,6 +206,7 @@ async function loadNetwork() {
         hyperswarm: HyperswarmMock,
         '../../../src/core/network/services/TransactionPoolService.js': { default: TransactionPoolServiceMock },
         '../../../src/core/network/services/ValidatorObserverService.js': { default: ValidatorObserverServiceMock },
+        '../../../src/core/consensus/services/IndexerObserverService.js': { default: IndexerObserverServiceMock },
         '../../../src/core/network/services/ConnectionManager.js': { default: ConnectionManagerMock },
         '../../../src/core/network/services/MessageOrchestrator.js': { default: MessageOrchestratorMock },
         '../../../src/core/network/services/TransactionRateLimiterService.js': { default: TransactionRateLimiterServiceMock },
@@ -229,13 +245,21 @@ async function loadNetwork() {
     const store = new CorestoreMock();
     const state = new EventEmitter();
     state.isAdmin = async () => false;
-    state.isIndexer = () => false;
+    state.isIndexer = sinon.stub().returns(isIndexer);
     state.indexerCount = async () => 0;
     state.isAdminAddress = async () => false;
-    const network = new Network(state, store, config, wallet);
+    state.requireLedgerConfigConsensusReady = requireLedgerConfigConsensusReady;
+    const network = new Network(state, store, config, wallet, ledgerConfigSynchronizer);
     await network.ready()
 
-    return { network, store, swarmInstance, connectionManagerInstance, state };
+    return {
+        network,
+        store,
+        swarmInstance,
+        connectionManagerInstance,
+        state,
+        epochProofProposalServiceInstance,
+    };
 }
 
 if (isBareRuntime) {
@@ -431,5 +455,48 @@ if (isBareRuntime) {
         t.is(network.pendingConnectionsCount(), 2, 'increments for each pending');
 
         t.teardown(async () => await network.close());
+    });
+
+    test('Network gates only epoch-proof production on fresh Model B readiness', async t => {
+        const synchronizer = new EventEmitter();
+        const guard = sinon.stub().rejects(new Error('ledger config not ready'));
+        const {
+            network,
+            swarmInstance,
+            epochProofProposalServiceInstance,
+        } = await loadNetwork({
+            isIndexer: true,
+            ledgerConfigSynchronizer: synchronizer,
+            requireLedgerConfigConsensusReady: guard,
+        });
+
+        t.ok(swarmInstance.join.calledOnce, 'replication starts while consensus is gated');
+        t.is(epochProofProposalServiceInstance.start.callCount, 0);
+        t.ok(epochProofProposalServiceInstance.stop.calledOnce);
+
+        guard.resolves({
+            descriptor: {
+                schemaId: PROOF_OF_TIME_SCHEMA_ID,
+                configId: b4a.alloc(32, 7)
+            },
+            adapterConfig: {
+                vdfDifficulty: 1,
+                vdfDiscriminantSize: 2048
+            }
+        });
+        synchronizer.emit('status', 'CONSENSUS_READY', 'CONFIG_VERIFYING');
+        await new Promise(resolve => setTimeout(resolve, 0));
+
+        t.ok(epochProofProposalServiceInstance.start.calledOnce,
+            'epoch proof production starts after a fresh signed-config guard');
+
+        guard.rejects(new Error('signed descriptor changed'));
+        synchronizer.emit('status', 'NOT_READY', 'CONSENSUS_READY');
+        await new Promise(resolve => setTimeout(resolve, 0));
+        t.ok(epochProofProposalServiceInstance.stop.callCount >= 2,
+            'a descriptor change stops epoch proof production');
+
+        await network.close();
+        t.is(synchronizer.listenerCount('status'), 0, 'status listener is removed on close');
     });
 }

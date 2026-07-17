@@ -101,7 +101,7 @@ class ConsensusValidationSchema {
                     epoch: {type: 'buffer', length: EPOCH_BYTE_LENGTH, required: true},
                     previous_epoch_record_hash: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true},
                     proposer: {type: 'buffer', length: this.#config.addressLength, required: true},
-                    vdf_parameters_hash: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true},
+                    config_id: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true},
                     vdf_proof: {type: 'buffer', length: VDF_BLOB_PROOF_SIZE, required: true},
                     signature: {type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true},
                 }

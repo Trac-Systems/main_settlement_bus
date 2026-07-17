@@ -21,7 +21,7 @@ const makeProofProposalPayload = (epoch, proofProposalOverrides = {}) => ({
         epoch,
         previous_epoch_record_hash: b4a.alloc(32, 1),
         proposer: b4a.alloc(config.addressLength, 2),
-        vdf_parameters_hash: b4a.alloc(32, 3),
+        config_id: b4a.alloc(32, 3),
         vdf_proof: b4a.alloc(VDF_BLOB_PROOF_SIZE, 4),
         signature: b4a.alloc(64, 5),
         ...proofProposalOverrides

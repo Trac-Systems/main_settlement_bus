@@ -38,8 +38,9 @@ export const COMMANDS = {
     GET_TXS_HASHES: "/get_txs_hashes",
     GET_TX_DETAILS: "/get_tx_details",
     GET_EXTENDED_TX_DETAILS: "/get_extended_tx_details",
+    LEDGER_CONFIG: "/ledger_config",
     EPOCH_GENESIS_INITIALIZATION: "/init_genesis",
-    SET_VDF_PARAMS: "/set_vdf_params"
+    SET_LEDGER_CONFIG: "/set_ledger_config"
 };
 
 export class CommandHandler {
@@ -48,8 +49,7 @@ export class CommandHandler {
     #wallet;
     #handlers;
     #pendingConfirmation = null;
-    #pendingGenesisInitialization = null;
-    #pendingSetVdfParams = null;
+    #pendingLedgerConfig = null;
 
     constructor({ config, msb, handleClose, wallet }) {
         this.#msb = msb;
@@ -63,12 +63,8 @@ export class CommandHandler {
             return this.#handlePendingConfirmation(input);
         }
 
-        if (this.#pendingGenesisInitialization !== null) {
-            return this.#handlePendingGenesisInitialization(input);
-        }
-
-        if (this.#pendingSetVdfParams !== null) {
-            return this.#handlePendingSetVdfParams(input);
+        if (this.#pendingLedgerConfig !== null) {
+            return this.#handlePendingLedgerConfig(input);
         }
 
         const [command, ...parts] = input.split(" ");
@@ -234,12 +230,16 @@ export class CommandHandler {
                 process: async ({ parts }) => this.#handlers.handleExtendedTxDetails(parts[0], parts[1] === "true")
             },
             {
+                evaluate: ({ command }) => command === COMMANDS.LEDGER_CONFIG,
+                process: async () => this.#handlers.handleLedgerConfigDiagnostics()
+            },
+            {
                 evaluate: ({ input }) => input.startsWith(COMMANDS.EPOCH_GENESIS_INITIALIZATION),
                 process: async () => this.#queueEpochGenesisInitialization()
             },
             {
-                evaluate: ({ input }) => input.startsWith(COMMANDS.SET_VDF_PARAMS),
-                process: async () => this.#queueSetVdfParams()
+                evaluate: ({ command }) => command === COMMANDS.SET_LEDGER_CONFIG,
+                process: async () => this.#queueLedgerConfig()
             }
         ];
     }
@@ -297,133 +297,102 @@ export class CommandHandler {
     }
 
     #queueEpochGenesisInitialization() {
-        this.#pendingGenesisInitialization = {
-            step: "difficulty"
-        };
-
-        console.log(this.#getGenesisDifficultyPrompt());
-    }
-
-    #handlePendingGenesisInitialization(input) {
-        const pendingGenesisInitialization = this.#pendingGenesisInitialization;
-
-        if (pendingGenesisInitialization.step === "difficulty") {
-            const difficulty = this.#parseGenesisEpochInteger(input);
-            if (!difficulty) {
-                console.log("Invalid difficulty. Please enter a positive integer (example 55_000_000).");
-                console.log(this.#getGenesisDifficultyPrompt());
-                return;
-            }
-
-            pendingGenesisInitialization.difficulty = difficulty;
-            pendingGenesisInitialization.step = "discriminantBitSize";
-            console.log(this.#getGenesisDiscriminantBitSizePrompt());
-            return;
-        }
-
-        const discriminantBitSize = this.#parseGenesisEpochInteger(input);
-        if (!discriminantBitSize) {
-            console.log("Invalid discriminant bit size. Please enter a positive integer (example 2048).");
-            console.log(this.#getGenesisDiscriminantBitSizePrompt());
-            return;
-        }
-
-        const difficulty = pendingGenesisInitialization.difficulty;
-        this.#pendingGenesisInitialization = null;
-
-        return this.#queueEpochGenesisConfirmation({
-            difficulty,
-            discriminantBitSize
-        });
-    }
-
-    #queueEpochGenesisConfirmation({ difficulty, discriminantBitSize }) {
-        const params = {
-            vdfDifficulty: difficulty.value,
-            vdfDiscriminantSize: discriminantBitSize.value
-        };
-
-        console.info("Genesis Epoch Initialization Parameters:");
-        console.info(`VDF difficulty: ${difficulty.display}`);
-        console.info(`VDF discriminant bit size: ${discriminantBitSize.display}`);
+        console.info("Genesis Epoch Initialization:");
+        console.info("The genesis epoch will reference the current signed LedgerConfig.");
 
         this.#pendingConfirmation = {
             prompt: "Do you want to proceed? (yes/no)",
             invalidMessage: 'Invalid input. Please answer "yes" or "no".',
             failureMessage: "Genesis epoch initialization failed",
-            onConfirm: async () => this.#handlers.handleEpochGenesisInitialization(params),
+            onConfirm: async () => this.#handlers.handleEpochGenesisInitialization(),
             onDecline: async () => console.log("Genesis epoch initialization cancelled.")
         };
 
         console.log(this.#pendingConfirmation.prompt);
     }
 
-    #parseGenesisEpochInteger(input) {
-        return this.#parsePositiveInteger(input);
-    }
-
-    #queueSetVdfParams() {
-        this.#pendingSetVdfParams = {
+    #queueLedgerConfig() {
+        this.#pendingLedgerConfig = {
             step: "difficulty"
         };
 
-        console.log(this.#getSetVdfParamsDifficultyPrompt());
+        console.log(this.#getLedgerConfigDifficultyPrompt());
     }
 
-    #handlePendingSetVdfParams(input) {
-        const difficulty = this.#parsePositiveInteger(input);
-        if (!difficulty) {
-            console.log("Invalid difficulty. Please enter a positive integer (example 55_000_000).");
-            console.log(this.#getSetVdfParamsDifficultyPrompt());
+    #handlePendingLedgerConfig(input) {
+        const pendingLedgerConfig = this.#pendingLedgerConfig;
+
+        if (pendingLedgerConfig.step === "difficulty") {
+            const difficulty = this.#parsePositiveInteger(input, 0xFFFFFFFFn);
+            if (!difficulty) {
+                console.log("Invalid difficulty. Please enter a positive unsigned 32-bit integer (example 55_000_000).");
+                console.log(this.#getLedgerConfigDifficultyPrompt());
+                return;
+            }
+
+            pendingLedgerConfig.difficulty = difficulty;
+            pendingLedgerConfig.step = "discriminantBitSize";
+            console.log(this.#getLedgerConfigDiscriminantBitSizePrompt());
             return;
         }
 
-        this.#pendingSetVdfParams = null;
-        return this.#queueSetVdfParamsConfirmation({ difficulty });
+        const discriminantBitSize = this.#parsePositiveInteger(input, 0xFFFFn);
+        if (!discriminantBitSize) {
+            console.log("Invalid discriminant bit size. Please enter a positive unsigned 16-bit integer (example 2048).");
+            console.log(this.#getLedgerConfigDiscriminantBitSizePrompt());
+            return;
+        }
+
+        const difficulty = pendingLedgerConfig.difficulty;
+        this.#pendingLedgerConfig = null;
+
+        return this.#queueLedgerConfigConfirmation({
+            difficulty,
+            discriminantBitSize
+        });
     }
 
-    #queueSetVdfParamsConfirmation({ difficulty }) {
+    #queueLedgerConfigConfirmation({ difficulty, discriminantBitSize }) {
         const params = {
-            vdfDifficulty: difficulty.value
+            vdfDifficulty: difficulty.value,
+            vdfDiscriminantSize: discriminantBitSize.value
         };
 
-        console.info("VDF Params Update:");
+        console.info("Proof-of-Time LedgerConfig:");
         console.info(`VDF difficulty: ${difficulty.display}`);
+        console.info(`VDF discriminant bit size: ${discriminantBitSize.display}`);
 
         this.#pendingConfirmation = {
             prompt: "Do you want to proceed? (yes/no)",
             invalidMessage: 'Invalid input. Please answer "yes" or "no".',
-            failureMessage: "VDF params update failed",
-            onConfirm: async () => this.#handlers.handleSetVdfParams(params),
-            onDecline: async () => console.log("VDF params update cancelled.")
+            failureMessage: "LedgerConfig publication failed",
+            onConfirm: async () => this.#handlers.handleSetProofOfTimeLedgerConfig(params),
+            onDecline: async () => console.log("LedgerConfig publication cancelled.")
         };
 
         console.log(this.#pendingConfirmation.prompt);
     }
 
-    #parsePositiveInteger(input) {
+    #parsePositiveInteger(input, maximum) {
         const display = input.trim();
         if (!/^[0-9]+(?:_[0-9]+)*$/.test(display)) {
             return null;
         }
 
         const value = display.replaceAll("_", "");
-        if (BigInt(value) <= 0n) {
+        const parsed = BigInt(value);
+        if (parsed <= 0n || parsed > maximum) {
             return null;
         }
 
         return { display, value };
     }
 
-    #getGenesisDifficultyPrompt() {
+    #getLedgerConfigDifficultyPrompt() {
         return "Set VDF difficulty (example 55_000_000):";
     }
 
-    #getGenesisDiscriminantBitSizePrompt() {
+    #getLedgerConfigDiscriminantBitSizePrompt() {
         return "Set VDF discriminant bit size (example 2048):";
-    }
-
-    #getSetVdfParamsDifficultyPrompt() {
-        return "Set new VDF difficulty (example 55_000_000):";
     }
 }

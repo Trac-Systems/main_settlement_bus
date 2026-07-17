@@ -20,5 +20,5 @@ enum OperationType {
     TRANSFER               = 13; // partial
     SET_EPOCH              = 14; // complete
     SET_GENESIS_EPOCH      = 15; // complete
-    SET_VDF_PARAMS         = 16; // complete
+    SET_LEDGER_CONFIG      = 16; // complete
 }

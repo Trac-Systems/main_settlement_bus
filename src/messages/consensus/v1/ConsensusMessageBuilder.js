@@ -26,7 +26,7 @@ class ConsensusMessageBuilder {
     #epoch;
     #previous_epoch_record_hash;
     #proposer;
-    #vdf_parameters_hash;
+    #config_id;
     #vdf_proof;
     #resultCode;
     #approver;
@@ -146,10 +146,10 @@ class ConsensusMessageBuilder {
         return this;
     }
 
-    setVdfParametersHash(vdfParametersHash) {
-        this.#vdf_parameters_hash = this.#validateBuffer(
-            vdfParametersHash,
-            'VDF parameters hash'
+    setConfigId(configId) {
+        this.#config_id = this.#validateBuffer(
+            configId,
+            'Config id'
         );
         return this;
     }
@@ -189,7 +189,7 @@ class ConsensusMessageBuilder {
             epoch: this.#validateBuffer(this.#epoch, 'Epoch'),
             previous_epoch_record_hash: this.#validateBuffer(this.#previous_epoch_record_hash, 'Previous epoch record hash'),
             proposer: this.#validateBuffer(this.#proposer, 'Proposer'),
-            vdf_parameters_hash: this.#validateBuffer(this.#vdf_parameters_hash, 'VDF parameters hash'),
+            config_id: this.#validateBuffer(this.#config_id, 'Config id'),
             vdf_proof: this.#validateBuffer(this.#vdf_proof, 'VDF proof')
         };
     }
@@ -220,7 +220,7 @@ class ConsensusMessageBuilder {
             proofProposal.epoch,
             proofProposal.previous_epoch_record_hash,
             proofProposal.proposer,
-            proofProposal.vdf_parameters_hash,
+            proofProposal.config_id,
             proofProposal.vdf_proof
         ));
     }
@@ -232,7 +232,7 @@ class ConsensusMessageBuilder {
             proofProposal.epoch,
             proofProposal.previous_epoch_record_hash,
             proofProposal.proposer,
-            proofProposal.vdf_parameters_hash,
+            proofProposal.config_id,
             proofProposal.vdf_proof,
             approver,
             requesterProofSignature

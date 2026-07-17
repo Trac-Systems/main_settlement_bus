@@ -14,8 +14,6 @@ import {
     NETWORK_ID_BYTE_LENGTH,
     EPOCH_BYTE_LENGTH,
     VDF_BLOB_PROOF_SIZE,
-    VDF_DIFFICULTY_SIZE,
-    VDF_DISCRIMINANT_SIZE,
 } from '../../../utils/constants.js';
 import {
     decodeProofProposalApproval,
@@ -35,7 +33,7 @@ class StateValidationSchema {
     #validateBalanceInitializationSchema;
     #validateSetEpochOperationSchema;
     #validateSetGenesisEpochOperationSchema;
-    #validateSetVdfParamsOperationSchema;
+    #validateSetLedgerConfigOperationSchema;
     #proofDataFields;
     #config;
 
@@ -51,7 +49,7 @@ class StateValidationSchema {
             {name: 'epoch', length: EPOCH_BYTE_LENGTH},
             {name: 'previous_epoch_record_hash', length: HASH_BYTE_LENGTH},
             {name: 'proposer', length: this.#config.addressLength},
-            {name: 'vdf_parameters_hash', length: HASH_BYTE_LENGTH},
+            {name: 'config_id', length: HASH_BYTE_LENGTH},
             {name: 'vdf_proof', length: VDF_BLOB_PROOF_SIZE},
             {name: 'signature', length: SIGNATURE_BYTE_LENGTH}
         ]);
@@ -273,7 +271,7 @@ class StateValidationSchema {
         this.#validateBalanceInitializationSchema = this.#compileBalanceInitializationSchema();
         this.#validateSetEpochOperationSchema = this.#compileSetEpochOperationSchema();
         this.#validateSetGenesisEpochOperationSchema = this.#compileSetGenesisEpochOperationSchema();
-        this.#validateSetVdfParamsOperationSchema = this.#compileSetVdfParamsOperationSchema();
+        this.#validateSetLedgerConfigOperationSchema = this.#compileSetLedgerConfigOperationSchema();
 
     }
 
@@ -656,8 +654,7 @@ class StateValidationSchema {
                 props: {
                     tx: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true},
                     txv: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true},
-                    df: {type: 'buffer', length: VDF_DIFFICULTY_SIZE, required: true},
-                    db: {type: 'buffer', length: VDF_DISCRIMINANT_SIZE, required: true},
+                    config_id: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true},
                     in: {type: 'buffer', length: NONCE_BYTE_LENGTH, required: true},
                     is: {type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true},
                 }
@@ -670,18 +667,45 @@ class StateValidationSchema {
         return this.#validateSetGenesisEpochOperationSchema(op) === true;
     }
 
-    #compileSetVdfParamsOperationSchema() {
+    #compileSetLedgerConfigOperationSchema() {
         const schema = {
             $$strict: true,
-            type: this.#operationTypeDomain(OperationType.SET_VDF_PARAMS),
+            type: this.#operationTypeDomain(OperationType.SET_LEDGER_CONFIG),
             address: {type: 'buffer', length: this.#config.addressLength, required: true},
-            vpo: {
+            lco: {
                 strict: true,
                 type: 'object',
                 props: {
                     tx: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true},
                     txv: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true},
-                    df: {type: 'buffer', length: VDF_DIFFICULTY_SIZE, required: true},
+                    // Genesis legitimately uses an all-zero hash. Domain validation
+                    // below the transport schema enforces the exact buffer length.
+                    previous_commit_id: {type: 'any', required: true},
+                    snapshot: {
+                        strict: true,
+                        type: 'object',
+                        required: true,
+                        props: {
+                            format_version: {type: 'number', integer: true, min: 1, required: true},
+                            commitment_scheme: {type: 'string', min: 1, max: 256, required: true},
+                            schema_id: {type: 'string', min: 1, max: 256, required: true},
+                            entries: {
+                                type: 'array',
+                                min: 0,
+                                max: 1024,
+                                required: true,
+                                items: {
+                                    strict: true,
+                                    type: 'object',
+                                    props: {
+                                        key: {type: 'any', required: true},
+                                        value: {type: 'any', required: true},
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    content_ref: {type: 'any', required: true},
                     in: {type: 'buffer', length: NONCE_BYTE_LENGTH, required: true},
                     is: {type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true},
                 }
@@ -690,8 +714,8 @@ class StateValidationSchema {
         return this.#validator.compile(schema);
     }
 
-    validateSetVdfParamsOperation(op) {
-        return this.#validateSetVdfParamsOperationSchema(op) === true;
+    validateSetLedgerConfigOperation(op) {
+        return this.#validateSetLedgerConfigOperationSchema(op) === true;
     }
 }
 

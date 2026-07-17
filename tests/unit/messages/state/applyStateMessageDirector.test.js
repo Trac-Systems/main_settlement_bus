@@ -4,17 +4,14 @@ import { WalletProvider } from 'trac-wallet';
 
 import { applyStateMessageFactory } from '../../../../src/messages/state/applyStateMessageFactory.js';
 import { addressToBuffer } from '../../../../src/core/state/utils/address.js';
-import {
-    OperationType,
-    VDF_DIFFICULTY_SIZE,
-    VDF_DISCRIMINANT_SIZE
-} from '../../../../src/utils/constants.js';
+import { OperationType } from '../../../../src/utils/constants.js';
 import { config } from '../../../helpers/config.js';
 import { testKeyPair1 } from '../../../fixtures/apply.fixtures.js';
 import {
     proofProposalApproval as approval,
     proofProposalData
 } from '../../../helpers/proofProposal.js';
+import { createZeroCommitId } from '../../../../src/core/ledger-config/ledgerConfigConstants.js';
 
 async function createWallet(mnemonic) {
     return await new WalletProvider(config).fromMnemonic({ mnemonic, derivationPath: config.derivationPath })
@@ -43,51 +40,51 @@ test('ApplyStateMessageDirector builds complete set epoch message', async t => {
 test('ApplyStateMessageDirector builds complete set genesis epoch message', async t => {
     const wallet = await createWallet(testKeyPair1.mnemonic);
     const txValidity = b4a.from('11'.repeat(32), 'hex');
-    const vdfDifficulty = b4a.from('22'.repeat(VDF_DIFFICULTY_SIZE), 'hex');
-    const vdfDiscriminantSize = b4a.from('33'.repeat(VDF_DISCRIMINANT_SIZE), 'hex');
+    const configId = b4a.from('22'.repeat(32), 'hex');
 
     const payload = await applyStateMessageFactory(wallet, config)
         .buildCompleteSetGenesisEpochMessage(
             wallet.address,
             txValidity,
-            vdfDifficulty,
-            vdfDiscriminantSize
+            configId
         );
 
     t.is(payload.type, OperationType.SET_GENESIS_EPOCH);
     t.ok(b4a.equals(payload.address, addressToBuffer(wallet.address, config.addressPrefix)));
     t.alike(Object.keys(payload).sort(), ['address', 'sgo', 'type']);
-    t.alike(Object.keys(payload.sgo).sort(), ['db', 'df', 'in', 'is', 'tx', 'txv']);
+    t.alike(Object.keys(payload.sgo).sort(), ['config_id', 'in', 'is', 'tx', 'txv']);
     t.ok(b4a.equals(payload.sgo.txv, txValidity));
-    t.ok(b4a.equals(payload.sgo.df, vdfDifficulty));
-    t.ok(b4a.equals(payload.sgo.db, vdfDiscriminantSize));
+    t.ok(b4a.equals(payload.sgo.config_id, configId));
     t.is(payload.sgo.tx.length, 32);
-    t.is(payload.sgo.df.length, VDF_DIFFICULTY_SIZE);
-    t.is(payload.sgo.db.length, VDF_DISCRIMINANT_SIZE);
+    t.is(payload.sgo.config_id.length, 32);
     t.is(payload.sgo.in.length, 32);
     t.is(payload.sgo.is.length, 64);
 });
 
-test('ApplyStateMessageDirector builds complete set VDF params message', async t => {
+test('ApplyStateMessageDirector builds a complete Model B ledger config message', async t => {
     const wallet = await createWallet(testKeyPair1.mnemonic);
-    const txValidity = b4a.from('44'.repeat(32), 'hex');
-    const vdfDifficulty = b4a.from('55'.repeat(VDF_DIFFICULTY_SIZE), 'hex');
+    const txValidity = b4a.alloc(32, 0x61);
+    const snapshot = {
+        formatVersion: 1,
+        commitmentScheme: 'binary-merkle-v1',
+        schemaId: 'trac/autobase-proof-of-time/v1',
+        entries: [
+            {key: b4a.from('vdf/difficulty'), value: b4a.from([0, 0, 0, 1])},
+            {key: b4a.from('vdf/discriminant-size-bits'), value: b4a.from([0, 1])},
+        ],
+    };
 
     const payload = await applyStateMessageFactory(wallet, config)
-        .buildCompleteSetVdfParamsMessage(
+        .buildCompleteSetLedgerConfigMessage(
             wallet.address,
             txValidity,
-            vdfDifficulty
+            createZeroCommitId(),
+            snapshot
         );
 
-    t.is(payload.type, OperationType.SET_VDF_PARAMS);
-    t.ok(b4a.equals(payload.address, addressToBuffer(wallet.address, config.addressPrefix)));
-    t.alike(Object.keys(payload).sort(), ['address', 'type', 'vpo']);
-    t.alike(Object.keys(payload.vpo).sort(), ['df', 'in', 'is', 'tx', 'txv']);
-    t.ok(b4a.equals(payload.vpo.txv, txValidity));
-    t.ok(b4a.equals(payload.vpo.df, vdfDifficulty));
-    t.is(payload.vpo.df.length, VDF_DIFFICULTY_SIZE);
-    t.is(payload.vpo.tx.length, 32);
-    t.is(payload.vpo.in.length, 32);
-    t.is(payload.vpo.is.length, 64);
+    t.is(payload.type, OperationType.SET_LEDGER_CONFIG);
+    t.alike(Object.keys(payload).sort(), ['address', 'lco', 'type']);
+    t.ok(b4a.equals(payload.lco.txv, txValidity));
+    t.is(payload.lco.snapshot.schema_id, snapshot.schemaId);
+    t.is(payload.lco.content_ref.length, 32);
 });

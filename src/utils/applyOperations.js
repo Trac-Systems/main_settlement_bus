@@ -60,9 +60,9 @@ const isSetGenesisEpoch = type => {
     ].includes(type);
 }
 
-const isSetVdfParams = type => {
+const isSetLedgerConfig = type => {
     return [
-        OperationType.SET_VDF_PARAMS
+        OperationType.SET_LEDGER_CONFIG
     ].includes(type);
 }
 
@@ -105,8 +105,8 @@ const operationToPayload = type => {
             jsonPath: 'sgo'
         },
         {
-            condition: isSetVdfParams,
-            jsonPath: 'vpo'
+            condition: isSetLedgerConfig,
+            jsonPath: 'lco'
         }
     ]
     const match = fromTo.find(entry => !!entry.condition(type))
@@ -124,5 +124,5 @@ export {
     isBalanceInitialization,
     isSetEpoch,
     isSetGenesisEpoch,
-    isSetVdfParams
+    isSetLedgerConfig
 }

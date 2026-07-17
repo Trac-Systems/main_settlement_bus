@@ -1,0 +1,19 @@
+export const NOT_READY = 'NOT_READY';
+export const SYNCING_LEDGER = 'SYNCING_LEDGER';
+export const CONFIG_UNAVAILABLE = 'CONFIG_UNAVAILABLE';
+export const CONFIG_VERIFYING = 'CONFIG_VERIFYING';
+export const UNSUPPORTED_CONSENSUS = 'UNSUPPORTED_CONSENSUS';
+export const CONSENSUS_READY = 'CONSENSUS_READY';
+export const CLOSED = 'CLOSED';
+
+export const LedgerConfigStatus = Object.freeze({
+    NOT_READY,
+    SYNCING_LEDGER,
+    CONFIG_UNAVAILABLE,
+    CONFIG_VERIFYING,
+    UNSUPPORTED_CONSENSUS,
+    CONSENSUS_READY,
+    CLOSED,
+});
+
+export default LedgerConfigStatus;

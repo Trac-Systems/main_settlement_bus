@@ -1,10 +1,10 @@
 import V1BaseConsensusOperation from "./V1BaseConsensusOperation.js";
 import {V1ConsensusProtocolError} from "../V1ConsensusProtocolError.js";
 import {ConsensusProtocolVersion, ConsensusResultCode} from "../../../../utils/constants.js";
-import {createMessage, uint16ToBuffer, uint32ToBuffer} from "../../../../utils/buffer.js";
-import tracCryptoApi from "trac-crypto-api";
+import {uint16ToBuffer} from "../../../../utils/buffer.js";
 import b4a from "b4a";
 import {verifyWesolowski} from '@tracsystems/trac-vdf';
+import {requireProofOfTimeConsensusConfig} from '../../requireProofOfTimeConsensusConfig.js';
 
 class V1EpochProofProposalRequest extends V1BaseConsensusOperation {
 
@@ -14,7 +14,8 @@ class V1EpochProofProposalRequest extends V1BaseConsensusOperation {
      * @param {Config} config Application configuration used by base validation
      * and network identity checks.
      * @param {State} state Ledger state. It must expose `requireCurrentEpoch()`,
-     * `requireEpoch(epoch)`, `requireSignedVDFParams()`, and `isIndexerAddress(address)`.
+     * `requireEpoch(epoch)`, `requireLedgerConfigConsensusReady()`, and
+     * `isIndexerAddress(address)`.
      * @throws {Error} When consensus schemas cannot be initialized from the configuration.
      */
     constructor(config, state) {
@@ -26,7 +27,7 @@ class V1EpochProofProposalRequest extends V1BaseConsensusOperation {
      *
      * Checks the payload schema, protocol version, network id, proposer identity,
      * proposal signature, proposer indexer membership, next epoch number,
-     * previous epoch record hash, VDF parameters hash, and VDF proof.
+     * previous epoch record hash, ledger config id, and VDF proof.
      *
      * @param {object} payload Decoded proof proposal request payload.
      * @param {object} connection Peer connection containing `remotePublicKey`.
@@ -35,9 +36,11 @@ class V1EpochProofProposalRequest extends V1BaseConsensusOperation {
      */
     async validate(payload, connection) {
         return await this.validateAsProtocolError(async () => {
+            const {activeConfig, vdfParams} = await requireProofOfTimeConsensusConfig(this._state);
             this.isPayloadSchemaValid(payload);
             this.validateProofProposalProtocolVersion(payload.proof_proposal);
             this.validateProofProposalNetworkId(payload.proof_proposal);
+            this.validateProofProposalConfigId(payload.proof_proposal, activeConfig);
             this.assertAddressWithRemotePublicKey(
                 payload.proof_proposal.proposer,
                 connection.remotePublicKey
@@ -47,8 +50,6 @@ class V1EpochProofProposalRequest extends V1BaseConsensusOperation {
             const currentEpoch = await this._state.requireCurrentEpoch();
             this.validateIncomingEpoch(payload.proof_proposal, currentEpoch);
             await this.validatePreviousEpochRecordHash(payload.proof_proposal, currentEpoch);
-            const vdfParams = await this._state.requireSignedVDFParams();
-            await this.validateProofProposalVdfParametersHash(payload.proof_proposal, vdfParams);
             await this.validateProofProposalVdfProof(payload.proof_proposal, vdfParams);
             return true;
         });
@@ -78,36 +79,18 @@ class V1EpochProofProposalRequest extends V1BaseConsensusOperation {
     }
 
     /**
-     * Validates that the proof proposal VDF parameters hash matches signed state.
-     *
-     * Reconstructs the signed difficulty and discriminant-size message,
-     * hashes it with BLAKE3, and compares it with `vdf_parameters_hash`.
+     * Validates that the proof proposal commits to the active signed config.
      *
      * @param {object} proofProposal Decoded proof proposal.
-     * @param {object} vdfParams Signed VDF parameters read from ledger state.
-     * @returns {Promise<void>}
-     * @throws {V1ConsensusProtocolError} When hashing fails or the hash does not match.
+     * @param {object} activeConfig Verified active ledger configuration.
+     * @returns {void}
+     * @throws {V1ConsensusProtocolError} When the config id does not match.
      */
-    async validateProofProposalVdfParametersHash(proofProposal, vdfParams) {
-        const message = createMessage(
-            uint32ToBuffer(vdfParams.vdfDifficulty),
-            uint16ToBuffer(vdfParams.vdfDiscriminantSize)
-        );
-
-        let expectedHash;
-        try {
-            expectedHash = await tracCryptoApi.hash.blake3(message);
-        } catch {
+    validateProofProposalConfigId(proofProposal, activeConfig) {
+        if (!b4a.equals(proofProposal.config_id, activeConfig.descriptor.configId)) {
             throw new V1ConsensusProtocolError(
                 ConsensusResultCode.UNEXPECTED_ERROR,
-                'Failed to hash VDF parameters.'
-            );
-        }
-
-        if (!b4a.equals(proofProposal.vdf_parameters_hash, expectedHash)) {
-            throw new V1ConsensusProtocolError(
-                ConsensusResultCode.UNEXPECTED_ERROR,
-                'VDF parameters hash is invalid.'
+                'Proof proposal config id does not match the active ledger config.'
             );
         }
     }
@@ -119,7 +102,7 @@ class V1EpochProofProposalRequest extends V1BaseConsensusOperation {
      * discriminant size for Wesolowski proof verification.
      *
      * @param {object} proofProposal Decoded proof proposal.
-     * @param {object} vdfParams Signed VDF parameters read from ledger state.
+     * @param {object} vdfParams Parameters decoded by the active ledger config adapter.
      * @returns {Promise<void>}
      * @throws {V1ConsensusProtocolError} When VDF verification fails or returns false.
      */

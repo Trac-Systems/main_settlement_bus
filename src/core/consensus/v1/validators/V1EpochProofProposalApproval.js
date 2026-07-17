@@ -1,9 +1,11 @@
 import V1BaseConsensusOperation from "./V1BaseConsensusOperation.js";
 import {ConsensusResultCode} from "../../../../utils/constants.js";
-import {createMessage , uint32ToBuffer} from "../../../../utils/buffer.js";
+import {createMessage, uint32ToBuffer} from "../../../../utils/buffer.js";
 import {encodeProofProposalApproval} from "../../../../codecs/consensus/v1/consensusV1OperationCodec.js";
 import tracCryptoApi from "trac-crypto-api";
 import {V1ConsensusProtocolError} from "../V1ConsensusProtocolError.js";
+import b4a from "b4a";
+import {requireProofOfTimeConsensusConfig} from '../../requireProofOfTimeConsensusConfig.js';
 
 class V1EpochProofProposalApproval extends V1BaseConsensusOperation {
     /**
@@ -34,7 +36,9 @@ class V1EpochProofProposalApproval extends V1BaseConsensusOperation {
      */
     async validate(payload, connection, proofProposal) {
         return await this.validateAsProtocolError(async () => {
+            const {activeConfig} = await requireProofOfTimeConsensusConfig(this._state);
             this.isPayloadSchemaValid(payload);
+            this.#validateProofProposalConfigId(proofProposal, activeConfig);
 
             await this.#validateResponseSignature(payload, connection.remotePublicKey);
             const resultCode = payload.proof_proposal_response.result;
@@ -48,6 +52,15 @@ class V1EpochProofProposalApproval extends V1BaseConsensusOperation {
             await this.validateAddressIsIndexer(connection.remotePublicKey);
             return true;
         });
+    }
+
+    #validateProofProposalConfigId(proofProposal, activeConfig) {
+        if (!b4a.equals(proofProposal?.config_id, activeConfig.descriptor.configId)) {
+            throw new V1ConsensusProtocolError(
+                ConsensusResultCode.UNEXPECTED_ERROR,
+                'The approved proposal no longer matches the active ledger config.'
+            );
+        }
     }
 
     /**

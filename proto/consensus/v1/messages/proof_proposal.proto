@@ -10,7 +10,7 @@ message ProofProposal {
   bytes epoch = 3; // epoch number (for what epoch the proof is for current_epoch + 1)
   bytes previous_epoch_record_hash = 4; // BLAKE3 hash of the encoded previous epoch record
   bytes proposer = 5; // TRAC address of the proposer
-  bytes vdf_parameters_hash = 6; // BLAKE3(uint32_be difficulty || uint16_be discriminant_bit_size)
+  bytes config_id = 6; // active signed ledger configuration id
   bytes vdf_proof = 7; // bytes blob  that is actually y || pi
   bytes signature = 8; // SIG(challenge_data + vdf_proof)
 }

@@ -15,7 +15,8 @@ async function runStateTests() {
     await import('./apply/state.apply.test.js');
     if (!isBare()) {
         await import('./stateAdminValidation.test.js');
-        await import('./vdfParams.test.js');
+        await import('./ledgerConfigSignedRead.test.js');
+        await import('./transactionHistory.test.js');
         await import('./State.test.js');
     }
     test.resume();

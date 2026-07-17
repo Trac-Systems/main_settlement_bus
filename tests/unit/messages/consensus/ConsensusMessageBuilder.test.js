@@ -50,7 +50,7 @@ test('ConsensusMessageBuilder builds proof proposal and verifies signature', asy
         .setEpoch(Number(proofProposalFixture.epoch.readBigUInt64BE(0)))
         .setPreviousEpochRecordHash(proofProposalFixture.previous_epoch_record_hash)
         .setProposer(proposer)
-        .setVdfParametersHash(proofProposalFixture.vdf_parameters_hash)
+        .setConfigId(proofProposalFixture.config_id)
         .setVdfProof(proofProposalFixture.vdf_proof)
         .buildPayload();
 
@@ -64,7 +64,7 @@ test('ConsensusMessageBuilder builds proof proposal and verifies signature', asy
     t.alike(proofProposal.epoch, proofProposalFixture.epoch);
     t.alike(proofProposal.previous_epoch_record_hash, proofProposalFixture.previous_epoch_record_hash);
     t.alike(proofProposal.proposer, proofProposalFixture.proposer);
-    t.alike(proofProposal.vdf_parameters_hash, proofProposalFixture.vdf_parameters_hash);
+    t.alike(proofProposal.config_id, proofProposalFixture.config_id);
     t.alike(proofProposal.vdf_proof, proofProposalFixture.vdf_proof);
     t.ok(b4a.isBuffer(proofProposal.signature));
 
@@ -74,7 +74,7 @@ test('ConsensusMessageBuilder builds proof proposal and verifies signature', asy
         proofProposal.epoch,
         proofProposal.previous_epoch_record_hash,
         proofProposal.proposer,
-        proofProposal.vdf_parameters_hash,
+        proofProposal.config_id,
         proofProposal.vdf_proof
     );
     const hash = await tracCryptoApi.hash.blake3(msg);
@@ -101,7 +101,7 @@ test('ConsensusMessageBuilder iterates proof proposal response ResultCode values
             .setEpoch(Number(proofProposalFixture.epoch.readBigUInt64BE(0)))
             .setPreviousEpochRecordHash(proofProposalFixture.previous_epoch_record_hash)
             .setProposer(proposer)
-            .setVdfParametersHash(proofProposalFixture.vdf_parameters_hash)
+            .setConfigId(proofProposalFixture.config_id)
             .setVdfProof(proofProposalFixture.vdf_proof)
             .setRequesterProofSignature(proofProposalFixture.signature)
             .setResultCode(code)
@@ -123,7 +123,7 @@ test('ConsensusMessageBuilder iterates proof proposal response ResultCode values
                 proofProposalFixture.epoch,
                 proofProposalFixture.previous_epoch_record_hash,
                 proofProposalFixture.proposer,
-                proofProposalFixture.vdf_parameters_hash,
+                proofProposalFixture.config_id,
                 proofProposalFixture.vdf_proof,
                 payload.proof_proposal_response.approval.approver,
                 proofProposalFixture.signature
@@ -218,7 +218,7 @@ test('ConsensusMessageBuilder encodes scalar number fields at byte-width boundar
             .setEpoch(testCase.epoch)
             .setPreviousEpochRecordHash(proofProposalFixture.previous_epoch_record_hash)
             .setProposer(proposer)
-            .setVdfParametersHash(proofProposalFixture.vdf_parameters_hash)
+            .setConfigId(proofProposalFixture.config_id)
             .setVdfProof(proofProposalFixture.vdf_proof)
             .buildPayload();
 
@@ -240,7 +240,7 @@ test('ConsensusMessageBuilder encodes scalar number fields at byte-width boundar
             proofProposal.epoch,
             proofProposal.previous_epoch_record_hash,
             proofProposal.proposer,
-            proofProposal.vdf_parameters_hash,
+            proofProposal.config_id,
             proofProposal.vdf_proof
         );
         const hash = await tracCryptoApi.hash.blake3(msg);
@@ -377,8 +377,8 @@ test('ConsensusMessageBuilder rejects invalid buffer and address fields', async 
     );
 
     t.exception(
-        () => builder.setVdfParametersHash('not-a-buffer'),
-        errorMessageIncludes('VDF parameters hash must be a buffer.')
+        () => builder.setConfigId('not-a-buffer'),
+        errorMessageIncludes('Config id must be a buffer.')
     );
 
     t.exception(
@@ -420,7 +420,7 @@ test('ConsensusMessageBuilder rejects missing fields before build result is avai
             .setEpoch(epoch)
             .setPreviousEpochRecordHash(proofProposalFixture.previous_epoch_record_hash)
             .setProposer(proposer)
-            .setVdfParametersHash(proofProposalFixture.vdf_parameters_hash)
+            .setConfigId(proofProposalFixture.config_id)
             .setVdfProof(proofProposalFixture.vdf_proof)
             .buildPayload(),
         errorMessageIncludes('Protocol version must be a buffer.')
@@ -445,7 +445,7 @@ test('ConsensusMessageBuilder rejects missing fields before build result is avai
             .setEpoch(epoch)
             .setPreviousEpochRecordHash(proofProposalFixture.previous_epoch_record_hash)
             .setProposer(proposer)
-            .setVdfParametersHash(proofProposalFixture.vdf_parameters_hash)
+            .setConfigId(proofProposalFixture.config_id)
             .setVdfProof(proofProposalFixture.vdf_proof)
             .setRequesterProofSignature(proofProposalFixture.signature)
             .setApprover(proposer)
@@ -476,7 +476,7 @@ test('ConsensusMessageBuilder signs non-zero network id and uint64 epochs withou
         .setEpoch(epoch)
         .setPreviousEpochRecordHash(proofProposalFixture.previous_epoch_record_hash)
         .setProposer(proposer)
-        .setVdfParametersHash(proofProposalFixture.vdf_parameters_hash)
+        .setConfigId(proofProposalFixture.config_id)
         .setVdfProof(proofProposalFixture.vdf_proof)
         .buildPayload();
 
@@ -491,7 +491,7 @@ test('ConsensusMessageBuilder signs non-zero network id and uint64 epochs withou
         proofProposal.epoch,
         proofProposal.previous_epoch_record_hash,
         proofProposal.proposer,
-        proofProposal.vdf_parameters_hash,
+        proofProposal.config_id,
         proofProposal.vdf_proof
     );
     const signedHash = await tracCryptoApi.hash.blake3(signedMessage);
@@ -504,7 +504,7 @@ test('ConsensusMessageBuilder signs non-zero network id and uint64 epochs withou
         epoch,
         proofProposalFixture.previous_epoch_record_hash,
         proofProposalFixture.proposer,
-        proofProposalFixture.vdf_parameters_hash,
+        proofProposalFixture.config_id,
         proofProposalFixture.vdf_proof
     );
     const legacyHash = await tracCryptoApi.hash.blake3(legacyMessage);

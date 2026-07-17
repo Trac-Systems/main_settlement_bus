@@ -48,7 +48,7 @@ $root.apply = (function() {
              * @property {apply.operations.ITxOperation|null} [txo] Operation txo
              * @property {apply.operations.ISetEpochOperation|null} [seo] Operation seo
              * @property {apply.operations.ISetGenesisEpochOperation|null} [sgo] Operation sgo
-             * @property {apply.operations.ISetVdfParamsOperation|null} [vpo] Operation vpo
+             * @property {apply.operations.ISetLedgerConfigOperation|null} [lco] Operation lco
              */
 
             /**
@@ -155,24 +155,24 @@ $root.apply = (function() {
             Operation.prototype.sgo = null;
 
             /**
-             * Operation vpo.
-             * @member {apply.operations.ISetVdfParamsOperation|null|undefined} vpo
+             * Operation lco.
+             * @member {apply.operations.ISetLedgerConfigOperation|null|undefined} lco
              * @memberof apply.operations.Operation
              * @instance
              */
-            Operation.prototype.vpo = null;
+            Operation.prototype.lco = null;
 
             // OneOf field names bound to virtual getters and setters
             var $oneOfFields;
 
             /**
              * Operation value.
-             * @member {"cao"|"aco"|"bio"|"tro"|"rao"|"bdo"|"txo"|"seo"|"sgo"|"vpo"|undefined} value
+             * @member {"cao"|"aco"|"bio"|"tro"|"rao"|"bdo"|"txo"|"seo"|"sgo"|"lco"|undefined} value
              * @memberof apply.operations.Operation
              * @instance
              */
             Object.defineProperty(Operation.prototype, "value", {
-                get: $util.oneOfGetter($oneOfFields = ["cao", "aco", "bio", "tro", "rao", "bdo", "txo", "seo", "sgo", "vpo"]),
+                get: $util.oneOfGetter($oneOfFields = ["cao", "aco", "bio", "tro", "rao", "bdo", "txo", "seo", "sgo", "lco"]),
                 set: $util.oneOfSetter($oneOfFields)
             });
 
@@ -222,8 +222,8 @@ $root.apply = (function() {
                     $root.apply.operations.SetEpochOperation.encode(message.seo, writer.uint32(/* id 10, wireType 2 =*/82).fork()).ldelim();
                 if (message.sgo != null && Object.hasOwnProperty.call(message, "sgo"))
                     $root.apply.operations.SetGenesisEpochOperation.encode(message.sgo, writer.uint32(/* id 11, wireType 2 =*/90).fork()).ldelim();
-                if (message.vpo != null && Object.hasOwnProperty.call(message, "vpo"))
-                    $root.apply.operations.SetVdfParamsOperation.encode(message.vpo, writer.uint32(/* id 12, wireType 2 =*/98).fork()).ldelim();
+                if (message.lco != null && Object.hasOwnProperty.call(message, "lco"))
+                    $root.apply.operations.SetLedgerConfigOperation.encode(message.lco, writer.uint32(/* id 12, wireType 2 =*/98).fork()).ldelim();
                 return writer;
             };
 
@@ -305,7 +305,7 @@ $root.apply = (function() {
                             break;
                         }
                     case 12: {
-                            message.vpo = $root.apply.operations.SetVdfParamsOperation.decode(reader, reader.uint32());
+                            message.lco = $root.apply.operations.SetLedgerConfigOperation.decode(reader, reader.uint32());
                             break;
                         }
                     default:
@@ -458,14 +458,14 @@ $root.apply = (function() {
                             return "sgo." + error;
                     }
                 }
-                if (message.vpo != null && message.hasOwnProperty("vpo")) {
+                if (message.lco != null && message.hasOwnProperty("lco")) {
                     if (properties.value === 1)
                         return "value: multiple values";
                     properties.value = 1;
                     {
-                        var error = $root.apply.operations.SetVdfParamsOperation.verify(message.vpo);
+                        var error = $root.apply.operations.SetLedgerConfigOperation.verify(message.lco);
                         if (error)
-                            return "vpo." + error;
+                            return "lco." + error;
                     }
                 }
                 return null;
@@ -554,7 +554,7 @@ $root.apply = (function() {
                 case 15:
                     message.type = 15;
                     break;
-                case "SET_VDF_PARAMS":
+                case "SET_LEDGER_CONFIG":
                 case 16:
                     message.type = 16;
                     break;
@@ -609,10 +609,10 @@ $root.apply = (function() {
                         throw TypeError(".apply.operations.Operation.sgo: object expected");
                     message.sgo = $root.apply.operations.SetGenesisEpochOperation.fromObject(object.sgo);
                 }
-                if (object.vpo != null) {
-                    if (typeof object.vpo !== "object")
-                        throw TypeError(".apply.operations.Operation.vpo: object expected");
-                    message.vpo = $root.apply.operations.SetVdfParamsOperation.fromObject(object.vpo);
+                if (object.lco != null) {
+                    if (typeof object.lco !== "object")
+                        throw TypeError(".apply.operations.Operation.lco: object expected");
+                    message.lco = $root.apply.operations.SetLedgerConfigOperation.fromObject(object.lco);
                 }
                 return message;
             };
@@ -689,10 +689,10 @@ $root.apply = (function() {
                     if (options.oneofs)
                         object.value = "sgo";
                 }
-                if (message.vpo != null && message.hasOwnProperty("vpo")) {
-                    object.vpo = $root.apply.operations.SetVdfParamsOperation.toObject(message.vpo, options);
+                if (message.lco != null && message.hasOwnProperty("lco")) {
+                    object.lco = $root.apply.operations.SetLedgerConfigOperation.toObject(message.lco, options);
                     if (options.oneofs)
-                        object.value = "vpo";
+                        object.value = "lco";
                 }
                 return object;
             };
@@ -746,7 +746,7 @@ $root.apply = (function() {
          * @property {number} TRANSFER=13 TRANSFER value
          * @property {number} SET_EPOCH=14 SET_EPOCH value
          * @property {number} SET_GENESIS_EPOCH=15 SET_GENESIS_EPOCH value
-         * @property {number} SET_VDF_PARAMS=16 SET_VDF_PARAMS value
+         * @property {number} SET_LEDGER_CONFIG=16 SET_LEDGER_CONFIG value
          */
         operations.OperationType = (function() {
             var valuesById = {}, values = Object.create(valuesById);
@@ -766,7 +766,7 @@ $root.apply = (function() {
             values[valuesById[13] = "TRANSFER"] = 13;
             values[valuesById[14] = "SET_EPOCH"] = 14;
             values[valuesById[15] = "SET_GENESIS_EPOCH"] = 15;
-            values[valuesById[16] = "SET_VDF_PARAMS"] = 16;
+            values[valuesById[16] = "SET_LEDGER_CONFIG"] = 16;
             return values;
         })();
 
@@ -4012,8 +4012,7 @@ $root.apply = (function() {
              * @interface ISetGenesisEpochOperation
              * @property {Uint8Array|null} [tx] SetGenesisEpochOperation tx
              * @property {Uint8Array|null} [txv] SetGenesisEpochOperation txv
-             * @property {Uint8Array|null} [df] SetGenesisEpochOperation df
-             * @property {Uint8Array|null} [db] SetGenesisEpochOperation db
+             * @property {Uint8Array|null} [config_id] SetGenesisEpochOperation config_id
              * @property {Uint8Array|null} ["in"] SetGenesisEpochOperation in
              * @property {Uint8Array|null} [is] SetGenesisEpochOperation is
              */
@@ -4050,20 +4049,12 @@ $root.apply = (function() {
             SetGenesisEpochOperation.prototype.txv = $util.newBuffer([]);
 
             /**
-             * SetGenesisEpochOperation df.
-             * @member {Uint8Array} df
+             * SetGenesisEpochOperation config_id.
+             * @member {Uint8Array} config_id
              * @memberof apply.operations.SetGenesisEpochOperation
              * @instance
              */
-            SetGenesisEpochOperation.prototype.df = $util.newBuffer([]);
-
-            /**
-             * SetGenesisEpochOperation db.
-             * @member {Uint8Array} db
-             * @memberof apply.operations.SetGenesisEpochOperation
-             * @instance
-             */
-            SetGenesisEpochOperation.prototype.db = $util.newBuffer([]);
+            SetGenesisEpochOperation.prototype.config_id = $util.newBuffer([]);
 
             /**
              * SetGenesisEpochOperation in.
@@ -4109,14 +4100,12 @@ $root.apply = (function() {
                     writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.tx);
                 if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
                     writer.uint32(/* id 2, wireType 2 =*/18).bytes(message.txv);
-                if (message.df != null && Object.hasOwnProperty.call(message, "df"))
-                    writer.uint32(/* id 3, wireType 2 =*/26).bytes(message.df);
-                if (message.db != null && Object.hasOwnProperty.call(message, "db"))
-                    writer.uint32(/* id 4, wireType 2 =*/34).bytes(message.db);
+                if (message.config_id != null && Object.hasOwnProperty.call(message, "config_id"))
+                    writer.uint32(/* id 3, wireType 2 =*/26).bytes(message.config_id);
                 if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
-                    writer.uint32(/* id 5, wireType 2 =*/42).bytes(message["in"]);
+                    writer.uint32(/* id 4, wireType 2 =*/34).bytes(message["in"]);
                 if (message.is != null && Object.hasOwnProperty.call(message, "is"))
-                    writer.uint32(/* id 6, wireType 2 =*/50).bytes(message.is);
+                    writer.uint32(/* id 5, wireType 2 =*/42).bytes(message.is);
                 return writer;
             };
 
@@ -4162,18 +4151,14 @@ $root.apply = (function() {
                             break;
                         }
                     case 3: {
-                            message.df = reader.bytes();
+                            message.config_id = reader.bytes();
                             break;
                         }
                     case 4: {
-                            message.db = reader.bytes();
-                            break;
-                        }
-                    case 5: {
                             message["in"] = reader.bytes();
                             break;
                         }
-                    case 6: {
+                    case 5: {
                             message.is = reader.bytes();
                             break;
                         }
@@ -4218,12 +4203,9 @@ $root.apply = (function() {
                 if (message.txv != null && message.hasOwnProperty("txv"))
                     if (!(message.txv && typeof message.txv.length === "number" || $util.isString(message.txv)))
                         return "txv: buffer expected";
-                if (message.df != null && message.hasOwnProperty("df"))
-                    if (!(message.df && typeof message.df.length === "number" || $util.isString(message.df)))
-                        return "df: buffer expected";
-                if (message.db != null && message.hasOwnProperty("db"))
-                    if (!(message.db && typeof message.db.length === "number" || $util.isString(message.db)))
-                        return "db: buffer expected";
+                if (message.config_id != null && message.hasOwnProperty("config_id"))
+                    if (!(message.config_id && typeof message.config_id.length === "number" || $util.isString(message.config_id)))
+                        return "config_id: buffer expected";
                 if (message["in"] != null && message.hasOwnProperty("in"))
                     if (!(message["in"] && typeof message["in"].length === "number" || $util.isString(message["in"])))
                         return "in: buffer expected";
@@ -4255,16 +4237,11 @@ $root.apply = (function() {
                         $util.base64.decode(object.txv, message.txv = $util.newBuffer($util.base64.length(object.txv)), 0);
                     else if (object.txv.length >= 0)
                         message.txv = object.txv;
-                if (object.df != null)
-                    if (typeof object.df === "string")
-                        $util.base64.decode(object.df, message.df = $util.newBuffer($util.base64.length(object.df)), 0);
-                    else if (object.df.length >= 0)
-                        message.df = object.df;
-                if (object.db != null)
-                    if (typeof object.db === "string")
-                        $util.base64.decode(object.db, message.db = $util.newBuffer($util.base64.length(object.db)), 0);
-                    else if (object.db.length >= 0)
-                        message.db = object.db;
+                if (object.config_id != null)
+                    if (typeof object.config_id === "string")
+                        $util.base64.decode(object.config_id, message.config_id = $util.newBuffer($util.base64.length(object.config_id)), 0);
+                    else if (object.config_id.length >= 0)
+                        message.config_id = object.config_id;
                 if (object["in"] != null)
                     if (typeof object["in"] === "string")
                         $util.base64.decode(object["in"], message["in"] = $util.newBuffer($util.base64.length(object["in"])), 0);
@@ -4307,18 +4284,11 @@ $root.apply = (function() {
                             object.txv = $util.newBuffer(object.txv);
                     }
                     if (options.bytes === String)
-                        object.df = "";
+                        object.config_id = "";
                     else {
-                        object.df = [];
+                        object.config_id = [];
                         if (options.bytes !== Array)
-                            object.df = $util.newBuffer(object.df);
-                    }
-                    if (options.bytes === String)
-                        object.db = "";
-                    else {
-                        object.db = [];
-                        if (options.bytes !== Array)
-                            object.db = $util.newBuffer(object.db);
+                            object.config_id = $util.newBuffer(object.config_id);
                     }
                     if (options.bytes === String)
                         object["in"] = "";
@@ -4339,10 +4309,8 @@ $root.apply = (function() {
                     object.tx = options.bytes === String ? $util.base64.encode(message.tx, 0, message.tx.length) : options.bytes === Array ? Array.prototype.slice.call(message.tx) : message.tx;
                 if (message.txv != null && message.hasOwnProperty("txv"))
                     object.txv = options.bytes === String ? $util.base64.encode(message.txv, 0, message.txv.length) : options.bytes === Array ? Array.prototype.slice.call(message.txv) : message.txv;
-                if (message.df != null && message.hasOwnProperty("df"))
-                    object.df = options.bytes === String ? $util.base64.encode(message.df, 0, message.df.length) : options.bytes === Array ? Array.prototype.slice.call(message.df) : message.df;
-                if (message.db != null && message.hasOwnProperty("db"))
-                    object.db = options.bytes === String ? $util.base64.encode(message.db, 0, message.db.length) : options.bytes === Array ? Array.prototype.slice.call(message.db) : message.db;
+                if (message.config_id != null && message.hasOwnProperty("config_id"))
+                    object.config_id = options.bytes === String ? $util.base64.encode(message.config_id, 0, message.config_id.length) : options.bytes === Array ? Array.prototype.slice.call(message.config_id) : message.config_id;
                 if (message["in"] != null && message.hasOwnProperty("in"))
                     object["in"] = options.bytes === String ? $util.base64.encode(message["in"], 0, message["in"].length) : options.bytes === Array ? Array.prototype.slice.call(message["in"]) : message["in"];
                 if (message.is != null && message.hasOwnProperty("is"))
@@ -4379,28 +4347,25 @@ $root.apply = (function() {
             return SetGenesisEpochOperation;
         })();
 
-        operations.SetVdfParamsOperation = (function() {
+        operations.LedgerConfigEntry = (function() {
 
             /**
-             * Properties of a SetVdfParamsOperation.
+             * Properties of a LedgerConfigEntry.
              * @memberof apply.operations
-             * @interface ISetVdfParamsOperation
-             * @property {Uint8Array|null} [tx] SetVdfParamsOperation tx
-             * @property {Uint8Array|null} [txv] SetVdfParamsOperation txv
-             * @property {Uint8Array|null} [df] SetVdfParamsOperation df
-             * @property {Uint8Array|null} ["in"] SetVdfParamsOperation in
-             * @property {Uint8Array|null} [is] SetVdfParamsOperation is
+             * @interface ILedgerConfigEntry
+             * @property {Uint8Array|null} [key] LedgerConfigEntry key
+             * @property {Uint8Array|null} [value] LedgerConfigEntry value
              */
 
             /**
-             * Constructs a new SetVdfParamsOperation.
+             * Constructs a new LedgerConfigEntry.
              * @memberof apply.operations
-             * @classdesc Represents a SetVdfParamsOperation.
-             * @implements ISetVdfParamsOperation
+             * @classdesc Represents a LedgerConfigEntry.
+             * @implements ILedgerConfigEntry
              * @constructor
-             * @param {apply.operations.ISetVdfParamsOperation=} [properties] Properties to set
+             * @param {apply.operations.ILedgerConfigEntry=} [properties] Properties to set
              */
-            function SetVdfParamsOperation(properties) {
+            function LedgerConfigEntry(properties) {
                 if (properties)
                     for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
                         if (properties[keys[i]] != null)
@@ -4408,110 +4373,1339 @@ $root.apply = (function() {
             }
 
             /**
-             * SetVdfParamsOperation tx.
-             * @member {Uint8Array} tx
-             * @memberof apply.operations.SetVdfParamsOperation
+             * LedgerConfigEntry key.
+             * @member {Uint8Array} key
+             * @memberof apply.operations.LedgerConfigEntry
              * @instance
              */
-            SetVdfParamsOperation.prototype.tx = $util.newBuffer([]);
+            LedgerConfigEntry.prototype.key = $util.newBuffer([]);
 
             /**
-             * SetVdfParamsOperation txv.
-             * @member {Uint8Array} txv
-             * @memberof apply.operations.SetVdfParamsOperation
+             * LedgerConfigEntry value.
+             * @member {Uint8Array} value
+             * @memberof apply.operations.LedgerConfigEntry
              * @instance
              */
-            SetVdfParamsOperation.prototype.txv = $util.newBuffer([]);
+            LedgerConfigEntry.prototype.value = $util.newBuffer([]);
 
             /**
-             * SetVdfParamsOperation df.
-             * @member {Uint8Array} df
-             * @memberof apply.operations.SetVdfParamsOperation
-             * @instance
-             */
-            SetVdfParamsOperation.prototype.df = $util.newBuffer([]);
-
-            /**
-             * SetVdfParamsOperation in.
-             * @member {Uint8Array} in
-             * @memberof apply.operations.SetVdfParamsOperation
-             * @instance
-             */
-            SetVdfParamsOperation.prototype["in"] = $util.newBuffer([]);
-
-            /**
-             * SetVdfParamsOperation is.
-             * @member {Uint8Array} is
-             * @memberof apply.operations.SetVdfParamsOperation
-             * @instance
-             */
-            SetVdfParamsOperation.prototype.is = $util.newBuffer([]);
-
-            /**
-             * Creates a new SetVdfParamsOperation instance using the specified properties.
+             * Creates a new LedgerConfigEntry instance using the specified properties.
              * @function create
-             * @memberof apply.operations.SetVdfParamsOperation
+             * @memberof apply.operations.LedgerConfigEntry
              * @static
-             * @param {apply.operations.ISetVdfParamsOperation=} [properties] Properties to set
-             * @returns {apply.operations.SetVdfParamsOperation} SetVdfParamsOperation instance
+             * @param {apply.operations.ILedgerConfigEntry=} [properties] Properties to set
+             * @returns {apply.operations.LedgerConfigEntry} LedgerConfigEntry instance
              */
-            SetVdfParamsOperation.create = function create(properties) {
-                return new SetVdfParamsOperation(properties);
+            LedgerConfigEntry.create = function create(properties) {
+                return new LedgerConfigEntry(properties);
             };
 
             /**
-             * Encodes the specified SetVdfParamsOperation message. Does not implicitly {@link apply.operations.SetVdfParamsOperation.verify|verify} messages.
+             * Encodes the specified LedgerConfigEntry message. Does not implicitly {@link apply.operations.LedgerConfigEntry.verify|verify} messages.
              * @function encode
-             * @memberof apply.operations.SetVdfParamsOperation
+             * @memberof apply.operations.LedgerConfigEntry
              * @static
-             * @param {apply.operations.ISetVdfParamsOperation} message SetVdfParamsOperation message or plain object to encode
+             * @param {apply.operations.ILedgerConfigEntry} message LedgerConfigEntry message or plain object to encode
              * @param {$protobuf.Writer} [writer] Writer to encode to
              * @returns {$protobuf.Writer} Writer
              */
-            SetVdfParamsOperation.encode = function encode(message, writer) {
+            LedgerConfigEntry.encode = function encode(message, writer) {
+                if (!writer)
+                    writer = $Writer.create();
+                if (message.key != null && Object.hasOwnProperty.call(message, "key"))
+                    writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.key);
+                if (message.value != null && Object.hasOwnProperty.call(message, "value"))
+                    writer.uint32(/* id 2, wireType 2 =*/18).bytes(message.value);
+                return writer;
+            };
+
+            /**
+             * Encodes the specified LedgerConfigEntry message, length delimited. Does not implicitly {@link apply.operations.LedgerConfigEntry.verify|verify} messages.
+             * @function encodeDelimited
+             * @memberof apply.operations.LedgerConfigEntry
+             * @static
+             * @param {apply.operations.ILedgerConfigEntry} message LedgerConfigEntry message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            LedgerConfigEntry.encodeDelimited = function encodeDelimited(message, writer) {
+                return this.encode(message, writer).ldelim();
+            };
+
+            /**
+             * Decodes a LedgerConfigEntry message from the specified reader or buffer.
+             * @function decode
+             * @memberof apply.operations.LedgerConfigEntry
+             * @static
+             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @param {number} [length] Message length if known beforehand
+             * @returns {apply.operations.LedgerConfigEntry} LedgerConfigEntry
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            LedgerConfigEntry.decode = function decode(reader, length, error) {
+                if (!(reader instanceof $Reader))
+                    reader = $Reader.create(reader);
+                var end = length === undefined ? reader.len : reader.pos + length, message = new $root.apply.operations.LedgerConfigEntry();
+                while (reader.pos < end) {
+                    var tag = reader.uint32();
+                    if (tag === error)
+                        break;
+                    switch (tag >>> 3) {
+                    case 1: {
+                            message.key = reader.bytes();
+                            break;
+                        }
+                    case 2: {
+                            message.value = reader.bytes();
+                            break;
+                        }
+                    default:
+                        reader.skipType(tag & 7);
+                        break;
+                    }
+                }
+                return message;
+            };
+
+            /**
+             * Decodes a LedgerConfigEntry message from the specified reader or buffer, length delimited.
+             * @function decodeDelimited
+             * @memberof apply.operations.LedgerConfigEntry
+             * @static
+             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @returns {apply.operations.LedgerConfigEntry} LedgerConfigEntry
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            LedgerConfigEntry.decodeDelimited = function decodeDelimited(reader) {
+                if (!(reader instanceof $Reader))
+                    reader = new $Reader(reader);
+                return this.decode(reader, reader.uint32());
+            };
+
+            /**
+             * Verifies a LedgerConfigEntry message.
+             * @function verify
+             * @memberof apply.operations.LedgerConfigEntry
+             * @static
+             * @param {Object.<string,*>} message Plain object to verify
+             * @returns {string|null} `null` if valid, otherwise the reason why it is not
+             */
+            LedgerConfigEntry.verify = function verify(message) {
+                if (typeof message !== "object" || message === null)
+                    return "object expected";
+                if (message.key != null && message.hasOwnProperty("key"))
+                    if (!(message.key && typeof message.key.length === "number" || $util.isString(message.key)))
+                        return "key: buffer expected";
+                if (message.value != null && message.hasOwnProperty("value"))
+                    if (!(message.value && typeof message.value.length === "number" || $util.isString(message.value)))
+                        return "value: buffer expected";
+                return null;
+            };
+
+            /**
+             * Creates a LedgerConfigEntry message from a plain object. Also converts values to their respective internal types.
+             * @function fromObject
+             * @memberof apply.operations.LedgerConfigEntry
+             * @static
+             * @param {Object.<string,*>} object Plain object
+             * @returns {apply.operations.LedgerConfigEntry} LedgerConfigEntry
+             */
+            LedgerConfigEntry.fromObject = function fromObject(object) {
+                if (object instanceof $root.apply.operations.LedgerConfigEntry)
+                    return object;
+                var message = new $root.apply.operations.LedgerConfigEntry();
+                if (object.key != null)
+                    if (typeof object.key === "string")
+                        $util.base64.decode(object.key, message.key = $util.newBuffer($util.base64.length(object.key)), 0);
+                    else if (object.key.length >= 0)
+                        message.key = object.key;
+                if (object.value != null)
+                    if (typeof object.value === "string")
+                        $util.base64.decode(object.value, message.value = $util.newBuffer($util.base64.length(object.value)), 0);
+                    else if (object.value.length >= 0)
+                        message.value = object.value;
+                return message;
+            };
+
+            /**
+             * Creates a plain object from a LedgerConfigEntry message. Also converts values to other types if specified.
+             * @function toObject
+             * @memberof apply.operations.LedgerConfigEntry
+             * @static
+             * @param {apply.operations.LedgerConfigEntry} message LedgerConfigEntry
+             * @param {$protobuf.IConversionOptions} [options] Conversion options
+             * @returns {Object.<string,*>} Plain object
+             */
+            LedgerConfigEntry.toObject = function toObject(message, options) {
+                if (!options)
+                    options = {};
+                var object = {};
+                if (options.defaults) {
+                    if (options.bytes === String)
+                        object.key = "";
+                    else {
+                        object.key = [];
+                        if (options.bytes !== Array)
+                            object.key = $util.newBuffer(object.key);
+                    }
+                    if (options.bytes === String)
+                        object.value = "";
+                    else {
+                        object.value = [];
+                        if (options.bytes !== Array)
+                            object.value = $util.newBuffer(object.value);
+                    }
+                }
+                if (message.key != null && message.hasOwnProperty("key"))
+                    object.key = options.bytes === String ? $util.base64.encode(message.key, 0, message.key.length) : options.bytes === Array ? Array.prototype.slice.call(message.key) : message.key;
+                if (message.value != null && message.hasOwnProperty("value"))
+                    object.value = options.bytes === String ? $util.base64.encode(message.value, 0, message.value.length) : options.bytes === Array ? Array.prototype.slice.call(message.value) : message.value;
+                return object;
+            };
+
+            /**
+             * Converts this LedgerConfigEntry to JSON.
+             * @function toJSON
+             * @memberof apply.operations.LedgerConfigEntry
+             * @instance
+             * @returns {Object.<string,*>} JSON object
+             */
+            LedgerConfigEntry.prototype.toJSON = function toJSON() {
+                return this.constructor.toObject(this, $protobuf.util.toJSONOptions);
+            };
+
+            /**
+             * Gets the default type url for LedgerConfigEntry
+             * @function getTypeUrl
+             * @memberof apply.operations.LedgerConfigEntry
+             * @static
+             * @param {string} [typeUrlPrefix] your custom typeUrlPrefix(default "type.googleapis.com")
+             * @returns {string} The default type url
+             */
+            LedgerConfigEntry.getTypeUrl = function getTypeUrl(typeUrlPrefix) {
+                if (typeUrlPrefix === undefined) {
+                    typeUrlPrefix = "type.googleapis.com";
+                }
+                return typeUrlPrefix + "/apply.operations.LedgerConfigEntry";
+            };
+
+            return LedgerConfigEntry;
+        })();
+
+        operations.LedgerConfigSnapshot = (function() {
+
+            /**
+             * Properties of a LedgerConfigSnapshot.
+             * @memberof apply.operations
+             * @interface ILedgerConfigSnapshot
+             * @property {number|null} [format_version] LedgerConfigSnapshot format_version
+             * @property {string|null} [commitment_scheme] LedgerConfigSnapshot commitment_scheme
+             * @property {string|null} [schema_id] LedgerConfigSnapshot schema_id
+             * @property {Array.<apply.operations.ILedgerConfigEntry>|null} [entries] LedgerConfigSnapshot entries
+             */
+
+            /**
+             * Constructs a new LedgerConfigSnapshot.
+             * @memberof apply.operations
+             * @classdesc Represents a LedgerConfigSnapshot.
+             * @implements ILedgerConfigSnapshot
+             * @constructor
+             * @param {apply.operations.ILedgerConfigSnapshot=} [properties] Properties to set
+             */
+            function LedgerConfigSnapshot(properties) {
+                this.entries = [];
+                if (properties)
+                    for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
+                        if (properties[keys[i]] != null)
+                            this[keys[i]] = properties[keys[i]];
+            }
+
+            /**
+             * LedgerConfigSnapshot format_version.
+             * @member {number} format_version
+             * @memberof apply.operations.LedgerConfigSnapshot
+             * @instance
+             */
+            LedgerConfigSnapshot.prototype.format_version = 0;
+
+            /**
+             * LedgerConfigSnapshot commitment_scheme.
+             * @member {string} commitment_scheme
+             * @memberof apply.operations.LedgerConfigSnapshot
+             * @instance
+             */
+            LedgerConfigSnapshot.prototype.commitment_scheme = "";
+
+            /**
+             * LedgerConfigSnapshot schema_id.
+             * @member {string} schema_id
+             * @memberof apply.operations.LedgerConfigSnapshot
+             * @instance
+             */
+            LedgerConfigSnapshot.prototype.schema_id = "";
+
+            /**
+             * LedgerConfigSnapshot entries.
+             * @member {Array.<apply.operations.ILedgerConfigEntry>} entries
+             * @memberof apply.operations.LedgerConfigSnapshot
+             * @instance
+             */
+            LedgerConfigSnapshot.prototype.entries = $util.emptyArray;
+
+            /**
+             * Creates a new LedgerConfigSnapshot instance using the specified properties.
+             * @function create
+             * @memberof apply.operations.LedgerConfigSnapshot
+             * @static
+             * @param {apply.operations.ILedgerConfigSnapshot=} [properties] Properties to set
+             * @returns {apply.operations.LedgerConfigSnapshot} LedgerConfigSnapshot instance
+             */
+            LedgerConfigSnapshot.create = function create(properties) {
+                return new LedgerConfigSnapshot(properties);
+            };
+
+            /**
+             * Encodes the specified LedgerConfigSnapshot message. Does not implicitly {@link apply.operations.LedgerConfigSnapshot.verify|verify} messages.
+             * @function encode
+             * @memberof apply.operations.LedgerConfigSnapshot
+             * @static
+             * @param {apply.operations.ILedgerConfigSnapshot} message LedgerConfigSnapshot message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            LedgerConfigSnapshot.encode = function encode(message, writer) {
+                if (!writer)
+                    writer = $Writer.create();
+                if (message.format_version != null && Object.hasOwnProperty.call(message, "format_version"))
+                    writer.uint32(/* id 1, wireType 0 =*/8).uint32(message.format_version);
+                if (message.commitment_scheme != null && Object.hasOwnProperty.call(message, "commitment_scheme"))
+                    writer.uint32(/* id 2, wireType 2 =*/18).string(message.commitment_scheme);
+                if (message.schema_id != null && Object.hasOwnProperty.call(message, "schema_id"))
+                    writer.uint32(/* id 3, wireType 2 =*/26).string(message.schema_id);
+                if (message.entries != null && message.entries.length)
+                    for (var i = 0; i < message.entries.length; ++i)
+                        $root.apply.operations.LedgerConfigEntry.encode(message.entries[i], writer.uint32(/* id 4, wireType 2 =*/34).fork()).ldelim();
+                return writer;
+            };
+
+            /**
+             * Encodes the specified LedgerConfigSnapshot message, length delimited. Does not implicitly {@link apply.operations.LedgerConfigSnapshot.verify|verify} messages.
+             * @function encodeDelimited
+             * @memberof apply.operations.LedgerConfigSnapshot
+             * @static
+             * @param {apply.operations.ILedgerConfigSnapshot} message LedgerConfigSnapshot message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            LedgerConfigSnapshot.encodeDelimited = function encodeDelimited(message, writer) {
+                return this.encode(message, writer).ldelim();
+            };
+
+            /**
+             * Decodes a LedgerConfigSnapshot message from the specified reader or buffer.
+             * @function decode
+             * @memberof apply.operations.LedgerConfigSnapshot
+             * @static
+             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @param {number} [length] Message length if known beforehand
+             * @returns {apply.operations.LedgerConfigSnapshot} LedgerConfigSnapshot
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            LedgerConfigSnapshot.decode = function decode(reader, length, error) {
+                if (!(reader instanceof $Reader))
+                    reader = $Reader.create(reader);
+                var end = length === undefined ? reader.len : reader.pos + length, message = new $root.apply.operations.LedgerConfigSnapshot();
+                while (reader.pos < end) {
+                    var tag = reader.uint32();
+                    if (tag === error)
+                        break;
+                    switch (tag >>> 3) {
+                    case 1: {
+                            message.format_version = reader.uint32();
+                            break;
+                        }
+                    case 2: {
+                            message.commitment_scheme = reader.string();
+                            break;
+                        }
+                    case 3: {
+                            message.schema_id = reader.string();
+                            break;
+                        }
+                    case 4: {
+                            if (!(message.entries && message.entries.length))
+                                message.entries = [];
+                            message.entries.push($root.apply.operations.LedgerConfigEntry.decode(reader, reader.uint32()));
+                            break;
+                        }
+                    default:
+                        reader.skipType(tag & 7);
+                        break;
+                    }
+                }
+                return message;
+            };
+
+            /**
+             * Decodes a LedgerConfigSnapshot message from the specified reader or buffer, length delimited.
+             * @function decodeDelimited
+             * @memberof apply.operations.LedgerConfigSnapshot
+             * @static
+             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @returns {apply.operations.LedgerConfigSnapshot} LedgerConfigSnapshot
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            LedgerConfigSnapshot.decodeDelimited = function decodeDelimited(reader) {
+                if (!(reader instanceof $Reader))
+                    reader = new $Reader(reader);
+                return this.decode(reader, reader.uint32());
+            };
+
+            /**
+             * Verifies a LedgerConfigSnapshot message.
+             * @function verify
+             * @memberof apply.operations.LedgerConfigSnapshot
+             * @static
+             * @param {Object.<string,*>} message Plain object to verify
+             * @returns {string|null} `null` if valid, otherwise the reason why it is not
+             */
+            LedgerConfigSnapshot.verify = function verify(message) {
+                if (typeof message !== "object" || message === null)
+                    return "object expected";
+                if (message.format_version != null && message.hasOwnProperty("format_version"))
+                    if (!$util.isInteger(message.format_version))
+                        return "format_version: integer expected";
+                if (message.commitment_scheme != null && message.hasOwnProperty("commitment_scheme"))
+                    if (!$util.isString(message.commitment_scheme))
+                        return "commitment_scheme: string expected";
+                if (message.schema_id != null && message.hasOwnProperty("schema_id"))
+                    if (!$util.isString(message.schema_id))
+                        return "schema_id: string expected";
+                if (message.entries != null && message.hasOwnProperty("entries")) {
+                    if (!Array.isArray(message.entries))
+                        return "entries: array expected";
+                    for (var i = 0; i < message.entries.length; ++i) {
+                        var error = $root.apply.operations.LedgerConfigEntry.verify(message.entries[i]);
+                        if (error)
+                            return "entries." + error;
+                    }
+                }
+                return null;
+            };
+
+            /**
+             * Creates a LedgerConfigSnapshot message from a plain object. Also converts values to their respective internal types.
+             * @function fromObject
+             * @memberof apply.operations.LedgerConfigSnapshot
+             * @static
+             * @param {Object.<string,*>} object Plain object
+             * @returns {apply.operations.LedgerConfigSnapshot} LedgerConfigSnapshot
+             */
+            LedgerConfigSnapshot.fromObject = function fromObject(object) {
+                if (object instanceof $root.apply.operations.LedgerConfigSnapshot)
+                    return object;
+                var message = new $root.apply.operations.LedgerConfigSnapshot();
+                if (object.format_version != null)
+                    message.format_version = object.format_version >>> 0;
+                if (object.commitment_scheme != null)
+                    message.commitment_scheme = String(object.commitment_scheme);
+                if (object.schema_id != null)
+                    message.schema_id = String(object.schema_id);
+                if (object.entries) {
+                    if (!Array.isArray(object.entries))
+                        throw TypeError(".apply.operations.LedgerConfigSnapshot.entries: array expected");
+                    message.entries = [];
+                    for (var i = 0; i < object.entries.length; ++i) {
+                        if (typeof object.entries[i] !== "object")
+                            throw TypeError(".apply.operations.LedgerConfigSnapshot.entries: object expected");
+                        message.entries[i] = $root.apply.operations.LedgerConfigEntry.fromObject(object.entries[i]);
+                    }
+                }
+                return message;
+            };
+
+            /**
+             * Creates a plain object from a LedgerConfigSnapshot message. Also converts values to other types if specified.
+             * @function toObject
+             * @memberof apply.operations.LedgerConfigSnapshot
+             * @static
+             * @param {apply.operations.LedgerConfigSnapshot} message LedgerConfigSnapshot
+             * @param {$protobuf.IConversionOptions} [options] Conversion options
+             * @returns {Object.<string,*>} Plain object
+             */
+            LedgerConfigSnapshot.toObject = function toObject(message, options) {
+                if (!options)
+                    options = {};
+                var object = {};
+                if (options.arrays || options.defaults)
+                    object.entries = [];
+                if (options.defaults) {
+                    object.format_version = 0;
+                    object.commitment_scheme = "";
+                    object.schema_id = "";
+                }
+                if (message.format_version != null && message.hasOwnProperty("format_version"))
+                    object.format_version = message.format_version;
+                if (message.commitment_scheme != null && message.hasOwnProperty("commitment_scheme"))
+                    object.commitment_scheme = message.commitment_scheme;
+                if (message.schema_id != null && message.hasOwnProperty("schema_id"))
+                    object.schema_id = message.schema_id;
+                if (message.entries && message.entries.length) {
+                    object.entries = [];
+                    for (var j = 0; j < message.entries.length; ++j)
+                        object.entries[j] = $root.apply.operations.LedgerConfigEntry.toObject(message.entries[j], options);
+                }
+                return object;
+            };
+
+            /**
+             * Converts this LedgerConfigSnapshot to JSON.
+             * @function toJSON
+             * @memberof apply.operations.LedgerConfigSnapshot
+             * @instance
+             * @returns {Object.<string,*>} JSON object
+             */
+            LedgerConfigSnapshot.prototype.toJSON = function toJSON() {
+                return this.constructor.toObject(this, $protobuf.util.toJSONOptions);
+            };
+
+            /**
+             * Gets the default type url for LedgerConfigSnapshot
+             * @function getTypeUrl
+             * @memberof apply.operations.LedgerConfigSnapshot
+             * @static
+             * @param {string} [typeUrlPrefix] your custom typeUrlPrefix(default "type.googleapis.com")
+             * @returns {string} The default type url
+             */
+            LedgerConfigSnapshot.getTypeUrl = function getTypeUrl(typeUrlPrefix) {
+                if (typeUrlPrefix === undefined) {
+                    typeUrlPrefix = "type.googleapis.com";
+                }
+                return typeUrlPrefix + "/apply.operations.LedgerConfigSnapshot";
+            };
+
+            return LedgerConfigSnapshot;
+        })();
+
+        operations.LedgerConfigDescriptor = (function() {
+
+            /**
+             * Properties of a LedgerConfigDescriptor.
+             * @memberof apply.operations
+             * @interface ILedgerConfigDescriptor
+             * @property {number|null} [format_version] LedgerConfigDescriptor format_version
+             * @property {string|null} [commitment_scheme] LedgerConfigDescriptor commitment_scheme
+             * @property {string|null} [schema_id] LedgerConfigDescriptor schema_id
+             * @property {number|Long|null} [config_version] LedgerConfigDescriptor config_version
+             * @property {Uint8Array|null} [config_root] LedgerConfigDescriptor config_root
+             * @property {Uint8Array|null} [config_id] LedgerConfigDescriptor config_id
+             * @property {Uint8Array|null} [commit_id] LedgerConfigDescriptor commit_id
+             * @property {Uint8Array|null} [content_ref] LedgerConfigDescriptor content_ref
+             */
+
+            /**
+             * Constructs a new LedgerConfigDescriptor.
+             * @memberof apply.operations
+             * @classdesc Represents a LedgerConfigDescriptor.
+             * @implements ILedgerConfigDescriptor
+             * @constructor
+             * @param {apply.operations.ILedgerConfigDescriptor=} [properties] Properties to set
+             */
+            function LedgerConfigDescriptor(properties) {
+                if (properties)
+                    for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
+                        if (properties[keys[i]] != null)
+                            this[keys[i]] = properties[keys[i]];
+            }
+
+            /**
+             * LedgerConfigDescriptor format_version.
+             * @member {number} format_version
+             * @memberof apply.operations.LedgerConfigDescriptor
+             * @instance
+             */
+            LedgerConfigDescriptor.prototype.format_version = 0;
+
+            /**
+             * LedgerConfigDescriptor commitment_scheme.
+             * @member {string} commitment_scheme
+             * @memberof apply.operations.LedgerConfigDescriptor
+             * @instance
+             */
+            LedgerConfigDescriptor.prototype.commitment_scheme = "";
+
+            /**
+             * LedgerConfigDescriptor schema_id.
+             * @member {string} schema_id
+             * @memberof apply.operations.LedgerConfigDescriptor
+             * @instance
+             */
+            LedgerConfigDescriptor.prototype.schema_id = "";
+
+            /**
+             * LedgerConfigDescriptor config_version.
+             * @member {number|Long} config_version
+             * @memberof apply.operations.LedgerConfigDescriptor
+             * @instance
+             */
+            LedgerConfigDescriptor.prototype.config_version = $util.Long ? $util.Long.fromBits(0,0,true) : 0;
+
+            /**
+             * LedgerConfigDescriptor config_root.
+             * @member {Uint8Array} config_root
+             * @memberof apply.operations.LedgerConfigDescriptor
+             * @instance
+             */
+            LedgerConfigDescriptor.prototype.config_root = $util.newBuffer([]);
+
+            /**
+             * LedgerConfigDescriptor config_id.
+             * @member {Uint8Array} config_id
+             * @memberof apply.operations.LedgerConfigDescriptor
+             * @instance
+             */
+            LedgerConfigDescriptor.prototype.config_id = $util.newBuffer([]);
+
+            /**
+             * LedgerConfigDescriptor commit_id.
+             * @member {Uint8Array} commit_id
+             * @memberof apply.operations.LedgerConfigDescriptor
+             * @instance
+             */
+            LedgerConfigDescriptor.prototype.commit_id = $util.newBuffer([]);
+
+            /**
+             * LedgerConfigDescriptor content_ref.
+             * @member {Uint8Array} content_ref
+             * @memberof apply.operations.LedgerConfigDescriptor
+             * @instance
+             */
+            LedgerConfigDescriptor.prototype.content_ref = $util.newBuffer([]);
+
+            /**
+             * Creates a new LedgerConfigDescriptor instance using the specified properties.
+             * @function create
+             * @memberof apply.operations.LedgerConfigDescriptor
+             * @static
+             * @param {apply.operations.ILedgerConfigDescriptor=} [properties] Properties to set
+             * @returns {apply.operations.LedgerConfigDescriptor} LedgerConfigDescriptor instance
+             */
+            LedgerConfigDescriptor.create = function create(properties) {
+                return new LedgerConfigDescriptor(properties);
+            };
+
+            /**
+             * Encodes the specified LedgerConfigDescriptor message. Does not implicitly {@link apply.operations.LedgerConfigDescriptor.verify|verify} messages.
+             * @function encode
+             * @memberof apply.operations.LedgerConfigDescriptor
+             * @static
+             * @param {apply.operations.ILedgerConfigDescriptor} message LedgerConfigDescriptor message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            LedgerConfigDescriptor.encode = function encode(message, writer) {
+                if (!writer)
+                    writer = $Writer.create();
+                if (message.format_version != null && Object.hasOwnProperty.call(message, "format_version"))
+                    writer.uint32(/* id 1, wireType 0 =*/8).uint32(message.format_version);
+                if (message.commitment_scheme != null && Object.hasOwnProperty.call(message, "commitment_scheme"))
+                    writer.uint32(/* id 2, wireType 2 =*/18).string(message.commitment_scheme);
+                if (message.schema_id != null && Object.hasOwnProperty.call(message, "schema_id"))
+                    writer.uint32(/* id 3, wireType 2 =*/26).string(message.schema_id);
+                if (message.config_version != null && Object.hasOwnProperty.call(message, "config_version"))
+                    writer.uint32(/* id 4, wireType 0 =*/32).uint64(message.config_version);
+                if (message.config_root != null && Object.hasOwnProperty.call(message, "config_root"))
+                    writer.uint32(/* id 5, wireType 2 =*/42).bytes(message.config_root);
+                if (message.config_id != null && Object.hasOwnProperty.call(message, "config_id"))
+                    writer.uint32(/* id 6, wireType 2 =*/50).bytes(message.config_id);
+                if (message.commit_id != null && Object.hasOwnProperty.call(message, "commit_id"))
+                    writer.uint32(/* id 7, wireType 2 =*/58).bytes(message.commit_id);
+                if (message.content_ref != null && Object.hasOwnProperty.call(message, "content_ref"))
+                    writer.uint32(/* id 8, wireType 2 =*/66).bytes(message.content_ref);
+                return writer;
+            };
+
+            /**
+             * Encodes the specified LedgerConfigDescriptor message, length delimited. Does not implicitly {@link apply.operations.LedgerConfigDescriptor.verify|verify} messages.
+             * @function encodeDelimited
+             * @memberof apply.operations.LedgerConfigDescriptor
+             * @static
+             * @param {apply.operations.ILedgerConfigDescriptor} message LedgerConfigDescriptor message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            LedgerConfigDescriptor.encodeDelimited = function encodeDelimited(message, writer) {
+                return this.encode(message, writer).ldelim();
+            };
+
+            /**
+             * Decodes a LedgerConfigDescriptor message from the specified reader or buffer.
+             * @function decode
+             * @memberof apply.operations.LedgerConfigDescriptor
+             * @static
+             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @param {number} [length] Message length if known beforehand
+             * @returns {apply.operations.LedgerConfigDescriptor} LedgerConfigDescriptor
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            LedgerConfigDescriptor.decode = function decode(reader, length, error) {
+                if (!(reader instanceof $Reader))
+                    reader = $Reader.create(reader);
+                var end = length === undefined ? reader.len : reader.pos + length, message = new $root.apply.operations.LedgerConfigDescriptor();
+                while (reader.pos < end) {
+                    var tag = reader.uint32();
+                    if (tag === error)
+                        break;
+                    switch (tag >>> 3) {
+                    case 1: {
+                            message.format_version = reader.uint32();
+                            break;
+                        }
+                    case 2: {
+                            message.commitment_scheme = reader.string();
+                            break;
+                        }
+                    case 3: {
+                            message.schema_id = reader.string();
+                            break;
+                        }
+                    case 4: {
+                            message.config_version = reader.uint64();
+                            break;
+                        }
+                    case 5: {
+                            message.config_root = reader.bytes();
+                            break;
+                        }
+                    case 6: {
+                            message.config_id = reader.bytes();
+                            break;
+                        }
+                    case 7: {
+                            message.commit_id = reader.bytes();
+                            break;
+                        }
+                    case 8: {
+                            message.content_ref = reader.bytes();
+                            break;
+                        }
+                    default:
+                        reader.skipType(tag & 7);
+                        break;
+                    }
+                }
+                return message;
+            };
+
+            /**
+             * Decodes a LedgerConfigDescriptor message from the specified reader or buffer, length delimited.
+             * @function decodeDelimited
+             * @memberof apply.operations.LedgerConfigDescriptor
+             * @static
+             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @returns {apply.operations.LedgerConfigDescriptor} LedgerConfigDescriptor
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            LedgerConfigDescriptor.decodeDelimited = function decodeDelimited(reader) {
+                if (!(reader instanceof $Reader))
+                    reader = new $Reader(reader);
+                return this.decode(reader, reader.uint32());
+            };
+
+            /**
+             * Verifies a LedgerConfigDescriptor message.
+             * @function verify
+             * @memberof apply.operations.LedgerConfigDescriptor
+             * @static
+             * @param {Object.<string,*>} message Plain object to verify
+             * @returns {string|null} `null` if valid, otherwise the reason why it is not
+             */
+            LedgerConfigDescriptor.verify = function verify(message) {
+                if (typeof message !== "object" || message === null)
+                    return "object expected";
+                if (message.format_version != null && message.hasOwnProperty("format_version"))
+                    if (!$util.isInteger(message.format_version))
+                        return "format_version: integer expected";
+                if (message.commitment_scheme != null && message.hasOwnProperty("commitment_scheme"))
+                    if (!$util.isString(message.commitment_scheme))
+                        return "commitment_scheme: string expected";
+                if (message.schema_id != null && message.hasOwnProperty("schema_id"))
+                    if (!$util.isString(message.schema_id))
+                        return "schema_id: string expected";
+                if (message.config_version != null && message.hasOwnProperty("config_version"))
+                    if (!$util.isInteger(message.config_version) && !(message.config_version && $util.isInteger(message.config_version.low) && $util.isInteger(message.config_version.high)))
+                        return "config_version: integer|Long expected";
+                if (message.config_root != null && message.hasOwnProperty("config_root"))
+                    if (!(message.config_root && typeof message.config_root.length === "number" || $util.isString(message.config_root)))
+                        return "config_root: buffer expected";
+                if (message.config_id != null && message.hasOwnProperty("config_id"))
+                    if (!(message.config_id && typeof message.config_id.length === "number" || $util.isString(message.config_id)))
+                        return "config_id: buffer expected";
+                if (message.commit_id != null && message.hasOwnProperty("commit_id"))
+                    if (!(message.commit_id && typeof message.commit_id.length === "number" || $util.isString(message.commit_id)))
+                        return "commit_id: buffer expected";
+                if (message.content_ref != null && message.hasOwnProperty("content_ref"))
+                    if (!(message.content_ref && typeof message.content_ref.length === "number" || $util.isString(message.content_ref)))
+                        return "content_ref: buffer expected";
+                return null;
+            };
+
+            /**
+             * Creates a LedgerConfigDescriptor message from a plain object. Also converts values to their respective internal types.
+             * @function fromObject
+             * @memberof apply.operations.LedgerConfigDescriptor
+             * @static
+             * @param {Object.<string,*>} object Plain object
+             * @returns {apply.operations.LedgerConfigDescriptor} LedgerConfigDescriptor
+             */
+            LedgerConfigDescriptor.fromObject = function fromObject(object) {
+                if (object instanceof $root.apply.operations.LedgerConfigDescriptor)
+                    return object;
+                var message = new $root.apply.operations.LedgerConfigDescriptor();
+                if (object.format_version != null)
+                    message.format_version = object.format_version >>> 0;
+                if (object.commitment_scheme != null)
+                    message.commitment_scheme = String(object.commitment_scheme);
+                if (object.schema_id != null)
+                    message.schema_id = String(object.schema_id);
+                if (object.config_version != null)
+                    if ($util.Long)
+                        (message.config_version = $util.Long.fromValue(object.config_version)).unsigned = true;
+                    else if (typeof object.config_version === "string")
+                        message.config_version = parseInt(object.config_version, 10);
+                    else if (typeof object.config_version === "number")
+                        message.config_version = object.config_version;
+                    else if (typeof object.config_version === "object")
+                        message.config_version = new $util.LongBits(object.config_version.low >>> 0, object.config_version.high >>> 0).toNumber(true);
+                if (object.config_root != null)
+                    if (typeof object.config_root === "string")
+                        $util.base64.decode(object.config_root, message.config_root = $util.newBuffer($util.base64.length(object.config_root)), 0);
+                    else if (object.config_root.length >= 0)
+                        message.config_root = object.config_root;
+                if (object.config_id != null)
+                    if (typeof object.config_id === "string")
+                        $util.base64.decode(object.config_id, message.config_id = $util.newBuffer($util.base64.length(object.config_id)), 0);
+                    else if (object.config_id.length >= 0)
+                        message.config_id = object.config_id;
+                if (object.commit_id != null)
+                    if (typeof object.commit_id === "string")
+                        $util.base64.decode(object.commit_id, message.commit_id = $util.newBuffer($util.base64.length(object.commit_id)), 0);
+                    else if (object.commit_id.length >= 0)
+                        message.commit_id = object.commit_id;
+                if (object.content_ref != null)
+                    if (typeof object.content_ref === "string")
+                        $util.base64.decode(object.content_ref, message.content_ref = $util.newBuffer($util.base64.length(object.content_ref)), 0);
+                    else if (object.content_ref.length >= 0)
+                        message.content_ref = object.content_ref;
+                return message;
+            };
+
+            /**
+             * Creates a plain object from a LedgerConfigDescriptor message. Also converts values to other types if specified.
+             * @function toObject
+             * @memberof apply.operations.LedgerConfigDescriptor
+             * @static
+             * @param {apply.operations.LedgerConfigDescriptor} message LedgerConfigDescriptor
+             * @param {$protobuf.IConversionOptions} [options] Conversion options
+             * @returns {Object.<string,*>} Plain object
+             */
+            LedgerConfigDescriptor.toObject = function toObject(message, options) {
+                if (!options)
+                    options = {};
+                var object = {};
+                if (options.defaults) {
+                    object.format_version = 0;
+                    object.commitment_scheme = "";
+                    object.schema_id = "";
+                    if ($util.Long) {
+                        var long = new $util.Long(0, 0, true);
+                        object.config_version = options.longs === String ? long.toString() : options.longs === Number ? long.toNumber() : long;
+                    } else
+                        object.config_version = options.longs === String ? "0" : 0;
+                    if (options.bytes === String)
+                        object.config_root = "";
+                    else {
+                        object.config_root = [];
+                        if (options.bytes !== Array)
+                            object.config_root = $util.newBuffer(object.config_root);
+                    }
+                    if (options.bytes === String)
+                        object.config_id = "";
+                    else {
+                        object.config_id = [];
+                        if (options.bytes !== Array)
+                            object.config_id = $util.newBuffer(object.config_id);
+                    }
+                    if (options.bytes === String)
+                        object.commit_id = "";
+                    else {
+                        object.commit_id = [];
+                        if (options.bytes !== Array)
+                            object.commit_id = $util.newBuffer(object.commit_id);
+                    }
+                    if (options.bytes === String)
+                        object.content_ref = "";
+                    else {
+                        object.content_ref = [];
+                        if (options.bytes !== Array)
+                            object.content_ref = $util.newBuffer(object.content_ref);
+                    }
+                }
+                if (message.format_version != null && message.hasOwnProperty("format_version"))
+                    object.format_version = message.format_version;
+                if (message.commitment_scheme != null && message.hasOwnProperty("commitment_scheme"))
+                    object.commitment_scheme = message.commitment_scheme;
+                if (message.schema_id != null && message.hasOwnProperty("schema_id"))
+                    object.schema_id = message.schema_id;
+                if (message.config_version != null && message.hasOwnProperty("config_version"))
+                    if (typeof message.config_version === "number")
+                        object.config_version = options.longs === String ? String(message.config_version) : message.config_version;
+                    else
+                        object.config_version = options.longs === String ? $util.Long.prototype.toString.call(message.config_version) : options.longs === Number ? new $util.LongBits(message.config_version.low >>> 0, message.config_version.high >>> 0).toNumber(true) : message.config_version;
+                if (message.config_root != null && message.hasOwnProperty("config_root"))
+                    object.config_root = options.bytes === String ? $util.base64.encode(message.config_root, 0, message.config_root.length) : options.bytes === Array ? Array.prototype.slice.call(message.config_root) : message.config_root;
+                if (message.config_id != null && message.hasOwnProperty("config_id"))
+                    object.config_id = options.bytes === String ? $util.base64.encode(message.config_id, 0, message.config_id.length) : options.bytes === Array ? Array.prototype.slice.call(message.config_id) : message.config_id;
+                if (message.commit_id != null && message.hasOwnProperty("commit_id"))
+                    object.commit_id = options.bytes === String ? $util.base64.encode(message.commit_id, 0, message.commit_id.length) : options.bytes === Array ? Array.prototype.slice.call(message.commit_id) : message.commit_id;
+                if (message.content_ref != null && message.hasOwnProperty("content_ref"))
+                    object.content_ref = options.bytes === String ? $util.base64.encode(message.content_ref, 0, message.content_ref.length) : options.bytes === Array ? Array.prototype.slice.call(message.content_ref) : message.content_ref;
+                return object;
+            };
+
+            /**
+             * Converts this LedgerConfigDescriptor to JSON.
+             * @function toJSON
+             * @memberof apply.operations.LedgerConfigDescriptor
+             * @instance
+             * @returns {Object.<string,*>} JSON object
+             */
+            LedgerConfigDescriptor.prototype.toJSON = function toJSON() {
+                return this.constructor.toObject(this, $protobuf.util.toJSONOptions);
+            };
+
+            /**
+             * Gets the default type url for LedgerConfigDescriptor
+             * @function getTypeUrl
+             * @memberof apply.operations.LedgerConfigDescriptor
+             * @static
+             * @param {string} [typeUrlPrefix] your custom typeUrlPrefix(default "type.googleapis.com")
+             * @returns {string} The default type url
+             */
+            LedgerConfigDescriptor.getTypeUrl = function getTypeUrl(typeUrlPrefix) {
+                if (typeUrlPrefix === undefined) {
+                    typeUrlPrefix = "type.googleapis.com";
+                }
+                return typeUrlPrefix + "/apply.operations.LedgerConfigDescriptor";
+            };
+
+            return LedgerConfigDescriptor;
+        })();
+
+        operations.LedgerConfigRootRecord = (function() {
+
+            /**
+             * Properties of a LedgerConfigRootRecord.
+             * @memberof apply.operations
+             * @interface ILedgerConfigRootRecord
+             * @property {Uint8Array|null} [previous_commit_id] LedgerConfigRootRecord previous_commit_id
+             * @property {apply.operations.ILedgerConfigDescriptor|null} [descriptor] LedgerConfigRootRecord descriptor
+             */
+
+            /**
+             * Constructs a new LedgerConfigRootRecord.
+             * @memberof apply.operations
+             * @classdesc Represents a LedgerConfigRootRecord.
+             * @implements ILedgerConfigRootRecord
+             * @constructor
+             * @param {apply.operations.ILedgerConfigRootRecord=} [properties] Properties to set
+             */
+            function LedgerConfigRootRecord(properties) {
+                if (properties)
+                    for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
+                        if (properties[keys[i]] != null)
+                            this[keys[i]] = properties[keys[i]];
+            }
+
+            /**
+             * LedgerConfigRootRecord previous_commit_id.
+             * @member {Uint8Array} previous_commit_id
+             * @memberof apply.operations.LedgerConfigRootRecord
+             * @instance
+             */
+            LedgerConfigRootRecord.prototype.previous_commit_id = $util.newBuffer([]);
+
+            /**
+             * LedgerConfigRootRecord descriptor.
+             * @member {apply.operations.ILedgerConfigDescriptor|null|undefined} descriptor
+             * @memberof apply.operations.LedgerConfigRootRecord
+             * @instance
+             */
+            LedgerConfigRootRecord.prototype.descriptor = null;
+
+            /**
+             * Creates a new LedgerConfigRootRecord instance using the specified properties.
+             * @function create
+             * @memberof apply.operations.LedgerConfigRootRecord
+             * @static
+             * @param {apply.operations.ILedgerConfigRootRecord=} [properties] Properties to set
+             * @returns {apply.operations.LedgerConfigRootRecord} LedgerConfigRootRecord instance
+             */
+            LedgerConfigRootRecord.create = function create(properties) {
+                return new LedgerConfigRootRecord(properties);
+            };
+
+            /**
+             * Encodes the specified LedgerConfigRootRecord message. Does not implicitly {@link apply.operations.LedgerConfigRootRecord.verify|verify} messages.
+             * @function encode
+             * @memberof apply.operations.LedgerConfigRootRecord
+             * @static
+             * @param {apply.operations.ILedgerConfigRootRecord} message LedgerConfigRootRecord message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            LedgerConfigRootRecord.encode = function encode(message, writer) {
+                if (!writer)
+                    writer = $Writer.create();
+                if (message.previous_commit_id != null && Object.hasOwnProperty.call(message, "previous_commit_id"))
+                    writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.previous_commit_id);
+                if (message.descriptor != null && Object.hasOwnProperty.call(message, "descriptor"))
+                    $root.apply.operations.LedgerConfigDescriptor.encode(message.descriptor, writer.uint32(/* id 2, wireType 2 =*/18).fork()).ldelim();
+                return writer;
+            };
+
+            /**
+             * Encodes the specified LedgerConfigRootRecord message, length delimited. Does not implicitly {@link apply.operations.LedgerConfigRootRecord.verify|verify} messages.
+             * @function encodeDelimited
+             * @memberof apply.operations.LedgerConfigRootRecord
+             * @static
+             * @param {apply.operations.ILedgerConfigRootRecord} message LedgerConfigRootRecord message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            LedgerConfigRootRecord.encodeDelimited = function encodeDelimited(message, writer) {
+                return this.encode(message, writer).ldelim();
+            };
+
+            /**
+             * Decodes a LedgerConfigRootRecord message from the specified reader or buffer.
+             * @function decode
+             * @memberof apply.operations.LedgerConfigRootRecord
+             * @static
+             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @param {number} [length] Message length if known beforehand
+             * @returns {apply.operations.LedgerConfigRootRecord} LedgerConfigRootRecord
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            LedgerConfigRootRecord.decode = function decode(reader, length, error) {
+                if (!(reader instanceof $Reader))
+                    reader = $Reader.create(reader);
+                var end = length === undefined ? reader.len : reader.pos + length, message = new $root.apply.operations.LedgerConfigRootRecord();
+                while (reader.pos < end) {
+                    var tag = reader.uint32();
+                    if (tag === error)
+                        break;
+                    switch (tag >>> 3) {
+                    case 1: {
+                            message.previous_commit_id = reader.bytes();
+                            break;
+                        }
+                    case 2: {
+                            message.descriptor = $root.apply.operations.LedgerConfigDescriptor.decode(reader, reader.uint32());
+                            break;
+                        }
+                    default:
+                        reader.skipType(tag & 7);
+                        break;
+                    }
+                }
+                return message;
+            };
+
+            /**
+             * Decodes a LedgerConfigRootRecord message from the specified reader or buffer, length delimited.
+             * @function decodeDelimited
+             * @memberof apply.operations.LedgerConfigRootRecord
+             * @static
+             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @returns {apply.operations.LedgerConfigRootRecord} LedgerConfigRootRecord
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            LedgerConfigRootRecord.decodeDelimited = function decodeDelimited(reader) {
+                if (!(reader instanceof $Reader))
+                    reader = new $Reader(reader);
+                return this.decode(reader, reader.uint32());
+            };
+
+            /**
+             * Verifies a LedgerConfigRootRecord message.
+             * @function verify
+             * @memberof apply.operations.LedgerConfigRootRecord
+             * @static
+             * @param {Object.<string,*>} message Plain object to verify
+             * @returns {string|null} `null` if valid, otherwise the reason why it is not
+             */
+            LedgerConfigRootRecord.verify = function verify(message) {
+                if (typeof message !== "object" || message === null)
+                    return "object expected";
+                if (message.previous_commit_id != null && message.hasOwnProperty("previous_commit_id"))
+                    if (!(message.previous_commit_id && typeof message.previous_commit_id.length === "number" || $util.isString(message.previous_commit_id)))
+                        return "previous_commit_id: buffer expected";
+                if (message.descriptor != null && message.hasOwnProperty("descriptor")) {
+                    var error = $root.apply.operations.LedgerConfigDescriptor.verify(message.descriptor);
+                    if (error)
+                        return "descriptor." + error;
+                }
+                return null;
+            };
+
+            /**
+             * Creates a LedgerConfigRootRecord message from a plain object. Also converts values to their respective internal types.
+             * @function fromObject
+             * @memberof apply.operations.LedgerConfigRootRecord
+             * @static
+             * @param {Object.<string,*>} object Plain object
+             * @returns {apply.operations.LedgerConfigRootRecord} LedgerConfigRootRecord
+             */
+            LedgerConfigRootRecord.fromObject = function fromObject(object) {
+                if (object instanceof $root.apply.operations.LedgerConfigRootRecord)
+                    return object;
+                var message = new $root.apply.operations.LedgerConfigRootRecord();
+                if (object.previous_commit_id != null)
+                    if (typeof object.previous_commit_id === "string")
+                        $util.base64.decode(object.previous_commit_id, message.previous_commit_id = $util.newBuffer($util.base64.length(object.previous_commit_id)), 0);
+                    else if (object.previous_commit_id.length >= 0)
+                        message.previous_commit_id = object.previous_commit_id;
+                if (object.descriptor != null) {
+                    if (typeof object.descriptor !== "object")
+                        throw TypeError(".apply.operations.LedgerConfigRootRecord.descriptor: object expected");
+                    message.descriptor = $root.apply.operations.LedgerConfigDescriptor.fromObject(object.descriptor);
+                }
+                return message;
+            };
+
+            /**
+             * Creates a plain object from a LedgerConfigRootRecord message. Also converts values to other types if specified.
+             * @function toObject
+             * @memberof apply.operations.LedgerConfigRootRecord
+             * @static
+             * @param {apply.operations.LedgerConfigRootRecord} message LedgerConfigRootRecord
+             * @param {$protobuf.IConversionOptions} [options] Conversion options
+             * @returns {Object.<string,*>} Plain object
+             */
+            LedgerConfigRootRecord.toObject = function toObject(message, options) {
+                if (!options)
+                    options = {};
+                var object = {};
+                if (options.defaults) {
+                    if (options.bytes === String)
+                        object.previous_commit_id = "";
+                    else {
+                        object.previous_commit_id = [];
+                        if (options.bytes !== Array)
+                            object.previous_commit_id = $util.newBuffer(object.previous_commit_id);
+                    }
+                    object.descriptor = null;
+                }
+                if (message.previous_commit_id != null && message.hasOwnProperty("previous_commit_id"))
+                    object.previous_commit_id = options.bytes === String ? $util.base64.encode(message.previous_commit_id, 0, message.previous_commit_id.length) : options.bytes === Array ? Array.prototype.slice.call(message.previous_commit_id) : message.previous_commit_id;
+                if (message.descriptor != null && message.hasOwnProperty("descriptor"))
+                    object.descriptor = $root.apply.operations.LedgerConfigDescriptor.toObject(message.descriptor, options);
+                return object;
+            };
+
+            /**
+             * Converts this LedgerConfigRootRecord to JSON.
+             * @function toJSON
+             * @memberof apply.operations.LedgerConfigRootRecord
+             * @instance
+             * @returns {Object.<string,*>} JSON object
+             */
+            LedgerConfigRootRecord.prototype.toJSON = function toJSON() {
+                return this.constructor.toObject(this, $protobuf.util.toJSONOptions);
+            };
+
+            /**
+             * Gets the default type url for LedgerConfigRootRecord
+             * @function getTypeUrl
+             * @memberof apply.operations.LedgerConfigRootRecord
+             * @static
+             * @param {string} [typeUrlPrefix] your custom typeUrlPrefix(default "type.googleapis.com")
+             * @returns {string} The default type url
+             */
+            LedgerConfigRootRecord.getTypeUrl = function getTypeUrl(typeUrlPrefix) {
+                if (typeUrlPrefix === undefined) {
+                    typeUrlPrefix = "type.googleapis.com";
+                }
+                return typeUrlPrefix + "/apply.operations.LedgerConfigRootRecord";
+            };
+
+            return LedgerConfigRootRecord;
+        })();
+
+        operations.SetLedgerConfigOperation = (function() {
+
+            /**
+             * Properties of a SetLedgerConfigOperation.
+             * @memberof apply.operations
+             * @interface ISetLedgerConfigOperation
+             * @property {Uint8Array|null} [tx] SetLedgerConfigOperation tx
+             * @property {Uint8Array|null} [txv] SetLedgerConfigOperation txv
+             * @property {Uint8Array|null} [previous_commit_id] SetLedgerConfigOperation previous_commit_id
+             * @property {apply.operations.ILedgerConfigSnapshot|null} [snapshot] SetLedgerConfigOperation snapshot
+             * @property {Uint8Array|null} [content_ref] SetLedgerConfigOperation content_ref
+             * @property {Uint8Array|null} ["in"] SetLedgerConfigOperation in
+             * @property {Uint8Array|null} [is] SetLedgerConfigOperation is
+             */
+
+            /**
+             * Constructs a new SetLedgerConfigOperation.
+             * @memberof apply.operations
+             * @classdesc Represents a SetLedgerConfigOperation.
+             * @implements ISetLedgerConfigOperation
+             * @constructor
+             * @param {apply.operations.ISetLedgerConfigOperation=} [properties] Properties to set
+             */
+            function SetLedgerConfigOperation(properties) {
+                if (properties)
+                    for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
+                        if (properties[keys[i]] != null)
+                            this[keys[i]] = properties[keys[i]];
+            }
+
+            /**
+             * SetLedgerConfigOperation tx.
+             * @member {Uint8Array} tx
+             * @memberof apply.operations.SetLedgerConfigOperation
+             * @instance
+             */
+            SetLedgerConfigOperation.prototype.tx = $util.newBuffer([]);
+
+            /**
+             * SetLedgerConfigOperation txv.
+             * @member {Uint8Array} txv
+             * @memberof apply.operations.SetLedgerConfigOperation
+             * @instance
+             */
+            SetLedgerConfigOperation.prototype.txv = $util.newBuffer([]);
+
+            /**
+             * SetLedgerConfigOperation previous_commit_id.
+             * @member {Uint8Array} previous_commit_id
+             * @memberof apply.operations.SetLedgerConfigOperation
+             * @instance
+             */
+            SetLedgerConfigOperation.prototype.previous_commit_id = $util.newBuffer([]);
+
+            /**
+             * SetLedgerConfigOperation snapshot.
+             * @member {apply.operations.ILedgerConfigSnapshot|null|undefined} snapshot
+             * @memberof apply.operations.SetLedgerConfigOperation
+             * @instance
+             */
+            SetLedgerConfigOperation.prototype.snapshot = null;
+
+            /**
+             * SetLedgerConfigOperation content_ref.
+             * @member {Uint8Array} content_ref
+             * @memberof apply.operations.SetLedgerConfigOperation
+             * @instance
+             */
+            SetLedgerConfigOperation.prototype.content_ref = $util.newBuffer([]);
+
+            /**
+             * SetLedgerConfigOperation in.
+             * @member {Uint8Array} in
+             * @memberof apply.operations.SetLedgerConfigOperation
+             * @instance
+             */
+            SetLedgerConfigOperation.prototype["in"] = $util.newBuffer([]);
+
+            /**
+             * SetLedgerConfigOperation is.
+             * @member {Uint8Array} is
+             * @memberof apply.operations.SetLedgerConfigOperation
+             * @instance
+             */
+            SetLedgerConfigOperation.prototype.is = $util.newBuffer([]);
+
+            /**
+             * Creates a new SetLedgerConfigOperation instance using the specified properties.
+             * @function create
+             * @memberof apply.operations.SetLedgerConfigOperation
+             * @static
+             * @param {apply.operations.ISetLedgerConfigOperation=} [properties] Properties to set
+             * @returns {apply.operations.SetLedgerConfigOperation} SetLedgerConfigOperation instance
+             */
+            SetLedgerConfigOperation.create = function create(properties) {
+                return new SetLedgerConfigOperation(properties);
+            };
+
+            /**
+             * Encodes the specified SetLedgerConfigOperation message. Does not implicitly {@link apply.operations.SetLedgerConfigOperation.verify|verify} messages.
+             * @function encode
+             * @memberof apply.operations.SetLedgerConfigOperation
+             * @static
+             * @param {apply.operations.ISetLedgerConfigOperation} message SetLedgerConfigOperation message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            SetLedgerConfigOperation.encode = function encode(message, writer) {
                 if (!writer)
                     writer = $Writer.create();
                 if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
                     writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.tx);
                 if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
                     writer.uint32(/* id 2, wireType 2 =*/18).bytes(message.txv);
-                if (message.df != null && Object.hasOwnProperty.call(message, "df"))
-                    writer.uint32(/* id 3, wireType 2 =*/26).bytes(message.df);
+                if (message.previous_commit_id != null && Object.hasOwnProperty.call(message, "previous_commit_id"))
+                    writer.uint32(/* id 3, wireType 2 =*/26).bytes(message.previous_commit_id);
+                if (message.snapshot != null && Object.hasOwnProperty.call(message, "snapshot"))
+                    $root.apply.operations.LedgerConfigSnapshot.encode(message.snapshot, writer.uint32(/* id 4, wireType 2 =*/34).fork()).ldelim();
+                if (message.content_ref != null && Object.hasOwnProperty.call(message, "content_ref"))
+                    writer.uint32(/* id 5, wireType 2 =*/42).bytes(message.content_ref);
                 if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
-                    writer.uint32(/* id 4, wireType 2 =*/34).bytes(message["in"]);
+                    writer.uint32(/* id 6, wireType 2 =*/50).bytes(message["in"]);
                 if (message.is != null && Object.hasOwnProperty.call(message, "is"))
-                    writer.uint32(/* id 5, wireType 2 =*/42).bytes(message.is);
+                    writer.uint32(/* id 7, wireType 2 =*/58).bytes(message.is);
                 return writer;
             };
 
             /**
-             * Encodes the specified SetVdfParamsOperation message, length delimited. Does not implicitly {@link apply.operations.SetVdfParamsOperation.verify|verify} messages.
+             * Encodes the specified SetLedgerConfigOperation message, length delimited. Does not implicitly {@link apply.operations.SetLedgerConfigOperation.verify|verify} messages.
              * @function encodeDelimited
-             * @memberof apply.operations.SetVdfParamsOperation
+             * @memberof apply.operations.SetLedgerConfigOperation
              * @static
-             * @param {apply.operations.ISetVdfParamsOperation} message SetVdfParamsOperation message or plain object to encode
+             * @param {apply.operations.ISetLedgerConfigOperation} message SetLedgerConfigOperation message or plain object to encode
              * @param {$protobuf.Writer} [writer] Writer to encode to
              * @returns {$protobuf.Writer} Writer
              */
-            SetVdfParamsOperation.encodeDelimited = function encodeDelimited(message, writer) {
+            SetLedgerConfigOperation.encodeDelimited = function encodeDelimited(message, writer) {
                 return this.encode(message, writer).ldelim();
             };
 
             /**
-             * Decodes a SetVdfParamsOperation message from the specified reader or buffer.
+             * Decodes a SetLedgerConfigOperation message from the specified reader or buffer.
              * @function decode
-             * @memberof apply.operations.SetVdfParamsOperation
+             * @memberof apply.operations.SetLedgerConfigOperation
              * @static
              * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
              * @param {number} [length] Message length if known beforehand
-             * @returns {apply.operations.SetVdfParamsOperation} SetVdfParamsOperation
+             * @returns {apply.operations.SetLedgerConfigOperation} SetLedgerConfigOperation
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
-            SetVdfParamsOperation.decode = function decode(reader, length, error) {
+            SetLedgerConfigOperation.decode = function decode(reader, length, error) {
                 if (!(reader instanceof $Reader))
                     reader = $Reader.create(reader);
-                var end = length === undefined ? reader.len : reader.pos + length, message = new $root.apply.operations.SetVdfParamsOperation();
+                var end = length === undefined ? reader.len : reader.pos + length, message = new $root.apply.operations.SetLedgerConfigOperation();
                 while (reader.pos < end) {
                     var tag = reader.uint32();
                     if (tag === error)
@@ -4526,14 +5720,22 @@ $root.apply = (function() {
                             break;
                         }
                     case 3: {
-                            message.df = reader.bytes();
+                            message.previous_commit_id = reader.bytes();
                             break;
                         }
                     case 4: {
-                            message["in"] = reader.bytes();
+                            message.snapshot = $root.apply.operations.LedgerConfigSnapshot.decode(reader, reader.uint32());
                             break;
                         }
                     case 5: {
+                            message.content_ref = reader.bytes();
+                            break;
+                        }
+                    case 6: {
+                            message["in"] = reader.bytes();
+                            break;
+                        }
+                    case 7: {
                             message.is = reader.bytes();
                             break;
                         }
@@ -4546,30 +5748,30 @@ $root.apply = (function() {
             };
 
             /**
-             * Decodes a SetVdfParamsOperation message from the specified reader or buffer, length delimited.
+             * Decodes a SetLedgerConfigOperation message from the specified reader or buffer, length delimited.
              * @function decodeDelimited
-             * @memberof apply.operations.SetVdfParamsOperation
+             * @memberof apply.operations.SetLedgerConfigOperation
              * @static
              * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
-             * @returns {apply.operations.SetVdfParamsOperation} SetVdfParamsOperation
+             * @returns {apply.operations.SetLedgerConfigOperation} SetLedgerConfigOperation
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
-            SetVdfParamsOperation.decodeDelimited = function decodeDelimited(reader) {
+            SetLedgerConfigOperation.decodeDelimited = function decodeDelimited(reader) {
                 if (!(reader instanceof $Reader))
                     reader = new $Reader(reader);
                 return this.decode(reader, reader.uint32());
             };
 
             /**
-             * Verifies a SetVdfParamsOperation message.
+             * Verifies a SetLedgerConfigOperation message.
              * @function verify
-             * @memberof apply.operations.SetVdfParamsOperation
+             * @memberof apply.operations.SetLedgerConfigOperation
              * @static
              * @param {Object.<string,*>} message Plain object to verify
              * @returns {string|null} `null` if valid, otherwise the reason why it is not
              */
-            SetVdfParamsOperation.verify = function verify(message) {
+            SetLedgerConfigOperation.verify = function verify(message) {
                 if (typeof message !== "object" || message === null)
                     return "object expected";
                 if (message.tx != null && message.hasOwnProperty("tx"))
@@ -4578,9 +5780,17 @@ $root.apply = (function() {
                 if (message.txv != null && message.hasOwnProperty("txv"))
                     if (!(message.txv && typeof message.txv.length === "number" || $util.isString(message.txv)))
                         return "txv: buffer expected";
-                if (message.df != null && message.hasOwnProperty("df"))
-                    if (!(message.df && typeof message.df.length === "number" || $util.isString(message.df)))
-                        return "df: buffer expected";
+                if (message.previous_commit_id != null && message.hasOwnProperty("previous_commit_id"))
+                    if (!(message.previous_commit_id && typeof message.previous_commit_id.length === "number" || $util.isString(message.previous_commit_id)))
+                        return "previous_commit_id: buffer expected";
+                if (message.snapshot != null && message.hasOwnProperty("snapshot")) {
+                    var error = $root.apply.operations.LedgerConfigSnapshot.verify(message.snapshot);
+                    if (error)
+                        return "snapshot." + error;
+                }
+                if (message.content_ref != null && message.hasOwnProperty("content_ref"))
+                    if (!(message.content_ref && typeof message.content_ref.length === "number" || $util.isString(message.content_ref)))
+                        return "content_ref: buffer expected";
                 if (message["in"] != null && message.hasOwnProperty("in"))
                     if (!(message["in"] && typeof message["in"].length === "number" || $util.isString(message["in"])))
                         return "in: buffer expected";
@@ -4591,17 +5801,17 @@ $root.apply = (function() {
             };
 
             /**
-             * Creates a SetVdfParamsOperation message from a plain object. Also converts values to their respective internal types.
+             * Creates a SetLedgerConfigOperation message from a plain object. Also converts values to their respective internal types.
              * @function fromObject
-             * @memberof apply.operations.SetVdfParamsOperation
+             * @memberof apply.operations.SetLedgerConfigOperation
              * @static
              * @param {Object.<string,*>} object Plain object
-             * @returns {apply.operations.SetVdfParamsOperation} SetVdfParamsOperation
+             * @returns {apply.operations.SetLedgerConfigOperation} SetLedgerConfigOperation
              */
-            SetVdfParamsOperation.fromObject = function fromObject(object) {
-                if (object instanceof $root.apply.operations.SetVdfParamsOperation)
+            SetLedgerConfigOperation.fromObject = function fromObject(object) {
+                if (object instanceof $root.apply.operations.SetLedgerConfigOperation)
                     return object;
-                var message = new $root.apply.operations.SetVdfParamsOperation();
+                var message = new $root.apply.operations.SetLedgerConfigOperation();
                 if (object.tx != null)
                     if (typeof object.tx === "string")
                         $util.base64.decode(object.tx, message.tx = $util.newBuffer($util.base64.length(object.tx)), 0);
@@ -4612,11 +5822,21 @@ $root.apply = (function() {
                         $util.base64.decode(object.txv, message.txv = $util.newBuffer($util.base64.length(object.txv)), 0);
                     else if (object.txv.length >= 0)
                         message.txv = object.txv;
-                if (object.df != null)
-                    if (typeof object.df === "string")
-                        $util.base64.decode(object.df, message.df = $util.newBuffer($util.base64.length(object.df)), 0);
-                    else if (object.df.length >= 0)
-                        message.df = object.df;
+                if (object.previous_commit_id != null)
+                    if (typeof object.previous_commit_id === "string")
+                        $util.base64.decode(object.previous_commit_id, message.previous_commit_id = $util.newBuffer($util.base64.length(object.previous_commit_id)), 0);
+                    else if (object.previous_commit_id.length >= 0)
+                        message.previous_commit_id = object.previous_commit_id;
+                if (object.snapshot != null) {
+                    if (typeof object.snapshot !== "object")
+                        throw TypeError(".apply.operations.SetLedgerConfigOperation.snapshot: object expected");
+                    message.snapshot = $root.apply.operations.LedgerConfigSnapshot.fromObject(object.snapshot);
+                }
+                if (object.content_ref != null)
+                    if (typeof object.content_ref === "string")
+                        $util.base64.decode(object.content_ref, message.content_ref = $util.newBuffer($util.base64.length(object.content_ref)), 0);
+                    else if (object.content_ref.length >= 0)
+                        message.content_ref = object.content_ref;
                 if (object["in"] != null)
                     if (typeof object["in"] === "string")
                         $util.base64.decode(object["in"], message["in"] = $util.newBuffer($util.base64.length(object["in"])), 0);
@@ -4631,15 +5851,15 @@ $root.apply = (function() {
             };
 
             /**
-             * Creates a plain object from a SetVdfParamsOperation message. Also converts values to other types if specified.
+             * Creates a plain object from a SetLedgerConfigOperation message. Also converts values to other types if specified.
              * @function toObject
-             * @memberof apply.operations.SetVdfParamsOperation
+             * @memberof apply.operations.SetLedgerConfigOperation
              * @static
-             * @param {apply.operations.SetVdfParamsOperation} message SetVdfParamsOperation
+             * @param {apply.operations.SetLedgerConfigOperation} message SetLedgerConfigOperation
              * @param {$protobuf.IConversionOptions} [options] Conversion options
              * @returns {Object.<string,*>} Plain object
              */
-            SetVdfParamsOperation.toObject = function toObject(message, options) {
+            SetLedgerConfigOperation.toObject = function toObject(message, options) {
                 if (!options)
                     options = {};
                 var object = {};
@@ -4659,11 +5879,19 @@ $root.apply = (function() {
                             object.txv = $util.newBuffer(object.txv);
                     }
                     if (options.bytes === String)
-                        object.df = "";
+                        object.previous_commit_id = "";
                     else {
-                        object.df = [];
+                        object.previous_commit_id = [];
                         if (options.bytes !== Array)
-                            object.df = $util.newBuffer(object.df);
+                            object.previous_commit_id = $util.newBuffer(object.previous_commit_id);
+                    }
+                    object.snapshot = null;
+                    if (options.bytes === String)
+                        object.content_ref = "";
+                    else {
+                        object.content_ref = [];
+                        if (options.bytes !== Array)
+                            object.content_ref = $util.newBuffer(object.content_ref);
                     }
                     if (options.bytes === String)
                         object["in"] = "";
@@ -4684,8 +5912,12 @@ $root.apply = (function() {
                     object.tx = options.bytes === String ? $util.base64.encode(message.tx, 0, message.tx.length) : options.bytes === Array ? Array.prototype.slice.call(message.tx) : message.tx;
                 if (message.txv != null && message.hasOwnProperty("txv"))
                     object.txv = options.bytes === String ? $util.base64.encode(message.txv, 0, message.txv.length) : options.bytes === Array ? Array.prototype.slice.call(message.txv) : message.txv;
-                if (message.df != null && message.hasOwnProperty("df"))
-                    object.df = options.bytes === String ? $util.base64.encode(message.df, 0, message.df.length) : options.bytes === Array ? Array.prototype.slice.call(message.df) : message.df;
+                if (message.previous_commit_id != null && message.hasOwnProperty("previous_commit_id"))
+                    object.previous_commit_id = options.bytes === String ? $util.base64.encode(message.previous_commit_id, 0, message.previous_commit_id.length) : options.bytes === Array ? Array.prototype.slice.call(message.previous_commit_id) : message.previous_commit_id;
+                if (message.snapshot != null && message.hasOwnProperty("snapshot"))
+                    object.snapshot = $root.apply.operations.LedgerConfigSnapshot.toObject(message.snapshot, options);
+                if (message.content_ref != null && message.hasOwnProperty("content_ref"))
+                    object.content_ref = options.bytes === String ? $util.base64.encode(message.content_ref, 0, message.content_ref.length) : options.bytes === Array ? Array.prototype.slice.call(message.content_ref) : message.content_ref;
                 if (message["in"] != null && message.hasOwnProperty("in"))
                     object["in"] = options.bytes === String ? $util.base64.encode(message["in"], 0, message["in"].length) : options.bytes === Array ? Array.prototype.slice.call(message["in"]) : message["in"];
                 if (message.is != null && message.hasOwnProperty("is"))
@@ -4694,32 +5926,424 @@ $root.apply = (function() {
             };
 
             /**
-             * Converts this SetVdfParamsOperation to JSON.
+             * Converts this SetLedgerConfigOperation to JSON.
              * @function toJSON
-             * @memberof apply.operations.SetVdfParamsOperation
+             * @memberof apply.operations.SetLedgerConfigOperation
              * @instance
              * @returns {Object.<string,*>} JSON object
              */
-            SetVdfParamsOperation.prototype.toJSON = function toJSON() {
+            SetLedgerConfigOperation.prototype.toJSON = function toJSON() {
                 return this.constructor.toObject(this, $protobuf.util.toJSONOptions);
             };
 
             /**
-             * Gets the default type url for SetVdfParamsOperation
+             * Gets the default type url for SetLedgerConfigOperation
              * @function getTypeUrl
-             * @memberof apply.operations.SetVdfParamsOperation
+             * @memberof apply.operations.SetLedgerConfigOperation
              * @static
              * @param {string} [typeUrlPrefix] your custom typeUrlPrefix(default "type.googleapis.com")
              * @returns {string} The default type url
              */
-            SetVdfParamsOperation.getTypeUrl = function getTypeUrl(typeUrlPrefix) {
+            SetLedgerConfigOperation.getTypeUrl = function getTypeUrl(typeUrlPrefix) {
                 if (typeUrlPrefix === undefined) {
                     typeUrlPrefix = "type.googleapis.com";
                 }
-                return typeUrlPrefix + "/apply.operations.SetVdfParamsOperation";
+                return typeUrlPrefix + "/apply.operations.SetLedgerConfigOperation";
             };
 
-            return SetVdfParamsOperation;
+            return SetLedgerConfigOperation;
+        })();
+
+        operations.LedgerConfigTransactionReceipt = (function() {
+
+            /**
+             * Properties of a LedgerConfigTransactionReceipt.
+             * @memberof apply.operations
+             * @interface ILedgerConfigTransactionReceipt
+             * @property {apply.operations.OperationType|null} [operation_type] LedgerConfigTransactionReceipt operation_type
+             * @property {Uint8Array|null} [tx_hash] LedgerConfigTransactionReceipt tx_hash
+             * @property {Uint8Array|null} [requester_address] LedgerConfigTransactionReceipt requester_address
+             * @property {apply.operations.ILedgerConfigRootRecord|null} [root_record] LedgerConfigTransactionReceipt root_record
+             */
+
+            /**
+             * Constructs a new LedgerConfigTransactionReceipt.
+             * @memberof apply.operations
+             * @classdesc Represents a LedgerConfigTransactionReceipt.
+             * @implements ILedgerConfigTransactionReceipt
+             * @constructor
+             * @param {apply.operations.ILedgerConfigTransactionReceipt=} [properties] Properties to set
+             */
+            function LedgerConfigTransactionReceipt(properties) {
+                if (properties)
+                    for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
+                        if (properties[keys[i]] != null)
+                            this[keys[i]] = properties[keys[i]];
+            }
+
+            /**
+             * LedgerConfigTransactionReceipt operation_type.
+             * @member {apply.operations.OperationType} operation_type
+             * @memberof apply.operations.LedgerConfigTransactionReceipt
+             * @instance
+             */
+            LedgerConfigTransactionReceipt.prototype.operation_type = 0;
+
+            /**
+             * LedgerConfigTransactionReceipt tx_hash.
+             * @member {Uint8Array} tx_hash
+             * @memberof apply.operations.LedgerConfigTransactionReceipt
+             * @instance
+             */
+            LedgerConfigTransactionReceipt.prototype.tx_hash = $util.newBuffer([]);
+
+            /**
+             * LedgerConfigTransactionReceipt requester_address.
+             * @member {Uint8Array} requester_address
+             * @memberof apply.operations.LedgerConfigTransactionReceipt
+             * @instance
+             */
+            LedgerConfigTransactionReceipt.prototype.requester_address = $util.newBuffer([]);
+
+            /**
+             * LedgerConfigTransactionReceipt root_record.
+             * @member {apply.operations.ILedgerConfigRootRecord|null|undefined} root_record
+             * @memberof apply.operations.LedgerConfigTransactionReceipt
+             * @instance
+             */
+            LedgerConfigTransactionReceipt.prototype.root_record = null;
+
+            /**
+             * Creates a new LedgerConfigTransactionReceipt instance using the specified properties.
+             * @function create
+             * @memberof apply.operations.LedgerConfigTransactionReceipt
+             * @static
+             * @param {apply.operations.ILedgerConfigTransactionReceipt=} [properties] Properties to set
+             * @returns {apply.operations.LedgerConfigTransactionReceipt} LedgerConfigTransactionReceipt instance
+             */
+            LedgerConfigTransactionReceipt.create = function create(properties) {
+                return new LedgerConfigTransactionReceipt(properties);
+            };
+
+            /**
+             * Encodes the specified LedgerConfigTransactionReceipt message. Does not implicitly {@link apply.operations.LedgerConfigTransactionReceipt.verify|verify} messages.
+             * @function encode
+             * @memberof apply.operations.LedgerConfigTransactionReceipt
+             * @static
+             * @param {apply.operations.ILedgerConfigTransactionReceipt} message LedgerConfigTransactionReceipt message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            LedgerConfigTransactionReceipt.encode = function encode(message, writer) {
+                if (!writer)
+                    writer = $Writer.create();
+                if (message.operation_type != null && Object.hasOwnProperty.call(message, "operation_type"))
+                    writer.uint32(/* id 1, wireType 0 =*/8).int32(message.operation_type);
+                if (message.tx_hash != null && Object.hasOwnProperty.call(message, "tx_hash"))
+                    writer.uint32(/* id 2, wireType 2 =*/18).bytes(message.tx_hash);
+                if (message.requester_address != null && Object.hasOwnProperty.call(message, "requester_address"))
+                    writer.uint32(/* id 3, wireType 2 =*/26).bytes(message.requester_address);
+                if (message.root_record != null && Object.hasOwnProperty.call(message, "root_record"))
+                    $root.apply.operations.LedgerConfigRootRecord.encode(message.root_record, writer.uint32(/* id 4, wireType 2 =*/34).fork()).ldelim();
+                return writer;
+            };
+
+            /**
+             * Encodes the specified LedgerConfigTransactionReceipt message, length delimited. Does not implicitly {@link apply.operations.LedgerConfigTransactionReceipt.verify|verify} messages.
+             * @function encodeDelimited
+             * @memberof apply.operations.LedgerConfigTransactionReceipt
+             * @static
+             * @param {apply.operations.ILedgerConfigTransactionReceipt} message LedgerConfigTransactionReceipt message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            LedgerConfigTransactionReceipt.encodeDelimited = function encodeDelimited(message, writer) {
+                return this.encode(message, writer).ldelim();
+            };
+
+            /**
+             * Decodes a LedgerConfigTransactionReceipt message from the specified reader or buffer.
+             * @function decode
+             * @memberof apply.operations.LedgerConfigTransactionReceipt
+             * @static
+             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @param {number} [length] Message length if known beforehand
+             * @returns {apply.operations.LedgerConfigTransactionReceipt} LedgerConfigTransactionReceipt
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            LedgerConfigTransactionReceipt.decode = function decode(reader, length, error) {
+                if (!(reader instanceof $Reader))
+                    reader = $Reader.create(reader);
+                var end = length === undefined ? reader.len : reader.pos + length, message = new $root.apply.operations.LedgerConfigTransactionReceipt();
+                while (reader.pos < end) {
+                    var tag = reader.uint32();
+                    if (tag === error)
+                        break;
+                    switch (tag >>> 3) {
+                    case 1: {
+                            message.operation_type = reader.int32();
+                            break;
+                        }
+                    case 2: {
+                            message.tx_hash = reader.bytes();
+                            break;
+                        }
+                    case 3: {
+                            message.requester_address = reader.bytes();
+                            break;
+                        }
+                    case 4: {
+                            message.root_record = $root.apply.operations.LedgerConfigRootRecord.decode(reader, reader.uint32());
+                            break;
+                        }
+                    default:
+                        reader.skipType(tag & 7);
+                        break;
+                    }
+                }
+                return message;
+            };
+
+            /**
+             * Decodes a LedgerConfigTransactionReceipt message from the specified reader or buffer, length delimited.
+             * @function decodeDelimited
+             * @memberof apply.operations.LedgerConfigTransactionReceipt
+             * @static
+             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @returns {apply.operations.LedgerConfigTransactionReceipt} LedgerConfigTransactionReceipt
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            LedgerConfigTransactionReceipt.decodeDelimited = function decodeDelimited(reader) {
+                if (!(reader instanceof $Reader))
+                    reader = new $Reader(reader);
+                return this.decode(reader, reader.uint32());
+            };
+
+            /**
+             * Verifies a LedgerConfigTransactionReceipt message.
+             * @function verify
+             * @memberof apply.operations.LedgerConfigTransactionReceipt
+             * @static
+             * @param {Object.<string,*>} message Plain object to verify
+             * @returns {string|null} `null` if valid, otherwise the reason why it is not
+             */
+            LedgerConfigTransactionReceipt.verify = function verify(message) {
+                if (typeof message !== "object" || message === null)
+                    return "object expected";
+                if (message.operation_type != null && message.hasOwnProperty("operation_type"))
+                    switch (message.operation_type) {
+                    default:
+                        return "operation_type: enum value expected";
+                    case 0:
+                    case 1:
+                    case 2:
+                    case 3:
+                    case 4:
+                    case 5:
+                    case 6:
+                    case 7:
+                    case 8:
+                    case 9:
+                    case 10:
+                    case 11:
+                    case 12:
+                    case 13:
+                    case 14:
+                    case 15:
+                    case 16:
+                        break;
+                    }
+                if (message.tx_hash != null && message.hasOwnProperty("tx_hash"))
+                    if (!(message.tx_hash && typeof message.tx_hash.length === "number" || $util.isString(message.tx_hash)))
+                        return "tx_hash: buffer expected";
+                if (message.requester_address != null && message.hasOwnProperty("requester_address"))
+                    if (!(message.requester_address && typeof message.requester_address.length === "number" || $util.isString(message.requester_address)))
+                        return "requester_address: buffer expected";
+                if (message.root_record != null && message.hasOwnProperty("root_record")) {
+                    var error = $root.apply.operations.LedgerConfigRootRecord.verify(message.root_record);
+                    if (error)
+                        return "root_record." + error;
+                }
+                return null;
+            };
+
+            /**
+             * Creates a LedgerConfigTransactionReceipt message from a plain object. Also converts values to their respective internal types.
+             * @function fromObject
+             * @memberof apply.operations.LedgerConfigTransactionReceipt
+             * @static
+             * @param {Object.<string,*>} object Plain object
+             * @returns {apply.operations.LedgerConfigTransactionReceipt} LedgerConfigTransactionReceipt
+             */
+            LedgerConfigTransactionReceipt.fromObject = function fromObject(object) {
+                if (object instanceof $root.apply.operations.LedgerConfigTransactionReceipt)
+                    return object;
+                var message = new $root.apply.operations.LedgerConfigTransactionReceipt();
+                switch (object.operation_type) {
+                default:
+                    if (typeof object.operation_type === "number") {
+                        message.operation_type = object.operation_type;
+                        break;
+                    }
+                    break;
+                case "UNKNOWN":
+                case 0:
+                    message.operation_type = 0;
+                    break;
+                case "ADD_ADMIN":
+                case 1:
+                    message.operation_type = 1;
+                    break;
+                case "DISABLE_INITIALIZATION":
+                case 2:
+                    message.operation_type = 2;
+                    break;
+                case "BALANCE_INITIALIZATION":
+                case 3:
+                    message.operation_type = 3;
+                    break;
+                case "APPEND_WHITELIST":
+                case 4:
+                    message.operation_type = 4;
+                    break;
+                case "ADD_WRITER":
+                case 5:
+                    message.operation_type = 5;
+                    break;
+                case "REMOVE_WRITER":
+                case 6:
+                    message.operation_type = 6;
+                    break;
+                case "ADMIN_RECOVERY":
+                case 7:
+                    message.operation_type = 7;
+                    break;
+                case "ADD_INDEXER":
+                case 8:
+                    message.operation_type = 8;
+                    break;
+                case "REMOVE_INDEXER":
+                case 9:
+                    message.operation_type = 9;
+                    break;
+                case "BAN_VALIDATOR":
+                case 10:
+                    message.operation_type = 10;
+                    break;
+                case "BOOTSTRAP_DEPLOYMENT":
+                case 11:
+                    message.operation_type = 11;
+                    break;
+                case "TX":
+                case 12:
+                    message.operation_type = 12;
+                    break;
+                case "TRANSFER":
+                case 13:
+                    message.operation_type = 13;
+                    break;
+                case "SET_EPOCH":
+                case 14:
+                    message.operation_type = 14;
+                    break;
+                case "SET_GENESIS_EPOCH":
+                case 15:
+                    message.operation_type = 15;
+                    break;
+                case "SET_LEDGER_CONFIG":
+                case 16:
+                    message.operation_type = 16;
+                    break;
+                }
+                if (object.tx_hash != null)
+                    if (typeof object.tx_hash === "string")
+                        $util.base64.decode(object.tx_hash, message.tx_hash = $util.newBuffer($util.base64.length(object.tx_hash)), 0);
+                    else if (object.tx_hash.length >= 0)
+                        message.tx_hash = object.tx_hash;
+                if (object.requester_address != null)
+                    if (typeof object.requester_address === "string")
+                        $util.base64.decode(object.requester_address, message.requester_address = $util.newBuffer($util.base64.length(object.requester_address)), 0);
+                    else if (object.requester_address.length >= 0)
+                        message.requester_address = object.requester_address;
+                if (object.root_record != null) {
+                    if (typeof object.root_record !== "object")
+                        throw TypeError(".apply.operations.LedgerConfigTransactionReceipt.root_record: object expected");
+                    message.root_record = $root.apply.operations.LedgerConfigRootRecord.fromObject(object.root_record);
+                }
+                return message;
+            };
+
+            /**
+             * Creates a plain object from a LedgerConfigTransactionReceipt message. Also converts values to other types if specified.
+             * @function toObject
+             * @memberof apply.operations.LedgerConfigTransactionReceipt
+             * @static
+             * @param {apply.operations.LedgerConfigTransactionReceipt} message LedgerConfigTransactionReceipt
+             * @param {$protobuf.IConversionOptions} [options] Conversion options
+             * @returns {Object.<string,*>} Plain object
+             */
+            LedgerConfigTransactionReceipt.toObject = function toObject(message, options) {
+                if (!options)
+                    options = {};
+                var object = {};
+                if (options.defaults) {
+                    object.operation_type = options.enums === String ? "UNKNOWN" : 0;
+                    if (options.bytes === String)
+                        object.tx_hash = "";
+                    else {
+                        object.tx_hash = [];
+                        if (options.bytes !== Array)
+                            object.tx_hash = $util.newBuffer(object.tx_hash);
+                    }
+                    if (options.bytes === String)
+                        object.requester_address = "";
+                    else {
+                        object.requester_address = [];
+                        if (options.bytes !== Array)
+                            object.requester_address = $util.newBuffer(object.requester_address);
+                    }
+                    object.root_record = null;
+                }
+                if (message.operation_type != null && message.hasOwnProperty("operation_type"))
+                    object.operation_type = options.enums === String ? $root.apply.operations.OperationType[message.operation_type] === undefined ? message.operation_type : $root.apply.operations.OperationType[message.operation_type] : message.operation_type;
+                if (message.tx_hash != null && message.hasOwnProperty("tx_hash"))
+                    object.tx_hash = options.bytes === String ? $util.base64.encode(message.tx_hash, 0, message.tx_hash.length) : options.bytes === Array ? Array.prototype.slice.call(message.tx_hash) : message.tx_hash;
+                if (message.requester_address != null && message.hasOwnProperty("requester_address"))
+                    object.requester_address = options.bytes === String ? $util.base64.encode(message.requester_address, 0, message.requester_address.length) : options.bytes === Array ? Array.prototype.slice.call(message.requester_address) : message.requester_address;
+                if (message.root_record != null && message.hasOwnProperty("root_record"))
+                    object.root_record = $root.apply.operations.LedgerConfigRootRecord.toObject(message.root_record, options);
+                return object;
+            };
+
+            /**
+             * Converts this LedgerConfigTransactionReceipt to JSON.
+             * @function toJSON
+             * @memberof apply.operations.LedgerConfigTransactionReceipt
+             * @instance
+             * @returns {Object.<string,*>} JSON object
+             */
+            LedgerConfigTransactionReceipt.prototype.toJSON = function toJSON() {
+                return this.constructor.toObject(this, $protobuf.util.toJSONOptions);
+            };
+
+            /**
+             * Gets the default type url for LedgerConfigTransactionReceipt
+             * @function getTypeUrl
+             * @memberof apply.operations.LedgerConfigTransactionReceipt
+             * @static
+             * @param {string} [typeUrlPrefix] your custom typeUrlPrefix(default "type.googleapis.com")
+             * @returns {string} The default type url
+             */
+            LedgerConfigTransactionReceipt.getTypeUrl = function getTypeUrl(typeUrlPrefix) {
+                if (typeUrlPrefix === undefined) {
+                    typeUrlPrefix = "type.googleapis.com";
+                }
+                return typeUrlPrefix + "/apply.operations.LedgerConfigTransactionReceipt";
+            };
+
+            return LedgerConfigTransactionReceipt;
         })();
 
         return operations;

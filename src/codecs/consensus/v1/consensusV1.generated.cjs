@@ -431,7 +431,7 @@ $root.consensus = (function() {
              * @property {Uint8Array|null} [epoch] ProofProposal epoch
              * @property {Uint8Array|null} [previous_epoch_record_hash] ProofProposal previous_epoch_record_hash
              * @property {Uint8Array|null} [proposer] ProofProposal proposer
-             * @property {Uint8Array|null} [vdf_parameters_hash] ProofProposal vdf_parameters_hash
+             * @property {Uint8Array|null} [config_id] ProofProposal config_id
              * @property {Uint8Array|null} [vdf_proof] ProofProposal vdf_proof
              * @property {Uint8Array|null} [signature] ProofProposal signature
              */
@@ -492,12 +492,12 @@ $root.consensus = (function() {
             ProofProposal.prototype.proposer = $util.newBuffer([]);
 
             /**
-             * ProofProposal vdf_parameters_hash.
-             * @member {Uint8Array} vdf_parameters_hash
+             * ProofProposal config_id.
+             * @member {Uint8Array} config_id
              * @memberof consensus.v1.ProofProposal
              * @instance
              */
-            ProofProposal.prototype.vdf_parameters_hash = $util.newBuffer([]);
+            ProofProposal.prototype.config_id = $util.newBuffer([]);
 
             /**
              * ProofProposal vdf_proof.
@@ -549,8 +549,8 @@ $root.consensus = (function() {
                     writer.uint32(/* id 4, wireType 2 =*/34).bytes(message.previous_epoch_record_hash);
                 if (message.proposer != null && Object.hasOwnProperty.call(message, "proposer"))
                     writer.uint32(/* id 5, wireType 2 =*/42).bytes(message.proposer);
-                if (message.vdf_parameters_hash != null && Object.hasOwnProperty.call(message, "vdf_parameters_hash"))
-                    writer.uint32(/* id 6, wireType 2 =*/50).bytes(message.vdf_parameters_hash);
+                if (message.config_id != null && Object.hasOwnProperty.call(message, "config_id"))
+                    writer.uint32(/* id 6, wireType 2 =*/50).bytes(message.config_id);
                 if (message.vdf_proof != null && Object.hasOwnProperty.call(message, "vdf_proof"))
                     writer.uint32(/* id 7, wireType 2 =*/58).bytes(message.vdf_proof);
                 if (message.signature != null && Object.hasOwnProperty.call(message, "signature"))
@@ -612,7 +612,7 @@ $root.consensus = (function() {
                             break;
                         }
                     case 6: {
-                            message.vdf_parameters_hash = reader.bytes();
+                            message.config_id = reader.bytes();
                             break;
                         }
                     case 7: {
@@ -673,9 +673,9 @@ $root.consensus = (function() {
                 if (message.proposer != null && message.hasOwnProperty("proposer"))
                     if (!(message.proposer && typeof message.proposer.length === "number" || $util.isString(message.proposer)))
                         return "proposer: buffer expected";
-                if (message.vdf_parameters_hash != null && message.hasOwnProperty("vdf_parameters_hash"))
-                    if (!(message.vdf_parameters_hash && typeof message.vdf_parameters_hash.length === "number" || $util.isString(message.vdf_parameters_hash)))
-                        return "vdf_parameters_hash: buffer expected";
+                if (message.config_id != null && message.hasOwnProperty("config_id"))
+                    if (!(message.config_id && typeof message.config_id.length === "number" || $util.isString(message.config_id)))
+                        return "config_id: buffer expected";
                 if (message.vdf_proof != null && message.hasOwnProperty("vdf_proof"))
                     if (!(message.vdf_proof && typeof message.vdf_proof.length === "number" || $util.isString(message.vdf_proof)))
                         return "vdf_proof: buffer expected";
@@ -722,11 +722,11 @@ $root.consensus = (function() {
                         $util.base64.decode(object.proposer, message.proposer = $util.newBuffer($util.base64.length(object.proposer)), 0);
                     else if (object.proposer.length >= 0)
                         message.proposer = object.proposer;
-                if (object.vdf_parameters_hash != null)
-                    if (typeof object.vdf_parameters_hash === "string")
-                        $util.base64.decode(object.vdf_parameters_hash, message.vdf_parameters_hash = $util.newBuffer($util.base64.length(object.vdf_parameters_hash)), 0);
-                    else if (object.vdf_parameters_hash.length >= 0)
-                        message.vdf_parameters_hash = object.vdf_parameters_hash;
+                if (object.config_id != null)
+                    if (typeof object.config_id === "string")
+                        $util.base64.decode(object.config_id, message.config_id = $util.newBuffer($util.base64.length(object.config_id)), 0);
+                    else if (object.config_id.length >= 0)
+                        message.config_id = object.config_id;
                 if (object.vdf_proof != null)
                     if (typeof object.vdf_proof === "string")
                         $util.base64.decode(object.vdf_proof, message.vdf_proof = $util.newBuffer($util.base64.length(object.vdf_proof)), 0);
@@ -790,11 +790,11 @@ $root.consensus = (function() {
                             object.proposer = $util.newBuffer(object.proposer);
                     }
                     if (options.bytes === String)
-                        object.vdf_parameters_hash = "";
+                        object.config_id = "";
                     else {
-                        object.vdf_parameters_hash = [];
+                        object.config_id = [];
                         if (options.bytes !== Array)
-                            object.vdf_parameters_hash = $util.newBuffer(object.vdf_parameters_hash);
+                            object.config_id = $util.newBuffer(object.config_id);
                     }
                     if (options.bytes === String)
                         object.vdf_proof = "";
@@ -821,8 +821,8 @@ $root.consensus = (function() {
                     object.previous_epoch_record_hash = options.bytes === String ? $util.base64.encode(message.previous_epoch_record_hash, 0, message.previous_epoch_record_hash.length) : options.bytes === Array ? Array.prototype.slice.call(message.previous_epoch_record_hash) : message.previous_epoch_record_hash;
                 if (message.proposer != null && message.hasOwnProperty("proposer"))
                     object.proposer = options.bytes === String ? $util.base64.encode(message.proposer, 0, message.proposer.length) : options.bytes === Array ? Array.prototype.slice.call(message.proposer) : message.proposer;
-                if (message.vdf_parameters_hash != null && message.hasOwnProperty("vdf_parameters_hash"))
-                    object.vdf_parameters_hash = options.bytes === String ? $util.base64.encode(message.vdf_parameters_hash, 0, message.vdf_parameters_hash.length) : options.bytes === Array ? Array.prototype.slice.call(message.vdf_parameters_hash) : message.vdf_parameters_hash;
+                if (message.config_id != null && message.hasOwnProperty("config_id"))
+                    object.config_id = options.bytes === String ? $util.base64.encode(message.config_id, 0, message.config_id.length) : options.bytes === Array ? Array.prototype.slice.call(message.config_id) : message.config_id;
                 if (message.vdf_proof != null && message.hasOwnProperty("vdf_proof"))
                     object.vdf_proof = options.bytes === String ? $util.base64.encode(message.vdf_proof, 0, message.vdf_proof.length) : options.bytes === Array ? Array.prototype.slice.call(message.vdf_proof) : message.vdf_proof;
                 if (message.signature != null && message.hasOwnProperty("signature"))

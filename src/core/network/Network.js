@@ -15,6 +15,7 @@ import ValidatorPendingRequestService from './services/ValidatorPendingRequestSe
 import TransactionCommitService from "./services/TransactionCommitService.js";
 import ValidatorHealthCheckService from './services/ValidatorHealthCheckService.js';
 import EpochProofProposalService from '../consensus/services/EpochProofProposalService.js';
+import { requireProofOfTimeConsensusConfig } from '../consensus/requireProofOfTimeConsensusConfig.js';
 import { Logger } from '../../utils/logger.js';
 import { WalletProvider } from 'trac-wallet';
 import { CustomEventType } from '../../utils/constants.js';
@@ -47,6 +48,10 @@ class Network extends ReadyResource {
     #consensusMessages;
     #indexerConnectionManager;
     #indexerPendingRequestService;
+    #ledgerConfigSynchronizer;
+    #ledgerConfigStatusListener = null;
+    #epochProofLifecycle = Promise.resolve();
+    #closing = false;
 
     /**
      * @param {State} state
@@ -54,13 +59,14 @@ class Network extends ReadyResource {
      * @param {Config} config
      * @param {object} address
      **/
-    constructor(state, store, config, wallet = null) {
+    constructor(state, store, config, wallet = null, ledgerConfigSynchronizer = null) {
         super();
 
         this.#config = config
         this.#state = state
         this.#store = store
         this.#wallet = wallet
+        this.#ledgerConfigSynchronizer = ledgerConfigSynchronizer;
         this.#pendingConnections = new Map();
         this.#transactionCommitService = new TransactionCommitService(this.#config);
         this.#transactionPoolService = new TransactionPoolService(state, wallet?.address, this.#transactionCommitService ,this.#config);
@@ -107,13 +113,18 @@ class Network extends ReadyResource {
         await this.#replicate();
 
         if (this.#state.isIndexer()) {
-            this.#epochProofProposalService.start();
             this.#indexerObserverService.start();
         }
+        await this.#queueEpochProofLifecycleReconciliation();
     }
 
     async _close() {
         this.#logger.info('Network: closing gracefully...');
+        this.#closing = true;
+        if (this.#ledgerConfigSynchronizer && this.#ledgerConfigStatusListener) {
+            this.#ledgerConfigSynchronizer.off('status', this.#ledgerConfigStatusListener);
+        }
+        await this.#queueEpochProofLifecycleReconciliation();
         await this.transactionPoolService.stop();
         await sleep(100);
         await this.#validatorObserverService.stop();
@@ -130,6 +141,13 @@ class Network extends ReadyResource {
     }
 
     setupNetworkListeners() {
+        if (this.#ledgerConfigSynchronizer) {
+            this.#ledgerConfigStatusListener = () => {
+                void this.#queueEpochProofLifecycleReconciliation();
+            };
+            this.#ledgerConfigSynchronizer.on('status', this.#ledgerConfigStatusListener);
+        }
+
         this.#state.on(CustomEventType.IS_INDEXER, async (publicKey) => {
             const indexersCount = await this.#state.indexerCount()
             this.#indexerConnectionManager.setMax(indexersCount);
@@ -150,20 +168,46 @@ class Network extends ReadyResource {
 
         this.#state.on(CustomEventType.IS_INDEXER, bufferAddress => {
             const address = tracCryptoApi.address.encode(this.#config.addressPrefix, bufferAddress);
-            if (address === this.#wallet.address) {
+            if (address === this.#wallet?.address) {
                 this.#indexerObserverService.start();
-                this.#epochProofProposalService.start();
+                void this.#queueEpochProofLifecycleReconciliation();
             }
         });
 
-        this.#state.on(CustomEventType.IS_NON_INDEXER, (bufferAddress) => {
+        this.#state.on(CustomEventType.IS_NON_INDEXER, async (bufferAddress) => {
             const address = tracCryptoApi.address.encode(this.#config.addressPrefix, bufferAddress);
-            if (address === this.#wallet.address) {
-                this.#indexerObserverService.stop();
-                this.#epochProofProposalService.stop();
+            if (address === this.#wallet?.address) {
+                await this.#indexerObserverService.stop();
+                await this.#queueEpochProofLifecycleReconciliation();
                 this.#indexerConnectionManager.clear();
             }
         });
+    }
+
+    #queueEpochProofLifecycleReconciliation() {
+        this.#epochProofLifecycle = this.#epochProofLifecycle
+            .catch(() => {})
+            .then(() => this.#reconcileEpochProofLifecycle());
+        return this.#epochProofLifecycle;
+    }
+
+    async #reconcileEpochProofLifecycle() {
+        if (!this.#epochProofProposalService) return;
+
+        if (this.#closing || !this.#state.isIndexer()) {
+            await this.#epochProofProposalService.stop?.();
+            return;
+        }
+
+        try {
+            await requireProofOfTimeConsensusConfig(this.#state);
+            this.#epochProofProposalService.start();
+        } catch (error) {
+            await this.#epochProofProposalService.stop?.();
+            this.#logger.debug(
+                `Epoch proof service remains stopped: ${error?.message ?? 'ledger config is not ready'}`
+            );
+        }
     }
 
     cleanupPendingConnections() {

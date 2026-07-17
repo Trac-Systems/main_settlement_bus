@@ -2,11 +2,7 @@ import b4a from 'b4a';
 import tracCryptoApi from 'trac-crypto-api';
 
 import { createMessage, toHex } from '../../utils/buffer.js';
-import {
-    OperationType,
-    VDF_DIFFICULTY_SIZE,
-    VDF_DISCRIMINANT_SIZE
-} from '../../utils/constants.js';
+import { OperationType } from '../../utils/constants.js';
 import { addressToBuffer, bufferToAddress } from '../../core/state/utils/address.js';
 import { isAddressValid } from "../../core/state/utils/address.js";
 import {
@@ -17,12 +13,18 @@ import {
     isRoleAccess,
     isSetEpoch,
     isSetGenesisEpoch,
-    isSetVdfParams,
+    isSetLedgerConfig,
     isTransaction,
     isTransfer,
     operationToPayload
 } from '../../utils/applyOperations.js';
 import { isHexString } from '../../utils/helpers.js';
+import {
+    calculateContentRef,
+    canonicalizeSnapshot,
+    encodeCanonicalSnapshot,
+} from '../../core/ledger-config/ledgerConfigMerkle.js';
+import { ledgerConfigSnapshotToWire } from '../../codecs/apply/ledgerConfigCodec.js';
 
 // Single use per transaction: reuse of this instance needs mutex/queue or fail-fast and can delay validation or break validation rule.
 // A fresh instance is effectively zero-cost, so no reset() is provided.
@@ -38,6 +40,7 @@ class ApplyStateMessageBuilder {
     #approvals;
     #built = false;
     #channel;
+    #configId;
     #contentHash;
     #config;
     #externalBootstrap;
@@ -45,6 +48,8 @@ class ApplyStateMessageBuilder {
     #incomingNonce;
     #incomingSignature;
     #incomingWriterKey;
+    #ledgerConfigContentRef;
+    #ledgerConfigSnapshot;
     #msbBootstrap;
     #operationType;
     #output;
@@ -52,10 +57,9 @@ class ApplyStateMessageBuilder {
     #payloadKey;
     #phase;
     #proofData;
+    #previousCommitId;
     #txHash;
     #txValidity;
-    #vdfDifficulty;
-    #vdfDiscriminantSize;
     #wallet;
     #writingKey;
 
@@ -186,13 +190,20 @@ class ApplyStateMessageBuilder {
         return this;
     }
 
-    setVdfDifficulty(vdfDifficulty) {
-        this.#vdfDifficulty = this.#normalizeHexBuffer(vdfDifficulty, VDF_DIFFICULTY_SIZE, 'VDF difficulty');
+    setConfigId(configId) {
+        this.#configId = b4a.from(this.#normalizeHexBuffer(configId, 32, 'Config id'));
         return this;
     }
 
-    setVdfDiscriminantSize(vdfDiscriminantSize) {
-        this.#vdfDiscriminantSize = this.#normalizeHexBuffer(vdfDiscriminantSize, VDF_DISCRIMINANT_SIZE, 'VDF discriminant size');
+    setPreviousCommitId(previousCommitId) {
+        this.#previousCommitId = b4a.from(
+            this.#normalizeHexBuffer(previousCommitId, 32, 'Previous commit id')
+        );
+        return this;
+    }
+
+    setLedgerConfigSnapshot(snapshot) {
+        this.#ledgerConfigSnapshot = canonicalizeSnapshot(snapshot);
         return this;
     }
 
@@ -569,31 +580,35 @@ class ApplyStateMessageBuilder {
             case OperationType.SET_GENESIS_EPOCH:
                 this.#requireFields([
                     [this.#txValidity, 'Transaction validity'],
-                    [this.#vdfDifficulty, 'Difficulty'],
-                    [this.#vdfDiscriminantSize, 'Discriminant size']
+                    [this.#configId, 'Config id']
                 ]);
                 msg = createMessage(
                     this.#config.networkId,
                     this.#txValidity,
-                    this.#vdfDifficulty,
-                    this.#vdfDiscriminantSize,
+                    this.#configId,
                     nonce,
                     this.#operationType
                 );
                 break;
-            case OperationType.SET_VDF_PARAMS:
+            case OperationType.SET_LEDGER_CONFIG: {
                 this.#requireFields([
                     [this.#txValidity, 'Transaction validity'],
-                    [this.#vdfDifficulty, 'Difficulty']
+                    [this.#previousCommitId, 'Previous commit id'],
+                    [this.#ledgerConfigSnapshot, 'Ledger config snapshot']
                 ]);
+                const snapshotBytes = encodeCanonicalSnapshot(this.#ledgerConfigSnapshot);
+                this.#ledgerConfigContentRef = await calculateContentRef(this.#ledgerConfigSnapshot);
                 msg = createMessage(
                     this.#config.networkId,
                     this.#txValidity,
-                    this.#vdfDifficulty,
+                    this.#previousCommitId,
+                    snapshotBytes,
+                    this.#ledgerConfigContentRef,
                     nonce,
                     this.#operationType
                 );
                 break;
+            }
             default:
                 throw new Error(`Unsupported operation type: ${this.#operationType}`);
         }
@@ -687,17 +702,18 @@ class ApplyStateMessageBuilder {
             return {
                 tx,
                 txv: this.#txValidity,
-                df: this.#vdfDifficulty,
-                db: this.#vdfDiscriminantSize,
+                config_id: this.#configId,
                 in: nonce,
                 is: signature
             };
         }
-        if (isSetVdfParams(this.#operationType)) {
+        if (isSetLedgerConfig(this.#operationType)) {
             return {
                 tx,
                 txv: this.#txValidity,
-                df: this.#vdfDifficulty,
+                previous_commit_id: this.#previousCommitId,
+                snapshot: ledgerConfigSnapshotToWire(this.#ledgerConfigSnapshot),
+                content_ref: this.#ledgerConfigContentRef,
                 in: nonce,
                 is: signature
             };

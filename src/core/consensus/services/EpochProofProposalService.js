@@ -6,6 +6,7 @@ import { Logger } from '../../../utils/logger.js';
 
 import { safeEncodeApplyOperation } from '../../../codecs/apply/applyOperationCodec.js';
 import { addressToBuffer } from '../../state/utils/address.js';
+import { requireProofOfTimeConsensusConfig } from '../requireProofOfTimeConsensusConfig.js';
 
 class EpochProofProposalService extends ReadyResource {
     #state;
@@ -70,9 +71,10 @@ class EpochProofProposalService extends ReadyResource {
     }
 
     async #worker(next) {
-        if (!this.#isInterrupted) {            
+        if (!this.#isInterrupted) {
+            await requireProofOfTimeConsensusConfig(this.#state);
             const commiteeMembers = [];
-            const epoch = await this.#state.lastEpoch()
+            const epoch = await this.#state.requireCurrentEpoch()
             let signatures = [] // list of members signatures
             
             commiteeMembers.forEach(member => {
@@ -88,6 +90,7 @@ class EpochProofProposalService extends ReadyResource {
     }
 
     async #appendEpoch(epoch, signatures) {
+        await requireProofOfTimeConsensusConfig(this.#state);
         const payload = {
             type: OperationType.SET_EPOCH,
             address: addressToBuffer(this.#wallet.address, this.#config.addressPrefix),

@@ -21,7 +21,7 @@ class ConsensusMessageDirector {
      * @param {number} epoch
      * @param {Buffer} previousEpochRecordHash
      * @param {string} proposer
-     * @param {Buffer} vdfParametersHash
+     * @param {Buffer} configId
      * @param {Buffer} vdfProof
      * @returns {Promise<object>}
      */
@@ -31,7 +31,7 @@ class ConsensusMessageDirector {
         epoch,
         previousEpochRecordHash,
         proposer,
-        vdfParametersHash,
+        configId,
         vdfProof
     ) {
         await this.#builder
@@ -43,7 +43,7 @@ class ConsensusMessageDirector {
             .setEpoch(epoch)
             .setPreviousEpochRecordHash(previousEpochRecordHash)
             .setProposer(proposer)
-            .setVdfParametersHash(vdfParametersHash)
+            .setConfigId(configId)
             .setVdfProof(vdfProof)
             .buildPayload();
 
@@ -57,7 +57,7 @@ class ConsensusMessageDirector {
      * @param {number} epoch
      * @param {Buffer} previousEpochRecordHash
      * @param {string} proposer
-     * @param {Buffer} vdfParametersHash
+     * @param {Buffer} configId
      * @param {Buffer} vdfProof
      * @param {Buffer} requesterProofSignature
      * @param {number} resultCode
@@ -70,7 +70,7 @@ class ConsensusMessageDirector {
         epoch,
         previousEpochRecordHash,
         proposer,
-        vdfParametersHash,
+        configId,
         vdfProof,
         requesterProofSignature,
         resultCode,
@@ -85,7 +85,7 @@ class ConsensusMessageDirector {
             .setEpoch(epoch)
             .setPreviousEpochRecordHash(previousEpochRecordHash)
             .setProposer(proposer)
-            .setVdfParametersHash(vdfParametersHash)
+            .setConfigId(configId)
             .setVdfProof(vdfProof)
             .setRequesterProofSignature(requesterProofSignature)
             .setResultCode(resultCode)

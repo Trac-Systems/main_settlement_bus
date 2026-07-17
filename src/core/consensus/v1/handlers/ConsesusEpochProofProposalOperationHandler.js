@@ -5,6 +5,8 @@ import { ConsensusResultCode, CustomEventType } from "../../../../utils/constant
 import { consensusMessageFactory } from "../../../../messages/consensus/v1/consensusMessageFactory.js";
 import { bufferToAddress } from "../../../state/utils/address.js"
 import ConnectionOperationHandler from "../../../network/protocols/shared/ConnectionOperationHandler.js";
+import b4a from 'b4a';
+import { requireProofOfTimeConsensusConfig } from '../../requireProofOfTimeConsensusConfig.js';
 
 
 class ConsensusEpochProofProposalOperationHandler extends ConnectionOperationHandler {
@@ -128,6 +130,13 @@ class ConsensusEpochProofProposalOperationHandler extends ConnectionOperationHan
     async #buildProofProposalApproval(sessionId, proofProposal, resultCode) {
         const proposer = bufferToAddress(proofProposal.proposer, this.config.addressPrefix);
 
+        if (resultCode === ConsensusResultCode.OK) {
+            const {activeConfig} = await requireProofOfTimeConsensusConfig(this.#state);
+            if (!b4a.equals(proofProposal.config_id, activeConfig.descriptor.configId)) {
+                throw new Error('Ledger config changed before signing the proof proposal approval.');
+            }
+        }
+
         // TODO: In here we are basically getting some fields represented as buffers from
         // the received proofProposal, converting them to numbers, just to convert them
         // back to buffers internally. This should be optimized
@@ -137,7 +146,7 @@ class ConsensusEpochProofProposalOperationHandler extends ConnectionOperationHan
             proofProposal.epoch.readBigUInt64BE(0),
             proofProposal.previous_epoch_record_hash,
             proposer,
-            proofProposal.vdf_parameters_hash,
+            proofProposal.config_id,
             proofProposal.vdf_proof,
             proofProposal.signature,
             resultCode,

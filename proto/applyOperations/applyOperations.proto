@@ -12,7 +12,7 @@ import "applyOperations/messages/bootstrap_deployment_operation.proto";
 import "applyOperations/messages/tx_operation.proto";
 import "applyOperations/messages/set_epoch_operation.proto";
 import "applyOperations/messages/set_genesis_epoch_operation.proto";
-import "applyOperations/messages/set_vdf_params_operation.proto";
+import "applyOperations/messages/set_ledger_config_operation.proto";
 
 // Main structure for the operations where messages are
 message Operation {
@@ -29,6 +29,6 @@ message Operation {
         TxOperation                       txo  = 9;
         SetEpochOperation                 seo  = 10;
         SetGenesisEpochOperation          sgo  = 11;
-        SetVdfParamsOperation             vpo  = 12;
+        SetLedgerConfigOperation          lco  = 12;
     }
 }

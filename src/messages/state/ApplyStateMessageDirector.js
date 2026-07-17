@@ -536,11 +536,10 @@ class ApplyStateMessageDirector {
      * Build a complete set genesis epoch payload.
      * @param {string|Buffer} invokerAddress
      * @param {string|Buffer} txValidity
-     * @param {string|Buffer} vdfDifficulty
-     * @param {string|Buffer} vdfDiscriminantSize
+     * @param {string|Buffer} configId
      * @returns {Promise<object>}
      */
-    async buildCompleteSetGenesisEpochMessage(invokerAddress, txValidity, vdfDifficulty, vdfDiscriminantSize) {
+    async buildCompleteSetGenesisEpochMessage(invokerAddress, txValidity, configId) {
         if (!this.#builder) throw new Error('Builder has not been set.');
         await this.#builder
             .setPhase('complete')
@@ -548,28 +547,30 @@ class ApplyStateMessageDirector {
             .setOperationType(OperationType.SET_GENESIS_EPOCH)
             .setAddress(invokerAddress)
             .setTxValidity(txValidity)
-            .setVdfDifficulty(vdfDifficulty)
-            .setVdfDiscriminantSize(vdfDiscriminantSize)
+            .setConfigId(configId)
             .build();
         return this.#builder.getPayload();
     }
 
     /**
-     * Build a complete set VDF params payload.
+     * Build a complete Model B ledger configuration commit.
+     * The builder canonicalizes the full snapshot witness and derives contentRef.
      * @param {string|Buffer} invokerAddress
      * @param {string|Buffer} txValidity
-     * @param {string|Buffer} vdfDifficulty
+     * @param {string|Buffer} previousCommitId
+     * @param {object} snapshot
      * @returns {Promise<object>}
      */
-    async buildCompleteSetVdfParamsMessage(invokerAddress, txValidity, vdfDifficulty) {
+    async buildCompleteSetLedgerConfigMessage(invokerAddress, txValidity, previousCommitId, snapshot) {
         if (!this.#builder) throw new Error('Builder has not been set.');
         await this.#builder
             .setPhase('complete')
             .setOutput('buffer')
-            .setOperationType(OperationType.SET_VDF_PARAMS)
+            .setOperationType(OperationType.SET_LEDGER_CONFIG)
             .setAddress(invokerAddress)
             .setTxValidity(txValidity)
-            .setVdfDifficulty(vdfDifficulty)
+            .setPreviousCommitId(previousCommitId)
+            .setLedgerConfigSnapshot(snapshot)
             .build();
         return this.#builder.getPayload();
     }

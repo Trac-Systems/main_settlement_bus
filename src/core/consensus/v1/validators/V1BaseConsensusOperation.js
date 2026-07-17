@@ -94,7 +94,7 @@ class V1BaseConsensusOperation {
      * Builds canonical VDF challenge data from proof proposal fields 1 through 6.
      *
      * The message contains protocol version, network id, epoch, previous epoch
-     * record hash, proposer address, and VDF parameters hash in protocol order.
+     * record hash, proposer address, and ledger config id in protocol order.
      *
      * @param {object} proofProposal Decoded proof proposal.
      * @returns {Buffer} Canonically encoded challenge data.
@@ -106,7 +106,7 @@ class V1BaseConsensusOperation {
             proofProposal.epoch,
             proofProposal.previous_epoch_record_hash,
             proofProposal.proposer,
-            proofProposal.vdf_parameters_hash
+            proofProposal.config_id
         );
     }
 

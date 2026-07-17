@@ -25,7 +25,7 @@ const proofProposal = Object.freeze({
         asAddress('82f6c1f684f4e251dfe092155b8861a0625b596991810b2b80b9c65ccbec5ad3'),
         config.addressPrefix
     ),
-    vdf_parameters_hash: bytes(3, HASH_BYTE_LENGTH),
+    config_id: bytes(3, HASH_BYTE_LENGTH),
     vdf_proof: bytes(67, VDF_BLOB_PROOF_SIZE),
     signature: bytes(67, SIGNATURE_BYTE_LENGTH)
 });

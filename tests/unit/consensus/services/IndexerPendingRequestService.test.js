@@ -36,7 +36,7 @@ async function buildProofProposal({ sessionId = uuidv7() } = {}) {
         .setEpoch(1n)
         .setPreviousEpochRecordHash(b4a.alloc(32))
         .setProposer(wallet.address)
-        .setVdfParametersHash(b4a.alloc(32))
+        .setConfigId(b4a.alloc(32))
         .setVdfProof(b4a.alloc(64))
         .buildPayload();
     return builder.getResult();

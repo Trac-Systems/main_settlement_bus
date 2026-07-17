@@ -15,13 +15,13 @@ import {
     TRAC_NAMESPACE,
     EventType,
     CustomEventType,
-    VDF_DIFFICULTY_SIZE,
-    VDF_DISCRIMINANT_SIZE,
 } from '../../utils/constants.js';
 import { isHexString, sleep, isTransactionRecordPut } from '../../utils/helpers.js';
 import tracCryptoApi from 'trac-crypto-api';
 import StateValidationSchema from './validators/StateValidationSchema.js';
 import { safeDecodeApplyOperation } from '../../codecs/apply/applyOperationCodec.js';
+import { safeDecodeProofProposal } from '../../codecs/consensus/v1/consensusV1OperationCodec.js';
+import { preflightLedgerConfigOperation } from '../../codecs/apply/ledgerConfigOperationPreflight.js';
 import { createMessage, ZERO_WK, NULL_BUFFER } from '../../utils/buffer.js';
 import addressUtils from './utils/address.js';
 import adminEntryUtils from './utils/adminEntry.js';
@@ -45,8 +45,33 @@ import { deepCopyBuffer } from '../../utils/buffer.js';
 import { Status } from './utils/transaction.js';
 import remote from 'hypercore/lib/fully-remote-proof.js'
 import PQueue from 'p-queue';
-import {decodeVdfParameters, encodeVdfParameters, createGenesisEpochProof} from './utils/epochProof.js';
+import { createGenesisEpochProof } from './utils/epochProof.js';
 import _ from 'lodash';
+import {
+    buildLedgerConfigTree,
+    calculateCommitId,
+    calculateConfigId,
+    calculateContentRef,
+    canonicalizeSnapshot,
+    encodeCanonicalSnapshot,
+} from '../ledger-config/ledgerConfigMerkle.js';
+import {
+    createZeroCommitId,
+    LEDGER_CONFIG_COMMITMENT_SCHEME,
+    LEDGER_CONFIG_FORMAT_VERSION,
+    LEDGER_CONFIG_HASH_BYTES,
+    MAX_LEDGER_CONFIG_OPERATION_BYTES,
+} from '../ledger-config/ledgerConfigConstants.js';
+import {
+    LedgerConfigAdapterRegistry,
+    proofOfTimeLedgerConfigAdapter,
+} from '../ledger-config/adapters/index.js';
+import {
+    encodeLedgerConfigTransactionReceipt,
+    encodeLedgerConfigRootRecord,
+    ledgerConfigSnapshotFromWire,
+    safeDecodeLedgerConfigRootRecord,
+} from '../../codecs/apply/ledgerConfigCodec.js';
 
 const OVERSIZED_BATCH_PENALTY_MULTIPLIER = BATCH_SIZE;
 
@@ -61,6 +86,8 @@ class State extends ReadyResource {
     #config
     #wallet
     #stateValidationSchema;
+    #ledgerConfigAdapterRegistry;
+    #ledgerConfigSynchronizer = null;
     #activeWriterCountCache = new Map();
 
     /**
@@ -68,7 +95,7 @@ class State extends ReadyResource {
      * @param {IWallet} wallet
      * @param {Config} config
      **/
-    constructor(store, wallet, config) {
+    constructor(store, wallet, config, ledgerConfigAdapters = []) {
         super();
 
         this.#config = config
@@ -76,11 +103,16 @@ class State extends ReadyResource {
         this.#store = store;
 
         this.#stateValidationSchema = new StateValidationSchema(config);
+        this.#ledgerConfigAdapterRegistry = new LedgerConfigAdapterRegistry([
+            proofOfTimeLedgerConfigAdapter,
+            ...ledgerConfigAdapters,
+        ]).seal();
         this.#base = new Autobase(this.#store, this.#config.bootstrap, {
             ackInterval: ACK_INTERVAL,
             valueEncoding: AUTOBASE_VALUE_ENCODING,
             bigBatches: false,
             optimistic: false,
+            fastForward: false,
             open: this.#setupHyperbee.bind(this),
             apply: this.applyHandler,
         })
@@ -96,6 +128,17 @@ class State extends ReadyResource {
 
     get stateValidationSchema() {
         return this.#stateValidationSchema;
+    }
+
+    get ledgerConfigAdapterRegistry() {
+        return this.#ledgerConfigAdapterRegistry;
+    }
+
+    setLedgerConfigSynchronizer(synchronizer) {
+        if (!synchronizer || typeof synchronizer.requireConsensusReady !== 'function') {
+            throw new Error('Ledger config synchronizer must expose requireConsensusReady().');
+        }
+        this.#ledgerConfigSynchronizer = synchronizer;
     }
 
     get applyHandler() {
@@ -301,6 +344,137 @@ class State extends ReadyResource {
         } finally {
             await view_session.close();
         }
+    }
+
+    async #validateLedgerConfigRootRecord(record, expectedCommitId) {
+        const descriptor = record?.descriptor;
+        const hashFields = [
+            ['previousCommitId', record?.previousCommitId],
+            ['configRoot', descriptor?.configRoot],
+            ['configId', descriptor?.configId],
+            ['commitId', descriptor?.commitId],
+            ['contentRef', descriptor?.contentRef],
+        ];
+
+        for (const [name, value] of hashFields) {
+            if (!b4a.isBuffer(value) || value.length !== LEDGER_CONFIG_HASH_BYTES) {
+                throw new Error(`Invalid signed ledger config ${name}.`);
+            }
+        }
+        if (!b4a.equals(descriptor.commitId, expectedCommitId)) {
+            throw new Error('Signed ledger config pointer does not match its root record.');
+        }
+        if (descriptor.formatVersion !== LEDGER_CONFIG_FORMAT_VERSION) {
+            throw new Error('Invalid signed ledger config formatVersion.');
+        }
+        if (!Number.isSafeInteger(descriptor.configVersion) || descriptor.configVersion <= 0) {
+            throw new Error('Invalid signed ledger config configVersion.');
+        }
+        if (typeof descriptor.schemaId !== 'string' || descriptor.schemaId.length === 0) {
+            throw new Error('Invalid signed ledger config schemaId.');
+        }
+        if (descriptor.commitmentScheme !== LEDGER_CONFIG_COMMITMENT_SCHEME) {
+            throw new Error('Invalid signed ledger config commitmentScheme.');
+        }
+
+        const expectedConfigId = await calculateConfigId({
+            formatVersion: descriptor.formatVersion,
+            commitmentScheme: descriptor.commitmentScheme,
+            schemaId: descriptor.schemaId,
+            entries: [],
+        }, descriptor.configRoot);
+        if (!b4a.equals(descriptor.configId, expectedConfigId)) {
+            throw new Error('Signed ledger config configId is inconsistent.');
+        }
+        const calculatedCommitId = await calculateCommitId(record.previousCommitId, descriptor.configId);
+        if (!b4a.equals(descriptor.commitId, calculatedCommitId)) {
+            throw new Error('Signed ledger config commitId is inconsistent.');
+        }
+        if (descriptor.configVersion === 1 && !b4a.equals(record.previousCommitId, createZeroCommitId())) {
+            throw new Error('The first signed ledger config must reference ZERO_COMMIT_ID.');
+        }
+        if (descriptor.configVersion > 1 && b4a.equals(record.previousCommitId, createZeroCommitId())) {
+            throw new Error('A non-genesis ledger config cannot reference ZERO_COMMIT_ID.');
+        }
+
+        return record;
+    }
+
+    async #getSignedLedgerConfigRecord(commitId = null) {
+        const sourceSignedLength = this.#base.view.core.signedLength;
+        const viewSession = this.#base.view.checkout(sourceSignedLength);
+        try {
+            let resolvedCommitId = commitId;
+            if (resolvedCommitId === null) {
+                const currentEntry = await viewSession.get(EntryType.LEDGER_CONFIG_CURRENT);
+                if (currentEntry === null) return null;
+                resolvedCommitId = currentEntry.value;
+            }
+
+            if (typeof resolvedCommitId === 'string') {
+                if (!isHexString(resolvedCommitId) || resolvedCommitId.length !== LEDGER_CONFIG_HASH_BYTES * 2) {
+                    throw new Error('Ledger config commit id must be a 32-byte buffer or hex string.');
+                }
+                resolvedCommitId = b4a.from(resolvedCommitId, 'hex');
+            }
+            if (!b4a.isBuffer(resolvedCommitId) || resolvedCommitId.length !== LEDGER_CONFIG_HASH_BYTES) {
+                throw new Error('Invalid signed ledger config current pointer.');
+            }
+
+            const rootKey = EntryType.LEDGER_CONFIG_ROOT + b4a.toString(resolvedCommitId, 'hex');
+            const rootEntry = await viewSession.get(rootKey);
+            if (rootEntry === null) {
+                throw new Error('Signed ledger config root record is missing.');
+            }
+
+            const record = safeDecodeLedgerConfigRootRecord(rootEntry.value);
+            if (record === null) {
+                throw new Error('Signed ledger config root record is corrupt.');
+            }
+            await this.#validateLedgerConfigRootRecord(record, resolvedCommitId);
+            if (record.descriptor.configVersion > 1) {
+                const previousRootKey = EntryType.LEDGER_CONFIG_ROOT +
+                    b4a.toString(record.previousCommitId, 'hex');
+                const previousRootEntry = await viewSession.get(previousRootKey);
+                const previousRecord = safeDecodeLedgerConfigRootRecord(previousRootEntry?.value);
+                if (previousRecord === null) {
+                    throw new Error('Signed ledger config previous root record is missing or corrupt.');
+                }
+                await this.#validateLedgerConfigRootRecord(
+                    previousRecord,
+                    record.previousCommitId
+                );
+                if (previousRecord.descriptor.configVersion + 1 !== record.descriptor.configVersion) {
+                    throw new Error('Signed ledger config version chain is inconsistent.');
+                }
+            }
+
+            return {
+                sourceSignedLength,
+                previousCommitId: b4a.from(record.previousCommitId),
+                descriptor: {
+                    ...record.descriptor,
+                    configRoot: b4a.from(record.descriptor.configRoot),
+                    configId: b4a.from(record.descriptor.configId),
+                    commitId: b4a.from(record.descriptor.commitId),
+                    contentRef: b4a.from(record.descriptor.contentRef),
+                },
+            };
+        } finally {
+            await viewSession.close();
+        }
+    }
+
+    /**
+     * Reads the current descriptor and its immutable record from one signed
+     * Hyperbee checkout. Unsigned tip changes can never leak into this result.
+     */
+    async getSignedLedgerConfig() {
+        return await this.#getSignedLedgerConfigRecord();
+    }
+
+    async getSignedLedgerConfigRoot(commitId) {
+        return await this.#getSignedLedgerConfigRecord(commitId);
     }
 
     async getAdminEntry() {
@@ -612,34 +786,19 @@ class State extends ReadyResource {
         return this.#bee;
     }
 
-    async getSignedVDFParams() {
-        const vdfParamsBuffer = await this.getSigned(EntryType.VDF_PARAMS);
-        if (_.isNil(vdfParamsBuffer)) return null;
-
-        const expectedLength = VDF_DIFFICULTY_SIZE + VDF_DISCRIMINANT_SIZE;
-        if (!b4a.isBuffer(vdfParamsBuffer)) {
-            throw new Error("Invalid VDF params value: expected a buffer.");
+    /**
+     * Consensus is unavailable until a signed descriptor exists and its
+     * off-chain snapshot has been freshly verified by the synchronizer.
+     */
+    async requireLedgerConfigConsensusReady() {
+        const ledgerConfig = await this.getSignedLedgerConfig();
+        if (ledgerConfig === null) {
+            throw new Error('A signed ledger config is required before consensus can run.');
         }
-        if (vdfParamsBuffer.length !== expectedLength) {
-            throw new Error(`Invalid VDF params length: expected ${expectedLength}, got ${vdfParamsBuffer.length}.`);
+        if (this.#ledgerConfigSynchronizer === null) {
+            throw new Error('Ledger config is signed but the local config is not synchronized.');
         }
-        const decodedVdfParams = decodeVdfParameters(vdfParamsBuffer);
-        if (decodedVdfParams === null) {
-            throw new Error("Invalid VDF params value.");
-        }
-
-        return {
-            vdfDifficulty: decodedVdfParams.difficulty.readUInt32BE(0),
-            vdfDiscriminantSize: decodedVdfParams.discriminantBitSize.readUInt16BE(0),
-        };
-    }
-
-    async requireSignedVDFParams() {
-        const params = await this.getSignedVDFParams();
-        if (_.isNil(params)) {
-            throw new Error("VDF parameters are not initialized.");
-        }
-        return params;
+        return await this.#ledgerConfigSynchronizer.requireConsensusReady();
     }
 
     // ATTENTION: DO NOT USE METHODS ABOVE IN APPLY PART!
@@ -661,16 +820,35 @@ class State extends ReadyResource {
 
         for (const node of nodes) {
 
-            if (b4a.byteLength(node.value) > transactionUtils.MAXIMUM_OPERATION_PAYLOAD_SIZE) {
+            const operationPayloadSize = b4a.byteLength(node.value);
+            if (operationPayloadSize > MAX_LEDGER_CONFIG_OPERATION_BYTES) {
                 this.#safeLogApply("Node payload exceeds the maximum operation payload size.", node.from.key)
                 invalidOperations++;
                 continue;
             };
 
+            if (
+                operationPayloadSize > transactionUtils.MAXIMUM_OPERATION_PAYLOAD_SIZE
+                && !preflightLedgerConfigOperation(node.value)
+            ) {
+                this.#safeLogApply("Large payload failed ledger config preflight.", node.from.key)
+                invalidOperations++;
+                continue;
+            }
+
             const op = safeDecodeApplyOperation(node.value);
 
             if (!op) {
                 this.#safeLogApply("Failed to decode operation.", node.from.key)
+                invalidOperations++;
+                continue;
+            }
+
+            const operationPayloadLimit = op.type === OperationType.SET_LEDGER_CONFIG
+                ? MAX_LEDGER_CONFIG_OPERATION_BYTES
+                : transactionUtils.MAXIMUM_OPERATION_PAYLOAD_SIZE;
+            if (operationPayloadSize > operationPayloadLimit) {
+                this.#safeLogApply("Node payload exceeds the operation-specific payload size.", node.from.key)
                 invalidOperations++;
                 continue;
             }
@@ -718,7 +896,7 @@ class State extends ReadyResource {
             [OperationType.TRANSFER]: this.#handleApplyTransferOperation.bind(this),
             [OperationType.SET_EPOCH]: this.#handleApplySetEpochOperation.bind(this),
             [OperationType.SET_GENESIS_EPOCH]: this.#handleApplySetGenesisEpoch.bind(this),
-            [OperationType.SET_VDF_PARAMS]: this.#handleApplySetVdfParams.bind(this),
+            [OperationType.SET_LEDGER_CONFIG]: this.#handleApplySetLedgerConfig.bind(this),
         };
         return handlers[type] || null;
     }
@@ -3475,11 +3653,40 @@ class State extends ReadyResource {
         return Status.SUCCESS;
     }
 
-    async #handleApplySetEpochOperation(op, view, base, node, _batch) {
+    async #handleApplySetEpochOperation(op, _view, _base, node, batch) {
         if (!this.#stateValidationSchema.validateSetEpochOperation(op)) {
             this.#safeLogApply(OperationType.SET_EPOCH, "Contract schema validation failed.", node.from.key)
             return Status.FAILURE;
         };
+
+        const proofProposal = safeDecodeProofProposal(op.seo.pd);
+        if (proofProposal === null) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "Proof proposal could not be decoded.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        let currentRootRecord;
+        try {
+            currentRootRecord = await this.#getCurrentLedgerConfigRecordApply(batch);
+        } catch (error) {
+            this.#safeLogApply(
+                OperationType.SET_EPOCH,
+                `Current ledger config is invalid: ${error.message}`,
+                node.from.key
+            );
+            return Status.FAILURE;
+        }
+
+        if (!b4a.isBuffer(proofProposal.config_id)
+            || proofProposal.config_id.length !== LEDGER_CONFIG_HASH_BYTES
+            || !b4a.equals(proofProposal.config_id, currentRootRecord.descriptor.configId)) {
+            this.#safeLogApply(
+                OperationType.SET_EPOCH,
+                "Epoch proof config id does not match the current ledger config.",
+                node.from.key
+            );
+            return Status.FAILURE;
+        }
 
         this.emit(CustomEventType.EPOCH_CREATED); // notify epoch committed
         return Status.SUCCESS;
@@ -3644,6 +3851,25 @@ class State extends ReadyResource {
     async #getEntryApply(key, batch) {
         const entry = await batch.get(key);
         return deepCopyBuffer(entry?.value)
+    }
+
+    async #getCurrentLedgerConfigRecordApply(batch) {
+        const currentCommitId = await this.#getEntryApply(
+            EntryType.LEDGER_CONFIG_CURRENT,
+            batch
+        );
+        if (!b4a.isBuffer(currentCommitId) || currentCommitId.length !== LEDGER_CONFIG_HASH_BYTES) {
+            throw new Error('current pointer is missing or invalid');
+        }
+
+        const currentRootKey = EntryType.LEDGER_CONFIG_ROOT + b4a.toString(currentCommitId, 'hex');
+        const currentRootBuffer = await this.#getEntryApply(currentRootKey, batch);
+        const currentRootRecord = safeDecodeLedgerConfigRootRecord(currentRootBuffer);
+        if (currentRootRecord === null) {
+            throw new Error('current root record is missing or corrupt');
+        }
+        await this.#validateLedgerConfigRootRecord(currentRootRecord, currentCommitId);
+        return currentRootRecord;
     }
 
     async #getDeploymentEntryApply(key, batch) {
@@ -4156,9 +4382,34 @@ class State extends ReadyResource {
         };
     }
 
-    async #handleApplySetGenesisEpoch(op, view, base, node, batch) {
+    async #handleApplySetGenesisEpoch(op, _view, base, node, batch) {
         if (!this.#stateValidationSchema.validateSetGenesisEpochOperation(op)) {
             this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Contract schema validation failed.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        // Genesis is anchored to the exact Model B configuration that consensus
+        // will use. Both the pointer and its immutable root record must already
+        // exist in the deterministic apply view.
+        let currentRootRecord;
+        try {
+            currentRootRecord = await this.#getCurrentLedgerConfigRecordApply(batch);
+        } catch (error) {
+            this.#safeLogApply(
+                OperationType.SET_GENESIS_EPOCH,
+                `Ledger config must be initialized before the genesis epoch: ${error.message}`,
+                node.from.key
+            );
+            return Status.FAILURE;
+        }
+
+        const configId = currentRootRecord.descriptor.configId;
+        if (!b4a.equals(op.sgo.config_id, configId)) {
+            this.#safeLogApply(
+                OperationType.SET_GENESIS_EPOCH,
+                "Genesis config id does not match the current ledger config.",
+                node.from.key
+            );
             return Status.FAILURE;
         }
 
@@ -4210,8 +4461,7 @@ class State extends ReadyResource {
         const message = createMessage(
             this.#config.networkId,
             op.sgo.txv,
-            op.sgo.df,
-            op.sgo.db,
+            op.sgo.config_id,
             op.sgo.in,
             OperationType.SET_GENESIS_EPOCH
         );
@@ -4270,25 +4520,7 @@ class State extends ReadyResource {
             return Status.IGNORE;
         }
 
-        // check if VDF params have been initialized if yes - failure
-        const vdfParams = await this.#getEntryApply(EntryType.VDF_PARAMS, batch);
-        if (vdfParams !== null) {
-            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "VDF params are set. Cannot set a new genesis epoch", node.from.key)
-            return Status.IGNORE;
-        }
-
-        // extract diff and dbs in this case we should check if this is not less than 0 and not higer than 4/2 bytes
-        const vdfDifficultyBuffer = op.sgo.df;
-        // can not be zero
-        const vdfDiscriminantBitSizeBuffer = op.sgo.db;
-        // can not be zero
-        const encodedVdfParamsEntry = encodeVdfParameters(vdfDifficultyBuffer, vdfDiscriminantBitSizeBuffer);
-        if (encodedVdfParamsEntry.length === 0) {
-            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Could not encode vdf parameters. Cannot set a new genesis epoch", node.from.key)
-            return Status.IGNORE;
-        }
-
-        const genesisEpoch = await createGenesisEpochProof(this.#config, requesterAddressString, encodedVdfParamsEntry);
+        const genesisEpoch = createGenesisEpochProof(this.#config, requesterAddressString, configId);
         if (!genesisEpoch) {
             this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Could not initialize genesis epoch", node.from.key)
             return Status.FAILURE;
@@ -4307,9 +4539,6 @@ class State extends ReadyResource {
         const epochHashLedgerEntry = EntryType.EPOCH_HASH + epochProofHashString;
         await batch.put(epochHashLedgerEntry, genesisEpoch);
         
-        // initialize VDFParams
-        await batch.put(EntryType.VDF_PARAMS, encodedVdfParamsEntry);
-
         // Put txHashHexString into the state to avoid replay attack
         await batch.put(txHashHexString, node.value);
 
@@ -4320,127 +4549,250 @@ class State extends ReadyResource {
         return Status.SUCCESS;
     }
 
-    async #handleApplySetVdfParams(op, _view, base, node, batch) {
-        if (!this.#stateValidationSchema.validateSetVdfParamsOperation(op)) {
-            this.#safeLogApply(OperationType.SET_VDF_PARAMS, "Contract schema validation failed.", node.from.key)
+    async #handleApplySetLedgerConfig(op, _view, base, node, batch) {
+        if (!this.#stateValidationSchema.validateSetLedgerConfigOperation(op)) {
+            this.#safeLogApply(OperationType.SET_LEDGER_CONFIG, "Contract schema validation failed.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        const previousCommitId = op.lco.previous_commit_id;
+        const contentRef = op.lco.content_ref;
+        if (!b4a.isBuffer(previousCommitId) || previousCommitId.length !== LEDGER_CONFIG_HASH_BYTES) {
+            this.#safeLogApply(OperationType.SET_LEDGER_CONFIG, "Previous commit id is invalid.", node.from.key);
+            return Status.FAILURE;
+        }
+        if (!b4a.isBuffer(contentRef) || contentRef.length !== LEDGER_CONFIG_HASH_BYTES) {
+            this.#safeLogApply(OperationType.SET_LEDGER_CONFIG, "Content reference is invalid.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        let snapshot;
+        let canonicalSnapshot;
+        let canonicalSnapshotBytes;
+        let expectedContentRef;
+        try {
+            snapshot = ledgerConfigSnapshotFromWire(op.lco.snapshot);
+            canonicalSnapshot = canonicalizeSnapshot(snapshot);
+            canonicalSnapshotBytes = encodeCanonicalSnapshot(canonicalSnapshot);
+            expectedContentRef = await calculateContentRef(canonicalSnapshot);
+        } catch (error) {
+            this.#safeLogApply(OperationType.SET_LEDGER_CONFIG, `Ledger config snapshot is invalid: ${error.message}`, node.from.key);
+            return Status.FAILURE;
+        }
+
+        // The signed semantic snapshot uses one canonical entry order. Raw
+        // protobuf field order is intentionally not part of the commitment.
+        const incomingEntries = snapshot.entries;
+        const canonicalEntries = canonicalSnapshot.entries;
+        const isCanonical = snapshot.formatVersion === canonicalSnapshot.formatVersion &&
+            snapshot.commitmentScheme === canonicalSnapshot.commitmentScheme &&
+            snapshot.schemaId === canonicalSnapshot.schemaId &&
+            incomingEntries.length === canonicalEntries.length &&
+            incomingEntries.every((entry, index) => {
+                return b4a.equals(entry.key, canonicalEntries[index].key) &&
+                    b4a.equals(entry.value, canonicalEntries[index].value);
+            });
+        if (!isCanonical) {
+            this.#safeLogApply(OperationType.SET_LEDGER_CONFIG, "Ledger config snapshot entries are not canonical.", node.from.key);
+            return Status.FAILURE;
+        }
+        if (!b4a.equals(contentRef, expectedContentRef)) {
+            this.#safeLogApply(OperationType.SET_LEDGER_CONFIG, "Content reference does not match the snapshot.", node.from.key);
             return Status.FAILURE;
         }
 
         const requesterAddressString = addressUtils.bufferToAddress(op.address, this.#config.addressPrefix);
         if (requesterAddressString === null) {
-            this.#safeLogApply(OperationType.SET_VDF_PARAMS, "Requester address is invalid.", node.from.key)
+            this.#safeLogApply(OperationType.SET_LEDGER_CONFIG, "Requester address is invalid.", node.from.key);
             return Status.FAILURE;
         }
-
         const requesterPublicKey = tracCryptoApi.address.decodeSafe(requesterAddressString);
         if (b4a.equals(requesterPublicKey, NULL_BUFFER)) {
-            this.#safeLogApply(OperationType.SET_VDF_PARAMS, "Failed to decode requester public key.", node.from.key)
+            this.#safeLogApply(OperationType.SET_LEDGER_CONFIG, "Failed to decode requester public key.", node.from.key);
             return Status.FAILURE;
         }
 
         const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
         if (adminEntry === null) {
-            this.#safeLogApply(OperationType.SET_VDF_PARAMS, "Invalid admin entry.", node.from.key)
+            this.#safeLogApply(OperationType.SET_LEDGER_CONFIG, "Invalid admin entry.", node.from.key);
             return Status.FAILURE;
         }
-
         const decodedAdminEntry = adminEntryUtils.decode(adminEntry, this.#config.addressPrefix);
         if (decodedAdminEntry === null) {
-            this.#safeLogApply(OperationType.SET_VDF_PARAMS, "Failed to decode admin entry.", node.from.key)
+            this.#safeLogApply(OperationType.SET_LEDGER_CONFIG, "Failed to decode admin entry.", node.from.key);
             return Status.FAILURE;
         }
-
         if (!this.#isAdminApply(decodedAdminEntry, node)) {
-            this.#safeLogApply(OperationType.SET_VDF_PARAMS, "Node is not allowed to perform this operation. (ADMIN ONLY)", node.from.key)
+            this.#safeLogApply(OperationType.SET_LEDGER_CONFIG, "Node is not allowed to perform this operation. (ADMIN ONLY)", node.from.key);
             return Status.FAILURE;
         }
-
         const adminPublicKey = tracCryptoApi.address.decodeSafe(decodedAdminEntry.address);
-        if (b4a.equals(adminPublicKey, NULL_BUFFER)) {
-            this.#safeLogApply(OperationType.SET_VDF_PARAMS, "Failed to decode admin public key.", node.from.key)
-            return Status.FAILURE;
-        }
-
-        if (!b4a.equals(adminPublicKey, requesterPublicKey)) {
-            this.#safeLogApply(OperationType.SET_VDF_PARAMS, "System admin and node public keys do not match.", node.from.key)
+        if (b4a.equals(adminPublicKey, NULL_BUFFER) || !b4a.equals(adminPublicKey, requesterPublicKey)) {
+            this.#safeLogApply(OperationType.SET_LEDGER_CONFIG, "System admin and requester public keys do not match.", node.from.key);
             return Status.FAILURE;
         }
 
         const message = createMessage(
             this.#config.networkId,
-            op.vpo.txv,
-            op.vpo.df,
-            op.vpo.in,
-            OperationType.SET_VDF_PARAMS
+            op.lco.txv,
+            previousCommitId,
+            canonicalSnapshotBytes,
+            contentRef,
+            op.lco.in,
+            OperationType.SET_LEDGER_CONFIG
         );
+
         if (message.length === 0) {
-            this.#safeLogApply(OperationType.SET_VDF_PARAMS, "Invalid requester message.", node.from.key)
+            this.#safeLogApply(OperationType.SET_LEDGER_CONFIG, "Invalid requester message.", node.from.key);
             return Status.FAILURE;
         }
-
         const hash = await tracCryptoApi.hash.blake3Safe(message);
-        if (!b4a.equals(hash, op.vpo.tx)) {
-            this.#safeLogApply(OperationType.SET_VDF_PARAMS, "Message hash does not match the tx_hash.", node.from.key)
+        if (!b4a.equals(hash, op.lco.tx)) {
+            this.#safeLogApply(OperationType.SET_LEDGER_CONFIG, "Message hash does not match the tx_hash.", node.from.key);
             return Status.FAILURE;
         }
-
-        const isMessageVerified = tracCryptoApi.signature.verify(op.vpo.is, op.vpo.tx, adminPublicKey);
-        if (!isMessageVerified) {
-            this.#safeLogApply(OperationType.SET_VDF_PARAMS, "Failed to verify message signature.", node.from.key)
+        if (!tracCryptoApi.signature.verify(op.lco.is, op.lco.tx, adminPublicKey)) {
+            this.#safeLogApply(OperationType.SET_LEDGER_CONFIG, "Failed to verify message signature.", node.from.key);
             return Status.FAILURE;
         }
 
         const indexersSequenceState = await this.#getIndexerSequenceStateApply(base);
-        if (indexersSequenceState === null) {
-            this.#safeLogApply(OperationType.SET_VDF_PARAMS, "Indexer sequence state is invalid.", node.from.key)
+        if (indexersSequenceState === null || !b4a.equals(op.lco.txv, indexersSequenceState)) {
+            this.#safeLogApply(OperationType.SET_LEDGER_CONFIG, "Transaction validity does not match signed state.", node.from.key);
             return Status.FAILURE;
         }
 
-        if (!b4a.equals(op.vpo.txv, indexersSequenceState)) {
-            this.#safeLogApply(OperationType.SET_VDF_PARAMS, "Transaction was not executed.", node.from.key)
-            return Status.FAILURE;
-        }
-
-        const txHashHexString = op.vpo.tx.toString('hex');
-        const opEntry = await this.#getEntryApply(txHashHexString, batch);
-        if (opEntry !== null) {
-            this.#safeLogApply(OperationType.SET_VDF_PARAMS, "Operation has already been applied.", node.from.key)
+        const txHashHexString = b4a.toString(op.lco.tx, 'hex');
+        if (await this.#getEntryApply(txHashHexString, batch) !== null) {
+            this.#safeLogApply(OperationType.SET_LEDGER_CONFIG, "Operation has already been applied.", node.from.key);
             return Status.IGNORE;
         }
 
-        const existingVdfParams = await this.#getEntryApply(EntryType.VDF_PARAMS, batch);
-        if (existingVdfParams === null) {
-            this.#safeLogApply(OperationType.SET_VDF_PARAMS, "VDF params have not been initialized.", node.from.key)
-            return Status.IGNORE;
+        const currentCommitId = await this.#getEntryApply(EntryType.LEDGER_CONFIG_CURRENT, batch);
+        let configVersion = 1;
+        if (currentCommitId === null) {
+            if (!b4a.equals(previousCommitId, createZeroCommitId())) {
+                this.#safeLogApply(OperationType.SET_LEDGER_CONFIG, "The first config must reference ZERO_COMMIT_ID.", node.from.key);
+                return Status.FAILURE;
+            }
+        } else {
+            if (!b4a.isBuffer(currentCommitId) || currentCommitId.length !== LEDGER_CONFIG_HASH_BYTES) {
+                this.#safeLogApply(OperationType.SET_LEDGER_CONFIG, "Current ledger config pointer is corrupt.", node.from.key);
+                return Status.FAILURE;
+            }
+            if (!b4a.equals(previousCommitId, currentCommitId)) {
+                this.#safeLogApply(OperationType.SET_LEDGER_CONFIG, "Previous commit id is stale.", node.from.key);
+                return Status.FAILURE;
+            }
+
+            const currentRootKey = EntryType.LEDGER_CONFIG_ROOT + b4a.toString(currentCommitId, 'hex');
+            const currentRootBuffer = await this.#getEntryApply(currentRootKey, batch);
+            const currentRootRecord = safeDecodeLedgerConfigRootRecord(currentRootBuffer);
+
+            try {
+                if (currentRootRecord === null) throw new Error('record cannot be decoded');
+                await this.#validateLedgerConfigRootRecord(currentRootRecord, currentCommitId);
+            } catch (error) {
+                this.#safeLogApply(OperationType.SET_LEDGER_CONFIG, `Current ledger config record is corrupt: ${error.message}`, node.from.key);
+                return Status.FAILURE;
+            }
+            if (currentRootRecord.descriptor.configVersion === Number.MAX_SAFE_INTEGER) {
+                this.#safeLogApply(OperationType.SET_LEDGER_CONFIG, "Ledger config version overflow.", node.from.key);
+                return Status.FAILURE;
+            }
+            configVersion = currentRootRecord.descriptor.configVersion + 1;
         }
 
-        const decodedVdfParams = decodeVdfParameters(existingVdfParams);
-        if (decodedVdfParams === null) {
-            this.#safeLogApply(OperationType.SET_VDF_PARAMS, "Stored VDF params are invalid.", node.from.key)
+        let tree;
+        let configId;
+        let commitId;
+        let rootRecordBuffer;
+        let transactionReceiptBuffer;
+        let descriptor;
+        try {
+            tree = await buildLedgerConfigTree(canonicalSnapshot);
+            configId = await calculateConfigId(canonicalSnapshot, tree.root);
+            commitId = await calculateCommitId(previousCommitId, configId);
+            descriptor = {
+                formatVersion: canonicalSnapshot.formatVersion,
+                commitmentScheme: canonicalSnapshot.commitmentScheme,
+                schemaId: canonicalSnapshot.schemaId,
+                configVersion,
+                configRoot: tree.root,
+                configId,
+                commitId,
+                contentRef,
+            };
+            rootRecordBuffer = encodeLedgerConfigRootRecord({
+                previousCommitId,
+                descriptor,
+            });
+            transactionReceiptBuffer = encodeLedgerConfigTransactionReceipt({
+                operationType: OperationType.SET_LEDGER_CONFIG,
+                txHash: op.lco.tx,
+                requesterAddress: op.address,
+                previousCommitId,
+                descriptor,
+            });
+        } catch (error) {
+            this.#safeLogApply(OperationType.SET_LEDGER_CONFIG, `Failed to build ledger config commitment: ${error.message}`, node.from.key);
             return Status.FAILURE;
         }
 
-        if (op.vpo.df.readUInt32BE(0) === 0) {
-            this.#safeLogApply(OperationType.SET_VDF_PARAMS, "VDF difficulty must be greater than zero.", node.from.key)
+        const rootKey = EntryType.LEDGER_CONFIG_ROOT + b4a.toString(commitId, 'hex');
+        if (await this.#getEntryApply(rootKey, batch) !== null) {
+            this.#safeLogApply(OperationType.SET_LEDGER_CONFIG, "Ledger config root record already exists.", node.from.key);
             return Status.FAILURE;
         }
 
-        const encodedVdfParams = encodeVdfParameters(
-            op.vpo.df,
-            decodedVdfParams.discriminantBitSize
-        );
-        if (encodedVdfParams.length === 0) {
-            this.#safeLogApply(OperationType.SET_VDF_PARAMS, "Could not encode VDF parameters.", node.from.key)
-            return Status.FAILURE;
-        }
+        // One deterministic batch makes the immutable history record, current
+        // pointer and compact standard transaction receipt visible atomically.
+        // The complete snapshot witness is intentionally omitted.
+        await batch.put(rootKey, rootRecordBuffer);
+        await batch.put(EntryType.LEDGER_CONFIG_CURRENT, b4a.from(commitId));
+        await batch.put(txHashHexString, transactionReceiptBuffer);
 
-        await batch.put(EntryType.VDF_PARAMS, encodedVdfParams);
-        await batch.put(txHashHexString, node.value);
+        // This event may only populate a derived, content-addressed local cache.
+        // State.apply never reads it and listener failures cannot change apply.
+        this.#emitEvent(CustomEventType.LEDGER_CONFIG_WITNESS, {
+            snapshot: {
+                ...canonicalSnapshot,
+                entries: canonicalSnapshot.entries.map(entry => ({
+                    key: b4a.from(entry.key),
+                    value: b4a.from(entry.value),
+                })),
+            },
+            descriptor: {
+                ...descriptor,
+                configRoot: b4a.from(descriptor.configRoot),
+                configId: b4a.from(descriptor.configId),
+                commitId: b4a.from(descriptor.commitId),
+                contentRef: b4a.from(descriptor.contentRef),
+            },
+            previousCommitId: b4a.from(previousCommitId),
+            tree: {
+                root: b4a.from(tree.root),
+                entries: tree.entries.map(entry => ({
+                    ...entry,
+                    key: b4a.from(entry.key),
+                    value: b4a.from(entry.value),
+                    leafHash: b4a.from(entry.leafHash),
+                })),
+                nodes: tree.nodes.map(treeNode => ({
+                    ...treeNode,
+                    hash: b4a.from(treeNode.hash),
+                    ...(treeNode.key && { key: b4a.from(treeNode.key) }),
+                    ...(treeNode.value && { value: b4a.from(treeNode.value) }),
+                    ...(treeNode.leftHash && { leftHash: b4a.from(treeNode.leftHash) }),
+                    ...(treeNode.rightHash && { rightHash: b4a.from(treeNode.rightHash) }),
+                })),
+                getProof: tree.getProof,
+            },
+        });
 
         if (this.#config.enableTxApplyLogs) {
-            console.info(`VDF params updated addr:wk:tx - ${requesterAddressString}:${decodedAdminEntry.wk.toString('hex')}:${txHashHexString}`);
+            console.info(`Ledger config updated addr:wk:tx - ${requesterAddressString}:${decodedAdminEntry.wk.toString('hex')}:${txHashHexString}`);
         }
-
         return Status.SUCCESS;
     }
 }

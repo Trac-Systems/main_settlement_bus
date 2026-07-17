@@ -43,7 +43,7 @@ test('ConsensusMessageDirector builds proof proposal and verifies signature', as
     const networkIdBuffer = uint16ToBuffer(networkId);
     const epochBuffer = uint64ToBuffer(epoch);
     const previousEpochRecordHash = b4a.alloc(32, 1);
-    const vdfParametersHash = b4a.alloc(32, 2);
+    const configId = b4a.alloc(32, 2);
     const vdfProof = b4a.alloc(VDF_BLOB_PROOF_SIZE, 3);
 
     const payload = await director.buildProofProposal(
@@ -52,7 +52,7 @@ test('ConsensusMessageDirector builds proof proposal and verifies signature', as
         epoch,
         previousEpochRecordHash,
         wallet.address,
-        vdfParametersHash,
+        configId,
         vdfProof
     );
 
@@ -66,7 +66,7 @@ test('ConsensusMessageDirector builds proof proposal and verifies signature', as
     t.alike(proofProposal.epoch, epochBuffer);
     t.alike(proofProposal.previous_epoch_record_hash, previousEpochRecordHash);
     t.alike(proofProposal.proposer, addressToBuffer(wallet.address, config.addressPrefix));
-    t.alike(proofProposal.vdf_parameters_hash, vdfParametersHash);
+    t.alike(proofProposal.config_id, configId);
     t.alike(proofProposal.vdf_proof, vdfProof);
     t.ok(b4a.isBuffer(proofProposal.signature));
 
@@ -76,7 +76,7 @@ test('ConsensusMessageDirector builds proof proposal and verifies signature', as
         proofProposal.epoch,
         proofProposal.previous_epoch_record_hash,
         proofProposal.proposer,
-        proofProposal.vdf_parameters_hash,
+        proofProposal.config_id,
         proofProposal.vdf_proof
     );
     const hash = await tracCryptoApi.hash.blake3(message);
@@ -94,7 +94,7 @@ test('ConsensusMessageDirector builds proof proposal response and verifies signa
     const networkIdBuffer = uint16ToBuffer(networkId);
     const epochBuffer = uint64ToBuffer(epoch);
     const previousEpochRecordHash = b4a.alloc(32, 1);
-    const vdfParametersHash = b4a.alloc(32, 2);
+    const configId = b4a.alloc(32, 2);
     const vdfProof = b4a.alloc(VDF_BLOB_PROOF_SIZE, 3);
     const requesterProofSignature = b4a.alloc(64, 4);
 
@@ -104,7 +104,7 @@ test('ConsensusMessageDirector builds proof proposal response and verifies signa
         epoch,
         previousEpochRecordHash,
         wallet.address,
-        vdfParametersHash,
+        configId,
         vdfProof,
         requesterProofSignature,
         ConsensusResultCode.OK,
@@ -127,7 +127,7 @@ test('ConsensusMessageDirector builds proof proposal response and verifies signa
         epochBuffer,
         previousEpochRecordHash,
         addressToBuffer(wallet.address, config.addressPrefix),
-        vdfParametersHash,
+        configId,
         vdfProof,
         proofProposalResponse.approval.approver,
         requesterProofSignature

@@ -12,7 +12,8 @@ import {
     BOOTSTRAP_HEXSTRING_LENGTH,
     BALANCE_MIGRATION_SLEEP_INTERVAL,
     WHITELIST_MIGRATION_DIR,
-    OperationType
+    OperationType,
+    CustomEventType,
 } from "./utils/constants.js";
 import { decimalStringToBigInt, bigIntTo16ByteBuffer, bufferToBigInt, bigIntToDecimalString } from "./utils/amountSerialization.js"
 import {
@@ -27,10 +28,30 @@ import {
     safeDecodeApplyOperation,
     safeEncodeApplyOperation
 } from "./codecs/apply/applyOperationCodec.js";
+import {
+    ledgerConfigTransactionReceiptToDetails,
+    safeDecodeLedgerConfigTransactionReceipt,
+    validateLedgerConfigTransactionReceipt,
+} from './codecs/apply/ledgerConfigCodec.js';
 import PartialTransactionValidator from "./core/network/protocols/shared/validators/PartialTransactionValidator.js";
 import PartialTransferValidator from "./core/network/protocols/shared/validators/PartialTransferValidator.js";
 import { BroadcastError, ValidationError } from "./utils/errors.js";
 import { uint16ToBuffer, uint32ToBuffer } from "./utils/buffer.js";
+import {
+    LedgerConfigContentStore,
+    LedgerConfigSynchronizer,
+    buildLedgerConfigDiagnostics,
+    canonicalizeSnapshot,
+    createZeroCommitId,
+    LEDGER_CONFIG_COMMITMENT_SCHEME,
+    LEDGER_CONFIG_FORMAT_VERSION,
+    PROOF_OF_TIME_CONFIG_KEYS,
+    PROOF_OF_TIME_SCHEMA_ID,
+    CONFIG_UNAVAILABLE,
+    CONFIG_VERIFYING,
+    NOT_READY,
+    SYNCING_LEDGER,
+} from './core/ledger-config/index.js';
 
 export class MainSettlementBus extends ReadyResource {
     #store;
@@ -38,15 +59,42 @@ export class MainSettlementBus extends ReadyResource {
     #network;
     #state;
     #config
+    #ledgerConfigAdapters;
+    #ledgerConfigSnapshotSources;
+    #ledgerConfigSnapshotSourceTimeoutMs;
+    #ledgerConfigRetryIntervalMs;
+    #ledgerConfigContentStore;
+    #ledgerConfigSynchronizer;
+    #ledgerConfigWitnessListener;
+    #ledgerConfigBaseUpdateListener;
+    #ledgerConfigFastForwardListener;
+    #ledgerConfigWitnessWrites = new Set();
+    #ledgerConfigSyncRequested = false;
+    #ledgerConfigSyncLoop = null;
+    #ledgerConfigRetryTimer = null;
+    #closing = false;
 
     /**
      * @param {import("./config/config.js").Config} config
      * @param {import("trac-wallet").Wallet | undefined} wallet
+     * @param {object} options Model B adapters, untrusted snapshot sources and retry limits
      **/
-    constructor(config, wallet = undefined) {
+    constructor(config, wallet = undefined, {
+        ledgerConfigAdapters = [],
+        ledgerConfigSnapshotSources = [],
+        ledgerConfigSnapshotSourceTimeoutMs = 30_000,
+        ledgerConfigRetryIntervalMs = 5_000,
+    } = {}) {
         super();
         this.#config = config
         this.#wallet = wallet;
+        this.#ledgerConfigAdapters = ledgerConfigAdapters;
+        this.#ledgerConfigSnapshotSources = ledgerConfigSnapshotSources;
+        this.#ledgerConfigSnapshotSourceTimeoutMs = ledgerConfigSnapshotSourceTimeoutMs;
+        if (!Number.isSafeInteger(ledgerConfigRetryIntervalMs) || ledgerConfigRetryIntervalMs < 1) {
+            throw new Error('ledgerConfigRetryIntervalMs must be a positive safe integer.');
+        }
+        this.#ledgerConfigRetryIntervalMs = ledgerConfigRetryIntervalMs;
         this.#store = new Corestore(this.#config.storesFullPath);
     }
 
@@ -62,6 +110,43 @@ export class MainSettlementBus extends ReadyResource {
         return this.#network;
     }
 
+    get ledgerConfigContentStore() {
+        return this.#ledgerConfigContentStore;
+    }
+
+    get ledgerConfigSynchronizer() {
+        return this.#ledgerConfigSynchronizer;
+    }
+
+    get ledgerConfigStatus() {
+        return this.#ledgerConfigSynchronizer?.status ?? null;
+    }
+
+    get activeLedgerConfig() {
+        // Diagnostic snapshot only. Consensus code must use
+        // requireActiveLedgerConfig(), which performs a fresh signed reread.
+        return this.#ledgerConfigSynchronizer?.activeConfig ?? null;
+    }
+
+    async requireActiveLedgerConfig() {
+        if (!this.#state) throw new Error('State is not initialized.');
+        return await this.#state.requireLedgerConfigConsensusReady();
+    }
+
+    /**
+     * Returns a read-only, JSON-safe diagnostic view of genesis, the signed
+     * LedgerConfig root chain and locally synchronized Model B content.
+     */
+    async getLedgerConfigDiagnostics() {
+        if (!this.#state) throw new Error('State is not initialized.');
+        return await buildLedgerConfigDiagnostics({
+            state: this.#state,
+            synchronizer: this.#ledgerConfigSynchronizer,
+            contentStore: this.#ledgerConfigContentStore,
+            addressPrefix: this.#config.addressPrefix,
+        });
+    }
+
     get wallet() {
         if (!this.#config.enableWallet) {
             return undefined;
@@ -70,10 +155,48 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async _open() {
-        this.#state = new State(this.#store, this.#wallet, this.#config);
-        this.#network = new Network(this.#state, this.#store, this.#config, this.#wallet);
+        this.#ledgerConfigContentStore = new LedgerConfigContentStore(this.#store);
+        await this.#ledgerConfigContentStore.ready();
+
+        this.#state = new State(
+            this.#store,
+            this.#wallet,
+            this.#config,
+            this.#ledgerConfigAdapters
+        );
+        this.#ledgerConfigWitnessListener = witness => this.#cacheLedgerConfigWitness(witness);
+        this.#state.on(CustomEventType.LEDGER_CONFIG_WITNESS, this.#ledgerConfigWitnessListener);
 
         await this.#state.ready();
+        await this.#drainLedgerConfigWitnessWrites();
+
+        this.#ledgerConfigSynchronizer = new LedgerConfigSynchronizer({
+            descriptorProvider: this.#state,
+            contentStore: this.#ledgerConfigContentStore,
+            adapterRegistry: this.#state.ledgerConfigAdapterRegistry,
+            snapshotSources: this.#ledgerConfigSnapshotSources,
+            snapshotSourceTimeoutMs: this.#ledgerConfigSnapshotSourceTimeoutMs,
+        });
+        this.#state.setLedgerConfigSynchronizer(this.#ledgerConfigSynchronizer);
+
+        this.#ledgerConfigBaseUpdateListener = () => {
+            void this.#scheduleLedgerConfigSynchronization();
+        };
+        this.#ledgerConfigFastForwardListener = () => {
+            void this.#scheduleLedgerConfigSynchronization();
+        };
+        this.#state.base.on('update', this.#ledgerConfigBaseUpdateListener);
+        this.#state.base.on('fast-forward', this.#ledgerConfigFastForwardListener);
+
+        await this.synchronizeLedgerConfig();
+
+        this.#network = new Network(
+            this.#state,
+            this.#store,
+            this.#config,
+            this.#wallet,
+            this.#ledgerConfigSynchronizer
+        );
         await this.#network.ready();
 
         if (this.#wallet) {
@@ -95,14 +218,41 @@ export class MainSettlementBus extends ReadyResource {
 
     async _close() {
         console.log("Closing everything gracefully... This may take a moment.");
+        this.#closing = true;
+        if (this.#ledgerConfigRetryTimer !== null) {
+            clearTimeout(this.#ledgerConfigRetryTimer);
+            this.#ledgerConfigRetryTimer = null;
+        }
 
-        await this.#network.close();
+        if (this.#state && this.#ledgerConfigWitnessListener) {
+            this.#state.off(CustomEventType.LEDGER_CONFIG_WITNESS, this.#ledgerConfigWitnessListener);
+        }
+        if (this.#state?.base && this.#ledgerConfigBaseUpdateListener) {
+            this.#state.base.off('update', this.#ledgerConfigBaseUpdateListener);
+        }
+        if (this.#state?.base && this.#ledgerConfigFastForwardListener) {
+            this.#state.base.off('fast-forward', this.#ledgerConfigFastForwardListener);
+        }
+
+        if (this.#network) await this.#network.close();
 
         await sleep(100);
 
-        await this.#state.close();
+        if (this.#ledgerConfigSynchronizer) {
+            await this.#ledgerConfigSynchronizer.close();
+        }
+        if (this.#ledgerConfigSyncLoop) {
+            await this.#ledgerConfigSyncLoop.catch(() => {});
+        }
+        await this.#drainLedgerConfigWitnessWrites();
+
+        if (this.#state) await this.#state.close();
 
         await sleep(100);
+
+        if (this.#ledgerConfigContentStore) {
+            await this.#ledgerConfigContentStore.close();
+        }
 
         if (this.#store !== null) {
             await this.#store.close();
@@ -113,6 +263,90 @@ export class MainSettlementBus extends ReadyResource {
 
     async destroy() {
         return await this.close();
+    }
+
+    async #cacheLedgerConfigWitness(witness) {
+        if (this.#closing || !this.#ledgerConfigContentStore) return;
+
+        let write;
+        write = this.#ledgerConfigContentStore.putCandidate(witness)
+            .then(() => this.#scheduleLedgerConfigSynchronization())
+            .catch(error => {
+                console.error(`Ledger config witness cache rejected: ${error.message}`);
+            })
+            .finally(() => this.#ledgerConfigWitnessWrites.delete(write));
+        this.#ledgerConfigWitnessWrites.add(write);
+        return await write;
+    }
+
+    async #drainLedgerConfigWitnessWrites() {
+        while (this.#ledgerConfigWitnessWrites.size > 0) {
+            await Promise.allSettled([...this.#ledgerConfigWitnessWrites]);
+        }
+    }
+
+    #scheduleLedgerConfigSynchronization() {
+        if (this.#closing || !this.#ledgerConfigSynchronizer) return Promise.resolve(null);
+        if (this.#ledgerConfigRetryTimer !== null) {
+            clearTimeout(this.#ledgerConfigRetryTimer);
+            this.#ledgerConfigRetryTimer = null;
+        }
+        this.#ledgerConfigSyncRequested = true;
+        if (this.#ledgerConfigSyncLoop) return this.#ledgerConfigSyncLoop;
+
+        const loop = (async () => {
+            let result = null;
+            while (this.#ledgerConfigSyncRequested && !this.#closing) {
+                this.#ledgerConfigSyncRequested = false;
+                try {
+                    result = await this.#ledgerConfigSynchronizer.synchronize();
+                } catch (error) {
+                    if (!this.#closing) {
+                        console.error(`Ledger config synchronization failed: ${error.message}`);
+                    }
+                }
+            }
+            if (result === null) await this.#armLedgerConfigRetry();
+            return result;
+        })().finally(() => {
+            if (this.#ledgerConfigSyncLoop === loop) this.#ledgerConfigSyncLoop = null;
+            if (this.#ledgerConfigSyncRequested && !this.#closing) {
+                void this.#scheduleLedgerConfigSynchronization();
+            }
+        });
+        this.#ledgerConfigSyncLoop = loop;
+        return loop;
+    }
+
+    async #armLedgerConfigRetry() {
+        if (this.#closing || this.#ledgerConfigRetryTimer !== null) return;
+        const retryableStatuses = new Set([
+            NOT_READY,
+            SYNCING_LEDGER,
+            CONFIG_UNAVAILABLE,
+            CONFIG_VERIFYING,
+        ]);
+        if (!retryableStatuses.has(this.#ledgerConfigSynchronizer.status)) return;
+
+        let ledgerConfigExpected;
+        try {
+            ledgerConfigExpected = await this.#state.getSignedLedgerConfig() !== null;
+        } catch {
+            // Corrupt/unavailable signed metadata must remain fail-closed and
+            // should be retried after replication or local repair.
+            ledgerConfigExpected = true;
+        }
+        if (!ledgerConfigExpected || this.#closing) return;
+
+        this.#ledgerConfigRetryTimer = setTimeout(() => {
+            this.#ledgerConfigRetryTimer = null;
+            void this.#scheduleLedgerConfigSynchronization();
+        }, this.#ledgerConfigRetryIntervalMs);
+    }
+
+    async synchronizeLedgerConfig() {
+        await this.#drainLedgerConfigWitnessWrites();
+        return await this.#scheduleLedgerConfigSynchronization();
     }
 
     async broadcastPartialTransaction(partialTransactionPayload) {
@@ -196,24 +430,39 @@ export class MainSettlementBus extends ReadyResource {
         const payload = await this.#state.getSigned(txHash);
         if (!payload) return null
 
-        const decoded = safeDecodeApplyOperation(payload);
-        if (!decoded) {
-            throw new Error(`Failed to decode payload for transaction hash: ${txHash}`);
-        }
-
-        return { payload, decoded }
+        return await this.#decodeStoredTransaction(txHash, payload);
     }
 
     async getUnconfirmedTxInfo(txHash) {
         const payload = await this.#state.get(txHash);
         if (!payload) return null
 
+        return await this.#decodeStoredTransaction(txHash, payload);
+    }
+
+    async #decodeStoredTransaction(txHash, payload) {
+        const receipt = safeDecodeLedgerConfigTransactionReceipt(payload);
+        if (receipt !== null) {
+            if (!isHexString(txHash) || txHash.length !== 64) {
+                throw new Error(`Invalid transaction hash for ledger config receipt: ${txHash}`);
+            }
+            const validated = await validateLedgerConfigTransactionReceipt(receipt, {
+                expectedTxHash: b4a.from(txHash, 'hex'),
+                expectedAddressLength: this.#config.addressLength,
+            });
+            return {
+                payload,
+                decoded: ledgerConfigTransactionReceiptToDetails(validated),
+                recordType: 'ledger-config-receipt',
+            };
+        }
+
         const decoded = safeDecodeApplyOperation(payload);
         if (!decoded) {
             throw new Error(`Failed to decode payload for transaction hash: ${txHash}`);
         }
 
-        return { payload, decoded }
+        return { payload, decoded, recordType: 'apply-operation' }
     }
 
     handleGetFee() {
@@ -291,10 +540,11 @@ export class MainSettlementBus extends ReadyResource {
             console.log("- /add_indexer <address>: Change a role of the selected writer node to indexer role. Charges a fee.");
             console.log("- /remove_indexer <address>: Change a role of the selected indexer node to default role. Charges a fee.");
             console.log("- /ban_writer <address>: Demote a whitelisted writer to default role and remove it from the whitelist. Charges a fee.");
-            console.log("- /init_genesis: Initialize genesis epoch.");
-            console.log("- /set_vdf_params: Update VDF difficulty.");
+            console.log("- /set_ledger_config: Publish a complete Proof-of-Time LedgerConfig snapshot.");
+            console.log("- /init_genesis: Initialize genesis epoch bound to the current signed LedgerConfig.");
         }
         console.log("Available commands:");
+        console.log("- /ledger_config: Display genesis, signed LedgerConfig root history, local cache, snapshot and Merkle tree.");
         console.log("- /add_writer: Add yourself as a validator to this MSB once whitelisted. Requires a fee + 10x the fee as a stake in $TNK.");
         console.log("- /remove_writer: Remove yourself from this MSB. Requires a fee, and the stake will be refunded.");
         console.log("- /node_status <address>: Get network information about a node with the given address.");
@@ -1062,7 +1312,7 @@ export class MainSettlementBus extends ReadyResource {
         await this.#state.append(encodedPayload);
     }
 
-    async handleEpochGenesisInitialization(params) {
+    async handleEpochGenesisInitialization() {
         if (!this.#config.enableWallet) {
             throw new Error("Can not initialize genesis epoch - wallet is not enabled.");
         }
@@ -1081,72 +1331,117 @@ export class MainSettlementBus extends ReadyResource {
             throw new Error("Can not initialize genesis epoch - you are not the admin.");
         }
 
-        const existingVDFParams = await this.#state.getSignedVDFParams();
-        if (existingVDFParams) {
-            throw new Error("Can not initialize genesis epoch - VDF parameters already exist.");
+        const activeConfig = await this.#state.requireLedgerConfigConsensusReady();
+        if (!activeConfig?.descriptor) {
+            throw new Error(
+                "Can not initialize genesis epoch - a signed, synchronized LedgerConfig is required."
+            );
+        }
+        if (activeConfig.descriptor.schemaId !== PROOF_OF_TIME_SCHEMA_ID) {
+            throw new Error(
+                `Can not initialize genesis epoch - unsupported LedgerConfig schema: ${activeConfig.descriptor.schemaId}.`
+            );
         }
 
-        const { vdfDifficulty, vdfDiscriminantSize } = params;
-        const difficultyNumber = Number(vdfDifficulty);
-        const discriminantNumber = Number(vdfDiscriminantSize);
-
-        if (!Number.isInteger(difficultyNumber) || difficultyNumber <= 0) {
-            throw new Error("VDF difficulty must be a positive unsigned 32-bit integer.");
+        const currentEpoch = await this.#state.getCurrentEpoch();
+        if (currentEpoch !== null) {
+            throw new Error("Can not initialize genesis epoch - genesis epoch already exists.");
         }
-        if (!Number.isInteger(discriminantNumber) || discriminantNumber <= 0) {
-            throw new Error("VDF discriminant size must be a positive unsigned 16-bit integer.");
-        }
-
-        const vdfDifficultyBuffer = uint32ToBuffer(difficultyNumber);
-        const vdfDiscriminantSizeBuffer = uint16ToBuffer(discriminantNumber);
 
         const txValidity = await this.#state.getIndexerSequenceState();
         const payload = await applyStateMessageFactory(this.#wallet, this.#config)
             .buildCompleteSetGenesisEpochMessage(
                 this.#wallet.address,
                 txValidity,
-                vdfDifficultyBuffer,
-                vdfDiscriminantSizeBuffer,
+                activeConfig.descriptor.configId,
             )
         const encodedPayload = encodeApplyOperation(payload);
         await this.#state.append(encodedPayload);
     }
 
-    async handleSetVdfParams(params) {
+    /**
+     * Publishes a complete Model B witness. State.apply validates the witness
+     * but persists only the immutable root descriptor and current pointer.
+     */
+    async handleSetLedgerConfig(snapshot) {
         if (!this.#config.enableWallet) {
-            throw new Error("Can not set VDF params - wallet is not enabled.");
+            throw new Error('Can not set ledger config - wallet is not enabled.');
         }
 
         const adminEntry = await this.#state.getAdminEntry();
-
         if (!adminEntry) {
-            throw new Error("Can not set VDF params - admin has not been initialized.");
+            throw new Error('Can not set ledger config - admin has not been initialized.');
         }
         if (!this.#wallet) {
-            throw new Error("Can not set VDF params - wallet is not initialized.");
+            throw new Error('Can not set ledger config - wallet is not initialized.');
         }
         if (!this.isAdmin(adminEntry)) {
-            throw new Error("Can not set VDF params - you are not the admin.");
+            throw new Error('Can not set ledger config - you are not the admin.');
+        }
+        if (!this.#ledgerConfigContentStore || !this.#ledgerConfigSynchronizer) {
+            throw new Error('Can not set ledger config - Model B runtime is not initialized.');
         }
 
-        await this.#state.requireSignedVDFParams();
+        const canonicalSnapshot = canonicalizeSnapshot(snapshot);
+        const adapter = this.#state.ledgerConfigAdapterRegistry.require(canonicalSnapshot.schemaId);
+        await adapter.validate(canonicalSnapshot);
 
-        const difficultyNumber = Number(params.vdfDifficulty);
-        if (!Number.isInteger(difficultyNumber) || difficultyNumber <= 0) {
-            throw new Error("VDF difficulty must be a positive unsigned 32-bit integer.");
-        }
+        const current = await this.#state.getSignedLedgerConfig();
+        const previousCommitId = current?.descriptor.commitId ?? createZeroCommitId();
 
-        const vdfDifficultyBuffer = uint32ToBuffer(difficultyNumber);
+        // Pre-publish to the local content-addressed store. This entry is only
+        // a candidate; the synchronizer marks it ready after a signed reread.
+        await this.#ledgerConfigContentStore.putSnapshot(canonicalSnapshot);
 
         const txValidity = await this.#state.getIndexerSequenceState();
         const payload = await applyStateMessageFactory(this.#wallet, this.#config)
-            .buildCompleteSetVdfParamsMessage(
+            .buildCompleteSetLedgerConfigMessage(
                 this.#wallet.address,
                 txValidity,
-                vdfDifficultyBuffer,
+                previousCommitId,
+                canonicalSnapshot,
             );
         const encodedPayload = encodeApplyOperation(payload);
         await this.#state.append(encodedPayload);
+        void this.#scheduleLedgerConfigSynchronization();
+
+        return b4a.toString(payload.lco.tx, 'hex');
+    }
+
+    /**
+     * Convenience entry point for the built-in Proof-of-Time adapter. The
+     * shared State contract remains schema-neutral and receives one complete
+     * snapshot through handleSetLedgerConfig().
+     */
+    async handleSetProofOfTimeLedgerConfig(params) {
+        const difficultyNumber = Number(params?.vdfDifficulty);
+        const discriminantNumber = Number(params?.vdfDiscriminantSize);
+
+        if (!Number.isInteger(difficultyNumber) || difficultyNumber <= 0 || difficultyNumber > 0xFFFFFFFF) {
+            throw new Error("VDF difficulty must be a positive unsigned 32-bit integer.");
+        }
+        if (!Number.isInteger(discriminantNumber) || discriminantNumber <= 0 || discriminantNumber > 0xFFFF) {
+            throw new Error("VDF discriminant size must be a positive unsigned 16-bit integer.");
+        }
+
+        return await this.handleSetLedgerConfig({
+            formatVersion: LEDGER_CONFIG_FORMAT_VERSION,
+            commitmentScheme: LEDGER_CONFIG_COMMITMENT_SCHEME,
+            schemaId: PROOF_OF_TIME_SCHEMA_ID,
+            entries: [
+                {
+                    key: b4a.from(PROOF_OF_TIME_CONFIG_KEYS.VDF_DIFFICULTY, 'utf8'),
+                    value: uint32ToBuffer(difficultyNumber),
+                },
+                {
+                    key: b4a.from(
+                        PROOF_OF_TIME_CONFIG_KEYS.VDF_DISCRIMINANT_SIZE_BITS,
+                        'utf8'
+                    ),
+                    value: uint16ToBuffer(discriminantNumber),
+                },
+            ],
+        });
     }
 }
 

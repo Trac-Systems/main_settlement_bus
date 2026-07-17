@@ -28,7 +28,7 @@ const PROOF_DATA_FIELD_RULES = Object.freeze([
     {name: 'epoch', length: EPOCH_BYTE_LENGTH},
     {name: 'previous_epoch_record_hash', length: HASH_BYTE_LENGTH},
     {name: 'proposer', length: config.addressLength},
-    {name: 'vdf_parameters_hash', length: HASH_BYTE_LENGTH},
+    {name: 'config_id', length: HASH_BYTE_LENGTH},
     {name: 'vdf_proof', length: VDF_BLOB_PROOF_SIZE},
     {name: 'signature', length: SIGNATURE_BYTE_LENGTH}
 ]);

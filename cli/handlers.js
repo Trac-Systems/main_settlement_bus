@@ -208,11 +208,18 @@ export class Handlers {
         return txDetails;
     }
 
-    async handleEpochGenesisInitialization(params) {
-        return this.#msb.handleEpochGenesisInitialization(params);
+    async handleLedgerConfigDiagnostics() {
+        const diagnostics = await this.#msb.getLedgerConfigDiagnostics();
+        console.log("LedgerConfig / Genesis diagnostics:");
+        console.log(JSON.stringify(diagnostics, null, 2));
+        return diagnostics;
     }
 
-    async handleSetVdfParams(params) {
-        return this.#msb.handleSetVdfParams(params);
+    async handleEpochGenesisInitialization() {
+        return this.#msb.handleEpochGenesisInitialization();
+    }
+
+    async handleSetProofOfTimeLedgerConfig(params) {
+        return this.#msb.handleSetProofOfTimeLedgerConfig(params);
     }
 }

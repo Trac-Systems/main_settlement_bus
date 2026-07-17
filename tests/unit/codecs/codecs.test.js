@@ -5,6 +5,8 @@ import { default as test } from 'brittle';
 async function runTests() {
     test.pause();
     await import('./applyOperationCodec.test.js');
+    await import('./ledgerConfigTransactionReceipt.test.js');
+    await import('./ledgerConfigOperationPreflight.test.js');
     await import('./networkV1OperationCodec.test.js');
     await import('./consensusV1OperationCodec.test.js');
     test.resume();

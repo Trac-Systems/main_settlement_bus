@@ -17,13 +17,29 @@ import {config} from '../../helpers/config.js';
 import {testKeyPair1, testKeyPair2, testKeyPair3} from '../../fixtures/apply.fixtures.js';
 import {errorMessageIncludes} from '../../helpers/regexHelper.js';
 import {createMessage, uint32ToBuffer} from '../../../src/utils/buffer.js';
+import {PROOF_OF_TIME_SCHEMA_ID} from '../../../src/core/ledger-config/index.js';
 
 const previousEpochRecordHash = b4a.alloc(32, 1);
-const vdfParametersHash = b4a.alloc(32, 2);
+const configId = b4a.alloc(32, 2);
 const vdfProof = b4a.alloc(VDF_BLOB_PROOF_SIZE, 3);
-const state = {
-    isIndexerAddress: async () => true
-};
+const activeConfig = Object.freeze({
+    descriptor: Object.freeze({
+        schemaId: PROOF_OF_TIME_SCHEMA_ID,
+        configId
+    }),
+    adapterConfig: Object.freeze({
+        vdfDifficulty: 1,
+        vdfDiscriminantSize: 2048
+    })
+});
+const createState = ({isIndexer = true, indexerError = null} = {}) => ({
+    requireLedgerConfigConsensusReady: async () => activeConfig,
+    isIndexerAddress: async () => {
+        if (indexerError) throw indexerError;
+        return isIndexer;
+    }
+});
+const state = createState();
 
 async function createWallet(keyPair) {
     return await new WalletProvider(config).fromSecretKey(keyPair.secretKey);
@@ -41,7 +57,7 @@ async function buildProofProposalPayload(proposerWallet) {
         .setEpoch(1)
         .setPreviousEpochRecordHash(previousEpochRecordHash)
         .setProposer(proposerWallet.address)
-        .setVdfParametersHash(vdfParametersHash)
+        .setConfigId(configId)
         .setVdfProof(vdfProof)
         .buildPayload();
 
@@ -61,7 +77,7 @@ async function buildProofProposalApprovalPayload(approverWallet, proofProposalPa
         .setEpoch(Number(proofProposal.epoch.readBigUInt64BE(0)))
         .setPreviousEpochRecordHash(proofProposal.previous_epoch_record_hash)
         .setProposer(bufferToAddress(proofProposal.proposer, config.addressPrefix))
-        .setVdfParametersHash(proofProposal.vdf_parameters_hash)
+        .setConfigId(proofProposal.config_id)
         .setVdfProof(proofProposal.vdf_proof)
         .setRequesterProofSignature(proofProposal.signature)
         .setResultCode(ConsensusResultCode.OK)
@@ -104,9 +120,7 @@ test('V1EpochProofProposalApproval validates approval signature against original
 test('V1EpochProofProposalApproval rejects approver that is not an indexer', async t => {
     const proposerWallet = await createWallet(testKeyPair1);
     const approverWallet = await createWallet(testKeyPair2);
-    const validator = new V1EpochProofProposalApproval(config, {
-        isIndexerAddress: async () => false
-    });
+    const validator = new V1EpochProofProposalApproval(config, createState({isIndexer: false}));
     const proofProposalPayload = await buildProofProposalPayload(proposerWallet);
     const approvalPayload = await buildProofProposalApprovalPayload(approverWallet, proofProposalPayload);
 
@@ -258,15 +272,32 @@ test('V1EpochProofProposalApproval rejects fake response signature', async t => 
     );
 });
 
+test('V1EpochProofProposalApproval rejects a proposal for a stale ledger config', async t => {
+    const proposerWallet = await createWallet(testKeyPair1);
+    const approverWallet = await createWallet(testKeyPair2);
+    const validator = new V1EpochProofProposalApproval(config, state);
+    const proofProposalPayload = await buildProofProposalPayload(proposerWallet);
+    const approvalPayload = await buildProofProposalApprovalPayload(approverWallet, proofProposalPayload);
+    const staleProofProposal = {
+        ...proofProposalPayload.proof_proposal,
+        config_id: b4a.alloc(32, 9)
+    };
+
+    await t.exception(
+        async () => validator.validate(
+            approvalPayload,
+            {remotePublicKey: approverWallet.publicKey},
+            staleProofProposal
+        ),
+        errorMessageIncludes('no longer matches the active ledger config')
+    );
+});
+
 test('V1EpochProofProposalApproval wraps state failures as protocol errors', async t => {
     const proposerWallet = await createWallet(testKeyPair1);
     const approverWallet = await createWallet(testKeyPair2);
     const stateError = new Error('Indexer state is unavailable.');
-    const validator = new V1EpochProofProposalApproval(config, {
-        isIndexerAddress: async () => {
-            throw stateError;
-        }
-    });
+    const validator = new V1EpochProofProposalApproval(config, createState({indexerError: stateError}));
     const proofProposalPayload = await buildProofProposalPayload(proposerWallet);
     const approvalPayload = await buildProofProposalApprovalPayload(approverWallet, proofProposalPayload);
 
