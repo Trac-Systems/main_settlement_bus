@@ -400,7 +400,7 @@ test('handleApproval validates OK responses, emits success, and returns approval
         }
     });
 
-    const result = await handler.handleApproval(message, connection, proofProposal);
+    const result = await handler.handleApproval(message, connection, connection.protocolSession.indexers, proofProposal);
 
     t.is(validatorPayload, message);
     t.is(validatorConnection, connection);

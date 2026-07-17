@@ -57,7 +57,7 @@ class ConsensusEpochProofProposalOperationHandler extends ConnectionOperationHan
                 message?.session_id,
                 connection,
                 protocolSession,
-                message.proof_proposal,
+                message,
                 resultCode
             );
         }
@@ -171,7 +171,7 @@ class ConsensusEpochProofProposalOperationHandler extends ConnectionOperationHan
         messageId,
         connection,
         protocolSession,
-        proofProposal,
+        message,
         resultCode
     ) {
         try {
@@ -183,7 +183,7 @@ class ConsensusEpochProofProposalOperationHandler extends ConnectionOperationHan
             const response = resultCode === ConsensusResultCode.OK
                 ? await this.#buildProofProposalApproval(
                     messageId,
-                    proofProposal,
+                    message.proof_proposal,
                     resultCode,
                 )
                 : await this.#buildProofProposalRejection(
@@ -195,7 +195,6 @@ class ConsensusEpochProofProposalOperationHandler extends ConnectionOperationHan
                 protocolSession,
                 connection,
                 response,
-                false
             );
 
         } catch (error) {
