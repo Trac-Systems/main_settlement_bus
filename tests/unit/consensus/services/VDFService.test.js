@@ -148,7 +148,7 @@ if (isBare) {
         };
     }
 
-    test('VDFBare._open creates a Thread with correct worker path and channel handle', async t => {
+    test('VDFBare._open creates a Thread with a file:// worker URL and channel handle', async t => {
         const portMock = makePortMock();
         const threadMock = makeThreadMock();
         const teardown = setupBare(portMock, threadMock);
@@ -160,8 +160,8 @@ if (isBare) {
         t.teardown(() => service.close());
 
         t.ok(ThreadStub.calledOnce);
-        t.ok(ThreadStub.firstCall.args[0] instanceof URL);
-        t.ok(ThreadStub.firstCall.args[0].href.endsWith('vdf-worker.js'));
+        t.ok(ThreadStub.firstCall.args[0].startsWith('file://'));
+        t.ok(ThreadStub.firstCall.args[0].endsWith('vdf-worker.js'));
         t.is(typeof ThreadStub.firstCall.args[1].data, 'object');
     });
 

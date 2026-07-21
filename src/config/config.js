@@ -222,6 +222,14 @@ export class Config {
         return this.#config.epochThreshold
     }
 
+    get epochSignatureTimeout() {
+        return this.#config.epochSignatureTimeout
+    }
+
+    get epochAppendTimeout() {
+        return this.#config.epochAppendTimeout
+    }
+
     get maxPendingRequestsInPendingRequestsService() {
         return this.#config.maxPendingRequestsInPendingRequestsService
     }
