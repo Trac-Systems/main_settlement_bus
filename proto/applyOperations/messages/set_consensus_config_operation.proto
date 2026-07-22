@@ -2,10 +2,15 @@ syntax = "proto3";
 
 package apply.operations;
 
-message SetVdfParamsOperation {
+message SetConsensusConfigOperation {
     bytes tx     = 1; // Transaction hash (unique identifier for the transaction)
     bytes txv    = 2; // Transaction expiration
-    bytes df     = 3; // VDF difficulty factor
+    consensusConfig cc     = 3; // consensus configuration
     bytes in     = 4; // Nonce of the invoker (admin)
     bytes is     = 5; // Signature of the invoker (admin)
+}
+
+message consensusConfig {
+  bytes version    = 1; // uint8
+  bytes configData = 2;
 }

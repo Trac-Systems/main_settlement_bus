@@ -48,7 +48,7 @@ $root.apply = (function() {
              * @property {apply.operations.ITxOperation|null} [txo] Operation txo
              * @property {apply.operations.ISetEpochOperation|null} [seo] Operation seo
              * @property {apply.operations.ISetGenesisEpochOperation|null} [sgo] Operation sgo
-             * @property {apply.operations.ISetVdfParamsOperation|null} [vpo] Operation vpo
+             * @property {apply.operations.ISetConsensusConfigOperation|null} [cco] Operation cco
              */
 
             /**
@@ -155,24 +155,24 @@ $root.apply = (function() {
             Operation.prototype.sgo = null;
 
             /**
-             * Operation vpo.
-             * @member {apply.operations.ISetVdfParamsOperation|null|undefined} vpo
+             * Operation cco.
+             * @member {apply.operations.ISetConsensusConfigOperation|null|undefined} cco
              * @memberof apply.operations.Operation
              * @instance
              */
-            Operation.prototype.vpo = null;
+            Operation.prototype.cco = null;
 
             // OneOf field names bound to virtual getters and setters
             var $oneOfFields;
 
             /**
              * Operation value.
-             * @member {"cao"|"aco"|"bio"|"tro"|"rao"|"bdo"|"txo"|"seo"|"sgo"|"vpo"|undefined} value
+             * @member {"cao"|"aco"|"bio"|"tro"|"rao"|"bdo"|"txo"|"seo"|"sgo"|"cco"|undefined} value
              * @memberof apply.operations.Operation
              * @instance
              */
             Object.defineProperty(Operation.prototype, "value", {
-                get: $util.oneOfGetter($oneOfFields = ["cao", "aco", "bio", "tro", "rao", "bdo", "txo", "seo", "sgo", "vpo"]),
+                get: $util.oneOfGetter($oneOfFields = ["cao", "aco", "bio", "tro", "rao", "bdo", "txo", "seo", "sgo", "cco"]),
                 set: $util.oneOfSetter($oneOfFields)
             });
 
@@ -222,8 +222,8 @@ $root.apply = (function() {
                     $root.apply.operations.SetEpochOperation.encode(message.seo, writer.uint32(/* id 10, wireType 2 =*/82).fork()).ldelim();
                 if (message.sgo != null && Object.hasOwnProperty.call(message, "sgo"))
                     $root.apply.operations.SetGenesisEpochOperation.encode(message.sgo, writer.uint32(/* id 11, wireType 2 =*/90).fork()).ldelim();
-                if (message.vpo != null && Object.hasOwnProperty.call(message, "vpo"))
-                    $root.apply.operations.SetVdfParamsOperation.encode(message.vpo, writer.uint32(/* id 12, wireType 2 =*/98).fork()).ldelim();
+                if (message.cco != null && Object.hasOwnProperty.call(message, "cco"))
+                    $root.apply.operations.SetConsensusConfigOperation.encode(message.cco, writer.uint32(/* id 12, wireType 2 =*/98).fork()).ldelim();
                 return writer;
             };
 
@@ -305,7 +305,7 @@ $root.apply = (function() {
                             break;
                         }
                     case 12: {
-                            message.vpo = $root.apply.operations.SetVdfParamsOperation.decode(reader, reader.uint32());
+                            message.cco = $root.apply.operations.SetConsensusConfigOperation.decode(reader, reader.uint32());
                             break;
                         }
                     default:
@@ -458,14 +458,14 @@ $root.apply = (function() {
                             return "sgo." + error;
                     }
                 }
-                if (message.vpo != null && message.hasOwnProperty("vpo")) {
+                if (message.cco != null && message.hasOwnProperty("cco")) {
                     if (properties.value === 1)
                         return "value: multiple values";
                     properties.value = 1;
                     {
-                        var error = $root.apply.operations.SetVdfParamsOperation.verify(message.vpo);
+                        var error = $root.apply.operations.SetConsensusConfigOperation.verify(message.cco);
                         if (error)
-                            return "vpo." + error;
+                            return "cco." + error;
                     }
                 }
                 return null;
@@ -609,10 +609,10 @@ $root.apply = (function() {
                         throw TypeError(".apply.operations.Operation.sgo: object expected");
                     message.sgo = $root.apply.operations.SetGenesisEpochOperation.fromObject(object.sgo);
                 }
-                if (object.vpo != null) {
-                    if (typeof object.vpo !== "object")
-                        throw TypeError(".apply.operations.Operation.vpo: object expected");
-                    message.vpo = $root.apply.operations.SetVdfParamsOperation.fromObject(object.vpo);
+                if (object.cco != null) {
+                    if (typeof object.cco !== "object")
+                        throw TypeError(".apply.operations.Operation.cco: object expected");
+                    message.cco = $root.apply.operations.SetConsensusConfigOperation.fromObject(object.cco);
                 }
                 return message;
             };
@@ -689,10 +689,10 @@ $root.apply = (function() {
                     if (options.oneofs)
                         object.value = "sgo";
                 }
-                if (message.vpo != null && message.hasOwnProperty("vpo")) {
-                    object.vpo = $root.apply.operations.SetVdfParamsOperation.toObject(message.vpo, options);
+                if (message.cco != null && message.hasOwnProperty("cco")) {
+                    object.cco = $root.apply.operations.SetConsensusConfigOperation.toObject(message.cco, options);
                     if (options.oneofs)
-                        object.value = "vpo";
+                        object.value = "cco";
                 }
                 return object;
             };
@@ -4379,28 +4379,28 @@ $root.apply = (function() {
             return SetGenesisEpochOperation;
         })();
 
-        operations.SetVdfParamsOperation = (function() {
+        operations.SetConsensusConfigOperation = (function() {
 
             /**
-             * Properties of a SetVdfParamsOperation.
+             * Properties of a SetConsensusConfigOperation.
              * @memberof apply.operations
-             * @interface ISetVdfParamsOperation
-             * @property {Uint8Array|null} [tx] SetVdfParamsOperation tx
-             * @property {Uint8Array|null} [txv] SetVdfParamsOperation txv
-             * @property {Uint8Array|null} [df] SetVdfParamsOperation df
-             * @property {Uint8Array|null} ["in"] SetVdfParamsOperation in
-             * @property {Uint8Array|null} [is] SetVdfParamsOperation is
+             * @interface ISetConsensusConfigOperation
+             * @property {Uint8Array|null} [tx] SetConsensusConfigOperation tx
+             * @property {Uint8Array|null} [txv] SetConsensusConfigOperation txv
+             * @property {apply.operations.IconsensusConfig|null} [cc] SetConsensusConfigOperation cc
+             * @property {Uint8Array|null} ["in"] SetConsensusConfigOperation in
+             * @property {Uint8Array|null} [is] SetConsensusConfigOperation is
              */
 
             /**
-             * Constructs a new SetVdfParamsOperation.
+             * Constructs a new SetConsensusConfigOperation.
              * @memberof apply.operations
-             * @classdesc Represents a SetVdfParamsOperation.
-             * @implements ISetVdfParamsOperation
+             * @classdesc Represents a SetConsensusConfigOperation.
+             * @implements ISetConsensusConfigOperation
              * @constructor
-             * @param {apply.operations.ISetVdfParamsOperation=} [properties] Properties to set
+             * @param {apply.operations.ISetConsensusConfigOperation=} [properties] Properties to set
              */
-            function SetVdfParamsOperation(properties) {
+            function SetConsensusConfigOperation(properties) {
                 if (properties)
                     for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
                         if (properties[keys[i]] != null)
@@ -4408,75 +4408,75 @@ $root.apply = (function() {
             }
 
             /**
-             * SetVdfParamsOperation tx.
+             * SetConsensusConfigOperation tx.
              * @member {Uint8Array} tx
-             * @memberof apply.operations.SetVdfParamsOperation
+             * @memberof apply.operations.SetConsensusConfigOperation
              * @instance
              */
-            SetVdfParamsOperation.prototype.tx = $util.newBuffer([]);
+            SetConsensusConfigOperation.prototype.tx = $util.newBuffer([]);
 
             /**
-             * SetVdfParamsOperation txv.
+             * SetConsensusConfigOperation txv.
              * @member {Uint8Array} txv
-             * @memberof apply.operations.SetVdfParamsOperation
+             * @memberof apply.operations.SetConsensusConfigOperation
              * @instance
              */
-            SetVdfParamsOperation.prototype.txv = $util.newBuffer([]);
+            SetConsensusConfigOperation.prototype.txv = $util.newBuffer([]);
 
             /**
-             * SetVdfParamsOperation df.
-             * @member {Uint8Array} df
-             * @memberof apply.operations.SetVdfParamsOperation
+             * SetConsensusConfigOperation cc.
+             * @member {apply.operations.IconsensusConfig|null|undefined} cc
+             * @memberof apply.operations.SetConsensusConfigOperation
              * @instance
              */
-            SetVdfParamsOperation.prototype.df = $util.newBuffer([]);
+            SetConsensusConfigOperation.prototype.cc = null;
 
             /**
-             * SetVdfParamsOperation in.
+             * SetConsensusConfigOperation in.
              * @member {Uint8Array} in
-             * @memberof apply.operations.SetVdfParamsOperation
+             * @memberof apply.operations.SetConsensusConfigOperation
              * @instance
              */
-            SetVdfParamsOperation.prototype["in"] = $util.newBuffer([]);
+            SetConsensusConfigOperation.prototype["in"] = $util.newBuffer([]);
 
             /**
-             * SetVdfParamsOperation is.
+             * SetConsensusConfigOperation is.
              * @member {Uint8Array} is
-             * @memberof apply.operations.SetVdfParamsOperation
+             * @memberof apply.operations.SetConsensusConfigOperation
              * @instance
              */
-            SetVdfParamsOperation.prototype.is = $util.newBuffer([]);
+            SetConsensusConfigOperation.prototype.is = $util.newBuffer([]);
 
             /**
-             * Creates a new SetVdfParamsOperation instance using the specified properties.
+             * Creates a new SetConsensusConfigOperation instance using the specified properties.
              * @function create
-             * @memberof apply.operations.SetVdfParamsOperation
+             * @memberof apply.operations.SetConsensusConfigOperation
              * @static
-             * @param {apply.operations.ISetVdfParamsOperation=} [properties] Properties to set
-             * @returns {apply.operations.SetVdfParamsOperation} SetVdfParamsOperation instance
+             * @param {apply.operations.ISetConsensusConfigOperation=} [properties] Properties to set
+             * @returns {apply.operations.SetConsensusConfigOperation} SetConsensusConfigOperation instance
              */
-            SetVdfParamsOperation.create = function create(properties) {
-                return new SetVdfParamsOperation(properties);
+            SetConsensusConfigOperation.create = function create(properties) {
+                return new SetConsensusConfigOperation(properties);
             };
 
             /**
-             * Encodes the specified SetVdfParamsOperation message. Does not implicitly {@link apply.operations.SetVdfParamsOperation.verify|verify} messages.
+             * Encodes the specified SetConsensusConfigOperation message. Does not implicitly {@link apply.operations.SetConsensusConfigOperation.verify|verify} messages.
              * @function encode
-             * @memberof apply.operations.SetVdfParamsOperation
+             * @memberof apply.operations.SetConsensusConfigOperation
              * @static
-             * @param {apply.operations.ISetVdfParamsOperation} message SetVdfParamsOperation message or plain object to encode
+             * @param {apply.operations.ISetConsensusConfigOperation} message SetConsensusConfigOperation message or plain object to encode
              * @param {$protobuf.Writer} [writer] Writer to encode to
              * @returns {$protobuf.Writer} Writer
              */
-            SetVdfParamsOperation.encode = function encode(message, writer) {
+            SetConsensusConfigOperation.encode = function encode(message, writer) {
                 if (!writer)
                     writer = $Writer.create();
                 if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
                     writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.tx);
                 if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
                     writer.uint32(/* id 2, wireType 2 =*/18).bytes(message.txv);
-                if (message.df != null && Object.hasOwnProperty.call(message, "df"))
-                    writer.uint32(/* id 3, wireType 2 =*/26).bytes(message.df);
+                if (message.cc != null && Object.hasOwnProperty.call(message, "cc"))
+                    $root.apply.operations.consensusConfig.encode(message.cc, writer.uint32(/* id 3, wireType 2 =*/26).fork()).ldelim();
                 if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
                     writer.uint32(/* id 4, wireType 2 =*/34).bytes(message["in"]);
                 if (message.is != null && Object.hasOwnProperty.call(message, "is"))
@@ -4485,33 +4485,33 @@ $root.apply = (function() {
             };
 
             /**
-             * Encodes the specified SetVdfParamsOperation message, length delimited. Does not implicitly {@link apply.operations.SetVdfParamsOperation.verify|verify} messages.
+             * Encodes the specified SetConsensusConfigOperation message, length delimited. Does not implicitly {@link apply.operations.SetConsensusConfigOperation.verify|verify} messages.
              * @function encodeDelimited
-             * @memberof apply.operations.SetVdfParamsOperation
+             * @memberof apply.operations.SetConsensusConfigOperation
              * @static
-             * @param {apply.operations.ISetVdfParamsOperation} message SetVdfParamsOperation message or plain object to encode
+             * @param {apply.operations.ISetConsensusConfigOperation} message SetConsensusConfigOperation message or plain object to encode
              * @param {$protobuf.Writer} [writer] Writer to encode to
              * @returns {$protobuf.Writer} Writer
              */
-            SetVdfParamsOperation.encodeDelimited = function encodeDelimited(message, writer) {
+            SetConsensusConfigOperation.encodeDelimited = function encodeDelimited(message, writer) {
                 return this.encode(message, writer).ldelim();
             };
 
             /**
-             * Decodes a SetVdfParamsOperation message from the specified reader or buffer.
+             * Decodes a SetConsensusConfigOperation message from the specified reader or buffer.
              * @function decode
-             * @memberof apply.operations.SetVdfParamsOperation
+             * @memberof apply.operations.SetConsensusConfigOperation
              * @static
              * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
              * @param {number} [length] Message length if known beforehand
-             * @returns {apply.operations.SetVdfParamsOperation} SetVdfParamsOperation
+             * @returns {apply.operations.SetConsensusConfigOperation} SetConsensusConfigOperation
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
-            SetVdfParamsOperation.decode = function decode(reader, length, error) {
+            SetConsensusConfigOperation.decode = function decode(reader, length, error) {
                 if (!(reader instanceof $Reader))
                     reader = $Reader.create(reader);
-                var end = length === undefined ? reader.len : reader.pos + length, message = new $root.apply.operations.SetVdfParamsOperation();
+                var end = length === undefined ? reader.len : reader.pos + length, message = new $root.apply.operations.SetConsensusConfigOperation();
                 while (reader.pos < end) {
                     var tag = reader.uint32();
                     if (tag === error)
@@ -4526,7 +4526,7 @@ $root.apply = (function() {
                             break;
                         }
                     case 3: {
-                            message.df = reader.bytes();
+                            message.cc = $root.apply.operations.consensusConfig.decode(reader, reader.uint32());
                             break;
                         }
                     case 4: {
@@ -4546,30 +4546,30 @@ $root.apply = (function() {
             };
 
             /**
-             * Decodes a SetVdfParamsOperation message from the specified reader or buffer, length delimited.
+             * Decodes a SetConsensusConfigOperation message from the specified reader or buffer, length delimited.
              * @function decodeDelimited
-             * @memberof apply.operations.SetVdfParamsOperation
+             * @memberof apply.operations.SetConsensusConfigOperation
              * @static
              * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
-             * @returns {apply.operations.SetVdfParamsOperation} SetVdfParamsOperation
+             * @returns {apply.operations.SetConsensusConfigOperation} SetConsensusConfigOperation
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
-            SetVdfParamsOperation.decodeDelimited = function decodeDelimited(reader) {
+            SetConsensusConfigOperation.decodeDelimited = function decodeDelimited(reader) {
                 if (!(reader instanceof $Reader))
                     reader = new $Reader(reader);
                 return this.decode(reader, reader.uint32());
             };
 
             /**
-             * Verifies a SetVdfParamsOperation message.
+             * Verifies a SetConsensusConfigOperation message.
              * @function verify
-             * @memberof apply.operations.SetVdfParamsOperation
+             * @memberof apply.operations.SetConsensusConfigOperation
              * @static
              * @param {Object.<string,*>} message Plain object to verify
              * @returns {string|null} `null` if valid, otherwise the reason why it is not
              */
-            SetVdfParamsOperation.verify = function verify(message) {
+            SetConsensusConfigOperation.verify = function verify(message) {
                 if (typeof message !== "object" || message === null)
                     return "object expected";
                 if (message.tx != null && message.hasOwnProperty("tx"))
@@ -4578,9 +4578,11 @@ $root.apply = (function() {
                 if (message.txv != null && message.hasOwnProperty("txv"))
                     if (!(message.txv && typeof message.txv.length === "number" || $util.isString(message.txv)))
                         return "txv: buffer expected";
-                if (message.df != null && message.hasOwnProperty("df"))
-                    if (!(message.df && typeof message.df.length === "number" || $util.isString(message.df)))
-                        return "df: buffer expected";
+                if (message.cc != null && message.hasOwnProperty("cc")) {
+                    var error = $root.apply.operations.consensusConfig.verify(message.cc);
+                    if (error)
+                        return "cc." + error;
+                }
                 if (message["in"] != null && message.hasOwnProperty("in"))
                     if (!(message["in"] && typeof message["in"].length === "number" || $util.isString(message["in"])))
                         return "in: buffer expected";
@@ -4591,17 +4593,17 @@ $root.apply = (function() {
             };
 
             /**
-             * Creates a SetVdfParamsOperation message from a plain object. Also converts values to their respective internal types.
+             * Creates a SetConsensusConfigOperation message from a plain object. Also converts values to their respective internal types.
              * @function fromObject
-             * @memberof apply.operations.SetVdfParamsOperation
+             * @memberof apply.operations.SetConsensusConfigOperation
              * @static
              * @param {Object.<string,*>} object Plain object
-             * @returns {apply.operations.SetVdfParamsOperation} SetVdfParamsOperation
+             * @returns {apply.operations.SetConsensusConfigOperation} SetConsensusConfigOperation
              */
-            SetVdfParamsOperation.fromObject = function fromObject(object) {
-                if (object instanceof $root.apply.operations.SetVdfParamsOperation)
+            SetConsensusConfigOperation.fromObject = function fromObject(object) {
+                if (object instanceof $root.apply.operations.SetConsensusConfigOperation)
                     return object;
-                var message = new $root.apply.operations.SetVdfParamsOperation();
+                var message = new $root.apply.operations.SetConsensusConfigOperation();
                 if (object.tx != null)
                     if (typeof object.tx === "string")
                         $util.base64.decode(object.tx, message.tx = $util.newBuffer($util.base64.length(object.tx)), 0);
@@ -4612,11 +4614,11 @@ $root.apply = (function() {
                         $util.base64.decode(object.txv, message.txv = $util.newBuffer($util.base64.length(object.txv)), 0);
                     else if (object.txv.length >= 0)
                         message.txv = object.txv;
-                if (object.df != null)
-                    if (typeof object.df === "string")
-                        $util.base64.decode(object.df, message.df = $util.newBuffer($util.base64.length(object.df)), 0);
-                    else if (object.df.length >= 0)
-                        message.df = object.df;
+                if (object.cc != null) {
+                    if (typeof object.cc !== "object")
+                        throw TypeError(".apply.operations.SetConsensusConfigOperation.cc: object expected");
+                    message.cc = $root.apply.operations.consensusConfig.fromObject(object.cc);
+                }
                 if (object["in"] != null)
                     if (typeof object["in"] === "string")
                         $util.base64.decode(object["in"], message["in"] = $util.newBuffer($util.base64.length(object["in"])), 0);
@@ -4631,15 +4633,15 @@ $root.apply = (function() {
             };
 
             /**
-             * Creates a plain object from a SetVdfParamsOperation message. Also converts values to other types if specified.
+             * Creates a plain object from a SetConsensusConfigOperation message. Also converts values to other types if specified.
              * @function toObject
-             * @memberof apply.operations.SetVdfParamsOperation
+             * @memberof apply.operations.SetConsensusConfigOperation
              * @static
-             * @param {apply.operations.SetVdfParamsOperation} message SetVdfParamsOperation
+             * @param {apply.operations.SetConsensusConfigOperation} message SetConsensusConfigOperation
              * @param {$protobuf.IConversionOptions} [options] Conversion options
              * @returns {Object.<string,*>} Plain object
              */
-            SetVdfParamsOperation.toObject = function toObject(message, options) {
+            SetConsensusConfigOperation.toObject = function toObject(message, options) {
                 if (!options)
                     options = {};
                 var object = {};
@@ -4658,13 +4660,7 @@ $root.apply = (function() {
                         if (options.bytes !== Array)
                             object.txv = $util.newBuffer(object.txv);
                     }
-                    if (options.bytes === String)
-                        object.df = "";
-                    else {
-                        object.df = [];
-                        if (options.bytes !== Array)
-                            object.df = $util.newBuffer(object.df);
-                    }
+                    object.cc = null;
                     if (options.bytes === String)
                         object["in"] = "";
                     else {
@@ -4684,8 +4680,8 @@ $root.apply = (function() {
                     object.tx = options.bytes === String ? $util.base64.encode(message.tx, 0, message.tx.length) : options.bytes === Array ? Array.prototype.slice.call(message.tx) : message.tx;
                 if (message.txv != null && message.hasOwnProperty("txv"))
                     object.txv = options.bytes === String ? $util.base64.encode(message.txv, 0, message.txv.length) : options.bytes === Array ? Array.prototype.slice.call(message.txv) : message.txv;
-                if (message.df != null && message.hasOwnProperty("df"))
-                    object.df = options.bytes === String ? $util.base64.encode(message.df, 0, message.df.length) : options.bytes === Array ? Array.prototype.slice.call(message.df) : message.df;
+                if (message.cc != null && message.hasOwnProperty("cc"))
+                    object.cc = $root.apply.operations.consensusConfig.toObject(message.cc, options);
                 if (message["in"] != null && message.hasOwnProperty("in"))
                     object["in"] = options.bytes === String ? $util.base64.encode(message["in"], 0, message["in"].length) : options.bytes === Array ? Array.prototype.slice.call(message["in"]) : message["in"];
                 if (message.is != null && message.hasOwnProperty("is"))
@@ -4694,32 +4690,279 @@ $root.apply = (function() {
             };
 
             /**
-             * Converts this SetVdfParamsOperation to JSON.
+             * Converts this SetConsensusConfigOperation to JSON.
              * @function toJSON
-             * @memberof apply.operations.SetVdfParamsOperation
+             * @memberof apply.operations.SetConsensusConfigOperation
              * @instance
              * @returns {Object.<string,*>} JSON object
              */
-            SetVdfParamsOperation.prototype.toJSON = function toJSON() {
+            SetConsensusConfigOperation.prototype.toJSON = function toJSON() {
                 return this.constructor.toObject(this, $protobuf.util.toJSONOptions);
             };
 
             /**
-             * Gets the default type url for SetVdfParamsOperation
+             * Gets the default type url for SetConsensusConfigOperation
              * @function getTypeUrl
-             * @memberof apply.operations.SetVdfParamsOperation
+             * @memberof apply.operations.SetConsensusConfigOperation
              * @static
              * @param {string} [typeUrlPrefix] your custom typeUrlPrefix(default "type.googleapis.com")
              * @returns {string} The default type url
              */
-            SetVdfParamsOperation.getTypeUrl = function getTypeUrl(typeUrlPrefix) {
+            SetConsensusConfigOperation.getTypeUrl = function getTypeUrl(typeUrlPrefix) {
                 if (typeUrlPrefix === undefined) {
                     typeUrlPrefix = "type.googleapis.com";
                 }
-                return typeUrlPrefix + "/apply.operations.SetVdfParamsOperation";
+                return typeUrlPrefix + "/apply.operations.SetConsensusConfigOperation";
             };
 
-            return SetVdfParamsOperation;
+            return SetConsensusConfigOperation;
+        })();
+
+        operations.consensusConfig = (function() {
+
+            /**
+             * Properties of a consensusConfig.
+             * @memberof apply.operations
+             * @interface IconsensusConfig
+             * @property {Uint8Array|null} [version] consensusConfig version
+             * @property {Uint8Array|null} [configData] consensusConfig configData
+             */
+
+            /**
+             * Constructs a new consensusConfig.
+             * @memberof apply.operations
+             * @classdesc Represents a consensusConfig.
+             * @implements IconsensusConfig
+             * @constructor
+             * @param {apply.operations.IconsensusConfig=} [properties] Properties to set
+             */
+            function consensusConfig(properties) {
+                if (properties)
+                    for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
+                        if (properties[keys[i]] != null)
+                            this[keys[i]] = properties[keys[i]];
+            }
+
+            /**
+             * consensusConfig version.
+             * @member {Uint8Array} version
+             * @memberof apply.operations.consensusConfig
+             * @instance
+             */
+            consensusConfig.prototype.version = $util.newBuffer([]);
+
+            /**
+             * consensusConfig configData.
+             * @member {Uint8Array} configData
+             * @memberof apply.operations.consensusConfig
+             * @instance
+             */
+            consensusConfig.prototype.configData = $util.newBuffer([]);
+
+            /**
+             * Creates a new consensusConfig instance using the specified properties.
+             * @function create
+             * @memberof apply.operations.consensusConfig
+             * @static
+             * @param {apply.operations.IconsensusConfig=} [properties] Properties to set
+             * @returns {apply.operations.consensusConfig} consensusConfig instance
+             */
+            consensusConfig.create = function create(properties) {
+                return new consensusConfig(properties);
+            };
+
+            /**
+             * Encodes the specified consensusConfig message. Does not implicitly {@link apply.operations.consensusConfig.verify|verify} messages.
+             * @function encode
+             * @memberof apply.operations.consensusConfig
+             * @static
+             * @param {apply.operations.IconsensusConfig} message consensusConfig message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            consensusConfig.encode = function encode(message, writer) {
+                if (!writer)
+                    writer = $Writer.create();
+                if (message.version != null && Object.hasOwnProperty.call(message, "version"))
+                    writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.version);
+                if (message.configData != null && Object.hasOwnProperty.call(message, "configData"))
+                    writer.uint32(/* id 2, wireType 2 =*/18).bytes(message.configData);
+                return writer;
+            };
+
+            /**
+             * Encodes the specified consensusConfig message, length delimited. Does not implicitly {@link apply.operations.consensusConfig.verify|verify} messages.
+             * @function encodeDelimited
+             * @memberof apply.operations.consensusConfig
+             * @static
+             * @param {apply.operations.IconsensusConfig} message consensusConfig message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            consensusConfig.encodeDelimited = function encodeDelimited(message, writer) {
+                return this.encode(message, writer).ldelim();
+            };
+
+            /**
+             * Decodes a consensusConfig message from the specified reader or buffer.
+             * @function decode
+             * @memberof apply.operations.consensusConfig
+             * @static
+             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @param {number} [length] Message length if known beforehand
+             * @returns {apply.operations.consensusConfig} consensusConfig
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            consensusConfig.decode = function decode(reader, length, error) {
+                if (!(reader instanceof $Reader))
+                    reader = $Reader.create(reader);
+                var end = length === undefined ? reader.len : reader.pos + length, message = new $root.apply.operations.consensusConfig();
+                while (reader.pos < end) {
+                    var tag = reader.uint32();
+                    if (tag === error)
+                        break;
+                    switch (tag >>> 3) {
+                    case 1: {
+                            message.version = reader.bytes();
+                            break;
+                        }
+                    case 2: {
+                            message.configData = reader.bytes();
+                            break;
+                        }
+                    default:
+                        reader.skipType(tag & 7);
+                        break;
+                    }
+                }
+                return message;
+            };
+
+            /**
+             * Decodes a consensusConfig message from the specified reader or buffer, length delimited.
+             * @function decodeDelimited
+             * @memberof apply.operations.consensusConfig
+             * @static
+             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @returns {apply.operations.consensusConfig} consensusConfig
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            consensusConfig.decodeDelimited = function decodeDelimited(reader) {
+                if (!(reader instanceof $Reader))
+                    reader = new $Reader(reader);
+                return this.decode(reader, reader.uint32());
+            };
+
+            /**
+             * Verifies a consensusConfig message.
+             * @function verify
+             * @memberof apply.operations.consensusConfig
+             * @static
+             * @param {Object.<string,*>} message Plain object to verify
+             * @returns {string|null} `null` if valid, otherwise the reason why it is not
+             */
+            consensusConfig.verify = function verify(message) {
+                if (typeof message !== "object" || message === null)
+                    return "object expected";
+                if (message.version != null && message.hasOwnProperty("version"))
+                    if (!(message.version && typeof message.version.length === "number" || $util.isString(message.version)))
+                        return "version: buffer expected";
+                if (message.configData != null && message.hasOwnProperty("configData"))
+                    if (!(message.configData && typeof message.configData.length === "number" || $util.isString(message.configData)))
+                        return "configData: buffer expected";
+                return null;
+            };
+
+            /**
+             * Creates a consensusConfig message from a plain object. Also converts values to their respective internal types.
+             * @function fromObject
+             * @memberof apply.operations.consensusConfig
+             * @static
+             * @param {Object.<string,*>} object Plain object
+             * @returns {apply.operations.consensusConfig} consensusConfig
+             */
+            consensusConfig.fromObject = function fromObject(object) {
+                if (object instanceof $root.apply.operations.consensusConfig)
+                    return object;
+                var message = new $root.apply.operations.consensusConfig();
+                if (object.version != null)
+                    if (typeof object.version === "string")
+                        $util.base64.decode(object.version, message.version = $util.newBuffer($util.base64.length(object.version)), 0);
+                    else if (object.version.length >= 0)
+                        message.version = object.version;
+                if (object.configData != null)
+                    if (typeof object.configData === "string")
+                        $util.base64.decode(object.configData, message.configData = $util.newBuffer($util.base64.length(object.configData)), 0);
+                    else if (object.configData.length >= 0)
+                        message.configData = object.configData;
+                return message;
+            };
+
+            /**
+             * Creates a plain object from a consensusConfig message. Also converts values to other types if specified.
+             * @function toObject
+             * @memberof apply.operations.consensusConfig
+             * @static
+             * @param {apply.operations.consensusConfig} message consensusConfig
+             * @param {$protobuf.IConversionOptions} [options] Conversion options
+             * @returns {Object.<string,*>} Plain object
+             */
+            consensusConfig.toObject = function toObject(message, options) {
+                if (!options)
+                    options = {};
+                var object = {};
+                if (options.defaults) {
+                    if (options.bytes === String)
+                        object.version = "";
+                    else {
+                        object.version = [];
+                        if (options.bytes !== Array)
+                            object.version = $util.newBuffer(object.version);
+                    }
+                    if (options.bytes === String)
+                        object.configData = "";
+                    else {
+                        object.configData = [];
+                        if (options.bytes !== Array)
+                            object.configData = $util.newBuffer(object.configData);
+                    }
+                }
+                if (message.version != null && message.hasOwnProperty("version"))
+                    object.version = options.bytes === String ? $util.base64.encode(message.version, 0, message.version.length) : options.bytes === Array ? Array.prototype.slice.call(message.version) : message.version;
+                if (message.configData != null && message.hasOwnProperty("configData"))
+                    object.configData = options.bytes === String ? $util.base64.encode(message.configData, 0, message.configData.length) : options.bytes === Array ? Array.prototype.slice.call(message.configData) : message.configData;
+                return object;
+            };
+
+            /**
+             * Converts this consensusConfig to JSON.
+             * @function toJSON
+             * @memberof apply.operations.consensusConfig
+             * @instance
+             * @returns {Object.<string,*>} JSON object
+             */
+            consensusConfig.prototype.toJSON = function toJSON() {
+                return this.constructor.toObject(this, $protobuf.util.toJSONOptions);
+            };
+
+            /**
+             * Gets the default type url for consensusConfig
+             * @function getTypeUrl
+             * @memberof apply.operations.consensusConfig
+             * @static
+             * @param {string} [typeUrlPrefix] your custom typeUrlPrefix(default "type.googleapis.com")
+             * @returns {string} The default type url
+             */
+            consensusConfig.getTypeUrl = function getTypeUrl(typeUrlPrefix) {
+                if (typeUrlPrefix === undefined) {
+                    typeUrlPrefix = "type.googleapis.com";
+                }
+                return typeUrlPrefix + "/apply.operations.consensusConfig";
+            };
+
+            return consensusConfig;
         })();
 
         return operations;
