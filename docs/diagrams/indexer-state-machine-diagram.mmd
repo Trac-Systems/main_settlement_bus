@@ -1,0 +1,180 @@
+flowchart TB
+      %% =========================================================
+      %% 1. ACTIVATION
+      %% =========================================================
+      subgraph ACTIVATION["1. INDEXER ACTIVATION"]
+          direction LR
+
+          Start((Start)) --> IsIndexer{"Node is<br/>an indexer?"}
+
+          IsIndexer -- No --> Inactive["INACTIVE<br/>Indexer service stopped"]
+          IsIndexer -- Yes --> HasGenesis{"Signed genesis<br/>epoch exists?"}
+
+          HasGenesis -- No --> WaitGenesis["WAITING FOR GENESIS"]
+          HasGenesis -- Yes --> LoadContext["LOAD EPOCH CONTEXT"]
+
+          WaitGenesis -->|"Genesis visible in signed view"| LoadContext
+          Inactive -->|"IS_INDEXER"| IsIndexer
+      end
+
+      LoadContext --> VdfInitialize
+      LoadContext --> ProposalListening
+
+      %% =========================================================
+      %% 2. BACKGROUND VDF LANE
+      %% =========================================================
+      subgraph VDF["2. BACKGROUND VDF WORKER"]
+          direction LR
+
+          VdfInitialize["INITIALIZE VDF<br/>Build challenge from epoch and proposer"]
+          VdfCalculate["CALCULATING VDF"]
+          VdfProofReady["LOCAL PROOF READY"]
+          VdfRetry["VDF RETRY"]
+
+          VdfInitialize --> VdfCalculate
+          VdfCalculate -->|"Valid Wesolowski proof found"| VdfProofReady
+
+          VdfInitialize -->|"Worker failure"| VdfRetry
+          VdfCalculate -->|"Solver failure"| VdfRetry
+          VdfRetry --> VdfInitialize
+
+          VdfProofReady -->|"Retain proof while consensus runs"| VdfProofReady
+      end
+
+      %% =========================================================
+      %% 3. CONSENSUS COORDINATOR
+      %% =========================================================
+      subgraph CONSENSUS["3. CONSENSUS COORDINATOR"]
+          direction TB
+
+          ProposalListening["READY FOR PROOF PROPOSALS<br/>Runs independently of outbound work"]
+
+          %% ---------------- INBOUND PATH ----------------
+          subgraph INBOUND["ALWAYS-ON INBOUND PROPOSAL LANE"]
+              direction LR
+
+              ValidateInbound["VALIDATE PROPOSAL"]
+
+              RejectInvalid["REJECT INVALID"]
+              RejectOld["REJECT OLD EPOCH"]
+              RejectFuture["REJECT FUTURE EPOCH"]
+
+              SignApproval["SIGN AND SEND APPROVAL"]
+
+              ValidateInbound -->|"Invalid schema, signer,<br/>VDF or committee member"| RejectInvalid
+              ValidateInbound -->|"Epoch is current or older"| RejectOld
+              ValidateInbound -->|"Epoch skips next epoch"| RejectFuture
+              ValidateInbound -->|"Valid next-epoch proposal"| SignApproval
+
+              SignApproval -->|"Continue handling proposals"| ProposalListening
+          end
+
+          %% ---------------- OUTBOUND PATH ----------------
+          subgraph OUTBOUND["OUTBOUND PROPOSAL PATH"]
+              direction LR
+
+              BuildProposal["BUILD AND SIGN<br/>PROOF PROPOSAL"]
+              QuorumDecision{"External approvals<br/>required?"}
+              Broadcast["SEND PROPOSAL<br/>TO INDEXERS"]
+              CollectApprovals["COLLECT APPROVALS"]
+              BuildSetEpoch["BUILD SET_EPOCH"]
+              RefreshBeforeAppend["REFRESH SIGNED STATE<br/>Immediately before append"]
+              NextEpochSigned{"Target epoch already<br/>in signed state?"}
+              SubmitSetEpoch["APPEND SET_EPOCH"]
+              SendAppendSignal["SEND APPEND SIGNAL"]
+
+              BuildProposal --> QuorumDecision
+
+              QuorumDecision -- "n = 1 or 2; proposer vote meets quorum" --> BuildSetEpoch
+              QuorumDecision -- "n >= 3" --> Broadcast
+
+              Broadcast --> CollectApprovals
+              CollectApprovals -->|"Valid unique committee approval; below quorum"| CollectApprovals
+              CollectApprovals -->|"Quorum reached, including proposer vote"| BuildSetEpoch
+
+              BuildSetEpoch --> RefreshBeforeAppend
+              RefreshBeforeAppend --> NextEpochSigned
+              NextEpochSigned -- "No" --> SubmitSetEpoch
+              NextEpochSigned -- "Yes" --> ReloadContext
+              SubmitSetEpoch -->|"Append accepted"| SendAppendSignal
+          end
+
+          %% ---------------- RECOVERY PATH ----------------
+          subgraph RECOVERY["RECOVERY AND RETRY"]
+              direction LR
+
+              RefreshState["REFRESH SIGNED STATE"]
+              RetryBackoff["BACKOFF<br/>Wait before retrying local proposal"]
+
+              RetryBackoff -->|"Backoff elapsed"| RefreshState
+              RefreshState -->|"Epoch unchanged; no local proof ready"| ProposalListening
+              RefreshState -->|"Epoch unchanged; local proof ready"| BuildProposal
+          end
+
+          ProposalListening -->|"PROOF_PROPOSAL received"| ValidateInbound
+
+          RejectInvalid -->|"Send signed error"| ProposalListening
+          RejectOld -->|"Send signed EPOCH_INVALID response"| ProposalListening
+          RejectFuture -->|"Send signed EPOCH_INVALID response"| ProposalListening
+
+          CollectApprovals -->|"Peer reports epoch mismatch"| RefreshState
+          CollectApprovals -->|"Timeout, disconnect or no quorum"| RetryBackoff
+
+          SubmitSetEpoch -->|"Append failed"| RetryBackoff
+          SendAppendSignal -->|"Signal sent"| RetryBackoff
+      end
+
+      VdfProofReady -.->|"LOCAL_PROOF_READY"| BuildProposal
+
+      %% =========================================================
+      %% 4. SIGNED-STATE TRANSITIONS
+      %% =========================================================
+      RefreshState -->|"New epoch discovered"| ReloadContext
+
+      ContextChanged["SIGNED CONTEXT CHANGED<br/>New epoch or VDF difficulty"] --> ReloadContext
+      ReloadContext["RELOAD SIGNED CONTEXT<br/>Discard old proof and pending requests"] --> LoadContext
+
+      StopEvent["IS_NON_INDEXER OR SHUTDOWN"] --> Inactive
+
+      %% =========================================================
+      %% PROTOCOL RULES
+      %% =========================================================
+      QuorumRules["QUORUM RULES<br/>effectiveQuorum(n) = 1 for n = 1 or 2<br/>effectiveQuorum(n) = floor(n / 2) + 1 for n >= 3<br/>The proposer's ProofProposal signature is quorum vote 1<br/>External ProofProposalApproval entries required = effectiveQuorum(n) - 1<br/>Count only unique approvals from the full current committee, not connected peers"]
+      QuorumDecision -.-> QuorumRules
+
+      ProposalRules["PROPOSAL HANDLING RULES<br/>Keep verifying and approving every valid next-epoch ProofProposal<br/>Do not rank, lock, or select competing proposals<br/>Before APPEND SET_EPOCH, re-check the target epoch in signed state<br/>If absent, append SET_EPOCH and send the append signal"]
+      SendAppendSignal -.-> ProposalRules
+
+      %% =========================================================
+      %% LEGEND
+      %% =========================================================
+      subgraph LEGEND["LEGEND"]
+          direction LR
+
+          LStart((Start))
+          LState["NORMAL STATE"]:::state
+          LWait["WAITING / HOLD"]:::wait
+          LSuccess["SUCCESS / READY"]:::success
+          LError["REJECTION / ERROR"]:::error
+          LDecision{"DECISION"}:::decision
+          LNote["RULE / GLOBAL EVENT"]:::note
+
+          LFrom["STATE A"]:::state -->|"Transition"| LTo["STATE B"]:::state
+          LSignal["SIGNAL"]:::state -.->|"Signal / reference"| LReceiver["RECEIVER"]:::state
+      end
+
+      %% =========================================================
+      %% STYLING
+      %% =========================================================
+      classDef state fill:#f8fafc,stroke:#334155,stroke-width:1.5px,color:#0f172a;
+      classDef wait fill:#fff7ed,stroke:#c2410c,stroke-width:1.5px,color:#431407;
+      classDef success fill:#ecfdf5,stroke:#047857,stroke-width:1.5px,color:#064e3b;
+      classDef error fill:#fef2f2,stroke:#b91c1c,stroke-width:1.5px,color:#450a0a;
+      classDef decision fill:#eff6ff,stroke:#1d4ed8,stroke-width:1.5px,color:#172554;
+      classDef note fill:#f8fafc,stroke:#64748b,stroke-dasharray:5 5,color:#334155;
+
+      class Inactive,WaitGenesis,RetryBackoff wait;
+      class VdfProofReady,BuildSetEpoch,SendAppendSignal success;
+      class RejectInvalid,RejectOld,RejectFuture error;
+      class IsIndexer,HasGenesis,QuorumDecision,NextEpochSigned decision;
+      class QuorumRules,ProposalRules,ContextChanged,StopEvent note;

@@ -62,7 +62,7 @@ test('PartialTransferValidator.validate rejects invalid recipient address or pub
         validator.address,
         config
     );
-    invalidAddressValidator.check.validateTransferOperation = () => true;
+    invalidAddressValidator.stateValidationSchema.validateTransferOperation = () => true;
     invalidAddressValidator.validateSignature = async () => true;
     await expectSharedValidatorError(
         t,

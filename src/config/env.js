@@ -20,14 +20,15 @@ const configData = {
         channel: '1111trac1network1msb1testnet1111',
         dhtBootstrap: ['116.202.214.149:10001','157.180.12.214:10001','node1.hyperdht.org:49737','node2.hyperdht.org:49737','node3.hyperdht.org:49737'], // these are used to peer discovery
         derivationPath: address.TESNET_DERIVATION_PATH,
-        enableValidatorObserver: true,
         pollInterval: 500, // Validator observer poll interval
         adminCacheTTL: 10_000, // Admin cache TTL ms
         validatorConnectionAttemptDelay: 5, // Delay between validator connection attempts (ms)
+        connectTimeoutMs: 5_000,
         bootstrapTimeout: 60_000, // time used (ms) to connect to new validators at bootstrap
         writersShortCacheTTL: 10_000, // short TTL during bootstrap
         writersLongCacheTTL: 120_000, // long TTL after bootstrap
         maxValidators: 50,
+        maxPendingConnections: 50,
         maxWritersForAdminIndexerConnection: 10, // Connectivity constants
         disableRateLimit: false,
         enableErrorApplyLogs: true,
@@ -53,9 +54,12 @@ const configData = {
         rateLimitMaxTransactionsPerSecond: 50, // Rate limiting constants
         maxPendingRequestsInPendingRequestsService: 50_000, // Maximum number of pending requests in PendingRequestService (This value should not exceed 256MB)
         pendingRequestTimeout: 3000, // constant after which time the transaction will be considered invalid
+        indexerPendingRequestTimeout: 20000, // constant after which time the transaction will be considered invalid
         txCommitTimeout: 2200,
         txPoolSize: 1000, // size of transaction pool
         validatorHealthCheckInterval: 5 * 60 * 1000, // How often to check validator health (ms)
+        epochInterval: 3 * 60 * 1000, // How often to trigger epoch proof proposal (ms)
+        epochThreshold: 2, // Minimum number of validator confirmations required to append a new epoch
         storesDirectory: 'stores/',
         storeName: 'testnet',
     },
@@ -69,14 +73,15 @@ const configData = {
         channel: '0000trac0network0msb0mainnet0000',
         dhtBootstrap: ['116.202.214.149:10001','157.180.12.214:10001','node1.hyperdht.org:49737','node2.hyperdht.org:49737','node3.hyperdht.org:49737'],
         derivationPath: address.MAINNET_DERIVATION_PATH,
-        enableValidatorObserver: true,
         pollInterval: 500, // Validator observer poll interval
         adminCacheTTL: 3_600_000, // Admin cache TTL ms
         validatorConnectionAttemptDelay: 5, // Delay between validator connection attempts (ms)
+        connectTimeoutMs: 5_000,
         bootstrapTimeout: 120_000, // time used (ms) to connect to new validators at bootstrap
         writersShortCacheTTL: 2_000, // short TTL during bootstrap
         writersLongCacheTTL: 120_000, // long TTL after bootstrap
         maxValidators: 50,
+        maxPendingConnections: 50,
         maxWritersForAdminIndexerConnection: 10, // Connectivity constants
         disableRateLimit: false,
         enableErrorApplyLogs: false,
@@ -102,9 +107,12 @@ const configData = {
         rateLimitMaxTransactionsPerSecond: 50, // Rate limiting constants
         maxPendingRequestsInPendingRequestsService: 50_000, // Maximum number of pending requests in PendingRequestService (This value should not exceed 256MB)
         pendingRequestTimeout: 3000, // constant after which time the transaction will be considered invalid
+        indexerPendingRequestTimeout: 20000, // constant after which time the transaction will be considered invalid
         txCommitTimeout: 2200,
         txPoolSize: 1000, // size of transaction pool
         validatorHealthCheckInterval: 5 * 60 * 1000, // How often to check validator health (ms)
+        epochInterval: 3 * 60 * 1000, // How often to trigger epoch proof proposal (ms)
+        epochThreshold: 2, // Minimum number of validator confirmations required to append a new epoch
         storesDirectory: 'stores/',
         storeName: 'mainnet',
     },
@@ -118,14 +126,15 @@ const configData = {
         channel: '12312313123123',
         dhtBootstrap: ['116.202.214.149:10001','157.180.12.214:10001','node1.hyperdht.org:49737','node2.hyperdht.org:49737','node3.hyperdht.org:49737'],
         derivationPath: address.MAINNET_DERIVATION_PATH,
-        enableValidatorObserver: true,
         pollInterval: 500, // Validator observer poll interval
         adminCacheTTL: 60_000, // Admin cache TTL ms
         validatorConnectionAttemptDelay: 5, // Delay between validator connection attempts (ms)
+        connectTimeoutMs: 5_000,
         bootstrapTimeout: 30_000,  // time used (ms) to connect to new validators at bootstrap
         writersShortCacheTTL: 1_000, // short TTL during bootstrap
         writersLongCacheTTL: 2_000, // long TTL after bootstrap
         maxValidators: 10,
+        maxPendingConnections: 50,
         maxWritersForAdminIndexerConnection: 10, // Connectivity constants
         disableRateLimit: false,
         enableErrorApplyLogs: true,
@@ -151,9 +160,12 @@ const configData = {
         rateLimitMaxTransactionsPerSecond: 50, // Rate limiting constants
         maxPendingRequestsInPendingRequestsService: 50_000, // Maximum number of pending requests in PendingRequestService (This value should not exceed 256MB)
         pendingRequestTimeout: 3000, // constant after which time the transaction will be considered invalid
+        indexerPendingRequestTimeout: 20000, // constant after which time the transaction will be considered invalid
         txCommitTimeout: 2200,
         txPoolSize: 1000, // size of transaction pool
         validatorHealthCheckInterval: 1_000, // How often to check validator health (ms)
+        epochInterval: 3 * 60 * 1000, // How often to trigger epoch proof proposal (ms)
+        epochThreshold: 2, // Minimum number of validator confirmations required to append a new epoch
         storesDirectory: 'stores/',
         storeName: 'development',
     }

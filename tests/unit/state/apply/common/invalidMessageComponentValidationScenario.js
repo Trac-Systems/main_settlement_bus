@@ -1,7 +1,7 @@
 import OperationValidationScenarioBase from './base/OperationValidationScenarioBase.js';
 import { eventFlush } from '../../../../helpers/autobaseTestHelpers.js';
 import b4a from 'b4a';
-import { safeDecodeApplyOperation, safeEncodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
+import { safeDecodeApplyOperation, safeEncodeApplyOperation } from '../../../../../src/codecs/apply/applyOperationCodec.js';
 
 export const MessageComponentStrategy = {
     TX_VALIDITY: 'TX_VALIDITY',

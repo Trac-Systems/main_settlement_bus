@@ -6,13 +6,10 @@ import { sleep, isHexString } from "./utils/helpers.js";
 import { applyStateMessageFactory } from "./messages/state/applyStateMessageFactory.js";
 import { isAddressValid } from "./core/state/utils/address.js";
 import Network from "./core/network/Network.js";
-import Check from "./utils/check.js";
 import State from "./core/state/State.js";
 import {
-    EventType,
     WHITELIST_SLEEP_INTERVAL,
     BOOTSTRAP_HEXSTRING_LENGTH,
-    CustomEventType,
     BALANCE_MIGRATION_SLEEP_INTERVAL,
     WHITELIST_MIGRATION_DIR,
     OperationType
@@ -25,17 +22,21 @@ import {
 } from "./utils/normalizers.js";
 import fileUtils from './utils/fileUtils.js';
 import migrationUtils from './utils/migrationUtils.js';
-import {safeDecodeApplyOperation, safeEncodeApplyOperation} from "./utils/protobuf/operationHelpers.js";
+import {
+    encodeApplyOperation,
+    safeDecodeApplyOperation,
+    safeEncodeApplyOperation
+} from "./codecs/apply/applyOperationCodec.js";
 import PartialTransactionValidator from "./core/network/protocols/shared/validators/PartialTransactionValidator.js";
 import PartialTransferValidator from "./core/network/protocols/shared/validators/PartialTransferValidator.js";
 import { BroadcastError, ValidationError } from "./utils/errors.js";
+import { uint16ToBuffer, uint32ToBuffer } from "./utils/buffer.js";
 
 export class MainSettlementBus extends ReadyResource {
     #store;
     #wallet;
     #network;
     #state;
-    #isClosing = false;
     #config
 
     /**
@@ -47,7 +48,6 @@ export class MainSettlementBus extends ReadyResource {
         this.#config = config
         this.#wallet = wallet;
         this.#store = new Corestore(this.#config.storesFullPath);
-        this.check = new Check(this.#config);
     }
 
     get config() {
@@ -71,26 +71,17 @@ export class MainSettlementBus extends ReadyResource {
 
     async _open() {
         this.#state = new State(this.#store, this.#wallet, this.#config);
-        this.#network = new Network(this.#state, this.#config, this.#wallet?.address ?? null);
+        this.#network = new Network(this.#state, this.#store, this.#config, this.#wallet);
 
         await this.#state.ready();
         await this.#network.ready();
-        await this.#stateEventsListener();
 
         if (this.#wallet) {
             this.#printWalletInfo();
         }
 
-        await this.#network.replicate(
-            this.#state,
-            this.#store,
-            this.#wallet,
-        );
-
         const adminEntry = await this.#state.getAdminEntry();
         await this.#setUpRoleAutomatically(adminEntry);
-
-
 
         console.log(`isIndexer: ${this.#state.isIndexer()}`);
         console.log(`isWriter: ${this.#state.isWritable()}`);
@@ -105,7 +96,6 @@ export class MainSettlementBus extends ReadyResource {
     async _close() {
         console.log("Closing everything gracefully... This may take a moment.");
 
-        this.#isClosing = true;
         await this.#network.close();
 
         await sleep(100);
@@ -202,37 +192,6 @@ export class MainSettlementBus extends ReadyResource {
         return nodeEntry?.isWhitelisted && !this.isAdmin(adminEntry);
     }
 
-    async #stateEventsListener() {
-        this.#state.on(CustomEventType.IS_INDEXER, (publicKey) => {
-            if (this.#isClosing) return;
-            this.#network.disconnectValidatorPeer(publicKey, 'peer promoted to indexer');
-        });
-
-        this.#state.on(CustomEventType.UNWRITABLE, (publicKey) => {
-            if (this.#isClosing) return;
-            this.#network.disconnectValidatorPeer(publicKey, 'peer became unwritable');
-        });
-
-        this.#state.base.on(EventType.IS_INDEXER, () => {
-            console.log("Current node is an indexer");
-        });
-
-        this.#state.base.on(EventType.IS_NON_INDEXER, async () => {
-            // Prevent further actions if closing is in progress
-            // The reason is that getNodeEntry is async and may cause issues if we will access state after closing
-            if (this.#isClosing) return;
-            console.log("Current node is not an indexer anymore");
-        });
-
-        this.#state.base.on(EventType.WRITABLE, async () => {
-            console.log("Current node is writable");
-        });
-
-        this.#state.base.on(EventType.UNWRITABLE, async () => {
-            console.log("Current node is unwritable");
-        });
-    }
-
     async getConfirmedTxInfo(txHash) {
         const payload = await this.#state.getSigned(txHash);
         if (!payload) return null
@@ -257,7 +216,7 @@ export class MainSettlementBus extends ReadyResource {
         return { payload, decoded }
     }
 
-    handleGetFee() {        
+    handleGetFee() {
         const fee = this.#state.getFee();
         return bufferToBigInt(fee);
     }
@@ -297,7 +256,7 @@ export class MainSettlementBus extends ReadyResource {
             let dagSystem = await this.#state.base.system.core.treeHash();
             let lengthdagSystem = this.#state.base.system.core.length;
             const wl = await this.#state.getWriterLength();
-            
+
             console.log("---------- node & network stats ----------");
             console.log("wallet.publicKey:", this.#wallet?.publicKey?.toString("hex") ?? "unset");
             console.log("wallet.address:", this.#wallet?.address ?? "unset");
@@ -332,6 +291,8 @@ export class MainSettlementBus extends ReadyResource {
             console.log("- /add_indexer <address>: Change a role of the selected writer node to indexer role. Charges a fee.");
             console.log("- /remove_indexer <address>: Change a role of the selected indexer node to default role. Charges a fee.");
             console.log("- /ban_writer <address>: Demote a whitelisted writer to default role and remove it from the whitelist. Charges a fee.");
+            console.log("- /init_genesis: Initialize genesis epoch.");
+            console.log("- /set_vdf_params: Update VDF difficulty.");
         }
         console.log("Available commands:");
         console.log("- /add_writer: Add yourself as a validator to this MSB once whitelisted. Requires a fee + 10x the fee as a stake in $TNK.");
@@ -1098,6 +1059,93 @@ export class MainSettlementBus extends ReadyResource {
             )
         console.log('Disabling initialization...');
         const encodedPayload = safeEncodeApplyOperation(payload);
+        await this.#state.append(encodedPayload);
+    }
+
+    async handleEpochGenesisInitialization(params) {
+        if (!this.#config.enableWallet) {
+            throw new Error("Can not initialize genesis epoch - wallet is not enabled.");
+        }
+
+        const adminEntry = await this.#state.getAdminEntry();
+
+        if (!adminEntry) {
+            throw new Error(
+                "Can not initialize genesis epoch - admin has not been initialized."
+            );
+        }
+        if (!this.#wallet) {
+            throw new Error("Can not initialize genesis epoch - wallet is not initialized.");
+        }
+        if (!this.isAdmin(adminEntry)) {
+            throw new Error("Can not initialize genesis epoch - you are not the admin.");
+        }
+
+        const existingVDFParams = await this.#state.getSignedVDFParams();
+        if (existingVDFParams) {
+            throw new Error("Can not initialize genesis epoch - VDF parameters already exist.");
+        }
+
+        const { vdfDifficulty, vdfDiscriminantSize } = params;
+        const difficultyNumber = Number(vdfDifficulty);
+        const discriminantNumber = Number(vdfDiscriminantSize);
+
+        if (!Number.isInteger(difficultyNumber) || difficultyNumber <= 0) {
+            throw new Error("VDF difficulty must be a positive unsigned 32-bit integer.");
+        }
+        if (!Number.isInteger(discriminantNumber) || discriminantNumber <= 0) {
+            throw new Error("VDF discriminant size must be a positive unsigned 16-bit integer.");
+        }
+
+        const vdfDifficultyBuffer = uint32ToBuffer(difficultyNumber);
+        const vdfDiscriminantSizeBuffer = uint16ToBuffer(discriminantNumber);
+
+        const txValidity = await this.#state.getIndexerSequenceState();
+        const payload = await applyStateMessageFactory(this.#wallet, this.#config)
+            .buildCompleteSetGenesisEpochMessage(
+                this.#wallet.address,
+                txValidity,
+                vdfDifficultyBuffer,
+                vdfDiscriminantSizeBuffer,
+            )
+        const encodedPayload = encodeApplyOperation(payload);
+        await this.#state.append(encodedPayload);
+    }
+
+    async handleSetVdfParams(params) {
+        if (!this.#config.enableWallet) {
+            throw new Error("Can not set VDF params - wallet is not enabled.");
+        }
+
+        const adminEntry = await this.#state.getAdminEntry();
+
+        if (!adminEntry) {
+            throw new Error("Can not set VDF params - admin has not been initialized.");
+        }
+        if (!this.#wallet) {
+            throw new Error("Can not set VDF params - wallet is not initialized.");
+        }
+        if (!this.isAdmin(adminEntry)) {
+            throw new Error("Can not set VDF params - you are not the admin.");
+        }
+
+        await this.#state.requireSignedVDFParams();
+
+        const difficultyNumber = Number(params.vdfDifficulty);
+        if (!Number.isInteger(difficultyNumber) || difficultyNumber <= 0) {
+            throw new Error("VDF difficulty must be a positive unsigned 32-bit integer.");
+        }
+
+        const vdfDifficultyBuffer = uint32ToBuffer(difficultyNumber);
+
+        const txValidity = await this.#state.getIndexerSequenceState();
+        const payload = await applyStateMessageFactory(this.#wallet, this.#config)
+            .buildCompleteSetVdfParamsMessage(
+                this.#wallet.address,
+                txValidity,
+                vdfDifficultyBuffer,
+            );
+        const encodedPayload = encodeApplyOperation(payload);
         await this.#state.append(encodedPayload);
     }
 }

@@ -1,6 +1,6 @@
 // PoolService.js
 import { BATCH_SIZE } from '../../../utils/constants.js';
-import Scheduler from '../../../utils/Scheduler.js';
+import SchedulableService from '../../../utils/scheduler/SchedulableService.js';
 import Denque from "denque";
 import b4a from "b4a";
 
@@ -43,13 +43,12 @@ export class TransactionPoolAlreadyQueuedError extends Error {
     }
 }
 
-class TransactionPoolService {
+class TransactionPoolService extends SchedulableService {
     #state;
     #address;
     #config;
     #txPool = new Denque();
     #transactionCommitService
-    #scheduler = null;
     #queuedTxHashes
 
     /**
@@ -59,6 +58,7 @@ class TransactionPoolService {
      * @param {Config} config
      **/
     constructor(state, address, transactionCommitService, config) {
+        super();
         this.#state = state;
         this.#address = address;
         this.#transactionCommitService = transactionCommitService;
@@ -79,16 +79,15 @@ class TransactionPoolService {
             console.info('TransactionPoolService can not start. Wallet is not enabled');
             return;
         }
-        if (this.#scheduler && this.#scheduler.isRunning) {
-            console.info('TransactionPoolService is already started');
-            return;
-        }
 
-        this.#scheduler = this.#createScheduler();
-        this.#scheduler.start();
+        return super.start();
     }
 
-    async #worker(next) {
+    getScheduleInterval() {
+        return this.#config.processIntervalMs;
+    }
+
+    async worker(next) {
         try {
             await this.#processTransactions();
             if (this.#txPool.size() > 0) {
@@ -99,10 +98,6 @@ class TransactionPoolService {
         } catch (error) {
             throw new Error(`TransactionPoolService worker error: ${error.message}`);
         }
-    }
-
-    #createScheduler() {
-        return new Scheduler((next) => this.#worker(next), this.#config.processIntervalMs);
     }
 
     async #processTransactions() {
@@ -187,10 +182,8 @@ class TransactionPoolService {
         this.txPool.push(txData);
     }
 
-    async stopPool(waitForCurrent = true) {
-        if (!this.#scheduler) return;
-        await this.#scheduler.stop(waitForCurrent);
-        this.#scheduler = null;
+    async stop(waitForCurrent = true) {
+        await super.stop(waitForCurrent);
         this.#queuedTxHashes.clear();
         this.#txPool.clear();
         console.info('TransactionPoolService: closing gracefully...');

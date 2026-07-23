@@ -511,6 +511,68 @@ class ApplyStateMessageDirector {
             .build();
         return this.#builder.getPayload();
     }
+
+    /**
+     * Build a complete set epoch payload.
+     * @param {string|Buffer} invokerAddress
+     * @param {string|Buffer} proofData
+     * @param {Array<string|Buffer>} approvals
+     * @returns {Promise<object>}
+     */
+    async buildCompleteSetEpochMessage(invokerAddress, proofData, approvals) {
+        if (!this.#builder) throw new Error('Builder has not been set.');
+        await this.#builder
+            .setPhase('complete')
+            .setOutput('buffer')
+            .setOperationType(OperationType.SET_EPOCH)
+            .setAddress(invokerAddress)
+            .setProofData(proofData)
+            .setApprovals(approvals)
+            .build();
+        return this.#builder.getPayload();
+    }
+
+    /**
+     * Build a complete set genesis epoch payload.
+     * @param {string|Buffer} invokerAddress
+     * @param {string|Buffer} txValidity
+     * @param {string|Buffer} vdfDifficulty
+     * @param {string|Buffer} vdfDiscriminantSize
+     * @returns {Promise<object>}
+     */
+    async buildCompleteSetGenesisEpochMessage(invokerAddress, txValidity, vdfDifficulty, vdfDiscriminantSize) {
+        if (!this.#builder) throw new Error('Builder has not been set.');
+        await this.#builder
+            .setPhase('complete')
+            .setOutput('buffer')
+            .setOperationType(OperationType.SET_GENESIS_EPOCH)
+            .setAddress(invokerAddress)
+            .setTxValidity(txValidity)
+            .setVdfDifficulty(vdfDifficulty)
+            .setVdfDiscriminantSize(vdfDiscriminantSize)
+            .build();
+        return this.#builder.getPayload();
+    }
+
+    /**
+     * Build a complete set VDF params payload.
+     * @param {string|Buffer} invokerAddress
+     * @param {string|Buffer} txValidity
+     * @param {string|Buffer} vdfDifficulty
+     * @returns {Promise<object>}
+     */
+    async buildCompleteSetVdfParamsMessage(invokerAddress, txValidity, vdfDifficulty) {
+        if (!this.#builder) throw new Error('Builder has not been set.');
+        await this.#builder
+            .setPhase('complete')
+            .setOutput('buffer')
+            .setOperationType(OperationType.SET_VDF_PARAMS)
+            .setAddress(invokerAddress)
+            .setTxValidity(txValidity)
+            .setVdfDifficulty(vdfDifficulty)
+            .build();
+        return this.#builder.getPayload();
+    }
 }
 
 export default ApplyStateMessageDirector;

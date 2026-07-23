@@ -1,8 +1,12 @@
 import b4a from 'b4a';
 import tracCryptoApi from 'trac-crypto-api';
 
-import { createMessage } from '../../utils/buffer.js';
-import { OperationType } from '../../utils/constants.js';
+import { createMessage, toHex } from '../../utils/buffer.js';
+import {
+    OperationType,
+    VDF_DIFFICULTY_SIZE,
+    VDF_DISCRIMINANT_SIZE
+} from '../../utils/constants.js';
 import { addressToBuffer, bufferToAddress } from '../../core/state/utils/address.js';
 import { isAddressValid } from "../../core/state/utils/address.js";
 import {
@@ -11,6 +15,9 @@ import {
     isBootstrapDeployment,
     isCoreAdmin,
     isRoleAccess,
+    isSetEpoch,
+    isSetGenesisEpoch,
+    isSetVdfParams,
     isTransaction,
     isTransfer,
     operationToPayload
@@ -28,9 +35,11 @@ import { isHexString } from '../../utils/helpers.js';
 class ApplyStateMessageBuilder {
     #address;
     #amount;
+    #approvals;
+    #built = false;
     #channel;
-    #config
     #contentHash;
+    #config;
     #externalBootstrap;
     #incomingAddress;
     #incomingNonce;
@@ -38,15 +47,17 @@ class ApplyStateMessageBuilder {
     #incomingWriterKey;
     #msbBootstrap;
     #operationType;
+    #output;
     #payload;
+    #payloadKey;
+    #phase;
+    #proofData;
     #txHash;
     #txValidity;
+    #vdfDifficulty;
+    #vdfDiscriminantSize;
     #wallet;
     #writingKey;
-    #phase;
-    #output;
-    #payloadKey;
-    #built=false;
 
     constructor(wallet, config) {
         this.#config = config;
@@ -159,6 +170,32 @@ class ApplyStateMessageBuilder {
         return this;
     }
 
+    setProofData(proofData) {
+        this.#proofData = this.#normalizeBytesBuffer(proofData, 'Proof data');
+        return this;
+    }
+
+    setApprovals(approvals) {
+        if (!Array.isArray(approvals)) {
+            throw new Error('Approvals must be an array.');
+        }
+
+        this.#approvals = approvals.map((approval, index) => {
+            return this.#normalizeBytesBuffer(approval, `Approval ${index}`);
+        });
+        return this;
+    }
+
+    setVdfDifficulty(vdfDifficulty) {
+        this.#vdfDifficulty = this.#normalizeHexBuffer(vdfDifficulty, VDF_DIFFICULTY_SIZE, 'VDF difficulty');
+        return this;
+    }
+
+    setVdfDiscriminantSize(vdfDiscriminantSize) {
+        this.#vdfDiscriminantSize = this.#normalizeHexBuffer(vdfDiscriminantSize, VDF_DISCRIMINANT_SIZE, 'VDF discriminant size');
+        return this;
+    }
+
     #requireFields(fields) {
         for (const [value, name] of fields) {
             if (!value) {
@@ -238,6 +275,24 @@ class ApplyStateMessageBuilder {
             return b4a.from(value, 'hex');
         }
         throw new Error(`${fieldName} must be a ${expectedBytes}-byte buffer or ${expectedBytes * 2}-length hexstring.`);
+    }
+
+    #normalizeBytesBuffer(value, fieldName) {
+        if (b4a.isBuffer(value)) {
+            if (value.length === 0) {
+                throw new Error(`${fieldName} must be a non-empty buffer.`);
+            }
+            return value;
+        }
+
+        if (typeof value === 'string') {
+            if (!isHexString(value)) {
+                throw new Error(`${fieldName} must be a non-empty hexstring.`);
+            }
+            return b4a.from(value, 'hex');
+        }
+
+        throw new Error(`${fieldName} must be a non-empty buffer or hexstring.`);
     }
 
     #normalizeAddress(address) {
@@ -325,6 +380,7 @@ class ApplyStateMessageBuilder {
                     OperationType.TRANSFER
                 );
                 break;
+
             default:
                 throw new Error(`Unsupported operation type: ${this.#operationType}`);
         }
@@ -378,6 +434,17 @@ class ApplyStateMessageBuilder {
     }
 
     async #buildCompleteBody() {
+        if (isSetEpoch(this.#operationType)) {
+            this.#requireFields([
+                [this.#proofData, 'Proof data'],
+                [this.#approvals, 'Approvals']
+            ]);
+            return {
+                pd: this.#proofData,
+                app: this.#approvals
+            };
+        }
+
         const nonce = tracCryptoApi.nonce.generate();
         let msg;
 
@@ -499,6 +566,34 @@ class ApplyStateMessageBuilder {
                     this.#operationType
                 );
                 break;
+            case OperationType.SET_GENESIS_EPOCH:
+                this.#requireFields([
+                    [this.#txValidity, 'Transaction validity'],
+                    [this.#vdfDifficulty, 'Difficulty'],
+                    [this.#vdfDiscriminantSize, 'Discriminant size']
+                ]);
+                msg = createMessage(
+                    this.#config.networkId,
+                    this.#txValidity,
+                    this.#vdfDifficulty,
+                    this.#vdfDiscriminantSize,
+                    nonce,
+                    this.#operationType
+                );
+                break;
+            case OperationType.SET_VDF_PARAMS:
+                this.#requireFields([
+                    [this.#txValidity, 'Transaction validity'],
+                    [this.#vdfDifficulty, 'Difficulty']
+                ]);
+                msg = createMessage(
+                    this.#config.networkId,
+                    this.#txValidity,
+                    this.#vdfDifficulty,
+                    nonce,
+                    this.#operationType
+                );
+                break;
             default:
                 throw new Error(`Unsupported operation type: ${this.#operationType}`);
         }
@@ -588,12 +683,30 @@ class ApplyStateMessageBuilder {
                 is: signature
             };
         }
+        if (isSetGenesisEpoch(this.#operationType)) {
+            return {
+                tx,
+                txv: this.#txValidity,
+                df: this.#vdfDifficulty,
+                db: this.#vdfDiscriminantSize,
+                in: nonce,
+                is: signature
+            };
+        }
+        if (isSetVdfParams(this.#operationType)) {
+            return {
+                tx,
+                txv: this.#txValidity,
+                df: this.#vdfDifficulty,
+                in: nonce,
+                is: signature
+            };
+        }
 
         throw new Error(`No corresponding value type for operation: ${this.#operationType}`);
     }
 
     #encodePayloadJson(payload) {
-        const toHex = buffer => buffer.toString('hex');
         const address = bufferToAddress(payload.address, this.#config.addressPrefix);
         if (!address) {
             throw new Error('Payload address is invalid.');

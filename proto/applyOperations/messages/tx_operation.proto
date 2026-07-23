@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package apply.operations;
+
+// transaction - (partial - need to be signed by another writer to be complete)
+message TxOperation {
+    bytes tx   = 1;  // Transaction hash (unique identifier for the transaction)
+    bytes txv  = 2;  // Transaction expiration
+    bytes iw   = 3;  // Writing key of the requesting node (external subnetwork)
+    bytes ch   = 4;  // Content hash (hash of the transaction's data)
+    bytes bs   = 5;  // External bootstrap contract
+    bytes mbs  = 6;  // MSB bootstrap key
+    bytes in   = 7;  // Nonce of the requesting node
+    bytes is   = 8;  // Requester's signature
+    bytes va   = 9;  // Validator's address (optional)
+    bytes vn   = 10; // Validator's nonce  (optional)
+    bytes vs   = 11; // Validator's signature (optional)
+}

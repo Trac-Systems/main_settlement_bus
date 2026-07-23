@@ -10,7 +10,7 @@ import {EntryType} from '../../src/utils/constants.js';
 import {sleep} from '../../src/utils/helpers.js'
 import {formatIndexersEntry} from '../../src/utils/helpers.js';
 import { applyStateMessageFactory } from "../../src/messages/state/applyStateMessageFactory.js";
-import { safeEncodeApplyOperation } from "../../src/utils/protobuf/operationHelpers.js"
+import { safeEncodeApplyOperation } from "../../src/codecs/apply/applyOperationCodec.js"
 import { $TNK } from '../../src/core/state/utils/balance.js';
 import { EventType } from '../../src/utils/constants.js';
 import { Config } from '../../src/config/config.js';

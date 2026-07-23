@@ -5,51 +5,10 @@ export const ZERO_WK = b4a.alloc(32, 0); // 32 bytes of zeroes, used as a placeh
 export const NULL_BUFFER = b4a.alloc(0) // null buffer (single byte of 0)
 
 const isUInt32 = (n) => { return Number.isInteger(n) && n >= 1 && n <= 0xFFFFFFFF; }
+const MAX_UINT64 = 0xFFFFFFFFFFFFFFFFn;
 
 export function isBufferValid(key, size) {
     return b4a.isBuffer(key) && key.length === size;
-}
-
-export const safeWriteUInt32BE = (value, offset) => {
-    try {
-        const buf = b4a.alloc(4);
-        buf.writeUInt32BE(value, offset);
-        return buf;
-    } catch {
-        return b4a.alloc(4);
-    }
-}
-
-export const createMessage = (...args) => {
-
-    if (args.length === 0) return b4a.alloc(0);
-
-    const buffers = args.map(arg => {
-        if (b4a.isBuffer(arg)) {
-            return arg;
-        } else if (typeof arg === 'number' && isUInt32(arg)) {
-            return safeWriteUInt32BE(arg, 0);
-        }
-    }).filter(buf => b4a.isBuffer(buf));
-
-    if (buffers.length === 0) return b4a.alloc(0);
-    return b4a.concat(buffers);
-}
-
-export function normalizeBuffer(message) {
-    if (b4a.isBuffer(message)) {
-        return message;
-    }
-
-    if (message.type === 'Buffer' && Array.isArray(message.data)) {
-        return b4a.from(message.data);
-    }
-
-    if (typeof message === 'object' && Object.keys(message).every(key => !isNaN(key))) {
-        return b4a.from(Object.values(message));
-    }
-
-    return null;
 }
 
 export const bigIntToBuffer = bigIntTo16ByteBuffer
@@ -61,26 +20,8 @@ export function deepCopyBuffer(buffer) {
     return copy;
 }
 
-function uint64ToBuffer(value, fieldName) {
-    if (typeof value === 'number') {
-        if (!Number.isSafeInteger(value) || value < 0) {
-            throw new Error(`${fieldName} must be a non-negative safe integer`);
-        }
-        value = BigInt(value);
-    } else if (typeof value !== 'bigint') {
-        throw new Error(`${fieldName} must be a number or bigint`);
-    }
-    if (value < 0n) {
-        throw new Error(`${fieldName} must be a non-negative integer`);
-    }
-
-    const buf = b4a.alloc(8);
-    buf.writeBigUInt64BE(value);
-    return buf;
-}
-
 export function timestampToBuffer(timestamp) {
-    return uint64ToBuffer(timestamp, 'timestamp');
+    return uint64ToBuffer(timestamp);
 }
 
 export function idToBuffer(id) {
@@ -110,5 +51,134 @@ export function encodeCapabilities(capabilities) {
         parts.push(bufferLen, capabilityBuffer);
     }
 
-    return parts.length ? b4a.concat(parts) : b4a.alloc(0);
+    return parts.length ? b4a.concat(parts) : NULL_BUFFER;
+}
+
+export function toHex(publicKey) {
+    return b4a.isBuffer(publicKey) ? b4a.toString(publicKey, 'hex') : publicKey;
+}
+
+export function uint8ToBuffer(value, offset = 0) {
+    if (!Number.isInteger(value) || value < 0 || value > 0xFF) {
+        throw new Error(`Value must be an unsigned 8-bit integer.`);
+    }
+
+    const buf = b4a.alloc(1);
+    buf.writeUInt8(value, offset);
+    return buf;
+}
+
+export const safeUint8ToBuffer = (value, offset = 0) => {
+    try {
+        return uint8ToBuffer(value, offset);
+    } catch {
+        return NULL_BUFFER;
+    }
+}
+
+export function uint16ToBuffer(value, offset = 0) {
+    if (!Number.isInteger(value) || value < 0 || value > 0xFFFF) {
+        throw new Error(`Value must be an unsigned 16-bit integer.`);
+    }
+
+    const buf = b4a.alloc(2);
+    buf.writeUInt16BE(value, offset);
+    return buf;
+}
+
+export const safeUint16ToBuffer = (value, offset = 0) => {
+    try {
+        return uint16ToBuffer(value, offset);
+    }
+    catch {
+        return NULL_BUFFER;
+    }
+}
+
+export const safeReadUint16BE = (buffer, offset = 0) => {
+    try {
+        if (!b4a.isBuffer(buffer) || buffer.length < offset + 2) {
+            return null;
+        }
+        return buffer.readUInt16BE(offset)
+    }
+    catch {
+        return null;
+    }
+}
+
+export function uint32ToBuffer(value, offset = 0) {
+    if (!Number.isInteger(value) || value < 0 || value > 0xFFFFFFFF) {
+        throw new Error(`Value must be an unsigned 32-bit integer.`);
+    }
+
+    const buf = b4a.alloc(4);
+    buf.writeUInt32BE(value, offset);
+    return buf;
+}
+
+export const safeWriteUInt32BE = (value, offset = 0) => {
+    try {
+        return uint32ToBuffer(value, offset);
+    } catch {
+        return NULL_BUFFER;
+    }
+}
+
+export const safeReadUint32BE = (buffer, offset = 0) => {
+    try {
+        if (!b4a.isBuffer(buffer) || buffer.length < offset + 4) {
+            return null;
+        }
+        return buffer.readUInt32BE(offset)
+    }
+    catch {
+        return null;
+    }
+}
+
+/**
+ * Use BigInt because uint64 values can be larger than Number.MAX_SAFE_INTEGER.
+ */
+// ATTENTION: It was decided to not use BigInt inside the apply function, so we can have more
+// control over the calculations. This function should not be used inside apply(). Use buffer
+// arithmetic (further down this file) instead.
+export function uint64ToBuffer(value) {
+    if (typeof value === 'number') {
+        if (!Number.isSafeInteger(value) || value < 0) {
+            throw new Error(`Value must be a non-negative safe integer`);
+        }
+    } else if (typeof value !== 'bigint') {
+        throw new Error(`Value must be a number or bigint`);
+    }
+
+    const uint64Value = typeof value === 'bigint' ? value : BigInt(value);
+
+    if (uint64Value < 0n) {
+        throw new Error(`Value must be a non-negative integer`);
+    }
+    if (uint64Value > MAX_UINT64) {
+        throw new Error(`Value must be an unsigned 64-bit integer`);
+    }
+
+    const buf = b4a.alloc(8);
+    buf.writeBigUInt64BE(uint64Value);
+    return buf;
+}
+
+
+export const createMessage = (...args) => {
+
+    if (args.length === 0) return NULL_BUFFER;
+
+    const buffers = args.map(arg => {
+        if (b4a.isBuffer(arg)) {
+            return arg;
+        } else if (typeof arg === 'number' && isUInt32(arg)) {
+            return safeWriteUInt32BE(arg);
+        }
+    }).filter(buf => b4a.isBuffer(buf));
+
+    if (buffers.length === 0) return NULL_BUFFER;
+    return b4a.concat(buffers);
 }

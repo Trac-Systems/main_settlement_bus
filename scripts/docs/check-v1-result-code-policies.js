@@ -2,8 +2,8 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import protobufModule from '../../src/utils/protobuf/networkV1.generated.cjs';
-import { ResultCode } from '../../src/utils/constants.js';
+import protobufModule from '../../src/codecs/network/v1/networkV1.generated.cjs';
+import { NetworkResultCode } from '../../src/utils/constants.js';
 import {
     resultToValidatorAction,
     shouldEndConnection,
@@ -15,7 +15,7 @@ const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, '..', '..');
 const docPath = path.join(repoRoot, 'docs', 'v1_result_code_policies.md');
 const headerLine = '| Sender | Validator | ResultCode | Value |';
-const protobufResultCodeEnum = protobufModule.network?.v1?.ResultCode ?? {};
+const protobufResultCodeEnum = protobufModule.common?.v1?.ResultCode ?? {};
 
 function buildGeneratedProtoResultCodes() {
     return Object.entries(protobufResultCodeEnum)
@@ -72,7 +72,7 @@ function parsePolicyTable(markdown) {
 }
 
 function buildExpectedRows() {
-    return Object.entries(ResultCode).map(([resultCodeName, value]) => ({
+    return Object.entries(NetworkResultCode).map(([resultCodeName, value]) => ({
         senderRotates: resultToValidatorAction(value) === SENDER_ACTION.ROTATE,
         validatorDisconnects: shouldEndConnection(value),
         resultCodeName,
@@ -84,26 +84,18 @@ function compareConstantsWithGeneratedProto() {
     const errors = [];
     const protoRows = buildGeneratedProtoResultCodes();
     const protoByName = new Map(protoRows.map((row) => [row.resultCodeName, row.value]));
-    const constantsByName = new Map(Object.entries(ResultCode));
+    const constantsByName = new Map(Object.entries(NetworkResultCode));
 
     for (const [resultCodeName, value] of constantsByName.entries()) {
         if (!protoByName.has(resultCodeName)) {
-            errors.push(`ResultCode constant ${resultCodeName} is missing from generated protobuf enum.`);
+            errors.push(`NetworkResultCode constant ${resultCodeName} is missing from generated common.v1.ResultCode enum.`);
             continue;
         }
 
         const protoValue = protoByName.get(resultCodeName);
         if (protoValue !== value) {
             errors.push(
-                `ResultCode constant ${resultCodeName} has value ${value}, but generated protobuf enum has ${protoValue}.`
-            );
-        }
-    }
-
-    for (const [resultCodeName, value] of protoByName.entries()) {
-        if (!constantsByName.has(resultCodeName)) {
-            errors.push(
-                `Generated protobuf enum exposes ${resultCodeName}=${value}, but src/utils/constants.js does not map it.`
+                `NetworkResultCode constant ${resultCodeName} has value ${value}, but generated common.v1.ResultCode enum has ${protoValue}.`
             );
         }
     }
@@ -175,7 +167,7 @@ function compareRows(documentedRows, expectedRows) {
 export async function checkV1ResultCodePolicies() {
     const protobufMismatchErrors = compareConstantsWithGeneratedProto();
     if (protobufMismatchErrors.length > 0) {
-        console.error('ResultCode constants are out of sync with the generated protobuf enum:');
+        console.error('NetworkResultCode constants are out of sync with the generated common.v1.ResultCode enum:');
         for (const error of protobufMismatchErrors) {
             console.error(`- ${error}`);
         }
@@ -196,7 +188,7 @@ export async function checkV1ResultCodePolicies() {
     }
 
     console.log(
-        `V1 result code policy documentation is in sync (${expectedRows.length} result codes checked).`
+        `V1 network result code policy documentation is in sync (${expectedRows.length} result codes checked).`
     );
     return true;
 }

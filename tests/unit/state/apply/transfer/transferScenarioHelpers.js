@@ -13,7 +13,7 @@ import addressUtils from '../../../../../src/core/state/utils/address.js';
 import transactionUtils from '../../../../../src/core/state/utils/transaction.js';
 import { toBalance, PERCENT_75, BALANCE_ZERO } from '../../../../../src/core/state/utils/balance.js';
 import { decimalStringToBigInt, bigIntTo16ByteBuffer } from '../../../../../src/utils/amountSerialization.js';
-import { safeDecodeApplyOperation, safeEncodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
+import { safeDecodeApplyOperation, safeEncodeApplyOperation } from '../../../../../src/codecs/apply/applyOperationCodec.js';
 import { ZERO_WK } from '../../../../../src/utils/buffer.js';
 import { EntryType, OperationType } from '../../../../../src/utils/constants.js';
 import { createMessage } from '../../../../../src/utils/buffer.js';
@@ -463,16 +463,16 @@ export async function applyInvalidTransferWithSchemaBypass(context, invalidPaylo
 		context.bootstrap ??
 		context.peers?.[0];
 
-    if (!node?.state?.check) {
-        throw new Error('applyInvalidTransferWithSchemaBypass requires a node with state and check.');
+    if (!node?.state?.stateValidationSchema) {
+        throw new Error('applyInvalidTransferWithSchemaBypass requires a node with state and stateValidationSchema.');
     }
 
-    const originalValidate = node.state.check.validateTransferOperation;
-    node.state.check.validateTransferOperation = () => true;
+    const originalValidate = node.state.stateValidationSchema.validateTransferOperation;
+    node.state.stateValidationSchema.validateTransferOperation = () => true;
     try {
         await appendInvalidTransferPayload(context, invalidPayload, { node });
     } finally {
-        node.state.check.validateTransferOperation = originalValidate;
+        node.state.stateValidationSchema.validateTransferOperation = originalValidate;
     }
 }
 
@@ -483,13 +483,13 @@ export async function applyInvalidTransferMissingValidatorFields(context, invali
 		context.bootstrap ??
 		context.peers?.[0];
 
-    if (!node?.state?.check) {
-        throw new Error('applyInvalidTransferMissingValidatorFields requires a node with state and check.');
+    if (!node?.state?.stateValidationSchema) {
+        throw new Error('applyInvalidTransferMissingValidatorFields requires a node with state and stateValidationSchema.');
     }
 
-    const originalValidate = node.state.check.validateTransferOperation;
+    const originalValidate = node.state.stateValidationSchema.validateTransferOperation;
     const originalHasOwn = Object.hasOwn;
-    node.state.check.validateTransferOperation = () => true;
+    node.state.stateValidationSchema.validateTransferOperation = () => true;
     Object.hasOwn = (obj, prop) => {
         if (prop === 'vs' || prop === 'va' || prop === 'vn') return false;
         return originalHasOwn(obj, prop);
@@ -498,7 +498,7 @@ export async function applyInvalidTransferMissingValidatorFields(context, invali
     try {
         await appendInvalidTransferPayload(context, invalidPayload, { node });
     } finally {
-        node.state.check.validateTransferOperation = originalValidate;
+        node.state.stateValidationSchema.validateTransferOperation = originalValidate;
         Object.hasOwn = originalHasOwn;
     }
 }

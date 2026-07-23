@@ -5,17 +5,17 @@ import Hypercore from 'hypercore';
 
 import V1BroadcastTransactionResponse, {extractRequiredVaFromDecodedTx} from '../../../../src/core/network/protocols/v1/validators/V1BroadcastTransactionResponse.js';
 import {V1ProtocolError} from '../../../../src/core/network/protocols/v1/V1ProtocolError.js';
-import Check from '../../../../src/utils/check.js';
+import StateValidationSchema from '../../../../src/core/state/validators/StateValidationSchema.js';
 import {
     unsafeEncodeApplyOperation,
     unsafeDecodeApplyOperation,
-} from '../../../../src/utils/protobuf/operationHelpers.js';
+} from '../../../../src/codecs/apply/applyOperationCodec.js';
 import {addressToBuffer} from '../../../../src/core/state/utils/address.js';
 import {publicKeyToAddress} from '../../../../src/utils/helpers.js';
 import {OperationType, ResultCode} from '../../../../src/utils/constants.js';
 import { config } from '../../../helpers/config.js';
 import { createState } from '../utils/createState.js';
-import protobufFixtures from '../../../fixtures/protobuf.fixtures.js';
+import protobufFixtures from '../../../fixtures/applyOperation.fixtures.js';
 import { testKeyPair1 } from '../../../fixtures/apply.fixtures.js';
 
 const remotePublicKey = b4a.from(testKeyPair1.publicKey, 'hex');
@@ -42,13 +42,13 @@ const createValidator = (stateOverrides = {}) =>
 const overrideCheckMethods = (t, overrides) => {
     const originals = {};
     for (const [name, impl] of Object.entries(overrides)) {
-        originals[name] = Check.prototype[name];
-        Check.prototype[name] = impl;
+        originals[name] = StateValidationSchema.prototype[name];
+        StateValidationSchema.prototype[name] = impl;
     }
 
     t.teardown(() => {
         for (const [name, original] of Object.entries(originals)) {
-            Check.prototype[name] = original;
+            StateValidationSchema.prototype[name] = original;
         }
     });
 };

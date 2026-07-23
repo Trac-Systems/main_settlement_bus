@@ -34,7 +34,7 @@ import RequesterAddressValidationScenario from '../common/requesterAddressValida
 import createRequesterPublicKeyValidationScenario from '../common/requesterPublicKeyValidationScenario.js';
 import InvalidHashValidationScenario from '../common/payload-structure/invalidHashValidationScenario.js';
 import OperationValidationScenarioBase from '../common/base/OperationValidationScenarioBase.js';
-import { safeDecodeApplyOperation, safeEncodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
+import { safeDecodeApplyOperation, safeEncodeApplyOperation } from '../../../../../src/codecs/apply/applyOperationCodec.js';
 import InvalidAddressValidationScenario from '../common/payload-structure/invalidAddressValidationScenario.js';
 import createAddressWithInvalidPublicKeyScenario from '../common/payload-structure/addressWithInvalidPublicKeyScenario.js';
 import TransactionValidityMismatchScenario from '../common/transactionValidityMismatchScenario.js';

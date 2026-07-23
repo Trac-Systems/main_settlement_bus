@@ -48,6 +48,24 @@ const isBalanceInitialization = type => {
     ].includes(type);
 }
 
+const isSetEpoch = type => {
+    return [
+        OperationType.SET_EPOCH
+    ].includes(type);
+}
+
+const isSetGenesisEpoch = type => {
+    return [
+        OperationType.SET_GENESIS_EPOCH
+    ].includes(type);
+}
+
+const isSetVdfParams = type => {
+    return [
+        OperationType.SET_VDF_PARAMS
+    ].includes(type);
+}
+
 const operationToPayload = type => {
     const fromTo = [
         {
@@ -77,6 +95,18 @@ const operationToPayload = type => {
         {
             condition: isBalanceInitialization,
             jsonPath: 'bio'
+        },
+        {
+            condition: isSetEpoch,
+            jsonPath: 'seo'
+        },
+        {
+            condition: isSetGenesisEpoch,
+            jsonPath: 'sgo'
+        },
+        {
+            condition: isSetVdfParams,
+            jsonPath: 'vpo'
         }
     ]
     const match = fromTo.find(entry => !!entry.condition(type))
@@ -91,5 +121,8 @@ export {
     isBootstrapDeployment,
     operationToPayload,
     isTransfer,
-    isBalanceInitialization
+    isBalanceInitialization,
+    isSetEpoch,
+    isSetGenesisEpoch,
+    isSetVdfParams
 }

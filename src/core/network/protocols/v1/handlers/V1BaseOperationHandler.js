@@ -1,30 +1,26 @@
 import {ResultCode} from "../../../../../utils/constants.js";
-import {publicKeyToAddress} from "../../../../../utils/helpers.js";
 import {V1ProtocolError} from "../V1ProtocolError.js";
+import ConnectionOperationHandler from "../../shared/ConnectionOperationHandler.js";
 
-class V1BaseOperationHandler {
+class V1BaseOperationHandler extends ConnectionOperationHandler{
     #rateLimiterService;
     #pendingRequestService;
-    #config;
-
     constructor(rateLimiterService, pendingRequestService, config) {
+        super(config);
         this.#rateLimiterService = rateLimiterService;
         this.#pendingRequestService = pendingRequestService;
-        this.#config = config;
     }
 
-    get config() {
-        return this.#config;
-    }
 
     applyRateLimit(connection) {
-        if (!this.#config.disableRateLimit) {
+        if (!this.config.disableRateLimit) {
             this.#rateLimiterService.v1HandleRateLimit(connection);
         }
     }
 
     async resolvePendingResponse(message, connection, validator, extractResultCode) {
         const pendingRequestServiceEntry = this.#pendingRequestService.getPendingRequest(message.id);
+        //TODO: Investigate if this return false shouldn't be a throw.
         if (!pendingRequestServiceEntry) return false;
 
         this.#pendingRequestService.stopPendingRequestTimeout(message.id);
@@ -40,19 +36,6 @@ class V1BaseOperationHandler {
         const rejected = this.#pendingRequestService.rejectPendingRequest(messageId, protocolError);
         if (!rejected) return;
         this.displayError(step, connection.remotePublicKey, protocolError);
-    }
-
-    async sendResponseAndMaybeClose(connection, response, endConnection) {
-        connection.protocolSession.sendAndForget(response);
-        if (!endConnection) return;
-
-        await connection.flush();
-        connection.end();
-    }
-
-    displayError(step = "undefined step", senderPublicKey, error) {
-        const errorMessage = error?.message ?? 'Unexpected error';
-        console.error(`${this.constructor.name}: ${step} ${publicKeyToAddress(senderPublicKey, this.#config)}: ${errorMessage}`);
     }
 
     #toProtocolError(error) {

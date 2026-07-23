@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package apply.operations;
+
+// add_writer, remove_writer, admin_recovery (partial - need to be signed by another writer to be complete)
+message RoleAccessOperation  {
+    bytes tx      = 1; // Transaction hash (unique identifier for the transaction)
+    bytes txv     = 2; // Transaction expiration
+    bytes iw      = 3; // Writing key of the invoker (whitelisted node, admin to be recovered, Trac Network)
+    bytes in      = 4; // Nonce of the invoker (whitelisted node, admin to be recovered, Trac Network)
+    bytes is      = 5; // Signature of the invoker (whitelisted node, admin to be recovered)
+    bytes va      = 6; // Validator's address (optional)
+    bytes vn      = 7; // Validator's nonce  (optional)
+    bytes vs      = 8; // Validator's signature (optional)
+}

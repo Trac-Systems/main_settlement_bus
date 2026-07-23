@@ -2,11 +2,11 @@ import Autobase from "autobase";
 import b4a from "b4a";
 import Hypercore from 'hypercore';
 import V1BaseOperation from "./V1BaseOperation.js";
-import {unsafeDecodeApplyOperation} from "../../../../../utils/protobuf/operationHelpers.js";
+import {unsafeDecodeApplyOperation} from "../../../../../codecs/apply/applyOperationCodec.js";
 import {isDeepEqualApplyPayload} from "../../../../../utils/deepEqualApplyPayload.js";
 import {addressToBuffer, bufferToAddress} from "../../../../state/utils/address.js";
 import {publicKeyToAddress} from "../../../../../utils/helpers.js";
-import Check from "../../../../../utils/check.js";
+import StateValidationSchema from "../../../../state/validators/StateValidationSchema.js";
 import {OperationType, ResultCode} from "../../../../../utils/constants.js";
 import {V1ProtocolError} from "../V1ProtocolError.js";
 
@@ -32,14 +32,14 @@ const stripValidatorMetadata = (value) => {
 
 class V1BroadcastTransactionResponse extends V1BaseOperation {
     #config;
-    #check;
+    #stateValidationSchema;
     #state;
 
     constructor(state, config) {
         super(config);
         this.#state = state;
         this.#config = config;
-        this.#check = new Check(config);
+        this.#stateValidationSchema = new StateValidationSchema(config);
     }
 
     async validate(payload, connection, pendingRequestServiceEntry) {
@@ -93,16 +93,16 @@ class V1BroadcastTransactionResponse extends V1BaseOperation {
             case OperationType.ADD_WRITER:
             case OperationType.REMOVE_WRITER:
             case OperationType.ADMIN_RECOVERY:
-                isValid =  this.#check.validateRoleAccessOperation(validatorDecodedTx);
+                isValid =  this.#stateValidationSchema.validateRoleAccessOperation(validatorDecodedTx);
                 break;
             case OperationType.BOOTSTRAP_DEPLOYMENT:
-                isValid =  this.#check.validateBootstrapDeploymentOperation(validatorDecodedTx);
+                isValid =  this.#stateValidationSchema.validateBootstrapDeploymentOperation(validatorDecodedTx);
                 break;
             case OperationType.TX:
-                isValid = this.#check.validateTransactionOperation(validatorDecodedTx);
+                isValid = this.#stateValidationSchema.validateTransactionOperation(validatorDecodedTx);
                 break;
             case OperationType.TRANSFER:
-                isValid = this.#check.validateTransferOperation(validatorDecodedTx);
+                isValid = this.#stateValidationSchema.validateTransferOperation(validatorDecodedTx);
                 break;
             default:
                 throw new V1ProtocolError(

@@ -19,7 +19,7 @@ import OperationAlreadyAppliedScenario from '../common/operationAlreadyAppliedSc
 import TransactionValidityMismatchScenario from '../common/transactionValidityMismatchScenario.js';
 import IndexerSequenceStateInvalidScenario from '../common/indexer/indexerSequenceStateInvalidScenario.js';
 import { applyStateMessageFactory } from '../../../../../src/messages/state/applyStateMessageFactory.js';
-import { safeEncodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
+import { safeEncodeApplyOperation } from '../../../../../src/codecs/apply/applyOperationCodec.js';
 import addAdminEntryExistsScenario from './adminEntryExistsScenario.js';
 import addAdminNonBootstrapNodeScenario from './nonBootstrapNodeScenario.js';
 import addAdminNodeEntryInitializationFailureScenario from './nodeEntryInitializationFailureScenario.js';

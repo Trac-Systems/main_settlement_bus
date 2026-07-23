@@ -3,6 +3,7 @@ import b4a from 'b4a';
 
 import V1ValidationSchema from '../../../../../src/core/network/protocols/v1/validators/V1ValidationSchema.js';
 import {
+    ConsensusResultCode,
     NetworkOperationType,
     NONCE_BYTE_LENGTH,
     ResultCode,
@@ -110,6 +111,10 @@ test('V1ValidationSchema.validateV1LivenessResponse - result value validation', 
     const unknownCode = structuredClone(validFixture);
     unknownCode.liveness_response.result = Math.max(...Object.values(ResultCode)) + 1;
     t.absent(v.validateV1LivenessResponse(unknownCode), 'unknown result code should fail');
+
+    const consensusOnlyCode = structuredClone(validFixture);
+    consensusOnlyCode.liveness_response.result = ConsensusResultCode.BAD_PROTOCOL_VERSION;
+    t.absent(v.validateV1LivenessResponse(consensusOnlyCode), 'consensus-only result code should fail');
 });
 
 test('V1ValidationSchema.validateV1LivenessResponse - buffer lengths', t => {

@@ -1,9 +1,9 @@
 import b4a from 'b4a';
 import tracCryptoApi from 'trac-crypto-api';
-import Check from '../../../../../utils/check.js';
+import StateValidationSchema from '../../../../state/validators/StateValidationSchema.js';
 import {bufferToAddress} from "../../../../state/utils/address.js";
 import {createMessage} from "../../../../../utils/buffer.js";
-import {OperationType, ResultCode} from "../../../../../utils/constants.js";
+import {OperationType, ResultCode, PUBLIC_KEY_LENGTH} from "../../../../../utils/constants.js";
 import {bufferToBigInt} from "../../../../../utils/amountSerialization.js";
 import {FEE} from "../../../../state/utils/transaction.js";
 import * as operationsUtils from '../../../../../utils/applyOperations.js';
@@ -11,18 +11,17 @@ import {V1ProtocolError} from '../../v1/V1ProtocolError.js';
 
 const MAX_AMOUNT = BigInt('0xffffffffffffffffffffffffffffffff');
 const FEE_BIGINT = bufferToBigInt(FEE);
-const PUBLIC_KEY_LENGTH = 32;
 
 class PartialOperationValidator {
     #state;
-    #check;
+    #stateValidationSchema;
     #config
     #selfAddress
 
     constructor(state, selfAddress, config) {
         this.#state = state;
         this.#config = config;
-        this.#check = new Check(this.#config);
+        this.#stateValidationSchema = new StateValidationSchema(this.#config);
         this.max_amount = MAX_AMOUNT;
         this.fee = FEE_BIGINT;
         this.#selfAddress = selfAddress;
@@ -32,8 +31,8 @@ class PartialOperationValidator {
         return this.#state;
     }
 
-    get check() {
-        return this.#check;
+    get stateValidationSchema() {
+        return this.#stateValidationSchema;
     }
 
     async validate() {
@@ -45,25 +44,25 @@ class PartialOperationValidator {
             throw new V1ProtocolError(ResultCode.TX_INVALID_PAYLOAD, 'Payload or payload type is missing.');
         }
 
-        const selectedValidator = this.#selectCheckSchemaValidator(payload.type);
+        const selectedValidator = this.#selectStateSchemaValidator(payload.type);
         const isPayloadValid = selectedValidator(payload);
         if (!isPayloadValid) {
             throw new V1ProtocolError(ResultCode.SCHEMA_VALIDATION_FAILED, 'Payload is invalid.');
         }
     }
 
-    #selectCheckSchemaValidator(type) {
+    #selectStateSchemaValidator(type) {
         switch (type) {
             case OperationType.ADD_WRITER:
             case OperationType.REMOVE_WRITER:
             case OperationType.ADMIN_RECOVERY:
-                return this.check.validateRoleAccessOperation.bind(this.check);
+                return this.stateValidationSchema.validateRoleAccessOperation.bind(this.stateValidationSchema);
             case OperationType.BOOTSTRAP_DEPLOYMENT:
-                return this.check.validateBootstrapDeploymentOperation.bind(this.check);
+                return this.stateValidationSchema.validateBootstrapDeploymentOperation.bind(this.stateValidationSchema);
             case OperationType.TX:
-                return this.check.validateTransactionOperation.bind(this.check);
+                return this.stateValidationSchema.validateTransactionOperation.bind(this.stateValidationSchema);
             case OperationType.TRANSFER:
-                return this.check.validateTransferOperation.bind(this.check);
+                return this.stateValidationSchema.validateTransferOperation.bind(this.stateValidationSchema);
             default:
                 throw new V1ProtocolError(
                     ResultCode.OPERATION_TYPE_UNKNOWN,

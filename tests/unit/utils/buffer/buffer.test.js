@@ -1,6 +1,26 @@
 import test from 'brittle';
 import b4a from 'b4a';
-import { createMessage, isBufferValid, safeWriteUInt32BE, deepCopyBuffer, encodeCapabilities, timestampToBuffer, idToBuffer } from '../../../../src/utils/buffer.js';
+import {
+    createMessage,
+    isBufferValid,
+    safeReadUint16BE,
+    safeReadUint32BE,
+    safeUint8ToBuffer,
+    safeUint16ToBuffer,
+    safeWriteUInt32BE,
+    uint8ToBuffer,
+    uint16ToBuffer,
+    uint32ToBuffer,
+    uint64ToBuffer,
+    deepCopyBuffer,
+    encodeCapabilities,
+    timestampToBuffer,
+    idToBuffer,
+    ZERO_WK,
+    NULL_BUFFER,
+    bigIntToBuffer,
+    toHex
+} from '../../../../src/utils/buffer.js';
 import { errorMessageIncludes } from "../../../helpers/regexHelper.js";
 
 const invalidDataTypes = [
@@ -137,25 +157,6 @@ test('isBufferValid - negative case', t => {
     t.not(isBufferValid(b4a.from('abcd', 'utf8'), 2), 'buffer too long');
 });
 
-test('safeWriteUInt32BE - positive case', t => {
-    const buf = safeWriteUInt32BE(0x01020304, 0);
-    t.ok(b4a.isBuffer(buf), 'returns a buffer');
-    t.is(buf.length, 4, 'buffer is 4 bytes');
-    t.is(buf.readUInt32BE(0), 0x01020304, 'encodes value correctly');
-
-    const edge = safeWriteUInt32BE(0x01020304, 4);
-    t.ok(b4a.isBuffer(edge), 'returns a buffer for offset at buffer end');
-    t.is(edge.length, 4, 'buffer is 4 bytes');
-    t.is(edge.readUInt32BE(0), 0, 'buffer is zeroed for out of bounds offset');
-});
-
-test('safeWriteUInt32BE - negative case', t => {
-    const negOffset = safeWriteUInt32BE(0x01020304, -1);
-    t.ok(b4a.isBuffer(negOffset), 'returns buffer for negative offset');
-    t.is(negOffset.length, 4, 'buffer is 4 bytes');
-    t.is(negOffset.readUInt32BE(0), 0, 'buffer is zeroed for negative offset');
-});
-
 test('deepCopyBuffer - returns null for falsy inputs', t => {
     t.is(deepCopyBuffer(null), null, 'null input returns null');
     t.is(deepCopyBuffer(undefined), null, 'undefined input returns null');
@@ -243,9 +244,246 @@ test('idToBuffer - encodes utf8 string', t => {
 });
 
 test('timestampToBuffer and idToBuffer - reject invalid input', t => {
-    t.exception(() => timestampToBuffer(-1), errorMessageIncludes('timestamp'));
-    t.exception(() => timestampToBuffer(1.5), errorMessageIncludes('timestamp'));
-    t.exception(() => timestampToBuffer('1'), errorMessageIncludes('timestamp'));
+    t.exception(() => timestampToBuffer(-1), errorMessageIncludes('Value must be a non-negative safe integer'));
+    t.exception(() => timestampToBuffer(1.5), errorMessageIncludes('Value must be a non-negative safe integer'));
+    t.exception(() => timestampToBuffer('1'), errorMessageIncludes('Value must be a number or bigint'));
     t.exception.all(() => idToBuffer(1));
     t.exception.all(() => idToBuffer(null));
+});
+
+test('uint32ToBuffer - encodes uint32 values and throws for invalid input', t => {
+    const zero = uint32ToBuffer(0);
+    t.ok(b4a.isBuffer(zero), 'returns a buffer for zero');
+    t.is(zero.readUInt32BE(0), 0, 'encodes zero');
+
+    const max = uint32ToBuffer(0xFFFFFFFF);
+    t.ok(b4a.isBuffer(max), 'returns buffer for max uint32');
+    t.is(max.readUInt32BE(0), 0xFFFFFFFF, 'encodes max uint32');
+
+    t.exception(() => uint32ToBuffer(-1), errorMessageIncludes('Value must be an unsigned 32-bit integer.'));
+    t.exception(() => uint32ToBuffer(0xFFFFFFFFFF), errorMessageIncludes('Value must be an unsigned 32-bit integer.'));
+});
+
+test('uint8ToBuffer - encodes boundary values', t => {
+    const zero = uint8ToBuffer(0);
+    t.ok(b4a.isBuffer(zero), 'returns buffer for zero');
+    t.is(zero.length, 1, 'uint8 is one byte');
+    t.is(zero.readUInt8(0), 0, 'encodes zero');
+
+    const max = uint8ToBuffer(0xFF);
+    t.ok(b4a.isBuffer(max), 'returns buffer for max uint8');
+    t.is(max.length, 1, 'uint8 max is one byte');
+    t.is(max.readUInt8(0), 0xFF, 'encodes max uint8');
+});
+
+test('uint8ToBuffer - rejects invalid values', t => {
+    const invalidValues = [
+        -1,
+        0x100,
+        1.5,
+        NaN,
+        Infinity,
+        '1',
+        1n,
+        b4a.alloc(1)
+    ];
+
+    for (const value of invalidValues) {
+        t.exception(() => uint8ToBuffer(value), errorMessageIncludes('Value must be an unsigned 8-bit integer.'));
+    }
+});
+
+test('uint16ToBuffer - encodes boundary values', t => {
+    const zero = uint16ToBuffer(0);
+    t.ok(b4a.isBuffer(zero), 'returns buffer for zero');
+    t.is(zero.length, 2, 'uint16 is two bytes');
+    t.is(zero.readUInt16BE(0), 0, 'encodes zero');
+
+    const max = uint16ToBuffer(0xFFFF);
+    t.ok(b4a.isBuffer(max), 'returns buffer for max uint16');
+    t.is(max.length, 2, 'uint16 max is two bytes');
+    t.is(max.readUInt16BE(0), 0xFFFF, 'encodes max uint16');
+});
+
+test('uint16ToBuffer - rejects invalid values', t => {
+    const invalidValues = [
+        -1,
+        0x10000,
+        1.5,
+        NaN,
+        Infinity,
+        '1',
+        1n,
+        b4a.alloc(2)
+    ];
+
+    for (const value of invalidValues) {
+        t.exception(() => uint16ToBuffer(value), errorMessageIncludes('Value must be an unsigned 16-bit integer.'));
+    }
+});
+
+test('uint64ToBuffer - encodes uint64 values and throws for invalid input', t => {
+    const zero = uint64ToBuffer(0);
+    t.ok(b4a.isBuffer(zero), 'returns a buffer for zero');
+    t.is(zero.readBigUInt64BE(0), 0n, 'encodes zero');
+
+    const large = uint64ToBuffer(0x100000000);
+    t.ok(b4a.isBuffer(large), 'returns buffer for values above uint32');
+    t.is(large.readBigUInt64BE(0), 0x100000000n, 'encodes uint64-range safe integer');
+
+    t.exception(() => uint64ToBuffer(-1), errorMessageIncludes('Value must be a non-negative safe integer'));
+    t.exception(() => uint64ToBuffer(0xFFFFFFFFFFFFFFFFn + 1n), errorMessageIncludes('Value must be an unsigned 64-bit integer'));
+});
+
+test('uint32ToBuffer - rejects non-integer and out-of-range values with field name', t => {
+    const invalidValues = [
+        1.5,
+        NaN,
+        Infinity,
+        -1,
+        0x100000000,
+        '1',
+        1n
+    ];
+
+    for (const value of invalidValues) {
+        t.exception(() => uint32ToBuffer(value), errorMessageIncludes('Value must be an unsigned 32-bit integer.'));
+    }
+});
+
+test('uint64ToBuffer - encodes bigint boundaries and rejects values outside uint64 range', t => {
+    const max = (2n ** 64n) - 1n;
+    const maxBuffer = uint64ToBuffer(max);
+
+    t.ok(b4a.isBuffer(maxBuffer), 'returns buffer for max uint64');
+    t.is(maxBuffer.readBigUInt64BE(0), max, 'encodes max uint64');
+    t.exception.all(() => uint64ToBuffer(2n ** 64n));
+});
+
+test('ZERO_WK and NULL_BUFFER constants expose expected buffers', t => {
+    t.ok(b4a.isBuffer(ZERO_WK), 'ZERO_WK is a buffer');
+    t.is(ZERO_WK.length, 32, 'ZERO_WK is 32 bytes');
+    t.ok(b4a.equals(ZERO_WK, b4a.alloc(32)), 'ZERO_WK is zero-filled');
+
+    t.ok(b4a.isBuffer(NULL_BUFFER), 'NULL_BUFFER is a buffer');
+    t.is(NULL_BUFFER.length, 0, 'NULL_BUFFER is empty');
+});
+
+test('bigIntToBuffer delegates to 16-byte bigint encoding', t => {
+    const encoded = bigIntToBuffer(123456789n);
+
+    t.ok(b4a.isBuffer(encoded), 'returns a buffer');
+    t.is(encoded.length, 16, 'encodes to 16 bytes');
+    t.is(encoded.readBigUInt64BE(8), 123456789n, 'low 64 bits encode value');
+});
+
+test('toHex returns hex for buffers and passes through non-buffers', t => {
+    const buffer = b4a.from('abcdef', 'hex');
+
+    t.is(toHex(buffer), 'abcdef', 'converts buffer to hex');
+    t.is(toHex('already-hex'), 'already-hex', 'returns string unchanged');
+    t.is(toHex(null), null, 'returns null unchanged');
+});
+
+test('safeWriteUInt32BE - encodes valid uint32 values', t => {
+    const buf = safeWriteUInt32BE(0x01020304);
+    t.ok(b4a.isBuffer(buf), 'returns a buffer');
+    t.is(buf.length, 4, 'buffer is 4 bytes');
+    t.is(buf.readUInt32BE(0), 0x01020304, 'encodes value correctly');
+});
+
+test('safeWriteUInt32BE - returns empty buffer for invalid writes', t => {
+    const invalidWrites = [
+        {value: 0x01020304, offset: -1, label: 'negative offset'},
+        {value: 0x01020304, offset: 4, label: 'offset at buffer end'},
+        {value: -1, offset: 0, label: 'negative value'},
+        {value: 0x100000000, offset: 0, label: 'value above uint32 max'},
+        {value: 1.5, offset: 0, label: 'non-integer value'},
+        {value: NaN, offset: 0, label: 'NaN value'},
+        {value: Infinity, offset: 0, label: 'Infinity value'},
+        {value: '1', offset: 0, label: 'string value'}
+    ];
+
+    for (const {value, offset, label} of invalidWrites) {
+        const encoded = safeWriteUInt32BE(value, offset);
+        t.ok(b4a.isBuffer(encoded), `${label} returns a buffer`);
+        t.is(encoded.length, 0, `${label} returns empty buffer`);
+    }
+});
+
+test('safeUint8ToBuffer - returns encoded buffer or empty fallback buffer', t => {
+    const max = safeUint8ToBuffer(0xFF);
+    t.ok(b4a.isBuffer(max), 'returns buffer for max uint8');
+    t.is(max.length, 1, 'uint8 is one byte');
+    t.is(max.readUInt8(0), 0xFF, 'encodes max uint8');
+
+    const invalidValues = [
+        -1,
+        0x100,
+        1.5,
+        NaN,
+        Infinity,
+        '1',
+        1n,
+        b4a.alloc(1)
+    ];
+
+    for (const value of invalidValues) {
+        const encoded = safeUint8ToBuffer(value);
+        t.ok(b4a.isBuffer(encoded), 'invalid value still returns a buffer');
+        t.is(encoded.length, 0, `invalid value returns empty buffer: ${String(value)}`);
+    }
+});
+
+test('safeUint16ToBuffer - returns encoded buffer or empty fallback buffer', t => {
+    const max = safeUint16ToBuffer(0xFFFF);
+    t.ok(b4a.isBuffer(max), 'returns buffer for max uint16');
+    t.is(max.length, 2, 'uint16 is two bytes');
+    t.is(max.readUInt16BE(0), 0xFFFF, 'encodes max uint16');
+
+    const invalidValues = [
+        -1,
+        0x10000,
+        1.5,
+        NaN,
+        Infinity,
+        '1',
+        1n,
+        b4a.alloc(2)
+    ];
+
+    for (const value of invalidValues) {
+        const encoded = safeUint16ToBuffer(value);
+        t.ok(b4a.isBuffer(encoded), 'invalid value still returns a buffer');
+        t.is(encoded.length, 0, `invalid value returns empty buffer: ${String(value)}`);
+    }
+});
+
+test('safeReadUint16BE - returns decoded number or null', t => {
+    const buffer = b4a.from('00010800ffff', 'hex');
+
+    t.is(safeReadUint16BE(buffer, 0), 1, 'reads uint16 at start');
+    t.is(safeReadUint16BE(buffer, 2), 2048, 'reads uint16 at offset');
+    t.is(safeReadUint16BE(buffer, 4), 0xFFFF, 'reads max uint16');
+    t.is(safeReadUint16BE(b4a.alloc(1)), null, 'returns null for short buffer');
+    t.is(safeReadUint16BE(buffer, 5), null, 'returns null for out-of-bounds offset');
+    t.is(safeReadUint16BE(null), null, 'returns null for invalid input');
+});
+
+test('safeReadUint32BE - returns decoded number or null', t => {
+    const buffer = b4a.from('0000000103473bc0ffffffff', 'hex');
+
+    t.is(safeReadUint32BE(buffer, 0), 1, 'reads uint32 at start');
+    t.is(safeReadUint32BE(buffer, 4), 55_000_000, 'reads uint32 at offset');
+    t.is(safeReadUint32BE(buffer, 8), 0xFFFFFFFF, 'reads max uint32');
+    t.is(safeReadUint32BE(b4a.alloc(3)), null, 'returns null for short buffer');
+    t.is(safeReadUint32BE(buffer, 9), null, 'returns null for out-of-bounds offset');
+    t.is(safeReadUint32BE(null), null, 'returns null for invalid input');
+});
+
+test('createMessage ignores invalid values when valid buffers are present', t => {
+    const validBuffer = b4a.from('abcd', 'hex');
+    const message = createMessage(validBuffer, 'invalid', null);
+
+    t.ok(b4a.equals(message, validBuffer), 'returns concat of valid buffers only');
 });

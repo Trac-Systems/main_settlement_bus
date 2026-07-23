@@ -2,7 +2,7 @@ import b4a from 'b4a';
 import sinon from 'sinon';
 import { config } from '../../../helpers/config.js';
 import { NetworkOperationType, V1_PROTOCOL_PAYLOAD_MAX_SIZE } from '../../../../src/utils/constants.js';
-import { encodeV1networkOperation } from '../../../../src/utils/protobuf/operationHelpers.js';
+import { encodeV1networkOperation } from '../../../../src/codecs/network/v1/networkV1OperationCodec.js';
 import NetworkMessageRouterV1 from '../../../../src/core/network/protocols/v1/NetworkMessageRouter.js';
 import V1LivenessOperationHandler from '../../../../src/core/network/protocols/v1/handlers/V1LivenessOperationHandler.js';
 import V1BroadcastTransactionOperationHandler from '../../../../src/core/network/protocols/v1/handlers/V1BroadcastTransactionOperationHandler.js';

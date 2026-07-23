@@ -3,7 +3,7 @@ import {
     buildBootstrapDeploymentPayload,
     assertBootstrapDeploymentFailureState
 } from './bootstrapDeploymentScenarioHelpers.js';
-import { safeDecodeApplyOperation, safeEncodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
+import { safeDecodeApplyOperation, safeEncodeApplyOperation } from '../../../../../src/codecs/apply/applyOperationCodec.js';
 import OperationValidationScenarioBase from '../common/base/OperationValidationScenarioBase.js';
 
 function removeValidatorFields(t, validPayload) {

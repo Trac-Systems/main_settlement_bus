@@ -2,7 +2,7 @@ import {OperationType} from '../../../../../utils/constants.js';
 import PartialRoleAccessValidator from "../../shared/validators/PartialRoleAccessValidator.js";
 import BaseStateOperationHandler from './BaseStateOperationHandler.js';
 import {applyStateMessageFactory} from "../../../../../messages/state/applyStateMessageFactory.js";
-import {safeEncodeApplyOperation} from "../../../../../utils/protobuf/operationHelpers.js";
+import {safeEncodeApplyOperation} from "../../../../../codecs/apply/applyOperationCodec.js";
 import {normalizeRoleAccessOperation} from "../../../../../utils/normalizers.js";
 import { publicKeyToAddress } from "../../../../../utils/helpers.js"
 import b4a from "b4a";

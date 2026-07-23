@@ -31,7 +31,7 @@ export default [
             "coverage/**",
             "migration/**",
             "node_modules/**",
-            "src/utils/protobuf/*.cjs",
+            "src/codecs/**/*.cjs",
             "stores/**",
             "stores1/**",
             "stores_/**",

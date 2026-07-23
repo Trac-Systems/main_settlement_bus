@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package apply.operations;
+
+// DO NOT CHANGE THE ORDER AFTER RELEASE - ONLY APPEND NEW ONES.
+enum OperationType {
+    UNKNOWN                = 0;
+    ADD_ADMIN              = 1; // complete
+    DISABLE_INITIALIZATION = 2; // complete
+    BALANCE_INITIALIZATION = 3; // complete
+    APPEND_WHITELIST       = 4; // complete
+    ADD_WRITER             = 5; // partial
+    REMOVE_WRITER          = 6; // partial
+    ADMIN_RECOVERY         = 7; // partial
+    ADD_INDEXER            = 8; // complete
+    REMOVE_INDEXER         = 9; // complete
+    BAN_VALIDATOR          = 10; // complete
+    BOOTSTRAP_DEPLOYMENT   = 11; // partial
+    TX                     = 12; // partial
+    TRANSFER               = 13; // partial
+    SET_EPOCH              = 14; // complete
+    SET_GENESIS_EPOCH      = 15; // complete
+    SET_VDF_PARAMS         = 16; // complete
+}

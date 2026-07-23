@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package apply.operations;
+
+message SetVdfParamsOperation {
+    bytes tx     = 1; // Transaction hash (unique identifier for the transaction)
+    bytes txv    = 2; // Transaction expiration
+    bytes df     = 3; // VDF difficulty factor
+    bytes in     = 4; // Nonce of the invoker (admin)
+    bytes is     = 5; // Signature of the invoker (admin)
+}

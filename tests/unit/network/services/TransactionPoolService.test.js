@@ -10,7 +10,7 @@ import TransactionPoolService, {
     TransactionPoolProofUnavailableError
 } from '../../../../src/core/network/services/TransactionPoolService.js';
 import TransactionCommitService from '../../../../src/core/network/services/TransactionCommitService.js';
-import { safeDecodeApplyOperation } from '../../../../src/utils/protobuf/operationHelpers.js';
+import { safeDecodeApplyOperation } from '../../../../src/codecs/apply/applyOperationCodec.js';
 import { bigIntTo16ByteBuffer, decimalStringToBigInt } from '../../../../src/utils/amountSerialization.js';
 import { BATCH_SIZE } from '../../../../src/utils/constants.js';
 import { overrideConfig } from '../../../helpers/config.js';
@@ -86,7 +86,7 @@ test('TransactionPoolService processes queued transaction and resolves commit wi
         t.ok(Number.isSafeInteger(receipt.blockNumber), 'blockNumber is safe integer');
         t.ok(receipt.blockNumber >= 0, 'blockNumber is non-negative');
     } finally {
-        await poolService.stopPool();
+        await poolService.stop();
         txCommitService.close();
         clock.restore();
     }
@@ -137,7 +137,7 @@ test('TransactionPoolService processes batch of 10 queued transactions and resol
             t.ok(receipt.proof.length > 0, `proof is non-empty for tx ${txHash}`);
         }
     } finally {
-        await poolService.stopPool();
+        await poolService.stop();
         txCommitService.close();
         clock.restore();
     }
@@ -198,7 +198,7 @@ test('TransactionPoolService rejects pending commit when proof is unavailable', 
             t.is(error.reason, 'proof-missing');
         }
     } finally {
-        await service.stopPool();
+        await service.stop();
         txCommitService.close();
         clock.restore();
     }
@@ -239,7 +239,7 @@ test('TransactionPoolService rejects pending commit when commit receipt is missi
             t.ok(error instanceof TransactionPoolMissingCommitReceiptError);
         }
     } finally {
-        await service.stopPool();
+        await service.stop();
         txCommitService.close();
         clock.restore();
     }
@@ -280,7 +280,7 @@ test('TransactionPoolService rejects all pending commits when appendWithProofOfP
         t.is(results[0].status, 'rejected');
         t.is(results[1].reason, appendError);
     } finally {
-        await service.stopPool();
+        await service.stop();
         txCommitService.close();
         clock.restore();
     }
@@ -312,7 +312,7 @@ test('TransactionPoolService.start is idempotent when scheduler is already runni
         t.ok(logs.some(m => m.includes('TransactionPoolService is already started')));
     } finally {
         console.info = originalInfo;
-        await service.stopPool();
+        await service.stop();
     }
 });
 
@@ -341,7 +341,7 @@ test('TransactionPoolService schedules immediate follow-up run when queue remain
 
         t.ok(appendCalls >= 2, 'queue processed in at least two batches before interval');
     } finally {
-        await service.stopPool();
+        await service.stop();
         clock.restore();
     }
 });
@@ -372,7 +372,7 @@ test('TransactionPoolService wraps worker errors from validation permission chec
         t.ok(workerError, 'worker error is wrapped');
     } finally {
         console.error = originalError;
-        await service.stopPool();
+        await service.stop();
         clock.restore();
     }
 });
@@ -387,6 +387,6 @@ test('TransactionPoolService.start does nothing when wallet is disabled', async 
         t.ok(logs.some(m => m.includes('Wallet is not enabled')));
     } finally {
         console.info = originalInfo;
-        await service.stopPool();
+        await service.stop();
     }
 });
