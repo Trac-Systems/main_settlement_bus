@@ -62,7 +62,7 @@ const isSetGenesisEpoch = type => {
 
 const isSetVdfParams = type => {
     return [
-        OperationType.SET_VDF_PARAMS
+        OperationType.SET_VDF_PARAMS // TODO: replace with SET_CONSENSUS_CONFIG
     ].includes(type);
 }
 
