@@ -5,7 +5,7 @@ import { default as test } from 'brittle';
 async function runTests() {
     test.pause();
 
-    await import('./check/check.test.js');
+    await import('../state/StateValidationSchema/check.test.js');
     await import('./deepEqualApplyPayload/deepEqualApplyPayload.test.js');
     await import('./helpers/helpers.test.js');
     await import('./fileUtils/readAddressesFromWhitelistFile.test.js');
