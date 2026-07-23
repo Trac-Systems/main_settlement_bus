@@ -729,9 +729,6 @@ class StateValidationSchema {
         return this.#validateSetConsensusConfigOperationSchema(op) === true;
     }
 
-    validateSetVdfParamsOperation(op) {
-        return this.validateSetConsensusConfigOperation(op);
-    }
 }
 
 export default StateValidationSchema;
