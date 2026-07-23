@@ -15,23 +15,7 @@ import {
     safeEncodeProofProposal,
     safeEncodeProofProposalApproval
 } from "../../../codecs/consensus/v1/consensusV1OperationCodec.js";
-import {
-    safeDecodeVdfConfig,
-    safeEncodeVdfConfig
-} from '../../../codecs/consensus/v1/vdfConfigCodec.js';
-
 const VDF_PARAMS_ENTRY_SIZE = VDF_DIFFICULTY_SIZE + VDF_DISCRIMINANT_SIZE;
-
-export function encodeVdfParameters(difficulty, discriminantBitSize) {
-    return safeEncodeVdfConfig({
-        difficulty,
-        discriminantBitSize
-    });
-}
-
-export function decodeVdfParameters(vdfParamsEntry) {
-    return safeDecodeVdfConfig(vdfParamsEntry);
-}
 
 export async function createGenesisEpochProof(config, proposerAddress, vdfParamsEntry) {
     const proposer = addressToBuffer(proposerAddress, config.addressPrefix);

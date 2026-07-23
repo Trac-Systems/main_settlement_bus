@@ -11,7 +11,7 @@ import {
     safeDecodeApplyOperation,
     safeEncodeApplyOperation
 } from '../../../../../src/codecs/apply/applyOperationCodec.js';
-import { decodeVdfParameters } from '../../../../../src/core/state/utils/epochProof.js';
+import { decodeVdfConfig } from '../../../../../src/codecs/consensus/v1/vdfConfigCodec.js';
 import {
     AUTOBASE_VALUE_ENCODING,
     EntryType
@@ -68,7 +68,7 @@ export async function assertVdfParams(t, base, expectedDifficulty, expectedDiscr
     const entry = await base.view.get(EntryType.VDF_PARAMS);
     t.ok(entry, 'VDF params entry exists');
 
-    const decoded = decodeVdfParameters(entry.value);
+    const decoded = decodeVdfConfig(entry.value);
     t.ok(decoded, 'VDF params entry decodes');
     t.is(decoded.difficulty.readUInt32BE(0), expectedDifficulty, 'VDF difficulty matches');
     t.is(
