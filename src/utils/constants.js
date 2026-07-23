@@ -42,7 +42,7 @@ export const OperationType = Object.freeze({
     TRANSFER: ApplyOperationType.TRANSFER,
     SET_EPOCH: ApplyOperationType.SET_EPOCH,
     SET_GENESIS_EPOCH: ApplyOperationType.SET_GENESIS_EPOCH,
-    SET_VDF_PARAMS: ApplyOperationType.SET_VDF_PARAMS,
+    SET_CONSENSUS_CONFIG: ApplyOperationType.SET_CONSENSUS_CONFIG,
 });
 
 export const NetworkOperationType = Object.freeze({

@@ -554,7 +554,7 @@ $root.apply = (function() {
                 case 15:
                     message.type = 15;
                     break;
-                case "SET_VDF_PARAMS":
+                case "SET_CONSENSUS_CONFIG":
                 case 16:
                     message.type = 16;
                     break;
@@ -746,7 +746,7 @@ $root.apply = (function() {
          * @property {number} TRANSFER=13 TRANSFER value
          * @property {number} SET_EPOCH=14 SET_EPOCH value
          * @property {number} SET_GENESIS_EPOCH=15 SET_GENESIS_EPOCH value
-         * @property {number} SET_VDF_PARAMS=16 SET_VDF_PARAMS value
+         * @property {number} SET_CONSENSUS_CONFIG=16 SET_CONSENSUS_CONFIG value
          */
         operations.OperationType = (function() {
             var valuesById = {}, values = Object.create(valuesById);
@@ -766,7 +766,7 @@ $root.apply = (function() {
             values[valuesById[13] = "TRANSFER"] = 13;
             values[valuesById[14] = "SET_EPOCH"] = 14;
             values[valuesById[15] = "SET_GENESIS_EPOCH"] = 15;
-            values[valuesById[16] = "SET_VDF_PARAMS"] = 16;
+            values[valuesById[16] = "SET_CONSENSUS_CONFIG"] = 16;
             return values;
         })();
 
