@@ -4724,8 +4724,8 @@ $root.apply = (function() {
              * Properties of a consensusConfig.
              * @memberof apply.operations
              * @interface IconsensusConfig
-             * @property {Uint8Array|null} [version] consensusConfig version
-             * @property {Uint8Array|null} [configData] consensusConfig configData
+             * @property {Uint8Array|null} [sv] consensusConfig sv
+             * @property {Uint8Array|null} [cd] consensusConfig cd
              */
 
             /**
@@ -4744,20 +4744,20 @@ $root.apply = (function() {
             }
 
             /**
-             * consensusConfig version.
-             * @member {Uint8Array} version
+             * consensusConfig sv.
+             * @member {Uint8Array} sv
              * @memberof apply.operations.consensusConfig
              * @instance
              */
-            consensusConfig.prototype.version = $util.newBuffer([]);
+            consensusConfig.prototype.sv = $util.newBuffer([]);
 
             /**
-             * consensusConfig configData.
-             * @member {Uint8Array} configData
+             * consensusConfig cd.
+             * @member {Uint8Array} cd
              * @memberof apply.operations.consensusConfig
              * @instance
              */
-            consensusConfig.prototype.configData = $util.newBuffer([]);
+            consensusConfig.prototype.cd = $util.newBuffer([]);
 
             /**
              * Creates a new consensusConfig instance using the specified properties.
@@ -4783,10 +4783,10 @@ $root.apply = (function() {
             consensusConfig.encode = function encode(message, writer) {
                 if (!writer)
                     writer = $Writer.create();
-                if (message.version != null && Object.hasOwnProperty.call(message, "version"))
-                    writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.version);
-                if (message.configData != null && Object.hasOwnProperty.call(message, "configData"))
-                    writer.uint32(/* id 2, wireType 2 =*/18).bytes(message.configData);
+                if (message.sv != null && Object.hasOwnProperty.call(message, "sv"))
+                    writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.sv);
+                if (message.cd != null && Object.hasOwnProperty.call(message, "cd"))
+                    writer.uint32(/* id 2, wireType 2 =*/18).bytes(message.cd);
                 return writer;
             };
 
@@ -4824,11 +4824,11 @@ $root.apply = (function() {
                         break;
                     switch (tag >>> 3) {
                     case 1: {
-                            message.version = reader.bytes();
+                            message.sv = reader.bytes();
                             break;
                         }
                     case 2: {
-                            message.configData = reader.bytes();
+                            message.cd = reader.bytes();
                             break;
                         }
                     default:
@@ -4866,12 +4866,12 @@ $root.apply = (function() {
             consensusConfig.verify = function verify(message) {
                 if (typeof message !== "object" || message === null)
                     return "object expected";
-                if (message.version != null && message.hasOwnProperty("version"))
-                    if (!(message.version && typeof message.version.length === "number" || $util.isString(message.version)))
-                        return "version: buffer expected";
-                if (message.configData != null && message.hasOwnProperty("configData"))
-                    if (!(message.configData && typeof message.configData.length === "number" || $util.isString(message.configData)))
-                        return "configData: buffer expected";
+                if (message.sv != null && message.hasOwnProperty("sv"))
+                    if (!(message.sv && typeof message.sv.length === "number" || $util.isString(message.sv)))
+                        return "sv: buffer expected";
+                if (message.cd != null && message.hasOwnProperty("cd"))
+                    if (!(message.cd && typeof message.cd.length === "number" || $util.isString(message.cd)))
+                        return "cd: buffer expected";
                 return null;
             };
 
@@ -4887,16 +4887,16 @@ $root.apply = (function() {
                 if (object instanceof $root.apply.operations.consensusConfig)
                     return object;
                 var message = new $root.apply.operations.consensusConfig();
-                if (object.version != null)
-                    if (typeof object.version === "string")
-                        $util.base64.decode(object.version, message.version = $util.newBuffer($util.base64.length(object.version)), 0);
-                    else if (object.version.length >= 0)
-                        message.version = object.version;
-                if (object.configData != null)
-                    if (typeof object.configData === "string")
-                        $util.base64.decode(object.configData, message.configData = $util.newBuffer($util.base64.length(object.configData)), 0);
-                    else if (object.configData.length >= 0)
-                        message.configData = object.configData;
+                if (object.sv != null)
+                    if (typeof object.sv === "string")
+                        $util.base64.decode(object.sv, message.sv = $util.newBuffer($util.base64.length(object.sv)), 0);
+                    else if (object.sv.length >= 0)
+                        message.sv = object.sv;
+                if (object.cd != null)
+                    if (typeof object.cd === "string")
+                        $util.base64.decode(object.cd, message.cd = $util.newBuffer($util.base64.length(object.cd)), 0);
+                    else if (object.cd.length >= 0)
+                        message.cd = object.cd;
                 return message;
             };
 
@@ -4915,24 +4915,24 @@ $root.apply = (function() {
                 var object = {};
                 if (options.defaults) {
                     if (options.bytes === String)
-                        object.version = "";
+                        object.sv = "";
                     else {
-                        object.version = [];
+                        object.sv = [];
                         if (options.bytes !== Array)
-                            object.version = $util.newBuffer(object.version);
+                            object.sv = $util.newBuffer(object.sv);
                     }
                     if (options.bytes === String)
-                        object.configData = "";
+                        object.cd = "";
                     else {
-                        object.configData = [];
+                        object.cd = [];
                         if (options.bytes !== Array)
-                            object.configData = $util.newBuffer(object.configData);
+                            object.cd = $util.newBuffer(object.cd);
                     }
                 }
-                if (message.version != null && message.hasOwnProperty("version"))
-                    object.version = options.bytes === String ? $util.base64.encode(message.version, 0, message.version.length) : options.bytes === Array ? Array.prototype.slice.call(message.version) : message.version;
-                if (message.configData != null && message.hasOwnProperty("configData"))
-                    object.configData = options.bytes === String ? $util.base64.encode(message.configData, 0, message.configData.length) : options.bytes === Array ? Array.prototype.slice.call(message.configData) : message.configData;
+                if (message.sv != null && message.hasOwnProperty("sv"))
+                    object.sv = options.bytes === String ? $util.base64.encode(message.sv, 0, message.sv.length) : options.bytes === Array ? Array.prototype.slice.call(message.sv) : message.sv;
+                if (message.cd != null && message.hasOwnProperty("cd"))
+                    object.cd = options.bytes === String ? $util.base64.encode(message.cd, 0, message.cd.length) : options.bytes === Array ? Array.prototype.slice.call(message.cd) : message.cd;
                 return object;
             };
 
