@@ -10,7 +10,8 @@ import {
     OperationType,
     AMOUNT_BYTE_LENGTH,
     VDF_DIFFICULTY_SIZE,
-    VDF_DISCRIMINANT_SIZE
+    VDF_DISCRIMINANT_SIZE,
+    CONSENSUS_CONFIG_SCHEMA_VERSION
 } from '../../src/utils/constants.js';
 import { config } from '../helpers/config.js'
 import { asAddress } from '../helpers/address.js';
@@ -449,27 +450,33 @@ export const SGO = {
     }
 }
 
-export const VPO = {
-    valid_set_vdf_params_operation: {
-        type: OperationType.SET_VDF_PARAMS,
+export const CCO = {
+    valid_set_consensus_config_operation: {
+        type: OperationType.SET_CONSENSUS_CONFIG,
         address: addressToBuffer(asAddress('3801ebd1f12462ad335b821807c9d87e4f20d57505222284b2634a7e8e5edac2'), config.addressPrefix),
-        vpo: {
+        cco: {
             tx: b4a.from('1bd4f96adeffba9c04943a82993c5b19660c3a5f572620d82a67464f381640e2', 'hex'),
             txv: b4a.from('f24e61cf7941256b080be2133bccb520414c78021215edfcb781622da526c414', 'hex'),
-            df: b4a.from('000f4240', 'hex'),
+            cc: {
+                sv: b4a.from('01', 'hex'),
+                cd: b4a.from('{"difficulty":1000000}', 'utf8')
+            },
             in: b4a.from('0ad7fe36a35a27ea4df932b800200823a97d4db31bca247f43ad7523b0493645', 'hex'),
             is: b4a.from('5b534be7a374148962c271d194c26cf5b1ad705ab218a87709a33fe74f9d1b811772447c939b17b2f803e3da7648f49b666b929fbb20e458ced952f147162c08', 'hex')
         }
     },
 
-    top_fields_set_vdf_params: ['type', 'address', 'vpo'],
-    set_vdf_params_value_fields: ['tx', 'txv', 'df', 'in', 'is'],
-    required_length_of_fields_for_set_vdf_params: {
+    top_fields_set_consensus_config: ['type', 'address', 'cco'],
+    set_consensus_config_value_fields: ['tx', 'txv', 'cc', 'in', 'is'],
+    consensus_config_fields: ['sv', 'cd'],
+    required_length_of_fields_for_set_consensus_config: {
         tx: HASH_BYTE_LENGTH,
         txv: HASH_BYTE_LENGTH,
-        df: VDF_DIFFICULTY_SIZE,
         in: NONCE_BYTE_LENGTH,
         is: SIGNATURE_BYTE_LENGTH
+    },
+    required_length_of_consensus_config_fields: {
+        sv: CONSENSUS_CONFIG_SCHEMA_VERSION
     }
 }
 
