@@ -45,7 +45,11 @@ import { deepCopyBuffer } from '../../utils/buffer.js';
 import { Status } from './utils/transaction.js';
 import remote from 'hypercore/lib/fully-remote-proof.js'
 import PQueue from 'p-queue';
-import {decodeVdfParameters, encodeVdfParameters, createGenesisEpochProof} from './utils/epochProof.js';
+import { createGenesisEpochProof } from './utils/epochProof.js';
+import {
+    safeDecodeVdfConfig,
+    safeEncodeVdfConfig
+} from '../../codecs/consensus/v1/vdfConfigCodec.js';
 import _ from 'lodash';
 
 const OVERSIZED_BATCH_PENALTY_MULTIPLIER = BATCH_SIZE;
@@ -623,7 +627,7 @@ class State extends ReadyResource {
         if (vdfParamsBuffer.length !== expectedLength) {
             throw new Error(`Invalid VDF params length: expected ${expectedLength}, got ${vdfParamsBuffer.length}.`);
         }
-        const decodedVdfParams = decodeVdfParameters(vdfParamsBuffer);
+        const decodedVdfParams = safeDecodeVdfConfig(vdfParamsBuffer);
         if (decodedVdfParams === null) {
             throw new Error("Invalid VDF params value.");
         }
@@ -4282,7 +4286,10 @@ class State extends ReadyResource {
         // can not be zero
         const vdfDiscriminantBitSizeBuffer = op.sgo.db;
         // can not be zero
-        const encodedVdfParamsEntry = encodeVdfParameters(vdfDifficultyBuffer, vdfDiscriminantBitSizeBuffer);
+        const encodedVdfParamsEntry = safeEncodeVdfConfig({
+            difficulty: vdfDifficultyBuffer,
+            discriminantBitSize: vdfDiscriminantBitSizeBuffer
+        });
         if (encodedVdfParamsEntry.length === 0) {
             this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Could not encode vdf parameters. Cannot set a new genesis epoch", node.from.key)
             return Status.IGNORE;
@@ -4414,7 +4421,7 @@ class State extends ReadyResource {
             return Status.IGNORE;
         }
 
-        const decodedVdfParams = decodeVdfParameters(existingVdfParams);
+        const decodedVdfParams = safeDecodeVdfConfig(existingVdfParams);
         if (decodedVdfParams === null) {
             this.#safeLogApply(OperationType.SET_VDF_PARAMS, "Stored VDF params are invalid.", node.from.key)
             return Status.FAILURE;
@@ -4425,10 +4432,10 @@ class State extends ReadyResource {
             return Status.FAILURE;
         }
 
-        const encodedVdfParams = encodeVdfParameters(
-            op.vpo.df,
-            decodedVdfParams.discriminantBitSize
-        );
+        const encodedVdfParams = safeEncodeVdfConfig({
+            difficulty: op.vpo.df,
+            discriminantBitSize: decodedVdfParams.discriminantBitSize
+        });
         if (encodedVdfParams.length === 0) {
             this.#safeLogApply(OperationType.SET_VDF_PARAMS, "Could not encode VDF parameters.", node.from.key)
             return Status.FAILURE;

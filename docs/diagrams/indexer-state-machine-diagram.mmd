@@ -18,7 +18,7 @@ flowchart TB
       end
 
       LoadContext --> VdfInitialize
-      LoadContext --> Listening
+      LoadContext --> ProposalListening
 
       %% =========================================================
       %% 2. BACKGROUND VDF LANE
@@ -47,10 +47,10 @@ flowchart TB
       subgraph CONSENSUS["3. CONSENSUS COORDINATOR"]
           direction TB
 
-          Listening["LISTENING<br/>Waiting for proposals or local proof"]
+          ProposalListening["READY FOR PROOF PROPOSALS<br/>Runs independently of outbound work"]
 
           %% ---------------- INBOUND PATH ----------------
-          subgraph INBOUND["INBOUND PROPOSAL PATH"]
+          subgraph INBOUND["ALWAYS-ON INBOUND PROPOSAL LANE"]
               direction LR
 
               ValidateInbound["VALIDATE PROPOSAL"]
@@ -60,14 +60,13 @@ flowchart TB
               RejectFuture["REJECT FUTURE EPOCH"]
 
               SignApproval["SIGN AND SEND APPROVAL"]
-              ApprovalHold["APPROVAL HOLD<br/>Wait for signed epoch"]
 
               ValidateInbound -->|"Invalid schema, signer,<br/>VDF or committee member"| RejectInvalid
               ValidateInbound -->|"Epoch is current or older"| RejectOld
               ValidateInbound -->|"Epoch skips next epoch"| RejectFuture
               ValidateInbound -->|"Valid next-epoch proposal"| SignApproval
 
-              SignApproval --> ApprovalHold
+              SignApproval -->|"Continue handling proposals"| ProposalListening
           end
 
           %% ---------------- OUTBOUND PATH ----------------
@@ -75,31 +74,29 @@ flowchart TB
               direction LR
 
               BuildProposal["BUILD AND SIGN<br/>PROOF PROPOSAL"]
-              QuorumDecision{"Approvals<br/>required?"}
+              QuorumDecision{"External approvals<br/>required?"}
               Broadcast["SEND PROPOSAL<br/>TO INDEXERS"]
               CollectApprovals["COLLECT APPROVALS"]
-              ResolveCompetition["RESOLVE COMPETING<br/>PROPOSAL"]
               BuildSetEpoch["BUILD SET_EPOCH"]
+              RefreshBeforeAppend["REFRESH SIGNED STATE<br/>Immediately before append"]
+              NextEpochSigned{"Target epoch already<br/>in signed state?"}
               SubmitSetEpoch["APPEND SET_EPOCH"]
-              ValidateSetEpoch["VALIDATE PROOF,<br/>COMMITTEE AND QUORUM"]
-              AwaitSignedCommit["WAIT FOR SIGNED COMMIT"]
+              SendAppendSignal["SEND APPEND SIGNAL"]
 
               BuildProposal --> QuorumDecision
 
-              QuorumDecision -- "n = 1 or 2" --> BuildSetEpoch
+              QuorumDecision -- "n = 1 or 2; proposer vote meets quorum" --> BuildSetEpoch
               QuorumDecision -- "n >= 3" --> Broadcast
 
               Broadcast --> CollectApprovals
-              CollectApprovals -->|"Valid approval; below quorum"| CollectApprovals
-              CollectApprovals -->|"Quorum reached"| BuildSetEpoch
-              CollectApprovals -->|"Competing proposal"| ResolveCompetition
+              CollectApprovals -->|"Valid unique committee approval; below quorum"| CollectApprovals
+              CollectApprovals -->|"Quorum reached, including proposer vote"| BuildSetEpoch
 
-              ResolveCompetition -->|"Local proposal selected"| CollectApprovals
-              ResolveCompetition -->|"Remote proposal selected"| SignApproval
-
-              BuildSetEpoch --> SubmitSetEpoch
-              SubmitSetEpoch --> ValidateSetEpoch
-              ValidateSetEpoch -->|"Valid"| AwaitSignedCommit
+              BuildSetEpoch --> RefreshBeforeAppend
+              RefreshBeforeAppend --> NextEpochSigned
+              NextEpochSigned -- "No" --> SubmitSetEpoch
+              NextEpochSigned -- "Yes" --> ReloadContext
+              SubmitSetEpoch -->|"Append accepted"| SendAppendSignal
           end
 
           %% ---------------- RECOVERY PATH ----------------
@@ -107,38 +104,31 @@ flowchart TB
               direction LR
 
               RefreshState["REFRESH SIGNED STATE"]
-              RetryCoordination["RETRY COORDINATION<br/>Apply backoff or proposer selection"]
+              RetryBackoff["BACKOFF<br/>Wait before retrying local proposal"]
 
-              RefreshState -->|"Epoch unchanged"| Listening
-              RetryCoordination -->|"Not selected or no proof"| Listening
-              RetryCoordination -->|"Selected and proof ready"| BuildProposal
+              RetryBackoff -->|"Backoff elapsed"| RefreshState
+              RefreshState -->|"Epoch unchanged; no local proof ready"| ProposalListening
+              RefreshState -->|"Epoch unchanged; local proof ready"| BuildProposal
           end
 
-          Listening -->|"PROOF_PROPOSAL received"| ValidateInbound
-          Listening -->|"LOCAL_PROOF_READY"| BuildProposal
+          ProposalListening -->|"PROOF_PROPOSAL received"| ValidateInbound
 
-          RejectInvalid -->|"Send signed error"| Listening
-          RejectOld -->|"Send already-calculated error"| Listening
-          RejectFuture -->|"Send invalid-epoch error"| Listening
-
-          ApprovalHold -->|"Hold timeout; epoch not created"| RetryCoordination
-          ApprovalHold -->|"Do not sign another proposal yet"| ApprovalHold
+          RejectInvalid -->|"Send signed error"| ProposalListening
+          RejectOld -->|"Send signed EPOCH_INVALID response"| ProposalListening
+          RejectFuture -->|"Send signed EPOCH_INVALID response"| ProposalListening
 
           CollectApprovals -->|"Peer reports epoch mismatch"| RefreshState
-          CollectApprovals -->|"Timeout, disconnect or no quorum"| RetryCoordination
+          CollectApprovals -->|"Timeout, disconnect or no quorum"| RetryBackoff
 
-          ValidateSetEpoch -->|"Stale context or invalid quorum"| RefreshState
-          AwaitSignedCommit -->|"Append or commit timeout"| RetryCoordination
-          AwaitSignedCommit -->|"Unsigned append is not final"| AwaitSignedCommit
+          SubmitSetEpoch -->|"Append failed"| RetryBackoff
+          SendAppendSignal -->|"Signal sent"| RetryBackoff
       end
 
-      VdfProofReady -.->|"LOCAL_PROOF_READY"| Listening
+      VdfProofReady -.->|"LOCAL_PROOF_READY"| BuildProposal
 
       %% =========================================================
       %% 4. SIGNED-STATE TRANSITIONS
       %% =========================================================
-      ApprovalHold -->|"Next epoch visible in signed view"| ReloadContext
-      AwaitSignedCommit -->|"Next epoch visible in signed view"| ReloadContext
       RefreshState -->|"New epoch discovered"| ReloadContext
 
       ContextChanged["SIGNED CONTEXT CHANGED<br/>New epoch or VDF difficulty"] --> ReloadContext
@@ -149,12 +139,11 @@ flowchart TB
       %% =========================================================
       %% PROTOCOL RULES
       %% =========================================================
-      QuorumRules["QUORUM RULES<br/>n = 1 or 2: proposer alone for now<br/>n >= 3: floor(n / 2) + 1<br/>Proposer signature counts as one vote<br/>Use full committee, not
-      connected peers"]
+      QuorumRules["QUORUM RULES<br/>effectiveQuorum(n) = 1 for n = 1 or 2<br/>effectiveQuorum(n) = floor(n / 2) + 1 for n >= 3<br/>The proposer's ProofProposal signature is quorum vote 1<br/>External ProofProposalApproval entries required = effectiveQuorum(n) - 1<br/>Count only unique approvals from the full current committee, not connected peers"]
       QuorumDecision -.-> QuorumRules
 
-      CompetitionRule["OPEN DECISION<br/>Leader schedule, lowest proof hash,<br/>deterministic backoff, or another tie-breaker"]
-      ResolveCompetition -.-> CompetitionRule
+      ProposalRules["PROPOSAL HANDLING RULES<br/>Keep verifying and approving every valid next-epoch ProofProposal<br/>Do not rank, lock, or select competing proposals<br/>Before APPEND SET_EPOCH, re-check the target epoch in signed state<br/>If absent, append SET_EPOCH and send the append signal"]
+      SendAppendSignal -.-> ProposalRules
 
       %% =========================================================
       %% LEGEND
@@ -184,8 +173,8 @@ flowchart TB
       classDef decision fill:#eff6ff,stroke:#1d4ed8,stroke-width:1.5px,color:#172554;
       classDef note fill:#f8fafc,stroke:#64748b,stroke-dasharray:5 5,color:#334155;
 
-      class Inactive,WaitGenesis,ApprovalHold,AwaitSignedCommit wait;
-      class VdfProofReady,BuildSetEpoch success;
+      class Inactive,WaitGenesis,RetryBackoff wait;
+      class VdfProofReady,BuildSetEpoch,SendAppendSignal success;
       class RejectInvalid,RejectOld,RejectFuture error;
-      class IsIndexer,HasGenesis,QuorumDecision decision;
-      class QuorumRules,CompetitionRule,ContextChanged,StopEvent note;
+      class IsIndexer,HasGenesis,QuorumDecision,NextEpochSigned decision;
+      class QuorumRules,ProposalRules,ContextChanged,StopEvent note;

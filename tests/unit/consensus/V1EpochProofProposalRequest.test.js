@@ -9,9 +9,9 @@ import V1EpochProofProposalRequest from '../../../src/core/consensus/v1/validato
 import {V1ConsensusProtocolError} from '../../../src/core/consensus/v1/V1ConsensusProtocolError.js';
 import {addressToBuffer} from '../../../src/core/state/utils/address.js';
 import {
-    createGenesisEpochProof,
-    encodeVdfParameters
+    createGenesisEpochProof
 } from '../../../src/core/state/utils/epochProof.js';
+import { encodeVdfConfig } from '../../../src/codecs/consensus/v1/vdfConfigCodec.js';
 import {
     createMessage,
     uint8ToBuffer,
@@ -58,10 +58,10 @@ async function createWallet(keyPair = testKeyPair1) {
 }
 
 async function buildGenesisEpochHash(wallet, vdfParams = TEST_VDF_PARAMS) {
-    const vdfParamsEntry = encodeVdfParameters(
-        uint32ToBuffer(vdfParams.vdfDifficulty),
-        uint16ToBuffer(vdfParams.vdfDiscriminantSize)
-    );
+    const vdfParamsEntry = encodeVdfConfig({
+        difficulty: uint32ToBuffer(vdfParams.vdfDifficulty),
+        discriminantBitSize: uint16ToBuffer(vdfParams.vdfDiscriminantSize)
+    });
     const genesisEpoch = await createGenesisEpochProof(config, wallet.address, vdfParamsEntry);
 
     return await tracCryptoApi.hash.blake3(genesisEpoch);

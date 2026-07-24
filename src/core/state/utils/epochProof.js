@@ -15,51 +15,7 @@ import {
     safeEncodeProofProposal,
     safeEncodeProofProposalApproval
 } from "../../../codecs/consensus/v1/consensusV1OperationCodec.js";
-
 const VDF_PARAMS_ENTRY_SIZE = VDF_DIFFICULTY_SIZE + VDF_DISCRIMINANT_SIZE;
-
-export function encodeVdfParameters(difficulty, discriminantBitSize) {
-    if (!isBufferValid(difficulty, VDF_DIFFICULTY_SIZE) || 
-        !isBufferValid(discriminantBitSize, VDF_DISCRIMINANT_SIZE)) {
-        return b4a.alloc(0);
-    }
-
-    try {
-        let vdfParamsEntry = b4a.alloc(VDF_PARAMS_ENTRY_SIZE);
-        let offset = 0;
-        b4a.copy(difficulty, vdfParamsEntry, offset);
-        offset += VDF_DIFFICULTY_SIZE;
-        b4a.copy(discriminantBitSize, vdfParamsEntry, offset);
-    
-        return vdfParamsEntry;
-    }
-    catch {
-        return b4a.alloc(0);
-    }
-}
-
-export function decodeVdfParameters(vdfParamsEntry) {
-    if (!isBufferValid(vdfParamsEntry, VDF_PARAMS_ENTRY_SIZE)) {
-        return null;
-    }
-
-    try {
-        let offset = 0;
-    
-        const difficulty = vdfParamsEntry.subarray(offset, offset + VDF_DIFFICULTY_SIZE);
-        offset += VDF_DIFFICULTY_SIZE;
-    
-        const discriminantBitSize = vdfParamsEntry.subarray(offset, offset + VDF_DISCRIMINANT_SIZE);
-    
-        return {
-            difficulty,
-            discriminantBitSize
-        }
-    }
-    catch {
-        return null;
-    }
-}
 
 export async function createGenesisEpochProof(config, proposerAddress, vdfParamsEntry) {
     const proposer = addressToBuffer(proposerAddress, config.addressPrefix);
