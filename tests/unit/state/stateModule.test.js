@@ -3,7 +3,7 @@ import { isBare } from './stateTestUtils.js';
 
 async function runStateTests() {
     test.pause();
-
+    await import('./StateValidationSchema/stateValidationSchema.test.js');
     await import('./utils/address.test.js');
     await import('./utils/adminEntry.test.js');
     await import('./utils/balance.test.js');
@@ -21,4 +21,4 @@ async function runStateTests() {
     test.resume();
 }
 
-runStateTests();
+await runStateTests();

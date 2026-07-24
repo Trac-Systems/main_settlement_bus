@@ -22,8 +22,8 @@ const APPLY_TO_OBJECT_OPTIONS = Object.freeze({
 
 test('Consensus config codec uses the SetConsensusConfigOperation wire format', t => {
     const config = {
-        version: b4a.from([0x01]),
-        configData: b4a.from([0x02, 0x03, 0x04])
+        sv: b4a.from([0x01]),
+        cd: b4a.from([0x02, 0x03, 0x04])
     };
 
     const encoded = encodeConsensusConfig(config);
@@ -37,10 +37,10 @@ test('Consensus config codec uses the SetConsensusConfigOperation wire format', 
     t.alike(decoded, config);
 });
 
-test('Consensus config codec supports empty configData', t => {
+test('Consensus config codec supports empty cd', t => {
     const config = {
-        version: b4a.from([0x01]),
-        configData: b4a.alloc(0)
+        sv: b4a.from([0x01]),
+        cd: b4a.alloc(0)
     };
 
     const encoded = encodeConsensusConfig(config);
@@ -49,10 +49,10 @@ test('Consensus config codec supports empty configData', t => {
     t.alike(decoded, config);
 });
 
-test('Consensus config codec preserves unknown versions and opaque configData', t => {
+test('Consensus config codec preserves unknown schema versions and opaque cd', t => {
     const config = {
-        version: b4a.from([0xff]),
-        configData: b4a.from([0x00, 0xff, 0x7f, 0x80])
+        sv: b4a.from([0xff]),
+        cd: b4a.from([0x00, 0xff, 0x7f, 0x80])
     };
 
     const decoded = decodeConsensusConfig(encodeConsensusConfig(config));
@@ -61,7 +61,7 @@ test('Consensus config codec preserves unknown versions and opaque configData', 
 });
 
 test('encodeConsensusConfig rejects invalid payloads', t => {
-    const validVersion = b4a.from([0x01]);
+    const validSchemaVersion = b4a.from([0x01]);
     const validConfigData = b4a.from([0x02]);
     const invalidPayloads = [
         null,
@@ -70,14 +70,14 @@ test('encodeConsensusConfig rejects invalid payloads', t => {
         b4a.alloc(0),
         'config',
         {},
-        { version: validVersion },
-        { configData: validConfigData },
-        { version: 1, configData: validConfigData },
-        { version: b4a.alloc(0), configData: validConfigData },
-        { version: b4a.alloc(2), configData: validConfigData },
-        { version: validVersion, configData: null },
-        { version: validVersion, configData: [] },
-        { version: validVersion, configData: 'data' }
+        { sv: validSchemaVersion },
+        { cd: validConfigData },
+        { sv: 1, cd: validConfigData },
+        { sv: b4a.alloc(0), cd: validConfigData },
+        { sv: b4a.alloc(2), cd: validConfigData },
+        { sv: validSchemaVersion, cd: null },
+        { sv: validSchemaVersion, cd: [] },
+        { sv: validSchemaVersion, cd: 'data' }
     ];
 
     for (const payload of invalidPayloads) {
@@ -103,8 +103,8 @@ test('decodeConsensusConfig rejects invalid encoded values', t => {
 
 test('Safe consensus config codec roundtrips valid configurations', t => {
     const config = {
-        version: b4a.from([0x80]),
-        configData: b4a.from([0x01, 0x02])
+        sv: b4a.from([0x80]),
+        cd: b4a.from([0x01, 0x02])
     };
 
     const encoded = safeEncodeConsensusConfig(config);
@@ -118,8 +118,8 @@ test('Safe consensus config codec returns fallback values for invalid input', t 
     const invalidConfigs = [
         null,
         {},
-        { version: b4a.alloc(0), configData: b4a.alloc(0) },
-        { version: b4a.from([0x01]), configData: null }
+        { sv: b4a.alloc(0), cd: b4a.alloc(0) },
+        { sv: b4a.from([0x01]), cd: null }
     ];
     const invalidEncodedValues = [
         null,

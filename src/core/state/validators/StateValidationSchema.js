@@ -16,6 +16,8 @@ import {
     VDF_BLOB_PROOF_SIZE,
     VDF_DIFFICULTY_SIZE,
     VDF_DISCRIMINANT_SIZE,
+    CONSENSUS_CONFIG_SCHEMA_VERSION_BYTE_LENGTH,
+    CONSENSUS_CONFIG_DATA_MAX_SIZE,
 } from '../../../utils/constants.js';
 import {
     decodeProofProposalApproval,
@@ -35,7 +37,7 @@ class StateValidationSchema {
     #validateBalanceInitializationSchema;
     #validateSetEpochOperationSchema;
     #validateSetGenesisEpochOperationSchema;
-    #validateSetVdfParamsOperationSchema;
+    #validateSetConsensusConfigOperationSchema;
     #proofDataFields;
     #config;
 
@@ -60,6 +62,7 @@ class StateValidationSchema {
             messages: {
                 buffer: "The '{field}' field must be a Buffer! Actual: {actual}",
                 bufferLength: "The '{field}' field must be a Buffer with length {expected}! Actual: {actual}",
+                bufferMaxLength: "The '{field}' field must be a Buffer no longer than {expected} bytes! Actual: {actual}",
                 nonZeroBuffer: "The '{field}' field must not be an empty or zero-filled Buffer!",
                 emptyBuffer: "The '{field}' field must not be an empty Buffer!",
                 proofData: "The '{field}' field must be an encoded ProofProposal buffer.",
@@ -100,6 +103,26 @@ class StateValidationSchema {
                                 ${this.makeError({type: "emptyBuffer", actual: "value", messages})}
                             }
                             return value;
+                    `
+            };
+        });
+
+        this.#validator.add("buffer_max_length", function ({schema, messages}, _path, _context) {
+            return {
+                source:
+                    `
+                        if (!${isBuffer}(value)) {
+                            ${this.makeError({type: "buffer", actual: "value", messages})}
+                        }
+                        if (value.length === 0 || value.length > ${schema.maxLength}) {
+                            ${this.makeError({
+        type: "bufferMaxLength",
+        expected: schema.maxLength,
+        actual: "value.length",
+        messages
+    })}
+                        }
+                        return value;
                     `
             };
         });
@@ -273,7 +296,7 @@ class StateValidationSchema {
         this.#validateBalanceInitializationSchema = this.#compileBalanceInitializationSchema();
         this.#validateSetEpochOperationSchema = this.#compileSetEpochOperationSchema();
         this.#validateSetGenesisEpochOperationSchema = this.#compileSetGenesisEpochOperationSchema();
-        this.#validateSetVdfParamsOperationSchema = this.#compileSetVdfParamsOperationSchema();
+        this.#validateSetConsensusConfigOperationSchema = this.#compileSetConsensusConfigOperationSchema();
 
     }
 
@@ -670,18 +693,30 @@ class StateValidationSchema {
         return this.#validateSetGenesisEpochOperationSchema(op) === true;
     }
 
-    #compileSetVdfParamsOperationSchema() {
+    #compileSetConsensusConfigOperationSchema() {
         const schema = {
             $$strict: true,
-            type: this.#operationTypeDomain(OperationType.SET_VDF_PARAMS),
+            type: this.#operationTypeDomain(OperationType.SET_CONSENSUS_CONFIG),
             address: {type: 'buffer', length: this.#config.addressLength, required: true},
-            vpo: {
+            cco: {
                 strict: true,
                 type: 'object',
                 props: {
                     tx: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true},
                     txv: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true},
-                    df: {type: 'buffer', length: VDF_DIFFICULTY_SIZE, required: true},
+                    cc: {
+                        strict: true,
+                        type: 'object',
+                        required: true,
+                        props: {
+                            sv: {type: 'buffer', length: CONSENSUS_CONFIG_SCHEMA_VERSION_BYTE_LENGTH, required: true},
+                            cd: {
+                                type: 'buffer_max_length',
+                                maxLength: CONSENSUS_CONFIG_DATA_MAX_SIZE,
+                                required: true
+                            },
+                        }
+                    },
                     in: {type: 'buffer', length: NONCE_BYTE_LENGTH, required: true},
                     is: {type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true},
                 }
@@ -690,9 +725,10 @@ class StateValidationSchema {
         return this.#validator.compile(schema);
     }
 
-    validateSetVdfParamsOperation(op) {
-        return this.#validateSetVdfParamsOperationSchema(op) === true;
+    validateSetConsensusConfigOperation(op) {
+        return this.#validateSetConsensusConfigOperationSchema(op) === true;
     }
+
 }
 
 export default StateValidationSchema;
