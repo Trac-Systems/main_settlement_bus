@@ -555,21 +555,21 @@ class ApplyStateMessageDirector {
     }
 
     /**
-     * Build a complete set VDF params payload.
+     * Build a complete set consensus config payload.
      * @param {string|Buffer} invokerAddress
      * @param {string|Buffer} txValidity
-     * @param {string|Buffer} vdfDifficulty
+     * @param {Buffer} encodedConsensusConfig
      * @returns {Promise<object>}
      */
-    async buildCompleteSetVdfParamsMessage(invokerAddress, txValidity, vdfDifficulty) {
+    async buildCompleteSetConsensusConfigMessage(invokerAddress, txValidity, encodedConsensusConfig) {
         if (!this.#builder) throw new Error('Builder has not been set.');
         await this.#builder
             .setPhase('complete')
             .setOutput('buffer')
-            .setOperationType(OperationType.SET_VDF_PARAMS)
+            .setOperationType(OperationType.SET_CONSENSUS_CONFIG)
             .setAddress(invokerAddress)
             .setTxValidity(txValidity)
-            .setVdfDifficulty(vdfDifficulty)
+            .setConsensusConfig(encodedConsensusConfig)
             .build();
         return this.#builder.getPayload();
     }

@@ -15,13 +15,14 @@ import {
     isBootstrapDeployment,
     isCoreAdmin,
     isRoleAccess,
+    isSetConsensusConfig,
     isSetEpoch,
     isSetGenesisEpoch,
-    isSetVdfParams,
     isTransaction,
     isTransfer,
     operationToPayload
 } from '../../utils/applyOperations.js';
+import { decodeConsensusConfig } from '../../codecs/apply/applyOperationCodec.js';
 import { isHexString } from '../../utils/helpers.js';
 
 // Single use per transaction: reuse of this instance needs mutex/queue or fail-fast and can delay validation or break validation rule.
@@ -40,6 +41,8 @@ class ApplyStateMessageBuilder {
     #channel;
     #contentHash;
     #config;
+    #consensusConfig;
+    #encodedConsensusConfig;
     #externalBootstrap;
     #incomingAddress;
     #incomingNonce;
@@ -183,6 +186,12 @@ class ApplyStateMessageBuilder {
         this.#approvals = approvals.map((approval, index) => {
             return this.#normalizeBytesBuffer(approval, `Approval ${index}`);
         });
+        return this;
+    }
+
+    setConsensusConfig(encodedConsensusConfig) {
+        this.#consensusConfig = decodeConsensusConfig(encodedConsensusConfig);
+        this.#encodedConsensusConfig = encodedConsensusConfig;
         return this;
     }
 
@@ -581,15 +590,15 @@ class ApplyStateMessageBuilder {
                     this.#operationType
                 );
                 break;
-            case OperationType.SET_VDF_PARAMS:
+            case OperationType.SET_CONSENSUS_CONFIG:
                 this.#requireFields([
                     [this.#txValidity, 'Transaction validity'],
-                    [this.#vdfDifficulty, 'Difficulty']
+                    [this.#encodedConsensusConfig, 'Consensus config']
                 ]);
                 msg = createMessage(
                     this.#config.networkId,
                     this.#txValidity,
-                    this.#vdfDifficulty,
+                    this.#encodedConsensusConfig,
                     nonce,
                     this.#operationType
                 );
@@ -693,11 +702,11 @@ class ApplyStateMessageBuilder {
                 is: signature
             };
         }
-        if (isSetVdfParams(this.#operationType)) {
+        if (isSetConsensusConfig(this.#operationType)) {
             return {
                 tx,
                 txv: this.#txValidity,
-                df: this.#vdfDifficulty,
+                cc: this.#consensusConfig,
                 in: nonce,
                 is: signature
             };
