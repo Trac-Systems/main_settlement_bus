@@ -16,7 +16,7 @@ import {
     VDF_BLOB_PROOF_SIZE,
     VDF_DIFFICULTY_SIZE,
     VDF_DISCRIMINANT_SIZE,
-    CONSENSUS_CONFIG_SCHEMA_VERSION,
+    CONSENSUS_CONFIG_SCHEMA_VERSION_BYTE_LENGTH,
     CONSENSUS_CONFIG_DATA_MAX_SIZE,
 } from '../../../utils/constants.js';
 import {
@@ -709,7 +709,7 @@ class StateValidationSchema {
                         type: 'object',
                         required: true,
                         props: {
-                            sv: {type: 'buffer', length: CONSENSUS_CONFIG_SCHEMA_VERSION, required: true},
+                            sv: {type: 'buffer', length: CONSENSUS_CONFIG_SCHEMA_VERSION_BYTE_LENGTH, required: true},
                             cd: {
                                 type: 'buffer_max_length',
                                 maxLength: CONSENSUS_CONFIG_DATA_MAX_SIZE,

@@ -11,7 +11,7 @@ import {
     AMOUNT_BYTE_LENGTH,
     VDF_DIFFICULTY_SIZE,
     VDF_DISCRIMINANT_SIZE,
-    CONSENSUS_CONFIG_SCHEMA_VERSION
+    CONSENSUS_CONFIG_SCHEMA_VERSION_BYTE_LENGTH
 } from '../../src/utils/constants.js';
 import { config } from '../helpers/config.js'
 import { asAddress } from '../helpers/address.js';
@@ -476,7 +476,7 @@ export const CCO = {
         is: SIGNATURE_BYTE_LENGTH
     },
     required_length_of_consensus_config_fields: {
-        sv: CONSENSUS_CONFIG_SCHEMA_VERSION
+        sv: CONSENSUS_CONFIG_SCHEMA_VERSION_BYTE_LENGTH
     }
 }
 
