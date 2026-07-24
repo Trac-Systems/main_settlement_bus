@@ -185,23 +185,23 @@ const getValidatedConsensusConfigPayload = (payload) => {
         throw new Error('ConsensusConfig payload must be an object.');
     }
 
-    const { version, configData } = payload;
+    const { sv, cd} = payload;
 
-    if (!b4a.isBuffer(version) || version.length !== 1) {
-        throw new Error('ConsensusConfig version must be a one-byte buffer.');
+    if (!b4a.isBuffer(sv) || sv.length !== 1) {
+        throw new Error('Schema version must be a one-byte buffer.');
     }
 
-    if (!b4a.isBuffer(configData)) {
+    if (!b4a.isBuffer(cd)) {
         throw new Error('ConsensusConfig configData must be a buffer.');
     }
 
-    return { version, configData };
+    return { sv, cd };
 }
 
 /**
  * Encodes a ConsensusConfig using the SetConsensusConfigOperation wire format.
  *
- * @param {{version: Buffer, configData: Buffer}} payload - Consensus config payload.
+ * @param {{sv: Buffer, cd: Buffer}} payload - Consensus config payload.
  * @returns {Buffer} Encoded ConsensusConfig.
  */
 export const encodeConsensusConfig = (payload) => {
@@ -216,7 +216,7 @@ export const encodeConsensusConfig = (payload) => {
  * Decodes a ConsensusConfig encoded with the SetConsensusConfigOperation wire format.
  *
  * @param {Buffer} payload - Encoded ConsensusConfig buffer.
- * @returns {{version: Buffer, configData: Buffer}} Decoded ConsensusConfig.
+ * @returns {{sv: Buffer, cd: Buffer}} Decoded ConsensusConfig.
  */
 export const decodeConsensusConfig = (payload) => {
     if (!b4a.isBuffer(payload)) {
@@ -249,7 +249,7 @@ export const safeEncodeConsensusConfig = (payload) => {
  * Safely decodes a ConsensusConfig. Returns null when the input is invalid.
  *
  * @param {*} payload - Encoded ConsensusConfig buffer.
- * @returns {{version: Buffer, configData: Buffer}|null} Decoded ConsensusConfig or null.
+ * @returns {{sv: Buffer, cd: Buffer}|null} Decoded ConsensusConfig or null.
  */
 export const safeDecodeConsensusConfig = (payload) => {
     try {
