@@ -8,7 +8,9 @@ import {
     ConsensusProtocolVersion,
     ConsensusResultCode,
     NetworkResultCode,
-    VDF_BLOB_PROOF_SIZE
+    VDF_BLOB_PROOF_SIZE,
+    VDF_DIFFICULTY_SIZE,
+    VDF_DISCRIMINANT_SIZE
 } from '../../../src/utils/constants.js';
 import {uint8ToBuffer, uint16ToBuffer, uint64ToBuffer} from '../../../src/utils/buffer.js';
 import {config} from '../../helpers/config.js';
@@ -23,8 +25,9 @@ const makeProofProposalPayload = (epoch, proofProposalOverrides = {}) => ({
         epoch,
         previous_epoch_record_hash: b4a.alloc(32, 1),
         proposer: b4a.alloc(config.addressLength, 2),
-        vdf_parameters_hash: b4a.alloc(32, 3),
-        vdf_proof: b4a.alloc(VDF_BLOB_PROOF_SIZE, 4),
+        difficulty: b4a.alloc(VDF_DIFFICULTY_SIZE, 3),
+        discriminant_bit_size: b4a.alloc(VDF_DISCRIMINANT_SIZE, 4),
+        proof: b4a.alloc(VDF_BLOB_PROOF_SIZE, 4),
         signature: b4a.alloc(64, 5),
         ...proofProposalOverrides
     },
