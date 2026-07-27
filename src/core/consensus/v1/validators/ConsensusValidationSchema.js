@@ -8,7 +8,7 @@ import {
     VDF_BLOB_PROOF_SIZE,
     PROTOCOL_VERSION_BYTE_LENGTH,
     NETWORK_ID_BYTE_LENGTH,
-    EPOCH_BYTE_LENGTH
+    EPOCH_BYTE_LENGTH, VDF_DIFFICULTY_SIZE, VDF_DISCRIMINANT_SIZE
 } from '../../../../utils/constants.js';
 import { V1ConsensusProtocolError } from '../V1ConsensusProtocolError.js';
 
@@ -102,8 +102,9 @@ class ConsensusValidationSchema {
                     epoch: { type: 'buffer', length: EPOCH_BYTE_LENGTH, required: true },
                     previous_epoch_record_hash: { type: 'buffer', length: HASH_BYTE_LENGTH, required: true },
                     proposer: { type: 'buffer', length: this.#config.addressLength, required: true },
-                    vdf_parameters_hash: { type: 'buffer', length: HASH_BYTE_LENGTH, required: true },
-                    vdf_proof: { type: 'buffer', length: VDF_BLOB_PROOF_SIZE, required: true },
+                    difficulty: { type: 'buffer', length: VDF_DIFFICULTY_SIZE, required: true },
+                    discriminant_bit_size: { type: 'buffer', length: VDF_DISCRIMINANT_SIZE, required: true },
+                    proof: { type: 'buffer', length: VDF_BLOB_PROOF_SIZE, required: true },
                     signature: { type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true },
                 }
             },
