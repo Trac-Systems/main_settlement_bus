@@ -51,8 +51,9 @@ test('ConsensusMessageBuilder builds proof proposal and verifies signature', asy
         .setEpoch(Number(proofProposalFixture.epoch.readBigUInt64BE(0)))
         .setPreviousEpochRecordHash(proofProposalFixture.previous_epoch_record_hash)
         .setProposer(proposer)
-        .setVdfParametersHash(proofProposalFixture.vdf_parameters_hash)
-        .setVdfProof(proofProposalFixture.vdf_proof)
+        .setDifficulty(proofProposalFixture.difficulty)
+        .setDiscriminantBitSize(proofProposalFixture.discriminant_bit_size)
+        .setProof(proofProposalFixture.proof)
         .buildPayload();
 
     const payload = builder.getResult();
@@ -65,8 +66,9 @@ test('ConsensusMessageBuilder builds proof proposal and verifies signature', asy
     t.alike(proofProposal.epoch, proofProposalFixture.epoch);
     t.alike(proofProposal.previous_epoch_record_hash, proofProposalFixture.previous_epoch_record_hash);
     t.alike(proofProposal.proposer, proofProposalFixture.proposer);
-    t.alike(proofProposal.vdf_parameters_hash, proofProposalFixture.vdf_parameters_hash);
-    t.alike(proofProposal.vdf_proof, proofProposalFixture.vdf_proof);
+    t.alike(proofProposal.difficulty, proofProposalFixture.difficulty);
+    t.alike(proofProposal.discriminant_bit_size, proofProposalFixture.discriminant_bit_size);
+    t.alike(proofProposal.proof, proofProposalFixture.proof);
     t.ok(b4a.isBuffer(proofProposal.signature));
 
     const msg = createMessage(
@@ -75,8 +77,9 @@ test('ConsensusMessageBuilder builds proof proposal and verifies signature', asy
         proofProposal.epoch,
         proofProposal.previous_epoch_record_hash,
         proofProposal.proposer,
-        proofProposal.vdf_parameters_hash,
-        proofProposal.vdf_proof
+        proofProposal.difficulty,
+        proofProposal.discriminant_bit_size,
+        proofProposal.proof
     );
     const hash = await tracCryptoApi.hash.blake3(msg);
     t.ok(wallet.verify(proofProposal.signature, hash, wallet.publicKey));
@@ -102,8 +105,9 @@ test('ConsensusMessageBuilder iterates proof proposal response ConsensusResultCo
             .setEpoch(Number(proofProposalFixture.epoch.readBigUInt64BE(0)))
             .setPreviousEpochRecordHash(proofProposalFixture.previous_epoch_record_hash)
             .setProposer(proposer)
-            .setVdfParametersHash(proofProposalFixture.vdf_parameters_hash)
-            .setVdfProof(proofProposalFixture.vdf_proof)
+            .setDifficulty(proofProposalFixture.difficulty)
+            .setDiscriminantBitSize(proofProposalFixture.discriminant_bit_size)
+            .setProof(proofProposalFixture.proof)
             .setRequesterProofSignature(proofProposalFixture.signature)
             .setResultCode(code)
             .setApprover(proposer)
@@ -124,8 +128,9 @@ test('ConsensusMessageBuilder iterates proof proposal response ConsensusResultCo
                 proofProposalFixture.epoch,
                 proofProposalFixture.previous_epoch_record_hash,
                 proofProposalFixture.proposer,
-                proofProposalFixture.vdf_parameters_hash,
-                proofProposalFixture.vdf_proof,
+                proofProposalFixture.difficulty,
+                proofProposalFixture.discriminant_bit_size,
+                proofProposalFixture.proof,
                 payload.proof_proposal_response.approval.approver,
                 proofProposalFixture.signature
             );
@@ -219,8 +224,9 @@ test('ConsensusMessageBuilder encodes scalar number fields at byte-width boundar
             .setEpoch(testCase.epoch)
             .setPreviousEpochRecordHash(proofProposalFixture.previous_epoch_record_hash)
             .setProposer(proposer)
-            .setVdfParametersHash(proofProposalFixture.vdf_parameters_hash)
-            .setVdfProof(proofProposalFixture.vdf_proof)
+            .setDifficulty(proofProposalFixture.difficulty)
+            .setDiscriminantBitSize(proofProposalFixture.discriminant_bit_size)
+            .setProof(proofProposalFixture.proof)
             .buildPayload();
 
         const payload = builder.getResult();
@@ -241,8 +247,9 @@ test('ConsensusMessageBuilder encodes scalar number fields at byte-width boundar
             proofProposal.epoch,
             proofProposal.previous_epoch_record_hash,
             proofProposal.proposer,
-            proofProposal.vdf_parameters_hash,
-            proofProposal.vdf_proof
+            proofProposal.difficulty,
+            proofProposal.discriminant_bit_size,
+            proofProposal.proof
         );
         const hash = await tracCryptoApi.hash.blake3(msg);
         t.ok(wallet.verify(proofProposal.signature, hash, wallet.publicKey));
@@ -378,13 +385,18 @@ test('ConsensusMessageBuilder rejects invalid buffer and address fields', async 
     );
 
     t.exception(
-        () => builder.setVdfParametersHash('not-a-buffer'),
-        errorMessageIncludes('VDF parameters hash must be a buffer.')
+        () => builder.setDifficulty('not-a-buffer'),
+        errorMessageIncludes('Difficulty must be a buffer.')
     );
 
     t.exception(
-        () => builder.setVdfProof('not-a-buffer'),
-        errorMessageIncludes('VDF proof must be a buffer.')
+        () => builder.setDiscriminantBitSize('not-a-buffer'),
+        errorMessageIncludes('Discriminant bit size must be a buffer.')
+    );
+
+    t.exception(
+        () => builder.setProof('not-a-buffer'),
+        errorMessageIncludes('Proof must be a buffer.')
     );
 
     t.exception(
@@ -426,8 +438,9 @@ test('ConsensusMessageBuilder rejects missing fields before build result is avai
             .setEpoch(epoch)
             .setPreviousEpochRecordHash(proofProposalFixture.previous_epoch_record_hash)
             .setProposer(proposer)
-            .setVdfParametersHash(proofProposalFixture.vdf_parameters_hash)
-            .setVdfProof(proofProposalFixture.vdf_proof)
+            .setDifficulty(proofProposalFixture.difficulty)
+            .setDiscriminantBitSize(proofProposalFixture.discriminant_bit_size)
+            .setProof(proofProposalFixture.proof)
             .buildPayload(),
         errorMessageIncludes('Protocol version must be a buffer.')
     );
@@ -451,8 +464,9 @@ test('ConsensusMessageBuilder rejects missing fields before build result is avai
             .setEpoch(epoch)
             .setPreviousEpochRecordHash(proofProposalFixture.previous_epoch_record_hash)
             .setProposer(proposer)
-            .setVdfParametersHash(proofProposalFixture.vdf_parameters_hash)
-            .setVdfProof(proofProposalFixture.vdf_proof)
+            .setDifficulty(proofProposalFixture.difficulty)
+            .setDiscriminantBitSize(proofProposalFixture.discriminant_bit_size)
+            .setProof(proofProposalFixture.proof)
             .setRequesterProofSignature(proofProposalFixture.signature)
             .setApprover(proposer)
             .buildPayload(),
@@ -482,8 +496,9 @@ test('ConsensusMessageBuilder signs non-zero network id and uint64 epochs withou
         .setEpoch(epoch)
         .setPreviousEpochRecordHash(proofProposalFixture.previous_epoch_record_hash)
         .setProposer(proposer)
-        .setVdfParametersHash(proofProposalFixture.vdf_parameters_hash)
-        .setVdfProof(proofProposalFixture.vdf_proof)
+        .setDifficulty(proofProposalFixture.difficulty)
+        .setDiscriminantBitSize(proofProposalFixture.discriminant_bit_size)
+        .setProof(proofProposalFixture.proof)
         .buildPayload();
 
     const proofProposal = builder.getResult().proof_proposal;
@@ -497,8 +512,9 @@ test('ConsensusMessageBuilder signs non-zero network id and uint64 epochs withou
         proofProposal.epoch,
         proofProposal.previous_epoch_record_hash,
         proofProposal.proposer,
-        proofProposal.vdf_parameters_hash,
-        proofProposal.vdf_proof
+        proofProposal.difficulty,
+        proofProposal.discriminant_bit_size,
+        proofProposal.proof
     );
     const signedHash = await tracCryptoApi.hash.blake3(signedMessage);
 
@@ -510,8 +526,9 @@ test('ConsensusMessageBuilder signs non-zero network id and uint64 epochs withou
         epoch,
         proofProposalFixture.previous_epoch_record_hash,
         proofProposalFixture.proposer,
-        proofProposalFixture.vdf_parameters_hash,
-        proofProposalFixture.vdf_proof
+        proofProposalFixture.difficulty,
+        proofProposalFixture.discriminant_bit_size,
+        proofProposalFixture.proof
     );
     const legacyHash = await tracCryptoApi.hash.blake3(legacyMessage);
     t.not(wallet.verify(proofProposal.signature, legacyHash, wallet.publicKey));

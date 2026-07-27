@@ -26,8 +26,9 @@ class ConsensusMessageBuilder {
     #epoch;
     #previous_epoch_record_hash;
     #proposer;
-    #vdf_parameters_hash;
-    #vdf_proof;
+    #difficulty;
+    #discriminant_bit_size;
+    #proof;
     #resultCode;
     #approver;
     #body;
@@ -69,13 +70,11 @@ class ConsensusMessageBuilder {
         if (!this.#type) throw new Error('Header requires type to be set');
         if (!this.#session_id) throw new Error('Header requires session to be set');
         if (!this.#timestamp) throw new Error('Header requires a timestamp provider');
-        //if (!Array.isArray(this.#capabilities)) throw new Error('Header requires capabilities array');
 
         this.#header = {
             type: this.#type,
             session_id: this.#session_id,
             timestamp: this.#timestamp,
-            //capabilities: this.#capabilities,
         };
         return this;
     }
@@ -146,16 +145,19 @@ class ConsensusMessageBuilder {
         return this;
     }
 
-    setVdfParametersHash(vdfParametersHash) {
-        this.#vdf_parameters_hash = this.#validateBuffer(
-            vdfParametersHash,
-            'VDF parameters hash'
-        );
+    setDifficulty(difficulty) {
+        this.#difficulty = this.#validateBuffer(difficulty, 'Difficulty');
+        return this;
+
+    }
+
+    setDiscriminantBitSize(discriminantBitSize) {
+        this.#discriminant_bit_size = this.#validateBuffer(discriminantBitSize, 'Discriminant bit size');
         return this;
     }
 
-    setVdfProof(vdfProof) {
-        this.#vdf_proof = this.#validateBuffer(vdfProof, 'VDF proof');
+    setProof(proof) {
+        this.#proof = this.#validateBuffer(proof, 'Proof');
         return this;
     }
 
@@ -189,8 +191,9 @@ class ConsensusMessageBuilder {
             epoch: this.#validateBuffer(this.#epoch, 'Epoch'),
             previous_epoch_record_hash: this.#validateBuffer(this.#previous_epoch_record_hash, 'Previous epoch record hash'),
             proposer: this.#validateBuffer(this.#proposer, 'Proposer'),
-            vdf_parameters_hash: this.#validateBuffer(this.#vdf_parameters_hash, 'VDF parameters hash'),
-            vdf_proof: this.#validateBuffer(this.#vdf_proof, 'VDF proof')
+            difficulty: this.#validateBuffer(this.#difficulty, 'Difficulty'),
+            discriminant_bit_size: this.#validateBuffer(this.#discriminant_bit_size, 'Discriminant bit size'),
+            proof: this.#validateBuffer(this.#proof, 'VDF proof')
         };
     }
 
@@ -220,8 +223,9 @@ class ConsensusMessageBuilder {
             proofProposal.epoch,
             proofProposal.previous_epoch_record_hash,
             proofProposal.proposer,
-            proofProposal.vdf_parameters_hash,
-            proofProposal.vdf_proof
+            proofProposal.difficulty,
+            proofProposal.discriminant_bit_size,
+            proofProposal.proof
         ));
     }
 
@@ -232,8 +236,9 @@ class ConsensusMessageBuilder {
             proofProposal.epoch,
             proofProposal.previous_epoch_record_hash,
             proofProposal.proposer,
-            proofProposal.vdf_parameters_hash,
-            proofProposal.vdf_proof,
+            proofProposal.difficulty,
+            proofProposal.discriminant_bit_size,
+            proofProposal.proof,
             approver,
             requesterProofSignature
         ));
