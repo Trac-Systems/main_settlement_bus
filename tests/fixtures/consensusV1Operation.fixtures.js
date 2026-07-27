@@ -11,6 +11,8 @@ import {
     HASH_BYTE_LENGTH,
     SIGNATURE_BYTE_LENGTH,
     VDF_BLOB_PROOF_SIZE,
+    VDF_DIFFICULTY_SIZE,
+    VDF_DISCRIMINANT_SIZE,
 } from '../../src/utils/constants.js';
 
 const { MessageType } = consensusV1Generated.consensus.v1;
@@ -26,8 +28,9 @@ const proofProposal = Object.freeze({
         asAddress('82f6c1f684f4e251dfe092155b8861a0625b596991810b2b80b9c65ccbec5ad3'),
         config.addressPrefix
     ),
-    vdf_parameters_hash: bytes(3, HASH_BYTE_LENGTH),
-    vdf_proof: bytes(67, VDF_BLOB_PROOF_SIZE),
+    difficulty: bytes(3, VDF_DIFFICULTY_SIZE),
+    discriminant_bit_size: bytes(4, VDF_DISCRIMINANT_SIZE),
+    proof: bytes(67, VDF_BLOB_PROOF_SIZE),
     signature: bytes(67, SIGNATURE_BYTE_LENGTH)
 });
 
