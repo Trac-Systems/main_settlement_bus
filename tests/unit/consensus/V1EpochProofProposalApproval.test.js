@@ -12,15 +12,18 @@ import {
     ConsensusOperationType,
     ConsensusProtocolVersion,
     ConsensusResultCode,
-    VDF_BLOB_PROOF_SIZE
+    VDF_BLOB_PROOF_SIZE,
+    VDF_DIFFICULTY_SIZE,
+    VDF_DISCRIMINANT_SIZE
 } from '../../../src/utils/constants.js';
 import {config} from '../../helpers/config.js';
 import {testKeyPair1, testKeyPair2, testKeyPair3} from '../../fixtures/apply.fixtures.js';
 import {createMessage, uint32ToBuffer} from '../../../src/utils/buffer.js';
 
 const previousEpochRecordHash = b4a.alloc(32, 1);
-const vdfParametersHash = b4a.alloc(32, 2);
-const vdfProof = b4a.alloc(VDF_BLOB_PROOF_SIZE, 3);
+const difficulty = b4a.alloc(VDF_DIFFICULTY_SIZE, 2);
+const discriminantBitSize = b4a.alloc(VDF_DISCRIMINANT_SIZE, 3);
+const proof = b4a.alloc(VDF_BLOB_PROOF_SIZE, 4);
 const state = {
     isIndexerAddress: async () => true
 };
@@ -41,8 +44,9 @@ async function buildProofProposalPayload(proposerWallet) {
         .setEpoch(1)
         .setPreviousEpochRecordHash(previousEpochRecordHash)
         .setProposer(proposerWallet.address)
-        .setVdfParametersHash(vdfParametersHash)
-        .setVdfProof(vdfProof)
+        .setDifficulty(difficulty)
+        .setDiscriminantBitSize(discriminantBitSize)
+        .setProof(proof)
         .buildPayload();
 
     return builder.getResult();
@@ -61,8 +65,9 @@ async function buildProofProposalApprovalPayload(approverWallet, proofProposalPa
         .setEpoch(Number(proofProposal.epoch.readBigUInt64BE(0)))
         .setPreviousEpochRecordHash(proofProposal.previous_epoch_record_hash)
         .setProposer(bufferToAddress(proofProposal.proposer, config.addressPrefix))
-        .setVdfParametersHash(proofProposal.vdf_parameters_hash)
-        .setVdfProof(proofProposal.vdf_proof)
+        .setDifficulty(proofProposal.difficulty)
+        .setDiscriminantBitSize(proofProposal.discriminant_bit_size)
+        .setProof(proofProposal.proof)
         .setRequesterProofSignature(proofProposal.signature)
         .setResultCode(ConsensusResultCode.OK)
         .setApprover(approverAddress)
