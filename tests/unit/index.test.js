@@ -2,10 +2,16 @@ import { test } from 'brittle';
 import sinon from 'sinon';
 import EventEmitter from 'bare-events';
 import b4a from 'b4a';
+import tracCryptoApi from 'trac-crypto-api';
 import { WalletProvider } from 'trac-wallet';
 import { OperationType } from '../../src/utils/constants.js';
-import { safeDecodeApplyOperation } from '../../src/codecs/apply/applyOperationCodec.js';
+import {
+    encodeConsensusConfig,
+    safeDecodeApplyOperation
+} from '../../src/codecs/apply/applyOperationCodec.js';
+import { decodeVdfConfig } from '../../src/codecs/consensus/v1/vdfConfigCodec.js';
 import { addressToBuffer } from '../../src/core/state/utils/address.js';
+import { createMessage } from '../../src/utils/buffer.js';
 import { overrideConfig } from '../helpers/config.js';
 import { testKeyPair1 } from '../fixtures/apply.fixtures.js';
 import { errorMessageIncludes } from '../helpers/regexHelper.js';
@@ -122,6 +128,16 @@ function adminEntryFor(wallet, state, overrides = {}) {
         address: wallet.address,
         wk: state.writingKey,
         ...overrides,
+    };
+}
+
+function validConsensusConfig() {
+    return {
+        schemaVersion: 1,
+        configData: {
+            difficulty: 60_000_000,
+            discriminantBitSize: 2048,
+        },
     };
 }
 
@@ -396,7 +412,7 @@ if (isBareRuntime) {
         await msb.close();
     });
 
-    test('MainSettlementBus appends set VDF params with encoded difficulty', async t => {
+    test('MainSettlementBus appends a generic version-1 consensus config operation', async t => {
         const consoleLog = sinon.stub(console, 'log');
         t.teardown(() => consoleLog.restore());
 
@@ -409,47 +425,52 @@ if (isBareRuntime) {
         await msb.ready();
 
         loaded.state.getAdminEntry.resolves(adminEntryFor(wallet, loaded.state));
-        loaded.state.requireSignedVDFParams.resolves({
-            vdfDifficulty: 55000000,
-            vdfDiscriminantSize: 2048,
-        });
         loaded.state.getIndexerSequenceState.resolves(txValidity);
 
-        await msb.handleSetVdfParams({
-            vdfDifficulty: '60000000',
-        });
+        await msb.handleSetConsensusConfig(validConsensusConfig());
 
-        t.ok(loaded.state.requireSignedVDFParams.calledOnce);
+        t.ok(loaded.state.requireSignedVDFParams.notCalled);
         t.ok(loaded.state.getIndexerSequenceState.calledOnce);
         t.ok(loaded.state.append.calledOnce);
 
         const encodedPayload = loaded.state.append.firstCall.args[0];
         const decoded = safeDecodeApplyOperation(encodedPayload);
 
-        t.is(decoded.type, OperationType.SET_VDF_PARAMS);
+        t.is(decoded.type, OperationType.SET_CONSENSUS_CONFIG);
         t.ok(b4a.equals(decoded.address, addressToBuffer(wallet.address, config.addressPrefix)));
-        t.ok(b4a.equals(decoded.vpo.txv, txValidity));
-        t.is(decoded.vpo.df.length, 4);
-        t.is(decoded.vpo.df.readUInt32BE(0), 60000000);
-        t.absent(decoded.vpo.db);
+        t.ok(b4a.equals(decoded.cco.txv, txValidity));
+        t.is(decoded.cco.cc.sv.readUInt8(0), 1);
+
+        const decodedVdfConfig = decodeVdfConfig(decoded.cco.cc.cd);
+        t.is(decodedVdfConfig.difficulty.readUInt32BE(0), 60_000_000);
+        t.is(decodedVdfConfig.discriminantBitSize.readUInt16BE(0), 2048);
+
+        const encodedConsensusConfig = encodeConsensusConfig(decoded.cco.cc);
+        const message = createMessage(
+            config.networkId,
+            decoded.cco.txv,
+            encodedConsensusConfig,
+            decoded.cco.in,
+            OperationType.SET_CONSENSUS_CONFIG
+        );
+        const expectedHash = await tracCryptoApi.hash.blake3(message);
+        t.ok(b4a.equals(decoded.cco.tx, expectedHash));
 
         await msb.close();
     });
 
-    test('MainSettlementBus rejects set VDF params when wallet is disabled', async t => {
+    test('MainSettlementBus rejects setting consensus config when wallet is disabled', async t => {
         const loaded = await loadMainSettlementBus();
         const config = buildGenesisConfig({ enableWallet: false });
         const msb = new loaded.MainSettlementBus(config);
 
         await t.exception(
-            () => msb.handleSetVdfParams({
-                vdfDifficulty: '60000000',
-            }),
+            () => msb.handleSetConsensusConfig(validConsensusConfig()),
             errorMessageIncludes('wallet is not enabled')
         );
     });
 
-    test('MainSettlementBus rejects set VDF params when admin is missing', async t => {
+    test('MainSettlementBus rejects setting consensus config when admin is missing', async t => {
         const consoleLog = sinon.stub(console, 'log');
         t.teardown(() => consoleLog.restore());
 
@@ -463,9 +484,7 @@ if (isBareRuntime) {
         loaded.state.getAdminEntry.resolves(null);
 
         await t.exception(
-            () => msb.handleSetVdfParams({
-                vdfDifficulty: '60000000',
-            }),
+            () => msb.handleSetConsensusConfig(validConsensusConfig()),
             errorMessageIncludes('admin has not been initialized')
         );
 
@@ -475,7 +494,7 @@ if (isBareRuntime) {
         await msb.close();
     });
 
-    test('MainSettlementBus rejects set VDF params for non-admin wallet', async t => {
+    test('MainSettlementBus rejects setting consensus config for non-admin wallet', async t => {
         const consoleLog = sinon.stub(console, 'log');
         t.teardown(() => consoleLog.restore());
 
@@ -491,9 +510,7 @@ if (isBareRuntime) {
         }));
 
         await t.exception(
-            () => msb.handleSetVdfParams({
-                vdfDifficulty: '60000000',
-            }),
+            () => msb.handleSetConsensusConfig(validConsensusConfig()),
             errorMessageIncludes('you are not the admin')
         );
 
@@ -503,7 +520,7 @@ if (isBareRuntime) {
         await msb.close();
     });
 
-    test('MainSettlementBus rejects set VDF params before VDF params are initialized', async t => {
+    test('MainSettlementBus rejects invalid generic consensus config input before submission', async t => {
         const consoleLog = sinon.stub(console, 'log');
         t.teardown(() => consoleLog.restore());
 
@@ -515,24 +532,33 @@ if (isBareRuntime) {
         await msb.ready();
 
         loaded.state.getAdminEntry.resolves(adminEntryFor(wallet, loaded.state));
-        loaded.state.requireSignedVDFParams.rejects(
-            new Error('VDF parameters are not initialized.')
-        );
 
-        await t.exception(
-            () => msb.handleSetVdfParams({
-                vdfDifficulty: '60000000',
-            }),
-            errorMessageIncludes('VDF parameters are not initialized.')
-        );
+        const invalidConfigs = [
+            null,
+            [],
+            'config',
+            {},
+            { schemaVersion: 1 },
+            { configData: {} },
+            { schemaVersion: 1, configData: {}, extra: true },
+            { schemaVersion: '1', configData: {} },
+            { schemaVersion: 0, configData: {} },
+            { schemaVersion: 256, configData: {} },
+            { schemaVersion: 2, configData: {} },
+        ];
 
+        for (const invalidConfig of invalidConfigs) {
+            await t.exception(() => msb.handleSetConsensusConfig(invalidConfig));
+        }
+
+        t.ok(loaded.state.requireSignedVDFParams.notCalled);
         t.ok(loaded.state.getIndexerSequenceState.notCalled);
         t.ok(loaded.state.append.notCalled);
 
         await msb.close();
     });
 
-    test('MainSettlementBus rejects set VDF params when VDF difficulty is not positive', async t => {
+    test('MainSettlementBus rejects invalid schema-version-1 configData before submission', async t => {
         const consoleLog = sinon.stub(console, 'log');
         t.teardown(() => consoleLog.restore());
 
@@ -544,18 +570,35 @@ if (isBareRuntime) {
         await msb.ready();
 
         loaded.state.getAdminEntry.resolves(adminEntryFor(wallet, loaded.state));
-        loaded.state.requireSignedVDFParams.resolves({
-            vdfDifficulty: 55000000,
-            vdfDiscriminantSize: 2048,
-        });
 
-        await t.exception(
-            () => msb.handleSetVdfParams({
-                vdfDifficulty: '0',
-            }),
-            errorMessageIncludes('VDF difficulty must be a positive unsigned 32-bit integer.')
-        );
+        const invalidConfigData = [
+            null,
+            [],
+            'config',
+            {},
+            { difficulty: 60_000_000 },
+            { discriminantBitSize: 2048 },
+            { difficulty: 60_000_000, discriminantBitSize: 2048, extra: true },
+            { difficulty: '60000000', discriminantBitSize: 2048 },
+            { difficulty: 1.5, discriminantBitSize: 2048 },
+            { difficulty: 0, discriminantBitSize: 2048 },
+            { difficulty: -1, discriminantBitSize: 2048 },
+            { difficulty: 0x100000000, discriminantBitSize: 2048 },
+            { difficulty: 60_000_000, discriminantBitSize: '2048' },
+            { difficulty: 60_000_000, discriminantBitSize: 1.5 },
+            { difficulty: 60_000_000, discriminantBitSize: 0 },
+            { difficulty: 60_000_000, discriminantBitSize: -1 },
+            { difficulty: 60_000_000, discriminantBitSize: 0x10000 },
+        ];
 
+        for (const configData of invalidConfigData) {
+            await t.exception(() => msb.handleSetConsensusConfig({
+                schemaVersion: 1,
+                configData,
+            }));
+        }
+
+        t.ok(loaded.state.requireSignedVDFParams.notCalled);
         t.ok(loaded.state.getIndexerSequenceState.notCalled);
         t.ok(loaded.state.append.notCalled);
 
