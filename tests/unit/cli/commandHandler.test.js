@@ -210,7 +210,7 @@ test("CommandHandler re-prompts malformed or incomplete consensus config JSON", 
     await handler.handle("abc");
 
     t.ok(console.log.calledWith(
-        'Invalid consensus config. Please enter a JSON object containing "schemaVersion" and "configData".'
+        'Invalid consensus config. Please enter a JSON object containing only "schemaVersion" and "configData".'
     ));
     t.ok(msb.handleSetConsensusConfig.notCalled);
 
@@ -219,12 +219,14 @@ test("CommandHandler re-prompts malformed or incomplete consensus config JSON", 
         "[]",
         '"value"',
         '{"schemaVersion":1}',
-        '{"configData":{}}'
+        '{"configData":{}}',
+        '{"schemaVersion":1,"configData":{},"extra":true}'
     ]) {
         await handler.handle(invalidInput);
     }
 
     t.ok(msb.handleSetConsensusConfig.notCalled);
+    t.ok(console.info.notCalled);
 
     await handler.handle('{"schemaVersion":1,"configData":{}}');
     await handler.handle("no");

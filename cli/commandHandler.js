@@ -379,7 +379,7 @@ export class CommandHandler {
         const consensusConfig = this.#parseConsensusConfig(input);
         if (!consensusConfig) {
             console.log(
-                'Invalid consensus config. Please enter a JSON object containing "schemaVersion" and "configData".'
+                'Invalid consensus config. Please enter a JSON object containing only "schemaVersion" and "configData".'
             );
             console.log(this.#getSetConsensusConfigPrompt());
             return;
@@ -409,6 +409,7 @@ export class CommandHandler {
             const parsed = JSON.parse(input);
             if (
                 !_.isPlainObject(parsed) ||
+                Object.keys(parsed).length !== 2 ||
                 !Object.hasOwn(parsed, "schemaVersion") ||
                 !Object.hasOwn(parsed, "configData")
             ) {
