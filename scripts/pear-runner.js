@@ -37,13 +37,12 @@ export const detectPearMajor = (runCommand = spawnSync) => {
     }
 
     const output = `${result.stdout ?? ''}\n${result.stderr ?? ''}`;
-    const major = parsePearMajor(output);
 
-    if (result.status !== 0 || major === null) {
+    if (result.status !== 0) {
         throw new Error('Could not determine the installed Pear major version from `pear -v`.');
     }
 
-    return major;
+    return parsePearMajor(output);
 };
 
 const exitCodeFor = (code, signal) => {

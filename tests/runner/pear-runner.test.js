@@ -43,6 +43,16 @@ test('detects the installed Pear major from pear -v output', () => {
     assert.equal(detectPearMajor(runCommand), 3);
 });
 
+test('treats successful unrecognized Pear CLI output as the module-based v3 path', () => {
+    const runCommand = () => ({
+        status: 0,
+        stdout: '',
+        stderr: ''
+    });
+
+    assert.equal(detectPearMajor(runCommand), null);
+});
+
 test('selects pear run for v2 and the module-based runner for v3', async () => {
     const calls = [];
     const runners = {
@@ -64,9 +74,14 @@ test('selects pear run for v2 and the module-based runner for v3', async () => {
         detectVersion: () => 3,
         ...runners
     }), 3);
+    assert.equal(await run(['--network', 'development'], {
+        detectVersion: () => null,
+        ...runners
+    }), 3);
     assert.deepEqual(calls, [
         ['v2', ['--network', 'mainnet']],
-        ['v3', ['--network', 'testnet']]
+        ['v3', ['--network', 'testnet']],
+        ['v3', ['--network', 'development']]
     ]);
 });
 
