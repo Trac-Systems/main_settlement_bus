@@ -1,6 +1,11 @@
 import test from 'brittle';
 
-import { isRpcEnabled, resolveConfig, resolveEnvironment } from '../../../src/config/args.js';
+import {
+    getArguments,
+    isRpcEnabled,
+    resolveConfig,
+    resolveEnvironment
+} from '../../../src/config/args.js';
 import { ENV } from '../../../src/config/env.js';
 
 async function withArgs(args, fn) {
@@ -115,4 +120,14 @@ test('args: resolveConfig rejects malformed and out-of-range port values', async
             );
         });
     }
+});
+
+test('args: reads Pear v3 worker arguments from Bare.argv', t => {
+    const args = getArguments({
+        Bare: {
+            argv: ['bare', 'msb.mjs', '--rpc', '--network', 'testnet']
+        }
+    });
+
+    t.alike(args, ['--rpc', '--network', 'testnet']);
 });
