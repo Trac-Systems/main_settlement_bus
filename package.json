@@ -7,11 +7,20 @@
     "type": "terminal"
   },
   "type": "module",
+  "files": [
+    "cli/",
+    "msb.mjs",
+    "NOTICE",
+    "rpc/",
+    "SECURITY.md",
+    "scripts/pear-runner.js",
+    "src/"
+  ],
   "scripts": {
-    "start": "NODE_OPTIONS='--max-old-space-size=4096' pear run .",
-    "rpc": "NODE_OPTIONS='--max-old-space-size=4096' pear run . --rpc --host ${npm_config_host} --port ${npm_config_port}",
-    "env": "if [ -f .env ]; then set -a; . ./.env; set +a; fi; NODE_OPTIONS='--max-old-space-size=4096' pear run . --stores-directory ${STORES_DIRECTORY:-stores} --network ${NETWORK:-mainnet}",
-    "env-rpc": "if [ -f .env ]; then set -a; . ./.env; set +a; fi; NODE_OPTIONS='--max-old-space-size=4096' pear run . --stores-directory ${STORES_DIRECTORY:-stores} --rpc --host ${MSB_HOST:-127.0.0.1} --port ${MSB_PORT:-5000} --network ${NETWORK:-mainnet}",
+    "start": "NODE_OPTIONS='--max-old-space-size=4096' node scripts/pear-runner.js",
+    "rpc": "NODE_OPTIONS='--max-old-space-size=4096' node scripts/pear-runner.js --rpc --host ${npm_config_host} --port ${npm_config_port}",
+    "env": "if [ -f .env ]; then set -a; . ./.env; set +a; fi; NODE_OPTIONS='--max-old-space-size=4096' node scripts/pear-runner.js --stores-directory ${STORES_DIRECTORY:-stores} --network ${NETWORK:-mainnet}",
+    "env-rpc": "if [ -f .env ]; then set -a; . ./.env; set +a; fi; NODE_OPTIONS='--max-old-space-size=4096' node scripts/pear-runner.js --stores-directory ${STORES_DIRECTORY:-stores} --rpc --host ${MSB_HOST:-127.0.0.1} --port ${MSB_PORT:-5000} --network ${NETWORK:-mainnet}",
     "env-rpc-docker": "if [ -f .env ]; then set -a; . ./.env; set +a; fi; NODE_OPTIONS='--max-old-space-size=4096' node msb.mjs --stores-directory ${STORES_DIRECTORY:-stores} --rpc --host 0.0.0.0 --port ${MSB_PORT:-5000} --network ${NETWORK:-mainnet}",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
@@ -22,7 +31,8 @@
     "test:unit:node": "brittle-node -t 60000 tests/unit/unit.test.js",
     "test:unit:bare": "brittle-bare -t 60000 tests/unit/unit.test.js",
     "test:unit:pear": "BRITTLE='-t 60000' brittle-pear tests/unit/unit.test.js",
-    "test:unit:all": "(npm run test:unit:node && npm run test:unit:bare) || exit 1",
+    "test:pear-runner": "node --test tests/runner/pear-runner.test.js",
+    "test:unit:all": "(npm run test:unit:node && npm run test:unit:bare && npm run test:pear-runner) || exit 1",
     "test:unit:node:cov": "brittle-node -c -t 60000 tests/unit/unit.test.js"
   },
   "dependencies": {
@@ -46,8 +56,11 @@
     "hypercore-crypto": "3.6.1",
     "hyperdht": "6.27.0",
     "hyperswarm": "4.14.2",
+    "hyperschema": "1.17.1",
     "lodash": "^4.18.1",
     "p-queue": "^9.1.0",
+    "pear-runtime": "1.3.1",
+    "process": "npm:bare-process@4.2.2",
     "protobufjs": "^7.5.4",
     "protocol-buffers-encodings": "1.2.0",
     "protomux": "3.10.1",

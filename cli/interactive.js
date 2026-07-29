@@ -1,6 +1,6 @@
 import ReadyResource from "ready-resource";
+import process from "process";
 import readline from "readline";
-import tty from "tty";
 import { WalletProvider, exportWallet, importFromFile } from "trac-wallet";
 import { MainSettlementBus } from "../src/index.js";
 import { sleep } from "../src/utils/helpers.js";
@@ -21,8 +21,8 @@ class Cli extends ReadyResource {
 
     async _open() {
         this.#readlineInstance = readline.createInterface({
-            input: new tty.ReadStream(0),
-            output: new tty.WriteStream(1),
+            input: process.stdin,
+            output: process.stdout,
             completer: line => this.#completeCommand(line) // This only works without Pear.
         });
 
