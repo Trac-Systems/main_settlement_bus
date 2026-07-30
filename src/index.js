@@ -2,6 +2,7 @@ import ReadyResource from "ready-resource";
 import Corestore from "corestore";
 import tracCryptoApi from "trac-crypto-api";
 import b4a from "b4a";
+import _ from "lodash";
 import { sleep, isHexString } from "./utils/helpers.js";
 import { applyStateMessageFactory } from "./messages/state/applyStateMessageFactory.js";
 import { isAddressValid } from "./core/state/utils/address.js";
@@ -24,13 +25,15 @@ import fileUtils from './utils/fileUtils.js';
 import migrationUtils from './utils/migrationUtils.js';
 import {
     encodeApplyOperation,
+    encodeConsensusConfig,
     safeDecodeApplyOperation,
     safeEncodeApplyOperation
 } from "./codecs/apply/applyOperationCodec.js";
+import { encodeVdfConfig } from "./codecs/consensus/v1/vdfConfigCodec.js";
 import PartialTransactionValidator from "./core/network/protocols/shared/validators/PartialTransactionValidator.js";
 import PartialTransferValidator from "./core/network/protocols/shared/validators/PartialTransferValidator.js";
 import { BroadcastError, ValidationError } from "./utils/errors.js";
-import { uint16ToBuffer, uint32ToBuffer } from "./utils/buffer.js";
+import { uint8ToBuffer, uint16ToBuffer, uint32ToBuffer } from "./utils/buffer.js";
 
 export class MainSettlementBus extends ReadyResource {
     #store;
@@ -292,7 +295,7 @@ export class MainSettlementBus extends ReadyResource {
             console.log("- /remove_indexer <address>: Change a role of the selected indexer node to default role. Charges a fee.");
             console.log("- /ban_writer <address>: Demote a whitelisted writer to default role and remove it from the whitelist. Charges a fee.");
             console.log("- /init_genesis: Initialize genesis epoch.");
-            console.log("- /set_vdf_params: Update VDF difficulty.");
+            console.log("- /set_consensus_config: Set new configuration data for a specific consensus schema version from JSON.");
         }
         console.log("Available commands:");
         console.log("- /add_writer: Add yourself as a validator to this MSB once whitelisted. Requires a fee + 10x the fee as a stake in $TNK.");
@@ -1112,41 +1115,107 @@ export class MainSettlementBus extends ReadyResource {
         await this.#state.append(encodedPayload);
     }
 
-    async handleSetVdfParams(params) {
+    async handleSetConsensusConfig(consensusConfig) {
         if (!this.#config.enableWallet) {
-            throw new Error("Can not set VDF params - wallet is not enabled.");
+            throw new Error("Can not set consensus config - wallet is not enabled.");
         }
 
         const adminEntry = await this.#state.getAdminEntry();
 
         if (!adminEntry) {
-            throw new Error("Can not set VDF params - admin has not been initialized.");
+            throw new Error("Can not set consensus config - admin has not been initialized.");
         }
         if (!this.#wallet) {
-            throw new Error("Can not set VDF params - wallet is not initialized.");
+            throw new Error("Can not set consensus config - wallet is not initialized.");
         }
         if (!this.isAdmin(adminEntry)) {
-            throw new Error("Can not set VDF params - you are not the admin.");
+            throw new Error("Can not set consensus config - you are not the admin.");
         }
 
-        await this.#state.requireSignedVDFParams();
-
-        const difficultyNumber = Number(params.vdfDifficulty);
-        if (!Number.isInteger(difficultyNumber) || difficultyNumber <= 0) {
-            throw new Error("VDF difficulty must be a positive unsigned 32-bit integer.");
+        if (!this.#hasExactKeys(consensusConfig, ["schemaVersion", "configData"])) {
+            throw new Error(
+                "Consensus config must contain only schemaVersion and configData."
+            );
         }
 
-        const vdfDifficultyBuffer = uint32ToBuffer(difficultyNumber);
+        const { schemaVersion, configData } = consensusConfig;
+        if (
+            !Number.isInteger(schemaVersion) ||
+            schemaVersion <= 0 ||
+            schemaVersion > 0xFF
+        ) {
+            throw new Error(
+                "Consensus config schemaVersion must be an integer from 1 to 255."
+            );
+        }
+
+        let encodedConfigData;
+        switch (schemaVersion) {
+            case 1:
+                encodedConfigData = this.#encodeConfigDataV1(configData);
+                break;
+            default:
+                throw new Error(
+                    `Unsupported consensus config schema version: ${schemaVersion}.`
+                );
+        }
+
+        const encodedConsensusConfig = encodeConsensusConfig({
+            sv: uint8ToBuffer(schemaVersion),
+            cd: encodedConfigData
+        });
 
         const txValidity = await this.#state.getIndexerSequenceState();
         const payload = await applyStateMessageFactory(this.#wallet, this.#config)
-            .buildCompleteSetVdfParamsMessage(
+            .buildCompleteSetConsensusConfigMessage(
                 this.#wallet.address,
                 txValidity,
-                vdfDifficultyBuffer,
+                encodedConsensusConfig
             );
         const encodedPayload = encodeApplyOperation(payload);
         await this.#state.append(encodedPayload);
+    }
+
+    // TODO: REFACTOR - In the future, this function should be extracted into another module.
+    #encodeConfigDataV1(configData) {
+        if (!this.#hasExactKeys(configData, ["difficulty", "discriminantBitSize"])) {
+            throw new Error(
+                "Consensus config schema version 1 configData must contain only difficulty and discriminantBitSize."
+            );
+        }
+
+        if (
+            !Number.isInteger(configData.difficulty) ||
+            configData.difficulty <= 0 ||
+            configData.difficulty > 0xFFFFFFFF
+        ) {
+            throw new Error(
+                "VDF difficulty must be a positive unsigned 32-bit integer."
+            );
+        }
+
+        if (
+            !Number.isInteger(configData.discriminantBitSize) ||
+            configData.discriminantBitSize <= 0 ||
+            configData.discriminantBitSize > 0xFFFF
+        ) {
+            throw new Error(
+                "VDF discriminant bit size must be a positive unsigned 16-bit integer."
+            );
+        }
+
+        return encodeVdfConfig({
+            difficulty: uint32ToBuffer(configData.difficulty),
+            discriminantBitSize: uint16ToBuffer(configData.discriminantBitSize)
+        });
+    }
+
+    #hasExactKeys(value, expectedKeys) {
+        return (
+            _.isPlainObject(value) &&
+            Object.keys(value).length === expectedKeys.length &&
+            expectedKeys.every(key => Object.hasOwn(value, key))
+        );
     }
 }
 

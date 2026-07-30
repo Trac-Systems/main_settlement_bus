@@ -212,7 +212,7 @@ export class Handlers {
         return this.#msb.handleEpochGenesisInitialization(params);
     }
 
-    async handleSetVdfParams(params) {
-        return this.#msb.handleSetVdfParams(params);
+    async handleSetConsensusConfig(consensusConfig) {
+        return this.#msb.handleSetConsensusConfig(consensusConfig);
     }
 }
