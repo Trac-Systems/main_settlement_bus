@@ -265,13 +265,151 @@ test("CommandHandler cancels pending consensus config input with /cancel", async
     t.ok(msb.printHelp.calledOnce);
 });
 
-test("CommandHandler no longer recognizes /set_vdf_params", async (t) => {
+test("CommandHandler collects VDF params and delegates a version-1 consensus config", async (t) => {
     stubConsole(t);
 
     const { handler, msb } = createSubject();
 
     await handler.handle("/set_vdf_params");
-    await handler.handle('{"schemaVersion":1,"configData":{}}');
 
+    t.ok(console.log.calledWith("Set new VDF difficulty (example 55_000_000):"));
+
+    await handler.handle("55_000_000");
+
+    t.ok(console.log.calledWith("Set new VDF discriminant bit size (example 2048):"));
     t.ok(msb.handleSetConsensusConfig.notCalled);
+
+    await handler.handle("2048");
+
+    t.ok(console.info.calledWith("VDF Params Update:"));
+    t.ok(console.info.calledWith("VDF difficulty: 55_000_000"));
+    t.ok(console.info.calledWith("VDF discriminant bit size: 2048"));
+    t.ok(console.log.calledWith("Do you want to proceed? (yes/no)"));
+    t.ok(msb.handleSetConsensusConfig.notCalled);
+
+    await handler.handle("yes");
+
+    t.ok(msb.handleSetConsensusConfig.calledOnceWithExactly({
+        schemaVersion: 1,
+        configData: {
+            difficulty: 55_000_000,
+            discriminantBitSize: 2048
+        }
+    }));
+});
+
+test("CommandHandler re-prompts invalid VDF difficulty without advancing", async (t) => {
+    stubConsole(t);
+
+    const { handler, msb } = createSubject();
+
+    await handler.handle("/set_vdf_params");
+    await handler.handle("abc");
+    await handler.handle("0");
+
+    t.ok(console.log.calledWith(
+        "Invalid difficulty. Please enter a positive integer (example 55_000_000)."
+    ));
+    t.ok(console.log.calledWith("Set new VDF difficulty (example 55_000_000):"));
+    t.ok(!console.log.calledWith("Set new VDF discriminant bit size (example 2048):"));
+    t.ok(msb.handleSetConsensusConfig.notCalled);
+
+    await handler.handle("55_000_000");
+
+    t.ok(console.log.calledWith("Set new VDF discriminant bit size (example 2048):"));
+});
+
+test("CommandHandler re-prompts invalid VDF discriminant bit size and retains difficulty", async (t) => {
+    stubConsole(t);
+
+    const { handler, msb } = createSubject();
+
+    await handler.handle("/set_vdf_params");
+    await handler.handle("55_000_000");
+    await handler.handle("abc");
+    await handler.handle("0");
+
+    t.ok(console.log.calledWith(
+        "Invalid discriminant bit size. Please enter a positive integer (example 2048)."
+    ));
+    t.ok(console.log.calledWith("Set new VDF discriminant bit size (example 2048):"));
+    t.ok(msb.handleSetConsensusConfig.notCalled);
+
+    await handler.handle("2048");
+    await handler.handle("yes");
+
+    t.ok(msb.handleSetConsensusConfig.calledOnceWithExactly({
+        schemaVersion: 1,
+        configData: {
+            difficulty: 55_000_000,
+            discriminantBitSize: 2048
+        }
+    }));
+});
+
+test("CommandHandler cancels VDF params input from the difficulty step", async (t) => {
+    stubConsole(t);
+
+    const { handler, msb } = createSubject();
+
+    await handler.handle("/set_vdf_params");
+    await handler.handle(" /CANCEL ");
+
+    t.ok(console.log.calledWith("VDF params update cancelled."));
+    t.ok(msb.handleSetConsensusConfig.notCalled);
+
+    await handler.handle("/help");
+
+    t.ok(msb.printHelp.calledOnce);
+});
+
+test("CommandHandler cancels VDF params input from the discriminant step", async (t) => {
+    stubConsole(t);
+
+    const { handler, msb } = createSubject();
+
+    await handler.handle("/set_vdf_params");
+    await handler.handle("55_000_000");
+    await handler.handle("/cancel");
+
+    t.ok(console.log.calledWith("VDF params update cancelled."));
+    t.ok(console.info.notCalled);
+    t.ok(msb.handleSetConsensusConfig.notCalled);
+
+    await handler.handle("/help");
+
+    t.ok(msb.printHelp.calledOnce);
+});
+
+test("CommandHandler declines VDF params update at confirmation", async (t) => {
+    stubConsole(t);
+
+    const { handler, msb } = createSubject();
+
+    await handler.handle("/set_vdf_params");
+    await handler.handle("55_000_000");
+    await handler.handle("2048");
+    await handler.handle("no");
+
+    t.ok(console.log.calledWith("VDF params update cancelled."));
+    t.ok(msb.handleSetConsensusConfig.notCalled);
+
+    await handler.handle("/help");
+
+    t.ok(msb.printHelp.calledOnce);
+});
+
+test("CommandHandler requires an exact /set_vdf_params command token", async (t) => {
+    stubConsole(t);
+
+    const { handler, msb } = createSubject();
+
+    await handler.handle("/set_vdf_params_extra");
+
+    t.ok(!console.log.calledWith("Set new VDF difficulty (example 55_000_000):"));
+    t.ok(msb.handleSetConsensusConfig.notCalled);
+
+    await handler.handle("/help");
+
+    t.ok(msb.printHelp.calledOnce);
 });
