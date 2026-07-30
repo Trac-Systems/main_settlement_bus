@@ -36,6 +36,19 @@ test('Config: valid overrideable startup fields remain usable after validation',
     t.alike(config.dhtBootstrap, ['node1.example.test:1234', 'node2.example.test:5678']);
 });
 
+test('Config: hyperbee cache entry limit defaults and validates', t => {
+    const config = createConfig(ENV.MAINNET, {});
+    t.is(config.hyperbeeCacheMaxEntries, 65_536);
+
+    const overridden = createConfig(ENV.MAINNET, { hyperbeeCacheMaxEntries: 7 });
+    t.is(overridden.hyperbeeCacheMaxEntries, 7);
+
+    t.exception(
+        () => createConfig(ENV.MAINNET, { hyperbeeCacheMaxEntries: 0 }),
+        /MainSettlementBus Config: hyperbeeCacheMaxEntries must be a positive safe integer\./
+    );
+});
+
 test('Config: valid buffer bootstrap override remains usable after validation', t => {
     const bootstrap = b4a.alloc(32, 0xab);
     const config = createConfig(ENV.MAINNET, { bootstrap });

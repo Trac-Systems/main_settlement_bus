@@ -1,5 +1,6 @@
 import ReadyResource from "ready-resource";
 import Corestore from "corestore";
+import Rache from "rache";
 import tracCryptoApi from "trac-crypto-api";
 import b4a from "b4a";
 import { sleep, isHexString } from "./utils/helpers.js";
@@ -46,7 +47,9 @@ export class MainSettlementBus extends ReadyResource {
         super();
         this.#config = config
         this.#wallet = wallet;
-        this.#store = new Corestore(this.#config.storesFullPath);
+        this.#store = new Corestore(this.#config.storesFullPath, {
+            globalCache: new Rache({ maxSize: this.#config.hyperbeeCacheMaxEntries })
+        });
         this.check = new Check(this.#config);
     }
 

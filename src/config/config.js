@@ -2,6 +2,8 @@ import b4a from 'b4a'
 import { isDefined } from '../utils/type.js'
 import _ from 'lodash'
 
+const DEFAULT_HYPERBEE_CACHE_MAX_ENTRIES = 65_536
+
 export class Config {
     #options
     #config
@@ -18,6 +20,7 @@ export class Config {
         this.#channel = this.#normalizeChannel(
             isDefined(options.channel) ? options.channel : config.channel
         )
+        void this.hyperbeeCacheMaxEntries
     }
 
     get addressLength() {
@@ -99,6 +102,18 @@ export class Config {
     get maxRetries() {
         if (this.#isOverriden('maxRetries')) return this.#options.maxRetries
         return this.#config.maxRetries
+    }
+
+    get hyperbeeCacheMaxEntries() {
+        const value = this.#isOverriden('hyperbeeCacheMaxEntries')
+            ? this.#options.hyperbeeCacheMaxEntries
+            : this.#config.hyperbeeCacheMaxEntries ?? DEFAULT_HYPERBEE_CACHE_MAX_ENTRIES
+
+        if (!Number.isSafeInteger(value) || value < 1) {
+            throw new Error('MainSettlementBus Config: hyperbeeCacheMaxEntries must be a positive safe integer.')
+        }
+
+        return value
     }
 
     get maxValidators() {

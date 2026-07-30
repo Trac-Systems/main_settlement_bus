@@ -35,6 +35,7 @@ const configData = {
         enableRoleRequester: false,
         enableTxApplyLogs: true,
         enableWallet: true,
+        hyperbeeCacheMaxEntries: 65_536,
         maxRetries: 3,
         messageThreshold: 3,
         messageValidatorRetryDelay: 1000, //How long to wait before retrying (ms) MESSAGE_VALIDATOR_RETRY_DELAY_MS
@@ -84,6 +85,7 @@ const configData = {
         enableRoleRequester: false,
         enableTxApplyLogs: false,
         enableWallet: true,
+        hyperbeeCacheMaxEntries: 65_536,
         maxRetries: 3,
         messageThreshold: 3,
         messageValidatorRetryDelay: 1000, //How long to wait before retrying (ms) MESSAGE_VALIDATOR_RETRY_DELAY_MS
@@ -133,6 +135,7 @@ const configData = {
         enableRoleRequester: false,
         enableTxApplyLogs: true,
         enableWallet: true,
+        hyperbeeCacheMaxEntries: 65_536,
         maxRetries: 3,
         messageThreshold: 1000,
         messageValidatorRetryDelay: 1000, //How long to wait before retrying (ms) MESSAGE_VALIDATOR_RETRY_DELAY_MS
