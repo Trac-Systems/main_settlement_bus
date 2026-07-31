@@ -296,6 +296,7 @@ export class MainSettlementBus extends ReadyResource {
             console.log("- /ban_writer <address>: Demote a whitelisted writer to default role and remove it from the whitelist. Charges a fee.");
             console.log("- /init_genesis: Initialize genesis epoch.");
             console.log("- /set_consensus_config: Set new configuration data for a specific consensus schema version from JSON.");
+            console.log("- /set_vdf_params: Update VDF difficulty and discriminant bit size.");
         }
         console.log("Available commands:");
         console.log("- /add_writer: Add yourself as a validator to this MSB once whitelisted. Requires a fee + 10x the fee as a stake in $TNK.");

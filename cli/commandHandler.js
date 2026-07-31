@@ -40,7 +40,8 @@ export const COMMANDS = {
     GET_TX_DETAILS: "/get_tx_details",
     GET_EXTENDED_TX_DETAILS: "/get_extended_tx_details",
     EPOCH_GENESIS_INITIALIZATION: "/init_genesis",
-    SET_CONSENSUS_CONFIG: "/set_consensus_config"
+    SET_CONSENSUS_CONFIG: "/set_consensus_config",
+    SET_VDF_PARAMS: "/set_vdf_params"
 };
 
 export class CommandHandler {
@@ -51,6 +52,7 @@ export class CommandHandler {
     #pendingConfirmation = null;
     #pendingGenesisInitialization = null;
     #pendingSetConsensusConfig = null;
+    #pendingSetVdfParams = null;
 
     constructor({ config, msb, handleClose, wallet }) {
         this.#msb = msb;
@@ -70,6 +72,10 @@ export class CommandHandler {
 
         if (this.#pendingSetConsensusConfig !== null) {
             return this.#handlePendingSetConsensusConfig(input);
+        }
+
+        if (this.#pendingSetVdfParams !== null) {
+            return this.#handlePendingSetVdfParams(input);
         }
 
         const [command, ...parts] = input.split(" ");
@@ -241,6 +247,10 @@ export class CommandHandler {
             {
                 evaluate: ({ input }) => input.startsWith(COMMANDS.SET_CONSENSUS_CONFIG),
                 process: async () => this.#queueSetConsensusConfig()
+            },
+            {
+                evaluate: ({ command }) => command === COMMANDS.SET_VDF_PARAMS,
+                process: async () => this.#queueSetVdfParams()
             }
         ];
     }
@@ -404,6 +414,80 @@ export class CommandHandler {
         console.log(this.#pendingConfirmation.prompt);
     }
 
+    #queueSetVdfParams() {
+        this.#pendingSetVdfParams = {
+            step: "difficulty"
+        };
+
+        console.log(this.#getSetVdfParamsDifficultyPrompt());
+    }
+
+    #handlePendingSetVdfParams(input) {
+        if (input.trim().toLowerCase() === "/cancel") {
+            this.#pendingSetVdfParams = null;
+            console.log("VDF params update cancelled.");
+            return;
+        }
+
+        const pendingSetVdfParams = this.#pendingSetVdfParams;
+
+        if (pendingSetVdfParams.step === "difficulty") {
+            const difficulty = this.#parsePositiveInteger(input, 0xFFFFFFFFn);
+            if (!difficulty) {
+                console.log(
+                    "Invalid difficulty. Please enter an integer between 1 and 4_294_967_295."
+                );
+                console.log(this.#getSetVdfParamsDifficultyPrompt());
+                return;
+            }
+
+            pendingSetVdfParams.difficulty = difficulty;
+            pendingSetVdfParams.step = "discriminantBitSize";
+            console.log(this.#getSetVdfParamsDiscriminantBitSizePrompt());
+            return;
+        }
+
+        const discriminantBitSize = this.#parsePositiveInteger(input, 0xFFFFn);
+        if (!discriminantBitSize) {
+            console.log(
+                "Invalid discriminant bit size. Please enter an integer between 1 and 65_535."
+            );
+            console.log(this.#getSetVdfParamsDiscriminantBitSizePrompt());
+            return;
+        }
+
+        const difficulty = pendingSetVdfParams.difficulty;
+        this.#pendingSetVdfParams = null;
+        return this.#queueSetVdfParamsConfirmation({
+            difficulty,
+            discriminantBitSize
+        });
+    }
+
+    #queueSetVdfParamsConfirmation({ difficulty, discriminantBitSize }) {
+        const consensusConfig = {
+            schemaVersion: 1,
+            configData: {
+                difficulty: Number(difficulty.value),
+                discriminantBitSize: Number(discriminantBitSize.value)
+            }
+        };
+
+        console.info("VDF Params Update:");
+        console.info(`VDF difficulty: ${difficulty.display}`);
+        console.info(`VDF discriminant bit size: ${discriminantBitSize.display}`);
+
+        this.#pendingConfirmation = {
+            prompt: "Do you want to proceed? (yes/no)",
+            invalidMessage: 'Invalid input. Please answer "yes" or "no".',
+            failureMessage: "VDF params update failed",
+            onConfirm: async () => this.#handlers.handleSetConsensusConfig(consensusConfig),
+            onDecline: async () => console.log("VDF params update cancelled.")
+        };
+
+        console.log(this.#pendingConfirmation.prompt);
+    }
+
     #parseConsensusConfig(input) {
         try {
             const parsed = JSON.parse(input);
@@ -422,14 +506,15 @@ export class CommandHandler {
         }
     }
 
-    #parsePositiveInteger(input) {
+    #parsePositiveInteger(input, maximum = null) {
         const display = input.trim();
         if (!/^[0-9]+(?:_[0-9]+)*$/.test(display)) {
             return null;
         }
 
         const value = display.replaceAll("_", "");
-        if (BigInt(value) <= 0n) {
+        const integer = BigInt(value);
+        if (integer <= 0n || (maximum !== null && integer > maximum)) {
             return null;
         }
 
@@ -446,5 +531,13 @@ export class CommandHandler {
 
     #getSetConsensusConfigPrompt() {
         return 'Set consensus config as JSON, or enter /cancel (example {"schemaVersion":1,"configData":{"difficulty":60000000,"discriminantBitSize":2048}}):';
+    }
+
+    #getSetVdfParamsDifficultyPrompt() {
+        return "Set new VDF difficulty (example 55_000_000):";
+    }
+
+    #getSetVdfParamsDiscriminantBitSizePrompt() {
+        return "Set new VDF discriminant bit size (example 2048):";
     }
 }
