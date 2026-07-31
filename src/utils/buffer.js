@@ -182,3 +182,10 @@ export const createMessage = (...args) => {
     if (buffers.length === 0) return NULL_BUFFER;
     return b4a.concat(buffers);
 }
+
+export function isZeroBuffer(buffer) {
+    if (!b4a.isBuffer(buffer)) {
+        return false;
+    }
+    return buffer.every(byte => byte === 0);
+}

@@ -2,8 +2,6 @@ import b4a from 'b4a'
 import tracCryptoApi from 'trac-crypto-api';
 import {
     HASH_BYTE_LENGTH,
-    VDF_DIFFICULTY_SIZE,
-    VDF_DISCRIMINANT_SIZE,
     VDF_BLOB_PROOF_SIZE,
     SIGNATURE_BYTE_LENGTH,
     ConsensusProtocolVersion
@@ -13,21 +11,16 @@ import { addressToBuffer } from './address.js';
 import { safeEncodeEpochProof } from '../../../codecs/apply/applyOperationCodec.js';
 import {
     safeEncodeProofProposal,
-    safeEncodeProofProposalApproval
 } from "../../../codecs/consensus/v1/consensusV1OperationCodec.js";
-const VDF_PARAMS_ENTRY_SIZE = VDF_DIFFICULTY_SIZE + VDF_DISCRIMINANT_SIZE;
 
-export async function createGenesisEpochProof(config, proposerAddress, vdfParamsEntry) {
+export async function createGenesisEpochProof(config, proposerAddress, encodedConfigData) {
     const proposer = addressToBuffer(proposerAddress, config.addressPrefix);
 
     if (proposer.length === 0) {
         return null;
     }
-    if (!isBufferValid(vdfParamsEntry, VDF_PARAMS_ENTRY_SIZE)) {
-        return null;
-    }
 
-    const vdfParametersHash = await tracCryptoApi.hash.blake3Safe(vdfParamsEntry);
+    const vdfParametersHash = await tracCryptoApi.hash.blake3Safe(encodedConfigData);
     if (!isBufferValid(vdfParametersHash, HASH_BYTE_LENGTH)) {
         return null;
     }
@@ -53,22 +46,14 @@ export async function createGenesisEpochProof(config, proposerAddress, vdfParams
         signature: b4a.alloc(SIGNATURE_BYTE_LENGTH).fill(0),
     }
 
-    const proposalApproval = {
-        approver: proposer,
-        approval_sig: b4a.alloc(SIGNATURE_BYTE_LENGTH).fill(0)
-    }
-
     const encodedProof = safeEncodeProofProposal(proofData);
     if (encodedProof.length === 0) {
         return null;
     }
-    const encodedProposalApproval = safeEncodeProofProposalApproval(proposalApproval);
-    if (encodedProposalApproval.length === 0) {
-        return null;
-    }
+
     const genesisEpochProof = {
         pd: encodedProof,
-        app: [encodedProposalApproval]
+        app: []
     }
 
     return safeEncodeEpochProof(genesisEpochProof);

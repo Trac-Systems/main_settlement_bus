@@ -4274,28 +4274,70 @@ class State extends ReadyResource {
             return Status.IGNORE;
         }
 
-        // check if VDF params have been initialized if yes - failure
-        const vdfParams = await this.#getEntryApply(EntryType.VDF_PARAMS, batch);
-        if (vdfParams !== null) {
-            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "VDF params are set. Cannot set a new genesis epoch", node.from.key)
+        const genesisConsensusConfigKey = EntryType.CONSENSUS_CONFIG_RECORD + 0;
+        const currentConsensusConfigId = await this.#getEntryApply(
+            EntryType.CONSENSUS_CONFIG_POINTER,
+            batch
+        );
+
+        const genesisConsensusConfig = await this.#getEntryApply(
+            genesisConsensusConfigKey,
+            batch
+        );
+
+        // Check if currently genesis config exists
+        if (currentConsensusConfigId !== null || genesisConsensusConfig !== null) {
+            this.#safeLogApply(
+                OperationType.SET_GENESIS_EPOCH,
+                "Genesis consensus config is set. Cannot set a new genesis epoch",
+                node.from.key
+            );
             return Status.IGNORE;
         }
 
-        // extract diff and dbs in this case we should check if this is not less than 0 and not higer than 4/2 bytes
         const vdfDifficultyBuffer = op.sgo.df;
-        // can not be zero
         const vdfDiscriminantBitSizeBuffer = op.sgo.db;
-        // can not be zero
-        const encodedVdfParamsEntry = safeEncodeVdfConfig({
+
+        if (
+            isZeroBuffer(vdfDifficultyBuffer) ||
+            isZeroBuffer(vdfDiscriminantBitSizeBuffer)
+        ) {
+            this.#safeLogApply(
+                OperationType.SET_GENESIS_EPOCH,
+                "VDF parameters must be greater than zero. Cannot set a new genesis epoch",
+                node.from.key
+            );
+            return Status.FAILURE;
+        }
+
+        const encodedConfigData = safeEncodeVdfConfig({
             difficulty: vdfDifficultyBuffer,
             discriminantBitSize: vdfDiscriminantBitSizeBuffer
         });
-        if (encodedVdfParamsEntry.length === 0) {
+
+        if (encodedConfigData.length === 0) {
             this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Could not encode vdf parameters. Cannot set a new genesis epoch", node.from.key)
-            return Status.IGNORE;
+            return Status.FAILURE;
         }
 
-        const genesisEpoch = await createGenesisEpochProof(this.#config, requesterAddressString, encodedVdfParamsEntry);
+        const encodedConsensusConfig = safeEncodeConsensusConfig({
+            sv: safeUint8ToBuffer(1),
+            cd: encodedConfigData
+        });
+        if (encodedConsensusConfig.length === 0) {
+            this.#safeLogApply(
+                OperationType.SET_GENESIS_EPOCH,
+                "Could not encode genesis consensus config. Cannot set a new genesis epoch",
+                node.from.key
+            );
+            return Status.FAILURE;
+        }
+        const genesisEpoch = await createGenesisEpochProof(
+            this.#config,
+            requesterAddressString,
+            encodedConfigData
+        );
+
         if (!genesisEpoch) {
             this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Could not initialize genesis epoch", node.from.key)
             return Status.FAILURE;
@@ -4303,19 +4345,35 @@ class State extends ReadyResource {
 
         // initialize CurrentEpoch field
         const zeroAsUint64Buffer = b4a.alloc(8, 0);
-        await batch.put(EntryType.EPOCH_CURRENT, zeroAsUint64Buffer);
+        await batch.put(
+            EntryType.EPOCH_CURRENT,
+            zeroAsUint64Buffer
+        );
         
         // initialize Epoch Field
         const epochProofHash = await tracCryptoApi.hash.blake3Safe(genesisEpoch);
-        await batch.put(epochZero, epochProofHash);
+        await batch.put(
+            epochZero,
+            epochProofHash
+        );
 
         // initialize EpochHash Field
         const epochProofHashString = epochProofHash.toString('hex');
         const epochHashLedgerEntry = EntryType.EPOCH_HASH + epochProofHashString;
-        await batch.put(epochHashLedgerEntry, genesisEpoch);
-        
-        // initialize VDFParams
-        await batch.put(EntryType.VDF_PARAMS, encodedVdfParamsEntry);
+        await batch.put(
+            epochHashLedgerEntry,
+            genesisEpoch
+        );
+
+        // initialize consensus config schema V1 and make record 0 current
+        await batch.put(
+            EntryType.CONSENSUS_CONFIG_POINTER,
+            safeWriteUInt32BE(0)
+        );
+        await batch.put(
+            genesisConsensusConfigKey,
+            encodedConsensusConfig
+        );
 
         // Put txHashHexString into the state to avoid replay attack
         await batch.put(txHashHexString, node.value);
