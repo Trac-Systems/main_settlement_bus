@@ -21,8 +21,16 @@ import {
 import { isHexString, sleep, isTransactionRecordPut } from '../../utils/helpers.js';
 import tracCryptoApi from 'trac-crypto-api';
 import StateValidationSchema from './validators/StateValidationSchema.js';
-import { safeDecodeApplyOperation } from '../../codecs/apply/applyOperationCodec.js';
-import { createMessage, ZERO_WK, NULL_BUFFER } from '../../utils/buffer.js';
+import {
+    safeDecodeApplyOperation,
+    safeEncodeConsensusConfig
+} from '../../codecs/apply/applyOperationCodec.js';
+import {
+    createMessage,
+    ZERO_WK,
+    NULL_BUFFER,
+    isZeroBuffer
+} from '../../utils/buffer.js';
 import addressUtils from './utils/address.js';
 import adminEntryUtils from './utils/adminEntry.js';
 import nodeEntryUtils, { setWritingKey, NODE_ENTRY_SIZE } from './utils/nodeEntry.js';
@@ -39,7 +47,7 @@ import {
     BALANCE_ZERO,
     toTerm,
 } from './utils/balance.js';
-import { safeWriteUInt32BE } from '../../utils/buffer.js';
+import { safeUint8ToBuffer, safeWriteUInt32BE } from '../../utils/buffer.js';
 import deploymentEntryUtils from './utils/deploymentEntry.js';
 import { deepCopyBuffer } from '../../utils/buffer.js';
 import { Status } from './utils/transaction.js';
