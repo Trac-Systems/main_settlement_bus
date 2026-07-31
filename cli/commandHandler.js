@@ -432,9 +432,11 @@ export class CommandHandler {
         const pendingSetVdfParams = this.#pendingSetVdfParams;
 
         if (pendingSetVdfParams.step === "difficulty") {
-            const difficulty = this.#parsePositiveInteger(input);
+            const difficulty = this.#parsePositiveInteger(input, 0xFFFFFFFFn);
             if (!difficulty) {
-                console.log("Invalid difficulty. Please enter a positive integer (example 55_000_000).");
+                console.log(
+                    "Invalid difficulty. Please enter an integer between 1 and 4_294_967_295."
+                );
                 console.log(this.#getSetVdfParamsDifficultyPrompt());
                 return;
             }
@@ -445,9 +447,11 @@ export class CommandHandler {
             return;
         }
 
-        const discriminantBitSize = this.#parsePositiveInteger(input);
+        const discriminantBitSize = this.#parsePositiveInteger(input, 0xFFFFn);
         if (!discriminantBitSize) {
-            console.log("Invalid discriminant bit size. Please enter a positive integer (example 2048).");
+            console.log(
+                "Invalid discriminant bit size. Please enter an integer between 1 and 65_535."
+            );
             console.log(this.#getSetVdfParamsDiscriminantBitSizePrompt());
             return;
         }
@@ -502,14 +506,15 @@ export class CommandHandler {
         }
     }
 
-    #parsePositiveInteger(input) {
+    #parsePositiveInteger(input, maximum = null) {
         const display = input.trim();
         if (!/^[0-9]+(?:_[0-9]+)*$/.test(display)) {
             return null;
         }
 
         const value = display.replaceAll("_", "");
-        if (BigInt(value) <= 0n) {
+        const integer = BigInt(value);
+        if (integer <= 0n || (maximum !== null && integer > maximum)) {
             return null;
         }
 

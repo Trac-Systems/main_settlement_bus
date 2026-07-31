@@ -306,9 +306,10 @@ test("CommandHandler re-prompts invalid VDF difficulty without advancing", async
     await handler.handle("/set_vdf_params");
     await handler.handle("abc");
     await handler.handle("0");
+    await handler.handle("4_294_967_296");
 
     t.ok(console.log.calledWith(
-        "Invalid difficulty. Please enter a positive integer (example 55_000_000)."
+        "Invalid difficulty. Please enter an integer between 1 and 4_294_967_295."
     ));
     t.ok(console.log.calledWith("Set new VDF difficulty (example 55_000_000):"));
     t.ok(!console.log.calledWith("Set new VDF discriminant bit size (example 2048):"));
@@ -328,9 +329,10 @@ test("CommandHandler re-prompts invalid VDF discriminant bit size and retains di
     await handler.handle("55_000_000");
     await handler.handle("abc");
     await handler.handle("0");
+    await handler.handle("65_536");
 
     t.ok(console.log.calledWith(
-        "Invalid discriminant bit size. Please enter a positive integer (example 2048)."
+        "Invalid discriminant bit size. Please enter an integer between 1 and 65_535."
     ));
     t.ok(console.log.calledWith("Set new VDF discriminant bit size (example 2048):"));
     t.ok(msb.handleSetConsensusConfig.notCalled);
@@ -343,6 +345,25 @@ test("CommandHandler re-prompts invalid VDF discriminant bit size and retains di
         configData: {
             difficulty: 55_000_000,
             discriminantBitSize: 2048
+        }
+    }));
+});
+
+test("CommandHandler accepts maximum VDF parameter values", async (t) => {
+    stubConsole(t);
+
+    const { handler, msb } = createSubject();
+
+    await handler.handle("/set_vdf_params");
+    await handler.handle("4_294_967_295");
+    await handler.handle("65_535");
+    await handler.handle("yes");
+
+    t.ok(msb.handleSetConsensusConfig.calledOnceWithExactly({
+        schemaVersion: 1,
+        configData: {
+            difficulty: 0xFFFFFFFF,
+            discriminantBitSize: 0xFFFF
         }
     }));
 });
