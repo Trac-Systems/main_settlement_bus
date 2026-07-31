@@ -3,7 +3,17 @@ import { bigIntToDecimalString, bufferToBigInt } from "../src/utils/amountSerial
 import { EntryType } from "../src/utils/constants.js";
 import { bufferToAddress } from "../src/core/state/utils/address.js";
 import deploymentEntryUtils from "../src/core/state/utils/deploymentEntry.js";
-import { safeDecodeApplyOperation } from "../src/codecs/apply/applyOperationCodec.js";
+import {
+    safeDecodeApplyOperation,
+    safeDecodeConsensusConfig,
+    safeDecodeEpochProof
+} from "../src/codecs/apply/applyOperationCodec.js";
+import {
+    safeDecodeProofProposal,
+    safeDecodeProofProposalApproval
+} from "../src/codecs/consensus/v1/consensusV1OperationCodec.js";
+import { safeDecodeVdfConfig } from "../src/codecs/consensus/v1/vdfConfigCodec.js";
+import { safeReadUint16BE, safeReadUint32BE } from "../src/utils/buffer.js";
 
 export class Handlers {
     #msb
@@ -206,6 +216,114 @@ export class Handlers {
         }
 
         return txDetails;
+    }
+
+    async handleTest() {
+        await this.#printDecodedGenesisEpoch();
+
+        const encodedCurrentConfigId = await this.#msb.state.getSigned(
+            EntryType.CONSENSUS_CONFIG_POINTER
+        );
+        const currentConfigId = safeReadUint32BE(encodedCurrentConfigId);
+
+        console.log(`Decoded ${EntryType.CONSENSUS_CONFIG_POINTER}:`, currentConfigId);
+
+        if (currentConfigId === null) {
+            console.log("Cannot read the current consensus config record: current config id is missing or invalid.");
+            return;
+        }
+
+        const configRecordKey = EntryType.CONSENSUS_CONFIG_RECORD + currentConfigId;
+        const encodedConfigRecord = await this.#msb.state.getSigned(configRecordKey);
+        const decodedConfigRecord = this.#decodeConsensusConfig(encodedConfigRecord);
+
+        console.log(`Decoded ${configRecordKey}:`);
+        console.log(JSON.stringify(decodedConfigRecord, null, 2));
+    }
+
+    async #printDecodedGenesisEpoch() {
+        const genesisEpochHash = await this.#msb.state.getSigned(EntryType.EPOCH + "0");
+        if (!genesisEpochHash) {
+            console.log(`Decoded ${EntryType.EPOCH}0: null`);
+            return;
+        }
+
+        const genesisEpochRecordKey = EntryType.EPOCH_HASH + genesisEpochHash.toString("hex");
+        const encodedGenesisEpoch = await this.#msb.state.getSigned(genesisEpochRecordKey);
+        const decodedGenesisEpochEnvelope = safeDecodeEpochProof(encodedGenesisEpoch);
+        if (!decodedGenesisEpochEnvelope) {
+            console.log(`Decoded ${genesisEpochRecordKey}: null`);
+            return;
+        }
+
+        const proofData = safeDecodeProofProposal(decodedGenesisEpochEnvelope.pd);
+        const approvals = decodedGenesisEpochEnvelope.app.map(
+            approval => safeDecodeProofProposalApproval(approval)
+        );
+        const decodedGenesisEpoch = {
+            proofData: this.#formatProofData(proofData),
+            approvals: approvals.map(approval => this.#formatApproval(approval))
+        };
+
+        console.log(`Decoded genesis epoch (${genesisEpochRecordKey}):`);
+        console.log(JSON.stringify(decodedGenesisEpoch, null, 2));
+    }
+
+    #decodeConsensusConfig(encodedConfig) {
+        const decodedConfig = safeDecodeConsensusConfig(encodedConfig);
+        if (!decodedConfig) {
+            return null;
+        }
+
+        const schemaVersion = decodedConfig.sv.readUInt8(0);
+        const decodedConfigData = schemaVersion === 1
+            ? safeDecodeVdfConfig(decodedConfig.cd)
+            : null;
+
+        return {
+            schemaVersion,
+            configData: decodedConfigData
+                ? {
+                    difficulty: safeReadUint32BE(decodedConfigData.difficulty),
+                    discriminantBitSize: safeReadUint16BE(decodedConfigData.discriminantBitSize)
+                }
+                : {
+                    encodedHex: decodedConfig.cd.toString("hex")
+                }
+        };
+    }
+
+    #formatProofData(proofData) {
+        if (!proofData) {
+            return null;
+        }
+
+        return {
+            protocolVersion: proofData.protocol_version.readUInt8(0),
+            networkId: safeReadUint16BE(proofData.network_id),
+            epoch: proofData.epoch.readBigUInt64BE(0).toString(),
+            previousEpochRecordHash: proofData.previous_epoch_record_hash.toString("hex"),
+            proposer: this.#formatAddress(proofData.proposer),
+            vdfParametersHash: proofData.vdf_parameters_hash.toString("hex"),
+            vdfProof: proofData.vdf_proof.toString("hex"),
+            signature: proofData.signature.toString("hex")
+        };
+    }
+
+    #formatApproval(approval) {
+        if (!approval) {
+            return null;
+        }
+
+        return {
+            approver: this.#formatAddress(approval.approver),
+            approvalSignature: approval.approval_sig.toString("hex")
+        };
+    }
+
+    #formatAddress(addressBuffer) {
+        return bufferToAddress(addressBuffer, this.#config.addressPrefix)
+            ?? addressBuffer.toString("hex");
     }
 
     async handleEpochGenesisInitialization(params) {

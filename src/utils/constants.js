@@ -23,7 +23,7 @@ export const EntryType = Object.freeze({
     EPOCH: `/epoch/`,              // Epoch hashes are stored under `/epoch/<n>`
     EPOCH_HASH: `/epochHash/`,     // Epoch proof payloads are stored under `/epochHash/<epochHashHex>`
     VDF_PARAMS: '/parameters/vdf', // TODO: DELETE
-    CONSENSUS_CONFIG_POINTER: '/consensus/config/current',
+    CONSENSUS_CONFIG_CURRENT: '/consensus/config/current',
     CONSENSUS_CONFIG_RECORD: '/consensus/config/record/',
 
 });

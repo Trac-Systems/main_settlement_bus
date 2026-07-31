@@ -309,6 +309,7 @@ export class MainSettlementBus extends ReadyResource {
         console.log("- /get_tx_info <tx_hash>: Get information about a transaction with the given hash.");
         console.log("- /get_validator_addr <writing_key>: Get the validator address mapped to the given writing key.");
         console.log("- /get_balance <address> <confirmed>: Get the balance of the node with specified address (confirmed = true is default)");
+        console.log("- /test: Display the decoded genesis epoch, current consensus config id, and its decoded config record.");
         console.log("- /exit: Exit the program.");
         console.log("- /help: Display this help.");
     }
