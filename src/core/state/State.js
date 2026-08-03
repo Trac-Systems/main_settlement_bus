@@ -45,6 +45,147 @@ import PQueue from 'p-queue';
 
 const OVERSIZED_BATCH_PENALTY_MULTIPLIER = BATCH_SIZE;
 
+// MAYHEM PATCH: Pear/Bare hypercore-storage expects every stored head to carry
+// a signature buffer. Autobase genesis views have zero signers, so they need an
+// explicit empty signature until the signed indexer view migration exists.
+function autobaseSessionSignerCount(session) {
+    return (session?.manifest?.signers ?? session?.core?.header?.manifest?.signers ?? []).length;
+}
+
+function canAutobaseSessionUseKeyPair(session, keyPair) {
+    if (!keyPair?.publicKey) return false;
+    const signers = session?.manifest?.signers ?? session?.core?.header?.manifest?.signers ?? [];
+    return signers.some((signer) => b4a.equals(signer.publicKey, keyPair.publicKey));
+}
+
+function autobaseSigningAppendOptions(session, keyPairFor, opts = {}) {
+    if (opts?.keyPair || opts?.signature) return opts;
+    const keyPair = keyPairFor() ?? session?.keyPair ?? session?.core?.header?.keyPair ?? null;
+    if (keyPair?.secretKey && canAutobaseSessionUseKeyPair(session, keyPair)) {
+        return { ...opts, keyPair };
+    }
+    if (autobaseSessionSignerCount(session) === 0) {
+        return { ...opts, signature: b4a.alloc(0) };
+    }
+    return opts;
+}
+
+function installSignedAutobaseSessionState(session, keyPairFor) {
+    if (!session?.state || typeof session.state.append !== 'function') return session;
+    if (session.state.__msbSignedAutobaseAppendInstalled === true) return session;
+
+    const append = session.state.append.bind(session.state);
+    Object.defineProperty(session.state, '__msbSignedAutobaseAppendInstalled', {
+        value: true,
+        enumerable: false,
+        configurable: false
+    });
+    session.state.append = (values, opts = {}) => append(values, autobaseSigningAppendOptions(session, keyPairFor, opts));
+    return session;
+}
+
+function installSignedAutobaseSession(session, keyPairFor) {
+    if (!session || typeof session.append !== 'function') return session;
+    if (session.__msbSignedAutobaseAppendInstalled === true) {
+        installSignedAutobaseSessionState(session, keyPairFor);
+        return session;
+    }
+
+    const append = session.append.bind(session);
+    Object.defineProperty(session, '__msbSignedAutobaseAppendInstalled', {
+        value: true,
+        enumerable: false,
+        configurable: false
+    });
+    session.append = (blocks, opts = {}) => append(blocks, autobaseSigningAppendOptions(session, keyPairFor, opts));
+    installSignedAutobaseSessionState(session, keyPairFor);
+
+    if (typeof session.ready === 'function' &&
+        session.__msbSignedAutobaseReadyInstalled !== true) {
+        const ready = session.ready.bind(session);
+        Object.defineProperty(session, '__msbSignedAutobaseReadyInstalled', {
+            value: true,
+            enumerable: false,
+            configurable: false
+        });
+        session.ready = async (...args) => {
+            const result = await ready(...args);
+            installSignedAutobaseSessionState(session, keyPairFor);
+            return result;
+        };
+    }
+
+    if (typeof session.session === 'function' &&
+        session.__msbSignedAutobaseChildSessionInstalled !== true) {
+        const createChildSession = session.session.bind(session);
+        Object.defineProperty(session, '__msbSignedAutobaseChildSessionInstalled', {
+            value: true,
+            enumerable: false,
+            configurable: false
+        });
+        session.session = (...args) => installSignedAutobaseSession(createChildSession(...args), keyPairFor);
+    }
+    return session;
+}
+
+export function installSignedAutobaseStore(store, keyPairFor = null) {
+    if (!store) return store;
+    if (store.__msbSignedAutobaseStoreInstalled === true) return store;
+
+    const resolveKeyPair = typeof keyPairFor === 'function'
+        ? keyPairFor
+        : () => keyPairFor ?? store.base?.local?.keyPair ?? store.base?.local?.core?.header?.keyPair ?? null;
+    const getLocal = typeof store.getLocal === 'function' ? store.getLocal.bind(store) : null;
+    const getViewByName = typeof store.getViewByName === 'function' ? store.getViewByName.bind(store) : null;
+    const get = typeof store.get === 'function' ? store.get.bind(store) : null;
+
+    Object.defineProperty(store, '__msbSignedAutobaseStoreInstalled', {
+        value: true,
+        enumerable: false,
+        configurable: false
+    });
+    if (getLocal) {
+        store.getLocal = (...args) => installSignedAutobaseSession(getLocal(...args), resolveKeyPair);
+    }
+    if (getViewByName) {
+        store.getViewByName = (...args) => {
+            const view = getViewByName(...args);
+            if (!view || typeof view.createSession !== 'function' ||
+                view.__msbSignedAutobaseViewInstalled === true) {
+                return view;
+            }
+            const createSession = view.createSession.bind(view);
+            Object.defineProperty(view, '__msbSignedAutobaseViewInstalled', {
+                value: true,
+                enumerable: false,
+                configurable: false
+            });
+            view.createSession = (...sessionArgs) => {
+                const session = createSession(...sessionArgs);
+                installSignedAutobaseSession(view.core, resolveKeyPair);
+                installSignedAutobaseSession(view.batch, resolveKeyPair);
+                installSignedAutobaseSession(view.atomicBatch, resolveKeyPair);
+                return installSignedAutobaseSession(session, resolveKeyPair);
+            };
+            return view;
+        };
+    }
+    if (get) {
+        store.get = (...args) => installSignedAutobaseSession(get(...args), resolveKeyPair);
+    }
+    if (typeof store.atomize === 'function' &&
+        store.__msbSignedAutobaseAtomizeInstalled !== true) {
+        const atomize = store.atomize.bind(store);
+        Object.defineProperty(store, '__msbSignedAutobaseAtomizeInstalled', {
+            value: true,
+            enumerable: false,
+            configurable: false
+        });
+        store.atomize = (...args) => installSignedAutobaseStore(atomize(...args), resolveKeyPair);
+    }
+    return store;
+}
+
 // TODO: #addWriter, #removeWriter, #transfer, #transferFeeTxOperation need to be refactored to get in arguments actor's nodeEntries in buffer format.
 
 class State extends ReadyResource {
@@ -439,6 +580,7 @@ class State extends ReadyResource {
     }
 
     #setupHyperbee(store) {
+        installSignedAutobaseStore(store);
         this.#bee = new Hyperbee(store.get(TRAC_NAMESPACE), {
             extension: false,
             keyEncoding: HYPERBEE_KEY_ENCODING,
