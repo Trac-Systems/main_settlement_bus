@@ -76,31 +76,31 @@ function normalizeAutobaseHead(head) {
         : head;
 }
 
-function installSignedAutobaseCoreStorage(core) {
-    if (!core?.storage || typeof core.storage.write !== 'function') return core;
-    if (core.storage.__msbSignedAutobaseCoreTxInstalled === true) return core;
+function installSignedAutobaseStorage(storage) {
+    if (!storage || typeof storage.write !== 'function') return storage;
+    if (storage.__msbSignedAutobaseCoreTxInstalled === true) return storage;
 
-    const write = core.storage.write.bind(core.storage);
-    const createSession = typeof core.storage.createSession === 'function'
-        ? core.storage.createSession.bind(core.storage)
+    const write = storage.write.bind(storage);
+    const createSession = typeof storage.createSession === 'function'
+        ? storage.createSession.bind(storage)
         : null;
-    const createAtomicSession = typeof core.storage.createAtomicSession === 'function'
-        ? core.storage.createAtomicSession.bind(core.storage)
+    const createAtomicSession = typeof storage.createAtomicSession === 'function'
+        ? storage.createAtomicSession.bind(storage)
         : null;
-    Object.defineProperty(core.storage, '__msbSignedAutobaseCoreTxInstalled', {
+    Object.defineProperty(storage, '__msbSignedAutobaseCoreTxInstalled', {
         value: true,
         enumerable: false,
         configurable: false
     });
     if (createSession) {
-        core.storage.createSession = (name, head, ...args) =>
+        storage.createSession = (name, head, ...args) =>
             createSession(name, normalizeAutobaseHead(head), ...args);
     }
     if (createAtomicSession) {
-        core.storage.createAtomicSession = (atom, head, ...args) =>
+        storage.createAtomicSession = (atom, head, ...args) =>
             createAtomicSession(atom, normalizeAutobaseHead(head), ...args);
     }
-    core.storage.write = (...args) => {
+    storage.write = (...args) => {
         const tx = write(...args);
         if (!tx || typeof tx.setHead !== 'function' ||
             tx.__msbSignedAutobaseCoreTxHeadInstalled === true) {
@@ -115,6 +115,13 @@ function installSignedAutobaseCoreStorage(core) {
         tx.setHead = (head, ...headArgs) => setHead(normalizeAutobaseHead(head), ...headArgs);
         return tx;
     };
+    return storage;
+}
+
+function installSignedAutobaseCoreStorage(core) {
+    if (!core) return core;
+    installSignedAutobaseStorage(core.storage);
+    installSignedAutobaseStorage(core.state?.storage);
     return core;
 }
 

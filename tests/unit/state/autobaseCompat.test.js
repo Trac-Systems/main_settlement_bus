@@ -170,3 +170,49 @@ test('MSB Autobase store wrapper covers atomic session head creation', async (t)
     t.is(heads.length, 1, 'atomic session creation is wrapped');
     t.is(heads[0].head.signature.length, 0, 'null atomic session head signature becomes an empty signature buffer');
 });
+
+test('MSB Autobase store wrapper covers core state atomic session heads', async (t) => {
+    const heads = [];
+    const viewCoreSession = {
+        manifest: { signers: [] },
+        core: {
+            header: { manifest: { signers: [] } },
+            storage: {
+                write() {
+                    return { setHead() {} };
+                }
+            },
+            state: {
+                storage: {
+                    write() {
+                        return { setHead() {} };
+                    },
+                    async createAtomicSession(atom, head) {
+                        heads.push({ atom, head });
+                        return {};
+                    }
+                }
+            }
+        },
+        async ready() {},
+        async append() {}
+    };
+    const store = {
+        getViewCore() {
+            return viewCoreSession;
+        }
+    };
+
+    installSignedAutobaseStore(store);
+    const migrated = store.getViewCore();
+    await migrated.ready();
+    await migrated.core.state.storage.createAtomicSession({ view: {} }, {
+        fork: 0,
+        length: 1,
+        rootHash: Buffer.alloc(32, 11),
+        signature: null
+    });
+
+    t.is(heads.length, 1, 'core state atomic session creation is wrapped');
+    t.is(heads[0].head.signature.length, 0, 'null state atomic session head signature becomes an empty signature buffer');
+});
