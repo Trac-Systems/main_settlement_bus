@@ -70,6 +70,40 @@ function autobaseSigningAppendOptions(session, keyPairFor, opts = {}) {
     return opts;
 }
 
+function normalizeAutobaseHead(head) {
+    return head && (head.signature === null || head.signature === undefined)
+        ? { ...head, signature: b4a.alloc(0) }
+        : head;
+}
+
+function installSignedAutobaseCoreStorage(core) {
+    if (!core?.storage || typeof core.storage.write !== 'function') return core;
+    if (core.storage.__msbSignedAutobaseCoreTxInstalled === true) return core;
+
+    const write = core.storage.write.bind(core.storage);
+    Object.defineProperty(core.storage, '__msbSignedAutobaseCoreTxInstalled', {
+        value: true,
+        enumerable: false,
+        configurable: false
+    });
+    core.storage.write = (...args) => {
+        const tx = write(...args);
+        if (!tx || typeof tx.setHead !== 'function' ||
+            tx.__msbSignedAutobaseCoreTxHeadInstalled === true) {
+            return tx;
+        }
+        const setHead = tx.setHead.bind(tx);
+        Object.defineProperty(tx, '__msbSignedAutobaseCoreTxHeadInstalled', {
+            value: true,
+            enumerable: false,
+            configurable: false
+        });
+        tx.setHead = (head, ...headArgs) => setHead(normalizeAutobaseHead(head), ...headArgs);
+        return tx;
+    };
+    return core;
+}
+
 function installSignedAutobaseSessionState(session, keyPairFor) {
     if (!session?.state || typeof session.state.append !== 'function') return session;
     if (session.state.__msbSignedAutobaseAppendInstalled === true) return session;
@@ -86,6 +120,7 @@ function installSignedAutobaseSessionState(session, keyPairFor) {
 
 function installSignedAutobaseSession(session, keyPairFor) {
     if (!session || typeof session.append !== 'function') return session;
+    installSignedAutobaseCoreStorage(session.core);
     if (session.__msbSignedAutobaseAppendInstalled === true) {
         installSignedAutobaseSessionState(session, keyPairFor);
         return session;
@@ -110,6 +145,7 @@ function installSignedAutobaseSession(session, keyPairFor) {
         });
         session.ready = async (...args) => {
             const result = await ready(...args);
+            installSignedAutobaseCoreStorage(session.core);
             installSignedAutobaseSessionState(session, keyPairFor);
             return result;
         };
@@ -137,6 +173,7 @@ export function installSignedAutobaseStore(store, keyPairFor = null) {
         : () => keyPairFor ?? store.base?.local?.keyPair ?? store.base?.local?.core?.header?.keyPair ?? null;
     const getLocal = typeof store.getLocal === 'function' ? store.getLocal.bind(store) : null;
     const getViewByName = typeof store.getViewByName === 'function' ? store.getViewByName.bind(store) : null;
+    const getViewCore = typeof store.getViewCore === 'function' ? store.getViewCore.bind(store) : null;
     const get = typeof store.get === 'function' ? store.get.bind(store) : null;
 
     Object.defineProperty(store, '__msbSignedAutobaseStoreInstalled', {
@@ -169,6 +206,9 @@ export function installSignedAutobaseStore(store, keyPairFor = null) {
             };
             return view;
         };
+    }
+    if (getViewCore) {
+        store.getViewCore = (...args) => installSignedAutobaseSession(getViewCore(...args), resolveKeyPair);
     }
     if (get) {
         store.get = (...args) => installSignedAutobaseSession(get(...args), resolveKeyPair);
