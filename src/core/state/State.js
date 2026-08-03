@@ -87,6 +87,16 @@ function installSignedAutobaseStorage(storage) {
     const createAtomicSession = typeof storage.createAtomicSession === 'function'
         ? storage.createAtomicSession.bind(storage)
         : null;
+    const resumeSession = typeof storage.resumeSession === 'function'
+        ? storage.resumeSession.bind(storage)
+        : null;
+    const atomize = typeof storage.atomize === 'function'
+        ? storage.atomize.bind(storage)
+        : null;
+    const wrapStorageResult = (result) =>
+        result && typeof result.then === 'function'
+            ? result.then(installSignedAutobaseStorage)
+            : installSignedAutobaseStorage(result);
     Object.defineProperty(storage, '__msbSignedAutobaseCoreTxInstalled', {
         value: true,
         enumerable: false,
@@ -94,11 +104,17 @@ function installSignedAutobaseStorage(storage) {
     });
     if (createSession) {
         storage.createSession = (name, head, ...args) =>
-            createSession(name, normalizeAutobaseHead(head), ...args);
+            wrapStorageResult(createSession(name, normalizeAutobaseHead(head), ...args));
     }
     if (createAtomicSession) {
         storage.createAtomicSession = (atom, head, ...args) =>
-            createAtomicSession(atom, normalizeAutobaseHead(head), ...args);
+            wrapStorageResult(createAtomicSession(atom, normalizeAutobaseHead(head), ...args));
+    }
+    if (resumeSession) {
+        storage.resumeSession = (...args) => wrapStorageResult(resumeSession(...args));
+    }
+    if (atomize) {
+        storage.atomize = (...args) => wrapStorageResult(atomize(...args));
     }
     storage.write = (...args) => {
         const tx = write(...args);
