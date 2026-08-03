@@ -273,6 +273,7 @@ class State extends ReadyResource {
             open: this.#setupHyperbee.bind(this),
             apply: this.applyHandler,
         })
+        installSignedAutobaseStore(this.#base._viewStore);
     }
 
     get base() {
