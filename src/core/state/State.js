@@ -4499,7 +4499,6 @@ class State extends ReadyResource {
             return Status.IGNORE;
         }
 
-        //////1
         const currentConsensusConfigBuffer = await this.#getEntryApply(EntryType.CONSENSUS_CONFIG_CURRENT, batch);
         if (currentConsensusConfigBuffer === null) {
             this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Initial consensus config has not been initialized yet", node.from.key)
