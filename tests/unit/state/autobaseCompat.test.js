@@ -92,3 +92,42 @@ test('MSB Autobase store wrapper covers migrated view core heads', async (t) => 
     t.is(heads.length, 1, 'migrated view core storage transaction is wrapped');
     t.is(heads[0].signature.length, 0, 'null prologue head signature becomes an empty signature buffer');
 });
+
+test('MSB Autobase store wrapper covers named session head creation', async (t) => {
+    const heads = [];
+    const viewCoreSession = {
+        manifest: { signers: [] },
+        core: {
+            header: { manifest: { signers: [] } },
+            storage: {
+                write() {
+                    return { setHead() {} };
+                },
+                async createSession(name, head) {
+                    heads.push({ name, head });
+                    return {};
+                }
+            }
+        },
+        async ready() {},
+        async append() {}
+    };
+    const store = {
+        getViewCore() {
+            return viewCoreSession;
+        }
+    };
+
+    installSignedAutobaseStore(store);
+    const migrated = store.getViewCore();
+    await migrated.ready();
+    await migrated.core.storage.createSession('batch', {
+        fork: 0,
+        length: 1,
+        rootHash: Buffer.alloc(32, 9),
+        signature: null
+    });
+
+    t.is(heads.length, 1, 'named session creation is wrapped');
+    t.is(heads[0].head.signature.length, 0, 'null session head signature becomes an empty signature buffer');
+});
