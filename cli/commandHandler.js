@@ -39,7 +39,6 @@ export const COMMANDS = {
     GET_TXS_HASHES: "/get_txs_hashes",
     GET_TX_DETAILS: "/get_tx_details",
     GET_EXTENDED_TX_DETAILS: "/get_extended_tx_details",
-    TEST: "/test",
     EPOCH_GENESIS_INITIALIZATION: "/init_genesis",
     SET_CONSENSUS_CONFIG: "/set_consensus_config",
     SET_VDF_PARAMS: "/set_vdf_params"
@@ -240,10 +239,6 @@ export class CommandHandler {
             {
                 evaluate: ({ input }) => input.startsWith(COMMANDS.GET_EXTENDED_TX_DETAILS),
                 process: async ({ parts }) => this.#handlers.handleExtendedTxDetails(parts[0], parts[1] === "true")
-            },
-            {
-                evaluate: ({ command }) => command === COMMANDS.TEST,
-                process: async () => this.#handlers.handleTest()
             },
             {
                 evaluate: ({ input }) => input.startsWith(COMMANDS.EPOCH_GENESIS_INITIALIZATION),
