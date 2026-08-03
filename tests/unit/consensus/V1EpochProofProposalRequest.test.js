@@ -35,6 +35,13 @@ const TEST_VDF_PARAMS = Object.freeze({
 const vdfProofCache = new Map();
 const defaultPreviousEpochRecordHash = b4a.alloc(32, 1);
 
+function keepBareEventLoopAlive(t) {
+    if (typeof globalThis.Bare === 'undefined') return;
+
+    const interval = setInterval(() => {}, 100);
+    t.teardown(() => clearInterval(interval));
+}
+
 function createState({
     currentEpoch = 0n,
     currentEpochHash = defaultPreviousEpochRecordHash,
@@ -147,6 +154,10 @@ async function assertProtocolError(t, action, resultCode, messageIncludes) {
 }
 
 test('V1EpochProofProposalRequest validates proof proposal signature', async t => {
+    // Bare does not track Emscripten's cold asynchronous WASM initialization
+    // as an active event-loop handle, so Brittle can otherwise report a deadlock.
+    keepBareEventLoopAlive(t);
+
     const wallet = await createWallet();
     const genesisEpochHash = await buildGenesisEpochHash(wallet);
     const state = createState({
